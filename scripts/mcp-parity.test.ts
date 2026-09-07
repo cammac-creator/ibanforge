@@ -97,6 +97,31 @@ const CONTRACT_TOOLS = [
 ];
 
 /**
+ * Outils ajoutés SEULEMENT à la surface A (le paquet npm), en connaissance de
+ * cause — voir l'en-tête de mcp/src/index.ts pour le motif complet. Datés et
+ * nommés pour que l'écart ne soit jamais silencieux : même idiome que
+ * KNOWN_GAPS ci-dessous, mais côté outils plutôt que resources/prompts.
+ */
+const A_ONLY_TOOLS: ReadonlyArray<{ tool: string; since: string; why: string }> = [
+  {
+    tool: 'audit_creditor_file',
+    since: '2026-09-07',
+    why:
+      "Enveloppe l'audit de fichier créanciers, payé par une session Stripe Checkout " +
+      'ponctuelle (pas x402/clé API comme tous les autres outils de ce fichier) avec une ' +
+      'charge utile de fichier en base64. Le propager à B (src/mcp/server.ts, écritures Stripe ' +
+      'en direct dans le process) et à C (src/routes/mcp-http.ts, qui force src/mcp/inventory.ts ' +
+      'et chaque document de découverte qui en dépend) est un chantier séparé, plus large.',
+  },
+  {
+    tool: 'audit_status',
+    since: '2026-09-07',
+    why: 'Lecture compagne de audit_creditor_file — même écart, même motif.',
+  },
+];
+const A_ONLY_NAMES = A_ONLY_TOOLS.map((t) => t.tool);
+
+/**
  * Écarts connus et ASSUMÉS entre surfaces, hors outils. Toute ligne ici est une
  * dette écrite : elle dit quel écart existe, et pourquoi il n'est pas refermé.
  */
@@ -117,20 +142,24 @@ describe("parité MCP — les extracteurs voient exactement ce qu'il faut", () =
   // regex qui matche trop (un champ `name:` imbriqué pris pour un outil)
   // fabriquerait des outils fantômes.
   for (const id of IDS) {
-    it(`surface ${id} (${SURFACES[id].label}) : ${CONTRACT_TOOLS.length} outils détectés, ni plus ni moins`, () => {
+    // A porte aussi les A_ONLY_TOOLS (voir juste au-dessus) : B et C restent
+    // strictement sur CONTRACT_TOOLS.
+    const expected = id === 'A' ? [...CONTRACT_TOOLS, ...A_ONLY_NAMES].sort() : CONTRACT_TOOLS;
+    it(`surface ${id} (${SURFACES[id].label}) : ${expected.length} outils détectés, ni plus ni moins`, () => {
       expect(
         toolNames(id),
         `l'extracteur de ${SURFACES[id].path} ne voit plus la bonne liste — regex à revoir, ou outil ajouté/retiré`,
-      ).toEqual(CONTRACT_TOOLS);
+      ).toEqual(expected);
     });
   }
 });
 
 describe("parité MCP — aucun écart entre les trois listes d'outils", () => {
-  it('A, B et C exposent la MÊME liste', () => {
+  it('A (hors A_ONLY_TOOLS), B et C exposent la MÊME liste', () => {
     const [a, b, c] = IDS.map((id) => toolNames(id));
-    expect(b, `${SURFACES.B.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(a);
-    expect(c, `${SURFACES.C.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(a);
+    const aShared = a.filter((t) => !A_ONLY_NAMES.includes(t));
+    expect(b, `${SURFACES.B.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(aShared);
+    expect(c, `${SURFACES.C.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(aShared);
   });
 
   for (const tool of CONTRACT_TOOLS) {
@@ -146,6 +175,29 @@ describe("parité MCP — aucun écart entre les trois listes d'outils", () => {
       }
     });
   }
+});
+
+describe('parité MCP — la limite de taille du fichier audit ne diverge pas de la route', () => {
+  /**
+   * `mcp/src/index.ts` copie AUDIT_MAX_BYTES pour refuser un fichier trop
+   * gros AVANT tout appel réseau (ce paquet ne peut pas importer src/lib/
+   * audit-file.ts, publié séparément). Même risque, même remède que
+   * FEEDBACK_ERROR_TYPES juste en dessous : un nombre recopié à la main à
+   * côté d'un nombre qui bouge finit par diverger en silence.
+   */
+  it('mcp/src/index.ts AUDIT_MAX_BYTES == src/lib/audit-file.ts AUDIT_MAX_BYTES', () => {
+    const routeValue = read('src/lib/audit-file.ts').match(
+      /export const AUDIT_MAX_BYTES\s*=\s*([^;]+);/,
+    )?.[1]
+      ?.trim();
+    const mcpValue = SRC.A.match(/const AUDIT_MAX_BYTES\s*=\s*([^;]+);/)?.[1]?.trim();
+    expect(routeValue, 'AUDIT_MAX_BYTES introuvable dans src/lib/audit-file.ts').toBeDefined();
+    expect(
+      mcpValue,
+      'mcp/src/index.ts a divergé de src/lib/audit-file.ts AUDIT_MAX_BYTES — le paquet npm ' +
+        'refuserait au mauvais seuil, ou plus du tout.',
+    ).toBe(routeValue);
+  });
 });
 
 describe('parité MCP — send_feedback écrit, donc il est plafonné partout', () => {

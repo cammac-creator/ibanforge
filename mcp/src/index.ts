@@ -2,7 +2,7 @@
 /**
  * IBANforge MCP Server
  *
- * Exposes 9 tools backed by the IBANforge HTTP API (api.ibanforge.com):
+ * Exposes 11 tools backed by the IBANforge HTTP API (api.ibanforge.com):
  *   - validate_iban
  *   - batch_validate_iban
  *   - lookup_bic
@@ -11,7 +11,20 @@
  *   - validate_payment_reference
  *   - check_postal_address
  *   - check_swiss_qr_bill
+ *   - audit_creditor_file
+ *   - audit_status
  *   - send_feedback
+ *
+ * `audit_creditor_file` / `audit_status` (added 07/09/2026) wrap the paid
+ * creditor-file audit (POST /v1/audit/upload, /v1/audit/checkout/:job,
+ * /v1/audit/status/:job — see src/routes/audit.ts). They are, for now,
+ * DELIBERATELY npm-only: unlike every other tool here they are priced
+ * through a one-off Stripe Checkout Session rather than x402/API-key, and
+ * propagating them to the two other MCP surfaces (src/mcp/server.ts,
+ * src/routes/mcp-http.ts) needs its own Stripe wiring plus updates to every
+ * discovery document src/mcp/inventory.ts feeds — a separate, larger change.
+ * `scripts/mcp-parity.test.ts` records this as a dated, named gap
+ * (A_ONLY_TOOLS) instead of letting it diverge silently.
  *
  * `send_feedback` was HTTP-only until 21/08/2026 (audit B3): npm is the main
  * distribution channel, so the agent that hits the quota wall or cannot prefund
@@ -39,6 +52,12 @@ const pkg = require('../package.json') as { version: string };
 
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const API_KEY = process.env.IBANFORGE_API_KEY;
+
+// Mirrors src/lib/audit-file.ts AUDIT_MAX_BYTES (5 MB). This package cannot
+// import from src/ (it is published separately), so the limit is copied;
+// scripts/mcp-parity.test.ts checks the two stay equal, same pattern as
+// FEEDBACK_ERROR_TYPES below.
+const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
 
 // Same hints as the remote server (src/routes/mcp-http.ts): the five DATA tools
 // are pure reads against our own API. Without readOnlyHint, MCP clients ask the
@@ -703,6 +722,130 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'audit_creditor_file',
+    title: 'Audit Creditor File',
+    // NOT read-only: a successful call stores a job server-side, and with
+    // checkout:true it also creates a Stripe Checkout Session. Same reasoning
+    // as send_feedback below — the tool in this pair that writes gets its
+    // confirmation; audit_status, a pure read, does not.
+    annotations: { title: 'Audit Creditor File' },
+    description:
+      'Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN structure and checksum, bank code against the national register, bank name and BIC, SEPA reachability and issuer type — plus checks a single IBAN call cannot make because they need the whole file: duplicate IBANs, the BIC the file carries against the BIC the register derives, address country against IBAN country, and Swiss structured-address conformity ahead of the 14 November 2026 deadline. ' +
+      'USE WHEN: the user has a spreadsheet or export of creditor/supplier bank accounts (accounts-payable file, vendor master, payment batch) and wants it checked before sending payments, or asks to "audit my creditor file" / "check this supplier list" / "validate this payment batch". ' +
+      'HOW: base64-encode the file bytes and pass them as `file_base64`, with the original `filename` (its extension decides CSV vs XLSX parsing). ' +
+      `LIMITS: rejects files decoding to more than ${AUDIT_MAX_BYTES / 1024 / 1024} MB — checked locally, before any network call — and sheets over 20,000 rows, which the route itself rejects (400 too_many_rows). ` +
+      'RETURNS a FREE PREVIEW ONLY, never the full report: `job` (the id to reuse with audit_status), `rows`, `paid` (always false from this call), `price_chf` / `currency` naming what the full report costs, `summary` (counts by status and finding code, countries seen, columns detected), and `preview` (the first flagged rows then the first OK ones, up to 20, IBANs masked like "CH10 **** 2346"). ' +
+      'The annotated .xlsx report is a PAID deliverable — 149 CHF up to 5,000 rows, 349 CHF up to 20,000 — settled through a one-off Stripe Checkout Session. This tool NEVER pays automatically: pass `checkout: true` to also receive a Checkout URL for a HUMAN to open, then poll audit_status with the same `job` id to learn when it is paid and get the download link. ' +
+      'COST: free. Only the full report is paid, and only once a human completes the Stripe checkout.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_base64: {
+          type: 'string',
+          description: 'The CSV or XLSX file content, base64-encoded — the raw payload only, no "data:" URL prefix.',
+        },
+        filename: {
+          type: 'string',
+          description: 'Original filename with its extension, e.g. "creditors.csv" or "suppliers.xlsx". The extension decides how the file is parsed.',
+        },
+        lang: {
+          type: 'string',
+          enum: ['en', 'fr', 'de'],
+          description: 'Language for the summary labels and, later, the annotated report. Defaults to "en".',
+        },
+        checkout: {
+          type: 'boolean',
+          description: 'When true, immediately create a Stripe Checkout Session after the upload and return its URL for a human to open and pay. Defaults to false. Never pays anything by itself.',
+        },
+      },
+      required: ['file_base64', 'filename'],
+    },
+    outputSchema: {
+      type: 'object',
+      description: 'The free preview of the audit: job id, summary and first rows. Never the full report.',
+      properties: {
+        job: { type: 'string', description: 'Job id — pass to audit_status to poll payment and get the download link.' },
+        rows: { type: 'number' },
+        tier: { type: 'string', enum: ['standard', 'large'] },
+        price_chf: { type: 'number', description: 'Price of the full report in CHF, decided by row count alone.' },
+        currency: { type: 'string' },
+        lang: { type: 'string', enum: ['en', 'fr', 'de'] },
+        paid: { type: 'boolean', description: 'Always false from this tool — nothing has been paid yet.' },
+        retention: { type: 'string', description: 'How long the job is kept before it purges.' },
+        summary: {
+          type: 'object',
+          description: 'Counts by status and finding code, countries seen, columns detected. Mirrors AuditSummary in the API.',
+          additionalProperties: true,
+        },
+        preview: {
+          type: 'array',
+          description: 'First flagged rows then first OK rows, up to 20. IBANs are masked.',
+          items: {
+            type: 'object',
+            properties: {
+              line: { type: 'number' },
+              iban_masked: { type: 'string' },
+              status: { type: 'string', enum: ['ok', 'warning', 'error'] },
+              findings: { type: 'array', items: { type: 'string' } },
+              bank_name: { type: ['string', 'null'] },
+            },
+          },
+        },
+        checkout: { type: ['string', 'null'], description: 'Route to call for payment, e.g. "POST /v1/audit/checkout/{job}". Null once paid.' },
+        download: { type: ['string', 'null'], description: 'Set only once paid and with the matching session — always null from this tool.' },
+        checkout_url: { type: 'string', description: 'Present only when `checkout: true` was passed and the session was created: a Stripe Checkout URL for a human to open.' },
+        checkout_session_id: { type: 'string', description: 'Present alongside checkout_url — pass it to audit_status as `session_id` right after a human pays.' },
+        _note: { type: 'string', description: 'Plain-language reminder that this is a free preview and how to get the paid report.' },
+      },
+      required: ['job', 'rows', 'paid', 'summary', 'preview'],
+      additionalProperties: true,
+    },
+  },
+  {
+    name: 'audit_status',
+    title: 'Audit Job Status',
+    annotations: { title: 'Audit Job Status', ...READ_ONLY },
+    description:
+      'Check the status of a creditor-file audit job created by audit_creditor_file: whether it is paid, and the download link once it is. ' +
+      'USE WHEN: following up on a `job` id after a human may have paid through the Checkout URL, to learn whether the full report is ready. ' +
+      'RETURNS: the same free-preview fields as audit_creditor_file, plus `paid`, `paid_at`, and `download` — a `GET /v1/audit/report/{job}?session_id=...` path, non-null only once paid AND `session_id` matches the paying session. ' +
+      "Pass the `session_id` from the Checkout URL's success redirect (its `session_id=` query parameter) so a just-completed payment is confirmed immediately instead of waiting for the webhook. " +
+      'COST: free.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job: { type: 'string', description: 'The job id returned by audit_creditor_file.' },
+        session_id: {
+          type: 'string',
+          description: 'The Stripe Checkout session id, from the success redirect (?session_id=...). Confirms payment immediately when the webhook has not landed yet.',
+        },
+      },
+      required: ['job'],
+    },
+    outputSchema: {
+      type: 'object',
+      description: 'Same shape as the free preview from audit_creditor_file, plus payment state.',
+      properties: {
+        job: { type: 'string' },
+        rows: { type: 'number' },
+        tier: { type: 'string', enum: ['standard', 'large'] },
+        price_chf: { type: 'number' },
+        currency: { type: 'string' },
+        lang: { type: 'string', enum: ['en', 'fr', 'de'] },
+        paid: { type: 'boolean' },
+        paid_at: { type: ['string', 'null'] },
+        expires_at: { type: 'string' },
+        retention: { type: 'string' },
+        summary: { type: 'object', additionalProperties: true },
+        preview: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        checkout: { type: ['string', 'null'] },
+        download: { type: ['string', 'null'], description: 'GET path for the .xlsx report. Non-null only when paid and session_id matched.' },
+      },
+      required: ['job', 'paid'],
+      additionalProperties: true,
+    },
+  },
+  {
     name: 'send_feedback',
     title: 'Send Feedback to IBANforge',
     // PAS de READ_ONLY ici : c'est le seul outil de ce serveur qui ÉCRIT.
@@ -781,7 +924,12 @@ function transportError(err: unknown): JsonRecord {
   };
 }
 
-async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord): Promise<JsonRecord> {
+async function apiCall(
+  method: 'GET' | 'POST',
+  path: string,
+  body?: JsonRecord,
+  form?: FormData,
+): Promise<JsonRecord> {
   const headers: Record<string, string> = {
     'User-Agent': `ibanforge-mcp/${pkg.version}`,
     Accept: 'application/json',
@@ -789,7 +937,12 @@ async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord):
   if (API_KEY) {
     headers.Authorization = `Bearer ${API_KEY}`;
   }
-  if (body) {
+  // multipart/form-data carries its own boundary in the Content-Type header;
+  // fetch/undici compute it from the FormData instance. Setting a
+  // Content-Type by hand here would drop that boundary, and Hono's
+  // c.req.parseBody() would answer invalid_multipart on an otherwise
+  // well-formed request.
+  if (body && !form) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -798,7 +951,7 @@ async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord):
     res = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: form ?? (body ? JSON.stringify(body) : undefined),
     });
   } catch (err) {
     // A throw here means no response object at all, and the caller could not
@@ -843,6 +996,18 @@ async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord):
   }
 
   return parsed as JsonRecord;
+}
+
+/**
+ * Best-effort content type for the multipart part carrying the uploaded
+ * file. The route decides CSV vs XLSX by filename extension (readTable in
+ * src/lib/audit-file.ts), not by this header — it only makes the request a
+ * politely-typed one.
+ */
+function contentTypeFor(filename: string): string {
+  return /\.(xlsx|xls)$/i.test(filename)
+    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    : 'text/csv';
 }
 
 /**
@@ -1057,6 +1222,68 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return relay(result);
       }
 
+      case 'audit_creditor_file': {
+        if (typeof a.file_base64 !== 'string' || !a.file_base64.trim()) {
+          return fail({ error: 'invalid_input', message: 'Argument `file_base64` must be a non-empty base64 string.' });
+        }
+        if (typeof a.filename !== 'string' || !a.filename.trim()) {
+          return fail({ error: 'invalid_input', message: 'Argument `filename` must be a non-empty string, e.g. "creditors.csv".' });
+        }
+        const fileBuffer = Buffer.from(a.file_base64, 'base64');
+        if (fileBuffer.length === 0) {
+          return fail({ error: 'invalid_input', message: 'Decoded `file_base64` is empty.' });
+        }
+        // Mirrors src/lib/audit-file.ts AUDIT_MAX_BYTES. This package is
+        // published separately and cannot import from src/, so the limit is
+        // copied; scripts/mcp-parity.test.ts checks the two stay equal — same
+        // pattern as FEEDBACK_ERROR_TYPES above.
+        if (fileBuffer.length > AUDIT_MAX_BYTES) {
+          return fail({
+            error: 'file_too_large',
+            message: `The file must be under ${AUDIT_MAX_BYTES / 1024 / 1024} MB (decoded size is ${(fileBuffer.length / 1024 / 1024).toFixed(2)} MB).`,
+            limits: { max_bytes: AUDIT_MAX_BYTES },
+          });
+        }
+        const lang: 'en' | 'fr' | 'de' = a.lang === 'fr' || a.lang === 'de' ? a.lang : 'en';
+        const form = new FormData();
+        form.append('file', new Blob([fileBuffer], { type: contentTypeFor(a.filename) }), a.filename);
+        form.append('lang', lang);
+        const result = await apiCall('POST', '/v1/audit/upload', undefined, form);
+        if (result._error) return fail(result);
+
+        let note =
+          'This is the FREE preview only (masked IBANs, summary counts) — never the full report. ' +
+          `The annotated .xlsx report costs ${String(result.price_chf ?? '')} ${String(result.currency ?? 'CHF')} ` +
+          'and is settled through a one-off Stripe Checkout Session. Call audit_status with this job id after a ' +
+          'human pays, or pass `checkout: true` to this tool to get the Checkout URL right away.';
+        const preview: JsonRecord = { ...result };
+        if (a.checkout === true) {
+          const jobId = typeof result.job === 'string' ? result.job : '';
+          const checkoutResult = await apiCall('POST', `/v1/audit/checkout/${encodeURIComponent(jobId)}`, {});
+          if (checkoutResult._error) {
+            preview.checkout_error = checkoutResult;
+          } else {
+            preview.checkout_url = checkoutResult.url;
+            preview.checkout_session_id = checkoutResult.session_id;
+            note += ` Checkout ready: have a human open ${String(checkoutResult.url)} to pay — this tool never pays automatically.`;
+          }
+        }
+        preview._note = note;
+        return out(preview);
+      }
+
+      case 'audit_status': {
+        if (typeof a.job !== 'string' || !a.job.trim()) {
+          return fail({ error: 'invalid_input', message: 'Argument `job` must be a non-empty string.' });
+        }
+        const query =
+          typeof a.session_id === 'string' && a.session_id
+            ? `?session_id=${encodeURIComponent(a.session_id)}`
+            : '';
+        const result = await apiCall('GET', `/v1/audit/status/${encodeURIComponent(a.job)}${query}`);
+        return relay(result);
+      }
+
       case 'send_feedback': {
         if (typeof a.error_type !== 'string' || typeof a.notes !== 'string' || a.notes.trim().length < 3) {
           return fail({
@@ -1102,4 +1329,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-process.stderr.write('IBANforge MCP server ready (stdio). 9 tools exposed.\n');
+process.stderr.write('IBANforge MCP server ready (stdio). 11 tools exposed.\n');

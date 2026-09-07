@@ -43,11 +43,62 @@ const FORMAT_PAYLOAD = {
   country: { code: 'CH', name: 'Switzerland' },
 };
 
+/** A job id shaped like the real one: 36 lowercase hex chars, no dashes (see src/routes/audit.test.ts). */
+const AUDIT_JOB_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const AUDIT_SESSION_ID = 'cs_test_stub123';
+
+/** POST /v1/audit/upload's free-preview answer, shaped like publicJob() + processing_ms/tiers. */
+const AUDIT_UPLOAD_PAYLOAD = {
+  job: AUDIT_JOB_ID,
+  rows: 2,
+  tier: 'standard',
+  price_chf: 149,
+  currency: 'CHF',
+  lang: 'fr',
+  paid: false,
+  paid_at: null,
+  expires_at: '2026-09-09T00:00:00.000Z',
+  retention: '2h',
+  summary: {
+    rows: 2,
+    ok: 1,
+    warning: 0,
+    error: 1,
+    by_code: { iban_invalid: 1 },
+    countries: [{ code: 'CH', rows: 2 }],
+    columns_detected: ['iban', 'name'],
+    address_checked: false,
+    tier: 'standard',
+    price_chf: 149,
+  },
+  preview: [
+    { line: 2, iban_masked: 'CH10 **** 2346', status: 'error', findings: ['iban_invalid'], bank_name: null },
+  ],
+  checkout: `POST /v1/audit/checkout/${AUDIT_JOB_ID}`,
+  download: null,
+  processing_ms: 3.2,
+  tiers: [
+    { up_to_rows: 5000, price_chf: 149 },
+    { up_to_rows: 20000, price_chf: 349 },
+  ],
+};
+
+/** GET /v1/audit/status/:job's answer once paid, with the session that paid. */
+const AUDIT_STATUS_PAYLOAD = {
+  ...AUDIT_UPLOAD_PAYLOAD,
+  paid: true,
+  paid_at: '2026-09-08T12:00:00.000Z',
+  checkout: null,
+  download: `/v1/audit/report/${AUDIT_JOB_ID}?session_id=${AUDIT_SESSION_ID}`,
+};
+
 let api: HttpServer;
 let apiBase: string;
 let client: Client;
 /** Raw bodies the tool POSTed to /v1/feedback, so the relayed shape can be asserted. */
 const feedbackBodies: string[] = [];
+/** Raw multipart bodies POSTed to /v1/audit/upload — proves both "it called" and "what it sent". */
+const auditUploadBodies: string[] = [];
 
 beforeAll(async () => {
   api = createServer((req, res) => {
@@ -85,6 +136,40 @@ beforeAll(async () => {
       });
       return;
     }
+    // audit_creditor_file relays a multipart POST. The raw body is captured
+    // so a test can prove the oversized case never reached here, and that a
+    // real multipart part (filename, lang field) was actually sent. A file
+    // named "reject.csv" simulates the route's own 400 (e.g. no_iban_column)
+    // without reimplementing CSV parsing in this stub.
+    if (req.url === '/v1/audit/upload' && req.method === 'POST') {
+      let raw = '';
+      req.on('data', (chunk) => { raw += String(chunk); });
+      req.on('end', () => {
+        auditUploadBodies.push(raw);
+        if (raw.includes('filename="reject.csv"')) {
+          res.writeHead(400).end(
+            JSON.stringify({
+              error: 'no_iban_column',
+              message: 'No column looks like an IBAN.',
+              limits: { max_rows: 20000, max_bytes: 5 * 1024 * 1024 },
+            }),
+          );
+          return;
+        }
+        res.writeHead(200).end(JSON.stringify(AUDIT_UPLOAD_PAYLOAD));
+      });
+      return;
+    }
+    if (req.url?.startsWith('/v1/audit/checkout/') && req.method === 'POST') {
+      res.writeHead(200).end(
+        JSON.stringify({ url: 'https://checkout.stripe.com/pay/cs_test_stub123', session_id: AUDIT_SESSION_ID, price_chf: 149 }),
+      );
+      return;
+    }
+    if (req.url?.startsWith('/v1/audit/status/') && req.method === 'GET') {
+      res.writeHead(200).end(JSON.stringify(AUDIT_STATUS_PAYLOAD));
+      return;
+    }
     res.writeHead(404).end(JSON.stringify({ error: 'not_found' }));
   });
   await new Promise<void>((ok) => api.listen(0, '127.0.0.1', ok));
@@ -108,13 +193,16 @@ afterAll(async () => {
 });
 
 describe('every tool declaring an outputSchema honours it', () => {
-  it('exposes nine tools, all of them declaring an output schema', async () => {
+  it('exposes eleven tools, all of them declaring an output schema', async () => {
     const { tools } = await client.listTools();
     // Six depuis le 21/08/2026 : `send_feedback` a rejoint les 5 outils de
     // donnée (audit B3 — le paquet npm était la seule surface sans boîte à
     // réclamations, alors que c'est le canal de distribution principal).
     // Sept depuis le 26/08/2026 : `validate_payment_reference`.
-    expect(tools).toHaveLength(9);
+    // Onze depuis le 07/09/2026 : `audit_creditor_file` et `audit_status`,
+    // l'audit de fichier créanciers payant — voir l'en-tête de
+    // mcp/src/index.ts pour le motif du gap avec les deux autres surfaces MCP.
+    expect(tools).toHaveLength(11);
     for (const t of tools) {
       expect(t.outputSchema, `${t.name} declares no outputSchema`).toBeDefined();
     }
@@ -217,5 +305,82 @@ describe('errors are flagged, not dressed up as results', () => {
     const res = await client.callTool({ name: 'check_compliance', arguments: { iban: 'CH9300762011623852957' } });
     expect(res.isError).toBe(true);
     expect(res.structuredContent).toBeUndefined();
+  });
+});
+
+describe('audit_creditor_file / audit_status: the paid creditor-file audit', () => {
+  // A tiny, fully synthetic CSV — fixtures only, per CLAUDE.md (this repo is public).
+  const TINY_CSV = Buffer.from('Nom;IBAN\nSociete Alpha;CH1000230000000012345\n', 'utf8').toString('base64');
+
+  it('uploads a file and returns the free preview with a payment note, having actually sent it', async () => {
+    const before = auditUploadBodies.length;
+    const res = await client.callTool({
+      name: 'audit_creditor_file',
+      arguments: { file_base64: TINY_CSV, filename: 'creanciers.csv', lang: 'fr' },
+    });
+
+    expect(res.isError).toBeFalsy();
+    expect(auditUploadBodies.length, 'the tool did not call the route at all').toBe(before + 1);
+    const sent = auditUploadBodies[auditUploadBodies.length - 1]!;
+    expect(sent).toContain('filename="creanciers.csv"');
+    expect(sent).toContain('name="lang"');
+
+    expect(res.structuredContent, 'audit_creditor_file returned no structuredContent').toBeDefined();
+    expect(res.structuredContent).toMatchObject({ job: AUDIT_JOB_ID, paid: false, price_chf: 149 });
+    const note = (res.structuredContent as { _note?: string })._note ?? '';
+    expect(note, 'the free preview must say the full report is a paid deliverable').toMatch(/paid|Stripe/i);
+  });
+
+  it('refuses an oversized file locally — the route is never called', async () => {
+    const before = auditUploadBodies.length;
+    const big = Buffer.alloc(5 * 1024 * 1024 + 1, 0x41).toString('base64');
+    const res = await client.callTool({
+      name: 'audit_creditor_file',
+      arguments: { file_base64: big, filename: 'big.csv' },
+    });
+
+    expect(res.isError).toBe(true);
+    const content = res.content as Array<{ type: string; text: string }>;
+    expect(JSON.parse(content[0]!.text).error).toBe('file_too_large');
+    expect(auditUploadBodies.length, 'an oversized file must never reach the route').toBe(before);
+  });
+
+  it('maps an upstream rejection (e.g. no_iban_column) to isError, not a result', async () => {
+    const res = await client.callTool({
+      name: 'audit_creditor_file',
+      arguments: { file_base64: Buffer.from('a;b\n1;2\n', 'utf8').toString('base64'), filename: 'reject.csv' },
+    });
+
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    const content = res.content as Array<{ type: string; text: string }>;
+    expect(JSON.parse(content[0]!.text).error).toBe('no_iban_column');
+  });
+
+  it('with checkout:true, also returns a Stripe Checkout URL for a human to open', async () => {
+    const res = await client.callTool({
+      name: 'audit_creditor_file',
+      arguments: { file_base64: TINY_CSV, filename: 'creanciers.csv', checkout: true },
+    });
+
+    expect(res.isError).toBeFalsy();
+    const sc = res.structuredContent as Record<string, unknown>;
+    expect(sc.checkout_url).toBe('https://checkout.stripe.com/pay/cs_test_stub123');
+    expect(sc.checkout_session_id).toBe(AUDIT_SESSION_ID);
+    expect(String(sc._note)).toMatch(/never pays automatically/i);
+  });
+
+  it('audit_status relays payment state and the download link once paid', async () => {
+    const res = await client.callTool({
+      name: 'audit_status',
+      arguments: { job: AUDIT_JOB_ID, session_id: AUDIT_SESSION_ID },
+    });
+
+    expect(res.isError).toBeFalsy();
+    expect(res.structuredContent).toMatchObject({
+      job: AUDIT_JOB_ID,
+      paid: true,
+      download: `/v1/audit/report/${AUDIT_JOB_ID}?session_id=${AUDIT_SESSION_ID}`,
+    });
   });
 });
