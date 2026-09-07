@@ -135,6 +135,13 @@ function previewOf(m: Message): string {
  *
  * Ties are broken on the id so the order is a total one: two mails of the same
  * minute must not swap places between the server's render and the browser's.
+ *
+ * Every row therefore names a real address, which is what the page's deep link
+ * rests on. Not enforced here, and it does not need to be: a contact with no
+ * address has no thread by construction — buildContacts hands it an empty one,
+ * since `email_messages` is joined on the address and there is nothing to join.
+ * A row for one could only appear if that stopped being true, and it would
+ * degrade to a link opening a fiche with no address rather than to a wrong one.
  */
 export function journalRows(contacts: Contact[]): JournalRow[] {
   const rows: JournalRow[] = [];

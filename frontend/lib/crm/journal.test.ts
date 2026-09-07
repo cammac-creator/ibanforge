@@ -194,6 +194,12 @@ describe('journalRows', () => {
     expect(ALL.some((r) => r.id === 'r3')).toBe(false);
   });
 
+  it('names an address on every line, which is what the deep link rests on', () => {
+    // A contact with no address has no thread by construction, so no line can
+    // point at one. The page links every row; this is the property it needs.
+    expect(ALL.every((r) => r.contact.id.includes('@'))).toBe(true);
+  });
+
   it('carries the contact, so a line names who it is with', () => {
     const row = ALL.find((r) => r.id === 'r1')!;
     expect(row.contact.label).toBe('Autorité Alpha');

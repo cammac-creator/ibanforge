@@ -273,8 +273,13 @@ export function JournalApp({
             et {summary.byDashboard} depuis le tableau de bord
             {/* Named rather than folded into one of the two above: a departure
                 nobody recorded is neither, and quietly counting it as the
-                operator's own would be the exact lie this page is against. */}
-            {summary.byMailbox > 0 && <> et {summary.byMailbox} depuis la messagerie</>}
+                operator's own would be the exact lie this page is against.
+
+                Behind a « · » and not a third « et »: the sentence promises two
+                halves of what left, and this is the remainder, which is a
+                different kind of clause. Three « et » in one breath also stops
+                being a sentence. */}
+            {summary.byMailbox > 0 && <> · {summary.byMailbox} depuis la messagerie</>}
           </>
         )}
         {' · '}
