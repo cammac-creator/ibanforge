@@ -15,7 +15,7 @@ IBANforge uses standard HTTP status codes and returns structured error responses
 | `200` | OK | Request succeeded (note: invalid IBANs still return 200 with `valid: false`) |
 | `400` | Bad Request | Malformed request body, missing fields, or invalid parameters |
 | `402` | Payment Required | No payment header or insufficient/invalid payment |
-| `404` | Not Found | BIC code not found in the database, or unknown endpoint |
+| `404` | Not Found | Unknown endpoint. An unknown BIC is not a 404: `/v1/bic/{code}` answers `200` with `found: false` |
 | `500` | Internal Server Error | Unexpected server error (please report these) |
 
 ## Validation error codes
@@ -33,11 +33,10 @@ These appear in the response body when an IBAN is invalid. The HTTP status is st
 
 ```json
 {
+  "iban": "CH100023000000001234",
   "valid": false,
-  "error": {
-    "code": "wrong_length",
-    "message": "Expected 21 characters for CH (Switzerland), got 19"
-  }
+  "error": "wrong_length",
+  "error_detail": "Expected 21 characters for CH, got 20."
 }
 ```
 
@@ -49,21 +48,18 @@ These return non-200 HTTP status codes.
 
 | Code | Description |
 |---|---|
-| `invalid_body` | Request body is not valid JSON |
-| `missing_iban` | The `iban` field is missing from the request body |
-| `missing_ibans` | The `ibans` field is missing from the batch request body |
-| `empty_array` | The `ibans` array is empty |
-| `too_many_ibans` | More than 10 IBANs in a batch request |
-| `invalid_bic_format` | BIC code is not 8 or 11 characters |
+| `invalid_json` | Request body is not valid JSON |
+| `invalid_request` | The `iban` field is missing or not a string; for a batch, the body has no array of IBAN strings (`ibans`, `iban_list` or `list`) |
+| `empty_batch` | The `ibans` array is empty |
+| `batch_too_large` | More than 100 IBANs in a batch request |
+| `invalid_bic_format` | BIC code is not 8 or 11 alphanumeric characters |
 
 ### Example: bad request
 
 ```json
 {
-  "error": {
-    "code": "too_many_ibans",
-    "message": "Maximum 10 IBANs per batch request, got 15"
-  }
+  "error": "batch_too_large",
+  "message": "Maximum 100 IBANs per batch request"
 }
 ```
 
@@ -101,14 +97,7 @@ See [x402 Payments](/docs/x402) for how to handle this.
 
 If you receive a 500 error, something unexpected happened on our side. The response will contain:
 
-```json
-{
-  "error": {
-    "code": "internal_error",
-    "message": "An unexpected error occurred"
-  }
-}
-```
+The body is the plain text `Internal Server Error` — there is no JSON envelope on a 500. Please report it with the endpoint and the time of the call (UTC).
 
 ## Troubleshooting
 

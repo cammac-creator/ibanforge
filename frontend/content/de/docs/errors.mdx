@@ -15,7 +15,7 @@ IBANforge verwendet standardmäßige HTTP-Statuscodes und gibt strukturierte Feh
 | `200` | OK | Anfrage erfolgreich (Hinweis: Ungültige IBANs geben dennoch 200 mit `valid: false` zurück) |
 | `400` | Bad Request | Fehlerhafter Anfrage-Body, fehlende Felder oder ungültige Parameter |
 | `402` | Payment Required | Fehlender Zahlungs-Header oder unzureichende/ungültige Zahlung |
-| `404` | Not Found | BIC-Code nicht in der Datenbank gefunden oder unbekannter Endpunkt |
+| `404` | Not Found | Unbekannter Endpunkt. Ein unbekannter BIC ist kein 404: `/v1/bic/{code}` antwortet mit `200` und `found: false` |
 | `500` | Internal Server Error | Unerwarteter Serverfehler (bitte melden Sie diese) |
 
 ## Validierungsfehlercodes
@@ -33,11 +33,10 @@ Diese erscheinen im Antwort-Body, wenn eine IBAN ungültig ist. Der HTTP-Status 
 
 ```json
 {
+  "iban": "CH100023000000001234",
   "valid": false,
-  "error": {
-    "code": "wrong_length",
-    "message": "Expected 21 characters for CH (Switzerland), got 19"
-  }
+  "error": "wrong_length",
+  "error_detail": "Expected 21 characters for CH, got 20."
 }
 ```
 
@@ -49,21 +48,18 @@ Diese geben HTTP-Statuscodes ungleich 200 zurück.
 
 | Code | Beschreibung |
 |---|---|
-| `invalid_body` | Anfrage-Body ist kein gültiges JSON |
-| `missing_iban` | Das Feld `iban` fehlt im Anfrage-Body |
-| `missing_ibans` | Das Feld `ibans` fehlt im Stapel-Anfrage-Body |
-| `empty_array` | Das `ibans`-Array ist leer |
-| `too_many_ibans` | Mehr als 10 IBANs in einer Stapelanfrage |
-| `invalid_bic_format` | BIC-Code ist nicht 8 oder 11 Zeichen lang |
+| `invalid_json` | Anfrage-Body ist kein gültiges JSON |
+| `invalid_request` | Das Feld `iban` fehlt oder ist keine Zeichenkette; bei einem Stapel enthält der Body kein Array von IBAN-Strings (`ibans`, `iban_list` oder `list`) |
+| `empty_batch` | Das `ibans`-Array ist leer |
+| `batch_too_large` | Mehr als 100 IBANs in einer Stapelanfrage |
+| `invalid_bic_format` | BIC-Code hat nicht 8 oder 11 alphanumerische Zeichen |
 
 ### Beispiel: Fehlerhafte Anfrage
 
 ```json
 {
-  "error": {
-    "code": "too_many_ibans",
-    "message": "Maximum 10 IBANs per batch request, got 15"
-  }
+  "error": "batch_too_large",
+  "message": "Maximum 100 IBANs per batch request"
 }
 ```
 
@@ -101,14 +97,7 @@ Siehe [x402-Zahlungen](/docs/x402) für den Umgang damit.
 
 Wenn Sie einen 500-Fehler erhalten, ist auf unserer Seite etwas Unerwartetes passiert. Die Antwort enthält:
 
-```json
-{
-  "error": {
-    "code": "internal_error",
-    "message": "An unexpected error occurred"
-  }
-}
-```
+Der Body ist der reine Text `Internal Server Error`; ein 500 hat keine JSON-Hülle. Bitte melden Sie ihn mit Endpunkt und Uhrzeit des Aufrufs (UTC).
 
 ## Fehlerbehebung
 

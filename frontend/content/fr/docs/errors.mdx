@@ -15,7 +15,7 @@ IBANforge utilise les codes de statut HTTP standards et renvoie des reponses d'e
 | `200` | OK | La requete a reussi (note : les IBAN invalides renvoient tout de meme 200 avec `valid: false`) |
 | `400` | Bad Request | Corps de requete mal forme, champs manquants ou parametres invalides |
 | `402` | Payment Required | En-tete de paiement manquant, paiement insuffisant ou invalide |
-| `404` | Not Found | Code BIC introuvable dans la base de donnees, ou endpoint inconnu |
+| `404` | Not Found | Endpoint inconnu. Un BIC inconnu n'est pas un 404 : `/v1/bic/{code}` répond `200` avec `found: false` |
 | `500` | Internal Server Error | Erreur inattendue du serveur (merci de nous la signaler) |
 
 ## Codes d'erreur de validation
@@ -33,11 +33,10 @@ Ces codes apparaissent dans le corps de la reponse lorsqu'un IBAN est invalide. 
 
 ```json
 {
+  "iban": "CH100023000000001234",
   "valid": false,
-  "error": {
-    "code": "wrong_length",
-    "message": "Expected 21 characters for CH (Switzerland), got 19"
-  }
+  "error": "wrong_length",
+  "error_detail": "Expected 21 characters for CH, got 20."
 }
 ```
 
@@ -49,21 +48,18 @@ Ces erreurs renvoient des codes de statut HTTP non-200.
 
 | Code | Description |
 |---|---|
-| `invalid_body` | Le corps de la requete n'est pas un JSON valide |
-| `missing_iban` | Le champ `iban` est manquant dans le corps de la requete |
-| `missing_ibans` | Le champ `ibans` est manquant dans le corps de la requete batch |
-| `empty_array` | Le tableau `ibans` est vide |
-| `too_many_ibans` | Plus de 10 IBAN dans une requete batch |
-| `invalid_bic_format` | Le code BIC ne fait pas 8 ou 11 caracteres |
+| `invalid_json` | Le corps de la requête n'est pas un JSON valide |
+| `invalid_request` | Le champ `iban` manque ou n'est pas une chaîne ; pour un lot, le corps ne contient pas de tableau d'IBAN (`ibans`, `iban_list` ou `list`) |
+| `empty_batch` | Le tableau `ibans` est vide |
+| `batch_too_large` | Plus de 100 IBAN dans une requête batch |
+| `invalid_bic_format` | Le code BIC ne fait pas 8 ou 11 caractères alphanumériques |
 
 ### Exemple : requete incorrecte
 
 ```json
 {
-  "error": {
-    "code": "too_many_ibans",
-    "message": "Maximum 10 IBANs per batch request, got 15"
-  }
+  "error": "batch_too_large",
+  "message": "Maximum 100 IBANs per batch request"
 }
 ```
 
@@ -101,14 +97,7 @@ Consultez [Paiements x402](/docs/x402) pour savoir comment gerer cela.
 
 Si vous recevez une erreur 500, quelque chose d'inattendu s'est produit de notre cote. La reponse contiendra :
 
-```json
-{
-  "error": {
-    "code": "internal_error",
-    "message": "An unexpected error occurred"
-  }
-}
-```
+Le corps est le texte brut `Internal Server Error` : un 500 n'a pas d'enveloppe JSON. Signalez-le avec l'endpoint et l'heure de l'appel (UTC).
 
 ## Depannage
 
