@@ -1424,7 +1424,21 @@ apiKeys.get('/v1/admin/client-activity', (c) => {
  * "blocked" banner. Bounded on purpose (never unlimited: this is a relief
  * valve, not a tap), journaled in `events`, effective on the customer's very
  * next request because validateApiKey re-reads monthly_limit each call.
+ *
+ * The ceiling moved from 20 000 to 1 000 000 on 2026-09-07. The lower bound
+ * was sized for a free key that had hit its 200: relief, not a plan. It also
+ * capped the ONLY gesture that can set an allowance above what a subscription
+ * mints — the vendor licence is minted at OEM_MONTHLY_LIMIT (50 000), and a
+ * vendor embedding the API validates hundreds of thousands of lines a month.
+ * Serving that customer meant a deploy with a hand-edited constant, which is
+ * why the roadmap carried "lift the 50 000 ceiling before approaching the L
+ * and XL segments" for weeks. A million a month is the largest allowance the
+ * per-call price list contemplates; above it the conversation is a contract,
+ * not a field. Still admin-only, still journaled, still never unlimited.
  */
+export const RAISE_LIMIT_MAX = 1_000_000;
+export const RAISE_LIMIT_MIN = 100;
+
 apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
@@ -1440,8 +1454,14 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
   if (!/^ifk_[a-f0-9]{8}$/.test(keyPrefix)) {
     return c.json({ error: 'invalid_input', message: 'key_prefix attendu (ifk_xxxxxxxx)' }, 400);
   }
-  if (!Number.isFinite(limit) || limit < 100 || limit > 20_000) {
-    return c.json({ error: 'invalid_input', message: 'monthly_limit borné à [100, 20000]' }, 400);
+  if (!Number.isFinite(limit) || limit < RAISE_LIMIT_MIN || limit > RAISE_LIMIT_MAX) {
+    return c.json(
+      {
+        error: 'invalid_input',
+        message: `monthly_limit borné à [${RAISE_LIMIT_MIN}, ${RAISE_LIMIT_MAX}]`,
+      },
+      400,
+    );
   }
   const db = getStatsDB();
   const before = db
