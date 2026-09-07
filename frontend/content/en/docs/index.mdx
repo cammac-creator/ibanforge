@@ -10,6 +10,8 @@ order: 0
 
 IBANforge is a fast, reliable API for **IBAN validation** and **BIC/SWIFT lookup**. It covers 89 countries with real-time checksum verification, BBAN structure parsing, enriched institution data from GLEIF, **SEPA compliance info**, **issuer classification** (bank vs. EMI/neobank), **sanctions & compliance screening** with a 0–100 risk score, and exclusive **Swiss clearing (BC-Nummer)** data from SIX BankMaster.
 
+> **Start here.** [Onboarding](/docs/onboarding) walks the whole path in ten minutes — the keyless call, the free key, every block of the answer read by its real name, a batch of 100 and the two kinds of error. Every `curl` on that page was really run, and every response is the one the API gave.
+
 > **Start free, without even a key.** Two endpoints solve a whole problem at no cost: [`/v1/reference/validate`](/docs/swiss-qr-iban) checks payment references (RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero) with a sourced verdict, and [`/v1/address/check`](/docs/structured-addresses) checks a structured ISO 20022 address against the SPS, T2 or Fedwire rules ahead of the November 2026 changes.
 
 ## Base URL
@@ -137,6 +139,7 @@ This returns pre-validated example IBANs from multiple countries so you can expl
 
 ## Next steps
 
+- [Onboarding](/docs/onboarding) — from zero to your first batch of 100, in ten minutes
 - [API keys](/docs/api-keys) — get your free key, 200 requests/month
 - [Validate a single IBAN](/docs/iban-validate) — full endpoint reference
 - [Batch validation](/docs/iban-batch) — validate up to 100 IBANs at once

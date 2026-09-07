@@ -1,0 +1,282 @@
+---
+title: "Prise en main"
+description: "De zéro au premier lot de 100 IBAN en dix minutes : l'appel sans clé, la clé gratuite, chaque bloc de la réponse lu par son vrai nom, les erreurs, et la suite."
+order: 2
+---
+
+# Prise en main — de zéro au premier lot en dix minutes
+
+Six étapes, dans l'ordre où vous les ferez vraiment. Rien ici n'est un aperçu de fonctionnalité : chaque `curl` ci-dessous a été exécuté contre l'API, et chaque bloc JSON est la réponse qu'elle a rendue, coupée avec `…` là où elle était longue. Les IBAN d'exemple sont ceux du reste de cette documentation : vous pouvez coller une étape dans la suivante.
+
+Si vous n'avez que deux minutes, faites l'étape 1 et l'étape 4 : le premier appel ne demande aucun compte, et le lot est la forme que prend la plupart des intégrations.
+
+## 1. Le premier appel, sans aucune clé
+
+`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **10 fois par jour et par adresse IP**, remis à zéro à minuit UTC.
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
+```
+
+La réponse est la réponse entière, plus un bloc que vous ne voyez jamais autrement que sans clé :
+
+```json
+{
+  "iban": "CH1000230000000012345",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "…": "…",
+  "trial": {
+    "calls_used_today": 1,
+    "calls_left_today": 9,
+    "daily_limit": 10,
+    "resets": "midnight UTC",
+    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"email\":\"you@company.com\",\"source\":\"api-trial\"} — 200 requests a month, no card",
+    "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
+  }
+}
+```
+
+`trial` est une dégustation, pas un palier. Au-delà de 10 appels par jour, l'endpoint répond `402` avec `cause.reason: "trial_exhausted"`, et le décompte vit en mémoire, par instance de serveur : à traiter comme un ordre de grandeur, jamais comme un quota sur lequel bâtir. `trial` disparaît de la réponse dès que vous envoyez une clé.
+
+## 2. La clé gratuite — 200 requêtes par mois
+
+Un seul POST, sans carte, sans portefeuille :
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@company.com", "source": "api-trial"}'
+```
+
+```json
+{
+  "api_key": "ifk_…",
+  "key_prefix": "ifk_…",
+  "email": "you@company.com",
+  "monthly_limit": 200,
+  "message": "Save this key — it will not be shown again.",
+  "terms_url": "https://ibanforge.com/legal/terms"
+}
+```
+
+La clé et son préfixe sont masqués ci-dessus et nulle part ailleurs : la vraie réponse porte `ifk_` suivi de 64 caractères hexadécimaux dans `api_key`, et ses 8 premiers caractères dans `key_prefix`. Conservez `api_key` comme un secret — elle n'est affichée qu'une fois. `key_prefix` peut être journalisé sans risque, et c'est ce que le support demande pour identifier une clé.
+
+Utilisez une vraie adresse. Les domaines jetables ou de remplissage sont refusés, et le refus est explicite plutôt que silencieux :
+
+```json
+{
+  "error": "disposable_email",
+  "message": "Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked."
+}
+```
+
+Envoyez ensuite la clé à chaque appel, et la même requête répond sans le bloc `trial` :
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ifk_…" \
+  -d '{"iban": "DE89370400440532013000"}'
+```
+
+`X-API-Key: ifk_…` fonctionne aussi, si l'en-tête Bearer est malcommode dans votre client. Chaque réponse authentifiée porte vos compteurs dans les en-têtes, en cas de succès comme de refus :
+
+```
+X-Quota-Used: 1
+X-Quota-Limit: 200
+X-Quota-Remaining: 199
+X-Quota-Month: 2026-09
+```
+
+Tout le reste sur les clés — vérification de la boîte mail, les trois `429`, les offres — est sur la page [Clés API](/docs/api-keys).
+
+## 3. Lire la première validation, bloc par bloc
+
+C'est l'étape que la plupart des intégrations sautent, puis se trompent. Les noms ci-dessous sont ceux que l'API renvoie réellement ; plusieurs ne sont pas ceux qu'on attend.
+
+Voici la réponse allemande de l'étape 2, coupée là où elle se répète :
+
+```json
+{
+  "iban": "DE89370400440532013000",
+  "valid": true,
+  "country": { "code": "DE", "name": "Germany" },
+  "check_digits": "89",
+  "bban": { "bank_code": "37040044", "account_number": "0532013000" },
+  "sepa": {
+    "member": true,
+    "schemes": ["SCT", "SDD", "SCT_INST"],
+    "vop_required": true,
+    "vop_participant": true,
+    "basis": "epc_register"
+  },
+  "formatted": "DE89 3704 0044 0532 0130 00",
+  "bic": {
+    "code": "COBADEFFXXX",
+    "bank_name": "Commerzbank",
+    "city": "Köln",
+    "source": "Deutsche Bundesbank Bankleitzahlendatei",
+    "as_of": "2026-09",
+    "basis": "national_register",
+    "authoritative": true,
+    "lei": "851WYGNLUQLFZBSYGB56",
+    "lei_status": "ACTIVE",
+    "address": { "…": "…" },
+    "postal_address": { "…": "…" }
+  },
+  "issuer": { "type": "bank", "name": "Commerzbank", "classification": "default" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "sepa_reachable_scope": "country",
+    "vop_coverage": true
+  },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "institution": { "name": "Commerzbank", "post_code": "50447", "town": "Köln", "country": "DE" },
+    "as_of": "2026-09"
+  },
+  "next_steps": [
+    {
+      "code": "screen_compliance",
+      "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. …",
+      "because": "bank_code_check.status is verified, so there is an institution to screen",
+      "action": "POST /v1/iban/compliance"
+    }
+  ],
+  "attribution": { "…": "…" }
+}
+```
+
+Bloc par bloc :
+
+| Bloc | Toujours présent | Ce qu'il répond |
+|---|---|---|
+| `valid` | oui | L'IBAN a-t-il passé la structure, la longueur et le checksum MOD-97. Un IBAN invalide renvoie quand même un HTTP `200`. |
+| `country` | oui | Le code ISO et le nom du pays. |
+| `check_digits`, `bban`, `formatted` | oui | L'IBAN démonté : les deux clés de contrôle, la partie nationale séparée en `bank_code` et `account_number`, et le regroupement imprimable. |
+| `bic` | quand un établissement est résolu | L'établissement derrière le code banque, avec `source`, `as_of`, `basis` et `authoritative` pour distinguer un registre national d'une table constituée à la main. Porte `lei`, `lei_status`, et l'adresse postale sous une forme lisible et une forme ISO 20022. |
+| `bank_code_check` | oui | **Le bloc à lire avant de payer qui que ce soit.** `status` (`verified` / `unknown` / …), `match`, le `register` interrogé, `authoritative`, et l'`institution` telle que ce registre l'écrit. Un checksum que vous pourriez calculer localement ne dit rien ici ; c'est la partie qu'on ne peut pas faire hors ligne. |
+| `issuer` | quand un établissement est résolu | `type` (`bank`, `emi`, …) et `classification` — une banque et un établissement de monnaie électronique ne sont pas la même contrepartie. |
+| `risk_indicators` | oui | Le bloc s'appelle `risk_indicators`, pas `risk` : `issuer_type`, `country_risk`, `test_bic`, `sepa_reachable`, `sepa_reachable_scope`, `vop_coverage`. Le score 0–100 vit sur [`/v1/iban/compliance`](/docs/compliance), pas ici. |
+| `sepa` | oui | `member`, `schemes`, et les deux champs Verification of Payee. |
+| `next_steps` | souvent | Quoi faire ensuite, sous forme lisible par machine : `code`, `do`, `because`, `action`. Un agent peut le suivre sans humain. |
+| `cost_usdc`, `processing_ms` | oui | Ce que l'appel coûte et le temps qu'il a pris. |
+| `attribution` | offre gratuite | `text`, `url`, `note`. Quand des résultats de l'offre gratuite sont montrés à des personnes, affichez le crédit ; un résultat qui reste dans votre backend ne doit rien. |
+| `trial` | sans clé uniquement | Voir l'étape 1. |
+
+**Il n'y a pas de bloc `vop` de premier niveau.** Verification of Payee se lit dans trois champs : `sepa.vop_required` (le pays est-il sous l'obligation), `sepa.vop_participant` (l'établissement résolu est-il inscrit comme prêt au registre EPC, `null` quand aucun établissement n'est résolu) et `risk_indicators.vop_coverage`. Le raisonnement complet est sur la page [VoP](/docs/vop).
+
+Deux blocs n'apparaissent que pour certains pays : ne conditionnez pas votre code à leur présence.
+
+- `clearing` — IBAN suisses. `iid`, `sic`, `instant_payments_chf`, `eurosic`, `qr_iid` et `qr_iids` issus du SIX BankMaster. Voir [Clearing suisse](/docs/ch-clearing).
+- `pra_authorisation` — IBAN britanniques. Si l'établissement est agréé, avec `firm_name`, `frn`, `section`, `basis` et la `source` (`Bank of England, List of Banks`) plus le `list_month` d'où elle est tirée.
+- `official_identity` — IBAN français, et les autres résolus via la liste BCE des institutions financières monétaires : `name`, `lei`, `address`, `category`, `matched_by`, `source`, `as_of`.
+
+Chaque bloc sourcé porte `source` et `as_of`, et la plupart portent `authoritative`. C'est volontaire : une affirmation qu'on ne peut pas dater est une affirmation qu'on ne peut pas défendre. Quelle donnée vient d'où, registre par registre, est sur [Sources de données](/docs/data-sources).
+
+## 4. Un lot de 100
+
+La même validation, jusqu'à 100 IBAN par appel, chacun traité indépendamment — un IBAN fautif ne gâche pas les autres.
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/batch \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ifk_…" \
+  -d '{"ibans": ["CH1000230000000012345", "DE89370400440532013000", "FR7630006000011234567890189", "…", "INVALID123"]}'
+```
+
+Avec 99 IBAN valides et un faux volontaire, la réponse se termine ainsi :
+
+```json
+{
+  "results": [
+    { "iban": "CH1000230000000012345", "valid": true, "…": "…" },
+    "…",
+    {
+      "iban": "INVALID123",
+      "valid": false,
+      "error": "unsupported_country",
+      "error_detail": "Country code 'IN' is not a recognized IBAN country.",
+      "cost_usdc": 0.002
+    }
+  ],
+  "count": 100,
+  "valid_count": 99,
+  "cost_usdc": 0.2,
+  "processing_ms": 7.12
+}
+```
+
+Trois choses à savoir avant de dimensionner un traitement :
+
+- `results` conserve **l'ordre et le nombre de votre entrée** : vous pouvez le recoller à vos lignes par index.
+- Chaque élément a la même forme qu'une validation unique, `bank_code_check` et `clearing` compris. Ils se lisent exactement comme à l'étape 3.
+- **Un lot débite une requête par IBAN.** 100 IBAN, ce sont 100 de vos 200 requêtes mensuelles gratuites, ou 100 crédits prépayés. Si le lot dépasse ce qu'il vous reste, l'API le refuse en bloc avec un `402` qui nomme le manque (`X-Quota-Required` / `X-Credits-Required`), et rien n'est consommé.
+
+Référence complète : [validation par lot](/docs/iban-batch).
+
+## 5. Lire les erreurs
+
+Deux choses différentes s'appellent une erreur, et les distinguer fait gagner un après-midi.
+
+**Un IBAN qui ne passe pas** n'est pas une requête en échec. Le statut HTTP est `200`, et le verdict est dans le corps :
+
+```json
+{
+  "iban": "CH100023000000001234",
+  "valid": false,
+  "error": "wrong_length",
+  "error_detail": "Expected 21 characters for CH, got 20.",
+  "…": "…"
+}
+```
+
+`error` est le code lisible par machine (`invalid_format`, `unsupported_country`, `wrong_length`, `checksum_failed`) et `error_detail` la phrase pour un humain.
+
+**Une requête qui ne se lit pas** est un vrai `4xx`, et le corps n'a aucun champ `valid` :
+
+```json
+{
+  "error": "invalid_request",
+  "message": "Request body must include an 'iban' field (case-insensitive: 'iban', 'IBAN', 'Iban' all work)."
+}
+```
+
+Donc : branchez d'abord sur le statut HTTP, puis sur `valid`, puis sur `error`. Tous les codes, tous les statuts et la liste de dépannage sont sur la [référence des erreurs](/docs/errors).
+
+## 6. Aller plus loin
+
+Vous avez désormais tout ce qu'un contrôle avant paiement demande. Le reste concerne le volume, l'autonomie, et les gens de votre équipe qui n'écrivent pas de code.
+
+**Plus de volume**
+- [Packs de crédits prépayés](/pricing) — 1k / 5k / 25k crédits, par carte ou en USDC (`POST /v1/credits/buy/1k|5k|25k`). Ils n'expirent jamais et s'attachent à la clé que vous avez déjà.
+- [Micropaiements x402](/docs/x402) — paiement à l'appel en USDC, sans aucun compte. C'est ce qu'une réponse `402` explique à un agent.
+
+**Agents**
+- [Intégration MCP](/docs/mcp) — le paquet `ibanforge-mcp` ou l'endpoint hébergé, et IBANforge devient des appels d'outil dans Claude, Cursor ou n'importe quel client MCP.
+- [Payer en tant qu'agent](/docs/pay-as-an-agent) — tout le chemin d'auto-embarquement, du `402` à l'appel réglé.
+
+**Votre stack**
+- [Recettes](/docs/recipes) — le même appel en Python, Node/TypeScript, PHP, Java et .NET avec les SDK officiels, plus la formule **Google Sheets** et le nœud **n8n** pour la part du travail qui n'est pas du code.
+
+**Un fichier entier, sans rien écrire**
+- [Audit de fichier](/audit) — déposez un fichier de créanciers (CSV ou XLSX) et recevez chaque ligne contrôlée contre les mêmes registres, avec les doublons, les BIC et les adresses. L'aperçu masqué est gratuit ; le classeur annoté est un paiement unique.
+
+## Étapes suivantes
+
+- [Clés API](/docs/api-keys) — la vérification, les `429`, les offres
+- [Valider un IBAN unique](/docs/iban-validate) — référence complète de l'endpoint
+- [Validation par lot](/docs/iban-batch) — l'appel à 100 IBAN en détail
+- [VoP](/docs/vop) — ce que `vop_required` et `vop_participant` disent vraiment
+- [Référence des erreurs](/docs/errors) — chaque code et sa cause
+- [Sources de données](/docs/data-sources) — quel registre répond pour quel pays
