@@ -264,29 +264,30 @@ export function ContactTable({
   // is NOT frozen: a row that leaves the filter (an answer sent) still
   // disappears, and that disappearance stays the confirmation the gesture
   // gives. Released when the file closes or the selection or the query moves.
-  const frozen = useRef<{
-    key: string;
-    order: Map<string, number>;
-    group: Map<string, MailRow['group']>;
-  } | null>(null);
-  const freezeKey = `${JSON.stringify(selection)}|${q}`;
-  if (selectedId === null) frozen.current = null;
-  else if (!frozen.current || frozen.current.key !== freezeKey) {
-    frozen.current = {
-      key: freezeKey,
+  // The snapshot used to be a ref written during render, which is the one
+  // thing the React Compiler rules refuse outright (react-hooks/refs, rules
+  // turned on 2026-09-07). A memo keyed on « which file is open, under which
+  // selection and which query » says exactly the same thing where React can
+  // see it: the key changes when the freeze must be retaken, and only then.
+  // `liveRows` is deliberately absent from the dependencies — re-reading it is
+  // precisely what the freeze exists to prevent — so this memo carries meaning
+  // rather than speed. Should React ever drop the cache, the cost is one
+  // re-sorted list under the cursor, never a wrong row.
+  const freezeKey = selectedId === null ? null : `${JSON.stringify(selection)}|${q}`;
+  const frozen = useMemo(() => {
+    if (freezeKey === null) return null;
+    return {
       order: new Map(liveRows.map((r, i) => [r.id, i])),
       group: new Map(liveRows.map((r) => [r.id, r.group])),
     };
-  }
-  const rows = useMemo(() => {
-    const f = frozen.current;
-    if (!f) return liveRows;
-    return [...liveRows]
-      .sort((a, b) => (f.order.get(a.id) ?? Infinity) - (f.order.get(b.id) ?? Infinity))
-      .map((r) => (f.group.has(r.id) ? { ...r, group: f.group.get(r.id) ?? null } : r));
-    // frozen is a ref updated above, on purpose outside React's dependency tracking
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveRows, selectedId, freezeKey]);
+  }, [freezeKey]);
+  const rows = useMemo(() => {
+    if (!frozen) return liveRows;
+    return [...liveRows]
+      .sort((a, b) => (frozen.order.get(a.id) ?? Infinity) - (frozen.order.get(b.id) ?? Infinity))
+      .map((r) => (frozen.group.has(r.id) ? { ...r, group: frozen.group.get(r.id) ?? null } : r));
+  }, [liveRows, frozen]);
   useEffect(() => {
     onRowsChange?.(rows.map((r) => r.id));
   }, [rows, onRowsChange]);

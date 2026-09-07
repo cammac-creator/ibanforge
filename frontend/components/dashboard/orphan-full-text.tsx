@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * The whole mail: the original text as the sync stored it and its French
@@ -45,11 +45,26 @@ export function OrphanFullText({
 }) {
   const [fr, setFr] = useState<string | null>(initialFr);
   const [lang, setLang] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
-  const [attempted, setAttempted] = useState(false);
+  const [failed, setFailed] = useState(false);
+  /**
+   * « In flight » is not a state of its own: a row with a text, no translation
+   * and no failure behind it is one the writer is working on — that is exactly
+   * when the request below is running. Held as state, it had to be written
+   * from the effect body, which buys a second render for a fact the first one
+   * already knew (react-hooks/set-state-in-effect, rules turned on
+   * 2026-09-07). Derived, « traduction en cours… » is on screen from the
+   * render that fires the request rather than the one after it.
+   */
+  const busy = !!body && !fr && !failed;
+  // One automatic attempt per row, latched. A ref rather than state: nothing
+  // renders it, and it is only read and written from the effect below.
+  const started = useRef(false);
 
-  async function translate() {
-    setState('busy');
+  /**
+   * The request. It touches no state before its first await, which is what
+   * lets the effect fire it without queueing a render behind itself.
+   */
+  async function run() {
     await acquire();
     try {
       const r = await fetch('/api/crm/orphan-translate', {
@@ -61,23 +76,29 @@ export function OrphanFullText({
       if (r.ok && data.body_fr) {
         setFr(data.body_fr);
         setLang(data.lang ?? null);
-        setState('idle');
-      } else setState('failed');
+      } else setFailed(true);
     } catch {
-      setState('failed');
+      setFailed(true);
     } finally {
       release();
     }
   }
 
+  /** The retry link: clears the failure, which is what puts the row back in
+   *  flight, then asks again. */
+  function retry() {
+    setFailed(false);
+    void run();
+  }
+
   // Automatic: the first render of an untranslated row asks once. A failure
   // leaves a retry link rather than looping on a writer that is down.
   useEffect(() => {
-    if (!body || fr || attempted) return;
-    setAttempted(true);
-    void translate();
+    if (!body || fr || started.current) return;
+    started.current = true;
+    void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body, fr, attempted]);
+  }, [body, fr]);
 
   if (!body) {
     return (
@@ -98,21 +119,21 @@ export function OrphanFullText({
     <details className="mt-1.5">
       <summary className="cursor-pointer select-none text-[12px] text-amber-400 hover:text-amber-300">
         mail complet
-        {fr ? ' (français et original)' : state === 'busy' ? ' (traduction en cours…)' : ''}
+        {fr ? ' (français et original)' : busy ? ' (traduction en cours…)' : ''}
       </summary>
       <div className="mt-2 grid gap-3 md:grid-cols-2">
         <div>
           <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-3)]">
             <span>Français</span>
-            {state === 'busy' && (
+            {busy && (
               <span className="font-normal normal-case tracking-normal text-amber-300">
                 traduction en cours…
               </span>
             )}
-            {state === 'failed' && (
+            {failed && (
               <span className="font-normal normal-case tracking-normal text-red-300">
                 le traducteur n&apos;a pas répondu,{' '}
-                <button type="button" onClick={() => void translate()} className="underline">
+                <button type="button" onClick={retry} className="underline">
                   réessayer
                 </button>
               </span>

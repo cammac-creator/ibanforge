@@ -31,9 +31,26 @@ export function TestIbanClient() {
   const t = useTranslations("testIban");
   const [country, setCountry] = useState<string>("CH");
   const [item, setItem] = useState<TestIbanItem | null>(null);
-  const [loading, setLoading] = useState(false);
+  // The first IBAN is already on its way when this mounts (the effect below),
+  // so the button spins from the first paint rather than from the render after
+  // it — the cascading render react-hooks/set-state-in-effect names (rules
+  // turned on 2026-09-07).
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  /**
+   * The request alone, no state around it. That is what lets the mount effect
+   * fire it without queueing a render behind itself; the button's handler puts
+   * the state back around it.
+   */
+  const fetchOne = useCallback(async (c: string): Promise<TestIbanItem | null> => {
+    const qs = c === "random" ? "" : `?country=${c}`;
+    const r = await fetch(`${API_BASE}/v1/test-iban${qs}`);
+    if (!r.ok) throw new Error(String(r.status));
+    const body = (await r.json()) as { test_ibans: TestIbanItem[] };
+    return body.test_ibans[0] ?? null;
+  }, []);
 
   const generate = useCallback(
     async (c: string) => {
@@ -41,25 +58,36 @@ export function TestIbanClient() {
       setError(false);
       setCopied(false);
       try {
-        const qs = c === "random" ? "" : `?country=${c}`;
-        const r = await fetch(`${API_BASE}/v1/test-iban${qs}`);
-        if (!r.ok) throw new Error(String(r.status));
-        const body = (await r.json()) as { test_ibans: TestIbanItem[] };
-        setItem(body.test_ibans[0] ?? null);
-        if (!body.test_ibans[0]) setError(true);
+        const next = await fetchOne(c);
+        setItem(next);
+        if (!next) setError(true);
       } catch {
         setError(true);
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [fetchOne],
   );
 
   useEffect(() => {
-    void generate("CH");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let alive = true;
+    void (async () => {
+      try {
+        const first = await fetchOne("CH");
+        if (!alive) return;
+        setItem(first);
+        if (!first) setError(true);
+      } catch {
+        if (alive) setError(true);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [fetchOne]);
 
   async function copyIban() {
     if (!item) return;

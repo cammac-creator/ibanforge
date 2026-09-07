@@ -490,9 +490,10 @@ describe('the conquest verdict on a dossier', () => {
   it('treats an API that does not serve the column yet as unmarked', () => {
     // Vercel and Railway ship independently: for a while the field is simply
     // absent. Absent must behave exactly as the rule did before it existed.
-    const { issued_by_us: _omitted, ...withoutColumn } = keyRow('d@alpha.example.net', { issued_by_us: 1 });
+    const withoutColumn = keyRow('d@alpha.example.net', { issued_by_us: 1 });
+    delete withoutColumn.issued_by_us;
     const d = dossierOf({
-      keys: [withoutColumn as KeyRow],
+      keys: [withoutColumn],
       prospects: [prospectRow('d@alpha.example.net', { source: 'campagne-fixture' })],
       messages: [msg('d@alpha.example.net', { msg_date: '2026-06-11T08:30:00Z' })],
     });

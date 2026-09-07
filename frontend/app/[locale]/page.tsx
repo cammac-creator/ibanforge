@@ -104,6 +104,14 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const capturedOn = dateFmt.format(new Date(`${capturedIban.captured_at}T00:00:00Z`))
   // Days left before SIX stops processing unstructured addresses, computed at
   // render (the page is revalidated every hour) and never by the browser.
+  //
+  // react-hooks/purity refuses an impure call during render and it is right
+  // about the call: this IS the clock. It is also the point. This is a server
+  // component, rendered once per revalidation window and never re-rendered in
+  // a browser, so there is no memoised render for the clock to make a liar of;
+  // frozen at build time the countdown would simply be wrong. The one impure
+  // read on the page, named.
+  // eslint-disable-next-line react-hooks/purity
   const daysLeft = Math.ceil((Date.UTC(2026, 10, 14) - Date.now()) / 86_400_000)
   const refreshedOn = liveStats.bicDataLastUpdated
     ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })

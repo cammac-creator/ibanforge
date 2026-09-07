@@ -36,6 +36,12 @@ export function LocaleSwitcher() {
     // The middleware reads this cookie to pick the locale of an unprefixed
     // path: without it, a reader who once opened /fr could never reach the
     // English pages again (they bounced back to /fr/…, 2026-09-05).
+    //
+    // react-hooks/immutability sees `document` as a value defined outside the
+    // component and refuses the assignment. It is not a render-phase write:
+    // this runs from a click, which is where the rule's own advice — "consider
+    // using an effect" — would put it anyway, one render later and for no gain.
+    // eslint-disable-next-line react-hooks/immutability
     document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000; samesite=lax; secure`;
     router.push(localePath(newLocale, rest));
     setOpen(false);
