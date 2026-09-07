@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contactIdFromParam, contactsHref } from './deep-link';
+import { contactIdFromParam, contactsHref, contactsOpenHref } from './deep-link';
 
 describe('contactsHref', () => {
   it('carries the address so the thread opens instead of the bare page', () => {
@@ -14,6 +14,20 @@ describe('contactsHref', () => {
   });
 });
 
+describe('contactsOpenHref', () => {
+  it('lands on the same page under the word the rest of the dashboard uses', () => {
+    // The Courrier journal points every line at a thread; `open` is what
+    // Clients and Clients Bot already call that gesture. CrmApp reads both.
+    expect(contactsOpenHref('fr', 'Registry@Alpha.Example.NET')).toBe(
+      '/fr/dashboard/contacts?open=registry%40alpha.example.net',
+    );
+  });
+
+  it('escapes exactly like the older spelling', () => {
+    expect(contactsOpenHref('en', 'a+b@x.net')).toBe('/dashboard/contacts?open=a%2Bb%40x.net');
+  });
+});
+
 describe('contactIdFromParam', () => {
   const ids = ['acme@example.com', 'a.dupont@societe-alpha.example'];
 
@@ -22,7 +36,9 @@ describe('contactIdFromParam', () => {
   });
 
   it('matches whatever the casing of the address in the link', () => {
-    expect(contactIdFromParam('A.Dupont@Societe-Alpha.Example', ids)).toBe('a.dupont@societe-alpha.example');
+    expect(contactIdFromParam('A.Dupont@Societe-Alpha.Example', ids)).toBe(
+      'a.dupont@societe-alpha.example',
+    );
   });
 
   it('selects nothing rather than guessing when the address is unknown', () => {

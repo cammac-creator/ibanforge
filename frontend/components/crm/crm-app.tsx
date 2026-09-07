@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CLIENT_PARAM, contactIdFromParam } from '@/lib/crm/deep-link';
+import { CLIENT_PARAM, OPEN_PARAM, contactIdFromParam } from '@/lib/crm/deep-link';
 import type { RowSelection } from '@/lib/crm/mail-rows';
 import { intentOf } from '@/lib/crm/intent';
 import { noReplyHolds } from '@/lib/crm/no-reply';
@@ -114,8 +114,14 @@ export function CrmApp({
   // thread is already there on the first paint instead of flashing the empty
   // pane. Server and browser see the same URL, so the two renders agree.
   const searchParams = useSearchParams();
+  // Two keys, one landing. `client` is what the Clients tab has always sent;
+  // `open` is what the rest of the dashboard calls the same gesture, and it is
+  // what the Courrier journal sends, since every one of its lines points at a
+  // thread and a third spelling of "open this dossier" is one nobody would
+  // remember. Neither is dropped: links built with the older key live in notes
+  // and bookmarks. `client` wins a collision, being the older contract.
   const linked = contactIdFromParam(
-    searchParams.get(CLIENT_PARAM),
+    searchParams.get(CLIENT_PARAM) ?? searchParams.get(OPEN_PARAM),
     contacts.map((c) => c.id),
   );
   // ?vue=prospection lands the table on the prospecting queue — the nav's

@@ -18,18 +18,29 @@ export function TopNav() {
   // Contacts. The Clients tab that came back on 30/07/2026 is a different
   // thing: Contacts is the conversation, Clients is what they do with the API.
   const onContacts = pathname.includes('/dashboard/contacts');
+  // Courrier is the journal of what Contacts holds the conversations of: every
+  // mail on one antichronological list, with who sent it. Its own tab because
+  // part of the mail now leaves without a click, and "what went out" is a
+  // different question from "what do I answer next".
+  const onCourrier = pathname.includes('/dashboard/courrier');
   // Order matters: '/dashboard/clients-bot' also contains '/dashboard/clients',
   // so the longer path is tested first or both tabs light up at once.
   const onBots = pathname.includes('/dashboard/clients-bot');
   const onClients = !onBots && pathname.includes('/dashboard/clients');
   const onForums = pathname.includes('/dashboard/forums');
-  const onOverview = !onContacts && !onClients && !onBots && !onForums;
+  // Every new tab has to be subtracted here too, or Overview lights up beside
+  // it: this is the resting tab, defined by nothing else being on.
+  const onOverview = !onContacts && !onCourrier && !onClients && !onBots && !onForums;
   const current = Number(searchParams.get('period') ?? 30);
   const period = PERIODS.includes(current) ? current : 30;
 
   const TABS = [
     { key: 'overview', href: localePath(locale, '/dashboard'), label: t('topNav.overview'), active: onOverview },
     { key: 'contacts', href: localePath(locale, '/dashboard/contacts'), label: t('topNav.contacts'), active: onContacts },
+    // Right after Contacts, and hard-coded like Clients and Forums beside it:
+    // the dashboard's chrome is French in the source rather than translated,
+    // and only the two oldest tabs still go through next-intl.
+    { key: 'courrier', href: localePath(locale, '/dashboard/courrier'), label: 'Courrier', active: onCourrier },
     { key: 'clients', href: localePath(locale, '/dashboard/clients'), label: 'Clients', active: onClients },
     { key: 'bots', href: localePath(locale, '/dashboard/clients-bot'), label: 'Clients Bot', active: onBots },
     { key: 'forums', href: localePath(locale, '/dashboard/forums'), label: 'Forums', active: onForums },

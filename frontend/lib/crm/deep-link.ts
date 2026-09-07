@@ -30,6 +30,21 @@ export function clientsHref(locale: string, clientId: string): string {
 }
 
 /**
+ * Contacts, with a thread open, addressed by `open` rather than by `client`.
+ *
+ * Two keys for one landing, on purpose. `client` is the older one and links
+ * built with it exist in notes and bookmarks, so Contacts goes on reading it;
+ * `open` is the word the rest of the dashboard already uses for "open this
+ * dossier" (Clients, Clients Bot), and the Courrier journal — whose every line
+ * points at a thread — would otherwise be the one place obliged to remember a
+ * third spelling. CrmApp reads both; see the note there.
+ */
+export function contactsOpenHref(locale: string, contactId: string): string {
+  const params = new URLSearchParams({ [OPEN_PARAM]: contactId.toLowerCase() });
+  return localePath(locale, `/dashboard/contacts?${params}`);
+}
+
+/**
  * The agent string identifying a bot dossier.
  *
  * NOT lowercased, unlike an address: a user-agent is the dossier's primary key
