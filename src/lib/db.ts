@@ -885,6 +885,19 @@ function openStatsDB(): DatabaseType.Database {
         'ALTER TABLE email_messages ADD COLUMN no_reply_needed INTEGER NOT NULL DEFAULT 0',
       );
     }
+    // Who pressed send — 'claude' (the agent wrote and sent it with no click),
+    // 'dashboard' (the operator's own composer), NULL (a copy the nightly IMAP
+    // sync read back, or anything that did not say).
+    //
+    // Nullable, unlike no_reply_needed above, and that difference is the whole
+    // point. "Nobody said" and "the mailbox" are the same answer here, so NULL
+    // is a truthful value rather than a missing one, and it is what lets the
+    // upsert write COALESCE(excluded.origin, origin): a re-sync that knows
+    // nothing keeps the mark, while a later POST that knows can still place
+    // one on a row already stored. no_reply_needed could buy neither, since
+    // its "unmarked" is 0 and COALESCE cannot tell 0 from a decision.
+    if (msgCols.length && !msgCols.includes('origin'))
+      statsDB.exec('ALTER TABLE email_messages ADD COLUMN origin TEXT');
     // Addresses whose future inbound mail is marked on arrival — the "always do
     // this for this correspondent" rule, applied by POST /v1/admin/email-messages.
     //

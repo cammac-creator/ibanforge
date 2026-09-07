@@ -30,6 +30,24 @@ export interface Message {
    * light nothing, visibly and everywhere at once, rather than half-working.
    */
   no_reply_needed?: number | null;
+  /**
+   * Who pressed send, on an outbound row.
+   *
+   * 'claude' — the agent wrote and sent it, with no click from the operator.
+   * 'dashboard' — the composer on this site (see app/api/crm/send/route.ts).
+   * null or absent — a copy the nightly IMAP sync read back from the mailbox,
+   * or a row written before the column existed. The two are the same answer:
+   * "nobody said", which is why NULL is a value here rather than a gap.
+   *
+   * Optional on the wire for the same deploy-order reason as `no_reply_needed`
+   * above: Vercel and Railway ship independently, so this frontend runs for a
+   * while against an API whose SELECT does not carry the column yet. Absent
+   * degrades to "the mailbox", which is what every row looked like before.
+   *
+   * Meaningless on an inbound row, and lib/crm/journal.ts states that rule
+   * once: an origin is a property of a DEPARTURE.
+   */
+  origin?: 'claude' | 'dashboard' | null;
 }
 
 export interface ClientKeyInfo {

@@ -1189,3 +1189,104 @@ describe('GET /v1/admin/email-messages — the two optional cuts (TABS-12, TABS-
     expect('body' in rows[0]).toBe(false);
   });
 });
+
+describe('POST /v1/admin/email-messages — where a sent mail came from', () => {
+  const app = () => makeApp();
+  const H = {
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+    'Content-Type': 'application/json',
+  };
+  /**
+   * One id per test, and never one ending in RUN_TAG.
+   *
+   * Two separate traps, both of which bit here. The block above filters its own
+   * rows with `String(m.id).endsWith(RUN_TAG)` and then asserts an exact
+   * length, so a row of ours ending in that tag would be swept into counts
+   * that have nothing to do with origin — hence the suffix after the tag. And
+   * the stats DB is a FILE: rows outlive the process, and this whole feature is
+   * "a second write does not erase the first", so two tests sharing an id would
+   * hand each other a mark. The tag keeps ids unique across runs, the per-test
+   * name keeps them unique within one.
+   */
+  const idFor = (name: string) => `origin-${RUN_TAG}-${name}`;
+
+  /** Send one row, with whatever this call declares about it. */
+  async function put(ID: string, extra: Record<string, unknown>) {
+    const res = await app().request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: H,
+      body: JSON.stringify({
+        messages: [
+          {
+            id: ID,
+            customer_email: 'acme@example.com',
+            direction: 'out',
+            msg_date: '2026-09-07T08:15:00',
+            subject: 'Demande de réutilisation des données',
+            snippet: 'Bonjour, nous sollicitons…',
+            ...extra,
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+  }
+
+  /** One row, read back through the very endpoint the dashboard reads. */
+  async function stored(ID: string, qs = ''): Promise<Record<string, unknown>> {
+    const res = await app().request(`/v1/admin/email-messages${qs}`, { headers: H });
+    expect(res.status).toBe(200);
+    const j = (await res.json()) as { messages: Array<Record<string, unknown>> };
+    return j.messages.find((m) => m.id === ID)!;
+  }
+
+  it('stores the origin declared at insertion, and serves it back', async () => {
+    const id = idFor('insert');
+    await put(id, { origin: 'claude' });
+    expect((await stored(id)).origin).toBe('claude');
+  });
+
+  it('keeps it when a re-sync of the same message declares none', async () => {
+    // The whole mailbox is re-ingested nightly by a script that reads IMAP and
+    // cannot know a mail was written by the agent rather than by hand. Without
+    // COALESCE, that sync would erase every mark the same evening it was placed.
+    const id = idFor('resync');
+    await put(id, { origin: 'claude' });
+    await put(id, { snippet: 'Bonjour, nous sollicitons… (resynchronisé)' });
+    const row = await stored(id);
+    expect(row.origin).toBe('claude');
+    // …while still updating everything the re-sync does know about.
+    expect(String(row.snippet)).toContain('resynchronisé');
+  });
+
+  it('lets a later write place a mark on a row already stored', async () => {
+    // The retrofit road: mail that left before this column existed is labelled
+    // by a second POST on the same stable id, not by a migration guessing.
+    const id = idFor('retrofit');
+    await put(id, {});
+    expect((await stored(id)).origin).toBe(null);
+    await put(id, { origin: 'dashboard' });
+    expect((await stored(id)).origin).toBe('dashboard');
+  });
+
+  it('folds a mis-cased word and ignores an unknown one', async () => {
+    // Folded rather than refused: a marking POST that says 'Claude' would
+    // otherwise fall to null, be preserved by COALESCE, and report success
+    // having changed nothing — the silent no-op this column cannot afford.
+    const id = idFor('vocabulary');
+    await put(id, { origin: ' Claude ' });
+    expect((await stored(id)).origin).toBe('claude');
+    // Unknown reads as "not declared", so it keeps what is stored rather than
+    // storing a word no badge knows how to draw.
+    await put(id, { origin: 'facteur' });
+    expect((await stored(id)).origin).toBe('claude');
+  });
+
+  it('serves the origin on the light cut too, which is what a list view asks', async () => {
+    const id = idFor('summary');
+    await put(id, { origin: 'dashboard' });
+    const row = await stored(id, '?fields=summary');
+    expect(row.origin).toBe('dashboard');
+    expect('body' in row).toBe(false);
+  });
+});

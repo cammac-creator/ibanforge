@@ -70,6 +70,18 @@ async function recordSent(to: string, subject: string, body: string, account: st
     // record was read back. A mail past 50k is a different problem.
     body: body.slice(0, 50_000),
     counterparty: account,
+    /**
+     * This composer, and the operator's own click. Declared here because this
+     * is the only place that knows it: the IMAP sync reading the Sent copy
+     * fifteen minutes later cannot tell a mail typed on this page from one
+     * typed in a mail client, and the upsert is written so that its silence
+     * preserves this word rather than erasing it (see api-keys.ts).
+     *
+     * The agent sends by POSTing the same endpoint with 'claude', which is the
+     * distinction the journal draws: mail that left with a click, and mail that
+     * left without one.
+     */
+    origin: 'dashboard',
   };
   try {
     await fetch(`${apiUrl}/v1/admin/email-messages`, {

@@ -1077,6 +1077,41 @@ interface EmailMessageInput {
   lang?: unknown;
   body?: unknown;
   counterparty?: unknown;
+  /**
+   * Who pressed send, for an outbound row. See ORIGINS below for the closed
+   * vocabulary, and the column's comment in db.ts for why it is nullable.
+   *
+   * Unlike no_reply_needed beside it, this one IS part of the input: the
+   * marker cannot be computed here, because "the agent sent this without a
+   * click" is knowledge only the caller holds.
+   */
+  origin?: unknown;
+}
+
+/**
+ * The two origins a caller may declare. Anything else — an unknown word, a
+ * typo, a value from a future the dashboard does not draw yet — reads as
+ * "not declared" and stores NULL, which the upsert then treats as "keeps
+ * whatever is there".
+ *
+ * A closed list rather than free TEXT, unlike `category` on the institutional
+ * contacts: this column is drawn as a badge on every sent line of the journal,
+ * so an unforeseen value would render as an unlabelled pill with nothing on
+ * screen to say where it came from. There is no operator here to file a value
+ * the vocabulary did not foresee — the writers are this codebase and the sync
+ * scripts.
+ */
+const ORIGINS = new Set(['claude', 'dashboard']);
+
+/** The declared origin, or null when nothing usable was declared. */
+function readOrigin(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  // Trimmed and folded before the test: a stray 'Claude' from a hand-written
+  // marking POST would otherwise fall to null, COALESCE would preserve the old
+  // value, and the request would report success having changed nothing — the
+  // silent no-op on the very operation this column exists for.
+  const s = v.trim().toLowerCase();
+  return ORIGINS.has(s) ? s : null;
 }
 
 /**
@@ -1102,8 +1137,8 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   const clip = (v: unknown, n: number): string | null =>
     typeof v === 'string' && v.length ? v.slice(0, n) : null;
   const upsert = db.prepare(
-    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed)
-     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @body, @counterparty, @no_reply_needed)
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed, origin)
+     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @body, @counterparty, @no_reply_needed, @origin)
      -- 🚨 no_reply_needed is deliberately ABSENT from the update list below, so
      -- an omitted column keeps its stored value. Ids are stable md5s and the
      -- whole mailbox is re-ingested every night: assigning it here would erase
@@ -1119,6 +1154,14 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
        -- by translate-messages.py; a raw re-sync must not wipe them).
        snippet_fr = COALESCE(excluded.snippet_fr, snippet_fr),
        lang = COALESCE(excluded.lang, lang),
+       -- Same shape as the two above, for a different pair of writers. The
+       -- nightly re-ingestion reads the mailbox and cannot know that a mail was
+       -- written by the agent rather than by hand, so it sends no origin and
+       -- must not erase one; a second POST that DOES know can still place the
+       -- mark on rows already stored, which is how mail sent before this column
+       -- existed gets labelled. COALESCE buys both, and it can here because
+       -- "not declared" is NULL rather than a value (see db.ts).
+       origin = COALESCE(excluded.origin, origin),
        body = excluded.body, counterparty = excluded.counterparty`,
   );
   // An outgoing message to a prospect's contact_email means it HAS been
@@ -1195,6 +1238,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
         body: clip(r.body, 50_000),
         counterparty: clip(r.counterparty, 255),
         no_reply_needed: noReply,
+        origin: readOrigin(r.origin),
       });
       if (direction === 'out') markContacted.run(email);
       n++;
@@ -1232,9 +1276,13 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
   const summaryOnly = c.req.query('fields') === 'summary';
   const sinceRaw = c.req.query('since') ?? '';
   const since = /^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) ? sinceRaw : null;
+  // `origin` is served by BOTH cuts. It is one short word, so it costs the
+  // summary nothing, and the journal that reads it is precisely a list view:
+  // dropping it from the light cut would make the caller with the least reason
+  // to download bodies the only one unable to say who sent a mail.
   const columns = summaryOnly
-    ? `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, counterparty, no_reply_needed`
-    : `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed`;
+    ? `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, counterparty, no_reply_needed, origin`
+    : `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed, origin`;
   const rows = since
     ? db
         .prepare(`SELECT ${columns} FROM email_messages WHERE msg_date >= ? ORDER BY msg_date ASC`)
