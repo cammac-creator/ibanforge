@@ -50,13 +50,21 @@ export function OrphanGist({
   eager: boolean;
 }) {
   const [gist, setGist] = useState<string | null>(initial);
-  const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
+  const [failed, setFailed] = useState(false);
   const [wanted, setWanted] = useState(eager);
+  /**
+   * « In flight » is not a state of its own: a row is busy exactly while it
+   * wants a gist, has none, and has not failed. Held as state, it had to be
+   * written from the effect body, which buys a second render for a fact the
+   * first one already knew — the pattern react-hooks/set-state-in-effect names
+   * (rules turned on 2026-09-07). Derived, the marker is on screen from the
+   * render that fires the request rather than the one after it.
+   */
+  const busy = wanted && !gist && !failed;
 
   useEffect(() => {
-    if (gist || !wanted || state !== 'idle') return;
+    if (gist || !wanted || failed) return;
     let alive = true;
-    setState('busy');
     (async () => {
       await acquire();
       try {
@@ -67,12 +75,10 @@ export function OrphanGist({
         });
         const data = (await r.json().catch(() => ({}))) as { gist_fr?: string };
         if (!alive) return;
-        if (r.ok && data.gist_fr) {
-          setGist(data.gist_fr);
-          setState('idle');
-        } else setState('failed');
+        if (r.ok && data.gist_fr) setGist(data.gist_fr);
+        else setFailed(true);
       } catch {
-        if (alive) setState('failed');
+        if (alive) setFailed(true);
       } finally {
         release();
       }
@@ -80,7 +86,7 @@ export function OrphanGist({
     return () => {
       alive = false;
     };
-  }, [gist, wanted, state, id, sender, subject, snippet, msgDate]);
+  }, [gist, wanted, failed, id, sender, subject, snippet, msgDate]);
 
   if (gist) {
     return (
@@ -101,22 +107,25 @@ export function OrphanGist({
   return (
     <div className="mt-1">
       {snippet && <p className="text-[12px] leading-relaxed text-[var(--fg-4)]">{snippet}</p>}
-      {state === 'busy' && (
+      {busy && (
         <p className="mt-0.5 text-[11.5px] text-amber-300">résumé en français en cours…</p>
       )}
-      {state === 'failed' && (
+      {failed && (
         <p className="mt-0.5 text-[11.5px] text-[var(--fg-4)]">
           pas de résumé français (le rédacteur n&apos;a pas répondu){' '}
           <button
             type="button"
             className="underline hover:text-[var(--fg-2)]"
-            onClick={() => setState('idle')}
+            onClick={() => setFailed(false)}
           >
             réessayer
           </button>
         </p>
       )}
-      {state === 'idle' && !wanted && (
+      {/* A row that has not been asked for is the only one still offering the
+          link: wanting a gist is what starts the request, so !wanted implies
+          nothing has failed yet. */}
+      {!wanted && (
         <button
           type="button"
           onClick={() => setWanted(true)}
