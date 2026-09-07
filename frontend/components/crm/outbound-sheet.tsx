@@ -18,6 +18,7 @@ import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
 import { PANEL_PADDING_PX } from './panel-padding';
+import { useRememberedFlag } from './use-remembered-flag';
 
 /**
  * How tall the open sheet is, in pixels.
@@ -216,31 +217,19 @@ export function OutboundSheet({
    * The scroll reserve stays blind to it, exactly as it is to the angles
    * growth above: the reserve protects a reading nobody is doing while they
    * are writing, and the sheet is back at rest the moment it folds.
+   *
+   * The choice is remembered, same contract and same reason as the reply
+   * sheet's (03/09/2026): this subtree is server-rendered, and a first state
+   * that differs between the server and the browser is a hydration mismatch.
+   * The mount effect that used to read it back was a setState in an effect
+   * body — what the React Compiler rules name (react-hooks/set-state-in-effect,
+   * turned on 2026-09-07) — and has become the store hook, which keeps the
+   * contract without it. See use-remembered-flag.ts.
    */
-  const [expanded, setExpanded] = useState(false);
-  /**
-   * The remembered choice, same contract and same reason as the reply sheet's
-   * (03/09/2026): read in an effect, because this subtree is server-rendered
-   * and a first state that differs between server and browser is a mismatch.
-   */
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(EXPAND_KEY) === '1') setExpanded(true);
-    } catch {
-      // Private window, or storage refused: the default height stands.
-    }
-  }, []);
+  const [expanded, setExpanded] = useRememberedFlag(EXPAND_KEY);
 
   function toggleExpanded() {
-    setExpanded((e) => {
-      const next = !e;
-      try {
-        localStorage.setItem(EXPAND_KEY, next ? '1' : '0');
-      } catch {
-        // Nothing to remember; the toggle still works for this sheet.
-      }
-      return next;
-    });
+    setExpanded(!expanded);
   }
 
   /**
