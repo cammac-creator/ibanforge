@@ -725,6 +725,34 @@
           }
         }
       },
+      "searchConsole": {
+        "title": "Search Console",
+        "lead": "Ce que Google envoie au site : quatre semaines complètes, puis les requêtes et les pages des 28 derniers jours.",
+        "notConfigured": "GSC_SA_JSON n'est pas posée dans cet environnement : rien n'est lu ici, et ce n'est pas une panne.",
+        "stale": "Google a refusé le dernier rafraîchissement ({status}). Ce qui suit est la lecture précédente, pas celle du jour.",
+        "week": "Semaine",
+        "clicks": "Clics",
+        "impressions": "Impr.",
+        "ctr": "CTR",
+        "position": "Pos.",
+        "queries": "Premières requêtes (28 j)",
+        "pages": "Premières pages (28 j)",
+        "noQueries": "Aucune requête n'a rapporté d'impression.",
+        "noPages": "Aucune page n'est apparue dans un résultat.",
+        "sitemap": "Plan du site",
+        "sitemapLine": "{submitted} URL soumises, {indexed} indexées — dernière lecture {date}",
+        "sitemapIssues": "{errors} erreurs, {warnings} avertissements",
+        "noSitemap": "Aucun plan du site soumis.",
+        "never": "jamais",
+        "witnesses": "URL témoins",
+        "inspectionFailed": "non inspectée",
+        "read": "Données jusqu'au {end} — Search Console a trois jours de retard. Lues le {at}.",
+        "state": {
+          "indexed": "indexée",
+          "notIndexed": "connue, non indexée",
+          "unknown": "inconnue de Google"
+        }
+      },
       "details": {
         "title": "Le détail {days} jours",
         "lead": "vrai, utile une fois par semaine, jamais urgent",

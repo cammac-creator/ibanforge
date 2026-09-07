@@ -1,5 +1,6 @@
 import type { ActivationClientRow } from '@/components/dashboard/clients-table';
 import type { StatusByPathRow } from '@/components/dashboard/status-by-path-table';
+import type { Fetched } from '@/components/dashboard/overview/fetching';
 import { SEEDED_PILOT_RE } from '@/lib/crm/build-contacts';
 
 /**
@@ -493,4 +494,103 @@ export function trialFunnel(events: WebEventsSummary | null, signups: SignupSour
     exhausted: count(TRIAL_EXHAUSTED_EVENT),
     keys: signups?.channels.find((c) => c.channel === TRIAL_SIGNUP_CHANNEL)?.n ?? 0,
   };
+}
+
+// ---------------------------------------------------------------- Search Console
+
+/** One complete Monday→Sunday week. `ctr` and `position` are null with no impression. */
+export interface SearchConsoleWeek {
+  start: string;
+  end: string;
+  clicks: number;
+  impressions: number;
+  ctr: number | null;
+  position: number | null;
+}
+
+/** A query as typed, or a page as a path relative to the site. */
+export interface SearchConsoleRow {
+  key: string;
+  clicks: number;
+  impressions: number;
+  position: number | null;
+}
+
+export interface SearchConsoleSitemap {
+  path: string;
+  submitted: number;
+  indexed: number;
+  last_submitted: string | null;
+  last_downloaded: string | null;
+  errors: number;
+  warnings: number;
+  is_pending: boolean;
+}
+
+/** Google's verdict folded to the three answers that call for different work. */
+export type IndexState = 'indexed' | 'not-indexed' | 'unknown';
+
+export interface SearchConsoleInspection {
+  path: string;
+  state: IndexState;
+  coverage: string | null;
+  last_crawled: string | null;
+  error: string | null;
+}
+
+/**
+ * GET /v1/admin/search-console (src/lib/search-console.ts in the API).
+ *
+ * `stale` is true when the payload is the last reading that landed rather than
+ * one taken just now — it always travels with the 502 the route answers when
+ * Google refuses, and `upstream_status` says which refusal.
+ */
+export interface SearchConsole {
+  site: string;
+  /** J-3: the last day Google is expected to have data for. */
+  window_end: string;
+  weeks: SearchConsoleWeek[];
+  top_window: { start: string; end: string };
+  queries: SearchConsoleRow[];
+  pages: SearchConsoleRow[];
+  sitemaps: SearchConsoleSitemap[];
+  inspections: SearchConsoleInspection[];
+  /** SQL datetime, UTC, of the reading itself — not of this request. */
+  fetched_at: string;
+  stale: boolean;
+  upstream_status?: number;
+}
+
+/**
+ * The one overview read that keeps the body of a failed response.
+ *
+ * `fetchJSON` drops `data` on any non-2xx, which is right for every other card
+ * and wrong for this one: the route answers 502 WITH the last reading attached
+ * precisely so a Google outage shows last week's figures rather than an empty
+ * box. Thrown away here, that whole design would be dead code. The card then
+ * branches on `status` — 503 is "not configured", 502 with data is a stale
+ * reading, anything else is a failed read.
+ *
+ * URL and headers are arguments rather than module constants, like every other
+ * derivation in this file: nothing here reads the environment on its own, so
+ * the reader is testable without one.
+ */
+export async function fetchSearchConsole(
+  apiUrl: string,
+  headers: HeadersInit,
+): Promise<Fetched<SearchConsole>> {
+  try {
+    const res = await fetch(`${apiUrl}/v1/admin/search-console`, { cache: 'no-store', headers });
+    const body: unknown = await res.json().catch(() => null);
+    // A summary is recognised by its weeks. `{ error: 'not_configured' }` and
+    // an HTML error page from a proxy both come back as data: null, and the
+    // status is what tells the card which of the two it is looking at.
+    const data =
+      body !== null && typeof body === 'object' && Array.isArray((body as SearchConsole).weeks)
+        ? (body as SearchConsole)
+        : null;
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 0, data: null };
+  }
 }

@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import de from '@/messages/de.json';
 import en from '@/messages/en.json';
 import fr from '@/messages/fr.json';
@@ -12,6 +12,7 @@ import {
   daysSince,
   dedupeMarkers,
   externalClients,
+  fetchSearchConsole,
   moneySummary,
   parseSqlUtc,
   recentSignups,
@@ -19,7 +20,7 @@ import {
   serverErrorPaths,
   trialFunnel,
 } from './dashboard-overview';
-import type { SignupSources, WebEventsSummary } from './dashboard-overview';
+import type { SearchConsole, SignupSources, WebEventsSummary } from './dashboard-overview';
 
 const NOW = new Date('2026-09-01T12:00:00Z');
 
@@ -381,6 +382,105 @@ describe('brokenLevel', () => {
 
   it('warns on a stale register', () => {
     expect(brokenLevel({ ...base, staleSources: 1 })).toBe('warn');
+  });
+});
+
+describe('fetchSearchConsole', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const summary = {
+    site: 'https://ibanforge.com/',
+    window_end: '2026-09-04',
+    weeks: [{ start: '2026-08-24', end: '2026-08-30', clicks: 4, impressions: 40, ctr: 10, position: 8 }],
+    top_window: { start: '2026-08-08', end: '2026-09-04' },
+    queries: [],
+    pages: [],
+    sitemaps: [],
+    inspections: [],
+    fetched_at: '2026-09-07 06:00:00',
+    stale: false,
+  } satisfies SearchConsole;
+
+  function upstream(body: unknown, status: number) {
+    vi.stubGlobal('fetch', async () => ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+    }));
+  }
+
+  it('reads a 200 like any other card', async () => {
+    upstream(summary, 200);
+    expect(await fetchSearchConsole('http://api.test', {})).toEqual({
+      ok: true,
+      status: 200,
+      data: summary,
+    });
+  });
+
+  /**
+   * The reason this reader exists instead of the page's generic `admin()`.
+   *
+   * The route answers 502 WITH the last reading that landed, so a Google
+   * outage shows last week's figures marked stale rather than an empty box.
+   * `fetchJSON` drops `data` on every non-2xx, which would make that whole
+   * path dead code.
+   */
+  it('keeps the stale payload the 502 carries', async () => {
+    upstream({ ...summary, stale: true, error: 'upstream', upstream_status: 429 }, 502);
+    const res = await fetchSearchConsole('http://api.test', {});
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(502);
+    expect(res.data?.stale).toBe(true);
+    expect(res.data?.weeks).toHaveLength(1);
+  });
+
+  it('gives the 503 no data, so the card can say "not configured" rather than "broken"', async () => {
+    upstream({ error: 'not_configured' }, 503);
+    expect(await fetchSearchConsole('http://api.test', {})).toEqual({
+      ok: false,
+      status: 503,
+      data: null,
+    });
+  });
+
+  it('refuses a body that is not a summary, whatever the status', async () => {
+    upstream({ error: 'upstream', upstream_status: 403 }, 502);
+    expect((await fetchSearchConsole('http://api.test', {})).data).toBeNull();
+  });
+
+  it('is status 0, not a throw, when the API cannot be reached', async () => {
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('ECONNREFUSED');
+    });
+    expect(await fetchSearchConsole('http://api.test', {})).toEqual({
+      ok: false,
+      status: 0,
+      data: null,
+    });
+  });
+});
+
+/**
+ * The one card that must NOT open with the guard every other card opens with.
+ *
+ * `!res.ok || !res.data → <FetchFailed>` is the right idiom everywhere else and
+ * the wrong one here: the route answers 502 WITH the last reading attached, and
+ * that guard would throw it away — the stale path would be dead code with a
+ * green suite, since this vitest is `environment: 'node'` and cannot render a
+ * component. Asserted on the source, which is the same trick the key check
+ * below uses and the only one available at this altitude.
+ */
+describe('the Search Console card', () => {
+  const src = readFileSync(
+    new URL('../components/dashboard/overview/search-console-card.tsx', import.meta.url),
+    'utf8',
+  );
+
+  it('branches on the presence of data and on 503, never on res.ok', () => {
+    expect(src).not.toMatch(/res\.ok/);
+    expect(src).toMatch(/res\.status === 503/);
+    expect(src).toMatch(/!data \?/);
   });
 });
 

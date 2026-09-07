@@ -30,7 +30,13 @@ import type {
 } from '@/components/dashboard/overview/types';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
 import { fetchTrafficTrend } from '@/lib/traffic-trend';
-import type { SignupSources, AuditStats, WebEventsSummary } from '@/lib/dashboard-overview';
+import {
+  fetchSearchConsole,
+  type SearchConsole,
+  type SignupSources,
+  type AuditStats,
+  type WebEventsSummary,
+} from '@/lib/dashboard-overview';
 
 /**
  * The founder's cockpit.
@@ -127,6 +133,16 @@ export default async function DashboardPage({
   // week for the pulse, the month for the shape.
   const doorsWeekP = admin<WebEventsSummary>('/v1/admin/web-events?days=7');
   const doorsMonthP = admin<WebEventsSummary>('/v1/admin/web-events?days=30');
+  /**
+   * What Google sends the site. NOT read through `admin()`: the route answers
+   * 502 with the last reading attached when Google refuses, and `fetchJSON`
+   * drops the body of any non-2xx — the card would show an empty box on the one
+   * day the previous week's figures are worth the most. `fetchSearchConsole`
+   * keeps that body; the missing-secret branch stays here like every other.
+   */
+  const searchConsoleP = ADMIN_SECRET
+    ? fetchSearchConsole(API_URL, adminHeaders)
+    : Promise.resolve(notFetched<SearchConsole>());
   // Swallows its own failures already; the catch is belt and braces, because a
   // promise created here and awaited three sections down would otherwise be an
   // unhandled rejection before anyone looks at it.
@@ -242,6 +258,7 @@ export default async function DashboardPage({
           auditStatsPromise={auditStatsP}
           doorsWeekPromise={doorsWeekP}
           doorsMonthPromise={doorsMonthP}
+          searchConsolePromise={searchConsoleP}
         />
       </Suspense>
 

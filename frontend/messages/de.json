@@ -725,6 +725,34 @@
           }
         }
       },
+      "searchConsole": {
+        "title": "Search Console",
+        "lead": "Was Google der Website schickt: vier vollständige Wochen, dann die Suchanfragen und Seiten der letzten 28 Tage.",
+        "notConfigured": "GSC_SA_JSON ist in dieser Umgebung nicht gesetzt: hier wird nichts gelesen, und das ist kein Fehler.",
+        "stale": "Google hat die letzte Aktualisierung abgelehnt ({status}). Es folgt die vorherige Lesung, nicht die von heute.",
+        "week": "Woche",
+        "clicks": "Klicks",
+        "impressions": "Impr.",
+        "ctr": "CTR",
+        "position": "Pos.",
+        "queries": "Top-Suchanfragen (28 T)",
+        "pages": "Top-Seiten (28 T)",
+        "noQueries": "Keine Suchanfrage hat eine Impression gebracht.",
+        "noPages": "Keine Seite ist in einem Ergebnis erschienen.",
+        "sitemap": "Sitemap",
+        "sitemapLine": "{submitted} URLs eingereicht, {indexed} indexiert — zuletzt gelesen {date}",
+        "sitemapIssues": "{errors} Fehler, {warnings} Warnungen",
+        "noSitemap": "Keine Sitemap eingereicht.",
+        "never": "nie",
+        "witnesses": "Stichproben-URLs",
+        "inspectionFailed": "nicht geprüft",
+        "read": "Daten bis {end} — Search Console hinkt drei Tage hinterher. Gelesen am {at}.",
+        "state": {
+          "indexed": "indexiert",
+          "notIndexed": "bekannt, nicht indexiert",
+          "unknown": "Google unbekannt"
+        }
+      },
       "details": {
         "title": "Das Detail über {days} Tage",
         "lead": "wahr, einmal pro Woche nützlich, nie dringend",

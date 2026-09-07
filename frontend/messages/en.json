@@ -725,6 +725,34 @@
           }
         }
       },
+      "searchConsole": {
+        "title": "Search Console",
+        "lead": "What Google sends the site: four complete weeks, then the queries and pages of the last 28 days.",
+        "notConfigured": "GSC_SA_JSON is not set in this environment: nothing is read here, and that is not a fault.",
+        "stale": "Google refused the last refresh ({status}). What follows is the previous reading, not today's.",
+        "week": "Week",
+        "clicks": "Clicks",
+        "impressions": "Impr.",
+        "ctr": "CTR",
+        "position": "Pos.",
+        "queries": "Top queries (28 d)",
+        "pages": "Top pages (28 d)",
+        "noQueries": "No query brought an impression.",
+        "noPages": "No page appeared in a result.",
+        "sitemap": "Sitemap",
+        "sitemapLine": "{submitted} URLs submitted, {indexed} indexed — last read {date}",
+        "sitemapIssues": "{errors} errors, {warnings} warnings",
+        "noSitemap": "No sitemap submitted.",
+        "never": "never",
+        "witnesses": "Witness URLs",
+        "inspectionFailed": "not inspected",
+        "read": "Data up to {end} — Search Console lags three days. Read on {at}.",
+        "state": {
+          "indexed": "indexed",
+          "notIndexed": "known, not indexed",
+          "unknown": "unknown to Google"
+        }
+      },
       "details": {
         "title": "The {days}-day detail",
         "lead": "true, useful once a week, never urgent",

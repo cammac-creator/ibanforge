@@ -5,12 +5,13 @@ import { LivingToolCard, type DemandGapsPayload, type FeedbackReport } from '../
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { topUsers } from '@/lib/crm/top-users';
-import { recentSignups, type SignupSources, type AuditStats, type WebEventsSummary } from '@/lib/dashboard-overview';
+import { recentSignups, type SearchConsole, type SignupSources, type AuditStats, type WebEventsSummary } from '@/lib/dashboard-overview';
 import { StatCardV2 } from '../stat-card-v2';
 import { ClientLinks } from './client-links';
 import { SignupSourcesCard } from './signup-sources-card';
 import { AuditStatsCard } from './audit-stats-card';
 import { LandingDoorsCard } from './landing-doors-card';
+import { SearchConsoleCard } from './search-console-card';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
@@ -40,6 +41,7 @@ export async function NewSection({
   auditStatsPromise,
   doorsWeekPromise,
   doorsMonthPromise,
+  searchConsolePromise,
 }: {
   locale: string;
   /** The page's single instant: see one-clock.ts. */
@@ -56,6 +58,8 @@ export async function NewSection({
   auditStatsPromise: Promise<Fetched<AuditStats>>;
   doorsWeekPromise: Promise<Fetched<WebEventsSummary>>;
   doorsMonthPromise: Promise<Fetched<WebEventsSummary>>;
+  /** What Google sends the site: the same "where do they come from" question, one door further out. */
+  searchConsolePromise: Promise<Fetched<SearchConsole>>;
 }) {
   const t = await getTranslations('dashboard.overview');
   const [activationRes, clientsRes, crm, historyRes, gapsRes, feedbackRes] = await Promise.all([
@@ -164,6 +168,8 @@ export async function NewSection({
       <SignupSourcesCard sourcesPromise={sourcesPromise} locale={locale} />
 
       <LandingDoorsCard weekPromise={doorsWeekPromise} monthPromise={doorsMonthPromise} signupsWeekPromise={sourcesWeekPromise} signupsMonthPromise={sourcesPromise} locale={locale} />
+
+      <SearchConsoleCard consolePromise={searchConsolePromise} locale={locale} />
 
       <AuditStatsCard statsPromise={auditStatsPromise} locale={locale} />
 
