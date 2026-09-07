@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
-import { apiJson, chIidFile, formatIban, getIid } from "@/lib/registers";
+import { apiJson, chIidFile, formatIban, getIid, iidIdentity } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
 
@@ -31,8 +31,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   if (!entry) return { title: "Not Found" };
   const t = await getTranslations({ locale, namespace: "registers" });
   const r = entry.register;
-  const vars = { iid: r.iid, name: r.name, town: r.town ?? "", bic: r.bic ?? "" };
-  return { title: t("iid.metaTitle", vars), description: t("iid.metaDescription", vars), alternates: alternatesFor(locale, `/iid/${r.iid}`) };
+  const id = iidIdentity(entry);
+  const vars = { iid: r.iid, name: id.name, town: id.town, bic: id.bic, target: id.redirectedTo ?? "" };
+  // A merged number says so in the title: "IID 04835: , " is what Google got
+  // for twenty-six pages before 2026-09-07 (see iidIdentity).
+  const title = id.redirectedTo ? t("iid.metaTitleRedirect", vars) : t("iid.metaTitle", vars);
+  const description = id.redirectedTo ? t("iid.metaDescriptionRedirect", vars) : t("iid.metaDescription", vars);
+  return { title, description, alternates: alternatesFor(locale, `/iid/${r.iid}`) };
 }
 
 export default async function IidPage({ params }: { params: Promise<{ locale: string; iid: string }> }) {
@@ -41,6 +46,7 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
   if (!entry) notFound();
   const t = await getTranslations("registers");
   const r = entry.register;
+  const id = iidIdentity(entry);
   const api = entry.api as Api;
   const file = chIidFile();
   const typeKey = api.institution?.type ?? "other";
@@ -54,12 +60,15 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
   const qrList = api.qr_iids?.length ? api.qr_iids.join(", ") : (api.qr_iid ?? r.qr_iid ?? null);
   const facts: Array<[string, React.ReactNode]> = [
     [t("iid.facts.iid"), r.iid],
-    [t("iid.facts.institution"), r.name],
+    [t("iid.facts.institution"), id.name || t("iid.facts.none")],
+    ...(id.redirectedTo
+      ? [[t("iid.facts.redirect"), <Link key="redirect" href={localePath(locale, `/iid/${id.redirectedTo}`)} className="text-amber-500 underline underline-offset-2">{id.redirectedTo}</Link>] as [string, React.ReactNode]]
+      : []),
     [t("iid.facts.type"), t(`iid.types.${typeKey}`)],
     [t("iid.facts.iidType"), t(`iid.types.${iidTypeKey}`)],
     [t("iid.facts.headquarters"), api.institution?.headquarters_iid && api.institution.headquarters_iid !== r.iid ? <Link href={localePath(locale, `/iid/${api.institution.headquarters_iid}`)} className="text-amber-500 underline underline-offset-2">{api.institution.headquarters_iid}</Link> : (api.institution?.headquarters_iid ?? t("iid.facts.none"))],
     [t("iid.facts.address"), address || t("iid.facts.none")],
-    [t("iid.facts.bic"), r.bic ?? t("iid.facts.none")],
+    [t("iid.facts.bic"), id.bic || t("iid.facts.none")],
     [t("iid.facts.services"), services.length ? services.join(" · ") : t("iid.facts.none")],
     [t("iid.facts.sicIid"), api.sic_iid ?? t("iid.facts.none")],
     [t("iid.facts.qrIid"), qrList ?? t("iid.facts.none")],
@@ -71,7 +80,11 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
       <header className="flex flex-col gap-3">
         <Badge variant="outline" className="w-fit">{t("iid.eyebrow")}</Badge>
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{t("iid.title", { iid: r.iid })}</h1>
-        <p className="text-lg text-muted-foreground">{t("iid.subtitle", { name: r.name, town: r.town ?? "" })}</p>
+        <p className="text-lg text-muted-foreground">
+          {id.redirectedTo
+            ? t("iid.subtitleRedirect", { target: id.redirectedTo, name: id.name, town: id.town })
+            : t("iid.subtitle", { name: id.name, town: id.town })}
+        </p>
       </header>
 
       <section className="overflow-x-auto rounded-md border" style={{ borderColor: "var(--hairline)" }}>
@@ -108,7 +121,7 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
             {related.map((e) => (
               <li key={e.register.iid} className="flex gap-3 truncate">
                 <Link href={localePath(locale, `/iid/${e.register.iid}`)} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.iid}</Link>
-                <span className="text-muted-foreground truncate">{e.register.town ?? e.register.name}</span>
+                <span className="text-muted-foreground truncate">{iidIdentity(e).town || iidIdentity(e).name}</span>
               </li>
             ))}
           </ul>

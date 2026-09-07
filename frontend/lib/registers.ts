@@ -48,6 +48,40 @@ export interface IidEntry {
   related: string[];
 }
 
+/**
+ * The identity an IID page shows in its title, description and subtitle.
+ *
+ * The SIX BankMaster publishes 26 IIDs (measured on the 2026-09-01 file) with no
+ * name, no town and no BIC of their own: merged institutions whose number is
+ * redirected to a successor (`redirect_iid`). Until 2026-09-07 those pages
+ * interpolated the empty fields as they were, and Google was served titles
+ * such as "IID 04835 (numéro de clearing) : , " — twenty-six junk pages in the
+ * sitemap. The API already answers such a number with the successor's identity
+ * and a `redirected_from` note, so the page carries the same: the target's
+ * name, town and BIC, and the redirection said in words.
+ */
+export interface IidIdentity {
+  name: string;
+  town: string;
+  bic: string;
+  /** The IID the register redirects this number to; null for a number that names an institution itself. */
+  redirectedTo: string | null;
+}
+
+export function iidIdentity(entry: IidEntry): IidIdentity {
+  const r = entry.register;
+  if (r.name.trim()) return { name: r.name, town: r.town ?? "", bic: r.bic ?? "", redirectedTo: null };
+  const api = entry.api as {
+    institution?: { name?: string };
+    address?: { town?: string | null };
+    bic?: string | null;
+  };
+  if (r.redirect_iid) {
+    return { name: api.institution?.name ?? "", town: api.address?.town ?? "", bic: api.bic ?? "", redirectedTo: r.redirect_iid };
+  }
+  return { name: "", town: "", bic: "", redirectedTo: null };
+}
+
 export interface AtRegister {
   code: string;
   name: string;
