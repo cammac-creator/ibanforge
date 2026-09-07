@@ -25,7 +25,7 @@ afterAll(() => {
 });
 
 interface Op {
-  id: number;
+  cursor: string;
   t: string;
   type: string;
   country: string | null;
@@ -52,28 +52,38 @@ describe('GET /v1/ops/recent', () => {
     expect(ops[0]).toMatchObject({ type: 'iban_validate', country: 'FR', success: false });
     expect(ops[1]).toMatchObject({ type: 'bic_lookup', country: 'CH', success: true });
     for (const op of ops) {
-      expect(Object.keys(op).sort()).toEqual(['country', 'id', 'success', 't', 'type']);
-      expect(op.id).toBeTypeOf('number');
+      expect(Object.keys(op).sort()).toEqual(['country', 'cursor', 'success', 't', 'type']);
+      // Adversarial review of 07/09/2026, F1: the row key is an opaque cursor,
+      // never the table's auto-increment id (the API's throughput in clear).
+      expect(op.cursor).toBeTypeOf('string');
+      expect(op.cursor).not.toMatch(/^\d+$/);
       expect(op.t).toBeTypeOf('string');
     }
   });
 
-  it('filters with ?after=<id> so a poller only receives what it has not seen', async () => {
+  it('filters with ?after=<cursor> so a poller only receives what it has not seen', async () => {
     const { ops: all } = await fetchOps();
-    const newest = all[0].id;
+    const newest = all[0].cursor;
     recordOperation('ch_clearing_lookup', 'CH', true, 0.003);
     // The 5 s cache must not hide rows from an after-cursor poll.
     const { ops } = await fetchOps(`?after=${newest}`);
     expect(ops.length).toBe(1);
     expect(ops[0].type).toBe('ch_clearing_lookup');
-    expect(ops[0].id).toBeGreaterThan(newest);
+    expect(ops[0].cursor).not.toBe(newest);
+  });
+
+  it('treats a cursor that is not ours as no cursor, and serves the window', async () => {
+    const { ops: plain } = await fetchOps();
+    for (const bogus of ['0', '12345', 'not-a-cursor', 'zzzzzzzzzz']) {
+      const { status, ops } = await fetchOps(`?after=${bogus}`);
+      expect(status).toBe(200);
+      expect(ops.length).toBe(plain.length);
+    }
   });
 
   it('caps the window at 50 operations', async () => {
     for (let i = 0; i < 60; i++) recordOperation('iban_format', 'AT', true, 0);
-    // A fresh poll (cache-busting cursor 0 is the plain query) may serve the
-    // 5 s cache; the cap applies either way.
-    const { ops } = await fetchOps('?after=0');
+    const { ops } = await fetchOps();
     expect(ops.length).toBeLessThanOrEqual(50);
   });
 
