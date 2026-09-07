@@ -8,6 +8,8 @@ order: 1
 
 IBANforge offers a **free tier** via API keys — 200 requests/month across all endpoints. No credit card, no crypto wallet required. For higher volumes, you can use [x402 micropayments](/docs/x402).
 
+This page is the reference on keys alone. If you have not made a call yet, [Onboarding](/docs/onboarding) is the shorter road: the keyless call, this key, the answer read block by block and a batch of 100, in ten minutes.
+
 ## Before the key: 10 calls a day, keyless
 
 `POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **10 times a day per IP address**, resetting at midnight UTC:
@@ -247,6 +249,7 @@ print(data)
 
 ## Next steps
 
+- [Onboarding](/docs/onboarding) — the whole path in ten minutes, from the keyless call to a batch of 100
 - [x402 Micropayments](/docs/x402) — unlimited pay-per-call with USDC
 - [IBAN Validation](/docs/iban-validate) — full endpoint reference
 - [Error Reference](/docs/errors) — all error codes and troubleshooting

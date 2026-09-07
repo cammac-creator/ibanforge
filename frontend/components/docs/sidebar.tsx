@@ -19,7 +19,7 @@ const groups: DocGroup[] = [
   {
     labelKey: "gettingStarted",
     icon: <BookOpen className="size-4" />,
-    slugs: ["index", "api-keys", "x402", "recipes"],
+    slugs: ["index", "api-keys", "onboarding", "x402", "recipes"],
   },
   {
     labelKey: "endpoints",

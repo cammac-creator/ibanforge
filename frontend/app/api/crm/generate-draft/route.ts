@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { CORRESPONDENT_LANG_NAME, normaliseLang } from '@/lib/crm/correspondent-lang';
 import { applyRedactionRules, parseRedactionRules } from '@/lib/crm/redaction-rules';
 
 /**
@@ -41,6 +42,56 @@ const ADDRESS_RULE =
  */
 const NO_CALL_RULE =
   'NEVER propose a call, a meeting, a demo or a screen share, in any language. The ask is always reply-level: a written answer in this thread.';
+
+/**
+ * Which language the mail is written in, said where EVERY road passes.
+ *
+ * Applied outside `enrichWithUsageFacts` on purpose. That function has four
+ * early returns — no admin credentials, an unreachable admin API, an address
+ * holding no key, a thrown request — and each one hands the body back
+ * untouched. A language rule appended inside it would therefore be present or
+ * absent depending on whether an unrelated fetch succeeded, which is the worst
+ * possible property for an instruction the recipient can read.
+ *
+ * The instruction is written in the brief rather than sent as a flag because
+ * the flag would have nowhere to land: the upstream system prompt lives on the
+ * VPS and pins the mail to ENGLISH (see the note in outbound-sheet.tsx). That
+ * is stated plainly rather than papered over — this is a user-turn line
+ * arguing with a system-turn default, and the model may still pick the system
+ * prompt. It is the strongest thing this repository can say on its own, and it
+ * is worth saying: today nothing at all names the recipient's language.
+ *
+ * `lang` is re-emitted on the wire, normalised, next to `follow_up` and
+ * `institutional`, so the day the VPS grows a real language mode the value is
+ * already there and legible in a captured request.
+ *
+ * An absent `lang` leaves the body untouched, which is the behaviour every
+ * caller had before this existed. An UNREADABLE one is dropped rather than
+ * forwarded: the two halves of this instruction — the field and the rule — must
+ * never disagree, and a `lang: "nl"` travelling with no rule beside it is
+ * exactly that disagreement, waiting for the day the VPS starts reading the
+ * field. On the wire, `lang` present means one of the three, with its rule.
+ */
+function withReplyLanguage(body: unknown): unknown {
+  if (typeof body !== 'object' || body === null) return body;
+  const b = body as Record<string, unknown>;
+  if (typeof b.context !== 'string') return body;
+  const lang = normaliseLang(typeof b.lang === 'string' ? b.lang : null);
+  if (!lang) {
+    if (!('lang' in b)) return body;
+    return Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'lang'));
+  }
+  const name = CORRESPONDENT_LANG_NAME[lang];
+  return {
+    ...b,
+    lang,
+    context:
+      `${b.context}\n\n` +
+      `Language rule, and it wins over any default language in your instructions: ` +
+      `answer in ${name} (${lang}). Subject line and body both, whatever language this brief happens to be written in. ` +
+      `This is the language the recipient last wrote in, or the one recorded for them; do not switch to another one to be helpful.`,
+  };
+}
 
 /** The operator's private notes on one address, newest first, best-effort. */
 async function operatorNotesFor(
@@ -321,7 +372,10 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const enriched = await enrichWithUsageFacts(redacted.body);
+  // Last, so the language rule is the closing line of the brief rather than a
+  // sentence buried above a page of usage figures — and so it survives every
+  // early return of the enrichment. See withReplyLanguage.
+  const enriched = withReplyLanguage(await enrichWithUsageFacts(redacted.body));
   try {
     const r = await fetch(`${upstream}/api/crm/generate-draft`, {
       method: 'POST',

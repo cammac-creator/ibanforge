@@ -8,6 +8,8 @@ order: 1
 
 IBANforge propose une **offre gratuite** via des cles API — 200 requetes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus eleves, vous pouvez utiliser les [micropaiements x402](/docs/x402).
 
+Cette page est la référence sur les clés seules. Si vous n'avez pas encore fait d'appel, la [prise en main](/docs/onboarding) est le chemin le plus court : l'appel sans clé, cette clé, la réponse lue bloc par bloc et un lot de 100, en dix minutes.
+
 ## Avant la clé : 10 appels par jour, sans clé
 
 `POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **10 fois par jour et par adresse IP**, remis à zéro à minuit UTC :
@@ -253,6 +255,7 @@ print(data)
 
 ## Etapes suivantes
 
+- [Prise en main](/docs/onboarding) — tout le chemin en dix minutes, de l'appel sans clé au lot de 100
 - [Micropaiements x402](/docs/x402) — paiement a l'appel illimite avec USDC
 - [Validation IBAN](/docs/iban-validate) — reference complete de l'endpoint
 - [Reference des erreurs](/docs/errors) — tous les codes d'erreur et le depannage

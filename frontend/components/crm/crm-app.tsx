@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { CLIENT_PARAM, OPEN_PARAM, contactIdFromParam } from '@/lib/crm/deep-link';
 import type { RowSelection } from '@/lib/crm/mail-rows';
 import { intentOf } from '@/lib/crm/intent';
+import { nextSelectionAfterSend } from '@/lib/crm/next-selection';
 import { noReplyHolds } from '@/lib/crm/no-reply';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { ContactDetail, ContactIdentity } from './contact-header';
@@ -195,11 +196,78 @@ export function CrmApp({
   const onDirtyChange = useCallback((d: boolean) => {
     composerDirty.current = d;
   }, []);
+  /**
+   * What was just done, said once and then gone: « Envoyé à … ».
+   *
+   * Held HERE and not in the sheet that did it, which is the whole reason this
+   * state exists at this level. The sheets are keyed on the contact, so the
+   * moment a send advances the selection the sheet REMOUNTS and any message it
+   * was holding dies with it — the confirmation would vanish at exactly the
+   * instant it is owed. The sheets keep their own line for FAILURES, where
+   * nothing moves and the text is still theirs to hold.
+   */
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * One toast at a time, and none left standing after this component goes.
+   * Same shape as the forums tab's `say`, and for the same two reasons it was
+   * written there (audit TABS-17): a second message inside the window used to
+   * be wiped by the first one's timer, and a component unmounted in between
+   * left a setState aimed at nothing.
+   */
+  const say = useCallback((text: string) => {
+    setToast(text);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => {
+      setToast(null);
+      toastTimer.current = null;
+    }, 5000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
 
-  // Same behaviour as the workspace this replaces: opening a thread clears its
-  // badge at once, locally, and tells the API in the background. A failed call
-  // is swallowed: the badge comes back on the next load, which is the harmless
-  // outcome, whereas blocking the click on a network round trip is not.
+  /**
+   * Everything opening a file does, minus the question.
+   *
+   * Split out of `open()` because a send has to reach it WITHOUT the guard.
+   * The sheet empties its fields on a confirmed send, but `onDirtyChange` is
+   * reported from an effect, so at the instant the send calls back the ref
+   * still says "there is a message in progress" — and `open()` would ask the
+   * operator whether they want to lose a mail that has already left. Two paths
+   * in, one behaviour, and the question stays on the path that genuinely
+   * destroys something.
+   */
+  function select(id: string, from?: HTMLElement | null) {
+    setSelectedId(id);
+    setShownId(id);
+    trigger.current = from ?? null;
+    // Opening a contact is a reading act. The composer comes back to rest.
+    setComposerOpen(false);
+    const c = contacts.find((x) => x.id === id);
+    const mark = c ? readMark(c) : '';
+    if (c?.unread && !readLocal.has(mark) && c.email) {
+      setReadLocal((prev) => new Set(prev).add(mark));
+      void fetch('/api/crm/thread-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: c.email }),
+      }).catch(() => {});
+    }
+  }
+
+  /**
+   * Opening a file on the operator's own gesture: a click on a row, j / k, the
+   * ◀ ▶ of the drawer.
+   *
+   * Same behaviour as the workspace this replaces: opening a thread clears its
+   * badge at once, locally, and tells the API in the background. A failed call
+   * is swallowed: the badge comes back on the next load, which is the harmless
+   * outcome, whereas blocking the click on a network round trip is not.
+   */
   function open(id: string, from?: HTMLElement | null) {
     /**
      * The one destructive path on this page, and the only one that asks.
@@ -222,21 +290,7 @@ export function CrmApp({
     ) {
       return;
     }
-    setSelectedId(id);
-    setShownId(id);
-    trigger.current = from ?? null;
-    // Opening a contact is a reading act. The composer comes back to rest.
-    setComposerOpen(false);
-    const c = contacts.find((x) => x.id === id);
-    const mark = c ? readMark(c) : '';
-    if (c?.unread && !readLocal.has(mark) && c.email) {
-      setReadLocal((prev) => new Set(prev).add(mark));
-      void fetch('/api/crm/thread-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: c.email }),
-      }).catch(() => {});
-    }
+    select(id, from);
   }
 
   /**
@@ -373,8 +427,12 @@ export function CrmApp({
   const onRowsChange = useCallback((ids: string[]) => setOrderedIds(ids), []);
   const position = shownId ? orderedIds.indexOf(shownId) : -1;
   const prevId = position > 0 ? orderedIds[position - 1] : null;
-  const nextId =
-    position >= 0 && position < orderedIds.length - 1 ? orderedIds[position + 1] : null;
+  // Through the shared rule rather than off `position` a second time: the walk
+  // in the drawer and the jump after a send have to name the same row, and two
+  // readings of one list are two answers waiting to disagree. See
+  // lib/crm/next-selection.ts, in particular on why "not in the list" is null
+  // and never the top of it.
+  const nextId = nextSelectionAfterSend(orderedIds, shownId);
   const goPrev = useCallback(() => {
     if (prevId) open(prevId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -383,6 +441,35 @@ export function CrmApp({
     if (nextId) open(nextId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextId]);
+
+  /**
+   * A mail has left. Say so, then move on.
+   *
+   * Three things, in the order the operator experiences them: the sheet has
+   * already folded itself (it is the only one that knows the send succeeded),
+   * the confirmation names the address it went to, and the selection walks to
+   * the next row OF THE LIST ON SCREEN — the filtered, searched, sorted one,
+   * so a run through "À répondre" stays a run through "À répondre".
+   *
+   * `select` and not `open`: see the note on the split. The sheet has just
+   * emptied its fields, but it reports that through an effect, so the dirty
+   * ref is still true at this instant and `open` would ask whether to lose a
+   * mail that has already gone.
+   *
+   * Nothing is refetched here. The sheet calls `router.refresh()` on the same
+   * confirmed send, which re-renders this server segment with the mail in the
+   * thread and the row in its new state; a second mechanism would only give
+   * the page two answers about when it is up to date.
+   */
+  const onSent = useCallback(
+    (to: string) => {
+      say(`✅ Envoyé à ${to}`);
+      const next = nextSelectionAfterSend(orderedIds, shownId);
+      if (next) select(next);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [say, orderedIds, shownId],
+  );
 
   // j / k walk the list from the keyboard when no field has the focus; with
   // the drawer closed, j opens the first row. The dirty guard in open() still
@@ -567,7 +654,7 @@ export function CrmApp({
                 sentToday={sentToday}
                 open={composerOpen}
                 onOpenChange={setComposerOpen}
-                onNext={nextId ? goNext : undefined}
+                onSent={onSent}
                 onDirtyChange={onDirtyChange}
               />
             ) : (
@@ -578,12 +665,33 @@ export function CrmApp({
                 sentToday={sentToday}
                 open={composerOpen}
                 onOpenChange={setComposerOpen}
+                onSent={onSent}
                 onDirtyChange={onDirtyChange}
               />
             )}
           </>
         )}
       </ContactDrawer>
+      {/* Over the drawer (z-90) rather than inside it, because the send moves
+          the drawer onto the NEXT file: a confirmation living in there would be
+          read as belonging to the contact now on screen. Bottom centre, out of
+          the way of both the table's rows and the drawer's own controls.
+
+          `role="status"` and not an alert: this is the good news, it must be
+          announced without interrupting, and it goes on its own after five
+          seconds. `pointer-events-none` so a toast that lands over a row never
+          swallows the click aimed at it. */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-6 z-[100] flex justify-center px-4"
+        >
+          <p className="max-w-[92vw] truncate rounded-lg border border-green-600/50 bg-[var(--ink-2)] px-4 py-2 text-[13px] font-medium text-green-300 shadow-[0_10px_30px_-8px_rgba(0,0,0,0.7)]">
+            {toast}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

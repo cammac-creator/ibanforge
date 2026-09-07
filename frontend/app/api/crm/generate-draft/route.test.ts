@@ -267,6 +267,79 @@ describe('POST /api/crm/generate-draft, correspondence with an institution', () 
   });
 });
 
+/**
+ * The recipient's language, checked on the wire.
+ *
+ * Worth its own tests for the reason the follow-up flag is: the language rule
+ * is appended AFTER the usage enrichment, and that enrichment has four early
+ * returns that hand the body straight back. A rule written inside it would be
+ * present or absent depending on whether an unrelated admin fetch happened to
+ * succeed — the worst possible property for an instruction the recipient can
+ * read. No admin environment is stubbed in this file, so every test below runs
+ * in exactly that degraded state.
+ */
+describe('POST /api/crm/generate-draft, the recipient language on the wire', () => {
+  it('closes the brief with the language rule, and names the language', async () => {
+    await post({ ...draft('someone@example.net'), lang: 'fr' });
+
+    const context = String(captured!.body.context);
+    expect(context.startsWith(BRIEF)).toBe(true);
+    expect(context).toContain('answer in French (fr)');
+    // Last, not buried above a page of standing rules: it is the closing line.
+    expect(context.trimEnd().endsWith('do not switch to another one to be helpful.')).toBe(true);
+  });
+
+  it('answers in German when that is what they wrote in', async () => {
+    await post({ ...draft('someone@example.net'), lang: 'de' });
+
+    expect(String(captured!.body.context)).toContain('answer in German (de)');
+  });
+
+  it('re-emits the normalised code beside follow_up, legible in a captured request', async () => {
+    await post({ ...draft('someone@example.net'), lang: 'FR-CH' });
+
+    expect(captured!.body).toHaveProperty('lang', 'fr');
+    expect(String(captured!.body.context)).toContain('answer in French (fr)');
+  });
+
+  it('says nothing at all when the caller sends no language', async () => {
+    await post(draft('someone@example.net'));
+
+    // The behaviour every caller had before this existed: no line, no field.
+    expect(captured!.body.context).toBe(BRIEF);
+    expect(captured!.body).not.toHaveProperty('lang');
+  });
+
+  it('says nothing for a language nobody here can proofread', async () => {
+    await post({ ...draft('someone@example.net'), lang: 'nl' });
+
+    expect(captured!.body.context).toBe(BRIEF);
+    expect(captured!.body).not.toHaveProperty('lang');
+  });
+
+  it('survives the redaction rewrite, which rebuilds the body', async () => {
+    vi.stubEnv('CRM_DRAFT_REDACTION_RULES', 'example.com=Acme');
+    await post({ ...draft('someone@example.com'), lang: 'fr' });
+
+    const context = String(captured!.body.context);
+    expect(context).toContain('IMPORTANT: never mention "Acme" anywhere.');
+    expect(context).toContain('answer in French (fr)');
+  });
+
+  it('reaches the institutional letter too, after its identity block', async () => {
+    await post({
+      ...draft('registry@alpha.example.net'),
+      contact_kind: 'institution',
+      institution: { org: 'Autorité Alpha', category: 'autorite', country: 'CH', dossier: null },
+      lang: 'de',
+    });
+
+    const context = String(captured!.body.context);
+    expect(context).toContain('Institution addressed: Autorité Alpha');
+    expect(context).toContain('answer in German (de)');
+  });
+});
+
 describe('POST /api/crm/generate-draft, the paths around it', () => {
   it('answers 503 and calls nobody when the shared secret is missing', async () => {
     vi.stubEnv('CRM_DRAFT_SECRET', '');

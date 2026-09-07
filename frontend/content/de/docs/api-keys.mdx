@@ -8,6 +8,8 @@ order: 1
 
 IBANforge bietet ein **kostenloses Kontingent** ueber API-Schluessel — 200 Anfragen/Monat auf allen Endpunkten. Keine Kreditkarte, keine Krypto-Wallet erforderlich. Fuer hoehere Volumen koennen Sie [x402-Mikrozahlungen](/docs/x402) verwenden.
 
+Diese Seite ist die Referenz allein zu Schlüsseln. Wenn Sie noch keinen Aufruf gemacht haben, sind die [Ersten Schritte](/docs/onboarding) der kürzere Weg: der Aufruf ohne Schlüssel, dieser Schlüssel, die Antwort Block für Block gelesen und ein Stapel von 100 — in zehn Minuten.
+
 ## Vor dem Schlüssel: 10 Aufrufe pro Tag, ohne Schlüssel
 
 `POST /v1/iban/validate` mit einer echten `iban` und ganz ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **10-mal pro Tag und IP-Adresse**, Rücksetzung um Mitternacht UTC:
@@ -255,6 +257,7 @@ print(data)
 
 ## Naechste Schritte
 
+- [Erste Schritte](/docs/onboarding) — der ganze Weg in zehn Minuten, vom Aufruf ohne Schlüssel bis zum Stapel von 100
 - [x402-Mikrozahlungen](/docs/x402) — unbegrenztes Pay-per-Call mit USDC
 - [IBAN-Validierung](/docs/iban-validate) — vollstaendige Endpunktreferenz
 - [Fehlerreferenz](/docs/errors) — alle Fehlercodes und Fehlerbehebung

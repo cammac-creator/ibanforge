@@ -10,6 +10,8 @@ order: 0
 
 IBANforge est une API rapide et fiable pour la **validation IBAN** et la **recherche BIC/SWIFT**. Elle couvre 89 pays avec vérification de checksum en temps réel, analyse de la structure BBAN, données institutionnelles enrichies via GLEIF et autres sources publiques (annuaire SWIFT, Bundesbank, SIX, NBP), **informations de conformité SEPA**, **classification de l'émetteur** (banque vs. EMI/néobanque), **screening sanctions & conformité** avec score de risque 0–100, et les données exclusives de **clearing suisse (BC-Nummer)** issues du SIX BankMaster.
 
+> **Commencez ici.** La [prise en main](/docs/onboarding) parcourt tout le chemin en dix minutes — l'appel sans clé, la clé gratuite, chaque bloc de la réponse lu par son vrai nom, un lot de 100 et les deux sortes d'erreur. Chaque `curl` de cette page a réellement été exécuté, et chaque réponse est celle que l'API a rendue.
+
 > **Commencez gratuitement, sans même une clé.** Deux endpoints règlent un problème entier sans rien payer : [`/v1/reference/validate`](/docs/swiss-qr-iban) contrôle les références de paiement (RF/ISO 11649, QRR suisse, OGM belge, viitenumero finlandais) avec un verdict sourcé, et [`/v1/address/check`](/docs/structured-addresses) contrôle une adresse ISO 20022 structurée contre les règles SPS, T2 ou Fedwire avant les échéances de novembre 2026.
 
 ## URL de base
@@ -137,6 +139,7 @@ Cela renvoie des exemples d'IBAN pre-valides de plusieurs pays afin que vous pui
 
 ## Etapes suivantes
 
+- [Prise en main](/docs/onboarding) — de zéro au premier lot de 100, en dix minutes
 - [Clés API](/docs/api-keys) — obtenez votre clé gratuite, 200 requêtes/mois
 - [Valider un IBAN unique](/docs/iban-validate) — reference complete du endpoint
 - [Validation par lot](/docs/iban-batch) — valider jusqu'a 100 IBAN en une seule requete
