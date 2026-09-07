@@ -31,6 +31,7 @@ import { recordDemandGap } from './demand-gaps.js';
 import { isTextbookIban } from './textbook-ibans.js';
 import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
+import { polishSettlementCheckDigit } from './pl-settlement-number.js';
 import { officialIdentityByNationalCode } from './official-identity.js';
 import { psdRegistrationByBankCode, type PsdEntityType } from './psd-register.js';
 import type {
@@ -634,7 +635,16 @@ function checkBankCode(
   lookupFailed: boolean,
 ): BankCodeCheck {
   try {
-    return decideBankCode(cc, bankCode, hit, bban, lookupFailed);
+    const verdict = decideBankCode(cc, bankCode, hit, bban, lookupFailed);
+    // Poland: the settlement number's own check digit is a fact the composite
+    // map cannot give (lib/pl-settlement-number.ts). It rides beside the
+    // verdict; it never changes `status`, because a structural impossibility
+    // and a register's silence are two different answers.
+    if (cc === 'PL') {
+      const checkDigit = polishSettlementCheckDigit(bankCode);
+      if (checkDigit) return { ...verdict, check_digit: checkDigit };
+    }
+    return verdict;
   } catch {
     return {
       value: bankCode,

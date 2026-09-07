@@ -378,3 +378,52 @@ describe('structural bank-code rules (LV, GI)', () => {
     expect(r.bank_code_check?.register).not.toMatch(/Latvijas Banka/);
   });
 });
+
+/**
+ * Two contradictions the August 2026 atlas of sources left open, settled on
+ * 07/09/2026 — see docs/data-sources.md, "Deux contradictions tranchées".
+ */
+describe('bank_code_check — Poland and Greenland', () => {
+  it('serves the eight-digit Polish settlement number with its own check-digit verdict', () => {
+    // The canonical Polish example IBAN: settlement number 10901014, whose
+    // eighth digit is the one NBP's algorithm produces.
+    const r = check('PL61109010140000071219812874');
+    expect(r.bank_code_check!.value).toBe('10901014');
+    expect(r.bank_code_check!.status).toBe('verified');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.bank_code_check!.check_digit).toEqual({
+      valid: true,
+      algorithm: expect.stringContaining('3,9,7,1,3,9,7'),
+    });
+  });
+
+  it('flags a Polish settlement number NBP could not have issued, without calling it not_allocated', () => {
+    // Same account, settlement number 10901015: mod-97 recomputed so the IBAN
+    // itself is valid, but the eighth digit is not the check digit of the
+    // first seven. The composite map has no such code, and the check-digit
+    // block says why a caller should read that miss as a typo.
+    const r = check('PL36109010150000071219812874');
+    expect(r.valid).toBe(true);
+    expect(r.bank_code_check!.check_digit?.valid).toBe(false);
+    expect(r.bank_code_check!.status).toBe('not_in_register');
+    expect(r.bank_code_check!.reason).toBe('absent_from_reference_data');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+  });
+
+  it('carries no check_digit block outside Poland', () => {
+    expect(check('DE89370400440532013000').bank_code_check!.check_digit).toBeUndefined();
+    expect(check('DK5000400440116243').bank_code_check!.check_digit).toBeUndefined();
+  });
+
+  it('resolves the Greenlandic registration number 6471 to Grønlandsbanken', () => {
+    // The IBAN registry's own example for Greenland. 6471 is the number the
+    // Danish FSA's register lists for Grønlandsbanken and the one Greenlandic
+    // institutions publish on their account details; the BIC comes from GLEIF.
+    const r = check('GL8964710001000206');
+    expect(r.bank_code_check!.value).toBe('6471');
+    expect(r.bank_code_check!.status).toBe('verified');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.bic?.code).toMatch(/^GRENGLGX/);
+    expect(r.bic?.bank_name).toMatch(/GR[ØO]NLANDSBANKEN/i);
+  });
+});

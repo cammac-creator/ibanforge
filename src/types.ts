@@ -230,6 +230,12 @@ export interface BankCodeCheck {
    * has no branch address to publish.
    */
   institution?: RegisterInstitution;
+  /**
+   * Poland only: whether the eight-digit settlement number ends with the check
+   * digit NBP's numbering ordinance prescribes. A separate fact from the
+   * register verdict, and never a reason — see lib/pl-settlement-number.ts.
+   */
+  check_digit?: { valid: boolean; algorithm: string };
   /** Year-month the consulted reference set was last refreshed. */
   as_of: string;
 }

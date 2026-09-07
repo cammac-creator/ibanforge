@@ -97,6 +97,17 @@ export const BANK_CODE_CHECK_SCHEMA = {
       },
       required: ['name', 'street', 'post_code', 'town', 'country'],
     },
+    check_digit: {
+      type: 'object',
+      description:
+        'Poland only. The eight-digit settlement number (numer rozliczeniowy) carries its own check digit under the NBP numbering ordinance; this block says whether the digits form a number NBP could have issued. ' +
+        'valid false means a typo or a fabricated number, whatever the register verdict beside it says. valid true is a statement about form only: existence stays the question `status` answers, with its own `authoritative` flag.',
+      properties: {
+        valid: { type: 'boolean' },
+        algorithm: { type: 'string', description: 'The rule applied, named so it can be cited.' },
+      },
+      required: ['valid', 'algorithm'],
+    },
     as_of: {
       type: 'string',
       description:
