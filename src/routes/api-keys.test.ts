@@ -1210,7 +1210,15 @@ describe('POST /v1/admin/email-messages — where a sent mail came from', () => 
    */
   const idFor = (name: string) => `origin-${RUN_TAG}-${name}`;
 
-  /** Send one row, with whatever this call declares about it. */
+  /**
+   * Send one row, with whatever this call declares about it.
+   *
+   * The subject carries the id since 2026-09-07: the store now reconciles two
+   * ids that name one message (same address, minute and subject), so five
+   * tests sharing one subject in one minute would all land on the first row
+   * and read each other's marks. Distinct subjects keep them distinct
+   * messages, which is what they were meant to be.
+   */
   async function put(ID: string, extra: Record<string, unknown>) {
     const res = await app().request('/v1/admin/email-messages', {
       method: 'POST',
@@ -1222,7 +1230,7 @@ describe('POST /v1/admin/email-messages — where a sent mail came from', () => 
             customer_email: 'acme@example.com',
             direction: 'out',
             msg_date: '2026-09-07T08:15:00',
-            subject: 'Demande de réutilisation des données',
+            subject: `Demande de réutilisation des données (${ID})`,
             snippet: 'Bonjour, nous sollicitons…',
             ...extra,
           },
@@ -1288,5 +1296,119 @@ describe('POST /v1/admin/email-messages — where a sent mail came from', () => 
     const row = await stored(id, '?fields=summary');
     expect(row.origin).toBe('dashboard');
     expect('body' in row).toBe(false);
+  });
+});
+
+describe('POST /v1/admin/email-messages — one message, one row, whatever id its writer computed', () => {
+  const app = () => makeApp();
+  const H = {
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+    'Content-Type': 'application/json',
+  };
+  const TO = `twin-${RUN_TAG}@alpha.example.net`;
+  const SUBJECT =
+    'Permission request, reuse of the register of financial institution codes in a commercial API';
+
+  async function post(messages: unknown[]): Promise<number> {
+    const res = await app().request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: H,
+      body: JSON.stringify({ messages }),
+    });
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { upserted: number }).upserted;
+  }
+
+  async function rowsTo(): Promise<Array<Record<string, unknown>>> {
+    const res = await app().request('/v1/admin/email-messages?since=2026-09-07&fields=summary', {
+      headers: H,
+    });
+    const j = (await res.json()) as { messages: Array<Record<string, unknown>> };
+    return j.messages.filter((m) => m.customer_email === TO);
+  }
+
+  it('the sync’s folded-subject, minute-grain copy lands on the sender’s row and keeps its origin', async () => {
+    // The sender records first: seconds in the date, the subject as typed.
+    await post([
+      {
+        id: `sender-${RUN_TAG}`,
+        customer_email: TO,
+        direction: 'out',
+        msg_date: '2026-09-07T06:32:57',
+        subject: SUBJECT,
+        snippet: 'Dear Sir or Madam',
+        origin: 'claude',
+      },
+    ]);
+    // Fifteen minutes later the IMAP sync posts the Sent copy: another id,
+    // the minute only, and the subject as the SMTP library folded it.
+    await post([
+      {
+        id: `sync-${RUN_TAG}`,
+        customer_email: TO,
+        direction: 'out',
+        msg_date: '2026-09-07T06:32',
+        subject:
+          'Permission request, reuse of the register of financial institution\r\n codes in a commercial API',
+        snippet: 'Dear Sir or Madam',
+      },
+    ]);
+    const rows = await rowsTo();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(`sender-${RUN_TAG}`);
+    expect(rows[0].origin).toBe('claude');
+    // Stored collapsed: the line break the fold introduced never reaches a screen.
+    expect(rows[0].subject).toBe(SUBJECT);
+  });
+
+  it('a send recorded just past the minute boundary still meets its Sent copy', async () => {
+    await post([
+      {
+        id: `late-${RUN_TAG}`,
+        customer_email: TO,
+        direction: 'out',
+        msg_date: '2026-09-07T07:00:02',
+        subject: 'Follow-up on the prevodnik',
+        snippet: 'A short follow-up',
+        origin: 'dashboard',
+      },
+    ]);
+    await post([
+      {
+        id: `late-sync-${RUN_TAG}`,
+        customer_email: TO,
+        direction: 'out',
+        msg_date: '2026-09-07T06:59',
+        subject: 'Follow-up on the prevodnik',
+        snippet: 'A short follow-up',
+      },
+    ]);
+    const rows = (await rowsTo()).filter((m) => String(m.subject).startsWith('Follow-up'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(`late-${RUN_TAG}`);
+    expect(rows[0].origin).toBe('dashboard');
+  });
+
+  it('two different subjects in the same minute stay two rows', async () => {
+    await post([
+      {
+        id: `a-${RUN_TAG}`,
+        customer_email: TO,
+        direction: 'out',
+        msg_date: '2026-09-07T08:10:05',
+        subject: 'First letter',
+        snippet: 'x',
+      },
+      {
+        id: `b-${RUN_TAG}`,
+        customer_email: TO,
+        direction: 'out',
+        msg_date: '2026-09-07T08:10:40',
+        subject: 'Second letter',
+        snippet: 'y',
+      },
+    ]);
+    const rows = (await rowsTo()).filter((m) => /letter$/.test(String(m.subject)));
+    expect(rows.map((m) => m.id).sort()).toEqual([`a-${RUN_TAG}`, `b-${RUN_TAG}`]);
   });
 });

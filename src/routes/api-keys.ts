@@ -1119,6 +1119,62 @@ function readOrigin(v: unknown): string | null {
  * tabornio mail DB + Sent folders. Upserts by stable id. Powers the CRM
  * conversation cockpit (GET /v1/admin/email-messages).
  */
+/**
+ * One message, one row, whatever id its writer computed.
+ *
+ * Two writers record the same outbound mail: the sender at the moment it
+ * leaves (the dashboard's recordSent, or the agent's send script) and the IMAP
+ * sync fifteen minutes later, from the copy in Sent. Both derive the id as
+ * md5(address|out|minute|subject), and the scheme is what keeps them from
+ * doubling each other — as long as they hash the same bytes. Measured on
+ * 2026-09-07 with eight letters sent by the agent: seven came back twice.
+ * Two reasons, both about the subject. The SMTP library folds a subject past
+ * 78 characters across two header lines, and the sync reads the folded value
+ * back with its "\r\n " inside, so the md5 differs; and a send that lands
+ * a few seconds before the minute boundary is stamped one minute later by
+ * the writer that records it after the relay answers. The one subject short
+ * enough not to fold was the one that matched.
+ *
+ * Rather than teaching every writer the same normalisation (the sync lives on
+ * the VPS, outside this repository), the store reconciles here: an incoming
+ * row whose address, direction, minute (give or take one) and whitespace-
+ * collapsed subject already exist under another id is written onto THAT id.
+ * Drafts are excluded — they are keyed by address alone and rewritten in
+ * place by design.
+ */
+function sameMessageId(
+  db: ReturnType<typeof getStatsDB>,
+  email: string,
+  direction: string,
+  msgDate: unknown,
+  subject: unknown,
+): string | null {
+  if (direction === 'draft' || typeof msgDate !== 'string') return null;
+  const at = new Date(
+    msgDate.length === 16 ? `${msgDate}:00Z` : msgDate.endsWith('Z') ? msgDate : `${msgDate}Z`,
+  );
+  if (Number.isNaN(at.getTime())) return null;
+  const minute = (d: Date): string => d.toISOString().slice(0, 16);
+  const lower = minute(new Date(at.getTime() - 60_000));
+  const upper = minute(new Date(at.getTime() + 120_000));
+  const norm = normaliseSubject(subject).toLowerCase();
+  const rows = db
+    .prepare(
+      'SELECT id, subject FROM email_messages WHERE customer_email = ? AND direction = ? AND msg_date >= ? AND msg_date < ?',
+    )
+    .all(email, direction, lower, upper) as Array<{ id: string; subject: string | null }>;
+  const twin = rows.find((r) => normaliseSubject(r.subject).toLowerCase() === norm);
+  return twin?.id ?? null;
+}
+
+/**
+ * Folding whitespace collapsed to one space, clipped where the sync clips.
+ * Stored this way too, so a folded subject never shows its line break.
+ */
+function normaliseSubject(subject: unknown): string {
+  return typeof subject === 'string' ? subject.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+}
+
 apiKeys.post('/v1/admin/email-messages', async (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
@@ -1223,12 +1279,15 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
           (from !== '' && noReplySenders.has(from)))
           ? 1
           : 0;
+      // See sameMessageId: a second writer's id for a row we already hold
+      // lands on the row, not beside it.
+      const id = sameMessageId(db, email, direction, r.msg_date, r.subject) ?? r.id.slice(0, 200);
       upsert.run({
-        id: r.id.slice(0, 200),
+        id,
         customer_email: email,
         direction,
         msg_date: clip(r.msg_date, 40),
-        subject: clip(r.subject, 500),
+        subject: normaliseSubject(r.subject) || null,
         snippet: clip(r.snippet, 300),
         snippet_fr: clip(r.snippet_fr, 8000),
         lang: clip(r.lang, 8),
