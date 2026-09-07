@@ -9,6 +9,8 @@
  * under a locale goes through app/[locale]/[...rest] and the translated
  * not-found instead.
  */
+import Link from "next/link";
+
 export default function RootNotFound() {
   return (
     <html lang="en">
@@ -17,7 +19,7 @@ export default function RootNotFound() {
           <p style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12, letterSpacing: "0.2em", color: "#f59e0b", margin: 0 }}>404</p>
           <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0.6rem 0" }}>This page does not exist.</h1>
           <p style={{ color: "#a8a29e", margin: "0 0 1.2rem" }}>IBANforge — IBAN, BIC and Swiss clearing API.</p>
-          <a href="/" style={{ color: "#f59e0b", textDecoration: "underline", textUnderlineOffset: 4 }}>Back to the home page</a>
+          <Link href="/" style={{ color: "#f59e0b", textDecoration: "underline", textUnderlineOffset: 4 }}>Back to the home page</Link>
         </main>
       </body>
     </html>
