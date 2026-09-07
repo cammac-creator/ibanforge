@@ -110,3 +110,38 @@ describe('POST /api/auth/login', () => {
     expect(ms).toBeGreaterThanOrEqual(DELAY_FLOOR_MS);
   });
 });
+
+/**
+ * Adversarial review of 07/09/2026, M1: the limiter keyed on the FIRST
+ * x-forwarded-for segment, the one the client writes, so a caller could
+ * re-roll the window with a header. It now keys on what the platform sets.
+ */
+describe('POST /api/auth/login — limiter key', () => {
+  function attemptWith(headers: Record<string, string>) {
+    return POST(
+      new NextRequest('http://site.test/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ password: 'wrong' }),
+      }),
+    );
+  }
+
+  it('ignores the client-written first segment and counts the platform-appended hop', async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await attemptWith({ 'x-forwarded-for': `10.0.0.${i}, 203.0.113.77` });
+      expect(res.status).toBe(401);
+    }
+    const sixth = await attemptWith({ 'x-forwarded-for': '10.0.0.99, 203.0.113.77' });
+    expect(sixth.status).toBe(429);
+  });
+
+  it('prefers x-real-ip when the platform sets it', async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await attemptWith({ 'x-real-ip': '203.0.113.78', 'x-forwarded-for': `10.0.1.${i}` });
+      expect(res.status).toBe(401);
+    }
+    const sixth = await attemptWith({ 'x-real-ip': '203.0.113.78', 'x-forwarded-for': '10.0.1.99' });
+    expect(sixth.status).toBe(429);
+  });
+});
