@@ -327,10 +327,10 @@ release-art/fca-api (table des codes `FSR-API-02-01-00` trouvé / `-11` absent /
 échanges du 27/02/2026), craigpotter/fca-php-sdk (absence enregistrée le 14/06/2023 : HTTP 200,
 `Data: null`). Une absence est servie `200 found:false`, facturée et mise en cache comme une réponse
 (un 404 serait remboursé par le middleware de clé et jamais réglé par x402 : chaque absence gratuite
-ferait de la route un balayeur de l'espace des FRN aux frais du registre). Choix à trancher : la copie
-expirée servie `stale` pendant une panne du registre peut avoir jusqu'à 30 h (24 h + 6 h de marge,
-`FCA_STALE_GRACE_MS`), au-delà de la lettre du « cache ≤ 24 h » décrit à la FCA — mettre la marge à 0
-pour tenir la lettre et répondre 502 à la place.
+ferait de la route un balayeur de l'espace des FRN aux frais du registre). **Tranché le 07/09 au soir :
+la marge « stale » est à zéro** (`FCA_STALE_GRACE_MS = 0`) : l'usage décrit à la FCA dit « cache ≤ 24 h »,
+donc une copie de plus d'un jour n'est jamais servie, panne ou pas — la route répond 502 et dit que le
+registre est indisponible. Rouvrir la marge suppose d'écrire d'abord à la FCA.
 
 ### ✅ 25/08/2026 — la Bank of England a accordé la permission
 

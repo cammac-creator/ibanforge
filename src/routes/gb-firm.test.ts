@@ -174,23 +174,20 @@ describe('GET /v1/gb/firm/:frn', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('serves the expired copy marked stale when the register is down, and 502 when there is none', async () => {
+  it('answers 502 when the register is down, for an expired row as for none — never a copy older than a day', async () => {
     const fetchMock = registerAnswers(json(FOUND), json({}, 500), json({}, 500));
     const app = makeApp();
     await app.request('/v1/gb/firm/123456');
-    // Age the row past its day (still inside the grace) without touching the clock.
+    // Age the row past its day without touching the clock. The usage described
+    // to the FCA says "cache ≤ 24 h": the expired copy is not an answer.
     getStatsDB()
       .prepare('UPDATE fca_firm_cache SET expires_at = ? WHERE frn = ?')
       .run(new Date(Date.now() - 60_000).toISOString(), '123456');
 
     resetFcaRegisterState();
-    const stale = await app.request('/v1/gb/firm/123456');
-    expect(stale.status).toBe(200);
-    expect(await stale.json()).toMatchObject({
-      found: true,
-      name: 'Alpha Bank Example Ltd',
-      cache: { hit: true, stale: true },
-    });
+    const expired = await app.request('/v1/gb/firm/123456');
+    expect(expired.status).toBe(502);
+    expect(await expired.json()).toMatchObject({ error: 'upstream', upstream_status: 500 });
 
     resetFcaRegisterState();
     const none = await app.request('/v1/gb/firm/234567');

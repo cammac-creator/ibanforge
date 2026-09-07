@@ -359,15 +359,17 @@ describe('lookupFirm — the one-day cache', () => {
     expect(cachedFirm('999999')?.lookup).toEqual({ found: false });
   });
 
-  it('refetches past the day, and serves the expired row only while the register is down', async () => {
+  it('refetches past the day, and answers an outage with an error rather than a copy older than a day', async () => {
+    // The usage described to the FCA says "cache ≤ 24 h" (FCA_STALE_GRACE_MS
+    // is 0): once the row is a day old, the register's outage is the answer.
     const later = T0 + FCA_CACHE_TTL_MS + 60_000;
     const { impl, calls } = scripted([json(FOUND_2026), json({}, 500), json(FOUND_2026)]);
     await lookupFirm('123456', { ...quiet, fetchImpl: impl, now: () => T0 });
 
     resetFcaRegisterState();
-    const stale = await lookupFirm('123456', { ...quiet, fetchImpl: impl, now: () => later });
-    expect(stale.cache).toEqual({ hit: true, stale: true });
-    expect(stale.retrieved_at).toBe('2026-09-07T12:00:00.000Z');
+    await expect(
+      lookupFirm('123456', { ...quiet, fetchImpl: impl, now: () => later }),
+    ).rejects.toMatchObject({ reason: 'http_500' });
     expect(calls).toHaveLength(2);
 
     resetFcaRegisterState();

@@ -70,12 +70,16 @@ export const FCA_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * How long past its expiry a row may still answer, marked `stale`, when the
- * register itself is down. Six hours: long enough to ride out an outage,
- * short enough that nothing older than thirty hours is ever served. Set to 0
- * to hold the letter of the "24 h" described to the FCA and answer 502
- * instead; the choice is documented in docs/data-sources.md.
+ * register itself is down.
+ *
+ * Zero, by decision of 07/09/2026: the usage described to the FCA — and
+ * accepted in writing the same day — says "cache ≤ 24 h". A copy older than
+ * that is not served, whatever the outage; the route answers 502 and says the
+ * register is down. The stale path stays in the code so the grace can be
+ * reopened deliberately, never by accident: raising this constant means
+ * writing to the FCA first. Documented in docs/data-sources.md.
  */
-export const FCA_STALE_GRACE_MS = 6 * 60 * 60 * 1000;
+export const FCA_STALE_GRACE_MS = 0;
 
 /**
  * Floor between two calls to the register, one call in flight at a time.
