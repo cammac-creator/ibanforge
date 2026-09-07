@@ -158,6 +158,16 @@ n'autorise) : écrire à EBA CLEARING, ou retirer, ou documenter l'incertitude.
 **SECO n'y apparaît pas.** Le flux est branché, il ne rapporte rien : ne pas
 annoncer SECO tant que la table ne le porte pas.
 
+**06/09/2026 — le rafraîchissement hebdomadaire a échoué sur un 500 de l'UE** (SECO a
+répondu 500 aussi, comme depuis juillet) : la base produite ne portait plus qu'OFAC et ONU,
+la porte des « claims » du workflow l'a refusée (à raison), et la base en production a
+vieilli d'une semaine. Relancé à la main le 07/09 (l'UE répondait de nouveau) : succès,
+commit `cda7b34b`. Depuis le 07/09, `scripts/compliance-carry-over.ts` recopie la liste
+manquante depuis la base précédente quand son téléchargement échoue, à condition que cette
+base ait moins de 21 jours, et l'inscrit dans `metadata.carried_over` (liste et date réelle
+des lignes) : les listes qui ont rafraîchi partent, la liste en panne est servie périmée et
+dite telle, et une panne de trois semaines fait de nouveau échouer le run.
+
 ## Hors dépôt, délibérément
 
 **Vocalink — table de contrôle modulo britannique** (`valacdos.txt`,
@@ -535,6 +545,42 @@ question ; si la réponse est négative, retirer les 21 lignes.
 **FCA Developer — la page des conditions API reste illisible (SPA), mais
 l'Accessibility Statement livre un canal : RegisterAPISupport@fca.org.uk.**
 La réponse de fond au dossier ouvert (#212491959) reste la voie principale.
+
+## ✅ 07/09/2026 — deux contradictions de l'atlas tranchées (PL, GL)
+
+L'atlas des sources d'août 2026 laissait deux questions ouvertes « à trancher avant toute promesse ».
+
+**Pologne — le code banque de l'IBAN est le numéro de règlement à huit chiffres, pas le
+numéro d'institution.** Le RIAD de la BCE identifie une banque polonaise par son numéro
+d'institution (trois chiffres, `PL00105` = ING Bank Śląski dans la liste des MFI) ; l'EWIB de la
+NBP porte le *numer rozliczeniowy* complet (huit chiffres : trois d'institution, quatre d'unité,
+un de contrôle). L'IBAN porte les huit. Position : `bank_code_check.value` reste le numéro de
+règlement (positions 5-12 de l'IBAN), vérifié contre la carte composite (`authoritative: false`)
+tant que la NBP n'a pas répondu à la demande de réutilisation d'EWIB (26/08, relance prévue
+le 10/09). Ce que la carte ne pouvait pas dire, le chiffre de contrôle le dit : il est calculé
+sur les sept premiers chiffres avec les poids 3, 9, 7, 1, 3, 9, 7, complément de la somme
+modulo 10 (`src/lib/pl-settlement-number.ts`). L'ordonnance qui le définit (Zarządzenie
+nr 7/2017 Prezesa NBP w sprawie sposobu numeracji banków i rachunków bankowych, texte
+consolidé du 30/08/2019, modifié le 03/12/2025) n'est lisible ni sur nbp.pl (mur anti-robot)
+ni dans la base juridique qui la sert (payante) : l'algorithme est épinglé par les numéros
+publiés qu'il reproduit (10100000 NBP, 10201026 PKO BP, 10901014 Santander/Erste, 11402004
+mBank), dans le test du module. Servi comme bloc `check_digit` à côté du verdict, jamais comme
+`not_allocated` : une impossibilité structurelle et le silence d'un registre sont deux réponses
+différentes.
+
+**Groenland — Grønlandsbanken, c'est 6471, et 1601 n'existait nulle part.** Trois citations
+convergentes mais périmées (PDF Finanstilsynet 2008, 2009, 2011) donnaient 6471 ; « 1601 »
+n'avait aucune source primaire et figurait pourtant dans notre carte curatée
+(`GL:1601 → GRENGLGXXXX`, commit e6a99891), servi comme `verified`. Tranché par deux sources
+actuelles et indépendantes : le registre des banques de la Finanstilsynet (Bilag 5.1,
+`cdn.finanstilsynet.dk/finanstilsynet/media/44631/Bilag5_1PI.pdf`, Grønlandsbanken A/S sous
+le reg.nr. 6471) et le compte que publie une institution publique groenlandaise (Grønlands
+Nationalmuseum & Arkiv, `da.nka.gl/arkivet/serviceydelser/` : « Grønlandsbanken, kontonummer
+6471-100-155-5 ») ; l'exemple officiel du registre IBAN pour GL (`GL89 6471 0001 0002 06`)
+porte le même numéro, et GLEIF connaît GRENGLGX comme Grønlandsbanken, Nuuk. Fait :
+`GL:6471 → GRENGLGXXXX` ajouté, `GL:1601` retiré. `GL:6460 → FIFBFOTXXXX` (BankNordik,
+même numéro que son entrée FO) est laissé tel quel : le numéro est celui de la banque, pas
+d'un pays, et rien ne le contredit.
 
 ## Sources écartées, et pourquoi
 
