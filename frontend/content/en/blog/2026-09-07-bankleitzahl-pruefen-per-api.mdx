@@ -1,0 +1,154 @@
+---
+title: "Checking a German bank code (Bankleitzahl) by API: what the Bundesbank register answers, field by field"
+description: "Checking a Bankleitzahl is not a checksum. The Deutsche Bundesbank publishes every month which codes are allocated, who holds them and which are being retired. Three real API answers, field by field, with ten calls a day and no key."
+date: "2026-09-07"
+faq:
+  - q: "What is a Bankleitzahl, and who allocates it?"
+    a: "The Bankleitzahl is the eight-digit code that occupies positions 5 to 12 of a German IBAN and names the institution holding the account. The Deutsche Bundesbank allocates it and publishes the complete allocation as the Bankleitzahlendatei, renewed monthly, the only national register in Europe that also announces the end of a code."
+  - q: "Is the IBAN check digit not enough?"
+    a: "No. The mod 97 check digit catches a typo but says nothing about whether the bank code exists: DE37 9999 9999 0123 4567 89 passes the check digit, and the Bundesbank never allocated bank code 99999999. Only the register answers the second question."
+  - q: "What does a retired code mean?"
+    a: "The Bundesbank announces the deletion of a Bankleitzahl and, in most cases, names the successor code. The answer then carries retired: true and superseded_by with the new code. The code was allocated, so the answer stays verified; a payment to the old code will eventually come back, and the beneficiary record has to be re-papered against the successor."
+  - q: "What does the check cost?"
+    a: "Nothing to start: ten checks a day per address with no key, 200 a month with the free key, and a single Bankleitzahl can be looked up on its own page under /blz with no call at all."
+---
+
+Someone who searches for "Bankleitzahl prüfen" (check a German bank code) rarely wants to compute a check digit. The question underneath is different: does this code still exist, who holds it, and may I pay into this account? No algorithm answers that; a register does. In Germany it is the [Bankleitzahlendatei of the Deutsche Bundesbank](/blz), renewed every month, listing every code the Bundesbank has allocated, with the institution behind it, its BIC and, alone among Europe's national registers, the announcement of which codes are about to disappear. The September 2026 file holds 3,506 bank codes, 75 of them marked for deletion.
+
+This post shows what our API answers to that question, on three real bank codes and field by field. The answers below are reproduced as served; only the fields that play no part in the bank-code verdict are trimmed.
+
+## The bank code travels inside an IBAN
+
+The API does not check a bare Bankleitzahl; it checks an IBAN, and that is deliberate: the bank code is read where it actually sits in a payment. To check a Bankleitzahl, build a German IBAN around it: `DE`, two check digits, the eight digits of the bank code, then ten digits of account number. The account number may be invented, because the verdict on the bank code does not depend on it; only the check digits have to be right. If you would rather not compute them, the [test IBAN generator](/tools/test-iban) draws real bank codes from the register, or you can open the code's own page, for instance [/blz/37040044](/blz/37040044).
+
+The verdict lives in a block of its own, `bank_code_check`. It is kept apart from `valid` because it answers a different question: `valid` says whether the IBAN is built to ISO 13616; `bank_code_check` says whether the bank code belongs to an institution, and how much that verdict is worth.
+
+## First answer: the code is allocated
+
+Bank code 37040044, in an IBAN with an invented account number:
+
+```json
+{
+  "iban": "DE82370400440123456789",
+  "valid": true,
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "institution": {
+      "name": "Commerzbank",
+      "street": null,
+      "post_code": "50447",
+      "town": "Köln",
+      "country": "DE"
+    },
+    "as_of": "2026-09"
+  },
+  "bic": {
+    "code": "COBADEFFXXX",
+    "bank_name": "Commerzbank",
+    "basis": "national_register",
+    "authoritative": true,
+    "as_of": "2026-09"
+  }
+}
+```
+
+Field by field:
+
+`value` is the code the verdict is about, here identical to positions 5 to 12 of the IBAN. `status: verified` means the code resolved to an institution we can name. `match: register` says how: an exact hit in the register, not a similarity search. `register` names the source of the verdict. `authoritative: true` is the field a program should branch on: it means the source is the register of the allocating authority, not a map we assembled, and therefore that a miss means something too, more on that below. `institution` reproduces what the register publishes about the holder: name, postal code and town. The street is missing because the Bundesbank publishes none; a `null` here is the honest shape, not a gap on our side. `as_of` is the month of the file the code was checked against, not the date of our call: whoever stores the answer knows how old the verdict is.
+
+The BIC block underneath comes from the same file: `basis: national_register` says that the Bundesbank itself wrote this BIC beside this bank code. That is the pairing one may settle against, and it is a different claim from a BIC database guessing the most likely BIC for a code.
+
+## Second answer: the code is being retired
+
+This is the field only Germany can provide. Bank code 10060198, allocated to Pax-Bank in Berlin:
+
+```json
+{
+  "iban": "DE84100601980123456789",
+  "valid": true,
+  "bank_code_check": {
+    "value": "10060198",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "retired": true,
+    "superseded_by": "37060193",
+    "institution": {
+      "name": "Pax-Bank",
+      "street": null,
+      "post_code": "14005",
+      "town": "Berlin",
+      "country": "DE"
+    },
+    "as_of": "2026-09"
+  },
+  "next_steps": [
+    {
+      "code": "bank_code_retired",
+      "do": "Update the beneficiary details. The register is retiring this bank code; 37060193 takes over.",
+      "because": "bank_code_check.retired is true in Deutsche Bundesbank Bankleitzahlendatei"
+    }
+  ]
+}
+```
+
+The status stays `verified`: the code was allocated, the institution is known, the IBAN is not an invention. But `retired: true` says the Bundesbank has announced the deletion, and `superseded_by` names the code that takes over. For a creditor file this is the most valuable line of the whole answer: a payment to the old code may still go through today and come back in a few months. `next_steps` turns the verdict into an action, `bank_code_retired`, with the field it follows from. A program can branch on the code; a person can read the sentence.
+
+How many such codes there are changes with every file; in September 2026 there are 75. We described [what moves in the registers from month to month](/blog/2026-09-04-what-changes-in-bank-registers-each-month) elsewhere.
+
+## Third answer: the code was never allocated
+
+Bank code 99999999 in an IBAN with correct check digits:
+
+```json
+{
+  "iban": "DE37999999990123456789",
+  "valid": true,
+  "bank_code_check": {
+    "value": "99999999",
+    "status": "not_in_register",
+    "reason": "not_allocated",
+    "match": null,
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "as_of": "2026-09"
+  },
+  "bic": null,
+  "next_steps": [
+    {
+      "code": "bank_code_not_allocated",
+      "do": "Do not send. The bank code is absent from the national register, so no institution holds this account.",
+      "because": "bank_code_check.status is not_in_register and authoritative is true (Deutsche Bundesbank Bankleitzahlendatei)"
+    }
+  ]
+}
+```
+
+`valid` is true, and that is the point: the check digit has no objection. Only `bank_code_check` says what is going on. `status: not_in_register` with `reason: not_allocated` means the register does not know the code, and because `authoritative` is true, it may be read as it stands: no institution holds this account. `not_allocated` is the only reason in the API that justifies stopping a payment, and it appears only together with `authoritative: true`.
+
+The contrast matters. In a country without a published register, say for most accounts in France, the reason on a miss is `absent_from_reference_data` and `authoritative` is false: the code is missing from our data, which says nothing about the country itself. The same words, "not found", carry a different weight in the two cases, and the API spells the difference out instead of hiding it in a `bic: null`.
+
+## How to call it
+
+Without a key, straight from the terminal, ten times a day per address:
+
+```bash
+curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"DE82370400440123456789"}'
+```
+
+The answer is complete, and it carries a `trial` block saying how many calls are left today. For production the [free key](/docs/api-keys) is enough, 200 requests a month with no card; to check a whole file, use [`POST /v1/iban/batch`](/docs/iban-validate) with up to a hundred IBANs per call. And if you would rather write no code at all, [every Bankleitzahl has its own page](/blz), with exactly this answer on it.
+
+## What the register does not say
+
+An allocated code is not an existing account. The register knows that bank code 37040044 belongs to Commerzbank; whether the account number behind it was ever opened, only the bank knows. Checking that the payee's name matches the account is, in Europe, the job of the banks' Verification of Payee, not of a register, and the API says so explicitly in `next_steps` rather than pretending otherwise.
+
+And the register has a date. An answer with `as_of: 2026-09` holds for the September file; in October a code allocated today may be marked for deletion. Whoever maintains master data therefore checks not once but at every renewal of the file, reading exactly the fields this post walked through: `retired` first, then `authoritative`, then everything else.
+
+How the IBAN check as a whole runs against this register, from the check digit to the BIC, is in the post [German IBAN validation against the Bundesbank register](/blog/2026-09-02-german-iban-validation-bundesbank-blz).

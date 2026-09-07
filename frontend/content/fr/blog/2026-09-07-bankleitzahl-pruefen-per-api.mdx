@@ -1,0 +1,154 @@
+---
+title: "Vérifier une Bankleitzahl par API : ce que répond le registre de la Bundesbank, champ par champ"
+description: "Vérifier un code banque allemand n'est pas un calcul de clé. La Deutsche Bundesbank publie chaque mois quels codes sont attribués, à qui, et lesquels vont disparaître. Trois vraies réponses de l'API, champ par champ, avec dix appels par jour sans clé."
+date: "2026-09-07"
+faq:
+  - q: "Qu'est-ce qu'une Bankleitzahl, et qui l'attribue ?"
+    a: "La Bankleitzahl est le code à huit chiffres qui occupe les positions 5 à 12 d'un IBAN allemand et nomme l'établissement qui tient le compte. La Deutsche Bundesbank l'attribue et publie l'attribution complète sous la forme de la Bankleitzahlendatei, renouvelée chaque mois, seul registre national d'Europe à annoncer aussi la fin d'un code."
+  - q: "La clé de contrôle de l'IBAN ne suffit-elle pas ?"
+    a: "Non. La clé mod 97 attrape la faute de frappe, mais ne dit rien de l'existence du code banque : DE37 9999 9999 0123 4567 89 passe la clé, et la Bundesbank n'a jamais attribué le code 99999999. Seul le registre répond à la seconde question."
+  - q: "Que signifie un code retiré ?"
+    a: "La Bundesbank annonce la suppression d'une Bankleitzahl et nomme, dans la plupart des cas, le code qui lui succède. La réponse porte alors retired: true et superseded_by avec le nouveau code. Le code a été attribué, la réponse reste verified ; mais un paiement vers l'ancien code finira par revenir, et la fiche du bénéficiaire est à refaire contre le successeur."
+  - q: "Combien coûte la vérification ?"
+    a: "Rien pour commencer : dix vérifications par jour et par adresse sans clé, 200 par mois avec la clé gratuite, et une Bankleitzahl seule se consulte sur sa propre page sous /fr/blz, sans aucun appel."
+---
+
+Qui cherche « Bankleitzahl prüfen » (vérifier un code banque allemand) veut rarement calculer une clé de contrôle. La question du dessous est autre : ce code existe-t-il encore, à qui appartient-il, et puis-je payer sur ce compte ? Aucun algorithme n'y répond ; un registre, oui. En Allemagne, c'est la [Bankleitzahlendatei de la Deutsche Bundesbank](/fr/blz), renouvelée chaque mois, qui liste tous les codes que la Bundesbank a attribués, avec l'établissement derrière chacun, son BIC et, seul registre national d'Europe à le faire, l'annonce des codes qui vont disparaître. Le fichier de septembre 2026 compte 3 506 codes banque, dont 75 marqués pour suppression.
+
+Cet article montre ce que notre API répond à cette question, sur trois vrais codes banque et champ par champ. Les réponses ci-dessous sont reproduites telles que servies ; seuls les champs sans rôle dans le verdict sur le code banque sont coupés.
+
+## Le code banque voyage dans un IBAN
+
+L'API ne vérifie pas une Bankleitzahl nue, mais un IBAN, et c'est voulu : le code banque est lu à la place qu'il occupe réellement dans un paiement. Pour vérifier une Bankleitzahl, on construit donc un IBAN allemand autour d'elle : `DE`, deux chiffres de contrôle, les huit chiffres du code banque, puis dix chiffres de numéro de compte. Le numéro de compte peut être inventé, car le verdict sur le code banque n'en dépend pas ; seuls les chiffres de contrôle doivent être justes. Qui ne veut pas les calculer prend le [générateur d'IBAN de test](/fr/tools/test-iban), qui tire de vrais codes banque du registre, ou ouvre la page du code lui-même, par exemple [/fr/blz/37040044](/fr/blz/37040044).
+
+Le verdict vit dans un bloc à part, `bank_code_check`. Il est séparé de `valid` parce qu'il répond à une autre question : `valid` dit si l'IBAN est construit selon ISO 13616 ; `bank_code_check` dit si le code banque appartient à un établissement, et ce que vaut ce verdict.
+
+## Première réponse : le code est attribué
+
+Le code banque 37040044, dans un IBAN au numéro de compte inventé :
+
+```json
+{
+  "iban": "DE82370400440123456789",
+  "valid": true,
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "institution": {
+      "name": "Commerzbank",
+      "street": null,
+      "post_code": "50447",
+      "town": "Köln",
+      "country": "DE"
+    },
+    "as_of": "2026-09"
+  },
+  "bic": {
+    "code": "COBADEFFXXX",
+    "bank_name": "Commerzbank",
+    "basis": "national_register",
+    "authoritative": true,
+    "as_of": "2026-09"
+  }
+}
+```
+
+Champ par champ :
+
+`value` est le code sur lequel porte le verdict, ici identique aux positions 5 à 12 de l'IBAN. `status: verified` signifie que le code a été rattaché à un établissement que nous nommons. `match: register` dit comment : par une correspondance exacte dans le registre, pas par une recherche approchante. `register` nomme la source du verdict. `authoritative: true` est le champ sur lequel un programme devrait brancher : il signifie que la source est le registre de l'autorité qui attribue les codes, pas une carte assemblée par nous, et donc qu'une absence veut dire quelque chose aussi, on y revient plus bas. `institution` reproduit ce que le registre publie sur le titulaire : nom, code postal et localité. La rue manque parce que la Bundesbank n'en publie pas ; un `null` ici est la forme honnête, pas une lacune de notre côté. `as_of` est le mois du fichier contre lequel le code a été vérifié, pas la date de notre appel : qui archive la réponse sait de quand date le verdict.
+
+Le bloc BIC en dessous vient du même fichier : `basis: national_register` dit que la Bundesbank elle-même a écrit ce BIC à côté de cette Bankleitzahl. C'est le couple sur lequel on peut régler un paiement, et c'est une autre prétention que celle d'une base de BIC qui devine le BIC le plus probable pour un code.
+
+## Deuxième réponse : le code est en cours de retrait
+
+C'est le champ que seule l'Allemagne peut fournir. Le code banque 10060198, attribué à la Pax-Bank à Berlin :
+
+```json
+{
+  "iban": "DE84100601980123456789",
+  "valid": true,
+  "bank_code_check": {
+    "value": "10060198",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "retired": true,
+    "superseded_by": "37060193",
+    "institution": {
+      "name": "Pax-Bank",
+      "street": null,
+      "post_code": "14005",
+      "town": "Berlin",
+      "country": "DE"
+    },
+    "as_of": "2026-09"
+  },
+  "next_steps": [
+    {
+      "code": "bank_code_retired",
+      "do": "Update the beneficiary details. The register is retiring this bank code; 37060193 takes over.",
+      "because": "bank_code_check.retired is true in Deutsche Bundesbank Bankleitzahlendatei"
+    }
+  ]
+}
+```
+
+Le statut reste `verified` : le code a été attribué, l'établissement est connu, l'IBAN n'est pas une invention. Mais `retired: true` dit que la Bundesbank a annoncé la suppression, et `superseded_by` nomme le code qui prend le relais. Pour un fichier de créanciers, c'est la ligne la plus précieuse de toute la réponse : un paiement vers l'ancien code passe peut-être encore aujourd'hui et reviendra dans quelques mois. `next_steps` traduit le verdict en action, `bank_code_retired`, avec le champ dont elle découle. Un programme branche sur le code ; une personne lit la phrase.
+
+Le nombre de ces codes change à chaque fichier ; en septembre 2026, il y en a 75. Nous avons décrit ailleurs [ce qui bouge dans les registres d'un mois à l'autre](/fr/blog/2026-09-04-what-changes-in-bank-registers-each-month).
+
+## Troisième réponse : le code n'a jamais été attribué
+
+Le code banque 99999999 dans un IBAN aux chiffres de contrôle corrects :
+
+```json
+{
+  "iban": "DE37999999990123456789",
+  "valid": true,
+  "bank_code_check": {
+    "value": "99999999",
+    "status": "not_in_register",
+    "reason": "not_allocated",
+    "match": null,
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "as_of": "2026-09"
+  },
+  "bic": null,
+  "next_steps": [
+    {
+      "code": "bank_code_not_allocated",
+      "do": "Do not send. The bank code is absent from the national register, so no institution holds this account.",
+      "because": "bank_code_check.status is not_in_register and authoritative is true (Deutsche Bundesbank Bankleitzahlendatei)"
+    }
+  ]
+}
+```
+
+`valid` est vrai, et c'est tout le sujet : la clé de contrôle n'a rien à redire. Seul `bank_code_check` dit ce qui se passe. `status: not_in_register` avec `reason: not_allocated` signifie que le registre ne connaît pas le code, et parce que `authoritative` est vrai, on peut le lire tel quel : aucun établissement ne tient ce compte. `not_allocated` est le seul motif de l'API qui justifie d'arrêter un paiement, et il n'apparaît qu'avec `authoritative: true`.
+
+Le contraste compte. Dans un pays sans registre publié, disons pour la plupart des comptes en France, le motif d'une absence est `absent_from_reference_data` et `authoritative` est faux : le code manque dans nos données, ce qui ne dit rien du pays lui-même. Les mêmes mots, « non trouvé », pèsent différemment dans les deux cas, et l'API épelle la différence au lieu de la cacher dans un `bic: null`.
+
+## Comment l'appeler
+
+Sans clé, depuis le terminal, dix fois par jour et par adresse :
+
+```bash
+curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"DE82370400440123456789"}'
+```
+
+La réponse est complète, et elle porte un bloc `trial` qui dit combien d'appels restent aujourd'hui. Pour la production, la [clé gratuite](/fr/docs/api-keys) suffit, 200 requêtes par mois sans carte ; pour vérifier un fichier entier, [`POST /v1/iban/batch`](/fr/docs/iban-validate) prend jusqu'à cent IBAN par appel. Et qui ne veut écrire aucune ligne de code trouve [chaque Bankleitzahl sur sa propre page](/fr/blz), avec exactement cette réponse dessus.
+
+## Ce que le registre ne dit pas
+
+Un code attribué n'est pas un compte existant. Le registre sait que le code 37040044 appartient à la Commerzbank ; si le numéro de compte derrière a jamais été ouvert, seule la banque le sait. Vérifier que le nom du bénéficiaire correspond au compte est, en Europe, le travail de la Verification of Payee des banques, pas d'un registre, et l'API le dit explicitement dans `next_steps` plutôt que de faire semblant.
+
+Et le registre a une date. Une réponse avec `as_of: 2026-09` vaut pour le fichier de septembre ; en octobre, un code attribué aujourd'hui peut être marqué pour suppression. Qui tient des données de base vérifie donc non pas une fois, mais à chaque renouvellement du fichier, en lisant exactement les champs que cet article a parcourus : `retired` d'abord, puis `authoritative`, puis tout le reste.
+
+Comment la vérification d'IBAN dans son ensemble tourne contre ce registre, de la clé de contrôle au BIC, se lit dans l'article [Validation d'un IBAN allemand contre le registre de la Bundesbank](/fr/blog/2026-09-02-german-iban-validation-bundesbank-blz).
