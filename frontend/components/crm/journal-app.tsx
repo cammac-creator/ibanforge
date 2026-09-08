@@ -48,10 +48,22 @@ const ORIGIN_OPTIONS: ReadonlyArray<{ key: SendOrigin | 'all'; label: string }> 
 ];
 
 /** What a line says about itself, before anything else on the row. */
-const DIRECTION_BADGE: Record<JournalDirection, { label: string; className: string }> = {
+const DIRECTION_BADGE: Record<JournalDirection, { label: string; className: string; title?: string }> = {
   in: { label: 'reçu', className: 'bg-blue-500/15 text-blue-300' },
   out: { label: 'envoyé', className: 'bg-amber-500/15 text-amber-300' },
   draft: { label: 'brouillon', className: 'bg-[var(--ink-4)] text-[var(--fg-2)]' },
+};
+
+/**
+ * A draft that will leave on its own: the VPS sends it at the minute shown,
+ * Swiss time (rule of 08/09/2026, random minutes inside business hours). Told
+ * apart from a human's draft so nobody reads « brouillon » as « waiting for my
+ * click », nor a passed minute as « the automation is broken ».
+ */
+const SCHEDULED_BADGE = {
+  label: 'programmé',
+  className: 'bg-violet-500/15 text-violet-300',
+  title: 'Part tout seul à l’heure indiquée (heure suisse), rédigé et envoyé par l’agent.',
 };
 
 /**
@@ -102,7 +114,7 @@ function Badge({
 }
 
 function JournalLine({ row, locale }: { row: JournalRow; locale: string }) {
-  const badge = DIRECTION_BADGE[row.direction];
+  const badge = row.scheduled ? SCHEDULED_BADGE : DIRECTION_BADGE[row.direction];
   const origin = row.origin ? ORIGIN_BADGE[row.origin] : null;
   return (
     <li className="grid grid-cols-1 gap-x-3 gap-y-0.5 border-b border-[var(--ink-4)]/40 px-3 py-2 last:border-b-0 sm:grid-cols-[82px_minmax(0,1fr)]">
@@ -118,7 +130,9 @@ function JournalLine({ row, locale }: { row: JournalRow; locale: string }) {
       </span>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge className={badge.className}>{badge.label}</Badge>
+          <Badge className={badge.className} title={badge.title}>
+            {badge.label}
+          </Badge>
           {origin && (
             <Badge className={origin.className} title={origin.title}>
               {origin.label}

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { isAutomated } from '@/lib/crm/automated';
 import { dayLabel, formatStamp } from '@/lib/crm/format';
+import { toZurich } from '@/lib/crm/zurich';
 import { splitQuoted } from '@/lib/crm/quoted';
 import type { Message } from '@/lib/crm/types';
 
@@ -77,7 +78,8 @@ function Bubble({
   const quotedLines = quoted ? quoted.split('\n').length : 0;
   const quotedLabel = quotedLines > 1 ? `les ${quotedLines} lignes citées` : 'la ligne citée';
 
-  const stamp = formatStamp(m.msg_date);
+  // Stored UTC, shown in Swiss time (lib/crm/zurich.ts).
+  const stamp = formatStamp(m.msg_date ? toZurich(m.msg_date) : m.msg_date);
 
   return (
     <div

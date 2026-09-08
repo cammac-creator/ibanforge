@@ -1,5 +1,6 @@
 import type { MessageRow } from './build-contacts';
 import { dayLabel, isoDay, shiftDay } from './format';
+import { toZurich } from './zurich';
 import { fold } from './mail-rows';
 import type { Contact, Message } from './types';
 
@@ -60,13 +61,24 @@ export interface JournalContact {
 export interface JournalRow {
   /** Stable across renders: the stored message id, or the contact and rank. */
   id: string;
-  /** The stamp as stored, e.g. '2026-09-07T08:15:00'. Never a Date. */
+  /**
+   * The stamp in Swiss time, e.g. '2026-09-07T10:15:00'. Never a Date. Stored
+   * stamps are UTC (the API, the IMAP sync and the scheduled sends all write
+   * UTC); the page shows the reader's clock, so a draft the VPS will send at
+   * 10:22 reads 10:22 — see lib/crm/zurich.ts for the incident.
+   */
   date: string;
-  /** Its 'YYYY-MM-DD' prefix — what the window and the shelves compare. */
+  /** Its 'YYYY-MM-DD' prefix, Swiss day — what the window and the shelves compare. */
   day: string;
   direction: JournalDirection;
   /** Null on anything that did not leave. See the header. */
   origin: SendOrigin | null;
+  /**
+   * A draft Claude scheduled for automatic sending (origin 'claude' on a
+   * draft): it leaves on its own at `date`, on the VPS. A human's own draft
+   * never carries this.
+   */
+  scheduled: boolean;
   contact: JournalContact;
   subject: string;
   /** One line of preview. */
@@ -158,17 +170,19 @@ export function journalRows(contacts: Contact[]): JournalRow[] {
     const all: Message[] = c.draft ? [...c.messages, c.draft] : c.messages;
     for (let i = 0; i < all.length; i += 1) {
       const m = all[i];
-      const day = isoDay(m.msg_date);
+      const local = m.msg_date ? toZurich(m.msg_date) : '';
+      const day = isoDay(local);
       if (!day || !m.msg_date) continue;
       const direction = directionOf(m);
       const subject = (m.subject ?? '').trim();
       const snippet = previewOf(m);
       rows.push({
         id: m.id || `${c.id}#${i}`,
-        date: m.msg_date,
+        date: local,
         day,
         direction,
         origin: originOf(m, direction),
+        scheduled: direction === 'draft' && m.origin === 'claude',
         contact,
         subject,
         snippet,

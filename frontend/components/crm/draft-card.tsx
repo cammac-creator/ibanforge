@@ -6,6 +6,7 @@ import { changedRows, confirmedSent, readAnswer, reasonOf, withReason } from '@/
 import { draftReading } from '@/lib/crm/draft-reading';
 import { sendingAccount } from '@/lib/crm/sending-account';
 import { formatStamp } from '@/lib/crm/format';
+import { toZurich } from '@/lib/crm/zurich';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
 
@@ -249,7 +250,9 @@ export function DraftCard({
     }
   }
 
-  const stamp = formatStamp(draft.msg_date);
+  // Stored UTC, shown in Swiss time (lib/crm/zurich.ts): a draft scheduled
+  // for 10:22 must read 10:22 on the card too.
+  const stamp = formatStamp(draft.msg_date ? toZurich(draft.msg_date) : draft.msg_date);
   // One draft per contact and one card on screen, so a constant id is unique
   // and stays readable. Distinct from the composer's, which can be open at the
   // same time: two lists sharing an id would make both aria-describedby point

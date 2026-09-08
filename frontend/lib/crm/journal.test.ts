@@ -397,3 +397,39 @@ describe('unattachedCount', () => {
     expect(unattachedCount([row('Registry@Alpha.Example.NET')], CONTACTS)).toBe(0);
   });
 });
+
+describe('journalRows — Swiss time and scheduled drafts (08/09/2026)', () => {
+  it('shows the stored UTC stamp in Swiss time and files the row on the Swiss day', () => {
+    const rows = journalRows([
+      contact({
+        id: 'late@alpha.example.net',
+        kind: 'prospect',
+        messages: [msg({ id: 'late', direction: 'out', msg_date: '2026-09-07T22:30:00' })],
+      }),
+    ]);
+    expect(rows[0].date).toBe('2026-09-08T00:30:00');
+    expect(rows[0].day).toBe('2026-09-08');
+  });
+
+  it('marks a draft Claude scheduled as such, and nothing else', () => {
+    const rows = journalRows([
+      contact({
+        id: 'a@alpha.example.net',
+        kind: 'prospect',
+        messages: [msg({ id: 'sent', direction: 'out', origin: 'claude', msg_date: '2026-09-08T08:22:00' })],
+        draft: msg({ id: 'planned', direction: 'draft', origin: 'claude', msg_date: '2026-09-08T09:44:00' }),
+      }),
+      contact({
+        id: 'b@alpha.example.net',
+        kind: 'client',
+        draft: msg({ id: 'mine', direction: 'draft', msg_date: '2026-09-08T07:36:00' }),
+      }),
+    ]);
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+    expect(byId.planned.scheduled).toBe(true);
+    expect(byId.planned.date).toBe('2026-09-08T11:44:00');
+    expect(byId.mine.scheduled).toBe(false);
+    expect(byId.sent.scheduled).toBe(false);
+    expect(byId.sent.origin).toBe('claude');
+  });
+});
