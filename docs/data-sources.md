@@ -332,6 +332,26 @@ la marge « stale » est à zéro** (`FCA_STALE_GRACE_MS = 0`) : l'usage décrit
 donc une copie de plus d'un jour n'est jamais servie, panne ou pas — la route répond 502 et dit que le
 registre est indisponible. Rouvrir la marge suppose d'écrire d'abord à la FCA.
 
+### ✅ 08/09/2026 — la Hellenic Bank Association accepte la réutilisation commerciale des fichiers HEBIC
+
+Lettre du lot 2 partie le 08/09 à 10 h 40 UTC (adresse générale de la HBA) ; réponse d'un Senior Director de
+l'association à 11 h 16 UTC, trente-six minutes plus tard :
+
+> « Indeed, IBANforge can reuse HEBIC files in its API responses normalised and credited as "Source: Hellenic
+> Bank Association (HEBIC)" explicitly stating the following Important Note "HBA is not responsible for the
+> accuracy of the data given by the banks. HBA has the right to make any adjustments when necessary and is not
+> responsible for any misuse of the Greek Banking System (HEBIC) index". »
+
+Deux conditions, à porter dans le code le jour du branchement : (1) le crédit exact « Source: Hellenic Bank
+Association (HEBIC) » avec la date de publication du fichier ; (2) **l'Important Note reproduite en entier** sur
+chaque réponse qui sert une donnée HEBIC (champ `notice` du bloc registre, jamais résumée) et dans la
+documentation. Remerciement envoyé le 08/09 avec le rappel des deux conditions.
+
+Ce que cela permet : un registre grec autoritatif à la manière du registre slovaque : le code à trois chiffres
+de l'IBAN grec (positions 5 à 7) → établissement et adresse, plus le fichier des agences (code à quatre chiffres,
+positions 8 à 11). Source : les fichiers HEBIC publiés sur hba.gr. Chantier à lancer ; tant qu'il ne l'est pas,
+la Grèce reste servie comme aujourd'hui (aucune donnée HEBIC n'est encore lue).
+
 ### ✅ 25/08/2026 — la Bank of England a accordé la permission
 
 Réponse du service Engagement and Enquiries de la Bank of England, reçue le
