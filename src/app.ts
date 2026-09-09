@@ -136,6 +136,32 @@ const redactPathSecrets = (line: string): string =>
 
 // Track all HTTP requests for dashboard analytics
 // Exclude internal/monitoring endpoints to avoid feedback loop
+/**
+ * Web Bot Auth (RFC 9421): what to write in request_log.agent_signature.
+ *
+ * 🚨 NORMALISED AT THE SOURCE, never the raw header. The identity Web Bot Auth
+ * attributes is the JWKS DIRECTORY, so the origin is the whole signal; keeping
+ * the full string would let an unauthenticated caller choose the cardinality of
+ * a table we keep for twelve months, and turn the GROUP BY behind
+ * /admin/scanners into a scan on a synchronous better-sqlite3 handle that sits
+ * in front of paying traffic. We still log what is RECEIVED and not what is
+ * valid — hence the 'malformed' sentinel rather than a silent drop.
+ *
+ * Returns an https origin, 'malformed', 'unnamed' (signed but no directory) or
+ * null (no signature header at all, which is 100% of traffic in 2026).
+ */
+export function agentSignatureOf(sigAgent: string | null, sigInput: string | null): string | null {
+  if (!sigAgent) return sigInput ? 'unnamed' : null;
+  // RFC 8941 structured field: the value arrives quoted.
+  const bare = sigAgent.trim().replace(/^"|"$/g, '');
+  try {
+    const u = new URL(bare);
+    return u.protocol === 'https:' ? u.origin.slice(0, 128) : 'malformed';
+  } catch {
+    return 'malformed';
+  }
+}
+
 const SKIP_TRACKING = new Set([
   '/stats',
   '/stats/history',
@@ -713,6 +739,10 @@ export function buildApp(): Hono<HonoEnv> {
         'x-real-ip': c.req.header('x-real-ip') ?? null,
       });
       const keyPrefix = c.get('apiKeyPrefix') ?? null;
+      const agentSignature = agentSignatureOf(
+        c.req.header('signature-agent') ?? null,
+        c.req.header('signature-input') ?? null,
+      );
       // MCP tool invocations record under a virtual path so the dashboards can
       // finally split real MCP usage from discovery handshakes.
       //
@@ -744,6 +774,7 @@ export function buildApp(): Hono<HonoEnv> {
         hashIp(ip),
         userAgent,
         keyPrefix,
+        agentSignature,
       );
     }
   });

@@ -26,6 +26,13 @@ interface ScannerRow {
   last_seen: string;
 }
 
+interface SignedAgentRow {
+  agent_signature: string;
+  total: number;
+  first_seen: string;
+  last_seen: string;
+}
+
 interface DrillRow {
   method: string;
   path: string;
@@ -119,6 +126,24 @@ adminScanners.get('/admin/scanners', (c) => {
       .get(`-${days} days`) as { c: number }
   ).c;
 
+  // Web Bot Auth: who signs, by JWKS origin. Served by the PARTIAL index on
+  // agent_signature (signed rows only), which is what keeps this GROUP BY cheap
+  // the day the column stops being empty. /admin/scanners and not /stats because
+  // this is the one view whose job is to tell a scanner from a customer, and a
+  // signature is a discriminant of exactly that family.
+  const signedAgents = db
+    .prepare(
+      `SELECT agent_signature, COUNT(*) as total,
+              MIN(created_at) as first_seen, MAX(created_at) as last_seen
+       FROM request_log
+       WHERE created_at >= datetime('now', ?)
+         AND agent_signature IS NOT NULL
+       GROUP BY agent_signature
+       ORDER BY total DESC
+       LIMIT 20`,
+    )
+    .all(`-${days} days`) as SignedAgentRow[];
+
   return c.json({
     period_days: days,
     total_requests_with_ip: totalLogged,
@@ -141,7 +166,13 @@ adminScanners.get('/admin/scanners', (c) => {
       last_seen: r.last_seen,
       drill_down: `?ip_hash=${r.ip_hash}&days=${days}`,
     })),
-    docs: 'Pass Bearer STATS_TOKEN. Aggregates request_log by (ip_hash, user_agent) over the last N days (1-30, default 7). Add ?ip_hash=... to drill into paths/methods for one source. IPs are salted-SHA256 truncated; never reversible.',
+    signed_agents: signedAgents.map((r) => ({
+      agent: r.agent_signature,
+      total: r.total,
+      first_seen: r.first_seen,
+      last_seen: r.last_seen,
+    })),
+    docs: 'Pass Bearer STATS_TOKEN. Aggregates request_log by (ip_hash, user_agent) over the last N days (1-30, default 7). Add ?ip_hash=... to drill into paths/methods for one source. IPs are salted-SHA256 truncated; never reversible. signed_agents counts Web Bot Auth (RFC 9421) headers by the ORIGIN of the JWKS directory announced in Signature-Agent, plus two sentinels: "unnamed" (signed, no directory) and "malformed" (Signature-Agent present but not an https URL). An EMPTY list is the correct answer today and not a fault: no known agent signs its requests in 2026, and this list exists to catch the day one starts.',
   });
 });
 
