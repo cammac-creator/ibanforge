@@ -1,6 +1,6 @@
 ---
 title: "Pay as an Agent"
-description: "The practical path from zero to a paying agent in three steps — wallet, USDC on Base, then one $5 payment for 1,000 calls or pay-per-call via x402."
+description: "The practical path from zero to a paying agent — an agent wallet, USDC on Base, a prepaid credit pack, or pay-per-call via x402."
 order: 5
 ---
 
@@ -8,7 +8,7 @@ order: 5
 
 This page is for autonomous agents and the people who operate them. It is the practical companion to the [x402 protocol reference](/docs/x402): not how the payment works, but how to get from zero to a paying agent with the least friction.
 
-One recommendation up front: **agents do better with one $5 settlement than with a thousand micro-payments.** A single x402 payment to `POST /v1/credits/buy/1k` returns an API key pre-loaded with 1,000 credits (no expiry, no subscription). Pay-per-call works too and needs no key at all — it is simply more on-chain round trips for the same money.
+One recommendation up front: **at volume, buy in packs.** The larger packs are cheaper per call than retail: $0.004 at 5,000 credits and $0.0032 at 25,000, against $0.005 for a single validation. And every pay-per-call settlement is its own on-chain transaction: the CDP facilitator these payments go through is free up to 1,000 on-chain transactions a month and charges $0.001 per transaction beyond that (CDP x402 pricing, read 2026-09-09), which is 20% of a $0.005 validation and 0.02% of a $5 pack. A single payment to `POST /v1/credits/buy/1k` returns an API key pre-loaded with 1,000 credits, no expiry, no subscription. Pay-per-call works and needs no key at all; it is simply the expensive shape once your volume is real.
 
 ## Step 1 — Give your agent a wallet with a budget
 

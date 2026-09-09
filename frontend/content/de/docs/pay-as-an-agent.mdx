@@ -1,6 +1,6 @@
 ---
 title: "Als Agent bezahlen"
-description: "Der praktische Weg von null zum zahlenden Agenten in drei Schritten — Wallet, USDC auf Base, dann eine 5-$-Zahlung für 1.000 Aufrufe oder Pay-per-Call via x402."
+description: "Der praktische Weg von null zum zahlenden Agenten: eine Agent-Wallet, USDC auf Base, ein Prepaid-Credit-Paket, oder Pay-per-Call via x402."
 order: 5
 ---
 
@@ -8,7 +8,7 @@ order: 5
 
 Diese Seite richtet sich an autonome Agenten und die Menschen, die sie betreiben. Sie ist der praktische Begleiter zur [x402-Protokollreferenz](/docs/x402): nicht wie die Zahlung funktioniert, sondern wie man mit möglichst wenig Reibung von null zu einem zahlenden Agenten kommt.
 
-Eine Empfehlung vorweg: **Agenten fahren besser mit einer 5-$-Abrechnung als mit tausend Mikrozahlungen.** Eine einzige x402-Zahlung an `POST /v1/credits/buy/1k` liefert einen API-Schlüssel mit 1.000 vorgeladenen Credits (kein Verfall, kein Abo). Pay-per-Call funktioniert ebenfalls und braucht gar keinen Schlüssel — es sind nur mehr On-Chain-Runden für dasselbe Geld.
+Eine Empfehlung vorweg: **Bei Volumen kaufen Sie Pakete.** Die größeren Pakete sind pro Aufruf günstiger als der Einzelpreis: 0,004 $ bei 5.000 Credits und 0,0032 $ bei 25.000, gegenüber 0,005 $ für eine einzelne Validierung. Und jede Pay-per-Call-Abrechnung ist eine eigene On-Chain-Transaktion: Der CDP-Facilitator, über den diese Zahlungen laufen, ist bis 1.000 On-Chain-Transaktionen pro Monat kostenlos und berechnet darüber hinaus 0,001 $ pro Transaktion (CDP-x402-Preise, gelesen am 2026-09-09), also 20 % einer Validierung zu 0,005 $ und 0,02 % eines 5-$-Pakets. Eine einzige Zahlung an `POST /v1/credits/buy/1k` liefert einen API-Schlüssel mit 1.000 vorgeladenen Credits, kein Verfall, kein Abo. Pay-per-Call funktioniert und braucht gar keinen Schlüssel; es ist bei echtem Volumen einfach die teure Form.
 
 ## Schritt 1 — Geben Sie Ihrem Agenten ein Wallet mit Budget
 
