@@ -214,6 +214,10 @@ function openStatsDB(): DatabaseType.Database {
       -- the drill-down and once for the IS NOT NULL scan behind the list of top
       -- sources. Dropping it would trade 49 Mo for a full scan of 1.1 M rows on
       -- the only view that tells a scanner from a customer.
+      -- agent_signature (Web Bot Auth, 2026-09-09) costs nothing today: it is
+      -- NULL on every unsigned request, which is all of them, and holds a short
+      -- https origin otherwise. Its index is PARTIAL (signed rows only), so it
+      -- stays near zero until an agent actually signs.
       -- No composite index was added for /stats/status-by-path either: once the
       -- query leads with the date (see getStatusByPath), the planner picks
       -- idx_request_log_date, and neither (path, created_at) nor
@@ -854,6 +858,33 @@ function openStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN x402_payment_ref TEXT');
       statsDB.exec(
         'CREATE INDEX IF NOT EXISTS idx_api_keys_x402_ref ON api_keys(x402_payment_ref)',
+      );
+    }
+    // Web Bot Auth (RFC 9421): who signed the request, in one column.
+    //
+    // Four readings:
+    //   https://host[:port]  the ORIGIN of the JWKS directory announced in the
+    //                        Signature-Agent header. The origin and not the raw
+    //                        string, because the identity Web Bot Auth attributes
+    //                        IS the directory, and because a whole header lets the
+    //                        CALLER pick our cardinality: 128 random bytes per
+    //                        request would inflate a table with twelve months of
+    //                        retention and turn the GROUP BY behind /admin/scanners
+    //                        into a scan, on a synchronous handle sitting in front
+    //                        of paying traffic.
+    //   'malformed'          Signature-Agent was there but is not an https URL.
+    //   'unnamed'            signed (Signature-Input) without saying where to verify.
+    //   NULL                 no signature header at all — 100% of traffic in 2026.
+    // We log what is RECEIVED, never what is valid: hence a sentinel rather than a
+    // silent drop. The exact bad string stays in the day's access logs, not here.
+    //
+    // 🚨 The ALTER comes first and the index after it: an index named in the
+    // CREATE TABLE block above would reference a column that does not exist yet
+    // on an old database, openStatsDB() would throw, and the API would not boot.
+    if (!reqCols.includes('agent_signature')) {
+      statsDB.exec('ALTER TABLE request_log ADD COLUMN agent_signature TEXT');
+      statsDB.exec(
+        'CREATE INDEX IF NOT EXISTS idx_request_log_agent_signature ON request_log(agent_signature) WHERE agent_signature IS NOT NULL',
       );
     }
     // CRM timeline: French translation + detected language of foreign messages.

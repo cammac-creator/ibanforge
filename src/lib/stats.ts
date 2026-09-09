@@ -59,7 +59,7 @@ function upsertHourly() {
 function insertRequest() {
   if (!_insertRequest) {
     _insertRequest = getStatsDB().prepare(
-      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind, ip_hash, user_agent, key_prefix) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind, ip_hash, user_agent, key_prefix, agent_signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
   }
   return _insertRequest;
@@ -335,6 +335,11 @@ export function normalizeRequestPath(path: string): string {
  *
  * `ipHash` and `userAgent` are optional and feed the /admin/scanners endpoint;
  * legacy callers that omit them still work (columns are nullable).
+ *
+ * `agentSignature` is the Web Bot Auth reading, ALREADY normalised by the caller
+ * (see src/app.ts): an https origin, 'malformed', 'unnamed', or null. It is not
+ * normalised here on purpose — the raw header must not travel this far, or the
+ * next caller of recordRequest will pass one.
  */
 export function recordRequest(
   method: string,
@@ -345,6 +350,7 @@ export function recordRequest(
   ipHash: string | null = null,
   userAgent: string | null = null,
   keyPrefix: string | null = null,
+  agentSignature: string | null = null,
 ) {
   try {
     const now = new Date();
@@ -365,6 +371,7 @@ export function recordRequest(
       ipHash,
       truncatedUa,
       keyPrefix,
+      agentSignature,
     );
   } catch (err) {
     // Request tracking is non-critical and must never break the API, but a

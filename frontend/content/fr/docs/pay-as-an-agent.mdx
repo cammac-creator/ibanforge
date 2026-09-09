@@ -1,6 +1,6 @@
 ---
 title: "Payer en tant qu'agent"
-description: "Le chemin pratique de zéro à un agent payeur en trois étapes — wallet, USDC sur Base, puis un paiement de 5 $ pour 1 000 appels ou le paiement à l'appel via x402."
+description: "Le chemin pratique de zéro à un agent payeur : un wallet d'agent, de l'USDC sur Base, un pack de crédits prépayé, ou le paiement à l'appel via x402."
 order: 5
 ---
 
@@ -8,7 +8,7 @@ order: 5
 
 Cette page s'adresse aux agents autonomes et aux personnes qui les opèrent. C'est le compagnon pratique de la [référence du protocole x402](/docs/x402) : non pas comment le paiement fonctionne, mais comment passer de zéro à un agent qui paie, avec le moins de friction possible.
 
-Une recommandation d'entrée : **un agent s'en sort mieux avec un règlement de 5 $ qu'avec mille micro-paiements.** Un seul paiement x402 vers `POST /v1/credits/buy/1k` renvoie une clé API préchargée de 1 000 crédits (sans expiration, sans abonnement). Le paiement à l'appel fonctionne aussi et ne demande aucune clé — c'est simplement plus d'allers-retours on-chain pour le même argent.
+Une recommandation d'entrée : **au volume, achetez par packs.** Les gros packs coûtent moins cher à l'appel que le détail : 0,004 $ à 5 000 crédits et 0,0032 $ à 25 000, contre 0,005 $ pour une validation à l'unité. Et chaque règlement à l'appel est une transaction on-chain à lui seul : le facilitateur CDP par lequel ces paiements passent est gratuit jusqu'à 1 000 transactions on-chain par mois et facture 0,001 $ par transaction au-delà (tarifs x402 de CDP, lus le 2026-09-09), soit 20 % d'une validation à 0,005 $ et 0,02 % d'un pack à 5 $. Un seul paiement vers `POST /v1/credits/buy/1k` renvoie une clé API préchargée de 1 000 crédits, sans expiration, sans abonnement. Le paiement à l'appel fonctionne et ne demande aucune clé ; c'est simplement la forme chère dès que le volume devient réel.
 
 ## Étape 1 — Donnez à votre agent un wallet avec un budget
 
