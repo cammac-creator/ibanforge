@@ -22,9 +22,22 @@ const PRIVATE_PATHS = [
   "/api/",
 ];
 
+/**
+ * Crawlers shut out on 2026-09-09. Vercel's request log for one hour that
+ * morning (05:32-06:28 UTC, 3 791 requests) was 69 % `meta-externalagent`
+ * (Meta's AI-training crawler, re-fetching the same 134 pages about ten
+ * times an hour) and 18 % `AwarioBot` (a brand-monitoring tool walking the
+ * register pages). Together they drove the Hobby team to 100 % of its
+ * function invocations and Active CPU. Neither brings a visitor or a
+ * search ranking. The Vercel WAF denies them as well; this file is the
+ * polite version they are supposed to read first.
+ */
+const SHUT_OUT = ["meta-externalagent", "AwarioBot"];
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
+      ...SHUT_OUT.map((userAgent) => ({ userAgent, disallow: "/" })),
       { userAgent: "*", allow: "/", disallow: PRIVATE_PATHS },
       { userAgent: "GPTBot", allow: "/", disallow: PRIVATE_PATHS },
       { userAgent: "ClaudeBot", allow: "/", disallow: PRIVATE_PATHS },

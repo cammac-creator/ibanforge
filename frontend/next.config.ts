@@ -81,6 +81,16 @@ const nextConfig: NextConfig = {
       { source: "/.well-known/api-catalog", destination: "https://api.ibanforge.com/.well-known/api-catalog", permanent: true },
       { source: "/apis.json", destination: "https://api.ibanforge.com/apis.json", permanent: true },
       /*
+       * 2026-09-09: agent-discovery scanners (ABC-Protocol-Agent-Discovery,
+       * and others without a name) ask the site for the agent manifests that
+       * live on the API host, and each miss ran the not-found page in a
+       * function. A permanent redirect answers at the edge and lands them on
+       * the real file. Only the three the API actually serves are listed.
+       */
+      { source: "/.well-known/agent.json", destination: "https://api.ibanforge.com/.well-known/agent.json", permanent: true },
+      { source: "/.well-known/agent-card.json", destination: "https://api.ibanforge.com/.well-known/agent-card.json", permanent: true },
+      { source: "/.well-known/x402.json", destination: "https://api.ibanforge.com/.well-known/x402.json", permanent: true },
+      /*
        * 2026-09-05 (audit n° 29): www.ibanforge.com served the whole site a
        * second time (200, canonical pointing at the apex) instead of sending
        * the visitor to the one host. A permanent redirect, every path.
