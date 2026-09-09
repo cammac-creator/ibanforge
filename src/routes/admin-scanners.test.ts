@@ -16,6 +16,14 @@
  * aggregates. No agent signs anything in 2026 — an EMPTY list is the correct
  * answer in production today, and this test is what says so the day it stops
  * being empty.
+ *
+ * 🚨 The assertions that carry this file are the EXACT ones: one row, and a
+ * total equal to the number of SIGNED requests. The first version of this file
+ * guarded unsigned traffic with `rows.every((r) => r.agent !== null)`, which can
+ * never fail: the route's own `WHERE agent_signature IS NOT NULL` makes a null
+ * agent unreachable. Labelling every unsigned request — 100% of production
+ * traffic — as a signed agent left the suite green. Shape taken from spec-05
+ * test 26: three signed requests, two unsigned, one entry, `total: 3`.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { buildApp } from '../app.js';
@@ -24,6 +32,9 @@ import { closeAll } from '../lib/db.js';
 afterAll(() => closeAll());
 
 const TOKEN = 'test-stats-token';
+
+const DIRECTORY = '"https://agent.example.com/.well-known/http-message-signatures-directory"';
+const SIGNATURE_INPUT = 'sig1=("@authority");created=1';
 
 interface SignedAgentRow {
   agent: string;
@@ -50,54 +61,67 @@ async function readSignedAgents(
 }
 
 describe('GET /admin/scanners — signed_agents', () => {
-  it('reports the JWKS origin of a signed request and ignores unsigned traffic', async () => {
+  // ⚠️ This first test counts the WHOLE list, so it has to run on a log that
+  // holds nothing but its own rows. Vitest runs a file's tests in declaration
+  // order and `vitest.config.ts` sets no `sequence.shuffle`; the day someone
+  // adds shuffling or `describe.concurrent`, move this file to its own
+  // STATS_DB_PATH rather than weakening the length assertion.
+  it('counts three signed requests as one agent and files two unsigned ones nowhere', async () => {
     const app = buildApp();
 
-    await app.request('/robots.txt', {
-      headers: {
-        'x-real-ip': '203.0.113.10',
-        'Signature-Agent':
-          '"https://agent.example.com/.well-known/http-message-signatures-directory"',
-        'Signature-Input': 'sig1=("@authority");created=1',
-      },
-    });
+    for (const ip of ['203.0.113.10', '203.0.113.11', '203.0.113.12']) {
+      await app.request('/robots.txt', {
+        headers: {
+          'x-real-ip': ip,
+          'Signature-Agent': DIRECTORY,
+          'Signature-Input': SIGNATURE_INPUT,
+        },
+      });
+    }
     // Unsigned: the shape of every request served today.
-    await app.request('/robots.txt', { headers: { 'x-real-ip': '203.0.113.11' } });
+    await app.request('/robots.txt', { headers: { 'x-real-ip': '203.0.113.13' } });
+    await app.request('/robots.txt', { headers: { 'x-real-ip': '203.0.113.14' } });
 
     const { status, rows, docs } = await readSignedAgents(app);
     expect(status).toBe(200);
+    // ONE row: the two unsigned requests are absent from the list, not filed
+    // under a nameless agent. Length is the only assertion that can say this —
+    // the route filters `agent_signature IS NOT NULL`, so looking for a null
+    // agent among the rows returned is looking for something the SQL forbids.
+    expect(rows, JSON.stringify(rows)).toHaveLength(1);
     // The origin, never the full directory URL: the path is the caller's to choose.
-    const signed = rows.find((r) => r.agent === 'https://agent.example.com');
-    expect(signed, JSON.stringify(rows)).toBeDefined();
-    expect(signed?.total).toBeGreaterThanOrEqual(1);
+    expect(rows[0].agent).toBe('https://agent.example.com');
+    // Exactly the three signed requests, never the five requests served.
+    expect(rows[0].total).toBe(3);
     // An empty list is the correct answer in production; the docs string has to
     // say so, or the next reader will file a bug against a working column.
     expect(docs.toLowerCase()).toContain('empty');
-    // Unsigned requests are absent, not counted as a nameless agent.
-    expect(rows.every((r) => r.agent !== null)).toBe(true);
   });
 
   it("files a signature without a directory as 'unnamed' and a broken one as 'malformed'", async () => {
     const app = buildApp();
 
     await app.request('/robots.txt', {
-      headers: { 'x-real-ip': '203.0.113.12', 'Signature-Input': 'sig1=("@authority");created=1' },
+      headers: { 'x-real-ip': '203.0.113.20', 'Signature-Input': SIGNATURE_INPUT },
     });
     await app.request('/robots.txt', {
-      headers: { 'x-real-ip': '203.0.113.13', 'Signature-Agent': 'not-a-url-at-all' },
+      headers: { 'x-real-ip': '203.0.113.21', 'Signature-Agent': 'not-a-url-at-all' },
     });
     // http:// is not https:// — a directory served in clear is not an identity.
     await app.request('/robots.txt', {
       headers: {
-        'x-real-ip': '203.0.113.14',
+        'x-real-ip': '203.0.113.22',
         'Signature-Agent': '"http://agent.example.com/jwks"',
       },
     });
 
     const { rows } = await readSignedAgents(app);
-    const agents = rows.map((r) => r.agent);
-    expect(agents, JSON.stringify(rows)).toContain('unnamed');
-    expect(agents, JSON.stringify(rows)).toContain('malformed');
-    expect(rows.find((r) => r.agent === 'malformed')?.total).toBeGreaterThanOrEqual(2);
+    const byAgent = new Map(rows.map((r) => [r.agent, r.total]));
+    // Exact totals, not `toBeGreaterThanOrEqual`: a floor passes at the two
+    // numbers this test exists to separate (see the warning in vitest.config.ts).
+    // The first test signs three requests and produces neither sentinel, so
+    // these two counts are this test's own.
+    expect(byAgent.get('unnamed'), JSON.stringify(rows)).toBe(1);
+    expect(byAgent.get('malformed'), JSON.stringify(rows)).toBe(2);
   });
 });
