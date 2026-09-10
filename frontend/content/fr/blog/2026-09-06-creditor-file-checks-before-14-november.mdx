@@ -8,12 +8,12 @@ faq:
   - q: "Une adresse hybride suffit-elle ?"
     a: "Oui, d'après les guidelines SPS 2026 : la localité et le pays dans leurs propres champs, le NPA aussi quand vous l'avez, et au plus deux lignes libres de 70 caractères pour le reste. Ce qui ne passe plus, c'est l'adresse entière sur une seule ligne."
   - q: "Swift a reporté sa date le 27 août 2026 : puis-je attendre ?"
-    a: "Non. Le report de Swift concerne les messages transfrontaliers CBPR+, avec une mise à jour promise pour décembre 2026 au plus tard. SIX, l'Eurosystème et les rulebooks de l'EPC n'ont pas bougé : le 14 novembre suisse et le 15 novembre SEPA tiennent."
+    a: "Le calendrier suisse doit être vérifié séparément. SIX publie toujours le 14 novembre 2026. Swift a reporté ses changements de paiement le 27 août ; l’EPC a aussi reporté son échéance du 15 novembre le 9 septembre et prévoit une nouvelle date en octobre. Ces annonces ne changent pas à elles seules le calendrier SIX."
   - q: "Combien coûte l'audit de fichier ?"
     a: "L'aperçu est gratuit : les compteurs et vingt lignes, IBAN masqués. Le classeur annoté coûte 149 CHF jusqu'à 5 000 lignes et 349 CHF jusqu'à 20 000, payé par carte, téléchargeable pendant 24 heures."
 ---
 
-Le 14 novembre 2026, les [Swiss Payment Standards 2026](/fr/docs/structured-addresses) entrent en vigueur. À partir de ce jour, un ordre de paiement dont l'adresse du créancier ne respecte ni la forme structurée ni la forme hybride n'est plus traité. Le 15, les rulebooks SEPA de l'EPC font de même pour les virements en euros, et l'Eurosystème bascule T2 le même week-end. Swift, lui, a suspendu sa propre date le 27 août 2026 ; nous avons décrit [l'état de chaque rail, document par document](/fr/blog/2026-09-02-which-date-structured-addresses), et rien de suisse n'y a bougé.
+Les Swiss Payment Standards publient toujours le 14 novembre 2026 pour l’adresse structurée ou hybride dans les ordres de paiement, lorsqu’une adresse est utilisée. L’EPC a reporté son échéance distincte du 15 novembre le 9 septembre ; Swift avait déjà reporté ses changements de paiement le 27 août. Ces annonces ne modifient pas à elles seules le calendrier suisse. Voir [les décisions datées, rail par rail](/fr/blog/2026-09-02-which-date-structured-addresses).
 
 Ce qui se joue en novembre, ce n'est pas votre logiciel de paiement. C'est votre fichier de créanciers : le tableau, la table ou l'export dans lequel dorment des fournisseurs saisis il y a dix ans, avec une adresse sur une ligne, un BIC recopié d'une facture et parfois un IBAN qui n'a jamais été vérifié. Chaque paiement part avec ces données. Voici les sept contrôles à lui faire passer, et comment les faire passer en dix minutes.
 
