@@ -1,20 +1,16 @@
 ---
 title: "La deadline adresses ISO 20022, et l'échappatoire par le BIC"
-description: "Novembre 2026 est bien réel : les SPS 2026 entrent en vigueur le 14, Fedwire suit le 16, et la dernière release SIC acceptant les adresses non structurées ferme le 20. Ce que les règles exigent vraiment est plus petit que la panique vendue — et les specs nomment elles-mêmes la porte de sortie. Nous avons livré deux choses : un bloc postal_address structuré sur les réponses BIC, et un contrôleur de conformité gratuit."
+description: "Comment le BIC peut identifier un établissement dans un message de paiement, ce qu’exige son adresse et comment IBANforge contrôle une adresse structurée. Calendrier actualisé après les reports de Swift et de l’EPC."
 date: "2026-08-26"
 ---
 
-Une vague de marketing explique en ce moment aux équipes paiement que leurs virements vont commencer à rebondir en novembre 2026 à cause des adresses. Les dates sont vraies. Le périmètre est bien plus petit que l'argumentaire — et les spécifications décrivent elles-mêmes une porte de sortie que personne ne cite dans les pitchs.
+Les règles d’adresse et leur date d’application sont deux questions distinctes. Cet article explique les exigences pour l’adresse d’un établissement financier et les cas où le BIC permet d’identifier l’agent. Le calendrier initial a été actualisé après les annonces de Swift et de l’EPC.
 
-## Les vraies dates
+## Calendrier actualisé
 
-Trois réseaux durcissent leurs règles d'adresse en une semaine :
+**Vérifié le 10 septembre 2026.** La [décision de l’EPC du 9 septembre](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline) maintient les adresses non structurées au-delà du 15 novembre 2026 pour ses cinq schémas de paiement ; la nouvelle date doit être fixée en octobre. Le [communiqué de Swift du 27 août](https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) reporte les changements de paiement sans nouvelle date pour les adresses, avec une mise à jour pour décembre au plus tard. [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) publie toujours son calendrier suisse distinct.
 
-- **14 novembre 2026** — entrée en vigueur des Swiss Payment Standards 2026 (SIX, SPS 2026 v2.3, publiés le 20.02.2026).
-- **16 novembre 2026** — date de production Fedwire pour la même famille de changements.
-- **20 novembre 2026** — dernière release SIC acceptant les adresses non structurées.
-
-Si vous avez vu « 22 novembre 2026 » dans une présentation, demandez la source. Nous avons cherché : aucun document primaire ne porte cette date. L'origine la plus plausible est le règlement suisse *2025*, valable dès le 22 novembre **2025** — un glissement d'un an recopié de slide en slide.
+L’ancienne date Fedwire du 16 novembre 2026 est aussi remplacée dans le relevé des sources par novembre 2027. Pour chaque rail et la date de lecture de sa source, consultez [le calendrier détaillé](/fr/blog/2026-09-02-which-date-structured-addresses). L’ancien 22 novembre 2026 figurait bien dans le guide de l’EPC avant son remplacement ; il ne faut pas le confondre avec les changements suisses de novembre 2025.
 
 ## Ce que les règles exigent vraiment
 

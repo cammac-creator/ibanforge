@@ -1,33 +1,28 @@
 ---
 title: "Strukturierte Adressen nach ISO 20022"
-description: "Die Regeln zur strukturierten Adresse ab November 2026, Schiene für Schiene, mit den Dokumenten, aus denen sie stammen — dazu die beiden Endpunkte: eine ISO-20022-postal_address zu jedem BIC, für den wir eine liefern können, und ein kostenloser Konformitätsprüfer für eine bereits strukturierte Adresse."
+description: "ISO-20022-Adressregeln und getrennte Zeitpläne: die veröffentlichte Schweizer Frist, Verschiebungen bei EPC und Swift, Institutsadressen und die kostenlose Adressprüfung."
 order: 14
 ---
 
-# Strukturierte Adressen nach ISO 20022 — was sich im November 2026 wirklich ändert
+# Strukturierte ISO-20022-Adressen: Regeln und Zeitpläne
 
-Drei Zahlungsschienen akzeptieren ab November 2026 keine vollständig unstrukturierte Postadresse mehr. Diese Seite nennt, was jede von ihnen verlangt, und zitiert dabei das Dokument, aus dem die Regel stammt. Danach zeigt sie die beiden Dinge, die diese API dazu beiträgt.
+Jeder Zahlungsweg bestimmt seinen Zeitplan. SIX nennt weiterhin den 14. November 2026 für Schweizer Zahlungsaufträge, wenn eine Adresse verwendet wird. EPC und Swift haben ihre Fristen verschoben. Diese Seite trennt die Termine von den Adressregeln, die die API prüft.
 
-Sie nennt ebenso unmissverständlich, was diese API **nicht** leistet. Dieser Teil wiegt schwerer als der Rest, denn die Frist ist überwiegend ein Problem, bei dem diese API nicht helfen kann — und eine Seite, die diese Grenze verwischt, kostet Sie im November eine abgelehnte Zahlungsdatei.
+> **Geprüft am 10. September 2026.** Die [EPC-Entscheidung vom 9. September](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline) erlaubt unstrukturierte Adressen in allen fünf Zahlungsschemen über den 15. November 2026 hinaus; das neue Enddatum soll im Oktober festgelegt werden. [Swift hat am 27. August](https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) die Zahlungsverkehrsänderungen ohne neues Adressdatum verschoben, mit einem Update spätestens im Dezember. [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) veröffentlicht weiterhin seinen getrennten Schweizer Zeitplan.
 
-## Die Frist, Schiene für Schiene
+## Die veröffentlichten Fristen
 
-> **Stand am 2. September 2026.** Am 27. August 2026 hat Swift alle Zahlungsverkehrs-Änderungen seines Standards Release vom November 2026 verschoben, die Abschaffung unstrukturierter Adressen eingeschlossen, mit einem spätestens im Dezember 2026 versprochenen Update. SIX, das Eurosystem (T2 R2026.NOV) und die EPC-Rulebooks waren an diesem Tag unverändert; Fedwire hat sein Release auf November 2027 verlegt; die Bank of England erwartet zwölf Monate Aufschub, unter Vorbehalt der Bestätigung. Der Stand Schiene für Schiene, mit jedem Dokument und jedem Satz, steht auf [Welches Datum ist DAS Datum?](/de/blog/2026-09-02-which-date-structured-addresses).
-
-| Datum | Was geschieht | Quelle |
+| Zahlungsweg | Stand, geprüft am 10. September 2026 | Quelle |
 |---|---|---|
-| **14. November 2026** | Inkrafttreten der Swiss Payment Standards 2026 — Business Rules v3.3, Implementation Guidelines Credit Transfer v2.3, QR-Rechnung v2.4 | SIX |
-| **November 2027** (war 16. November 2026) | Release des Fedwire Funds Service verschoben; genaues Datum wird im Herbst 2026 bekannt gegeben; die Format-FAQ sagt noch «As of Nov 16» | Federal Reserve Financial Services |
-| **20. November 2026** | Letztes SIC-Release, das einen Zahlungsauftrag mit unstrukturierter Adresse noch verarbeitet | SIX |
-| **R2026.NOV** | T2-/RTGS-Version im November 2026 im Produktivbetrieb | Europäische Zentralbank |
+| Swiss Payment Standards | Der 14. November 2026 bleibt das veröffentlichte Datum; strukturierte oder hybride Adresse, wenn eine Adresse verwendet wird | [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) |
+| EPC-Zahlungsschemen | Das für 15. November 2026 geplante Ende ist verschoben; neues Datum soll im Oktober festgelegt werden | [EPC-Entscheidung vom 9. September](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline) |
+| Swift / CBPR+-Zahlungen | Änderungen vom November 2026 verschoben; kein neues Adressdatum in der Mitteilung | [Swift, 27. August](https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) |
 
-Zwei Anmerkungen zu dieser Tabelle.
+Diese Verschiebungen ändern für sich allein die Schweizer Regeln nicht. Sie ändern auch nicht die von `/v1/address/check` geprüften Felder: Das Ergebnis beschreibt die Übereinstimmung mit dem genannten Dokument, nicht das Datum, ab dem eine Bank die Regel anwenden muss. T2, Fedwire und CHAPS haben eigene Zeitpläne; die datierten Quellen stehen unter [Welches Datum ist DAS Datum?](/de/blog/2026-09-02-which-date-structured-addresses).
 
-**Sie hat keine CBPR+-Zeile, und das ist Absicht.** Die CBPR+-Usage-Guideline und das *PMPG November 2026 postal address guidance* — jenes Dokument, das die Federal Reserve selbst als ihre vorgelagerte Referenz benennt — sind beide auf swift.com veröffentlicht. Alles auf dieser Seite stammt aus einem Dokument, das abgerufen und gelesen wurde; nichts davon aus einem Dokument, bei dem das nicht gelang. Wir drucken deshalb kein CBPR+-Datum, und der Prüfer unten kennt kein Schema `cbpr+`.
+Das frühere Datum **22. November 2026** stand tatsächlich im EPC-Leitfaden. Version 2.1 ersetzte es durch den 15. November 2026, der im September 2026 ebenfalls verschoben wurde. Es ist keine aktuelle Frist. Die Schweizer QR-Rechnungsänderung vom **22. November 2025** ist ein anderes Ereignis.
 
-**Vorsicht bei einem Datum, das richtig aussieht und es nicht ist.** Der *22. November* ist eine echte Frist — aber die von **2025**: das Inkrafttreten von SPS 2025 und das Ende der MT/MX-Koexistenz. Es ist kein Datum von 2026, und ein Migrationsplan, der es um ein Jahr weiterschreibt, plant gegen nichts.
-
-Sie halten eine Swiss-QR-Rechnung statt einer blossen Adresse? [`POST /v1/ch/qr-bill/check`](/docs/swiss-qr-iban) liest die ganzen Nutzdaten und sagt, ob ihre Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, mit vorgeschlagener strukturierter Form.
+Für eine ganze Schweizer QR-Rechnung prüft [`POST /v1/ch/qr-bill/check`](/de/docs/swiss-qr-iban) die Nutzdaten, einschliesslich strukturierter (S) oder kombinierter (K) Adressen.
 
 ## Was die Regeln von einer Agent-Adresse verlangen: einen Ort und ein Land
 
@@ -227,4 +222,4 @@ Was nach diesen drei Abzügen bleibt, ist klein und echt: die ISO-20022-Form ein
 
 ## Die Papierspur der Marktpraxis
 
-Die PMPG (Payments Market Practice Group, das unabhängige Gremium zur Begleitung der ISO-20022-Einführung) veröffentlicht den monatlichen Newsletter *Payment Insights*; die Ausgabe vom August 2026 behandelt genau diese Frist — und erlaubt, anders als die CBPR+-Usage-Guidelines, die Wiedergabe unter Quellenangabe, sodass wir sie zitieren können. Drei Punkte verdienen Ihre Aufmerksamkeit: Sie bestätigt das Standards Release vom November 2026 als den Meilenstein, an dem unstrukturierte Adressen entfernt werden; sie benennt die **hybride Postadresse** — dasselbe `format: "hybrid"`, das diese API ausliefert — als die von der PMPG getragene Form für nicht vollständig strukturierbare Adressen; und ihre Impact-Tabelle stuft «Einmalzahlung mit unvollständigen Kreditor-Adressdaten» als **begrenzt** ein, gegenüber **hoch** für fehlende Ländercodes in Dateien mit hohem Volumen. Quelle: PMPG, *Payment Insights, August 2026*.
+Die PMPG (Payments Market Practice Group, das unabhängige Gremium zur Begleitung der ISO-20022-Einführung) veröffentlicht den monatlichen Newsletter *Payment Insights*; die Ausgabe vom August 2026 behandelt genau diese Frist — und erlaubt, anders als die CBPR+-Usage-Guidelines, die Wiedergabe unter Quellenangabe, sodass wir sie zitieren können. Drei Punkte verdienen Ihre Aufmerksamkeit: Sie beschrieb die damals für November 2026 geplante Entfernung; dieser Zeitplan ist durch die oben genannten Verschiebungen von Swift und EPC überholt; sie benennt die **hybride Postadresse** — dasselbe `format: "hybrid"`, das diese API ausliefert — als die von der PMPG getragene Form für nicht vollständig strukturierbare Adressen; und ihre Impact-Tabelle stuft «Einmalzahlung mit unvollständigen Kreditor-Adressdaten» als **begrenzt** ein, gegenüber **hoch** für fehlende Ländercodes in Dateien mit hohem Volumen. Quelle: PMPG, *Payment Insights, August 2026*.

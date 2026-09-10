@@ -256,9 +256,9 @@
       "daysLabel": "jours avant le 14 novembre 2026",
       "daysAria": "{days} jours avant le 14 novembre 2026",
       "since": "en vigueur depuis le 14 novembre 2026",
-      "line1": "SIX ne traite plus les paiements dont l’adresse ne respecte pas les règles structurées ou hybrides.",
-      "line2": "L’Eurosystème et l’EPC basculent le même week-end.",
-      "line3": "Swift a suspendu sa propre date le 27 août 2026."
+      "line1": "À partir du 14 novembre 2026, les ordres de paiement relevant des Swiss Payment Standards doivent respecter les exigences applicables lorsqu’une adresse est utilisée.",
+      "line2": "L’EPC a reporté son échéance du 15 novembre le 9 septembre 2026 ; une nouvelle date doit être fixée en octobre.",
+      "line3": "Swift a aussi reporté son échéance le 27 août 2026. Le calendrier suisse reste publié séparément par SIX."
     },
     "integrations": {
       "heading": "Dans votre langage, votre ERP, votre tableur",
@@ -1334,7 +1334,7 @@
   "vendors": {
     "meta": {
       "title": "Pour les éditeurs de logiciels : intégrez la validation d'IBAN dans votre produit",
-      "description": "Licence OEM pour les éditeurs ERP, comptabilité et paie à partir de 149 $ par mois : validation d'IBAN contre les registres, la donnée de clearing suisse la plus profonde d'une API publique, un contrôle d'adresse ISO 20022 gratuit pour les échéances des 14 et 15 novembre 2026, pré-contrôles de conformité et DPA signable."
+      "description": "Licence OEM pour les éditeurs ERP, comptabilité et paie dès 149 $ par mois : validation IBAN contre les registres, clearing suisse, contrôle d’adresse ISO 20022 gratuit, pré-contrôles de conformité et DPA signable. Consultez le calendrier propre à chaque rail."
     },
     "eyebrow": "Pour les éditeurs de logiciels",
     "hero": {
@@ -1347,8 +1347,8 @@
     },
     "deadline": {
       "badge": "Échéance datée",
-      "title": "Adresses structurées : 14 et 15 novembre 2026",
-      "body": "Le 14 novembre 2026, les Swiss Payment Standards 2026 entrent en vigueur, et SIX écrit que les paiements qui ne respectent pas les règles d'adresse structurée ne peuvent plus être traités. Le 15 novembre 2026, les schémas EPC (SCT, SCT Inst, SDD) n'acceptent plus que les adresses structurées et hybrides, et l'élément pays devient obligatoire dès qu'un agent se trouve dans un pays SEPA hors EEE, c'est-à-dire la Suisse. Tout produit de facturation, de comptabilité ou d'ERP qui émet un fichier de paiement est concerné. Depuis le 27 août 2026, Swift a reporté sa propre date de novembre 2026 pour les messages transfrontaliers sans en fixer une nouvelle ; SIX et l'EPC n'avaient rien changé au 2 septembre 2026.",
+      "title": "Adresses structurées : calendriers distincts pour la Suisse, l’EPC et Swift",
+      "body": "Vérifié le 10 septembre 2026 : SIX publie toujours le 14 novembre 2026 pour les exigences d’adresse des Swiss Payment Standards. Le 9 septembre, l’EPC a reporté la fin des adresses non structurées de ses cinq schémas au-delà du 15 novembre ; il prévoit de fixer la nouvelle date en octobre. Swift a aussi reporté ses changements de paiement le 27 août, avec une mise à jour pour décembre au plus tard. Les annonces de l’EPC et de Swift ne changent pas à elles seules le calendrier suisse. Continuez à préparer vos données fournisseurs selon les règles du rail utilisé.",
       "what": "Deux choses que cette API fait pour vous, déjà en production. Un contrôle de conformité gratuit vous dit, règle par règle et avec le document dont chaque règle provient, si une adresse que vous avez structurée passe sur un rail donné. Et résoudre un code de clearing ou un IBAN en BIC supprime souvent l'obligation d'adresse de l'agent : détenez le BIC, et cette branche de la règle ne s'applique plus à vous.",
       "refused": "Refusée : un pays en minuscules et pas d'élément localité",
       "accepted": "Acceptée : localité, pays et rue dans leurs propres éléments",
@@ -1411,12 +1411,12 @@
   "compare": {
     "meta": {
       "title": "IBANforge contre AbstractAPI, iban.com, IBANAPI et les bibliothèques open source : une comparaison honnête",
-      "description": "Prix et capacités des API de validation d'IBAN, lus sur les pages de tarifs publiques le 2 septembre 2026 : AbstractAPI 99 $ par mois pour un booléen, iban.com dès 530 € par an, IBANAPI dès 15 $, IBANforge en packs de 5 $ sans abonnement, et quand une bibliothèque open source gratuite suffit."
+      "description": "Prix et capacités des API de validation IBAN vérifiés le 10 septembre 2026 : périodes de facturation, quotas avec données bancaires, SDK disponibles et limites de chaque option. IBANforge, AbstractAPI, iban.com, IBANAPI et bibliothèques open source."
     },
     "eyebrow": "Comparatif",
     "hero": {
       "title": "Choisir une API de validation d'IBAN",
-      "description": "Cinq options réalistes : le booléen le moins cher du marché, deux API commerciales établies, les bibliothèques open source, et nous. Le même mot sur l'étiquette, des objets très différents à l'intérieur. Chaque prix ci-dessous a été lu sur une page de tarifs publique le 2 septembre 2026."
+      "description": "Comparez API payantes et bibliothèques open source selon les données renvoyées, le nombre de recherches bancaires incluses et la période facturée. Sources publiques vérifiées le 10 septembre 2026 ; ces services ne sont pas interchangeables."
     },
     "disclosure": "Nous vendons l'un des produits de ce tableau : lisez-le en le sachant. Chaque chiffre est daté et vient d'une page publique ; si un prix a changé ou qu'une erreur s'est glissée, écrivez à support@ibanforge.com et nous corrigerons.",
     "table": {
@@ -1436,15 +1436,15 @@
           "ibancom": "Abonnement annuel : 530 €/an (2 000 lookups) à 4 150 €/an (illimité), engagement 1 an, hors TVA.",
           "ibanapi": "Crédits prépayés qui expirent avec le plan : 15 $ pour 60 jours (2 000 basiques + 400 recherches banque) à 115 $ pour un an (30 000 + 5 000).",
           "libs": "Gratuit (MIT/LGPL). Le coût, c'est votre temps.",
-          "abstract": "Abonnement mensuel : 99 $ par mois pour 60 000 requêtes par mois (environ 0,00165 $ l'appel), curseur de volume jusqu'à 199 $ et 499 $. Gratuit : 100 requêtes, 1 requête par seconde."
+          "abstract": "Standard mensuel : 99 $ pour 60 000 requêtes/mois, 3 requêtes/seconde. L’option annuelle est distincte. Gratuit : 100 requêtes, 1 requête/seconde."
         },
         "example": {
           "label": "2 000 validations avec données bancaires",
           "ibanforge": "10 $ une fois (2 packs 1k), sans expiration ni abonnement",
           "ibancom": "530 €/an (plan Professional)",
-          "ibanapi": "palier ≥ 40 $/mois (la limite dure = les bank credits : 400/mois à 15 $)",
-          "libs": "0 $, mais aucune donnée bancaire (structure + checksum seulement)",
-          "abstract": "Aucune donnée bancaire à aucun prix : la réponse est {\"iban\": \"...\", \"is_valid\": true}. Pour 2 000 contrôles booléens, 99 $ par mois."
+          "ibanapi": "Un forfait publié couvrant à lui seul 2 000 recherches bancaires : 115 $ pour 365 jours, avec 5 000 recherches. Celui à 40 $/180 jours n’en comprend que 1 500. Les achats successifs ne sont pas comparés ici.",
+          "libs": "Pas de frais d’API ; les données bancaires dépendent du paquet et de ses registres. Couverture et fraîcheur à vérifier.",
+          "abstract": "La réponse documentée fournit un booléen de validité, sans données bancaires. Le forfait Standard mensuel affiche 99 $ pour 60 000 requêtes."
         },
         "freeTier": {
           "label": "Offre gratuite",
@@ -1459,8 +1459,8 @@
           "ibanforge": "121k+ BIC, 39k+ enrichis LEI via GLEIF, rafraîchis chaque mois",
           "ibancom": "Oui, c'est leur cœur de produit",
           "ibanapi": "« Si disponible » selon leur doc",
-          "libs": "Non, validation structurelle seulement",
-          "abstract": "Non. Un booléen seulement"
+          "libs": "Selon la bibliothèque : schwifty peut retrouver le BIC d’un IBAN à partir de ses données de codes banque.",
+          "abstract": "La réponse publiée contient iban et is_valid ; aucun BIC ni nom de banque n’est documenté."
         },
         "swiss": {
           "label": "Profondeur clearing suisse (SIC / euroSIC / QR-IID)",
@@ -1480,7 +1480,7 @@
         },
         "agents": {
           "label": "Agents IA (MCP, paiement autonome)",
-          "ibanforge": "Serveur MCP natif (8 outils) + paiement x402 en USDC : un agent paie sans compte",
+          "ibanforge": "Serveur MCP natif et paiement par appel x402 en USDC ; ce mode de paiement ne demande pas de compte.",
           "ibancom": "Non",
           "ibanapi": "Non",
           "libs": "Non (une bibliothèque, pas un service)",
@@ -1497,8 +1497,8 @@
         "trust": {
           "label": "Surface légale/ops publiée",
           "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après résiliation (DPA 4.7)",
-          "ibancom": "Conditions entreprise sur demande (non publiées en juillet 2026)",
-          "ibanapi": "CGU/confidentialité publiées ; pas de page de statut publique trouvée (juillet 2026)",
+          "ibancom": "Conditions, politique de confidentialité et DPA publics ; modalités de redistribution à convenir avec le fournisseur.",
+          "ibanapi": "Conditions et politique de confidentialité publiques ; engagements de service à vérifier auprès du fournisseur.",
           "libs": "Fichier de licence",
           "abstract": "CGU et confidentialité publiées"
         }
@@ -1507,8 +1507,8 @@
     "notFor": {
       "heading": "Quand IBANforge n'est pas le bon choix",
       "items": [
-        "Vous n'avez besoin que de la structure + checksum. Une bibliothèque gratuite (ibantools, schwifty, iban4j, IbanNet) le fait en local, sans latence ni coût. Honnêtement : commencez là, revenez quand il vous faut les données bancaires, les rails ou la compliance.",
-        "Vous avez besoin de la vraie Verification of Payee : la correspondance du NOM du titulaire auprès de la banque. C'est un réseau de PSP régulés (scheme EPC). Personne ne le vend comme simple API ; le produit BAV d'iban.com et les services bancaires couvrent ce besoin. IBANforge fait du pré-check à la saisie, pas du name matching.",
+        "Vous avez seulement besoin de vérifier localement la structure et la somme de contrôle. Des bibliothèques comme ibantools, schwifty, iban4j et IbanNet évitent un appel à une API distante. Certaines incluent aussi des données bancaires : vérifiez leur couverture et leur politique de mise à jour.",
+        "Vous avez besoin de la Verification of Payee, qui compare le nom du titulaire auprès de la banque. Des services dédiés, dont l’API BAV/VoP d’iban.com, couvrent cet usage. IBANforge fournit des pré-contrôles de données bancaires à la saisie et ne réalise pas cette comparaison de noms.",
         "Il vous faut les annuaires spécifiques au Royaume-Uni (sort codes, EISCD) : SORTware d'iban.com est fait pour ça.",
         "Vous voulez un account manager et un contrat papier négocié dès le premier jour : les acteurs à abonnement annuel sont structurés pour ça ; chez nous cela n'existe qu'à travers l'accord OEM."
       ]
@@ -1528,12 +1528,12 @@
       "getKey": "Obtenir une clé gratuite",
       "playground": "Ouvrir le playground"
     },
-    "footnote": "Prix relevés le 11 juillet 2026 sur iban.com/pricing et ibanapi.com/prices. La TVA et le détail des plans leur appartiennent ; leurs pages font foi.",
+    "footnote": "Sources publiques vérifiées le 10 septembre 2026. Les périodes facturées et les quotas avec données bancaires sont distingués. TVA, licences et conditions au paiement restent celles de chaque fournisseur.",
     "honest": {
       "heading": "Là où nous perdons, dit simplement",
       "items": [
-        "À l'appel, AbstractAPI est trois fois moins cher que nous : environ 0,00165 $ contre 0,005 $. Si un booléen vous suffit, 60 000 contrôles par mois coûtent 99 $ chez lui et environ 200 $ en packs de 25 000 crédits chez nous. Vous n'achetez pas le même objet, mais vous devez connaître le chiffre.",
-        "Java et .NET n'ont pas encore de SDK IBANforge. IbanNet et iban4j sont les standards de fait de ces écosystèmes pour la structure et la clé de contrôle ; nous servons la donnée qu'ils refusent de servir, par REST, Python et TypeScript."
+        "Pour 60 000 contrôles de validité seule, le forfait Standard mensuel publié par AbstractAPI coûte 99 $. Chez IBANforge, 2 packs de 25 000 et 2 packs de 5 000 crédits coûtent 200 $ et incluent l’enrichissement bancaire. Si la structure et la somme de contrôle suffisent, une bibliothèque locale peut éviter ces deux factures.",
+        "Des SDK Java 17+ et .NET 8 existent désormais, en plus de Python et TypeScript. Java est publié sur Maven Central ; le code source .NET est public. Ces SDK appellent l’API hébergée, tandis que des bibliothèques comme iban4j et IbanNet effectuent des contrôles locaux."
       ]
     },
     "others": {
@@ -1541,21 +1541,21 @@
       "cols": {
         "vendor": "Acteur",
         "sells": "Ce qu'il vend",
-        "price": "Prix lu le 2 septembre 2026",
+        "price": "Prix vérifié le 10 septembre 2026",
         "free": "Palier gratuit"
       },
       "rows": [
         {
           "vendor": "iban.de",
-          "sells": "Calcul et validation d'IBAN, mêmes paliers qu'iban.com, environ 20 % moins cher",
+          "sells": "Calcul et validation IBAN ; comparer les quotas annuels inclus",
           "price": "420 € à 3 800 € par an, engagement d'un an",
           "free": "Aucun trouvé"
         },
         {
           "vendor": "iban-test.eu",
-          "sells": "40 pays contre répertoires réels, 111 en syntaxe seule, un serveur MCP hébergé",
-          "price": "10 contrôles gratuits, puis une grille payante non extraite",
-          "free": "10 contrôles"
+          "sells": "Contrôles contre les registres bancaires pour 40 pays, intégrations REST et MCP",
+          "price": "Forfaits API payants ; consulter la page du fournisseur pour les quotas et tarifs actuels",
+          "free": "Contrôles gratuits dans le navigateur et essai API ; quota à confirmer à l’inscription"
         },
         {
           "vendor": "apilayer bankdataapi",
@@ -1566,18 +1566,18 @@
         {
           "vendor": "API Ninjas",
           "sells": "Décomposition d'IBAN ; nom de banque, adresse et BIC réservés aux plans payants",
-          "price": "39 $ par mois pour 100 000 appels partagés entre toutes leurs API",
+          "price": "Forfait Developer affiché à 39 $/mois pour 100 000 appels partagés entre les API ; offre à confirmer au paiement",
           "free": "3 000 par mois, usage non commercial"
         },
         {
           "vendor": "openiban",
           "sells": "Clé de contrôle plus enrichissement banque pour BE, DE, NL, LU, CH, AT, LI",
-          "price": "Gratuit à vie, open source",
+          "price": "Service public gratuit et code open source ; aucun SLA payant établi dans cette comparaison",
           "free": "Tout"
         }
       ]
     },
-    "footnoteExtra": "Vérifiés le 2 septembre 2026 :"
+    "footnoteExtra": "Sources publiques vérifiées le 10 septembre 2026 :"
   },
   "testIban": {
     "metaTitle": "Générateur d'IBAN de test — codes banque réels, vérifiés aux registres nationaux",

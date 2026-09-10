@@ -256,9 +256,9 @@
       "daysLabel": "days before 14 November 2026",
       "daysAria": "{days} days before 14 November 2026",
       "since": "in force since 14 November 2026",
-      "line1": "SIX no longer processes payments whose address fails the structured or hybrid rules.",
-      "line2": "The Eurosystem and the EPC switch the same weekend.",
-      "line3": "Swift suspended its own date on 27 August 2026."
+      "line1": "From 14 November 2026, payment orders covered by the Swiss Payment Standards must meet the applicable address requirements when an address is used.",
+      "line2": "The EPC postponed its 15 November deadline on 9 September 2026; a new date is due to be set in October.",
+      "line3": "Swift also postponed its deadline on 27 August 2026. The Swiss timetable remains separately published by SIX."
     },
     "integrations": {
       "heading": "In your language, your ERP, your spreadsheet",
@@ -1334,7 +1334,7 @@
   "vendors": {
     "meta": {
       "title": "For Software Vendors: embed IBAN validation in your product",
-      "description": "OEM licensing for ERP, accounting and payroll vendors from $149/month: registry-grade IBAN validation, the deepest Swiss clearing data in a public API, a free ISO 20022 address check for the 14 and 15 November 2026 deadlines, compliance pre-checks and a signable DPA."
+      "description": "OEM licensing for ERP, accounting and payroll vendors from $149 a month: register-backed IBAN validation, Swiss clearing data, a free ISO 20022 address checker, compliance pre-checks and a signable DPA. Check the published timetable for each payment rail."
     },
     "eyebrow": "For software vendors",
     "hero": {
@@ -1347,8 +1347,8 @@
     },
     "deadline": {
       "badge": "Dated deadline",
-      "title": "Structured addresses: 14 and 15 November 2026",
-      "body": "On 14 November 2026 the Swiss Payment Standards 2026 come into force, and SIX states that payments which do not meet the structured-address rules can no longer be processed. On 15 November 2026 the EPC schemes (SCT, SCT Inst, SDD) accept structured and hybrid addresses only, and the country element becomes mandatory as soon as one agent sits in a SEPA country outside the EEA, which is Switzerland. Every invoicing, accounting or ERP product that emits a payment file is concerned. Since 27 August 2026 Swift has deferred its own November 2026 date for cross-border messages without setting a new one; SIX and the EPC had not changed anything on 2 September 2026.",
+      "title": "Structured addresses: Switzerland, EPC and Swift have separate timetables",
+      "body": "Checked on 10 September 2026: SIX still publishes 14 November 2026 for the Swiss Payment Standards address requirements. On 9 September, the EPC postponed the end of unstructured addresses under all five payment schemes beyond 15 November; it plans to set the new date in October. Swift also deferred its payments changes on 27 August, with an update by December at the latest. The EPC and Swift announcements do not themselves change the Swiss timetable. Continue preparing your supplier data against the rules of the rail you use.",
       "what": "Two things this API does about it, both already live. A free conformity check tells you, rule by rule and with the document each rule comes from, whether an address you have structured passes a given rail. And resolving a clearing code or an IBAN into a BIC often removes the agent-address obligation altogether: hold the BIC, and that branch of the rule does not apply to you.",
       "refused": "Refused: a country in lowercase and no town element",
       "accepted": "Accepted: town, country and the street in their own elements",
@@ -1411,12 +1411,12 @@
   "compare": {
     "meta": {
       "title": "IBANforge vs AbstractAPI vs iban.com vs IBANAPI vs open-source libraries: an honest comparison",
-      "description": "Prices and capabilities of IBAN validation APIs, read from public pricing pages on September 2, 2026: AbstractAPI $99/month for a boolean, iban.com from €530/year, IBANAPI from $15, IBANforge $5 one-time packs, and when a free open-source library is all you need."
+      "description": "IBAN validation API prices and capabilities checked on 10 September 2026: pricing periods, bank-data quotas, SDK availability and the limits of each option. IBANforge, AbstractAPI, iban.com, IBANAPI and open-source libraries."
     },
     "eyebrow": "Comparison",
     "hero": {
       "title": "Choosing an IBAN validation API",
-      "description": "Five realistic options: the cheapest boolean on the market, two established commercial APIs, the open-source libraries, and us. Same word on the tin, very different objects inside. Every price below was read from a public pricing page on September 2, 2026."
+      "description": "Compare paid APIs and open-source libraries by the data returned, the number of bank lookups included and the billing period. Public sources checked on 10 September 2026; these are not interchangeable services."
     },
     "disclosure": "We sell one of the products in this table — read it with that in mind. Every number is dated and comes from a public page; if we got something wrong or a price changed, tell us at support@ibanforge.com and we will fix it.",
     "table": {
@@ -1436,15 +1436,15 @@
           "ibancom": "Annual subscription: €530/year (2,000 lookups) to €4,150/year (unlimited), 1-year minimum, VAT excl.",
           "ibanapi": "Prepaid credits that expire with the plan: $15 for 60 days (2,000 basic + 400 bank lookups) to $115 for a year (30,000 + 5,000).",
           "libs": "Free (MIT/LGPL). Your time is the cost.",
-          "abstract": "Monthly subscription: $99/month for 60,000 requests per month (about $0.00165 per call), volume slider to $199 and $499. Free: 100 requests, 1 request per second."
+          "abstract": "Monthly Standard: $99 for 60,000 requests/month, 3 requests/second. The annual option is separate. Free: 100 requests, 1 request/second."
         },
         "example": {
           "label": "2,000 validations with bank data",
           "ibanforge": "$10 one-time (2 × 1k packs) — no expiry, no subscription",
           "ibancom": "€530/year (Professional plan)",
-          "ibanapi": "≥ $40/month tier (bank credits are the binding limit: 400/month at $15)",
-          "libs": "$0 — but no bank data at all (structure + checksum only)",
-          "abstract": "No bank data at any price: the response is {\"iban\": \"...\", \"is_valid\": true}. For 2,000 boolean checks, $99/month."
+          "ibanapi": "A single published plan covering 2,000 bank lookups: $115 for 365 days, including 5,000 bank lookups. The $40/180-day plan includes only 1,500. Repeat purchases are not compared here.",
+          "libs": "No API fee; bank data depends on the package and its bundled registers. Coverage and freshness must be checked.",
+          "abstract": "The documented response provides a validity boolean, without bank data. The monthly Standard plan lists $99 for 60,000 requests."
         },
         "freeTier": {
           "label": "Free tier",
@@ -1459,8 +1459,8 @@
           "ibanforge": "121k+ BICs, 39k+ LEI-enriched via GLEIF, refreshed monthly",
           "ibancom": "Yes — their core product",
           "ibanapi": "“If available” per their docs",
-          "libs": "No — structural validation only",
-          "abstract": "No. A boolean only"
+          "libs": "Varies by library: schwifty can resolve an IBAN’s BIC from its bank-code data.",
+          "abstract": "The published response contains iban and is_valid; no BIC or bank name is documented."
         },
         "swiss": {
           "label": "Swiss clearing depth (SIC / euroSIC / QR-IID)",
@@ -1480,7 +1480,7 @@
         },
         "agents": {
           "label": "AI agents (MCP, autonomous payment)",
-          "ibanforge": "Native MCP server (8 tools) + x402 pay-per-call in USDC — an agent can pay without an account",
+          "ibanforge": "Native MCP server and x402 pay-per-call in USDC; payment does not require an account on that rail.",
           "ibancom": "No",
           "ibanapi": "No",
           "libs": "No (a library, not a service)",
@@ -1497,8 +1497,8 @@
         "trust": {
           "label": "Published legal/ops surface",
           "ibanforge": "ToS, privacy, pre-signed DPA, OEM SLA, live status page — all public. Telemetry self-deletes 30 days after termination (DPA 4.7)",
-          "ibancom": "Enterprise terms on request (not published as of July 2026)",
-          "ibanapi": "ToS/privacy published; no public status page found (July 2026)",
+          "ibancom": "Public terms, privacy policy and DPA; redistribution arrangements are discussed with sales.",
+          "ibanapi": "Public terms and privacy policy; operational commitments must be checked with the provider.",
           "libs": "License file",
           "abstract": "ToS and privacy published"
         }
@@ -1507,8 +1507,8 @@
     "notFor": {
       "heading": "When IBANforge is not the right choice",
       "items": [
-        "You only need structure + checksum validation. A free library (ibantools, schwifty, iban4j, IbanNet) does that locally with zero latency and zero cost. Honestly: start there — come back when you need bank data, rails or compliance signals.",
-        "You need real Verification of Payee — matching the account holder's NAME at the bank. That is a regulated-PSP network (EPC scheme). Nobody sells it as a simple API; iban.com's BAV product and bank-side services cover it. IBANforge does input-time pre-checks, not name matching.",
+        "You only need local structure and checksum checks. Libraries such as ibantools, schwifty, iban4j and IbanNet can avoid a remote API call. Some also include bank data: check the package’s coverage and update policy.",
+        "You need Verification of Payee, which compares the account holder’s name at the bank. Dedicated services, including iban.com’s BAV/VoP API, cover that use case. IBANforge provides input-time bank-data pre-checks and does not perform name matching.",
         "You need UK-specific directories (sort codes, EISCD). iban.com's SORTware is built for that.",
         "You want an account manager and a negotiated paper contract from day one — the annual-subscription vendors are structured for that; we offer it only through the OEM agreement."
       ]
@@ -1528,12 +1528,12 @@
       "getKey": "Get a free key",
       "playground": "Open the playground"
     },
-    "footnote": "Prices checked on July 11, 2026 on iban.com/pricing and ibanapi.com/prices. VAT and plan details are theirs to change; the linked pages are authoritative.",
+    "footnote": "Public sources checked on 10 September 2026. Billing periods and bank-data quotas are stated separately. VAT, licence conditions and current checkout terms remain those of each provider.",
     "honest": {
       "heading": "Where we lose, said plainly",
       "items": [
-        "Per call, AbstractAPI is three times cheaper than us: about $0.00165 against $0.005. If a boolean is all you need, 60,000 checks a month cost $99 there and about $200 in our 25,000-credit packs. You are not buying the same object, but you should know the number.",
-        "Java and .NET have no IBANforge SDK yet. IbanNet and iban4j are the de facto standards of those ecosystems for structure and checksum; we serve the data they refuse to serve, through REST, Python and TypeScript."
+        "For 60,000 validity-only checks, AbstractAPI’s published monthly Standard plan is $99. In IBANforge prepaid packs, 2 × 25,000 plus 2 × 5,000 credits cost $200 and include bank enrichment. If structure and checksum alone are enough, a local library may avoid either bill.",
+        "Java 17+ and .NET 8 SDKs now exist alongside Python and TypeScript. Java is published on Maven Central; the .NET source is public. These SDKs call the hosted API, whereas libraries such as iban4j and IbanNet perform local checks."
       ]
     },
     "others": {
@@ -1541,21 +1541,21 @@
       "cols": {
         "vendor": "Vendor",
         "sells": "What it sells",
-        "price": "Price read on September 2, 2026",
+        "price": "Price checked on 10 September 2026",
         "free": "Free tier"
       },
       "rows": [
         {
           "vendor": "iban.de",
-          "sells": "IBAN calculation and validation, same tiers as iban.com, about 20% cheaper",
+          "sells": "IBAN calculation and validation; compare the included annual query quotas",
           "price": "€420 to €3,800 per year, one-year term",
           "free": "None found"
         },
         {
           "vendor": "iban-test.eu",
-          "sells": "40 countries against real directories, 111 in syntax only, a hosted MCP server",
-          "price": "10 free checks, then a paid grid not extracted",
-          "free": "10 checks"
+          "sells": "Bank-directory checks for 40 countries, plus REST and MCP integration",
+          "price": "Paid API packages; consult the linked provider page for its current quota and price",
+          "free": "Free browser checks and an API trial; confirm the current quota when registering"
         },
         {
           "vendor": "apilayer bankdataapi",
@@ -1566,18 +1566,18 @@
         {
           "vendor": "API Ninjas",
           "sells": "IBAN decomposition; bank name, address and BIC reserved to paid plans",
-          "price": "$39/month for 100,000 calls shared across all their APIs",
+          "price": "Developer plan displayed at $39/month for 100,000 calls shared across the APIs; confirm the current offer at checkout",
           "free": "3,000 per month, non-commercial use"
         },
         {
           "vendor": "openiban",
           "sells": "Checksum plus bank enrichment for BE, DE, NL, LU, CH, AT, LI",
-          "price": "Free forever, open source",
+          "price": "Free public service and open-source code; no paid SLA established in this comparison",
           "free": "Everything"
         }
       ]
     },
-    "footnoteExtra": "Verified September 2, 2026:"
+    "footnoteExtra": "Public sources checked on 10 September 2026:"
   },
   "testIban": {
     "metaTitle": "Test IBAN Generator — real bank codes, verified against national registers",
