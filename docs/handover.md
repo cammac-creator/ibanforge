@@ -311,6 +311,23 @@ guarantees are easy to undo by accident:
   a guarded `ALTER TABLE`. An older build ignores it — but rolling back must not restore the old
   behaviour of one new session per click.
 
+**Sales indicators, 10 September (#181).** A private route, `GET /v1/admin/pack-sales`, sums the
+payment amounts actually retained on credit keys, grouped by payment reference, excluding granted
+and internal keys — a key rotation is no longer a sale. It reads key metadata only: no wallet, no
+chain call. The dashboard tile and its detail share one read and one formatter, so they cannot
+disagree, and the figure does not depend on the wallet card being reachable. The frontend guard
+refuses a payload from an older API — wrong version, wrong scope, or counts that do not add up —
+and the page then says the amount is unavailable rather than showing a catalogue total.
+**This number is neither profit nor a complete ledger**: it excludes subscription renewals, file
+audits, refunds, fees and costs, and the copy on the page says so.
+
+**A pre-existing hydration bug, measured on 10 September.** The operator dashboard raises React
+error #418 in French and German, never in English, because some numbers are grouped one way by
+the server and another way by the browser. It reproduces on the deployment *before* that day's
+work as well, so it is older than any of it. This is the failure class this codebase knows best;
+the fix is to route those numbers through `frontend/lib/format-grouped.ts`, as the wallet card now
+does.
+
 **Landed on 10 September, after this file was written.** Two branches prepared by a second
 agent were reviewed, merged and published: the address timetables and the API comparison in
 three languages (#178), and the subscription link that a key rotation used to drop (#177).
