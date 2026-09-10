@@ -4,6 +4,10 @@ Instructions for any coding agent opening this repository. Codex reads this file
 Claude Code reads `CLAUDE.md` next to it. **The two must say the same thing** — if you
 change a rule here, change it there.
 
+**`docs/handover.md` is the long version**: why each rule below exists, how the bank-code
+verdict works, what a green test suite does not prove, the traps already paid for, the work
+in flight and the known debts. Read this file first, that one before your first commit.
+
 IBANforge is an IBAN validation and BIC lookup API. Three areas live in one repository:
 
 | Area | Path | Runs on | Deployed by |
