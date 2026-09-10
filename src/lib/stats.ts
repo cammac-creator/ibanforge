@@ -1192,8 +1192,8 @@ export function getStatsHistory(days: number = 7): Array<{
    *
    * The rank here is `n * 0.99` truncated. At 20 samples that is row 19 — the
    * exact row `n * 0.95` lands on. Publishing both under one floor would serve
-   * the p95 twice, once labelled p99, on the surface where a customer asked for
-   * the tail specifically because the median flatters us. Below a hundred
+   * the p95 twice, once labelled p99, on the surface where the tail is asked
+   * for specifically, because the median flatters us. Below a hundred
    * measurements there is no ninety-ninth percentile to report, so the honest
    * answer is the gap the page already knows how to render.
    */

@@ -195,7 +195,7 @@ describe('bank_code_check.reason — why an answer is not verified', () => {
  * "Is your derived BIC authoritative enough to store and settle against, or
  * advisory only?"
  *
- * The question a regulated pilot customer put in writing, and the answer had to
+ * A question regulated integrators put in writing, and the answer had to
  * move from the documentation into the payload: a caveat on a docs page is a
  * caveat the first integration to read the JSON never sees.
  */

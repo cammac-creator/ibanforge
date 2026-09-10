@@ -22,9 +22,9 @@
  *   an invented one costs the reader's trust in every other line.
  *
  * • The revenue line counted our own test settlements as income, and ignored
- *   the credit packs — the only money that ever arrived. Both rails are now
- *   reported, and the on-chain one is split against a configured list of our
- *   own payer wallets.
+ *   the credit packs entirely — so it described neither rail correctly. Both
+ *   are now reported, and the on-chain one is split against a configured list
+ *   of our own payer wallets.
  *
  * • "Errors" folded 402 in. A 402 is the paywall answering an anonymous probe:
  *   the product working. It hid a 5xx rate worth being proud of.
@@ -33,8 +33,8 @@
  *   client finishing a migration over two days reads exactly like steady
  *   demand.
  *
- * • Nothing here ever opened the customer ledger, so the most engaged unpaid
- *   user in the base had been invisible for months. Conversion figures now
+ * • Nothing here ever opened the customer ledger, so the accounts that use the
+ *   product hardest without paying stayed invisible. Conversion figures now
  *   lead the report, and they lead the research prompt too: fed only traffic
  *   counters, an analyst can only ever propose more traffic.
  * ─────────────────────────────────────────────────────────────────────────
@@ -143,7 +143,9 @@ function requireEnv(): void {
     ['STATS_TOKEN', STATS_TOKEN],
     ['TELEGRAM_BOT_TOKEN', BOT_TOKEN],
     ['TELEGRAM_CHAT_ID', CHAT_ID],
-  ].filter(([, v]) => !v).map(([k]) => k);
+  ]
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
   if (missing.length) {
     throw new Error(`Missing required env: ${missing.join(', ')}`);
   }
@@ -208,7 +210,8 @@ const n = (v: number) => v.toLocaleString('fr-CH');
  * for.
  */
 export function conversionSection(b: BusinessSummary | null): string {
-  if (!b) return '💰 CONVERSION\n(indisponible cette semaine — /admin/business-summary injoignable)';
+  if (!b)
+    return '💰 CONVERSION\n(indisponible cette semaine — /admin/business-summary injoignable)';
 
   const c = b.credits;
   const lines = [

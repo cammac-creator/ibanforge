@@ -6,9 +6,10 @@
  * written before that are attributed here, by pairing each one with the request
  * that produced it: same second, same endpoint. The two inserts happen inside
  * one HTTP request, so the pairing is sound where it is unique — and it is only
- * applied where it is unique. Measured on production before writing this:
- * 3,384 rows, 3,285 with exactly one candidate, 17 ambiguous, 82 with none.
- * The 17 and the 82 are left NULL rather than guessed.
+ * applied where it is unique. Measured on production before writing this: the
+ * overwhelming majority of rows had exactly one candidate, a small remainder
+ * was ambiguous or had none, and that remainder is left NULL rather than
+ * guessed.
  *
  * Only fills NULLs, so running it twice changes nothing the second time.
  *

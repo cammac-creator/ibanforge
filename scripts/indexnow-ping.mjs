@@ -9,10 +9,10 @@
  *   node scripts/indexnow-ping.mjs https://ibanforge.com/en/blog/my-post [more URLs…]
  *   node scripts/indexnow-ping.mjs --sitemap        # every URL of the live sitemap
  *
- * The sitemap mode exists since 2026-09-06: the only signup of the fortnight
- * came from Bing, the register and country pages number in the thousands,
- * and a weekly resubmission (see .github/workflows/indexnow.yml) is how they
- * get looked at. Google does not take IndexNow; it reads the sitemap.
+ * The sitemap mode exists since 2026-09-06: the engines that take IndexNow do
+ * send us readers, the register and country pages number in the thousands, and
+ * a weekly resubmission (see .github/workflows/indexnow.yml) is how they get
+ * looked at. Google does not take IndexNow; it reads the sitemap.
  */
 const KEY = '30fa164b3376b422e39a5e3d2f7b91de';
 const HOST = 'ibanforge.com';

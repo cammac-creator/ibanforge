@@ -7,9 +7,9 @@
  * not allocated, and it may only be made where we hold the national register
  * itself. Until now that was Switzerland alone, via SIX BankMaster. Germany was
  * checked against a composite map assembled from BIC directories, so a German
- * miss meant "absent from our data" and nothing more. That is the gap a pilot customer
- * named as the one that mattered, and Germany is their largest settlement
- * corridor.
+ * miss meant "absent from our data" and nothing more. That is the gap this
+ * closes: Germany is one of the busiest SEPA corridors, and "absent from our
+ * data" is not an answer a payment engine can act on.
  *
  * The Bundesbank publishes the whole register as a CSV. Measured 29/07/2026:
  * 13,807 rows, 3,506 distinct BLZ carrying a Merkmal=1 record. That is the
@@ -20,8 +20,8 @@
  * ## Deleted codes and successors
  *
  * 75 BLZ carry a deletion mark and 34 of those name a successor. A merged or
- * renamed bank is precisely the failure mode a pilot customer put on their own edge-case
- * list and the one case I had no verifiable example for. Those rows are kept,
+ * renamed bank is precisely the failure mode payment teams ask about first,
+ * and the one case this register finally gives a verifiable example of. Those rows are kept,
  * not dropped: a retired BLZ was really allocated, and answering
  * `not_in_register` for it would be a worse lie than answering `verified`
  * without qualification. The retirement and the successor travel with the
@@ -141,10 +141,14 @@ async function main(): Promise<void> {
   const text = await download();
   const rows = parseBlzCsv(text);
   console.log(`Parsed ${rows.length} payment-participating BLZ`);
-  console.log(`  retired: ${rows.filter((r) => r.retired).length}, with a successor: ${rows.filter((r) => r.successor_blz).length}`);
+  console.log(
+    `  retired: ${rows.filter((r) => r.retired).length}, with a successor: ${rows.filter((r) => r.successor_blz).length}`,
+  );
 
   if (rows.length < MIN_EXPECTED_ROWS) {
-    throw new Error(`Only ${rows.length} BLZ parsed, expected at least ${MIN_EXPECTED_ROWS}. Refusing to replace the table.`);
+    throw new Error(
+      `Only ${rows.length} BLZ parsed, expected at least ${MIN_EXPECTED_ROWS}. Refusing to replace the table.`,
+    );
   }
 
   const db = new Database(BIC_DB_PATH);

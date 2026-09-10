@@ -153,9 +153,9 @@ describe('credits', () => {
 });
 
 describe('steady unpaid users', () => {
-  // The case the daily lifecycle radar cannot see: nothing about this account
-  // ever transitions, so it fires no event, yet it is the most engaged unpaid
-  // user in the base.
+  // The case the daily lifecycle radar cannot see: nothing about such an
+  // account ever transitions, so it fires no event — and an account of this
+  // shape can still be among the heaviest users of the free tier.
   it('surfaces an account that calls every month and never reaches the cap', () => {
     const s = summary([
       key({

@@ -316,8 +316,8 @@ export interface IBANValidationResult {
      * ## The question this answers
      *
      * "Is your derived BIC authoritative enough to store and settle against, or
-     * advisory only?" — asked in writing by a regulated pilot customer, and until
-     * now answerable only from the documentation. A field that is read by a
+     * advisory only?" — a question regulated integrators put in writing, and one
+     * that used to be answerable only from the documentation. A field that is read by a
      * machine and acted on by a payment engine has to carry its own weight in
      * the payload; a caveat living on a docs page is a caveat that gets stripped
      * by the first integration that reads the JSON.
