@@ -2,6 +2,11 @@
 
 API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface MCP pour agents AI, données SEPA/VoP, classification émetteur (vIBAN detection), et indicateurs de risque compliance.
 
+> 🤝 **`AGENTS.md`, à côté, dit la même chose pour les autres agents** (Codex le lit, pas ce
+> fichier-ci) : règles dures, versions de Node par zone, travaux en cours, et les deux
+> conventions internes (une seule feuille de route, un rapport HTML par chantier).
+> **Une règle qui change ici change là-bas**, sinon deux agents travaillent sur deux lois.
+
 ## Stack
 
 - **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 11 ne publie pas de binaire linux-x64 pour l'ABI 137)
