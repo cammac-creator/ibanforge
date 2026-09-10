@@ -1,7 +1,8 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { adminAuditStats } from './admin-audit-stats.js';
-import { closeAll } from '../lib/db.js';
+import { closeAll, getStatsDB } from '../lib/db.js';
+import { auditStats } from '../lib/audit-jobs.js';
 
 afterAll(() => closeAll());
 
@@ -71,5 +72,70 @@ describe('the uploads behind the count', () => {
       if (prev === undefined) delete process.env.ADMIN_SECRET;
       else process.env.ADMIN_SECRET = prev;
     }
+  });
+});
+
+describe('Montants des audits confirmés par Stripe', () => {
+  beforeEach(() => getStatsDB().exec('DELETE FROM audit_sales'));
+
+  function sale(amount: number | null, currency: string | null, paidAt?: string) {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO audit_sales (job_id, rows, tier, price_chf, amount_paid_minor, amount_paid_currency, paid_at)
+         VALUES ('audit-fictif', 4, 'small', 149, ?, ?, COALESCE(?, datetime('now')))`,
+      )
+      .run(amount, currency, paidAt ?? null);
+  }
+
+  it('additionne les montants CHF après remise, sans convertir les autres devises ni deviner les inconnus', () => {
+    sale(14900, 'chf');
+    sale(7450, 'CHF');
+    sale(0, 'chf');
+    sale(null, null);
+    sale(14900, 'usd');
+    sale(14900, 'chf', '2000-01-01 00:00:00');
+
+    const stats = auditStats(30);
+    expect(stats.sales).toBe(5);
+    expect(stats.revenue_basis).toBe('stripe_checkout');
+    expect(stats.revenue_chf).toBe(223.5);
+    expect(stats.payment_amounts).toEqual({ chf: 3, other_currency: 1, unknown: 1 });
+    expect(stats.recent_sales).toHaveLength(5);
+    expect(stats.recent_sales).toContainEqual(
+      expect.objectContaining({ amount_paid_minor: 7450, amount_paid_currency: 'CHF' }),
+    );
+  });
+
+  it('distingue un montant historique inconnu d’un paiement connu à zéro', () => {
+    sale(null, null);
+    expect(auditStats(30)).toMatchObject({
+      revenue_chf: null,
+      payment_amounts: { chf: 0, other_currency: 0, unknown: 1 },
+    });
+    getStatsDB().exec('DELETE FROM audit_sales');
+    sale(0, 'chf');
+    expect(auditStats(30)).toMatchObject({
+      revenue_chf: 0,
+      payment_amounts: { chf: 1, other_currency: 0, unknown: 0 },
+    });
+  });
+
+  it('ne transforme pas une devise étrangère en francs', () => {
+    sale(9900, 'usd');
+    expect(auditStats(30)).toMatchObject({
+      revenue_chf: null,
+      payment_amounts: { chf: 0, other_currency: 1, unknown: 0 },
+    });
+  });
+
+  it('signale les montants incomplets ou invalides sans les additionner', () => {
+    sale(-100, 'chf');
+    sale(10.5, 'chf');
+    sale(100, null);
+    sale(100, 'inconnue');
+    expect(auditStats(30)).toMatchObject({
+      revenue_chf: null,
+      payment_amounts: { chf: 0, other_currency: 0, unknown: 4 },
+    });
   });
 });

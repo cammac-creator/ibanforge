@@ -623,6 +623,7 @@ function openStatsDB(): DatabaseType.Database {
         preview_json TEXT NOT NULL,
         report BLOB NOT NULL,
         stripe_session_id TEXT,
+        checkout_params_json TEXT,
         paid_at TEXT,
         payer_email TEXT,
         amount_paid_minor INTEGER,
@@ -719,6 +720,13 @@ function openStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_marketplace_events_at ON marketplace_events(created_at);
     `);
+    // La réservation Checkout disparaît avec le rapport ; aucun fichier ni délai ajouté.
+    const auditCols = (
+      statsDB.prepare('PRAGMA table_info(audit_jobs)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (!auditCols.includes('checkout_params_json')) {
+      statsDB.exec('ALTER TABLE audit_jobs ADD COLUMN checkout_params_json TEXT');
+    }
     // Forums tab: the reply is WRITTEN in the thread's language but READ in
     // French — two texts, two columns (draft = what gets copied/posted,
     // draft_fr = the faithful translation shown to the operator).

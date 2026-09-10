@@ -119,8 +119,9 @@ describe('checkout, status and report', () => {
       amount_minor: 14900,
       currency: 'chf',
     });
-    expect(paid?.paid_at).toBeTruthy();
-    expect(paid!.expires_at > paid!.created_at).toBe(true);
+    expect(paid.status).toBe('paid');
+    expect(paid.job?.paid_at).toBeTruthy();
+    expect(paid.job!.expires_at > paid.job!.created_at).toBe(true);
 
     const status = await app().request(`/v1/audit/status/${job}?session_id=cs_test_123`);
     const sb = (await status.json()) as UploadBody;
@@ -178,7 +179,7 @@ describe('sample report and statistics', () => {
     });
     const after = auditStats(30);
     expect(after.sales).toBe(before.sales + 1);
-    expect(after.revenue_chf).toBe(before.revenue_chf + 149);
+    expect(after.revenue_chf).toBe((before.revenue_chf ?? 0) + 149);
     expect(after.uploads).toBeGreaterThan(before.uploads);
     expect(after.last_sale_at).toBeTruthy();
   });

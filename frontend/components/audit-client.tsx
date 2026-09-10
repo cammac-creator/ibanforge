@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AuditSummaryView, type AuditStatus } from "@/components/audit-summary";
+import { auditErrorText } from "@/lib/audit-errors";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.ibanforge.com";
 
@@ -46,7 +47,7 @@ export function AuditClient({ locale }: { locale: string }) {
         const r = await fetch(`${API_BASE}/v1/audit/upload`, { method: "POST", body: form });
         const body = (await r.json()) as AuditStatus & { error?: string; message?: string };
         if (!r.ok) {
-          setError(errorText(t, body.error, body.message));
+          setError(auditErrorText(t, body.error, body.message));
           setStage("idle");
           return;
         }
@@ -72,7 +73,7 @@ export function AuditClient({ locale }: { locale: string }) {
       });
       const body = (await r.json()) as { url?: string; error?: string; message?: string };
       if (!r.ok || !body.url) {
-        setError(errorText(t, body.error, body.message));
+        setError(auditErrorText(t, body.error, body.message));
         setStage("preview");
         return;
       }
@@ -174,27 +175,6 @@ export function AuditClient({ locale }: { locale: string }) {
       ) : null}
     </section>
   );
-}
-
-function errorText(t: ReturnType<typeof useTranslations>, code?: string, message?: string): string {
-  switch (code) {
-    case "no_iban_column":
-      return t("upload.error.noIban");
-    case "empty":
-      return t("upload.error.empty");
-    case "too_many_rows":
-      return t("upload.error.tooManyRows");
-    case "file_too_large":
-      return t("upload.error.tooLarge");
-    case "unreadable":
-      return t("upload.error.unreadable");
-    case "job_not_found":
-      return t("upload.error.expired");
-    case "payments_unavailable":
-      return t("upload.error.payments");
-    default:
-      return message ?? t("upload.error.generic");
-  }
 }
 
 

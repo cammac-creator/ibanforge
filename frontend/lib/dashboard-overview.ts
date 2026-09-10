@@ -422,12 +422,15 @@ export interface AuditStats {
   since: string;
   uploads: number;
   sales: number;
-  revenue_chf: number;
+  revenue_chf: number | null;
+  /** Absents sur une API ancienne : son total catalogue ne doit pas être présenté comme payé. */
+  revenue_basis?: 'stripe_checkout';
+  payment_amounts?: { chf: number; other_currency: number; unknown: number };
   last_sale_at: string | null;
   conversion: number | null;
   /** Each upload of the window, newest first (the API keeps the row count, a key prefix when one was sent, nothing else). */
   recent_uploads?: Array<{ at: string; rows: number | null; tier: string | null; key_prefix: string | null; internal: boolean }>;
-  recent_sales?: Array<{ paid_at: string; rows: number; tier: string; price_chf: number }>;
+  recent_sales?: Array<{ paid_at: string; rows: number; tier: string; price_chf: number; amount_paid_minor?: number | null; amount_paid_currency?: string | null }>;
 }
 
 /**
