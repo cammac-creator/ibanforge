@@ -284,6 +284,14 @@ that *repairs* such a leak must not describe what it removed.
 
 ## 9. Work in flight
 
+**Landed on 10 September, after this file was written.** Two branches prepared by a second
+agent were reviewed, merged and published: the address timetables and the API comparison in
+three languages (#178), and the subscription link that a key rotation used to drop (#177).
+Both are on `main`, the API runs the merged commit and both domains serve the new site. The
+comparison had been claiming that Java and .NET have no SDK, which stopped being true; the
+timetable pages still announced an EPC deadline the EPC has since postponed. Neither change
+touches prices, quotas or the signup path.
+
 **A ninth register (Greece).** Written permission for commercial reuse was granted on
 8 September under two conditions: an exact credit line, and a disclaimer reproduced in full
 on every response carrying that data. The work exists on local branches that have never
@@ -300,6 +308,17 @@ before merging: the runtime environment variables the site needs are not carried
 container by anything visible in the repository; the workflow still triggers on its own
 branch, which its own comment says to remove at merge; and the legal texts carry a future
 date, which must follow the cutover rather than precede it.
+
+A fourth item was added on 10 September, and it is an acceptance criterion, not a detail. On
+a standalone `next start` server built from that branch, the unprefixed English routes
+(`/compare`, `/docs/structured-addresses`, the timetable article) answered 308 to their own
+address — a redirect loop. The public site serves all three at 200, confirmed in WebKit with
+an English browser. `middleware.ts`, `i18n/routing.ts` and `next.config.ts` are identical to
+`main`, so the cause is not a difference in configuration; the working hypothesis is an
+interaction between the local rewrite and the `/en` redirect. **Reproduce it and close it on
+the candidate server before touching DNS**, and do not delete the SEO redirects on a hunch:
+locale detection means an unprefixed URL legitimately serves a different language depending
+on the browser, so a naive fix breaks something that works.
 
 **The keyless trial goes from ten calls a day to twenty-five, with no e-mail and no key.**
 Decided 9 September, **not yet in the code**. The constant is used properly inside `src/`,
@@ -322,7 +341,13 @@ usage promises exactly that, plus a test that fails if any CRM module imports th
 no component tests over the largest client-side surface · the missing verbatim attribution
 of section 5 · two authoritative registers with uninstructed licences.
 
-**Medium.** The npm release path does not do what the documentation says · the release
+**Medium.** A key rotated *before* 10 September carries no subscription link, because the
+rotation used to drop it: `deactivateBySubscription` cannot find such a key, so a cancellation
+leaves it working. The fix protects every rotation from now on and deliberately repairs
+nothing retroactively. How many keys are in that state cannot be read from this repository,
+and the repair — matching old keys back to their subscription — is a decision with money on
+both sides, not a cleanup to run quietly · the npm release path does not do what the
+documentation says · the release
 workflow can go green while publishing nothing · `src/routes/api-keys.ts` and
 `src/lib/stats.ts` each mix two trades in one very large file, which is exactly how two
 agents collide · the free-tier quota is retyped in three files · the writable database's
