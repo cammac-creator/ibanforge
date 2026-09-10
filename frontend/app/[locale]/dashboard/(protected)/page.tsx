@@ -17,6 +17,7 @@ import { ChaseSection } from '@/components/dashboard/overview/chase-section';
 import { DetailsSection } from '@/components/dashboard/overview/details-section';
 import { ApiDownBanner, HealthStrip, OverviewHeader } from '@/components/dashboard/overview/header';
 import { MoneySection } from '@/components/dashboard/overview/money-section';
+import type { PackSalesSnapshot } from '@/lib/dashboard/pack-sales';
 import { NewSection } from '@/components/dashboard/overview/new-section';
 import { TrafficSection } from '@/components/dashboard/overview/traffic-section';
 import { SectionSkeleton } from '@/components/dashboard/overview/section';
@@ -129,6 +130,7 @@ export default async function DashboardPage({
   // conversion is a key, and the card shows every figure on 7 and 30 days.
   const signupSourcesWeekP = admin<SignupSources>('/v1/admin/signup-sources?days=7');
   const auditStatsP = admin<AuditStats>('/v1/admin/audit-stats?days=30');
+  const packSalesP = admin<PackSalesSnapshot>('/v1/admin/pack-sales');
   // What the landing page's visitors click (audit n° 32, 2026-09-05): the
   // week for the pulse, the month for the shape.
   const doorsWeekP = admin<WebEventsSummary>('/v1/admin/web-events?days=7');
@@ -216,6 +218,7 @@ export default async function DashboardPage({
           clientsPromise={clientsP}
           crmPromise={crmP}
           digestPromise={digestP}
+          packSalesPromise={packSalesP}
         />
       </Suspense>
 
