@@ -152,28 +152,21 @@ export async function DetailsSection({
             <div className="mb-4 flex items-center gap-2">
               <p className={sectionTitle}>{o('details.businessFunnel', { days: period })}</p>
               <InfoDot>
-                Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing) avec la
-                bonne méthode HTTP. Le bruit (scanner, robots, discovery) est exclu, ainsi que les
-                clés internes — le funnel ne mesure que la demande réelle du marché.
+                {o('details.businessFunnelChart.scope')}
                 <br />
                 <br />
-                <strong>Différence avec « Requêtes HTTP »</strong> : ce graphe-ci = la DEMANDE (qui
-                utilise le produit) ; l&apos;autre = l&apos;ATTENTION (tout ce qui touche le
-                serveur, bruit compris).
+                {o('details.businessFunnelChart.reading')}
                 <br />
                 <br />
-                <strong className="text-[var(--ok)]">Paid success</strong> = l’agent a payé (x402)
-                ou utilisé sa clé et reçu 2xx.
+                <strong className="text-[var(--ok)]">{o('details.businessFunnelChart.series.success')}</strong> : {o('details.businessFunnelChart.help.success')}
                 <br />
-                <strong className="text-amber-400">Paywall hit</strong> = agent intéressé mais sans
-                auth → 402.
+                <strong className="text-amber-400">{o('details.businessFunnelChart.series.paywall')}</strong> : {o('details.businessFunnelChart.help.paywall')}
                 <br />
-                <strong className="text-violet-400">Auth / quota</strong> = 401 (mauvaise clé) ou
-                429 (quota atteint).
+                <strong className="text-violet-400">{o('details.businessFunnelChart.series.auth_or_quota')}</strong> : {o('details.businessFunnelChart.help.authOrQuota')}
                 <br />
-                <strong className="text-yellow-400">Bad input</strong> = 400 (body mal formé).
+                <strong className="text-yellow-400">{o('details.businessFunnelChart.series.bad_input')}</strong> : {o('details.businessFunnelChart.help.badInput')}
                 <br />
-                <strong className="text-red-400">Server error</strong> = 5xx, doit rester à zéro.
+                <strong className="text-red-400">{o('details.businessFunnelChart.series.server_error')}</strong> : {o('details.businessFunnelChart.help.serverError')}
               </InfoDot>
             </div>
             {!funnelRes.ok ? (
@@ -186,6 +179,7 @@ export async function DetailsSection({
                 data={funnelRes.data?.rows ?? []}
                 markers={markers}
                 cohortByDate={cohortByDate}
+                todayUtc={nowIso.slice(0, 10)}
               />
             )}
           </div>
@@ -195,10 +189,7 @@ export async function DetailsSection({
               <div className="mb-4 flex items-center gap-2">
                 <p className={sectionTitle}>{o('details.httpRequests', { days: period })}</p>
                 <InfoDot>
-                  <strong>Tout ce qui frappe à la porte du serveur</strong> : vraies validations,
-                  mais aussi robots, scanners, handshakes MCP, pages de découverte, 404. C&apos;est
-                  un thermomètre d&apos;ATTENTION, pas de business — un pic ici sans pic dans le
-                  funnel de conversion = du bruit machine.
+                  {o('details.httpRequestsNote')}
                   <br />
                   <br />
                   <strong className="text-[var(--fg-2)]">Zone grise « Attendu »</strong> = la plage

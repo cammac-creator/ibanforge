@@ -5,26 +5,15 @@ import { WeeklyDigestCard, type DigestEntry } from '../weekly-digest-card';
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { moneySummary } from '@/lib/dashboard-overview';
+import { packUsdLabel, retainedPackSales, type PackSalesSnapshot } from '@/lib/dashboard/pack-sales';
+import { PackSalesCard } from './pack-sales-card';
 import { ClientLinks } from './client-links';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
 import type { HistoryEntry, StatsResponse } from './types';
 
-/**
- * Section 1 — the money.
- *
- * The first question of the morning used to be answered across four blocks
- * and about 1 700 px: an x402 total at the top, a Stripe pack total in the
- * middle, a paying/pilot count beside it, and the on-chain wallet card at the
- * very bottom. They are one band now, every figure carries the window it was
- * measured over (ENS-06), and one figure is NEW: the credits sold and never
- * consumed, which is the number that describes the break after purchase and
- * which nothing on the dashboard aggregated.
- *
- * No kill-line gauge: it was retired on 01/09/2026 and a cockpit must not
- * carry a target nobody is steering by any more.
- */
+/** Montants conservés, crédits recensés et portefeuille gardent leurs périmètres propres. */
 export async function MoneySection({
   locale,
   period,
@@ -34,6 +23,7 @@ export async function MoneySection({
   clientsPromise,
   crmPromise,
   digestPromise,
+  packSalesPromise,
 }: {
   locale: string;
   period: number;
@@ -44,14 +34,16 @@ export async function MoneySection({
   clientsPromise: Promise<Fetched<ActivationClientRow[]>>;
   crmPromise: Promise<BuildInput | null>;
   digestPromise: Promise<Fetched<{ digests: DigestEntry[] }>>;
+  packSalesPromise: Promise<Fetched<PackSalesSnapshot>>;
 }) {
   const t = await getTranslations('dashboard.overview');
-  const [statsRes, historyRes, clientsRes, crm, digestRes] = await Promise.all([
+  const [statsRes, historyRes, clientsRes, crm, digestRes, packsRes] = await Promise.all([
     statsPromise,
     historyPromise,
     clientsPromise,
     crmPromise,
     digestPromise,
+    packSalesPromise,
   ]);
 
   const now = new Date(nowIso);
@@ -59,6 +51,7 @@ export async function MoneySection({
   const money = moneySummary(clientsRes.data ?? [], now);
   const snap = crm ? snapshotOnce(crm, nowIso) : null;
   const writable = snap ? writableIds(snap) : null;
+  const packs = packsRes.ok ? retainedPackSales(packsRes.data) : null;
 
   // Real day-over-day delta, from the daily series. The one badge on this page
   // that was NOT a delta (ENS-02) has been removed rather than faked.
@@ -80,10 +73,10 @@ export async function MoneySection({
 
   return (
     <OverviewSection step={1} title={t('money.title')} lead={t('money.lead')}>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCardV2
           title={t('money.packs')}
-          value={snap ? `$${fmt(snap.revenueUsd)}` : '—'}
+          value={packUsdLabel(packs, locale)}
           accentColor="#22c55e"
           hint={t('money.packsHint')}
         />
@@ -91,7 +84,7 @@ export async function MoneySection({
           title={t('money.x402')}
           value={
             statsRes.data
-              ? `$${(statsRes.data.total_revenue_usdc_clean ?? statsRes.data.total_revenue_usdc ?? 0).toFixed(4)}`
+              ? `${(statsRes.data.total_revenue_usdc_clean ?? statsRes.data.total_revenue_usdc ?? 0).toFixed(4)} USDC`
               : '—'
           }
           trend={revTrendPct ? { direction: revTrend, label: t('money.vsYesterday', { percent: revTrendPct }) } : undefined}
@@ -113,14 +106,16 @@ export async function MoneySection({
         />
       </div>
 
-      {/* Who bought, and the two gestures on each of them. The old page named
-          buyers only inside a 25-row table it shared with everyone else. */}
+      <p className="text-xs text-[var(--fg-4)]">{t('money.retainedKeysNote')}</p>
+      <PackSalesCard data={packs} locale={locale} />
+
+      {/* Les comptes à crédits restent accessibles sans les confondre avec des ventes. */}
       <div className={overviewCard}>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-sm font-medium text-[var(--fg-2)]">{t('money.buyers')}</p>
-          {money.consumedPct !== null && (
+          {money.creditsSold > 0 && (
             <p className="text-[11px] text-[var(--fg-4)]">
-              {t('money.consumed', { pct: money.consumedPct, sold: fmt(money.creditsSold) })}
+              {t('money.recorded', { count: fmt(money.creditsSold) })}
             </p>
           )}
         </div>
@@ -152,7 +147,7 @@ export async function MoneySection({
         )}
       </div>
 
-      {/* The live USDC wallet, unchanged. Its Stripe half is a separate fix. */}
+      {/* Le portefeuille se lit séparément des références Stripe conservées. */}
       <RevenueCard />
 
       {digests.length > 0 && (

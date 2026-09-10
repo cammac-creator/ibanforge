@@ -106,7 +106,7 @@ export function StatCardV2({
             </p>
             {hint && <InfoDot>{hint}</InfoDot>}
           </div>
-          <p className="text-2xl font-bold font-mono text-white leading-none mb-2">
+          <p className="text-2xl font-bold font-mono text-white leading-none mb-2 [overflow-wrap:anywhere]">
             {value}
           </p>
           {trend && <TrendBadge trend={trend} />}
