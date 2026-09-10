@@ -284,6 +284,33 @@ that *repairs* such a leak must not describe what it removed.
 
 ## 9. Work in flight
 
+**The report purchase path, hardened on 10 September (#180).** Worth reading before touching
+`src/lib/audit-jobs.ts`, `src/routes/audit.ts` or the Stripe webhook, because several of its
+guarantees are easy to undo by accident:
+
+- **One Checkout reservation per report.** Creation carries a stable idempotency key derived from
+  the report id, so a retry after a network cut reuses the same session instead of opening a
+  second one. Before this, a second session could leave the first payer unable to download what
+  they had paid for.
+- **The first genuinely paid session is fixed atomically with the sale**, and the sale row
+  outlives the report file. A different session paying afterwards is an *incident*, reported as
+  such: no second delivery is performed and no refund is claimed. The confirmation e-mail links
+  the session that actually paid, not the one carried by the event.
+- **One receipt per payment**, keyed by a hash of the session id, so a retried webhook does not
+  send a second message and does not silence the next incident.
+- **Card only, and a Checkout that expires five minutes before the report does.** A first
+  creation is refused when less than thirty minutes remain. The two-hour unpaid and twenty-four
+  hour paid retention windows are unchanged. Enabling a deferred payment method here would sell
+  access to a file that will be gone before the money arrives.
+- **Notifications are sent after the local receipt, with no outbox.** A cut just after that
+  receipt can lose the message: never promise guaranteed e-mail delivery.
+- The audit statistics now sum the **amounts actually recorded** in Swiss francs, keep a known
+  zero distinct from an unknown amount, and count foreign-currency payments out separately. They
+  are not a revenue ledger and do not reconstruct history.
+- The migration that carries this is additive: the column is in the create statement and added by
+  a guarded `ALTER TABLE`. An older build ignores it — but rolling back must not restore the old
+  behaviour of one new session per click.
+
 **Landed on 10 September, after this file was written.** Two branches prepared by a second
 agent were reviewed, merged and published: the address timetables and the API comparison in
 three languages (#178), and the subscription link that a key rotation used to drop (#177).
