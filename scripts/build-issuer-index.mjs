@@ -1,5 +1,6 @@
 /**
- * Build src/lib/issuers-generated.ts.
+ * Build the issuer index of the iban-core package (written OUTSIDE this repo,
+ * to ../iban-core/src/issuers-generated.ts — see the write at the end of file).
  *
  * Cross-matches the EBA PIR + FCA UK EMI/PI register snapshot against the BIC
  * base (bic_entries) by exact normalized-name match, and emits a

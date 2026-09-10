@@ -18,8 +18,9 @@
  * enough to SAY so.
  *
  * Its own file on purpose: the failure is recorded in module-level state inside
- * `db.ts`, and the suite runs single-fork (see vitest.config.ts). Poisoning that
- * state for a neighbouring file would turn every later `/health` red.
+ * `db.ts`, and files share a worker (Vitest 4 removed the single-fork option;
+ * see the note in vitest.config.ts). Poisoning that state for a neighbouring
+ * file would turn every later `/health` red.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { writeFileSync, mkdtempSync } from 'node:fs';

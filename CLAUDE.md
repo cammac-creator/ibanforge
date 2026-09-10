@@ -9,7 +9,7 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 
 ## Stack
 
-- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 11 ne publie pas de binaire linux-x64 pour l'ABI 137)
+- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 — `^13` aujourd'hui — ne publie pas de binaire linux-x64 pour l'ABI de Node 24, et `node:24-slim` n'a pas de compilateur)
 - **Framework** : Hono
 - **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (121k+ BIC entries from GLEIF + SwiftCodes/MIT + SIX + EBA Step2 SCT + Bundesbank + NBP, plus 1,100+ Swiss clearing entries SIX — counts drift at each monthly refresh, read them live via `getEntryCount()` / `getChClearingCount()`), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)
@@ -33,7 +33,10 @@ src/
     landing.ts          # GET / (HTML landing page)
     demo.ts             # GET /v1/demo (free examples)
   lib/
-    iban.ts             # IBAN validation logic (mod97, BBAN parsing)
+    iban.ts             # ADAPTATEUR de 25 lignes seulement : mod97, longueurs et découpage BBAN
+                        # vivent HORS de ce dépôt, dans le paquet npm aliasé `iban-core`
+                        # (npm:ibanforge, publié depuis cammac-creator/iban-core).
+                        # Filet local : src/lib/iban-core-contract.test.ts
     enrich.ts           # Post-validation enrichment (BIC, issuer, SEPA, risk, CH clearing)
     ch-clearing.ts      # Swiss BC-Nummer lookup, institution type detection
     issuers.ts          # EMI/neobank classification (85 known BIC8 mappings — the live count is served in /llms.txt)
@@ -138,7 +141,7 @@ supposer qu'un worktree est mort :
 | POST | /v1/iban/compliance | 0.02 | Sanctions (bank-BIC) + FATF + SEPA + VoP + risk score 0-100 |
 | GET | /v1/demo | free | Example validations |
 | GET | /health | free | Health check + stats |
-| GET | /stats | free | Detailed statistics |
+| GET | /stats | admin | Detailed statistics — exige `Authorization: Bearer STATS_TOKEN`, jamais public |
 | GET | / | free | Landing page |
 
 ## Commands
