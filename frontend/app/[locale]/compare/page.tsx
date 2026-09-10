@@ -1,11 +1,8 @@
+import { JourneyActions } from "@/components/journey-actions";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Check, Scale, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
-import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({
   params,
@@ -273,26 +270,9 @@ export default async function ComparePage({
         </ul>
       </section>
 
-      {/* ── CTA ───────────────────────────────────────────────────────────── */}
-      <section
-        className="border-t flex flex-col items-center text-center px-4 py-24 gap-5"
-        style={{ borderColor: "var(--hairline)" }}
-      >
-        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
-          {t("cta.heading")}
-        </h2>
-        <p className="text-sm text-muted-foreground max-w-md" style={{ lineHeight: 1.65 }}>
-          {t("cta.description")}
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 mt-1">
-          <GetKeyButton variant="amber" className="px-6">
-            {t("cta.getKey")}
-          </GetKeyButton>
-          <Button size="lg" variant="outline" className="px-6" render={<Link href={localePath(locale, '/playground')} />}>
-            {t("cta.playground")}
-          </Button>
-        </div>
-      </section>
+      <div className="mx-auto w-full max-w-4xl px-4 pb-12">
+        <JourneyActions locale={locale} path="/compare" />
+      </div>
     </div>
   );
 }

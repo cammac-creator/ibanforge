@@ -1,5 +1,5 @@
+import { JourneyActions } from "@/components/journey-actions";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { CodeBlock } from "@/components/code-block";
 import { alternatesFor } from "@/lib/seo";
@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EndpointRow } from "@/components/ui/endpoint-row";
 import { StatusDot } from "@/components/ui/status-dot";
-import { localePath } from "@/lib/locale-path";
 
 /**
  * Translated, and correct about what we ship.
@@ -448,29 +447,10 @@ export default async function AgentsPage({
         </ul>
       </section>
 
-      {/* Final CTA */}
-      <section
-        className="flex flex-col items-center text-center px-4 py-32 gap-6 border-t"
-        style={{ borderColor: "var(--ink-4)", background: "var(--ink-0)" }}
-      >
-        <h2
-          className="text-3xl sm:text-4xl font-bold tracking-tight"
-          style={{ letterSpacing: "-0.02em" }}
-        >
-          {t("cta.heading")}
-        </h2>
-        <p className="text-muted-foreground max-w-md" style={{ lineHeight: 1.65 }}>
-          {t("cta.description")}
-        </p>
-        <Button
-          size="lg"
-          variant="amber"
-          className="px-8 mt-2"
-          render={<Link href={localePath(locale, '/playground')} />}
-        >
-          {t("cta.button")}
-        </Button>
-      </section>
+      <div className="mx-auto w-full max-w-4xl px-4">
+        <JourneyActions locale={locale} path="/agents" />
+      </div>
+
     </div>
   );
 }

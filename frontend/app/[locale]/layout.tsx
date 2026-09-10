@@ -65,27 +65,26 @@ type Props = {
 };
 
 const META_BY_LOCALE = {
-  // Audit 2026-09-05 (n° 14): the search snippet promised an "API for AI
-  // agents" while the fold speaks to invoicing software before the November
-  // 2026 deadlines. One promise now, the fold's; no figure typed by hand.
+  // Même promesse internationale que l’accueil ; les détails de couverture
+  // restent dans les sources et les pages de chaque pays.
   en: {
-    title: "IBANforge — IBAN, BIC & Swiss clearing API for invoicing tools",
+    title: "IBANforge | IBAN validation & BIC lookup API for business software",
     description:
-      "IBAN, BIC, SIX Swiss clearing and sanctions in one request: the data invoicing software must serve before 14 November 2026. REST, SDKs, MCP. Free: 200 requests a month.",
+      "Validate IBANs and look up banks and BICs for ERP, invoicing and payroll software across supported countries. Try the API or preview a supplier file for free.",
     ogLocale: "en_US",
     alternates: { fr: "fr", de: "de" },
   },
   fr: {
-    title: "IBANforge — API IBAN, BIC et clearing suisse pour éditeurs",
+    title: "IBANforge | API de validation IBAN et BIC pour vos logiciels",
     description:
-      "IBAN, BIC, clearing suisse SIX et sanctions en une requête : les données que les logiciels de facturation doivent servir avant le 14 novembre 2026. REST, SDK, MCP. Gratuit : 200 requêtes par mois.",
+      "Validez les IBAN et retrouvez banque et BIC pour vos logiciels ERP, facturation et paie dans les pays couverts. Essai API et aperçu de fichier fournisseurs gratuits.",
     ogLocale: "fr_FR",
     alternates: { en: "en", de: "de" },
   },
   de: {
-    title: "IBANforge — API für IBAN, BIC und Schweizer Clearing",
+    title: "IBANforge | IBAN-Validierung und BIC-Suche für Ihre Software",
     description:
-      "IBAN, BIC, SIX-Clearing und Sanktionen in einer Anfrage: die Daten, die Rechnungssoftware vor dem 14. November 2026 liefern muss. REST, SDKs, MCP. Gratis: 200 Anfragen pro Monat.",
+      "IBANs prüfen, Banken und BICs für ERP-, Rechnungs- und Lohnsoftware in den unterstützten Ländern ermitteln. API und Vorschau für Lieferantendateien gratis testen.",
     ogLocale: "de_DE",
     alternates: { en: "en", fr: "fr" },
   },

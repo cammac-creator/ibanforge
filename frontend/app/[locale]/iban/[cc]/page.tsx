@@ -1,3 +1,5 @@
+import { JourneyActions } from "@/components/journey-actions";
+import { journeyFor } from "@/lib/journeys";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -179,9 +181,13 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
         <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
       </section>
 
+      <JourneyActions locale={locale} path={`/iban/${cc}`} />
+
       <section className="flex flex-wrap gap-4 text-sm">
         <Link href={localePath(locale, "/tools/test-iban")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("cta.tool", { country })}</Link>
-        <Link href={localePath(locale, "/audit")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{tr("common.ctaAudit")}</Link>
+        {!journeyFor(`/iban/${cc}`) && (
+          <Link href={localePath(locale, "/audit")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{tr("common.ctaAudit")}</Link>
+        )}
         <Link href={localePath(locale, "/docs/iban-validate")} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("cta.docs")}</Link>
         {registerIndex && (
           <Link href={localePath(locale, registerIndex)} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("cta.registerIndex")}</Link>

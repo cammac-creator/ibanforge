@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { ArrowRight, CalendarClock, FileCheck2, Landmark, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
 import { localePath } from "@/lib/locale-path";
 
@@ -31,10 +32,9 @@ export default async function VendorsPage({
   const { locale } = await params;
   const t = await getTranslations("vendors");
 
-  // Card links mirror the three arguments: Swiss clearing docs, compliance
-  // docs, legal/DPA. Kept in code (not i18n) — they're routes, not copy.
+  // Les liens suivent les capacités présentées, avec la langue de la page.
   const ARG_LINKS = [
-    localePath(locale, '/docs/ch-clearing'),
+    localePath(locale, '/docs/iban-validate'),
     localePath(locale, '/docs/compliance'),
     localePath(locale, '/legal/dpa'),
   ] as const;
@@ -43,8 +43,8 @@ export default async function VendorsPage({
 
   return (
     <div className="flex flex-col">
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="flex flex-col items-center text-center px-4 py-28 sm:py-32 gap-7 max-w-3xl mx-auto">
+      {/* Essayer la réponse avant de choisir une offre. */}
+      <section className="flex flex-col items-center text-center px-4 py-16 sm:py-20 gap-6 max-w-3xl mx-auto">
         <span className="eyebrow">{t("eyebrow")}</span>
 
         <h1 className="text-5xl sm:text-6xl md:text-7xl display-forge">
@@ -60,18 +60,124 @@ export default async function VendorsPage({
             size="lg"
             variant="amber"
             className="px-6"
-            render={<a href="mailto:support@ibanforge.com?subject=OEM%20licensing" />}
+            nativeButton={false}
+            render={<Link href={localePath(locale, '/playground')} data-evt="cta:vendor-try" />}
           >
-            {t("hero.cta.contact")}
+            {t("hero.cta.try")}
           </Button>
           <Button
             size="lg"
             variant="outline"
             className="px-6"
-            render={<Link href={localePath(locale, '/docs')} />}
+            nativeButton={false}
+            render={<Link href={localePath(locale, '/docs')} data-evt="cta:vendor-docs" />}
           >
             {t("hero.cta.docs")}
           </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">{t("hero.trialNote")}</p>
+      </section>
+
+      {/* Trois étapes autonomes utilisent les écrans déjà disponibles. */}
+      <section className="px-4 pb-16 max-w-5xl mx-auto w-full" aria-labelledby="vendor-start">
+        <h2 id="vendor-start" className="text-2xl sm:text-3xl font-semibold tracking-tight mb-8 text-center">
+          {t("start.heading")}
+        </h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border p-6 flex flex-col gap-3">
+            <span className="font-mono text-xs text-amber-500">01</span>
+            <h3 className="font-semibold">{t("start.try.title")}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t("start.try.body")}</p>
+            <Link href={localePath(locale, '/playground')} data-evt="cta:vendor-try" className="text-sm text-amber-500 underline underline-offset-4">
+              {t("hero.cta.try")}
+            </Link>
+          </div>
+          <div className="rounded-xl border p-6 flex flex-col gap-3">
+            <span className="font-mono text-xs text-amber-500">02</span>
+            <h3 className="font-semibold">{t("start.docs.title")}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t("start.docs.body")}</p>
+            <Link href={localePath(locale, '/docs/onboarding')} data-evt="cta:vendor-docs" className="text-sm text-amber-500 underline underline-offset-4">
+              {t("start.docs.link")}
+            </Link>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              <Link href={localePath(locale, '/docs/recipes#integration-odoo')} data-evt="cta:vendor-docs" className="underline underline-offset-4">Odoo 18</Link>
+              <Link href={localePath(locale, '/docs/recipes#integration-n8n')} data-evt="cta:vendor-docs" className="underline underline-offset-4">n8n</Link>
+            </div>
+          </div>
+          <div className="rounded-xl border p-6 flex flex-col gap-3">
+            <span className="font-mono text-xs text-amber-500">03</span>
+            <h3 className="font-semibold">{t("start.key.title")}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t("start.key.body")}</p>
+            <GetKeyButton size="default" variant="outline" className="w-fit">{t("start.key.button")}</GetKeyButton>
+            <Link href={localePath(locale, '/pricing')} className="text-sm text-amber-500 underline underline-offset-4">{t("start.key.plans")}</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Where it sits — 3-step flow ───────────────────────────────────── */}
+      <section className="px-4 py-24 max-w-5xl mx-auto w-full">
+        <h2
+          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-14 text-center"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t("flow.heading")}
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 items-stretch">
+          {STEPS.map((i) => (
+            <div key={i} className="contents">
+              {i > 0 && (
+                <div className="hidden md:flex items-center justify-center text-amber-500/70">
+                  <ArrowRight className="size-5" aria-hidden />
+                </div>
+              )}
+              <div
+                className="rounded-xl border p-6 flex flex-col gap-3"
+                style={{ borderColor: i === 1 ? "rgba(245, 158, 11, 0.4)" : "var(--ink-4)", background: i === 1 ? "rgba(245, 158, 11, 0.05)" : "var(--ink-1)" }}
+              >
+                <span className="font-mono text-xs text-amber-500">{String(i + 1).padStart(2, "0")}</span>
+                <h3 className="font-semibold text-foreground">{t(`flow.steps.${i}.title`)}</h3>
+                <p className="text-sm text-muted-foreground" style={{ lineHeight: 1.65 }}>
+                  {t(`flow.steps.${i}.body`)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Three arguments ───────────────────────────────────────────────── */}
+      <section className="px-4 pb-24 max-w-6xl mx-auto w-full">
+        <h2
+          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-14 text-center"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t("args.heading")}
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          {ARG_LINKS.map((href, i) => {
+            const Icon = ARG_ICONS[i];
+            return (
+              <div
+                key={href}
+                className="rounded-xl border p-7 flex flex-col gap-3"
+                style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
+              >
+                <Icon className="size-5 text-amber-500" aria-hidden />
+                <h3 className="font-semibold text-foreground">{t(`args.items.${i}.title`)}</h3>
+                <p className="text-sm text-muted-foreground flex-1" style={{ lineHeight: 1.65 }}>
+                  {t(`args.items.${i}.body`)}
+                </p>
+                <Link
+                  href={href}
+                  className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit"
+                >
+                  {t(`args.items.${i}.link`)} →
+                </Link>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -147,73 +253,6 @@ export default async function VendorsPage({
         </div>
       </section>
 
-      {/* ── Where it sits — 3-step flow ───────────────────────────────────── */}
-      <section className="px-4 py-24 max-w-5xl mx-auto w-full">
-        <h2
-          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-14 text-center"
-          style={{ letterSpacing: "-0.02em" }}
-        >
-          {t("flow.heading")}
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 items-stretch">
-          {STEPS.map((i) => (
-            <div key={i} className="contents">
-              {i > 0 && (
-                <div className="hidden md:flex items-center justify-center text-amber-500/70">
-                  <ArrowRight className="size-5" aria-hidden />
-                </div>
-              )}
-              <div
-                className="rounded-xl border p-6 flex flex-col gap-3"
-                style={{ borderColor: i === 1 ? "rgba(245, 158, 11, 0.4)" : "var(--ink-4)", background: i === 1 ? "rgba(245, 158, 11, 0.05)" : "var(--ink-1)" }}
-              >
-                <span className="font-mono text-xs text-amber-500">{String(i + 1).padStart(2, "0")}</span>
-                <h3 className="font-semibold text-foreground">{t(`flow.steps.${i}.title`)}</h3>
-                <p className="text-sm text-muted-foreground" style={{ lineHeight: 1.65 }}>
-                  {t(`flow.steps.${i}.body`)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Three arguments ───────────────────────────────────────────────── */}
-      <section className="px-4 pb-24 max-w-6xl mx-auto w-full">
-        <h2
-          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-14 text-center"
-          style={{ letterSpacing: "-0.02em" }}
-        >
-          {t("args.heading")}
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-          {ARG_LINKS.map((href, i) => {
-            const Icon = ARG_ICONS[i];
-            return (
-              <div
-                key={href}
-                className="rounded-xl border p-7 flex flex-col gap-3"
-                style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
-              >
-                <Icon className="size-5 text-amber-500" aria-hidden />
-                <h3 className="font-semibold text-foreground">{t(`args.items.${i}.title`)}</h3>
-                <p className="text-sm text-muted-foreground flex-1" style={{ lineHeight: 1.65 }}>
-                  {t(`args.items.${i}.body`)}
-                </p>
-                <Link
-                  href={href}
-                  className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit"
-                >
-                  {t(`args.items.${i}.link`)} →
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       {/* ── OEM contact ───────────────────────────────────────────────────── */}
       <section className="border-t px-4 py-24 w-full" style={{ borderColor: "var(--hairline)" }}>
         <div className="max-w-3xl mx-auto flex flex-col items-center text-center gap-5">
@@ -234,6 +273,7 @@ export default async function VendorsPage({
             size="lg"
             variant="amber"
             className="px-8 font-mono"
+            nativeButton={false}
             render={<a href="mailto:support@ibanforge.com?subject=OEM%20licensing" />}
           >
             {t("oem.cta")}

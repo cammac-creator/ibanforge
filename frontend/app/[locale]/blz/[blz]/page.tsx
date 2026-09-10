@@ -1,3 +1,5 @@
+import { JourneyActions } from "@/components/journey-actions";
+import { journeyFor } from "@/lib/journeys";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -101,9 +103,13 @@ export default async function BlzPage({ params }: { params: Promise<{ locale: st
         </section>
       )}
 
+      <JourneyActions locale={locale} path={`/blz/${blz}`} />
+
       <section className="flex flex-wrap gap-4 text-sm">
         <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
-        <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
+        {!journeyFor(`/blz/${blz}`) && (
+          <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
+        )}
         <Link href={localePath(locale, '/blz')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("blz.indexTitle")}</Link>
       </section>
 

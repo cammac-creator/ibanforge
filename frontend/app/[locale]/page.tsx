@@ -9,7 +9,6 @@ import { Reveal } from "@/components/reveal"
 import { StatsBar } from "@/components/stats-bar"
 import { ForgeFilm, type FilmStrings } from "@/components/forge/forge-film"
 import { FoldDemo } from "@/components/forge/fold-demo"
-import { CtaBeacon } from "@/components/forge/cta-beacon"
 import capturedIban from "./playground/captured-iban.json"
 import { DEFAULT_RESULT } from "./playground/examples"
 import {
@@ -41,14 +40,13 @@ export const revalidate = 3600
 const FEATURE_COUNT = 6
 const ENDPOINT_COUNT = 7
 
-/* The distribution: every package and module that exists today, with the
-   command or pointer that installs it. Nothing here is announced ahead of
-   itself — .NET says "from source" until NuGet carries it. */
+/* Chaque intégration pointe vers son paquet ou son code disponible.
+   Le SDK .NET est disponible sur NuGet. */
 const INTEGRATIONS = [
   { key: 'ts', cmd: 'npm install @ibanforge/sdk', href: 'https://www.npmjs.com/package/@ibanforge/sdk' },
   { key: 'py', cmd: 'pip install ibanforge', href: 'https://pypi.org/project/ibanforge/' },
   { key: 'java', cmd: 'com.ibanforge:ibanforge-sdk', href: 'https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk' },
-  { key: 'dotnet', cmd: 'IBANforge.Sdk · dotnet pack', href: 'https://github.com/cammac-creator/ibanforge/tree/main/sdks/dotnet' },
+  { key: 'dotnet', cmd: 'dotnet add package IBANforge.Sdk', href: 'https://www.nuget.org/packages/IBANforge.Sdk' },
   { key: 'mcp', cmd: 'npx -y ibanforge-mcp', href: 'https://www.npmjs.com/package/ibanforge-mcp' },
   { key: 'n8n', cmd: 'npm install n8n-nodes-ibanforge', href: 'https://www.npmjs.com/package/n8n-nodes-ibanforge' },
   { key: 'odoo', cmd: 'ibanforge_bank_autofill', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/odoo' },
@@ -163,7 +161,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
   return (
     <div className="forge">
-      <CtaBeacon locale={locale} />
       {/* ── The fold: the promise on the left, the proof on the right ──────
           Audit 2026-09-04 (L3 + M1 + L1). The 149 px lockup repeated the
           header's logo and dwarfed a 33 px h1; 56 % of the fold was empty;
@@ -192,27 +189,28 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               b: (chunks) => <b>{chunks}</b>,
             })}
           </p>
-          {/* Audit 2026-09-04 (S7): the primary action asked for an e-mail
-              against a promise; seeing a response is the smaller step and the
-              natural first one on an API. The key comes second. */}
+          {/* Deux usages donnent accès aux essais existants, sans ouvrir de compte. */}
           <div className="hero-cta">
             <Button
               size="lg"
               variant="amber"
               className="px-6"
               nativeButton={false}
-            render={<Link href={localePath(locale, '/playground')} data-evt="cta:try" />}
+              render={<Link href={localePath(locale, '/playground')} data-evt="cta:journey-api" />}
             >
               {t('hero.cta.tryFree')}
             </Button>
-            <GetKeyButton variant="outline" className="px-6" evt="cta:key">
-              {t('hero.cta.getKey')}
-            </GetKeyButton>
+            <Button
+              size="lg"
+              variant="outline"
+              className="px-6"
+              nativeButton={false}
+              render={<Link href={localePath(locale, '/audit')} data-evt="cta:journey-audit" />}
+            >
+              {t('hero.cta.audit')}
+            </Button>
           </div>
-          {/* The second audience, named on the fold (audit 2026-09-05, n° 20). */}
-          <p className="hero-alt">
-            <Link href={localePath(locale, '/audit')} data-evt="cta:audit-fold">{t('hero.altDoor')}</Link>
-          </p>
+          <p className="hero-alt">{t('hero.trialNote')}</p>
         </div>
         <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} capturedOn={capturedOn} />
       </section>

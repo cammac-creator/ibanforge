@@ -6,7 +6,7 @@ order: 12
 
 # Recettes — valider un IBAN dans votre stack
 
-Chaque recette fait le même appel : `POST /v1/iban/validate`, qui rend structure + clé, la banque émettrice (BIC), le contrôle du code banque au registre national, la classification EMI/vIBAN et la joignabilité SEPA/VoP. D'abord une clé gratuite (200 requêtes/mois, sans carte) :
+Chaque recette utilise le même point d'entrée : `POST /v1/iban/validate`, qui rend structure + clé, la banque émettrice (BIC), le contrôle du code banque au registre national, la classification EMI/vIBAN et la joignabilité SEPA/VoP. D'abord une clé gratuite (200 requêtes/mois, sans carte) :
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
@@ -98,7 +98,11 @@ Les erreurs sont typées sous `IBANforgeException` : `PaymentRequiredException` 
 
 ## C# / .NET
 
-Le SDK .NET officiel (net8.0, aucune dépendance hors du framework) expose les mêmes méthodes en appels asynchrones. La publication sur NuGet est en attente ; d'ici là, référencez le projet ou faites `dotnet pack` depuis `sdks/dotnet` (identifiant `IBANforge.Sdk`, version 1.5.0).
+Le SDK .NET officiel (net8.0, aucune dépendance hors du framework) expose les mêmes méthodes en appels asynchrones. Installez [`IBANforge.Sdk` 1.5.0 depuis NuGet](https://www.nuget.org/packages/IBANforge.Sdk/1.5.0) :
+
+```bash
+dotnet add package IBANforge.Sdk --version 1.5.0
+```
 
 ```csharp
 using var client = new IBANforgeClient(new IBANforgeOptions { ApiKey = Environment.GetEnvironmentVariable("IBANFORGE_API_KEY") });
@@ -128,25 +132,48 @@ function VALIDATE_IBAN(iban) {
 
 Attention au quota : un appel par évaluation de cellule. Pour une colonne entière, préférez le [endpoint batch](/docs/iban-batch) depuis un script (jusqu'à 100 IBAN par appel).
 
+<span id="integration-n8n" className="block scroll-mt-28" />
+
 ## n8n
 
-Installez le node communautaire — validation, recherche BIC, clearing suisse et pré-contrôle conformité, avec un écran de credentials :
+Le paquet publié [`n8n-nodes-ibanforge@0.1.1`](https://www.npmjs.com/package/n8n-nodes-ibanforge) propose la validation IBAN, la recherche BIC, le clearing suisse et les pré-contrôles de conformité au niveau bancaire. Cette recette concerne **n8n auto-hébergé**, avec un compte propriétaire ou administrateur. L'installation d'un paquet depuis npm n'est pas disponible sur n8n Cloud, qui exige une fiche vérifiée. Voir le [guide d'installation n8n](https://docs.n8n.io/integrations/community-nodes/installation-and-management/).
 
-```
-Settings → Community nodes → Install → n8n-nodes-ibanforge
+1. Ouvrez **Settings → Community nodes → Install** et saisissez `n8n-nodes-ibanforge@0.1.1`.
+2. Obtenez une [clé API gratuite](/fr/docs/api-keys) (200 requêtes/mois, adresse mail requise, sans carte). Dans un nouveau workflow, reliez **Manual Trigger** à **IBANforge** et collez la clé dans un identifiant **IBANforge API**.
+3. Choisissez **Validate IBAN**, saisissez l'exemple de documentation `DE89370400440532013000`, puis exécutez l'étape.
+4. Lisez le résultat JSON : `valid` doit valoir `true` pour cet exemple, `bank_code_check` décrit le résultat du registre et `bic` la banque lorsqu'elle peut être identifiée. Une opération terminée qui renvoie ces champs prouve le premier appel API ; le seul test de connexion au vert ne suffit pas.
+
+Dans la version 0.1.1, le test de connexion appelle la route publique `/v1/demo`, qui ne vérifie pas la clé. Contrôlez le résultat réel de **Validate IBAN** avant d'utiliser le workflow. Ni un format valide ni une banque identifiée ne prouvent l'existence du compte ou son appartenance à un bénéficiaire nommé.
+
+Pour une installation manuelle, exécutez les commandes suivantes **avec l'utilisateur du service n8n**, dans son conteneur le cas échéant, puis redémarrez n8n :
+
+```bash
+mkdir -p ~/.n8n/nodes
+cd ~/.n8n/nodes
+npm install n8n-nodes-ibanforge@0.1.1
 ```
 
-Auto-hébergé : `npm install n8n-nodes-ibanforge`. (Les nodes communautaires non vérifiés tournent en auto-hébergé ; le listing vérifié pour n8n Cloud est en cours.)
+Le nœud traite chaque élément entrant séparément ; il n'a pas d'opération batch. Une liste de 100 éléments peut donc consommer 100 requêtes. [Détails de l'installation manuelle](https://docs.n8n.io/integrations/community-nodes/installation-and-management/manual-installation/).
+
+<span id="integration-odoo" className="block scroll-mt-28" />
 
 ## Odoo
 
-Un module Odoo 18 (AGPL-3) remplit le BIC et le nom de la banque sur un compte bancaire de partenaire dès qu'un IBAN est saisi, et crée ou réutilise la fiche banque correspondante. Il n'est pas encore sur l'Odoo Apps store ; installez-le depuis le dépôt, à la racine de la branche qui porte le nom de la version d'Odoo :
+Le [module Odoo public](https://github.com/cammac-creator/ibanforge-odoo/tree/18.0), version **18.0.1.0.0** (AGPL-3), remplit le BIC et le nom de la banque lorsque l'API peut les identifier. Il exige **Odoo 18 avec prise en charge des modules Python personnalisés**, sur votre propre serveur ou sur Odoo.sh. [Odoo Online ne prend pas en charge ces modules](https://www.odoo.com/documentation/18.0/administration/odoo_online.html). Cette installation utilise le dépôt source et ne dépend pas d'une fiche Odoo Apps.
 
-```
-git clone -b 18.0 https://github.com/cammac-creator/ibanforge-odoo.git addons/ibanforge_bank_autofill
+Sur votre propre serveur Odoo, clonez le dépôt dans le répertoire de votre choix :
+
+```bash
+git clone --branch 18.0 --single-branch https://github.com/cammac-creator/ibanforge-odoo.git /path/to/ibanforge-odoo
 ```
 
-Mettez à jour la liste des applications, installez **IBANforge bank autofill**, puis ouvrez Configuration → IBANforge et collez votre clé API. Sans clé, le module reste hors ligne et Odoo se comporte exactement comme d'origine. Le [README](https://github.com/cammac-creator/ibanforge-odoo#readme) décrit le badge SEPA et risque, et ce que le module ajoute par rapport à Odoo natif et au module OCA.
+Ajoutez `/path/to/ibanforge-odoo` à la liste `addons_path` existante d'Odoo, en conservant les autres chemins. Le module se trouve dans son **sous-répertoire** : le manifeste doit être à <code className="break-all">/path/to/ibanforge-odoo/ibanforge_bank_autofill/__manifest__.py</code>. Vous pouvez aussi copier uniquement ce répertoire `ibanforge_bank_autofill` dans un répertoire d'extensions déjà configuré. Vérifiez que la bibliothèque Python `requests` est disponible dans l'environnement Odoo. Sur Odoo.sh, ajoutez ce répertoire de module à votre projet selon la [procédure des modules personnalisés](https://www.odoo.com/documentation/18.0/administration/odoo_sh/getting_started/create.html).
+
+1. Redémarrez Odoo, activez le mode développeur et actualisez la liste des applications. Retirez le filtre **Apps** par défaut si nécessaire, puis installez **IBANforge Bank Auto-fill** (`ibanforge_bank_autofill`).
+2. Ouvrez **Configuration → IBANforge**, collez votre [clé API](/fr/docs/api-keys) et enregistrez les paramètres. Conservez l'adresse API par défaut. Sans clé, le module ne fait aucun appel réseau.
+3. Dans une base de test, créez un compte bancaire de partenaire avec `DE89370400440532013000`. Laissez le champ banque vide, saisissez l'IBAN, puis quittez le champ. Contrôlez la banque et le BIC détectés ou la banque associée, enregistrez, puis rouvrez le compte pour vérifier que le lien vers la banque a été conservé.
+
+Une API indisponible ou un BIC absent laisse le remplissage automatique inactif ; cela ne bloque pas l'enregistrement. Le module Odoo `base_iban` continue de valider le format de l'IBAN. À l'enregistrement, une banque déjà indiquée sur le compte est conservée. La saisie puis l'enregistrement d'un nouveau compte peuvent utiliser **deux appels API** : 200 requêtes mensuelles ne représentent donc pas 200 comptes saisis manuellement. L'IBAN est transmis à l'API configurée ; le résultat ne prouve pas la propriété du compte. [Comportement et limites du module](https://github.com/cammac-creator/ibanforge-odoo/blob/18.0/ibanforge_bank_autofill/README.rst).
 
 ## Agents IA (MCP)
 

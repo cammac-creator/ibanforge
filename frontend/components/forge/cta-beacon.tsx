@@ -44,7 +44,7 @@ function send(name: string, locale: string) {
   }
 }
 
-export function CtaBeacon({ locale }: { locale: string }) {
+export function CtaBeacon({ locale, page }: { locale: string; page: string }) {
   useEffect(() => {
     const once = new Set<string>()
     const onClick = (e: MouseEvent) => {
@@ -63,6 +63,7 @@ export function CtaBeacon({ locale }: { locale: string }) {
       document.removeEventListener("click", onClick, true)
       document.removeEventListener("forge:station", onStation)
     }
-  }, [locale])
+  // Une navigation interne ouvre une nouvelle page, donc une nouvelle lecture du film.
+  }, [locale, page])
   return null
 }

@@ -1,3 +1,5 @@
+import { JourneyActions } from "@/components/journey-actions";
+import { journeyFor } from "@/lib/journeys";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -97,9 +99,13 @@ export default async function BeCodePage({ params }: { params: Promise<{ locale:
         </section>
       )}
 
+      <JourneyActions locale={locale} path={`/be/${code}`} />
+
       <section className="flex flex-wrap gap-4 text-sm">
         <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
-        <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
+        {!journeyFor(`/be/${code}`) && (
+          <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
+        )}
         <Link href={localePath(locale, '/docs/be-bank-codes')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("be.docLink")}</Link>
         <Link href={localePath(locale, '/be')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("be.indexTitle")}</Link>
       </section>
