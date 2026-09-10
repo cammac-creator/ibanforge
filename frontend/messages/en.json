@@ -677,9 +677,9 @@
         "audit": {
           "title": "Creditor file audit, last {days} days",
           "uploads": "files uploaded",
-          "sales": "paid",
-          "revenue": "CHF",
-          "conversion": "conversion",
+          "sales": "reports unlocked",
+          "revenue": "amounts paid (CHF)",
+          "conversion": "reports / uploads",
           "lastSale": "last sale",
           "empty": "No file uploaded yet.",
           "recent": "the uploads, newest first",
@@ -687,7 +687,14 @@
           "rowsUnknown": "size unknown",
           "internal": "internal key (test)",
           "withKey": "key {key}",
-          "noKey": "no key (public page)"
+          "noKey": "no key (public page)",
+          "scope": "What these figures measure",
+          "known": "{known, plural, one {# report with a known CHF amount} other {# reports with a known CHF amount}} out of {sales, plural, one {# unlocked report.} other {# unlocked reports.}}",
+          "unknown": "{count, plural, one {# report without a usable amount: excluded from the total.} other {# reports without a usable amount: excluded from the total.}}",
+          "otherCurrency": "{count, plural, one {# report in another currency: excluded from the CHF total.} other {# reports in another currency: excluded from the CHF total.}}",
+          "unavailable": "Paid amounts unavailable. Catalogue prices are not used as a substitute.",
+          "revenueNote": "Amounts confirmed by Stripe at checkout, including discounts, before refunds and fees. This total is not profit.",
+          "ratioNote": "Reports and uploads within the period, including samples and internal tests. This is not visitor conversion; the ratio can exceed 100%."
         },
         "doors": {
           "title": "Actions across the site",
@@ -1804,8 +1811,12 @@
         "tooLarge": "The file is larger than 5 MB.",
         "unreadable": "The file could not be read as CSV or XLSX.",
         "expired": "This audit has expired. Upload the file again.",
-        "payments": "Card payments are not available right now. Write to support@ibanforge.com.",
-        "generic": "Something went wrong. Try again or write to support@ibanforge.com."
+        "payments": "Payment is temporarily unavailable. Try again in a few seconds. If the problem persists, contact support@ibanforge.com.",
+        "generic": "Something went wrong. Try again or write to support@ibanforge.com.",
+        "checkoutExpired": "The payment window for this report has closed. Upload the file again before paying.",
+        "checkoutPending": "Your payment is being prepared or confirmed. Try again in a few seconds.",
+        "paymentReview": "This payment needs review. Do not make another purchase; contact support@ibanforge.com.",
+        "alreadyPaid": "This report is already paid for. Do not pay again; use your download link or contact support@ibanforge.com."
       },
       "sample": "Try with a sample file",
       "dropHere": "Drop it here"

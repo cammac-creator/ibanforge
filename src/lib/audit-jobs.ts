@@ -11,6 +11,7 @@
  * hours after payment, and the page says exactly that.
  */
 import { randomBytes } from 'node:crypto';
+import type Stripe from 'stripe';
 import { getStatsDB } from './db.js';
 import { isInternalEmail } from './internal-accounts.js';
 import type { AuditSummary, PreviewRow, AuditLang, AuditTierCode } from './audit-file.js';
@@ -109,24 +110,72 @@ const COLUMNS =
   'id, created_at, expires_at, filename, rows, tier, price_chf, lang, summary_json, preview_json, stripe_session_id, paid_at, payer_email, downloads';
 
 export function getAuditJob(id: string): AuditJob | null {
-  const r = getStatsDB().prepare(`SELECT ${COLUMNS} FROM audit_jobs WHERE id = ?`).get(id) as
-    Row | undefined;
+  const r = getStatsDB()
+    .prepare(`SELECT ${COLUMNS} FROM audit_jobs WHERE id = ? AND expires_at > ?`)
+    .get(id, isoIn(0)) as Row | undefined;
   return r ? toJob(r) : null;
 }
 
 export function getAuditReport(id: string): Buffer | null {
-  const r = getStatsDB().prepare('SELECT report FROM audit_jobs WHERE id = ?').get(id) as
-    { report: Buffer } | undefined;
+  const r = getStatsDB()
+    .prepare('SELECT report FROM audit_jobs WHERE id = ? AND expires_at > ?')
+    .get(id, isoIn(0)) as { report: Buffer } | undefined;
   return r ? r.report : null;
 }
 
-export function attachAuditSession(id: string, sessionId: string): void {
-  getStatsDB()
-    .prepare('UPDATE audit_jobs SET stripe_session_id = ? WHERE id = ?')
-    .run(sessionId, id);
+/** Fige le corps Stripe avant le réseau, y compris après un arrêt avant attachement. */
+export function getReservedAuditCheckout(id: string): Stripe.Checkout.SessionCreateParams | null {
+  const row = getStatsDB()
+    .prepare('SELECT checkout_params_json FROM audit_jobs WHERE id = ? AND expires_at > ?')
+    .get(id, isoIn(0)) as { checkout_params_json: string | null } | undefined;
+  return row?.checkout_params_json
+    ? (JSON.parse(row.checkout_params_json) as Stripe.Checkout.SessionCreateParams)
+    : null;
 }
 
-/** Mark paid. Idempotent: a second call keeps the first payment's data. */
+export function reserveAuditCheckout(
+  id: string,
+  params: Stripe.Checkout.SessionCreateParams,
+): Stripe.Checkout.SessionCreateParams | null {
+  const db = getStatsDB();
+  return db
+    .transaction(() => {
+      const info = db
+        .prepare(
+          `UPDATE audit_jobs SET checkout_params_json = COALESCE(checkout_params_json, ?)
+       WHERE id = ? AND paid_at IS NULL AND stripe_session_id IS NULL AND expires_at > ?`,
+        )
+        .run(JSON.stringify(params), id, isoIn(0));
+      if (!info.changes) return null;
+      const row = db
+        .prepare('SELECT checkout_params_json FROM audit_jobs WHERE id = ?')
+        .get(id) as {
+        checkout_params_json: string;
+      };
+      return JSON.parse(row.checkout_params_json) as Stripe.Checkout.SessionCreateParams;
+    })
+    .immediate();
+}
+
+/** Un attachement tardif ne doit remplacer ni un paiement ni une autre session. */
+export function attachAuditSession(id: string, sessionId: string): boolean {
+  return (
+    getStatsDB()
+      .prepare(
+        `UPDATE audit_jobs SET stripe_session_id = ?
+       WHERE id = ? AND paid_at IS NULL AND expires_at > ?
+         AND (stripe_session_id IS NULL OR stripe_session_id = ?)`,
+      )
+      .run(sessionId, id, isoIn(0), sessionId).changes > 0
+  );
+}
+
+export interface AuditPaymentResult {
+  status: 'paid' | 'already_paid' | 'additional_payment' | 'job_missing';
+  job: AuditJob | null;
+}
+
+/** Le premier paiement confirmé fixe la livraison et sa vente dans une même transaction. */
 export function markAuditPaid(
   id: string,
   payment: {
@@ -135,45 +184,53 @@ export function markAuditPaid(
     amount_minor: number | null;
     currency: string | null;
   },
-): AuditJob | null {
+): AuditPaymentResult {
   const db = getStatsDB();
-  const before = getAuditJob(id);
-  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  db.prepare(
-    `UPDATE audit_jobs
-        SET paid_at = COALESCE(paid_at, ?),
-            stripe_session_id = COALESCE(stripe_session_id, ?),
-            payer_email = COALESCE(payer_email, ?),
-            amount_paid_minor = COALESCE(amount_paid_minor, ?),
-            amount_paid_currency = COALESCE(amount_paid_currency, ?),
-            expires_at = CASE WHEN paid_at IS NULL THEN ? ELSE expires_at END
-      WHERE id = ?`,
-  ).run(
-    now,
-    payment.session_id,
-    payment.email,
-    payment.amount_minor,
-    payment.currency,
-    isoIn(PAID_TTL_HOURS),
-    id,
-  );
-  const after = getAuditJob(id);
-  if (before && !before.paid_at && after?.paid_at) {
-    db.prepare(
-      `INSERT INTO audit_sales (job_id, rows, tier, price_chf, amount_paid_minor, amount_paid_currency, stripe_session_id, lang)
+  return db
+    .transaction((): AuditPaymentResult => {
+      const before = getAuditJob(id);
+      // La vente survit à la purge : un autre événement du même paiement reste un rejeu.
+      const sale = db
+        .prepare('SELECT stripe_session_id FROM audit_sales WHERE job_id = ? ORDER BY id LIMIT 1')
+        .get(id) as { stripe_session_id: string | null } | undefined;
+      const paidSession =
+        sale?.stripe_session_id ?? (before?.paid_at ? before.stripe_session_id : null);
+      if (paidSession) {
+        return {
+          status: paidSession === payment.session_id ? 'already_paid' : 'additional_payment',
+          job: before,
+        };
+      }
+      if (!before) return { status: 'job_missing', job: null };
+      if (before.paid_at) return { status: 'additional_payment', job: before };
+      db.prepare(
+        `UPDATE audit_jobs SET paid_at = ?, stripe_session_id = ?, payer_email = ?,
+       amount_paid_minor = ?, amount_paid_currency = ?, expires_at = ? WHERE id = ?`,
+      ).run(
+        isoIn(0),
+        payment.session_id,
+        payment.email,
+        payment.amount_minor,
+        payment.currency,
+        isoIn(PAID_TTL_HOURS),
+        id,
+      );
+      db.prepare(
+        `INSERT INTO audit_sales (job_id, rows, tier, price_chf, amount_paid_minor, amount_paid_currency, stripe_session_id, lang)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      id,
-      after.rows,
-      after.tier,
-      after.price_chf,
-      payment.amount_minor,
-      payment.currency,
-      payment.session_id,
-      after.lang,
-    );
-  }
-  return after;
+      ).run(
+        id,
+        before.rows,
+        before.tier,
+        before.price_chf,
+        payment.amount_minor,
+        payment.currency,
+        payment.session_id,
+        before.lang,
+      );
+      return { status: 'paid', job: getAuditJob(id) };
+    })
+    .immediate();
 }
 
 export function countAuditDownload(id: string): void {
@@ -183,7 +240,7 @@ export function countAuditDownload(id: string): void {
 /** Remove what nobody may read any more. Cheap; called on every upload and status read. */
 export function purgeExpiredAuditJobs(now = new Date()): number {
   const cutoff = now.toISOString().replace('T', ' ').slice(0, 19);
-  const info = getStatsDB().prepare('DELETE FROM audit_jobs WHERE expires_at < ?').run(cutoff);
+  const info = getStatsDB().prepare('DELETE FROM audit_jobs WHERE expires_at <= ?').run(cutoff);
   return info.changes;
 }
 
@@ -226,7 +283,10 @@ export interface AuditStats {
   since: string;
   uploads: number;
   sales: number;
-  revenue_chf: number;
+  /** Total CHF connu à la commande, avant remboursements et frais ; jamais le catalogue. */
+  revenue_chf: number | null;
+  revenue_basis: 'stripe_checkout';
+  payment_amounts: { chf: number; other_currency: number; unknown: number };
   last_sale_at: string | null;
   conversion: number | null;
   /**
@@ -243,7 +303,14 @@ export interface AuditStats {
     internal: boolean;
   }>;
   /** The sales of the window, from the durable ledger. */
-  recent_sales: Array<{ paid_at: string; rows: number; tier: string; price_chf: number }>;
+  recent_sales: Array<{
+    paid_at: string;
+    rows: number;
+    tier: string;
+    price_chf: number;
+    amount_paid_minor: number | null;
+    amount_paid_currency: string | null;
+  }>;
 }
 
 /** Uploads (durable, from the operations log) and sales (durable ledger) over the period. */
@@ -257,11 +324,28 @@ export function auditStats(days: number): AuditStats {
       )
       .get(`-${days} days`) as { n: number }
   ).n;
+  // Un ancien montant absent reste inconnu. Les devises ne sont jamais additionnées.
   const sales = db
     .prepare(
-      `SELECT COUNT(*) n, COALESCE(SUM(price_chf), 0) chf, MAX(paid_at) last FROM audit_sales WHERE paid_at >= datetime('now', ?)`,
+      `WITH measured AS (
+         SELECT paid_at, amount_paid_minor, lower(trim(amount_paid_currency)) currency,
+                (typeof(amount_paid_minor) = 'integer' AND amount_paid_minor >= 0
+                 AND lower(trim(amount_paid_currency)) GLOB '[a-z][a-z][a-z]') valid_amount
+         FROM audit_sales WHERE paid_at >= datetime('now', ?)
+       )
+       SELECT COUNT(*) n, MAX(paid_at) last,
+              COALESCE(SUM(CASE WHEN valid_amount AND currency = 'chf' THEN amount_paid_minor ELSE 0 END), 0) chf_minor,
+              COUNT(CASE WHEN valid_amount AND currency = 'chf' THEN 1 END) chf_payments,
+              COUNT(CASE WHEN valid_amount AND currency != 'chf' THEN 1 END) other_currency_payments
+       FROM measured`,
     )
-    .get(`-${days} days`) as { n: number; chf: number; last: string | null };
+    .get(`-${days} days`) as {
+    n: number;
+    last: string | null;
+    chf_minor: number;
+    chf_payments: number;
+    other_currency_payments: number;
+  };
   const uploadRows = db
     .prepare(
       `SELECT created_at AS at, error_detail AS detail, key_prefix
@@ -303,7 +387,8 @@ export function auditStats(days: number): AuditStats {
   });
   const recentSales = db
     .prepare(
-      `SELECT paid_at, rows, tier, price_chf FROM audit_sales WHERE paid_at >= datetime('now', ?)
+      `SELECT paid_at, rows, tier, price_chf, amount_paid_minor, amount_paid_currency
+       FROM audit_sales WHERE paid_at >= datetime('now', ?)
        ORDER BY paid_at DESC LIMIT 20`,
     )
     .all(`-${days} days`) as AuditStats['recent_sales'];
@@ -312,7 +397,13 @@ export function auditStats(days: number): AuditStats {
     since,
     uploads,
     sales: sales.n,
-    revenue_chf: sales.chf,
+    revenue_chf: sales.chf_payments > 0 || sales.n === 0 ? sales.chf_minor / 100 : null,
+    revenue_basis: 'stripe_checkout',
+    payment_amounts: {
+      chf: sales.chf_payments,
+      other_currency: sales.other_currency_payments,
+      unknown: sales.n - sales.chf_payments - sales.other_currency_payments,
+    },
     last_sale_at: sales.last,
     conversion: uploads > 0 ? Math.round((sales.n / uploads) * 1000) / 1000 : null,
     recent_uploads: recentUploads,

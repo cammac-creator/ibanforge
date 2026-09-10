@@ -19,6 +19,7 @@
  * webhooks aggressively, and we must not mint the same key twice.
  */
 import { Hono } from 'hono';
+import { createHash } from 'node:crypto';
 import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
 import {
@@ -31,7 +32,7 @@ import {
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
-import { notifyOps } from '../lib/ops-alert.js';
+import { notifyOps, opsFail } from '../lib/ops-alert.js';
 import {
   sendApiKeyEmail,
   sendSubscriptionKeyEmail,
@@ -261,26 +262,55 @@ export function processStripeEvent(event: Stripe.Event): {
   // first payment's data if Stripe retries.
   const auditJobId = session.metadata?.audit_job;
   if (typeof auditJobId === 'string' && auditJobId !== '') {
-    const paidJob = markAuditPaid(auditJobId, {
-      session_id: session.id,
-      email: session.customer_email ?? session.customer_details?.email ?? null,
-      amount_minor: session.amount_total ?? null,
-      currency: session.currency ?? null,
-    });
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
-      event.id,
-      event.type,
-    );
-    if (paidJob?.payer_email) {
+    const sessionHash = createHash('sha256').update(session.id).digest('hex');
+    const { result, notify } = db
+      .transaction(() => {
+        const payment = markAuditPaid(auditJobId, {
+          session_id: session.id,
+          email: session.customer_email ?? session.customer_details?.email ?? null,
+          amount_minor: session.amount_total ?? null,
+          currency: session.currency ?? null,
+        });
+        db.prepare(
+          'INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
+        ).run(event.id, event.type);
+        // Un reçu par paiement, même si Stripe envoie plusieurs événements distincts.
+        // Le préfixe est séparé des evt_ Stripe et ne contient aucun lien d'accès.
+        const notice = db
+          .prepare(
+            'INSERT OR IGNORE INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
+          )
+          .run(`audit-notice:${sessionHash}`, `audit:${payment.status}`);
+        return { result: payment, notify: notice.changes > 0 };
+      })
+      .immediate();
+    const incident = result.status === 'job_missing' || result.status === 'additional_payment';
+    const paidJob = incident ? null : result.job;
+    if (incident && notify) {
+      // L'événement reste reçu, mais aucune livraison ni remboursement n'est prétendu.
+      // Seuls les journaux privés portent la référence ; jamais le lien d'accès dans OPS.
+      console.error('[audit-payment]', result.status, {
+        event_id: event.id,
+        audit_job: auditJobId,
+      });
+      if (!process.env.VITEST) {
+        void opsFail(
+          `audit:${result.status}:${sessionHash}`,
+          'Paiement audit à examiner dans les outils privés. Aucune nouvelle livraison confirmée.',
+          1,
+        );
+      }
+    }
+    if (notify && paidJob?.payer_email) {
       sendAuditReadyEmail({
         to: paidJob.payer_email,
         lang: paidJob.lang,
-        link: `https://ibanforge.com/${paidJob.lang}/audit/done?job=${paidJob.id}&session_id=${encodeURIComponent(session.id)}`,
+        link: `https://ibanforge.com/${paidJob.lang}/audit/done?job=${paidJob.id}&session_id=${encodeURIComponent(paidJob.stripe_session_id!)}`,
         rows: paidJob.rows,
         price_chf: paidJob.price_chf,
       });
     }
-    if (paidJob && !process.env.VITEST) {
+    if (notify && paidJob && result.status === 'paid' && !process.env.VITEST) {
       const who = paidJob.payer_email
         ? `<mail>@${paidJob.payer_email.split('@')[1]}`
         : 'e-mail inconnu';
@@ -290,7 +320,14 @@ export function processStripeEvent(event: Stripe.Event): {
     }
     return {
       status: 200,
-      body: { received: true, event_id: event.id, audit_job: auditJobId, paid: paidJob !== null },
+      body: {
+        received: true,
+        event_id: event.id,
+        audit_job: auditJobId,
+        paid: !incident,
+        delivery: result.status,
+        report_available: paidJob !== null,
+      },
     };
   }
 

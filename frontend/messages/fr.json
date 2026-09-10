@@ -677,9 +677,9 @@
         "audit": {
           "title": "Audit de fichier, {days} derniers jours",
           "uploads": "fichiers déposés",
-          "sales": "payés",
-          "revenue": "CHF",
-          "conversion": "conversion",
+          "sales": "rapports débloqués",
+          "revenue": "montants payés (CHF)",
+          "conversion": "rapports / dépôts",
           "lastSale": "dernière vente",
           "empty": "Aucun fichier déposé pour l'instant.",
           "recent": "les dépôts, du plus récent au plus ancien",
@@ -687,7 +687,14 @@
           "rowsUnknown": "taille inconnue",
           "internal": "clé interne (test)",
           "withKey": "clé {key}",
-          "noKey": "sans clé (page publique)"
+          "noKey": "sans clé (page publique)",
+          "scope": "Périmètre des mesures",
+          "known": "{known, plural, one {# rapport avec montant CHF connu} other {# rapports avec montant CHF connu}} sur {sales, plural, one {# rapport débloqué.} other {# rapports débloqués.}}",
+          "unknown": "{count, plural, one {# rapport sans montant exploitable : exclu du total.} other {# rapports sans montant exploitable : exclus du total.}}",
+          "otherCurrency": "{count, plural, one {# rapport dans une autre devise : exclu du total CHF.} other {# rapports dans une autre devise : exclus du total CHF.}}",
+          "unavailable": "Montants payés indisponibles. Aucun prix catalogue utilisé à leur place.",
+          "revenueNote": "Montants confirmés par Stripe à la commande, remises comprises, avant remboursements et frais. Ce total n’est pas un bénéfice.",
+          "ratioNote": "Rapports et dépôts de la période, y compris les exemples et les essais internes. Ce ratio ne mesure pas la conversion des visiteurs ; il peut dépasser 100 %."
         },
         "doors": {
           "title": "Les actions sur le site",
@@ -1804,8 +1811,12 @@
         "tooLarge": "Le fichier dépasse 5 Mo.",
         "unreadable": "Le fichier n'a pas pu être lu comme CSV ou XLSX.",
         "expired": "Cet audit a expiré. Déposez le fichier à nouveau.",
-        "payments": "Le paiement par carte n'est pas disponible pour le moment. Écrivez à support@ibanforge.com.",
-        "generic": "Quelque chose n'a pas marché. Réessayez ou écrivez à support@ibanforge.com."
+        "payments": "Le paiement est momentanément indisponible. Réessayez dans quelques secondes. Si le problème persiste, contactez support@ibanforge.com.",
+        "generic": "Quelque chose n'a pas marché. Réessayez ou écrivez à support@ibanforge.com.",
+        "checkoutExpired": "Le délai pour payer ce rapport est terminé. Déposez le fichier à nouveau avant de payer.",
+        "checkoutPending": "Votre paiement est en cours de préparation ou de confirmation. Réessayez dans quelques secondes.",
+        "paymentReview": "Ce paiement doit être vérifié. N’effectuez pas un nouvel achat ; contactez support@ibanforge.com.",
+        "alreadyPaid": "Ce rapport est déjà payé. Ne payez pas une seconde fois ; utilisez votre lien de téléchargement ou contactez support@ibanforge.com."
       },
       "sample": "Essayer avec un fichier d’exemple",
       "dropHere": "Lâchez le fichier ici"

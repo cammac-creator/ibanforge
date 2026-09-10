@@ -35,11 +35,14 @@ import {
   getAuditJob,
   getAuditReport,
   attachAuditSession,
+  reserveAuditCheckout,
+  getReservedAuditCheckout,
   markAuditPaid,
   countAuditDownload,
   purgeExpiredAuditJobs,
   PAID_TTL_HOURS,
   UNPAID_TTL_HOURS,
+  type AuditPaymentResult,
 } from '../lib/audit-jobs.js';
 import { extractClientIp, recordOperation } from '../lib/stats.js';
 import { SAMPLE_CREDITOR_CSV } from '../lib/audit-sample.js';
@@ -262,6 +265,7 @@ audit.get('/v1/audit/sample-report.xlsx', (c) => {
 });
 
 audit.post('/v1/audit/checkout/:job', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const job = getAuditJob(c.req.param('job'));
   if (!job)
     return c.json(
@@ -288,14 +292,18 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
       },
       503,
     );
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const locale = langOf(body.locale ?? job.lang);
   const email =
     typeof body.email === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.email)
       ? body.email
       : undefined;
-  const session = await stripe.checkout.sessions.create({
+  // Le paiement ferme avant le rapport, sans prolonger les deux heures du dépôt.
+  const checkoutExpiresAt =
+    Math.floor(Date.parse(`${job.expires_at.replace(' ', 'T')}Z`) / 1000) - 300;
+  const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'payment',
+    payment_method_types: ['card'],
+    expires_at: checkoutExpiresAt,
     locale,
     // A 100 % promotion code is how the operator proves the paid path without a card.
     allow_promotion_codes: true,
@@ -317,9 +325,105 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
     metadata: { audit_job: job.id, rows: String(job.rows), tier: job.tier },
     success_url: `${SITE}/${locale}/audit/done?job=${job.id}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${SITE}/${locale}/audit?job=${job.id}&cancelled=1`,
-  });
-  attachAuditSession(job.id, session.id);
-  return c.json({ url: session.url, session_id: session.id, price_chf: job.price_chf });
+  };
+  const expired = () =>
+    c.json(
+      {
+        error: 'checkout_expired',
+        message: 'The payment window has closed. Upload the file again before paying.',
+      },
+      410,
+    );
+  const pending = () =>
+    c.json(
+      {
+        error: 'checkout_in_progress',
+        message: 'This payment is already being prepared. Try again in a few seconds.',
+      },
+      409,
+    );
+  try {
+    let session: Stripe.Checkout.Session;
+    if (job.stripe_session_id) {
+      session = await stripe.checkout.sessions.retrieve(job.stripe_session_id);
+    } else {
+      let reserved = getReservedAuditCheckout(job.id);
+      if (!reserved) {
+        // La borne Stripe ne concerne que la première création, pas son rejeu.
+        if (checkoutExpiresAt - Math.floor(Date.now() / 1000) < 1805) return expired();
+        reserved = reserveAuditCheckout(job.id, params);
+      }
+      if (!reserved) return pending();
+      if (!reserved.expires_at || reserved.expires_at <= Date.now() / 1000) return expired();
+      session = await stripe.checkout.sessions.create(reserved, {
+        idempotencyKey: `audit:${job.id}`,
+      });
+    }
+    if (session.metadata?.audit_job !== job.id) {
+      return c.json(
+        { error: 'payment_session_mismatch', message: 'This payment does not match the audit.' },
+        409,
+      );
+    }
+    if (session.payment_status === 'paid' || session.payment_status === 'no_payment_required') {
+      const result = markAuditPaid(job.id, {
+        session_id: session.id,
+        email: session.customer_email ?? session.customer_details?.email ?? null,
+        amount_minor: session.amount_total,
+        currency: session.currency,
+      });
+      if ((result.status === 'paid' || result.status === 'already_paid') && result.job) {
+        return c.json({
+          url: `${SITE}/${result.job.lang}/audit/done?job=${job.id}&session_id=${encodeURIComponent(session.id)}`,
+          session_id: session.id,
+          price_chf: job.price_chf,
+        });
+      }
+      return c.json(
+        {
+          error: result.status,
+          message: 'The payment requires review. No new payment was created.',
+        },
+        409,
+      );
+    }
+    if (session.status === 'expired') return expired();
+    if (session.status !== 'open') return pending();
+    // Une ancienne session peut encore porter l'échéance Stripe par défaut d'une journée.
+    if (session.expires_at > checkoutExpiresAt || session.expires_at <= Date.now() / 1000) {
+      await stripe.checkout.sessions.expire(session.id);
+      return expired();
+    }
+    if (!session.url) return pending();
+    if (!attachAuditSession(job.id, session.id)) {
+      const current = getAuditJob(job.id);
+      if (!current) return expired();
+      if (current.paid_at && current.stripe_session_id === session.id) {
+        return c.json({
+          url: `${SITE}/${current.lang}/audit/done?job=${job.id}&session_id=${encodeURIComponent(session.id)}`,
+          session_id: session.id,
+          price_chf: job.price_chf,
+        });
+      }
+      // Ne pas exposer une deuxième session ouverte si un paiement a gagné la course.
+      if (current.paid_at) await stripe.checkout.sessions.expire(session.id);
+      return pending();
+    }
+    return c.json({ url: session.url, session_id: session.id, price_chf: job.price_chf });
+  } catch (error) {
+    if (error instanceof Stripe.errors.StripeInvalidRequestError && error.param === 'expires_at') {
+      // Une réservation tardivement rejouée n'avait peut-être jamais atteint Stripe.
+      return expired();
+    }
+    // Reprendre la même réservation au prochain essai, même si Stripe a créé la session.
+    return c.json(
+      {
+        error: 'payments_unavailable',
+        message: 'Payment could not be resumed. Try again shortly.',
+      },
+      503,
+    );
+  }
 });
 
 audit.get('/v1/audit/status/:job', async (c) => {
@@ -332,6 +436,7 @@ audit.get('/v1/audit/status/:job', async (c) => {
       404,
     );
   const sessionId = c.req.query('session_id') ?? null;
+  let delivery: AuditPaymentResult['status'] | undefined;
   // The webhook is the normal path. When the customer is back before it
   // landed, ask Stripe directly rather than making them refresh.
   if (!job.paid_at && sessionId && sessionId === job.stripe_session_id) {
@@ -343,20 +448,31 @@ audit.get('/v1/audit/status/:job', async (c) => {
           session.metadata?.audit_job === id &&
           (session.payment_status === 'paid' || session.payment_status === 'no_payment_required')
         ) {
-          job =
-            markAuditPaid(id, {
-              session_id: session.id,
-              email: session.customer_email ?? session.customer_details?.email ?? null,
-              amount_minor: session.amount_total,
-              currency: session.currency,
-            }) ?? job;
+          const result = markAuditPaid(id, {
+            session_id: session.id,
+            email: session.customer_email ?? session.customer_details?.email ?? null,
+            amount_minor: session.amount_total,
+            currency: session.currency,
+          });
+          delivery = result.status;
         }
       } catch {
         // Stripe unreachable: the page keeps polling; the webhook will land.
       }
     }
   }
-  return c.json(publicJob(job, { sessionId }));
+  // Le rapport peut avoir expiré ou être devenu payé pendant la lecture Stripe.
+  job = getAuditJob(id);
+  if (!job) {
+    return c.json(
+      { error: 'job_not_found', message: 'This audit has expired or never existed.' },
+      404,
+    );
+  }
+  return c.json({
+    ...publicJob(job, { sessionId: delivery === 'additional_payment' ? null : sessionId }),
+    ...(delivery ? { delivery } : {}),
+  });
 });
 
 audit.get('/v1/audit/report/:job', (c) => {

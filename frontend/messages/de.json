@@ -677,9 +677,9 @@
         "audit": {
           "title": "Kreditorendatei-Prüfung, letzte {days} Tage",
           "uploads": "hochgeladene Dateien",
-          "sales": "bezahlt",
-          "revenue": "CHF",
-          "conversion": "Konversion",
+          "sales": "freigeschaltete Berichte",
+          "revenue": "bezahlte Beträge (CHF)",
+          "conversion": "Berichte / Uploads",
           "lastSale": "letzter Verkauf",
           "empty": "Noch keine Datei hochgeladen.",
           "recent": "die Uploads, neueste zuerst",
@@ -687,7 +687,14 @@
           "rowsUnknown": "Grösse unbekannt",
           "internal": "interner Schlüssel (Test)",
           "withKey": "Schlüssel {key}",
-          "noKey": "ohne Schlüssel (öffentliche Seite)"
+          "noKey": "ohne Schlüssel (öffentliche Seite)",
+          "scope": "Umfang der Messung",
+          "known": "{known, plural, one {# Bericht mit bekanntem CHF-Betrag} other {# Berichte mit bekanntem CHF-Betrag}} von {sales, plural, one {# freigeschalteten Bericht.} other {# freigeschalteten Berichten.}}",
+          "unknown": "{count, plural, one {# Bericht ohne verwertbaren Betrag: nicht im Gesamtbetrag enthalten.} other {# Berichte ohne verwertbaren Betrag: nicht im Gesamtbetrag enthalten.}}",
+          "otherCurrency": "{count, plural, one {# Bericht in einer anderen Währung: nicht im CHF-Gesamtbetrag enthalten.} other {# Berichte in einer anderen Währung: nicht im CHF-Gesamtbetrag enthalten.}}",
+          "unavailable": "Bezahlte Beträge nicht verfügbar. Katalogpreise werden nicht als Ersatz verwendet.",
+          "revenueNote": "Von Stripe beim Checkout bestätigte Beträge, inklusive Rabatten, vor Rückerstattungen und Gebühren. Dieser Gesamtbetrag ist kein Gewinn.",
+          "ratioNote": "Berichte und Uploads im Zeitraum, einschließlich Beispielen und internen Tests. Das ist keine Besucher-Konversionsrate; das Verhältnis kann über 100 % liegen."
         },
         "doors": {
           "title": "Aktionen auf der Website",
@@ -1804,8 +1811,12 @@
         "tooLarge": "Die Datei ist grösser als 5 MB.",
         "unreadable": "Die Datei konnte nicht als CSV oder XLSX gelesen werden.",
         "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
-        "payments": "Kartenzahlung ist derzeit nicht verfügbar. Schreiben Sie an support@ibanforge.com.",
-        "generic": "Etwas ist schiefgelaufen. Versuchen Sie es erneut oder schreiben Sie an support@ibanforge.com."
+        "payments": "Die Zahlung ist vorübergehend nicht verfügbar. Versuchen Sie es in wenigen Sekunden erneut. Falls das Problem weiterhin besteht, wenden Sie sich an support@ibanforge.com.",
+        "generic": "Etwas ist schiefgelaufen. Versuchen Sie es erneut oder schreiben Sie an support@ibanforge.com.",
+        "checkoutExpired": "Die Zahlungsfrist für diesen Bericht ist abgelaufen. Laden Sie die Datei vor der Zahlung erneut hoch.",
+        "checkoutPending": "Ihre Zahlung wird vorbereitet oder bestätigt. Versuchen Sie es in wenigen Sekunden erneut.",
+        "paymentReview": "Diese Zahlung muss geprüft werden. Kaufen Sie nicht erneut; wenden Sie sich an support@ibanforge.com.",
+        "alreadyPaid": "Dieser Bericht ist bereits bezahlt. Zahlen Sie nicht erneut; nutzen Sie Ihren Download-Link oder wenden Sie sich an support@ibanforge.com."
       },
       "sample": "Mit einer Beispieldatei testen",
       "dropHere": "Hier ablegen"
