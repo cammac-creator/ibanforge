@@ -356,7 +356,14 @@ of it · Vercel's configuration exists only in its dashboard, so the site cannot
 reconstructed from a clone · several Dependabot pull requests sit green and unmerged, and
 the frontend limit has been hit before, which silently stops security updates too.
 
-**Light but worth a line.** Four versions were published without a git tag, which makes the
+**Light but worth a line.** The comparison page states a competitor's Standard plan as 60 000
+requests **per month** for $99. Re-read on 10 September, that vendor's own API page reads
+"$99/month (billed annually)" and "60 000 requests / year" — the same price over a period twelve
+times longer. The figure predates the September rewrite, which only reformulated the line around
+it, and a single automated read of a page driven by a monthly/annual toggle and a volume slider
+is not enough to overwrite a claim about a named third party. Check it by eye with the toggle set
+to monthly, then correct or confirm — the page invites corrections in writing, so leaving it
+wrong costs more than the fix · four versions were published without a git tag, which makes the
 release notes of their successors wrong · one SDK is on the artifact repository but absent
 from its public search index · a handful of orphaned frontend components and one dead
 module that still carries a hostname · the content security policy has never left
