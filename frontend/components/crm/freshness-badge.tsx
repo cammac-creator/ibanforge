@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toZurich } from '@/lib/crm/zurich';
 
 /**
  * Data that states its age. Both CRM pages are server-fetched then live for a
@@ -22,16 +23,9 @@ export function FreshnessBadge({ fetchedAtIso }: { fetchedAtIso: string }) {
     return () => clearInterval(id);
   }, [fetchedAtIso]);
 
-  // Formatted in a FIXED zone, so the server (UTC on Vercel) and the browser
-  // (Zurich) print the same text for the same instant. getHours() printed the
-  // runtime's local hour on each side: « 08:35 » in the HTML, « 10:35 » after
-  // hydration, and React 19 reported the mismatch (#418) on every page that
-  // carries this badge — which is every dashboard page.
-  const hhmm = new Intl.DateTimeFormat('fr-CH', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Zurich',
-  }).format(new Date(fetchedAtIso));
+  // Même heure suisse des deux côtés, sans formatage natif variable selon ICU.
+  // Normaliser d'abord en UTC conserve aussi les entrées portant un décalage.
+  const hhmm = toZurich(new Date(fetchedAtIso).toISOString()).slice(11, 16);
   const stale = ageMin >= 15;
 
   return (

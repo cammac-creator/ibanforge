@@ -33,6 +33,26 @@ async function render(value: unknown, locale = 'fr') {
 
 describe('Montants conservés des packs et limites visibles', () => {
   it.each([
+    ['en', 'Known USD amount for 1 reference out of 1 retained Stripe reference.'],
+    ['fr', 'Montant USD connu pour 1 référence sur 1 référence Stripe retenue.'],
+    ['de', 'Bekannter USD-Betrag für 1 von 1 berücksichtigten Stripe-Referenz.'],
+  ])('accorde une référence unique en %s', async (locale, coverage) => {
+    const html = await render(sample({ groups: 1, usd_known_groups: 1, usd_zero_groups: 0,
+      amount_missing_groups: 0, other_currency_groups: 0, invalid_amount_groups: 0, conflicting_groups: 0 }), locale);
+    expect(html).toContain(coverage);
+  });
+
+  it.each([
+    ['en', 'Known USD amount for 1 reference out of 2 retained Stripe references.'],
+    ['fr', 'Montant USD connu pour 1 référence sur 2 références Stripe retenues.'],
+    ['de', 'Bekannter USD-Betrag für 1 von 2 berücksichtigten Stripe-Referenzen.'],
+  ])('accorde séparément le montant connu et les références retenues en %s', async (locale, coverage) => {
+    const html = await render(sample({ groups: 2, usd_known_groups: 1, usd_zero_groups: 0,
+      amount_missing_groups: 1, other_currency_groups: 0, invalid_amount_groups: 0, conflicting_groups: 0 }), locale);
+    expect(html).toContain(coverage);
+  });
+
+  it.each([
     ['fr', '1 234,50 USD', 'Montant USD connu pour 2 références sur 6', 'remboursements', 'une autre devise', 'pas rapprochées'],
     ['en', '1,234.50 USD', 'Known USD amount for 2 references out of 6', 'refunds', 'another currency', 'not reconciled'],
     ['de', '1 234,50 USD', 'Bekannter USD-Betrag für 2 von 6', 'Rückerstattungen', 'anderer Währung', 'nicht mit Abwicklungen abgeglichen'],

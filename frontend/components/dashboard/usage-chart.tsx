@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocale } from 'next-intl';
+import { formatGrouped } from '@/lib/format-grouped';
 
 const VIOLET = '#a855f7';
 const VIOLET_DIM = '#6d28d9';
@@ -42,6 +44,7 @@ export function UsageChart({
   series: number[];
   months: string[];
 }) {
+  const locale = useLocale();
   const dailyTotal = days.reduce((a, d) => a + d.count, 0);
   const monthlyTotal = series.reduce((a, b) => a + b, 0);
   const [mode, setMode] = useState<Mode>(dailyTotal > 0 ? 'day' : 'month');
@@ -99,7 +102,7 @@ export function UsageChart({
               </button>
             ))}
           </div>
-          <p className="shrink-0 font-mono text-[11px] text-violet-300">{total.toLocaleString('fr-CH')} appels</p>
+          <p className="shrink-0 font-mono text-[11px] text-violet-300">{formatGrouped(total, locale)} appels</p>
         </div>
       </div>
       <div className="mt-2 flex h-[52px] items-end gap-[3px]">

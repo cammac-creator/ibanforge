@@ -1,5 +1,6 @@
 'use client';
 
+import { formatStamp } from '@/lib/crm/format';
 import {
   ComposedChart,
   Bar,
@@ -66,10 +67,7 @@ export function StackedBarChart({ data, bars, band, markers }: StackedBarChartPr
           tick={{ fill: '#71717a', fontSize: 11 }}
           axisLine={{ stroke: '#27272a' }}
           tickLine={false}
-          tickFormatter={(v: string) => {
-            const d = new Date(v + 'T00:00:00');
-            return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
-          }}
+          tickFormatter={(v: string) => formatStamp(v) ?? v}
         />
         <YAxis
           tick={{ fill: '#71717a', fontSize: 11 }}

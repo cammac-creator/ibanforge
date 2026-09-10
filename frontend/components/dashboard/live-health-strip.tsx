@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { formatGrouped } from '@/lib/format-grouped';
 import { InfoDot } from './info-dot';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ibanforge-production.up.railway.app';
-const LOCALE_TAG: Record<string, string> = { en: 'en-US', fr: 'fr-CH', de: 'de-CH' };
 
 interface HealthData {
   status: string;
@@ -62,9 +62,8 @@ function staleness(lastWriteAt: string | null | undefined): { stale: boolean; mi
  */
 export function LiveHealthStrip({ lastWriteAt }: { lastWriteAt?: string | null }) {
   const locale = useLocale();
-  const tag = LOCALE_TAG[locale] ?? 'en-US';
   const t = useTranslations('dashboard');
-  const fmt = (n: number) => n.toLocaleString(tag);
+  const fmt = (n: number) => formatGrouped(n, locale);
 
   const [online, setOnline] = useState<boolean | null>(null);
   const [ms, setMs] = useState(0);
