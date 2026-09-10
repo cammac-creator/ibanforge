@@ -348,7 +348,7 @@ export function rotateApiKey(oldKey: string): {
   const oldHash = hashKey(oldKey);
   const row = db
     .prepare(
-      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit FROM api_keys WHERE key_hash = ? AND active = 1',
+      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit, stripe_subscription_id FROM api_keys WHERE key_hash = ? AND active = 1',
     )
     .get(oldHash) as
     | {
@@ -357,6 +357,7 @@ export function rotateApiKey(oldKey: string): {
         credits_remaining: number | null;
         credits_total: number | null;
         no_recredit: number | null;
+        stripe_subscription_id: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -368,8 +369,9 @@ export function rotateApiKey(oldKey: string): {
   const tx = db.transaction(() => {
     // Carry the opt-out flag across — without it, a key the cohort radar took
     // off the monthly reset would clear itself in one self-service /rotate call.
+    // Conserver le lien d’abonnement : sa résiliation doit révoquer la nouvelle clé.
     db.prepare(
-      'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, no_recredit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, no_recredit, stripe_subscription_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
       newHash,
       keyPrefix,
@@ -378,6 +380,7 @@ export function rotateApiKey(oldKey: string): {
       row.credits_remaining,
       row.credits_total,
       row.no_recredit ?? 0,
+      row.stripe_subscription_id,
     );
     // Move the usage ledger to the new key hash too. Otherwise the lifetime sum
     // (and the plain monthly count) restart at zero on rotation — which would

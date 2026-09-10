@@ -4,6 +4,7 @@ import { processStripeEvent } from './stripe-webhook.js';
 import {
   consumeOneTimeKey,
   validateApiKey,
+  rotateApiKey,
   OEM_MONTHLY_LIMIT,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
@@ -275,6 +276,50 @@ describe('processStripeEvent — Pro subscription (public monthly tier)', () => 
     expect(second.body.key_prefix).toBe(first.body.key_prefix);
     expect(second.notify).toBeUndefined();
   });
+});
+
+describe('résiliation après rotation d’une clé abonnée', () => {
+  it.each(['oem', 'pro'] as const)(
+    'révoque la dernière clé %s après deux rotations et reste idempotent',
+    (plan) => {
+      const run = Date.now();
+      const sessionId = `cs_test_${plan}_rotation_${run}`;
+      const subscriptionId = `sub_test_${plan}_rotation_${run}`;
+      const checkout = plan === 'oem' ? mockOemEvent : mockProEvent;
+      processStripeEvent(
+        checkout({ id: `evt_${plan}_rotation_${run}`, sessionId, subscriptionId }),
+      );
+      const delivered = consumeOneTimeKey(sessionId)!;
+      const first = rotateApiKey(delivered.api_key)!;
+      const last = rotateApiKey(first.api_key)!;
+
+      expect(validateApiKey(delivered.api_key).valid).toBe(false);
+      expect(validateApiKey(first.api_key).valid).toBe(false);
+      expect(validateApiKey(last.api_key).valid).toBe(true);
+      expect(validateApiKey(last.api_key).monthlyLimit).toBe(
+        plan === 'oem' ? OEM_MONTHLY_LIMIT : PRO_MONTHLY_LIMIT,
+      );
+
+      const cancellation = mockSubscriptionDeleted({
+        id: `evt_${plan}_rotation_cancel_${run}`,
+        subscriptionId,
+      });
+      const canceled = processStripeEvent(cancellation);
+      expect(canceled.body.key_deactivated).toBe(last.key_prefix);
+      expect(validateApiKey(last.api_key).valid).toBe(false);
+      expect(rotateApiKey(last.api_key)).toBeNull();
+
+      // Une répétition de la résiliation ou du paiement ne réactive aucune clé.
+      const countAfterCancellation = keyCount();
+      expect(processStripeEvent(cancellation).body.idempotent).toBe(true);
+      const replayedCheckout = processStripeEvent(
+        checkout({ id: `evt_${plan}_rotation_retry_${run}`, sessionId, subscriptionId }),
+      );
+      expect(replayedCheckout.notify).toBeUndefined();
+      expect(keyCount()).toBe(countAfterCancellation);
+      expect(validateApiKey(last.api_key).valid).toBe(false);
+    },
+  );
 });
 
 describe('processStripeEvent — idempotency', () => {
