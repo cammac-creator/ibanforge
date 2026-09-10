@@ -60,8 +60,8 @@
     },
     "badge": "En ligne · {rate} % sans erreur sur 30 jours",
     "hero": {
-      "title": "L’IBAN entre. Le BIC, la banque et le verdict SEPA <accent>sortent</accent>.",
-      "description": "<b>{bic}</b> entrées BIC, <b>{ch}</b> entrées de clearing SIX, screening OFAC/EU/UN : les données que les éditeurs de facturation suisses et DACH doivent servir avant les échéances de novembre 2026. REST, SDK, MCP.",
+      "title": "Validez les IBAN. Retrouvez les BIC. <accent>Dans vos logiciels.</accent>",
+      "description": "Pour vos logiciels de gestion, de facturation et de paie, en Suisse et à l’international. Validez les IBAN et retrouvez banque et BIC parmi <b>{bic}</b> entrées, selon la couverture de chaque pays.",
       "demo": {
         "calling": "appel en cours…",
         "live": "{server} ms serveur · {rtt} ms aller-retour, mesurés sur cet appel",
@@ -72,10 +72,12 @@
         "bodyAria": "Réponse de l’API"
       },
       "cta": {
-        "tryFree": "Essayer une requête",
-        "getKey": "Obtenir une clé gratuite"
+        "tryFree": "Tester l’API",
+        "getKey": "Obtenir une clé gratuite",
+        "audit": "Contrôler un fichier fournisseurs"
       },
-      "altDoor": "Pas développeur ? Auditez votre fichier de créanciers →"
+      "altDoor": "Pas développeur ? Auditez votre fichier de créanciers →",
+      "trialNote": "Essai API sans inscription. Aperçu de fichier fournisseurs gratuit."
     },
     "features": {
       "0": {
@@ -267,18 +269,18 @@
         "ts": "SDK TypeScript / JavaScript",
         "py": "SDK Python",
         "java": "SDK Java 17+ · Maven Central",
-        "dotnet": "SDK .NET 8 · dotnet add package IBANforge.Sdk",
+        "dotnet": "SDK .NET 8 · disponible sur NuGet",
         "mcp": "Serveur MCP · Claude, Cursor, Cline",
-        "n8n": "Nœud n8n",
-        "odoo": "Module Odoo 18 · BIC et banque remplis à la saisie",
+        "n8n": "Nœud n8n 0.1.1 · auto-hébergé",
+        "odoo": "Module Odoo 18 · modules personnalisés requis",
         "sheets": "Complément Google Sheets",
         "postman": "Collection Postman"
       }
     },
     "audit": {
-      "heading": "Vous payez des fournisseurs ? Auditez votre fichier de créanciers",
-      "text": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté, tout de suite.",
-      "cta": "Auditer un fichier"
+      "heading": "Contrôlez votre fichier fournisseurs avant le prochain paiement",
+      "text": "Déposez un CSV ou un fichier Excel et consultez gratuitement les anomalies détectées. Le classeur annoté coûte 149 CHF jusqu’à 5 000 lignes, ou 349 CHF jusqu’à 20 000 lignes.",
+      "cta": "Contrôler un fichier fournisseurs"
     },
     "badgeFallback": "API en ligne · état en direct",
     "share": {
@@ -408,7 +410,7 @@
       },
       "3": {
         "question": "Et pour les gros volumes ?",
-        "answer": "La tarification à l'appel évolue linéairement sans limite de débit. Pour de très gros volumes (millions d'appels/mois), ou pour intégrer l'API dans votre propre produit, la voie est celle des éditeurs (Éditeur/OEM) : tarification au volume, SLA écrit et engagements de support. Elle est décrite sur notre page éditeurs (ibanforge.com/fr/vendors), et support@ibanforge.com ouvre la discussion."
+        "answer": "Pour des volumes dépassant les offres publiées, un SLA écrit ou des engagements de support particuliers, consultez notre page éditeurs (ibanforge.com/fr/vendors) et contactez support@ibanforge.com. L’intégration de l’API dans votre produit est déjà permise dans les quotas et conditions de votre offre. Elle n’autorise pas l’extraction globale des bases ni leur revente comme jeu de données autonome."
       },
       "heading": "Questions fréquentes"
     },
@@ -445,7 +447,7 @@
     },
     "oem": {
       "label": "Éditeur / OEM",
-      "text": "Vous intégrez IBANforge dans votre propre produit ? Licence éditeur / OEM à partir de 149 $ par mois (50 000 requêtes, SLA écrit, facturation UE) : parlons-en.",
+      "text": "Besoin de 50 000 requêtes par mois, d’un SLA écrit ou d’engagements de support ? L’offre éditeur/OEM démarre à 149 $ par mois. Une intégration ordinaire peut utiliser Pro, dans les limites et conditions de l’offre.",
       "cta": "Voir la page éditeurs →"
     },
     "audit": {
@@ -457,7 +459,7 @@
       "label": "Abonnement Pro",
       "title": "Vous préférez une facture mensuelle fixe ?",
       "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro le 1er, résiliable à tout moment. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
-      "note": "Besoin de 50 000 requêtes par mois, d'un SLA écrit ou d'un droit d'intégration ? C'est la licence éditeur / OEM, plus bas.",
+      "note": "L’intégration dans votre produit est permise dans les limites et conditions de votre offre. Pour un SLA écrit, des engagements de support ou des volumes plus élevés, consultez l’offre éditeur/OEM.",
       "price": "29 $",
       "per": "/ mois",
       "cta": "Souscrire à Pro"
@@ -688,14 +690,14 @@
           "noKey": "sans clé (page publique)"
         },
         "doors": {
-          "title": "Les portes de l'accueil",
-          "lead": "Ce que les visiteurs cliquent sur la page d'accueil : la semaine pour le pouls, le mois pour la forme.",
+          "title": "Les actions sur le site",
+          "lead": "Clics sur les liens suivis des pages publiques, sur 7 et 30 jours. Ce sont des actions, pas des visiteurs uniques. La mesure couvrait auparavant seulement l’accueil : les périodes qui précèdent cet élargissement ne sont pas directement comparables.",
           "empty": "Aucun clic mesuré pour l'instant.",
           "door": "Porte",
           "col7": "7 j",
           "col30": "30 j",
           "film": "Film : {start} l'ont lancé, {end} sont allés au bout",
-          "clicks": "Clics : {week} sur 7 jours, {month} sur 30",
+          "clicks": "Clics sur le site : {week} sur 7 jours, {month} sur 30",
           "pages": "Par page",
           "referrers": "Référents",
           "since": "Mesuré depuis le {date}. Navigateurs pilotés et Lighthouse exclus, aucun cookie, 90 jours de rétention.",
@@ -721,7 +723,11 @@
             "cta_key_final": "Fin de page → Obtenir une clé",
             "cta_docs": "Fin de page → Documentation",
             "cta_key_account": "Page Votre clé → Obtenir une clé",
-            "cta_key_tool": "Outils gratuits → Obtenir une clé"
+            "cta_key_tool": "Outils gratuits → Obtenir une clé",
+            "cta_journey_api": "Parcours API",
+            "cta_journey_audit": "Parcours → Contrôler un fichier",
+            "cta_vendor_try": "Éditeurs → Tester l’API",
+            "cta_vendor_docs": "Éditeurs → Guides d’intégration"
           }
         }
       },
@@ -1333,17 +1339,19 @@
   },
   "vendors": {
     "meta": {
-      "title": "Pour les éditeurs de logiciels : intégrez la validation d'IBAN dans votre produit",
-      "description": "Licence OEM pour les éditeurs ERP, comptabilité et paie dès 149 $ par mois : validation IBAN contre les registres, clearing suisse, contrôle d’adresse ISO 20022 gratuit, pré-contrôles de conformité et DPA signable. Consultez le calendrier propre à chaque rail."
+      "title": "API IBAN et BIC pour logiciels de gestion, facturation et paie",
+      "description": "Testez la validation IBAN et la recherche de banque et BIC pour vos logiciels. Essai gratuit, guides d’intégration et prix publics. OEM pour engagements particuliers."
     },
     "eyebrow": "Pour les éditeurs de logiciels",
     "hero": {
-      "title": "Votre produit touche des IBAN. Nous les gardons propres.",
-      "description": "ERP, comptabilité, paie ou logiciel bancaire : intégrez une validation d'IBAN contre les registres au moment de la saisie, pour que les paiements de vos clients cessent d'échouer au moment du paiement. Une API REST, des erreurs lisibles par une machine, aucune donnée de compte stockée.",
+      "title": "Contrôlez les IBAN dès leur saisie dans votre logiciel.",
+      "description": "Ajoutez la validation IBAN et la recherche de banque et BIC à vos parcours fournisseurs, facturation et paie dans les pays couverts. Examinez la réponse de l’API, puis connectez votre logiciel avec la documentation.",
       "cta": {
         "contact": "Parler licence OEM",
-        "docs": "Lire la documentation"
-      }
+        "docs": "Lire la documentation",
+        "try": "Tester l’API"
+      },
+      "trialNote": "Commencez sans compte ni rendez-vous. Aucune clé API n’est nécessaire pour essayer la validation IBAN dans le bac à sable."
     },
     "deadline": {
       "badge": "Échéance datée",
@@ -1365,29 +1373,29 @@
       "steps": [
         {
           "title": "Votre logiciel",
-          "body": "Un utilisateur saisit un IBAN ou une adresse : onboarding fournisseur, données de base de paie, saisie de paiement, émission de facture."
+          "body": "Un utilisateur saisit un IBAN dans une fiche fournisseur, un formulaire de paie ou un écran de paiement. Contrôlez-le avant l’enregistrement ou la création du fichier de virements."
         },
         {
           "title": "Pré-contrôle IBANforge",
-          "body": "Structure (registre 89 pays), banque émettrice identifiée (121 k+ BIC), rails (SEPA / SIC / instantané), indicateurs de risque, conformité d'adresse : un appel, p99 sous 50 ms."
+          "body": "Contrôlez la structure et la clé de l’IBAN, puis utilisez les informations banque, BIC et pays disponibles dans les registres. Les contrôles d’adresse et de conformité ont leurs propres endpoints."
         },
         {
           "title": "Au moment du paiement",
-          "body": "Moins de fichiers rejetés en novembre, moins de rejets VoP, moins de réparations manuelles, moins de tickets de support à votre nom."
+          "body": "Montrez l’erreur à l’utilisateur et corrigez les données à la source. Un IBAN valide ne prouve pas qui détient le compte et ne garantit pas la réussite du virement."
         }
       ]
     },
     "args": {
-      "heading": "Trois raisons pour lesquelles les éditeurs choisissent IBANforge",
+      "heading": "Ce que votre intégration peut utiliser",
       "items": [
         {
-          "title": "La donnée de clearing suisse la plus profonde d'une API publique",
-          "body": "1 100+ entrées SIX BankMaster avec participation SIC / euroSIC / instantané et gestion des QR-IID, rafraîchies chaque mois, plus une postal_address ISO 20022 pour chaque établissement que nous pouvons servir, et 121 k+ BIC (39 k+ enrichis LEI via GLEIF). Si vos utilisateurs paient des fournisseurs suisses, c'est la différence.",
-          "link": "Documentation clearing suisse"
+          "title": "Des registres documentés, pays par pays",
+          "body": "Validation IBAN, codes banque, noms d’établissement et BIC lorsque les sources les fournissent. Consultez la couverture et la date des sources pour vos marchés. Les paiements suisses disposent aussi des données SIX, QR-IID et participations SIC/euroSIC.",
+          "link": "Documentation de validation IBAN"
         },
         {
-          "title": "Pré-contrôle de conformité intégré",
-          "body": "Filtrage des sanctions (OFAC, EU, UN), listes GAFI, atteignabilité SEPA et données d'exigence VoP, score de risque 0 à 100 : un endpoint pour trier avant qu'un paiement quitte votre produit.",
+          "title": "Des indicateurs de risque au niveau de la banque",
+          "body": "L’endpoint de conformité compare le BIC de la banque résolue aux listes OFAC, EU, UN et renvoie les indicateurs de risque pays et SEPA. Ils servent à un premier contrôle, en complément des vôtres ; ils ne vérifient pas le titulaire du compte.",
           "link": "Documentation conformité"
         },
         {
@@ -1399,13 +1407,31 @@
     },
     "oem": {
       "eyebrow": "Éditeur / OEM",
-      "title": "Une licence qui correspond à votre façon de livrer",
+      "title": "Besoin d’engagements particuliers ?",
       "price": "À partir de 149 $ par mois",
       "priceDetail": "Une clé à 50 000 requêtes par mois, droits de redistribution, SLA écrit (99,5 %), facturation UE, un contact de support nommé. Au-delà de 50 000 requêtes par mois, une conversation fixe le prix de volume.",
-      "body": "Intégrer IBANforge dans votre propre produit, pour vos propres clients, demande plus qu'une clé comptée. C'est l'accord OEM, et son prix de départ est public parce que tous les autres acteurs de ce marché cachent le leur.",
+      "body": "Une intégration ordinaire de l’API peut démarrer avec Pro. Échangeons sur l’OEM si vous avez besoin de droits de redistribution, d’un SLA écrit, de support adapté ou de volumes au-delà des offres publiées.",
       "cta": "support@ibanforge.com",
-      "hint": "Un seul mail : dites-nous ce que vous livrez et à qui. Moins de 10 000 requêtes par mois et pas besoin de SLA ? Le palier Pro à 29 $ par mois se prend seul, sur la page des tarifs.",
+      "hint": "Décrivez votre produit et les engagements attendus. Pro, à 29 $ par mois pour 10 000 requêtes, se prend directement sur la page des tarifs.",
       "slaLink": "Lire le SLA"
+    },
+    "start": {
+      "heading": "De la première réponse à votre intégration",
+      "try": {
+        "title": "Voir une réponse réelle",
+        "body": "Lancez un contrôle IBAN dans le bac à sable. Examinez le résultat de validation ainsi que les informations de banque, BIC et SEPA disponibles pour ce pays."
+      },
+      "docs": {
+        "title": "Connecter votre logiciel",
+        "body": "Suivez le guide du premier appel, puis utilisez REST ou un SDK disponible. Odoo 18 exige les modules personnalisés ; le guide n8n concerne les installations auto-hébergées.",
+        "link": "Suivre le guide d’intégration"
+      },
+      "key": {
+        "title": "Choisir votre clé et votre offre",
+        "body": "Obtenez une clé gratuite pour continuer. Les packs de crédits et Pro se prennent sur la page des tarifs, selon votre utilisation.",
+        "button": "Obtenir une clé gratuite",
+        "plans": "Comparer les offres et les prix"
+      }
     }
   },
   "compare": {
@@ -1533,7 +1559,7 @@
       "heading": "Là où nous perdons, dit simplement",
       "items": [
         "Pour 60 000 contrôles de validité seule, le forfait Standard mensuel publié par AbstractAPI coûte 99 $. Chez IBANforge, 2 packs de 25 000 et 2 packs de 5 000 crédits coûtent 200 $ et incluent l’enrichissement bancaire. Si la structure et la somme de contrôle suffisent, une bibliothèque locale peut éviter ces deux factures.",
-        "Des SDK Java 17+ et .NET 8 existent désormais, en plus de Python et TypeScript. Java est publié sur Maven Central ; le code source .NET est public. Ces SDK appellent l’API hébergée, tandis que des bibliothèques comme iban4j et IbanNet effectuent des contrôles locaux."
+        "Des SDK Java 17+ et .NET 8 existent désormais, en plus de Python et TypeScript. Java est publié sur Maven Central ; .NET est disponible sur NuGet. Ces SDK appellent l’API hébergée, tandis que des bibliothèques comme iban4j et IbanNet effectuent des contrôles locaux."
       ]
     },
     "others": {
@@ -1797,7 +1823,7 @@
         "bank": "Banque"
       },
       "more": "Aperçu gratuit : {shown} lignes sur {rows}, IBAN masqués. Le classeur payant montre chaque ligne en entier.",
-      "meaning": "{errors, plural, =0 {Aucun paiement de ce fichier ne serait rejeté par la banque} one {# paiement de ce fichier serait rejeté par la banque} other {# paiements de ce fichier seraient rejetés par la banque}} ; {warnings, plural, =0 {rien d'autre à vérifier} one {# ligne mérite une vérification} other {# lignes méritent une vérification}} avant le prochain lot de virements."
+      "meaning": "{errors, plural, =0 {Aucune erreur bloquante détectée par ces contrôles} one {# ligne présente une erreur bloquante} other {# lignes présentent des erreurs bloquantes}} ; {warnings, plural, =0 {aucun autre avertissement} one {# ligne mérite une vérification} other {# lignes méritent une vérification}}. Cela ne confirme ni le titulaire du compte ni la réussite d’un paiement."
     },
     "status": {
       "ok": "OK",

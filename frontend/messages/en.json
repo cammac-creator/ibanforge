@@ -60,8 +60,8 @@
     },
     "badge": "Online · {rate} % error-free over 30 days",
     "hero": {
-      "title": "The IBAN goes in. The BIC, the bank and the SEPA verdict <accent>come out</accent>.",
-      "description": "<b>{bic}</b> BIC entries, <b>{ch}</b> SIX clearing entries, OFAC/EU/UN screening: the data Swiss and DACH invoicing software has to serve before the November 2026 deadlines. REST, SDKs, MCP.",
+      "title": "IBAN validation and BIC lookup <accent>for your software</accent>.",
+      "description": "For ERP, invoicing and payroll software in Switzerland and internationally. Validate IBANs and look up banks and BICs in a directory of <b>{bic}</b> entries, with coverage documented by country.",
       "demo": {
         "calling": "calling…",
         "live": "{server} ms server · {rtt} ms round trip, measured on this call",
@@ -72,10 +72,12 @@
         "bodyAria": "API response"
       },
       "cta": {
-        "tryFree": "Try a request",
-        "getKey": "Get a free key"
+        "tryFree": "Try the API",
+        "getKey": "Get a free key",
+        "audit": "Check a supplier file"
       },
-      "altDoor": "Not a developer? Audit your creditor file →"
+      "altDoor": "Not a developer? Audit your creditor file →",
+      "trialNote": "Try the API without signing up. Preview a supplier file for free."
     },
     "features": {
       "0": {
@@ -267,18 +269,18 @@
         "ts": "TypeScript / JavaScript SDK",
         "py": "Python SDK",
         "java": "Java 17+ SDK · Maven Central",
-        "dotnet": ".NET 8 SDK · dotnet add package IBANforge.Sdk",
+        "dotnet": ".NET 8 SDK · available on NuGet",
         "mcp": "MCP server · Claude, Cursor, Cline",
-        "n8n": "n8n node",
-        "odoo": "Odoo 18 module · BIC and bank filled as you type",
+        "n8n": "n8n node 0.1.1 · self-hosted",
+        "odoo": "Odoo 18 module · custom modules required",
         "sheets": "Google Sheets add-on",
         "postman": "Postman collection"
       }
     },
     "audit": {
-      "heading": "Paying suppliers? Audit your creditor file",
-      "text": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook, at once.",
-      "cta": "Audit a file"
+      "heading": "Check your supplier file before the next payment run",
+      "text": "Upload a CSV or Excel file and preview the findings for free. The annotated workbook costs 149 CHF for up to 5,000 rows, or 349 CHF for up to 20,000 rows.",
+      "cta": "Check a supplier file"
     },
     "badgeFallback": "API online · live status",
     "share": {
@@ -408,7 +410,7 @@
       },
       "3": {
         "question": "What about high volume?",
-        "answer": "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), or to embed the API in your own product, the Editor/OEM path is the one to take: volume pricing, a written SLA and support commitments. It is described on our vendor page (ibanforge.com/en/vendors), and support@ibanforge.com opens the conversation."
+        "answer": "For volumes beyond the published plans, a written SLA or specific support commitments, see our software vendors page (ibanforge.com/vendors) and contact support@ibanforge.com. Integrating the API into your product is already permitted within your plan’s quota and terms. This does not permit wholesale database extraction or resale as a standalone dataset."
       },
       "heading": "Frequently asked questions"
     },
@@ -445,7 +447,7 @@
     },
     "oem": {
       "label": "Editor / OEM",
-      "text": "Embedding IBANforge in your own product? Editor / OEM licensing from $149/month (50,000 requests, written SLA, EU invoicing): talk to us.",
+      "text": "Need 50,000 requests per month, a written SLA or support commitments? Editor/OEM starts at $149 per month. Ordinary integration can use Pro within the plan’s limits and terms.",
       "cta": "See the vendors page →"
     },
     "audit": {
@@ -457,7 +459,7 @@
       "label": "Pro subscription",
       "title": "Prefer a flat monthly bill?",
       "text": "Pro: 10,000 requests a month, every endpoint, resets on the 1st, cancel anytime. Card checkout through Stripe, your key arrives by e-mail right after payment and works within seconds.",
-      "note": "Need 50,000 a month, a written SLA or embedding rights? That is Editor / OEM, further down.",
+      "note": "Integration into your product is permitted within your plan’s limits and terms. For a written SLA, support commitments or higher volumes, see the Editor/OEM plan.",
       "price": "$29",
       "per": "/ month",
       "cta": "Subscribe to Pro"
@@ -688,14 +690,14 @@
           "noKey": "no key (public page)"
         },
         "doors": {
-          "title": "The landing page's doors",
-          "lead": "What visitors click on the home page: the week for the pulse, the month for the shape.",
+          "title": "Actions across the site",
+          "lead": "Clicks on tagged links across public pages, over 7 and 30 days. These are actions, not unique visitors. Tracking previously covered only the homepage: periods before this expansion are not directly comparable.",
           "empty": "No click measured yet.",
           "door": "Door",
           "col7": "7 d",
           "col30": "30 d",
           "film": "Film: {start} started it, {end} reached the end",
-          "clicks": "Clicks: {week} over 7 days, {month} over 30",
+          "clicks": "Site clicks: {week} over 7 days, {month} over 30",
           "pages": "By page",
           "referrers": "Referrers",
           "since": "Measured since {date}. Driven browsers and Lighthouse excluded, no cookie, 90 days of retention.",
@@ -721,7 +723,11 @@
             "cta_key_final": "Page end → Get a key",
             "cta_docs": "Page end → Documentation",
             "cta_key_account": "Your key page → Get a key",
-            "cta_key_tool": "Free tools → Get a key"
+            "cta_key_tool": "Free tools → Get a key",
+            "cta_journey_api": "API journey",
+            "cta_journey_audit": "Journey → Check a supplier file",
+            "cta_vendor_try": "Software vendors → Try the API",
+            "cta_vendor_docs": "Software vendors → Integration guides"
           }
         }
       },
@@ -1333,17 +1339,19 @@
   },
   "vendors": {
     "meta": {
-      "title": "For Software Vendors: embed IBAN validation in your product",
-      "description": "OEM licensing for ERP, accounting and payroll vendors from $149 a month: register-backed IBAN validation, Swiss clearing data, a free ISO 20022 address checker, compliance pre-checks and a signable DPA. Check the published timetable for each payment rail."
+      "title": "IBAN and BIC API for ERP, invoicing and payroll software",
+      "description": "Try IBAN validation and bank/BIC lookup for your software. Free API trial, integration guides and public prices. OEM for specific service commitments."
     },
     "eyebrow": "For software vendors",
     "hero": {
-      "title": "Your product touches IBANs. We keep them clean.",
-      "description": "ERP, accounting, payroll or banking software: embed registry-grade IBAN validation at input time, so your customers' payments stop failing at payment time. One REST API, machine-readable errors, no bank account data stored.",
+      "title": "Check IBANs when your users enter them.",
+      "description": "Add IBAN validation and bank/BIC lookup to supplier onboarding, invoicing and payroll workflows across supported countries. Inspect the API response, then connect your software using the documentation.",
       "cta": {
         "contact": "Talk OEM licensing",
-        "docs": "Read the docs"
-      }
+        "docs": "Read the docs",
+        "try": "Try the API"
+      },
+      "trialNote": "Start without an account or sales call. No API key is needed to try IBAN validation in the playground."
     },
     "deadline": {
       "badge": "Dated deadline",
@@ -1365,29 +1373,29 @@
       "steps": [
         {
           "title": "Your software",
-          "body": "A user types an IBAN or an address: supplier onboarding, payroll master data, payment entry, invoice emission."
+          "body": "A user enters an IBAN in a supplier record, payroll form or payment screen. Check it before saving it or creating a payment file."
         },
         {
           "title": "IBANforge pre-check",
-          "body": "Structure (89-country registry), issuing bank identified (121k+ BICs), rails (SEPA / SIC / instant), risk flags, address conformity: one call, p99 under 50 ms."
+          "body": "Check the IBAN structure and checksum, then use the bank, BIC and country information available from the registers. Address and compliance checks have their own endpoints."
         },
         {
           "title": "At payment time",
-          "body": "Fewer rejected files in November, fewer VoP rejections, fewer manual repairs, fewer support tickets with your name on them."
+          "body": "Show the error to the user and correct the source data. A valid IBAN does not establish who owns the account or guarantee a successful transfer."
         }
       ]
     },
     "args": {
-      "heading": "Three reasons vendors pick IBANforge",
+      "heading": "What your integration can use",
       "items": [
         {
-          "title": "The deepest Swiss clearing data in a public API",
-          "body": "1,100+ SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly, plus an ISO 20022 postal_address on every institution we can serve one for, and 121k+ BICs (39k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
-          "link": "Swiss clearing docs"
+          "title": "Documented registers, country by country",
+          "body": "IBAN validation, bank codes, bank names and BICs where the sources provide them. Check the documented coverage and source dates for your markets. Swiss payments also have SIX clearing data, QR-IIDs and SIC/euroSIC participation.",
+          "link": "IBAN validation documentation"
         },
         {
-          "title": "Compliance pre-check built in",
-          "body": "Sanctions screening (OFAC, EU, UN), FATF lists, SEPA reachability and VoP-requirement data, risk score 0 to 100: one endpoint to triage before a payment leaves your product.",
+          "title": "Bank-level risk indicators",
+          "body": "The compliance endpoint screens the resolved bank BIC against OFAC, EU, UN lists and returns country-risk and SEPA indicators. Use these for an initial check alongside your own controls; they do not verify the account holder.",
           "link": "Compliance docs"
         },
         {
@@ -1399,13 +1407,31 @@
     },
     "oem": {
       "eyebrow": "Editor / OEM",
-      "title": "Licensing that matches how you ship",
+      "title": "Need specific service commitments?",
       "price": "From $149 per month",
       "priceDetail": "One key at 50,000 requests per month, redistribution rights, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price.",
-      "body": "Embedding IBANforge inside your own product, for your own customers, takes more than a metered key. That is the OEM agreement, and its starting price is public because every other vendor in this market hides theirs.",
+      "body": "Ordinary API integration can start on Pro. Discuss OEM if you need redistribution rights, a written SLA, tailored support or volumes beyond the published plans.",
       "cta": "support@ibanforge.com",
-      "hint": "One email: tell us what you ship and to whom. Under 10,000 requests a month and no SLA needed? The Pro plan at $29 a month is self-service, on the pricing page.",
+      "hint": "Describe your product and the commitments you need. Pro, at $29 per month for 10,000 requests, is available directly from the pricing page.",
       "slaLink": "Read the SLA"
+    },
+    "start": {
+      "heading": "From your first response to your integration",
+      "try": {
+        "title": "See a real response",
+        "body": "Run an IBAN check in the playground. Inspect the validation result and the bank, BIC and SEPA information available for that country."
+      },
+      "docs": {
+        "title": "Connect your workflow",
+        "body": "Follow the first-call guide, then use REST or an available SDK. Odoo 18 requires custom modules; the n8n guide covers self-hosted installations.",
+        "link": "Follow the integration guide"
+      },
+      "key": {
+        "title": "Choose your key and plan",
+        "body": "Get a free key to continue. Credit packs and Pro are available from the pricing page; choose according to your usage.",
+        "button": "Get a free key",
+        "plans": "Compare plans and prices"
+      }
     }
   },
   "compare": {
@@ -1533,7 +1559,7 @@
       "heading": "Where we lose, said plainly",
       "items": [
         "For 60,000 validity-only checks, AbstractAPI’s published monthly Standard plan is $99. In IBANforge prepaid packs, 2 × 25,000 plus 2 × 5,000 credits cost $200 and include bank enrichment. If structure and checksum alone are enough, a local library may avoid either bill.",
-        "Java 17+ and .NET 8 SDKs now exist alongside Python and TypeScript. Java is published on Maven Central; the .NET source is public. These SDKs call the hosted API, whereas libraries such as iban4j and IbanNet perform local checks."
+        "Java 17+ and .NET 8 SDKs now exist alongside Python and TypeScript. Java is published on Maven Central; .NET is available on NuGet. These SDKs call the hosted API, whereas libraries such as iban4j and IbanNet perform local checks."
       ]
     },
     "others": {
@@ -1797,7 +1823,7 @@
         "bank": "Bank"
       },
       "more": "Free preview: {shown} of {rows} rows, IBANs masked. The paid workbook shows every row in full.",
-      "meaning": "{errors, plural, =0 {No payment in this file would be rejected by the bank} one {# payment in this file would be rejected by the bank} other {# payments in this file would be rejected by the bank}}; {warnings, plural, =0 {nothing else needs a look} one {# row deserves a look} other {# rows deserve a look}} before the next payment run."
+      "meaning": "{errors, plural, =0 {No blocking errors detected by these checks} one {# row has a blocking error} other {# rows have blocking errors}}; {warnings, plural, =0 {no further warnings} one {# row needs review} other {# rows need review}}. This does not confirm account ownership or guarantee that a payment will succeed."
     },
     "status": {
       "ok": "OK",

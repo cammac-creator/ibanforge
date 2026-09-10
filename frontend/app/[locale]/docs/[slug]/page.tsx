@@ -1,3 +1,4 @@
+import { JourneyActions } from "@/components/journey-actions";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
 import { getDoc, mdxOptions, mdxComponents } from "@/lib/mdx";
@@ -107,6 +108,7 @@ export default async function DocPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
       <MDXRemote source={doc.content} options={mdxOptions} components={mdxComponents} />
+      <JourneyActions locale={locale} path={`/docs/${slug}`} />
       {KEY_CTA_SLUGS.has(slug) && (
         <div className="not-prose mt-10 flex flex-col items-start gap-3 rounded-xl border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">{t("keyCta.prompt")}</p>

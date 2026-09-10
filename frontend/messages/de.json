@@ -60,8 +60,8 @@
     },
     "badge": "Online · {rate} % fehlerfrei über 30 Tage",
     "hero": {
-      "title": "Die IBAN kommt rein. BIC, Bank und SEPA-Status <accent>kommen raus</accent>.",
-      "description": "<b>{bic}</b> BIC-Einträge, <b>{ch}</b> SIX-Clearing-Einträge, OFAC/EU/UN-Screening: die Daten, die Schweizer und DACH-Rechnungssoftware vor den Umstellungen im November 2026 liefern muss. REST, SDKs, MCP.",
+      "title": "IBANs prüfen. BICs finden. <accent>Für Ihre Software.</accent>",
+      "description": "Für ERP-, Rechnungs- und Lohnsoftware in der Schweiz und international. Prüfen Sie IBANs und finden Sie Banken und BICs unter <b>{bic}</b> Einträgen, mit dokumentierter Abdeckung je Land.",
       "demo": {
         "calling": "Aufruf läuft…",
         "live": "{server} ms Server · {rtt} ms Umlauf, auf diesem Aufruf gemessen",
@@ -72,10 +72,12 @@
         "bodyAria": "API-Antwort"
       },
       "cta": {
-        "tryFree": "Eine Anfrage testen",
-        "getKey": "Kostenlosen Key holen"
+        "tryFree": "API testen",
+        "getKey": "Kostenlosen Key holen",
+        "audit": "Lieferantendatei prüfen"
       },
-      "altDoor": "Kein Entwickler? Prüfen Sie Ihre Kreditorendatei →"
+      "altDoor": "Kein Entwickler? Prüfen Sie Ihre Kreditorendatei →",
+      "trialNote": "API ohne Anmeldung testen. Kostenlose Vorschau für Lieferantendateien."
     },
     "features": {
       "0": {
@@ -267,18 +269,18 @@
         "ts": "TypeScript-/JavaScript-SDK",
         "py": "Python-SDK",
         "java": "Java-17+-SDK · Maven Central",
-        "dotnet": ".NET-8-SDK · dotnet add package IBANforge.Sdk",
+        "dotnet": ".NET-8-SDK · auf NuGet verfügbar",
         "mcp": "MCP-Server · Claude, Cursor, Cline",
-        "n8n": "n8n-Node",
-        "odoo": "Odoo-18-Modul · BIC und Bank beim Tippen ausgefüllt",
+        "n8n": "n8n-Node 0.1.1 · selbst gehostet",
+        "odoo": "Odoo-18-Modul · eigene Module erforderlich",
         "sheets": "Google-Sheets-Add-on",
         "postman": "Postman-Sammlung"
       }
     },
     "audit": {
-      "heading": "Sie zahlen Lieferanten? Prüfen Sie Ihre Kreditorendatei",
-      "text": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe, sofort.",
-      "cta": "Datei prüfen"
+      "heading": "Prüfen Sie Ihre Lieferantendatei vor dem nächsten Zahlungslauf",
+      "text": "Laden Sie eine CSV- oder Excel-Datei hoch und sehen Sie die Ergebnisse kostenlos. Die kommentierte Arbeitsmappe kostet 149 CHF bis 5.000 Zeilen oder 349 CHF bis 20.000 Zeilen.",
+      "cta": "Lieferantendatei prüfen"
     },
     "badgeFallback": "API online · Live-Status",
     "share": {
@@ -408,7 +410,7 @@
       },
       "3": {
         "question": "Was ist mit hohen Volumen?",
-        "answer": "Die Preise pro Aufruf skalieren linear ohne Ratenlimits. Für sehr hohe Volumen (Millionen von Aufrufen/Monat), oder um die API in Ihr eigenes Produkt einzubetten, führt der Weg über Editor/OEM: Volumenpreise, ein schriftliches SLA und Support-Zusagen. Beschrieben ist er auf unserer Seite für Softwareanbieter (ibanforge.com/de/vendors), und support@ibanforge.com eröffnet das Gespräch."
+        "answer": "Für Volumen über den veröffentlichten Tarifen, ein schriftliches SLA oder besondere Supportzusagen besuchen Sie unsere Seite für Softwareanbieter (ibanforge.com/de/vendors) und kontaktieren Sie support@ibanforge.com. Die Integration der API in Ihr Produkt ist bereits innerhalb der Kontingente und Bedingungen Ihres Tarifs erlaubt. Dies gestattet weder die vollständige Extraktion der Datenbanken noch ihren Weiterverkauf als eigenständigen Datensatz."
       },
       "heading": "Häufig gestellte Fragen"
     },
@@ -445,7 +447,7 @@
     },
     "oem": {
       "label": "Editor / OEM",
-      "text": "Sie betten IBANforge in Ihr eigenes Produkt ein? Editor-/OEM-Lizenz ab 149 $ pro Monat (50'000 Anfragen, schriftliches SLA, EU-Rechnungsstellung): Sprechen Sie mit uns.",
+      "text": "Benötigen Sie 50.000 Anfragen pro Monat, ein schriftliches SLA oder Supportzusagen? Editor/OEM beginnt bei 149 $ pro Monat. Eine gewöhnliche Integration ist mit Pro innerhalb der Grenzen und Bedingungen des Tarifs möglich.",
       "cta": "Zur Hersteller-Seite →"
     },
     "audit": {
@@ -457,7 +459,7 @@
       "label": "Pro-Abonnement",
       "title": "Lieber eine feste Monatsrechnung?",
       "text": "Pro: 10'000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
-      "note": "Sie brauchen 50'000 Anfragen pro Monat, ein schriftliches SLA oder Einbettungsrechte? Das ist Editor / OEM, weiter unten.",
+      "note": "Die Integration in Ihr Produkt ist innerhalb der Grenzen und Bedingungen Ihres Tarifs erlaubt. Für ein schriftliches SLA, Supportzusagen oder höhere Volumen nutzen Sie das Editor/OEM-Angebot.",
       "price": "29 $",
       "per": "/ Monat",
       "cta": "Pro abonnieren"
@@ -688,14 +690,14 @@
           "noKey": "ohne Schlüssel (öffentliche Seite)"
         },
         "doors": {
-          "title": "Die Türen der Startseite",
-          "lead": "Was Besucher auf der Startseite anklicken: die Woche für den Puls, der Monat für die Form.",
+          "title": "Aktionen auf der Website",
+          "lead": "Klicks auf markierte Links der öffentlichen Seiten, über 7 und 30 Tage. Das sind Aktionen, keine einzelnen Besucher. Zuvor wurde nur die Startseite erfasst: Zeiträume vor dieser Erweiterung sind nicht direkt vergleichbar.",
           "empty": "Noch kein Klick gemessen.",
           "door": "Tür",
           "col7": "7 T",
           "col30": "30 T",
           "film": "Film: {start} haben ihn gestartet, {end} bis zum Ende gesehen",
-          "clicks": "Klicks: {week} in 7 Tagen, {month} in 30",
+          "clicks": "Website-Klicks: {week} über 7 Tage, {month} über 30",
           "pages": "Nach Seite",
           "referrers": "Referrer",
           "since": "Gemessen seit {date}. Gesteuerte Browser und Lighthouse ausgeschlossen, kein Cookie, 90 Tage Aufbewahrung.",
@@ -721,7 +723,11 @@
             "cta_key_final": "Seitenende → Schlüssel holen",
             "cta_docs": "Seitenende → Dokumentation",
             "cta_key_account": "Seite Ihr Schlüssel → Schlüssel holen",
-            "cta_key_tool": "Gratis-Werkzeuge → Schlüssel holen"
+            "cta_key_tool": "Gratis-Werkzeuge → Schlüssel holen",
+            "cta_journey_api": "API-Pfad",
+            "cta_journey_audit": "Einstieg → Lieferantendatei prüfen",
+            "cta_vendor_try": "Softwareanbieter → API testen",
+            "cta_vendor_docs": "Softwareanbieter → Integrationsanleitungen"
           }
         }
       },
@@ -1333,17 +1339,19 @@
   },
   "vendors": {
     "meta": {
-      "title": "Für Softwareanbieter: IBAN-Validierung in Ihr Produkt einbetten",
-      "description": "OEM-Lizenz für ERP-, Buchhaltungs- und Lohnsoftware ab 149 $ monatlich: IBAN-Prüfung gegen Register, Schweizer Clearingdaten, kostenlose ISO-20022-Adressprüfung, Compliance-Vorprüfungen und unterzeichnungsfähiger DPA. Beachten Sie den Zeitplan des jeweiligen Zahlungswegs."
+      "title": "IBAN- und BIC-API für ERP-, Rechnungs- und Lohnsoftware",
+      "description": "IBAN-Validierung und Bank-/BIC-Suche für Ihre Software testen. Kostenloser API-Test, Integrationsanleitungen und öffentliche Preise. OEM für besondere Zusagen."
     },
     "eyebrow": "Für Softwareanbieter",
     "hero": {
-      "title": "Ihr Produkt berührt IBANs. Wir halten sie sauber.",
-      "description": "ERP, Buchhaltung, Lohn oder Banking-Software: Betten Sie eine registerbasierte IBAN-Validierung bei der Eingabe ein, damit die Zahlungen Ihrer Kunden nicht mehr im Zahlungsmoment scheitern. Eine REST-API, maschinenlesbare Fehler, keine gespeicherten Kontodaten.",
+      "title": "Prüfen Sie IBANs bei der Eingabe in Ihrer Software.",
+      "description": "Ergänzen Sie Lieferantenerfassung, Rechnungsstellung und Lohnabrechnung um IBAN-Prüfung und Bank-/BIC-Suche in den unterstützten Ländern. Sehen Sie sich die API-Antwort an und verbinden Sie Ihre Software anhand der Dokumentation.",
       "cta": {
         "contact": "OEM-Lizenz besprechen",
-        "docs": "Dokumentation lesen"
-      }
+        "docs": "Dokumentation lesen",
+        "try": "API testen"
+      },
+      "trialNote": "Starten Sie ohne Konto oder Beratungstermin. Für einen IBAN-Test im Playground brauchen Sie keinen API-Key."
     },
     "deadline": {
       "badge": "Datierter Stichtag",
@@ -1365,29 +1373,29 @@
       "steps": [
         {
           "title": "Ihre Software",
-          "body": "Ein Nutzer gibt eine IBAN oder eine Adresse ein: Lieferanten-Onboarding, Lohnstammdaten, Zahlungserfassung, Rechnungsausgabe."
+          "body": "Ein Nutzer gibt eine IBAN im Lieferantenstamm, in der Lohnabrechnung oder in einer Zahlungsmaske ein. Prüfen Sie sie vor dem Speichern oder Erstellen der Zahlungsdatei."
         },
         {
           "title": "IBANforge-Vorprüfung",
-          "body": "Struktur (Register für 89 Länder), ausgebende Bank identifiziert (121k+ BICs), Schienen (SEPA / SIC / Instant), Risikohinweise, Adresskonformität: ein Aufruf, p99 unter 50 ms."
+          "body": "Prüfen Sie IBAN-Struktur und Prüfziffer und nutzen Sie die verfügbaren Bank-, BIC- und Länderdaten aus den Registern. Adress- und Compliance-Prüfungen haben eigene Endpunkte."
         },
         {
           "title": "Im Zahlungsmoment",
-          "body": "Weniger abgelehnte Dateien im November, weniger VoP-Ablehnungen, weniger manuelle Korrekturen, weniger Support-Tickets mit Ihrem Namen darauf."
+          "body": "Zeigen Sie dem Nutzer den Fehler und korrigieren Sie die Quelldaten. Eine gültige IBAN belegt weder den Kontoinhaber noch garantiert sie eine erfolgreiche Überweisung."
         }
       ]
     },
     "args": {
-      "heading": "Drei Gründe, warum Anbieter IBANforge wählen",
+      "heading": "Was Ihre Integration nutzen kann",
       "items": [
         {
-          "title": "Die tiefsten Schweizer Clearing-Daten einer öffentlichen API",
-          "body": "1'100+ SIX-BankMaster-Einträge mit SIC-/euroSIC-/Instant-Teilnahme und QR-IID-Behandlung, monatlich aktualisiert, dazu eine ISO-20022-postal_address für jedes Institut, für das wir eine liefern können, und 121k+ BICs (39k+ LEI-angereichert via GLEIF). Wenn Ihre Nutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
-          "link": "Dokumentation Schweizer Clearing"
+          "title": "Dokumentierte Register je Land",
+          "body": "IBAN-Prüfung, Bankcodes, Banknamen und BICs, soweit die Quellen diese liefern. Prüfen Sie Abdeckung und Quellenstand für Ihre Märkte. Für Schweizer Zahlungen gibt es zusätzlich SIX-Clearing, QR-IIDs und SIC-/euroSIC-Teilnahme.",
+          "link": "Dokumentation zur IBAN-Prüfung"
         },
         {
-          "title": "Compliance-Vorprüfung eingebaut",
-          "body": "Sanktionsprüfung (OFAC, EU, UN), FATF-Listen, SEPA-Erreichbarkeit und VoP-Pflichtdaten, Risikoscore 0 bis 100: ein Endpunkt zur Triage, bevor eine Zahlung Ihr Produkt verlässt.",
+          "title": "Risikoindikatoren auf Bankebene",
+          "body": "Der Compliance-Endpunkt gleicht den ermittelten Bank-BIC mit den Listen OFAC, EU, UN ab und liefert Länder- und SEPA-Indikatoren. Nutzen Sie diese zur Vorprüfung neben Ihren eigenen Kontrollen; sie prüfen nicht den Kontoinhaber.",
           "link": "Dokumentation Compliance"
         },
         {
@@ -1399,13 +1407,31 @@
     },
     "oem": {
       "eyebrow": "Editor / OEM",
-      "title": "Eine Lizenz, die zu Ihrer Auslieferung passt",
+      "title": "Brauchen Sie besondere Leistungszusagen?",
       "price": "Ab 149 $ pro Monat",
       "priceDetail": "Ein Schlüssel mit 50'000 Anfragen pro Monat, Weitervertriebsrechte, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50'000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest.",
-      "body": "IBANforge in Ihr eigenes Produkt einzubetten, für Ihre eigenen Kunden, braucht mehr als einen gezählten Schlüssel. Das ist die OEM-Vereinbarung, und ihr Einstiegspreis ist öffentlich, weil jeder andere Anbieter in diesem Markt seinen versteckt.",
+      "body": "Eine gewöhnliche API-Integration kann mit Pro starten. Besprechen Sie OEM mit uns, wenn Sie Weiterverteilungsrechte, ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
       "cta": "support@ibanforge.com",
-      "hint": "Eine E-Mail: Sagen Sie uns, was Sie ausliefern und an wen. Unter 10'000 Anfragen pro Monat und kein SLA nötig? Das Pro-Abo für $29 im Monat gibt es ohne Gespräch, direkt auf der Preisseite.",
+      "hint": "Beschreiben Sie Ihr Produkt und die benötigten Zusagen. Pro für 29 $ pro Monat mit 10.000 Anfragen ist direkt auf der Preisseite erhältlich.",
       "slaLink": "SLA lesen"
+    },
+    "start": {
+      "heading": "Von der ersten Antwort zur Integration",
+      "try": {
+        "title": "Eine echte Antwort sehen",
+        "body": "Prüfen Sie eine IBAN im Playground. Sehen Sie sich das Prüfergebnis und die verfügbaren Bank-, BIC- und SEPA-Daten für dieses Land an."
+      },
+      "docs": {
+        "title": "Ihre Software verbinden",
+        "body": "Folgen Sie der Anleitung für den ersten Aufruf und nutzen Sie REST oder ein verfügbares SDK. Odoo 18 setzt eigene Module voraus; die n8n-Anleitung gilt für selbst gehostete Installationen.",
+        "link": "Zur Integrationsanleitung"
+      },
+      "key": {
+        "title": "Key und Tarif wählen",
+        "body": "Holen Sie einen kostenlosen Key, um fortzufahren. Guthabenpakete und Pro sind auf der Preisseite verfügbar, passend zu Ihrer Nutzung.",
+        "button": "Kostenlosen Key holen",
+        "plans": "Tarife und Preise vergleichen"
+      }
     }
   },
   "compare": {
@@ -1533,7 +1559,7 @@
       "heading": "Wo wir verlieren, klar gesagt",
       "items": [
         "Für 60.000 reine Gültigkeitsprüfungen kostet der veröffentlichte monatliche Standardtarif von AbstractAPI 99 $. Bei IBANforge kosten 2 Pakete mit 25.000 und 2 mit 5.000 Credits zusammen 200 $ und enthalten Bankdaten. Reichen Struktur und Prüfziffer aus, kann eine lokale Bibliothek beide Kosten vermeiden.",
-        "SDKs für Java 17+ und .NET 8 sind inzwischen neben Python und TypeScript vorhanden. Java ist auf Maven Central veröffentlicht; der .NET-Quellcode ist öffentlich. Diese SDKs rufen die gehostete API auf, während Bibliotheken wie iban4j und IbanNet lokal prüfen."
+        "SDKs für Java 17+ und .NET 8 sind inzwischen neben Python und TypeScript vorhanden. Java ist auf Maven Central veröffentlicht; .NET ist auf NuGet verfügbar. Diese SDKs rufen die gehostete API auf, während Bibliotheken wie iban4j und IbanNet lokal prüfen."
       ]
     },
     "others": {
@@ -1797,7 +1823,7 @@
         "bank": "Bank"
       },
       "more": "Kostenlose Vorschau: {shown} von {rows} Zeilen, IBAN maskiert. Die bezahlte Arbeitsmappe zeigt jede Zeile vollständig.",
-      "meaning": "{errors, plural, =0 {Keine Zahlung dieser Datei würde von der Bank abgewiesen} one {# Zahlung dieser Datei würde von der Bank abgewiesen} other {# Zahlungen dieser Datei würden von der Bank abgewiesen}}; {warnings, plural, =0 {sonst ist nichts zu prüfen} one {# Zeile verdient einen Blick} other {# Zeilen verdienen einen Blick}} vor dem nächsten Zahlungslauf."
+      "meaning": "{errors, plural, =0 {Diese Prüfungen haben keine blockierenden Fehler erkannt} one {# Zeile enthält einen blockierenden Fehler} other {# Zeilen enthalten blockierende Fehler}}; {warnings, plural, =0 {keine weiteren Warnungen} one {# Zeile sollte überprüft werden} other {# Zeilen sollten überprüft werden}}. Das bestätigt weder den Kontoinhaber noch den Erfolg einer Zahlung."
     },
     "status": {
       "ok": "OK",
