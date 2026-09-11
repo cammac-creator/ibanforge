@@ -7,6 +7,7 @@ import type { BuildInput } from '@/lib/crm/build-contacts';
 import { moneySummary } from '@/lib/dashboard-overview';
 import { packUsdLabel, retainedPackSales, type PackSalesSnapshot } from '@/lib/dashboard/pack-sales';
 import { PackSalesCard } from './pack-sales-card';
+import { FailedPaymentsCard } from './failed-payments-card';
 import { ClientLinks } from './client-links';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
@@ -24,6 +25,7 @@ export async function MoneySection({
   crmPromise,
   digestPromise,
   packSalesPromise,
+  failedPaymentsPromise,
 }: {
   locale: string;
   period: number;
@@ -35,15 +37,17 @@ export async function MoneySection({
   crmPromise: Promise<BuildInput | null>;
   digestPromise: Promise<Fetched<{ digests: DigestEntry[] }>>;
   packSalesPromise: Promise<Fetched<PackSalesSnapshot>>;
+  failedPaymentsPromise: Promise<Fetched<unknown>>;
 }) {
   const t = await getTranslations('dashboard.overview');
-  const [statsRes, historyRes, clientsRes, crm, digestRes, packsRes] = await Promise.all([
+  const [statsRes, historyRes, clientsRes, crm, digestRes, packsRes, refusRes] = await Promise.all([
     statsPromise,
     historyPromise,
     clientsPromise,
     crmPromise,
     digestPromise,
     packSalesPromise,
+    failedPaymentsPromise,
   ]);
 
   const now = new Date(nowIso);
@@ -108,6 +112,10 @@ export async function MoneySection({
 
       <p className="text-xs text-[var(--fg-4)]">{t('money.retainedKeysNote')}</p>
       <PackSalesCard data={packs} locale={locale} />
+
+      {/* Un refus de paiement est le signal le plus actionnable de cette section :
+          quelqu'un a sorti sa carte et il est reparti sans rien. */}
+      <FailedPaymentsCard value={refusRes.ok ? refusRes.data : null} locale={locale} />
 
       {/* Les comptes à crédits restent accessibles sans les confondre avec des ventes. */}
       <div className={overviewCard}>

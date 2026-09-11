@@ -849,6 +849,32 @@
         "retention": "“First” means the first response found in retained logs, not first-ever usage or a new signup. Logs are purged after twelve months and after cancellation under the existing policy.",
         "days": "Two distinct UTC days suffice, even around midnight. This is neither a return after 24 hours nor day-seven retention.",
         "limits": "Trials may be included. Calls without an attributable key and hosted MCP are outside scope. No linkage to clicks, visits or purchases; the existing “Made a call” indicators keep their definition."
+      },
+      "failedPayments": {
+        "title": "Declined payments",
+        "unavailable": "Declined payments could not be read. No zero is inferred.",
+        "period": "Last {days} days, from {from} to {to}.",
+        "none": "No declined payment in this period.",
+        "attempts": "Declined attempts",
+        "unrecovered": "Buyers who left without paying",
+        "recoveredNote": "A buyer who eventually paid is not counted as lost, even if the first attempts were declined.",
+        "recovered": "eventually paid",
+        "lost": "left with nothing",
+        "noEmail": "unknown address",
+        "reason": {
+          "velocity": "their bank blocked it, too many attempts in a row",
+          "funds": "insufficient funds",
+          "expired": "expired card",
+          "cvc": "security code refused",
+          "generic": "bank decline, no reason given",
+          "risk": "blocked on suspicion of fraud",
+          "other": "another bank reason"
+        },
+        "method": "What this block shows",
+        "source": "Read straight from Stripe when this page opens, over the last 90 days. Nothing is stored here.",
+        "recoveredRule": "A decline followed by a successful payment from the same address is marked “eventually paid”: it is not a lost sale.",
+        "notCharged": "A declined payment charges nobody. The buyer paid nothing and received nothing.",
+        "limits": "These declines come from the buyers’ banks, not from an account setting. This block counts neither drop-offs before checkout nor visitors who never tried."
       }
     },
     "header": {

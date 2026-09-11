@@ -849,6 +849,32 @@
         "retention": "« Première » signifie première réponse retrouvée dans les traces conservées, pas première utilisation à vie ni nouvelle inscription. Les traces sont purgées après douze mois et après résiliation selon la politique existante.",
         "days": "Deux jours UTC distincts suffisent, même autour de minuit. Ce n’est ni un retour après 24 heures ni une rétention à J+7.",
         "limits": "Essais possibles inclus. Appels sans clé rattachable et MCP hébergé hors périmètre. Aucun rapprochement avec les clics, les visites ou les achats ; les anciens indicateurs « Ont appelé » gardent leur définition."
+      },
+      "failedPayments": {
+        "title": "Paiements refusés",
+        "unavailable": "Lecture des paiements refusés indisponible. Aucun zéro n’est déduit.",
+        "period": "{days} derniers jours, du {from} au {to}.",
+        "none": "Aucun paiement refusé sur cette période.",
+        "attempts": "Tentatives refusées",
+        "unrecovered": "Acheteurs repartis sans payer",
+        "recoveredNote": "Un acheteur qui a fini par payer n’est pas compté comme perdu, même si ses premières tentatives ont été refusées.",
+        "recovered": "a fini par payer",
+        "lost": "reparti sans rien",
+        "noEmail": "adresse inconnue",
+        "reason": {
+          "velocity": "sa banque a bloqué, trop de tentatives rapprochées",
+          "funds": "fonds insuffisants",
+          "expired": "carte expirée",
+          "cvc": "code de vérification refusé",
+          "generic": "refus de la banque, sans motif précisé",
+          "risk": "bloqué pour soupçon de fraude",
+          "other": "autre motif de la banque"
+        },
+        "method": "Ce que montre ce bloc",
+        "source": "Lu directement chez Stripe à l’ouverture de cette page, sur les 90 derniers jours. Rien n’est stocké ici.",
+        "recoveredRule": "Un refus suivi d’un paiement réussi de la même adresse est marqué « a fini par payer » : ce n’est pas une vente perdue.",
+        "notCharged": "Un paiement refusé ne débite personne. L’acheteur n’a rien payé et n’a rien reçu.",
+        "limits": "Ces refus viennent des banques des acheteurs, pas d’un réglage du compte. Ce bloc ne compte ni les abandons avant le paiement, ni les visiteurs qui n’ont jamais essayé."
       }
     },
     "header": {

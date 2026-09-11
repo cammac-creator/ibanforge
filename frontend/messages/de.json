@@ -849,6 +849,32 @@
         "retention": "„Erste“ bedeutet die erste in den aufbewahrten Protokollen gefundene Antwort, nicht die erste Nutzung überhaupt oder eine Neuanmeldung. Protokolle werden nach zwölf Monaten und nach Kündigung gemäß der bestehenden Regelung gelöscht.",
         "days": "Zwei verschiedene UTC-Tage reichen aus, auch rund um Mitternacht. Dies ist weder eine Rückkehr nach 24 Stunden noch eine Bindungsrate am siebten Tag.",
         "limits": "Testnutzung kann enthalten sein. Aufrufe ohne zuordenbaren Schlüssel und gehostetes MCP sind nicht erfasst. Keine Verknüpfung mit Klicks, Besuchen oder Käufen; die bisherigen Aufrufkennzahlen behalten ihre Definition."
+      },
+      "failedPayments": {
+        "title": "Abgelehnte Zahlungen",
+        "unavailable": "Abgelehnte Zahlungen konnten nicht gelesen werden. Es wird keine Null abgeleitet.",
+        "period": "Letzte {days} Tage, vom {from} bis {to}.",
+        "none": "Keine abgelehnte Zahlung in diesem Zeitraum.",
+        "attempts": "Abgelehnte Versuche",
+        "unrecovered": "Käufer, die ohne Zahlung gegangen sind",
+        "recoveredNote": "Wer am Ende doch bezahlt hat, gilt nicht als verloren, auch wenn die ersten Versuche abgelehnt wurden.",
+        "recovered": "hat am Ende bezahlt",
+        "lost": "ohne alles gegangen",
+        "noEmail": "Adresse unbekannt",
+        "reason": {
+          "velocity": "die Bank hat blockiert, zu viele Versuche kurz hintereinander",
+          "funds": "unzureichende Deckung",
+          "expired": "Karte abgelaufen",
+          "cvc": "Prüfziffer abgelehnt",
+          "generic": "Ablehnung der Bank, ohne Begründung",
+          "risk": "wegen Betrugsverdacht blockiert",
+          "other": "anderer Grund der Bank"
+        },
+        "method": "Was dieser Block zeigt",
+        "source": "Beim Öffnen dieser Seite direkt bei Stripe gelesen, über die letzten 90 Tage. Hier wird nichts gespeichert.",
+        "recoveredRule": "Eine Ablehnung, auf die eine erfolgreiche Zahlung derselben Adresse folgt, gilt als „hat am Ende bezahlt“ und ist kein verlorener Verkauf.",
+        "notCharged": "Eine abgelehnte Zahlung belastet niemanden. Der Käufer hat nichts bezahlt und nichts erhalten.",
+        "limits": "Diese Ablehnungen kommen von den Banken der Käufer, nicht von einer Kontoeinstellung. Weder Abbrüche vor der Zahlung noch Besucher, die es nie versucht haben, sind hier gezählt."
       }
     },
     "header": {
