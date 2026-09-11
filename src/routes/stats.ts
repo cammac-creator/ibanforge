@@ -29,6 +29,10 @@ const stats = new Hono();
  * used timingSafeEqual), and /stats is exempt from the rate limiter, so it
  * was the softest of the group. Mirror the others.
  */
+export function isStatsAuthorized(authHeader: string | undefined): boolean {
+  return checkAuth(authHeader);
+}
+
 function checkAuth(authHeader: string | undefined): boolean {
   const token = process.env.STATS_TOKEN;
   if (!token || !authHeader) return false;

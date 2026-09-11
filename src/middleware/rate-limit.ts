@@ -1,4 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
+import { isAdminAuthorized } from '../routes/api-keys.js';
+import { isStatsAuthorized } from '../routes/stats.js';
 import { extractClientIp } from '../lib/stats.js';
 
 // Guarded like facilitatorTimeoutMs() in x402.ts, and for the same reason: a
@@ -80,6 +82,32 @@ export function rateLimitMiddleware(): MiddlewareHandler {
     // The webhook handler itself verifies the signature, so rate-limiting by
     // IP gives us no security and risks dropping legitimate events.
     if (path === '/v1/stripe/webhook') {
+      await next();
+      return;
+    }
+
+    /*
+     * 🚨 11.09.2026 — les lectures privées du tableau de bord portent déjà leur
+     * secret, et les limiter par IP ne protégeait rien tout en cassant l'écran
+     * de son propriétaire.
+     *
+     * Un seul affichage du tableau de bord tire une quinzaine d'appels privés.
+     * Trois affichages dans la même minute dépassaient donc le plafond de 100,
+     * et les appels suivants repartaient en 429. Côté navigateur, tous les blocs
+     * privés disparaissaient d'un coup, remplacés par « indisponible » — et
+     * l'API n'en gardait AUCUNE trace, parce que ce 429 part d'ici, avant que la
+     * route ait pu journaliser quoi que ce soit. On a cherché la panne pendant
+     * une demi-journée du mauvais côté.
+     *
+     * L'exemption est conditionnée au secret VALIDE, jamais au chemin seul : un
+     * appelant sans secret, ou avec un mauvais, reste limité comme avant, donc
+     * la protection contre l'essai en force est intacte.
+     */
+    if (path.startsWith('/v1/admin/') && isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+      await next();
+      return;
+    }
+    if (path.startsWith('/stats/') && isStatsAuthorized(c.req.header('Authorization'))) {
       await next();
       return;
     }
