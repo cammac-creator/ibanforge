@@ -325,25 +325,30 @@ any of its three numbers:
 Measured on the served API, not locally: 162–235 ms per read on both windows, twelve concurrent
 reads all successful, and no failure under the full parallel load a dashboard render produces.
 
-🚨 **An intermittent degradation of the dashboard's private reads, older than both lots and not
-explained.** Every block fed by `ADMIN_SECRET` comes back unavailable at once — the packs card,
-which predates #183, included. Measured cadence: roughly one render in twelve when the instances
-are warm, and markedly more in the minutes after a deployment, where one run of twelve gave seven.
-The failing render completes in about 2.4 s instead of 6.5 s, and **the API records nothing**:
-zero 5xx on `/v1/admin/activation` over seven days, 4 ms average, and the 401 counter does not
-move while it happens — so the request never leaves the Vercel function.
+✅ **The dashboard's private blocks used to vanish together, and the cause was our own rate
+limiter.** One dashboard render fires about fifteen private reads. Three renders inside the same
+minute crossed the 100-requests-per-minute-per-IP ceiling, and every call after that came back
+429, so all `ADMIN_SECRET`-fed blocks turned to "unavailable" at once. **The API's own logs showed
+nothing**: that 429 leaves `rateLimitMiddleware` before any route can write to `request_log`, so
+`/v1/admin/activation` showed zero 5xx, a 4 ms average and a motionless 401 counter while the
+screen was visibly broken. Half a day was spent looking on the wrong side of the wire.
 
-The shape fits `admin()` taking its `ADMIN_SECRET ? fetch : notFetched()` short circuit: the
-variable is read once at module scope, and an instance that starts without it never calls
-anything. Worth checking first, and cheap — `npx vercel env ls`, and whether the value carries a
-trailing newline, which is exactly what bit three values on this project on 09/09. **Ruled out:**
-it is not a cached or prerendered page — `x-vercel-cache` was `MISS` with `age: 0` on the failing
-renders as well as the good ones.
+Fixed on 11 September: an authenticated private read is exempt from the per-IP limiter, because
+rate-limiting a call that already carries its secret protects nothing — a caller without the
+secret is stopped by the 401. **The exemption is conditioned on a VALID secret, never on the path
+alone**, so an unauthenticated or wrong-secret caller is limited exactly as before and the
+brute-force protection is intact. Verified on the served site: 18 consecutive renders, zero
+degraded, against 4 in 15 before.
 
-Do not read a one-off "unavailable" card as a defect of the measure. The fallback itself was
-checked on the served site and is correct: the title, the sentence "Mesure indisponible pour cette
-lecture. Aucun zéro n'est déduit.", and not a single digit. Reproduce by loading
-`/fr/dashboard?period=90` a dozen times.
+Two things were repaired along the way and are worth knowing:
+
+- `ADMIN_SECRET` and `STATS_TOKEN` on the site host each carried a trailing newline that the API
+  host did not have (43 vs 42 characters, 65 vs 64). Both are now byte-identical to the API's.
+  This was **not** the cause of the outage above, but a header value with a newline is a latent
+  trap, and the two values had silently diverged.
+- Do not read a one-off "unavailable" card as a defect of the measure behind it. The fallback was
+  checked on the served site and is correct: the title, the sentence saying no zero is inferred,
+  and not a single digit.
 
 
 **The report purchase path, hardened on 10 September (#180).** Worth reading before touching
