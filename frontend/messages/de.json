@@ -833,6 +833,22 @@
         "errorsUnread": "Fehlerquoten nicht lesbar: diese Tabelle ist leer, weil die Lesung fehlgeschlagen ist, nicht weil der Tag perfekt war.",
         "channels": "Zugangskanäle",
         "statusByPath": "Status pro Endpunkt · {days} Tage"
+      },
+      "serviceUsage": {
+        "title": "Fachliche Antworten und wiederkehrende Nutzung",
+        "unavailable": "Diese Messung ist für diesen Abruf nicht verfügbar. Daraus wird keine Null abgeleitet.",
+        "period": "{days} Tage, vom {from} bis {to}, Stand {at} UTC. Der laufende Tag ist unvollständig.",
+        "active": "Konten mit einer fachlichen 2xx-Antwort",
+        "first": "Davon erste beobachtete Antwort im Zeitraum",
+        "returning": "Davon Nutzung an mindestens zwei UTC-Tagen",
+        "subsets": "Die letzten beiden Zahlen sind Teilmengen der ersten. Sie können sich überschneiden und dürfen nicht addiert werden.",
+        "empty": "Keine zuordenbare Antwort in diesem Zeitraum beobachtet. Das beweist nicht, dass außerhalb dieses Umfangs keine Nutzung stattfand.",
+        "method": "Was dieser Block misst",
+        "definition": "HTTP-2xx-Antworten auf den Routen für IBAN-Validierung, Batch, Compliance, BIC-Suche und Schweizer Clearing mit der erwarteten Methode. Auch ein negatives Ergebnis kann nützlich sein: 2xx bedeutet nicht „gültige IBAN“.",
+        "accounts": "Ein Konto fasst gespeicherte Schlüssel derselben E-Mail-Adresse zusammen, einschließlich ersetzter Schlüssel. Dies ist keine Personenzahl. Interne Konten, generische Zahlungsadressen und mehrdeutige Präfixe sind ausgeschlossen.",
+        "retention": "„Erste“ bedeutet die erste in den aufbewahrten Protokollen gefundene Antwort, nicht die erste Nutzung überhaupt oder eine Neuanmeldung. Protokolle werden nach zwölf Monaten und nach Kündigung gemäß der bestehenden Regelung gelöscht.",
+        "days": "Zwei verschiedene UTC-Tage reichen aus, auch rund um Mitternacht. Dies ist weder eine Rückkehr nach 24 Stunden noch eine Bindungsrate am siebten Tag.",
+        "limits": "Testnutzung kann enthalten sein. Aufrufe ohne zuordenbaren Schlüssel und gehostetes MCP sind nicht erfasst. Keine Verknüpfung mit Klicks, Besuchen oder Käufen; die bisherigen Aufrufkennzahlen behalten ihre Definition."
       }
     },
     "header": {

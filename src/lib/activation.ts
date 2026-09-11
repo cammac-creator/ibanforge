@@ -1,5 +1,6 @@
 import { getStatsDB } from './db.js';
 import { isInternalEmail } from './internal-accounts.js';
+import { getServiceUsage, type ServiceUsage } from './service-usage.js';
 
 /**
  * Per-EMAIL activation picture. The unit is deliberately the email, never the
@@ -81,6 +82,7 @@ export interface ActivationResponse {
   funnel: ActivationFunnel;
   sources: ActivationSourceRow[];
   cohorts: ActivationCohort[];
+  service_usage: ServiceUsage;
 }
 
 interface KeyRow {
@@ -353,5 +355,11 @@ export function getActivation(days = 30): ActivationResponse {
     };
   });
 
-  return { clients, funnel, sources, cohorts };
+  return {
+    clients,
+    funnel,
+    sources,
+    cohorts,
+    service_usage: getServiceUsage(days, new Date(nowMs)),
+  };
 }

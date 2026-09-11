@@ -833,6 +833,22 @@
         "errorsUnread": "Taux d'erreur illisibles : ce tableau est vide parce que la lecture a échoué, pas parce que la journée est parfaite.",
         "channels": "Canaux d'accès",
         "statusByPath": "Statuts par endpoint · {days} jours"
+      },
+      "serviceUsage": {
+        "title": "Réponses métier et retour d’usage",
+        "unavailable": "Mesure indisponible pour cette lecture. Aucun zéro n’est déduit.",
+        "period": "{days} jours, du {from} au {to}, arrêté à {at} UTC. Journée en cours incomplète.",
+        "active": "Comptes avec une réponse métier 2xx",
+        "first": "Dont première réponse observée dans la période",
+        "returning": "Dont usage sur au moins deux jours UTC",
+        "subsets": "Les deux derniers nombres sont des sous-ensembles du premier. Ils peuvent se recouper et ne s’additionnent pas.",
+        "empty": "Aucune réponse attribuable observée dans cette période. Cela ne prouve pas une absence d’usage hors du périmètre.",
+        "method": "Ce que mesure ce bloc",
+        "definition": "Réponses HTTP 2xx sur les routes de validation IBAN, batch, compliance, recherche BIC et clearing suisse, avec la méthode attendue. Un verdict négatif peut être une réponse utile : 2xx ne veut pas dire « IBAN valide ».",
+        "accounts": "Un compte regroupe les clés conservées sous une même adresse e-mail, y compris les anciennes clés remplacées. Ce n’est pas un nombre de personnes. Comptes internes, adresses génériques de paiement et préfixes ambigus exclus.",
+        "retention": "« Première » signifie première réponse retrouvée dans les traces conservées, pas première utilisation à vie ni nouvelle inscription. Les traces sont purgées après douze mois et après résiliation selon la politique existante.",
+        "days": "Deux jours UTC distincts suffisent, même autour de minuit. Ce n’est ni un retour après 24 heures ni une rétention à J+7.",
+        "limits": "Essais possibles inclus. Appels sans clé rattachable et MCP hébergé hors périmètre. Aucun rapprochement avec les clics, les visites ou les achats ; les anciens indicateurs « Ont appelé » gardent leur définition."
       }
     },
     "header": {

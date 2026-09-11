@@ -833,6 +833,22 @@
         "errorsUnread": "Error rates unreadable: this table is empty because the read failed, not because the day was perfect.",
         "channels": "Access channels",
         "statusByPath": "Statuses by endpoint · {days} days"
+      },
+      "serviceUsage": {
+        "title": "Business responses and returning usage",
+        "unavailable": "This measurement is unavailable for this read. No zero is inferred.",
+        "period": "{days} days, from {from} to {to}, as of {at} UTC. The current day is incomplete.",
+        "active": "Accounts with a business 2xx response",
+        "first": "Of which, first observed response in this period",
+        "returning": "Of which, usage on at least two UTC days",
+        "subsets": "The last two figures are subsets of the first. They may overlap and must not be added together.",
+        "empty": "No attributable response observed in this period. This does not prove there was no usage outside this scope.",
+        "method": "What this block measures",
+        "definition": "HTTP 2xx responses on IBAN validation, batch, compliance, BIC lookup and Swiss clearing routes, with the expected method. A negative verdict can be useful: 2xx does not mean “valid IBAN”.",
+        "accounts": "An account groups retained keys under the same email address, including replaced keys. This is not a count of people. Internal accounts, generic payment addresses and ambiguous prefixes are excluded.",
+        "retention": "“First” means the first response found in retained logs, not first-ever usage or a new signup. Logs are purged after twelve months and after cancellation under the existing policy.",
+        "days": "Two distinct UTC days suffice, even around midnight. This is neither a return after 24 hours nor day-seven retention.",
+        "limits": "Trials may be included. Calls without an attributable key and hosted MCP are outside scope. No linkage to clicks, visits or purchases; the existing “Made a call” indicators keep their definition."
       }
     },
     "header": {
