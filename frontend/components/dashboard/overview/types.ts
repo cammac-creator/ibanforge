@@ -54,6 +54,8 @@ export interface HourlyResponse {
 }
 
 export interface ActivationData {
+  /** Bloc additif validé à la lecture, absent avec une API antérieure. */
+  service_usage?: unknown;
   clients: ActivationClientRow[];
   funnel: ActivationFunnelData;
   sources: AcquisitionSourceRow[];

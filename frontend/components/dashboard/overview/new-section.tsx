@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { ActivationFunnel } from '../activation-funnel';
+import { ServiceUsageCard } from './service-usage-card';
 import { TopUsersToday } from '../top-users-today';
 import { LivingToolCard, type DemandGapsPayload, type FeedbackReport } from '../living-tool-card';
 import type { ActivationClientRow } from '../clients-table';
@@ -130,6 +131,8 @@ export async function NewSection({
       ) : (
         <FetchFailed name={t('fresh.funnel')} status={activationRes.status} />
       )}
+
+      <ServiceUsageCard value={activationRes.ok ? activationRes.data?.service_usage : null} locale={locale} />
 
       <div className={overviewCard}>
         <p className="mb-2 text-sm font-medium text-[var(--fg-2)]">
