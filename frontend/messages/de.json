@@ -610,7 +610,7 @@
         "packSales": {
           "title": "Pakete · Details der bekannten Stripe-Beträge",
           "unavailable": "Gespeicherte Beträge nicht verfügbar. Kein Ersatz durch Katalogpreise.",
-          "coverage": "Bekannter USD-Betrag für {known} von {total} berücksichtigten Stripe-Referenzen.",
+          "coverage": "Bekannter USD-Betrag für {known} von {total, plural, one {# berücksichtigten Stripe-Referenz} other {# berücksichtigten Stripe-Referenzen}}.",
           "amountScope": "Summe der gespeicherten USD-Beträge nach Rabatten, vor Gebühren oder Rückerstattungen. Jede Stripe-Referenz zählt einmal, auch bei mehreren Schlüsseln. Pro/OEM-Verlängerungen und Dateiaudits sind nicht enthalten; die Summe misst keinen Gewinn.",
           "empty": "Keine berücksichtigte Stripe-Paketreferenz. Kein bestätigter Betrag anzuzeigen.",
           "zero": "Referenzen mit bestätigtem USD-Betrag von null: {count}.",

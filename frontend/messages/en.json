@@ -610,7 +610,7 @@
         "packSales": {
           "title": "Packs · known Stripe amount details",
           "unavailable": "Retained amounts unavailable. No catalogue price used as a replacement.",
-          "coverage": "Known USD amount for {known} references out of {total} retained Stripe references.",
+          "coverage": "Known USD amount for {known, plural, one {# reference} other {# references}} out of {total, plural, one {# retained Stripe reference} other {# retained Stripe references}}.",
           "amountScope": "Total recorded USD amounts, after discounts and before fees or refunds. Each Stripe reference counts once, even across multiple keys. This total excludes Pro/OEM renewals and file audits; it does not measure profit.",
           "empty": "No retained Stripe pack reference. No confirmed amount to display.",
           "zero": "References with a confirmed zero USD amount: {count}.",

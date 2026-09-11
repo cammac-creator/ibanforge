@@ -610,7 +610,7 @@
         "packSales": {
           "title": "Packs · détail des montants Stripe connus",
           "unavailable": "Montants conservés indisponibles. Aucun prix catalogue utilisé en remplacement.",
-          "coverage": "Montant USD connu pour {known} références sur {total} références Stripe retenues.",
+          "coverage": "Montant USD connu pour {known, plural, =1 {# référence} other {# références}} sur {total, plural, =1 {# référence Stripe retenue} other {# références Stripe retenues}}.",
           "amountScope": "Total des montants USD enregistrés, après réductions et avant frais ou remboursements. Chaque référence Stripe compte une fois, même avec plusieurs clés. Ce total ne couvre pas les renouvellements Pro/OEM, ni les audits de fichiers ; il ne mesure pas le bénéfice.",
           "empty": "Aucune référence Stripe de pack retenue. Aucun montant confirmé à afficher.",
           "zero": "Références avec un montant USD confirmé à zéro : {count}.",

@@ -1,5 +1,7 @@
 'use client';
 
+import { useLocale } from 'next-intl';
+import { formatGrouped } from '@/lib/format-grouped';
 import { HoverTooltip } from './info-dot';
 
 export interface StatusByPathRow {
@@ -94,6 +96,8 @@ function healthColor(row: StatusByPathRow): string {
 }
 
 export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
+  const locale = useLocale();
+  const fmt = (value: number) => formatGrouped(value, locale);
   if (rows.length === 0) {
     return <div className="flex h-32 items-center justify-center text-[var(--fg-5)] text-sm">Aucune donnée</div>;
   }
@@ -126,7 +130,7 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
                       <div>{describePath(row.path)}</div>
                       {methods.length > 0 && (
                         <div className="text-[var(--fg-3)]">
-                          Méthodes : {methods.map(([m, n]) => `${m} ×${n}`).join(' · ')}
+                          Méthodes : {methods.map(([m, n]) => `${m} ×${fmt(n)}`).join(' · ')}
                         </div>
                       )}
                     </div>
@@ -152,7 +156,7 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
                 {row.avg_ms != null ? `${row.avg_ms}ms` : '—'}
               </span>
               <span className="w-16 text-right font-mono text-xs text-purple-400 tabular-nums">
-                {row.total.toLocaleString()}
+                {fmt(row.total)}
               </span>
             </div>
 
@@ -169,7 +173,7 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
                     content={
                       <div className="space-y-1.5">
                         <div className="font-semibold text-[var(--fg-1)]">
-                          {cls.label} · {value.toLocaleString()} ({((value / row.total) * 100).toFixed(1)}%)
+                          {cls.label} · {fmt(value)} ({formatGrouped((value / row.total) * 100, locale, 1)}%)
                         </div>
                         <div className="text-[var(--fg-3)]">{cls.hint}</div>
                         {detail.length > 0 && (
@@ -177,7 +181,7 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
                             {detail.map(([code, n]) => (
                               <div key={code} className="flex items-start gap-2">
                                 <span className="font-mono text-[var(--fg-1)] tabular-nums shrink-0">{code}</span>
-                                <span className="font-mono text-[var(--fg-4)] tabular-nums shrink-0">×{n.toLocaleString()}</span>
+                                <span className="font-mono text-[var(--fg-4)] tabular-nums shrink-0">×{fmt(n)}</span>
                                 <span className="text-[var(--fg-3)] text-[11px] leading-snug">{explainCode(code, row.path)}</span>
                               </div>
                             ))}
@@ -206,14 +210,14 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
                     key={cls.key}
                     content={
                       <div className="space-y-1.5">
-                        <div className="font-semibold text-[var(--fg-1)]">{cls.label} · {value.toLocaleString()}</div>
+                        <div className="font-semibold text-[var(--fg-1)]">{cls.label} · {fmt(value)}</div>
                         <div className="text-[var(--fg-3)]">{cls.hint}</div>
                         {detail.length > 0 && (
                           <div className="mt-1 space-y-1 border-t border-[var(--ink-4)]/80 pt-1.5">
                             {detail.map(([code, n]) => (
                               <div key={code} className="flex items-start gap-2">
                                 <span className="font-mono text-[var(--fg-1)] tabular-nums shrink-0">{code}</span>
-                                <span className="font-mono text-[var(--fg-4)] tabular-nums shrink-0">×{n.toLocaleString()}</span>
+                                <span className="font-mono text-[var(--fg-4)] tabular-nums shrink-0">×{fmt(n)}</span>
                                 <span className="text-[var(--fg-3)] text-[11px] leading-snug">{explainCode(code, row.path)}</span>
                               </div>
                             ))}
@@ -225,7 +229,7 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
                     <span className="inline-flex items-center gap-1">
                       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cls.color }} />
                       <span className="text-[var(--fg-3)]">{cls.label}</span>
-                      <span>{value.toLocaleString()}</span>
+                      <span>{fmt(value)}</span>
                     </span>
                   </HoverTooltip>
                 );
