@@ -284,6 +284,56 @@ that *repairs* such a leak must not describe what it removed.
 
 ## 9. Work in flight
 
+**Dashboard numbers now render identically on both sides (#182, 11 September).** Five client
+components — `status-by-path-table`, `live-health-strip`, `usage-chart`, `stacked-bar-chart` and
+the CRM `freshness-badge` — used `toLocaleString`, `toLocaleDateString` or `Intl.DateTimeFormat`.
+Node and WebKit ship different ICU data, so the server wrote `121 773` (narrow no-break space)
+where Safari wrote `121'773`, and React reported a hydration mismatch (#418) on every dashboard
+page, in French and German only. They now go through `frontend/lib/format-grouped.ts`,
+`frontend/lib/crm/format.ts` and `frontend/lib/crm/zurich.ts`, which are pure and locale-explicit.
+`frontend/lib/dashboard/number-rendering.test.ts` locks it: it stubs the native formatter to
+return two *different* strings and asserts the rendered HTML is byte-identical, and it fails the
+badge if `Intl.DateTimeFormat` is constructed at all. **The rule this encodes: a client component
+never calls a native locale formatter.** Verified on the served site — the served dashboard
+JavaScript contains zero `toLocale*` calls, against nine before.
+
+**Observed business responses and returning days (#183, 11 September).** `src/lib/service-usage.ts`
+adds a `service_usage` block, version 1, to the existing private route `/v1/admin/activation`.
+No new endpoint, no new collection, no migration, no browser identifier. Read it before quoting
+any of its three numbers:
+
+- **The unit is an account that can be attributed, not a person, not a sale, not a visitor.** An
+  account is a normalised e-mail gathering its retained keys, including keys deactivated by a
+  rotation. A key prefix claimed by more than one account is dropped *before* internal and generic
+  accounts are excluded, so a key shared between an internal and an external account is never
+  credited to the external one.
+- **A business response is a 2xx on a billable route**, reusing `buildBillableFilter` and excluding
+  literal OpenAPI path parameters. A negative IBAN verdict returned with HTTP 200 counts: the
+  measure is "the service answered", not "the answer was yes".
+- **`first_observed_accounts` means the first business response still present in the retained
+  traces**, not the first ever. A purge moves that date. Say "first observed", never "new".
+- **`returning_accounts` is at least two distinct UTC days inside the window**, unioned across the
+  account's keys. **Two dates are not a D+7 retention figure**, and the two subsets overlap — never
+  add them together.
+- The frontend guard `frontend/lib/dashboard/service-usage.ts` recomputes the expected window from
+  `observed_until` and `period_days` and refuses the whole reading on any mismatch. **An older or
+  incoherent API renders "unavailable", never three zeros.** Keep that property: a zero that is
+  really an outage is the failure mode this card exists to avoid.
+- Calls with no attributable key, generic accounts and the hosted MCP are out of scope, and no
+  visit → account → purchase link is delivered by this lot.
+
+Measured on the served API, not locally: 162–235 ms per read on both windows, twelve concurrent
+reads all successful, and no failure under the full parallel load a dashboard render produces.
+
+🚨 **An intermittent degradation of the dashboard's private reads, older than both lots and not
+explained.** Roughly one render in twelve, every block fed by `ADMIN_SECRET` comes back
+unavailable at once — the packs card, which predates #183, included. The failing render completes
+in about 2.4 s instead of 6.5 s, and the API records nothing: zero 5xx on `/v1/admin/activation`
+over seven days, 4 ms average, and the 401 counter does not move when it happens. So the request
+appears not to leave the Vercel function at all. Do not read a one-off "unavailable" card as a
+defect of the measure; reproduce it by loading `/fr/dashboard?period=90` a dozen times.
+
+
 **The report purchase path, hardened on 10 September (#180).** Worth reading before touching
 `src/lib/audit-jobs.ts`, `src/routes/audit.ts` or the Stripe webhook, because several of its
 guarantees are easy to undo by accident:
