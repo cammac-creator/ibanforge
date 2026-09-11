@@ -326,12 +326,24 @@ Measured on the served API, not locally: 162–235 ms per read on both windows, 
 reads all successful, and no failure under the full parallel load a dashboard render produces.
 
 🚨 **An intermittent degradation of the dashboard's private reads, older than both lots and not
-explained.** Roughly one render in twelve, every block fed by `ADMIN_SECRET` comes back
-unavailable at once — the packs card, which predates #183, included. The failing render completes
-in about 2.4 s instead of 6.5 s, and the API records nothing: zero 5xx on `/v1/admin/activation`
-over seven days, 4 ms average, and the 401 counter does not move when it happens. So the request
-appears not to leave the Vercel function at all. Do not read a one-off "unavailable" card as a
-defect of the measure; reproduce it by loading `/fr/dashboard?period=90` a dozen times.
+explained.** Every block fed by `ADMIN_SECRET` comes back unavailable at once — the packs card,
+which predates #183, included. Measured cadence: roughly one render in twelve when the instances
+are warm, and markedly more in the minutes after a deployment, where one run of twelve gave seven.
+The failing render completes in about 2.4 s instead of 6.5 s, and **the API records nothing**:
+zero 5xx on `/v1/admin/activation` over seven days, 4 ms average, and the 401 counter does not
+move while it happens — so the request never leaves the Vercel function.
+
+The shape fits `admin()` taking its `ADMIN_SECRET ? fetch : notFetched()` short circuit: the
+variable is read once at module scope, and an instance that starts without it never calls
+anything. Worth checking first, and cheap — `npx vercel env ls`, and whether the value carries a
+trailing newline, which is exactly what bit three values on this project on 09/09. **Ruled out:**
+it is not a cached or prerendered page — `x-vercel-cache` was `MISS` with `age: 0` on the failing
+renders as well as the good ones.
+
+Do not read a one-off "unavailable" card as a defect of the measure. The fallback itself was
+checked on the served site and is correct: the title, the sentence "Mesure indisponible pour cette
+lecture. Aucun zéro n'est déduit.", and not a single digit. Reproduce by loading
+`/fr/dashboard?period=90` a dozen times.
 
 
 **The report purchase path, hardened on 10 September (#180).** Worth reading before touching
