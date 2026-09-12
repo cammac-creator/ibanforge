@@ -21,7 +21,7 @@ export const revalidate = 3600;
  * you are actually looking at. Falls back to `main` for local development,
  * where the variable is unset.
  */
-const REF = process.env.VERCEL_GIT_COMMIT_SHA || "main";
+const REF = process.env.GIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "main";
 const CHANGELOG_URL = `https://raw.githubusercontent.com/cammac-creator/ibanforge/${REF}/CHANGELOG.md`;
 
 async function getChangelog(): Promise<string | null> {
