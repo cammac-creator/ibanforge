@@ -155,8 +155,9 @@ touching any register.** Four rules distilled from it:
    response built from their data.** That is a permission condition, not a freshness nicety:
    a credit that rots is a breach. The pattern to copy is the guard test that fails when
    the month shown differs from the month loaded (`src/routes/pra-attribution.test.ts`).
-3. **A refusal closes a source completely** — none of its data may enter the repository or
-   the API. One payment network has refused.
+3. **Un refus ferme complètement une source** : aucune de ses données ne doit entrer dans
+   le dépôt ou l'API. AusPayNet a explicitement refusé la réutilisation proposée de son CSV
+   BSB ; la restriction datée figure dans `docs/data-sources.md`.
 4. **A register's own robots file is respected as policy.** One central bank names our
    crawler; that is not something to "fix" with a user-agent rotation.
 
@@ -410,6 +411,14 @@ been pushed, so a cloud agent cannot see it. It was first built treating the cou
 *authoritative* register, which is wrong — the published file lists credit institutions,
 not the whole code allocation, so a real payment institution's code would be answered "not
 allocated". The switch to the partial path is decided and under way. **Do not start over.**
+
+**Précision reçue le 14 septembre 2026.** La HBA confirme que HEBIC ne couvre pas les
+établissements de paiement et de monnaie électronique émettant des IBAN grecs ; elle renvoie
+à la Bank of Greece pour leurs codes. Le traitement partiel reste donc obligatoire avant
+intégration. Elle confirme aussi qu'aucune date exacte de publication n'est fournie : citer
+l'édition et la date de consultation séparément, sans inventer de date. Les conditions
+actualisées, ainsi que les réponses de la NBS, de Betaalvereniging Nederland et d'AusPayNet,
+sont consignées dans `docs/data-sources.md`. Cette mise à jour ne modifie aucun registre.
 
 **Moving the site off Vercel to a Swiss VPS.** One commit on `vps-migration`: a container
 image for the site, a workflow that builds on GitHub and ships over a restricted SSH key
