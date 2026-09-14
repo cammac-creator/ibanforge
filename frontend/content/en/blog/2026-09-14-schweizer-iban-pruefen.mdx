@@ -1,0 +1,158 @@
+---
+title: "Checking a Swiss IBAN: check digits, the SIX IID register, QR-IBAN"
+description: "A Swiss IBAN passes three checks, not one: the check digits, the five-digit IID against the SIX register, and whether it is a QR-IBAN that demands a QR reference. Three real API answers, field by field, with ten calls a day and no key."
+date: "2026-09-14"
+faq:
+  - q: "What is the IID in a Swiss IBAN?"
+    a: "The five digits after the two check digits: the bank clearing number (BC-Nummer, IID), which SIX allocates in the BankMaster and republishes monthly, with the institution, its registered address, its participation in SIC, euroSIC and Instant Payments, and its QR-IID."
+  - q: "Are the check digits not enough?"
+    a: "No. The official example IBAN CH93 0076 2011 6238 5295 7 passes the check digits, and its IID 00762 was never allocated by SIX. Only the register answers whether an institution stands behind the code."
+  - q: "How do you recognise a QR-IBAN?"
+    a: "By its IID: between 30000 and 31999 it is a QR-IID, and the IBAN is a QR-IBAN. It requires a QR reference (QRR) on the QR-bill; an ordinary IBAN forbids one. The API reports is_qr_iid and resolves the QR-IID to the institution."
+  - q: "What does the check cost?"
+    a: "Nothing to start: ten checks a day per address with no key, 200 a month with the free key, and every IID has its own page under /iid, with no call at all."
+---
+
+Search for "check Swiss IBAN" and you mostly get a check-digit calculator. It answers one question out of three. A Swiss IBAN is CH, two check digits, a five-digit bank clearing number (IID) and twelve characters of account. The check digits say whether the string is consistent with itself. The IID says which institution holds the account, and whether that code is allocated at all: that lives in the [SIX BankMaster](/iid), the register that allocates the codes and republishes every month, with the registered address and the payment rails. And the IID says a third thing: between 30000 and 31999 the IBAN is a [QR-IBAN](/docs/swiss-qr-iban), and the payment has to carry a QR reference or be rejected.
+
+This post shows the three answers on three real IBANs, as our API serves them. The answers are reproduced as served, trimmed only of the fields that play no part here.
+
+## First answer: the example IBAN everyone tests with
+
+CH93 0076 2011 6238 5295 7 is the Swiss example in Swift's IBAN registry. It passes the check digits, and thousands of forms test their validation with it:
+
+```json
+{
+  "iban": "CH9300762011623852957",
+  "valid": true,
+  "bank_code_check": {
+    "value": "00762",
+    "status": "not_in_register",
+    "reason": "not_allocated",
+    "match": null,
+    "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+    "authoritative": true,
+    "as_of": "2026-09"
+  },
+  "clearing": null,
+  "bic": null,
+  "next_steps": [
+    {
+      "code": "bank_code_not_allocated",
+      "do": "Do not send. The bank code is absent from the national register, so no institution holds this account.",
+      "because": "bank_code_check.status is not_in_register and authoritative is true (SIX BankMaster (Swiss IID / BC-Nummer register))"
+    }
+  ]
+}
+```
+
+`valid` is true: the check digits have no objection. `bank_code_check` says the rest. IID 00762 is not allocated in the register, and because `authoritative` is true it may be read as it stands: no institution holds this account. `not_allocated` is the only reason in the API that justifies stopping a payment, and it only appears with a national register behind it. Why official example IBANs so often point at unallocated codes, we [described in August](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+## Second answer: an allocated code, with everything SIX says about it
+
+IID 00230, with an invented account number (the twelve characters play no part in the verdict on the code; only the check digits have to be right):
+
+```json
+{
+  "iban": "CH4900230000012345678",
+  "valid": true,
+  "bank_code_check": {
+    "value": "00230",
+    "status": "verified",
+    "match": "register",
+    "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+    "authoritative": true,
+    "institution": {
+      "name": "UBS Switzerland AG",
+      "street": "Bahnhofstrasse 45",
+      "post_code": "8098",
+      "town": "Zürich",
+      "country": "CH"
+    },
+    "as_of": "2026-09"
+  },
+  "clearing": {
+    "iid": "00230",
+    "name": "UBS Switzerland AG",
+    "type": "bank",
+    "town": "Zürich",
+    "sic": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "qr_iid": "30005",
+    "qr_iid_source": "register",
+    "qr_iids": ["30005", "30308"]
+  },
+  "bic": {
+    "code": "UBSWCHZH",
+    "bank_name": "UBS Switzerland AG",
+    "basis": "curated_map",
+    "authoritative": false,
+    "source": "IBANforge curated bank-code map"
+  }
+}
+```
+
+Three blocks, three claims. `bank_code_check` is the register's verdict: `verified`, `authoritative: true`, and beneath it the registered address as SIX publishes it, street and number included, which very few European registers do. `clearing` is what the register says about the payment rails: participation in SIC (the Swiss franc clearing), in Instant Payments in francs, in euroSIC for the euro, and the QR-IIDs the institution holds, here 30005 and 30308. Anyone generating or checking a QR-bill finds here which QR-IID belongs to which bank.
+
+The third block is the honest one: `bic` carries `basis: curated_map` and `authoritative: false`. The SIX register publishes no BIC beside the IID, so the BIC comes from our own maintained map, and the API says so instead of pretending SIX confirmed it. The IID is vouched for, the BIC is an indication: two different weights, two fields, and a program reading the answer branches on `authoritative`, not on the presence of a value.
+
+## Third answer: a QR-IBAN, and what it demands
+
+The same bank, but with its QR-IID 30005 in the IID position:
+
+```json
+{
+  "iban": "CH1730005000012345678",
+  "valid": true,
+  "bank_code_check": {
+    "value": "30005",
+    "status": "verified",
+    "match": "register",
+    "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+    "authoritative": true,
+    "institution": {
+      "name": "UBS Switzerland AG",
+      "street": "Bahnhofstrasse 45",
+      "post_code": "8098",
+      "town": "Zürich",
+      "country": "CH"
+    },
+    "as_of": "2026-09"
+  },
+  "clearing": {
+    "iid": "00230",
+    "name": "UBS Switzerland AG",
+    "type": "bank",
+    "town": "Zürich",
+    "sic": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "qr_iid": "30005",
+    "qr_iid_source": "register",
+    "is_qr_iid": true
+  }
+}
+```
+
+`is_qr_iid: true` is the field that makes the difference. A QR-IBAN is not a second account number but the same bank under a number that may only be paid with a QR reference (QRR, 27 characters, recursive modulo 10 check digit). `clearing.iid` resolves the QR-IID to the institution, 00230, so the account belongs to the right bank even though the IBAN itself only carries the QR-IID. In a creditor file this is the check nobody does by hand: a QR-IBAN without a reference, or an ordinary IBAN with a QRR reference, are both payments that come back. The whole QR-bill, header, IBAN, reference and addresses, is checked for free by [`POST /v1/ch/qr-bill/check`](/docs/swiss-qr-iban), with the [page for non-developers](/tools/qr-bill) beside it.
+
+One detail for the careful: the QR-IBAN from the SIX documentation, CH44 3199 9123 0008 8901 2, carries QR-IID 31999, which is likewise not allocated in the current BankMaster. It is a specimen, not an account, and the API says so exactly as it does for Swift's example IBAN.
+
+## How to call it
+
+Without a key, from the terminal, ten times a day per address:
+
+```bash
+curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"CH4900230000012345678"}'
+```
+
+The answer is complete and carries a `trial` block saying how many calls are left today. For production the [free key](/docs/api-keys) is enough, 200 requests a month with no card. If you would rather write no code: [every IID has its own page](/iid) with exactly this answer, [the Swiss IBAN format with the official example](/iban/ch) sits beside it, and the [test IBAN generator](/tools/test-iban) produces Swiss IBANs with real, allocated IIDs for fixtures and demos.
+
+## What the register does not say
+
+An allocated IID is not an existing account. SIX knows that 00230 belongs to UBS; whether the twelve characters behind it were ever opened, only the bank knows. Whether the payee's name matches the account is, in Switzerland, the job of the banks' [Verification of Payee](/blog/2026-09-02-verification-of-payee-switzerland), not of a register. And from 14 November 2026 SIX requires a structured or hybrid creditor address: the registered address from the register is the bank's, not the payee's, and does not replace it.
+
+What [moves in the register from month to month](/blog/2026-09-04-what-changes-in-bank-registers-each-month) we described elsewhere; the answers above carry their `as_of` and hold for the September file.
