@@ -592,11 +592,31 @@ but the number is written out by hand in roughly twenty documentation surfaces, 
 message catalogues, the machine-readable files and the README. Changing only the constant
 would leave those lying.
 
-**Version 1.6.0 was released on 15 September 2026** (PR 197: the MCP output schemas now
-match what the enrichment serves, so the official client stops rejecting valid answers; the
-npm package bounds its requests and no longer expands a refused batch; both SDKs create a key
-without an address; the two audit tools of the npm package ship with it). The device-grant
-tools (`request_api_key`, `poll_api_key`, wave 2 of the keyless chantier) wait for 1.7.0.
+**Versions 1.6.0 and 1.7.0 were both released on 15 September 2026.** 1.6.0 carried PR 197
+(the MCP output schemas now match what the enrichment serves, so the official client stops
+rejecting valid answers; the npm package bounds its requests and no longer expands a refused
+batch; both SDKs create a key without an address; the two audit tools of the npm package ship
+with it). 1.7.0 carried the **device grant** (RFC 8628): `src/lib/device-grant.ts` holds the
+whole quota guard, `src/routes/device-grant.ts` the five routes, `frontend/app/[locale]/device/`
+the approval page, and the two tools `request_api_key` / `poll_api_key` live on the three MCP
+surfaces (the remote one calls the module directly with a mutable per-session call context and
+binds the remembered `device_code` to the network fingerprint that opened it; the npm package
+and the stdio server of this repository relay over HTTPS). Two things to know before touching
+it: the per-network daily budget is **shared in both directions** with `POST /v1/keys/generate`
+(a pending request is a promised key, and `generate` reads the same sum), and `device_codes`
+must never enter the backup (it holds the key in clear until the single collection). The
+adversarial review of the lot found no blocker; its seven findings were fixed the same evening
+(revocation with `deactivated_at`, the race between two approval tabs, the 404 delays counted
+in `pollsInFlight`, a token issued without a row, the extension capped at two lifetimes, the
+`device:polls` probe, the 429 in the contract). Spec: `docs/internal/…/spec-04-device-grant-mcp.md`
+(internal); what is still an extension is listed there (§2.8 session cap and max-fair eviction,
+the farm replay).
+
+**Agents launched in a worktree may start behind the announced revision.** Observed on
+15 September: a worktree created for a reviewer opened at the base commit, not at the head the
+brief named. Every brief now asks the agent to check `git rev-parse HEAD` first and to move to
+the named revision itself. A heredoc that is not quoted (`<<EOF` instead of `<<'EOF'`) executes
+the backticks of the brief it writes; quote it and substitute variables with `sed` afterwards.
 
 **The UK firm lookup answers 503** (`not_configured`) until two environment variables are
 set. It was built blind, with a one-day cache and no stale grace because the described
