@@ -62,7 +62,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - GET  /v1/credits/bundles — free, list prepaid credit bundles
 - GET  /v1/demo — free example validations
 - POST /v1/keys/generate (no body at all) — free API key, no e-mail, no card, 25 req/month
-- POST /v1/keys/generate {"email":"you@company.com"} — same route, optional address, and it starts the claim
+- POST /v1/keys/generate {"email":"you@company.com"} — same route, optional address, and the key is issued already at the full allowance (tier "email", nothing left to claim)
 - POST /v1/keys/claim (key in the Authorization header, never the body) — raises that same key to 200 a month with a mailed 6-digit code, or to 200 once with an x402 payment on the key
 
 ## How to pay (4 rails, no dead-ends)

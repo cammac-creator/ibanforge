@@ -23,7 +23,7 @@ Result: less surface area to maintain, more pages exposed to crawlers and agents
 [`/agents`](https://ibanforge.com/en/agents) is the new entry point for any AI agent or developer integrating IBANforge. It walks through three paths in plain language:
 
 1. **MCP** — drop the IBANforge MCP server into Claude Desktop, Cursor, or Cline. Five tools auto-discovered: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `lookup_ch_clearing`, `check_compliance`. Either stdio (`npx -y ibanforge-mcp`) or remote streamable-HTTP at `https://api.ibanforge.com/mcp`.
-2. **Free API key** — POST any email to `/v1/keys/generate`, receive a key with 200 free calls/month, no captcha, no email verification, no signup form. The key is shown once — bots and humans handle this the same way.
+2. **Free API key** — POST any email to `/v1/keys/generate`, receive a key with 200 free calls/month *(as of 15 September 2026 no address is needed: an empty POST returns a key at 25 a month, and an address, or a claim, raises it to 200)*, no captcha, no email verification, no signup form. The key is shown once — bots and humans handle this the same way.
 3. **x402 micropayments** — sign a payment authorization with a wallet on Base L2, the Coinbase CDP facilitator settles in ~1-2 seconds, the API returns the response. No quota, no subscription. Perfect for agents that scale beyond 200 calls.
 
 Every paid endpoint advertises its price via `/.well-known/x402`, agents.json, mcp.json, openapi.json, and llms.txt — so a crawling agent can discover IBANforge, learn how to authenticate, and start using it without a human in the loop.

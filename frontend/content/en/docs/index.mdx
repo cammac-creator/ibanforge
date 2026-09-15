@@ -24,7 +24,7 @@ All endpoints are served over HTTPS. HTTP requests are redirected automatically.
 
 ## Authentication
 
-**Before any of them: the first 10 calls a day need nothing at all.** `POST /v1/iban/validate` with a real `iban` and no key is served in full, 10 times a day per IP address. The answer carries a `trial` block saying how many are left today and the one request that gets you a free key. It is a taster, not a tier: past 10/day the endpoint answers `402` again, with `cause.reason: "trial_exhausted"`.
+**Before any of them: the first 25 calls a day need nothing at all.** `POST /v1/iban/validate` with a real `iban` and no key is served in full, 25 times a day for the address it comes from address. The answer carries a `trial` block saying how many are left today and the one request that gets you a free key. It is a taster, not a tier: past 10/day the endpoint answers `402` again, with `cause.reason: "trial_exhausted"`.
 
 Then, three ways in — pick what fits, your app or agent never hits a dead-end:
 
@@ -53,7 +53,7 @@ A request without a valid key or payment gets a `402` response with machine-read
 
 ## Quick example
 
-No key, nothing to sign up for — this works as it stands, 10 times a day per IP:
+No key, nothing to sign up for — this works as it stands, 25 times a day for the address it comes from:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -74,7 +74,7 @@ The response then carries an extra `trial` block:
 }
 ```
 
-Past 10 calls a day, take the [free key](/docs/api-keys) — one POST, no card — and add `Authorization: Bearer ifk_...` to the same request.
+Past 25 calls a day, take the [free key](/docs/api-keys) — one POST, no card — and add `Authorization: Bearer ifk_...` to the same request.
 
 Response:
 

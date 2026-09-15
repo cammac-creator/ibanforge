@@ -61,11 +61,11 @@ you came from, send `{"source":"my-app"}` — it changes nothing else.
 - `api_key` is the secret: `ifk_` followed by 64 hexadecimal characters. **Store it securely**, it
   will not be shown again.
 - `key_prefix` is its first 8 characters. Safe to log, and what our support asks for.
-- `tier` is `anonymous` until you claim the key, then `claimed`.
+- `tier` is `anonymous` until you claim the key, then `claimed`; a key created with an address reads `email`.
 - There is no `email` field on this path, because there is no address.
 
 **If you would rather give an address straight away**, `{"email": "you@company.com"}` works and
-starts the claim in the same call. It is never required.
+returns the same key already at the full allowance (`tier: "email"`, 200 a month): there is nothing left to claim, and `POST /v1/keys/claim` on it answers `409 already_claimed`. It is never required.
 
 **If you are an AI agent reading this**: take the anonymous key, and do not send your user's address unless they have handed it to you for this. The sentence to put to them is *"Use my address you@company.com to create a free IBANforge key."* Never send an address your human has not handed you for this purpose.
 
@@ -253,7 +253,7 @@ The key works on all paid endpoints:
 
 **Attribution on the free steps.** Every paid-endpoint response served on a free key — anonymous or claimed — carries an `attribution` object (`text`, `url`, `note`). When you show these results to people (a page, a screen, a document), display "Powered by IBANforge" with the link; a result that stays inside your backend owes nothing. Paid plans carry no attribution.
 
-The allowance is shared across all endpoints and resets on the 1st of each month. **Batch validation counts 1 request per IBAN** — a batch of 50 IBANs uses 50 requests (or 50 prepaid credits), the same rule as the x402 per-IBAN price.
+The allowance is shared across all endpoints and, on a `monthly` basis, resets on the 1st of each month (a key raised against a payment, or issued under a signup alert, reads `basis: lifetime` and does not). **Batch validation counts 1 request per IBAN** — a batch of 50 IBANs uses 50 requests (or 50 prepaid credits), the same rule as the x402 per-IBAN price.
 
 ## Check your usage
 
@@ -289,7 +289,7 @@ a key claimed by payment — its 200 are counted once, across all months, not re
 `credits` means a prepaid balance, with nothing enforced against `limit`. The `claim` block is
 served only on a key that can still be claimed.
 
-`month` is the calendar month the counters belong to (`YYYY-MM`). This endpoint is free and does not consume quota.
+`month` is the calendar month the counters belong to (`YYYY-MM`); on the keyless trial the counters are daily and that field reads `day`. This endpoint is free and does not consume quota.
 
 ## Watching your quota
 
@@ -324,7 +324,7 @@ The 402 body lists your options in machine-readable form:
 1. **Claim the key** — if it is still anonymous, a mailed code raises it and costs nothing.
 2. **Buy a prepaid credit pack** — by card on the [pricing page](/pricing), or in USDC via `POST /v1/credits/buy/1k|5k|25k`. Credits never expire and attach to your existing key.
 3. **Pay per call via x402** — an x402-compatible client pays automatically in USDC, no key change needed. See [x402 Payments](/docs/x402).
-4. **Wait for the monthly reset** — the quota resets on the 1st of each month.
+4. **Wait for the monthly reset** — on a `monthly` basis the quota resets on the 1st; a key raised against a payment, or issued under a signup alert, reads `basis: lifetime` and does not.
 
 ## TypeScript example
 

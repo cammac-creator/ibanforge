@@ -6,6 +6,7 @@ import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 import { dataTools, FREE_ENDPOINTS } from '../mcp/inventory.js';
 import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import { CONSENT_BOUNDARY } from '../lib/consent.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -195,7 +196,9 @@ const x402Document: Handler = (c) => {
         // "you@example.com" did not: example.com is on the disposable-domain
         // blocklist, so every agent that copied this line literally got a 400.
         signup_with_email:
-          'POST /v1/keys/generate with body {"email":"you@company.com"} — optional, and only with an address your human gave you for this',
+          // L'interdit vient de l'atome, jamais d'une reformulation locale : une
+          // réécriture qui le laisserait tomber ici n'était vue par aucun garde.
+          `POST /v1/keys/generate with body {"email":"you@company.com"} — optional. ${CONSENT_BOUNDARY}`,
         claim:
           'POST /v1/keys/claim, key in the Authorization header — a mailed 6-digit code gives the full allowance every month, an x402 payment on the key gives it once',
         anonymous_tier_quota: ANONYMOUS_MONTHLY_LIMIT,

@@ -12,7 +12,7 @@ Si vous n'avez que deux minutes, faites l'étape 1 et l'étape 4 : le premier ap
 
 ## 1. Le premier appel, sans aucune clé
 
-`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **10 fois par jour et par adresse IP**, remis à zéro à minuit UTC.
+`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **25 fois par jour et par adresse IP**, remis à zéro à minuit UTC.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -39,7 +39,7 @@ La réponse est la réponse entière, plus un bloc que vous ne voyez jamais autr
 }
 ```
 
-`trial` est une dégustation, pas un palier. Au-delà de 10 appels par jour, l'endpoint répond `402` avec `cause.reason: "trial_exhausted"`, et le décompte vit en mémoire, par instance de serveur : à traiter comme un ordre de grandeur, jamais comme un quota sur lequel bâtir. `trial` disparaît de la réponse dès que vous envoyez une clé.
+`trial` est une dégustation, pas un palier. Au-delà de 25 appels par jour, l'endpoint répond `402` avec `cause.reason: "trial_exhausted"`, et le décompte vit dans la base du service : il survit à un redéploiement. `trial` disparaît de la réponse dès que vous envoyez une clé.
 
 ## 2. La clé gratuite — 200 requêtes par mois
 
@@ -69,7 +69,7 @@ Utilisez une vraie adresse. Les domaines jetables ou de remplissage sont refusé
 ```json
 {
   "error": "disposable_email",
-  "message": "Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked."
+  "message": "An address was supplied, and this one is a disposable domain: example.com, mailinator and the like are blocked. Either send an address you can read, or send no body at all — a key with no address is issued on the spot."
 }
 ```
 

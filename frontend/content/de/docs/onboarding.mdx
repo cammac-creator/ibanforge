@@ -12,7 +12,7 @@ Wenn Sie nur zwei Minuten haben: Schritt 1 und Schritt 4. Der erste Aufruf brauc
 
 ## 1. Der erste Aufruf, ganz ohne Schlüssel
 
-`POST /v1/iban/validate` mit einer echten `iban` und ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **10-mal pro Tag und IP-Adresse**, Rücksetzung um Mitternacht UTC.
+`POST /v1/iban/validate` mit einer echten `iban` und ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **25-mal pro Tag und IP-Adresse**, Rücksetzung um Mitternacht UTC.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -39,7 +39,7 @@ Die Antwort ist die vollständige Antwort, plus ein Block, den Sie nur ohne Schl
 }
 ```
 
-`trial` ist eine Kostprobe, keine Stufe. Über 10 Aufrufe pro Tag antwortet der Endpunkt mit `402` und `cause.reason: "trial_exhausted"`, und gezählt wird im Arbeitsspeicher je Serverinstanz: als Größenordnung zu verstehen, nie als Kontingent, auf dem man baut. `trial` verschwindet aus der Antwort, sobald Sie einen Schlüssel senden.
+`trial` ist eine Kostprobe, keine Stufe. Über 25 Aufrufe pro Tag antwortet der Endpunkt mit `402` und `cause.reason: "trial_exhausted"`, und gezählt wird in der Datenbank des Dienstes: der Zähler überlebt ein Redeploy. `trial` verschwindet aus der Antwort, sobald Sie einen Schlüssel senden.
 
 ## 2. Der kostenlose Schlüssel — 200 Anfragen pro Monat
 
@@ -69,7 +69,7 @@ Verwenden Sie eine echte Adresse. Platzhalter- und Wegwerfdomains werden abgeleh
 ```json
 {
   "error": "disposable_email",
-  "message": "Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked."
+  "message": "An address was supplied, and this one is a disposable domain: example.com, mailinator and the like are blocked. Either send an address you can read, or send no body at all — a key with no address is issued on the spot."
 }
 ```
 

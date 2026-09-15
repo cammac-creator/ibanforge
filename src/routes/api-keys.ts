@@ -1083,7 +1083,13 @@ apiKeys.post('/v1/keys/claim', async (c) => {
       .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
       .get(keyHash) as { n: number }
   ).n;
-  if (served <= 0) {
+  // 🚨 Une clé COUPÉE POUR RAFALE est exemptée de « a servi au moins un appel » :
+  // le radar coupe sur la naissance, jamais sur l'usage, et une clé frappée dans
+  // une rafale puis coupée avant son premier appel ne pourra jamais en servir un.
+  // Sans cette exemption, le 402 « claim it back » l'envoyait dans une boucle
+  // (revue adversariale du 15/09, lentille textes, constat 3). Le coût d'un code
+  // reste borné par les plafonds d'envoi par (adresse, réseau) et par domaine.
+  if (served <= 0 && !repair) {
     return c.json(
       {
         error: 'unused_key',

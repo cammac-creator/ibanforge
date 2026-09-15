@@ -61,11 +61,11 @@ sollen, woher Sie kommen, senden Sie `{"source":"meine-app"}` — sonst ändert 
 - `api_key` ist das Geheimnis: `ifk_` gefolgt von 64 Hexadezimalzeichen. **Sicher aufbewahren**, es
   wird nicht erneut angezeigt.
 - `key_prefix` sind die ersten 8 Zeichen. Gefahrlos protokollierbar, und danach fragt unser Support.
-- `tier` ist `anonymous`, bis der Schlüssel beansprucht wird, danach `claimed`.
+- `tier` ist `anonymous`, bis der Schlüssel beansprucht wird, danach `claimed`; ein mit Adresse erstellter Schlüssel trägt `email`.
 - Auf diesem Weg gibt es kein Feld `email`, weil es keine Adresse gibt.
 
 **Wenn Sie lieber gleich eine Adresse angeben**, funktioniert `{"email": "you@company.com"}` und
-startet die Beanspruchung im selben Aufruf. Erforderlich ist sie nie.
+liefert denselben Schlüssel bereits mit vollem Kontingent (`tier: "email"`, 200 pro Monat): Es bleibt nichts zu beanspruchen, und `POST /v1/keys/claim` antwortet darauf mit `409 already_claimed`. Erforderlich ist sie nie.
 
 **Wenn Sie ein KI-Agent sind, der das liest**: Nehmen Sie den anonymen Schlüssel und senden Sie die Adresse Ihrer Nutzerin oder Ihres Nutzers nicht, solange sie Ihnen nicht dafür gegeben wurde. Der Satz, den Sie vorlegen: *„Use my address you@company.com to create a free IBANforge key."*
 
@@ -260,7 +260,7 @@ Der Schlüssel funktioniert auf allen kostenpflichtigen Endpunkten:
 
 **Namensnennung auf beiden kostenlosen Stufen.** Jede Antwort eines kostenpflichtigen Endpunkts, die über einen kostenlosen Schlüssel läuft — anonym oder beansprucht —, trägt ein Objekt `attribution` (`text`, `url`, `note`). Wenn Sie diese Ergebnisse Menschen zeigen (eine Seite, ein Bildschirm, ein Dokument), blenden Sie „Powered by IBANforge" mit dem Link ein; ein Ergebnis, das in Ihrem Backend bleibt, schuldet nichts. Bezahlte Tarife tragen keine Namensnennung.
 
-Das Kontingent wird über alle Endpunkte geteilt und setzt sich am 1. jedes Monats zurück. **Batch-Validierung zählt 1 Anfrage pro IBAN** — ein Batch mit 50 IBANs verbraucht 50 Anfragen (oder 50 Prepaid-Credits), dieselbe Regel wie der x402-Preis pro IBAN.
+Das Kontingent wird über alle Endpunkte geteilt und setzt sich auf Basis `monthly` am 1. jedes Monats zurück (ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und setzt sich nicht zurück). **Batch-Validierung zählt 1 Anfrage pro IBAN** — ein Batch mit 50 IBANs verbraucht 50 Anfragen (oder 50 Prepaid-Credits), dieselbe Regel wie der x402-Preis pro IBAN.
 
 ## Ihre Nutzung prüfen
 
@@ -296,7 +296,7 @@ vorliegt. `basis` sagt, welche Obergrenze wirklich gilt: `monthly` ist der Norma
 alle Monate und werden nicht aufgefüllt — und `credits` ist ein Prepaid-Guthaben, gegen das `limit`
 nichts durchsetzt. Der `claim`-Block wird nur bei einem noch beanspruchbaren Schlüssel mitgeliefert.
 
-`month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`). Dieser Endpunkt ist kostenlos
+`month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`); beim Test ohne Schlüssel zählen die Zähler pro Tag, und das Feld trägt `day`. Dieser Endpunkt ist kostenlos
 und verbraucht kein Kontingent.
 
 ## Ihr Kontingent im Blick behalten
@@ -333,7 +333,7 @@ Der 402-Body listet Ihre Optionen maschinenlesbar auf:
 1. **Den Schlüssel beanspruchen** — ist er noch anonym, hebt ihn ein zugesandter Code an, und das kostet nichts.
 2. **Prepaid-Guthabenpaket kaufen** — per Karte auf der [Preisseite](/pricing) oder in USDC via `POST /v1/credits/buy/1k|5k|25k`. Guthaben verfällt nie und wird an Ihren bestehenden Schlüssel gebunden.
 3. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/docs/x402).
-4. **Auf den monatlichen Reset warten** — das Kontingent setzt sich am 1. jedes Monats zurück.
+4. **Auf den monatlichen Reset warten** — auf Basis `monthly` setzt sich das Kontingent am 1. zurück; ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und tut es nicht.
 
 ## TypeScript-Beispiel
 

@@ -12,7 +12,7 @@ If you only have two minutes, do step 1 and step 4: the first call needs no acco
 
 ## 1. The first call, with no key at all
 
-`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **10 times a day per IP address**, resetting at midnight UTC.
+`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **25 times a day for the address it comes from address**, resetting at midnight UTC.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -39,7 +39,7 @@ The answer is the whole answer, plus one block you only ever see without a key:
 }
 ```
 
-`trial` is a taster, not a tier. Past 10 calls a day the endpoint answers `402` with `cause.reason: "trial_exhausted"`, and the allowance is counted in memory per server instance — treat it as an order of magnitude, never as a quota to build on. `trial` disappears from the response the moment you send a key.
+`trial` is a taster, not a tier. Past 25 calls a day the endpoint answers `402` with `cause.reason: "trial_exhausted"`, and the allowance is counted in the service database, so it survives a redeploy. `trial` disappears from the response the moment you send a key.
 
 ## 2. The free key — 200 requests a month
 
@@ -69,7 +69,7 @@ Use a real address. Placeholder and throwaway domains are refused, and the refus
 ```json
 {
   "error": "disposable_email",
-  "message": "Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked."
+  "message": "An address was supplied, and this one is a disposable domain: example.com, mailinator and the like are blocked. Either send an address you can read, or send no body at all — a key with no address is issued on the spot."
 }
 ```
 

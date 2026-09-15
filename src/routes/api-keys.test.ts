@@ -2119,12 +2119,13 @@ describe('POST /v1/keys/claim — lot 6b : une clé coupée pour rafale se rend 
     expect(((await res.json()) as { error: string }).error).toBe('invalid_key');
   });
 
-  it('une clé coupée qui n’a jamais servi garde son 403 unused_key : rien à rendre, une clé neuve suffit', async () => {
+  it('une clé coupée qui n’a jamais servi est quand même réclamable : le radar coupe sur la naissance, pas sur l’usage', async () => {
     const app = makeApp();
     const k = anonKey(`repair-unused-${RUN_TAG}`);
     expect(revokeBurstBatch([burst(k)]).revoked).toBe(1);
+    // Sans relais en test, le temps 1 rend 503 ; ce qui compte est qu'il n'y a
+    // ni 401 (clé inconnue) ni 403 unused_key (la boucle du constat 3).
     const res = await claim(app, k.api_key, { email: `unused-${RUN_TAG}@alpha.example.net` });
-    expect(res.status).toBe(403);
-    expect(((await res.json()) as { error: string }).error).toBe('unused_key');
+    expect([202, 503]).toContain(res.status);
   });
 });

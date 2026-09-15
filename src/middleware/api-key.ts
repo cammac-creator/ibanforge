@@ -41,10 +41,11 @@ import { CLAIM_MIN_PAID_USD } from '../lib/tiers.js';
  */
 export const KEY_REVOKED_BURST_DETAIL =
   'This anonymous key was revoked: it was minted inside a burst of automated signups and cut with ' +
-  'that burst. If this key was yours, claim it back: POST /v1/keys/claim with this key and an email ' +
-  'address returns it to you, active, at 200 requests a month, out of reach of this sweep. Or take a ' +
-  'fresh key - POST /v1/keys/generate needs no email address - or pay per call with x402, which needs ' +
-  'no key at all.';
+  'that burst. If this key was yours, claim it back in two steps: POST /v1/keys/claim with this key ' +
+  'and an email address mails a 6-digit code, then the same call with that code returns the key to ' +
+  `you, active, at ${FREE_TIER_MONTHLY_LIMIT} requests a month, out of reach of this sweep - even if it ` +
+  'never served a call. Or take a fresh key - POST /v1/keys/generate needs no email address - or pay ' +
+  'per call with x402, which needs no key at all.';
 
 /**
  * Extract an IBANforge API key from common locations agents use:

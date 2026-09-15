@@ -24,7 +24,7 @@ Alle Endpunkte werden über HTTPS bereitgestellt. HTTP-Anfragen werden automatis
 
 ## Authentifizierung
 
-**Vor allen dreien: Die ersten 10 Aufrufe pro Tag brauchen gar nichts.** `POST /v1/iban/validate` mit einer echten `iban` und ohne Schlüssel wird vollständig beantwortet, 10-mal pro Tag und IP-Adresse. Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der einen Anfrage, die einen kostenlosen Schlüssel liefert. Eine Kostprobe, keine Stufe: über 10/Tag antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
+**Vor allen dreien: Die ersten 25 Aufrufe pro Tag brauchen gar nichts.** `POST /v1/iban/validate` mit einer echten `iban` und ohne Schlüssel wird vollständig beantwortet, 25-mal pro Tag für die Adresse, von der er kommt-Adresse. Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der einen Anfrage, die einen kostenlosen Schlüssel liefert. Eine Kostprobe, keine Stufe: über 10/Tag antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
 
 Danach drei Wege hinein — wählen Sie, was passt; Ihre App oder Ihr Agent landet nie in einer Sackgasse:
 
@@ -53,7 +53,7 @@ Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort m
 
 ## Schnellbeispiel
 
-Ohne Schlüssel, ohne Anmeldung — dieser Aufruf funktioniert so, wie er ist, 10-mal pro Tag und IP:
+Ohne Schlüssel, ohne Anmeldung — dieser Aufruf funktioniert so, wie er ist, 25-mal pro Tag für die Adresse, von der er kommt:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \

@@ -39,7 +39,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   everywhere, the line that says when *not* to use it: never send an address your human has not
   handed you for this purpose — on the 402 body, both `llms.txt` files, the MCP
   instructions and the tool cost line of the three transports, the `/v1` and `.well-known`
-  discovery documents, the OpenAPI contract and the npm package's README. **Why**: an agent asked to
+  discovery documents and the npm package's README (the OpenAPI contract documents the routes, not the consent sentence). **Why**: an agent asked to
   fetch a key refused, in its own words, rather than register a person's address with a third party
   — and it was right to. The address was never what the free tier was protecting; the key was.
 - **Poland: the settlement number's own check digit, served beside the register verdict.** A Polish IBAN opens on the eight-digit *numer rozliczeniowy* (three digits of bank, four of unit, one check digit under NBP's numbering ordinance). `bank_code_check.check_digit` now says whether the eight digits form a number NBP could have issued — weights 3, 9, 7, 1, 3, 9, 7 over the first seven, complement modulo 10, pinned by the published numbers of NBP, PKO BP, Santander/Erste and mBank because the ordinance text is not machine-readable. `valid: false` reads as a typo; it never becomes `not_allocated`, which stays reserved for an authoritative register. This settles the August atlas' open question: the IBAN carries the eight digits, not the ECB's three-digit institution number.

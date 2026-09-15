@@ -111,7 +111,7 @@ operations:
         effect: payment
       - operation: POST /v1/keys/generate
         reason: Mints a credential. An empty body mints an anonymous one and
-          asks for nothing; an optional email address starts the claim.
+          asks for nothing; an optional email address issues the key already at the full allowance, nothing left to claim.
         effect: credential
       - operation: POST /v1/keys/claim
         reason: Raises the allowance of the key already in hand, against an
@@ -484,7 +484,7 @@ Authorization: Bearer ifk_xxxxxxxx
   all, ${FREE_MONTHLY} a month once that same key is claimed.
 - Prepaid credits: one payment, one key, no expiry.
 - Mint one: \`POST /v1/keys/generate\` with no body at all. An email address is
-  optional, and it starts the claim to the full allowance.
+  optional, and it issues the key already at the full allowance (nothing left to claim).
 - Claim it: \`POST /v1/keys/claim\`, key in the \`Authorization\` header.
 - Check remaining allowance: \`GET /v1/keys/usage\`.
 

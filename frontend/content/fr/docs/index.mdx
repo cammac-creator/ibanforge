@@ -24,7 +24,7 @@ Tous les endpoints sont servis en HTTPS. Les requetes HTTP sont automatiquement 
 
 ## Authentification
 
-**Avant toutes les trois : les 10 premiers appels du jour ne demandent rien.** `POST /v1/iban/validate` avec un vrai `iban` et sans clé est servi en entier, 10 fois par jour et par adresse IP. La réponse porte un bloc `trial` qui dit combien il en reste aujourd'hui et la requête unique qui donne une clé gratuite. C'est une dégustation, pas un palier : au-delà de 10/jour, l'endpoint répond de nouveau `402`, avec `cause.reason: "trial_exhausted"`.
+**Avant toutes les trois : les 25 premiers appels du jour ne demandent rien.** `POST /v1/iban/validate` avec un vrai `iban` et sans clé est servi en entier, 25 fois par jour pour l'adresse d'où il vient. La réponse porte un bloc `trial` qui dit combien il en reste aujourd'hui et la requête unique qui donne une clé gratuite. C'est une dégustation, pas un palier : au-delà de 25 par jour, l'endpoint répond de nouveau `402`, avec `cause.reason: "trial_exhausted"`.
 
 Ensuite, trois portes d'entrée — choisissez ce qui vous convient, votre app ou votre agent ne tombe jamais sur un cul-de-sac :
 
@@ -53,7 +53,7 @@ Une requête sans clé valide ni paiement reçoit une réponse `402` avec des in
 
 ## Exemple rapide
 
-Sans clé, sans inscription — cet appel fonctionne tel quel, 10 fois par jour et par IP :
+Sans clé, sans inscription — cet appel fonctionne tel quel, 25 fois par jour pour l'adresse d'où il vient :
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -74,7 +74,7 @@ La réponse porte alors un bloc `trial` supplémentaire :
 }
 ```
 
-Au-delà de 10 appels par jour, prenez la [clé gratuite](/docs/api-keys) — un seul POST, sans carte — et ajoutez `Authorization: Bearer ifk_...` à la même requête.
+Au-delà de 25 appels par jour, prenez la [clé gratuite](/docs/api-keys) — un seul POST, sans carte — et ajoutez `Authorization: Bearer ifk_...` à la même requête.
 
 Reponse :
 

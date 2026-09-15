@@ -87,7 +87,7 @@
       },
       "1": {
         "badge": "MCP-native — pour agents",
-        "title": "8 outils, sans inscription",
+        "title": "9 outils, sans inscription",
         "description": "Serveur Model Context Protocol natif (stdio + HTTP). Claude, Cursor et tout agent MCP s’installent en une ligne : npx -y ibanforge-mcp."
       },
       "2": {
@@ -243,7 +243,7 @@
       "heading": "Les agents ont leur propre rail",
       "sub": "Cette page parle aussi robot — chaque affirmation ci-dessus est lisible par machine, et chaque endpoint est payable sans humain dans la boucle.",
       "mcpTitle": "MCP natif",
-      "mcpBody": "8 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
+      "mcpBody": "9 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
       "x402Title": "Micropaiements x402",
       "x402Body": "Les agents autonomes paient à la requête en USDC — sans compte, sans checkout, règlement on-chain.",
       "docsTitle": "Docs lisibles par machine",
@@ -1325,8 +1325,8 @@
   },
   "agents": {
     "meta": {
-      "title": "Serveur MCP de validation d’IBAN — 8 outils, sans inscription",
-      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 8 outils. Une clé API sans aucun e-mail : 25 requêtes par mois, 200 par mois une fois réclamée. Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
+      "title": "Serveur MCP de validation d’IBAN — 9 outils, sans inscription",
+      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 9 outils. Une clé API sans aucun e-mail : 25 requêtes par mois, 200 par mois une fois réclamée. Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
     },
     "eyebrow": "Pour les agents IA",
     "hero": {
@@ -1342,7 +1342,7 @@
       "mcp": {
         "badge": "Voie 1 · MCP",
         "title": "Serveur MCP natif",
-        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 8 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
+        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 9 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
         "tradeoff": "Stdio ou HTTP · npm ou distant"
       },
       "apiKey": {
@@ -1361,12 +1361,12 @@
     "mcp": {
       "eyebrow": "Voie 1 · MCP",
       "heading": "Installer dans Claude Desktop, Cursor ou Cline",
-      "description": "Le serveur MCP IBANforge expose 8 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
+      "description": "Le serveur MCP IBANforge expose 9 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Ajouter à ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) ou %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · endpoint distant",
       "httpDescription": "Pointez n'importe quel client MCP compatible vers :",
-      "toolsHeading": "8 outils disponibles"
+      "toolsHeading": "9 outils disponibles"
     },
     "apiKey": {
       "eyebrow": "Voie 2 · Clé gratuite",
