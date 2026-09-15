@@ -13,6 +13,7 @@ import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
+import { purgeLineageFacts } from './lib/lineage-facts.js';
 import { reviewLedgerVolume, snapshotTrialDay, sweepDailyLedger } from './lib/daily-ip-ledger.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
@@ -82,6 +83,11 @@ try {
       `Retention: purged ${purgedTerminated} request_log rows of terminated keys (DPA 4.7)`,
     );
   purgeExpiredVerifications();
+  // Les faits de mesure de l'essai, alignés sur les 12 mois de request_log et
+  // sur AUCUNE promesse nouvelle (lot M). Au démarrage aussi, et pas seulement
+  // dans le tick de 24 h : un redéploiement quotidien ferait que le tick ne
+  // tombe jamais, et la purge ne s'exécuterait jamais.
+  purgeLineageFacts(12);
 } catch (err) {
   console.error('Retention purge failed at boot:', err);
 }
@@ -98,6 +104,7 @@ setInterval(
       purgeOldRequestLog(12);
       purgeTerminatedKeyTelemetry(30);
       purgeExpiredVerifications();
+      purgeLineageFacts(12);
       checkpointStatsWal();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

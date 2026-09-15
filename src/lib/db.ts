@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { resetStatements } from './bic-lookup.js';
 import { resetNationalRegisterStatements } from './national-registers.js';
-import { resetStatsStatements } from './stats.js';
+import { buildCanonicalBillableFilter, resetStatsStatements } from './stats.js';
 import { closeComplianceDB } from './compliance-db.js';
 import { resetChClearingStatements } from './ch-clearing.js';
 import { resetPraBanksStatements } from './pra-banks.js';
@@ -1271,8 +1271,281 @@ function openStatsDB(): DatabaseType.Database {
         created_at              TEXT    DEFAULT (datetime('now'))
       ) WITHOUT ROWID;
     `);
+    migrateLineageFacts(statsDB);
   }
   return statsDB;
+}
+
+/**
+ * Les faits de mesure de l'essai : une ligne par LIGNÉE de clé (lot M,
+ * 15/09/2026, contrat de mesure du même jour).
+ *
+ * Posé en DERNIER, après le registre d'essai du lot 4, et sorti dans sa propre
+ * fonction pour qu'un chantier voisin qui migre `api_keys` ne se retrouve pas à
+ * fusionner dans la même région de fichier. Il nomme `origin_prefix`,
+ * `claimed_at`, `tier` et `key_settlements` : tous posés plus haut, donc
+ * l'ordre est celui qu'exige le piège 1 du 19/08 (un index ou un backfill qui
+ * nomme une colonne créée plus bas fait échouer TOUTE l'ouverture, et l'API ne
+ * démarre plus).
+ *
+ * Les trois rattrapages sont écrits pour pouvoir être rejoués : le premier ne
+ * touche que les lignes à `lineage_hash IS NULL`, le deuxième est un
+ * `INSERT OR IGNORE`, le troisième ne s'exécute que si le deuxième a
+ * réellement inséré quelque chose.
+ */
+function migrateLineageFacts(statsDB: DatabaseType.Database): void {
+  // ─── 1. La référence interne stable, sur api_keys ─────────────────────────
+  //
+  // Le contrat l'exige : « les préfixes de clé ne constituent pas des
+  // identifiants uniques garantis : employer côté serveur une référence
+  // interne stable, conserver origin_prefix pour la compatibilité du radar ».
+  // La référence est la `key_hash` de la clé NÉE : elle est unique par
+  // construction (contrainte UNIQUE d'origine), elle ne voyage jamais dans une
+  // réponse, et elle survit à N rotations parce que `rotateApiKey` la recopie.
+  const keyCols = (
+    statsDB.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
+  ).map((r) => r.name);
+  if (!keyCols.includes('lineage_hash')) {
+    statsDB.exec('ALTER TABLE api_keys ADD COLUMN lineage_hash TEXT');
+  }
+  // L'index APRÈS l'ALTER, inconditionnellement : à ce stade la colonne existe
+  // par les deux chemins (base neuve ou base migrée).
+  statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_lineage ON api_keys(lineage_hash)');
+
+  // ─── 2. La table des faits ────────────────────────────────────────────────
+  //
+  // Une ligne par lignée, et les « premiers » écrits UNE fois : toute écriture
+  // passe par un COALESCE, donc rejouer le même fait deux fois ne change rien.
+  // Le dédoublonnage est une propriété de la forme, pas d'un identifiant
+  // d'événement à comparer.
+  //
+  // Pas de contre-apostrophe et pas de point d'interrogation dans les
+  // commentaires SQL ci-dessous : ils vivent dans un littéral de gabarit JS,
+  // ou la contre-apostrophe termine la chaîne.
+  //
+  // AUCUN corps métier, aucun IBAN, aucune adresse, aucune IP, aucune clé,
+  // aucun secret : des hachages, des dates UTC au format de datetime('now'),
+  // des routes canoniques et des contextes pris dans des valeurs contrôlées.
+  statsDB.exec(`
+    CREATE TABLE IF NOT EXISTS lineage_facts (
+      -- La key_hash de la clé née. Jamais servie, jamais journalisée ailleurs.
+      lineage_hash              TEXT PRIMARY KEY,
+      -- Format de datetime('now'), 'YYYY-MM-DD HH:MM:SS' UTC, comme toutes les
+      -- autres colonnes temporelles de ce fichier. Surtout PAS l'ISO 8601 de
+      -- toISOString() : 'T' (0x54) est superieur a l'espace (0x20) en
+      -- comparaison lexicographique, donc une fenetre glissante ecrite en
+      -- WHERE ... >= datetime('now', modificateur) serait TOUJOURS VRAIE.
+      birth_at                  TEXT,
+      -- Le palier lu A LA NAISSANCE quand la ligne est ecrite au fil de l'eau.
+      -- Sur une ligne RATTRAPEE, c'est le palier COURANT de la cle d'origine :
+      -- une reclamation reecrit la colonne tier sur place, donc le palier de
+      -- naissance n'est pas reconstituable apres coup. Approximation assumee et
+      -- sans consequence : les indicateurs ne lisent que les lignes au fil de
+      -- l'eau.
+      birth_tier                TEXT,
+      birth_source              TEXT,
+      -- Page d'arrivée (chemin canonique seulement), site référent réduit à son
+      -- DOMAINE, et page sur laquelle la clé a été remise. Lus de
+      -- signup_attribution, qui les valide déjà champ par champ. NULL = inconnu,
+      -- jamais une valeur devinée. delivery_page reste NULL tant que le site
+      -- n'envoie pas la page de remise : signup_attribution ne porte
+      -- aujourd'hui que la page d'ARRIVEE.
+      entry_landing             TEXT,
+      entry_referrer_domain     TEXT,
+      delivery_page             TEXT,
+      -- Le premier appel métier 2xx, sa route canonique, et le contexte observé.
+      first_success_at          TEXT,
+      first_success_route       TEXT,
+      -- 'demo' (panneau du site), 'unknown' (client sans marqueur) ou 'traces'
+      -- (premier observe dans les traces conservées, donc reconstitué après
+      -- coup et jamais confondu avec un fait écrit au fil de l'eau).
+      first_success_context     TEXT,
+      -- Premier succès dont le contexte n'est PAS 'demo'. « Hors panneau »
+      -- signifie contexte observé, pas preuve d'un vrai dossier : la part de
+      -- contexte inconnu est publiée à côté. JAMAIS posé par un rattrapage,
+      -- ou l'on déduirait « production » d'une trace muette.
+      first_unmarked_success_at TEXT,
+      -- Un succès dans [premier succès + 7 j, premier succès + 14 j[. Calculé
+      -- A L'ECRITURE parce qu'il ne se déduit pas de first/last : une lignée
+      -- active en semaine 2 puis en semaine 5 a un last_success hors fenêtre.
+      week2_success_at          TEXT,
+      last_success_at           TEXT,
+      -- Le jour UTC du dernier succès compté, qui rend success_days idempotent
+      -- EN BASE et pas seulement en mémoire : sans lui, un redéploiement en
+      -- milieu de journée vide le cache mémoire et compte le jour deux fois.
+      last_success_day          TEXT,
+      success_days              INTEGER NOT NULL DEFAULT 0,
+      first_claim_at            TEXT,
+      claim_method              TEXT,
+      first_settlement_at       TEXT,
+      settlement_count          INTEGER NOT NULL DEFAULT 0,
+      -- La clé PAYEE remise à ce porteur, quand le rapprochement est sans
+      -- ambiguïté. Reliée commercialement, jamais fusionnée : ni les quotas ni
+      -- les droits ne se réunissent (contrat du 15/09).
+      paid_key_hash             TEXT,
+      paid_key_delivered_at     TEXT,
+      paid_first_success_at     TEXT,
+      -- 1 = ligne reconstituée à la migration, 0 = ligne écrite au fil de l'eau.
+      -- C'est ce drapeau qui donne un sens à « depuis le démarrage de la
+      -- nouvelle mesure » : les dénominateurs ne retiennent que les lignes à 0.
+      backfilled                INTEGER NOT NULL DEFAULT 0,
+      updated_at                TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_lineage_facts_birth ON lineage_facts(backfilled, birth_at);
+    CREATE INDEX IF NOT EXISTS idx_lineage_facts_paid ON lineage_facts(paid_key_hash);
+    CREATE INDEX IF NOT EXISTS idx_lineage_facts_first ON lineage_facts(first_success_at);
+  `);
+
+  // ─── 3. Rattrapage de lineage_hash, en JS, une fois ───────────────────────
+  //
+  // En JS et pas en SQL parce que le cas ambigu se DECIDE : une clé qui porte
+  // un origin_prefix dont plusieurs lignes revendiquent le préfixe n'a pas de
+  // lignée connaissable, et le contrat dit d'écarter la correspondance, pas de
+  // choisir la première. Écartée, elle devient sa propre lignée.
+  //
+  // 🚨 Jamais de regroupement par `email = 'anonymous'` : la sentinelle est
+  // partagée par tout le monde, et le contrat l'interdit nommément — ce serait
+  // réunir toutes les clés anonymes du service en une seule lignée.
+  const needsLineage = statsDB
+    .prepare('SELECT 1 AS one FROM api_keys WHERE lineage_hash IS NULL LIMIT 1')
+    .get() as { one: number } | undefined;
+  if (needsLineage) {
+    const rows = statsDB
+      .prepare(
+        'SELECT id, key_hash, origin_prefix FROM api_keys WHERE lineage_hash IS NULL ORDER BY id',
+      )
+      .all() as Array<{ id: number; key_hash: string; origin_prefix: string | null }>;
+    // Un préfixe vers UNE seule key_hash, et seulement quand il est unique.
+    const byPrefix = new Map<string, string | null>();
+    for (const r of statsDB.prepare('SELECT key_prefix, key_hash FROM api_keys').all() as Array<{
+      key_prefix: string;
+      key_hash: string;
+    }>) {
+      byPrefix.set(r.key_prefix, byPrefix.has(r.key_prefix) ? null : r.key_hash);
+    }
+    const setLineage = statsDB.prepare('UPDATE api_keys SET lineage_hash = ? WHERE id = ?');
+    let ambiguous = 0;
+    statsDB.transaction(() => {
+      for (const r of rows) {
+        let lineage = r.key_hash;
+        if (r.origin_prefix) {
+          const resolved = byPrefix.get(r.origin_prefix);
+          if (resolved) lineage = resolved;
+          else ambiguous++;
+        }
+        setLineage.run(lineage, r.id);
+      }
+    })();
+    if (ambiguous > 0) {
+      console.warn(
+        `[lineage] correspondance ambiguë écartée pour ${ambiguous} clé(s) : ` +
+          'origin_prefix sans ligne unique, chacune devient sa propre lignée',
+      );
+    }
+  }
+
+  // ─── 4. Rattrapage des naissances, depuis api_keys ────────────────────────
+  //
+  // La ligne d'ORIGINE d'une lignée est celle dont key_hash = lineage_hash.
+  // birth_at prend le MIN du groupe plutôt que la date de cette ligne : si elle
+  // a disparu, la lignée garde une naissance plausible au lieu de n'en avoir
+  // aucune. Palier, source et attribution restent lus sur la ligne d'origine,
+  // et valent NULL quand elle manque — inconnu, pas devine.
+  const inserted = statsDB
+    .prepare(
+      `INSERT OR IGNORE INTO lineage_facts
+         (lineage_hash, birth_at, birth_tier, birth_source, entry_landing, entry_referrer_domain,
+          first_claim_at, claim_method, first_settlement_at, settlement_count, backfilled, updated_at)
+       SELECT k.lineage_hash,
+              MIN(k.created_at),
+              (SELECT o.tier   FROM api_keys o WHERE o.key_hash = k.lineage_hash),
+              (SELECT o.source FROM api_keys o WHERE o.key_hash = k.lineage_hash),
+              (SELECT a.landing  FROM signup_attribution a
+                 JOIN api_keys o ON o.key_prefix = a.key_prefix
+                WHERE o.key_hash = k.lineage_hash),
+              (SELECT a.referrer FROM signup_attribution a
+                 JOIN api_keys o ON o.key_prefix = a.key_prefix
+                WHERE o.key_hash = k.lineage_hash),
+              (SELECT MIN(c.claimed_at) FROM api_keys c
+                WHERE c.lineage_hash = k.lineage_hash AND c.claimed_at IS NOT NULL),
+              (SELECT c.claim_method FROM api_keys c
+                WHERE c.lineage_hash = k.lineage_hash AND c.claimed_at IS NOT NULL
+                ORDER BY c.claimed_at LIMIT 1),
+              (SELECT MIN(s.created_at) FROM key_settlements s
+                 JOIN api_keys j ON j.key_hash = s.key_hash
+                WHERE j.lineage_hash = k.lineage_hash),
+              (SELECT COUNT(*) FROM key_settlements s
+                 JOIN api_keys j ON j.key_hash = s.key_hash
+                WHERE j.lineage_hash = k.lineage_hash),
+              1,
+              datetime('now')
+         FROM api_keys k
+        WHERE k.lineage_hash IS NOT NULL
+        GROUP BY k.lineage_hash`,
+    )
+    .run();
+
+  // ─── 5. Rattrapage des « premiers » depuis request_log ────────────────────
+  //
+  // Seulement quand l'étape 4 a réellement inséré : au deuxième démarrage elle
+  // n'insère plus rien et ce balayage ne coûte rien. Le résultat est étiqueté
+  // 'traces', c'est-à-dire « premier OBSERVE dans les traces conservées » : la
+  // purge des 12 mois a pu emporter le vrai premier appel, et le contrat exige
+  // que les deux ne soient jamais confondus.
+  //
+  // Le filtre est celui de la mesure au fil de l'eau, par ÉGALITÉ sur la route
+  // canonique. Il compte donc moins qu'un LIKE : une ligne écrite avant la
+  // normalisation des chemins n'y entre pas. Assumé — réintroduire le préfixe
+  // textuel ferait diverger le rattrapage du fil de l'eau, et le contrat
+  // interdit de reconnaître une route à son seul préfixe.
+  if (inserted.changes > 0) {
+    const billable = buildCanonicalBillableFilter();
+    const traces = statsDB
+      .prepare(
+        `SELECT k.lineage_hash AS lineage,
+                MIN(r.created_at) AS first_at,
+                MAX(r.created_at) AS last_at,
+                COUNT(DISTINCT date(r.created_at)) AS days,
+                -- La route de la PREMIERE ligne : created_at est de largeur fixe,
+                -- donc le minimum lexicographique de la concaténation est celui
+                -- de la date, et le suffixe est la route qui l'accompagne.
+                MIN(r.created_at || '|' || r.path) AS first_pair
+           FROM request_log r
+           JOIN api_keys k ON k.key_prefix = r.key_prefix
+          WHERE r.key_prefix IS NOT NULL
+            AND r.status >= 200 AND r.status < 300
+            AND k.lineage_hash IS NOT NULL
+            AND (${billable.sql})
+            AND r.key_prefix NOT IN (
+              SELECT key_prefix FROM api_keys
+               GROUP BY key_prefix HAVING COUNT(DISTINCT lineage_hash) > 1)
+          GROUP BY k.lineage_hash`,
+      )
+      .all(...billable.params) as Array<{
+      lineage: string;
+      first_at: string;
+      last_at: string;
+      days: number;
+      first_pair: string;
+    }>;
+    const update = statsDB.prepare(
+      `UPDATE lineage_facts
+          SET first_success_at      = COALESCE(first_success_at, ?),
+              first_success_route   = COALESCE(first_success_route, ?),
+              first_success_context = COALESCE(first_success_context, 'traces'),
+              last_success_at       = COALESCE(last_success_at, ?),
+              last_success_day      = COALESCE(last_success_day, ?),
+              success_days          = MAX(success_days, ?),
+              updated_at            = datetime('now')
+        WHERE lineage_hash = ? AND first_success_at IS NULL`,
+    );
+    statsDB.transaction(() => {
+      for (const t of traces) {
+        const route = t.first_pair.slice(t.first_at.length + 1);
+        update.run(t.first_at, route, t.last_at, t.last_at.slice(0, 10), t.days, t.lineage);
+      }
+    })();
+  }
 }
 
 // ---------------------------------------------------------------------------

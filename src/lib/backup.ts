@@ -36,18 +36,19 @@ import { getStatsDB } from './db.js';
 import { recordEvent } from './events.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
-export const BACKUP_FORMAT = 3;
+export const BACKUP_FORMAT = 4;
 /**
  * Ce qu'un restaurateur d'aujourd'hui sait lire. Le format 1 n'a pas les deux
  * journaux du palier de clé (key_claims, key_settlements), le format 2 n'a pas
- * le journal d'annulation du radar (key_revocations, lot 6) : ils y valent []
+ * le journal d'annulation du radar (key_revocations, lot 6), le format 3 n'a pas
+ * les faits de mesure de l'essai (lineage_facts, lot M) : ils y valent []
  * et le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
  * le format rend irrestaurable tout dump pris avant la livraison — sur une base
  * qui n'a pas d'autre sauvegarde. Et incrémenter plutôt que ne rien faire :
  * sans numéro, un dump tronqué et un dump légitimement ancien seraient
  * indiscernables, et le `?? []` masquerait l'un comme l'autre.
  */
-export const READABLE_FORMATS = [1, 2, 3] as const;
+export const READABLE_FORMATS = [1, 2, 3, 4] as const;
 
 export interface BackupPayload {
   format: number;
@@ -59,6 +60,7 @@ export interface BackupPayload {
     key_claims?: number;
     key_settlements?: number;
     key_revocations?: number;
+    lineage_facts?: number;
   };
   api_keys: Array<Record<string, unknown>>;
   api_usage: Array<Record<string, unknown>>;
@@ -74,6 +76,16 @@ export interface BackupPayload {
    * clé désactivée par le radar ne peut plus être rendue telle qu'elle était.
    */
   key_revocations?: Array<Record<string, unknown>>;
+  /**
+   * Format 4. Les faits de mesure de l'essai : une ligne par lignée de clé.
+   *
+   * Pas de l'argent, mais une mesure qui ne se reconstitue plus. Le premier
+   * résultat d'une lignée est écrit une seule fois : un volume perdu et
+   * restauré sans cette table rendrait des lignées vivantes avec un entonnoir
+   * vide, et le rattrapage depuis request_log ne rendrait que ce que la purge
+   * des douze mois a laissé.
+   */
+  lineage_facts?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -121,6 +133,9 @@ export function exportPaidState(takenAt: string): BackupPayload {
   const revocations = db.prepare('SELECT * FROM key_revocations').all() as Array<
     Record<string, unknown>
   >;
+  const lineages = db.prepare('SELECT * FROM lineage_facts').all() as Array<
+    Record<string, unknown>
+  >;
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
   // indistinguishable from any other call. This annotation puts it on the
@@ -143,12 +158,14 @@ export function exportPaidState(takenAt: string): BackupPayload {
       key_claims: claims.length,
       key_settlements: settlements.length,
       key_revocations: revocations.length,
+      lineage_facts: lineages.length,
     },
     api_keys: keys,
     api_usage: usage,
     key_claims: claims,
     key_settlements: settlements,
     key_revocations: revocations,
+    lineage_facts: lineages,
   };
 }
 
@@ -163,6 +180,8 @@ export interface RestoreReport {
   settlements_skipped: number;
   revocations_inserted: number;
   revocations_skipped: number;
+  lineages_inserted: number;
+  lineages_skipped: number;
 }
 
 /**
@@ -197,6 +216,8 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     settlements_skipped: 0,
     revocations_inserted: 0,
     revocations_skipped: 0,
+    lineages_inserted: 0,
+    lineages_skipped: 0,
   };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
@@ -235,6 +256,12 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     for (const row of payload.key_revocations ?? []) {
       if (insertRow('key_revocations', row)) report.revocations_inserted++;
       else report.revocations_skipped++;
+    }
+    // Absent d'un dump aux formats 1 à 3 ; un dump au format 4 le porte
+    // toujours, même vide.
+    for (const row of payload.lineage_facts ?? []) {
+      if (insertRow('lineage_facts', row)) report.lineages_inserted++;
+      else report.lineages_skipped++;
     }
   });
   run();

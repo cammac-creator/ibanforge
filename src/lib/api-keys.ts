@@ -11,6 +11,7 @@ import {
 import { normalizeEmail } from './email-norm.js';
 import { recordKeyCreation } from './key-creation-guard.js';
 import { recordKeyClaim, type KeyClaimMethod } from './key-claims.js';
+import { linkPaidKeyToLineage, recordLineageBirth, recordLineageClaim } from './lineage-facts.js';
 
 /** Ré-export conservé pour les consommateurs du middleware. */
 export { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
@@ -100,9 +101,13 @@ export function generateApiKey(
     // datetime('now'), c'est-à-dire de SQLite en UTC, comme toutes les autres
     // dates de cette table. Une date calculée en JS y arriverait dans le fuseau
     // de la machine et ferait glisser toute fenêtre glissante qui la lit.
+    // lineage_hash = la key_hash de cette clé-ci : elle EST la clé née, donc sa
+    // propre lignée. La colonne voyage DANS la transaction de frappe parce que
+    // c'est une identité et non de la télémétrie — une clé sans lignée serait
+    // invisible à la mesure sans qu'aucun appel ne le signale (lot M).
     `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, source, issued_by_us, tier,
-                           claimed_at, claim_method)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, ?)`,
+                           claimed_at, claim_method, lineage_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, ?, ?)`,
   );
   for (let attempt = 0; attempt < 3; attempt++) {
     const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
@@ -125,9 +130,15 @@ export function generateApiKey(
         // drapeau est ignoré sur la branche anonyme plutôt que cru sur parole.
         provenMailbox && email ? 1 : 0,
         provenMailbox && email ? 'email_code' : null,
+        keyHash,
       );
       recordKeyCreation(birth?.ipHash ?? 'unknown', birth?.userAgent ?? null, keyPrefix);
     })();
+    // HORS de la transaction, exprès : un refus d'écriture du fait de mesure ne
+    // doit pas annuler une clé déjà frappée. La perte est réparable (la
+    // migration reconstitue une naissance depuis api_keys, et le premier appel
+    // métier crée la ligne manquante), l'inverse ne l'est pas.
+    recordLineageBirth({ lineageHash: keyHash, tier, source: source ?? null, keyPrefix });
     return { api_key: rawKey, key_prefix: keyPrefix, key_hash: keyHash };
   }
   throw new Error('key_prefix collided three times in a row: the key generator is broken');
@@ -169,19 +180,23 @@ export function generateCreditKey(
   // x402 callers don't always have an email and we don't want to gate the
   // bundle behind one.
   const storedEmail = email && email.includes('@') ? email : 'credits-buyer';
+  const emailNorm = normalizeEmail(storedEmail);
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view, tier) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view, tier, lineage_hash) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
     storedEmail,
-    normalizeEmail(storedEmail),
+    emailNorm,
     credits,
     credits,
     paymentRef ?? null,
     paymentRef ? rawKey : null,
     'paid',
+    keyHash,
   );
+  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', keyPrefix });
+  linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
   return { api_key: rawKey, key_prefix: keyPrefix, credits };
 }
 
@@ -230,20 +245,24 @@ export function generateStripeKey(
   const keyHash = hashKey(rawKey);
   const keyPrefix = rawKey.slice(0, 12);
   const storedEmail = email && email.includes('@') ? email : 'stripe-buyer';
+  const emailNorm = normalizeEmail(storedEmail);
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view, tier) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view, tier, lineage_hash) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
     storedEmail,
-    normalizeEmail(storedEmail),
+    emailNorm,
     credits,
     credits,
     stripeSessionId,
     rawKey,
     'paid',
+    keyHash,
   );
+  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', keyPrefix });
+  linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
 
   return { api_key: rawKey, key_prefix: keyPrefix, credits, idempotent: false };
 }
@@ -294,20 +313,24 @@ export function generateOemKey(
   const keyHash = hashKey(rawKey);
   const keyPrefix = rawKey.slice(0, 12);
   const storedEmail = email && email.includes('@') ? email : 'oem-subscriber';
+  const emailNorm = normalizeEmail(storedEmail);
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view, tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view, tier, lineage_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
     storedEmail,
-    normalizeEmail(storedEmail),
+    emailNorm,
     monthlyLimit,
     stripeSessionId,
     stripeSubscriptionId,
     rawKey,
     'paid',
+    keyHash,
   );
+  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', keyPrefix });
+  linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
 
   return { api_key: rawKey, key_prefix: keyPrefix, monthly_limit: monthlyLimit, idempotent: false };
 }
@@ -465,7 +488,7 @@ export function rotateApiKey(oldKey: string): {
     .prepare(
       `SELECT key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, no_recredit,
               stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
-              shield_episode, origin_prefix
+              shield_episode, origin_prefix, lineage_hash
          FROM api_keys WHERE key_hash = ? AND active = 1`,
     )
     .get(oldHash) as
@@ -485,6 +508,7 @@ export function rotateApiKey(oldKey: string): {
         claim_method: string | null;
         shield_episode: string | null;
         origin_prefix: string | null;
+        lineage_hash: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -509,11 +533,17 @@ export function rotateApiKey(oldKey: string): {
     // n'est recopiée sous le nouveau préfixe : le disjoncteur COMPTE ces lignes,
     // et une copie à chaque /rotate (route sans plafond) offrirait un moyen de
     // l'armer à volonté, donc de dégrader les clés que les autres créent.
+    // 🚨 lineage_hash : la MÊME lignée que la clé d'origine, recopiée comme
+    // origin_prefix l'est. Une lignée survit à la rotation — c'est le contrat de
+    // mesure qui l'exige, et sans cette copie une clé tournée repartirait à zéro
+    // de premier résultat, de jours actifs et de règlements. Repli sur
+    // l'ancienne key_hash pour une clé antérieure à la colonne : elle devient
+    // alors sa propre origine, ce qui est juste.
     db.prepare(
       `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total,
                              no_recredit, stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
-                             shield_episode, origin_prefix)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                             shield_episode, origin_prefix, lineage_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       newHash,
       keyPrefix,
@@ -531,6 +561,7 @@ export function rotateApiKey(oldKey: string): {
       row.claim_method,
       row.shield_episode,
       row.origin_prefix ?? row.key_prefix,
+      row.lineage_hash ?? oldHash,
     );
     // Move the usage ledger to the new key hash too. Otherwise the lifetime sum
     // (and the plain monthly count) restart at zero on rotation — which would
@@ -964,6 +995,11 @@ export function claimKey(
       method,
       ipHash: opts.ipHash ?? null,
     });
+    // Le fait de mesure dans la MÊME transaction que la promotion (contrat du
+    // 15/09) : les deux ne peuvent pas se désynchroniser. La fonction avale ses
+    // propres erreurs, donc un défaut de télémétrie ne fait pas échouer une
+    // réclamation légitime — et le fait perdu se relit sur api_keys.claimed_at.
+    recordLineageClaim(db, keyHash, method);
     return true;
   });
   return tx();
