@@ -82,7 +82,9 @@ export async function MoneySection({
 
   return (
     <OverviewSection step={1} title={t('money.title')} lead={t('money.lead')} aside={compact ? <Link href={`${localePath(locale, '/dashboard')}?view=revenue&period=${period}`} className="rounded-lg border border-[var(--ink-4)] px-3 py-2 text-xs text-amber-300">{w('revenueDetails')} →</Link> : undefined}>
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      {/* Une colonne sur téléphone : à deux colonnes, « 0.2780 USDC » se coupait en trois lignes
+          dans une carte de 155 px (vu en production le 15.09.2026, WebKit 390 px). */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCardV2
           title={t('money.packs')}
           value={packUsdLabel(packs, locale)}
