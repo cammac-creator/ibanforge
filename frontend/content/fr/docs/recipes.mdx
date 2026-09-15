@@ -16,6 +16,8 @@ curl -X POST https://api.ibanforge.com/v1/keys/generate \
 
 La note honnête qui a sa place dans chaque intégration : un contrôle mod-97 local attrape les fautes de frappe, rien d'autre. Trois des quatre IBAN d'exemple officiels passent toutes les clés et pointent pourtant des codes banque qu'aucun registre n'a attribués — [l'histoire complète](/blog/2026-08-06-example-ibans-unallocated-bank-codes). Le contrôle au registre est la partie impossible en local.
 
+Pour un formulaire salarié, consultez la [recette RH : contrôler un IBAN à la saisie](/fr/docs/hr-iban-validation).
+
 ## Python
 
 Avec le SDK officiel (`pip install ibanforge`) :

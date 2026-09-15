@@ -1,0 +1,53 @@
+---
+title: "RH : contrôler un IBAN à la saisie"
+description: "Une recette côté serveur pour distinguer une faute de saisie, un format valide et un contrôle indisponible, sans confondre format et titulaire du compte."
+order: 13
+---
+
+# Contrôler les IBAN dans un logiciel RH
+
+Lorsqu’un employé saisit son IBAN, contrôlez-le côté serveur avant de confirmer la saisie. La clé API reste sur votre serveur. Envoyez uniquement l’IBAN : le nom de l’employé, son salaire et son dossier RH ne sont pas nécessaires à cette requête.
+
+Un résultat HTTP 200 signifie que la requête a été traitée. **Lisez le champ `valid`** pour connaître le résultat du contrôle de format. Un format valide et une banque identifiée ne prouvent ni l’existence du compte, ni son appartenance à l’employé. Ce contrôle ne constitue pas une autorisation de payer.
+
+## Trois résultats distincts
+
+| Résultat de la recette | Comportement conseillé |
+|---|---|
+| `invalid_input` | Demander de vérifier la saisie de l’IBAN. |
+| `format_valid` | Le format est conforme ; conserver séparément les éventuels contrôles de banque et de titulaire. |
+| `check_unavailable` | Le contrôle n’a pas pu être conclu. Afficher « Contrôle momentanément indisponible » et garder le dossier en attente de vérification. |
+
+Un BIC absent n’est pas, à lui seul, une faute de saisie. Le champ `bank_code_check` décrit séparément le résultat du registre ; une absence dans des données partielles ne permet pas d’affirmer que le compte est invalide. Voir la [signification des résultats](/fr/docs/iban-validate).
+
+## Exemple TypeScript prêt à adapter
+
+L’[exemple complet et testé](https://github.com/cammac-creator/ibanforge/blob/main/scripts/hr-iban-example.ts) exporte `reviewEmployeeIban`. Copiez ce fichier dans votre projet côté serveur, puis appelez-le :
+
+```ts
+import { reviewEmployeeIban } from './hr-iban-example.js';
+
+const key = process.env.IBANFORGE_API_KEY;
+if (!key) throw new Error('Clé API manquante');
+
+// Exemple public de documentation, jamais un dossier salarié.
+const review = await reviewEmployeeIban('DE89370400440532013000', key);
+
+if (review.status === 'invalid_input') {
+  // Demander une correction de la saisie.
+} else if (review.status === 'check_unavailable') {
+  // Signaler un contrôle en attente, sans déclarer l’IBAN invalide.
+} else {
+  // Format conforme ; le contrôle du titulaire reste distinct.
+}
+```
+
+L’exemple borne chaque appel à 15 secondes et ne journalise ni IBAN ni clé. Il ne sauvegarde aucun dossier et n’effectue aucune relance automatique.
+
+## Traiter les interruptions
+
+**401 :** vérifier la clé. **402 :** vérifier l’accès et le crédit. **429 :** respecter le délai indiqué par le service avant un nouvel essai. **5xx ou coupure réseau :** proposer un nouvel essai plus tard. Aucun de ces cas ne signifie que l’IBAN saisi est faux.
+
+En production, évitez un appel à chaque frappe : lancez le contrôle à la validation du champ. Ne placez pas la clé dans le navigateur, l’application mobile, une URL ou les journaux. Pour un import de fichiers, consultez le [traitement par lots](/fr/docs/iban-batch).
+
+Avant de brancher un dossier réel, testez un exemple public, une faute volontaire, un résultat sans BIC et une indisponibilité. Une [clé API](/fr/docs/api-keys) sert aux appels côté serveur ; l’essai anonyme est destiné à l’évaluation du service.

@@ -971,3 +971,37 @@ y compris pour les quatre vraies banques : les onze clés `SM:` de la carte cur�
 sont des radicaux de BIC à quatre lettres (`SM:BASM`, `SM:MAOI`…) alors qu'un
 IBAN saint-marinais porte **cinq chiffres**. Elles ne pouvaient jamais
 correspondre. Gain net, rien à élaguer.
+
+
+## ABBL — registre luxembourgeois IBAN/BIC (import privé)
+
+Source officielle : <https://www.abbl.lu/professionals/payments/luxembourg-register-of-iban-bic-codes/>.
+La page de publication <https://www.abbl.lu/publications/abbl-luxembourg-register-of-iban-bic-codes/>
+lie le classeur courant. Le lien est résolu à chaque import ; sa partie variable ne doit pas être figée.
+
+Une confirmation écrite du 15/09/2026 autorise l'utilisation décrite : une entrée normalisée
+par réponse API, y compris commerciale, avec « Source: ABBL, Luxembourg register of IBAN/BIC codes »
+et date de publication, actualisation mensuelle et sans redistribution du fichier source.
+La preuve complète reste dans le dossier interne privé. Cela ne crée pas une licence générale
+pour redistribuer le registre dans le dépôt, les exports ou les paquets.
+
+### Stockage et raccordement
+
+`scripts/seed-lu-register.ts` produit un fichier JSON privé, jamais `data/bic.sqlite`.
+`LU_REGISTER_PATH` désigne explicitement ce fichier. Aucun téléchargement au traitement d'une
+requête, aucune clé API ni donnée client dans cet import. Le fichier est écrit en mode 600
+par remplacement atomique, après contrôle des en-têtes, codes, BIC luxembourgeois, doublons,
+date et taille minimale. Un recul de date ou une baisse de plus de 10 % demande une vérification
+manuelle et laisse l'édition précédente intacte. Un fichier local invalide bloque aussi son
+remplacement automatique : l'opérateur doit examiner la situation.
+
+La date est celle de publication visible sur la page, pas la date de téléchargement ni
+le `dateModified` technique du site. La mention « published » l'explicite dans le crédit servi.
+Chaque correspondance porte la source et la date dans `bic` et `bank_code_check`.
+Le BIC provient directement du couple publié par l'ABBL. Le contrôle d'allocation garde
+`authoritative: false` : une absence ne devient pas `not_allocated`. Aucun total de couverture
+ni page de liste n'est ajouté avant activation et vérification en production.
+
+L'import et le lecteur sont prêts pour l'intégrateur ; ni le stockage de production ni la
+chaîne de déploiement ne sont modifiés ici. L'import doit être exécuté mensuellement dans le
+circuit privé autorisé. Il n'est pas ajouté au workflow public qui régénère et commite les bases.
