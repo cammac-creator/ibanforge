@@ -115,14 +115,25 @@ describe('sauvegarde du palier de clé', () => {
     ).run(prefix, hash);
 
     const dump = exportPaidState('2026-09-15T12:00:00Z');
-    expect(dump.format).toBe(3);
+    // Le numéro courant et non un 3 figé : chaque lot qui ajoute une table
+    // l'incrémente, et ce test-ci porte sur le journal d'annulation, pas sur la
+    // valeur du compteur (que le test 23 vérifie déjà contre BACKUP_FORMAT).
+    expect(dump.format).toBe(BACKUP_FORMAT);
+    expect(READABLE_FORMATS).toContain(3);
     const mine = dump.key_revocations!.filter((r) => r.key_hash === hash);
     expect(mine).toHaveLength(1);
     expect(dump.counts.key_revocations).toBeGreaterThanOrEqual(1);
 
     // Le journal est perdu, pour cette ligne-là ; le dump la rend, une seule fois.
     db.prepare('DELETE FROM key_revocations WHERE key_hash = ?').run(hash);
-    const only = { ...dump, api_keys: [], api_usage: [], key_claims: [], key_settlements: [] };
+    const only = {
+      ...dump,
+      api_keys: [],
+      api_usage: [],
+      key_claims: [],
+      key_settlements: [],
+      lineage_facts: [],
+    };
     const report = restorePaidState({ ...only, key_revocations: mine });
     expect(report.revocations_inserted).toBe(1);
     const again = restorePaidState({ ...only, key_revocations: mine });
@@ -146,5 +157,75 @@ describe('sauvegarde du palier de clé', () => {
     });
     expect(f2.revocations_inserted).toBe(0);
     expect(f2.revocations_skipped).toBe(0);
+  });
+
+  it('23quater. un aller-retour conserve les faits de mesure, et un dump au format 3 se restaure sans eux', () => {
+    expect(READABLE_FORMATS).toContain(3);
+    expect(BACKUP_FORMAT).toBe(4);
+    const db = getStatsDB();
+    const lineage = `bk4-lineage-${RUN}`;
+    // Une lignée comme le lot M l'écrit : bornes au format SQLite, « premiers »
+    // posés une seule fois. Sans elle dans le dump, un volume restauré rendrait
+    // des clés vivantes avec un entonnoir vide — et le rattrapage depuis
+    // request_log ne rendrait que ce que la purge des douze mois a laissé.
+    db.prepare(
+      `INSERT INTO lineage_facts
+         (lineage_hash, birth_at, birth_tier, backfilled, first_success_at, first_success_route,
+          first_success_context, first_unmarked_success_at, last_success_at, last_success_day,
+          success_days, updated_at)
+       VALUES (?, '2026-09-15 08:00:00', 'anonymous', 0, '2026-09-15 08:30:00',
+               'POST /v1/iban/validate', 'unknown', '2026-09-15 08:30:00',
+               '2026-09-15 09:00:00', '2026-09-15', 1, '2026-09-15 09:00:00')`,
+    ).run(lineage);
+
+    const dump = exportPaidState('2026-09-15T12:00:00Z');
+    expect(dump.format).toBe(BACKUP_FORMAT);
+    const mine = dump.lineage_facts!.filter((r) => r.lineage_hash === lineage);
+    expect(mine).toHaveLength(1);
+    expect(dump.counts.lineage_facts).toBeGreaterThanOrEqual(1);
+
+    // Les faits sont perdus, pour cette lignée-là ; le dump les rend, une fois.
+    db.prepare('DELETE FROM lineage_facts WHERE lineage_hash = ?').run(lineage);
+    const only = {
+      ...dump,
+      api_keys: [],
+      api_usage: [],
+      key_claims: [],
+      key_settlements: [],
+      key_revocations: [],
+    };
+    const report = restorePaidState({ ...only, lineage_facts: mine });
+    expect(report.lineages_inserted).toBe(1);
+    const again = restorePaidState({ ...only, lineage_facts: mine });
+    expect(again.lineages_inserted).toBe(0);
+    expect(again.lineages_skipped).toBe(1);
+    const back = db
+      .prepare(
+        'SELECT first_success_at, first_success_context, success_days, backfilled FROM lineage_facts WHERE lineage_hash = ?',
+      )
+      .all(lineage);
+    expect(back).toEqual([
+      {
+        first_success_at: '2026-09-15 08:30:00',
+        first_success_context: 'unknown',
+        success_days: 1,
+        backfilled: 0,
+      },
+    ]);
+
+    // Un dump au format 3 (avant le lot M) n'a pas cette table : rien à
+    // remettre, et ce n'est pas une erreur.
+    const f3 = restorePaidState({
+      format: 3,
+      taken_at: '2026-09-15T00:00:00Z',
+      counts: { api_keys: 0, api_usage: 0, key_claims: 0, key_settlements: 0, key_revocations: 0 },
+      api_keys: [],
+      api_usage: [],
+      key_claims: [],
+      key_settlements: [],
+      key_revocations: [],
+    });
+    expect(f3.lineages_inserted).toBe(0);
+    expect(f3.lineages_skipped).toBe(0);
   });
 });

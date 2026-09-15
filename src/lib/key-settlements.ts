@@ -1,6 +1,7 @@
 import { getStatsDB } from './db.js';
 import { CLAIM_MIN_PAID_USD } from './tiers.js';
 import { claimKey } from './api-keys.js';
+import { recordLineageSettlement } from './lineage-facts.js';
 
 /**
  * Ce qui a été payé, sur quelle clé (spec 01 §3.5).
@@ -31,6 +32,10 @@ export function recordKeySettlement(p: {
       'INSERT OR IGNORE INTO key_settlements (key_hash, key_prefix, payment_ref, quoted_amount_usd, route) VALUES (?, ?, ?, ?, ?)',
     )
     .run(p.keyHash, p.keyPrefix, p.paymentRef, p.quotedAmountUsd, p.route);
+  // Le fait de mesure seulement quand l'INSERT a RÉELLEMENT inséré : une
+  // requête rejouée avec la même référence ne doit pas faire monter le compteur
+  // de règlements de la lignée (lot M).
+  if (info.changes > 0) recordLineageSettlement(p.keyHash);
   return info.changes > 0;
 }
 

@@ -77,11 +77,13 @@ import { chQrBill } from './routes/ch-qr-bill.js';
 import { adminAuditStats } from './routes/admin-audit-stats.js';
 import { adminPackSales } from './routes/admin-pack-sales.js';
 import { adminTrial } from './routes/admin-trial.js';
+import { adminFunnel } from './routes/admin-funnel.js';
 import { adminCohorts } from './routes/admin-cohorts.js';
 import { adminFailedPayments } from './routes/admin-failed-payments.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
+import { CONTEXT_HEADER, recordLineageSuccess } from './lib/lineage-facts.js';
 import {
   bicGuardMiddleware,
   frnGuardMiddleware,
@@ -580,12 +582,17 @@ export function buildApp(): Hono<HonoEnv> {
       // PAYMENT-SIGNATURE is the x402 v2 payment header and X-Payment the v1 one.
       // Both must be listed: a browser client sending a header absent from this
       // list is stopped at the preflight, so the paid call never leaves the page.
+      // X-IBANforge-Context est le marqueur de contexte de la mesure (lot M) :
+      // le panneau du site envoie `demo`. Sans cette ligne, le navigateur
+      // arrête l'appel au preflight et le panneau cesse de fonctionner — un
+      // en-tête absent de cette liste n'est pas ignoré, il bloque la requête.
       allowHeaders: [
         'Content-Type',
         'Authorization',
         'PAYMENT-SIGNATURE',
         'X-Payment',
         'X-API-Key',
+        'X-IBANforge-Context',
       ],
       // Without exposeHeaders a browser caller can read only the six CORS-safelisted
       // response headers, so every signal we take care to send back — how much quota
@@ -780,6 +787,25 @@ export function buildApp(): Hono<HonoEnv> {
         keyPrefix,
         agentSignature,
       );
+      // Les faits de mesure de la lignée, juste après la télémétrie brute et
+      // seulement si une clé a été présentée (lot M). Le chemin RÉEL et non
+      // `recordedPath` : les chemins virtuels de MCP ne sont dans aucune
+      // famille métier, et leur substitution ne changerait rien au verdict
+      // tout en rendant la lecture fausse.
+      //
+      // `recordLineageSuccess` écarte elle-même ce qui n'est pas un succès
+      // métier, borne son coût à une écriture par lignée et par jour, et ne
+      // jette jamais : un écrit de télémétrie ne transforme pas un 200 en 500.
+      const keyHash = c.get('apiKeyHash');
+      if (keyHash) {
+        recordLineageSuccess({
+          keyHash,
+          method: c.req.method,
+          path,
+          status: c.res.status,
+          context: c.req.header(CONTEXT_HEADER),
+        });
+      }
     }
   });
 
@@ -992,6 +1018,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', adminAuditStats);
   app.route('/', adminPackSales);
   app.route('/', adminTrial);
+  app.route('/', adminFunnel);
   app.route('/', adminCohorts);
   app.route('/', adminFailedPayments);
   app.route('/', adminSearchConsole);

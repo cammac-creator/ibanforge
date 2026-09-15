@@ -1,4 +1,5 @@
 import { getStatsDB } from './db.js';
+import { fillLineageEntry } from './lineage-facts.js';
 
 /**
  * Where a signup came from.
@@ -62,6 +63,12 @@ export function recordSignupAttribution(
       attribution?.utm_medium ?? null,
       attribution?.utm_campaign ?? null,
     );
+  // La lignée apprend ici sa page d'arrivée et son site référent (lot M) : la
+  // route écrit l'attribution APRÈS avoir frappé la clé, donc au moment de la
+  // naissance ces champs n'existent pas encore. Les champs de campagne ne
+  // bougent pas : `INSERT OR REPLACE` peut les remplacer plus tard, et le
+  // contrat interdit d'appeler « première campagne » ce qui n'en est pas une.
+  fillLineageEntry(keyPrefix);
 }
 
 export interface SignupSources {

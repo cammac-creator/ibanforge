@@ -1434,13 +1434,75 @@ export interface BusinessFunnelDay {
 // Intentionally conservative: any path normalised to a billable family with
 // the expected verb is in; everything else (scanner hitting POST on a GET
 // route, or /robots.txt, /favicon.ico, /) is excluded.
-const BILLABLE_RULES: Array<{ method: string; pathStartsWith: string }> = [
-  { method: 'POST', pathStartsWith: '/v1/iban/validate' },
-  { method: 'POST', pathStartsWith: '/v1/iban/batch' },
-  { method: 'POST', pathStartsWith: '/v1/iban/compliance' },
-  { method: 'GET', pathStartsWith: '/v1/bic/' },
-  { method: 'GET', pathStartsWith: '/v1/ch/clearing/' },
+//
+// `canonical` est la MÊME famille, écrite telle que `normalizeRequestPath` la
+// rend. Les deux vivent côte à côte parce qu'elles servent deux lectures
+// différentes et qu'une seule des deux est sûre selon le cas :
+//   - `pathStartsWith` alimente le LIKE de `buildBillableFilter`, qui balaie
+//     `request_log` et doit continuer d'attraper les lignes écrites AVANT la
+//     normalisation des chemins ;
+//   - `canonical` alimente `isBillableCall`, qui décide au fil de l'eau. Le
+//     contrat de mesure du 15/09 interdit nommément de reconnaître une route à
+//     son seul préfixe textuel : `GET /v1/bic/a/b/c` commence par
+//     `/v1/bic/` sans être une recherche de BIC, et `POST /v1/iban/validateXY`
+//     commence par `/v1/iban/validate` sans être une validation.
+// Une famille ajoutée ici doit porter les deux, sinon le typage refuse.
+const BILLABLE_RULES: Array<{ method: string; pathStartsWith: string; canonical: string }> = [
+  { method: 'POST', pathStartsWith: '/v1/iban/validate', canonical: '/v1/iban/validate' },
+  { method: 'POST', pathStartsWith: '/v1/iban/batch', canonical: '/v1/iban/batch' },
+  { method: 'POST', pathStartsWith: '/v1/iban/compliance', canonical: '/v1/iban/compliance' },
+  { method: 'GET', pathStartsWith: '/v1/bic/', canonical: '/v1/bic/:code' },
+  { method: 'GET', pathStartsWith: '/v1/ch/clearing/', canonical: '/v1/ch/clearing/:iid' },
 ];
+
+/**
+ * Cet appel-ci est-il un appel MÉTIER ? (contrat de mesure du 15/09/2026)
+ *
+ * Le verdict se prend sur la route NORMALISÉE, comparée à l'identique à la
+ * famille : un préfixe textuel ne suffit pas (voir le commentaire de
+ * `BILLABLE_RULES`). La requête est écartée aussi, par construction, quand elle
+ * porte un gabarit OpenAPI non substitué (`/v1/bic/%7Bcode%7D`) : ce chemin ne
+ * se normalise pas vers la famille et `getBusinessFunnel` l'exclut déjà de son
+ * côté.
+ *
+ * 🚨 Ce que ce prédicat NE couvre PAS, et c'est une limite connue, pas un
+ * oubli : les invocations d'outils MCP. Elles atterrissent sous `/mcp` (la
+ * télémétrie les range sous `/mcp:tools-call`), qui n'est dans aucune famille
+ * facturable. Un agent qui n'utilise IBANforge que par MCP produit donc zéro
+ * activation mesurée. Étendre les familles à `/mcp` changerait la sémantique de
+ * `buildBillableFilter`, donc du tableau d'affaires existant : c'est une
+ * décision à prendre à part.
+ *
+ * `path` accepte un chemin brut (avec son identifiant) ; la normalisation est
+ * faite ici. Une éventuelle requête est coupée avant, défensivement : le
+ * middleware de suivi passe déjà un `pathname`.
+ */
+export function isBillableCall(method: string, path: string): boolean {
+  const canonical = normalizeRequestPath(path.split('?')[0] ?? '');
+  const verb = method.toUpperCase();
+  return BILLABLE_RULES.some((r) => r.method === verb && r.canonical === canonical);
+}
+
+/**
+ * Le même filtre, en SQL, mais par ÉGALITÉ sur la route canonique.
+ *
+ * Réservé aux lectures qui doivent coïncider exactement avec `isBillableCall` —
+ * le rattrapage de mesure sur `request_log`, qui compare des lignes déjà
+ * normalisées à l'écriture. Il compte donc MOINS que `buildBillableFilter` :
+ * une ligne écrite avant la normalisation des chemins (un IBAN complet dans le
+ * chemin, par exemple) n'y entre pas. C'est assumé : le résultat de ce
+ * rattrapage est étiqueté « premier observé dans les traces conservées », et
+ * réintroduire le LIKE ici ferait diverger le rattrapage du fil de l'eau.
+ */
+export function buildCanonicalBillableFilter(): { sql: string; params: string[] } {
+  const clauses = BILLABLE_RULES.map(() => '(method = ? AND path = ?)').join(' OR ');
+  const params: string[] = [];
+  for (const r of BILLABLE_RULES) {
+    params.push(r.method);
+    params.push(r.canonical);
+  }
+  return { sql: clauses, params };
+}
 
 export function buildBillableFilter(): { sql: string; params: string[] } {
   // (method = ? AND path LIKE ?) OR (method = ? AND path LIKE ?) ...
