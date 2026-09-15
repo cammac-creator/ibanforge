@@ -1,6 +1,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { CONSENT_ASK } from '../lib/consent.js';
+import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT, TRIAL_SIGNUP_SOURCE } from '../lib/trial.js';
+import { ANONYMOUS_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 /**
  * One version of our own numbers, everywhere.
@@ -68,6 +71,51 @@ const DATED_LINE = /as of|refresh|Breakdown|20\d{2}-\d{2}/i;
  * served string — served literals never start with a comment marker. */
 const CODE_COMMENT = /^\s*(\/\/|\*|\/\*|#)/;
 const CODE_EXT = /\.(ts|tsx|js|mjs|py|cs|java)$/;
+
+/**
+ * La DÉCLARATION canonique d'un plafond n'est pas une promesse périmée : c'est
+ * la source unique que ce garde existe pour imposer, et le motif « palier +
+ * 200 » l'attrape par construction (`FREE_TIER_MONTHLY_LIMIT = 200`).
+ *
+ * 🚨 Exemptée par CHEMIN et par forme, jamais par motif seul : un motif
+ * exempterait aussi la dixième copie du même chiffre dans un autre fichier,
+ * c'est-à-dire exactement la maladie soignée ici (neuf copies du 200 vivaient
+ * sans constante du tout).
+ */
+const CANONICAL_CONSTANTS = 'src/lib/tiers.ts';
+const CONSTANT_DECLARATION = /^export const [A-Z0-9_]+ = \d+;/;
+
+/**
+ * Les fichiers dont le lot des textes agents (15/09/2026) a la charge.
+ *
+ * Leur compte est à ZÉRO et le reste : un budget global qui descend laisse une
+ * régression se cacher derrière le travail des autres, alors qu'une égalité à
+ * zéro par fichier nomme le fichier qui régresse. Les autres lignes vivantes
+ * appartiennent aux textes humains (frontend/), aux paquets publiés et aux
+ * intégrations, et restent sous le plafond global ci-dessous.
+ */
+const MIGRATED = [
+  'src/app.ts',
+  'src/lib/attribution.ts',
+  'src/lib/forum-draft-gen.ts',
+  'src/lib/mcp-resources.ts',
+  'src/lib/trial.ts',
+  'src/mcp/instructions.ts',
+  'src/middleware/api-key.ts',
+  'src/middleware/enrich-402.ts',
+  'src/routes/api-keys.ts',
+  'src/routes/artifacts.ts',
+  'src/routes/discovery.ts',
+  'src/routes/landing.ts',
+  'src/routes/mcp-http.ts',
+  'src/routes/openapi.ts',
+  'src/routes/playground.ts',
+  'frontend/public/llms.txt',
+  'frontend/public/llms-full.txt',
+  'mcp/README.md',
+  'mcp/server.json',
+  'mcp/src/index.ts',
+];
 
 const BANNED: Array<{ pattern: RegExp; wanted: string }> = [
   {
@@ -204,14 +252,107 @@ describe('migration des promesses sur l’essai', () => {
         .split('\n')
         .forEach((line, i) => {
           if (DATED_LINE.test(line) || (isCode && CODE_COMMENT.test(line))) return;
+          if (rel === CANONICAL_CONSTANTS && CONSTANT_DECLARATION.test(line)) return;
           // Une ligne n'est comptée qu'une fois, même si deux motifs coïncident.
           if (hasDeprecatedTrialClaim(line)) offenders.push(`${rel}:${i + 1} ${line.trim()}`);
         });
     }
     // Budget de lignes encore à migrer. Ce nombre ne remonte JAMAIS.
-    // Mesuré sur cette branche ; le repère historique était 166 lignes.
+    // Mesuré sur cette branche ; le repère historique était 166 lignes, puis
+    // 174 avant le lot des textes agents (15/09/2026), qui a vidé ses fichiers.
     // Réduire avec chaque lot de textes, jusqu'à une égalité à zéro au raccordement.
-    const BUDGET = 174;
+    const BUDGET = 140;
     expect(offenders.length, offenders.join('\n')).toBeLessThanOrEqual(BUDGET);
+  });
+
+  it('les fichiers du lot des textes agents sont à ZÉRO, et y restent', () => {
+    const offenders: string[] = [];
+    for (const rel of MIGRATED) {
+      const isCode = CODE_EXT.test(rel);
+      readFileSync(join(ROOT, rel), 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if (DATED_LINE.test(line) || (isCode && CODE_COMMENT.test(line))) return;
+          if (rel === CANONICAL_CONSTANTS && CONSTANT_DECLARATION.test(line)) return;
+          if (hasDeprecatedTrialClaim(line)) offenders.push(`${rel}:${i + 1} ${line.trim()}`);
+        });
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+});
+
+/**
+ * Le gabarit d'adresse ne voyage JAMAIS sans son interdit.
+ *
+ * 🚨 Balayage de FICHIERS, et c'est la correction qui compte : la version
+ * précédente de cette règle bouclait sur les chaînes de `src/lib/consent.ts`,
+ * donc sur UNE des six surfaces de publication. La zone B ne peut pas importer
+ * (`mcp/`, `frontend/`, `sdks/`, `integrations/` sont d'autres paquets), donc le
+ * gabarit y voyage en copie verbatim, et aucune de ces copies n'était vérifiée.
+ * Une traduction, une troncature de description d'outil ou une réécriture de
+ * `llms.txt` qui laisse tomber l'interdit ne faisait rougir aucun test.
+ *
+ * ⚠️ Ce balayage-ci EXCLUT les fichiers de test, à l'inverse du balayage des
+ * tournures ci-dessus, et il faut dire pourquoi les deux diffèrent : un test
+ * qui épingle la phrase de consentement la CITE, il ne la publie à personne,
+ * alors qu'une fixture qui affirme « 200 requêtes par mois » est une valeur
+ * périmée qu'il faut corriger comme la source.
+ */
+const FORBID =
+  /never send an address your human has not|n'envoyez pas l'adresse de votre utilisateur|senden Sie die Adresse .{0,40} nicht/i;
+const IS_TEST = /\.(test|spec)\.(ts|tsx|js|mjs)$/;
+
+describe('la phrase de consentement et son interdit', () => {
+  it("aucune surface ne publie le gabarit d'adresse sans son interdit", () => {
+    const offenders: string[] = [];
+    let seen = 0;
+    for (const file of walk(ROOT)) {
+      const rel = relative(ROOT, file);
+      if (IS_TEST.test(rel)) continue;
+      const text = readFileSync(file, 'utf8');
+      if (!text.includes(CONSENT_ASK) && !text.includes('to create a free IBANforge key')) continue;
+      seen += 1;
+      if (!FORBID.test(text)) offenders.push(rel);
+    }
+    expect(offenders, `gabarit d'adresse sans interdit : ${offenders.join(', ')}`).toEqual([]);
+    // 🚨 Un balayage qui ne trouve aucune surface passe au vert en ne
+    // vérifiant rien : la phrase est publiée, donc au moins un fichier la
+    // porte, et le jour où plus rien ne la porte c'est une régression.
+    expect(seen, 'plus aucune surface ne publie la phrase de consentement').toBeGreaterThan(0);
+  });
+
+  it("le conseil de l'essai garde le jeton de mesure ET l'unité des deux plafonds", () => {
+    // Sans le `source`, la carte des portes d'entrée du tableau de bord tombe à
+    // zéro pour toujours, et aucun autre test ne le verrait.
+    expect(TRIAL_FREE_KEY_HINT).toContain(`"source":"${TRIAL_SIGNUP_SOURCE}"`);
+    // Les deux 25 se croisent dans cette phrase : chacun porte son unité.
+    expect(TRIAL_FREE_KEY_HINT).toMatch(/\bMONTH\b/);
+    expect(TRIAL_FREE_KEY_HINT).toMatch(/\bDAY\b/);
+    expect(TRIAL_FREE_KEY_HINT).not.toContain('you@');
+  });
+
+  it('une ligne où les deux plafonds se croisent porte les deux unités', () => {
+    // Les deux quotas valent le même nombre et n'ont AUCUN rapport : 25 par
+    // jour sur la seule route de validation, 25 par mois sur tous les
+    // endpoints. Une ligne qui cite le nombre deux fois les met face à face,
+    // et c'est là que l'unité devient obligatoire.
+    const figure = String(REST_TRIAL_DAILY_LIMIT);
+    expect(figure).toBe(String(ANONYMOUS_MONTHLY_LIMIT));
+    // 🚨 Le chiffre NU, comme `N200` ci-dessus : sans ces bornes, « 1k = $5,
+    // 5k = $20, 25k = $80 » compte deux 25 et la ligne des paquets de crédits
+    // devient une infraction. Un garde qui rougit sur une phrase vraie se fait
+    // désarmer.
+    const bare = new RegExp(String.raw`(?<![.,\d])${figure}(?![.,]?\d)(?![kK])`, 'g');
+    const offenders: string[] = [];
+    for (const rel of ['frontend/public/llms.txt', 'frontend/public/llms-full.txt']) {
+      readFileSync(join(ROOT, rel), 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if ((line.match(bare) ?? []).length < 2) return;
+          if (/\bday\b/i.test(line) && /\bmonth\b/i.test(line)) return;
+          offenders.push(`${rel}:${i + 1} ${line.trim()}`);
+        });
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 });

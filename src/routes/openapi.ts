@@ -51,8 +51,11 @@ const buildRawSpec = () => ({
       'IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — ' +
       'full payment-rail participation, the deepest Swiss clearing data in any public API), ' +
       'EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring. ' +
-      'Three ways to pay, no dead-ends: a free API key (200 req/month), prepaid credit packs ' +
-      '(card or USDC), or pay-per-call via x402 micropayments (USDC on Base L2, no signup).',
+      'Four ways to pay, no dead-ends, and the first needs no email address: a free API key (' +
+      ANONYMOUS_MONTHLY_LIMIT +
+      ' req/month, empty body), the same key claimed to ' +
+      FREE_TIER_MONTHLY_LIMIT +
+      ' a month, prepaid credit packs (card or USDC), or pay-per-call via x402 micropayments (USDC on Base L2, no signup).',
     contact: {
       url: 'https://ibanforge.com',
     },
@@ -73,7 +76,13 @@ const buildRawSpec = () => ({
         description:
           'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first ' +
           REST_TRIAL_DAILY_LIMIT +
-          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64) — send a real `iban` and the response carries a `trial` block with the count left and how to take a free key (200 requests/month). Past ' +
+          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64) — send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. Those ' +
+          REST_TRIAL_DAILY_LIMIT +
+          ' are a day, on this route only; the key carries ' +
+          ANONYMOUS_MONTHLY_LIMIT +
+          ' a month, on every endpoint, and one call at POST /v1/keys/claim raises it to ' +
+          FREE_TIER_MONTHLY_LIMIT +
+          ' a month. Past ' +
           REST_TRIAL_DAILY_LIMIT +
           ', the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
         tags: ['IBAN'],
@@ -897,9 +906,11 @@ const buildRawSpec = () => ({
           },
           '400': {
             description:
-              'Body rejected before any key was considered. "error" is "invalid_json", "invalid_email", ' +
-              '"disposable_email" (the free tier needs a real, non-disposable mailbox), or "undeliverable_email" ' +
-              '(the mail server for that domain refused the address, so no verification code could be delivered).',
+              'Body rejected before any key was considered, and every one of these applies only when an ' +
+              '"email" field was supplied — an empty body cannot be refused for its address. "error" is ' +
+              '"invalid_json", "invalid_email", "disposable_email" (an address on that path must be a real, ' +
+              'non-disposable mailbox), or "undeliverable_email" (the mail server for that domain refused the ' +
+              'address, so no verification code could be delivered).',
           },
           '403': {
             description:
@@ -916,9 +927,12 @@ const buildRawSpec = () => ({
           },
           '429': {
             description:
-              'Too many creations. "key_creation_limit": at most 3 free keys per network per day. ' +
-              '"verification_rate_limited": too many codes were mailed to this address or from this network today. ' +
-              '"rate_limited": one key per email per day. Existing keys keep working in every case.',
+              'Too many creations. "key_creation_limit": at most ' +
+              DAILY_KEY_CREATION_LIMIT +
+              ' free keys per network per day. "verification_rate_limited": too many codes were mailed to this ' +
+              'address or from this network today. "rate_limited": one key per email per day. Existing keys keep ' +
+              'working in every case. A separate global shield may reduce the allowance of a key minted during a ' +
+              'burst; it never refuses one, and claiming that key lifts it straight away.',
           },
           '503': {
             description:
@@ -1612,7 +1626,12 @@ const buildRawSpec = () => ({
       apiKey: {
         type: 'http',
         scheme: 'bearer',
-        description: 'API key (Bearer ifk_xxx) — 200 free requests/month, or custom quota for paid keys',
+        description:
+          'API key (Bearer ifk_xxx) — ' +
+          ANONYMOUS_MONTHLY_LIMIT +
+          ' free requests/month without an email address, ' +
+          FREE_TIER_MONTHLY_LIMIT +
+          ' a month once claimed, or a custom quota for paid keys',
       },
     },
     schemas: {
@@ -1678,7 +1697,10 @@ const buildRawSpec = () => ({
               resets: { type: 'string', example: 'midnight UTC' },
               free_key: {
                 type: 'string',
-                description: 'The request that ends the trial in your favour: a free key, 200 requests a month.',
+                description:
+                  'The request that ends the trial in your favour: a key that needs no email address, ' +
+                  ANONYMOUS_MONTHLY_LIMIT +
+                  ' requests a month on every endpoint.',
               },
               docs: { type: 'string', format: 'uri' },
             },
@@ -2513,7 +2535,11 @@ const buildRawSpec = () => ({
     },
     { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
     { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)' },
-    { name: 'API Keys', description: 'API key management — generate free keys and check usage' },
+    {
+      name: 'API Keys',
+      description:
+        'API key management — mint a key with or without an email address, claim it, rotate it, check its usage',
+    },
     { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N credits; batch validation debits 1 credit per IBAN' },
     { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },
     { name: 'Free', description: 'Free endpoints — no payment required' },

@@ -11,6 +11,10 @@ import {
 import { validateIBAN } from './iban.js';
 import { buildActivationNudgeEmail, buildApiKeyEmail, buildFreeKeyEmail } from './email.js';
 import * as emailModule from './email.js';
+// Le plafond vient de la constante, pas d'un littéral : une fixture qui fige
+// « 200 » est une surface de plus à corriger le jour où le palier bouge, et le
+// garde de `src/routes/static-claims.test.ts` la compte comme telle.
+import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 
 /**
  * Fixtures are invented (CLAUDE.md): a key shape that is real in form and
@@ -95,12 +99,15 @@ describe('outgoing message bodies carry no em or en dash', () => {
    * fixture, or the lock test below names the omission.
    */
   const fixtures: Record<string, { subject: string; text: string; html: string }> = {
-    buildFreeKeyEmail: buildFreeKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 200 }),
+    buildFreeKeyEmail: buildFreeKeyEmail({
+      rawKey: FAKE_KEY,
+      monthlyLimit: FREE_TIER_MONTHLY_LIMIT,
+    }),
     buildApiKeyEmail: buildApiKeyEmail({ rawKey: FAKE_KEY, credits: 1000, bundle: '1k' }),
     buildActivationNudgeEmail: buildActivationNudgeEmail({ keyPrefix: FAKE_PREFIX }),
     buildQuotaWarningEmail: emailModule.buildQuotaWarningEmail({
-      used: 160,
-      limit: 200,
+      used: Math.round(FREE_TIER_MONTHLY_LIMIT * 0.8),
+      limit: FREE_TIER_MONTHLY_LIMIT,
       month: '2026-08',
       keyPrefix: FAKE_PREFIX,
     }),
@@ -167,7 +174,7 @@ describe('recipientDomain', () => {
 
 describe('the key reaches every message that claims to carry it', () => {
   it('free key delivery prints the raw key and the working curl', () => {
-    const mail = buildFreeKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 200 });
+    const mail = buildFreeKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: FREE_TIER_MONTHLY_LIMIT });
     expect(mail.text).toContain(FAKE_KEY);
     expect(mail.html).toContain(FAKE_KEY);
     expect(mail.text).toContain(`Authorization: Bearer ${FAKE_KEY}`);

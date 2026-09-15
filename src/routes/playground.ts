@@ -18,6 +18,7 @@
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { extractClientIp, hashIp } from '../lib/stats.js';
+import { ANONYMOUS_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 interface Target {
   path: string;
@@ -106,7 +107,7 @@ export function createPlaygroundRelay(app: {
           error: 'playground_rate_limited',
           message:
             `The public demo is capped at ${HOURLY_LIMIT} calls per hour. ` +
-            'Generate a free API key (POST /v1/keys/generate, 200 req/month) to keep going.',
+            `Take a free API key without giving an e-mail (POST /v1/keys/generate with an empty body, ${ANONYMOUS_MONTHLY_LIMIT} req/month) to keep going.`,
         },
         429,
       );

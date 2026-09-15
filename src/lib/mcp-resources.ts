@@ -2,6 +2,7 @@
  * MCP resources and prompts — shared between stdio and HTTP MCP servers
  */
 import { IBAN_LENGTHS, getSepaInfo, getCountryRisk, getCountryName } from './countries.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 
 export interface CountryInfo {
   code: string;
@@ -83,8 +84,8 @@ export function buildPricingPayload(): {
     ],
     currency: 'USDC',
     network: 'Base L2 (eip155:8453)',
-    free_tier: '200 requests/month with API key (no card required)',
-    note: 'Prices in USDC. Pay-per-call via x402 or use free API key tier.',
+    free_tier: `${ANONYMOUS_MONTHLY_LIMIT} requests/month on a key that needs no e-mail, ${FREE_TIER_MONTHLY_LIMIT} a month once claimed (no card either way)`,
+    note: 'Prices in USDC. Pay-per-call via x402, or take a key with an empty POST to /v1/keys/generate.',
   };
 }
 

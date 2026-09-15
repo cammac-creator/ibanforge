@@ -6,6 +6,7 @@ import type { PraAuthorisation } from './lib/pra-banks.js';
 import type { OfficialIdentity } from './lib/official-identity.js';
 import type { PsdRegistration } from './lib/psd-register.js';
 import type { ReferenceCheckBlock } from './lib/payment-reference.js';
+import type { KeyTier } from './lib/tiers.js';
 
 export type { UkModulusResult, PraAuthorisation, PsdRegistration, ReferenceCheckBlock };
 
@@ -49,6 +50,17 @@ export interface PaywallCause {
     // does not mean the counter was working.
     | 'trial_unavailable';
   detail: string;
+  /**
+   * Le palier de la clé présentée, quand une clé l'a été.
+   *
+   * Posé par le middleware de clé, lu par `enrich-402.ts` : le rail de
+   * réclamation reste offert à une clé ANONYME épuisée (réclamer relève la clé
+   * en main, cela ne frappe pas une seconde clé gratuite) et part sur une clé
+   * réclamée. 🚨 Le critère est le palier et non le plafond : une clé née sous
+   * alerte porte 5 et non 25, et un critère chiffré laisserait sans issue le
+   * porteur honnête qu'on vient de dégrader.
+   */
+  tier?: KeyTier;
   // required/remaining: batch billing (1 unit per IBAN) can refuse a request
   // all-or-nothing while some allowance is left — these say how much.
   quota?: {
@@ -614,7 +626,12 @@ export interface TrialBlock {
   calls_left_today: number;
   daily_limit: number;
   resets: string;
-  /** Copy-pasteable: the request that mints a free 200/month key. */
+  /**
+   * Copy-pasteable: the request that mints a key with no address at all.
+   * Its figure is the ANONYMOUS monthly allowance, and the one thing this
+   * field must keep saying is which of the two 25s it means (a month, on
+   * every endpoint — not a day, on this route). See src/lib/trial.ts.
+   */
   free_key: string;
   docs: string;
 }

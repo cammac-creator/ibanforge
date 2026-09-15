@@ -13,6 +13,7 @@ import { getIbansArray } from '../lib/request-helpers.js';
 import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
 import { maybeSendQuotaWarning } from '../lib/quota-notice.js';
 import { burstRevocationFor } from '../lib/key-revocations.js';
+import { CLAIM_MIN_PAID_USD } from '../lib/tiers.js';
 
 /**
  * Ce que lit un agent dont la clé anonyme a été coupée par le radar de cohortes.
@@ -204,7 +205,8 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
           reason: 'invalid_api_key',
           detail:
             'An API key was provided (ifk_…) but it is invalid or revoked. ' +
-            'Check for typos or truncation, or generate a new free key: POST /v1/keys/generate.',
+            'Check for typos or truncation, or take a new one in one call and without an e-mail: ' +
+            'POST /v1/keys/generate with no body at all.',
         });
       }
       c.header('X-API-Key-Invalid', 'true');
@@ -328,21 +330,89 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       // their quota resets next month.
       // Hint headers tell the agent what happened so it can log + decide.
       const shortfall = quota.remaining > 0;
+      // 🚨 L'assiette du plafond n'est pas toujours le mois, et trois phrases
+      // le disaient sans regarder.
+      //
+      // `no_recredit = 1` fait mesurer le plafond sur la SOMME de tous les mois
+      // (`checkAndIncrementQuota`), donc rien ne repart le 1er : c'est le cas
+      // d'une clé née sous alerte du disjoncteur et d'une clé promue contre un
+      // paiement (« 200 une fois, pas 200 par mois »). Servir « it resets on
+      // the 1st » à ces deux populations, et leur attribuer `used`/`limit` au
+      // mois courant, c'est promettre un retour d'allocation qui n'arrivera
+      // jamais — et le site comme le `notice` du 201 disent l'inverse.
+      const lifetime = noRecredit === true;
+      // « for 2026-09 » est faux sur une assiette de vie : les deux nombres
+      // sont alors la somme de tous les mois.
+      const spentOn = lifetime ? 'in total on this key' : `for ${quota.month}`;
+      // Une clé ANONYME à `no_recredit` ne peut être qu'une clé née sous
+      // alerte : un paiement l'aurait fait sortir du palier anonyme. Test sur
+      // le PALIER et non sur le plafond (une clé bouclier porte 5, pas 25).
+      const shield = lifetime && tier === 'anonymous';
+
+      // ⚠️ Aucune de ces phrases ne renvoie vers l'essai sans clé, plus
+      // généreux en validations : y renvoyer apprendrait à un client à JETER sa
+      // clé pour retrouver du quota, ce qui détruit la seule identité stable
+      // qu'on ait de lui et le remet en concurrence avec tout son réseau.
+      //
+      // 🚨 Et le rail de réclamation passe EN PREMIER sur les deux populations
+      // anonymes : c'est la seule sortie gratuite, et elle relève la clé en
+      // main au lieu d'en frapper une seconde.
+      const anonymousExhausted =
+        `This key's anonymous allowance is spent for ${quota.month} (${quota.used}/${quota.limit} requests) — ` +
+        'it resets on the 1st. Free way out now: claim this key at POST /v1/keys/claim with a mailbox you can ' +
+        `read, for ${FREE_TIER_MONTHLY_LIMIT} a month on the same key — same secret, same prefix, same history. ` +
+        `Or pay per call via x402; $${CLAIM_MIN_PAID_USD} settled on this key raises it to ` +
+        `${FREE_TIER_MONTHLY_LIMIT}, once.`;
+
+      const shieldExhausted =
+        `This key was issued with a reduced allowance and it is spent (${quota.used}/${quota.limit} requests ` +
+        'counted over the whole life of the key: a reduced allowance does not start over on the 1st). ' +
+        'It goes back up on its own within a few hours. To lift it to ' +
+        `${FREE_TIER_MONTHLY_LIMIT} a month right away, claim this key: POST /v1/keys/claim with a mailbox you ` +
+        'can read. Or pay per call via x402, which needs no key at all.';
+
+      // 🚨 Cette phrase ne propose PAS le code par mail : une clé déjà sortie
+      // du palier anonyme se voit répondre 409 `already_claimed`. Promettre
+      // une sortie gratuite que la route refuse serait pire que se taire.
+      const paidOnceExhausted =
+        `This key's allowance is spent: ${quota.used}/${quota.limit} requests counted over the whole life of ` +
+        'the key, because it was granted against a payment — once, not every month, so nothing starts over on ' +
+        `the 1st. To keep going now: ${CARD_CHECKOUT_HINT}. ` +
+        'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.';
+
+      const monthlyExhausted =
+        `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
+        `it resets on the 1st of next month. To keep going now: ${CARD_CHECKOUT_HINT}. ` +
+        'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.';
+
+      const exhausted = shield
+        ? shieldExhausted
+        : lifetime
+          ? paidOnceExhausted
+          : tier === 'anonymous'
+            ? anonymousExhausted
+            : monthlyExhausted;
+
+      const resets = shield
+        ? 'not monthly — it goes back up within a few hours, or at once if this key is claimed'
+        : lifetime
+          ? 'never — this allowance was granted once, not monthly'
+          : '1st of month';
+
       c.set('paywallCause', {
         reason: shortfall ? 'monthly_quota_insufficient' : 'monthly_quota_exhausted',
+        tier,
         detail: shortfall
-          ? `This batch of ${units} IBANs needs ${units} free-tier requests (1 per IBAN) but only ${quota.remaining} remain for ${quota.month} ` +
+          ? `This batch of ${units} IBANs needs ${units} requests from this key's allowance (1 per IBAN) but only ${quota.remaining} remain ${spentOn} ` +
             `(${quota.used}/${quota.limit} used) — nothing was consumed. Send a batch of ≤${quota.remaining} IBANs, ` +
             `or lift the limit now. ${CARD_CHECKOUT_HINT}. ` +
             'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.'
-          : `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
-            `it resets on the 1st of next month. To keep going now: ${CARD_CHECKOUT_HINT}. ` +
-            'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.',
+          : exhausted,
         quota: {
           used: quota.used,
           limit: quota.limit,
           month: quota.month,
-          resets: '1st of month',
+          resets,
           required: units,
           remaining: quota.remaining,
         },
@@ -353,7 +423,19 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       c.header('X-Quota-Used', String(quota.used));
       c.header('X-Quota-Limit', String(quota.limit));
       c.header('X-Quota-Month', quota.month);
-      c.header('X-Quota-Reset-Hint', 'monthly, 1st of month');
+      // 🚨 La moitié lisible par une machine du correctif ci-dessus : sur une
+      // assiette de vie, `X-Quota-Month` dit dans quel mois la consommation a
+      // été ÉCRITE, pas sur quoi le plafond est mesuré. Sans cet en-tête, un
+      // client qui ne lit que les en-têtes programmerait une reprise le 1er.
+      c.header('X-Quota-Basis', lifetime ? 'lifetime' : 'month');
+      c.header(
+        'X-Quota-Reset-Hint',
+        shield
+          ? 'no monthly reset; lifted when the alert clears, or at once by a claim'
+          : lifetime
+            ? 'no monthly reset; this allowance was granted once'
+            : 'monthly, 1st of month',
+      );
       await next();
       return;
     }

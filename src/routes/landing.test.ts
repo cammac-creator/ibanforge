@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import { landing } from './landing.js';
 import { PAYMENT_LINKS } from '../lib/payment-links.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 const app = new Hono();
 app.route('/', landing);
@@ -75,8 +76,23 @@ describe('Landing page', () => {
   });
 
   it('has pricing section with both paths', () => {
-    expect(html).toContain('200 requests');
+    // Les deux marches, depuis les constantes : la carte du palier gratuit
+    // annonce le quota de la clé anonyme, et la page dit où mène la
+    // réclamation. Un littéral ici serait une dixième autorité sur un plafond.
+    expect(html).toContain(`${ANONYMOUS_MONTHLY_LIMIT} requests/month`);
+    expect(html).toContain(`${FREE_TIER_MONTHLY_LIMIT} a month`);
     expect(html).toContain('$0.003');
+  });
+
+  it('ne demande plus une adresse pour rendre une clé', () => {
+    // Le champ e-mail du formulaire a perdu `required` le 15/09/2026 : la page
+    // annonce « no e-mail, no card » juste au-dessus, et un champ obligatoire
+    // en dessous aurait été une contradiction sur une seule page.
+    expect(html).not.toContain('name="email" placeholder="your@email.com" required');
+    // Espaces normalisés : prettier coupe la carte de prix en plusieurs lignes,
+    // et une promesse ne change pas de sens parce qu'un retour à la ligne la
+    // traverse.
+    expect(html.replace(/\s+/g, ' ')).toContain('no e-mail, no card');
   });
 
   it('has quick start with multiple languages', () => {

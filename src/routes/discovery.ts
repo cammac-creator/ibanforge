@@ -4,6 +4,8 @@ import type { Handler } from 'hono';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 import { dataTools, FREE_ENDPOINTS } from '../mcp/inventory.js';
+import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -186,11 +188,18 @@ const x402Document: Handler = (c) => {
       api_key: {
         scheme: 'bearer',
         token_prefix: 'ifk_',
+        // 🚨 La voie la plus courte d'abord : un corps VIDE suffit. C'est ce
+        // champ qu'un agent lit avant de décider s'il doit inscrire quelqu'un.
+        signup: 'POST /v1/keys/generate with no body at all — no e-mail required',
         // The address in this example must PASS the free-tier signup guard.
         // "you@example.com" did not: example.com is on the disposable-domain
         // blocklist, so every agent that copied this line literally got a 400.
-        signup: 'POST /v1/keys/generate with body {"email":"you@company.com"}',
-        free_tier_quota: 200,
+        signup_with_email:
+          'POST /v1/keys/generate with body {"email":"you@company.com"} — optional, and only with an address your human gave you for this',
+        claim:
+          'POST /v1/keys/claim, key in the Authorization header — a mailed 6-digit code gives the full allowance every month, an x402 payment on the key gives it once',
+        anonymous_tier_quota: ANONYMOUS_MONTHLY_LIMIT,
+        free_tier_quota: FREE_TIER_MONTHLY_LIMIT,
         free_tier_period: 'month',
       },
       x402: {
@@ -226,7 +235,9 @@ const oauthResourceMetadata = {
   authentication_methods: [
     {
       type: 'api_key',
-      description: 'Free tier: 200 requests/month. POST /v1/keys/generate to obtain.',
+      description:
+        `Free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests/month with no e-mail (POST /v1/keys/generate with an empty body), ` +
+        `${FREE_TIER_MONTHLY_LIMIT} a month once the key is claimed at POST /v1/keys/claim.`,
       docs: 'https://ibanforge.com/docs',
     },
     {
@@ -433,7 +444,8 @@ const A2A_AGENT_CARD = {
       in: 'header',
       name: 'Authorization',
       description:
-        'Bearer ifk_… — free key via POST /v1/keys/generate (200 req/month). x402/USDC accepted on paid routes without any key.',
+        `Bearer ifk_… — a free key with no e-mail: POST /v1/keys/generate with no body at all (${ANONYMOUS_MONTHLY_LIMIT} req/month), ` +
+        `POST /v1/keys/claim lifts it to ${FREE_TIER_MONTHLY_LIMIT} a month. x402/USDC accepted on paid routes without any key.`,
     },
   },
   defaultInputModes: ['application/json'],
@@ -512,7 +524,8 @@ const APIS_JSON = {
       aid: 'ibanforge:ibanforge-api',
       name: 'IBANforge API',
       description:
-        'REST + MCP + x402. Free tier: 200 requests/month with an emailed key; the HTTP MCP transport answers 10 free tool calls per IP per day with no key at all.',
+        `REST + MCP + x402. Free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests/month on a key that needs no e-mail at all, ` +
+        `${FREE_TIER_MONTHLY_LIMIT} a month once claimed; the HTTP MCP transport answers ${MCP_DAILY_LIMIT} free tool calls per IP per day with no key at all.`,
       humanURL: 'https://ibanforge.com',
       baseURL: 'https://api.ibanforge.com',
       tags: [
@@ -624,7 +637,7 @@ const GLAMA_MANIFEST = {
     `${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; further rows from the ` +
     `SwiftCodes (MIT), Bundesbank, SIX and EBA STEP2 SCT), ${F.claim.chClearing} Swiss clearing ` +
     `entries from the SIX BankMaster refreshed monthly, ${F.claim.countries} countries. ` +
-    `MCP-native over HTTP and stdio, x402 micropayments on Base L2, free tier.`,
+    `MCP-native over HTTP and stdio, x402 micropayments on Base L2, and a free API key that needs no e-mail.`,
   homepage: 'https://ibanforge.com',
   repository: 'https://github.com/cammac-creator/ibanforge',
   documentation: 'https://ibanforge.com/docs/mcp',

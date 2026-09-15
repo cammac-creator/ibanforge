@@ -24,6 +24,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { MCP_INSTRUCTIONS } from './instructions.js';
+import { MCP_TOOLS } from './inventory.js';
+import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8');
@@ -102,5 +105,40 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
     expect(MCP_INSTRUCTIONS).toContain('POST https://api.ibanforge.com/v1/keys/generate');
     expect(MCP_INSTRUCTIONS).toContain('200 REST calls/month');
     expect(MCP_INSTRUCTIONS).toContain('send_feedback');
+  });
+
+  /**
+   * Les chiffres de ce bloc sont ÉCRITS, et c'est imposé : l'extracteur
+   * ci-dessus ne lit que des chaînes entre apostrophes simples, donc un gabarit
+   * à backticks interpolant les constantes casserait les trois tests de parité
+   * (`spec-06 §3.3`). Ces deux assertions sont la contrepartie : elles relient
+   * les chiffres écrits aux constantes qui les appliquent, si bien qu'un
+   * réglage de palier fait rougir ce fichier au lieu de laisser le texte mentir.
+   */
+  it('les chiffres écrits sont ceux que le code applique', () => {
+    expect(MCP_INSTRUCTIONS).toContain(`Free tier: ${MCP_DAILY_LIMIT} tool calls/IP/day`);
+    expect(MCP_INSTRUCTIONS).toContain(`${ANONYMOUS_MONTHLY_LIMIT} REST calls/month`);
+    expect(MCP_INSTRUCTIONS).toContain(`${FREE_TIER_MONTHLY_LIMIT} REST calls/month`);
+  });
+
+  /**
+   * 🚨 Ce bloc est injecté dans le contexte du modèle AVANT `tools/list`.
+   *
+   * Nommer un outil qui n'existe pas encore y est pire qu'ailleurs : l'agent le
+   * cherche dans la liste, ne le trouve pas, et apprend que notre documentation
+   * mente. Le device grant (`request_api_key` / `poll_api_key`) est décidé et
+   * spécifié mais PAS livré : ce test est ce qui empêche de l'annoncer ici
+   * avant qu'il réponde.
+   */
+  it("ne nomme aucun outil qui n'est pas enregistré", () => {
+    const known = new Set(MCP_TOOLS.map((t) => t.name));
+    const TOOLISH =
+      /\b(?:validate|batch|lookup|check|audit|send|request|poll|list|get|create|claim|generate)_[a-z0-9_]+\b/g;
+    const cited = [...new Set(MCP_INSTRUCTIONS.match(TOOLISH) ?? [])];
+    // Le bloc CITE des outils : un motif qui n'en trouve aucun passerait au
+    // vert en ne vérifiant rien.
+    expect(cited.length).toBeGreaterThan(0);
+    const unknown = cited.filter((name) => !known.has(name));
+    expect(unknown, `outils cités mais non enregistrés : ${unknown.join(', ')}`).toEqual([]);
   });
 });

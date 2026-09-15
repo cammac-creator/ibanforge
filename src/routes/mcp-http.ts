@@ -44,6 +44,12 @@ import { datasetFacts } from '../lib/dataset-facts.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import { MCP_DAILY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
+import {
+  ANONYMOUS_MONTHLY_LIMIT,
+  FREE_TIER_MONTHLY_LIMIT,
+  KEY_CLAIM_URL,
+  KEY_GENERATE_URL,
+} from '../lib/tiers.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -179,7 +185,9 @@ export const mcpSessions = createMcpSessionStore();
 // évitée.
 const FREE_TIER_NOTE =
   `free: ${MCP_DAILY_LIMIT} units/IP/day on this transport, one per call and one per IBAN in batch_validate_iban, ` +
-  'or a free API key at POST https://api.ibanforge.com/v1/keys/generate for 200 REST calls/month';
+  `or an ifk_ key with no e-mail at all — POST ${KEY_GENERATE_URL} with no body for ` +
+  `${ANONYMOUS_MONTHLY_LIMIT} REST calls/month, and POST /v1/keys/claim lifts that same key to ` +
+  `${FREE_TIER_MONTHLY_LIMIT} a month`;
 const costLine = (price: string): string => `COST: ${price} (${FREE_TIER_NOTE}).`;
 
 /**
@@ -981,8 +989,12 @@ mcpHttp.post('/mcp', async (c) => {
           code: -32000,
           message:
             `Daily MCP free tier limit reached (${MCP_DAILY_LIMIT} units/day; one per tool call, one per IBAN in batch_validate_iban). ` +
-            'For unlimited access, use the REST API with an API key ' +
-            '(free: POST /v1/keys/generate) or x402 micropayments. ' +
+            'You can take a key without giving anyone an e-mail: POST ' +
+            `${KEY_GENERATE_URL} with no body at all returns an ifk_ key worth ` +
+            `${ANONYMOUS_MONTHLY_LIMIT} REST calls/month, on the spot. ` +
+            `POST ${KEY_CLAIM_URL} lifts that same key to ${FREE_TIER_MONTHLY_LIMIT} a month: a 6-digit code ` +
+            'on an address your human gives you for this, or an x402 payment on the key — that rail grants ' +
+            `${FREE_TIER_MONTHLY_LIMIT} once, not ${FREE_TIER_MONTHLY_LIMIT} a month. ` +
             'See https://api.ibanforge.com/.well-known/x402',
           data: { used: limit.used, limit: MCP_DAILY_LIMIT, remaining: 0 },
         },
@@ -1050,7 +1062,8 @@ mcpHttp.post('/mcp', async (c) => {
           message:
             `Daily MCP session limit reached (${MCP_SESSIONS_PER_IP_DAY} new sessions/day). ` +
             'Reuse the mcp-session-id returned by initialize instead of opening a session per call, ' +
-            'or use the REST API with an API key (free: POST /v1/keys/generate).',
+            `or move to the REST API: POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key ` +
+            `with no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST calls/month.`,
           data: { used: opened.used, limit: MCP_SESSIONS_PER_IP_DAY, remaining: 0 },
         },
       });
@@ -1145,7 +1158,13 @@ mcpHttp.get('/mcp', async (c) => {
           mcp_daily_limit_unit: 'one unit per tool call, one per IBAN in batch_validate_iban',
           mcp_sessions_per_day: MCP_SESSIONS_PER_IP_DAY,
           session_idle_timeout_minutes: MCP_SESSION_IDLE_MS / 60000,
-          rest_api_signup: 'POST /v1/keys/generate {"email":"you@company.com"} for 200 req/month',
+          anonymous_key: `POST /v1/keys/generate with no body at all — no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST req/month`,
+          claim_to_full: `POST /v1/keys/claim — a mailed code or an x402 payment on the key; lifts that same key to ${FREE_TIER_MONTHLY_LIMIT} req/month`,
+          // `rest_api_signup` conservé en DOUBLON d'`anonymous_key` : les
+          // moissonneurs d'annuaires (Glama, Smithery, MCP.so) affichent des
+          // champs NOMMÉS, donc retirer un nom qu'ils lisent déjà efface la
+          // porte gratuite de leur fiche. On ajoute sans retirer.
+          rest_api_signup: `POST /v1/keys/generate with no body at all — no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST req/month`,
         },
         x402: 'https://api.ibanforge.com/.well-known/x402',
         documentation: 'https://ibanforge.com/docs',

@@ -8,6 +8,7 @@ import {
   stripDashes,
   DRAFT_SYSTEM,
 } from './forum-draft-gen.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 
 describe('buildVerifiedFacts — les données réelles injectées dans le brouillon', () => {
   it('résout un IBAN valide contre la vraie base (BIC, schémas SEPA)', () => {
@@ -140,7 +141,11 @@ describe('DRAFT_SYSTEM — la doctrine tient ses invariants', () => {
     expect(DRAFT_SYSTEM).toContain('NEVER use em dashes');
     expect(DRAFT_SYSTEM).toContain('disclosure: I built ibanforge.com');
     expect(DRAFT_SYSTEM).toContain('honest alternative');
-    expect(DRAFT_SYSTEM).toContain('200 requests/month');
+    // Les deux marches du palier gratuit, lues dans les constantes : une
+    // réponse de forum qui ne cite qu'un chiffre sur deux fait croire que la
+    // clé demande une adresse.
+    expect(DRAFT_SYSTEM).toContain(`${ANONYMOUS_MONTHLY_LIMIT} requests/month`);
+    expect(DRAFT_SYSTEM).toContain(`${FREE_TIER_MONTHLY_LIMIT} a month`);
   });
   it('demande le format à marqueurs, pas du JSON', () => {
     expect(DRAFT_SYSTEM).toContain('===DRAFT===');

@@ -17,6 +17,7 @@ import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
 import { resetDailyLedger, resetDailyLedgerStatements } from '../lib/daily-ip-ledger.js';
 import { generateApiKey } from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
+import { CONSENT_FIELDS } from '../lib/consent.js';
 
 const WALLET = '0x00000000000000000000000000000000000000A1';
 const VALID_IBAN = 'CH9300762011623852957';
@@ -219,6 +220,7 @@ describe('the trial is exhausted', () => {
       message?: string;
       accepts?: unknown[];
       free_tier?: unknown;
+      claim_to_200?: unknown;
     };
     expect(body.error).toBe('payment_required');
     expect(body.cause?.reason).toBe('trial_exhausted');
@@ -232,7 +234,13 @@ describe('the trial is exhausted', () => {
     expect(Array.isArray(body.accepts)).toBe(true);
     // And still shown the free key — unlike an exhausted KEY, this caller has
     // none, so the signup rail is the conversion the trial exists for.
-    expect(body.free_tier).toBeDefined();
+    //
+    // 🚨 Égalité STRICTE, et non « défini » : le lot de l'essai avait relâché
+    // l'assertion parce que le rail appartenait au lot des textes. Il est écrit
+    // maintenant, et c'est le seul mécanisme qui empêche une seconde rédaction
+    // du même palier d'apparaître dans le corps le plus lu du produit.
+    expect(body.free_tier).toEqual(CONSENT_FIELDS.free_tier);
+    expect(body.claim_to_200).toEqual(CONSENT_FIELDS.claim_to_200);
   });
 
   it('never assumes the caller is the one who spent', async () => {
@@ -279,7 +287,7 @@ describe('the ledger can be down without a single message lying', () => {
     // Le rail gratuit RESTE : cet appelant ne détient aucune clé, et il n'a
     // rien fait de mal. `trial_unavailable` ne doit pas entrer dans
     // ALLOWANCE_EXHAUSTED, qui est une énumération explicite.
-    expect(body.free_tier).toBeDefined();
+    expect(body.free_tier).toEqual(CONSENT_FIELDS.free_tier);
     expect(body.cause?.detail).toContain('Nothing is wrong with your request');
   });
 });

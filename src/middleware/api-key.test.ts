@@ -11,9 +11,14 @@ import {
   getUsage,
   checkAndIncrementQuota,
   claimKey,
+  markShieldBirth,
 } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
-import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import {
+  ANONYMOUS_MONTHLY_LIMIT,
+  FREE_TIER_MONTHLY_LIMIT,
+  SHIELD_MONTHLY_LIMIT,
+} from '../lib/tiers.js';
 import type { HonoEnv } from '../types.js';
 
 function makeApp() {
@@ -595,5 +600,125 @@ describe('apiKeyMiddleware — le palier anonyme', () => {
       headers: { Authorization: `Bearer ${k.api_key}` },
     });
     expect(seen).toEqual([keyHash, keyHash]);
+  });
+});
+
+/**
+ * L'épuisement de quota, population par population.
+ *
+ * 🚨 La phrase « it resets on the 1st » était servie à TOUT LE MONDE, y compris
+ * aux deux populations dont le plafond se mesure sur la vie de la clé
+ * (`no_recredit = 1`) : une clé née sous alerte du disjoncteur, et une clé
+ * promue contre un paiement (« une fois, pas chaque mois »). Rien ne repart le
+ * 1er pour elles, et `used`/`limit` ne sont pas ceux du mois cité juste avant.
+ * Aucun test ne voyait la contradiction, parce que toutes les fixtures
+ * existantes naissaient avec une adresse et un recrédit mensuel.
+ *
+ * Le rail de réclamation est vérifié en même temps : c'est la seule sortie
+ * gratuite d'une clé anonyme épuisée, et la retirer refabriquerait le
+ * cul-de-sac que ce palier existe pour supprimer.
+ */
+describe('apiKeyMiddleware — épuisement : trois populations, trois vérités', () => {
+  async function paywalledApp() {
+    const { enrich402Middleware } = await import('./enrich-402.js');
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', enrich402Middleware());
+    app.use('/v1/*', apiKeyMiddleware());
+    app.get('/v1/paid', (c) => {
+      if (c.get('apiKeyAuthenticated')) return c.json({ ok: true });
+      return c.body('', 402);
+    });
+    return app;
+  }
+
+  function burn(keyHash: string, limit: number, noRecredit: boolean) {
+    let quota = checkAndIncrementQuota(keyHash, limit, 1, noRecredit);
+    while (quota.allowed) quota = checkAndIncrementQuota(keyHash, limit, 1, noRecredit);
+  }
+
+  type Wall = {
+    cause?: { reason?: string; detail?: string; tier?: string; quota?: { resets?: string } };
+    message?: string;
+    free_tier?: unknown;
+    claim_to_200?: unknown;
+  };
+
+  it('clé ANONYME épuisée : la réclamation en première sortie, et le 1er du mois est vrai', async () => {
+    const key = generateApiKey(null)!.api_key;
+    const { keyHash, monthlyLimit } = validateApiKey(key);
+    expect(monthlyLimit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    burn(keyHash, monthlyLimit, false);
+
+    const app = await paywalledApp();
+    const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as Wall;
+    expect(body.cause?.tier).toBe('anonymous');
+    expect(body.cause?.detail).toContain('/v1/keys/claim');
+    // La réclamation AVANT tout achat : la position dans la phrase est le fond.
+    const detail = body.cause?.detail ?? '';
+    expect(detail.indexOf('/v1/keys/claim')).toBeLessThan(
+      detail.indexOf('x402') === -1 ? detail.length : detail.indexOf('x402'),
+    );
+    expect(detail).toContain('resets on the 1st');
+    expect(body.cause?.quota?.resets).toBe('1st of month');
+    expect(res.headers.get('X-Quota-Basis')).toBe('month');
+    // Le rail gratuit de FRAPPE part (pas de seconde clé), celui de
+    // RÉCLAMATION reste (il relève la clé en main).
+    expect(body.free_tier).toBeUndefined();
+    expect(body.claim_to_200).toBeDefined();
+  });
+
+  it('clé née SOUS ALERTE : pas de reprise le 1er, elle remonte seule, et la réclamation la relève tout de suite', async () => {
+    const key = generateApiKey(null, SHIELD_MONTHLY_LIMIT)!.api_key;
+    const { keyHash } = validateApiKey(key);
+    markShieldBirth({ keyHash, episodeId: `test-episode-${RUN_ID}` });
+    const after = validateApiKey(key);
+    expect(after.noRecredit).toBe(true);
+    expect(after.monthlyLimit).toBe(SHIELD_MONTHLY_LIMIT);
+    burn(keyHash, after.monthlyLimit, true);
+
+    const app = await paywalledApp();
+    const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as Wall;
+    const detail = body.cause?.detail ?? '';
+    expect(detail).not.toContain('resets on the 1st');
+    expect(detail).toContain('does not start over on the 1st');
+    expect(detail).toContain('goes back up on its own');
+    expect(detail).toContain('/v1/keys/claim');
+    expect(body.cause?.quota?.resets).not.toContain('1st of month');
+    expect(res.headers.get('X-Quota-Basis')).toBe('lifetime');
+    expect(res.headers.get('X-Quota-Reset-Hint')).toContain('no monthly reset');
+    // 🚨 Le cas que le critère chiffré de la révision 2 cassait : une clé
+    // bouclier porte 5 et non 25, et c'est la seule population à qui la sortie
+    // a été promise.
+    expect(body.claim_to_200).toBeDefined();
+  });
+
+  it('clé promue par PAIEMENT : une fois, pas chaque mois, et aucune promesse de code gratuit', async () => {
+    const key = generateApiKey(null)!.api_key;
+    const { keyHash } = validateApiKey(key);
+    expect(claimKey(keyHash, 'x402')).toBe(true);
+    const paid = validateApiKey(key);
+    expect(paid.tier).toBe('paid');
+    expect(paid.noRecredit).toBe(true);
+    expect(paid.monthlyLimit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    burn(keyHash, paid.monthlyLimit, true);
+
+    const app = await paywalledApp();
+    const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as Wall;
+    const detail = body.cause?.detail ?? '';
+    expect(detail).not.toContain('resets on the 1st');
+    expect(detail).toContain('once, not every month');
+    expect(detail).toContain('whole life of the key');
+    // Une clé sortie du palier anonyme se voit répondre 409 `already_claimed` :
+    // lui proposer la réclamation serait promettre ce que la route refuse.
+    expect(detail).not.toContain('/v1/keys/claim');
+    expect(body.claim_to_200).toBeUndefined();
+    expect(body.free_tier).toBeUndefined();
+    expect(res.headers.get('X-Quota-Basis')).toBe('lifetime');
   });
 });

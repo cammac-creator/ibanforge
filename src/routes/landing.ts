@@ -4,6 +4,7 @@ import { html, raw } from 'hono/html';
 import { createRequire } from 'node:module';
 import { PAYMENT_LINKS, PRO_PAYMENT_LINK } from '../lib/payment-links.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -32,7 +33,7 @@ landing.get('/', (c) => {
         '@type': 'Offer',
         price: '0',
         priceCurrency: 'USD',
-        description: 'Free tier: 200 requests/month with API key',
+        description: `Free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests/month with an API key that needs no e-mail`,
       },
       {
         '@type': 'Offer',
@@ -60,7 +61,7 @@ landing.get('/', (c) => {
         name: 'How much does IBANforge cost?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'IBANforge offers a free tier with 200 requests per month using an API key. Beyond that, pay $0.002 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required.',
+          text: `IBANforge offers a free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests a month on an API key you get with one empty POST, no e-mail and no card, and ${FREE_TIER_MONTHLY_LIMIT} a month once you claim that key. Beyond that, pay $0.002 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required.`,
         },
       },
       {
@@ -1030,9 +1031,14 @@ landing.get('/', (c) => {
             </div>
             <div class="keygen">
               <form class="keygen-form" onsubmit="return generateKey(event)">
-                <input type="email" name="email" placeholder="your@email.com" required />
+                <input type="email" name="email" placeholder="e-mail (optional)" />
                 <button type="submit">Get my key</button>
               </form>
+              <p style="margin:8px 0 0;font-size:11px;color:#52525b">
+                Leave it empty and the key is yours right away: ${ANONYMOUS_MONTHLY_LIMIT} requests
+                a month, nothing to confirm. An address raises it to ${FREE_TIER_MONTHLY_LIMIT} a
+                month.
+              </p>
               <p style="margin:8px 0 0;font-size:11px;color:#52525b">
                 By requesting a key you agree to the
                 <a href="https://ibanforge.com/legal/terms" style="color:#71717a"
@@ -1046,7 +1052,10 @@ landing.get('/', (c) => {
               <div class="keygen-result" id="keygenResult">
                 <strong>Your API key (save it now):</strong>
                 <code id="keygenKey"></code>
-                <div class="warn">200 requests/month free. This key will not be shown again.</div>
+                <div class="warn">
+                  ${ANONYMOUS_MONTHLY_LIMIT} requests/month &mdash; claim this key to raise it to
+                  ${FREE_TIER_MONTHLY_LIMIT} a month. It will not be shown again.
+                </div>
               </div>
               <div class="keygen-error" id="keygenError"></div>
             </div>
@@ -1217,7 +1226,7 @@ landing.get('/', (c) => {
                 </div>
                 <div class="feat-stat">&lt;30ms</div>
                 <h3>Fast &amp; Developer-friendly</h3>
-                <p>OpenAPI spec. npm SDK. Batch up to 100 IBANs. Free tier with 200 req/month.</p>
+                <p>OpenAPI spec. npm SDK. Batch up to 100 IBANs. Free key without an e-mail.</p>
               </div>
             </div>
           </div>
@@ -1232,7 +1241,8 @@ landing.get('/', (c) => {
                 <div class="path-badge path-badge-green">FREE TIER</div>
                 <h3>API Key</h3>
                 <p class="path-price">
-                  <strong>200 requests/month</strong> &mdash; no card required
+                  <strong>${ANONYMOUS_MONTHLY_LIMIT} requests/month</strong> &mdash; no e-mail, no
+                  card
                 </p>
                 <ul class="path-features">
                   <li><span class="check">&check;</span> All endpoints included</li>
@@ -1581,7 +1591,7 @@ landing.get('/', (c) => {
           async function generateKey(e) {
             e.preventDefault();
             var form = e.target,
-              email = form.email.value;
+              email = form.email.value.trim();
             var errEl = document.getElementById('keygenError'),
               resEl = document.getElementById('keygenResult'),
               keyEl = document.getElementById('keygenKey');
@@ -1591,7 +1601,7 @@ landing.get('/', (c) => {
               var r = await fetch('/v1/keys/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email }),
+                body: JSON.stringify(email ? { email: email } : {}),
               });
               var d = await r.json();
               if (!r.ok) {

@@ -58,11 +58,23 @@ Same JSON config — drop into the respective `mcp.json`.
 
 Three modes, in order of precedence:
 
-1. **API key (free tier)** — set `IBANFORGE_API_KEY=ifk_…` in the env config. 200 free requests/month.
+1. **API key (free)** — set `IBANFORGE_API_KEY=ifk_…` in the env config. 25 free requests/month on a key that needs no e-mail, 200 a month once claimed.
 2. **x402 micropayments (USDC on Base L2)** — automatic when an x402-capable wallet is configured. See [x402 discovery](https://api.ibanforge.com/.well-known/x402).
 3. **Anonymous** — only the demo endpoint and rate-limited public surface are accessible.
 
-Get a free API key:
+Get a free API key without giving an address:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate
+```
+
+Raise the same key to 200 requests a month with `POST /v1/keys/claim`, sending the key as
+`Authorization: Bearer ifk_…` (never in the body) once it has served at least one call: a 6-digit
+code mailed to an address you choose to give. An x402 payment made on the key also claims it, but
+for 200 requests once rather than 200 a month — never send an address your human has not handed you
+for this purpose.
+
+An address is still accepted at creation, and it only skips ahead to the claim step:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
