@@ -1,0 +1,20 @@
+{
+  "en": {
+    "src": "/audit/workbook-en.0d2977c0e627.png",
+    "width": 1200,
+    "height": 630,
+    "sourceHash": "20add2ee516e"
+  },
+  "fr": {
+    "src": "/audit/workbook-fr.08b230f8ce8c.png",
+    "width": 1200,
+    "height": 630,
+    "sourceHash": "3ec01205ffc4"
+  },
+  "de": {
+    "src": "/audit/workbook-de.36b8e3630964.png",
+    "width": 1200,
+    "height": 630,
+    "sourceHash": "7dbdc1217f3e"
+  }
+}

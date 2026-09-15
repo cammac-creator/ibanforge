@@ -2007,6 +2007,13 @@
       "title": "What you download",
       "text": "Your columns, untouched, then ours: status, findings, bank and BIC from the register, IBAN country, SEPA reach, ISO 20022 address verdict, detail. A summary sheet closes the workbook.",
       "sample": "Download a sample report (.xlsx)",
+      "imageTitle": "Your audit report, in Excel.",
+      "imageCaption": "Simplified report preview · fictional data",
+      "imageAlt": "IBANforge workbook preview: original columns, status, findings, bank and BIC from the register, with fictional rows.",
+      "tableToggle": "View the example rows",
+      "originalColumns": "Your columns",
+      "auditColumns": "Audit results",
+      "summaryTab": "Summary",
       "cols": [
         "Name",
         "IBAN",

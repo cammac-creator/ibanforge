@@ -2007,6 +2007,13 @@
       "title": "Ce que vous téléchargez",
       "text": "Vos colonnes, intactes, puis les nôtres : statut, constats, banque et BIC du registre, pays de l'IBAN, joignabilité SEPA, verdict d'adresse ISO 20022, détail. Une feuille de synthèse ferme le classeur.",
       "sample": "Télécharger un rapport d'exemple (.xlsx)",
+      "imageTitle": "Votre rapport d’audit, dans Excel.",
+      "imageCaption": "Aperçu simplifié du rapport · données fictives",
+      "imageAlt": "Aperçu du classeur IBANforge : colonnes d’origine, statut, constats, banque et BIC du registre, avec des lignes fictives.",
+      "tableToggle": "Voir les lignes de l’exemple",
+      "originalColumns": "Vos colonnes",
+      "auditColumns": "Les résultats de l’audit",
+      "summaryTab": "Synthèse",
       "cols": [
         "Nom",
         "IBAN",
