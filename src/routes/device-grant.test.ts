@@ -22,7 +22,12 @@ import { buildApp } from '../app.js';
 import { apiKeys } from './api-keys.js';
 import { deviceGrant } from './device-grant.js';
 import { getStatsDB } from '../lib/db.js';
-import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import {
+  ANONYMOUS_MONTHLY_LIMIT,
+  FREE_TIER_MONTHLY_LIMIT,
+  SHIELD_MONTHLY_LIMIT,
+} from '../lib/tiers.js';
+import { BREAKER_THRESHOLD, evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
 import {
   DAILY_KEY_CREATION_LIMIT,
   VERIFICATION_SENDS_PER_SOURCE_DAY,
@@ -995,5 +1000,106 @@ describe('les corps illisibles', () => {
     const app = makeApp();
     const res = await app.request('/v1/keys/device', { method: 'POST' });
     expect(res.status).toBe(201);
+  });
+});
+
+/**
+ * 🚨 LE DERNIER BLOC DU FICHIER, ET IL DOIT LE RESTER : il ARME le disjoncteur
+ * global, état qui vit dans `kv_state` et survivrait aux tests suivants. Son
+ * nettoyage retire les deux, la rafale injectée et l'état.
+ */
+describe('une clé device née pendant une alerte du disjoncteur', () => {
+  afterEach(() => {
+    const db = getStatsDB();
+    db.prepare("DELETE FROM key_creations WHERE ip_hash LIKE 'rafale-%'").run();
+    db.prepare("DELETE FROM kv_state WHERE key LIKE 'creation_breaker:%'").run();
+  });
+
+  it('sort dégradée, marquée par son hash, et l’épisode est inscrit', async () => {
+    const app = makeApp();
+    const db = getStatsDB();
+    // Une rafale : assez de créations ET assez de réseaux distincts. La
+    // diversité est obligatoire — sans elle le disjoncteur serait un déni de
+    // service à cinq adresses, et c'est la clause qui ne doit jamais sauter.
+    const insert = db.prepare('INSERT INTO key_creations (ip_hash, key_prefix) VALUES (?, ?)');
+    for (let i = 0; i < BREAKER_THRESHOLD + 2; i++) {
+      insert.run(`rafale-${i}`, `ifk_rafale${i}`);
+    }
+    expect(evaluateBreakerOnCreation().armed).toBe(true);
+
+    const { deviceCode } = await openAndApprove(app);
+    const got = await post(app, '/v1/keys/device/token', { device_code: deviceCode });
+    const key = (await got.json()) as Record<string, unknown>;
+    // Le plafond réduit est passé À LA FRAPPE, jamais par un UPDATE
+    // d'après-coup : la colonne ne doit pas porter une valeur que la réponse
+    // contredit. Le retrait relit donc la COLONNE, et il lit 5.
+    expect(key.monthly_limit).toBe(SHIELD_MONTHLY_LIMIT);
+
+    // 🚨 L'assertion qui compte. Une révision antérieure appelait
+    // `markShieldBirth(key_prefix, …)`, et `api_keys.key_prefix` n'a AUCUNE
+    // contrainte d'unicité : l'UPDATE ne touchait alors AUCUNE ligne. La clé
+    // sortait bien à cinq unités (le plafond passe par `generateApiKey`) mais
+    // SANS `no_recredit` et SANS épisode — elle se rechargeait tous les mois,
+    // échappait à la remontée automatique du désarmement, et restait
+    // inauditable. Le défaut était donc invisible à toute assertion posée sur
+    // la seule réponse HTTP.
+    const row = db
+      .prepare(
+        'SELECT no_recredit, shield_episode, monthly_limit FROM api_keys WHERE key_prefix = ?',
+      )
+      .get(key.key_prefix) as {
+      no_recredit: number;
+      shield_episode: string | null;
+      monthly_limit: number;
+    };
+    expect(row.no_recredit).toBe(1);
+    expect(row.shield_episode).not.toBeNull();
+    expect(row.monthly_limit).toBe(SHIELD_MONTHLY_LIMIT);
+
+    // Et la ligne de naissance reste UNIQUE : la dégradation n'ajoute pas un
+    // second comptage.
+    const births = db
+      .prepare('SELECT COUNT(*) AS n FROM key_creations WHERE key_prefix = ?')
+      .get(key.key_prefix) as { n: number };
+    expect(births.n).toBe(1);
+  });
+
+  it('ne dégrade PAS une clé qui a prouvé une boîte', async () => {
+    // 🚨 Le prédicat est « alerte armée ET pas de boîte prouvée », jamais
+    // « alerte armée ET palier anonyme ». Une clé née d'un code à six chiffres
+    // vérifié porte `claimed_at`, donc elle n'est pas dégradée : c'est la
+    // doctrine « une clé qui prouve une boîte n'est pas dégradée ».
+    const app = makeApp();
+    const db = getStatsDB();
+    const insert = db.prepare('INSERT INTO key_creations (ip_hash, key_prefix) VALUES (?, ?)');
+    for (let i = 0; i < BREAKER_THRESHOLD + 2; i++) {
+      insert.run(`rafale-${i}`, `ifk_rafale${i}`);
+    }
+    expect(evaluateBreakerOnCreation().armed).toBe(true);
+
+    const email = 'shielded@alpha.example.net';
+    const opened = await open(app);
+    const token = await tokenFor(app, opened.user_code);
+    const challenge = createVerificationChallenge(email, null);
+    if (typeof challenge !== 'string') throw new Error('challenge refused');
+    const approved = await post(app, '/v1/keys/device/approve', {
+      user_code: opened.user_code,
+      approval_token: token,
+      email,
+      code: challenge,
+    });
+    expect(approved.status, await approved.clone().text()).toBe(200);
+    const verdict = (await approved.json()) as Record<string, unknown>;
+    expect(verdict.monthly_limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    expect(verdict).not.toHaveProperty('notice');
+
+    const got = await post(app, '/v1/keys/device/token', { device_code: opened.device_code });
+    const key = (await got.json()) as Record<string, unknown>;
+    expect(key.monthly_limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    const row = db
+      .prepare('SELECT no_recredit, claimed_at FROM api_keys WHERE key_prefix = ?')
+      .get(key.key_prefix) as { no_recredit: number; claimed_at: string | null };
+    expect(row.no_recredit).toBe(0);
+    expect(row.claimed_at).not.toBeNull();
   });
 });
