@@ -702,9 +702,18 @@ export function forceDisarm(
 ): BreakerState {
   const prev = readBreakerState();
   if (!prev.armed) {
-    // Rien à désarmer. On en profite pour purger un état résiduel : si les trois
-    // clés de contrat traînaient sans `armed`, le radar les lirait encore.
-    writeBreakerState(prev);
+    // Rien à désarmer. On purge un état résiduel — si `armed_at` ou l'épisode
+    // traînaient sans `armed`, le radar les lirait encore et bornerait son
+    // rayon sur un instant fantôme — mais SEULEMENT s'il y en a un.
+    //
+    // 🚨 La condition n'est pas du zèle : sous interrupteur de crise, ce
+    // chemin est emprunté à CHAQUE inscription, et une écriture `kv_state`
+    // prend le verrou d'écriture de SQLite. Purger inconditionnellement
+    // ferait payer un verrou par inscription sur le chemin le plus chaud du
+    // service, pendant précisément la crise qu'on essaie de traverser.
+    if (prev.episode_id !== null || prev.armed_at !== null || prev.last_exceeded_at !== null) {
+      writeBreakerState(prev);
+    }
     return prev;
   }
   markShieldMinutes(prev, now);
