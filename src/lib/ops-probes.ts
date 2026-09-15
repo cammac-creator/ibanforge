@@ -24,6 +24,7 @@ import {
   BREAKER_STUCK_HOURS,
 } from './creation-breaker.js';
 import { LINEAGE_BLIND_STREAK, lineageWriteFailures } from './lineage-facts.js';
+import { devicePollsInFlightMax, pollsInFlight } from './device-grant.js';
 
 /**
  * Le point de montage du volume Railway (`railway.toml` → mountPath /app/data).
@@ -253,6 +254,33 @@ async function probeLineage(): Promise<void> {
   }
 }
 
+/**
+ * S12 — les attentes retenues par le device grant (spec 04 §2.3).
+ *
+ * Une saturation permanente du plafond d'attentes ne casse rien de visible :
+ * tout agent honnête reçoit `authorization_pending` immédiat pour toujours, et
+ * un `time curl` ne permet pas de conclure. La mesure vit ici, pas dans un
+ * chronomètre (revue adversariale du 15/09, H2).
+ */
+export async function probeDevicePolls(): Promise<void> {
+  try {
+    const total = pollsInFlight();
+    const max = devicePollsInFlightMax();
+    if (total >= max) {
+      await opsFail(
+        'device:polls',
+        `${total} attentes du device grant retenues sur ${max} (rail device : ` +
+          `${pollsInFlight('device')}) : le long-polling répond immédiatement à tout le monde. ` +
+          'Premier geste : baisser DEVICE_POLLS_IN_FLIGHT_MAX, pas allonger le tick.',
+      );
+    } else {
+      await opsOk('device:polls');
+    }
+  } catch (err) {
+    console.error('[ops-probe] device polls:', err instanceof Error ? err.message : err);
+  }
+}
+
 /** Tick horaire unique : toutes les sondes + les hommes morts. */
 async function tick(): Promise<void> {
   await checkHeartbeats();
@@ -262,6 +290,7 @@ async function tick(): Promise<void> {
   await probeFatfAge();
   await probeBreaker();
   await probeLineage();
+  await probeDevicePolls();
 }
 
 const TICK_MS = 60 * 60 * 1000;

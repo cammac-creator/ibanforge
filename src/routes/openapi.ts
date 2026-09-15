@@ -1111,6 +1111,11 @@ const buildRawSpec = () => ({
               'belongs to another flow — stop. "unsupported_grant_type": grant_type was present and wrong. ' +
               '"invalid_json": the body is neither valid JSON nor form-encoded.',
           },
+          '429': {
+            description:
+              'The per-address request limiter of the whole API, which this endpoint does not bypass: ' +
+              'wait retry_after seconds. A client that polls once or twice a minute never meets it.',
+          },
         },
       },
     },

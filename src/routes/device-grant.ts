@@ -45,7 +45,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { randomInt } from 'node:crypto';
 import { evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
-import { generateApiKey, markShieldBirth } from '../lib/api-keys.js';
+import { generateApiKey, markShieldBirth, revokeApiKey } from '../lib/api-keys.js';
 import { isAllowedOrigin } from '../lib/cors-origins.js';
 import { extractClientIp } from '../lib/stats.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
@@ -80,6 +80,7 @@ import {
   checkApprovalToken,
   consumeGrantKey,
   denyGrant,
+  deviceMissDelayFloorMs,
   devicePollTickMs,
   devicePollWaitMs,
   devicePollsInFlightMax,
@@ -236,7 +237,19 @@ async function uniform404(
   approverSource: string | null,
   route: 'lookup' | 'approve' | 'deny',
 ): Promise<Response> {
-  await sleep(uniformMissDelayMs(approverSource, route), c.req.raw.signal);
+  // 🚨 Retarder est un moyen de défense, pas un moyen de se faire tenir des
+  // connexions : l'attente d'un 404 prend une place dans le même compteur que
+  // le long-polling (spec 04 §3.3). Une fois le plafond global atteint, le
+  // délai retombe au plancher, qui reste uniforme — l'oracle temporel ne
+  // rouvre pas, seule l'escalade s'arrête.
+  const release = enterPoll('device', approverSource);
+  try {
+    const saturated = pollsInFlight() >= devicePollsInFlightMax();
+    const delay = saturated ? deviceMissDelayFloorMs() : uniformMissDelayMs(approverSource, route);
+    await sleep(delay, c.req.raw.signal);
+  } finally {
+    release();
+  }
   return c.json({ error: 'invalid_or_expired', message: TEXTS.invalid_or_expired }, 404);
 }
 
@@ -504,6 +517,13 @@ deviceGrant.post('/v1/keys/device/lookup', async (c) => {
     return uniform404(c, approverSource, 'lookup');
   }
 
+  // 🚨 La garde CSRF. Un seul jeton vivant par grant : un nouveau lookup
+  // écrase le précédent, donc de deux onglets ouverts sur le même code c'est
+  // le dernier chargé qui peut approuver. Aucune ligne écrite (le grant vient
+  // d'être tranché par une requête concurrente) : c'est le même 404 uniforme.
+  const approvalToken = issueApprovalToken(grant.device_code_hash);
+  if (approvalToken === null) return uniform404(c, approverSource, 'lookup');
+
   return c.json({
     user_code: formatUserCode(userCode),
     client_name: grant.client_name,
@@ -512,10 +532,7 @@ deviceGrant.post('/v1/keys/device/lookup', async (c) => {
     status: grant.status,
     anonymous_monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
     claimed_monthly_limit: FREE_TIER_MONTHLY_LIMIT,
-    // 🚨 La garde CSRF. Un seul jeton vivant par grant : un nouveau lookup
-    // écrase le précédent, donc de deux onglets ouverts sur le même code c'est
-    // le dernier chargé qui peut approuver.
-    approval_token: issueApprovalToken(grant.device_code_hash),
+    approval_token: approvalToken,
   });
 });
 
@@ -703,8 +720,8 @@ async function sendVerificationCode(
   // 🚨 LES DEUX HORLOGES NE PARTENT PAS EN MÊME TEMPS. Le grant court depuis sa
   // création, le code depuis son ENVOI, c'est-à-dire maintenant. Sans cette
   // rallonge, un humain qui met cinq minutes à ouvrir le lien puis demande la
-  // voie e-mail tape un code JUSTE et s'entend répondre invalide. Rallongé UNE
-  // seule fois : une deuxième demande de code ne repousse plus rien.
+  // voie e-mail tape un code JUSTE et s'entend répondre invalide. Rallongé à
+  // chaque envoi, dans la borne de deux durées de vie depuis la création.
   const expiresAt = extendForEmail(grant.device_code_hash);
   return c.json(
     {
@@ -731,7 +748,7 @@ async function sendVerificationCode(
  * `user_code` de repartir avec la clé : au mieux il fait recevoir une clé
  * anonyme à l'agent légitime.
  */
-function mint(c: Context, grant: GrantRow, verifiedEmail: string | null): Response {
+async function mint(c: Context, grant: GrantRow, verifiedEmail: string | null): Promise<Response> {
   // 0. L'empreinte est celle du CRÉATEUR du grant, jamais celle de
   //    l'approbateur. La sentinelle remplace un ip_hash absent POUR LE JOURNAL
   //    seulement : un compteur global n'a besoin d'aucune ancre pour compter,
@@ -808,11 +825,23 @@ function mint(c: Context, grant: GrantRow, verifiedEmail: string | null): Respon
   }
 
   // 5. Le grant passe à 'approved' et ouvre la fenêtre de retrait.
-  approveGrant(
+  //    🚨 Sur `changes`, jamais sur la lecture d'avant : entre le contrôle du
+  //    jeton et cette ligne, une résolution MX peut durer deux secondes, et
+  //    deux onglets peuvent frapper pour le même grant. Le perdant de la
+  //    course aurait sinon une clé ACTIVE qu'aucune ligne ne porte — que la
+  //    purge ne pourrait jamais révoquer — et répondrait « c'est fait » à un
+  //    humain dont l'agent recevra l'autre clé (revue du 15/09, C1). La clé
+  //    perdante est révoquée sur-le-champ ; sa ligne de naissance reste, le
+  //    budget du jour a bien été débité.
+  const attached = approveGrant(
     grant.device_code_hash,
     { tier, keyHash: result.key_hash, rawKey: result.api_key },
     'device',
   );
+  if (!attached) {
+    revokeApiKey(result.api_key);
+    return uniform404(c, keyCreationSource(clientIpOf(c)), 'approve');
+  }
 
   return c.json({
     ok: true,

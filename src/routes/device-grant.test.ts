@@ -37,9 +37,39 @@ import {
 import {
   DEVICE_APPROVAL_MISSES_PER_IP_HOUR,
   DEVICE_CODES_PER_IP_HOUR,
+  DEVICE_GRANT_MAX_LIFETIME_SECONDS,
   DEVICE_POLL_INTERVAL_SECONDS,
+  approveGrant,
   hashGrantSecret,
+  issueApprovalToken,
+  pollsInFlight,
+  purgeExpiredDeviceCodes,
 } from '../lib/device-grant.js';
+
+/**
+ * Un point d'attente injectable dans la frappe, pour jouer la course que la
+ * suite ne peut pas produire seule : sous vitest le contrôle du domaine est
+ * sauté, donc `findGrantByUserCode → approveGrant` devient entièrement
+ * synchrone et aucune requête concurrente ne peut s'y glisser. En production,
+ * une résolution MX de deux secondes sépare le contrôle du jeton de la frappe.
+ * Seule `generateApiKey` est enveloppée ; le reste du module reste réel.
+ */
+const race = vi.hoisted(() => ({
+  afterMint: null as null | (() => void),
+  lastMint: null as null | { key_hash: string; key_prefix: string },
+}));
+vi.mock('../lib/api-keys.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/api-keys.js')>();
+  return {
+    ...actual,
+    generateApiKey: (...args: Parameters<typeof actual.generateApiKey>) => {
+      const result = actual.generateApiKey(...args);
+      race.lastMint = result;
+      race.afterMint?.();
+      return result;
+    },
+  };
+});
 
 /**
  * Le relais de courrier, remplacé par une doublure qui RETIENT le code.
@@ -909,10 +939,19 @@ describe('les plafonds', () => {
 });
 
 describe('les deux horloges', () => {
-  it('rallonge le grant à l’envoi du code, et une seule fois', async () => {
+  it('rallonge le grant à chaque envoi de code, sans jamais dépasser deux durées de vie', async () => {
     const app = makeApp();
     const opened = await open(app);
     const token = await tokenFor(app, opened.user_code);
+    const hash = hashGrantSecret(opened.device_code);
+    const read = () =>
+      getStatsDB()
+        .prepare(
+          `SELECT expires_at, email_extended,
+                  CAST(strftime('%s', expires_at) - strftime('%s','now') AS INTEGER) AS left
+             FROM device_codes WHERE device_code_hash = ?`,
+        )
+        .get(hash) as { expires_at: string; email_extended: number; left: number };
     // Le grant n'a plus que deux minutes : un humain qui met cinq minutes à
     // ouvrir le lien puis demande la voie e-mail recevrait un code valable
     // quinze minutes contre un grant qui meurt dans dix.
@@ -920,27 +959,121 @@ describe('les deux horloges', () => {
     const asked = await post(app, '/v1/keys/device/approve', {
       user_code: opened.user_code,
       approval_token: token,
-      email: 'clock@alpha.example.net',
+      email: 'horloge-1@alpha.example.net',
     });
     expect(asked.status).toBe(202);
     expect(((await asked.json()) as { expires_in: number }).expires_in).toBeGreaterThan(600);
+    expect(read().email_extended).toBe(1);
 
-    const afterFirst = getStatsDB()
-      .prepare('SELECT expires_at, email_extended FROM device_codes WHERE device_code_hash = ?')
-      .get(hashGrantSecret(opened.device_code)) as { expires_at: string; email_extended: number };
-    expect(afterFirst.email_extended).toBe(1);
-
-    // Une deuxième demande ne repousse plus rien.
-    await post(app, '/v1/keys/device/approve', {
+    // 🚨 L'humain corrige une adresse mal tapée à la quinzième minute : le
+    // second code repousse ENCORE l'échéance. Ne rallonger qu'une fois lui
+    // laissait soixante secondes pour taper un code juste, le symptôme même
+    // que la rallonge existe pour fermer.
+    rewindGrant(opened.device_code, '+60 seconds');
+    const again = await post(app, '/v1/keys/device/approve', {
       user_code: opened.user_code,
       approval_token: token,
-      email: 'clock2@alpha.example.net',
+      email: 'horloge-2@alpha.example.net',
     });
-    const afterSecond = getStatsDB()
-      .prepare('SELECT expires_at, email_extended FROM device_codes WHERE device_code_hash = ?')
-      .get(hashGrantSecret(opened.device_code)) as { expires_at: string; email_extended: number };
-    expect(afterSecond.expires_at).toBe(afterFirst.expires_at);
-    expect(afterSecond.email_extended).toBe(1);
+    expect(again.status).toBe(202);
+    expect(read().left).toBeGreaterThan(600);
+    expect(read().email_extended).toBe(2);
+
+    // Mais jamais au-delà de deux durées de vie depuis la création : un grant
+    // vieux de vingt-cinq minutes ne gagne que les cinq qui restent.
+    getStatsDB()
+      .prepare(`UPDATE device_codes SET created_at = datetime('now', ?) WHERE device_code_hash = ?`)
+      .run(`-${DEVICE_GRANT_MAX_LIFETIME_SECONDS - 300} seconds`, hash);
+    const third = await post(app, '/v1/keys/device/approve', {
+      user_code: opened.user_code,
+      approval_token: token,
+      email: 'horloge-3@alpha.example.net',
+    });
+    expect(third.status).toBe(202);
+    const capped = read();
+    expect(capped.email_extended).toBe(3);
+    expect(capped.left).toBeLessThanOrEqual(300);
+    expect(capped.left).toBeGreaterThan(250);
+  });
+
+  it('un grant tranché entre le contrôle du jeton et la frappe ne répond jamais « c’est fait »', async () => {
+    // Deux onglets, le plus récent détenant le jeton vivant : l'un poste son
+    // code pendant que l'autre clique. Le perdant de la course frappait une clé
+    // ACTIVE qu'aucune ligne ne portait — invisible de la purge — et répondait
+    // ok:true à un humain dont l'agent recevra l'autre clé.
+    const app = makeApp();
+    const opened = await open(app, { 'x-real-ip': '203.0.113.77' });
+    const token = await tokenFor(app, opened.user_code);
+    const hash = hashGrantSecret(opened.device_code);
+    race.afterMint = () => {
+      approveGrant(hash, { tier: 'anonymous', rawKey: 'ifk_gagnant_de_la_course' }, 'device');
+    };
+    const res = await post(app, '/v1/keys/device/approve', {
+      user_code: opened.user_code,
+      approval_token: token,
+    });
+    race.afterMint = null;
+    expect(res.status).toBe(404);
+    const body = await res.text();
+    expect((JSON.parse(body) as { error: string }).error).toBe('invalid_or_expired');
+    expect(body).not.toContain('ifk_');
+
+    // Le grant porte la clé du gagnant, et rien d'autre.
+    const grant = getStatsDB()
+      .prepare('SELECT key_hash, status FROM device_codes WHERE device_code_hash = ?')
+      .get(hash) as { key_hash: string; status: string };
+    expect(grant.status).toBe('approved');
+    expect(grant.key_hash).toBe(hashGrantSecret('ifk_gagnant_de_la_course'));
+
+    // La clé du perdant existe (le budget du jour a bien été débité) mais elle
+    // est révoquée, avec sa date : la purge de télémétrie la trouvera.
+    expect(race.lastMint).not.toBeNull();
+    const loser = getStatsDB()
+      .prepare('SELECT active, deactivated_at FROM api_keys WHERE key_hash = ?')
+      .get(race.lastMint!.key_hash) as { active: number; deactivated_at: string | null };
+    expect(loser.active).toBe(0);
+    expect(loser.deactivated_at).not.toBeNull();
+  });
+
+  it("l'attente d'un 404 tient une place dans le compteur d'attentes", async () => {
+    // Retarder est un moyen de défense, pas un moyen de se faire tenir des
+    // connexions : les délais des 404 comptent comme le long-polling.
+    const app = makeApp();
+    process.env.DEVICE_MISS_DELAY_FLOOR_MS = '120';
+    expect(pollsInFlight('device')).toBe(0);
+    const pending = post(app, '/v1/keys/device/lookup', { user_code: 'AAAA-AAAA' });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(pollsInFlight('device')).toBeGreaterThanOrEqual(1);
+    expect((await pending).status).toBe(404);
+    expect(pollsInFlight('device')).toBe(0);
+  });
+
+  it('la purge révoque une clé approuvée jamais retirée AVEC sa date de révocation', async () => {
+    // Sans `deactivated_at`, la purge de télémétrie des clés terminées (clause
+    // 4.7 du DPA) ne trouve jamais cette clé : ses lignes de journal resteraient
+    // pour toujours.
+    const app = makeApp();
+    const { deviceCode } = await openAndApprove(app);
+    const hash = hashGrantSecret(deviceCode);
+    getStatsDB()
+      .prepare(
+        `UPDATE device_codes SET expires_at = datetime('now', '-2 hours') WHERE device_code_hash = ?`,
+      )
+      .run(hash);
+    const purged = purgeExpiredDeviceCodes();
+    expect(purged.revoked).toBe(1);
+    const key = getStatsDB()
+      .prepare(
+        `SELECT k.active, k.deactivated_at FROM api_keys k
+           JOIN device_codes d ON d.key_hash = k.key_hash WHERE d.device_code_hash = ?`,
+      )
+      .get(hash) as { active: number; deactivated_at: string | null };
+    expect(key.active).toBe(0);
+    expect(key.deactivated_at).not.toBeNull();
+  });
+
+  it('lookup ne rend jamais un jeton qu’aucune ligne ne porte', () => {
+    expect(issueApprovalToken(hashGrantSecret('ifd_inconnu'))).toBeNull();
   });
 
   it('frappe la clé quand un code JUSTE arrive sur un grant qui allait mourir', async () => {

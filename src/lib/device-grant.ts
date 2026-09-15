@@ -563,16 +563,19 @@ export function findGrantBySecret(secret: string, expected: GrantRail): GrantRow
  * Un seul jeton vivant par grant : un nouveau lookup écrase le précédent. Deux
  * onglets ouverts sur le même code, c'est le dernier chargé qui peut approuver.
  */
-export function issueApprovalToken(secretHash: string): string {
+export function issueApprovalToken(secretHash: string): string | null {
   const token = APPROVAL_TOKEN_PREFIX + randomBytes(32).toString('hex');
-  getStatsDB()
+  const info = getStatsDB()
     .prepare(
       `UPDATE device_codes
           SET approval_token_hash = ?, approval_token_expires_at = datetime('now', ?)
         WHERE device_code_hash = ? AND grant_type = 'device' AND status = 'pending'`,
     )
     .run(hashGrantSecret(token), `+${DEVICE_APPROVAL_TOKEN_TTL_SECONDS} seconds`, secretHash);
-  return token;
+  // Un jeton rendu sans ligne écrite ne validerait jamais : la page repartirait
+  // avec un 403 silencieux, une relance, puis « cette page a trop attendu ».
+  // Branché sur `changes`, comme approveGrant et denyGrant.
+  return info.changes > 0 ? token : null;
 }
 
 export function checkApprovalToken(secretHash: string, token: string): boolean {
@@ -744,22 +747,39 @@ export function grantMonthlyLimit(tier: KeyTier | null, stored: number | null): 
   return tier === 'anonymous' ? ANONYMOUS_MONTHLY_LIMIT : FREE_TIER_MONTHLY_LIMIT;
 }
 
+/** Un grant ne vit jamais plus longtemps que ceci, rallonges comprises : deux
+ *  durées de vie depuis sa création. Le nombre d'envois de code est déjà borné
+ *  ailleurs (par destinataire, par réseau, par domaine) ; cette borne-ci borne
+ *  le TEMPS. */
+export const DEVICE_GRANT_MAX_LIFETIME_SECONDS = 2 * DEVICE_CODE_TTL_SECONDS;
+
 /**
- * La rallonge de la branche e-mail, UNE SEULE FOIS.
+ * La rallonge de la branche e-mail, à CHAQUE envoi de code, bornée dans le temps.
  *
- * Rend l'échéance COURANTE de la ligne, rallongée ou non : un second appel ne
- * repousse rien, mais la page a quand même besoin du décompte vrai pour recaler
- * son horloge. `null` veut dire « aucun grant device en attente sous ce
- * secret », et rien d'autre.
+ * La révision précédente ne rallongeait qu'une fois, et rouvrait au second
+ * envoi le symptôme même qu'elle voulait fermer : l'humain qui corrige une
+ * adresse mal tapée à la quinzième minute recevait un code valable quinze
+ * minutes contre un grant qui mourait dans soixante secondes (revue
+ * adversariale du 15/09, H1). Chaque envoi repousse donc l'échéance d'une durée
+ * de vie, sans jamais dépasser DEVICE_GRANT_MAX_LIFETIME_SECONDS depuis la
+ * création ; `email_extended` compte les rallonges.
+ *
+ * Rend l'échéance COURANTE de la ligne, rallongée ou non : la page a besoin du
+ * décompte vrai pour recaler son horloge. `null` veut dire « aucun grant device
+ * en attente sous ce secret », et rien d'autre.
  */
 export function extendForEmail(secretHash: string): string | null {
   const db = getStatsDB();
   db.prepare(
     `UPDATE device_codes
-        SET expires_at = MAX(expires_at, datetime('now', ?)), email_extended = 1
-      WHERE device_code_hash = ? AND grant_type = 'device' AND status = 'pending'
-        AND email_extended = 0`,
-  ).run(`+${DEVICE_CODE_TTL_SECONDS} seconds`, secretHash);
+        SET expires_at = MIN(MAX(expires_at, datetime('now', ?)), datetime(created_at, ?)),
+            email_extended = email_extended + 1
+      WHERE device_code_hash = ? AND grant_type = 'device' AND status = 'pending'`,
+  ).run(
+    `+${DEVICE_CODE_TTL_SECONDS} seconds`,
+    `+${DEVICE_GRANT_MAX_LIFETIME_SECONDS} seconds`,
+    secretHash,
+  );
   const row = db
     .prepare(
       `SELECT expires_at FROM device_codes
@@ -995,9 +1015,13 @@ export function purgeExpiredDeviceCodes(): DevicePurgeResult {
   //    ⚠️ `expires_at` porte déjà la fenêtre de retrait posée par
   //    l'approbation, donc cette étape ne peut pas attraper une clé encore
   //    retirable.
+  //    🚨 `deactivated_at` AVEC `active = 0`, comme tous les autres sites de
+  //    révocation : la purge de télémétrie des clés terminées (clause 4.7 du
+  //    DPA) ne lit que la paire, et une clé révoquée sans date garderait ses
+  //    lignes de journal pour toujours (revue adversariale du 15/09, P1).
   const revoked = db
     .prepare(
-      `UPDATE api_keys SET active = 0
+      `UPDATE api_keys SET active = 0, deactivated_at = datetime('now')
         WHERE key_hash IN (SELECT key_hash FROM device_codes
                             WHERE grant_type = 'device' AND status = 'approved'
                               AND key_hash IS NOT NULL
