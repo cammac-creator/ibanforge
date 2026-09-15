@@ -36,23 +36,30 @@ import { getStatsDB } from './db.js';
 import { recordEvent } from './events.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
-export const BACKUP_FORMAT = 2;
+export const BACKUP_FORMAT = 3;
 /**
  * Ce qu'un restaurateur d'aujourd'hui sait lire. Le format 1 n'a pas les deux
- * journaux du palier de clé (key_claims, key_settlements) : ils y valent [] et
- * le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
+ * journaux du palier de clé (key_claims, key_settlements), le format 2 n'a pas
+ * le journal d'annulation du radar (key_revocations, lot 6) : ils y valent []
+ * et le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
  * le format rend irrestaurable tout dump pris avant la livraison — sur une base
  * qui n'a pas d'autre sauvegarde. Et incrémenter plutôt que ne rien faire :
  * sans numéro, un dump tronqué et un dump légitimement ancien seraient
  * indiscernables, et le `?? []` masquerait l'un comme l'autre.
  */
-export const READABLE_FORMATS = [1, 2] as const;
+export const READABLE_FORMATS = [1, 2, 3] as const;
 
 export interface BackupPayload {
   format: number;
   /** Stamped by the caller, not by this module: the clock is not our business. */
   taken_at: string;
-  counts: { api_keys: number; api_usage: number; key_claims?: number; key_settlements?: number };
+  counts: {
+    api_keys: number;
+    api_usage: number;
+    key_claims?: number;
+    key_settlements?: number;
+    key_revocations?: number;
+  };
   api_keys: Array<Record<string, unknown>>;
   api_usage: Array<Record<string, unknown>>;
   /**
@@ -62,6 +69,11 @@ export interface BackupPayload {
    */
   key_claims?: Array<Record<string, unknown>>;
   key_settlements?: Array<Record<string, unknown>>;
+  /**
+   * Format 3. Les anciens soldes des clés coupées pour rafale : sans eux, une
+   * clé désactivée par le radar ne peut plus être rendue telle qu'elle était.
+   */
+  key_revocations?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -106,6 +118,9 @@ export function exportPaidState(takenAt: string): BackupPayload {
   const settlements = db.prepare('SELECT * FROM key_settlements').all() as Array<
     Record<string, unknown>
   >;
+  const revocations = db.prepare('SELECT * FROM key_revocations').all() as Array<
+    Record<string, unknown>
+  >;
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
   // indistinguishable from any other call. This annotation puts it on the
@@ -127,11 +142,13 @@ export function exportPaidState(takenAt: string): BackupPayload {
       api_usage: usage.length,
       key_claims: claims.length,
       key_settlements: settlements.length,
+      key_revocations: revocations.length,
     },
     api_keys: keys,
     api_usage: usage,
     key_claims: claims,
     key_settlements: settlements,
+    key_revocations: revocations,
   };
 }
 
@@ -144,6 +161,8 @@ export interface RestoreReport {
   claims_skipped: number;
   settlements_inserted: number;
   settlements_skipped: number;
+  revocations_inserted: number;
+  revocations_skipped: number;
 }
 
 /**
@@ -176,6 +195,8 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     claims_skipped: 0,
     settlements_inserted: 0,
     settlements_skipped: 0,
+    revocations_inserted: 0,
+    revocations_skipped: 0,
   };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
@@ -208,6 +229,12 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     for (const row of payload.key_settlements ?? []) {
       if (insertRow('key_settlements', row)) report.settlements_inserted++;
       else report.settlements_skipped++;
+    }
+    // Absent d'un dump aux formats 1 et 2 ; un dump au format 3 le porte
+    // toujours, même vide.
+    for (const row of payload.key_revocations ?? []) {
+      if (insertRow('key_revocations', row)) report.revocations_inserted++;
+      else report.revocations_skipped++;
     }
   });
   run();
