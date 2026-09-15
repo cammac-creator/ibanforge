@@ -1498,54 +1498,77 @@ function migrateLineageFacts(statsDB: DatabaseType.Database): void {
   // normalisation des chemins n'y entre pas. Assumé — réintroduire le préfixe
   // textuel ferait diverger le rattrapage du fil de l'eau, et le contrat
   // interdit de reconnaître une route à son seul préfixe.
+  //
+  // 🚨 SOUS try/catch, et c'est la seule étape qui l'est : les quatre
+  // précédentes sont structurelles, celle-ci ne fait que reconstituer un passé.
+  // Une exception ici remonterait jusqu'à openStatsDB(), et l'API ne
+  // démarrerait plus — le prix exact du piège du 19/08, pour un agrément. Si
+  // elle échoue, la reconstruction est perdue (l'étape 4 n'insérera plus rien
+  // au démarrage suivant) et la mesure au fil de l'eau reste entière.
+  //
+  // C'est aussi le seul balayage lourd du bloc : il lit request_log en entier,
+  // une fois, au tout premier démarrage après la livraison. À regarder dans les
+  // journaux de déploiement.
   if (inserted.changes > 0) {
-    const billable = buildCanonicalBillableFilter();
-    const traces = statsDB
-      .prepare(
-        `SELECT k.lineage_hash AS lineage,
-                MIN(r.created_at) AS first_at,
-                MAX(r.created_at) AS last_at,
-                COUNT(DISTINCT date(r.created_at)) AS days,
-                -- La route de la PREMIERE ligne : created_at est de largeur fixe,
-                -- donc le minimum lexicographique de la concaténation est celui
-                -- de la date, et le suffixe est la route qui l'accompagne.
-                MIN(r.created_at || '|' || r.path) AS first_pair
-           FROM request_log r
-           JOIN api_keys k ON k.key_prefix = r.key_prefix
-          WHERE r.key_prefix IS NOT NULL
-            AND r.status >= 200 AND r.status < 300
-            AND k.lineage_hash IS NOT NULL
-            AND (${billable.sql})
-            AND r.key_prefix NOT IN (
-              SELECT key_prefix FROM api_keys
-               GROUP BY key_prefix HAVING COUNT(DISTINCT lineage_hash) > 1)
-          GROUP BY k.lineage_hash`,
-      )
-      .all(...billable.params) as Array<{
-      lineage: string;
-      first_at: string;
-      last_at: string;
-      days: number;
-      first_pair: string;
-    }>;
-    const update = statsDB.prepare(
-      `UPDATE lineage_facts
-          SET first_success_at      = COALESCE(first_success_at, ?),
-              first_success_route   = COALESCE(first_success_route, ?),
-              first_success_context = COALESCE(first_success_context, 'traces'),
-              last_success_at       = COALESCE(last_success_at, ?),
-              last_success_day      = COALESCE(last_success_day, ?),
-              success_days          = MAX(success_days, ?),
-              updated_at            = datetime('now')
-        WHERE lineage_hash = ? AND first_success_at IS NULL`,
-    );
-    statsDB.transaction(() => {
-      for (const t of traces) {
-        const route = t.first_pair.slice(t.first_at.length + 1);
-        update.run(t.first_at, route, t.last_at, t.last_at.slice(0, 10), t.days, t.lineage);
-      }
-    })();
+    try {
+      backfillLineageFirstsFromTraces(statsDB);
+    } catch (err) {
+      console.error(
+        '[lineage] rattrapage des premiers depuis les traces abandonné :',
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
+}
+
+/** Étape 5 de la migration ci-dessus, sortie pour que son échec soit borné. */
+function backfillLineageFirstsFromTraces(statsDB: DatabaseType.Database): void {
+  const billable = buildCanonicalBillableFilter();
+  const traces = statsDB
+    .prepare(
+      `SELECT k.lineage_hash AS lineage,
+              MIN(r.created_at) AS first_at,
+              MAX(r.created_at) AS last_at,
+              COUNT(DISTINCT date(r.created_at)) AS days,
+              -- La route de la PREMIERE ligne : created_at est de largeur fixe,
+              -- donc le minimum lexicographique de la concaténation est celui
+              -- de la date, et le suffixe est la route qui l'accompagne.
+              MIN(r.created_at || '|' || r.path) AS first_pair
+         FROM request_log r
+         JOIN api_keys k ON k.key_prefix = r.key_prefix
+        WHERE r.key_prefix IS NOT NULL
+          AND r.status >= 200 AND r.status < 300
+          AND k.lineage_hash IS NOT NULL
+          AND (${billable.sql})
+          AND r.key_prefix NOT IN (
+            SELECT key_prefix FROM api_keys
+             GROUP BY key_prefix HAVING COUNT(DISTINCT lineage_hash) > 1)
+        GROUP BY k.lineage_hash`,
+    )
+    .all(...billable.params) as Array<{
+    lineage: string;
+    first_at: string;
+    last_at: string;
+    days: number;
+    first_pair: string;
+  }>;
+  const update = statsDB.prepare(
+    `UPDATE lineage_facts
+        SET first_success_at      = COALESCE(first_success_at, ?),
+            first_success_route   = COALESCE(first_success_route, ?),
+            first_success_context = COALESCE(first_success_context, 'traces'),
+            last_success_at       = COALESCE(last_success_at, ?),
+            last_success_day      = COALESCE(last_success_day, ?),
+            success_days          = MAX(success_days, ?),
+            updated_at            = datetime('now')
+      WHERE lineage_hash = ? AND first_success_at IS NULL`,
+  );
+  statsDB.transaction(() => {
+    for (const t of traces) {
+      const route = t.first_pair.slice(t.first_at.length + 1);
+      update.run(t.first_at, route, t.last_at, t.last_at.slice(0, 10), t.days, t.lineage);
+    }
+  })();
 }
 
 // ---------------------------------------------------------------------------
