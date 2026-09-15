@@ -6,6 +6,7 @@ import { ClientMessages } from "@/components/client-messages"
 import { AuditWorkbookPreview } from "@/components/audit-workbook-preview";
 import { Upload, Eye, Download } from "lucide-react";
 import { alternatesFor, urlFor } from "@/lib/seo";
+import { auditImageFor } from "@/lib/audit-images";
 
 export async function generateMetadata({
   params,
@@ -14,6 +15,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "audit" });
+  const image = { ...auditImageFor(locale), alt: t("workbook.imageAlt") };
   return {
     title: t("metaTitle"),
     description: t("metaDescription"),
@@ -23,8 +25,9 @@ export async function generateMetadata({
       description: t("ogDescription"),
       url: urlFor(locale, '/audit'),
       type: "website",
+      images: [image],
     },
-    twitter: { card: "summary_large_image", title: t("metaTitle"), description: t("ogDescription") },
+    twitter: { card: "summary_large_image", title: t("metaTitle"), description: t("ogDescription"), images: [image] },
   };
 }
 
@@ -43,6 +46,7 @@ export default async function AuditPage({
     description: t("ogDescription"),
     brand: { "@type": "Brand", name: "IBANforge" },
     url: urlFor(locale, '/audit'),
+    image: [auditImageFor(locale).url],
     offers: [
       { "@type": "Offer", price: "149", priceCurrency: "CHF", description: t("prices.standard"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
       { "@type": "Offer", price: "349", priceCurrency: "CHF", description: t("prices.large"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },

@@ -2007,6 +2007,13 @@
       "title": "Was Sie herunterladen",
       "text": "Ihre Spalten, unverändert, dann unsere: Status, Befunde, Bank und BIC aus dem Register, IBAN-Land, SEPA-Erreichbarkeit, Adressurteil ISO 20022, Detail. Ein Zusammenfassungsblatt schliesst die Arbeitsmappe ab.",
       "sample": "Beispielbericht herunterladen (.xlsx)",
+      "imageTitle": "Ihr Prüfbericht, in Excel.",
+      "imageCaption": "Vereinfachte Berichtsvorschau · fiktive Daten",
+      "imageAlt": "Vorschau der IBANforge-Arbeitsmappe: ursprüngliche Spalten, Status, Befunde, Bank und BIC aus dem Register, mit fiktiven Zeilen.",
+      "tableToggle": "Beispielzeilen ansehen",
+      "originalColumns": "Ihre Spalten",
+      "auditColumns": "Prüfergebnisse",
+      "summaryTab": "Zusammenfassung",
       "cols": [
         "Name",
         "IBAN",
