@@ -24,6 +24,12 @@ export interface PaywallCause {
     | 'credits_exhausted'
     | 'credits_insufficient'
     | 'invalid_api_key'
+    // Une clé anonyme coupée par le radar de cohortes (lot 6). Distincte de
+    // `invalid_api_key` parce que le message de celle-ci envoie le lecteur
+    // chercher une faute de frappe qui n'existe pas, ce qui est faux ET
+    // démoralisant pour un agent honnête pris dans un rayon de souffle. Une clé
+    // révoquée par son PORTEUR garde, elle, `invalid_api_key`.
+    | 'key_revoked_burst'
     // The keyless REST trial ran out for today (src/middleware/anonymous-trial.ts).
     // A developer who reached this has already SEEN the product work, which is
     // the one paywall moment worth a different sentence from "payment required".

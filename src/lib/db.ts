@@ -999,6 +999,63 @@ function openStatsDB(): DatabaseType.Database {
     if (pvCols.length > 0 && !pvCols.includes('key_prefix')) {
       statsDB.exec('ALTER TABLE pending_verifications ADD COLUMN key_prefix TEXT');
     }
+    // ── Journal d'annulation du radar de cohortes (lot 6, 15/09/2026) ────────
+    //
+    // Une clé coupée pour rafale doit pouvoir être RENDUE. C'est la seule
+    // écriture de tout ce chantier qui ne se rembobine pas par un revert du
+    // code : la migration se laisse, le schéma reste, mais une clé désactivée
+    // reste désactivée. D'où l'ancien solde, consigné ici au moment de la coupe.
+    //
+    // 🚨 « L'ancien solde » n'est PAS credits_remaining. Une clé mensuelle n'a
+    // pas de solde : cette colonne vaut NULL pour elle (l'INSERT du mint libre
+    // ne l'écrit pas). Sont donc consignés le plafond du moment
+    // (prev_monthly_limit), les unités déjà consommées TOUS MOIS CONFONDUS
+    // (prev_units_used — ces clés portent no_recredit, et c'est sur cette base
+    // que leur plafond se mesure), prev_no_recredit et prev_active pour rendre
+    // exactement l'état d'avant, et prev_credits_remaining comme témoin, pour
+    // que le journal se relise sans supposer les clauses du rayon.
+    //
+    // 🚨 RÉTENTION : aucune purge, jamais. Poser active = 0 démarre l'horloge de
+    // purgeTerminatedKeyTelemetry(30), qui supprime les lignes request_log de la
+    // clé trente jours après sa désactivation. Passé ce délai, ce journal est la
+    // SEULE trace de ce que la clé a fait, et une purge dessus rendrait
+    // l'annulation impossible.
+    //
+    // 🚨 La restauration se fait par key_hash, jamais par key_prefix : ce
+    // dernier n'a porté aucune unicité dans la base héritée, et un UPDATE sans
+    // LIMIT sur une colonne non unique touche toutes les lignes du préfixe.
+    // key_prefix et origin_prefix restent pour la lecture humaine du journal.
+    //
+    // 🚨 Cette table n'entre pas d'elle-même dans la sauvegarde :
+    // src/lib/backup.ts nomme ses tables explicitement (format 2).
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS key_revocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_prefix TEXT NOT NULL,
+        origin_prefix TEXT,
+        key_hash TEXT NOT NULL,
+        revoked_at TEXT NOT NULL DEFAULT (datetime('now')),
+        reason TEXT NOT NULL,
+        episode_id TEXT,
+        anchor TEXT NOT NULL,
+        anchor_share REAL NOT NULL,
+        anchor_keys INTEGER NOT NULL,
+        burst_from TEXT NOT NULL,
+        burst_to TEXT NOT NULL,
+        burst_keys INTEGER NOT NULL,
+        window_minutes REAL NOT NULL,
+        distinct_sources INTEGER NOT NULL,
+        prev_active INTEGER NOT NULL,
+        prev_monthly_limit INTEGER,
+        prev_units_used INTEGER NOT NULL,
+        prev_no_recredit INTEGER NOT NULL,
+        prev_credits_remaining INTEGER,
+        restored_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_key_revocations_episode ON key_revocations(episode_id, revoked_at);
+      CREATE INDEX IF NOT EXISTS idx_key_revocations_prefix ON key_revocations(key_prefix);
+      CREATE INDEX IF NOT EXISTS idx_key_revocations_hash ON key_revocations(key_hash, restored_at);
+    `);
     // Web Bot Auth (RFC 9421): who signed the request, in one column.
     //
     // Four readings:
