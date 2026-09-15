@@ -375,6 +375,48 @@ families), `paid_key_delivered` is almost always 1 by construction, and rows rec
 migration are flagged `backfilled = 1` and excluded from every denominator. The migration reads
 `request_log` once, at the first boot after the deploy, under its own try/catch. Backup format 4.
 
+**The whole first wave shipped on 15 September, then went through the adversarial review the
+programme brief required (four lenses, one reflection-tier agent each).** What the review changed the
+same day, and why it matters to whoever touches these modules next:
+
+- **Verification codes are budgeted per (recipient, network) and per recipient domain**
+  (`challengeSendAllowed` in `src/lib/key-creation-guard.ts`). Counted per recipient alone, the
+  anti-mail-bombing cap was the weapon: three codes posted by a stranger to a victim's address locked
+  that address out of any code for a day. The per-domain cap (public mailbox providers exempt) is
+  also what bounds a catch-all domain: a farm that spends a domain name used to get the six-digit
+  proof of mailbox for free and without limit, and that proof exempts a key from the breaker's shield,
+  from both radar passes and from any cut. That yield existed before the programme; the review made
+  it visible, the domain cap bounds it, and the two remaining levers (a global hourly cap on claims,
+  a smaller per-network cap on anonymous creations) are decisions, not code.
+- **The manual cut honours the diversity guard unless `force: true` is in the body**
+  (`cutCohortNow`). The report and the alert invite the operator to paste an anchor into
+  `POST /v1/admin/cohorts/cut`, and the anchor they paste is sometimes the one the automatic pass had
+  just spared (`below_source_floor`): a lone newcomer under a generic User-Agent, or a whole corporate
+  NAT. Cutting is now a written decision, never an omission.
+- **The e-mail pass of the cohort radar loads on `tier = 'email'`, not on quota columns.** Its
+  historical `no_recredit = 0 AND monthly_limit IS NULL` described "an ordinary free key" only as long
+  as nothing else wrote those columns; the breaker's shield does, and the lift writes an explicit 200,
+  so every key that had been through an alert left both passes for good, silently.
+- **A long burst window (60 keys in 6 hours)** in `ANON_BURST_WINDOWS`: a farm that spaces one
+  creation every three minutes never formed a 30-second burst and left the anonymous pass before any
+  grouping, whatever its User-Agent.
+- **`key_creations` is in the backup (format 6).** Without it a restored volume made every restored
+  key invisible to the breaker and the radar, hence irrevocable: the one place where the single birth
+  row invariant was silently undone.
+- **The lineage measurement counts consecutive write failures and `lineage:blind` says so**; a
+  database refusing writes used to produce a funnel full of zeros that nothing could tell from
+  "nobody activates". `closeAll()` also resets the lineage day cache.
+- The consent atoms no longer describe the second-wave rails (an MCP approval tool, a card checkout
+  on the API) as existing: they say "planned, not available yet" and point at what exists (packs by
+  card on the pricing page, in USDC through the API). An agent that reads a route which answers 404
+  learns that the documentation lies.
+
+What the review confirmed and left alone: a key already in service never falls to the radar (only a
+key born inside the burst window can), rotation carries everything, a settlement is counted once, a
+manual cut on a single-network cohort is possible only with `force`, and the breaker cannot be armed
+"permanently" without renewing dozens of fresh networks a day — its bound and its automatic lift are
+the right answers there.
+
 **Dashboard numbers now render identically on both sides (#182, 11 September).** Five client
 components — `status-by-path-table`, `live-health-strip`, `usage-chart`, `stacked-bar-chart` and
 the CRM `freshness-badge` — used `toLocaleString`, `toLocaleDateString` or `Intl.DateTimeFormat`.
