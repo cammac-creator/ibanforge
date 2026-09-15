@@ -28,7 +28,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
 | BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 374 au 2026-08-25 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
-| Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation autorisée **sans accord préalable**, mais **citation de la NBS obligatoire** et **fichier non modifié** | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, lettre du 26/08/2026 sans réponse, voir ci-dessous |
+| Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation et traitement confirmés par écrit le 09/09/2026, **citation de la NBS obligatoire** ; conditions du fichier conservées | ✅ **réponse du 09/09/2026 relue le 14/09/2026** — ingérée le 06/09/2026, voir ci-dessous |
 | Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | ❓ **AUCUNE condition d'utilisation publiée** — ni licence, ni interdiction | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, licence `unknown`, lettre à écrire, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
@@ -343,14 +343,55 @@ l'association à 11 h 16 UTC, trente-six minutes plus tard :
 > responsible for any misuse of the Greek Banking System (HEBIC) index". »
 
 Deux conditions, à porter dans le code le jour du branchement : (1) le crédit exact « Source: Hellenic Bank
-Association (HEBIC) » avec la date de publication du fichier ; (2) **l'Important Note reproduite en entier** sur
+Association (HEBIC) » ; (2) **l'Important Note reproduite en entier** sur
 chaque réponse qui sert une donnée HEBIC (champ `notice` du bloc registre, jamais résumée) et dans la
 documentation. Remerciement envoyé le 08/09 avec le rappel des deux conditions.
 
-Ce que cela permet : un registre grec autoritatif à la manière du registre slovaque : le code à trois chiffres
-de l'IBAN grec (positions 5 à 7) → établissement et adresse, plus le fichier des agences (code à quatre chiffres,
-positions 8 à 11). Source : les fichiers HEBIC publiés sur hba.gr. Chantier à lancer ; tant qu'il ne l'est pas,
-la Grèce reste servie comme aujourd'hui (aucune donnée HEBIC n'est encore lue).
+**Précision de la HBA reçue le 14/09/2026 : le fichier est partiel pour les émetteurs d'IBAN grecs.**
+Les codes HEBIC ne sont pas attribués aux établissements de paiement et de monnaie électronique qui
+émettent des IBAN grecs. Pour leurs codes à trois chiffres, la HBA renvoie à la Bank of Greece,
+autorité compétente : <https://www.bankofgreece.gr/en/main-tasks/supervision/supervised-institutions>.
+Ce renvoi ne constitue ni une liste complète déjà vérifiée ni une autorisation de réutiliser une autre source.
+
+Ce que le fichier permet : confirmer l'établissement et l'adresse associés à un code bancaire présent
+(positions 5 à 7 de l'IBAN). **Une absence ne prouve jamais que le code n'existe pas.** L'intégration doit
+donc suivre `NON_EXHAUSTIVE_REGISTERS`, avec `authoritative: false`, sans verdict `not_allocated` déduit
+de cette seule absence. Le fichier des agences est distinct ; la présence du code bancaire ne valide pas
+les chiffres de l'agence. Source : <https://www.hba.gr/info/hebicmap>.
+
+**Édition, pas date inventée.** La HBA confirme le 14/09 qu'elle ne fournit aucune date exacte de publication.
+La page nomme l'édition « 2026 B' τρίμηνο » (2026 T2), encore visible à la relecture du 14/09. Citer
+l'édition et la date de consultation, en les distinguant ; ni la réponse reçue ni la consultation ne sont
+la date de publication du fichier.
+
+Le chantier grec existe sur des branches locales, mais HEBIC n'est pas encore intégré à `main` au
+14/09/2026. La bascule vers le traitement partiel reste une condition préalable à l'intégration par la
+session responsable des registres ; ne pas relancer ni publier les anciennes branches autoritatives.
+
+### ✅ 10/09/2026 — Betaalvereniging Nederland confirme la réutilisation de sa liste BIC
+
+Réponse initiale du 31/08/2026, retransmise le 10/09 et relue le 14/09 : la liste BIC peut être utilisée
+gratuitement, sans accord de licence formel, avec **attribution à Betaalvereniging Nederland** et une
+**mise en garde indiquant qu'un BIC ou un code bancaire peut être modifié, retiré ou ajouté à tout moment**.
+L'association ne garantit pas l'exactitude permanente de la liste. Ces conditions devront accompagner
+les données lors de leur utilisation ; cette permission n'établit pas à elle seule l'exhaustivité du registre.
+
+L'association indique que son flux RSS constitue le seul historique des changements et qu'il remonte
+à au moins treize mois au moment de sa réponse. Ne pas en déduire une profondeur historique garantie
+ou une archive complète disponible depuis une autre source. La présente entrée consigne les conditions ;
+elle ne déclare aucun nouvel import ni modification de l'API.
+
+### ⛔ 03/09/2026 — AusPayNet refuse la réutilisation du répertoire BSB
+
+Refus explicite, relu le 14/09/2026, de l'usage proposé : extraire le CSV BSB public, le normaliser et
+redistribuer ses données dans l'API commerciale IBANforge, même avec attribution. AusPayNet invoque les
+conditions de son site et son rôle de gestionnaire des codes.
+
+**Aucune donnée issue de ce fichier ne doit être importée, stockée ou servie par IBANforge.** Ne pas
+traiter AusPayNet comme un registre autoritatif ni contourner le refus par une copie du même fichier.
+Cette interdiction porte sur cette source et cet usage ; elle ne préjuge pas des droits d'une autre
+source australienne indépendante, qui exigerait sa propre vérification. Aucune intégration BSB n'est
+introduite par cette mise à jour documentaire.
 
 ### ✅ 25/08/2026 — la Bank of England a accordé la permission
 
@@ -804,17 +845,21 @@ L'astérisque renvoie à une note de bas de page qui ne concerne **que** la
 reproduction des billets en euros (décision BCE/2003/4) : sans rapport avec un
 répertoire de codes de paiement.
 
-### La position, et ce qui reste ouvert
+### La position et la réponse reçue
 
 Nous ne redistribuons pas le fichier : nous servons **un enregistrement par
 requête**, noms verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la
 version et la date d'effet lues sur la page.
 
-⏳ **Lettre du 26/08/2026 à info@nbs.sk, sans réponse au 06/09/2026** : elle
-demande si l'extraction de champs compte comme une modification du fichier au
-sens de la clause ci-dessus. La ČNB, sur une clause quasi identique, a répondu
-le **27/08/2026** que non (« you do not alter the information », avis personnel
-du département). **Si la NBS répond par la négative, le registre est retiré.**
+**Réponse de la NBS du 09/09/2026, relue le 14/09/2026**, à la demande du
+26/08 sur l'extraction de champs dans une API commerciale : la NBS indique
+que le répertoire est disponible pour réutilisation, notamment pour traitement,
+et demande de citer **Národná banka Slovenska** comme source. Elle fournit
+le fichier <https://nbs.sk/dokument/53533909-a9c9-4727-8b89-c9fca5e214ca/stiahnut/?force=true>.
+La mention « sans réponse » est donc périmée. Cette clarification porte sur
+l'usage décrit ; conserver l'attribution, les noms verbatim et la traçabilité
+de l'édition. Elle ne remplace pas les conditions générales par une licence
+ouverte sans restrictions ni ne fige l'UUID du fichier pour les rafraîchissements.
 
 ### Ce que ça impose au code
 
