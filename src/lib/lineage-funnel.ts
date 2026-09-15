@@ -305,6 +305,8 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
   // 🚨 Ce que cet indicateur peut et ne peut PAS voir, à dire avant de lire le
   // chiffre : il vaut presque toujours 1 par construction, parce que les trois
   // chemins de frappe écrivent la référence ET la clé dans la même opération.
+  // La route journalisée porte le paquet (« POST /v1/credits/buy/1k »), d'où le
+  // joker APRÈS la barre oblique : sans lui, aucun règlement de paquet n'entrait.
   // Il attrape le seul écart réel — un règlement journalisé sans clé frappée,
   // par exemple un webhook interrompu — et il est aveugle à une clé frappée
   // sans aucune trace de règlement, qui n'aurait par définition pas de
@@ -320,7 +322,7 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
                 ) AS delivered
            FROM key_settlements s
           WHERE s.created_at >= @from AND s.created_at < @to
-            AND s.route LIKE '%/v1/credits/buy'
+            AND s.route LIKE '%/v1/credits/buy/%'
          UNION ALL
          SELECT COALESCE(k.x402_payment_ref, k.stripe_session_id) AS ref, 1 AS delivered
            FROM (${PAID_KEYS}) k
