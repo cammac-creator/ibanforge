@@ -16,7 +16,7 @@
  *   const r = await client.validateIban('CH1000230000000012345');
  *
  *   // Generate a free key in 1 line
- *   const key = await IBANforge.generateApiKey('you@company.com');
+ *   const key = await IBANforge.generateApiKey();
  *
  * ⚠️ The IBAN above is not decoration. `CH9300762011623852957` — the SWIFT
  * registry's illustration, which every quickstart reaches for — carries a bank
@@ -424,6 +424,8 @@ export interface APIKey {
   api_key: string;
   key_prefix: string;
   email?: string;
+  tier?: 'anonymous' | 'email';
+  claim_url?: string;
   monthly_limit?: number;
   message?: string;
   terms_url?: string;
@@ -441,7 +443,7 @@ export interface APIKeyUsage {
   key_prefix: string;
   /** Calls consumed this calendar month. */
   used: number;
-  /** Monthly quota for this key (200 on the free tier). */
+  /** Quota réel de cette clé ; lire cette valeur plutôt que supposer un palier. */
   limit: number;
   remaining: number;
   /** 'YYYY-MM' of the quota window. */
@@ -638,7 +640,7 @@ export class IBANforge {
     try {
       const res = await fetch(`${this.baseUrl}${path}`, { ...init, signal: ctrl.signal });
       await raiseForStatus(res);
-      return res.json() as Promise<T>;
+      return await res.json() as T;
     } catch (err) {
       if (err instanceof IBANforgeError) throw err;
       if (err instanceof Error && err.name === 'AbortError') {
@@ -778,21 +780,21 @@ export class IBANforge {
   // ---- API keys ----
 
   /**
-   * Create a free API key (200 requests/month). The key is shown ONCE.
-   *
-   * Use a real mailbox: fictional and disposable domains (`example.com`,
-   * `mailinator`, …) are refused with `disposable_email`. A second key from the
-   * same network within seven days answers 403 `verification_required` and
-   * mails a six-digit code — repeat the call as `{ email, code }` to claim it.
+   * Crée une clé sans e-mail : 25 appels REST/mois, à conserver dès réception.
+   * Lire monthly_limit : une protection temporaire peut réduire le quota.
+   * Une adresse explicitement fournie conserve le parcours historique avec code.
+   * Ne pas créer une nouvelle clé à chaque appel ni pour contourner une limite.
    */
   static async generateApiKey(
-    email: string,
+    email?: string,
     config: { baseUrl?: string; timeoutMs?: number; code?: string } = {},
   ): Promise<APIKey> {
     const { code, ...clientConfig } = config;
-    const body: { email: string; code?: string } = { email };
+    const body: { email?: string; code?: string } = {};
+    if (email !== undefined) body.email = email;
     if (code) body.code = code;
-    return new IBANforge(clientConfig).post('/v1/keys/generate', body);
+    // La création publique ne doit pas transporter une clé ambiante.
+    return new IBANforge({ ...clientConfig, apiKey: '' }).post('/v1/keys/generate', body);
   }
 
   /** Current month's quota usage for the configured API key. */

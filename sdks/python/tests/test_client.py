@@ -315,3 +315,63 @@ async def test_async_402():
     async with AsyncIBANforge() as cl:
         with pytest.raises(PaymentRequiredError):
             await cl.validate_iban(SAMPLE_IBAN)
+
+
+@respx.mock
+def test_creation_sans_email_et_reutilisation(monkeypatch):
+    """La création n'utilise pas une clé ambiante et n'envoie aucune adresse."""
+    monkeypatch.setenv("IBANFORGE_API_KEY", "ifk_ambient")
+    creation = respx.post(f"{BASE}/v1/keys/generate").mock(return_value=httpx.Response(
+        201, json={"api_key": "ifk_new", "tier": "anonymous", "monthly_limit": 25}
+    ))
+    validation = respx.post(f"{BASE}/v1/iban/validate").mock(return_value=httpx.Response(
+        200, json={"iban": SAMPLE_IBAN, "valid": True}
+    ))
+    usage = respx.get(f"{BASE}/v1/keys/usage").mock(return_value=httpx.Response(
+        200, json={"limit": 25, "used": 1, "remaining": 24}
+    ))
+    key = IBANforge.generate_api_key()
+    with IBANforge(api_key=key["api_key"]) as sdk:
+        assert sdk.validate_iban(SAMPLE_IBAN)["valid"] is True
+        assert sdk.usage()["remaining"] == 24
+    sent = creation.calls.last.request
+    assert sent.content == b"{}"
+    assert "authorization" not in sent.headers
+    assert sent.headers["user-agent"].startswith("ibanforge-python/")
+    assert validation.calls.last.request.headers["authorization"] == "Bearer ifk_new"
+    assert usage.calls.last.request.headers["authorization"] == "Bearer ifk_new"
+    assert creation.call_count == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_creation_async_sans_email_et_reutilisation(monkeypatch):
+    monkeypatch.setenv("IBANFORGE_API_KEY", "ifk_ambient")
+    creation = respx.post(f"{BASE}/v1/keys/generate").mock(return_value=httpx.Response(
+        201, json={"api_key": "ifk_new", "tier": "anonymous", "monthly_limit": 25}
+    ))
+    validation = respx.post(f"{BASE}/v1/iban/validate").mock(return_value=httpx.Response(
+        200, json={"iban": SAMPLE_IBAN, "valid": True}
+    ))
+    key = await AsyncIBANforge.generate_api_key()
+    async with AsyncIBANforge(api_key=key["api_key"]) as sdk:
+        assert (await sdk.validate_iban(SAMPLE_IBAN))["valid"] is True
+    sent = creation.calls.last.request
+    assert sent.content == b"{}"
+    assert "authorization" not in sent.headers
+    assert sent.headers["user-agent"].startswith("ibanforge-python/")
+    assert validation.calls.last.request.headers["authorization"] == "Bearer ifk_new"
+    assert creation.call_count == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_creation_async_conserve_adresse_et_code():
+    import json
+    creation = respx.post(f"{BASE}/v1/keys/generate").mock(return_value=httpx.Response(
+        201, json={"api_key": "ifk_new", "monthly_limit": 200}
+    ))
+    await AsyncIBANforge.generate_api_key("acme@example.com", code="123456")
+    assert json.loads(creation.calls.last.request.content) == {
+        "email": "acme@example.com", "code": "123456"
+    }

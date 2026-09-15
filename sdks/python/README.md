@@ -73,26 +73,29 @@ with IBANforge() as client:                         # free, no key
     print(proof["authoritative"])                   # True
 ```
 
-## Get a free API key (1 line, no signup form)
+## Get a reusable key without e-mail
 
 ```python
 from ibanforge import IBANforge
 
-key = IBANforge.generate_api_key("you@company.com")
-print(key["monthly_limit"])                         # 200
-# key["api_key"] is shown ONCE — store it now.
+key = IBANforge.generate_api_key()
+print(key["monthly_limit"])                         # 25
+# Conserver key["api_key"] : elle ne sera affichée qu’une fois.
 ```
 
-Use a mailbox you can read: fictional domains (`example.com`, `mailinator`, …) are refused with `disposable_email`. A **second** key from the same network within seven days answers `403 verification_required` and mails a six-digit code — call again with it:
+No address, card or confirmation is needed. Store the key in your secret configuration,
+reuse it for subsequent calls, and read `usage()` for its actual allowance. Normally this
+key provides 25 REST requests per month; temporary creation protection can lower that
+allowance, so read `monthly_limit` from the response. Do not create a key per request.
 
-```python
-from ibanforge import IBANforge
+After the key has served a call, `POST /v1/keys/claim` with
+`Authorization: Bearer ifk_…` can raise its allowance: an explicitly supplied mailbox
+and a six-digit code give 200 requests per month; an x402 payment made on the key gives
+200 requests once. An exhausted quota does not authorize sending an address or making
+a payment on the user's behalf. Follow the API's error details and retry delay.
 
-key = IBANforge.generate_api_key("you@company.com", code="123456")
-print(key["monthly_limit"])                         # 200
-```
-
-When the monthly quota is exhausted, the API falls back to advertising x402 payment requirements instead of dead-ending, and the key resumes at the start of the next month.
+The existing email argument and code option remain supported for callers who explicitly
+choose that route. No email is inferred from environment variables or other accounts.
 
 ## Quick start (async)
 
@@ -130,7 +133,7 @@ asyncio.run(main())
 | `demo()` | **free** | Worked examples of every endpoint |
 | `usage()` | **free** | This key's quota for the current month |
 | `health()` | **free** | API version, database size |
-| `IBANforge.generate_api_key(email)` | **free** | 200 requests/month |
+| `IBANforge.generate_api_key(email=None)` | **free** | Reusable key without e-mail; read its returned quota |
 
 In practice:
 

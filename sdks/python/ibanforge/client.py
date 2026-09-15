@@ -13,7 +13,7 @@ Usage:
     out = client.validate_iban("CH1000230000000012345")
 
     # Generate a free key in 1 line
-    key = IBANforge.generate_api_key("you@company.com")
+    key = IBANforge.generate_api_key()
     client = IBANforge(api_key=key["api_key"])
 
 ⚠️ The IBAN above is not decoration. ``CH9300762011623852957`` — the SWIFT
@@ -321,28 +321,24 @@ class IBANforge:
 
     @staticmethod
     def generate_api_key(
-        email: str,
+        email: Optional[str] = None,
         *,
         base_url: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
         code: Optional[str] = None,
     ) -> APIKey:
-        """Create a free API key (200 requests/month).
+        """Crée une clé sans e-mail : 25 appels REST/mois, à conserver.
 
-        The key is shown ONCE — store it securely. After the monthly quota the
-        IBANforge API falls back to advertising x402 payment requirements; the
-        same key continues to work next month.
-
-        Use a mailbox you can read: fictional and disposable domains
-        (``example.com``, ``mailinator``…) are refused with ``disposable_email``.
-        A SECOND key from the same network within seven days answers 403
-        ``verification_required`` and mails a six-digit code — call again with
-        ``code=`` to claim it.
+        Lire monthly_limit : une protection temporaire peut réduire ce quota.
+        Une adresse explicitement fournie conserve le parcours avec code.
+        Réutiliser la clé ; ne pas en créer pour contourner une limite.
         """
-        payload: Dict[str, Any] = {"email": email}
+        payload: Dict[str, Any] = {}
+        if email is not None:
+            payload["email"] = email
         if code:
             payload["code"] = code
-        with httpx.Client(base_url=resolve_base_url(base_url), timeout=timeout) as cl:
+        with httpx.Client(base_url=resolve_base_url(base_url), timeout=timeout, headers={"User-Agent": USER_AGENT}) as cl:
             res = cl.post("/v1/keys/generate", json=payload)
             _raise_for_status(res)
             return res.json()

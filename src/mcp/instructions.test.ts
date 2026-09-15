@@ -77,6 +77,11 @@ const IMPORTERS: Array<{ label: string; path: string; importLine: string }> = [
 ];
 
 describe('les trois surfaces MCP servent les mêmes instructions', () => {
+  it('le paquet npm adapte le quota du texte commun à son transport REST', () => {
+    // Le bloc métier reste identique ; annoncer le quota HTTP distant « ici »
+    // dans un client REST était faux. La recette stdio vérifie le texte reçu.
+    expect(read('mcp/src/index.ts')).toContain('instructions: stdioInstructions(INSTRUCTIONS)');
+  });
   for (const surface of IMPORTERS) {
     it(`${surface.label} injecte la constante partagée`, () => {
       const source = read(surface.path);

@@ -130,8 +130,72 @@ export const BIC_AUTHORITATIVE_SCHEMA = z
       'NOT bank_code_check.authoritative, which answers a different question — whether a national register was consulted about the BANK CODE. In Switzerland the register confirms the code while the BIC still comes from our curated map.',
   );
 
+// Ces blocs nomment les champs réellement renvoyés par enrichResult. Le client
+// MCP officiel rejette une propriété non déclarée dans un objet de sortie fermé.
+const REGISTER_INSTITUTION_SCHEMA = z.object({
+  name: z.string(),
+  street: z.string().nullable(),
+  post_code: z.string().nullable(),
+  town: z.string().nullable(),
+  country: z.string(),
+  lei: z.string().nullable().optional(),
+});
+
+const POSTAL_ADDRESS_SCHEMA = z.object({
+  strt_nm: z.string().optional(),
+  bldg_nb: z.string().optional(),
+  pst_cd: z.string().optional(),
+  twn_nm: z.string(),
+  ctry: z.string(),
+  adr_line: z.array(z.string()).optional(),
+  format: z.enum(['structured', 'hybrid']),
+  source: z.string(),
+  as_of: z.string().nullable(),
+});
+
+const REGISTERED_ADDRESS_SCHEMA = z.object({
+  type: z.literal('registered'),
+  street: z.string().nullable(),
+  post_code: z.string().nullable(),
+  region: z.string().nullable(),
+  city: z.string().nullable(),
+  country: z.string(),
+  romanized: z.string().nullable(),
+  romanization: z.enum(['original_latin', 'gleif_english', 'unavailable']),
+  source: z.string(),
+  language: z.string().nullable(),
+  as_of: z.string().nullable(),
+});
+
+const ENRICHED_BIC_SCHEMA = z
+  .object({
+    code: z.string(),
+    bank_name: z.string().nullable(),
+    city: z.string().nullable(),
+    basis: BIC_BASIS_SCHEMA,
+    authoritative: BIC_AUTHORITATIVE_SCHEMA,
+    source: z
+      .string()
+      .nullable()
+      .optional()
+      .describe('Source of the bank-code/BIC pairing; keep its provenance.'),
+    as_of: z.string().nullable().optional(),
+    lei: z
+      .string()
+      .nullable()
+      .optional()
+      .describe('GLEIF identity of the resolved BIC holder, not necessarily the bank-code holder.'),
+    lei_status: z.string().nullable().optional(),
+    address: REGISTERED_ADDRESS_SCHEMA.nullable().optional(),
+    postal_address: POSTAL_ADDRESS_SCHEMA.nullable().optional(),
+  })
+  .nullable()
+  .optional();
+
 export const BANK_CODE_CHECK_SCHEMA = z
   .object({
+    institution: REGISTER_INSTITUTION_SCHEMA.optional(),
+    check_digit: z.object({ valid: z.boolean(), algorithm: z.string() }).optional(),
     value: z.string(),
     status: z
       .string()
@@ -197,19 +261,7 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
       account_number: z.string(),
     })
     .optional(),
-  bic: z
-    .object({
-      code: z.string(),
-      bank_name: z.string().nullable(),
-      city: z.string().nullable(),
-      basis: BIC_BASIS_SCHEMA,
-      authoritative: BIC_AUTHORITATIVE_SCHEMA,
-    })
-    .nullable()
-    .optional()
-    .describe(
-      'Resolved BIC/SWIFT when BBAN→BIC mapping exists. Read basis before storing it as a routing instruction: only a national_register pairing is settlement-grade.',
-    ),
+  bic: ENRICHED_BIC_SCHEMA,
   sepa: z
     .object({
       member: z.boolean(),
@@ -236,7 +288,11 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
     .optional(),
   issuer: z
     .object({
-      type: z.string().describe('bank | digital_bank | emi | payment_institution'),
+      type: z
+        .string()
+        .nullable()
+        .describe('bank | digital_bank | emi | payment_institution; null when unsubstantiated'),
+      iban_issuer: z.enum(['confirmed', 'not_listed']).optional(),
       name: z.string(),
       classification: z
         .string()
@@ -273,10 +329,43 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
       instant_payments_chf: z.boolean(),
       eurosic: z.boolean(),
       qr_iid: z.string().nullable(),
+      qr_iid_source: z.enum(['register', 'headquarters']).nullable(),
+      qr_iids: z.array(z.string()).optional(),
+      is_qr_iid: z.boolean().optional(),
     })
     .nullable()
     .optional()
     .describe('Swiss clearing data when country is CH or LI.'),
+  modulus_check: z
+    .object({
+      checked: z.boolean(),
+      passed: z.boolean().nullable(),
+      source: z.string(),
+      table_fetched_on: z.string(),
+    })
+    .optional(),
+  pra_authorisation: z
+    .object({
+      authorised: z.literal(true),
+      firm_name: z.string(),
+      frn: z.string(),
+      section: z.string(),
+      basis: z.string(),
+      source: z.string(),
+      list_month: z.string(),
+    })
+    .optional(),
+  psd_registration: z
+    .object({
+      registered: z.literal(true),
+      entity_type: z.string(),
+      name: z.string(),
+      country: z.string(),
+      competent_authority: z.string(),
+      source: z.string(),
+      as_of: z.string(),
+    })
+    .optional(),
   error: z.string().optional(),
   error_detail: z.string().optional(),
   cost_usdc: z.number().describe('What THIS call was billed. Zero on the free MCP tier.'),
@@ -287,77 +376,11 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
   processing_ms: z.number().optional(),
 };
 
+// Le lot contient le même enrichissement que l'appel unitaire. Deux copies
+// avaient divergé sur check_digits, le BIC, le clearing et la provenance.
 const BATCH_VALIDATE_IBAN_OUTPUT_SCHEMA = {
   results: z
-    .array(
-      z.object({
-        iban: z.string(),
-        valid: z.boolean(),
-        country: z.object({ code: z.string(), name: z.string() }).optional(),
-        bban: z
-          .object({
-            bank_code: z.string(),
-            branch_code: z.string().optional(),
-            account_number: z.string(),
-          })
-          .optional(),
-        bic: z
-          .object({
-            code: z.string(),
-            bank_name: z.string().nullable(),
-            city: z.string().nullable(),
-            basis: BIC_BASIS_SCHEMA,
-            authoritative: BIC_AUTHORITATIVE_SCHEMA,
-          })
-          .nullable()
-          .optional(),
-        issuer: z
-          .object({ type: z.string(), name: z.string(), classification: z.string() })
-          .optional(),
-        sepa: z
-          .object({
-            member: z.boolean(),
-            schemes: z.array(z.string()),
-            vop_required: z.boolean(),
-            vop_participant: z.boolean().nullable().optional(),
-            basis: z.enum(['country_default', 'epc_register']).optional(),
-          })
-          .optional(),
-        risk_indicators: z
-          .object({
-            issuer_type: z.string().nullable(),
-            country_risk: z.string(),
-            test_bic: z.boolean(),
-            sepa_reachable: z.boolean(),
-            sepa_reachable_scope: z.string(),
-            vop_coverage: z.boolean(),
-          })
-          .optional(),
-        bank_code_check: BANK_CODE_CHECK_SCHEMA,
-        official_identity: OFFICIAL_IDENTITY_SCHEMA,
-        next_steps: NEXT_STEPS_SCHEMA,
-        clearing: z
-          .object({
-            iid: z.string(),
-            name: z.string(),
-            type: z.string(),
-            town: z.string().nullable(),
-            sic: z.boolean(),
-            instant_payments_chf: z.boolean(),
-            eurosic: z.boolean(),
-            qr_iid: z.string().nullable(),
-          })
-          .nullable()
-          .optional(),
-        error: z.string().optional(),
-        error_detail: z.string().optional(),
-        cost_usdc: z.number().describe('What THIS IBAN was billed. Zero on the free MCP tier.'),
-        list_price_usdc: z
-          .number()
-          .optional()
-          .describe('Catalogue price per IBAN on the paid REST/x402 route.'),
-      }),
-    )
+    .array(z.object(VALIDATE_IBAN_OUTPUT_SCHEMA))
     .describe('One result per input IBAN, in the same order. Same shape as validate_iban.'),
   count: z.number().describe('Number of IBANs processed.'),
 };
@@ -401,58 +424,27 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
 };
 
 const CHECK_COMPLIANCE_OUTPUT_SCHEMA = {
-  iban: z.string(),
-  valid: z.boolean(),
-  country: z.object({ code: z.string(), name: z.string() }).optional(),
-  bic: z
-    .object({
-      code: z.string(),
-      bank_name: z.string().nullable(),
-      city: z.string().nullable(),
-      basis: BIC_BASIS_SCHEMA,
-      authoritative: BIC_AUTHORITATIVE_SCHEMA,
-    })
-    .nullable()
-    .optional(),
-  issuer: z.object({ type: z.string(), name: z.string(), classification: z.string() }).optional(),
-  sepa: z
-    .object({
-      member: z.boolean(),
-      schemes: z.array(z.string()),
-      vop_required: z.boolean(),
-    })
-    .optional(),
-  risk_indicators: z
-    .object({
-      issuer_type: z
-        .string()
-        .nullable()
-        .describe('Null when no institution resolved — it no longer defaults to "bank".'),
-      country_risk: z.string(),
-      test_bic: z.boolean(),
-      sepa_reachable: z.boolean(),
-      sepa_reachable_scope: z
-        .string()
-        .describe('Scope the reachability holds at. Country-derived, not account-derived.'),
-      vop_coverage: z.boolean(),
-    })
-    .optional(),
-  bank_code_check: BANK_CODE_CHECK_SCHEMA,
-  official_identity: OFFICIAL_IDENTITY_SCHEMA,
-  next_steps: NEXT_STEPS_SCHEMA,
+  ...VALIDATE_IBAN_OUTPUT_SCHEMA,
   compliance: z.object({
     sanctions: z.object({
+      bank_screened: z
+        .boolean()
+        .describe(
+          'False means no bank was screened; do not interpret bank_sanctioned as a finding.',
+        ),
       country_sanctioned: z.boolean(),
       bank_sanctioned: z.boolean(),
       matched_lists: z.array(z.string()),
       fatf_status: z.string(),
     }),
     reachability: z.object({
+      screened: z.boolean(),
       sepa_instant: z.boolean(),
       sct: z.boolean(),
       sdd: z.boolean(),
     }),
     vop: z.object({
+      screened: z.boolean(),
       participant: z.boolean(),
       status: z.string(),
     }),

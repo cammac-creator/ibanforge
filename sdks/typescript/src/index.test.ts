@@ -336,6 +336,33 @@ describe('IBANforge — network & timeout failures', () => {
 });
 
 describe('IBANforge — client-side preconditions', () => {
+  it('crée une clé sans e-mail, sans transmettre une clé ambiante, puis la réutilise', async () => {
+    vi.stubEnv('IBANFORGE_API_KEY', 'ifk_ambient');
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ api_key: 'ifk_new', key_prefix: 'ifk_new', tier: 'anonymous', monthly_limit: 25 }))
+      .mockResolvedValueOnce(jsonResponse({ iban: 'DE89370400440532013000', valid: true }))
+      .mockResolvedValueOnce(jsonResponse({ limit: 25, used: 1, remaining: 24 }));
+    const key = await IBANforge.generateApiKey();
+    const sdk = new IBANforge({ apiKey: key.api_key });
+    expect((await sdk.validateIban('DE89370400440532013000')).valid).toBe(true);
+    expect((await sdk.usage()).remaining).toBe(24);
+    expect(JSON.parse(calledInit(0).body as string)).toEqual({});
+    expect((calledInit(0).headers as Record<string, string>).Authorization).toBeUndefined();
+    expect((calledInit(1).headers as Record<string, string>).Authorization).toBe('Bearer ifk_new');
+    expect((calledInit(2).headers as Record<string, string>).Authorization).toBe('Bearer ifk_new');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('conserve le délai jusqu’à la lecture complète du JSON', async () => {
+    fetchMock.mockImplementation(async (_url, init: RequestInit) => ({
+      ok: true,
+      json: () => new Promise((_resolve, reject) => {
+        init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      }),
+    }));
+    await expect(new IBANforge({ timeoutMs: 25 }).health()).rejects.toThrow('timed out after 25ms');
+  });
+
   it('usage() throws AuthError without an API key and never calls the network', async () => {
     expect(() => new IBANforge().usage()).toThrow(AuthError);
     expect(fetchMock).not.toHaveBeenCalled();

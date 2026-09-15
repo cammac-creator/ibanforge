@@ -240,18 +240,24 @@ class AsyncIBANforge:
 
     @staticmethod
     async def generate_api_key(
-        email: str,
+        email: Optional[str] = None,
         *,
         base_url: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
         code: Optional[str] = None,
     ) -> APIKey:
-        """Create a free API key (200 requests/month). See the sync client for
-        the disposable-domain and mailbox-verification rules."""
-        payload: Dict[str, Any] = {"email": email}
+        """Crée une clé sans e-mail : 25 appels REST/mois, à conserver.
+
+        Lire monthly_limit : une protection temporaire peut réduire ce quota.
+        Une adresse explicitement fournie conserve le parcours avec code.
+        Réutiliser la clé ; ne pas en créer pour contourner une limite.
+        """
+        payload: Dict[str, Any] = {}
+        if email is not None:
+            payload["email"] = email
         if code:
             payload["code"] = code
-        async with httpx.AsyncClient(base_url=resolve_base_url(base_url), timeout=timeout) as cl:
+        async with httpx.AsyncClient(base_url=resolve_base_url(base_url), timeout=timeout, headers={"User-Agent": USER_AGENT}) as cl:
             res = await cl.post("/v1/keys/generate", json=payload)
             _raise_for_status(res)
             return res.json()
