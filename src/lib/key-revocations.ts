@@ -342,8 +342,7 @@ export function restoreBurstRevocation(keyHash: string): boolean {
           ORDER BY revoked_at DESC, id DESC LIMIT 1`,
       )
       .get(keyHash, REVOCATION_REASON_BURST) as
-      | { prev_monthly_limit: number | null; prev_no_recredit: number }
-      | undefined;
+      { prev_monthly_limit: number | null; prev_no_recredit: number } | undefined;
     if (!row) return false;
     const res = db
       .prepare(

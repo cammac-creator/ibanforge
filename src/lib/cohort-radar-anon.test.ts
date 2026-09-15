@@ -724,7 +724,10 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     expect(on.anon_revoked).toBe(20);
     expect(listKeyRevocations({ episodeId: `ep-optin-${RUN}`, limit: 1000 }).total).toBe(20);
     expect(activeCount(keys.map((k) => k.prefix))).toBe(0);
-    expect(burstRevocationFor(keys[0].hash), 'le middleware servira le 402 « coupée »').not.toBeNull();
+    expect(
+      burstRevocationFor(keys[0].hash),
+      'le middleware servira le 402 « coupée »',
+    ).not.toBeNull();
   });
 
   // -------------------------------------------------------------------------

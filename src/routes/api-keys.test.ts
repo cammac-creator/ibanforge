@@ -2049,7 +2049,9 @@ describe('POST /v1/keys/claim — lot 6b : une clé coupée pour rafale se rend 
     expect(json.monthly_limit).toBe(FREE_TIER_MONTHLY_LIMIT);
     expect(String(json.message)).toContain('active again');
 
-    expect(validateApiKey(k.api_key).valid, 'rendue : le middleware l’accepte de nouveau').toBe(true);
+    expect(validateApiKey(k.api_key).valid, 'rendue : le middleware l’accepte de nouveau').toBe(
+      true,
+    );
     expect(burstRevocationFor(k.key_hash), 'plus de motif « coupée » à servir').toBeNull();
     const row = db
       .prepare(
@@ -2074,7 +2076,9 @@ describe('POST /v1/keys/claim — lot 6b : une clé coupée pour rafale se rend 
     const k = anonKey(`repair-owner-${RUN_TAG}`);
     fakeUsage(k.key_hash, 1);
     getStatsDB()
-      .prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?")
+      .prepare(
+        "UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?",
+      )
       .run(k.key_hash);
     const res = await claim(app, k.api_key, { email: `owner-${RUN_TAG}@alpha.example.net` });
     expect(res.status).toBe(401);
