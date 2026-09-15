@@ -5,7 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-09-15
+
 ### Changed
+
+- **`ibanforge-mcp`: a refused call stays a refused call.** The npm package bounds every request (`IBANFORGE_TIMEOUT_MS`, 30 s by default, body included), never retries a POST on its own, keeps the API's `cause` and the `Retry-After` value, and turns a non-JSON 200 into an explicit `invalid_response`. The format-only fallback is reserved for keyless callers and is marked `_degraded: true` / `_scope: "format_only"` with the upstream status, so an agent cannot read a checksum as a bank verdict; a configured key that is exhausted is an explicit error rather than a silent downgrade; a refused batch is no longer expanded into one free request per IBAN. The instructions the installed server sends at connection say that it calls the REST API and shares its keyless trial, distinct from the remote `/mcp` allowance; the README and the hint on a 402 no longer promise an x402 wallet the package does not have, and the configuration examples no longer ship a placeholder key.
 
 - **One definition of each monthly allowance.** The free monthly figure used to exist in nine
   independent copies plus four bare literals; every surface that quotes an allowance now reads it
@@ -24,6 +28,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **CRM: the French translation no longer replaces the original, and the answer has room to be read.** In a thread bubble and on a draft card, "afficher l'original" now reveals the source text under the French instead of swapping one for the other, so comparing two languages costs one click and no going back. In both composers the translation is a plain panel rather than a fold, the body field grows with its content (one scrollbar where there were two nested ones), the sheet stands up by itself as soon as a proposal lands, and the height the operator chooses is remembered.
 
 ### Added
+
+- **SDKs: a key without an address, in one call.** `IBANforge.generateApiKey()` (TypeScript) and `IBANforge.generate_api_key()` (Python, sync and async) accept no argument and return the anonymous key with its `tier` and `claim_url`; an explicit address and code keep the historical path. The creation call never carries an ambient key from the environment, the Python one sends the SDK's `User-Agent`, and the TypeScript timeout now covers reading the JSON body. The quickstart fixture was re-recorded from the real route against a throwaway database.
 
 - **A free API key that asks for nothing.** `POST /v1/keys/generate` with no body at all now returns
   an `ifk_` key on the spot: no address, no card, nothing to confirm, nothing mailed and no record
@@ -66,6 +72,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Postman collection.** `integrations/postman/ibanforge.postman_collection.json`, generated from the live OpenAPI contract: 28 requests in 8 folders, bearer auth from a single `apiKey` variable, the free endpoints marked as such.
 
 ### Fixed
+
+- **MCP: the declared output schemas match the answers served.** A conformant MCP client validates each tool result against the `outputSchema` published by `tools/list` and rejects an undeclared property in a closed object, so a German, Swiss, French or British validation was served with HTTP 200 and `isError: false` and still thrown away by the official client: the schema omitted the BIC's `source`, `as_of`, `lei`, `lei_status`, `address` and `postal_address`, the register's `institution` and the Polish `check_digit` on `bank_code_check`, the Swiss `qr_iid_source`, the UK `modulus_check`, `pra_authorisation` and `psd_registration`, and the `screened` flags of the compliance block. `validate_iban`, `batch_validate_iban` and `check_compliance` now share one definition of the enriched result, and a new test drives the real HTTP route through the official MCP client with every published discovery example and still rejects a mistyped verdict. No register and no verdict changed.
 
 - **CRM: stamps are shown in Swiss time, and a scheduled draft says so.** Every `msg_date` is stored in UTC (the API, the IMAP sync and the scheduled sends all write UTC), and the journal, the thread and the draft card printed the digits as stored — a draft the VPS would send at 10:22 read "08:22", and at 09:50 looked overdue. `lib/crm/zurich.ts` converts with the European DST rule (no `Intl` in client components), the journal groups days in Swiss time, and a draft with origin `claude` carries the badge « programmé » instead of « brouillon ».
 

@@ -1,7 +1,7 @@
 {
   "name": "ibanforge",
   "description": "Know the bank behind any IBAN: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA + VoP reachability and sanctions + risk scoring, for developers and AI agents, by REST or MCP.",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "install": {
     "npm": "npx -y ibanforge-mcp",
     "config": {

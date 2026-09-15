@@ -246,11 +246,11 @@ class AsyncIBANforge:
         timeout: float = DEFAULT_TIMEOUT,
         code: Optional[str] = None,
     ) -> APIKey:
-        """Crée une clé sans e-mail : 25 appels REST/mois, à conserver.
+        """Create a key with no address: 25 REST calls a month, shown ONCE, to keep.
 
-        Lire monthly_limit : une protection temporaire peut réduire ce quota.
-        Une adresse explicitement fournie conserve le parcours avec code.
-        Réutiliser la clé ; ne pas en créer pour contourner une limite.
+        Read monthly_limit from the response: a temporary protection can lower it.
+        An explicitly supplied address keeps the path with the mailed code.
+        Reuse the key; do not create one to get around a limit.
         """
         payload: Dict[str, Any] = {}
         if email is not None:

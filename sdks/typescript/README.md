@@ -74,7 +74,7 @@ import { IBANforge } from '@ibanforge/sdk';
 
 const key = await IBANforge.generateApiKey();
 console.log(key.monthly_limit);            // 25
-// Conserver key.api_key : elle ne sera affichée qu’une fois.
+// key.api_key is shown ONCE — store it now.
 ```
 
 No address, card or confirmation is needed. Store the key in your secret configuration,

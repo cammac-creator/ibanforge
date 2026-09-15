@@ -26,7 +26,7 @@
  * Use a register-allocated code, or GET /v1/test-iban, which mints one.
  */
 
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 const DEFAULT_BASE_URL = 'https://api.ibanforge.com';
 
 /**
@@ -443,7 +443,7 @@ export interface APIKeyUsage {
   key_prefix: string;
   /** Calls consumed this calendar month. */
   used: number;
-  /** Quota réel de cette clé ; lire cette valeur plutôt que supposer un palier. */
+  /** This key's actual monthly quota; read it rather than assuming a tier. */
   limit: number;
   remaining: number;
   /** 'YYYY-MM' of the quota window. */
@@ -780,10 +780,10 @@ export class IBANforge {
   // ---- API keys ----
 
   /**
-   * Crée une clé sans e-mail : 25 appels REST/mois, à conserver dès réception.
-   * Lire monthly_limit : une protection temporaire peut réduire le quota.
-   * Une adresse explicitement fournie conserve le parcours historique avec code.
-   * Ne pas créer une nouvelle clé à chaque appel ni pour contourner une limite.
+   * Create a key with no address: 25 REST calls a month, shown ONCE — store it on receipt.
+   * Read `monthly_limit` from the response: a temporary protection can lower it.
+   * An explicitly supplied address keeps the historical path with the mailed code.
+   * Do not create a new key per call, nor to get around a limit.
    */
   static async generateApiKey(
     email?: string,
