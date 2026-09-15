@@ -1,9 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { getStatsDB } from './db.js';
 
-const DEFAULT_MONTHLY_LIMIT = 200;
-/** The free tier's monthly allowance; a key at or under it carries the attribution block. */
-export const FREE_TIER_MONTHLY_LIMIT = DEFAULT_MONTHLY_LIMIT;
+import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
+
+/** Ré-export conservé pour les consommateurs du middleware. */
+export { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 const KEY_PREFIX = 'ifk_';
 
 function hashKey(key: string): string {

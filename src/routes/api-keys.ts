@@ -1,4 +1,5 @@
 import { opsFail } from '../lib/ops-alert.js';
+import { FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
@@ -377,7 +378,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     void sendFreeKeyEmail({
       to: email.trim().toLowerCase(),
       rawKey: result.api_key,
-      monthlyLimit: 200,
+      monthlyLimit: FREE_TIER_MONTHLY_LIMIT,
     }).catch(() => {
       alertKeyDeliveryFailure('free key delivery threw before the relay answered');
     });
@@ -388,7 +389,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       api_key: result.api_key,
       key_prefix: result.key_prefix,
       email: email.trim().toLowerCase(),
-      monthly_limit: 200,
+      monthly_limit: FREE_TIER_MONTHLY_LIMIT,
       message: 'Save this key — it will not be shown again.',
       terms_url: 'https://ibanforge.com/legal/terms',
     },
@@ -667,7 +668,7 @@ apiKeys.post('/v1/keys/rotate', (c) => {
     {
       api_key: rotated.api_key,
       key_prefix: rotated.key_prefix,
-      monthly_limit: rotated.monthly_limit ?? 200,
+      monthly_limit: rotated.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT,
       credits_remaining: rotated.credits_remaining,
       message: 'New key issued and the old one revoked. Save this — it will not be shown again.',
     },
@@ -709,7 +710,7 @@ apiKeys.post('/v1/admin/keys', async (c) => {
       api_key: result.api_key,
       key_prefix: result.key_prefix,
       email: email.trim().toLowerCase(),
-      monthly_limit: monthlyLimit ?? 200,
+      monthly_limit: monthlyLimit ?? FREE_TIER_MONTHLY_LIMIT,
       issued_by_us: issuedByUs,
     },
     201,
@@ -757,7 +758,7 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
       imported: true,
       key_prefix: keyPrefix,
       email: email.trim().toLowerCase(),
-      monthly_limit: monthlyLimit ?? 200,
+      monthly_limit: monthlyLimit ?? FREE_TIER_MONTHLY_LIMIT,
     },
     201,
   );
@@ -1577,12 +1578,14 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
   if (!before) return c.json({ error: 'not_found' }, 404);
   db.prepare('UPDATE api_keys SET monthly_limit = ? WHERE key_prefix = ?').run(limit, keyPrefix);
   db.prepare(`INSERT INTO events (kind, label) VALUES ('manual', ?)`).run(
-    `quota relevé via CRM : ${keyPrefix} ${before.monthly_limit ?? 200} → ${limit}/mois`,
+    `quota relevé via CRM : ${keyPrefix} ${before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT} → ${limit}/mois`,
   );
-  console.log(`[admin] raise-limit ${keyPrefix}: ${before.monthly_limit ?? 200} -> ${limit}`);
+  console.log(
+    `[admin] raise-limit ${keyPrefix}: ${before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT} -> ${limit}`,
+  );
   return c.json({
     key_prefix: keyPrefix,
-    previous_limit: before.monthly_limit ?? 200,
+    previous_limit: before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT,
     monthly_limit: limit,
   });
 });
