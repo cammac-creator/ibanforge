@@ -612,6 +612,27 @@ in `pollsInFlight`, a token issued without a row, the extension capped at two li
 (internal); what is still an extension is listed there (§2.8 session cap and max-fair eviction,
 the farm replay).
 
+**The measurement now follows agent identities** (same evening, after the device grant).
+`lineage_facts` gained `first_success_client` and `last_success_client`, a client family taken
+from a closed list (`src/lib/lineage-clients.ts`, derived from the User-Agent prefixes the SDKs
+and the npm package actually send; the User-Agent itself is never stored). Two daily aggregate
+tables, `device_grant_daily` and `mcp_remote_daily` (`src/lib/agent-entry-daily.ts`), are
+incremented by the routes and the purge at the moment a decision is taken, because
+`device_codes` is purged after 24 hours and the remote MCP surface logs no tool name — they
+are the only durable trace of the device rail and of the keyless MCP top of funnel, which is
+why they entered the backup (format 7) while `trial_daily`, recomputable from its ledger, did
+not. `GET /v1/admin/funnel` keeps every key it had and adds `by_birth_source` (capped at
+twelve named doors plus `(other)`), `by_first_client` (ten buckets that partition the cohort,
+including `(unknown)` for lineages activated before the family was recorded and `(none)` for
+lineages never activated) and a `device` block (counters, the chain from opened to delivered to
+born lineages, the three indicators, and `mcp_remote` with its note: calls without identity,
+never counted as activations). One dead attribution path was found and repaired on the way:
+a key born from a verified e-mail code never went through `claimKey`, so its lineage never got
+`claim_method` and a card purchase could not be linked to it; `recordLineageBirth` now reads
+both fields from `api_keys`. On the first production read `device_grant_daily` starts empty
+while device lineages already exist, so the `chain` ratios come back `null` and
+`not_yet_measurable` rather than zero.
+
 **Agents launched in a worktree may start behind the announced revision.** Observed on
 15 September: a worktree created for a reviewer opened at the base commit, not at the head the
 brief named. Every brief now asks the agent to check `git rev-parse HEAD` first and to move to
