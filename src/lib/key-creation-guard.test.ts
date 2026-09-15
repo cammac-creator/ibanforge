@@ -14,6 +14,9 @@ import {
   purgeExpiredVerifications,
   VERIFICATION_SENDS_PER_EMAIL_DAY,
   VERIFICATION_SENDS_PER_SOURCE_DAY,
+  CHALLENGE_GRACE_MINUTES,
+  CLAIM_SUCCESS_PER_SOURCE_DAY,
+  DAILY_KEY_CREATION_LIMIT,
 } from './key-creation-guard.js';
 import { getStatsDB } from './db.js';
 
@@ -313,5 +316,115 @@ describe('normalizeIpForGuard — one bucket per /64, whatever the notation', ()
 
   it('ignores a zone index, which names a local interface and not the peer', () => {
     expect(normalizeIpForGuard('fe80::1%eth0')).toBe(normalizeIpForGuard('fe80::1'));
+  });
+});
+
+describe('la cible d’un défi : un code sait à quoi il sert', () => {
+  it('un code émis pour la clé A est refusé pour la clé B, SANS punir la victime', () => {
+    const email = `target-${RUN}@alpha-corp.example.net`;
+    const code = plant(email, 'src', 'ifk_aaaaaaaa');
+    const refused = checkVerificationCode(email, code, 'ifk_bbbbbbbb');
+    expect(refused).toEqual({ ok: false, reason: 'wrong_target' });
+    // 🚨 Le compteur d'essais n'a pas bougé. Il vit sur une ligne clée par
+    // l'ADRESSE seule : un tiers postait cinq codes bidon visant l'adresse
+    // d'une victime, chacun comptant un essai, et bloquait son défi en cours
+    // jusqu'à expiration. La cible présentée ne prouve RIEN sur le code, donc
+    // la compter comme un essai punit la victime et pas l'attaquant.
+    const row = getStatsDB()
+      .prepare('SELECT attempts FROM pending_verifications WHERE email = ?')
+      .get(email) as { attempts: number };
+    expect(row.attempts).toBe(0);
+    // Et le défi marche toujours pour sa vraie cible.
+    expect(checkVerificationCode(email, code, 'ifk_aaaaaaaa')).toEqual({ ok: true });
+  });
+
+  it('un défi de CRÉATION (sans cible) est refusé pour une réclamation, et reste bon pour une création', () => {
+    const a = `nocible-a-${RUN}@alpha-corp.example.net`;
+    const codeA = plant(a, 'src');
+    // Sans cette règle, un code émis pour créer une clé était consommable pour
+    // en réclamer une autre : rien dans la table ne disait à quoi il servait.
+    expect(checkVerificationCode(a, codeA, 'ifk_cccccccc')).toEqual({
+      ok: false,
+      reason: 'wrong_target',
+    });
+
+    // Non-régression stricte du chemin de création : la cible absente des deux
+    // côtés, le comportement est celui d'avant, octet pour octet.
+    const b = `nocible-b-${RUN}@alpha-corp.example.net`;
+    const codeB = plant(b, 'src');
+    expect(checkVerificationCode(b, codeB)).toEqual({ ok: true });
+  });
+
+  it('un défi vivant qui vise une autre clé n’est pas écrasé avant la grâce, et l’est après', () => {
+    const email = `grace-${RUN}@alpha-corp.example.net`;
+    const first = plant(email, 'src', 'ifk_dddddddd');
+    // Dans la fenêtre : refus. Son destinataire est peut-être en train de
+    // recopier ses six chiffres, et sur la réclamation l'écrasement est infligé
+    // par un TIERS.
+    expect(createVerificationChallenge(email, 'src', 'ifk_eeeeeeee')).toEqual({
+      refused: 'in_flight',
+    });
+    expect(checkVerificationCode(email, first, 'ifk_dddddddd')).toEqual({ ok: true });
+
+    // Au-delà de la grâce : l'écrasement reprend. Refuser toujours donnerait à
+    // n'importe quel porteur de clé le moyen de verrouiller une adresse
+    // pendant toute la durée de vie du code.
+    const again = plant(email, 'src', 'ifk_dddddddd');
+    getStatsDB()
+      .prepare(`UPDATE pending_verifications SET created_at = datetime('now', ?) WHERE email = ?`)
+      .run(`-${CHALLENGE_GRACE_MINUTES + 1} minutes`, email);
+    const third = plant(email, 'src', 'ifk_eeeeeeee');
+    expect(third).not.toBe(again);
+    expect(checkVerificationCode(email, third, 'ifk_eeeeeeee')).toEqual({ ok: true });
+  });
+
+  it('le même défi réémis pour la MÊME cible n’est jamais refusé', () => {
+    const email = `same-${RUN}@alpha-corp.example.net`;
+    plant(email, 'src', 'ifk_ffffffff');
+    const second = plant(email, 'src', 'ifk_ffffffff');
+    expect(checkVerificationCode(email, second, 'ifk_ffffffff')).toEqual({ ok: true });
+  });
+});
+
+describe('le budget d’envoi se compte par BOÎTE, pas par écriture d’adresse', () => {
+  it('une étiquette et des points partagent le même budget chez gmail', () => {
+    // Sans normalisation, you+1@, you+2@ et y.o.u@ sont trois destinataires
+    // pour le compteur et une seule boîte pour leur porteur : le plafond par
+    // destinataire se multipliait à volonté.
+    const src = `send-alias-${RUN}`;
+    const plain = `budget${RUN}@gmail.com`;
+    const tagged = `budget${RUN}+ci@gmail.com`;
+    const dotted = `b.u.d.g.e.t${RUN}@gmail.com`;
+    for (const e of [plain, tagged, dotted].slice(0, VERIFICATION_SENDS_PER_EMAIL_DAY)) {
+      expect(challengeSendAllowed(src, e).ok).toBe(true);
+      recordVerificationSend(src, e);
+    }
+    const check = challengeSendAllowed(src, plain);
+    expect(check.ok).toBe(false);
+    expect(check.ok === false && check.reason).toBe('recipient');
+    // Et l'alias non plus : c'est la même boîte.
+    expect(challengeSendAllowed(src, dotted).ok).toBe(false);
+  });
+
+  it('une adresse ordinaire garde exactement le budget d’avant', () => {
+    // Non-régression : hors gmail et sans étiquette, la valeur hachée est
+    // identique à celle de la version précédente, donc les compteurs déjà en
+    // base gardent leur sens.
+    const src = `send-plain-${RUN}`;
+    const email = `plain-${RUN}@alpha-corp.example.net`;
+    expect(challengeSendAllowed(src, email).ok).toBe(true);
+    recordVerificationSend(src, email);
+    expect(challengeSendAllowed(src, `PLAIN-${RUN}@Alpha-Corp.Example.Net`).ok).toBe(true);
+  });
+});
+
+describe('la parité des deux portes', () => {
+  it('le plafond de réclamations par réseau est le plafond de créations, pas un réglage à part', () => {
+    // 🚨 Ce n'est pas une coïncidence à documenter, c'est une égalité à FIGER :
+    // le critère d'acceptation de la réclamation est la parité avec la
+    // création. Un chiffre à part dériverait le jour où l'un des deux bouge, et
+    // la réclamation redeviendrait plus généreuse sur l'axe même que les deux
+    // fermes d'août ont payé.
+    expect(CLAIM_SUCCESS_PER_SOURCE_DAY).toBe(DAILY_KEY_CREATION_LIMIT);
   });
 });

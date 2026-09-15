@@ -44,8 +44,10 @@ vi.mock('./mail-domain.js', async (importOriginal) => {
 
 const { apiKeys } = await import('../routes/api-keys.js');
 const { maybeSendQuotaWarning } = await import('./quota-notice.js');
-const { ANONYMOUS_CONTACT } = await import('./tiers.js');
-const { generateApiKey, validateApiKey } = await import('./api-keys.js');
+const { ANONYMOUS_CONTACT, FREE_TIER_MONTHLY_LIMIT } = await import('./tiers.js');
+const { generateApiKey, validateApiKey, getKeyTier } = await import('./api-keys.js');
+const { VERIFICATION_TTL_MINUTES } = await import('./key-creation-guard.js');
+const { getStatsDB } = await import('./db.js');
 
 const ENV = { vitest: process.env.VITEST, testKeys: process.env.IBANFORGE_ADMIN_TEST_KEYS };
 const RUN = Date.now();
@@ -128,5 +130,68 @@ describe('la branche anonyme n’appelle jamais la fonction d’envoi', () => {
     );
     expect(outcome).toBe('no_contact');
     expect(sendQuotaWarningEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('la réclamation en deux temps, avec un relais qui répond', () => {
+  it('le temps 1 rend 202 et poste le code, le temps 2 promeut la clé', async () => {
+    // C'est le SEUL endroit de la suite où le 202 est réellement atteint :
+    // ailleurs aucun relais n'est configuré et la route répond 503
+    // fail-CLOSED, ce qui est le comportement réel de production sans relais.
+    // Ici le relais est remplacé, donc le contrat des deux temps se vérifie.
+    const app = makeApp();
+    const k = generateApiKey(null, undefined, undefined, false, { ipHash: `spy-202-${RUN}` });
+    if (!k) throw new Error('mint anonyme impossible');
+    // La clé doit avoir servi : la condition d'entrée transforme « une clé
+    // gratuite obtenue n'importe où ouvre un mail vers une adresse arbitraire »
+    // en « chaque mail coûte un appel réellement servi ».
+    getStatsDB()
+      .prepare('INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 1)')
+      .run(k.key_hash, new Date().toISOString().slice(0, 7));
+
+    const email = `claim-202-${RUN}@alpha-corp.example.net`;
+    const first = await asProduction(() =>
+      app.request('/v1/keys/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+        body: JSON.stringify({ email }),
+      }),
+    );
+    expect(first.status).toBe(202);
+    const sent = (await first.json()) as Record<string, unknown>;
+    expect(sent.status).toBe('code_sent');
+    expect(sent.key_prefix).toBe(k.key_prefix);
+    expect(sent.expires_in_minutes).toBe(VERIFICATION_TTL_MINUTES);
+    expect(deliverKeyVerificationEmail).toHaveBeenCalledTimes(1);
+    // L'envoi est journalisé, et il ne compte PAS contre le plafond de
+    // réclamations par réseau, qui ne lit que les succès.
+    const sends = getStatsDB()
+      .prepare("SELECT COUNT(*) AS n FROM key_claims WHERE event = 'send' AND key_hash = ?")
+      .get(k.key_hash) as { n: number };
+    expect(sends.n).toBe(1);
+
+    // Le code posté est celui que l'espion a reçu : la route ne le rend jamais.
+    const code = (deliverKeyVerificationEmail.mock.calls[0] as unknown as [{ code: string }])[0]
+      .code;
+    expect(code).toMatch(/^\d{6}$/);
+
+    const second = await asProduction(() =>
+      app.request('/v1/keys/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+        body: JSON.stringify({ email, code }),
+      }),
+    );
+    expect(second.status).toBe(200);
+    const claimed = (await second.json()) as Record<string, unknown>;
+    expect(claimed.claimed).toBe(true);
+    expect(claimed.monthly_limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    const row = getKeyTier(k.key_hash)!;
+    expect(row.tier).toBe('claimed');
+    expect(row.claim_method).toBe('email_code');
+    // Le rail de l'adresse EFFACE la dégradation : la réclamation est la preuve
+    // que celle-ci ne visait pas cette clé.
+    expect(row.no_recredit).toBe(0);
+    expect(row.shield_episode).toBeNull();
   });
 });
