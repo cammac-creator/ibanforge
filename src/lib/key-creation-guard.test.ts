@@ -19,6 +19,20 @@ import { getStatsDB } from './db.js';
 
 const RUN = Date.now();
 
+/**
+ * Le défi posé à la main, comme la route le fait.
+ *
+ * `createVerificationChallenge` rend `string | { refused }` depuis que la
+ * réclamation partage la table des défis. Aucun cas de ce fichier n'a de cible
+ * concurrente, donc le refus ne peut pas survenir — mais le narrow doit être
+ * écrit, sinon le type du code n'est pas une chaîne pour tsc.
+ */
+function plant(email: string, source: string | null, keyPrefix?: string | null): string {
+  const r = createVerificationChallenge(email, source, keyPrefix);
+  if (typeof r !== 'string') throw new Error(`challenge refused: ${r.refused}`);
+  return r;
+}
+
 describe('normalizeIpForGuard', () => {
   it('passes IPv4 through unchanged', () => {
     expect(normalizeIpForGuard('203.0.113.87')).toBe('203.0.113.87');
@@ -84,7 +98,7 @@ describe('creation counting', () => {
 describe('verification challenge', () => {
   it('accepts the right code exactly once', () => {
     const email = `verif-${RUN}@alpha-corp.example.net`;
-    const code = createVerificationChallenge(email, 'src');
+    const code = plant(email, 'src');
     expect(code).toMatch(/^\d{6}$/);
     expect(checkVerificationCode(email, code)).toEqual({ ok: true });
     // Consumed on success — replay must fail.
@@ -93,7 +107,7 @@ describe('verification challenge', () => {
 
   it('locks after too many wrong attempts — 6 digits must not be brute-forceable', () => {
     const email = `verif-lock-${RUN}@alpha-corp.example.net`;
-    const code = createVerificationChallenge(email, 'src');
+    const code = plant(email, 'src');
     for (let i = 0; i < VERIFICATION_MAX_ATTEMPTS; i++) {
       expect(checkVerificationCode(email, '000000').ok).toBe(false);
     }
@@ -103,7 +117,7 @@ describe('verification challenge', () => {
 
   it('refuses an expired code and clears it', () => {
     const email = `verif-exp-${RUN}@alpha-corp.example.net`;
-    const code = createVerificationChallenge(email, 'src');
+    const code = plant(email, 'src');
     getStatsDB()
       .prepare(
         "UPDATE pending_verifications SET expires_at = datetime('now', '-1 minute') WHERE email = ?",
@@ -115,8 +129,8 @@ describe('verification challenge', () => {
 
   it('re-requesting a challenge replaces the previous code', () => {
     const email = `verif-re-${RUN}@alpha-corp.example.net`;
-    const first = createVerificationChallenge(email, 'src');
-    const second = createVerificationChallenge(email, 'src');
+    const first = plant(email, 'src');
+    const second = plant(email, 'src');
     if (first !== second) {
       expect(checkVerificationCode(email, first).ok).toBe(false);
     }

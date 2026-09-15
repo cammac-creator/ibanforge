@@ -254,7 +254,23 @@ apiKeys.post('/v1/keys/generate', async (c) => {
           );
         }
         const sendId = recordVerificationSend(creationSource, email.trim().toLowerCase());
+        // Défi de CRÉATION : aucune cible de clé (troisième argument absent),
+        // ce qui est exactement le comportement d'avant la réclamation. Le
+        // refus `in_flight` ne peut donc pas survenir ici — un défi de
+        // création n'écrase jamais qu'un autre défi de création, qui vise la
+        // même cible nulle. La garde est écrite quand même : elle est ce qui
+        // rend le type honnête, et un futur appel avec cible la trouverait.
         const challenge = createVerificationChallenge(email.trim().toLowerCase(), creationSource);
+        if (typeof challenge !== 'string') {
+          return c.json(
+            {
+              error: 'verification_in_flight',
+              message:
+                'A verification code was just sent for this address. Use it, or try again in a moment.',
+            },
+            409,
+          );
+        }
         const outcome = await deliverKeyVerificationEmail({
           to: email.trim().toLowerCase(),
           code: challenge,

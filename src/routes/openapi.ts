@@ -857,6 +857,12 @@ const buildRawSpec = () => ({
               'and "reason" says which ("wrong_code", "expired", "no_challenge", "too_many_attempts"); request ' +
               'again without "code" to be sent a fresh one.',
           },
+          '409': {
+            description:
+              '"verification_in_flight": a verification code for that address was issued moments ago for a ' +
+              'DIFFERENT key (a claim on POST /v1/keys/claim), and it is not overwritten while its recipient is ' +
+              'still copying it. Use that code, or repeat this request in a couple of minutes.',
+          },
           '429': {
             description:
               'Too many creations. "key_creation_limit": at most 3 free keys per network per day. ' +

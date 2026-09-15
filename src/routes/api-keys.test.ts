@@ -14,6 +14,19 @@ function makeApp() {
 /** Unique per run: the stats DB is a file, and these rows outlive the process. */
 const RUN_TAG = String(Date.now());
 
+/**
+ * Le code en clair d'un défi posé à la main, comme la route le fait.
+ *
+ * `createVerificationChallenge` rend `string | { refused: 'in_flight' }` depuis
+ * que la réclamation partage la table des défis. Un défi sans cible n'est
+ * jamais refusé par un autre défi sans cible : le narrow est là pour tsc, et
+ * il jette plutôt que de masquer un refus qui voudrait dire autre chose.
+ */
+function plant(challenge: string | { refused: string }): string {
+  if (typeof challenge !== 'string') throw new Error(`challenge refused: ${challenge.refused}`);
+  return challenge;
+}
+
 const originalEnv = { ...process.env };
 beforeEach(() => {
   process.env.ADMIN_SECRET = 'correct-horse-battery-staple';
@@ -645,7 +658,11 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     // relay is unset in tests). checkVerificationCode consumes it, so plant a
     // fresh one exactly like the route did.
     const { createVerificationChallenge } = await import('../lib/key-creation-guard.js');
-    const code = createVerificationChallenge(`guard-b-${suffix}@alpha-corp.example.net`, 'test');
+    // `plant` narrows the string | { refused } the challenge now returns: the
+    // claim path shares this table, and only a COMPETING target can refuse.
+    const code = plant(
+      createVerificationChallenge(`guard-b-${suffix}@alpha-corp.example.net`, 'test'),
+    );
     const unlocked = await gen(app, `guard-b-${suffix}@alpha-corp.example.net`, ip, code);
     expect(unlocked.status).toBe(201);
   });
@@ -663,7 +680,7 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     expect((await gen(app, `cap-1-${suffix}@alpha-corp.example.net`, ip)).status).toBe(201);
     for (const n of [2, 3]) {
       const email = `cap-${n}-${suffix}@alpha-corp.example.net`;
-      const code = createVerificationChallenge(email, 'test');
+      const code = plant(createVerificationChallenge(email, 'test'));
       expect((await gen(app, email, ip, code)).status).toBe(201);
     }
 
