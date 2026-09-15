@@ -218,3 +218,38 @@ npm run test:watch   # Watch mode
 ```
 
 Tests live next to source files (`*.test.ts`). Use vitest with no special config needed.
+
+## Remettre une PR à l'intégrateur (depuis le 15.09.2026)
+
+La session principale Claude Code intègre **toute seule** : tant que son terminal est ouvert, elle
+repasse toutes les quinze à vingt minutes, prend chaque PR prête l'une après l'autre, relit le
+diff, fusionne dans `main` avec les contrôles locaux (dont `next build`, que la CI ne fait pas),
+surveille le déploiement, prouve le changement en ligne, pose le jalon sur la feuille de route
+privée et prévient Claude-Alain. On ne lui demande rien, sauf quand une règle dit que c'est à lui.
+
+Ce qui rend une PR *prête* :
+
+- branche `codex/<sujet>-<aaaammjj>`, base `main`, **pas un brouillon**, tous les contrôles GitHub
+  verts ;
+- une description en français : ce qui change, ce qui a été testé (check racine, tests du site,
+  `next build`, contrôles navigateur) et, si le site est touché, **une chose à vérifier en ligne
+  après publication** (une phrase nouvelle, un fichier à empreinte, un champ JSON) qui n'existe
+  qu'après le changement ;
+- le dossier privé `docs/internal/<sujet>-<aaaa-mm-jj>/` avec `PASSATION.md` et, si un jalon est
+  attendu, `ETAPE-PROPOSEE.json` (`titre`, `statut`, `resume`, `rapport`, `url_locale`, `version`,
+  `integration`). L'intégrateur l'enregistre et y écrit `enregistre_le`.
+
+Ce que l'intégrateur répond, par étiquette :
+
+| Étiquette | Sens | Quoi faire |
+|---|---|---|
+| `integrateur:en-cours` | fusion, tests et publication en cours | rien ; ne pas pousser sur cette branche tant que l'étiquette est là |
+| `integrateur:a-corriger` | un commentaire public dit ce qui doit changer | pousser le correctif sur la même branche ; l'étiquette tombe seule à la passe suivante |
+| `integrateur:attente-claude-alain` | prix, quotas, registres, textes légaux, infrastructure : sa décision | attendre ; il retire l'étiquette |
+
+L'intégrateur ne fusionne jamais Dependabot, `vps-migration` ni `registre-gr-*` (autres circuits,
+autres sessions) et ne publie jamais un paquet (`RELEASING.md`).
+
+La mécanique : `docs/internal/integration/integrateur.py` (privé, sur le Mac). Le jugement : la
+skill `/ibanforge-integrer` de la session principale. Page privée du journal :
+`docs/internal/pages/integrateur.html` sur le port des pages internes.

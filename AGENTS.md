@@ -160,3 +160,39 @@ one failure mode this repository has already paid for: say which files you are t
 before you take them.
 
 `frontend/AGENTS.md` is written and re-added automatically by `next dev`. Leave it there.
+
+---
+
+## Handing a pull request to the integrator (since 15 September 2026)
+
+The main Claude Code session integrates automatically: it polls this repository every fifteen to
+twenty minutes while its terminal is open, takes each ready pull request in turn, reads the diff,
+merges it into `main` with the local checks (including `next build`, which CI does not run),
+watches the deployment, proves the change online, records a milestone on the private roadmap and
+tells Claude-Alain. Nothing is asked of him unless a rule says it is his decision.
+
+What makes a pull request *ready*:
+
+- branch named `codex/<subject>-<yyyymmdd>`, base `main`, **not a draft**, all GitHub checks green;
+- a description in French that says what changed, what was tested (root check, frontend tests,
+  `next build`, browser checks) and, if the site is touched, **one thing to verify online after
+  publication** — a new sentence, a file with a content hash, a JSON field — that only exists after
+  the change;
+- the private folder `docs/internal/<subject>-<yyyy-mm-dd>/` with `PASSATION.md` and, when a
+  roadmap milestone is expected, `ETAPE-PROPOSEE.json` (`titre`, `statut`, `resume`, `rapport`,
+  `url_locale`, `version`, `integration`). The integrator registers it and stamps it
+  `enregistre_le`.
+
+What the integrator answers with:
+
+| Label | Meaning | What to do |
+|---|---|---|
+| `integrateur:en-cours` | being merged, tested and published | nothing; do not push to that branch until the label goes |
+| `integrateur:a-corriger` | a public comment names what must change | push the fix on the same branch; the label is lifted automatically on the next pass |
+| `integrateur:attente-claude-alain` | prices, quotas, registers, legal texts, infrastructure: his decision | wait; he removes the label |
+
+The integrator never merges Dependabot, `vps-migration` or `registre-gr-*` branches: those belong
+to other circuits or other sessions. It never publishes a package: releases follow `RELEASING.md`.
+
+The mechanics live in `docs/internal/integration/integrateur.py` (private, on the Mac) and the
+judgement in the skill `/ibanforge-integrer` of the main Claude Code session.

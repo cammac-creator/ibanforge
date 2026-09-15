@@ -224,6 +224,25 @@ npmjs.com, so the two npm steps of the workflow still end in "already on npm —
 One command that does not do what it looks like: `npm --prefix <dir> publish` publishes the
 package of the **current** directory, not `<dir>`.
 
+**Pull requests from Codex are integrated by a loop, not by hand (since 15 September 2026).**
+The main Claude Code session polls the repository every fifteen to twenty minutes while its
+terminal is open. For each ready pull request on a `codex/` branch (not a draft, every GitHub
+check green) it runs the mechanical controls (`docs/internal/integration/integrateur.py`, private:
+forbidden files, lockfile rewrites, public-repository leaks, sensitive paths), reads the diff
+itself, merges `--no-ff` into `main` in the main working tree, replays the local checks for the
+areas touched — including `next build`, which CI does not run — and resets the tree if anything
+is red. After the push it waits for the CI run of `main`, for the API container to restart and
+answer `ok` on `/health`, for the Vercel deployment of that commit to be `READY` with both
+domains, and for one piece of content that only exists after the change to be served. Only then
+does it record the milestone, write the coordination sheet and notify. If the API stops
+answering after a merge, it reverts the merge commit at once; if `main` goes red, it merges
+nothing else until it is green again. Three labels carry the state: `integrateur:en-cours`,
+`integrateur:a-corriger` (a public comment says what to fix; lifted automatically when a new
+commit lands), `integrateur:attente-claude-alain` (prices, quotas, registers, legal texts,
+infrastructure). What the loop expects from a pull request is in `AGENTS.md`, section "Handing a
+pull request to the integrator". The loop merges nothing from Dependabot and publishes no
+package.
+
 ---
 
 ## 7. What a green suite does not prove
