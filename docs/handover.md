@@ -285,6 +285,40 @@ that *repairs* such a leak must not describe what it removed.
 
 ## 9. Work in flight
 
+**The key tier data layer landed on 15 September (lot 2 of the no-e-mail key programme).**
+`api_keys` now carries `tier` (`anonymous | email | claimed | paid`, default `email`, which is true
+for every key born before the column), `claimed_at` and `claim_method` (the date and the door of a
+PROOF — a verified 6-digit code or a qualifying payment — never set retroactively, because nobody can
+know after the fact which historical key actually proved its mailbox), `email_norm` (the form on
+which "one person, one free key" is measured: `+tag` dropped everywhere, dots dropped on gmail only),
+`origin_prefix` (the lineage that survives `/rotate`) and `shield_episode`. Two append-only journals
+the caller cannot erase: `key_claims` and `key_settlements`. Read
+`src/lib/api-keys.ts` before touching any of it; four rules distilled from it:
+
+1. **`generateApiKey` is the only place a free key is minted, and it writes its own
+   `key_creations` row inside the same transaction.** Do not add a second `recordKeyCreation`
+   call in a handler: the creation breaker counts those rows, and a doubled row arms it at half
+   the real volume. Paid rails (`generateCreditKey`, `generateStripeKey`, `generateOemKey`) write
+   none: a burst of purchases is not abuse.
+2. **Rotation does NOT copy the birth row** — it carries `origin_prefix` instead, and moves
+   `key_settlements` along with `api_usage`. A copy per `/rotate` (a public route with no cap)
+   would let anyone arm the breaker at will; a settlement left behind would let a rotated key
+   buy the promotion again.
+3. **Every write that targets a key goes by `key_hash`, never by `key_prefix`.** The prefix had
+   no uniqueness in the inherited database (a guarded unique index now exists, and the mint
+   redraws on collision), and an `UPDATE` without `LIMIT` on a non-unique column promotes every
+   row of that prefix.
+4. **A migration block that backfills from later columns is placed after them.** The tier block
+   sits after the `x402_payment_ref` migration on purpose: placed inside the earlier `keyCols`
+   block it would throw `no such column` on a fresh database and the API would not boot.
+   `src/lib/db-schema.test.ts` opens a fresh database, an April-shaped one and one with duplicate
+   prefixes, and is the only test that catches a misplaced block.
+
+The backup format moved to 2 with a READABLE range `[1, 2]`: bumping without a range would have
+made every dump taken before this day unrestorable, on a database that has no other backup; not
+bumping would have made a truncated dump indistinguishable from an old one. Restore order matters:
+start the service once so the migration runs, then restore.
+
 **Dashboard numbers now render identically on both sides (#182, 11 September).** Five client
 components — `status-by-path-table`, `live-health-strip`, `usage-chart`, `stacked-bar-chart` and
 the CRM `freshness-badge` — used `toLocaleString`, `toLocaleDateString` or `Intl.DateTimeFormat`.
