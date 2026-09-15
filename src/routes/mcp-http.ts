@@ -33,7 +33,8 @@ import {
 import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 
 import { extractClientIp } from '../lib/stats.js';
-import { countDailyUnits } from '../lib/daily-ip-ledger.js';
+import { countDailyUnits, countDailyUnitsInMemory } from '../lib/daily-ip-ledger.js';
+import { ledgerBucket } from '../lib/ledger-bucket.js';
 import {
   buildCountriesPayload,
   buildPricingPayload,
@@ -171,8 +172,13 @@ export const mcpSessions = createMcpSessionStore();
  * belong in the same sentence — one without the other either scares the agent
  * off or hides the bill.
  */
+// 🚨 Le chiffre est INTERPOLÉ depuis mcp-limits.js, et c'est ce qui rend
+// l'interpolation possible : tant que `MCP_DAILY_LIMIT` était déclaré plus bas
+// dans CE module, l'utiliser ici jetait un ReferenceError à l'import — l'API ne
+// démarrait plus. Valeur inchangée (le plafond MCP reste 10), dérive future
+// évitée.
 const FREE_TIER_NOTE =
-  'free: 10 units/IP/day on this transport, one per call and one per IBAN in batch_validate_iban, ' +
+  `free: ${MCP_DAILY_LIMIT} units/IP/day on this transport, one per call and one per IBAN in batch_validate_iban, ` +
   'or a free API key at POST https://api.ibanforge.com/v1/keys/generate for 200 REST calls/month';
 const costLine = (price: string): string => `COST: ${price} (${FREE_TIER_NOTE}).`;
 
@@ -819,8 +825,23 @@ function checkMcpRateLimit(
   key: string,
   units = 1,
   limit: number = MCP_DAILY_LIMIT,
-): { allowed: boolean; used: number; remaining: number } {
+): { allowed: boolean; used: number; remaining: number; degraded?: true } {
   return countDailyUnits(key, units, limit);
+}
+
+/**
+ * The ledger bucket for one SOURCE on this transport.
+ *
+ * 🚨 Exactly the gesture the REST trial makes, from the same module, and both
+ * doors have to make it: the IPv6 collapsed to its /64 first, then hashed. A
+ * single routed /64 otherwise yields an unbounded number of allowances, and the
+ * bucket keys land in the file that holds the API keys.
+ *
+ * The `unknown` fallback is namespaced but stays memory-only in the ledger, so
+ * a handful of unplaceable callers cannot shut the door for a whole day.
+ */
+function mcpBucket(ip: string, prefix: '' | 'init:'): string {
+  return ledgerBucket(ip, prefix);
 }
 
 /**
@@ -926,7 +947,25 @@ mcpHttp.post('/mcp', async (c) => {
     }) ?? 'unknown';
 
   if (toolUnits > 0) {
-    const limit = checkMcpRateLimit(ip, toolUnits);
+    const limit = checkMcpRateLimit(mcpBucket(ip, ''), toolUnits);
+    if (limit.degraded) {
+      // La comptabilité est morte, pas le plafond : dire « Daily MCP free tier
+      // limit reached » serait un mensonge sur un compte qui n'a pas été tenu.
+      // Message distinct, et `degraded` dans les données pour que le client
+      // sache qu'il ne s'agit pas de sa consommation.
+      c.header('X-MCP-Outcome', 'rate_limited');
+      return c.json({
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: {
+          code: -32000,
+          message:
+            'Free-tier accounting is temporarily unavailable; use an API key or x402 to continue. ' +
+            'See https://api.ibanforge.com/.well-known/x402',
+          data: { degraded: true },
+        },
+      });
+    }
     if (!limit.allowed) {
       // A refusal used to be indistinguishable from a success in request_log:
       // both landed as `POST /mcp:tools-call 200`, because the marker below was
@@ -988,7 +1027,19 @@ mcpHttp.post('/mcp', async (c) => {
     // calls are (SEC-01, audit 2026-09-01). Checked here rather than on the
     // `initialize` method alone: this is the exact line where the memory is
     // about to be spent, whatever the body claims to be.
-    const opened = checkMcpRateLimit(`init:${ip}`, 1, MCP_SESSIONS_PER_IP_DAY);
+    const initBucket = mcpBucket(ip, 'init:');
+    let opened = checkMcpRateLimit(initBucket, 1, MCP_SESSIONS_PER_IP_DAY);
+    if (opened.degraded) {
+      // 🚨 Cette porte ne peut PAS être fail-open. Ce qui borne déjà : le
+      // magasin plafonné à MCP_MAX_SESSIONS (LRU d'abord), la balayeuse d'idle
+      // et le limiteur global. Ce qui manque quand même sous panne : la borne
+      // PAR ADRESSE — sans elle, un seul appelant remplit le magasin et
+      // l'éviction LRU jette les sessions de tout le monde. On bascule donc sur
+      // le compteur mémoire au même plafond : par instance et perdu au
+      // redéploiement, c'est-à-dire exactement le comportement d'avant le
+      // portage. On ne dégrade pas en dessous de l'existant.
+      opened = countDailyUnitsInMemory(initBucket, 1, MCP_SESSIONS_PER_IP_DAY);
+    }
     if (!opened.allowed) {
       c.header('X-MCP-Outcome', 'session_rate_limited');
       return c.json({

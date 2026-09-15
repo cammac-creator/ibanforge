@@ -5,23 +5,32 @@ import { isSellingRoute } from './x402.js';
 import { getIban } from '../lib/request-helpers.js';
 import { countDailyUnits, refundDailyUnits } from '../lib/daily-ip-ledger.js';
 import { extractClientIp } from '../lib/stats.js';
+import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { recordServerEvent } from '../lib/web-events.js';
 import { recordSafely } from '../lib/record-safely.js';
 import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT, TRIAL_RESET } from '../lib/trial.js';
 
 /**
- * Ten keyless validations a day, per address, on POST /v1/iban/validate.
+ * Twenty-five keyless validations a day, per SOURCE, on POST /v1/iban/validate.
  *
- * Decided 06/09/2026. The HTTP MCP transport has served a taster since July —
- * ten tool calls a day per address, no key, no wallet — and it converts, while
- * the REST door had no equivalent: a developer's first contact with IBANforge
- * is a terminal, they paste the curl from the docs, and they met a 402 before
- * ever seeing a response body. Parity between the human and the agent: the
- * same allowance, the same ceiling, the same invitation in the answer.
+ * Decided 06/09/2026 at ten, raised to twenty-five on 15/09/2026. The HTTP MCP
+ * transport has served a taster since July — no key, no wallet — and it
+ * converts, while the REST door had no equivalent: a developer's first contact
+ * with IBANforge is a terminal, they paste the curl from the docs, and they met
+ * a 402 before ever seeing a response body.
  *
- * It is a taster, not a tier — the same doctrine `MCP_DAILY_LIMIT` carries. Ten
- * calls is enough to decide whether the enrichment is worth a key and far too
- * few to run anything on, and the response says so on every single call.
+ * 🚨 The two allowances are no longer the same number, and that is deliberate.
+ * Parity is in the INVITATION, not in the figure: this door opens one route at
+ * $0.005, the MCP taster opens every data tool up to a $0.02 compliance
+ * screening, so the smaller allowance is the MCP one. The ten here had been
+ * copied from `MCP_DAILY_LIMIT` because a number was needed.
+ *
+ * It is a taster, not a tier. Twenty-five calls is enough to decide whether the
+ * enrichment is worth a key and far too few to run anything on, and the
+ * response says so on every single call.
+ *
+ * The count is kept in the service database, so it survives a redeploy, and the
+ * bucket is a normalised, hashed SOURCE — never an address.
  *
  * ── What it must NOT do ─────────────────────────────────────────────────────
  *
@@ -48,16 +57,32 @@ const TRIAL_METHOD = 'POST';
 const TRIAL_PATH = '/v1/iban/validate';
 
 /**
- * The ledger key for one address's REST allowance.
+ * The ledger key for one SOURCE's REST allowance.
  *
- * Namespaced away from the MCP entries (`<ip>` for tool calls, `init:<ip>` for
- * sessions) so an agent that used its ten MCP calls still gets its ten REST
- * ones: they are two doors onto the same product and a developer comparing
- * them must not find the second one already shut.
+ * Namespaced away from the MCP entries (`<h>` for tool calls, `init:<h>` for
+ * sessions) so an agent that used its MCP allowance still gets its REST one:
+ * they are two doors onto the same product and a developer comparing them must
+ * not find the second one already shut.
+ *
+ * The bucket itself — /64 collapse, then salted hash, with the `unknown`
+ * fallback — lives in `src/lib/ledger-bucket.ts`, shared with the MCP door.
+ * One implementation, because leaving one of the two doors unguarded is enough
+ * to reopen the hole.
  */
 function ledgerKey(ip: string): string {
-  return `rest:${ip}`;
+  return ledgerBucket(ip, 'rest:');
 }
+
+/**
+ * An IPv6 in text is at most 45 characters; past that it is not an address.
+ *
+ * ⚠️ This is not the protection — the protection is the hashing plus the row
+ * ceiling in the ledger. Since every bucket is hashed, an absurd header can no
+ * longer become an arbitrary durable primary key; all this motif still buys is
+ * that such a header does not consume a row. A rejected shape falls back onto
+ * the shared `unknown` bucket, which stays in memory.
+ */
+const IP_SHAPE = /^[0-9a-fA-F:.%[\]]{3,45}$/;
 
 /**
  * The address, or one shared bucket for everyone we cannot place.
@@ -67,16 +92,38 @@ function ledgerKey(ip: string): string {
  * allowance is bypassed by rotating a header. When there is no address at all
  * we fail CLOSED onto a single `unknown` bucket: the deliberate opposite of the
  * signup guard in api-keys.ts, which fails open. Refusing a signup costs a
- * customer; refusing an eleventh free validation costs a curl that gets the
+ * customer; refusing a twenty-sixth free validation costs a curl that gets the
  * same 402 it got last week.
+ *
+ * The raw address is returned here, not the bucket: the telemetry dedup keys
+ * (`evt:*`) are memory-only and keep the address in clear on purpose — hashing
+ * them would cost a SHA-256 per request for nothing. The /64 collapse and the
+ * hashing happen in `ledgerKey`.
  */
 function trialIp(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string {
-  return (
-    extractClientIp({
-      'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
-      'x-real-ip': c.req.header('x-real-ip') ?? null,
-    }) ?? 'unknown'
-  );
+  const ip = extractClientIp({
+    'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
+    'x-real-ip': c.req.header('x-real-ip') ?? null,
+  });
+  if (!ip || !IP_SHAPE.test(ip)) return 'unknown';
+  return ip;
+}
+
+/**
+ * The ceiling actually applied to this call.
+ *
+ * 🚨 Point d'accroche du lot 5, et il est nommé exprès. Tant que le disjoncteur
+ * n'existe pas, la limite effective EST la limite documentée. Le lot 5 branche
+ * ici, et ici seulement, la réduction temporaire sous alerte — à trois
+ * conditions déjà écrites : la lecture de l'état d'alerte se fait dans ce
+ * middleware et jamais dans le registre (qui reste un compteur pur), le
+ * prédicat est l'alerte DÉCLENCHÉE PAR L'ESSAI et jamais une alerte de créations
+ * de clés (sinon n'importe qui éteint la vitrine sans y gagner une unité), et
+ * tout ce qui est publié — `quota.limit`, `X-Trial-Limit`, le bloc `trial` —
+ * cite la limite effective et non la documentée.
+ */
+function effectiveTrialLimit(): number {
+  return REST_TRIAL_DAILY_LIMIT;
 }
 
 export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
@@ -122,7 +169,30 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
 
     const ip = trialIp(c);
     const key = ledgerKey(ip);
-    const spent = countDailyUnits(key, 1, REST_TRIAL_DAILY_LIMIT);
+    const limit = effectiveTrialLimit();
+    const spent = countDailyUnits(key, 1, limit);
+
+    if (spent.degraded) {
+      // La base du service ne répond pas. Le plafond n'est pas atteint : il
+      // n'est pas mesurable. Dire « vous avez épuisé vos 25 appels » avec un
+      // compte fabriqué ferait mentir la réponse et rendrait l'incident
+      // illisible dans les journaux, alors que la documentation continue
+      // d'annoncer les 25 premiers appels servis. On pose donc une cause
+      // distincte et on laisse passer vers le 402 x402 standard : aucun
+      // message ne mente, aucun 500, et l'incident se lit de l'extérieur.
+      //
+      // Pas de bloc `quota` (il n'y a aucun compte à citer) et pas d'en-tête
+      // `X-Trial-*` : on sort avant de les poser.
+      c.set('paywallCause', {
+        reason: 'trial_unavailable',
+        detail:
+          'The keyless allowance is temporarily unavailable, so this call falls back to payment. ' +
+          `Nothing is wrong with your request. A free key still works: ${TRIAL_FREE_KEY_HINT}. ` +
+          'Or settle this 402 with x402 — no account needed.',
+      });
+      await next();
+      return;
+    }
 
     if (!spent.allowed) {
       // Fall THROUGH to x402 rather than answering here: the 402 an agent gets
@@ -130,16 +200,23 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
       // travelling inside it (enrich-402 reads `paywallCause`). Answering a
       // bespoke 429 would break every x402 client on the one route they use
       // most.
+      // ⚠️ « this address gets today », jamais « you have used » : depuis le
+      // portage, un redéploiement ne remet plus le compteur à zéro, un pool
+      // résidentiel peut pré-brûler le seau d'un développeur honnête, et le
+      // seau est désormais un PRÉFIXE, donc plusieurs abonnés d'un même /64
+      // partagent une franchise. Le message ne suppose jamais que l'appelant
+      // est celui qui a dépensé. Ne pas remplacer par « your network », qui
+      // inviterait à débattre du périmètre.
       c.set('paywallCause', {
         reason: 'trial_exhausted',
         detail:
-          `You used the ${REST_TRIAL_DAILY_LIMIT} keyless validations this address gets today ` +
+          `You used the ${limit} keyless validations this address gets today ` +
           `(${spent.used} calls served); the allowance resets at ${TRIAL_RESET}. ` +
           `To keep going now, take a free key: ${TRIAL_FREE_KEY_HINT}. ` +
           'Prefer to pay per call? Settle this 402 with x402 — no account needed.',
         quota: {
           used: spent.used,
-          limit: REST_TRIAL_DAILY_LIMIT,
+          limit,
           month: 'day',
           resets: TRIAL_RESET,
           required: 1,
@@ -157,7 +234,7 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
 
     c.set('anonymousTrial', {
       used: spent.used,
-      limit: REST_TRIAL_DAILY_LIMIT,
+      limit,
       remaining: spent.remaining,
     });
     // The attribution block the free tier carries applies here for the same
@@ -195,8 +272,8 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
     // pre-refund; on a 4xx there is no such block to disagree with, because the
     // handler that would have written it is the one that refused.
     c.header('X-Trial-Used', String(used));
-    c.header('X-Trial-Limit', String(REST_TRIAL_DAILY_LIMIT));
-    c.header('X-Trial-Remaining', String(Math.max(REST_TRIAL_DAILY_LIMIT - used, 0)));
+    c.header('X-Trial-Limit', String(limit));
+    c.header('X-Trial-Remaining', String(Math.max(limit - used, 0)));
     c.header('X-Trial-Reset', TRIAL_RESET);
   };
 }

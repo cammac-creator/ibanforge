@@ -7,6 +7,10 @@ import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 // flood cap are what the handler enforces, and a contract that quotes its own
 // copy of them is a contract that will be wrong one refactor from now.
 import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedback.js';
+// Même motif que la ligne ci-dessus : le contrat cite le plafond que le
+// middleware applique, jamais une copie retapée. 🚨 Y compris `example`, qui
+// est un NOMBRE et qu'aucune garde de prose ne voit passer.
+import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
 
 const openapi = new Hono();
 
@@ -52,7 +56,11 @@ const buildRawSpec = () => ({
         operationId: 'validateIBAN',
         summary: 'Validate a single IBAN',
         description:
-          'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first 10 calls a day from one IP are served with no key and no payment** — send a real `iban` and the response carries a `trial` block with the count left and how to take a free key (200 requests/month). Past 10, the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
+          'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first ' +
+          REST_TRIAL_DAILY_LIMIT +
+          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64) — send a real `iban` and the response carries a `trial` block with the count left and how to take a free key (200 requests/month). Past ' +
+          REST_TRIAL_DAILY_LIMIT +
+          ', the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -1488,7 +1496,9 @@ const buildRawSpec = () => ({
           trial: {
             type: 'object',
             description:
-              'Present ONLY on a call served by the keyless daily trial: POST /v1/iban/validate with a real `iban` and no API key is served 10 times a day per IP, with no payment. Says how many calls are left today and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint.',
+              'Present ONLY on a call served by the keyless daily trial: POST /v1/iban/validate with a real `iban` and no API key is served ' +
+              REST_TRIAL_DAILY_LIMIT +
+              ' times a day per source address (IPv6 counted per /64), with no payment. Says how many calls are left today and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint.',
             required: [
               'calls_used_today',
               'calls_left_today',
@@ -1499,8 +1509,8 @@ const buildRawSpec = () => ({
             ],
             properties: {
               calls_used_today: { type: 'integer', example: 1 },
-              calls_left_today: { type: 'integer', example: 9 },
-              daily_limit: { type: 'integer', example: 10 },
+              calls_left_today: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT - 1 },
+              daily_limit: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT },
               resets: { type: 'string', example: 'midnight UTC' },
               free_key: {
                 type: 'string',
