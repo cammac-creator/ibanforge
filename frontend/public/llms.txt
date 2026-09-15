@@ -30,14 +30,14 @@ Optional: set IBANFORGE_API_KEY=ifk_... in env. Get one with no e-mail: POST htt
 POST https://api.ibanforge.com/mcp  (JSON-RPC: initialize → tools/list → tools/call)
 
 ### OpenAI agents (no Custom GPT or ChatGPT Plus needed)
-Agents SDK: point MCPServerStreamableHttp at the MCP URL above — the 9 tools auto-load.
+Agents SDK: point MCPServerStreamableHttp at the MCP URL above — the 11 tools auto-load.
 Function-calling (Chat Completions / Responses): wire tools to the OpenAPI at /openapi.json.
 
 ### Pay-per-call without an API key (x402, USDC on Base L2)
 GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any agent with a Base wallet can discover, pay, and call.
 Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5 payment for 1,000 credits): https://ibanforge.com/docs/pay-as-an-agent?src=llms
 
-## 9 MCP tools
+## 11 MCP tools
 - validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005
 - batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 per IBAN (e.g. 100 = $0.20)
 - lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
@@ -47,6 +47,8 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
 - check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
+- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the daily limit. Cost: free
+- poll_api_key — collect the key once a human has approved it, handed over exactly once, with the config line to paste. Cost: free
 
 ## REST endpoints
 - POST /v1/iban/validate — single IBAN, full enrichment ($0.005; first 25/day per IP free, no key — see the keyless trial above)

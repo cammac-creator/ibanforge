@@ -43,7 +43,6 @@
  */
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { randomInt } from 'node:crypto';
 import { evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
 import { generateApiKey, markShieldBirth, revokeApiKey } from '../lib/api-keys.js';
 import { isAllowedOrigin } from '../lib/cors-origins.js';
@@ -72,21 +71,20 @@ import {
 import {
   DEVICE_CODE_TTL_SECONDS,
   DEVICE_POLL_INTERVAL_SECONDS,
-  DEVICE_POLL_JITTER_MS,
-  DEVICE_SLOW_DOWN_INCREMENT_SECONDS,
+  DEVICE_TEXTS,
   DEVICE_VERIFICATION_URI,
   type GrantRow,
   approveGrant,
+  awaitGrantSettlement,
   checkApprovalToken,
   consumeGrantKey,
   denyGrant,
+  deviceConfigLine,
   deviceMissDelayFloorMs,
-  devicePollTickMs,
-  devicePollWaitMs,
   devicePollsInFlightMax,
-  devicePollsInFlightPerIp,
-  devicePollsInFlightPerRail,
+  displayToHuman,
   enterPoll,
+  pollsInFlight,
   extendForEmail,
   findGrantBySecret,
   findGrantByUserCode,
@@ -98,7 +96,6 @@ import {
   normalizeGrantSource,
   normalizeUserCode,
   openGrant,
-  pollsInFlight,
   recordApprovalAttempt,
   sanitizeDisplayField,
   secondsUntil,
@@ -119,51 +116,25 @@ const REASON_MAX = 200;
  * SANS AUCUN CHIFFRE ÉCRIT : chaque nombre est interpolé depuis sa constante.
  * Un chiffre tapé ici serait une énième autorité sur un plafond, et il
  * mentirait le jour où le palier bouge.
+ *
+ * 🚨 Les phrases du CHEMIN AGENT viennent de `DEVICE_TEXTS` (le module), elles
+ * ne sont pas recopiées : la surface MCP HTTP sert les MÊMES phrases dans sa
+ * sortie structurée, et deux copies d'un refus, c'est un agent qui lit deux
+ * explications du même mur. Les clés ci-dessous sont celles qui n'existent que
+ * sur cette route, dont tout le CHEMIN HUMAIN (la page d'approbation).
  */
 const TEXTS = {
-  opened:
-    'Show the user_code and the verification_uri to a human. Do not open the link yourself. ' +
-    'Then poll POST /v1/keys/device/token with the device_code.',
-  authorization_pending:
-    'Nobody has approved this code yet. Wait for the interval, then call again. Nothing is wrong.',
-  slow_down: `You are polling faster than the interval. Add ${DEVICE_SLOW_DOWN_INCREMENT_SECONDS} seconds to your interval and try again.`,
-  access_denied:
-    'Somebody refused this request. Tell your human and ask them whether to try again; ' +
-    'open at most one more request.',
-  expired_token:
-    'This code expired without being approved. Ask for a new one at most once, then fall back ' +
-    'to the keyless allowance or to x402.',
-  invalid_grant:
-    'Unknown device code, or the key was already collected. A key is handed over exactly once.',
+  ...DEVICE_TEXTS,
   invalid_or_expired: 'This code is not valid, or it has expired. Ask the agent for a new one.',
-  device_rate_limited:
-    'This network has already taken its free keys for today, counting the ones still waiting for ' +
-    'approval. Existing keys keep working, the keyless trial needs nothing, and x402 needs no key at all.',
   key_rate_limited: 'Only one API key can be generated per email per day. Try again tomorrow.',
   approval_token_required:
     'Reload the approval page and try again: the approval it was holding is no longer current.',
   unsupported_media_type: 'Send this request as application/json.',
-  device_unavailable:
-    'The key service is temporarily unable to open a request. Validation still works; try again in a minute.',
   forbidden_origin: 'This origin is not allowed to approve or refuse a device request.',
-  saved: 'Save this key — it will not be shown again.',
   code_sent: `A 6-digit code was sent to the address supplied. Submit it within ${VERIFICATION_TTL_MINUTES} minutes to receive a key with the higher allowance.`,
 } as const;
 
 const TERMS_URL = 'https://ibanforge.com/legal/terms';
-
-/**
- * La ligne que l'humain colle dans la configuration de son client MCP.
- *
- * 🚨 Variante A : le paquet npm ne réécrit JAMAIS le fichier de configuration
- * de son propre client. Un serveur MCP qui écrit dans la configuration de son
- * client est une élévation de privilège que personne n'a demandée, et le chemin
- * du fichier diffère selon le client. Le `--` est obligatoire dans la syntaxe
- * publiée par `claude mcp add --help`.
- */
-function configLine(rawKey: string): string {
-  return `claude mcp add ibanforge -e IBANFORGE_API_KEY=${rawKey} -- npx -y ibanforge-mcp`;
-}
 
 function clientIpOf(c: Context): string | null {
   return extractClientIp({
@@ -300,23 +271,41 @@ deviceGrant.post('/v1/keys/device', async (c) => {
     source: normalizeGrantSource(body.source, 'web-device'),
   });
 
+  // 🚨 Les DEUX sorties portent `display_to_human`, y compris le refus : les
+  // surfaces MCP A et B sont de simples relais de cette route, et un refus sans
+  // bloc à montrer les obligerait à en composer un — trois compositions locales
+  // pour une phrase (§5.4).
   if (!result.ok) {
     return result.error === 'device_rate_limited'
-      ? c.json({ error: 'device_rate_limited', message: TEXTS.device_rate_limited }, 429)
+      ? c.json(
+          {
+            error: 'device_rate_limited',
+            message: TEXTS.device_rate_limited,
+            display_to_human: displayToHuman({ status: 'device_rate_limited' }),
+          },
+          429,
+        )
       : c.json({ error: 'device_unavailable', message: TEXTS.device_unavailable }, 503);
   }
+
+  // Celui que l'agent affiche : il pré-remplit le code. `verification_uri`
+  // seul sert le cas où l'humain tape l'adresse à la main sur un autre appareil.
+  const verificationUriComplete = `${DEVICE_VERIFICATION_URI}?code=${encodeURIComponent(result.userCode)}`;
 
   return c.json(
     {
       device_code: result.deviceCode,
       user_code: result.userCode,
       verification_uri: DEVICE_VERIFICATION_URI,
-      // Celui que l'agent affiche : il pré-remplit le code. Le premier sert le
-      // cas où l'humain tape l'adresse à la main sur un autre appareil.
-      verification_uri_complete: `${DEVICE_VERIFICATION_URI}?code=${encodeURIComponent(result.userCode)}`,
+      verification_uri_complete: verificationUriComplete,
       expires_in: result.expiresIn,
       interval: DEVICE_POLL_INTERVAL_SECONDS,
       message: TEXTS.opened,
+      display_to_human: displayToHuman({
+        status: 'ok',
+        userCode: result.userCode,
+        verificationUriComplete,
+      }),
     },
     201,
   );
@@ -354,7 +343,7 @@ function deliveredBody(minted: {
     ...(minted.email ? { email: minted.email } : {}),
     message: TEXTS.saved,
     terms_url: TERMS_URL,
-    config_line: configLine(minted.api_key),
+    config_line: deviceConfigLine(minted.api_key),
   };
 }
 
@@ -415,37 +404,18 @@ deviceGrant.post('/v1/keys/device/token', async (c) => {
   //    une requête simple, sans preflight. Coût de cette règle pour un client
   //    RFC-conforme : zéro.
   const fromBrowser = Boolean(c.req.header('origin') || c.req.header('sec-fetch-mode'));
-  // 2) 3) 4) Les trois bornes d'attentes. Au-delà de n'importe laquelle, on ne
-  //    fait PAS attendre : on répond tout de suite. Le client conforme repasse
-  //    à son intervalle, le dommage est borné quel que soit le nombre de
-  //    réplicas, et aucune réponse n'est fausse.
-  const saturated =
-    pollsInFlight() >= devicePollsInFlightMax() ||
-    pollsInFlight('device') >= devicePollsInFlightPerRail() ||
-    (ipHash !== null && pollsInFlight('device', ipHash) >= devicePollsInFlightPerIp());
+  if (fromBrowser) return c.json(pendingBody(grant.expires_in), 400);
 
-  if (fromBrowser || saturated) return c.json(pendingBody(grant.expires_in), 400);
-
-  const release = enterPoll('device', ipHash);
-  try {
-    const deadline = Date.now() + devicePollWaitMs();
-    while (Date.now() < deadline) {
-      const tick = devicePollTickMs();
-      // Gigue bornée PAR LE TICK : c'est une dispersion pour que N attentes ne
-      // relisent pas la base à la même milliseconde, pas un délai. Une gigue de
-      // une demi-seconde sur un tick de vingt millisecondes ferait rater le
-      // réveil qu'on mesure.
-      const jitter = randomInt(0, Math.min(DEVICE_POLL_JITTER_MS, tick) + 1);
-      await sleep(Math.min(tick + jitter, Math.max(1, deadline - Date.now())), c.req.raw.signal);
-      if (c.req.raw.signal?.aborted) break;
-      const again = findGrantBySecret(secret, 'device');
-      if (!again) return c.json({ error: 'invalid_grant', message: TEXTS.invalid_grant }, 400);
-      grant = again;
-      if (grant.status !== 'pending' || grant.expired === 1) break;
-    }
-  } finally {
-    release();
+  // 🚨 La boucle vit dans le module depuis le 15/09/2026, parce que la surface
+  // MCP HTTP attend sur la MÊME base avec les MÊMES trois plafonds de
+  // `pollsInFlight` : deux boucles auraient donné deux comportements sous
+  // saturation, et les deux répondent `authorization_pending`, donc rien ne
+  // dirait laquelle a raison. Les trois bornes sont lues là-bas.
+  const waited = await awaitGrantSettlement(secret, 'device', grant, ipHash, c.req.raw.signal);
+  if (waited.kind === 'vanished') {
+    return c.json({ error: 'invalid_grant', message: TEXTS.invalid_grant }, 400);
   }
+  grant = waited.grant;
 
   const after = settle(c, grant, secretHash);
   if (after) return after;

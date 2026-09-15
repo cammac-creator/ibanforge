@@ -20,6 +20,23 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | `audit_creditor_file` | Audit an entire creditor/supplier file (CSV/XLSX): IBAN, bank, BIC, SEPA reach and address conformity per row, plus file-wide checks (duplicates, BIC mismatch, address vs. IBAN country). Free preview with masked IBANs; the full annotated report is a paid deliverable | free preview (report: CHF via Stripe) |
 | `audit_status`        | Check payment status of an audit job created by `audit_creditor_file` and get the report download link once paid          | free        |
 | `send_feedback`       | Report incorrect data, or claim the refund the x402 terms promise when a paid answer was wrong                            | free        |
+| `request_api_key`     | Open a key request a human approves in a browser — no e-mail, no card, no account. Shows a short code and a link to hand to your human | free        |
+| `poll_api_key`        | Collect the key once a human has approved it. Handed over exactly once, with the line to paste into an MCP client config  | free        |
+
+## Get a durable key from inside your MCP client
+
+No e-mail, no account, no form. Four steps, about fifteen seconds of human time:
+
+1. Call **`request_api_key`**. Read `status` first — `ok` means a code was issued.
+2. Show your human the `display_to_human` block **verbatim**: it carries the short code
+   and the link. Do not open the link yourself, and never invent an address.
+3. Your human opens the page, checks the code matches, and clicks. The page gives a key
+   with no address at all; they may add one there to raise the monthly allowance.
+4. Call **`poll_api_key`** (no argument needed). On `approved` it carries the key **once**,
+   plus a ready-made `config_line` to paste. Save it as `IBANFORGE_API_KEY` and reconnect.
+
+Both tools are free and keep working after the daily limit is reached — that is the point
+of them.
 
 ## Connect and get a first result
 

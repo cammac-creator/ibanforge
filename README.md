@@ -66,9 +66,14 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (sanctions + FATF + VoP)      | $0.02    |
 | `validate_payment_reference` | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS or Finnish viitenumero checksum, plus the QRR ↔ QR-IBAN pairing verdict | **free** |
 | `check_postal_address` | An ISO 20022 address against one rail's published rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its source | **free** |
-| `send_feedback`       | Report incorrect data or claim an x402 refund — the only tool that writes                 | free     |
+| `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses ahead of 14.11.2026 | **free** |
+| `send_feedback`       | Report incorrect data or claim an x402 refund                                             | free     |
+| `request_api_key`     | You hit the daily limit, or need a durable key — a human approves in a browser, no e-mail  | free     |
+| `poll_api_key`        | Collect that key once it is approved, handed over exactly once                             | free     |
 
-The two free tools need no key, no wallet and no signup: they are the ones to try first.
+The free tools need no key, no wallet and no signup: they are the ones to try first. The
+last two are the way out of the daily limit without anyone typing an address — they keep
+answering after the limit is reached.
 
 Full descriptions with WHEN-to-use triggers are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
 

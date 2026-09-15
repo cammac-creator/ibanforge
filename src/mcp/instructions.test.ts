@@ -131,9 +131,14 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
    *
    * Nommer un outil qui n'existe pas encore y est pire qu'ailleurs : l'agent le
    * cherche dans la liste, ne le trouve pas, et apprend que notre documentation
-   * mente. Le device grant (`request_api_key` / `poll_api_key`) est décidé et
-   * spécifié mais PAS livré : ce test est ce qui empêche de l'annoncer ici
-   * avant qu'il réponde.
+   * mente.
+   *
+   * ✅ 15/09/2026 : le device grant (`request_api_key` / `poll_api_key`) est
+   * LIVRÉ sur les trois surfaces, et la phrase qui les nomme est entrée dans le
+   * bloc le jour où les deux outils ont répondu. Ce test avait interdit de
+   * l'annoncer avant ; il l'autorise maintenant parce que les deux noms sont
+   * dans `MCP_TOOLS`, PAS parce qu'on l'a desserré. La garde vaut pour le
+   * prochain outil décidé et pas encore servi.
    */
   it("ne nomme aucun outil qui n'est pas enregistré", () => {
     const known = new Set(MCP_TOOLS.map((t) => t.name));

@@ -34,6 +34,14 @@ export const MCP_INSTRUCTIONS =
   // nom d'outil cité est bien enregistré.
   'Free tier: 10 tool calls/IP/day here, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
   'POST https://api.ibanforge.com/v1/keys/claim lifts that same key to 200 REST calls/month — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. The mailed code gives 200 every month; a payment gives 200 once. ' +
+  // 2026-09-15 : la phrase du device grant, ajoutée le jour où les deux outils
+  // ont RÉPONDU. Elle attendait cela, et pas par prudence de rédaction : ce
+  // bloc est injecté dans le contexte du modèle AVANT `tools/list`, donc
+  // nommer un outil absent apprend à l'agent que notre documentation mente.
+  // `instructions.test.ts` porte la garde qui l'interdisait ; elle passe
+  // maintenant parce que les deux noms sont dans `MCP_TOOLS`, pas parce qu'on
+  // l'a desserrée.
+  'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the daily limit. ' +
   'Prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
   'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
   'Paying as an agent (wallet, USDC on Base, prepaid packs): https://ibanforge.com/docs/pay-as-an-agent — ' +

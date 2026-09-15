@@ -982,6 +982,185 @@ export function pollsInFlight(rail?: GrantRail, ipHash?: string): number {
   return n;
 }
 
+/** L'attente, interruptible par l'abandon du client. */
+function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const done = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener('abort', done, { once: true });
+  });
+}
+
+/**
+ * Ce que l'attente longue a trouvé. `vanished` est le seul cas où l'appelant
+ * n'a plus de ligne à interpréter : la purge est passée, ou un retrait
+ * concurrent a gagné.
+ */
+export type GrantWaitOutcome = { kind: 'alive'; grant: GrantRow } | { kind: 'vanished' };
+
+/**
+ * Le long-polling, UNE SEULE FOIS, pour la route HTTP comme pour la surface
+ * MCP.
+ *
+ * 🚨 Extrait de `src/routes/device-grant.ts` le 15/09/2026 parce que la surface
+ * MCP HTTP attend sur la MÊME base, avec les MÊMES trois plafonds. Deux boucles
+ * auraient donné deux comportements sous saturation, et c'est précisément le
+ * cas où une divergence ne se voit pas : les deux répondent
+ * `authorization_pending`, l'une en trente secondes et l'autre tout de suite,
+ * et rien ne dit laquelle a raison.
+ *
+ * Les trois bornes de `pollsInFlight` sont lues ICI, avant de retenir la place.
+ * Au-delà de n'importe laquelle on ne fait PAS attendre : on rend la ligne
+ * telle quelle, l'appelant répond `authorization_pending` immédiatement, le
+ * client conforme repasse à son intervalle. Aucune réponse n'est fausse, et le
+ * dommage est borné quel que soit le nombre de réplicas.
+ *
+ * `signal` est facultatif : la route passe `c.req.raw.signal`, une surface qui
+ * n'a pas de requête HTTP sous la main ne passe rien et l'attente va jusqu'à
+ * son échéance.
+ */
+export async function awaitGrantSettlement(
+  secret: string,
+  rail: GrantRail,
+  grant: GrantRow,
+  ipHash: string | null,
+  signal?: AbortSignal | null,
+): Promise<GrantWaitOutcome> {
+  const saturated =
+    pollsInFlight() >= devicePollsInFlightMax() ||
+    pollsInFlight(rail) >= devicePollsInFlightPerRail() ||
+    (ipHash !== null && pollsInFlight(rail, ipHash) >= devicePollsInFlightPerIp());
+  if (saturated) return { kind: 'alive', grant };
+
+  let current = grant;
+  const release = enterPoll(rail, ipHash);
+  try {
+    const deadline = Date.now() + devicePollWaitMs();
+    while (Date.now() < deadline) {
+      const tick = devicePollTickMs();
+      // Gigue bornée PAR LE TICK : c'est une dispersion pour que N attentes ne
+      // relisent pas la base à la même milliseconde, pas un délai. Une gigue de
+      // une demi-seconde sur un tick de vingt millisecondes ferait rater le
+      // réveil qu'on mesure.
+      const jitter = randomInt(0, Math.min(DEVICE_POLL_JITTER_MS, tick) + 1);
+      await sleep(Math.min(tick + jitter, Math.max(1, deadline - Date.now())), signal);
+      if (signal?.aborted) break;
+      const again = findGrantBySecret(secret, rail);
+      if (!again) return { kind: 'vanished' };
+      current = again;
+      if (current.status !== 'pending' || current.expired === 1) break;
+    }
+  } finally {
+    release();
+  }
+  return { kind: 'alive', grant: current };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Le bloc que l'agent montre à son humain, construit PAR LE SERVEUR
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Les phrases que DEUX portes servent : la route HTTP et la surface MCP HTTP.
+ *
+ * 🚨 Déclarées ICI et nulle part ailleurs. La route les sert dans son corps de
+ * réponse, la surface MCP les sert dans le `message` de sa sortie structurée,
+ * et les surfaces MCP stdio les relaient depuis le corps HTTP : une phrase
+ * écrite deux fois est une phrase dont une copie finit par dériver, et c'est
+ * toujours celle qu'on ne relit pas qui est servie. Un agent qui lit deux
+ * explications différentes du même mur conclut à une panne au lieu de prendre
+ * le chemin de repli.
+ *
+ * En anglais, comme tout ce que lit un modèle, et SANS AUCUN CHIFFRE ÉCRIT :
+ * chaque nombre est interpolé depuis sa constante.
+ */
+export const DEVICE_TEXTS = {
+  opened:
+    'Show the user_code and the verification_uri to a human. Do not open the link yourself. ' +
+    'Then poll POST /v1/keys/device/token with the device_code.',
+  authorization_pending:
+    'Nobody has approved this code yet. Wait for the interval, then call again. Nothing is wrong.',
+  slow_down: `You are polling faster than the interval. Add ${DEVICE_SLOW_DOWN_INCREMENT_SECONDS} seconds to your interval and try again.`,
+  access_denied:
+    'Somebody refused this request. Tell your human and ask them whether to try again; ' +
+    'open at most one more request.',
+  expired_token:
+    'This code expired without being approved. Ask for a new one at most once, then fall back ' +
+    'to the keyless allowance or to x402.',
+  invalid_grant:
+    'Unknown device code, or the key was already collected. A key is handed over exactly once.',
+  device_rate_limited:
+    'This network has already taken its free keys for today, counting the ones still waiting for ' +
+    'approval. Existing keys keep working, the keyless trial needs nothing, and x402 needs no key at all.',
+  device_unavailable:
+    'The key service is temporarily unable to open a request. Validation still works; try again in a minute.',
+  saved: 'Save this key — it will not be shown again.',
+} as const;
+
+/**
+ * La ligne que l'humain colle dans la configuration de son client MCP.
+ *
+ * 🚨 Variante A : le paquet npm ne réécrit JAMAIS le fichier de configuration
+ * de son propre client. Un serveur MCP qui écrit dans la configuration de son
+ * client est une élévation de privilège que personne n'a demandée, et le chemin
+ * du fichier diffère selon le client. Le `--` est obligatoire dans la syntaxe
+ * publiée par `claude mcp add --help`.
+ *
+ * Partagée avec la surface MCP HTTP depuis le 15/09/2026 : c'est une ligne
+ * qu'un humain COLLE dans un terminal, et deux versions auraient donné une
+ * commande qui ne marche pas sur l'une des deux portes.
+ */
+export function deviceConfigLine(rawKey: string): string {
+  return `claude mcp add ibanforge -e IBANFORGE_API_KEY=${rawKey} -- npx -y ibanforge-mcp`;
+}
+
+/**
+ * Le bloc prêt à coller que l'agent montre à son humain, mot pour mot.
+ *
+ * 🚨 CONSTRUIT PAR LE SERVEUR, jamais composé par une surface. Les trois
+ * surfaces MCP le relaient : A et B le reçoivent dans le corps HTTP, C
+ * l'appelle en direct. Trois compositions locales auraient donné trois textes,
+ * et c'est celui qu'un humain lit sur l'écran de son terminal — la seule
+ * défense simple contre un agent qui afficherait un lien fabriqué est que
+ * l'étape 2 lui apprenne à comparer les deux codes.
+ *
+ * 🚨 LES TROIS CHIFFRES SONT INTERPOLÉS, jamais tapés : le mois anonyme depuis
+ * `ANONYMOUS_MONTHLY_LIMIT`, le mois réclamé depuis `FREE_TIER_MONTHLY_LIMIT`,
+ * la durée depuis `DEVICE_CODE_TTL_SECONDS`. C'est la SEULE surface autorisée à
+ * annoncer la durée du grant, parce qu'elle la lit à la constante au lieu de la
+ * promettre.
+ *
+ * 🚨 `device_code` N'ENTRE JAMAIS ICI. Ce bloc traverse le transcript du
+ * modèle, les journaux du client MCP et les copier-coller de rapport
+ * d'incident ; le `device_code` est le porteur unique de la clé. Seul le
+ * `user_code`, qui ne retire rien, s'y montre.
+ */
+export function displayToHuman(
+  outcome:
+    | { status: 'ok'; userCode: string; verificationUriComplete: string }
+    | { status: 'device_rate_limited' }
+    | { status: 'device_unavailable' },
+): string {
+  if (outcome.status === 'device_rate_limited') return DEVICE_TEXTS.device_rate_limited;
+  if (outcome.status === 'device_unavailable') return DEVICE_TEXTS.device_unavailable;
+  const minutes = Math.round(DEVICE_CODE_TTL_SECONDS / 60);
+  return (
+    'IBANforge needs one approval from you, and it takes about fifteen seconds.\n' +
+    '\n' +
+    `  1. Open:  ${outcome.verificationUriComplete}\n` +
+    `  2. Check the code shown on the page reads:  ${outcome.userCode}\n` +
+    '  3. Click "Get the key". No e-mail, no card, no account.\n' +
+    '\n' +
+    `That gives ${ANONYMOUS_MONTHLY_LIMIT} requests a month. On the same page you may add an e-mail address\n` +
+    `instead, which raises it to ${FREE_TIER_MONTHLY_LIMIT}. The code stops working in ${minutes} minutes.`
+  );
+}
+
 export interface DevicePurgeResult {
   /** Lignes supprimées, tous rails et toutes tables confondus. */
   removed: number;
