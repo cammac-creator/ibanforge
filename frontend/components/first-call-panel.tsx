@@ -7,6 +7,8 @@ import {
   buildSnippets,
   firstCallUrl,
   summarizeFirstCall,
+  DEMO_CONTEXT_HEADER,
+  DEMO_CONTEXT_VALUE,
   SAMPLE_IBAN,
   type FirstCallSummary,
   type SnippetLanguage,
@@ -28,6 +30,15 @@ const LANGUAGES: Array<{ id: SnippetLanguage; label: string }> = [
  * already in place. The purchase page has had this since August; the free
  * dialog, where most signups happen, did not. See lib/first-call.ts
  * for the measurement behind it.
+ *
+ * 🚨 `monthlyLimit` est le quota RÉEL de la clé qui vient d'être délivrée (25
+ * sur une clé anonyme, 200 sur une clé avec adresse), lu de la réponse de
+ * création : cette valeur ne se devine pas, et une clé anonyme à qui l'on
+ * annoncerait 200 mentirait dès le premier appel.
+ *
+ * L'appel lancé d'ici est une DÉMONSTRATION et le dit, à l'écran comme dans
+ * l'en-tête de contexte : les extraits à copier, eux, sont les appels du
+ * visiteur et n'en portent pas.
  */
 export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: string; apiKey: string; monthlyLimit: number }) {
   const t = useTranslations('apiKeyDialog.firstCall');
@@ -45,24 +56,41 @@ export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: str
     setFailure('');
     const started = performance.now();
     try {
-      const r = await fetch(firstCallUrl(apiBase), {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ iban: SAMPLE_IBAN }),
-      });
+      const url = firstCallUrl(apiBase);
+      const body = JSON.stringify({ iban: SAMPLE_IBAN });
+      const base = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+      let r: Response;
+      try {
+        r = await fetch(url, {
+          method: 'POST',
+          headers: { ...base, [DEMO_CONTEXT_HEADER]: DEMO_CONTEXT_VALUE },
+          body,
+        });
+      } catch {
+        // 🚨 Un en-tête personnalisé que l'API ne liste pas dans ses
+        // `allowHeaders` est refusé au préambule CORS, et le navigateur rend
+        // alors la MÊME erreur qu'une coupure réseau : les deux sont
+        // indiscernables ici. Le marqueur de démonstration est un confort de
+        // mesure, jamais une condition d'accès : on rejoue donc l'appel une
+        // seule fois sans lui. La mesure classe cette lignée en « contexte
+        // inconnu », ce que le contrat prévoit, au lieu de laisser le visiteur
+        // devant un panneau mort sur la page qui vient de lui donner sa clé.
+        // Le repli disparaîtra le jour où l'en-tête sera accepté au CORS.
+        r = await fetch(url, { method: 'POST', headers: base, body });
+      }
       const elapsed = Math.round(performance.now() - started);
-      const body: unknown = await r.json().catch(() => null);
+      const answer: unknown = await r.json().catch(() => null);
       if (!r.ok) {
         const msg =
-          body && typeof body === 'object' && typeof (body as { message?: unknown }).message === 'string'
-            ? (body as { message: string }).message
+          answer && typeof answer === 'object' && typeof (answer as { message?: unknown }).message === 'string'
+            ? (answer as { message: string }).message
             : `HTTP ${r.status}`;
         setFailure(msg);
         setStatus('failed');
         return;
       }
-      setSummary(summarizeFirstCall(body, r.headers));
-      setJson(JSON.stringify(body, null, 2));
+      setSummary(summarizeFirstCall(answer, r.headers));
+      setJson(JSON.stringify(answer, null, 2));
       setMs(elapsed);
       setStatus('done');
     } catch (err) {
@@ -97,8 +125,11 @@ export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: str
       </div>
       {status === 'idle' && (
         <>
-          <p className="text-sm mb-3" style={{ color: 'var(--fg-3)', lineHeight: 1.55 }}>
+          <p className="text-sm mb-1.5" style={{ color: 'var(--fg-3)', lineHeight: 1.55 }}>
             {t('hint', { limit: monthlyLimit })}
+          </p>
+          <p className="text-xs mb-3" style={{ color: 'var(--fg-4)', lineHeight: 1.5 }}>
+            {t('demoNote')}
           </p>
           <Button type="button" onClick={run} variant="amber" className="w-full">
             {t('run')}
@@ -142,9 +173,12 @@ export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: str
               {json}
             </pre>
           </details>
-          <div className="font-mono text-xs uppercase tracking-caps mb-2" style={{ color: 'var(--fg-3)' }}>
+          <div className="font-mono text-xs uppercase tracking-caps mb-1" style={{ color: 'var(--fg-3)' }}>
             {t('snippets')}
           </div>
+          <p className="text-xs mb-2" style={{ color: 'var(--fg-4)', lineHeight: 1.5 }}>
+            {t('snippetsNote')}
+          </p>
           <div className="flex items-center gap-1 mb-2" role="tablist" aria-label={t('snippets')}>
             {LANGUAGES.map((l) => (
               <button

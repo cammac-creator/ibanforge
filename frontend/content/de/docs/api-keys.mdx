@@ -1,18 +1,21 @@
 ---
-title: "API-Schluessel"
-description: "Generieren Sie einen kostenlosen API-Schluessel fuer 200 Anfragen/Monat auf allen IBANforge-Endpunkten — keine Kreditkarte, keine Krypto-Wallet erforderlich."
+title: "API-Schlüssel"
+description: "Holen Sie sich einen IBANforge-API-Schlüssel ganz ohne E-Mail — 25 Anfragen pro Monat sofort, 200 pro Monat sobald der Schlüssel beansprucht ist. Keine Kreditkarte, keine Krypto-Wallet."
 order: 1
 ---
 
-# API-Schluessel
+# API-Schlüssel
 
-IBANforge bietet ein **kostenloses Kontingent** ueber API-Schluessel — 200 Anfragen/Monat auf allen Endpunkten. Keine Kreditkarte, keine Krypto-Wallet erforderlich. Fuer hoehere Volumen koennen Sie [x402-Mikrozahlungen](/docs/x402) verwenden.
+IBANforge hat zwei kostenlose Stufen, und die erste verlangt gar nichts. Ein POST mit leerem Body
+liefert einen `ifk_`-Schlüssel für **25 Anfragen pro Monat**: keine Adresse, keine Karte, nichts zu
+bestätigen. Ein weiterer Aufruf — ein zugesandter Code — hebt denselben Schlüssel dauerhaft auf
+**200 Anfragen pro Monat**. Darüber hinaus: [x402-Mikrozahlungen](/docs/x402) oder Prepaid-Pakete.
 
 Diese Seite ist die Referenz allein zu Schlüsseln. Wenn Sie noch keinen Aufruf gemacht haben, sind die [Ersten Schritte](/docs/onboarding) der kürzere Weg: der Aufruf ohne Schlüssel, dieser Schlüssel, die Antwort Block für Block gelesen und ein Stapel von 100 — in zehn Minuten.
 
-## Vor dem Schlüssel: 10 Aufrufe pro Tag, ohne Schlüssel
+## Vor dem Schlüssel: 25 Aufrufe pro Tag, ohne Schlüssel
 
-`POST /v1/iban/validate` mit einer echten `iban` und ganz ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **10-mal pro Tag und IP-Adresse**, Rücksetzung um Mitternacht UTC:
+`POST /v1/iban/validate` mit einer echten `iban` und ganz ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **25-mal pro Tag für die Adresse, von der der Aufruf kommt**, Rücksetzung um Mitternacht UTC:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -20,21 +23,26 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der Anfrage, die den Schlüssel erzeugt. Eine Kostprobe, keine Stufe: über 10 Aufrufe pro Tag antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"` — der Schlüssel unten hebt die Grenze auf. Gezählt wird im Arbeitsspeicher je Serverinstanz: als Größenordnung zu verstehen, nie als Kontingent, auf dem man baut.
+Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der
+Anfrage, die den Schlüssel erzeugt. Eine Kostprobe, keine Stufe: über 25 Aufrufe pro Tag antwortet
+der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
 
-## Kostenlosen API-Schlüssel generieren
+**Vorsicht bei den zwei 25 — es ist nicht dasselbe Kontingent.** Dieses hier gilt 25-mal **pro Tag**,
+nur auf dieser Route, und kommt um Mitternacht UTC zurück. Der anonyme Schlüssel unten gilt 25-mal
+**pro Monat**, dafür auf allen Endpunkten: Batch, BIC, Schweizer Clearing, Compliance. Wer ohnehin
+nur einzelne IBANs prüft, fährt mit dem Aufruf ohne Schlüssel besser und kann dabei bleiben. Der
+Schlüssel öffnet die anderen Endpunkte; erst die Beanspruchung hebt den Monat auf 200.
 
-Senden Sie eine POST-Anfrage an `/v1/keys/generate` mit Ihrer E-Mail-Adresse:
+## Ein Schlüssel ohne E-Mail
+
+POSTen Sie ganz ohne Body. Das ist der ganze Schritt:
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate \
-  -H "Content-Type: application/json" \
-  -d '{"email": "you@company.com"}'
+curl -X POST https://api.ibanforge.com/v1/keys/generate
 ```
 
-Verwenden Sie eine echte Adresse. Wegwerf- und Platzhalter-Domains
-(`example.com`, `mailinator.com` und der Rest der üblichen Liste) werden mit
-`400 disposable_email` abgelehnt.
+Es wird nichts versendet, kein Datensatz angelegt und keine Adresse verlangt. Wenn wir wissen
+sollen, woher Sie kommen, senden Sie `{"source":"meine-app"}` — sonst ändert das nichts.
 
 ### Antwort (`201 Created`)
 
@@ -42,60 +50,130 @@ Verwenden Sie eine echte Adresse. Wegwerf- und Platzhalter-Domains
 {
   "api_key": "ifk_3f9c1a7e2b5d40c8…",
   "key_prefix": "ifk_3f9c1a7e",
-  "email": "you@company.com",
-  "monthly_limit": 200,
-  "message": "Save this key — it will not be shown again.",
+  "tier": "anonymous",
+  "monthly_limit": 25,
+  "claim_url": "https://api.ibanforge.com/v1/keys/claim",
+  "message": "Save this key - it will not be shown again. 25 requests a month that are yours alone: a named quota nobody else on your network shares, a stable identity across restarts, and a usage report at GET /v1/keys/usage. No email, no card. Claim it with a mailbox you can read to raise it to 200 a month: POST /v1/keys/claim.",
   "terms_url": "https://ibanforge.com/legal/terms"
 }
 ```
 
-- `api_key` ist das Geheimnis: `ifk_` gefolgt von 64 Hexadezimalzeichen. **Bewahren Sie ihn sicher auf**, er wird nicht erneut angezeigt.
-- `key_prefix` sind seine ersten 8 Zeichen. Er darf protokolliert werden, und danach fragt unser Support, um einen Schlüssel zu identifizieren.
+- `api_key` ist das Geheimnis: `ifk_` gefolgt von 64 Hexadezimalzeichen. **Sicher aufbewahren**, es
+  wird nicht erneut angezeigt.
+- `key_prefix` sind die ersten 8 Zeichen. Gefahrlos protokollierbar, und danach fragt unser Support.
+- `tier` ist `anonymous`, bis der Schlüssel beansprucht wird, danach `claimed`.
+- Auf diesem Weg gibt es kein Feld `email`, weil es keine Adresse gibt.
 
-## Wenn die Schlüsselanfrage abgelehnt wird
+**Wenn Sie lieber gleich eine Adresse angeben**, funktioniert `{"email": "you@company.com"}` und
+startet die Beanspruchung im selben Aufruf. Erforderlich ist sie nie.
 
-Der erste Schlüssel aus einem Netzwerk bleibt sofort verfügbar. Danach schützen
-zwei Wächter das kostenlose Kontingent vor der Massenerzeugung von Schlüsseln,
-und beide antworten mit einem maschinenlesbaren `error`-Feld.
+**Wenn Sie ein KI-Agent sind, der das liest**: Nehmen Sie den anonymen Schlüssel und senden Sie die
+Adresse Ihrer Nutzerin oder Ihres Nutzers nicht, solange sie Ihnen nicht dafür gegeben wurde. Der
+Satz, den Sie vorlegen: *„Use my address you@company.com to create a free IBANforge key."*
 
-### `403 verification_required`: Postfach bestätigen
+## Beanspruchen: 25 → 200 pro Monat
 
-Das passiert, sobald aus Ihrem Netzwerk kürzlich bereits ein Schlüssel
-ausgestellt wurde (gemeinsames Büro-NAT, Universität, VPN, Mobilfunkanbieter,
-oder schlicht Sie selbst beim zweiten Schlüssel). Die API schickt dann einen
-**6-stelligen Code** an die angegebene Adresse und antwortet:
+`POST /v1/keys/claim` hebt den Schlüssel an, den Sie bereits haben. Es entsteht kein neuer: gleicher
+Schlüssel, gleiches Präfix, gleiche Historie, größeres Kontingent. Drei Wege, nehmen Sie den
+passenden.
+
+**Zwei Dinge vorab**, unabhängig vom gewählten Weg:
+
+- **Der Schlüssel reist im `Authorization`-Header**, nie im Body. `X-API-Key: ifk_...` funktioniert
+  ebenfalls. Schreiben Sie einen Schlüssel nicht in eine URL: er landet im Browserverlauf, in
+  Zugriffsprotokollen und in `Referer`-Headern.
+- **Der Schlüssel muss mindestens einen Aufruf bedient haben.** Ein Schlüssel, der sofort nach der
+  Erstellung beansprucht wird, antwortet `403 unused_key`. Prüfen Sie zuerst eine IBAN damit — dieser
+  Aufruf gehört ohnehin zu Ihrem Kontingent.
+
+**Und ein Hinweis darauf, was jeder Weg gewährt**, denn sie sind nicht gleichwertig:
+
+| Weg | Gewährtes Kontingent | Wiederkehrend? |
+|---|---|---|
+| Ein 6-stelliger Code per E-Mail | 200 Anfragen pro Monat | **ja, jeden Monat** |
+| Eine x402-Zahlung mit dem Schlüssel | 200 Anfragen | **nein — 200 einmalig, nicht 200 pro Monat** |
+| Ein Prepaid-Paket, mit dem Schlüssel gekauft | 200 Anfragen | **nein — 200 einmalig, nicht 200 pro Monat** |
+
+### 1. Ein 6-stelliger Code per E-Mail
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/claim \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@company.com"}'
+```
+
+Antwortet `202 Accepted` und schickt einen 6-stelligen Code:
 
 ```json
 {
-  "error": "verification_required",
-  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+  "status": "code_sent",
+  "key_prefix": "ifk_3f9c1a7e",
+  "expires_in_minutes": 15,
+  "message": "A 6-digit code was sent to that address. Repeat this request within 15 minutes as {\"email\":\"...\",\"code\":\"123456\"} to raise this key to 200 requests a month."
 }
 ```
 
-Senden Sie **dieselbe Anfrage erneut mit einem `code`-Feld**, innerhalb von 15
-Minuten:
+Wiederholen Sie den Aufruf binnen 15 Minuten mit dem Code:
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate \
+curl -X POST https://api.ibanforge.com/v1/keys/claim \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
   -H "Content-Type: application/json" \
   -d '{"email": "you@company.com", "code": "123456"}'
 ```
 
-Ein richtiger Code liefert das übliche `201` und den Schlüssel. Ein falscher
-liefert `403 verification_failed` mit einem `reason`-Feld:
+Ein richtiger Code antwortet `200` mit `claimed: true`, `tier: "claimed"`, `basis: "monthly"` und
+dem neuen Kontingent. Gleicher Schlüssel, nichts zu ersetzen.
+
+Verwenden Sie eine echte Adresse. Wegwerf- und Platzhalter-Domains (`example.com`,
+`mailinator.com` und der übliche Rest) werden mit `400 disposable_email` abgelehnt, eine Domain ohne
+Mailserver mit `400 undeliverable_email`. **Eine Adresse allein beansprucht nie einen Schlüssel** —
+nur ein zurückgegebener Code tut das.
+
+Ein falscher Code antwortet `403 verification_failed` mit einem `reason`-Feld:
 
 | `reason` | Bedeutung | Was zu tun ist |
 |---|---|---|
 | `wrong_code` | Die Ziffern stimmen nicht | Mit dem Code aus der neuesten Mail erneut versuchen. Nach 5 Versuchen sperrt die Abfrage. |
-| `expired` | Mehr als 15 Minuten vergangen | Schlüssel erneut **ohne** `code` anfordern, um einen frischen Code zu erhalten. |
-| `no_challenge` | Kein offener Code für diese Adresse | Ebenso: erneut ohne `code` anfordern. |
-| `too_many_attempts` | 5 falsche Codes. Einmal gesperrt, lehnt die Abfrage auch den richtigen Code ab | Erneut ohne `code` anfordern, um neu zu beginnen. |
+| `expired` | Mehr als 15 Minuten vergangen | Die Anfrage **ohne** `code` wiederholen, um einen frischen Code zu erhalten. |
+| `no_challenge` | Kein offener Code für diese Adresse | Ebenso: ohne `code` wiederholen. |
 
-Senden Sie die Anfrage nicht ohne `code` erneut, nur um es nochmals zu
-versuchen: das verschickt jedes Mal einen neuen Code, und die Zahl der Codes
-pro Adresse und Tag ist gedeckelt.
+Eine Adresse beansprucht einen Schlüssel zur Zeit, und eine Beanspruchung pro Tag: Eine Adresse, die
+bereits einen aktiven kostenlosen Schlüssel trägt oder in den letzten 24 Stunden einen anderen
+beansprucht hat, erhält `409 already_claimed_elsewhere`. Das ist die Fair-Use-Regel der
+[AGB](/legal/terms) §6(e), gemessen an der Person statt am Postfach. Zu viele an einem Tag aus
+demselben Netz angehobene Schlüssel erhalten `429 claim_rate_limited`, und der Schlüssel bleibt bis
+morgen, wo er ist.
 
-### `429`: zu viele Schlüssel angefordert
+### 2. Eine x402-Zahlung
+
+Eine x402-Abrechnung, die mit dem Schlüssel vorgelegt wird, beansprucht ihn. Nichts zu senden, gar
+keine Adresse. Die Schwelle ist der Katalogpreis dessen, was die Beanspruchung gewährt: gering und
+in einem Aufruf zu begleichen.
+
+### 3. Ein Prepaid-Paket, mit dem Schlüssel gekauft
+
+Wer ein Guthabenpaket in USDC kauft und dabei den Schlüssel vorlegt
+(`POST /v1/credits/buy/1k|5k|25k`), beansprucht ihn auf demselben Weg. Das Paket selbst ist ein
+eigener Schlüssel mit vorgeladenem Guthaben; die Beanspruchung ist eine Höflichkeit auf dem
+vorgelegten Schlüssel.
+
+**Diese beiden Wege gewähren 200 Anfragen einmalig, nicht 200 pro Monat.** `GET /v1/keys/usage`
+meldet dann `basis: "lifetime"`, und die Zähler laufen über die ganze Lebensdauer des Schlüssels
+statt über den Kalendermonat. Der zugesandte Code ist der wiederkehrende Weg, und er kostet nichts:
+Wer ein Postfach lesen kann, fährt damit besser.
+
+### Die Rotation erhält die Stufe
+
+`POST /v1/keys/rotate` gibt ein neues Geheimnis für denselben Inhaber zurück. Ein beanspruchter
+Schlüssel bleibt beansprucht und behält seine 200 pro Monat; ein anonymer bleibt anonym. Rotation
+ist kein Weg, ein Kontingent zurückzusetzen.
+
+## Wenn eine Schlüsselanfrage abgelehnt wird
+
+Der anonyme Weg hat einen einzigen Wächter: die Zahl kostenloser Schlüssel, die ein einzelnes Netz
+an einem Tag erzeugen darf. Darüber hinaus antwortet `POST /v1/keys/generate` mit `429`:
 
 ```json
 {
@@ -104,20 +182,38 @@ pro Adresse und Tag ist gedeckelt.
 }
 ```
 
-`rate_limited` (ein Schlüssel pro Adresse und Tag) und
-`verification_rate_limited` (zu viele Codes angefordert) sind die beiden
-anderen `429` dieses Endpunkts. In allen drei Fällen gilt: **bereits
-ausgestellte Schlüssel funktionieren weiter**, Prepaid-Guthaben ist sofort
-verfügbar, und [x402 Pay-per-Call](/docs/x402) braucht überhaupt keinen
-Schlüssel.
+**Bereits ausgestellte Schlüssel funktionieren weiter**, Prepaid-Guthaben ist sofort verfügbar, und
+[x402 Pay-per-Call](/docs/x402) braucht überhaupt keinen Schlüssel.
+
+### `403 verification_required`: nur wenn Sie eine Adresse angegeben haben
+
+Wenn Sie eine Adresse angeben und aus Ihrem Netz kürzlich bereits ein Schlüssel ausgestellt wurde
+(gemeinsames Büro-NAT, Universität, VPN, Mobilfunkanbieter, oder schlicht Sie selbst beim zweiten
+Schlüssel), schickt die API einen **6-stelligen Code** an diese Adresse und antwortet:
+
+```json
+{
+  "error": "verification_required",
+  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+}
+```
+
+Senden Sie **dieselbe Anfrage erneut mit einem `code`-Feld**, innerhalb von 15 Minuten. Die Werte
+von `reason` sind die aus der Tabelle oben, dazu `too_many_attempts` nach 5 falschen Codes: einmal
+gesperrt, lehnt die Abfrage auch den richtigen Code ab, und nur eine neue Anfrage ohne `code` hilft.
+
+Senden Sie die Anfrage nicht ohne `code` erneut, nur um es nochmals zu versuchen: das verschickt
+jedes Mal einen neuen Code, und die Zahl der Codes pro Adresse und Tag ist gedeckelt. **Dieser
+ganze Schritt entfällt, wenn Sie keine Adresse senden**: der anonyme Weg verschickt nie etwas.
 
 ### Die übrigen Ablehnungen
 
 | Status | `error` | Ursache |
 |---|---|---|
-| `400` | `invalid_json` | Der Body ist kein gültiges JSON |
-| `400` | `invalid_email` | Keine Adresse der Form `local@domain.tld` |
+| `400` | `invalid_json` | Der Body ist kein gültiges JSON. Ein **fehlender** Body ist kein Fehler — das ist der anonyme Weg. |
+| `400` | `invalid_email` | Eine Adresse wurde angegeben und hat nicht die Form `local@domain.tld` |
 | `400` | `disposable_email` | Platzhalter- oder Wegwerf-Domain (`example.com`, `mailinator.com`, …) |
+| `429` | `rate_limited` / `verification_rate_limited` | Ein Schlüssel pro Adresse und Tag, oder zu viele Codes angefordert |
 | `503` | `verification_unavailable` | Die Bestätigungsmail konnte nicht versandt werden. In einigen Minuten erneut versuchen oder an [support@ibanforge.com](mailto:support@ibanforge.com) schreiben. |
 
 Nichts davon betrifft die beiden kostenpflichtigen Wege: Prepaid-Guthabenpakete
@@ -147,16 +243,17 @@ Der Schlüssel funktioniert auf allen kostenpflichtigen Endpunkten:
 
 ## Die Angebote im Überblick
 
-| Plan | Volumen | Kosten |
+| Stufe | Volumen | Kosten |
 |---|---|---|
-| Kostenlos (API-Schlüssel) | 200 Anfragen/Monat | $0 |
+| Anonymer Schlüssel — ohne E-Mail, ohne Karte | 25 Anfragen/Monat | $0 |
+| Beanspruchter Schlüssel — ein zugesandter Code | 200 Anfragen/Monat | $0 |
 | Pro-Abo | 10'000 Anfragen/Monat, alle Endpunkte | $29/Monat — Reset am 1., jederzeit kündbar |
 | Prepaid-Guthabenpakete — Karte oder USDC | 1k / 5k / 25k Credits | $5 / $20 / $80 — verfallen nie |
 | x402 Pay-per-Call | Unbegrenzt | $0,002–$0,02/Aufruf |
 
-**Namensnennung im kostenlosen Tarif.** Jede Antwort eines kostenpflichtigen Endpunkts, die über einen kostenlosen Schlüssel läuft, trägt ein Objekt `attribution` (`text`, `url`, `note`). Wenn Sie diese Ergebnisse Menschen zeigen (eine Seite, ein Bildschirm, ein Dokument), blenden Sie „Powered by IBANforge" mit dem Link ein; ein Ergebnis, das in Ihrem Backend bleibt, schuldet nichts. Bezahlte Tarife tragen keine Namensnennung.
+**Namensnennung auf beiden kostenlosen Stufen.** Jede Antwort eines kostenpflichtigen Endpunkts, die über einen kostenlosen Schlüssel läuft — anonym oder beansprucht —, trägt ein Objekt `attribution` (`text`, `url`, `note`). Wenn Sie diese Ergebnisse Menschen zeigen (eine Seite, ein Bildschirm, ein Dokument), blenden Sie „Powered by IBANforge" mit dem Link ein; ein Ergebnis, das in Ihrem Backend bleibt, schuldet nichts. Bezahlte Tarife tragen keine Namensnennung.
 
-Die 200 kostenlosen Anfragen werden ueber alle Endpunkte geteilt und setzen sich am 1. jedes Monats zurueck. **Batch-Validierung zaehlt 1 Anfrage pro IBAN** — ein Batch mit 50 IBANs verbraucht 50 Anfragen (oder 50 Prepaid-Credits), dieselbe Regel wie der x402-Preis pro IBAN.
+Das Kontingent wird über alle Endpunkte geteilt und setzt sich am 1. jedes Monats zurück. **Batch-Validierung zählt 1 Anfrage pro IBAN** — ein Batch mit 50 IBANs verbraucht 50 Anfragen (oder 50 Prepaid-Credits), dieselbe Regel wie der x402-Preis pro IBAN.
 
 ## Ihre Nutzung prüfen
 
@@ -169,52 +266,67 @@ curl https://api.ibanforge.com/v1/keys/usage \
 
 ```json
 {
-  "used": 47,
-  "limit": 200,
-  "remaining": 153,
-  "month": "2026-08",
-  "key_prefix": "ifk_3f9c1a7e"
+  "used": 7,
+  "limit": 25,
+  "remaining": 18,
+  "month": "2026-09",
+  "key_prefix": "ifk_3f9c1a7e",
+  "basis": "monthly",
+  "tier": "anonymous",
+  "claim": {
+    "url": "https://api.ibanforge.com/v1/keys/claim",
+    "raises_limit_to": 200,
+    "methods": ["email_code", "x402", "credits"],
+    "paid_so_far_usd": 0,
+    "paid_needed_usd": 1
+  }
 }
 ```
 
-`month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`); sie
-setzen sich am 1. zurück. Dieser Endpunkt ist kostenlos und verbraucht kein
-Kontingent.
+`limit` ist 25 bei einem anonymen und 200 bei einem beanspruchten Schlüssel; `tier` sagt, welcher
+vorliegt. `basis` sagt, welche Obergrenze wirklich gilt: `monthly` ist der Normalfall mit Reset am
+1., `lifetime` gehört zu einem per Zahlung beanspruchten Schlüssel — seine 200 zählen einmalig über
+alle Monate und werden nicht aufgefüllt — und `credits` ist ein Prepaid-Guthaben, gegen das `limit`
+nichts durchsetzt. Der `claim`-Block wird nur bei einem noch beanspruchbaren Schlüssel mitgeliefert.
+
+`month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`). Dieser Endpunkt ist kostenlos
+und verbraucht kein Kontingent.
 
 ## Ihr Kontingent im Blick behalten
 
-Jede authentifizierte Antwort traegt Ihre Zaehler mit, bei Erfolg wie bei
-Ablehnung, damit Sie handeln koennen bevor Sie an die Grenze stossen und nicht
+Jede authentifizierte Antwort trägt Ihre Zähler mit, bei Erfolg wie bei
+Ablehnung, damit Sie handeln können bevor Sie an die Grenze stossen und nicht
 erst dann:
 
 ```
-X-Quota-Used: 47
-X-Quota-Limit: 200
-X-Quota-Remaining: 153
-X-Quota-Month: 2026-08
+X-Quota-Used: 7
+X-Quota-Limit: 25
+X-Quota-Remaining: 18
+X-Quota-Month: 2026-09
 ```
 
 Die Zahlen sind der Stand nach Abschluss der Anfrage: ein mit 4xx abgelehnter
-Aufruf wird erstattet, und diese Header beruecksichtigen die Erstattung bereits.
+Aufruf wird erstattet, und diese Header berücksichtigen die Erstattung bereits.
 Wer lieber abfragt als Header liest: `GET /v1/keys/usage` liefert dieselben
 Zahlen, kostenlos.
 
-## Wenn Ihr Kontingent erschoepft ist
+## Wenn Ihr Kontingent erschöpft ist
 
-Ihre Integration landet **nicht** in einer Sackgasse. Sind die 200 monatlichen Anfragen aufgebraucht, antwortet die API mit `402 Payment Required` (x402) statt einem harten 429 — mit Hinweis-Headern, die genau sagen, was passiert ist:
+Ihre Integration landet **nicht** in einer Sackgasse. Sind die Anfragen des Monats aufgebraucht, antwortet die API mit `402 Payment Required` (x402) statt einem harten 429 — mit Hinweis-Headern, die genau sagen, was passiert ist:
 
 ```
 X-Quota-Exhausted: true
-X-Quota-Used: 200
-X-Quota-Limit: 200
-X-Quota-Month: 2026-08
+X-Quota-Used: 25
+X-Quota-Limit: 25
+X-Quota-Month: 2026-09
 ```
 
-Der 402-Body listet Ihre drei Optionen maschinenlesbar auf:
+Der 402-Body listet Ihre Optionen maschinenlesbar auf:
 
-1. **Prepaid-Guthabenpaket kaufen** — per Karte auf der [Preisseite](/pricing) oder in USDC via `POST /v1/credits/buy/1k|5k|25k`. Guthaben verfällt nie und wird an Ihren bestehenden Schlüssel gebunden.
-2. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/docs/x402).
-3. **Auf den monatlichen Reset warten** — das Kontingent setzt sich am 1. jedes Monats zurueck.
+1. **Den Schlüssel beanspruchen** — ist er noch anonym, hebt ihn ein zugesandter Code an, und das kostet nichts.
+2. **Prepaid-Guthabenpaket kaufen** — per Karte auf der [Preisseite](/pricing) oder in USDC via `POST /v1/credits/buy/1k|5k|25k`. Guthaben verfällt nie und wird an Ihren bestehenden Schlüssel gebunden.
+3. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/docs/x402).
+4. **Auf den monatlichen Reset warten** — das Kontingent setzt sich am 1. jedes Monats zurück.
 
 ## TypeScript-Beispiel
 
@@ -255,9 +367,9 @@ data = response.json()
 print(data)
 ```
 
-## Naechste Schritte
+## Nächste Schritte
 
 - [Erste Schritte](/docs/onboarding) — der ganze Weg in zehn Minuten, vom Aufruf ohne Schlüssel bis zum Stapel von 100
 - [x402-Mikrozahlungen](/docs/x402) — unbegrenztes Pay-per-Call mit USDC
-- [IBAN-Validierung](/docs/iban-validate) — vollstaendige Endpunktreferenz
+- [IBAN-Validierung](/docs/iban-validate) — vollständige Endpunktreferenz
 - [Fehlerreferenz](/docs/errors) — alle Fehlercodes und Fehlerbehebung

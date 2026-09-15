@@ -1,18 +1,21 @@
 ---
-title: "Cles API"
-description: "Generez une cle API gratuite pour obtenir 200 requetes/mois sur tous les endpoints IBANforge — sans carte bancaire, sans portefeuille crypto."
+title: "Clés API"
+description: "Obtenez une clé API IBANforge sans donner d'e-mail — 25 requêtes par mois immédiatement, 200 par mois une fois la clé réclamée. Sans carte bancaire, sans portefeuille crypto."
 order: 1
 ---
 
-# Cles API
+# Clés API
 
-IBANforge propose une **offre gratuite** via des cles API — 200 requetes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus eleves, vous pouvez utiliser les [micropaiements x402](/docs/x402).
+IBANforge a deux marches gratuites, et la première ne demande rien. Un POST au corps vide renvoie
+une clé `ifk_` de **25 requêtes par mois** : aucune adresse, aucune carte, rien à confirmer. Un
+appel de plus — un code reçu par mail — porte cette même clé à **200 requêtes par mois**,
+définitivement. Au-delà, les [micropaiements x402](/docs/x402) ou les packs prépayés.
 
 Cette page est la référence sur les clés seules. Si vous n'avez pas encore fait d'appel, la [prise en main](/docs/onboarding) est le chemin le plus court : l'appel sans clé, cette clé, la réponse lue bloc par bloc et un lot de 100, en dix minutes.
 
-## Avant la clé : 10 appels par jour, sans clé
+## Avant la clé : 25 appels par jour, sans clé
 
-`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **10 fois par jour et par adresse IP**, remis à zéro à minuit UTC :
+`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **25 fois par jour pour l'adresse d'où il vient**, remis à zéro à minuit UTC :
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -20,21 +23,27 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-La réponse porte un bloc `trial` avec le nombre d'appels restants aujourd'hui et la requête qui crée la clé. C'est une dégustation, pas un palier : au-delà de 10 appels par jour, l'endpoint répond de nouveau `402` avec `cause.reason: "trial_exhausted"`, et c'est la clé ci-dessous qui lève la limite. Le décompte vit en mémoire, par instance de serveur : à traiter comme un ordre de grandeur, jamais comme un quota sur lequel bâtir.
+La réponse porte un bloc `trial` avec le nombre d'appels restants aujourd'hui et la requête qui crée
+la clé. C'est une dégustation, pas un palier : au-delà de 25 appels par jour, l'endpoint répond de
+nouveau `402` avec `cause.reason: "trial_exhausted"`.
 
-## Générer une clé API gratuite
+**Attention aux deux 25 : ce n'est pas le même quota.** Celui-ci vaut 25 **par jour**, sur cette
+route seulement, et il revient à minuit UTC. La clé anonyme ci-dessous vaut 25 **par mois**, sur tous
+les endpoints : lot, BIC, clearing suisse, conformité. Si vous ne faites que valider un IBAN à la
+fois, l'appel sans clé est le meilleur marché et vous pouvez y rester. La clé ouvre les autres
+endpoints ; c'est la réclamation qui porte le mois à 200.
 
-Envoyez une requête POST à `/v1/keys/generate` avec votre adresse email :
+## Une clé sans e-mail
+
+POSTez sans aucun corps. C'est toute l'étape :
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate \
-  -H "Content-Type: application/json" \
-  -d '{"email": "you@company.com"}'
+curl -X POST https://api.ibanforge.com/v1/keys/generate
 ```
 
-Utilisez une vraie adresse. Les domaines jetables ou fictifs (`example.com`,
-`mailinator.com` et le reste de la liste habituelle) sont refusés avec
-`400 disposable_email`.
+Rien n'est envoyé par mail, aucun dossier n'est ouvert, aucune adresse n'est demandée. Si vous
+voulez que nous sachions d'où vous venez, envoyez `{"source":"mon-app"}` : cela ne change rien
+d'autre.
 
 ### Réponse (`201 Created`)
 
@@ -42,59 +51,127 @@ Utilisez une vraie adresse. Les domaines jetables ou fictifs (`example.com`,
 {
   "api_key": "ifk_3f9c1a7e2b5d40c8…",
   "key_prefix": "ifk_3f9c1a7e",
-  "email": "you@company.com",
-  "monthly_limit": 200,
-  "message": "Save this key — it will not be shown again.",
+  "tier": "anonymous",
+  "monthly_limit": 25,
+  "claim_url": "https://api.ibanforge.com/v1/keys/claim",
+  "message": "Save this key - it will not be shown again. 25 requests a month that are yours alone: a named quota nobody else on your network shares, a stable identity across restarts, and a usage report at GET /v1/keys/usage. No email, no card. Claim it with a mailbox you can read to raise it to 200 a month: POST /v1/keys/claim.",
   "terms_url": "https://ibanforge.com/legal/terms"
 }
 ```
 
-- `api_key` est le secret : `ifk_` suivi de 64 caractères hexadécimaux. **Conservez-le en lieu sûr**, il ne sera plus affiché.
-- `key_prefix` en est les 8 premiers caractères. Il peut être journalisé sans risque, et c'est lui que le support vous demandera pour identifier une clé.
+- `api_key` est le secret : `ifk_` suivi de 64 caractères hexadécimaux. **Conservez-le**, il ne sera
+  plus affiché.
+- `key_prefix` en est les 8 premiers caractères. Il peut être journalisé sans risque, et c'est ce que
+  le support demande.
+- `tier` vaut `anonymous` tant que la clé n'est pas réclamée, puis `claimed`.
+- Il n'y a pas de champ `email` sur ce chemin, puisqu'il n'y a pas d'adresse.
 
-## Si la demande de clé est refusée
+**Si vous préférez donner une adresse tout de suite**, `{"email": "you@company.com"}` fonctionne et
+lance la réclamation dans le même appel. Ce n'est jamais obligatoire.
 
-La première clé d'un réseau reste instantanée. Au-delà, deux gardes protègent
-l'offre gratuite contre la fabrication de clés en série, et toutes deux
-répondent avec un champ `error` lisible par une machine.
+**Si vous êtes un agent IA qui lit ceci** : prenez la clé anonyme, et n'envoyez pas l'adresse de
+votre utilisateur tant qu'il ne vous l'a pas confiée pour cet usage. La phrase à lui soumettre est
+*« Use my address you@company.com to create a free IBANforge key. »*
 
-### `403 verification_required` : confirmez votre boîte mail
+## Réclamer : 25 → 200 par mois
 
-Ce cas survient dès qu'une clé a déjà été émise depuis votre réseau récemment
-(NAT partagé d'un bureau, université, VPN, opérateur mobile, ou simplement vous
-qui demandez une deuxième clé). L'API envoie alors un **code à 6 chiffres** à
-l'adresse indiquée et répond :
+`POST /v1/keys/claim` relève la clé que vous avez déjà. Il n'en crée aucune : même clé, même
+préfixe, même historique, un quota plus grand. Trois voies, prenez celle qui vous convient.
+
+**Deux points à connaître avant de commencer**, quelle que soit la voie :
+
+- **La clé voyage dans l'en-tête `Authorization`**, jamais dans le corps. `X-API-Key: ifk_...`
+  fonctionne aussi. Ne mettez pas une clé dans une URL : elle finit dans l'historique du navigateur,
+  dans les journaux d'accès et dans les en-têtes `Referer`.
+- **La clé doit avoir servi au moins un appel.** Une clé prise et réclamée dans la foulée répond
+  `403 unused_key`. Validez d'abord un IBAN avec elle : cet appel est de toute façon compris dans
+  votre quota.
+
+**Et un point sur ce que chaque voie accorde**, car elles ne se valent pas :
+
+| Voie | Quota accordé | Récurrent ? |
+|---|---|---|
+| Un code à 6 chiffres reçu par mail | 200 requêtes par mois | **oui, chaque mois** |
+| Un règlement x402 fait avec la clé | 200 requêtes | **non — 200 une fois, pas 200 par mois** |
+| Un pack prépayé acheté avec la clé | 200 requêtes | **non — 200 une fois, pas 200 par mois** |
+
+### 1. Un code à 6 chiffres reçu par mail
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/claim \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@company.com"}'
+```
+
+Répond `202 Accepted` et envoie un code à 6 chiffres :
 
 ```json
 {
-  "error": "verification_required",
-  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+  "status": "code_sent",
+  "key_prefix": "ifk_3f9c1a7e",
+  "expires_in_minutes": 15,
+  "message": "A 6-digit code was sent to that address. Repeat this request within 15 minutes as {\"email\":\"...\",\"code\":\"123456\"} to raise this key to 200 requests a month."
 }
 ```
 
-Renvoyez **la même requête avec un champ `code`** dans les 15 minutes :
+Répétez l'appel dans les 15 minutes avec le code :
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate \
+curl -X POST https://api.ibanforge.com/v1/keys/claim \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
   -H "Content-Type: application/json" \
   -d '{"email": "you@company.com", "code": "123456"}'
 ```
 
-Un code correct renvoie le `201` habituel et la clé. Un code faux renvoie
-`403 verification_failed` avec un champ `reason` :
+Un code correct répond `200` avec `claimed: true`, `tier: "claimed"`, `basis: "monthly"` et le
+nouveau quota. Même clé, rien à remplacer.
 
-| `reason` | Ce que ça veut dire | Quoi faire |
+Utilisez une vraie adresse. Les domaines jetables ou fictifs (`example.com`, `mailinator.com` et le
+reste de la liste habituelle) sont refusés avec `400 disposable_email`, et un domaine sans serveur
+de mail avec `400 undeliverable_email`. **Une adresse seule ne réclame jamais une clé** : seul un
+code revenu le fait.
+
+Un code faux répond `403 verification_failed` avec un champ `reason` :
+
+| `reason` | Ce que cela veut dire | Quoi faire |
 |---|---|---|
-| `wrong_code` | Les chiffres ne correspondent pas | Réessayez avec le code du dernier mail reçu. Le défi se verrouille après 5 tentatives. |
-| `expired` | Plus de 15 minutes se sont écoulées | Redemandez une clé **sans** `code` pour en recevoir un nouveau. |
-| `no_challenge` | Aucun code en attente pour cette adresse | Idem : redemandez sans `code`. |
-| `too_many_attempts` | 5 codes faux. Une fois verrouillé, le défi refuse aussi le bon code | Redemandez sans `code` pour repartir sur un nouveau défi. |
+| `wrong_code` | Les chiffres ne correspondent pas | Réessayez avec le code du dernier mail. Le défi se verrouille après 5 tentatives. |
+| `expired` | Plus de 15 minutes écoulées | Répétez la requête **sans** `code` pour en recevoir un nouveau. |
+| `no_challenge` | Aucun code en attente pour cette adresse | Pareil : répétez sans `code`. |
 
-Ne renvoyez pas la requête sans `code` juste pour réessayer : cela envoie un
-nouveau code à chaque fois, et le nombre de codes envoyés à une même adresse
-par jour est plafonné.
+Une adresse réclame une clé à la fois, et une réclamation par jour : une adresse qui porte déjà une
+clé gratuite vivante, ou qui a réclamé une autre clé dans les 24 heures, reçoit
+`409 already_claimed_elsewhere`. C'est la règle d'usage loyal des [CGU](/legal/terms) §6(e),
+rattachée à la personne plutôt qu'à la boîte mail. Trop de clés relevées depuis un même réseau dans
+la journée reçoivent `429 claim_rate_limited`, et la clé reste où elle est jusqu'à demain.
 
-### `429` : trop de clés demandées
+### 2. Un règlement x402
+
+Un règlement x402 effectué en présentant la clé la réclame. Rien à envoyer, aucune adresse. Le seuil
+est le prix catalogue de ce que la réclamation accorde : faible, et réglable en un appel.
+
+### 3. Un pack prépayé acheté avec la clé
+
+Acheter un pack de crédits en USDC en présentant la clé (`POST /v1/credits/buy/1k|5k|25k`) la
+réclame de la même façon. Le pack lui-même est une clé distincte, préchargée en crédits ; la
+réclamation est une courtoisie sur la clé que vous avez présentée.
+
+**Ces deux voies accordent 200 requêtes une fois, pas 200 par mois.** `GET /v1/keys/usage` rapporte
+alors `basis: "lifetime"`, et les compteurs courent sur la vie entière de la clé plutôt que sur le
+mois calendaire. Le code reçu par mail est la voie récurrente, et elle ne coûte rien : si vous
+pouvez lire une boîte mail, c'est la meilleure affaire.
+
+### La rotation conserve le palier
+
+`POST /v1/keys/rotate` renvoie un nouveau secret pour le même détenteur. Une clé réclamée reste
+réclamée et garde ses 200 par mois ; une clé anonyme reste anonyme. La rotation n'est pas un moyen
+de remettre un quota à zéro.
+
+## Si une demande de clé est refusée
+
+Le chemin anonyme a une seule garde : le nombre de clés gratuites qu'un même réseau peut créer en
+une journée. Au-delà, `POST /v1/keys/generate` répond `429` :
 
 ```json
 {
@@ -103,19 +180,38 @@ par jour est plafonné.
 }
 ```
 
-`rate_limited` (une clé par adresse et par jour) et `verification_rate_limited`
-(trop de codes demandés) sont les deux autres `429` de cet endpoint. Dans les
-trois cas : **les clés que vous détenez déjà continuent de fonctionner**, les
-crédits prépayés sont instantanés, et le [paiement à l'appel x402](/docs/x402)
-ne demande aucune clé.
+**Les clés que vous détenez déjà continuent de fonctionner**, les crédits prépayés sont
+instantanés, et le [paiement à l'appel x402](/docs/x402) ne demande aucune clé.
+
+### `403 verification_required` : seulement si vous avez donné une adresse
+
+Si vous donnez une adresse et qu'une clé a déjà été émise depuis votre réseau récemment (bureau
+partagé, université, VPN, opérateur mobile, ou simplement une deuxième clé pour vous), l'API envoie
+un **code à 6 chiffres** à cette adresse et répond :
+
+```json
+{
+  "error": "verification_required",
+  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+}
+```
+
+Renvoyez la **même requête avec un champ `code`** dans les 15 minutes. Les valeurs de `reason` sont
+celles du tableau ci-dessus, plus `too_many_attempts` après 5 codes faux : une fois verrouillé, le
+défi refuse aussi le bon code, et seule une nouvelle requête sans `code` aide.
+
+Ne renvoyez pas la requête sans `code` juste pour réessayer : cela envoie un nouveau code chaque
+fois, et le nombre de codes envoyés à une adresse par jour est plafonné. **Toute cette étape
+disparaît si vous n'envoyez pas d'adresse** : le chemin anonyme n'envoie jamais rien.
 
 ### Les autres refus
 
 | Statut | `error` | Cause |
 |---|---|---|
-| `400` | `invalid_json` | Le corps n'est pas du JSON valide |
-| `400` | `invalid_email` | Ce n'est pas une adresse `local@domaine.tld` |
+| `400` | `invalid_json` | Le corps n'est pas du JSON valide. Un corps **absent** n'est pas une erreur : c'est le chemin anonyme. |
+| `400` | `invalid_email` | Une adresse a été fournie et ce n'est pas une adresse `local@domaine.tld` |
 | `400` | `disposable_email` | Domaine fictif ou jetable (`example.com`, `mailinator.com`, …) |
+| `429` | `rate_limited` / `verification_rate_limited` | Une clé par adresse et par jour, ou trop de codes demandés |
 | `503` | `verification_unavailable` | Le mail de vérification n'a pas pu partir. Réessayez dans quelques minutes, ou écrivez à [support@ibanforge.com](mailto:support@ibanforge.com). |
 
 Rien de tout cela ne s'applique aux deux voies payantes : les packs de crédits
@@ -143,18 +239,19 @@ La clé fonctionne sur tous les endpoints payants :
 - `POST /v1/iban/compliance`
 - `GET /v1/ch/clearing/:iid`
 
-## Les offres en un coup d'oeil
+## Les offres en un coup d'œil
 
-| Plan | Volume | Cout |
+| Palier | Volume | Coût |
 |---|---|---|
-| Gratuit (clé API) | 200 requêtes/mois | 0 $ |
+| Clé anonyme — sans e-mail, sans carte | 25 requêtes/mois | 0 $ |
+| Clé réclamée — un code reçu par mail | 200 requêtes/mois | 0 $ |
 | Abonnement Pro | 10 000 requêtes/mois, tous les endpoints | 29 $/mois — remise à zéro le 1er, résiliable à tout moment |
 | Packs de crédits prépayés — carte ou USDC | 1k / 5k / 25k crédits | 5 $ / 20 $ / 80 $ — n'expirent jamais |
 | x402 paiement à l'appel | Illimité | 0,002 $–0,02 $/appel |
 
-**Attribution sur le palier gratuit.** Chaque réponse d'un endpoint payant servie sur une clé gratuite porte un objet `attribution` (`text`, `url`, `note`). Quand vous montrez ces résultats à des personnes (une page, un écran, un document), affichez « Powered by IBANforge » avec le lien ; un résultat qui reste dans votre backend ne doit rien. Les plans payants ne portent aucune attribution.
+**Attribution sur les deux marches gratuites.** Chaque réponse d'un endpoint payant servie sur une clé gratuite — anonyme ou réclamée — porte un objet `attribution` (`text`, `url`, `note`). Quand vous montrez ces résultats à des personnes (une page, un écran, un document), affichez « Powered by IBANforge » avec le lien ; un résultat qui reste dans votre backend ne doit rien. Les plans payants ne portent aucune attribution.
 
-Les 200 requetes gratuites sont partagees entre tous les endpoints et se reinitalisent le 1er de chaque mois. **La validation par lot compte 1 requete par IBAN** — un lot de 50 IBANs consomme 50 requetes (ou 50 credits prepayes), la meme regle que le prix x402 par IBAN.
+Le quota est partagé entre tous les endpoints et se réinitialise le 1er de chaque mois. **La validation par lot compte 1 requête par IBAN** — un lot de 50 IBAN consomme 50 requêtes (ou 50 crédits prépayés), la même règle que le prix x402 par IBAN.
 
 ## Vérifier votre consommation
 
@@ -167,17 +264,31 @@ curl https://api.ibanforge.com/v1/keys/usage \
 
 ```json
 {
-  "used": 47,
-  "limit": 200,
-  "remaining": 153,
-  "month": "2026-08",
-  "key_prefix": "ifk_3f9c1a7e"
+  "used": 7,
+  "limit": 25,
+  "remaining": 18,
+  "month": "2026-09",
+  "key_prefix": "ifk_3f9c1a7e",
+  "basis": "monthly",
+  "tier": "anonymous",
+  "claim": {
+    "url": "https://api.ibanforge.com/v1/keys/claim",
+    "raises_limit_to": 200,
+    "methods": ["email_code", "x402", "credits"],
+    "paid_so_far_usd": 0,
+    "paid_needed_usd": 1
+  }
 }
 ```
 
-`month` est le mois calendaire auquel se rapportent les compteurs (`YYYY-MM`),
-et ils se réinitialisent le 1er. Cet endpoint est gratuit et ne consomme pas de
-quota.
+`limit` vaut 25 sur une clé anonyme et 200 sur une clé réclamée ; `tier` dit laquelle. `basis` dit
+quel plafond gouverne vraiment : `monthly` est le cas normal, remis à zéro le 1er ; `lifetime`
+appartient à une clé réclamée par paiement — ses 200 sont comptés une fois, tous mois confondus, et
+non rechargés ; `credits` est un solde prépayé, et rien n'est alors opposé à `limit`. Le bloc `claim`
+n'est servi que sur une clé encore réclamable.
+
+`month` est le mois calendaire auquel se rapportent les compteurs (`YYYY-MM`). Cet endpoint est
+gratuit et ne consomme pas de quota.
 
 ## Surveiller votre quota
 
@@ -186,10 +297,10 @@ refus, pour que vous puissiez réagir avant le mur plutôt qu'au moment où vous
 le heurtez :
 
 ```
-X-Quota-Used: 47
-X-Quota-Limit: 200
-X-Quota-Remaining: 153
-X-Quota-Month: 2026-08
+X-Quota-Used: 7
+X-Quota-Limit: 25
+X-Quota-Remaining: 18
+X-Quota-Month: 2026-09
 ```
 
 Les chiffres sont le solde une fois la requête réglée : un appel rejeté en 4xx
@@ -197,22 +308,23 @@ est remboursé, et ces en-têtes tiennent déjà compte du remboursement. Si vou
 préférez interroger plutôt que lire des en-têtes, `GET /v1/keys/usage` renvoie
 les mêmes nombres, et c'est gratuit.
 
-## Lorsque votre quota est depasse
+## Lorsque votre quota est dépassé
 
-Votre intégration ne tombe **pas** sur un cul-de-sac. Une fois les 200 requêtes mensuelles épuisées, l'API répond `402 Payment Required` (x402) plutôt qu'un 429 sec, avec des en-têtes qui disent exactement ce qui s'est passé :
+Votre intégration ne tombe **pas** sur un cul-de-sac. Une fois les requêtes du mois épuisées, l'API répond `402 Payment Required` (x402) plutôt qu'un 429 sec, avec des en-têtes qui disent exactement ce qui s'est passé :
 
 ```
 X-Quota-Exhausted: true
-X-Quota-Used: 200
-X-Quota-Limit: 200
-X-Quota-Month: 2026-08
+X-Quota-Used: 25
+X-Quota-Limit: 25
+X-Quota-Month: 2026-09
 ```
 
-Le corps du 402 liste vos trois options, lisibles par machine :
+Le corps du 402 liste vos options, lisibles par machine :
 
-1. **Acheter un pack de crédits prépayés** — par carte sur la page [tarifs](/pricing), ou en USDC via `POST /v1/credits/buy/1k|5k|25k`. Les crédits n'expirent jamais et s'attachent à votre clé existante.
-2. **Payer à l'appel via x402** — un client compatible x402 paie automatiquement en USDC, sans changer de clé. Voir [Paiements x402](/docs/x402).
-3. **Attendre la réinitialisation mensuelle** — le quota se réinitialise le 1er de chaque mois.
+1. **Réclamer la clé** — si elle est encore anonyme, un code reçu par mail la relève et ne coûte rien.
+2. **Acheter un pack de crédits prépayés** — par carte sur la page [tarifs](/pricing), ou en USDC via `POST /v1/credits/buy/1k|5k|25k`. Les crédits n'expirent jamais et s'attachent à votre clé existante.
+3. **Payer à l'appel via x402** — un client compatible x402 paie automatiquement en USDC, sans changer de clé. Voir [Paiements x402](/docs/x402).
+4. **Attendre la réinitialisation mensuelle** — le quota se réinitialise le 1er de chaque mois.
 
 ## Exemple TypeScript
 
@@ -253,9 +365,9 @@ data = response.json()
 print(data)
 ```
 
-## Etapes suivantes
+## Étapes suivantes
 
 - [Prise en main](/docs/onboarding) — tout le chemin en dix minutes, de l'appel sans clé au lot de 100
-- [Micropaiements x402](/docs/x402) — paiement a l'appel illimite avec USDC
-- [Validation IBAN](/docs/iban-validate) — reference complete de l'endpoint
-- [Reference des erreurs](/docs/errors) — tous les codes d'erreur et le depannage
+- [Micropaiements x402](/docs/x402) — paiement à l'appel illimité avec USDC
+- [Validation IBAN](/docs/iban-validate) — référence complète de l'endpoint
+- [Référence des erreurs](/docs/errors) — tous les codes d'erreur et le dépannage

@@ -17,6 +17,21 @@
 export const SAMPLE_IBAN = 'CH1000230000000012345';
 export const FIRST_CALL_PATH = '/v1/iban/validate';
 
+/**
+ * Le marqueur de démonstration du contrat de mesure.
+ *
+ * L'appel que le panneau lance lui-même part avec cet en-tête, et lui seul :
+ * c'est ce qui permet plus tard de distinguer « la lignée a essayé depuis la
+ * page » de « la lignée a servi un vrai dossier ». Les extraits à copier n'en
+ * portent PAS : un appel recopié par le visiteur est un appel hors panneau, et
+ * le lui faire porter effacerait la seule distinction que la mesure cherche.
+ *
+ * 🚨 L'en-tête n'est pas une condition d'accès, et il ne doit jamais en
+ * devenir une : voir le repli dans components/first-call-panel.tsx.
+ */
+export const DEMO_CONTEXT_HEADER = 'X-IBANforge-Context';
+export const DEMO_CONTEXT_VALUE = 'demo';
+
 export type SnippetLanguage = 'curl' | 'node' | 'python';
 export type Snippets = Record<SnippetLanguage, string>;
 
