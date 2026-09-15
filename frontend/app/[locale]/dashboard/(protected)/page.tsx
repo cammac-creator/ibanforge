@@ -1,4 +1,6 @@
 import { Suspense } from 'react';
+import { overviewView } from '@/lib/dashboard/workspace';
+import { OverviewNavigation } from '@/components/dashboard/overview/navigation';
 import { getLocale } from 'next-intl/server';
 import type { BusinessFunnelDay } from '@/components/dashboard/business-funnel-chart';
 import type { ChannelRow } from '@/components/dashboard/channels-panel';
@@ -40,33 +42,9 @@ import {
   type WebEventsSummary,
 } from '@/lib/dashboard-overview';
 
-/**
- * The founder's cockpit.
- *
- * Rebuilt on 2026-09-01 from an audit (ENS-01..ENS-24) that found the page to
- * be a chronological stack of twenty-two blocks, six and a half thousand
- * pixels tall: at 7 a.m. the money was at 1 700 px, what was broken at
- * 5 300 px, and the follow-ups due were a number with no button anywhere near
- * it. It answers five questions in order now, one section each:
- *
- *   1. the money            4. what is new
- *   2. who to chase today   5. the 30-day detail, folded shut
- *   3. what is broken
- *
- * Two structural rules hold the rest together:
- *
- * • Nothing is awaited here. The upstream reads start together (they were
- *   already parallel and that was never the problem) and are handed to async
- *   sections under <Suspense>, so the shell paints immediately instead of
- *   holding the PREVIOUS screen still for the three seconds a cold upstream
- *   costs. There is a loading.tsx beside this file for the same reason.
- *   The /stats failure that used to be a full-page early return is now one
- *   streamed banner, because that early return was itself the await that made
- *   streaming impossible.
- *
- * • Every block distinguishes "the fetch failed" from "the data is zero". A
- *   broken STATS_TOKEN once rendered as four days of empty charts that read
- *   exactly like a traffic collapse.
+/** Quatre vues pour séparer le travail quotidien des analyses détaillées.
+ * Les lectures utiles à la vue démarrent ensemble et restent sous Suspense.
+ * Une lecture indisponible conserve toujours son état, jamais un zéro implicite.
  */
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -90,6 +68,14 @@ export default async function DashboardPage({
 }) {
   const locale = await getLocale();
   const params = await searchParams;
+  const view = overviewView(params.view);
+  const money = view === 'today' || view === 'revenue';
+  const growth = view === 'growth';
+  const service = view === 'service';
+  const statsFor = <T,>(enabled: boolean, path: string) =>
+    enabled ? stats<T>(path) : Promise.resolve(notFetched<T>());
+  const adminFor = <T,>(enabled: boolean, path: string) =>
+    enabled ? admin<T>(path) : Promise.resolve(notFetched<T>());
   const periodParam = Number(params.period ?? 30);
   const period: ValidPeriod = VALID_PERIODS.includes(periodParam as ValidPeriod)
     ? (periodParam as ValidPeriod)
@@ -101,44 +87,65 @@ export default async function DashboardPage({
   // slowest one landed) is not.
   const statsP = stats<StatsResponse>('/stats');
   const historyP = stats<HistoryEntry[]>(`/stats/history?period=${period}`);
-  const funnelP = stats<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`);
-  const errorsP = stats<ErrorsResponse>(`/stats/errors?period=${period}`);
-  const hourlyP = stats<HourlyResponse>(`/stats/hourly?period=${period}`);
-  const eventsP = stats<{ events: Array<{ created_at: string; kind: string; label: string }> }>(
+  const funnelP = statsFor<{ rows?: BusinessFunnelDay[] }>(
+    service,
+    `/stats/business-funnel?period=${period}`,
+  );
+  const errorsP = statsFor<ErrorsResponse>(service, `/stats/errors?period=${period}`);
+  const hourlyP = statsFor<HourlyResponse>(service, `/stats/hourly?period=${period}`);
+  const eventsP = statsFor<{ events: Array<{ created_at: string; kind: string; label: string }> }>(
+    service,
     `/stats/events?period=${period}`,
   );
-  const statusByPathP = stats<{ rows: StatusByPathRow[] }>(
+  const statusByPathP = statsFor<{ rows: StatusByPathRow[] }>(
+    service,
     `/stats/status-by-path?period=${period}`,
   );
-  const sourcesP = stats<{ by_client_kind: ChannelRow[] }>(`/stats/sources?period=${period}`);
-  const patternsP = stats<{ geo_trend: Array<Record<string, number | string>> }>(
+  const sourcesP = statsFor<{ by_client_kind: ChannelRow[] }>(
+    service,
+    `/stats/sources?period=${period}`,
+  );
+  const patternsP = statsFor<{ geo_trend: Array<Record<string, number | string>> }>(
+    service,
     `/stats/patterns?period=${period}`,
   );
-  const cohortFootprintP = stats<CohortFootprint>('/stats/cohort-footprint');
-  const healthP = fetchJSON<{ bic_sources?: SourceFreshnessEntry[] }>(`${API_URL}/health`, {});
+  const cohortFootprintP = statsFor<CohortFootprint>(service, '/stats/cohort-footprint');
+  const healthP = service
+    ? fetchJSON<{ bic_sources?: SourceFreshnessEntry[] }>(`${API_URL}/health`, {})
+    : Promise.resolve(notFetched<{ bic_sources?: SourceFreshnessEntry[] }>());
 
   // Per-email activation. Only 30 and 90 are served upstream, and only the
   // funnel/sources/cohorts of this payload depend on the window at all.
   const activationP = admin<ActivationData>(`/v1/admin/activation?days=${period === 90 ? 90 : 30}`);
-  const digestP = admin<{ digests: DigestEntry[] }>('/v1/admin/digest?limit=8');
-  const orphanP = admin<{ orphans: OrphanMailRow[]; pending: number }>('/v1/admin/orphan-mail');
-  const demandGapsP = admin<DemandGapsPayload>('/v1/admin/demand-gaps?days=30');
-  const feedbackP = admin<{ open: number; reports: FeedbackReport[] }>(
+  const digestP = adminFor<{ digests: DigestEntry[] }>(
+    view === 'revenue',
+    '/v1/admin/digest?limit=8',
+  );
+  const orphanP = adminFor<{ orphans: OrphanMailRow[]; pending: number }>(
+    view === 'today',
+    '/v1/admin/orphan-mail',
+  );
+  const demandGapsP = adminFor<DemandGapsPayload>(growth, '/v1/admin/demand-gaps?days=30');
+  const feedbackP = adminFor<{ open: number; reports: FeedbackReport[] }>(
+    growth,
     '/v1/admin/feedback?limit=10',
   );
-  const signupSourcesP = admin<SignupSources>('/v1/admin/signup-sources?days=30');
+  const signupSourcesP = adminFor<SignupSources>(growth, '/v1/admin/signup-sources?days=30');
   // Same channels over the week, for the trial group of the doors card: its
   // conversion is a key, and the card shows every figure on 7 and 30 days.
-  const signupSourcesWeekP = admin<SignupSources>('/v1/admin/signup-sources?days=7');
-  const auditStatsP = admin<AuditStats>('/v1/admin/audit-stats?days=30');
-  const packSalesP = admin<PackSalesSnapshot>('/v1/admin/pack-sales');
+  const signupSourcesWeekP = adminFor<SignupSources>(growth, '/v1/admin/signup-sources?days=7');
+  const auditStatsP = adminFor<AuditStats>(growth, '/v1/admin/audit-stats?days=30');
+  const packSalesP = adminFor<PackSalesSnapshot>(money, '/v1/admin/pack-sales');
   // 90 jours fixes : un refus de la semaine passée reste actionnable, la période
   // du reste de l'écran n'a pas de sens ici.
-  const failedPaymentsP = admin<FailedPaymentsSnapshot>('/v1/admin/failed-payments?days=90');
+  const failedPaymentsP = adminFor<FailedPaymentsSnapshot>(
+    money,
+    '/v1/admin/failed-payments?days=90',
+  );
   // What the landing page's visitors click (audit n° 32, 2026-09-05): the
   // week for the pulse, the month for the shape.
-  const doorsWeekP = admin<WebEventsSummary>('/v1/admin/web-events?days=7');
-  const doorsMonthP = admin<WebEventsSummary>('/v1/admin/web-events?days=30');
+  const doorsWeekP = adminFor<WebEventsSummary>(growth, '/v1/admin/web-events?days=7');
+  const doorsMonthP = adminFor<WebEventsSummary>(growth, '/v1/admin/web-events?days=30');
   /**
    * What Google sends the site. NOT read through `admin()`: the route answers
    * 502 with the last reading attached when Google refuses, and `fetchJSON`
@@ -146,9 +153,10 @@ export default async function DashboardPage({
    * day the previous week's figures are worth the most. `fetchSearchConsole`
    * keeps that body; the missing-secret branch stays here like every other.
    */
-  const searchConsoleP = ADMIN_SECRET
-    ? fetchSearchConsole(API_URL, adminHeaders)
-    : Promise.resolve(notFetched<SearchConsole>());
+  const searchConsoleP =
+    ADMIN_SECRET && growth
+      ? fetchSearchConsole(API_URL, adminHeaders)
+      : Promise.resolve(notFetched<SearchConsole>());
   // Swallows its own failures already; the catch is belt and braces, because a
   // promise created here and awaited three sections down would otherwise be an
   // unhandled rejection before anyone looks at it.
@@ -197,98 +205,112 @@ export default async function DashboardPage({
   const readAtIso = new Date().toISOString();
   // 180 days: the card compares each window with the one before it, and the
   // 90-day window needs the 90 before it to say so.
-  const trendP = fetchTrafficTrend(180);
+  const trendP = growth ? fetchTrafficTrend(180) : null;
 
   return (
     <div className="flex min-w-0 flex-col gap-7">
-      <OverviewHeader period={period} readAtIso={readAtIso} />
+      <OverviewHeader readAtIso={readAtIso} />
+      <OverviewNavigation view={view} period={period} />
 
       <Suspense
         fallback={<div className="h-[70px] animate-pulse rounded-xl bg-[var(--ink-2)]/60" />}
       >
-        <HealthStrip statsPromise={statsP} />
+        <HealthStrip statsPromise={statsP} compact={!service} />
       </Suspense>
       <Suspense fallback={null}>
         <ApiDownBanner statsPromise={statsP} />
       </Suspense>
 
-      <Suspense fallback={<SectionSkeleton rows={4} />}>
-        <MoneySection
-          locale={locale}
-          period={period}
-          nowIso={readAtIso}
-          statsPromise={statsP}
-          historyPromise={historyP}
-          clientsPromise={clientsP}
-          crmPromise={crmP}
-          digestPromise={digestP}
-          packSalesPromise={packSalesP}
-          failedPaymentsPromise={failedPaymentsP}
-        />
-      </Suspense>
+      {view === 'today' && (
+        <Suspense fallback={<SectionSkeleton tall />}>
+          <ChaseSection
+            locale={locale}
+            nowIso={readAtIso}
+            clientsPromise={clientsP}
+            crmPromise={crmP}
+            orphanPromise={orphanP}
+          />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionSkeleton tall />}>
-        <TrafficSection nowIso={readAtIso} trendPromise={trendP} />
-      </Suspense>
+      {money && (
+        <Suspense fallback={<SectionSkeleton rows={4} />}>
+          <MoneySection
+            compact={view === 'today'}
+            locale={locale}
+            period={period}
+            nowIso={readAtIso}
+            statsPromise={statsP}
+            historyPromise={historyP}
+            clientsPromise={clientsP}
+            crmPromise={crmP}
+            digestPromise={digestP}
+            packSalesPromise={packSalesP}
+            failedPaymentsPromise={failedPaymentsP}
+          />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionSkeleton tall />}>
-        <ChaseSection
-          locale={locale}
-          nowIso={readAtIso}
-          clientsPromise={clientsP}
-          crmPromise={crmP}
-          orphanPromise={orphanP}
-        />
-      </Suspense>
+      {trendP && (
+        <Suspense fallback={<SectionSkeleton tall />}>
+          <TrafficSection nowIso={readAtIso} trendPromise={trendP} />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionSkeleton rows={3} />}>
-        <BrokenSection
-          period={period}
-          statsPromise={statsP}
-          errorsPromise={errorsP}
-          statusByPathPromise={statusByPathP}
-          healthPromise={healthP}
-        />
-      </Suspense>
+      {service && (
+        <Suspense fallback={<SectionSkeleton rows={3} />}>
+          <BrokenSection
+            period={period}
+            statsPromise={statsP}
+            errorsPromise={errorsP}
+            statusByPathPromise={statusByPathP}
+            healthPromise={healthP}
+          />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionSkeleton tall />}>
-        <NewSection
-          locale={locale}
-          nowIso={readAtIso}
-          activationPromise={activationP}
-          clientsPromise={clientsP}
-          crmPromise={crmP}
-          historyPromise={historyP}
-          demandGapsPromise={demandGapsP}
-          feedbackPromise={feedbackP}
-          sourcesPromise={signupSourcesP}
-          sourcesWeekPromise={signupSourcesWeekP}
-          auditStatsPromise={auditStatsP}
-          doorsWeekPromise={doorsWeekP}
-          doorsMonthPromise={doorsMonthP}
-          searchConsolePromise={searchConsoleP}
-        />
-      </Suspense>
+      {growth && (
+        <Suspense fallback={<SectionSkeleton tall />}>
+          <NewSection
+            locale={locale}
+            nowIso={readAtIso}
+            activationPromise={activationP}
+            clientsPromise={clientsP}
+            crmPromise={crmP}
+            historyPromise={historyP}
+            demandGapsPromise={demandGapsP}
+            feedbackPromise={feedbackP}
+            sourcesPromise={signupSourcesP}
+            sourcesWeekPromise={signupSourcesWeekP}
+            auditStatsPromise={auditStatsP}
+            doorsWeekPromise={doorsWeekP}
+            doorsMonthPromise={doorsMonthP}
+            searchConsolePromise={searchConsoleP}
+          />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionSkeleton />}>
-        <DetailsSection
-          locale={locale}
-          period={period}
-          nowIso={readAtIso}
-          historyPromise={historyP}
-          funnelPromise={funnelP}
-          eventsPromise={eventsP}
-          errorsPromise={errorsP}
-          hourlyPromise={hourlyP}
-          statusByPathPromise={statusByPathP}
-          sourcesPromise={sourcesP}
-          patternsPromise={patternsP}
-          statsPromise={statsP}
-          activationPromise={activationP}
-          cohortFootprintPromise={cohortFootprintP}
-          crmPromise={crmP}
-        />
-      </Suspense>
+      {service && (
+        <Suspense fallback={<SectionSkeleton />}>
+          <DetailsSection
+            locale={locale}
+            period={period}
+            nowIso={readAtIso}
+            historyPromise={historyP}
+            funnelPromise={funnelP}
+            eventsPromise={eventsP}
+            errorsPromise={errorsP}
+            hourlyPromise={hourlyP}
+            statusByPathPromise={statusByPathP}
+            sourcesPromise={sourcesP}
+            patternsPromise={patternsP}
+            statsPromise={statsP}
+            activationPromise={activationP}
+            cohortFootprintPromise={cohortFootprintP}
+            crmPromise={crmP}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

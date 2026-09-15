@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { formatGrouped } from '@/lib/format-grouped';
+import styles from './workspace.module.css';
 import {
   callsToday,
   chipOfDossier,
@@ -97,7 +100,6 @@ export function ClientsApp({
   const [dir, setDir] = useState<SortDir>(SORT_DEFAULT_DIR.freshness);
   const [filter, setFilter] = useState<Filter>(() => (linkedId ? 'all' : 'used'));
   const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [stateMenuOpen, setStateMenuOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(() => linkedId);
 
@@ -203,7 +205,7 @@ export function ClientsApp({
           { l: 'Clients', v: String(shown.length), h: `${usedCount} ont appelé` },
           {
             l: 'Requêtes cumulées',
-            v: totalRequests.toLocaleString('fr-CH'),
+            v: formatGrouped(totalRequests, locale),
             h: `${windowDays} derniers jours`,
           },
           { l: 'Pays contrôlés', v: String(distinctCountries), h: 'tous clients confondus' },
@@ -225,194 +227,153 @@ export function ClientsApp({
           a line that always says zero is a line nobody reads. */}
       {offBooks.count > 0 && (
         <p className="text-[12px] text-[var(--fg-5)]">
-          Hors clients : {offBooks.requests.toLocaleString('fr-CH')} requête
+          Hors clients : {formatGrouped(offBooks.requests, locale)} requête
           {offBooks.requests > 1 ? 's' : ''} de trafic de fermes et de clés d&apos;amorçage sur{' '}
           {offBooks.count} dossier{offBooks.count > 1 ? 's' : ''}, exclues des cartes ci-dessus
           comme elles le sont de la vue d&apos;ensemble.
         </p>
       )}
 
-      <div className="relative min-w-0 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
-        {/* Every control lives in the header row itself: click a column to
-            sort it (again to flip), click État to filter, click the lens to
-            search. On phones the row thumb-scrolls; the old pill bar is gone. */}
-        <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-[var(--ink-4)] px-4 py-2 text-[11.5px] uppercase tracking-wider text-[var(--fg-5)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <span className="flex w-auto shrink-0 items-center gap-1 md:w-[27%] md:shrink">
-            <button
-              type="button"
-              onClick={() => onHeader('name')}
-              className={headerBtn(sort === 'name')}
-              title="Trier par nom"
-            >
-              Client{arrowOf('name')}
-            </button>
-            {searchOpen || query ? (
-              <span className="flex items-center gap-1">
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onBlur={() => {
-                    if (!query.trim()) setSearchOpen(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setQuery('');
-                      setSearchOpen(false);
-                    }
-                  }}
-                  placeholder="Nom, adresse, clé, pays…"
-                  className="w-40 rounded border border-[var(--ink-4)] bg-[var(--ink-1)] px-1.5 py-0.5 text-base normal-case tracking-normal text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none sm:text-[12px]"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuery('');
-                    setSearchOpen(false);
-                  }}
-                  aria-label="Effacer la recherche"
-                  className="rounded px-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
-                >
-                  ✕
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSearchOpen(true)}
-                aria-label="Rechercher dans les clients"
-                title="Rechercher (nom, adresse, clé, pays)"
-                className="rounded px-1 text-[12px] text-[var(--fg-5)] hover:text-[var(--fg-2)]"
-              >
-                🔍
+      <div className="relative min-w-0 rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--ink-4)] p-4">
+          <div className={`${styles.searchField} basis-48`}>
+            <Search size={18} aria-hidden />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Nom, adresse, clé ou pays…"
+              aria-label="Rechercher dans les clients"
+            />
+            {query && (
+              <button type="button" onClick={() => setQuery('')} aria-label="Effacer la recherche">
+                <X size={16} aria-hidden />
               </button>
             )}
-          </span>
-
-          {HEADERS.map((h) =>
-            h.key === 'state' ? (
-              <button
-                key={h.key}
-                type="button"
-                onClick={() => setStateMenuOpen((o) => !o)}
-                title="Filtrer par état (le tri par gravité est dans le menu)"
-                className={`flex w-auto shrink-0 items-center gap-1 rounded px-1 py-0.5 text-left transition-colors hover:text-[var(--fg-2)] md:w-[12%] ${
-                  sort === 'state' || filterMeta || filter === 'all' ? 'text-[var(--fg-2)]' : ''
-                }`}
-              >
-                {filterMeta && (
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: filterMeta.colour }}
-                  />
-                )}
-                <span className="truncate">
-                  {filterMeta
-                    ? `État · ${filterMeta.label}`
-                    : filter === 'all'
-                      ? 'État · tous'
-                      : 'État'}
-                  {arrowOf('state')}
-                </span>
-                <span aria-hidden className="text-[9px]">
-                  ▾
-                </span>
-              </button>
-            ) : (
-              <button
-                key={h.key}
-                type="button"
-                onClick={() => onHeader(h.key)}
-                title="Trier sur cette colonne (re-cliquer inverse)"
-                className={`${headerBtn(sort === h.key)} w-auto ${h.width} ${h.right ? 'md:text-right' : ''} ${h.key === 'last30' ? 'md:shrink-0' : ''}`}
-              >
-                {h.key === 'requests' ? `Requêtes (jour / ${windowDays} j)` : h.label}
-                {arrowOf(h.key)}
-              </button>
-            ),
-          )}
-        </div>
-
-        {stateMenuOpen && (
-          <>
-            <div
-              className="fixed inset-0 z-20"
-              onClick={() => setStateMenuOpen(false)}
-              aria-hidden
-            />
-            <div className="absolute left-3 top-11 z-30 w-72 overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl md:left-[27%]">
-              <button
-                type="button"
-                onClick={() => {
-                  onHeader('state');
-                  setStateMenuOpen(false);
-                }}
-                className="flex w-full items-center gap-2 border-b border-[var(--ink-4)]/60 px-3 py-2 text-left text-[12.5px] text-[var(--fg-3)] hover:bg-[var(--ink-3)]/60"
-              >
-                ⇅ Trier par gravité {sort === 'state' ? (dir === 'asc' ? '▲' : '▼') : ''}
-              </button>
-              {(
-                [
-                  {
-                    key: 'used' as Filter,
-                    label: 'Ont appelé',
-                    n: usedCount,
-                    why: 'les adresses qui ont appelé au moins une fois',
-                    colour: null,
-                  },
-                  {
-                    key: 'all' as Filter,
-                    label: 'Tous',
-                    n: shown.length,
-                    why: 'toutes les adresses, clés muettes comprises',
-                    colour: null,
-                  },
-                  ...[...STATES, ...NUANCES]
-                    .filter((v) => counts[v.key] > 0)
-                    .map((v) => ({
-                      key: v.key as Filter,
-                      label: v.label,
-                      n: counts[v.key],
-                      why: v.why,
-                      colour: v.colour as string | null,
-                    })),
-                ] as Array<{
-                  key: Filter;
-                  label: string;
-                  n: number;
-                  why: string;
-                  colour: string | null;
-                }>
-              ).map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  title={item.why}
-                  onClick={() => {
-                    setFilter(item.key);
-                    setStateMenuOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-[var(--ink-3)]/60 ${
-                    filter === item.key ? 'bg-[var(--ink-3)]/80 text-white' : 'text-[var(--fg-2)]'
-                  }`}
+          </div>
+          <div className="relative w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setStateMenuOpen((o) => !o)}
+              aria-expanded={stateMenuOpen}
+              aria-controls="client-state-filter"
+              className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-[var(--ink-4)] px-3 text-sm text-[var(--fg-2)]"
+            >
+              <SlidersHorizontal size={17} aria-hidden />
+              {filterMeta?.label ?? (filter === 'all' ? 'Tous les clients' : 'Ont déjà appelé')}
+            </button>
+            {stateMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-20"
+                  onClick={() => setStateMenuOpen(false)}
+                  aria-hidden
+                />
+                <div
+                  id="client-state-filter"
+                  className="absolute left-0 top-full mt-2 z-30 w-72 max-w-[calc(100vw-4rem)] max-h-[60dvh] overflow-y-auto sm:left-auto sm:right-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl"
                 >
-                  {item.colour ? (
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: item.colour }}
-                    />
-                  ) : (
-                    <span className="h-1.5 w-1.5 shrink-0" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                  <span className="font-mono text-[12px] tabular-nums text-[var(--fg-4)]">
-                    {item.n}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onHeader('state');
+                      setStateMenuOpen(false);
+                    }}
+                    className="flex min-h-11 w-full items-center gap-2 border-b border-[var(--ink-4)]/60 px-3 py-2 text-left text-[12.5px] text-[var(--fg-3)] hover:bg-[var(--ink-3)]/60"
+                  >
+                    ⇅ Trier par gravité {sort === 'state' ? (dir === 'asc' ? '▲' : '▼') : ''}
+                  </button>
+                  {(
+                    [
+                      {
+                        key: 'used' as Filter,
+                        label: 'Ont appelé',
+                        n: usedCount,
+                        why: 'les adresses qui ont appelé au moins une fois',
+                        colour: null,
+                      },
+                      {
+                        key: 'all' as Filter,
+                        label: 'Tous',
+                        n: shown.length,
+                        why: 'toutes les adresses, clés muettes comprises',
+                        colour: null,
+                      },
+                      ...[...STATES, ...NUANCES]
+                        .filter((v) => counts[v.key] > 0)
+                        .map((v) => ({
+                          key: v.key as Filter,
+                          label: v.label,
+                          n: counts[v.key],
+                          why: v.why,
+                          colour: v.colour as string | null,
+                        })),
+                    ] as Array<{
+                      key: Filter;
+                      label: string;
+                      n: number;
+                      why: string;
+                      colour: string | null;
+                    }>
+                  ).map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      title={item.why}
+                      onClick={() => {
+                        setFilter(item.key);
+                        setStateMenuOpen(false);
+                      }}
+                      className={`flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-[var(--ink-3)]/60 ${
+                        filter === item.key
+                          ? 'bg-[var(--ink-3)]/80 text-white'
+                          : 'text-[var(--fg-2)]'
+                      }`}
+                    >
+                      {item.colour ? (
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: item.colour }}
+                        />
+                      ) : (
+                        <span className="h-1.5 w-1.5 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <span className="font-mono text-[12px] tabular-nums text-[var(--fg-4)]">
+                        {item.n}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <p className="px-4 py-2 text-xs text-[var(--fg-4)]" aria-live="polite">
+          {view.length} dossier{view.length > 1 ? 's' : ''} affiché{view.length > 1 ? 's' : ''}
+        </p>
+        <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap border-y border-[var(--ink-4)] px-4 py-2 text-[11.5px] text-[var(--fg-4)]">
+          <button
+            type="button"
+            onClick={() => onHeader('name')}
+            className={`${headerBtn(sort === 'name')} md:w-[27%]`}
+            title="Trier par nom"
+          >
+            Client{arrowOf('name')}
+          </button>
+          {HEADERS.map((h) => (
+            <button
+              key={h.key}
+              type="button"
+              onClick={() => onHeader(h.key)}
+              title="Trier sur cette colonne (re-cliquer inverse)"
+              className={`${headerBtn(sort === h.key)} min-h-9 w-auto ${h.width} ${h.right ? 'md:text-right' : ''} ${h.key === 'last30' ? 'md:shrink-0' : ''}`}
+            >
+              {h.key === 'requests' ? `Requêtes (jour / ${windowDays} j)` : h.label}
+              {arrowOf(h.key)}
+            </button>
+          ))}
+        </div>
 
         {/* Announced, never silent: the lens has stepped outside the État
             filter because nothing inside it matched. */}
@@ -436,7 +397,7 @@ export function ClientsApp({
                 <button
                   onClick={() => setOpenId(d.id)}
                   aria-haspopup="dialog"
-                  className="flex w-full flex-wrap items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--ink-3)]/40 md:flex-nowrap"
+                  className="flex w-full flex-wrap items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-[var(--ink-3)]/40 md:flex-nowrap"
                 >
                   {/* The address is the identity line, not the subtitle (ask of
                       21/08). Most customers sign up from a free mailbox, so the
@@ -507,14 +468,14 @@ export function ClientsApp({
                   <span className="w-auto text-right font-mono text-sm tabular-nums md:w-[13%]">
                     {todayCalls > 0 ? (
                       <span className="text-[var(--fg-1)]">
-                        {todayCalls.toLocaleString('fr-CH')}
+                        {formatGrouped(todayCalls, locale)}
                       </span>
                     ) : (
                       <span className="text-[var(--fg-4)]">0</span>
                     )}
                     <span className="text-[var(--fg-4)]"> / </span>
                     <span className="text-[12px] text-[var(--fg-3)]">
-                      {d.requests.toLocaleString('fr-CH')}
+                      {formatGrouped(d.requests, locale)}
                     </span>
                   </span>
                   <span className="w-auto shrink-0 md:w-24">
@@ -522,7 +483,7 @@ export function ClientsApp({
                   </span>
                   <span className="w-auto truncate text-[13px] text-[var(--fg-3)] md:w-[13%]">
                     {d.daysSinceLastCall == null && d.usedAllTime > 0
-                      ? `rien sur ${windowDays} j · ${d.usedAllTime.toLocaleString('fr-CH')} avant`
+                      ? `rien sur ${windowDays} j · ${formatGrouped(d.usedAllTime, locale)} avant`
                       : relativeDays(d.daysSinceLastCall)}
                   </span>
                   {/* Three flags, then an ellipsis. Five filled the row without

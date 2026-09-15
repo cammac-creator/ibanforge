@@ -1,5 +1,6 @@
 import { isAuthenticated } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import styles from '@/components/dashboard/workspace.module.css';
 import { TopNav } from '@/components/dashboard/top-nav';
 import { DashboardTooltipProvider } from '@/components/dashboard/tooltip-provider';
 import { ClientMessages } from "@/components/client-messages"
@@ -15,9 +16,9 @@ export default async function DashboardLayout({
   return (
     <ClientMessages ns={["dashboard"]}>
     <DashboardTooltipProvider>
-      <div className="min-h-screen bg-[var(--ink-0)] text-white">
+      <div className={styles.shell}>
         <TopNav />
-        <main className="px-4 py-6 md:px-8 md:py-8 max-w-7xl mx-auto">
+        <main id="dashboard-content" tabIndex={-1} className={styles.main}>
           {children}
         </main>
       </div>

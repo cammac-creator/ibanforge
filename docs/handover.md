@@ -699,3 +699,28 @@ deployed or live, run the command that shows it and paste the output: a successf
 not proof of deployment, a clean tree is not proof of deletion, and a green CI is not proof
 that the production image boots. And before declaring an access missing, try it and quote
 the failure.
+
+
+## 12. Espace de travail CRM — refonte du 15 septembre 2026
+
+La navigation protégée utilise une barre latérale à partir de 1 100 px et une barre basse
+sur téléphone. Les styles et les couleurs de travail restent limités au layout du dashboard.
+La vue d’ensemble conserve sa route et accepte `view=today|revenue|growth|service` ; un ancien
+lien ouvre `today`. Le paramètre `period=7|30|90` reste attaché au passage entre les vues.
+Les conversations à traiter apparaissent avant le résumé des revenus. Les sections détaillées
+ne déclenchent leurs lectures que dans la vue qui les utilise. Les alertes de collecte périmée,
+les refus de paiement et la distinction entre zéro et donnée indisponible restent visibles.
+
+Contacts propose quatre files permanentes, une recherche et deux filtres explicites. Les
+compteurs des files respectent la population et la précision choisies, avant la recherche.
+Les actions de ligne passent par un menu visible au toucher ; le balayage caché est retiré.
+Les règles de sélection, de gel de l’ordre pendant une lecture, de garde du brouillon et
+les routes de mutation restent celles des modules CRM existants. Courrier ouvre la fiche
+depuis toute la ligne. Clients sépare recherche, filtrage et tri, et utilise `formatGrouped`
+pour garder les nombres identiques entre Node et WebKit.
+
+Recette locale avec données entièrement fictives, sans copie de base ou de secret de production.
+Les tests dédiés couvrent les liens vue/période, les compteurs filtrés, les files vides,
+l’accès aux actions et le rendu des nombres dans les trois langues. La publication et la
+recette finale sur le domaine authentifié restent à l’intégrateur principal. L’ancienne
+boucle de redirection anglaise du serveur Next local (section 9) reste hors de ce chantier.

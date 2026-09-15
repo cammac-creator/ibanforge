@@ -17,6 +17,8 @@ import { localDay } from '@/lib/crm/snooze';
 import { kindWord, railColorOf, rowStatus, shortAge } from '@/lib/crm/table-view';
 import { CrmToolbar } from './crm-toolbar';
 import { NewInstitutionForm } from './new-institution';
+import { Archive, BellOff, Check, Clock3, MoreHorizontal, SearchX } from 'lucide-react';
+import styles from './workspace.module.css';
 
 /**
  * The contacts table: one bar, then every contact across the full width.
@@ -87,89 +89,64 @@ export async function rowAction(
 function RowActions({
   row,
   onDone,
-  onBusy,
+  onError,
 }: {
   row: MailRow;
   onDone: () => void;
-  onBusy: (b: boolean) => void;
+  onError: (message: string) => void;
 }) {
-  async function act(kind: 'snooze' | 'archive' | 'read' | 'noreply', e: React.MouseEvent) {
-    e.stopPropagation();
-    e.preventDefault();
-    if (
-      kind === 'archive' &&
-      !window.confirm(`Archiver ${row.who} ? (statut terminal côté prospection)`)
-    )
-      return;
-    onBusy(true);
-    const ok = await rowAction(row, kind);
-    onBusy(false);
-    if (ok) onDone();
-  }
-
-  const btn =
-    'rounded border border-[var(--ink-5)] bg-[var(--ink-1)] px-1.5 py-0.5 text-[11px] text-[var(--fg-2)] hover:border-[var(--amber-500)]/60 hover:text-[var(--fg-1)]';
-
-  // « Rien à répondre » from the row, for the population that sends the most
-  // mail with no question in it — self-service clients and institutional
-  // desks — which has neither a prospect id nor an unread mark once opened.
+  const menu = useRef<HTMLDetailsElement>(null);
+  const [pending, setPending] = useState(false);
   const canNoReply = row.nextAction === 'reply' && !!row.lastInboundId;
   if (!row.prospectId && !row.unread && !canNoReply) return null;
 
+  async function act(kind: 'snooze' | 'archive' | 'read' | 'noreply') {
+    if (pending) return;
+    if (kind === 'archive' && !window.confirm(`Archiver ${row.who} ?`)) return;
+    setPending(true);
+    onError('');
+    const ok = await rowAction(row, kind);
+    setPending(false);
+    if (ok) {
+      if (menu.current) menu.current.open = false;
+      onDone();
+    } else {
+      onError('Cette action n’a pas pu être enregistrée. Réessaie dans un instant.');
+    }
+  }
+
   return (
-    // Over the last two columns, which hide themselves on hover (the age and
-    // the unread dot both carry group-hover:invisible). A solid background
-    // rather than a translucent one: these sit on top of a highlighted row.
-    //
-    // Below 900px the row is two lines and this stays centred on the pair, so
-    // it covers the right end of the subject line while the pointer is on the
-    // row. Accepted: the same cluster already covers the age and the dot, the
-    // occlusion lasts exactly as long as the hover, and a phone — the width
-    // this breakpoint is for — has no hover at all.
-    <span className="pointer-events-none absolute right-1.5 top-1/2 hidden -translate-y-1/2 gap-1 rounded-md bg-[var(--ink-1)] p-0.5 shadow-lg group-hover:flex">
-      <span className="pointer-events-auto flex gap-1">
-        {row.prospectId && (
-          <button
-            type="button"
-            className={btn}
-            title="Mettre en veille 7 jours"
-            onClick={(e) => act('snooze', e)}
-          >
-            💤 7 j
-          </button>
-        )}
-        {row.prospectId && (
-          <button
-            type="button"
-            className={btn}
-            title="Archiver (terminal)"
-            onClick={(e) => act('archive', e)}
-          >
-            📥
-          </button>
-        )}
+    <details ref={menu} className={styles.actions} name="contact-row-actions">
+      <summary aria-label={`Actions pour ${row.who}`}>
+        <MoreHorizontal size={18} aria-hidden />
+      </summary>
+      <div className={styles.actionMenu}>
         {row.unread && (
-          <button
-            type="button"
-            className={btn}
-            title="Marquer lu sans ouvrir"
-            onClick={(e) => act('read', e)}
-          >
-            ✓ lu
+          <button type="button" disabled={pending} onClick={() => void act('read')}>
+            <Check size={16} aria-hidden />
+            Marquer comme lu
           </button>
         )}
         {canNoReply && (
-          <button
-            type="button"
-            className={btn}
-            title="Rien à répondre : classe son dernier message sans ouvrir la fiche"
-            onClick={(e) => act('noreply', e)}
-          >
-            🔕
+          <button type="button" disabled={pending} onClick={() => void act('noreply')}>
+            <BellOff size={16} aria-hidden />
+            Rien à répondre
           </button>
         )}
-      </span>
-    </span>
+        {row.prospectId && (
+          <button type="button" disabled={pending} onClick={() => void act('snooze')}>
+            <Clock3 size={16} aria-hidden />
+            Mettre en veille 7 jours
+          </button>
+        )}
+        {row.prospectId && (
+          <button type="button" disabled={pending} onClick={() => void act('archive')}>
+            <Archive size={16} aria-hidden />
+            Archiver
+          </button>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -179,45 +156,10 @@ const CONFIDENCE_BADGE: Record<string, { label: string; cls: string }> = {
   low: { label: 'faible', cls: 'text-[var(--err,#ef4444)]' },
 };
 
-/**
- * The six columns, written once and worn by both the header and every row.
- *
- * Below 900px the grid narrows to four tracks and the thread's state folds
- * away — it is one of five words, re-read in a breath inside the drawer. What
- * does NOT fold is the last message: the list this table replaces showed the
- * subject and the preview at 375px, on two extra lines under the name, and
- * losing them would mean triaging a phone screen by opening every contact. It
- * moves to a second line instead (CELLS below), which is where those two lines
- * already were.
- *
- * The header wears this too, and stays one line: `display:none` removes a
- * folded span from grid placement altogether, so what is left flows into the
- * four tracks on its own.
- */
-const GRID =
-  'grid items-center gap-x-3.5 max-[900px]:gap-y-0.5 grid-cols-[3px_15rem_1fr_9.5rem_5.5rem_1.75rem] max-[900px]:grid-cols-[3px_1fr_5rem_1.75rem]';
-
-/** Folded away with the column it belongs to. */
-const FOLDS = 'max-[900px]:hidden';
-
-/**
- * Where each cell of a ROW sits once the grid narrows.
- *
- * Explicit rather than left to auto-placement, and only on the rows: the
- * subject cell stops being `display:none` under 900px, so it would otherwise
- * take the third track of the first line and push the age and the dot onto a
- * line of their own. Written as coordinates, the row reads
- *
- *     rail | who        age  •
- *          | subject — preview
- */
-const AT = {
-  rail: 'max-[900px]:row-span-2 max-[900px]:h-auto max-[900px]:self-stretch',
-  who: 'max-[900px]:col-start-2 max-[900px]:row-start-1',
-  message: 'max-[900px]:col-start-2 max-[900px]:col-span-3 max-[900px]:row-start-2',
-  age: 'max-[900px]:col-start-3 max-[900px]:row-start-1',
-  dot: 'max-[900px]:col-start-4 max-[900px]:row-start-1',
-};
+/** La grille suit la largeur disponible, y compris à côté de la navigation. */
+const GRID = styles.grid;
+const FOLDS = styles.desktop;
+const AT = { rail: styles.avatar, who: styles.who, message: styles.message, age: styles.age, dot: styles.dot };
 
 export function ContactTable({
   input,
@@ -245,9 +187,14 @@ export function ContactTable({
   // the unnarrowed input, so the counts hold still while the operator types.
   // Both rules live in searchRows; this component only holds the input's state.
   const [q, setQ] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const filters = useMemo(() => mailFilters(input), [input]);
+  const queueCounts = useMemo(() => Object.fromEntries(
+    [null, 'reply', 'followup', 'drafts'].map((work) => [work ?? 'all', selectedRows(input, {
+      ...selection, work: work as MailFilterKey | null,
+    }).length]),
+  ), [input, selection]);
   // Memoised on purpose. The projection sorts the base, scores heat and folds
   // a search haystack per contact, and this component re-renders on every
   // keystroke and every hover-driven busy flip; without the memo the whole
@@ -292,46 +239,28 @@ export function ContactTable({
     onRowsChange?.(rows.map((r) => r.id));
   }, [rows, onRowsChange]);
 
-  // Touch swipe: left = snooze (needs a prospect row), right = mark read
-  // (needs an unread thread). 64px of travel commits; less snaps back. Held
-  // as (id, dx) so only the touched row translates.
-  const touch = useRef<{ id: string; x: number } | null>(null);
-  const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
-
-  function onTouchStart(id: string, e: React.TouchEvent) {
-    touch.current = { id, x: e.touches[0].clientX };
-  }
-  function onTouchMove(e: React.TouchEvent) {
-    if (!touch.current) return;
-    const dx = e.touches[0].clientX - touch.current.x;
-    if (Math.abs(dx) > 8) setDrag({ id: touch.current.id, dx: Math.max(-96, Math.min(96, dx)) });
-  }
-  async function onTouchEnd() {
-    const d = drag;
-    touch.current = null;
-    setDrag(null);
-    if (!d || Math.abs(d.dx) < 64) return;
-    const row = rows.find((r) => r.id === d.id);
-    if (!row) return;
-    const kind = d.dx < 0 ? 'snooze' : 'read';
-    if (kind === 'snooze' && !row.prospectId) return;
-    if (kind === 'read' && !row.unread) return;
-    setBusy(true);
-    const ok = await rowAction(row, kind);
-    setBusy(false);
-    if (ok) router.refresh();
-  }
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
+    <div className={styles.table}>
       <CrmToolbar
         filters={filters}
+        queueCounts={queueCounts}
         selection={selection}
         onSelection={setSelection}
         query={q}
         onQuery={setQ}
       />
 
+      <div className={styles.results} aria-live="polite" aria-atomic="true">
+        <span>{rows.length} contact{rows.length > 1 ? 's' : ''} affiché{rows.length > 1 ? 's' : ''}</span>
+        {[selection.population !== 'all' ? selection.population : null, selection.refine].filter((k): k is MailFilterKey => !!k).map((key) => (
+          <button type="button" key={key} onClick={() => setSelection(key === selection.population ? { ...selection, population: 'all' } : { ...selection, refine: null })}
+            aria-label={`Retirer le filtre ${filters.find((f) => f.key === key)?.label ?? key}`}>
+            {filters.find((f) => f.key === key)?.label ?? key} ×
+          </button>
+        ))}
+      </div>
+      {actionError && <p role="alert" className="border-b border-red-400/30 bg-red-500/10 p-3 text-sm text-red-300">{actionError}</p>}
       {/* Only under Correspondants. Registering an address is the gesture that
           segment is FOR — nothing else on this page can make an institution's
           thread appear — and it would be noise above the day's reply queue. */}
@@ -342,7 +271,7 @@ export function ContactTable({
           every one of two hundred rows would bury the rows. */}
       <div
         aria-hidden
-        className={`${GRID} border-b border-[var(--ink-4)]/60 px-3 py-1.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--fg-4)]`}
+        className={`${GRID} ${styles.columns} border-b border-[var(--ink-4)]/60 px-3 py-1.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--fg-4)]`}
       >
         <span />
         <span>Contact</span>
@@ -354,7 +283,7 @@ export function ContactTable({
         </span>
       </div>
 
-      <div className={busy ? 'opacity-60' : ''}>
+      <div>
         {rows.length === 0 ? (
           // Three different absences: a search can empty a view that is not
           // empty, the correspondents' segment is empty until an address is
@@ -362,7 +291,7 @@ export function ContactTable({
           // wrong control would send the operator to the wrong place.
           <div className="px-4 py-10 text-center text-[13.5px] text-[var(--fg-3)]">
             {q.trim() ? (
-              'Aucun contact ne correspond.'
+              <><SearchX size={30} className="mx-auto mb-3 text-[var(--fg-4)]" aria-hidden /><p>Aucun contact ne correspond à cette recherche.</p><button type="button" onClick={() => setQ('')} className={styles.reset}>Effacer la recherche</button></>
             ) : selection.population === 'institution' && !selection.work && !selection.refine ? (
               'Aucun correspondant enregistré. Ajoute une adresse pour que son fil remonte ici.'
             ) : selection.work || selection.refine ? (
@@ -460,17 +389,9 @@ export function ContactTable({
                   <button
                     type="button"
                     onClick={(e) => onSelect(r.id, e.currentTarget)}
-                    onTouchStart={(e) => onTouchStart(r.id, e)}
-                    onTouchMove={onTouchMove}
-                    onTouchEnd={onTouchEnd}
-                    style={
-                      drag?.id === r.id
-                        ? { transform: `translateX(${drag.dx}px)`, transition: 'none' }
-                        : undefined
-                    }
                     aria-pressed={on}
-                    className={`${GRID} w-full border-b border-[var(--ink-4)]/40 px-3 py-2 text-left ${
-                      on ? 'bg-white/[0.07]' : 'hover:bg-white/[0.03]'
+                    className={`${GRID} ${styles.row} w-full border-b border-[var(--ink-4)]/50 text-left ${
+                      on ? 'bg-white/[0.04]' : ''
                     }`}
                   >
                     {/* The kind, as the one mark every row carries. Chips are
@@ -478,9 +399,10 @@ export function ContactTable({
                       ordinary active client would be an unlabelled line. */}
                     <span
                       aria-hidden
-                      className={`h-[2.1em] w-[3px] rounded-sm ${AT.rail}`}
-                      style={{ backgroundColor: railColorOf(r.kind) }}
-                    />
+                      className={AT.rail}
+                      data-unread={r.unread || undefined}
+                      style={{ color: railColorOf(r.kind), backgroundColor: `${railColorOf(r.kind)}18`, border: `1px solid ${railColorOf(r.kind)}30` }}
+                    >{r.who.split(/\s+/).map((word) => word[0]).slice(0, 2).join('').toUpperCase()}</span>
 
                     <span className={`flex min-w-0 items-baseline gap-1.5 ${AT.who}`}>
                       <span className="sr-only">{kindWord(r.kind)} : </span>
@@ -572,7 +494,6 @@ export function ContactTable({
                       </span>
                       {r.preview && (
                         <span className="text-[var(--fg-4)]">
-                          {' — '}
                           {r.lastFromUs && <span className="text-amber-400/80">toi : </span>}
                           {r.preview}
                         </span>
@@ -608,13 +529,13 @@ export function ContactTable({
                       list made. */}
                     {confidence ? (
                       <span
-                        className={`${AT.age} truncate text-right text-[11.5px] group-hover:invisible ${confidence.cls}`}
+                        className={`${AT.age} truncate text-right text-[11.5px]  ${confidence.cls}`}
                       >
                         {confidence.label}
                       </span>
                     ) : (
                       <span
-                        className={`${AT.age} text-right font-mono text-[12px] tabular-nums group-hover:invisible ${
+                        className={`${AT.age} text-right font-mono text-[12px] tabular-nums  ${
                           r.urgent ? 'text-[var(--amber-500)]' : 'text-[var(--fg-4)]'
                         }`}
                       >
@@ -622,13 +543,9 @@ export function ContactTable({
                       </span>
                     )}
 
-                    <span aria-hidden className={`${AT.dot} text-center group-hover:invisible`}>
-                      {r.unread && (
-                        <span className="inline-block h-2 w-2 rounded-full bg-[var(--amber-500)]" />
-                      )}
-                    </span>
+                    <span aria-hidden className={AT.dot} />
                   </button>
-                  <RowActions row={r} onBusy={setBusy} onDone={() => router.refresh()} />
+                  <RowActions row={r} onError={setActionError} onDone={() => router.refresh()} />
                 </div>
               </Fragment>
             );

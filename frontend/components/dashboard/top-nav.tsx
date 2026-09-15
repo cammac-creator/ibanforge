@@ -1,116 +1,133 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
+import {
+  ArrowUpRight,
+  Bot,
+  ChevronRight,
+  LayoutDashboard,
+  Mail,
+  MessagesSquare,
+  MoreHorizontal,
+  Search,
+  Users,
+  ContactRound,
+} from 'lucide-react';
 import { CommandPalette } from './cmdk';
+import { LogoutButton } from './logout-button';
 import { localePath } from '@/lib/locale-path';
+import styles from './workspace.module.css';
 
-const PERIODS = [7, 30, 90];
+const DESTINATIONS = [
+  { key: 'overview', path: '/dashboard', icon: LayoutDashboard },
+  { key: 'contacts', path: '/dashboard/contacts', icon: ContactRound },
+  { key: 'mail', path: '/dashboard/courrier', icon: Mail },
+  { key: 'clients', path: '/dashboard/clients', icon: Users },
+  { key: 'bots', path: '/dashboard/clients-bot', icon: Bot },
+  { key: 'forums', path: '/dashboard/forums', icon: MessagesSquare },
+] as const;
 
 export function TopNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const t = useTranslations('dashboard');
   const locale = useLocale();
+  const t = useTranslations('dashboard.workspace');
+  const more = useRef<HTMLDetailsElement>(null);
+  const current =
+    DESTINATIONS.find((item) => pathname.replace(/\/$/, '').endsWith(item.path)) ?? DESTINATIONS[0];
+  const search = () => window.dispatchEvent(new Event('ibf-open-cmdk'));
 
-  // Clients and prospects were two tabs over two near-twin pages, merged into
-  // Contacts. The Clients tab that came back on 30/07/2026 is a different
-  // thing: Contacts is the conversation, Clients is what they do with the API.
-  const onContacts = pathname.includes('/dashboard/contacts');
-  // Courrier is the journal of what Contacts holds the conversations of: every
-  // mail on one antichronological list, with who sent it. Its own tab because
-  // part of the mail now leaves without a click, and "what went out" is a
-  // different question from "what do I answer next".
-  const onCourrier = pathname.includes('/dashboard/courrier');
-  // Order matters: '/dashboard/clients-bot' also contains '/dashboard/clients',
-  // so the longer path is tested first or both tabs light up at once.
-  const onBots = pathname.includes('/dashboard/clients-bot');
-  const onClients = !onBots && pathname.includes('/dashboard/clients');
-  const onForums = pathname.includes('/dashboard/forums');
-  // Every new tab has to be subtracted here too, or Overview lights up beside
-  // it: this is the resting tab, defined by nothing else being on.
-  const onOverview = !onContacts && !onCourrier && !onClients && !onBots && !onForums;
-  const current = Number(searchParams.get('period') ?? 30);
-  const period = PERIODS.includes(current) ? current : 30;
-
-  const TABS = [
-    { key: 'overview', href: localePath(locale, '/dashboard'), label: t('topNav.overview'), active: onOverview },
-    { key: 'contacts', href: localePath(locale, '/dashboard/contacts'), label: t('topNav.contacts'), active: onContacts },
-    // Right after Contacts, and hard-coded like Clients and Forums beside it:
-    // the dashboard's chrome is French in the source rather than translated,
-    // and only the two oldest tabs still go through next-intl.
-    { key: 'courrier', href: localePath(locale, '/dashboard/courrier'), label: 'Courrier', active: onCourrier },
-    { key: 'clients', href: localePath(locale, '/dashboard/clients'), label: 'Clients', active: onClients },
-    { key: 'bots', href: localePath(locale, '/dashboard/clients-bot'), label: 'Clients Bot', active: onBots },
-    { key: 'forums', href: localePath(locale, '/dashboard/forums'), label: 'Forums', active: onForums },
-  ];
+  const links = (items: readonly (typeof DESTINATIONS)[number][], mobile = false) =>
+    items.map((item) => (
+      <Link
+        key={item.key}
+        href={localePath(locale, item.path)}
+        prefetch={false}
+        aria-current={current.key === item.key ? 'page' : undefined}
+        className={mobile ? styles.mobileLink : styles.navLink}
+        onClick={() => {
+          if (more.current) more.current.open = false;
+        }}
+      >
+        <item.icon size={19} strokeWidth={1.7} aria-hidden />
+        <span>{t(item.key)}</span>
+        {!mobile && current.key === item.key && (
+          <ChevronRight size={14} className={styles.navArrow} aria-hidden />
+        )}
+      </Link>
+    ));
 
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-3 sm:px-4">
-      {/* Logo + tabs — the tab row thumb-scrolls on phones instead of wrapping. */}
-      <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="inline-flex h-6 w-6 select-none items-center justify-center rounded bg-amber-500 text-[10px] font-black tracking-tight text-amber-foreground">
-            IF
+    <>
+      <a href="#dashboard-content" className={styles.skip}>
+        {t('skip')}
+      </a>
+      <aside className={styles.sidebar} aria-label={t('navigation')}>
+        <Link href={localePath(locale, '/dashboard')} className={styles.brand}>
+          <span className={styles.brandMark}>IF</span>
+          <span>
+            IBANforge<small>{t('space')}</small>
           </span>
-          <span className="hidden text-sm font-semibold text-white md:inline">IBANforge</span>
-        </div>
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {TABS.map((tab) => (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              className={[
-                'shrink-0 rounded px-3 py-2 text-sm font-medium transition-colors sm:py-1.5',
-                tab.active
-                  ? 'bg-[var(--ink-4)] text-white'
-                  : 'text-[var(--fg-4)] hover:bg-[var(--ink-4)]/50 hover:text-[var(--fg-2)]',
-              ].join(' ')}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      {/* Search everywhere: ⌘K on a keyboard, this button on a thumb. */}
-      <button
-        type="button"
-        onClick={() => window.dispatchEvent(new Event('ibf-open-cmdk'))}
-        title="Rechercher un client ou un contact (⌘K)"
-        className="shrink-0 rounded px-2 py-2 text-[var(--fg-4)] transition-colors hover:bg-[var(--ink-4)]/50 hover:text-[var(--fg-2)] sm:py-1.5"
-      >
-        🔍
-      </button>
-      <CommandPalette />
-
-      {/* Right: period pills (overview only) + back link — desktop only, the
-          phone gives every pixel to the tabs. */}
-      <div className="hidden shrink-0 items-center gap-3 md:flex">
-        {onOverview && (
-          <div className="flex items-center gap-1">
-            {PERIODS.map((p) => (
-              <Link
-                key={p}
-                href={`${pathname}?period=${p}`}
-                className={[
-                  'rounded px-2.5 py-1 text-xs font-medium transition-colors',
-                  period === p
-                    ? 'border border-amber-500/30 bg-amber-500/15 text-amber-400'
-                    : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]',
-                ].join(' ')}
-              >
-                {p}d
-              </Link>
-            ))}
-          </div>
-        )}
-        <div className="h-4 w-px bg-[var(--ink-4)]" />
-        <Link href={localePath(locale)} className="text-xs text-[var(--fg-4)] transition-colors hover:text-[var(--fg-2)]">
-          {t('topNav.backToSite')}
         </Link>
-      </div>
-    </div>
+        <button type="button" onClick={search} className={styles.search} aria-label={t('search')}>
+          <Search size={17} aria-hidden />
+          <span>{t('searchShort')}</span>
+          <kbd>⌘ K</kbd>
+        </button>
+        <p className={styles.navCaption}>{t('daily')}</p>
+        <nav aria-label={t('navigation')}>{links(DESTINATIONS.slice(0, 4))}</nav>
+        <p className={styles.navCaption}>{t('explore')}</p>
+        <nav aria-label={t('explore')}>{links(DESTINATIONS.slice(4))}</nav>
+        <div className={styles.sidebarFooter}>
+          <Link href={localePath(locale)} className={styles.navLink}>
+            <ArrowUpRight size={18} aria-hidden />
+            {t('site')}
+          </Link>
+          <LogoutButton />
+        </div>
+      </aside>
+      <header className={styles.mobileHeader}>
+        <Link
+          href={localePath(locale, '/dashboard')}
+          className={styles.brand}
+          aria-label="IBANforge"
+        >
+          <span className={styles.brandMark}>IF</span>
+          <span>IBANforge</span>
+        </Link>
+        <button
+          type="button"
+          onClick={search}
+          className={styles.iconButton}
+          aria-label={t('search')}
+        >
+          <Search size={21} aria-hidden />
+        </button>
+      </header>
+      <nav className={styles.mobileNav} aria-label={t('navigation')}>
+        {links(DESTINATIONS.slice(0, 4), true)}
+        <details ref={more} className={styles.more} key={pathname}>
+          <summary
+            className={styles.mobileLink}
+            aria-label={t('more')}
+            data-active={current.key === 'bots' || current.key === 'forums'}
+          >
+            <MoreHorizontal size={21} aria-hidden />
+            <span>{t('more')}</span>
+          </summary>
+          <div className={styles.moreMenu}>
+            {links(DESTINATIONS.slice(4))}
+            <Link href={localePath(locale)} className={styles.navLink}>
+              <ArrowUpRight size={18} aria-hidden />
+              {t('site')}
+            </Link>
+            <LogoutButton />
+          </div>
+        </details>
+      </nav>
+      <CommandPalette />
+    </>
   );
 }
