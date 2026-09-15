@@ -2422,5 +2422,32 @@
       "text": "Dieses Werkzeug ist gratis und braucht keinen Schlüssel. Mit Ihrem eigenen Schlüssel tut die API dasselbe aus Ihrem Code: 25 Aufrufe pro Monat ohne Adresse, 200 pro Monat nach Beanspruchung.",
       "cta": "Gratis-Schlüssel holen"
     }
+  },
+  "device": {
+    "title": "Ein Agent fragt nach einem API-Schlüssel",
+    "subtitle": "Prüfen Sie, ob der Code mit dem übereinstimmt, den Ihr Agent angezeigt hat, und bestätigen Sie dann.",
+    "codeLabel": "Code",
+    "whoLabel": "Wer fragt",
+    "whyLabel": "Wofür",
+    "whoUnknown": "Ein Agent ohne Namensangabe",
+    "whyUnknown": "Kein Grund angegeben",
+    "expiresIn": "Dieser Code läuft in {minutes} Min. {seconds} Sek. ab.",
+    "approveAnon": "Schlüssel holen ({limit} Anfragen pro Monat)",
+    "approveAnonNote": "Ohne E-Mail, ohne Karte, ohne Konto.",
+    "approveEmail": "Stattdessen E-Mail-Adresse angeben ({limit} pro Monat)",
+    "approveEmailNote": "Wir senden einen 6-stelligen Code, um zu prüfen, dass das Postfach Ihnen gehört. Die Adresse dient nur dem Schlüssel.",
+    "codeSent": "Code gesendet. Geben Sie unten die 6 Ziffern ein.",
+    "deny": "Das habe ich nicht angefordert",
+    "doneTitle": "Fertig. Kehren Sie zu Ihrem Agenten zurück.",
+    "doneBody": "Der Schlüssel ging direkt an den anfragenden Agenten. Er wird auf dieser Seite nie angezeigt und nur einmal ausgegeben.",
+    "deniedTitle": "Abgelehnt. Es wurde nichts erstellt.",
+    "expiredTitle": "Dieser Code ist abgelaufen",
+    "expiredBody": "Bitten Sie Ihren Agenten um einen neuen.",
+    "invalidTitle": "Dieser Code ist ungültig",
+    "tokenStaleTitle": "Diese Seite hat zu lange gewartet",
+    "tokenStaleBody": "Laden Sie sie neu und bestätigen Sie erneut. Es wurde nichts erstellt, Ihr Code gilt weiterhin.",
+    "keyRateLimitedTitle": "Diese Adresse hat heute schon einen Schlüssel erhalten",
+    "keyRateLimitedBody": "Ein Schlüssel pro Adresse und Tag. Nehmen Sie stattdessen den Schlüssel ohne Adresse, er funktioniert sofort, oder kommen Sie morgen wieder.",
+    "safetyNote": "IBANforge fragt Sie auf dieser Seite nie nach Passwort, Kartennummer oder Bankverbindung."
   }
 }

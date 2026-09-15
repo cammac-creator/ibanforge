@@ -2422,5 +2422,32 @@
       "text": "This tool is free and needs no key. With your own key the API does the same from your code: 25 calls a month without giving an address, 200 a month once you claim it.",
       "cta": "Get a free key"
     }
+  },
+  "device": {
+    "title": "An agent is asking for an API key",
+    "subtitle": "Check the code matches the one your agent showed you, then approve.",
+    "codeLabel": "Code",
+    "whoLabel": "Who is asking",
+    "whyLabel": "What for",
+    "whoUnknown": "An agent that did not give its name",
+    "whyUnknown": "No reason given",
+    "expiresIn": "This code stops working in {minutes} min {seconds} s.",
+    "approveAnon": "Get the key ({limit} requests a month)",
+    "approveAnonNote": "No e-mail, no card, no account.",
+    "approveEmail": "Add an e-mail address instead ({limit} a month)",
+    "approveEmailNote": "We send a 6-digit code to check the mailbox is yours. The address is used for the key and for nothing else.",
+    "codeSent": "Code sent. Enter the 6 digits below.",
+    "deny": "I did not ask for this",
+    "doneTitle": "Done. Go back to your agent.",
+    "doneBody": "The key went straight to the agent that asked for it. It is never shown on this page, and it is shown only once.",
+    "deniedTitle": "Refused. Nothing was created.",
+    "expiredTitle": "This code has expired",
+    "expiredBody": "Ask your agent for a new one.",
+    "invalidTitle": "This code is not valid",
+    "tokenStaleTitle": "This page waited too long",
+    "tokenStaleBody": "Reload it and approve again. Nothing was created, and your code still works.",
+    "keyRateLimitedTitle": "This address already got a key today",
+    "keyRateLimitedBody": "One key per address per day. Take the key with no address instead — it works right away — or come back tomorrow with this one.",
+    "safetyNote": "IBANforge will never ask you for a password, a card number or a bank detail on this page."
   }
 }
