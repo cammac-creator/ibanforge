@@ -263,6 +263,122 @@ describe('parité MCP — send_feedback écrit, donc il est plafonné partout', 
   });
 });
 
+describe('parité MCP — les descriptions du device grant sont identiques au caractère près', () => {
+  /**
+   * 🚨 La seule chose qu'un agent lit avant de choisir un outil, et elle est
+   * recopiée TROIS fois à la main.
+   *
+   * Les longues descriptions vivent dans les trois serveurs, par décision
+   * assumée (voir l'en-tête de `src/mcp/inventory.ts` : la table de découverte
+   * ne porte que ce qu'un document de découverte a besoin de savoir). Mais un
+   * texte recopié trois fois est un texte dont deux copies dérivent, et
+   * celles-ci disent à l'agent quoi FAIRE du résultat : lire `status` d'abord,
+   * ne pas ouvrir le lien, ne jamais inventer d'adresse, ne pas boucler serré.
+   * Une copie qui perdrait une de ces phrases donnerait un comportement
+   * différent selon le transport, sans que rien ne le dise.
+   *
+   * Même remède que `AUDIT_MAX_BYTES`, `FEEDBACK_ERROR_TYPES` et
+   * `MCP_INSTRUCTIONS` : recopié, mais gardé.
+   */
+  const DEVICE_TOOLS = ['request_api_key', 'poll_api_key'] as const;
+
+  /** Le bloc d'un outil, coupé avant le suivant. Deux formes, deux découpes. */
+  function toolBlock(id: SurfaceId, tool: string): string {
+    const src = SRC[id];
+    let start: number;
+    let nextRe: RegExp;
+    if (id === 'A') {
+      // A déclare un tableau d'objets : `name: 'x',`.
+      start = src.indexOf(`name: '${tool}',`);
+      nextRe = /\n\s*name: '[a-z_]+',/;
+    } else {
+      // B et C appellent `registerTool('x', {…})` : on remonte à l'appel.
+      const at = src.indexOf(`'${tool}',`);
+      start = at === -1 ? -1 : src.lastIndexOf('registerTool(', at);
+      nextRe = /registerTool\(/;
+    }
+    if (start === -1) throw new Error(`${SURFACES[id].path} ne déclare pas ${tool}`);
+    const rest = src.slice(start);
+    const next = nextRe.exec(rest.slice(1));
+    return next === null ? rest : rest.slice(0, next.index + 1);
+  }
+
+  /**
+   * La description d'un outil, concaténation de chaînes à apostrophes simples
+   * rejointe et commentaires retirés.
+   *
+   * Le balayage démarre À `description:` et pas au début du bloc : sinon les
+   * chaînes de `name:` et `title:` entreraient dans le texte comparé, et la
+   * comparaison passerait au vert sur deux préfixes identiques.
+   */
+  function descriptionOf(id: SurfaceId, tool: string): string {
+    const block = toolBlock(id, tool);
+    const at = block.indexOf('description:');
+    if (at === -1) throw new Error(`${SURFACES[id].path} : ${tool} n'a pas de description`);
+    const rest = block.slice(at);
+    // Le dernier morceau termine la propriété : `',`. Tous les autres finissent
+    // par `' +`, donc le balayage ne peut pas s'arrêter trop tôt.
+    const end = /'\s*,\s*\n/.exec(rest);
+    if (end === null)
+      throw new Error(`${SURFACES[id].path} : ${tool} n'est pas un littéral simple`);
+    const chunk = rest.slice(0, end.index + end[0].length);
+    const withoutComments = chunk.replace(/^\s*\/\/.*$/gm, '');
+    const pieces = withoutComments.match(/'(?:[^'\\]|\\.)*'/g) ?? [];
+    return pieces.map((p) => p.slice(1, -1).replace(/\\'/g, "'")).join('');
+  }
+
+  for (const tool of DEVICE_TOOLS) {
+    // Garde-fou du garde-fou : un extracteur qui ne trouve plus rien rendrait
+    // la comparaison verte en comparant trois chaînes vides.
+    it(`${tool} : les trois extracteurs voient un texte réel`, () => {
+      for (const id of IDS) {
+        expect(
+          descriptionOf(id, tool).length,
+          `l'extracteur de description de ${SURFACES[id].path} ne voit plus rien pour ${tool} — regex à revoir, sinon la comparaison suivante ne mesure plus rien`,
+        ).toBeGreaterThan(200);
+      }
+    });
+
+    it(`${tool} : A, B et C servent le MÊME texte`, () => {
+      const a = descriptionOf('A', tool);
+      expect(
+        descriptionOf('B', tool),
+        `${SURFACES.B.path} a divergé de ${SURFACES.A.path} sur la description de ${tool} : un agent suivrait des consignes différentes selon le transport.`,
+      ).toBe(a);
+      expect(
+        descriptionOf('C', tool),
+        `${SURFACES.C.path} a divergé de ${SURFACES.A.path} sur la description de ${tool}.`,
+      ).toBe(a);
+    });
+
+    // Les phrases qui changent le COMPORTEMENT de l'agent, nommées une par une :
+    // une divergence les emporterait ensemble, mais une réécriture bien
+    // intentionnée n'en perdrait qu'une, et c'est ce cas-là qu'on veut voir.
+    it(`${tool} : les consignes qui engagent l'agent sont toutes là`, () => {
+      const text = descriptionOf('A', tool);
+      expect(text, 'la gratuité doit être dite, sinon un agent au plafond ne tente rien').toContain(
+        'does NOT count against the daily free-tier limit',
+      );
+      if (tool === 'request_api_key') {
+        expect(text, '« lire status d’abord » est la première consigne').toContain(
+          'read `status` first',
+        );
+        expect(text, "l'agent ne doit JAMAIS ouvrir le lien").toContain('Do NOT open the link');
+        expect(text, 'ni inventer une adresse').toContain('do NOT invent an e-mail address');
+        expect(text, 'le bloc se montre mot pour mot').toContain('VERBATIM');
+      } else {
+        expect(text, 'ne jamais boucler serré : la maison a déjà payé ce défaut').toContain(
+          'never in a tight loop',
+        );
+        expect(text, 'la clé est remise UNE fois').toContain('carries the key ONCE');
+        expect(text, 'un refus redemande l’accord de l’humain').toContain(
+          'ask THEM whether to try again',
+        );
+      }
+    });
+  }
+});
+
 describe("parité MCP — l'attente du client dépasse celle du serveur", () => {
   /**
    * 🚨 Le piège que rien ne nommait, et qui aurait cassé `poll_api_key` sur les
