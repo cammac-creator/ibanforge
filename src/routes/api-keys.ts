@@ -7,6 +7,7 @@ import {
   SHIELD_MONTHLY_LIMIT,
 } from '../lib/tiers.js';
 import { evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
+import { grantReservationCount } from '../lib/device-grant.js';
 import { normalizeEmail } from '../lib/email-norm.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -340,7 +341,13 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   // generateApiKey pour ce que le bouclier à venir en tire.
   let provenMailbox = false;
   if (creationSource && process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true') {
-    if (countKeyCreations(creationSource, 24) >= DAILY_KEY_CREATION_LIMIT) {
+    // 🚨 La réservation est PARTAGÉE avec le device grant : un grant encore en
+    // attente est une clé promise, il occupe une place. Compter `key_creations`
+    // seul laissait six clés sortir pour un budget de trois (trois grants
+    // ouverts, puis trois clés ici, puis les trois approbations) — mesuré le
+    // 15/09/2026 sur base neuve, un seul réseau. `grantReservationCount` somme
+    // les deux termes, et `openGrant` lit la même somme dans l'autre sens.
+    if (grantReservationCount(creationSource) >= DAILY_KEY_CREATION_LIMIT) {
       return c.json(
         {
           error: 'key_creation_limit',

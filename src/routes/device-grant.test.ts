@@ -787,6 +787,42 @@ describe('les plafonds', () => {
     expect(((await refused.json()) as { error: string }).error).toBe('device_rate_limited');
   });
 
+  it('partage le budget dans les DEUX sens : trois grants ouverts ferment /v1/keys/generate', async () => {
+    // 🚨 Le jumeau du test précédent, et c'est lui qui manquait : la garde du
+    // jour de /v1/keys/generate lisait `key_creations` SEUL, où un grant en
+    // attente ne figure pas. Mesuré le 15/09/2026 sur base neuve, un seul
+    // réseau : trois grants ouverts, puis trois clés par /v1/keys/generate,
+    // puis les trois approbations — six clés pour un budget de trois, avec
+    // l'invariant de naissance intact (six lignes pour six clés).
+    const app = makeApp();
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const ip = '203.0.113.51';
+    const opened: Opened[] = [];
+    for (let i = 0; i < DAILY_KEY_CREATION_LIMIT; i++)
+      opened.push(await open(app, { 'x-real-ip': ip }));
+
+    // Trois clés PROMISES : la porte /v1/keys/generate est fermée à ce réseau.
+    const refused = await post(app, '/v1/keys/generate', {}, { 'x-real-ip': ip });
+    expect(refused.status, await refused.clone().text()).toBe(429);
+    expect(((await refused.json()) as { error: string }).error).toBe('key_creation_limit');
+
+    // Les trois approbations frappent trois clés, et trois seulement.
+    for (const grant of opened) {
+      const token = await tokenFor(app, grant.user_code);
+      const res = await post(app, '/v1/keys/device/approve', {
+        user_code: grant.user_code,
+        approval_token: token,
+      });
+      expect(res.status, await res.clone().text()).toBe(200);
+    }
+    const stillRefused = await post(app, '/v1/keys/generate', {}, { 'x-real-ip': ip });
+    expect(stillRefused.status).toBe(429);
+    const born = getStatsDB()
+      .prepare('SELECT COUNT(*) AS n FROM key_creations WHERE ip_hash = ?')
+      .get(keyCreationSource(ip)) as { n: number };
+    expect(born.n).toBe(DAILY_KEY_CREATION_LIMIT);
+  });
+
   it("plafonne les envois de code sur l'APPROBATEUR, pas sur le créateur du grant", async () => {
     // 🚨 Sans cela, le plafond serait indexé sur une adresse que l'attaquant
     // renouvelle à chaque grant, alors qu'il existe pour borner l'envoi DEPUIS
