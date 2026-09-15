@@ -5,6 +5,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-09-15
+
+### Added
+
+- **A durable key for an agent, approved by a human in a browser: the device grant (RFC 8628).** `POST /v1/keys/device` opens a request and returns a short code and a link; the agent shows both to its human and never opens the link itself; the human opens `ibanforge.com/device`, sees who is asking and what for, and approves in one click — with no address at all (the smaller free allowance) or with a mailbox verified by a 6-digit code (the full one); the agent collects the key exactly once at `POST /v1/keys/device/token` (long-polling, `authorization_pending` and `slow_down` as the RFC spells them) together with the configuration line to paste. The two MCP tools `request_api_key` and `poll_api_key` wrap that journey on the three MCP surfaces (the npm package, the stdio server of this repository and the remote `/mcp` endpoint) and stay free past the daily MCP allowance, because they are the way out of it. The whole quota guard lives in one module: the request shares the daily per-network budget with `POST /v1/keys/generate` in both directions (a pending request is a promised key), an hourly cap bounds the churn of requests, the approval page holds a short-lived token so a cross-site request cannot approve or refuse, unknown, expired and already-decided codes answer one uniform 404 at one uniform pace, the key is handed over once even under concurrent collection, and a key approved that nobody ever collected is revoked by the daily purge. The page is served in three languages, is not indexed, and drops the code from its address before its first request. The key is never shown on the page.
+
+### Changed
+
+- **`ibanforge-mcp`: thirteen tools.** The two device-grant tools join the package; the instructions sent at connection name them; the `poll_api_key` relay waits longer than the server's long-polling so the client never loses the race by a hair; a refused request (`device_rate_limited`) and a pending poll come back as data with a `display_to_human` block, never as tool errors, because they are the way out of the daily limit rather than a failure of it.
+- **Agent-facing texts say the approval door is open.** The consent block, the MCP instructions of the three surfaces, both `llms.txt` files (the full one listed five tools where the transport served nine), the `/v1` and `/mcp` discovery documents, the OpenAPI contract and the two READMEs now describe `request_api_key` and `poll_api_key` as available; the card checkout opened from the API remains announced as planned.
+
+### Fixed
+
+- **Device grant, after its adversarial review.** A key approved but never collected is now revoked *with* its revocation date, so the retention purge of terminated keys finds it; the loser of a race between two approval tabs no longer keeps an active key that no request carries and no longer sees "Done"; the delay of an unknown-code answer holds a place in the same counter as long-polling; a lookup can no longer return an approval token that nothing recorded; the extension of a request when a verification code is mailed follows every mailing, capped at two lifetimes from creation, instead of once; an operations probe watches the long-polling ceiling; the contract of `POST /v1/keys/device/token` lists the global request limiter.
+
 ## [1.6.0] — 2026-09-15
 
 ### Changed
