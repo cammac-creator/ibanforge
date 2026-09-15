@@ -26,9 +26,6 @@ interface ObservedPrefix {
   days_in_window: string | null;
 }
 
-// Ces valeurs peuvent appartenir à plusieurs acheteurs sans adresse rattachée.
-const GENERIC_ACCOUNTS = new Set(['credits-buyer', 'stripe-buyer', 'oem-subscriber']);
-
 /**
  * Une réponse métier 2xx, pas un verdict IBAN positif ni une preuve de paiement.
  * Les purges peuvent retirer la première utilisation : le minimum reste donc
@@ -58,7 +55,9 @@ export function getServiceUsage(days = 30, now = new Date()): ServiceUsage {
     // partagée entre un compte interne et un compte externe à ce dernier.
     if (accounts.size !== 1) continue;
     const account = accounts.values().next().value;
-    if (!account || GENERIC_ACCOUNTS.has(account) || isInternalEmail(account)) continue;
+    // Une sentinelle sans adresse peut désigner plusieurs clés indépendantes.
+    // Les réunir inventerait un compte et des retours qui n'ont pas été observés.
+    if (!account || !account.includes('@') || isInternalEmail(account)) continue;
     eligible.set(prefix, account);
   }
 
