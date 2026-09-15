@@ -831,6 +831,11 @@ export function buildApp(): Hono<HonoEnv> {
           path,
           status: c.res.status,
           context: c.req.header(CONTEXT_HEADER),
+          // L'UA déjà lu pour `recordRequest`, pas une seconde lecture
+          // d'en-tête : il est réduit à une FAMILLE dans
+          // `recordLineageSuccess` et n'entre jamais tel quel dans
+          // `lineage_facts` (chantier « mesure agents », 15/09).
+          userAgent,
         });
       }
     }

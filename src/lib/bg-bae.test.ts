@@ -134,17 +134,29 @@ describe('the test register really is the invented one', () => {
     expect(lib.bgAttribution()).toBe(`Bulgarian National Bank, BAE register (${AS_OF})`);
   });
 
-  it('serves that credit on /llms.txt, dated from the data', async () => {
-    // The attribution is a licence condition, so it has to reach a surface a
-    // reader actually gets — and it has to be READ rather than written, or the
-    // first refresh turns the credit into a false statement about a date.
-    const { buildApp } = await import('../app.js');
-    const res = await buildApp().request('https://api.ibanforge.com/llms.txt');
-    const text = await res.text();
-    expect(res.status).toBe(200);
-    expect(text).toContain(`Bulgarian National Bank, BAE register (${AS_OF})`);
-    expect(text).toContain('3 bank codes');
-  });
+  // 🚨 Même motif que `health-boot-corrupt.test.ts` : le test ci-dessous
+  // construit l'application ENTIÈRE pour lire une ligne de crédit. Mesuré le
+  // 15/09/2026, seul : 3,4 à 3,6 s contre le défaut de vitest de 5 000 ms, soit
+  // une marge d'une seconde et demie que le parallélisme de la suite complète
+  // consomme. Le délai explicite n'affaiblit aucune des trois assertions ;
+  // un « timed out », lui, n'en vérifiait aucune.
+  const BUILD_APP_TIMEOUT_MS = 30_000;
+
+  it(
+    'serves that credit on /llms.txt, dated from the data',
+    async () => {
+      // The attribution is a licence condition, so it has to reach a surface a
+      // reader actually gets — and it has to be READ rather than written, or the
+      // first refresh turns the credit into a false statement about a date.
+      const { buildApp } = await import('../app.js');
+      const res = await buildApp().request('https://api.ibanforge.com/llms.txt');
+      const text = await res.text();
+      expect(res.status).toBe(200);
+      expect(text).toContain(`Bulgarian National Bank, BAE register (${AS_OF})`);
+      expect(text).toContain('3 bank codes');
+    },
+    BUILD_APP_TIMEOUT_MS,
+  );
 });
 
 describe('validate answers Bulgaria from the register', () => {

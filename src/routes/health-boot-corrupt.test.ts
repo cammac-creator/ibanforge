@@ -89,11 +89,31 @@ async function bootWith(dbPath: string): Promise<HealthAnswer> {
 }
 
 describe('PERF-03 — a corrupt stats database must not kill the boot', () => {
-  it('builds the application instead of throwing at import', async () => {
-    // The assertion IS "this call returns". Before the fix, the rejection came
-    // from the dynamic import itself, several frames before buildApp().
-    await expect(bootWith(corruptStatsDb())).resolves.toBeDefined();
-  });
+  // 🚨 Le délai EXPLICITE du test ci-dessous n'est pas un assouplissement
+  // d'assertion : cette assertion-ci est « cet appel revient », pas « il
+  // revient vite ». Le test construit l'application ENTIÈRE sur un graphe de
+  // modules neuf. Mesuré le 15/09/2026 : 2,0 à 2,3 s seul et à cache chaud,
+  // 4,8 s au premier passage à cache froid — contre le défaut de vitest,
+  // 5 000 ms, que `vitest.config.ts` ne redéfinit pas. La marge est de
+  // quelques centaines de millisecondes, et le parallélisme de la suite
+  // complète la consomme : le test échouait une fois sur deux en disant
+  // « timed out », c'est-à-dire en n'affirmant rien du tout.
+  //
+  // 🚨 Ne PAS relever `testTimeout` globalement pour autant : le défaut de 5 s
+  // est load-bearing ailleurs — les tests de long-polling de `mcp-http.test.ts`
+  // et de `device-grant.test.ts` règlent leurs propres attentes pour rester en
+  // dessous, et un défaut plus large y masquerait une attente qui ne rend plus.
+  const BOOT_TIMEOUT_MS = 30_000;
+
+  it(
+    'builds the application instead of throwing at import',
+    async () => {
+      // The assertion IS "this call returns". Before the fix, the rejection came
+      // from the dynamic import itself, several frames before buildApp().
+      await expect(bootWith(corruptStatsDb())).resolves.toBeDefined();
+    },
+    BOOT_TIMEOUT_MS,
+  );
 
   it('answers 503 and names the stats database, with the SQLite cause', async () => {
     const { status, body } = await bootWith(corruptStatsDb());

@@ -36,21 +36,23 @@ import { getStatsDB } from './db.js';
 import { recordEvent } from './events.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
-export const BACKUP_FORMAT = 6;
+export const BACKUP_FORMAT = 7;
 /**
  * Ce qu'un restaurateur d'aujourd'hui sait lire. Le format 1 n'a pas les deux
  * journaux du palier de clé (key_claims, key_settlements), le format 2 n'a pas
  * le journal d'annulation du radar (key_revocations, lot 6), le format 3 n'a pas
  * les faits de mesure de l'essai (lineage_facts, lot M), le format 4 n'a pas le
  * journal des bascules du disjoncteur (breaker_transitions, lot 5), le format 5
- * n'a pas les naissances de clés (key_creations, revue du 15/09) : ils y
+ * n'a pas les naissances de clés (key_creations, revue du 15/09), le format 6
+ * n'a pas les deux compteurs journaliers des portes d'agent
+ * (device_grant_daily, mcp_remote_daily, chantier « mesure agents ») : ils y
  * valent [] et le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
  * le format rend irrestaurable tout dump pris avant la livraison — sur une base
  * qui n'a pas d'autre sauvegarde. Et incrémenter plutôt que ne rien faire :
  * sans numéro, un dump tronqué et un dump légitimement ancien seraient
  * indiscernables, et le `?? []` masquerait l'un comme l'autre.
  */
-export const READABLE_FORMATS = [1, 2, 3, 4, 5, 6] as const;
+export const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 export interface BackupPayload {
   format: number;
@@ -65,6 +67,8 @@ export interface BackupPayload {
     lineage_facts?: number;
     breaker_transitions?: number;
     key_creations?: number;
+    device_grant_daily?: number;
+    mcp_remote_daily?: number;
   };
   api_keys: Array<Record<string, unknown>>;
   api_usage: Array<Record<string, unknown>>;
@@ -103,6 +107,27 @@ export interface BackupPayload {
    * constat R3). Une ligne par création libre, aucune donnée client.
    */
   key_creations?: Array<Record<string, unknown>>;
+  /**
+   * Format 7. Les deux compteurs journaliers des portes par lesquelles une
+   * identité d'AGENT arrive : le rail device grant, et le haut de l'entonnoir
+   * MCP distant.
+   *
+   * 🚨 Le discriminant qui les fait entrer ici alors que `trial_daily`, juste à
+   * côté, en est délibérément absente, est la RECOMPUTABILITÉ.
+   * `trial_daily` se reconstruit depuis `trial_ledger`. Ces deux tables non :
+   * `device_codes` est purgée à 24 h et `mcp_remote_daily` n'a AUCUNE autre
+   * source — le nom de l'outil MCP n'est journalisé nulle part. Restaurer un
+   * volume sans elles rendrait des lignées vivantes avec un rail à zéro, le
+   * même argument que `lineage_facts` fait valoir trois blocs plus haut.
+   *
+   * 🚨 `device_codes` N'ENTRE PAS dans la sauvegarde et n'y entrera pas : elle
+   * porte `raw_key_once`, c'est-à-dire une clé API EN CLAIR, et l'export est
+   * précisément le fichier fait pour être copié hors du serveur (voir
+   * `EXPORT_EXCLUDED_COLUMNS` et SEC-03). Ces deux tables-ci ne portent que des
+   * comptes : pas d'adresse, pas d'UA, pas de code, pas de clé.
+   */
+  device_grant_daily?: Array<Record<string, unknown>>;
+  mcp_remote_daily?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -159,6 +184,12 @@ export function exportPaidState(takenAt: string): BackupPayload {
   const creations = db.prepare('SELECT * FROM key_creations').all() as Array<
     Record<string, unknown>
   >;
+  const grantDays = db.prepare('SELECT * FROM device_grant_daily').all() as Array<
+    Record<string, unknown>
+  >;
+  const mcpDays = db.prepare('SELECT * FROM mcp_remote_daily').all() as Array<
+    Record<string, unknown>
+  >;
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
   // indistinguishable from any other call. This annotation puts it on the
@@ -184,6 +215,8 @@ export function exportPaidState(takenAt: string): BackupPayload {
       lineage_facts: lineages.length,
       breaker_transitions: transitions.length,
       key_creations: creations.length,
+      device_grant_daily: grantDays.length,
+      mcp_remote_daily: mcpDays.length,
     },
     api_keys: keys,
     api_usage: usage,
@@ -193,6 +226,8 @@ export function exportPaidState(takenAt: string): BackupPayload {
     lineage_facts: lineages,
     breaker_transitions: transitions,
     key_creations: creations,
+    device_grant_daily: grantDays,
+    mcp_remote_daily: mcpDays,
   };
 }
 
@@ -213,6 +248,10 @@ export interface RestoreReport {
   transitions_skipped: number;
   creations_inserted: number;
   creations_skipped: number;
+  grant_days_inserted: number;
+  grant_days_skipped: number;
+  mcp_days_inserted: number;
+  mcp_days_skipped: number;
 }
 
 /**
@@ -253,6 +292,10 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     transitions_skipped: 0,
     creations_inserted: 0,
     creations_skipped: 0,
+    grant_days_inserted: 0,
+    grant_days_skipped: 0,
+    mcp_days_inserted: 0,
+    mcp_days_skipped: 0,
   };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
@@ -308,6 +351,19 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     for (const row of payload.key_creations ?? []) {
       if (insertRow('key_creations', row)) report.creations_inserted++;
       else report.creations_skipped++;
+    }
+    // Absents d'un dump aux formats 1 à 6 ; un dump au format 7 les porte
+    // toujours, même vides. `INSERT OR IGNORE` sur (day, source) et sur (day) :
+    // fusionner un vieux dump dans une base vivante ne peut donc pas écraser la
+    // journée en cours par celle du dump — un compteur cumulatif remis à une
+    // valeur ancienne serait pire qu'une journée manquante.
+    for (const row of payload.device_grant_daily ?? []) {
+      if (insertRow('device_grant_daily', row)) report.grant_days_inserted++;
+      else report.grant_days_skipped++;
+    }
+    for (const row of payload.mcp_remote_daily ?? []) {
+      if (insertRow('mcp_remote_daily', row)) report.mcp_days_inserted++;
+      else report.mcp_days_skipped++;
     }
   });
   run();

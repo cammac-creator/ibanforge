@@ -320,4 +320,96 @@ describe('sauvegarde du palier de clé', () => {
     expect(f5.creations_inserted).toBe(0);
     db.prepare('DELETE FROM key_creations WHERE key_prefix = ?').run(prefix);
   });
+
+  it('23septies. un aller-retour conserve les deux compteurs de portes, et un dump au format 6 se restaure sans eux', () => {
+    // 🚨 Le discriminant qui les fait entrer dans la sauvegarde alors que
+    // `trial_daily` en est délibérément absente : `trial_daily` se reconstruit
+    // depuis `trial_ledger`, ces deux tables non. `device_codes` est purgée à
+    // 24 h, et le nom d'un outil MCP n'est journalisé nulle part. Une
+    // restauration sans elles rendrait des lignées vivantes avec un rail à zéro.
+    expect(READABLE_FORMATS).toContain(6);
+    expect(READABLE_FORMATS).toContain(7);
+    expect(BACKUP_FORMAT).toBe(7);
+    const db = getStatsDB();
+    const day = `2026-09-${String((RUN % 28) + 1).padStart(2, '0')}`;
+    db.prepare(
+      'INSERT INTO device_grant_daily (day, source, opened, approved_anonymous, delivered) VALUES (?, ?, 4, 3, 2)',
+    ).run(day, 'mcp-device');
+    db.prepare(
+      'INSERT INTO mcp_remote_daily (day, sessions, tool_calls, key_requests) VALUES (?, 5, 40, 3)',
+    ).run(day);
+    const dump = exportPaidState('2026-09-15T12:00:00Z');
+    const grants = dump.device_grant_daily!.filter((r) => r.day === day);
+    const mcps = dump.mcp_remote_daily!.filter((r) => r.day === day);
+    expect(grants).toHaveLength(1);
+    expect(mcps).toHaveLength(1);
+    expect(dump.counts.device_grant_daily).toBeGreaterThanOrEqual(1);
+    expect(dump.counts.mcp_remote_daily).toBeGreaterThanOrEqual(1);
+    db.prepare('DELETE FROM device_grant_daily WHERE day = ?').run(day);
+    db.prepare('DELETE FROM mcp_remote_daily WHERE day = ?').run(day);
+    const only = {
+      ...dump,
+      api_keys: [],
+      api_usage: [],
+      key_claims: [],
+      key_settlements: [],
+      key_revocations: [],
+      lineage_facts: [],
+      breaker_transitions: [],
+      key_creations: [],
+    };
+    const report = restorePaidState({
+      ...only,
+      device_grant_daily: grants,
+      mcp_remote_daily: mcps,
+    });
+    expect(report.grant_days_inserted).toBe(1);
+    expect(report.mcp_days_inserted).toBe(1);
+    // Rejouée : rien de plus, et surtout rien d'écrasé. Un compteur cumulatif
+    // remis à une valeur ancienne serait pire qu'une journée manquante.
+    const again = restorePaidState({
+      ...only,
+      device_grant_daily: grants,
+      mcp_remote_daily: mcps,
+    });
+    expect(again.grant_days_inserted).toBe(0);
+    expect(again.grant_days_skipped).toBe(1);
+    expect(again.mcp_days_inserted).toBe(0);
+    expect(again.mcp_days_skipped).toBe(1);
+    const back = db
+      .prepare(
+        'SELECT source, opened, approved_anonymous, delivered FROM device_grant_daily WHERE day = ?',
+      )
+      .all(day);
+    expect(back).toEqual([
+      { source: 'mcp-device', opened: 4, approved_anonymous: 3, delivered: 2 },
+    ]);
+    const backMcp = db
+      .prepare('SELECT sessions, tool_calls, key_requests FROM mcp_remote_daily WHERE day = ?')
+      .all(day);
+    expect(backMcp).toEqual([{ sessions: 5, tool_calls: 40, key_requests: 3 }]);
+    // Un dump au format 6 n'a pas ces tables : rien à remettre, et ce n'est pas
+    // une erreur.
+    const f6 = restorePaidState({
+      format: 6,
+      taken_at: '2026-09-15T00:00:00Z',
+      counts: { api_keys: 0, api_usage: 0 },
+      api_keys: [],
+      api_usage: [],
+    });
+    expect(f6.grant_days_inserted).toBe(0);
+    expect(f6.mcp_days_inserted).toBe(0);
+    db.prepare('DELETE FROM device_grant_daily WHERE day = ?').run(day);
+    db.prepare('DELETE FROM mcp_remote_daily WHERE day = ?').run(day);
+  });
+
+  it("device_codes n'entre JAMAIS dans la sauvegarde : elle porte une clé en clair", () => {
+    // 🚨 L'assertion la plus importante du fichier pour ce chantier.
+    // `device_codes.raw_key_once` est une clé API EN CLAIR, et l'export est
+    // précisément le fichier fait pour être copié hors du serveur (SEC-03).
+    const dump = exportPaidState('2026-09-15T12:00:00Z') as unknown as Record<string, unknown>;
+    expect(Object.keys(dump)).not.toContain('device_codes');
+    expect(Object.keys(dump.counts as object)).not.toContain('device_codes');
+    expect(JSON.stringify(dump)).not.toContain('raw_key_once');
+  });
 });

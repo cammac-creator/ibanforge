@@ -1286,3 +1286,88 @@ describe('device grant — les deux outils sur le transport HTTP', () => {
     expect(String(opened.structuredContent!.display_to_human)).not.toContain('ifd_');
   });
 });
+
+describe('le haut de l’entonnoir MCP distant, par jour', () => {
+  /** La ligne du jour, ou des zéros. */
+  function today(): { sessions: number; tool_calls: number; key_requests: number } {
+    const row = getStatsDB()
+      .prepare(
+        "SELECT sessions, tool_calls, key_requests FROM mcp_remote_daily WHERE day = date('now')",
+      )
+      .get() as { sessions: number; tool_calls: number; key_requests: number } | undefined;
+    return row ?? { sessions: 0, tool_calls: 0, key_requests: 0 };
+  }
+
+  it("une ouverture de session compte une session, et l'appel d'outil compte un appel", async () => {
+    const before = today();
+    const app = makeApp();
+    const ip = freshIp();
+    const sessionId = await initialize(app, ip);
+    // 🚨 Une session comptée là où la MÉMOIRE est dépensée, pas sur la méthode
+    // `initialize` : c'est la ligne qui construit le McpServer.
+    expect(today().sessions).toBe(before.sessions + 1);
+    // `initialize` n'est pas un appel d'outil.
+    expect(today().tool_calls).toBe(before.tool_calls);
+    await rpc(app, sessionId, 'tools/list', {}, 5, ip);
+    expect(today().tool_calls).toBe(before.tool_calls);
+    await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      { name: 'lookup_ch_clearing', arguments: { iid: '230' } },
+      6,
+      ip,
+    );
+    expect(today().tool_calls).toBe(before.tool_calls + 1);
+  });
+
+  it('un appel de request_api_key est compté À PART, et il coûte zéro unité', async () => {
+    // 🚨 La mesure qu'AUCUNE source existante ne peut rendre : `request_log` ne
+    // garde que le chemin `/mcp:tools-call`, jamais le nom de l'outil, et le
+    // registre journalier ne compte que des UNITÉS — or cet outil est dans
+    // MCP_FREE_TOOLS, donc à zéro unité, donc parfaitement invisible.
+    expect(MCP_FREE_TOOLS.has('request_api_key')).toBe(true);
+    const before = today();
+    const app = makeApp();
+    const ip = freshIp();
+    const sessionId = await initialize(app, ip);
+    await rpc(app, sessionId, 'tools/call', { name: 'request_api_key' }, 7, ip);
+    const after = today();
+    expect(after.key_requests).toBe(before.key_requests + 1);
+    // Il compte AUSSI comme appel d'outil : les deux colonnes disent deux
+    // choses différentes, et la seconde n'est pas un sous-ensemble caché.
+    expect(after.tool_calls).toBe(before.tool_calls + 1);
+  });
+
+  it("un appel REFUSÉ par le plafond n'écrit rien du tout", async () => {
+    // 🚨 Le placement qui compte. `daily-ip-ledger.ts` garde une carte mémoire
+    // pour que le coût serveur d'un refusé reste exactement zéro écriture,
+    // alors que le limiteur global lui laisse cent requêtes par minute.
+    // Compter les TENTATIVES aurait rendu à un refusé une écriture par requête
+    // dans le fichier qui porte api_keys, les crédits et les paiements.
+    const app = makeApp();
+    const ip = freshIp();
+    const sessionId = await initialize(app, ip);
+    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+      await rpc(
+        app,
+        sessionId,
+        'tools/call',
+        { name: 'lookup_ch_clearing', arguments: { iid: '230' } },
+        100 + i,
+        ip,
+      );
+    }
+    const before = today();
+    const refused = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      { name: 'lookup_ch_clearing', arguments: { iid: '230' } },
+      999,
+      ip,
+    );
+    expect(refused.error?.message).toContain('Daily MCP free tier limit reached');
+    expect(today()).toEqual(before);
+  });
+});

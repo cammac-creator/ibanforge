@@ -40,6 +40,7 @@ import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { isBillableCall, normalizeRequestPath } from './stats.js';
 import { isInternalEmail } from './internal-accounts.js';
+import { normalizeLineageClient } from './lineage-clients.js';
 
 /**
  * Le marqueur de contexte, en-tête de requête.
@@ -67,6 +68,13 @@ export function normalizeLineageContext(raw: string | null | undefined): Lineage
  * deux sont nécessaires : sans la seconde, un appel marqué `demo` le matin
  * empêcherait le premier appel sans marqueur de l'après-midi de poser
  * `first_unmarked_success_at`.
+ *
+ * Depuis le chantier « mesure agents » (15/09), la FAMILLE de client entre dans
+ * la clé pour la même raison exactement : sans elle, le premier succès du jour
+ * figerait `last_success_client` et un porteur qui passe du panneau du site à
+ * son SDK dans la même journée serait lu comme n'ayant jamais quitté le
+ * panneau. La borne reste petite et connue d'avance : deux contextes × huit
+ * familles = au plus seize écritures par lignée et par jour.
  */
 let cachedDay = '';
 const seenToday = new Set<string>();
@@ -119,6 +127,26 @@ export function resetLineageDayCache(): void {
  *
  * `backfilled = 0` est le seul endroit où cette valeur est écrite : c'est ce
  * drapeau qui définit « depuis le démarrage de la nouvelle mesure ».
+ *
+ * ## 🚨 La preuve de boîte POSÉE À LA NAISSANCE (« mesure agents », 15/09)
+ *
+ * `first_claim_at` et `claim_method` sont relus sur `api_keys`, par la clé qui
+ * vient de naître, et non passés en paramètre. Motif : une clé née d'un code
+ * e-mail VÉRIFIÉ reçoit `claimed_at` et `claim_method = 'email_code'` DANS la
+ * transaction de frappe (`generateApiKey`, branche `provenMailbox`), et ne
+ * passe donc JAMAIS par `claimKey`, seul appelant de `recordLineageClaim` et
+ * dont l'UPDATE est gardé par `WHERE tier = 'anonymous'`. Sans ces deux
+ * sous-requêtes, `lineage_facts.claim_method` restait NULL pour toutes les
+ * clés du rail device nées avec une adresse — et `linkPaidKeyToLineage`, qui
+ * exige `claim_method = 'email_code'`, ne pouvait relier AUCUN achat par carte
+ * à une identité d'agent. Le chemin d'attribution existait dans le code et
+ * était mort dans les faits.
+ *
+ * La lecture se fait sur `api_keys` plutôt que sur un booléen de l'appelant
+ * pour la même raison que le rattrapage de la migration le fait (étape 4 de
+ * `migrateLineageFacts`, qui lit `c.claim_method`) : deux écrivains qui
+ * déduisent la même valeur par deux chemins différents finissent par ne plus
+ * dire la même chose.
  */
 export function recordLineageBirth(p: {
   lineageHash: string;
@@ -133,11 +161,15 @@ export function recordLineageBirth(p: {
     db.prepare(
       `INSERT OR IGNORE INTO lineage_facts
          (lineage_hash, birth_at, birth_tier, birth_source,
-          entry_landing, entry_referrer_domain, delivery_page, backfilled, updated_at)
+          entry_landing, entry_referrer_domain, delivery_page,
+          first_claim_at, claim_method, backfilled, updated_at)
        VALUES (?, datetime('now'), ?, ?,
                (SELECT landing  FROM signup_attribution WHERE key_prefix = ?),
                (SELECT referrer FROM signup_attribution WHERE key_prefix = ?),
-               ?, 0, datetime('now'))`,
+               ?,
+               (SELECT claimed_at    FROM api_keys WHERE key_hash = ?),
+               (SELECT claim_method  FROM api_keys WHERE key_hash = ?),
+               0, datetime('now'))`,
     ).run(
       p.lineageHash,
       p.tier,
@@ -145,6 +177,8 @@ export function recordLineageBirth(p: {
       p.keyPrefix ?? null,
       p.keyPrefix ?? null,
       p.deliveryPage ?? null,
+      p.lineageHash,
+      p.lineageHash,
     );
   } catch (err) {
     complain(err);
@@ -190,6 +224,20 @@ export function fillLineageEntry(keyPrefix: string): void {
  * service a répondu, et le contrat le dit explicitement. Un lot de plusieurs
  * IBAN compte pour UNE activation ; les unités consommées sont un autre
  * indicateur, qui vit ailleurs.
+ *
+ * ## La famille de client (« mesure agents », 15/09)
+ *
+ * `first_success_client` par COALESCE — le premier écrit gagne — et
+ * `last_success_client` toujours réécrit. L'UA n'est JAMAIS stocké : seule une
+ * valeur de la liste fermée de `lineage-clients.ts` entre en base.
+ *
+ * ⚠️ Ce que `last_success_client` dit exactement : la famille du dernier succès
+ * COMPTÉ, c'est-à-dire du dernier succès qui a franchi le cache du jour. Le
+ * cache retient une écriture par lignée, par contexte, par famille et par jour,
+ * donc un porteur qui alterne entre deux clients dans la même heure ne fait pas
+ * défiler la colonne à chaque appel : elle porte le dernier des deux VUS ce
+ * jour-là. Ce n'est pas « le client du dernier appel », et le lire ainsi
+ * surestimerait la fraîcheur de la colonne.
  */
 export function recordLineageSuccess(p: {
   keyHash: string;
@@ -197,21 +245,26 @@ export function recordLineageSuccess(p: {
   path: string;
   status: number;
   context: string | null | undefined;
+  /** En-tête `User-Agent` brut. Réduit à une famille ICI, jamais stocké. */
+  userAgent?: string | null;
 }): void {
   if (p.status < 200 || p.status >= 300) return;
   if (!p.keyHash) return;
   if (!isBillableCall(p.method, p.path)) return;
   const context = normalizeLineageContext(p.context);
+  // 🚨 Réduit AVANT tout le reste, et l'UA ne redescend jamais plus bas : à
+  // partir d'ici il n'existe plus qu'une famille prise dans la liste fermée.
+  const client = normalizeLineageClient(p.userAgent, p.context);
   const day = new Date().toISOString().slice(0, 10);
   if (day !== cachedDay) {
     cachedDay = day;
     seenToday.clear();
   }
   // Court-circuit AVANT toute lecture de base, et c'est là tout le coût sur le
-  // chemin chaud : une clé déjà vue aujourd'hui dans ce contexte ne déclenche
-  // plus rien du tout. Sans lui, chaque appel métier payait la résolution de la
-  // lignée, soit une lecture indexée par requête servie.
-  const fastKey = `k:${p.keyHash}|${context}`;
+  // chemin chaud : une clé déjà vue aujourd'hui dans ce contexte et cette
+  // famille ne déclenche plus rien du tout. Sans lui, chaque appel métier payait
+  // la résolution de la lignée, soit une lecture indexée par requête servie.
+  const fastKey = `k:${p.keyHash}|${context}|${client}`;
   if (seenToday.has(fastKey)) return;
   try {
     const db = getStatsDB();
@@ -222,7 +275,7 @@ export function recordLineageSuccess(p: {
     // lignée inventée sur un porteur qui n'existe plus.
     if (!row) return;
     const lineage = row.lineage_hash ?? p.keyHash;
-    const contextKey = `${lineage}|${context}`;
+    const contextKey = `${lineage}|${context}|${client}`;
     // La lignée a déjà écrit aujourd'hui dans ce contexte, par une AUTRE clé
     // (le cas d'une lignée qui porterait deux clés actives). On mémorise aussi
     // le raccourci par clé, pour que l'appel suivant s'arrête plus haut.
@@ -252,6 +305,7 @@ export function recordLineageSuccess(p: {
       `INSERT INTO lineage_facts
          (lineage_hash, birth_at, birth_tier, birth_source, backfilled,
           first_success_at, first_success_route, first_success_context,
+          first_success_client, last_success_client,
           first_unmarked_success_at, last_success_at, last_success_day, success_days, updated_at)
        VALUES (
          ?,
@@ -260,12 +314,15 @@ export function recordLineageSuccess(p: {
          (SELECT source FROM api_keys WHERE key_hash = ?),
          1,
          datetime('now'), ?, ?,
+         ?, ?,
          CASE WHEN ? <> 'demo' THEN datetime('now') END,
          datetime('now'), date('now'), 1, datetime('now'))
        ON CONFLICT(lineage_hash) DO UPDATE SET
          first_success_at      = COALESCE(first_success_at, excluded.first_success_at),
          first_success_route   = COALESCE(first_success_route, excluded.first_success_route),
          first_success_context = COALESCE(first_success_context, excluded.first_success_context),
+         first_success_client  = COALESCE(first_success_client, excluded.first_success_client),
+         last_success_client   = excluded.last_success_client,
          first_unmarked_success_at = COALESCE(first_unmarked_success_at,
                                               excluded.first_unmarked_success_at),
          week2_success_at = COALESCE(week2_success_at,
@@ -279,7 +336,7 @@ export function recordLineageSuccess(p: {
                                                  THEN 1 ELSE 0 END),
          last_success_day = excluded.last_success_day,
          updated_at       = excluded.updated_at`,
-    ).run(lineage, lineage, lineage, lineage, route, context, context);
+    ).run(lineage, lineage, lineage, lineage, route, context, client, client, context);
     seenToday.add(contextKey);
     seenToday.add(fastKey);
     failureStreak = 0;

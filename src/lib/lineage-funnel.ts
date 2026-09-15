@@ -36,6 +36,13 @@
  */
 import { getStatsDB } from './db.js';
 import { registerInternalEmailFn } from './internal-accounts.js';
+import {
+  DEVICE_BIRTH_SOURCES,
+  DEVICE_DOORS,
+  type DeviceDoor,
+  LINEAGE_CLIENTS,
+} from './lineage-clients.js';
+import { readDeviceGrantDaily, readMcpRemoteDaily } from './agent-entry-daily.js';
 
 export interface FunnelIndicator {
   numerator: number;
@@ -51,6 +58,99 @@ export interface FunnelShare {
   denominator: number;
   value: number | null;
   note?: string;
+}
+
+/**
+ * Une ventilation : une population de lignées, et les trois indicateurs qui ont
+ * un sens sur elle (chantier « mesure agents », 15/09/2026).
+ *
+ * `lineages` est la POPULATION du seau, pas un numérateur : c'est elle qui
+ * donne un sens aux trois indicateurs en dessous, et elle se lit différemment
+ * selon la ventilation —
+ *   - `by_birth_source` : lignées NÉES par cette porte ;
+ *   - `by_first_client` : lignées ACTIVÉES par ce client, plus deux seaux qui
+ *     ne sont pas des familles — `(unknown)` = activées AVANT que la famille
+ *     soit enregistrée, `(none)` = nées et JAMAIS activées.
+ *
+ * Les trois indicateurs gardent la forme et les règles du haut du fichier :
+ * dénominateur limité aux lignées qui ont le recul requis, `pending` pour les
+ * autres, jamais de pourcentage sur un dénominateur nul.
+ */
+export interface FunnelBucket {
+  name: string;
+  lineages: number;
+  first_result_24h: FunnelIndicator;
+  return_week_2: FunnelIndicator;
+  attributable_purchase_30d: FunnelIndicator;
+}
+
+/** Une journée du rail device, telle que le bloc `device` la publie. */
+export interface DeviceDoorCounters {
+  source: DeviceDoor;
+  opened: number;
+  rate_limited: number;
+  approved_anonymous: number;
+  approved_email: number;
+  denied: number;
+  expired: number;
+  delivered: number;
+}
+
+/**
+ * Le rail device de bout en bout : ouverts → approuvés → remis → lignées nées →
+ * premier résultat → retour → achat, plus le haut de l'entonnoir MCP distant.
+ *
+ * 🚨 DEUX GRANULARITÉS DANS UN SEUL BLOC, et c'est la chose à savoir avant de
+ * lire un rapport : `counters` et `mcp_remote` sont à la granularité du JOUR
+ * UTC (des compteurs incrémentés à la décision), alors que `lineages` et les
+ * trois indicateurs viennent de `lineage_facts`, à la SECONDE. `window_days`
+ * dit quels jours ont été sommés. Les rapports internes au bloc `counters`
+ * (`chain.approved_of_opened`, `chain.delivered_of_approved`) sont donc
+ * cohérents entre eux ; seul `chain.lineages_of_delivered` croise les deux, et
+ * il porte sa propre note.
+ */
+export interface DeviceRail {
+  /** Les jours UTC sommés, bornes INCLUSES — pas la fenêtre à la seconde. */
+  window_days: { from: string; to: string };
+  counters: {
+    opened: number;
+    rate_limited: number;
+    approved_anonymous: number;
+    approved_email: number;
+    /** La somme des deux branches d'approbation, écrite pour ne pas l'additionner à la main. */
+    approved: number;
+    denied: number;
+    expired: number;
+    delivered: number;
+  };
+  by_door: DeviceDoorCounters[];
+  chain: {
+    approved_of_opened: FunnelShare;
+    delivered_of_approved: FunnelShare;
+    lineages_of_delivered: FunnelShare;
+  };
+  /** Lignées nées par ce rail dans la fenêtre à la seconde. */
+  lineages: { created: number; admissible: number };
+  indicators: {
+    first_result_24h: FunnelIndicator;
+    return_week_2: FunnelIndicator;
+    attributable_purchase_30d: FunnelIndicator;
+  };
+  /**
+   * Le haut de l'entonnoir de la surface MCP distante, sans clé.
+   *
+   * 🚨 Des appels SANS IDENTITÉ : cette surface sert sans clé, donc aucun de
+   * ces trois nombres n'est rattachable à une lignée, et aucun n'entre dans un
+   * dénominateur d'activation. C'est le « traiter cette mesure explicitement »
+   * de la passation du 15/09 : la dire, et dire pourquoi elle s'arrête là.
+   */
+  mcp_remote: {
+    sessions: number;
+    tool_calls: number;
+    key_requests: number;
+    note: string;
+  };
+  notes: string[];
 }
 
 export interface LineageFunnel {
@@ -71,6 +171,14 @@ export interface LineageFunnel {
   unknown_context_share: FunnelShare;
   /** Part des clés payées remises qui sont reliées à une lignée d'essai. */
   paid_link_coverage: FunnelShare;
+  /**
+   * Par PORTE de naissance. Bornée à la lecture : voir `BIRTH_SOURCE_BUCKETS`.
+   */
+  by_birth_source: FunnelBucket[];
+  /** Par FAMILLE de client du premier succès. Liste fermée, donc complète. */
+  by_first_client: FunnelBucket[];
+  /** Le rail device de bout en bout, et le haut de l'entonnoir MCP distant. */
+  device: DeviceRail;
   notes: string[];
 }
 
@@ -159,6 +267,45 @@ const LINKED_PAID = `
           AND (is_internal_email(k.email) = 1 OR COALESCE(k.issued_by_us, 0) = 1))
 `;
 
+/**
+ * Sentinelles de seau, choisies pour etre IMPOSSIBLES a produire.
+ *
+ * `birth_source` et les familles de client passent par
+ * `/^[a-z0-9_-]{1,40}$/` (cote grant comme cote `POST /v1/keys/generate`), donc
+ * aucune parenthese ne peut y entrer. Sans cette precaution, un appelant qui
+ * declarerait `source=other` viendrait se confondre avec le seau de
+ * debordement, et le tableau dirait n'importe quoi sans qu'aucun test ne
+ * rougisse.
+ */
+const NO_BUCKET = '(none)';
+const OVERFLOW_BUCKET = '(other)';
+/**
+ * 🚨 « Activée, mais AVANT que la famille soit enregistrée », et ce seau n'est
+ * pas une subtilite : `first_success_client` arrive NULL sur toutes les lignees
+ * ecrites au fil de l'eau par le lot M, qui ont pourtant un premier succes.
+ * Les replier dans `(none)` — « jamais activee » — publierait des lignees
+ * ACTIVES comme n'ayant jamais rien fait, avec un numerateur de premier
+ * resultat non nul dans un seau censé n'en avoir aucun. Les replier dans
+ * `other` serait aussi faux : `other` veut dire « un client non reconnu s'est
+ * declare », celui-ci veut dire « nous ne mesurions pas encore ». Meme doctrine
+ * que `unknown_context_share` : l'inconnu se publie a cote, il ne se devine pas.
+ */
+const UNKNOWN_BUCKET = '(unknown)';
+
+/**
+ * Combien de portes de naissance sont nommees, le reste allant dans `(other)`.
+ *
+ * 🚨 Une BORNE A LA LECTURE, et elle est necessaire : `birth_source` recopie la
+ * source declaree par l'appelant, donc sa cardinalite n'est bornee par rien a
+ * l'ecriture. Sans ce plafond, un appelant qui change de `source` a chaque cle
+ * ferait grossir la reponse d'un objet par cle creee.
+ *
+ * Le classement est fait par NOMBRE DE LIGNEES decroissant, ce qui rend le
+ * bruit inoffensif : mille sources a une lignee chacune ne deplacent pas une
+ * vraie porte du haut du classement, elles s'additionnent dans `(other)`.
+ */
+const BIRTH_SOURCE_BUCKETS = 12;
+
 export interface FunnelOptions {
   /** 'YYYY-MM-DD' : début de fenêtre. Par défaut, le démarrage de la mesure. */
   since?: string | null;
@@ -204,9 +351,9 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
    * ici évite d'avoir à tenir à jour un jeu de paramètres par requête — la
    * faute que ce filtre rend impossible.
    */
-  const count = (sql: string): number => {
+  const count = (sql: string, extra: Record<string, unknown> = {}): number => {
     const bound: Record<string, unknown> = {};
-    for (const [name, value] of Object.entries(bounds)) {
+    for (const [name, value] of Object.entries({ ...bounds, ...extra })) {
       if (sql.includes(`@${name}`)) bound[name] = value;
     }
     return (db.prepare(sql).get(bound) as { n: number }).n;
@@ -366,6 +513,245 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
   const paidDelivered = count(`SELECT COUNT(*) AS n FROM (${PAID_KEYS}) k`);
   const paidLinked = count(`SELECT COUNT(*) AS n FROM (${LINKED}) l`);
 
+  // ── Les trois indicateurs, sur un SOUS-ENSEMBLE de la cohorte ───────────
+  //
+  // Les mêmes requêtes que ci-dessus, avec un prédicat de seau en plus.
+  // Écrites une fois ici plutôt que recopiées par ventilation : deux
+  // formulations du même indicateur finissent par ne plus dire la même chose,
+  // et c'est toujours celle qu'on ne relit pas qui est publiée.
+  //
+  // `filter` est une expression SQL écrite DANS ce fichier ; les valeurs de
+  // seau, elles, sont liées par paramètre nommé (`extra`), parce qu'elles
+  // viennent de la base et donc, en dernière analyse, de l'appelant.
+  //
+  // `pending` est celui du SEAU, pas celui de la cohorte entière : un seau né
+  // hier ne doit pas emprunter la couverture d'un seau né le mois dernier.
+  const tripleFor = (
+    filter: string,
+    extra: Record<string, unknown> = {},
+  ): {
+    first_result_24h: FunnelIndicator;
+    return_week_2: FunnelIndicator;
+    attributable_purchase_30d: FunnelIndicator;
+  } => {
+    const bucket = `SELECT COUNT(*) AS n FROM (${COHORT}) c WHERE (${filter})`;
+    const d24 = count(`${bucket} AND c.birth_at <= datetime(@observed, '-1 day')`, extra);
+    const n24 = count(
+      `${bucket} AND c.birth_at <= datetime(@observed, '-1 day')
+         AND c.first_success_at IS NOT NULL
+         AND c.first_success_at < datetime(c.birth_at, '+1 day')`,
+      extra,
+    );
+    const p24 = count(`${bucket} AND c.birth_at > datetime(@observed, '-1 day')`, extra);
+    const dW2 = count(
+      `${bucket} AND c.first_success_at IS NOT NULL
+         AND c.first_success_at <= datetime(@observed, '-14 days')`,
+      extra,
+    );
+    const nW2 = count(
+      `${bucket} AND c.first_success_at IS NOT NULL
+         AND c.first_success_at <= datetime(@observed, '-14 days')
+         AND c.week2_success_at IS NOT NULL`,
+      extra,
+    );
+    const pW2 = count(
+      `${bucket} AND c.first_success_at IS NOT NULL
+         AND c.first_success_at > datetime(@observed, '-14 days')`,
+      extra,
+    );
+    const d30 = count(`${bucket} AND c.birth_at <= datetime(@observed, '-30 days')`, extra);
+    const n30 = count(
+      `${bucket} AND c.birth_at <= datetime(@observed, '-30 days')
+         AND ((c.first_settlement_at IS NOT NULL
+               AND c.first_settlement_at < datetime(c.birth_at, '+30 days'))
+           OR (c.paid_key_delivered_at IS NOT NULL
+               AND c.paid_key_delivered_at < datetime(c.birth_at, '+30 days')))`,
+      extra,
+    );
+    const p30 = count(`${bucket} AND c.birth_at > datetime(@observed, '-30 days')`, extra);
+    return {
+      first_result_24h: indicator(n24, d24, p24),
+      return_week_2: indicator(nW2, dW2, pW2),
+      attributable_purchase_30d: indicator(n30, d30, p30),
+    };
+  };
+
+  // ── Ventilation par PORTE de naissance, bornée à la lecture ─────────────
+  //
+  // La liste des seaux est tirée de la cohorte ADMISSIBLE et non des lignées
+  // créées : c'est cette population-là que les indicateurs mesurent, et deux
+  // populations dans un même objet feraient lire un numérateur contre le
+  // mauvais total.
+  const sourceRows = db
+    .prepare(
+      `SELECT COALESCE(c.birth_source, @none) AS bucket, COUNT(*) AS n
+         FROM (${COHORT}) c
+        GROUP BY bucket
+        ORDER BY n DESC, bucket ASC`,
+    )
+    .all({ from, to, none: NO_BUCKET }) as Array<{ bucket: string; n: number }>;
+  const namedSources = sourceRows.slice(0, BIRTH_SOURCE_BUCKETS);
+  const overflowSources = sourceRows.slice(BIRTH_SOURCE_BUCKETS);
+  const byBirthSource: FunnelBucket[] = namedSources.map((r) => ({
+    name: r.bucket,
+    lineages: r.n,
+    ...tripleFor('COALESCE(c.birth_source, @none) = @bucket', {
+      none: NO_BUCKET,
+      bucket: r.bucket,
+    }),
+  }));
+  if (overflowSources.length > 0) {
+    // 🚨 `NOT IN` sur les portes NOMMÉES, et non `IN` sur les repliées : le
+    // nombre de paramètres liés est alors borné par `BIRTH_SOURCE_BUCKETS`,
+    // quoi que fasse l'appelant. Écrit dans l'autre sens, il grandissait avec
+    // la cardinalité même que ce plafond existe pour borner — et
+    // `getLineageFunnel` n'a aucun try/catch, donc un plafond de paramètres
+    // atteint aurait rendu un 500 sur la route d'admin. Aucun risque de NULL :
+    // le COALESCE a déjà remplacé l'absence par la sentinelle.
+    const extra: Record<string, unknown> = { none: NO_BUCKET };
+    namedSources.forEach((r, i) => {
+      extra[`nb${i}`] = r.bucket;
+    });
+    const placeholders = namedSources.map((_, i) => `@nb${i}`).join(', ');
+    byBirthSource.push({
+      name: OVERFLOW_BUCKET,
+      lineages: overflowSources.reduce((sum, r) => sum + r.n, 0),
+      ...tripleFor(`COALESCE(c.birth_source, @none) NOT IN (${placeholders})`, extra),
+    });
+  }
+
+  // ── Ventilation par FAMILLE de client du premier succès ─────────────────
+  //
+  // Liste FERMÉE, donc tous les seaux sont publiés, y compris à zéro : la forme
+  // de la réponse ne change pas d'une lecture à l'autre, et un seau absent
+  // serait indiscernable d'un seau à zéro.
+  //
+  // DEUX seaux au-delà des huit familles, et la distinction n'est pas
+  // cosmétique :
+  //   - `(unknown)` : activée, mais avant que la famille soit enregistrée.
+  //   - `(none)`    : née et JAMAIS activée.
+  // Les confondre publierait les lignées déjà mesurées par le lot M — qui ont
+  // un premier succès et une famille NULL — comme n'ayant jamais rien fait.
+  //
+  // Les dix seaux PARTITIONNENT la cohorte : `first_success_at IS NULL` d'un
+  // côté, et de l'autre huit familles plus l'absence de famille. Leur somme
+  // vaut donc `lineages.admissible`, ce qui est la seule preuve simple que la
+  // ventilation ne perd personne.
+  const byFirstClient: FunnelBucket[] = [...LINEAGE_CLIENTS, UNKNOWN_BUCKET, NO_BUCKET].map(
+    (name) => {
+      const filter =
+        name === NO_BUCKET
+          ? 'c.first_success_at IS NULL'
+          : name === UNKNOWN_BUCKET
+            ? 'c.first_success_at IS NOT NULL AND c.first_success_client IS NULL'
+            : 'c.first_success_client = @bucket';
+      const extra = name === NO_BUCKET || name === UNKNOWN_BUCKET ? {} : { bucket: name };
+      return {
+        name,
+        lineages: count(`SELECT COUNT(*) AS n FROM (${COHORT}) c WHERE (${filter})`, extra),
+        ...tripleFor(filter, extra),
+      };
+    },
+  );
+
+  // ── Le rail device, de la porte jusqu'à l'achat ─────────────────────────
+  //
+  // 🚨 Les compteurs sont sommés sur des JOURS UTC pleins : `to` est une borne
+  // EXCLUSIVE à la seconde, mais `device_grant_daily` et `mcp_remote_daily` ne
+  // savent pas découper une journée. Sur une fenêtre qui commence à midi, ces
+  // compteurs portent donc aussi la matinée. `window_days` le dit, et les notes
+  // du bloc le répètent : c'est la seule façon honnête de publier un compteur
+  // journalier à côté d'une cohorte à la seconde.
+  const fromDay = from.slice(0, 10);
+  const toDay = to.slice(0, 10);
+  const grantDays = readDeviceGrantDaily(fromDay, toDay);
+  const mcpDays = readMcpRemoteDaily(fromDay, toDay);
+  const sumDoor = (door: DeviceDoor): DeviceDoorCounters => {
+    const rows = grantDays.filter((r) => r.source === door);
+    const add = (pick: (r: (typeof rows)[number]) => number): number =>
+      rows.reduce((sum, r) => sum + pick(r), 0);
+    return {
+      source: door,
+      opened: add((r) => r.opened),
+      rate_limited: add((r) => r.rate_limited),
+      approved_anonymous: add((r) => r.approved_anonymous),
+      approved_email: add((r) => r.approved_email),
+      denied: add((r) => r.denied),
+      expired: add((r) => r.expired),
+      delivered: add((r) => r.delivered),
+    };
+  };
+  const byDoor = DEVICE_DOORS.map(sumDoor);
+  const doorTotal = (pick: (d: DeviceDoorCounters) => number): number =>
+    byDoor.reduce((sum, d) => sum + pick(d), 0);
+  const approvedAnonymous = doorTotal((d) => d.approved_anonymous);
+  const approvedEmail = doorTotal((d) => d.approved_email);
+  const approved = approvedAnonymous + approvedEmail;
+  const opened = doorTotal((d) => d.opened);
+  const delivered = doorTotal((d) => d.delivered);
+
+  // Les deux portes du rail, liées par paramètre : la liste est écrite dans
+  // `lineage-clients.ts`, et l'y lire plutôt que la retaper garantit qu'une
+  // troisième porte ajoutée un jour entre dans ce bloc sans qu'on y pense.
+  const deviceExtra: Record<string, unknown> = {};
+  DEVICE_BIRTH_SOURCES.forEach((v, i) => {
+    deviceExtra[`dv${i}`] = v;
+  });
+  const devicePlaceholders = DEVICE_BIRTH_SOURCES.map((_, i) => `@dv${i}`).join(', ');
+  const deviceFilter = `c.birth_source IN (${devicePlaceholders})`;
+  const deviceCreated = count(
+    `SELECT COUNT(*) AS n FROM lineage_facts f
+      WHERE f.backfilled = 0
+        AND COALESCE(f.birth_tier, '') <> 'paid'
+        AND f.birth_at >= @from AND f.birth_at < @to
+        AND f.birth_source IN (${devicePlaceholders})`,
+    deviceExtra,
+  );
+  const deviceAdmissible = count(
+    `SELECT COUNT(*) AS n FROM (${COHORT}) c WHERE ${deviceFilter}`,
+    deviceExtra,
+  );
+
+  const device: DeviceRail = {
+    window_days: { from: fromDay, to: toDay },
+    counters: {
+      opened,
+      rate_limited: doorTotal((d) => d.rate_limited),
+      approved_anonymous: approvedAnonymous,
+      approved_email: approvedEmail,
+      approved,
+      denied: doorTotal((d) => d.denied),
+      expired: doorTotal((d) => d.expired),
+      delivered,
+    },
+    by_door: byDoor,
+    chain: {
+      approved_of_opened: share(approved, opened),
+      delivered_of_approved: share(delivered, approved),
+      lineages_of_delivered: share(deviceAdmissible, delivered),
+    },
+    lineages: { created: deviceCreated, admissible: deviceAdmissible },
+    indicators: tripleFor(deviceFilter, deviceExtra),
+    mcp_remote: {
+      sessions: mcpDays.reduce((sum, r) => sum + r.sessions, 0),
+      tool_calls: mcpDays.reduce((sum, r) => sum + r.tool_calls, 0),
+      key_requests: mcpDays.reduce((sum, r) => sum + r.key_requests, 0),
+      note:
+        'Appels servis SANS AUCUNE IDENTITE sur la surface MCP distante : cette porte sert sans cle, ' +
+        "donc aucun de ces trois nombres n'est rattachable a une lignee, et aucun n'entre dans un " +
+        "denominateur d'activation. tool_calls compte les appels SERVIS (un refus de plafond " +
+        "n'ecrit rien, pour qu'un appelant refuse ne coute aucune ecriture) ; les refus se lisent " +
+        'dans request_log sous /mcp:tools-call:refused et /mcp:session:refused.',
+    },
+    notes: [
+      'Deux granularites dans ce bloc : counters et mcp_remote sont sommes sur des JOURS UTC pleins (window_days), lineages et indicators sur la fenetre a la seconde.',
+      "opened ne s'additionne PAS en approved + denied + expired + delivered : un grant encore en attente au moment de la lecture n'est dans aucun seau terminal, et un grant approuve puis retire compte dans les deux.",
+      'expired veut dire « expiration TRANCHEE par la purge ce jour-la », pas « grant dont le TTL est passe » : le compteur est incremente a la decision, parce que device_codes est purgee a 24 h et ne peut plus rien dire apres coup.',
+      'lineages_of_delivered est le seul rapport de ce bloc qui croise les deux granularites : son numerateur vient de lineage_facts, son denominateur des compteurs journaliers.',
+      'Les compteurs du rail ne portent que le rail device : une approbation ou un retrait de checkout est un paiement, et ne les touche pas.',
+    ],
+  };
+
   return {
     observed_at: observedAt,
     measurement_started_at: started,
@@ -381,12 +767,19 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
     },
     unknown_context_share: share(unknownContext, activated),
     paid_link_coverage: share(paidLinked, paidDelivered),
+    by_birth_source: byBirthSource,
+    by_first_client: byFirstClient,
+    device,
     notes: [
       `${created - admissible} lignee(s) ecartee(s) de la fenetre : compte interne, cle frappee par nous, ou cohorte regroupee.`,
-      "Les appels servis par MCP ne comptent pas comme activation : ils atterrissent sous /mcp, hors des familles de routes metier. Un agent qui n'utilise que MCP produit donc zero activation mesuree.",
+      "Les appels servis par MCP ne comptent pas comme activation : ils atterrissent sous /mcp, hors des familles de routes metier. Un agent qui n'utilise que MCP produit donc zero activation mesuree. Ce trafic-la est mesure a part, dans device.mcp_remote, et il n'est rattachable a aucune lignee.",
       'paid_key_delivered vaut presque toujours 1 par construction : la reference de reglement et la cle sont ecrites dans la meme operation.',
       "Les reglements x402 a l'appel forment une serie distincte et ne remettent aucune cle.",
       'coverage = denominator / (denominator + pending) : la part de la cohorte qui a atteint le recul requis, pas un jugement sur le resultat.',
+      `by_birth_source est borne a ${BIRTH_SOURCE_BUCKETS} portes nommees plus (other) : birth_source recopie une source DECLAREE par l'appelant, dont la cardinalite n'est bornee par rien a l'ecriture.`,
+      "by_first_client vient d'une liste FERMEE de familles derivees de l'User-Agent ; l'User-Agent lui-meme n'entre jamais dans lineage_facts. Deux seaux ne sont pas des familles : (none) = nee et JAMAIS activee, (unknown) = activee AVANT que la famille soit enregistree. Les dix seaux partitionnent la cohorte, leur somme vaut lineages.admissible.",
+      "La famille browser est posee quand l'appel porte le marqueur de contexte demo. Ce marqueur est DECLARE par le client, exactement comme l'User-Agent : deux observations, aucune preuve.",
+      "L'integration n8n ne pose aucun User-Agent a nous : ses appels tombent dans other, et aucune famille n8n n'existe.",
     ],
   };
 }

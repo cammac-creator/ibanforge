@@ -12,11 +12,13 @@ import {
   DEVICE_USER_CODE_LENGTH,
   approveGrant,
   consumeGrantKey,
+  denyGrant,
   drawUserCode,
   enterPoll,
   findGrantByUserCode,
   grantReservationCount,
   hashGrantSecret,
+  issueApprovalToken,
   missDelayMs,
   normalizeUserCode,
   openGrant,
@@ -558,5 +560,196 @@ describe("le nettoyage de ce que l'agent déclare", () => {
     expect(sanitizeDisplayField(42, 60)).toBeNull();
     // Et un libellé honnête traverse intact.
     expect(sanitizeDisplayField('Claude Code (v1.2)', 60)).toBe('Claude Code (v1.2)');
+  });
+});
+
+describe('le compteur journalier du rail device', () => {
+  /** La ligne du jour pour une porte, ou des zéros si elle n'existe pas. */
+  function today(door: string): Record<string, number> {
+    const row = getStatsDB()
+      .prepare(
+        `SELECT opened, rate_limited, approved_anonymous, approved_email, denied, expired, delivered
+           FROM device_grant_daily WHERE day = date('now') AND source = ?`,
+      )
+      .get(door) as Record<string, number> | undefined;
+    return (
+      row ?? {
+        opened: 0,
+        rate_limited: 0,
+        approved_anonymous: 0,
+        approved_email: 0,
+        denied: 0,
+        expired: 0,
+        delivered: 0,
+      }
+    );
+  }
+
+  it('une ouverture, une approbation et un retrait comptent chacun UNE fois, sur LEUR porte', () => {
+    const before = today('mcp-device');
+    const opened = openGrant({
+      ip: '203.0.113.90',
+      userAgent: 'vitest/1.0',
+      clientName: 'vitest',
+      reason: 'compteur',
+      source: 'mcp-device',
+    });
+    if (!opened.ok) throw new Error(opened.error);
+    expect(today('mcp-device').opened).toBe(before.opened + 1);
+
+    const minted = generateApiKey(null, undefined, 'mcp-device', false, { ipHash: 'unknown' });
+    if (!minted) throw new Error('generateApiKey returned null');
+    const secretHash = hashGrantSecret(opened.deviceCode);
+    expect(
+      approveGrant(
+        secretHash,
+        { tier: 'anonymous', keyHash: minted.key_hash, rawKey: minted.api_key },
+        'device',
+      ),
+    ).toBe(true);
+    expect(today('mcp-device').approved_anonymous).toBe(before.approved_anonymous + 1);
+    expect(today('mcp-device').approved_email).toBe(before.approved_email);
+
+    expect(consumeGrantKey(secretHash, 'device')).not.toBeNull();
+    expect(today('mcp-device').delivered).toBe(before.delivered + 1);
+    // 🚨 Un SECOND retrait ne rend rien, donc ne compte rien : la clé est
+    // remise exactement une fois, et le compteur doit dire la même chose que la
+    // remise.
+    expect(consumeGrantKey(secretHash, 'device')).toBeNull();
+    expect(today('mcp-device').delivered).toBe(before.delivered + 1);
+  });
+
+  it("une approbation avec adresse prouvée compte dans l'AUTRE branche", () => {
+    const before = today('web-device');
+    const opened = openGrant({
+      ip: '203.0.113.91',
+      userAgent: null,
+      clientName: null,
+      reason: null,
+      source: 'web-device',
+    });
+    if (!opened.ok) throw new Error(opened.error);
+    const minted = generateApiKey(
+      `dg-${Date.now()}@alpha.example.net`,
+      undefined,
+      'web-device',
+      false,
+      { ipHash: 'unknown' },
+      true,
+    );
+    if (!minted) throw new Error('generateApiKey returned null');
+    approveGrant(
+      hashGrantSecret(opened.deviceCode),
+      { tier: 'email', keyHash: minted.key_hash, rawKey: minted.api_key },
+      'device',
+    );
+    expect(today('web-device').approved_email).toBe(before.approved_email + 1);
+    expect(today('web-device').approved_anonymous).toBe(before.approved_anonymous);
+  });
+
+  it('un refus humain compte, et seulement quand il aboutit', () => {
+    const before = today('web-device');
+    const opened = openGrant({
+      ip: '203.0.113.92',
+      userAgent: null,
+      clientName: null,
+      reason: null,
+      source: 'web-device',
+    });
+    if (!opened.ok) throw new Error(opened.error);
+    const secretHash = hashGrantSecret(opened.deviceCode);
+    // Sans jeton valide, `denyGrant` ne détruit rien : rien ne doit être compté.
+    expect(denyGrant(secretHash, 'pas-le-bon')).toBe(false);
+    expect(today('web-device').denied).toBe(before.denied);
+    const token = issueApprovalToken(secretHash);
+    expect(token).not.toBeNull();
+    expect(denyGrant(secretHash, token as string)).toBe(true);
+    expect(today('web-device').denied).toBe(before.denied + 1);
+  });
+
+  it('un refus de plafond compte comme rate_limited, sur la porte déclarée', () => {
+    const ip = '203.0.113.93';
+    const bucket = keyCreationSource(ip) as string;
+    const before = today('mcp-device');
+    for (let i = 0; i < DAILY_KEY_CREATION_LIMIT; i++) {
+      recordKeyCreation(bucket, 'vitest/1.0', `ifk_cnt_${i}`);
+    }
+    const refused = openGrant({
+      ip,
+      userAgent: null,
+      clientName: null,
+      reason: null,
+      source: 'mcp-device',
+    });
+    expect(refused.ok).toBe(false);
+    expect(today('mcp-device').rate_limited).toBe(before.rate_limited + 1);
+    // Et un refus n'ouvre rien : la colonne `opened` ne bouge pas.
+    expect(today('mcp-device').opened).toBe(before.opened);
+  });
+
+  it('une source libre est repliée sur other, pas stockée telle quelle', () => {
+    // 🚨 La borne qui garde la table petite ET sans identifiant durable. Une
+    // source déclarée par l'appelant, stockée telle quelle, ferait de cette
+    // colonne un jeu d'identifiants non borné, dans une table sans rétention.
+    const before = today('other');
+    const opened = openGrant({
+      ip: '203.0.113.94',
+      userAgent: null,
+      clientName: null,
+      reason: null,
+      source: 'ma-porte-inventee',
+    });
+    expect(opened.ok).toBe(true);
+    expect(today('other').opened).toBe(before.opened + 1);
+    const rows = getStatsDB()
+      .prepare('SELECT DISTINCT source FROM device_grant_daily')
+      .all() as Array<{ source: string }>;
+    expect(rows.every((r) => ['web-device', 'mcp-device', 'other'].includes(r.source))).toBe(true);
+  });
+
+  it('la purge compte les expirations QU’ELLE TRANCHE, par porte', () => {
+    const before = today('web-device');
+    const opened = openGrant({
+      ip: '203.0.113.95',
+      userAgent: null,
+      clientName: null,
+      reason: null,
+      source: 'web-device',
+    });
+    if (!opened.ok) throw new Error(opened.error);
+    rewind(hashGrantSecret(opened.deviceCode), '-2 hours');
+    purgeExpiredDeviceCodes();
+    expect(today('web-device').expired).toBe(before.expired + 1);
+    // 🚨 Rejouée, la purge ne recompte pas : la ligne est déjà 'expired', donc
+    // elle n'est plus dans le prédicat. C'est ce qui rend le compteur juste
+    // malgré un passage toutes les 24 h.
+    purgeExpiredDeviceCodes();
+    expect(today('web-device').expired).toBe(before.expired + 1);
+  });
+
+  it('le rail checkout ne touche AUCUN de ces compteurs', () => {
+    const minted = generateApiKey(null, undefined, 'checkout', false, { ipHash: 'unknown' });
+    if (!minted) throw new Error('generateApiKey returned null');
+    const secretHash = hashGrantSecret('ifn_counter_checkout');
+    insertCheckoutRow({ secretHash, status: 'pending' });
+    const beforeAll = getStatsDB()
+      .prepare(
+        "SELECT COALESCE(SUM(approved_anonymous + approved_email + delivered), 0) AS n FROM device_grant_daily WHERE day = date('now')",
+      )
+      .get() as { n: number };
+    expect(
+      approveGrant(
+        secretHash,
+        { tier: 'paid', keyHash: minted.key_hash, rawKey: minted.api_key },
+        'checkout',
+      ),
+    ).toBe(true);
+    expect(consumeGrantKey(secretHash, 'checkout')).not.toBeNull();
+    const afterAll = getStatsDB()
+      .prepare(
+        "SELECT COALESCE(SUM(approved_anonymous + approved_email + delivered), 0) AS n FROM device_grant_daily WHERE day = date('now')",
+      )
+      .get() as { n: number };
+    expect(afterAll.n).toBe(beforeAll.n);
   });
 });

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getStatsDB } from './db.js';
-import { generateApiKey, claimKey, rotateApiKey, generateCreditKey } from './api-keys.js';
+import {
+  generateApiKey,
+  claimKey,
+  rotateApiKey,
+  generateCreditKey,
+  generateStripeKey,
+} from './api-keys.js';
 import { recordKeySettlement } from './key-settlements.js';
 import {
   normalizeLineageContext,
@@ -30,8 +36,27 @@ function factOf(lineage: string) {
     Record<string, unknown> | undefined;
 }
 
-function callOk(keyHash: string, context?: string, path = '/v1/iban/validate') {
-  recordLineageSuccess({ keyHash, method: 'POST', path, status: 200, context });
+function callOk(keyHash: string, context?: string, path = '/v1/iban/validate', userAgent?: string) {
+  recordLineageSuccess({ keyHash, method: 'POST', path, status: 200, context, userAgent });
+}
+
+/** Une lignée neuve née par le rail device, avec la porte déclarée. */
+function deviceLineage(
+  door: 'web-device' | 'mcp-device',
+  email: string | null = null,
+  provenMailbox = false,
+): { api_key: string; key_hash: string; key_prefix: string } {
+  n += 1;
+  const key = generateApiKey(
+    email,
+    undefined,
+    door,
+    false,
+    { ipHash: `lf-dev-${RUN}-${n}` },
+    provenMailbox,
+  );
+  if (!key) throw new Error('clé non frappée');
+  return key;
 }
 
 beforeEach(() => {
@@ -313,5 +338,131 @@ describe('rétention', () => {
     // La clé active survit malgré son âge : c'est un porteur vivant.
     expect(factOf(live.key_hash)).toBeDefined();
     expect(factOf(dead.key_hash)).toBeUndefined();
+  });
+});
+
+describe('la famille de client du succès', () => {
+  it("le PREMIER client est figé, le DERNIER suit — et l'UA n'est jamais stocké", () => {
+    const k = freshLineage();
+    callOk(k.key_hash, undefined, '/v1/iban/validate', 'ibanforge-mcp/1.6.0');
+    const first = factOf(k.key_hash)!;
+    expect(first.first_success_client).toBe('mcp-npm');
+    expect(first.last_success_client).toBe('mcp-npm');
+    // Un autre client, le même jour : le cache porte la famille, donc
+    // l'écriture passe et le dernier bouge sans que le premier bouge.
+    callOk(k.key_hash, undefined, '/v1/iban/validate', 'ibanforge-python/1.6.0');
+    const then = factOf(k.key_hash)!;
+    expect(then.first_success_client).toBe('mcp-npm');
+    expect(then.last_success_client).toBe('sdk-python');
+    // 🚨 Le jour n'est compté qu'UNE fois malgré les deux écritures : c'est
+    // `last_success_day` qui rend `success_days` idempotent en base, et non le
+    // cache mémoire — dont la clé vient justement de changer.
+    expect(then.success_days).toBe(1);
+    // Et l'User-Agent lui-même n'est nulle part dans la ligne.
+    const values = Object.values(then).map((v) => String(v));
+    expect(values.some((v) => v.includes('ibanforge-mcp/1.6.0'))).toBe(false);
+    expect(values.some((v) => v.includes('ibanforge-python'))).toBe(false);
+  });
+
+  it('le marqueur `demo` rend browser, un UA absent rend other', () => {
+    const k = freshLineage();
+    callOk(k.key_hash, 'demo', '/v1/iban/validate', 'Mozilla/5.0 (Macintosh) Safari/605');
+    expect(factOf(k.key_hash)!.first_success_client).toBe('browser');
+    const bare = freshLineage();
+    callOk(bare.key_hash);
+    expect(factOf(bare.key_hash)!.first_success_client).toBe('other');
+  });
+
+  it('le même client deux fois le même jour ne repasse pas en base', () => {
+    const k = freshLineage();
+    callOk(k.key_hash, undefined, '/v1/iban/validate', 'ibanforge-ts/1.6.0');
+    const before = factOf(k.key_hash)!;
+    // Le court-circuit du cache : rien ne bouge, pas même `updated_at`.
+    callOk(k.key_hash, undefined, '/v1/iban/batch', 'ibanforge-ts/1.6.0');
+    const after = factOf(k.key_hash)!;
+    expect(after.first_success_route).toBe(before.first_success_route);
+    expect(after.last_success_at).toBe(before.last_success_at);
+  });
+});
+
+describe('la preuve de boîte POSÉE À LA NAISSANCE', () => {
+  it("une clé née d'un code vérifié porte claim_method dans lineage_facts", () => {
+    // 🚨 Le trou que ce test ferme : `generateApiKey` écrit
+    // `claimed_at` + `claim_method = 'email_code'` DANS sa transaction quand la
+    // boîte est prouvée, et cette clé ne passe donc JAMAIS par `claimKey`
+    // (gardée par `WHERE tier = 'anonymous'`), seul appelant de
+    // `recordLineageClaim`. Sans le miroir à la naissance, la lignée restait à
+    // claim_method NULL et AUCUN achat par carte ne pouvait lui être relié.
+    const address = `lf-${RUN}-born@alpha.example.net`;
+    const born = deviceLineage('mcp-device', address, true);
+    const f = factOf(born.key_hash)!;
+    expect(f.claim_method).toBe('email_code');
+    expect(f.first_claim_at).not.toBeNull();
+    expect(f.birth_source).toBe('mcp-device');
+  });
+
+  it('une clé née anonyme ne prétend prouver aucune boîte', () => {
+    const anon = deviceLineage('web-device');
+    const f = factOf(anon.key_hash)!;
+    expect(f.claim_method).toBeNull();
+    expect(f.first_claim_at).toBeNull();
+  });
+});
+
+describe("les trois chemins d'attribution d'un achat", () => {
+  it('(a) un règlement x402 SUR LA CLÉ de la lignée est attribuable', () => {
+    const k = deviceLineage('mcp-device');
+    expect(
+      recordKeySettlement({
+        keyHash: k.key_hash,
+        keyPrefix: k.key_prefix,
+        paymentRef: `lf-x402-${RUN}-${n}`,
+        route: 'POST /v1/iban/validate',
+        quotedAmountUsd: 0.005,
+      }),
+    ).toBe(true);
+    const f = factOf(k.key_hash)!;
+    expect(f.first_settlement_at).not.toBeNull();
+    expect(f.settlement_count).toBe(1);
+  });
+
+  it('(b) un achat de crédits réglé AVEC cette clé est attribuable à la lignée', () => {
+    // La clé d'essai est celle qui PRÉSENTE le paiement sur la route d'achat :
+    // le crochet x402 écrit la ligne de règlement sur elle, donc la lignée
+    // d'essai porte l'achat, même si le paquet vendu est une clé distincte.
+    const k = deviceLineage('mcp-device');
+    expect(
+      recordKeySettlement({
+        keyHash: k.key_hash,
+        keyPrefix: k.key_prefix,
+        paymentRef: `lf-pack-${RUN}-${n}`,
+        route: 'POST /v1/credits/buy/1k',
+        quotedAmountUsd: 5,
+      }),
+    ).toBe(true);
+    expect(factOf(k.key_hash)!.first_settlement_at).not.toBeNull();
+    const route = getStatsDB()
+      .prepare('SELECT route FROM key_settlements WHERE key_hash = ?')
+      .get(k.key_hash) as { route: string };
+    expect(route.route).toBe('POST /v1/credits/buy/1k');
+  });
+
+  it('(c) un paquet payé par CARTE se relie à une lignée device née vérifiée', () => {
+    const address = `lf-${RUN}-card@alpha.example.net`;
+    const born = deviceLineage('web-device', address, true);
+    generateStripeKey(address, 1_000, `cs_test_${RUN}_${n}`);
+    const f = factOf(born.key_hash)!;
+    expect(f.paid_key_hash).not.toBeNull();
+    expect(f.paid_key_delivered_at).not.toBeNull();
+  });
+
+  it("(c) rien ne se relie à une lignée device née ANONYME : c'est la limite, pas un défaut", () => {
+    // Aucune clé de rapprochement : la clé anonyme n'a pas d'adresse, et
+    // l'acheteur par carte n'a pas de clé. Le contrat dit d'écarter la
+    // correspondance ambiguë, et la part non reliée est publiée dans
+    // `paid_link_coverage`.
+    const anon = deviceLineage('mcp-device');
+    generateCreditKey(null, 1_000, `lf-anon-pack-${RUN}-${n}`);
+    expect(factOf(anon.key_hash)!.paid_key_hash).toBeNull();
   });
 });

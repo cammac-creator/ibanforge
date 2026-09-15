@@ -44,6 +44,7 @@ import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 
 import { extractClientIp } from '../lib/stats.js';
 import { countDailyUnits, countDailyUnitsInMemory } from '../lib/daily-ip-ledger.js';
+import { bumpMcpRemoteDaily } from '../lib/agent-entry-daily.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
 import {
   buildCountriesPayload,
@@ -1349,6 +1350,13 @@ mcpHttp.post('/mcp', async (c) => {
   // zéro événement : `request_api_key` coûte 0 et reste un appel à mesurer.
   // Hissé ici parce que `calls` vit dans le `try` ci-dessous.
   let toolCalls = 0;
+  // 🚨 Les appels de `request_api_key`, comptés SÉPARÉMENT et depuis le même
+  // parse (chantier « mesure agents », 15/09). C'est la seule mesure du haut de
+  // l'entonnoir qu'aucune source existante ne peut rendre : `request_log` ne
+  // garde que le chemin `/mcp:tools-call`, jamais le nom de l'outil, et le
+  // registre journalier ne compte que des UNITÉS — or cet outil coûte zéro unité
+  // (`MCP_FREE_TOOLS`), donc il y est parfaitement invisible.
+  let keyRequests = 0;
   try {
     const body = await cloned.json();
     // JSON-RPC allows a BATCH: the body may be an array of messages. On an
@@ -1365,6 +1373,7 @@ mcpHttp.post('/mcp', async (c) => {
     }> = Array.isArray(body) ? body : [body];
     const calls = messages.filter((m) => m?.method === 'tools/call');
     toolCalls = calls.length;
+    keyRequests = calls.filter((m) => m?.params?.name === 'request_api_key').length;
     toolUnits = calls.reduce((sum, m) => sum + mcpToolUnits(m?.params), 0);
     toolName =
       calls
@@ -1447,6 +1456,21 @@ mcpHttp.post('/mcp', async (c) => {
   // de ce que cet outil existe pour faire.
   if (toolCalls > 0) c.set('mcpToolCall', true);
 
+  // ─── Le haut de l'entonnoir MCP distant, par jour ─────────────────────────
+  // (chantier « mesure agents », 15/09)
+  //
+  // 🚨 APRÈS la porte du plafond, exprès, et ce n'est pas un détail de
+  // placement : `daily-ip-ledger.ts` tient une carte `overLimit` en mémoire
+  // pour que le coût serveur d'un appelant refusé reste exactement zéro
+  // écriture, alors que le limiteur global lui laisse cent requêtes par
+  // minute. Compter ici les TENTATIVES aurait rendu à un refusé une écriture
+  // par requête dans le fichier qui porte `api_keys`, les crédits et les traces
+  // de paiement. `tool_calls` compte donc les appels SERVIS ; les refus se
+  // lisent déjà à part, sous `/mcp:tools-call:refused` dans `request_log`.
+  //
+  // Une seule écriture par requête `/mcp`, sur une table d'une ligne par jour.
+  if (toolCalls > 0) bumpMcpRemoteDaily({ toolCalls, keyRequests });
+
   const sessionId = c.req.header('mcp-session-id');
 
   // 🚨 LE PORTEUR EST PRÉPARÉ ICI, AVANT DE SAVOIR S'IL Y A UNE SESSION, et
@@ -1526,6 +1550,14 @@ mcpHttp.post('/mcp', async (c) => {
         },
       });
     }
+    // La session est ACCORDÉE : la franchise vient d'être débitée et le
+    // McpServer va être construit. Comptée ici et pas sur la méthode
+    // `initialize`, pour la même raison que le plafond l'est ici — c'est la
+    // ligne où la mémoire est dépensée, quoi que prétende le corps. Les refus
+    // se lisent sous `/mcp:session:refused` dans `request_log`
+    // (chantier « mesure agents », 15/09).
+    bumpMcpRemoteDaily({ sessions: 1 });
+
     // New session — create transport and connect server
     transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID(),
