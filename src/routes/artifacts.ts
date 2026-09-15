@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { RATE_LIMIT } from '../middleware/rate-limit.js';
 import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { FREE_TIER_MONTHLY_LIMIT as FREE_MONTHLY } from '../lib/tiers.js';
+import { MCP_DAILY_LIMIT as MCP_FREE_DAILY } from '../lib/mcp-limits.js';
 
 /**
  * Machine-readable operating artifacts: what an agent is allowed to do without
@@ -22,11 +24,9 @@ import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
  */
 export const artifacts = new Hono();
 
-const FREE_MONTHLY = 200;
 // The guarded value the middleware actually enforces — never a second parse
 // of the env var, which could publish "NaN" into a machine-readable contract.
 const RATE_PER_MIN = RATE_LIMIT;
-const MCP_FREE_DAILY = 10;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Agentic access contract — the one artifact with real operational meaning.

@@ -12,6 +12,7 @@
  * (see src/routes/api-keys.ts).
  */
 import { createHash } from 'node:crypto';
+import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
 
 // ---------------------------------------------------------------------------
 // API payload shapes
@@ -80,8 +81,8 @@ export interface RadarState {
   keys: Record<string, RadarKeyState>;
 }
 
-/** Default monthly quota when monthly_limit is null (mirrors scripts/admin-keys.ts). */
-export const DEFAULT_MONTHLY_LIMIT = 200;
+/** Ré-export historique du plafond commun. */
+export { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

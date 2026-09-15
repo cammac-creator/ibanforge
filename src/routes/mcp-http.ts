@@ -42,6 +42,7 @@ import {
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
+import { MCP_DAILY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -784,7 +785,7 @@ function registeredToolNames(): string[] {
 // allowance is a taster, not a tier: 10 calls is enough to evaluate the
 // service and far too few to run on. Announce it wherever it is offered —
 // an undocumented free path converts nobody.
-export const MCP_DAILY_LIMIT = 10;
+export { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
 /**
  * Opening a session is not a tool call, so until 2026-09-01 it was counted by
  * nothing at all — and it is the expensive one (a whole McpServer, see the
@@ -792,7 +793,7 @@ export const MCP_DAILY_LIMIT = 10;
  * per process, re-opened after a redeploy) and far below what it takes to fill
  * a container. Same ledger as the tool-call allowance, separate key.
  */
-export const MCP_SESSIONS_PER_IP_DAY = 30;
+export { MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
 
 // The sessions nobody ever closed (SEC-01/MCP-08). It used to share a tick with
 // the call counter; since the counter moved to src/lib/daily-ip-ledger.ts —

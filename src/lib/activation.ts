@@ -1,4 +1,5 @@
 import { getStatsDB } from './db.js';
+import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { isInternalEmail } from './internal-accounts.js';
 import { getServiceUsage, type ServiceUsage } from './service-usage.js';
 
@@ -220,7 +221,10 @@ export function getActivation(days = 30): ActivationResponse {
       list[0].created_at,
     );
     const freeUsed = freeKeys.reduce((a, k) => a + (usageByHash.get(k.key_hash) ?? 0), 0);
-    const freeQuota = freeKeys.reduce((a, k) => a + (k.monthly_limit ?? 200), 0);
+    const freeQuota = freeKeys.reduce(
+      (a, k) => a + (k.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT),
+      0,
+    );
     const creditsTotal = paidKeys.reduce((a, k) => a + (k.credits_total ?? 0), 0);
     const creditsRemaining = paidKeys.reduce((a, k) => a + (k.credits_remaining ?? 0), 0);
 

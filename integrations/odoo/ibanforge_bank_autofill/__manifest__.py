@@ -10,7 +10,7 @@ IBANforge Bank Auto-fill
 
 Automatically fill the BIC (SWIFT) code and bank name on a partner bank
 account as soon as an IBAN is entered, using the IBANforge API
-(121k+ BIC codes, 75 countries). No manual bank pre-configuration required.
+(121k+ BIC codes, 89 countries). No manual bank pre-configuration required.
 """,
     "author": "IBANforge",
     "website": "https://ibanforge.com/?utm_source=odoo",

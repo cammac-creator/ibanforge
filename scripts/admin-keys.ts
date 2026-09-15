@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes } from 'node:crypto';
+import { FREE_TIER_MONTHLY_LIMIT } from '../src/lib/tiers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -45,7 +46,7 @@ async function remoteList() {
   console.log('  ' + '-'.repeat(90));
 
   for (const r of data.keys) {
-    const limit = r.monthly_limit ?? 200;
+    const limit = r.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT;
     const status = r.active ? 'active' : 'inactive';
     const pct = limit > 0 ? Math.round((r.used / limit) * 100) : 0;
     console.log(
@@ -96,9 +97,9 @@ function localMode() {
   const STATS_DB_PATH = process.env.STATS_DB_PATH ?? resolve(__dirname, '../data/stats.sqlite');
   const db = new Database(STATS_DB_PATH);
 
-  const keyCols = (
-    db.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
-  ).map((r: { name: string }) => r.name);
+  const keyCols = (db.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>).map(
+    (r: { name: string }) => r.name,
+  );
   if (!keyCols.includes('monthly_limit')) {
     db.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
   }
@@ -139,7 +140,7 @@ function localList() {
   console.log('  ' + '-'.repeat(90));
 
   for (const r of rows) {
-    const limit = r.monthly_limit ?? 200;
+    const limit = r.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT;
     const status = r.active ? 'active' : 'inactive';
     const pct = limit > 0 ? Math.round((r.used / limit) * 100) : 0;
     console.log(
@@ -163,7 +164,7 @@ function localGenerate(email: string, monthlyLimit?: number) {
   console.log(`  Key generated LOCALLY for ${email}`);
   console.log(`  API Key:       ${rawKey}`);
   console.log(`  Prefix:        ${keyPrefix}`);
-  console.log(`  Monthly limit: ${monthlyLimit ?? 200}`);
+  console.log(`  Monthly limit: ${monthlyLimit ?? FREE_TIER_MONTHLY_LIMIT}`);
   console.log(`\n  ⚠  This key only works locally. Use without --local for production.\n`);
   db.close();
 }
@@ -212,7 +213,7 @@ switch (command) {
 
   Commands:
     list                         List all API keys with usage
-    generate <email> [limit]     Generate a new key (default: 200/month)
+    generate <email> [limit]     Generate a new key (default: ${FREE_TIER_MONTHLY_LIMIT}/month)
 
   Modes:
     (default)                    Production via admin API (requires ADMIN_SECRET)
