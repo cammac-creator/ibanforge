@@ -51,6 +51,22 @@ export interface KeyBirth {
  * monde entier. Elle porte sur la forme normalisée (plus d'étiquette, points
  * retirés chez gmail), sinon you+1@ et y.o.u@ sont trois personnes pour la
  * base et une boîte pour leur porteur.
+ *
+ * `provenMailbox` (lot 3) : vrai UNIQUEMENT quand un code à 6 chiffres vient
+ * d'être vérifié pour cette création. Il pose alors `claimed_at` et
+ * `claim_method = 'email_code'` DÈS LA NAISSANCE. Le palier reste 'email' —
+ * cette clé n'a jamais été anonyme, rien n'a été « réclamé » — mais la PREUVE
+ * de la boîte se lit désormais sur `claimed_at`.
+ *
+ * 🚨 Sans cette ligne, le bouclier du disjoncteur dégraderait le seul palier
+ * que les fermes n'utilisent pas : la PREMIÈRE clé d'un réseau neuf n'exige
+ * aucun code et naît donc au palier gratuit, non dégradée. Un prédicat
+ * `tier === 'anonymous'` laisserait passer une ferme entière montée sur des
+ * réseaux sans historique ; `claimed_at IS NULL` la couvre.
+ *
+ * ⚠️ Corollaire pour tout futur lecteur : après ce lot, `claimed_at IS NOT NULL`
+ * ne veut plus dire « a été réclamée » mais « a prouvé une boîte ». Un compteur
+ * de réclamations doit filtrer sur `tier`, jamais sur la seule nullité.
  */
 export function generateApiKey(
   email: string | null,
@@ -58,6 +74,7 @@ export function generateApiKey(
   source?: string,
   issuedByUs = false,
   birth?: KeyBirth,
+  provenMailbox = false,
 ): { api_key: string; key_prefix: string; key_hash: string } | null {
   const db = getStatsDB();
   const emailNorm = email ? normalizeEmail(email) : null;
@@ -79,7 +96,13 @@ export function generateApiKey(
   // porteurs sous un même préfixe se liraient l'un l'autre.
   const clash = db.prepare('SELECT 1 AS one FROM api_keys WHERE key_prefix = ?');
   const insert = db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, source, issued_by_us, tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    // claimed_at par un CASE et non par un paramètre : la date doit venir de
+    // datetime('now'), c'est-à-dire de SQLite en UTC, comme toutes les autres
+    // dates de cette table. Une date calculée en JS y arriverait dans le fuseau
+    // de la machine et ferait glisser toute fenêtre glissante qui la lit.
+    `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, source, issued_by_us, tier,
+                           claimed_at, claim_method)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, ?)`,
   );
   for (let attempt = 0; attempt < 3; attempt++) {
     const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
@@ -98,6 +121,10 @@ export function generateApiKey(
         source ?? null,
         issuedByUs ? 1 : 0,
         tier,
+        // Une clé sans adresse n'a par construction aucune boîte à prouver : le
+        // drapeau est ignoré sur la branche anonyme plutôt que cru sur parole.
+        provenMailbox && email ? 1 : 0,
+        provenMailbox && email ? 'email_code' : null,
       );
       recordKeyCreation(birth?.ipHash ?? 'unknown', birth?.userAgent ?? null, keyPrefix);
     })();

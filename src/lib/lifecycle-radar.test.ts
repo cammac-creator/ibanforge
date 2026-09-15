@@ -252,6 +252,45 @@ describe('detectEvents — exclusions', () => {
   it('skips deactivated keys', () => {
     expect(detect([key({ email: 'ops@acme.com', used: 200, active: 0 })])).toHaveLength(0);
   });
+
+  it('une clé anonyme à 24/25 ne produit AUCUN événement', () => {
+    // 🚨 C'est la surface la plus coûteuse du palier anonyme, parce que ce
+    // module POUSSE sur Telegram. La sentinelle n'est pas interne (pas
+    // d'arobase, donc pas de domaine), et le seuil est un RATIO : chaque clé
+    // anonyme annoncerait QUOTA_80 dès 20 unités sur 25 puis QUOTA_FULL à 25,
+    // huit fois plus tôt qu'une clé du palier gratuit, toutes agrégées sous une
+    // identité unique et une société devinée depuis un domaine vide.
+    const anon = key({
+      tier: 'anonymous',
+      email: 'anonymous',
+      used: 24,
+      monthly_limit: 25,
+    });
+    expect(detect([anon])).toHaveLength(0);
+    // À 25/25 non plus.
+    expect(
+      detect([key({ tier: 'anonymous', email: 'anonymous', used: 25, monthly_limit: 25 })]),
+    ).toHaveLength(0);
+
+    // Le jumeau POSITIF : une clé réclamée garde son événement commercial. Sans
+    // cette moitié, un vert ne prouverait qu'une boucle cassée.
+    const claimed = key({
+      tier: 'claimed',
+      email: 'ops@acme.com',
+      used: 160,
+      monthly_limit: 200,
+    });
+    expect(detect([claimed]).map((e) => e.kind)).toEqual(['QUOTA_80']);
+  });
+
+  it('une fixture sans palier se comporte comme avant — le champ est optionnel', () => {
+    // Le champ est optionnel à dessein : les fixtures antérieures ne le portent
+    // pas, et un champ requis les aurait toutes cassées pour un filtre qui,
+    // absent, doit se lire « palier inconnu », donc traité comme aujourd'hui.
+    expect(
+      detect([key({ email: 'ops@acme.com', used: 200, monthly_limit: 200 })]).map((e) => e.kind),
+    ).toEqual(['QUOTA_FULL']);
+  });
 });
 
 describe('diffAgainstState — anti-repetition', () => {

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { draftOne } from './prospect-radar-server.js';
+import { draftOne, enrichClientCompanies } from './prospect-radar-server.js';
 import type { ProspectForMail } from './prospect-radar.js';
+import { generateApiKey } from './api-keys.js';
+import { getStatsDB } from './db.js';
 
 const PROSPECT: ProspectForMail = {
   id: 'p_test',
@@ -78,5 +80,39 @@ describe('draftOne retry on unparseable generation', () => {
 
     await expect(draftOne(PROSPECT)).rejects.toThrow(/unparseable \(stop_reason=max_tokens\)/);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('le palier anonyme ne produit aucune fiche de prospection', () => {
+  it('une clé anonyme n’est pas un candidat ; la même clé au palier gratuit en est un', async () => {
+    // 🚨 Le défaut que ce test ferme. La sentinelle du palier anonyme n'est pas
+    // interne (elle ne matche aucun terme de la liste des comptes internes),
+    // donc elle deviendrait UN prospect unique agrégeant les préfixes de toutes
+    // les clés anonymes. Et comme une adresse sans arobase n'a pas de domaine,
+    // l'identification basculerait sur le user-agent : un agent de collecte
+    // partirait sur le site du premier client venu.
+    const db = getStatsDB();
+    db.prepare('DELETE FROM api_keys').run();
+    const anon = generateApiKey(null, undefined, undefined, false, { ipHash: 'prospect-anon' });
+    expect(anon).not.toBeNull();
+
+    const nothing = await enrichClientCompanies(5);
+    expect(nothing.tried).toBe(0);
+    expect(nothing.unresolved).toBe(0);
+    const noProfile = (
+      db.prepare("SELECT COUNT(*) AS n FROM company_profiles WHERE email = 'anonymous'").get() as {
+        n: number;
+      }
+    ).n;
+    expect(noProfile).toBe(0);
+
+    // Le jumeau POSITIF, sans réseau : la MÊME ligne au palier gratuit devient
+    // un candidat. Sans lui, un vert ne prouverait qu'une requête cassée.
+    // Aucun appel sortant n'est possible ici — la sentinelle n'a ni domaine ni
+    // user-agent, donc la boucle la classe « non résolue » et s'arrête là.
+    db.prepare("UPDATE api_keys SET tier = 'email' WHERE key_prefix = ?").run(anon!.key_prefix);
+    const found = await enrichClientCompanies(5);
+    expect(found.tried).toBe(1);
+    expect(found.unresolved).toBe(1);
   });
 });

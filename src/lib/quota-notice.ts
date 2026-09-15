@@ -1,12 +1,24 @@
 import { recordQuotaNotice, clearQuotaNotice, getKeyAgeHours, isNoRecredit } from './api-keys.js';
 import { sendQuotaWarningEmail } from './email.js';
 import { isUnroutableEmail } from './disposable-domains.js';
+import { ANONYMOUS_CONTACT } from './tiers.js';
 
 /**
  * Placeholders stored in `api_keys.email` when the buyer never gave an address
  * (x402 / Stripe / OEM anonymous paths). Mailing them would bounce.
+ *
+ * ANONYMOUS_CONTACT rejoint la liste avec le palier sans e-mail. C'est une
+ * ceinture et un point d'ancrage nommé, pas une correction : la sentinelle n'a
+ * pas d'arobase, donc `isReachable` rendait DÉJÀ false. Ce qui manquait était
+ * un endroit où le cas porte son nom, pour qu'un test puisse le citer et qu'un
+ * futur lecteur ne se demande pas si le palier anonyme a été oublié ici.
  */
-const PLACEHOLDER_CONTACTS = new Set(['credits-buyer', 'stripe-buyer', 'oem-subscriber']);
+const PLACEHOLDER_CONTACTS = new Set([
+  'credits-buyer',
+  'stripe-buyer',
+  'oem-subscriber',
+  ANONYMOUS_CONTACT,
+]);
 
 export type QuotaNoticeOutcome =
   | 'sent'

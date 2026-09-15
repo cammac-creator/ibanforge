@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
@@ -20,6 +20,8 @@ import { getIbansArray } from '../lib/request-helpers.js';
 // 502 would otherwise discard. Imported, never redefined: two hashes that had
 // to agree would eventually stop agreeing.
 import { settlementRef } from '../routes/credits-buy.js';
+import { opsFail } from '../lib/ops-alert.js';
+import { settleAndMaybeClaim } from '../lib/key-settlements.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -1099,6 +1101,14 @@ export function withFacilitatorTimeout<T>(
 // onto another's response under concurrency.
 export interface SettlementSlot {
   unconfirmed: FacilitatorTimeoutError | null;
+  /**
+   * Le prix que le paywall a COTÉ pour cette requête, en dollars. null =
+   * inconnu, et le journal n'écrit alors RIEN : la référence de paiement est
+   * unique, donc une ligne à zéro consommerait la référence à jamais et
+   * rendrait silencieusement inopérante toute écriture correcte ultérieure.
+   * Une ligne absente se rattrape, une ligne fausse non.
+   */
+  quotedUsd: number | null;
 }
 const settlementSlot = new AsyncLocalStorage<SettlementSlot>();
 
@@ -1111,7 +1121,7 @@ const settlementSlot = new AsyncLocalStorage<SettlementSlot>();
  * green. Exercised by x402.test.ts against a fake facilitator.
  */
 export function runInSettlementSlot<T>(fn: () => T): { slot: SettlementSlot; out: T } {
-  const slot: SettlementSlot = { unconfirmed: null };
+  const slot: SettlementSlot = { unconfirmed: null, quotedUsd: null };
   const out = settlementSlot.run(slot, fn);
   return { slot, out };
 }
@@ -1197,6 +1207,82 @@ export function boundFacilitator<
     getSupported: (...args: unknown[]) =>
       withFacilitatorTimeout(getSupported.apply(client, args), 'supported'),
   });
+}
+
+/**
+ * Journal de règlement et promotion au seuil, pour une route tarifée réglée
+ * AVEC une clé.
+ *
+ * CINQ conditions, toutes nécessaires :
+ *
+ *  1. le règlement est CONFIRMÉ (`slot.unconfirmed` nul). Le bloc de 502
+ *     ci-dessus est celui où l'on ne SAIT PAS, et on n'inscrit pas un montant
+ *     sur un paiement dont on ignore le sort ;
+ *
+ *  2. 🚨 le paywall a RÉELLEMENT réglé : `outcome === undefined`. Ne JAMAIS
+ *     lire `c.res.status` ici. Sur le chemin d'un paiement REFUSÉ (signature
+ *     invalide, expirée, montant insuffisant) le SDK rend sa réponse par
+ *     VALEUR, sans poser `c.res`, et le getter fabrique alors une réponse vide
+ *     de statut 200 : un en-tête de paiement bidon passait donc un test « 2xx »
+ *     et s'inscrivait au journal. Seul le chemin vérifié rend `undefined` en
+ *     ayant posé `c.res`. ⚠️ `undefined` ne suffit pas seul (une route non
+ *     tarifée rend aussi la valeur de next()) : c'est la conjonction avec (3)
+ *     et (4) qui conclut — sans en-tête de paiement il n'y a rien à
+ *     journaliser, et sans clé valide personne à créditer ;
+ *
+ *  3. un en-tête de paiement était présent ;
+ *
+ *  4. une clé valide était présentée. Le hash est posé sur TOUS les chemins à
+ *     clé valide, épuisement de quota compris, ce qui est exactement le cas qui
+ *     nous intéresse : une clé authentifiée et dans son quota court-circuite le
+ *     paywall, donc ce crochet ne se déclenche que quand la clé est à court ;
+ *
+ *  5. la cotation est CONNUE. Sinon on n'écrit RIEN : la référence est unique,
+ *     une ligne à zéro la consommerait définitivement. Sur l'argent, on échoue
+ *     fermé en n'écrivant pas.
+ *
+ * N'écrit JAMAIS `x402_payment_ref` sur la clé : cette colonne signifie « paquet
+ * vendu » pour le partage du chiffre d'affaires par rail et pour la
+ * récupération d'un paquet par sa référence. L'y écrire inscrirait une vente
+ * fantôme dans le revenu.
+ *
+ * Sous try/catch : une écriture de journal ne doit jamais transformer un 200
+ * payé en 500.
+ */
+function recordSettlementForKey(c: Context<HonoEnv>, slot: SettlementSlot, outcome: unknown): void {
+  const settled = outcome === undefined;
+  const keyHash = c.get('apiKeyHash');
+  const ref = settlementRef(c);
+  const usd = slot.quotedUsd;
+  const route = `${c.req.method} ${new URL(c.req.url).pathname}`;
+  if (!settled || !keyHash || !ref) return;
+  if (typeof usd !== 'number' || usd <= 0) {
+    // Réglé, mais la cotation manque : on le DIT, on n'invente pas un montant.
+    // La référence reste libre, donc la ligne s'écrira le jour où le défaut est
+    // réparé — ce qu'une ligne à zéro aurait rendu impossible.
+    void opsFail(
+      'x402:unpriced-settlement',
+      `A settlement was confirmed on ${route} with a key presented, but the paywall quote could not be read: no ledger row was written.`,
+      3,
+    );
+    return;
+  }
+  try {
+    settleAndMaybeClaim({
+      keyHash,
+      keyPrefix: c.get('apiKeyPrefix') ?? '',
+      paymentRef: ref,
+      route,
+      quotedAmountUsd: usd,
+      method: 'x402',
+    });
+  } catch (err) {
+    void opsFail(
+      'x402:settlement-ledger',
+      `The settlement ledger refused a write on ${route}: ${err instanceof Error ? err.message : String(err)}`,
+      3,
+    );
+  }
 }
 
 // The wallet is NOT baked in here: prices and payTo are resolved per request by
@@ -1344,10 +1430,42 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // The safety net, run once on the way out. See capDescription: it must
       // NOT live inside the builder, or the test that enforces the limit ends
       // up reading its own correction.
+      //
+      // Même boucle, deuxième geste : on enrobe le prix pour RETENIR ce que le
+      // paywall a coté. Le montant réglé n'atteint jamais notre code — aucun
+      // en-tête de réponse ne le porte — donc on capture la cotation là où elle
+      // est déjà calculée, une fois, par requête. Les sept routes tarifées
+      // passent par là sans qu'aucune soit énumérée, le lot dynamique compris :
+      // le prix vient de la table, pas d'une copie de la table.
+      //
+      // 🚨 Uniquement l'objet `routes` LOCAL de cette requête, et jamais la
+      // sortie de buildRouteTable là où la découverte la lit (/.well-known/x402,
+      // le texte /v1, l'artefact) : ces surfaces publient des NOMBRES, et une
+      // fonction à leur place changerait ce qui est publié. buildRouteTable
+      // reconstruit sa table à chaque appel, donc l'enrobage ne s'empile pas.
       for (const config of Object.values(routes)) {
-        const entry = config as { description?: string };
+        const entry = config as { description?: string; accepts?: { price?: unknown } };
         if (typeof entry.description === 'string')
           entry.description = capDescription(entry.description);
+
+        const original = entry.accepts?.price;
+        if (entry.accepts && original !== undefined) {
+          entry.accepts.price = async (ctx: unknown): Promise<string> => {
+            const priced =
+              typeof original === 'function'
+                ? await (original as (c: unknown) => Promise<string> | string)(ctx)
+                : String(original);
+            // getStore() rend undefined si le prix est évalué HORS du run() :
+            // ce n'est pas une erreur, on rend le prix sans rien retenir. Une
+            // exception ici tuerait le paywall.
+            const slot = settlementSlot.getStore();
+            if (slot) {
+              const n = Number(String(priced).replace(/^\$/, ''));
+              slot.quotedUsd = Number.isFinite(n) && n > 0 ? n : null;
+            }
+            return priced;
+          };
+        }
       }
 
       const httpServer = new paywall.core.x402HTTPResourceServer(
@@ -1394,9 +1512,12 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // Run the paywall inside a request-scoped slot so a settle that timed out
       // can be told apart from a settle that was refused. Both leave the SDK
       // answering `402 {}`; only one of them means "we do not know".
-      const slot: SettlementSlot = { unconfirmed: null };
+      const slot: SettlementSlot = { unconfirmed: null, quotedUsd: null };
       const outcome = await settlementSlot.run(slot, () => middleware(c, next));
-      if (!slot.unconfirmed) return outcome;
+      if (!slot.unconfirmed) {
+        recordSettlementForKey(c, slot, outcome);
+        return outcome;
+      }
 
       // Replace the SDK's bare 402. Clearing c.res first is the SDK's own idiom
       // and it matters: Hono's `res` setter copies headers from the response it

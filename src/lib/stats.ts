@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
+import { ANONYMOUS_CONTACT } from './tiers.js';
 import type { RejectReason } from './input-normalize.js';
 import type {
   OperationType,
@@ -2291,7 +2292,13 @@ export function purgeOldRequestLog(months: number = 12): number {
 // Placeholder emails used when a buyer had no address (x402/Stripe flows).
 // Several unrelated customers share them, so "does this email still have an
 // active key" is meaningless for these — their telemetry is purged per key.
-const PLACEHOLDER_EMAILS = ['credits-buyer', 'stripe-buyer', 'oem-subscriber'];
+//
+// 🚨 ANONYMOUS_CONTACT y entre avec le palier sans e-mail, et ce n'est PAS
+// cosmétique : la purge conserve la télémétrie tant qu'il existe une clé active
+// portant la MÊME adresse. Avec une sentinelle partagée, une seule clé anonyme
+// vivante dans toute la base empêcherait indéfiniment la purge de TOUTES les
+// autres — une croissance non bornée qu'aucun test ne rougit.
+const PLACEHOLDER_EMAILS = ['credits-buyer', 'stripe-buyer', 'oem-subscriber', ANONYMOUS_CONTACT];
 
 /**
  * DPA clause 4.7 — telemetry deletion after termination, BY DEFAULT.
@@ -2322,6 +2329,105 @@ export function purgeTerminatedKeyTelemetry(days: number = 30): number {
     .prepare(`DELETE FROM operations WHERE key_prefix IN (${terminatedKeys})`)
     .run(days, ...PLACEHOLDER_EMAILS).changes;
   return purged;
+}
+
+/**
+ * Ce que le palier anonyme produit : combien de clés, combien montent, par
+ * quel rail, pour combien d'argent, et en combien de temps.
+ *
+ * Sans cette mesure on saurait seulement que des clés naissent. C'est
+ * l'équivalent, pour la porte sans e-mail, de ce que la mesure de l'essai fait
+ * pour la porte sans clé.
+ *
+ * 🚨 Trois pièges de définition, et chacun ferait mentir un chiffre :
+ *
+ *  - `paid` compte les clés PROMUES par un paiement, pas les acheteurs de
+ *    paquets. La migration du palier a posé `tier = 'paid'` sur toute clé
+ *    historique qui portait un solde prépayé ou une session de carte, sans
+ *    `claim_method` : c'est ce dernier qui distingue une promotion (toujours
+ *    écrite par la promotion elle-même) d'un backfill ;
+ *  - `by_method` ne regarde que les paliers d'arrivée. Depuis le lot 3, une
+ *    clé créée avec un code vérifié porte `claim_method = 'email_code'` DÈS SA
+ *    NAISSANCE, en restant au palier 'email' : la compter ici gonflerait les
+ *    réclamations de clés qui n'ont jamais rien réclamé ;
+ *  - le délai est calculé par SQLite, en secondes, sur deux horodatages UTC.
+ *    Le lire en JS ferait glisser la mesure du fuseau de la machine, ce qu'
+ *    aucun test ne rougirait.
+ *
+ * Et le délai médian n'est pas de la curiosité. Une clé réclamée sort du rayon
+ * de révocation, définitivement et par construction ; une ferme qui réclame une
+ * minute après avoir créé achète donc cette sortie pour le prix d'un domaine,
+ * et ne laisse qu'une trace : la brièveté du délai. Un porteur honnête réclame
+ * quand il en a besoin, souvent des heures plus tard.
+ */
+export function anonymousTierCounts(): {
+  keys: number;
+  claimed: number;
+  paid: number;
+  by_method: Array<{ method: string; n: number }>;
+  paid_usd_total: number;
+  claim_delay_median_s: number | null;
+} {
+  const db = getStatsDB();
+  const rows = db
+    .prepare(
+      `SELECT tier, claim_method, COUNT(*) AS n
+         FROM api_keys
+        WHERE tier IN ('anonymous', 'claimed', 'paid')
+        GROUP BY tier, claim_method`,
+    )
+    .all() as Array<{ tier: string; claim_method: string | null; n: number }>;
+
+  let keys = 0;
+  let claimed = 0;
+  let paid = 0;
+  const byMethod = new Map<string, number>();
+  for (const r of rows) {
+    if (r.tier === 'anonymous') keys += r.n;
+    if (r.tier === 'claimed') claimed += r.n;
+    if (r.tier === 'paid' && r.claim_method !== null) paid += r.n;
+    if ((r.tier === 'claimed' || r.tier === 'paid') && r.claim_method !== null) {
+      byMethod.set(r.claim_method, (byMethod.get(r.claim_method) ?? 0) + r.n);
+    }
+  }
+
+  const paidTotal = (
+    db
+      .prepare('SELECT COALESCE(SUM(quoted_amount_usd), 0) AS total FROM key_settlements')
+      .get() as {
+      total: number;
+    }
+  ).total;
+
+  const delays = (
+    db
+      .prepare(
+        `SELECT CAST(strftime('%s', claimed_at) AS INTEGER) - CAST(strftime('%s', created_at) AS INTEGER) AS d
+           FROM api_keys
+          WHERE tier IN ('claimed', 'paid') AND claimed_at IS NOT NULL AND claim_method IS NOT NULL
+          ORDER BY d`,
+      )
+      .all() as Array<{ d: number | null }>
+  )
+    .map((r) => r.d)
+    .filter((d): d is number => typeof d === 'number');
+  const median =
+    delays.length === 0
+      ? null
+      : delays.length % 2 === 1
+        ? delays[(delays.length - 1) / 2]
+        : (delays[delays.length / 2 - 1] + delays[delays.length / 2]) / 2;
+
+  return {
+    keys,
+    claimed,
+    paid,
+    by_method: [...byMethod.entries()]
+      .map(([method, n]) => ({ method, n }))
+      .sort((a, b) => b.n - a.n || a.method.localeCompare(b.method)),
+    paid_usd_total: paidTotal,
+    claim_delay_median_s: median,
+  };
 }
 
 /**

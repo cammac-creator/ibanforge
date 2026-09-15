@@ -10,8 +10,10 @@ import {
   validateApiKey,
   getUsage,
   checkAndIncrementQuota,
+  claimKey,
 } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 import type { HonoEnv } from '../types.js';
 
 function makeApp() {
@@ -478,5 +480,120 @@ describe('apiKeyMiddleware — routes documented free are billed nothing', () =>
     });
     expect(res.status).toBe(200);
     expect(getUsage(keyHash).used).toBe(before + 1);
+  });
+});
+
+describe('apiKeyMiddleware — le palier anonyme', () => {
+  /** Une clé anonyme, frappée comme la route le fait. */
+  function anon(tag: string) {
+    const k = generateApiKey(null, undefined, undefined, false, { ipHash: `mw-${tag}-${RUN_ID}` });
+    if (!k) throw new Error('mint anonyme impossible');
+    return k;
+  }
+
+  it('le plafond appliqué est bien 25, mesuré par le compteur lui-même', async () => {
+    const k = anon('quota');
+    const { keyHash, monthlyLimit, tier } = validateApiKey(k.api_key);
+    expect(tier).toBe('anonymous');
+    // 🚨 Mesuré par checkAndIncrementQuota, et non par la valeur de la colonne :
+    // c'est le compteur qui refuse, et un plafond NULL se relirait « palier
+    // gratuit » sans qu'aucune colonne ne mente.
+    expect(monthlyLimit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    const spent = checkAndIncrementQuota(keyHash, monthlyLimit, ANONYMOUS_MONTHLY_LIMIT);
+    expect(spent.allowed).toBe(true);
+    expect(spent.limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    const over = checkAndIncrementQuota(keyHash, monthlyLimit, 1);
+    expect(over.allowed).toBe(false);
+
+    // Et la requête servie tombe bien dans le paywall plutôt que dans un 429.
+    const res = await makeApp().request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${k.api_key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(res.headers.get('X-Quota-Exhausted')).toBe('true');
+    expect(res.headers.get('X-Quota-Limit')).toBe(String(ANONYMOUS_MONTHLY_LIMIT));
+  });
+
+  it('une clé réclamée par code vaut 200 par MOIS, pas 200 à vie', async () => {
+    const k = anon('claimed');
+    // Ce que pose le rail de l'adresse : le plafond gratuit ET l'effacement du
+    // drapeau qui mesurerait sur la vie de la clé.
+    expect(
+      claimKey(k.key_hash, 'email_code', { email: `mw-${RUN_ID}@alpha-corp.example.net` }),
+    ).toBe(true);
+    const { keyHash, monthlyLimit, noRecredit } = validateApiKey(k.api_key);
+    expect(monthlyLimit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    expect(noRecredit).toBe(false);
+    // Un mois ANTÉRIEUR déjà consommé ne doit rien retirer au mois courant :
+    // c'est toute la différence entre « par mois » et « à vie », et elle ne se
+    // voit que par cette fixture.
+    getStatsDB()
+      .prepare('INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)')
+      .run(keyHash, '2026-01', FREE_TIER_MONTHLY_LIMIT);
+    const q = checkAndIncrementQuota(keyHash, monthlyLimit, 1, noRecredit);
+    expect(q.allowed).toBe(true);
+    expect(q.limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    expect(q.used).toBe(1);
+  });
+
+  it('à 20 unités sur 25, AUCUN en-tête X-Quota-Notice', async () => {
+    // 🚨 Le seuil est un ratio (0,8), pas un nombre : à 200 il vaut 160, à 25
+    // il vaut 20. Sans l'exclusion, une clé anonyme annoncerait à 20 unités un
+    // avertissement par mail qui n'existera jamais — la sentinelle n'a pas
+    // d'arobase. La garde `&& email` ne protégeait rien : la sentinelle est une
+    // chaîne vraie.
+    const k = anon('notice');
+    const { keyHash, monthlyLimit } = validateApiKey(k.api_key);
+    // 19 consommées : l'appel servi ci-dessous est celui qui franchit 20.
+    checkAndIncrementQuota(keyHash, monthlyLimit, 19);
+    const res = await makeApp().request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${k.api_key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Quota-Used')).toBe('20');
+    expect(res.headers.get('X-Quota-Notice')).toBeNull();
+
+    // Le jumeau POSITIF : une clé du palier gratuit publie toujours l'en-tête à
+    // 160 sur 200. Sans lui, un vert ne prouverait qu'une branche morte.
+    const free = generateApiKey(`notice-${RUN_ID}@alpha-corp.example.net`);
+    if (!free) throw new Error('mint impossible');
+    const freeHash = validateApiKey(free.api_key).keyHash;
+    checkAndIncrementQuota(freeHash, FREE_TIER_MONTHLY_LIMIT, 159);
+    const res2 = await makeApp().request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${free.api_key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(res2.status).toBe(200);
+    expect(res2.headers.get('X-Quota-Notice')).toBe('threshold-crossed');
+  });
+
+  it('le hash de la clé est posé sur tous les chemins à clé valide, quota épuisé compris', async () => {
+    // C'est ce que lisent le crochet de règlement x402 et la vente de paquets,
+    // et le cas qui les intéresse est précisément celui où le quota est épuisé :
+    // une clé dans son quota court-circuite le paywall.
+    const k = anon('hash');
+    const { keyHash, monthlyLimit } = validateApiKey(k.api_key);
+    const seen: Array<string | null | undefined> = [];
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', apiKeyMiddleware());
+    app.post('/v1/probe', (c) => {
+      seen.push(c.get('apiKeyHash'));
+      return c.json({ ok: true });
+    });
+    await app.request('/v1/probe', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${k.api_key}` },
+    });
+    // Quota épuisé, deuxième passage.
+    checkAndIncrementQuota(keyHash, monthlyLimit, ANONYMOUS_MONTHLY_LIMIT);
+    await app.request('/v1/probe', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${k.api_key}` },
+    });
+    expect(seen).toEqual([keyHash, keyHash]);
   });
 });

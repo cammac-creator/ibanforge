@@ -21,6 +21,14 @@ import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
 export interface AdminKey {
   key_prefix: string;
   email: string;
+  /**
+   * Le palier, servi par GET /v1/admin/keys depuis le lot 3.
+   *
+   * OPTIONNEL à dessein : les fixtures de test antérieures ne le portent pas,
+   * et un champ requis les casserait toutes pour un filtre qui, absent, se lit
+   * « palier inconnu » — donc traité comme aujourd'hui.
+   */
+  tier?: string;
   monthly_limit: number | null;
   active: number; // 0 | 1
   created_at: string; // ISO timestamp
@@ -241,6 +249,15 @@ export function detectEvents(keys: AdminKey[], opts: DetectOptions): RadarEvent[
   const events: RadarEvent[] = [];
   for (const k of keys) {
     if (!k.active) continue; // deactivated key: nothing to act on
+    // 🚨 Le palier anonyme sort ici, au même endroit que les comptes internes,
+    // et c'est la surface la plus coûteuse des quatre : ce module POUSSE sur
+    // Telegram. `isInternal('anonymous')` rend false (pas d'arobase, donc pas
+    // de domaine), et le seuil de quota est un RATIO : chaque clé anonyme
+    // annoncerait QUOTA_80 dès 20 unités sur 25 puis QUOTA_FULL à 25, huit fois
+    // plus tôt qu'une clé du palier gratuit, toutes agrégées sous une identité
+    // unique et une société devinée depuis un domaine vide. Ce n'est pas un
+    // tableau interne, c'est un message qui part.
+    if (k.tier === 'anonymous') continue;
     if (isInternal(k.email)) continue;
 
     const classified = classifyKey(k, now, sinceMs, goneQuietMinDom);

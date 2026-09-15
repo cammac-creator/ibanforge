@@ -1,5 +1,6 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from './db.js';
+import { normalizeEmail } from './email-norm.js';
 import { hashIp } from './stats.js';
 
 /**
@@ -21,6 +22,25 @@ import { hashIp } from './stats.js';
  * IPv6 collapsed to its /64 first (one subscriber = one /64; counting full
  * addresses would hand every IPv6 caller millions of free identities).
  * No raw IP ever touches disk here either.
+ *
+ * ── Ce que le chantier « clé sans e-mail » ajoute (lot 3, 15/09/2026) ────────
+ *
+ * Le palier ANONYME n'est PAS gardé par ce mécanisme : il n'y a pas de boîte à
+ * prouver, donc le pas d'identité n'a aucun objet sur cette branche. Ce qui le
+ * tient est le disjoncteur global de créations, ailleurs. Seul le plafond par
+ * réseau (DAILY_KEY_CREATION_LIMIT) vaut pour les deux branches.
+ *
+ * Le même code à 6 chiffres sert désormais DEUX chemins : créer une clé
+ * (/v1/keys/generate) et en réclamer une (/v1/keys/claim). D'où la cible
+ * `keyPrefix` portée par le défi : sans elle, un code émis pour créer était
+ * consommable pour réclamer, et l'inverse.
+ *
+ * 🚨 Et l'ORDRE des quatre gestes d'un envoi est une contrainte du contrat, pas
+ * un détail : plafond d'envoi, enregistrement de l'envoi, création du défi,
+ * puis envoi réel. `createVerificationChallenge` remet `attempts` à zéro par
+ * son ON CONFLICT — réémettre un défi EST la remise à zéro du compteur
+ * d'essais, seul rempart contre la force brute des six chiffres. Créer le défi
+ * avant de mesurer l'envoi offrirait des remises à zéro gratuites.
  */
 
 export const DAILY_KEY_CREATION_LIMIT = 3;
@@ -41,6 +61,37 @@ export const VERIFICATION_MAX_ATTEMPTS = 5;
  */
 export const VERIFICATION_SENDS_PER_EMAIL_DAY = 3;
 export const VERIFICATION_SENDS_PER_SOURCE_DAY = 15;
+
+/**
+ * Plafond de RÉCLAMATIONS RÉUSSIES par réseau et par 24 h.
+ *
+ * Volontairement égal à DAILY_KEY_CREATION_LIMIT, et non un chiffre à part :
+ * le critère d'acceptation de POST /v1/keys/claim est la parité avec
+ * /v1/keys/generate, pas un réglage indépendant qui dériverait le jour où l'un
+ * des deux bouge. Sans lui, le seul plafond de réseau applicable à la
+ * réclamation était celui des ENVOIS de code (VERIFICATION_SENDS_PER_SOURCE_DAY),
+ * cinq fois plus généreux — et sur l'axe exact que les deux fermes d'août ont
+ * payé, la diversité d'adresses. VERIFICATION_SENDS_PER_EMAIL_DAY ne rattrape
+ * rien : il compte par destinataire, donc il est inopérant devant un domaine
+ * qui accepte tout.
+ *
+ * 🚨 Il compte des SUCCÈS, pas des tentatives : un code faux ne consomme pas le
+ * budget, sinon un tiers derrière le même NAT épuiserait celui d'un bureau
+ * entier.
+ */
+export const CLAIM_SUCCESS_PER_SOURCE_DAY = DAILY_KEY_CREATION_LIMIT;
+
+/**
+ * Fenêtre pendant laquelle un défi en cours n'est pas écrasé par un défi qui
+ * vise une AUTRE clé : le temps que son destinataire recopie ses six chiffres.
+ *
+ * Deux minutes et non quinze (la durée de vie du défi) parce que refuser tout
+ * écrasement créerait un verrou : n'importe quel porteur d'une clé anonyme
+ * tiendrait une adresse bloquée pendant toute la durée de vie du code. Le
+ * verrou plafonne donc à deux minutes, et au-delà l'écrasement reprend le
+ * comportement actuel, octet pour octet.
+ */
+export const CHALLENGE_GRACE_MINUTES = 2;
 
 /**
  * Collapse an IPv6 address to its /64 prefix; IPv4 passes through.
@@ -130,6 +181,24 @@ function sha256(s: string): string {
 }
 
 /**
+ * La forme sur laquelle le budget d'envoi se compte.
+ *
+ * Hachée NORMALISÉE (étiquette après « + » retirée, points retirés chez les
+ * deux domaines qui les ignorent) : sans cela `you+1@`, `you+2@` et `y.o.u@`
+ * sont trois destinataires pour le compteur et une seule boîte pour leur
+ * porteur, donc le plafond par destinataire se multiplie à volonté. Pour une
+ * adresse sans étiquette et hors de ces domaines, la valeur hachée est
+ * identique à celle d'avant : non-régression stricte.
+ *
+ * Repli sur la chaîne brute mise en minuscules quand la normalisation rend null
+ * (pas d'arobase) : ce n'est pas une adresse, mais le compteur doit quand même
+ * compter quelque chose de stable plutôt que de jeter.
+ */
+function sendBudgetKey(email: string): string {
+  return sha256(normalizeEmail(email) ?? email.trim().toLowerCase());
+}
+
+/**
  * May we mail a verification code for this (source, recipient) right now?
  * Both windows are 24h. Returns the reason so the caller can answer precisely.
  */
@@ -141,7 +210,7 @@ export function challengeSendAllowed(source: string | null, email: string): Chal
       .prepare(
         "SELECT COUNT(*) AS n FROM verification_sends WHERE email_hash = ? AND created_at >= datetime('now', '-24 hours')",
       )
-      .get(sha256(email.trim().toLowerCase())) as { n: number }
+      .get(sendBudgetKey(email)) as { n: number }
   ).n;
   if (toEmail >= VERIFICATION_SENDS_PER_EMAIL_DAY) return { ok: false, reason: 'recipient' };
   // A null source (unknown IP) cannot be rate-limited by source, only by
@@ -169,7 +238,7 @@ export function recordVerificationSend(source: string | null, email: string): nu
   const db = getStatsDB();
   const info = db
     .prepare('INSERT INTO verification_sends (ip_hash, email_hash) VALUES (?, ?)')
-    .run(source, sha256(email.trim().toLowerCase()));
+    .run(source, sendBudgetKey(email));
   db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run();
   db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run();
   return Number(info.lastInsertRowid);
@@ -243,34 +312,81 @@ export function purgeExpiredVerifications(): number {
 /**
  * Issue (or replace) the verification challenge for this address and return
  * the plain code — the CALLER mails it; only the hash is stored.
+ *
+ * `keyPrefix` dit à QUOI le code sert. null (ou absent) = défi du chemin de
+ * CRÉATION, comportement inchangé octet pour octet pour tous les appels
+ * existants ; sinon la clé qu'un défi de RÉCLAMATION vise. Sans cette cible,
+ * la clé primaire de la table étant l'adresse seule, un code émis pour créer
+ * une clé serait consommable pour en réclamer une autre.
+ *
+ * Retour `string | { refused: 'in_flight' }` et non un objet dans les deux
+ * cas : la forme heureuse reste la chaîne que trois appelants consomment déjà
+ * telle quelle, et seul le refus se distingue (`typeof r === 'string'`).
  */
-export function createVerificationChallenge(email: string, source: string | null): string {
-  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  getStatsDB()
+export function createVerificationChallenge(
+  email: string,
+  source: string | null,
+  keyPrefix?: string | null,
+): string | { refused: 'in_flight' } {
+  const db = getStatsDB();
+  const target = keyPrefix ?? null;
+  // Un défi vivant qui vise une AUTRE cible et a moins de CHALLENGE_GRACE_MINUTES
+  // n'est pas écrasé : son destinataire est peut-être en train de recopier ses
+  // six chiffres, et sur /claim l'écrasement est infligé par un TIERS (toute
+  // clé anonyme permet de demander un code vers n'importe quelle adresse).
+  const live = db
     .prepare(
-      `INSERT INTO pending_verifications (email, code_hash, ip_hash, attempts, created_at, expires_at)
-       VALUES (?, ?, ?, 0, datetime('now'), datetime('now', ?))
+      `SELECT key_prefix, (created_at >= datetime('now', ?)) AS fresh
+         FROM pending_verifications
+        WHERE email = ? AND expires_at > datetime('now')`,
+    )
+    .get(`-${CHALLENGE_GRACE_MINUTES} minutes`, email) as
+    { key_prefix: string | null; fresh: number } | undefined;
+  if (live && live.fresh === 1 && (live.key_prefix ?? null) !== target) {
+    return { refused: 'in_flight' };
+  }
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  db.prepare(
+    // key_prefix est dans le DO UPDATE aussi : sans cela un défi de réclamation
+    // qui remplace un défi de création garderait l'ancienne cible.
+    `INSERT INTO pending_verifications (email, code_hash, ip_hash, attempts, created_at, expires_at, key_prefix)
+       VALUES (?, ?, ?, 0, datetime('now'), datetime('now', ?), ?)
        ON CONFLICT(email) DO UPDATE SET
          code_hash = excluded.code_hash, ip_hash = excluded.ip_hash,
-         attempts = 0, created_at = excluded.created_at, expires_at = excluded.expires_at`,
-    )
-    .run(email, sha256(code), source, `+${VERIFICATION_TTL_MINUTES} minutes`);
+         attempts = 0, created_at = excluded.created_at, expires_at = excluded.expires_at,
+         key_prefix = excluded.key_prefix`,
+  ).run(email, sha256(code), source, `+${VERIFICATION_TTL_MINUTES} minutes`, target);
   return code;
 }
 
 export type VerificationCheck =
   | { ok: true }
-  | { ok: false; reason: 'no_challenge' | 'expired' | 'too_many_attempts' | 'wrong_code' };
+  | {
+      ok: false;
+      reason: 'no_challenge' | 'expired' | 'too_many_attempts' | 'wrong_code' | 'wrong_target';
+    };
 
 /**
  * Check a submitted code. Deletes the challenge on success; counts attempts
  * on failure so the 6 digits cannot be brute-forced within the TTL.
+ *
+ * `expectKeyPrefix` est la cible attendue : absente ou null pour le chemin de
+ * création (non-régression stricte), le préfixe de la clé présentée pour une
+ * réclamation.
  */
-export function checkVerificationCode(email: string, code: string): VerificationCheck {
+export function checkVerificationCode(
+  email: string,
+  code: string,
+  expectKeyPrefix?: string | null,
+): VerificationCheck {
   const db = getStatsDB();
   const row = db
-    .prepare('SELECT code_hash, attempts, expires_at FROM pending_verifications WHERE email = ?')
-    .get(email) as { code_hash: string; attempts: number; expires_at: string } | undefined;
+    .prepare(
+      'SELECT code_hash, attempts, expires_at, key_prefix FROM pending_verifications WHERE email = ?',
+    )
+    .get(email) as
+    | { code_hash: string; attempts: number; expires_at: string; key_prefix: string | null }
+    | undefined;
   if (!row) return { ok: false, reason: 'no_challenge' };
 
   const expired = db.prepare("SELECT datetime('now') > ? AS gone").get(row.expires_at) as {
@@ -279,6 +395,16 @@ export function checkVerificationCode(email: string, code: string): Verification
   if (expired.gone) {
     db.prepare('DELETE FROM pending_verifications WHERE email = ?').run(email);
     return { ok: false, reason: 'expired' };
+  }
+  // 🚨 La mauvaise cible n'incrémente PAS `attempts`. Le compteur vit sur une
+  // ligne clée par l'ADRESSE seule : un tiers muni d'une clé anonyme postait
+  // cinq codes bidon visant l'adresse d'une victime, chacun comptant un essai,
+  // et bloquait le défi en cours de celle-ci jusqu'à expiration. La cible
+  // présentée ne prouve rien sur le code : la compter comme un essai punit la
+  // victime, pas l'attaquant. L'anti-oracle est préservé autrement — même
+  // raison HTTP et même texte que `wrong_code`.
+  if ((row.key_prefix ?? null) !== (expectKeyPrefix ?? null)) {
+    return { ok: false, reason: 'wrong_target' };
   }
   if (row.attempts >= VERIFICATION_MAX_ATTEMPTS) return { ok: false, reason: 'too_many_attempts' };
 

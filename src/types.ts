@@ -80,6 +80,18 @@ type HonoEnv = {
   Variables: {
     apiKeyAuthenticated: boolean;
     apiKeyPrefix: string | null;
+    /**
+     * Le hash de la clé présentée, posé par le middleware de clé sur TOUS les
+     * chemins à clé valide, épuisement de quota compris.
+     *
+     * Il vient à côté du préfixe et non à sa place : le préfixe est l'identité
+     * qui voyage dans la télémétrie, le hash est celle sur laquelle on ÉCRIT
+     * (key_prefix ne portait aucune unicité dans la base héritée, donc un
+     * UPDATE sur cette colonne touche toutes les lignes du préfixe). Lu par le
+     * crochet de règlement x402 et par la vente de paquets de crédits, qui ont
+     * besoin de désigner la clé présentée quand son quota est justement épuisé.
+     */
+    apiKeyHash?: string | null;
     paywallCause?: PaywallCause;
     /** Set by the MCP route when the request carries tools/call invocations, so the stats middleware can split real usage from discovery handshakes. */
     mcpToolCall?: boolean;

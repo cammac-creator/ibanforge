@@ -1042,4 +1042,37 @@ describe('the charged amount, when the API starts serving it', () => {
     expect(client.apiKey.amountPaidMinor).toBe(1500);
     expect(client.apiKey.amountPaidCurrency).toBe('usd');
   });
-})
+});
+
+describe('le palier de clé, quand l’API le sert', () => {
+  it('une clé anonyme ne crée aucun contact, une clé réclamée en crée un', () => {
+    // 🚨 Le filtre est sur le PALIER, pas sur l'adresse : « anonymous » n'est
+    // surtout PAS ajouté à INTERNAL_RE, qui est comparé caractère pour
+    // caractère à son jumeau côté API.
+    //
+    // Toutes les clés anonymes partagent une sentinelle, donc sans le filtre
+    // elles se regrouperaient en UN dossier client unique, avec la somme de
+    // leurs appels. Une clé promue par paiement n'a pas d'adresse non plus.
+    // Une clé réclamée, elle, a fourni une vraie adresse et prouvé qu'elle la
+    // lit : c'est un contact.
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('anonymous', { tier: 'anonymous', monthly_limit: 25 }),
+        keyRow('anonymous', { tier: 'paid', key_prefix: 'ifk_paidanon' }),
+        keyRow('raised@example.net', { tier: 'claimed' }),
+      ],
+    });
+    const emails = out.map((c) => c.email);
+    expect(emails).toEqual(['raised@example.net']);
+  });
+
+  it('une clé sans palier sur le fil se comporte comme avant', () => {
+    // Optionnel sur le fil pour la raison de déploiement du reste du fichier :
+    // Vercel et Railway partent indépendamment, donc ce frontend tourne un
+    // temps contre une API qui ne sert pas encore le champ. Absent, il se lit
+    // « palier inconnu » et le CRM est exactement le CRM d'avant.
+    const out = buildContacts({ ...base, keys: [keyRow('alpha@example.net')] });
+    expect(out).toHaveLength(1);
+  });
+});

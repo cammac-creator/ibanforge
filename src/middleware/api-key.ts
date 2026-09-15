@@ -159,8 +159,16 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       return;
     }
 
-    const { valid, keyHash, email, monthlyLimit, creditsRemaining, creditsTotal, noRecredit } =
-      validateApiKey(key);
+    const {
+      valid,
+      keyHash,
+      email,
+      tier,
+      monthlyLimit,
+      creditsRemaining,
+      creditsTotal,
+      noRecredit,
+    } = validateApiKey(key);
 
     if (!valid) {
       // A key WAS supplied but doesn't validate (typo, truncation, revoked).
@@ -208,6 +216,12 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     // charts) on EVERY valid-key path — including quota/credit exhaustion
     // fall-throughs, where the request still belongs to this customer.
     c.set('apiKeyPrefix', key.slice(0, 12));
+    // Le hash à côté du préfixe, sur le même chemin et pour la même raison
+    // d'attribution — mais c'est lui que lisent les deux écrivains qui doivent
+    // désigner la clé présentée : le crochet de règlement x402 et la vente de
+    // paquets. Posé ICI, donc aussi quand le quota est épuisé, qui est
+    // exactement le cas où un règlement x402 arrive avec une clé.
+    c.set('apiKeyHash', keyHash);
 
     // Billable units for this request: 1 everywhere except batch validation,
     // which bills 1 per IBAN (same rule as the x402 per-IBAN price).
@@ -353,7 +367,16 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     // Fire-and-forget: the customer's request must never wait on SMTP. The
     // notice bookkeeping touches the DB, so a lock or an in-flight shutdown
     // can reject — that must land in the log, never as an unhandled rejection.
-    if (quota.crossedNoticeThreshold && email) {
+    //
+    // 🚨 Branche ENTIÈRE sautée sur le palier anonyme, en-tête compris. Le
+    // seuil est un RATIO (0,8), pas un nombre : à 200 il vaut 160, à 25 il
+    // vaut 20, donc le franchissement arrive huit fois plus tôt. Et la garde
+    // `&& email` ne protège rien ici, puisque `email` vaut la sentinelle, qui
+    // est vraie. Sans cette exclusion, une clé anonyme annonce à 20 unités un
+    // avertissement par mail qui n'existera jamais : la sentinelle n'a pas
+    // d'arobase, donc quota-notice rend `no_contact`. L'appelant ne perd aucun
+    // signal, les quatre en-têtes X-Quota-* disent déjà tout.
+    if (quota.crossedNoticeThreshold && email && tier !== 'anonymous') {
       c.header('X-Quota-Notice', 'threshold-crossed');
       void maybeSendQuotaWarning({
         keyHash,
