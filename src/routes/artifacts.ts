@@ -164,13 +164,15 @@ quotas:
   rest_anonymous_trial:
     requests: ${REST_TRIAL_DAILY_LIMIT}
     window: 1 day
-    scope: per client IP
+    scope: per client source address (IPv6 counted per /64)
     applies_to: POST /v1/iban/validate
     resets: midnight UTC
-    note: The same taster over plain REST, for a caller with no key and no wallet.
+    note: A taster over plain REST, for a caller with no key and no wallet.
       Granted only when the body carries a real iban; an empty body still gets the
       402 discovery envelope. Past the ceiling the route answers 402 with
-      cause.reason = trial_exhausted. Counted in memory, per instance.
+      cause.reason = trial_exhausted. Counted in the service database, so it
+      survives a redeploy. The MCP taster above is deliberately smaller: one MCP
+      call can be a $0.02 compliance screening, a REST validation is $0.005.
   prepaid_credits:
     note: One credit per validation or lookup; batch validation debits one credit
       per IBAN. No expiry.
@@ -476,10 +478,12 @@ an agent can evaluate the API before anyone signs anything.
 ## 4. REST, anonymous
 
 \`POST /v1/iban/validate\` with a real \`iban\` and no credential at all is served
-${REST_TRIAL_DAILY_LIMIT} times per IP per day, full enrichment included. The
-answer carries a \`trial\` block with the count left and the one request that
-mints a free key. Same taster as the MCP one, for a human at a terminal. Past
-the ceiling the route answers 402 again, \`cause.reason = trial_exhausted\`.
+${REST_TRIAL_DAILY_LIMIT} times per source address per day (IPv6 counted per
+/64), full enrichment included. The answer carries a \`trial\` block with the
+count left and the one request that mints a free key. For a human at a terminal,
+where the MCP taster serves an agent. Past the ceiling the route answers 402
+again, \`cause.reason = trial_exhausted\`. The count lives in the service
+database, so it survives a redeploy.
 
 ## Failure modes
 

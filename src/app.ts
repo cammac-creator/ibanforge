@@ -63,7 +63,7 @@ import { createPlaygroundRelay } from './routes/playground.js';
 import { createX402Middleware } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
 import { anonymousTrialMiddleware } from './middleware/anonymous-trial.js';
-import { REST_TRIAL_DAILY_LIMIT } from './lib/trial.js';
+import { REST_TRIAL_DAILY_LIMIT, TRIAL_RESET } from './lib/trial.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
 import { creditsBuy } from './routes/credits-buy.js';
@@ -76,6 +76,7 @@ import { audit } from './routes/audit.js';
 import { chQrBill } from './routes/ch-qr-bill.js';
 import { adminAuditStats } from './routes/admin-audit-stats.js';
 import { adminPackSales } from './routes/admin-pack-sales.js';
+import { adminTrial } from './routes/admin-trial.js';
 import { adminFailedPayments } from './routes/admin-failed-payments.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
@@ -345,7 +346,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\` (${MCP_TOOLS.length} tools, no signup)
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp
 - **Try it with zero setup, as an agent (${MCP_DAILY_LIMIT} free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_DAILY_LIMIT} calls/day you get JSON-RPC error -32000, so move to the free API key (200 req/month) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
-- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per IP):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"CH9300762011623852957"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take the free key. Same doctrine as the MCP taster: past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`paywall_cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC and is counted per instance, in memory.
+- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"CH9300762011623852957"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take the free key. Past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`paywall_cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC, is counted per source address (IPv6 counted per /64), and lives in the service database, so it survives a redeploy. The HTTP MCP transport has its own, smaller allowance (${MCP_DAILY_LIMIT} tool calls/day): one MCP call can be a $0.02 compliance screening, a REST validation is $0.005.
 
 ## Discovery endpoints
 
@@ -439,7 +440,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/compliance \\
 
 Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (OFAC matched list + FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` participant status, and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
 
-**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. One precision since 06/09/2026: POST /v1/iban/validate with a REAL \`iban\` in the body and no key is served ${REST_TRIAL_DAILY_LIMIT} times a day per IP (see the keyless trial above) — the empty-body probe is unaffected and still gets its 402. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
+**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. One precision since 06/09/2026: POST /v1/iban/validate with a REAL \`iban\` in the body and no key is served ${REST_TRIAL_DAILY_LIMIT} times a day per source address, IPv6 counted per /64 (see the keyless trial above) — the empty-body probe is unaffected and still gets its 402. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
 
 ### 6. validate_payment_reference — structured payment reference (${toolPriceLabel('validate_payment_reference')})
 
@@ -814,6 +815,19 @@ export function buildApp(): Hono<HonoEnv> {
     c.json({
       name: 'IBANforge API v1',
       documentation: 'https://api.ibanforge.com/openapi.json',
+      // Le bloc que le lot 4 ajoute ici : jusqu'au 15/09/2026, un agent qui
+      // sondait /v1 en JSON n'apprenait rien de l'essai sans clé — la prose de
+      // /llms.txt le disait, ce point de découverte non. Les chiffres viennent
+      // des constantes, jamais retapés.
+      trial: {
+        endpoint: 'POST /v1/iban/validate',
+        daily_limit: REST_TRIAL_DAILY_LIMIT,
+        scope: 'per client source address (IPv6 counted per /64)',
+        resets: TRIAL_RESET,
+        exhausted: 'HTTP 402, paywall_cause.reason = "trial_exhausted"',
+        note: 'No key, no wallet, no e-mail: a real iban in the body is served in full. Counted in the service database, so it survives a redeploy.',
+        mcp_daily_limit: MCP_DAILY_LIMIT,
+      },
       discovery: {
         x402: 'https://api.ibanforge.com/.well-known/x402',
         mcp: 'https://api.ibanforge.com/mcp',
@@ -976,6 +990,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', webEvents);
   app.route('/', adminAuditStats);
   app.route('/', adminPackSales);
+  app.route('/', adminTrial);
   app.route('/', adminFailedPayments);
   app.route('/', adminSearchConsole);
   app.route('/', adminBusiness);

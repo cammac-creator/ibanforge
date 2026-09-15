@@ -13,6 +13,7 @@ import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
+import { reviewLedgerVolume, snapshotTrialDay, sweepDailyLedger } from './lib/daily-ip-ledger.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
 import { startProspectRadar } from './lib/prospect-radar-server.js';
@@ -143,6 +144,39 @@ startActivationNudge();
 // fail-soft mais aucune n'avait de sonde de vie — une panne et une semaine
 // calme produisaient exactement le même silence.
 startOpsProbes();
+
+// ─── Registre des franchises d'essai : trace, purge, contre-pression ─────────
+//
+// Le registre était une Map de niveau module avec son propre `setInterval` ;
+// depuis son portage en base (15/09/2026), ce minuteur ne peut plus vivre dans
+// le module : il ouvrirait `stats.sqlite` au simple import, y compris dans les
+// suites de tests qui n'en veulent pas, et avant `initStatsDB()`. Il vit donc
+// ici, avec les autres travaux d'entretien.
+//
+// 🚨 L'ORDRE est le point : `snapshotTrialDay(hier)` PUIS la purge. Inversé, la
+// colonne `rest_attempts_uncounted` — l'ampleur réelle d'une rafale, tenue en
+// mémoire — est perdue tous les jours, en silence.
+//
+// Cadence horaire et pas quotidienne : une journée de rotation de sources peut
+// créer beaucoup de lignes, et attendre 24 h pour les rendre est précisément le
+// scénario que la contre-pression de volume borne.
+function trialLedgerTick(): void {
+  try {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    snapshotTrialDay(yesterday);
+    const purged = sweepDailyLedger();
+    if (purged > 0) console.log(`Retention: swept ${purged} trial ledger entries`);
+    reviewLedgerVolume();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Trial ledger sweep failed:', msg);
+    // Seuil 2 : le tick tourne toutes les heures, et deux échecs de suite
+    // signifient qu'une journée d'essai part à la purge sans laisser de trace.
+    void opsFail('trial:sweep', `Entretien du registre d'essai en échec : ${msg}`, 2);
+  }
+}
+trialLedgerTick();
+setInterval(trialLedgerTick, 60 * 60 * 1000).unref();
 
 // ─── Drained shutdown ────────────────────────────────────────────────────────
 //

@@ -641,9 +641,15 @@ function causeFields(cause: PaywallCause | undefined): Record<string, unknown> {
  * Neither is `trial_exhausted`, and for a stronger reason: that caller holds no
  * key at all. The keyless trial exists to end in a signup, so the one response
  * where the free-tier rail matters most is the one that says the taster is
- * over. Stripping it there would be answering "you have used your ten free
- * calls" with no way to get an eleventh short of paying — the opposite of the
+ * over. Stripping it there would be answering "your free calls for today are
+ * spent" with no way to get another one short of paying — the opposite of the
  * decision that shipped the trial.
+ *
+ * Nor is `trial_unavailable`, for the same reason and more so: the trial's
+ * ledger is down, this caller did nothing wrong, and the free key is the one
+ * rail that would get it out of the hole. Since this Set is an explicit
+ * enumeration, adding the cause to the type does not file it here on its own —
+ * a test asserts that.
  */
 const ALLOWANCE_EXHAUSTED: ReadonlySet<PaywallCause['reason']> = new Set([
   'monthly_quota_exhausted',

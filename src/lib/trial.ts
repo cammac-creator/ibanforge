@@ -1,11 +1,24 @@
 /**
- * The keyless REST trial, in figures and in words. Decided 06/09/2026.
+ * The keyless REST trial, in figures and in words. Decided 06/09/2026, raised
+ * from ten to twenty-five on 15/09/2026.
  *
- * Ten validations a day per address on POST /v1/iban/validate, no key, no
- * wallet — the exact parity of the MCP taster (`MCP_DAILY_LIMIT`), because a
- * developer's first contact is a terminal and an agent's first contact is a
- * tool call, and only one of the two used to get an answer. The middleware that
- * enforces it is src/middleware/anonymous-trial.ts.
+ * Twenty-five validations a day per SOURCE on POST /v1/iban/validate, no key,
+ * no wallet. The middleware that enforces it is
+ * src/middleware/anonymous-trial.ts.
+ *
+ * 🚨 The figure is no longer the MCP taster's. It used to be, and that parity
+ * was the whole justification — the ten had been copied from `MCP_DAILY_LIMIT`
+ * because a number was needed, not because anything had been measured. Two
+ * reasons to break it, both about price rather than symmetry: this trial opens
+ * ONE route at $0.005, while the MCP taster hands out every data tool, up to a
+ * $0.02 compliance screening; and the friction is on this side, where a
+ * developer pasting the curl examples from the documentation burns several
+ * calls before reading a single answer. So REST is 25 and MCP stays 10, and the
+ * smaller MCP allowance is the deliberate one.
+ *
+ * "Per source", not "per address": the ledger bucket is the IPv6 /64 collapsed
+ * and then salted-hashed, because an IPv6 subscriber is handed a whole prefix
+ * and can pick a fresh address inside it for free.
  *
  * A LEAF module on purpose: the /v1 text, the `.well-known/rate-limits.yml`
  * artifact and the validate handler all quote these, and none of them should
@@ -13,8 +26,23 @@
  * `payment-links.ts` exists.
  */
 
-/** Calls served per address per UTC day. A taster, not a tier. */
-export const REST_TRIAL_DAILY_LIMIT = 10;
+/** Calls served per source per UTC day. A taster, not a tier. */
+export const REST_TRIAL_DAILY_LIMIT = 25;
+
+/**
+ * Hard ceiling of `trial_ledger` rows on the current UTC day. Past it the
+ * ledger stops INSERTING new buckets and counts them in memory instead, so the
+ * size of the file that holds the API keys stops being the caller's choice.
+ *
+ * The figure is not arbitrary: the hourly purge deletes at most 5 000 rows per
+ * statement and runs at most 40 passes per tick. A ceiling above what one tick
+ * can drain would be a table that never empties.
+ *
+ * ⚠️ This bounds the DISK. The separate question — at what burst of distinct
+ * sources the allowance should be temporarily reduced — is not decided here and
+ * waits on a measured baseline (`trial_daily.peak_hour_buckets`).
+ */
+export const TRIAL_LEDGER_MAX_ROWS_PER_DAY = 200_000;
 
 /** When the allowance comes back. UTC because the ledger's day is UTC. */
 export const TRIAL_RESET = 'midnight UTC';

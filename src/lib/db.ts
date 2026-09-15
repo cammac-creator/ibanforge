@@ -13,6 +13,7 @@ import { resetPsdRegisterStatements } from './psd-register.js';
 import { resetBgBaeStatements } from './bg-bae.js';
 import { resetBlzStatements } from './de-blz.js';
 import { normalizeEmail } from './email-norm.js';
+import { resetDailyLedgerStatements } from './daily-ip-ledger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -1125,6 +1126,94 @@ function openStatsDB(): DatabaseType.Database {
     // fresh one without reading the thread.
     if (prospectCols.length && !prospectCols.includes('outcome_at'))
       statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_at TEXT');
+    // ─── Registre des franchises d'essai (lot 4, 15/09/2026) ────────────────
+    //
+    // Bloc autonome posé en DERNIER, exprès : deux `CREATE TABLE IF NOT EXISTS`
+    // et aucun `ALTER`, donc aucun index à créer après une colonne ajoutée et
+    // aucune garde `PRAGMA table_info` (le piège du 19/08, qui empêchait l'API
+    // de démarrer, n'a pas de prise ici). Le placer à la fin garde la région
+    // isolée des autres chantiers qui migrent `api_keys` en parallèle.
+    statsDB.exec(`
+      -- Le compteur de toutes les franchises mesurées par source et par jour :
+      -- l'essai REST sans clé, les appels d'outils MCP, les ouvertures de
+      -- session MCP. Porté de la mémoire vers ici le 15/09/2026 : un
+      -- redéploiement oubliait tout, et le compteur d'une franchise ne
+      -- survivait pas à une mise en production. Ce n'est PAS une promesse de
+      -- partage entre instances : le service tourne sur un seul conteneur avec
+      -- un volume à attachement unique (railway.toml, numReplicas = 1), et
+      -- SQLite sur volume ne suivrait pas une seconde réplique.
+      --
+      -- Pas de contre-apostrophe et pas de point d'interrogation dans ce
+      -- commentaire : il vit dans un littéral de gabarit JS, où la
+      -- contre-apostrophe termine la chaîne (même note que request_log).
+      --
+      -- La colonne bucket est la clé NAMESPACÉE de la SOURCE ('rest:<h>',
+      -- '<h>', 'init:<h>'), où <h> est hashIp(normalizeIpForGuard(ip)) : l'IPv6
+      -- repliée sur son /64 PUIS hachée avec le sel du service. Jamais une
+      -- adresse, ni en clair ni entière.
+      --   - le /64 parce qu'un abonné IPv6 se voit remettre un préfixe entier
+      --     et peut y choisir une adresse neuve gratuitement : compter
+      --     l'adresse revient à ne rien compter (key-creation-guard.ts:45-60) ;
+      --   - le hachage parce que toute adresse persistée dans ce fichier est
+      --     hachée (request_log.ip_hash, key_creations.ip_hash) et que rien ici
+      --     n'a besoin de l'adresse en clair : la table n'est lue que par sa
+      --     clé complète ou par une plage sur la colonne day.
+      -- Les seaux 'unknown' et 'evt:*' n'arrivent JAMAIS ici (MEMORY_ONLY).
+      --
+      -- Les compteurs repartent de zéro une fois à la mise en production : les
+      -- clés de seau changent de forme (même note que normalizeIpForGuard).
+      --
+      -- DEUX horodatages, deux signaux DIFFÉRENTS :
+      --   - first_seen : quand le seau est APPARU. Posé à l'insertion, jamais
+      --     réécrit. Mesure l'arrivée de sources neuves.
+      --   - last_seen  : quand le seau a DÉPENSÉ pour la dernière fois.
+      --     Réécrit à chaque dépense comptée. Mesure la charge, et c'est le
+      --     seul des deux qu'un amorçage lent ne contourne pas.
+      --
+      -- Format des horodatages : celui de datetime('now'),
+      -- 'YYYY-MM-DD HH:MM:SS' UTC, comme toutes les autres colonnes
+      -- temporelles de ce fichier. Surtout PAS l'ISO 8601 de toISOString() :
+      -- 'T' (0x54) est supérieur à l'espace (0x20) en comparaison
+      -- lexicographique, donc une fenêtre glissante écrite en
+      -- WHERE last_seen >= datetime('now', modificateur) serait TOUJOURS VRAIE
+      -- et les 60 minutes deviendraient un compte depuis minuit, sans erreur
+      -- et sans test rouge.
+      CREATE TABLE IF NOT EXISTS trial_ledger (
+        day        TEXT    NOT NULL,
+        bucket     TEXT    NOT NULL,
+        units      INTEGER NOT NULL DEFAULT 0,
+        first_seen TEXT    NOT NULL,
+        last_seen  TEXT    NOT NULL,
+        PRIMARY KEY (day, bucket)
+      ) WITHOUT ROWID;
+      -- Ce qui reste d'une journée d'essai une fois ses lignes purgées.
+      -- Quelques dizaines d'octets par jour, et le seul moyen de dire APRÈS
+      -- COUP ce qui s'est passé. Écrite par snapshotTrialDay(), juste avant la
+      -- purge, qui SORT SANS ÉCRIRE quand la journée ne compte aucun seau :
+      -- sinon le passage suivant recalculerait des zéros sur une table vide et
+      -- écraserait la seule trace. shield_minutes a un AUTRE écrivain, le tick
+      -- du disjoncteur (lot 5) : les deux requêtes se partagent la ligne sans
+      -- se marcher dessus, d'où son DEFAULT 0.
+      --
+      -- 🚨 Aucune source individuelle ici, même hachée : cette table est un
+      -- agrégat et n'a AUCUNE politique de rétention. Une colonne « top 20 des
+      -- seaux » y ferait vivre des identifiants de source plus longtemps que
+      -- les 12 mois de request_log, qui est l'endroit prévu pour l'attribution
+      -- fine et qui, lui, a une politique. Des COMPTES, jamais des sources.
+      CREATE TABLE IF NOT EXISTS trial_daily (
+        day                     TEXT    PRIMARY KEY,
+        rest_buckets            INTEGER NOT NULL,
+        rest_units_counted      INTEGER NOT NULL,
+        rest_attempts_uncounted INTEGER NOT NULL DEFAULT 0,
+        rest_over_limit         INTEGER NOT NULL,
+        peak_hour_buckets       INTEGER NOT NULL,
+        mcp_buckets             INTEGER NOT NULL,
+        mcp_units               INTEGER NOT NULL,
+        init_buckets            INTEGER NOT NULL,
+        shield_minutes          INTEGER NOT NULL DEFAULT 0,
+        created_at              TEXT    DEFAULT (datetime('now'))
+      ) WITHOUT ROWID;
+    `);
   }
   return statsDB;
 }
@@ -1153,6 +1242,10 @@ export function closeAll(): void {
     statsDB.close();
     statsDB = null;
     resetStatsStatements();
+    // Le registre d'essai garde ses huit requêtes préparées au niveau module :
+    // sans cette ligne, la première dépense après une réouverture répondrait
+    // depuis une connexion morte (même motif que resetBlzStatements ci-dessus).
+    resetDailyLedgerStatements();
   }
   // A recorded open failure must not outlive the connection it described: after
   // a close the next getStatsDB() decides afresh, otherwise a test (or a reseed)

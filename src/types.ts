@@ -27,7 +27,21 @@ export interface PaywallCause {
     // The keyless REST trial ran out for today (src/middleware/anonymous-trial.ts).
     // A developer who reached this has already SEEN the product work, which is
     // the one paywall moment worth a different sentence from "payment required".
-    | 'trial_exhausted';
+    | 'trial_exhausted'
+    // The ledger behind the keyless trial could not be read or written at all,
+    // so the allowance is not exhausted — it is unmeasurable. A distinct cause
+    // rather than a fabricated count: the documentation keeps announcing that
+    // the first calls of the day are served, and operations must be able to
+    // tell "the trial is down" from "everybody spent their allowance" in the
+    // logs. It carries no `quota` (there is no count to quote), and it must NOT
+    // join ALLOWANCE_EXHAUSTED in enrich-402.ts: this caller holds no key, so
+    // the free-tier rail is more useful to it than to anyone.
+    //
+    // ⚠️ `trial_exhausted` can still be answered during such an outage, for a
+    // bucket already marked as over its ceiling in memory. That refusal is
+    // exact and stays as it is — reading `trial_exhausted` during an incident
+    // does not mean the counter was working.
+    | 'trial_unavailable';
   detail: string;
   // required/remaining: batch billing (1 unit per IBAN) can refuse a request
   // all-or-nothing while some allowance is left — these say how much.

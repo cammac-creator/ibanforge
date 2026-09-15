@@ -8,13 +8,13 @@
  * empty-body probe, and a typo'd key keeping its own 402 — are invisible to any
  * composition that does not include x402.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from './x402.js';
 import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
-import { resetDailyLedger } from '../lib/daily-ip-ledger.js';
+import { resetDailyLedger, resetDailyLedgerStatements } from '../lib/daily-ip-ledger.js';
 import { generateApiKey } from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 
@@ -233,6 +233,75 @@ describe('the trial is exhausted', () => {
     // And still shown the free key — unlike an exhausted KEY, this caller has
     // none, so the signup rail is the conversion the trial exists for.
     expect(body.free_tier).toBeDefined();
+  });
+
+  it('never assumes the caller is the one who spent', async () => {
+    // ⚠️ Depuis le portage, un redéploiement ne remet plus le compteur à zéro,
+    // et le seau est un PRÉFIXE : plusieurs abonnés d'un même /64 partagent une
+    // franchise. Le message dit « this address gets today », jamais « you have
+    // used » — et pas « your network », qui inviterait à débattre du périmètre.
+    const h = freshHeaders();
+    for (let i = 0; i < REST_TRIAL_DAILY_LIMIT + 1; i += 1) await validate({ iban: VALID_IBAN }, h);
+    const res = await validate({ iban: VALID_IBAN }, h);
+    const body = (await res.json()) as { cause?: { detail: string } };
+    expect(body.cause?.detail).toContain('this address gets today');
+    expect(body.cause?.detail).not.toMatch(/you have used|your network/i);
+    // Et le chiffre cité est bien le plafond appliqué, jamais un chiffre retapé.
+    expect(body.cause?.detail).toContain(`${REST_TRIAL_DAILY_LIMIT} keyless validations`);
+  });
+});
+
+describe('the ledger can be down without a single message lying', () => {
+  afterEach(() => {
+    // La table est recréée à la réouverture, comme au démarrage du service.
+    closeAll();
+    resetDailyLedger();
+  });
+
+  it('answers trial_unavailable, not a fabricated trial_exhausted', async () => {
+    // 🚨 Avant le portage, `countDailyUnits` ne pouvait pas échouer. Après, une
+    // base illisible ferait dire « vous avez épuisé vos 25 appels » avec un
+    // compte inventé, alors que la documentation continue d'annoncer les 25
+    // premiers appels servis. Cause distincte, pas de quota à citer, et pas
+    // d'en-tête X-Trial-* : il n'y a aucun compte à publier.
+    getStatsDB().exec('DROP TABLE IF EXISTS trial_ledger');
+    resetDailyLedgerStatements();
+    const res = await validate({ iban: VALID_IBAN }, freshHeaders());
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as {
+      cause?: { reason: string; detail: string; quota?: unknown };
+      free_tier?: unknown;
+    };
+    expect(body.cause?.reason).toBe('trial_unavailable');
+    expect(body.cause?.quota).toBeUndefined();
+    expect(res.headers.get('x-trial-used')).toBeNull();
+    expect(res.headers.get('x-trial-limit')).toBeNull();
+    // Le rail gratuit RESTE : cet appelant ne détient aucune clé, et il n'a
+    // rien fait de mal. `trial_unavailable` ne doit pas entrer dans
+    // ALLOWANCE_EXHAUSTED, qui est une énumération explicite.
+    expect(body.free_tier).toBeDefined();
+    expect(body.cause?.detail).toContain('Nothing is wrong with your request');
+  });
+});
+
+describe('one IPv6 /64, one allowance', () => {
+  it('counts two addresses of the same prefix as one source', async () => {
+    // 🚨 Le correctif de sécurité du lot : sans le repli /64, un abonné IPv6
+    // choisit une adresse neuve dans son préfixe pour chaque appel, et le
+    // plafond ne compte rien.
+    const first = (await (
+      await validate({ iban: VALID_IBAN }, { 'x-real-ip': '2001:db8:aa:1::1' })
+    ).json()) as TrialBody;
+    const second = (await (
+      await validate({ iban: VALID_IBAN }, { 'x-real-ip': '2001:db8:aa:1::2' })
+    ).json()) as TrialBody;
+    expect(first.trial?.calls_used_today).toBe(1);
+    expect(second.trial?.calls_used_today).toBe(2);
+    // Un autre /64 garde sa propre franchise.
+    const other = (await (
+      await validate({ iban: VALID_IBAN }, { 'x-real-ip': '2001:db8:aa:2::1' })
+    ).json()) as TrialBody;
+    expect(other.trial?.calls_used_today).toBe(1);
   });
 });
 
