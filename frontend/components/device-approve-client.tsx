@@ -239,6 +239,12 @@ export function DeviceApproveClient() {
    */
   const decide = useCallback(
     async (kind: 'approve' | 'deny', extra: Record<string, string> = {}): Promise<void> => {
+      // 🚨 Le même verrou que `lookup`, et il compte davantage ici : `disabled`
+      // n'agit qu'au rendu suivant, donc deux clics très rapprochés partiraient
+      // tous les deux. Le second recevrait le 404 du grant déjà tranché et
+      // remplacerait « c'est fait » par « ce code n'est pas valide ».
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       setBusy(true);
       setNotice(null);
       try {
@@ -317,6 +323,7 @@ export function DeviceApproveClient() {
       } catch {
         setNotice({ kind: 'text', text: '' });
       } finally {
+        inFlightRef.current = false;
         setBusy(false);
       }
     },
