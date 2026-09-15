@@ -193,8 +193,8 @@ describe('service_usage — réponses métier observées', () => {
   it('ne fabrique pas un compte qui revient à partir de deux clés anonymes', () => {
     key('ifk_anon_a', 'anonymous');
     key('ifk_anon_b', ' ANONYMOUS ');
-    request('ifk_anon_a', '2026-09-01 10:00:00');
-    request('ifk_anon_b', '2026-09-02 10:00:00');
+    request('ifk_anon_a', '2026-09-10 10:00:00');
+    request('ifk_anon_b', '2026-09-11 10:00:00');
     key('ifk_member', 'member@alpha.example.net');
     request('ifk_member');
 
