@@ -291,7 +291,8 @@ describe('migration des faits de lignée', () => {
       success_days: number;
     };
     expect(f.first_success_at).toBe('2026-07-02 08:00:00');
-    expect(f.first_success_route).toBe('/v1/iban/validate');
+    // Au MÊME format que le fil de l'eau, verbe compris.
+    expect(f.first_success_route).toBe('POST /v1/iban/validate');
     expect(f.first_success_context).toBe('traces');
     // 🚨 JAMAIS posé par un rattrapage : une trace muette ne prouve pas
     // « hors panneau », et le contrat interdit d'en déduire « production ».

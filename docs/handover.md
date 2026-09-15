@@ -356,6 +356,25 @@ served). The breaker (lot 5) arms the radar through three bare `kv_state` string
 `src/lib/cohort-radar.ts` rather than redeclaring them. The backup format is 3 (readable `[1, 2, 3]`)
 so that a dump taken before the journal existed stays distinguishable from a truncated one.
 
+**The trial is measured per key lineage since 15 September (lot M).** `api_keys.lineage_hash` is the
+`key_hash` of the key that was born; `rotateApiKey` copies it, so a lineage survives rotation, and
+`lineage_facts` keeps ONE row per lineage with every "first" written once (`COALESCE`, so replaying a
+fact changes nothing): first business 2xx and its canonical route, first call outside the demo panel,
+second-week return, settlements, the paid key linked to the same holder when the match is
+unambiguous. The recorder runs in the tracking middleware of `src/app.ts` after `recordRequest`, only
+when a key was presented, only for the billable families (`isBillableCall`, matched on the
+normalised route, never on a textual prefix), and costs one write per lineage, per context and per
+UTC day; it never throws. The context comes from the request header `X-IBANforge-Context` (`demo`
+from the site's first-call panel, anything else is `unknown` — never inferred as "production"); the
+header is in the CORS allow-list, and removing it there silently breaks the panel at preflight.
+`GET /v1/admin/funnel?since=YYYY-MM-DD&days=28` serves the six indicators of the measurement contract
+with denominators restricted to lineages that have the required hindsight (`pending` otherwise) and
+`null` instead of a percentage when the denominator is empty. Three limits are printed in the
+response itself: MCP tool calls are not activations (they land under `/mcp`, outside the billable
+families), `paid_key_delivered` is almost always 1 by construction, and rows reconstituted at
+migration are flagged `backfilled = 1` and excluded from every denominator. The migration reads
+`request_log` once, at the first boot after the deploy, under its own try/catch. Backup format 4.
+
 **Dashboard numbers now render identically on both sides (#182, 11 September).** Five client
 components — `status-by-path-table`, `live-health-strip`, `usage-chart`, `stacked-bar-chart` and
 the CRM `freshness-badge` — used `toLocaleString`, `toLocaleDateString` or `Intl.DateTimeFormat`.

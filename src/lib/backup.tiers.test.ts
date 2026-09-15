@@ -161,7 +161,7 @@ describe('sauvegarde du palier de clé', () => {
 
   it('23quater. un aller-retour conserve les faits de mesure, et un dump au format 3 se restaure sans eux', () => {
     expect(READABLE_FORMATS).toContain(3);
-    expect(BACKUP_FORMAT).toBe(4);
+    expect(READABLE_FORMATS).toContain(4);
     const db = getStatsDB();
     const lineage = `bk4-lineage-${RUN}`;
     // Une lignée comme le lot M l'écrit : bornes au format SQLite, « premiers »
@@ -227,5 +227,54 @@ describe('sauvegarde du palier de clé', () => {
     });
     expect(f3.lineages_inserted).toBe(0);
     expect(f3.lineages_skipped).toBe(0);
+  });
+
+  it('23quinquies. un aller-retour conserve le journal des bascules du disjoncteur, et un dump au format 4 se restaure sans lui', () => {
+    expect(READABLE_FORMATS).toContain(4);
+    const db = getStatsDB();
+    const episode = `ep-bk-${RUN}`;
+    db.prepare(
+      `INSERT INTO breaker_transitions
+         (episode_id, direction, reason, "trigger", creations_in_window, distinct_sources, threshold, window_minutes, undegraded)
+       VALUES (?, 'armed', 'threshold', 'creations', 12, 6, 10, 60, 0)`,
+    ).run(episode);
+    const dump = exportPaidState('2026-09-15T12:00:00Z');
+    expect(dump.format).toBe(BACKUP_FORMAT);
+    const mine = dump.breaker_transitions!.filter((r) => r.episode_id === episode);
+    expect(mine).toHaveLength(1);
+    expect(dump.counts.breaker_transitions).toBeGreaterThanOrEqual(1);
+
+    db.prepare('DELETE FROM breaker_transitions WHERE episode_id = ?').run(episode);
+    const only = {
+      ...dump,
+      api_keys: [],
+      api_usage: [],
+      key_claims: [],
+      key_settlements: [],
+      key_revocations: [],
+      lineage_facts: [],
+    };
+    const report = restorePaidState({ ...only, breaker_transitions: mine });
+    expect(report.transitions_inserted).toBe(1);
+    const again = restorePaidState({ ...only, breaker_transitions: mine });
+    expect(again.transitions_inserted).toBe(0);
+    expect(again.transitions_skipped).toBe(1);
+    const back = db
+      .prepare(
+        'SELECT direction, reason, creations_in_window FROM breaker_transitions WHERE episode_id = ?',
+      )
+      .all(episode);
+    expect(back).toEqual([{ direction: 'armed', reason: 'threshold', creations_in_window: 12 }]);
+
+    const f4 = restorePaidState({
+      format: 4,
+      taken_at: '2026-09-15T00:00:00Z',
+      counts: { api_keys: 0, api_usage: 0 },
+      api_keys: [],
+      api_usage: [],
+    });
+    expect(f4.transitions_inserted).toBe(0);
+    expect(f4.transitions_skipped).toBe(0);
+    db.prepare('DELETE FROM breaker_transitions WHERE episode_id = ?').run(episode);
   });
 });

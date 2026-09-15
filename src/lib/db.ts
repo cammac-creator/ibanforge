@@ -1566,6 +1566,16 @@ function migrateLineageFacts(statsDB: DatabaseType.Database): void {
       );
     }
   }
+  // Même garde que ci-dessus : une remise à niveau est un agrément, jamais une
+  // raison de ne pas démarrer.
+  try {
+    repairBackfilledRouteVerbs(statsDB);
+  } catch (err) {
+    console.error(
+      '[lineage] remise à niveau des routes rattrapées abandonnée :',
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 /** Étape 5 de la migration ci-dessus, sortie pour que son échec soit borné. */
@@ -1579,8 +1589,9 @@ function backfillLineageFirstsFromTraces(statsDB: DatabaseType.Database): void {
               COUNT(DISTINCT date(r.created_at)) AS days,
               -- La route de la PREMIERE ligne : created_at est de largeur fixe,
               -- donc le minimum lexicographique de la concaténation est celui
-              -- de la date, et le suffixe est la route qui l'accompagne.
-              MIN(r.created_at || '|' || r.path) AS first_pair
+              -- de la date, et le suffixe est la route qui l'accompagne — au
+              -- MEME format que le fil de l'eau, verbe compris (canonicalRouteOf).
+              MIN(r.created_at || '|' || r.method || ' ' || r.path) AS first_pair
          FROM request_log r
          JOIN api_keys k ON k.key_prefix = r.key_prefix
         WHERE r.key_prefix IS NOT NULL
@@ -1616,6 +1627,26 @@ function backfillLineageFirstsFromTraces(statsDB: DatabaseType.Database): void {
       update.run(t.first_at, route, t.last_at, t.last_at.slice(0, 10), t.days, t.lineage);
     }
   })();
+}
+
+/**
+ * Remise à niveau des routes rattrapées SANS verbe (première livraison du 15/09,
+ * qui écrivait le seul chemin) : le verbe d'une famille métier se déduit de sa
+ * route, et le fil de l'eau écrit « VERBE chemin ». Idempotent : ne touche que
+ * les lignes 'traces' dont la route ne porte pas encore d'espace.
+ */
+function repairBackfilledRouteVerbs(statsDB: DatabaseType.Database): void {
+  statsDB
+    .prepare(
+      `UPDATE lineage_facts
+          SET first_success_route = CASE
+                WHEN first_success_route LIKE '/v1/bic/%' OR first_success_route LIKE '/v1/ch/clearing/%'
+                THEN 'GET ' ELSE 'POST ' END || first_success_route
+        WHERE first_success_context = 'traces'
+          AND first_success_route IS NOT NULL
+          AND first_success_route NOT LIKE '% %'`,
+    )
+    .run();
 }
 
 // ---------------------------------------------------------------------------
