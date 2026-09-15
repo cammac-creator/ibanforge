@@ -12,6 +12,38 @@ import {
 import { getIbansArray } from '../lib/request-helpers.js';
 import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
 import { maybeSendQuotaWarning } from '../lib/quota-notice.js';
+import { burstRevocationFor } from '../lib/key-revocations.js';
+
+/**
+ * Ce que lit un agent dont la clé anonyme a été coupée par le radar de cohortes.
+ *
+ * 🚨 DEUX RÈGLES ONT ÉCRIT CE TEXTE, et elles valent pour toute retouche future.
+ *
+ * 1. Il ne dit RIEN de la facturation. Une version antérieure écrivait
+ *    « Nothing was charged and nothing was kept ». Ce module ne sait pas ce qui
+ *    a été facturé : le crochet de réclamation x402 avale son erreur par
+ *    doctrine (un écrit de télémétrie ne doit jamais transformer un 200 payé en
+ *    500), donc une clé qui a réellement réglé peut se retrouver sans
+ *    réclamation enregistrée, être coupée, et lire une phrase fausse. Il dit ce
+ *    qui a été fait de la CLÉ, jamais de l'argent. Aucun des mots `charged`,
+ *    `refund` ou `billed` n'a sa place ici.
+ *
+ * 2. Il ne promet que ce qui est livré. La sortie qu'il donne EN PREMIER est la
+ *    réclamation, qui rend la clé, parce qu'une version qui disait d'abord
+ *    « reprends une clé neuve » envoyait la victime dans une boucle : la clé
+ *    neuve meurt à la rafale suivante, qu'un attaquant relance toutes les cinq
+ *    minutes. C'est aussi pourquoi la révocation automatique ne s'active pas
+ *    tant que `/v1/keys/claim` n'accepte pas une clé coupée pour rafale.
+ *
+ * Aucun mot ne suppose que le lecteur est coupable, et il donne trois sorties :
+ * récupérer sa clé, en prendre une neuve, ou payer à l'appel sans clé du tout.
+ */
+export const KEY_REVOKED_BURST_DETAIL =
+  'This anonymous key was revoked: it was minted inside a burst of automated signups and cut with ' +
+  'that burst. If this key was yours, claim it back: POST /v1/keys/claim with this key and an email ' +
+  'address returns it to you, active, at 200 requests a month, out of reach of this sweep. Or take a ' +
+  'fresh key - POST /v1/keys/generate needs no email address - or pay per call with x402, which needs ' +
+  'no key at all.';
 
 /**
  * Extract an IBANforge API key from common locations agents use:
@@ -134,12 +166,39 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       // A key WAS supplied but doesn't validate (typo, truncation, revoked).
       // Without this marker the request is indistinguishable from anonymous
       // traffic and the client is never told its key is broken.
-      c.set('paywallCause', {
-        reason: 'invalid_api_key',
-        detail:
-          'An API key was provided (ifk_…) but it is invalid or revoked. ' +
-          'Check for typos or truncation, or generate a new free key: POST /v1/keys/generate.',
-      });
+      //
+      // Depuis le lot 6, une clé coupée POUR RAFALE par le radar de cohortes a
+      // son propre message. L'ancien envoie le lecteur chercher une faute de
+      // frappe qui n'existe pas : c'est faux, et c'est démoralisant pour un
+      // agent honnête pris dans un rayon de souffle. Une clé révoquée par son
+      // porteur, ou par un abonnement clos, garde le message historique.
+      //
+      // 🚨 La requête supplémentaire est UNIQUEMENT sur le chemin d'échec, donc
+      // jamais sur le chemin chaud d'un client valide, et l'index
+      // (key_hash, restored_at) est là pour elle.
+      //
+      // 🚨 `X-API-Key-Invalid: true` reste posé dans les DEUX cas. Le middleware
+      // d'essai sans clé s'appuie sur le fait qu'une clé a été PRÉSENTÉE pour ne
+      // pas faire retomber l'appel dans l'essai gratuit ; le retirer ferait
+      // d'une clé révoquée un billet gratuit vers l'essai par adresse, c'est-à
+      // -dire l'inverse du but.
+      //
+      // 🚨 Et le statut final reste 402, pas 403 : ce middleware ne rend jamais
+      // de statut, il pose la cause et laisse passer, et c'est le rail x402 qui
+      // répond avec elle. Un 403 sec serait un cul-de-sac exactement là où
+      // l'agent honnête doit pouvoir agir — reprendre sa clé, ou payer.
+      const burst = keyHash ? burstRevocationFor(keyHash) : null;
+      if (burst) {
+        c.set('paywallCause', { reason: 'key_revoked_burst', detail: KEY_REVOKED_BURST_DETAIL });
+        c.header('X-API-Key-Revoked', 'burst');
+      } else {
+        c.set('paywallCause', {
+          reason: 'invalid_api_key',
+          detail:
+            'An API key was provided (ifk_…) but it is invalid or revoked. ' +
+            'Check for typos or truncation, or generate a new free key: POST /v1/keys/generate.',
+        });
+      }
       c.header('X-API-Key-Invalid', 'true');
       await next();
       return;

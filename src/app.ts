@@ -77,6 +77,7 @@ import { chQrBill } from './routes/ch-qr-bill.js';
 import { adminAuditStats } from './routes/admin-audit-stats.js';
 import { adminPackSales } from './routes/admin-pack-sales.js';
 import { adminTrial } from './routes/admin-trial.js';
+import { adminCohorts } from './routes/admin-cohorts.js';
 import { adminFailedPayments } from './routes/admin-failed-payments.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
@@ -991,6 +992,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', adminAuditStats);
   app.route('/', adminPackSales);
   app.route('/', adminTrial);
+  app.route('/', adminCohorts);
   app.route('/', adminFailedPayments);
   app.route('/', adminSearchConsole);
   app.route('/', adminBusiness);
