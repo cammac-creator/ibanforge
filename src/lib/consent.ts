@@ -1,7 +1,6 @@
 import {
   ANONYMOUS_MONTHLY_LIMIT,
   FREE_TIER_MONTHLY_LIMIT,
-  KEY_CHECKOUT_URL,
   KEY_CLAIM_URL,
   KEY_GENERATE_URL,
 } from './tiers.js';
@@ -35,16 +34,14 @@ To claim that same key by e-mail, POST ${KEY_CLAIM_URL}. Send the key as "Author
 
 Already paying? ${PAYMENT_CLAIM} The e-mail code is the recurring free rail. The anonymous key keeps working within its allowance whether it is claimed or not.
 
-Separately, an MCP client can call request_api_key, show the returned approval link and user code to a human, then use poll_api_key after approval. The human controls what they share; the agent does not handle their address. This journey returns its own key and does not promote an existing anonymous key.
-
-For a card purchase, POST ${KEY_CHECKOUT_URL} with {"pack":"1k"} returns a Stripe link and a secret nonce. No key or e-mail is needed to open the checkout. The human enters their own address on Stripe. After payment, POST ${KEY_CHECKOUT_URL}/claim with {"nonce":"..."} to collect a SEPARATE key with credits that never expire, once only. Keep the nonce secret, send it only in the retrieval request body, and never put it in a URL. This purchase does not change an existing anonymous key.`;
+Prepaid credit packs are a SEPARATE key with credits that never expire, and do not change the key you already hold: your human buys one by card on https://ibanforge.com/pricing and receives the key by e-mail, or you buy one in USDC with POST https://api.ibanforge.com/v1/credits/buy/1k (also 5k, 25k). Two further doors are planned and NOT available yet: a human-approved key request from inside an MCP client, and a card checkout opened from the API that returns the key against a secret nonce. Do not look for them until this text says they exist.`;
 
 export const CONSENT_MEDIUM =
   `POST ${KEY_GENERATE_URL} with no body gives an ifk_ key with no e-mail: ${ANONYMOUS_MONTHLY_LIMIT} REST calls/month in normal operation (protective limits may apply). ` +
   `After at least one call, POST ${KEY_CLAIM_URL} with "Authorization: Bearer ifk_...", never the key in the body. ` +
   `Ask: "${CONSENT_ASK}". ${CONSENT_BOUNDARY} ` +
   `An e-mailed 6-digit code grants ${FREE_TIER_MONTHLY_LIMIT} calls every month; ${PAYMENT_CLAIM} ` +
-  `For a separate human-approved key use request_api_key then poll_api_key. For a separate paid credit key use POST ${KEY_CHECKOUT_URL} with {"pack":"1k"}, then POST ${KEY_CHECKOUT_URL}/claim with the secret nonce in the body after payment.`;
+  `Prepaid credit packs are a SEPARATE key: by card on https://ibanforge.com/pricing (your human pays, the key arrives by e-mail) or in USDC with POST https://api.ibanforge.com/v1/credits/buy/1k. A human-approved key request from an MCP client and a card checkout opened from the API are planned, not available yet.`;
 
 export const CONSENT_SHORT =
   `free: POST ${KEY_GENERATE_URL} with no body — no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST calls/month in normal operation (protective limits may apply); ` +
@@ -62,16 +59,18 @@ export const CONSENT_FIELDS = {
     auth: 'Send the key as "Authorization: Bearer ifk_...", never in the body. The key must have served at least one call.',
     by_email: `Ask your human: "${CONSENT_ASK}". ${CONSENT_BOUNDARY} POST {"email":"..."} returns 202 and mails a 6-digit code; repeat with the same address and "code" to claim ${FREE_TIER_MONTHLY_LIMIT} requests every month.`,
     by_agent_approval:
-      'Separate approval journey, not a claim of an existing key: call request_api_key, show the approval link and user code, then poll_api_key after human approval. Open a grant only when needed: it reserves a key creation allowance. The agent does not handle an address.',
+      'Planned, not available yet: a separate approval journey, not a claim of an existing key, where an MCP client shows an approval link to a human and never handles an address. Until it exists, by_email and by_payment are the two ways to raise a key; do not look for an approval tool.',
     by_payment: PAYMENT_CLAIM,
   },
   buy_credits_by_card: {
     description: 'A separate purchase: it does not change the key you already hold',
-    endpoint: `POST ${KEY_CHECKOUT_URL}`,
-    auth: 'No key and no e-mail. Body: {"pack":"1k"} (or 5k, 25k); the pack is required.',
+    endpoint:
+      'https://ibanforge.com/pricing (card, paid by your human) — or POST https://api.ibanforge.com/v1/credits/buy/1k in USDC (also 5k, 25k)',
+    auth: 'No key and no e-mail on the pricing page. The USDC route is paid per call with x402. A card checkout opened from the API (POST /v1/keys/checkout) is planned, not available yet: do not call it.',
     human_step:
-      'Show checkout_url to your human. They enter their own address on Stripe. Keep the returned nonce secret; never put it in a URL.',
-    collect: `After payment, POST ${KEY_CHECKOUT_URL}/claim with {"nonce":"..."} in the body. It returns a SEPARATE key with credits that never expire, once only.`,
+      'Show https://ibanforge.com/pricing to your human. They enter their own address on Stripe and receive the key by e-mail. Treat any key or secret you are handed as a secret: never put it in a URL.',
+    collect:
+      'The pack is a SEPARATE key with credits that never expire, delivered after payment. Collecting it from the API with a secret nonce in the body is planned, not available yet.',
   },
 } as const;
 
