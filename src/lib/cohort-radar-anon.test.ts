@@ -41,6 +41,7 @@ import {
   type BurstRevocationInput,
 } from './key-revocations.js';
 import { KEY_REVOKED_BURST_DETAIL } from '../middleware/api-key.js';
+import { buildApp } from '../app.js';
 import { ANON_ANCHOR_MIN_KEYS, BREAKER_MIN_DISTINCT_SOURCES, toSqliteUtc } from './cohort-radar.js';
 import { ANONYMOUS_CONTACT, ANONYMOUS_MONTHLY_LIMIT, CLAIM_REPAIR_LANDED } from './tiers.js';
 import { KV_SHIELD_ARMED, KV_SHIELD_ARMED_AT, KV_SHIELD_EPISODE_ID } from './shield-state.js';
@@ -86,6 +87,8 @@ it('le schéma exigé des lots sœurs est en place', () => {
 interface Minted {
   prefix: string;
   hash: string;
+  /** La clé en clair, pour la présenter à une route. */
+  raw: string;
 }
 
 let minted: Minted[] = [];
@@ -157,8 +160,8 @@ function mint(opts: {
        VALUES (?, ?, ?, ?, '/v1/iban/validate')`,
     ).run(hash, prefix, `ref-${prefix}-${i}`, usd);
   }
-  minted.push({ prefix, hash });
-  return { prefix, hash };
+  minted.push({ prefix, hash, raw });
+  return { prefix, hash, raw };
 }
 
 /** Consomme des unités, pour que `prev_units_used` ait quelque chose à consigner. */
@@ -522,11 +525,12 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     expect(generic.skipped_reason).toBe('below_source_floor');
     expect(activeCount([honest.prefix]), 'l’honnête isolé survit').toBe(1);
     expect(activeCount(bait.map((k) => k.prefix))).toBe(2);
-    // La ferme elle-même, à quarante réseaux, passe la garde de diversité et
-    // n'est retenue que par l'absence de réparation par réclamation.
+    // La ferme elle-même, à quarante réseaux, passe la garde de diversité et,
+    // depuis le lot 6b (réparation par réclamation livrée), n'est plus retenue
+    // au premier tick que par la confirmation sur deux ticks.
     const farmLine = report.revocations.find((r) => r.anchor === `ua:${farmUa}`)!;
     expect(farmLine.distinct_sources).toBe(40);
-    expect(farmLine.skipped_reason).toBe('claim_repair_missing');
+    expect(farmLine.skipped_reason).toBe('awaiting_confirm');
     expect(activeCount(farm.map((k) => k.prefix))).toBe(40);
   });
 
@@ -656,7 +660,7 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
   });
 
   // -------------------------------------------------------------------------
-  it('l’opt-in absent ne coupe RIEN, et posé ne coupe rien non plus tant que la réparation manque', async () => {
+  it('l’opt-in absent ne coupe RIEN ; posé, chaque garde le dit dans l’ordre, et la coupe confirmée se journalise', async () => {
     const now = RUN;
     const start = now - 60 * 1000;
     const ua = `optin-${RUN}/1.0`;
@@ -679,20 +683,8 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
       else process.env.IBANFORGE_REVOCATION_ENABLED = saved;
     }
 
-    // 2. Drapeau POSÉ : la révocation reste bridée, parce que `/v1/keys/claim`
-    //    n'accepte pas encore une clé coupée pour rafale. Sans cette garde, la
-    //    victime d'un empoisonnement lit un texte qui l'envoie chercher une clé
-    //    neuve, et la clé neuve meurt à la rafale suivante.
-    const on = await withRevocationEnabled(() => scan(now));
-    expect(CLAIM_REPAIR_LANDED, 'le drapeau part à false, par décision').toBe(false);
-    expect(on.revocations.find((r) => r.anchor === `ua:${ua}`)!.skipped_reason).toBe(
-      'claim_repair_missing',
-    );
-    expect(on.anon_revoked).toBe(0);
-    expect(listKeyRevocations().total).toBe(0);
-    expect(activeCount(keys.map((k) => k.prefix))).toBe(20);
-
-    // 3. L'interrupteur de crise éteint aussi la révocation, et il le DIT.
+    // 2. Drapeau POSÉ mais interrupteur de crise : la révocation s'éteint aussi,
+    //    et le rapport le DIT.
     const savedBreaker = process.env.IBANFORGE_BREAKER_DISABLED;
     process.env.IBANFORGE_BREAKER_DISABLED = '1';
     try {
@@ -700,16 +692,39 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
       expect(crisis.revocations.find((r) => r.anchor === `ua:${ua}`)!.skipped_reason).toBe(
         'breaker_disabled',
       );
+      expect(crisis.anon_revoked).toBe(0);
     } finally {
       if (savedBreaker === undefined) delete process.env.IBANFORGE_BREAKER_DISABLED;
       else process.env.IBANFORGE_BREAKER_DISABLED = savedBreaker;
     }
 
-    // 4. Hors alerte, le motif le plus informatif est l'absence d'épisode.
+    // 3. Hors alerte, le motif le plus informatif est l'absence d'épisode.
     disarm();
     const calm = await withRevocationEnabled(() => scan(now));
     expect(calm.revocations.find((r) => r.anchor === `ua:${ua}`)!.skipped_reason).toBe('not_armed');
     expect(calm.shield_armed).toBe(false);
+    expect(activeCount(keys.map((k) => k.prefix))).toBe(20);
+
+    // 4. Sous alerte, drapeau posé, réparation livrée (lot 6b) : la cohorte a
+    //    déjà été vue deux fois sur cet épisode, la confirmation est acquise, et
+    //    la passe COUPE — en journalisant chaque clé, pour qu'elle se rende.
+    expect(CLAIM_REPAIR_LANDED, 'la réparation par réclamation est livrée').toBe(true);
+    arm(`ep-optin-${RUN}`, start);
+    // Le compteur de confirmation vit PAR épisode : le passage hors alerte l'a
+    // remis à zéro, donc le premier tick de l'épisode ré-armé attend encore.
+    const first = await withRevocationEnabled(() => scan(now));
+    expect(first.revocations.find((r) => r.anchor === `ua:${ua}`)!.skipped_reason).toBe(
+      'awaiting_confirm',
+    );
+    expect(first.anon_revoked).toBe(0);
+    const on = await withRevocationEnabled(() => scan(now));
+    const line = on.revocations.find((r) => r.anchor === `ua:${ua}`)!;
+    expect(line.skipped_reason).toBeUndefined();
+    expect(line.keys).toBe(20);
+    expect(on.anon_revoked).toBe(20);
+    expect(listKeyRevocations({ episodeId: `ep-optin-${RUN}`, limit: 1000 }).total).toBe(20);
+    expect(activeCount(keys.map((k) => k.prefix))).toBe(0);
+    expect(burstRevocationFor(keys[0].hash), 'le middleware servira le 402 « coupée »').not.toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -900,7 +915,43 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
   //
   // Ce que ce garde ne peut pas faire : détecter une route livrée PUIS bridée par
   // un autre chemin. Le module ne possède pas cette route.
-  it.todo('CLAIM_REPAIR_LANDED dit ce que /v1/keys/claim fait vraiment');
+  it('CLAIM_REPAIR_LANDED dit ce que /v1/keys/claim fait vraiment', async () => {
+    // Une clé anonyme qui a servi, coupée pour rafale, présentée à la réclamation.
+    const key = mint({ ua: 'repair/1.0', ipHash: 'net-repair', atMs: RUN - 60_000 });
+    useUnits(key.hash, 1);
+    expect(
+      revokeForBurst({
+        keyHash: key.hash,
+        keyPrefix: key.prefix,
+        originPrefix: null,
+        episodeId: 'ep-two-way',
+        anchor: 'ua:repair/1.0',
+        anchorShare: 1,
+        anchorKeys: 16,
+        burstFrom: toSqliteUtc(RUN - 120_000),
+        burstTo: toSqliteUtc(RUN - 90_000),
+        burstKeys: 16,
+        windowMinutes: 0.5,
+        distinctSources: BREAKER_MIN_DISTINCT_SOURCES,
+      }),
+    ).toBe(true);
+    const res = await buildApp().request('/v1/keys/claim', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key.raw}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'two-way@alpha.example.net' }),
+    });
+    if (CLAIM_REPAIR_LANDED) {
+      expect(
+        res.status,
+        'le drapeau est levé mais /claim refuse encore une clé révoquée : la révocation coupe sans réparation possible',
+      ).not.toBe(401);
+    } else {
+      expect(
+        res.status,
+        'la route relâche déjà son 401 : lever CLAIM_REPAIR_LANDED, sinon le radar reste bridé pour rien',
+      ).toBe(401);
+    }
+  });
 });
 
 describe.skipIf(!READY)('cadence et sûreté de la passe', () => {

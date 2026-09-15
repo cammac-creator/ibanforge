@@ -2,7 +2,8 @@ import { BACKUP_FORMAT } from '../lib/backup.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { apiKeys } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
-import { generateApiKey, getKeyTier } from '../lib/api-keys.js';
+import { generateApiKey, getKeyTier, validateApiKey } from '../lib/api-keys.js';
+import { burstRevocationFor, revokeBurstBatch } from '../lib/key-revocations.js';
 import {
   ANONYMOUS_MONTHLY_LIMIT,
   CLAIM_MIN_PAID_USD,
@@ -1997,5 +1998,95 @@ describe('le palier se lit et survit', () => {
     expect(secondRow.tier).toBe('email');
     expect(secondRow.claimed_at).not.toBeNull();
     expect(secondRow.claim_method).toBe('email_code');
+  });
+});
+
+describe('POST /v1/keys/claim — lot 6b : une clé coupée pour rafale se rend par la réclamation', () => {
+  const claim = (app: Hono, key: string, body: Record<string, unknown>) =>
+    app.request('/v1/keys/claim', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const burst = (k: { key_hash: string; key_prefix: string }) => ({
+    keyHash: k.key_hash,
+    keyPrefix: k.key_prefix,
+    originPrefix: null,
+    episodeId: 'ep-repair',
+    anchor: 'ua:demo-http-client/1.0',
+    anchorShare: 1,
+    anchorKeys: 16,
+    burstFrom: '2026-09-15 10:00:00',
+    burstTo: '2026-09-15 10:00:30',
+    burstKeys: 16,
+    windowMinutes: 0.5,
+    distinctSources: 5,
+  });
+
+  it('reconnue au temps 1, rendue ET promue au temps 2, dans la même transaction', async () => {
+    const app = makeApp();
+    const db = getStatsDB();
+    const k = anonKey(`repair-${RUN_TAG}`);
+    fakeUsage(k.key_hash, 2);
+    expect(revokeBurstBatch([burst(k)]).revoked).toBe(1);
+    expect(validateApiKey(k.api_key).valid, 'coupée : le middleware la refuse').toBe(false);
+
+    const email = `repair-${RUN_TAG}@alpha.example.net`;
+    // Temps 1 : la clé coupée est RECONNUE — pas de 401. Sans relais en test le
+    // temps 1 ne rend jamais 202 ; ce qui compte ici est que la route ne la
+    // traite pas comme une clé inconnue.
+    const step1 = await claim(app, k.api_key, { email });
+    expect(step1.status).not.toBe(401);
+
+    // Temps 2 : le code planté, ciblé sur cette clé, la rend et la promeut.
+    const code = plant(createVerificationChallenge(email, 'test', k.key_prefix));
+    const res = await claim(app, k.api_key, { email, code });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(json.claimed).toBe(true);
+    expect(json.restored).toBe(true);
+    expect(json.tier).toBe('claimed');
+    expect(json.monthly_limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    expect(String(json.message)).toContain('active again');
+
+    expect(validateApiKey(k.api_key).valid, 'rendue : le middleware l’accepte de nouveau').toBe(true);
+    expect(burstRevocationFor(k.key_hash), 'plus de motif « coupée » à servir').toBeNull();
+    const row = db
+      .prepare(
+        'SELECT active, deactivated_at, tier, monthly_limit, no_recredit FROM api_keys WHERE key_hash = ?',
+      )
+      .get(k.key_hash);
+    expect(row).toEqual({
+      active: 1,
+      deactivated_at: null,
+      tier: 'claimed',
+      monthly_limit: FREE_TIER_MONTHLY_LIMIT,
+      no_recredit: 0,
+    });
+    const journal = db
+      .prepare('SELECT restored_at FROM key_revocations WHERE key_hash = ?')
+      .get(k.key_hash) as { restored_at: string | null };
+    expect(journal.restored_at).toBeTruthy();
+  });
+
+  it('une clé révoquée par son PORTEUR reste refusée : le journal anon_burst est la seule porte', async () => {
+    const app = makeApp();
+    const k = anonKey(`repair-owner-${RUN_TAG}`);
+    fakeUsage(k.key_hash, 1);
+    getStatsDB()
+      .prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?")
+      .run(k.key_hash);
+    const res = await claim(app, k.api_key, { email: `owner-${RUN_TAG}@alpha.example.net` });
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_key');
+  });
+
+  it('une clé coupée qui n’a jamais servi garde son 403 unused_key : rien à rendre, une clé neuve suffit', async () => {
+    const app = makeApp();
+    const k = anonKey(`repair-unused-${RUN_TAG}`);
+    expect(revokeBurstBatch([burst(k)]).revoked).toBe(1);
+    const res = await claim(app, k.api_key, { email: `unused-${RUN_TAG}@alpha.example.net` });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe('unused_key');
   });
 });

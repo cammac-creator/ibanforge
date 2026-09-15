@@ -319,5 +319,48 @@ export function burstRevocationFor(keyHash: string): { revoked_at: string } | nu
   }
 }
 
+/**
+ * Rend une clé coupée pour rafale, telle qu'elle était : le pendant de
+ * `revokeBurstBatch`, appelé par la RÉCLAMATION une fois le code vérifié
+ * (lot 6b, 15/09/2026). L'appelant l'enchaîne avec la promotion dans UNE
+ * transaction : si la promotion échouait, la clé serait rendue et non promue,
+ * jamais promue et non rendue.
+ *
+ * 🚨 Par hash, jamais par préfixe (voir la migration). Rend `false` — et ne
+ * touche rien — quand il n'y a rien à rendre : clé déjà active, ou aucune
+ * ligne `anon_burst` non restaurée. L'ancien plafond et le drapeau de
+ * non-recharge reviennent tels que le journal les a consignés ; la promotion
+ * qui suit les réécrit, et c'est voulu.
+ */
+export function restoreBurstRevocation(keyHash: string): boolean {
+  const db = getStatsDB();
+  const tx = db.transaction((): boolean => {
+    const row = db
+      .prepare(
+        `SELECT prev_monthly_limit, prev_no_recredit FROM key_revocations
+          WHERE key_hash = ? AND reason = ? AND restored_at IS NULL
+          ORDER BY revoked_at DESC, id DESC LIMIT 1`,
+      )
+      .get(keyHash, REVOCATION_REASON_BURST) as
+      | { prev_monthly_limit: number | null; prev_no_recredit: number }
+      | undefined;
+    if (!row) return false;
+    const res = db
+      .prepare(
+        `UPDATE api_keys
+            SET active = 1, deactivated_at = NULL, monthly_limit = ?, no_recredit = ?
+          WHERE key_hash = ? AND active = 0`,
+      )
+      .run(row.prev_monthly_limit, row.prev_no_recredit, keyHash);
+    if (res.changes === 0) return false;
+    db.prepare(
+      `UPDATE key_revocations SET restored_at = datetime('now')
+        WHERE key_hash = ? AND reason = ? AND restored_at IS NULL`,
+    ).run(keyHash, REVOCATION_REASON_BURST);
+    return true;
+  });
+  return tx();
+}
+
 /** Ré-export pour que la route de coupe manuelle lotisse comme la passe. */
 export { ANON_REVOCATION_BATCH };

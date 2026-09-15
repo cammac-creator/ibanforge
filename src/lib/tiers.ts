@@ -41,4 +41,7 @@ export const KEY_CHECKOUT_URL = 'https://api.ibanforge.com/v1/keys/checkout';
  * Ce que ce garde ne peut pas faire, et il faut le dire : il ne détecte pas une
  * route livrée PUIS bridée par un autre chemin.
  */
-export const CLAIM_REPAIR_LANDED = false;
+// Levé le 15/09/2026 (lot 6b) : `/v1/keys/claim` reconnaît une clé coupée pour
+// rafale (`findBurstRevokedKey`) et la rend en même temps qu'il la promeut
+// (`restoreBurstRevocation`). Le test à deux sens est actif.
+export const CLAIM_REPAIR_LANDED = true;

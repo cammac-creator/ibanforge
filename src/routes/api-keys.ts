@@ -17,10 +17,12 @@ import {
   rotateApiKey,
   getKeyTier,
   claimKey,
+  findBurstRevokedKey,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
 import { paidSoFarUsd } from '../lib/key-settlements.js';
+import { restoreBurstRevocation } from '../lib/key-revocations.js';
 import { PRO_PAYMENT_LINK, PRO_PRICE_USD } from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
 import { getKeyReport } from '../lib/key-report.js';
@@ -913,9 +915,15 @@ apiKeys.post('/v1/keys/claim', async (c) => {
     return c.json({ error: 'missing_key', message: MISSING_KEY_MESSAGE }, 401);
   }
   const validation = validateApiKey(key);
-  if (!validation.valid) {
+  // Lot 6b : une clé coupée POUR RAFALE par le radar de cohortes est la SEULE
+  // clé inactive acceptée ici. La réclamation est sa réparation : le radar ne
+  // coupe automatiquement que si ce chemin existe (CLAIM_REPAIR_LANDED). Une
+  // clé révoquée par son porteur, ou inconnue, garde son 401.
+  const repair = validation.valid ? null : findBurstRevokedKey(key);
+  if (!validation.valid && !repair) {
     return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
   }
+  const keyHash = validation.valid ? validation.keyHash : repair!.keyHash;
 
   // Même lecture que /v1/keys/generate, pour la même raison : un corps vide est
   // légitime (il ne mène nulle part ici, mais il ne doit pas passer pour cassé)
@@ -935,7 +943,7 @@ apiKeys.post('/v1/keys/claim', async (c) => {
     body = parsed as typeof body;
   }
 
-  const tierRow = getKeyTier(validation.keyHash);
+  const tierRow = getKeyTier(keyHash);
   if (!tierRow || tierRow.tier !== 'anonymous') {
     return c.json(
       {
@@ -997,7 +1005,7 @@ apiKeys.post('/v1/keys/claim', async (c) => {
   const served = (
     getStatsDB()
       .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
-      .get(validation.keyHash) as { n: number }
+      .get(keyHash) as { n: number }
   ).n;
   if (served <= 0) {
     return c.json(
@@ -1094,7 +1102,7 @@ apiKeys.post('/v1/keys/claim', async (c) => {
         event: 'send',
         emailNorm,
         keyPrefix: tierRow.key_prefix,
-        keyHash: validation.keyHash,
+        keyHash: keyHash,
         method: 'email_code',
         ipHash: claimSource,
       });
@@ -1187,7 +1195,13 @@ apiKeys.post('/v1/keys/claim', async (c) => {
   // La promotion et sa ligne de journal dans la MÊME transaction (voir
   // claimKey) : une promotion qui ne se journalise pas est invisible au plafond
   // par réseau. Idempotente par son WHERE sur le palier anonyme.
-  const promoted = claimKey(validation.keyHash, 'email_code', { email, ipHash: claimSource });
+  // Rendre PUIS promouvoir, dans une seule transaction : une clé coupée pour
+  // rafale revient d'abord telle qu'elle était (restoreBurstRevocation), et la
+  // promotion la fait monter ensuite. Si l'une des deux échoue, rien n'est écrit.
+  const promoted = getStatsDB().transaction((): boolean => {
+    if (repair && !restoreBurstRevocation(keyHash)) return false;
+    return claimKey(keyHash, 'email_code', { email, ipHash: claimSource });
+  })();
   if (!promoted) {
     return c.json(
       {
@@ -1199,7 +1213,7 @@ apiKeys.post('/v1/keys/claim', async (c) => {
       409,
     );
   }
-  const after = getKeyTier(validation.keyHash);
+  const after = getKeyTier(keyHash);
   return c.json(
     {
       claimed: true,
@@ -1214,7 +1228,12 @@ apiKeys.post('/v1/keys/claim', async (c) => {
       basis: 'monthly',
       previous_monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
       claimed_at: after?.claimed_at ?? null,
-      message: `This key now allows ${FREE_TIER_MONTHLY_LIMIT} requests a month. Same key, nothing to replace.`,
+      // Vrai quand la clé avait été coupée pour rafale : elle est de nouveau
+      // active, et c'est la phrase que le 402 lui promettait.
+      restored: repair !== null,
+      message: repair
+        ? `This key is active again and now allows ${FREE_TIER_MONTHLY_LIMIT} requests a month, out of reach of the burst sweep. Same key, nothing to replace.`
+        : `This key now allows ${FREE_TIER_MONTHLY_LIMIT} requests a month. Same key, nothing to replace.`,
     },
     200,
   );

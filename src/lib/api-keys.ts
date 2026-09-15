@@ -9,6 +9,7 @@ import {
   type KeyTier,
 } from './tiers.js';
 import { normalizeEmail } from './email-norm.js';
+import { burstRevocationFor } from './key-revocations.js';
 import { recordKeyCreation } from './key-creation-guard.js';
 import { recordKeyClaim, type KeyClaimMethod } from './key-claims.js';
 
@@ -896,6 +897,25 @@ export interface KeyTierRow {
 }
 
 /** Le palier d'une clé, par hash. Un seul nom pour cette lecture. */
+/**
+ * Une clé INACTIVE que le radar de cohortes a coupée pour rafale et pas encore
+ * rendue (lot 6b). C'est la SEULE clé inactive que `POST /v1/keys/claim`
+ * accepte : la réclamation est la réparation que le lot 6 exige avant toute
+ * révocation automatique, et `CLAIM_REPAIR_LANDED` (tiers.ts) dit qu'elle
+ * existe. Jamais une clé révoquée par son porteur ni par un abonnement clos :
+ * celles-là n'ont aucune ligne `anon_burst` non restaurée, et `revokeApiKey`
+ * garde son invariant (une clé révoquée par son porteur ne revient jamais).
+ */
+export function findBurstRevokedKey(key: string): { keyHash: string; keyPrefix: string } | null {
+  if (!key.startsWith(KEY_PREFIX)) return null;
+  const keyHash = hashKey(key);
+  const row = getStatsDB()
+    .prepare('SELECT key_prefix, active, tier FROM api_keys WHERE key_hash = ?')
+    .get(keyHash) as { key_prefix: string; active: number; tier: string } | undefined;
+  if (!row || row.active === 1 || row.tier !== 'anonymous') return null;
+  return burstRevocationFor(keyHash) ? { keyHash, keyPrefix: row.key_prefix } : null;
+}
+
 export function getKeyTier(keyHash: string): KeyTierRow | null {
   const row = getStatsDB()
     .prepare(

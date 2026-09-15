@@ -1028,7 +1028,10 @@ const buildRawSpec = () => ({
           'A verified mailbox is the only rail that grants the allowance EVERY month. There is also an implicit ' +
           `paid rail with no call to make here: once ${CLAIM_MIN_PAID_USD} USD of x402 settlements or a credit ` +
           `pack have been settled while presenting the key, it is raised to ${FREE_TIER_MONTHLY_LIMIT} requests ` +
-          'ONCE, with no monthly renewal. GET /v1/keys/usage serves the counter as a "claim" block.',
+          'ONCE, with no monthly renewal. GET /v1/keys/usage serves the counter as a "claim" block. ' +
+          'A key that the cohort radar cut inside a burst of automated signups (the API answers 402 ' +
+          '"key_revoked_burst" to it) is the one inactive key this route accepts: a successful claim restores ' +
+          'it, active, and raises it in the same step ("restored": true in the answer).',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         requestBody: {
@@ -1082,7 +1085,8 @@ const buildRawSpec = () => ({
           '401': {
             description:
               '"missing_key": no key was presented — it goes in the header, never in the body. "invalid_key": the ' +
-              'key is unknown or inactive.',
+              'key is unknown or inactive (a key cut for a signup burst is NOT refused here: it is restored by a ' +
+              'successful claim).',
           },
           '403': {
             description:
