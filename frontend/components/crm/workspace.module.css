@@ -84,8 +84,16 @@
   min-height: 44px;
   background: transparent;
   color: var(--fg-1);
-  font-size: 14px;
+  /* 16 px par défaut : en dessous, iOS Safari zoome la page à chaque focus. La règle à 16 px
+     plus bas vit dans une requête de conteneur que seule `.table` déclenche ; la page Clients
+     n'a pas ce conteneur et restait à 14 px. On réduit donc seulement quand le conteneur est large. */
+  font-size: 16px;
   outline: none;
+}
+@container (min-width: 650px) {
+  .searchField input {
+    font-size: 14px;
+  }
 }
 .searchField input::placeholder {
   color: var(--fg-4);
