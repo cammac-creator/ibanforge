@@ -264,6 +264,14 @@ describe('the contract covers the routes and fields the server actually serves',
     ['/v1/credits/balance', 'get'],
     ['/v1/feedback', 'post'],
     ['/v1/feedback/{id}', 'get'],
+    // Les cinq routes du device grant. Un agent qui ne peut pas lire ce
+    // parcours dans le contrat en inventera un, et celui qu'il invente ouvre un
+    // navigateur — ce que la variante A existe précisément pour éviter.
+    ['/v1/keys/device', 'post'],
+    ['/v1/keys/device/token', 'post'],
+    ['/v1/keys/device/lookup', 'post'],
+    ['/v1/keys/device/approve', 'post'],
+    ['/v1/keys/device/deny', 'post'],
   ])('documents %s %s', (path, method) => {
     expect(spec.paths[path], `${path} is not in the document`).toBeDefined();
     expect(spec.paths[path][method], `${path} has no ${method} operation`).toBeDefined();

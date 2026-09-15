@@ -13,6 +13,7 @@ import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
+import { purgeExpiredDeviceCodes } from './lib/device-grant.js';
 import { purgeLineageFacts } from './lib/lineage-facts.js';
 import { reviewLedgerVolume, snapshotTrialDay, sweepDailyLedger } from './lib/daily-ip-ledger.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
@@ -83,6 +84,13 @@ try {
       `Retention: purged ${purgedTerminated} request_log rows of terminated keys (DPA 4.7)`,
     );
   purgeExpiredVerifications();
+  // Les grants d'appareil et le journal de leurs tentatives, aux DEUX mêmes
+  // endroits que la purge des vérifications. 🚨 L'étape qui révoque une clé
+  // approuvée que personne n'est venu chercher est le point le plus facile à
+  // oublier : sans elle, chaque approbation dont l'agent est mort entre-temps
+  // laisse une clé active que PERSONNE ne détient, invisible dans les
+  // statistiques d'usage et impossible à rattacher à quiconque.
+  purgeExpiredDeviceCodes();
   // Les faits de mesure de l'essai, alignés sur les 12 mois de request_log et
   // sur AUCUNE promesse nouvelle (lot M). Au démarrage aussi, et pas seulement
   // dans le tick de 24 h : un redéploiement quotidien ferait que le tick ne
@@ -104,6 +112,7 @@ setInterval(
       purgeOldRequestLog(12);
       purgeTerminatedKeyTelemetry(30);
       purgeExpiredVerifications();
+      purgeExpiredDeviceCodes();
       purgeLineageFacts(12);
       checkpointStatsWal();
     } catch (err) {

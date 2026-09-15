@@ -591,6 +591,95 @@ function openStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_verification_sends_ip ON verification_sends(ip_hash, created_at);
       CREATE INDEX IF NOT EXISTS idx_verification_sends_email ON verification_sends(email_hash, created_at);
+      -- Un grant d'appareil (RFC 8628) : l'agent ouvre la ligne, l'humain
+      -- l'approuve sur une page, l'agent vient chercher la clé UNE fois. La
+      -- table porte aussi, sous un autre grant_type, le nonce du Checkout : c'est
+      -- le MÊME circuit nonce -> clé, et deux tables jumelles auraient divergé au
+      -- premier correctif.
+      --
+      -- 🚨 Le partage se paie en clauses WHERE, jamais en confiance : toute
+      -- fonction qui lit cette table prend le rail en PARAMÈTRE OBLIGATOIRE
+      -- (src/lib/device-grant.ts).
+      CREATE TABLE IF NOT EXISTS device_codes (
+        -- Le secret que l'agent présente pour retirer la clé. Seul son SHA-256
+        -- est stocké, exactement comme api_keys.key_hash.
+        device_code_hash  TEXT PRIMARY KEY,
+        -- Le code court que l'humain tape. NULL pour grant_type='checkout' —
+        -- SQLite tolère plusieurs NULL sous une contrainte UNIQUE, ce qui est
+        -- exactement ce dont ce rail a besoin.
+        user_code         TEXT UNIQUE,
+        grant_type        TEXT NOT NULL DEFAULT 'device',   -- 'device' | 'checkout'
+        status            TEXT NOT NULL DEFAULT 'pending',  -- pending|approved|delivered|denied|expired
+        tier              TEXT,                             -- NULL | 'anonymous' | 'email'
+        -- La clé frappée, une fois approuvée. key_hash relie à api_keys ;
+        -- raw_key_once porte la clé en clair jusqu'au premier retrait, où la
+        -- requête de retrait elle-même la met à NULL, jamais en deux temps.
+        key_hash          TEXT,
+        raw_key_once      TEXT,
+        -- Ce que l'agent a déclaré, nettoyé et tronqué : affiché à l'humain,
+        -- jamais exécuté.
+        client_name       TEXT,
+        reason            TEXT,
+        source            TEXT,
+        -- 🚨 L'EMPREINTE DU CRÉATEUR, capturée à l'ouverture du grant, parce
+        -- qu'elle n'existera plus au moment de la frappe. C'est elle, et elle
+        -- seule, qui part au journal des créations. approver_ip_hash est un
+        -- indice d'enquête, jamais une ancre, et JAMAIS une exemption de
+        -- révocation : les deux valeurs sont choisies par l'appelant.
+        ip_hash           TEXT,     -- le réseau qui a OUVERT le grant (keyCreationSource)
+        user_agent        TEXT,     -- l'User-Agent de l'AGENT, tronqué à 256
+        approver_ip_hash  TEXT,     -- le réseau qui l'a APPROUVÉ : enquête seulement
+        -- Jeton d'approbation lié au dernier lookup. Haché, jamais rendu deux fois.
+        approval_token_hash        TEXT,
+        approval_token_expires_at  TEXT,
+        created_at        TEXT DEFAULT (datetime('now')),
+        expires_at        TEXT NOT NULL,
+        approved_at       TEXT,
+        delivered_at      TEXT,
+        last_polled_at    TEXT,
+        poll_count        INTEGER NOT NULL DEFAULT 0,
+        -- La branche e-mail de /approve rallonge l'echeance UNE fois, parce que
+        -- le code a 6 chiffres part quand l'humain arrive et non quand le grant
+        -- naît : les deux horloges ne partent pas en même temps.
+        email_extended    INTEGER NOT NULL DEFAULT 0,
+        -- Colonnes du rail checkout. Écrites ici parce que les deux modules
+        -- partent ensemble ; sinon, en ALTER forward-only, et l'index sur
+        -- stripe_session_id devrait alors être créé APRÈS cet ALTER.
+        stripe_session_id TEXT,     -- NULL sur grant_type='device'
+        pack              TEXT,     -- '1k' | '5k' | '25k'
+        locale            TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_device_codes_expires ON device_codes(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_device_codes_status  ON device_codes(status, created_at);
+      -- La réservation lit (ip_hash, grant_type, status, expires_at) à chaque ouverture.
+      CREATE INDEX IF NOT EXISTS idx_device_codes_ip     ON device_codes(ip_hash, grant_type, status, expires_at);
+      -- 🚨 Cet index sert la PURGE (la clé approuvée sans porteur) et l'alerte de
+      -- support du rail checkout. Il ne sert AUCUNE clause du radar de cohortes :
+      -- la clause de non-révocation qu'une révision antérieure annonçait ici est
+      -- SUPPRIMÉE, et ne doit pas être réécrite au motif d'un index orphelin.
+      CREATE INDEX IF NOT EXISTS idx_device_codes_key    ON device_codes(key_hash);
+      -- Le webhook du paiement cherche la ligne par session quand la référence
+      -- client manque.
+      CREATE INDEX IF NOT EXISTS idx_device_codes_session ON device_codes(stripe_session_id);
+      -- Chaque user_code présenté à lookup/approve/deny. C'est ce qui transforme
+      -- « 20^8 combinaisons » en une garantie plutôt qu'en une espérance :
+      -- l'entropie borne la chance d'un coup, ce journal borne le NOMBRE de coups.
+      --
+      -- 🚨 'route' existe pour que lookup ait son propre budget. 'hit' existe pour
+      -- que seules les tentatives INFRUCTUEUSES alimentent le BUDGET, et pour rien
+      -- d'autre : le DÉLAI qui en découle s'applique à tous les 404, hit compris.
+      CREATE TABLE IF NOT EXISTS device_code_attempts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_hash    TEXT,
+        route      TEXT NOT NULL DEFAULT 'approve',   -- 'lookup' | 'approve' | 'deny'
+        hit        INTEGER NOT NULL DEFAULT 0,        -- 1 si le code existait
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      -- Les deux index portent 'hit' en tête de queue : toutes les requêtes de
+      -- plafond filtrent dessus, et un index qui ne le porte pas ferait scanner
+      -- les réussites.
+      CREATE INDEX IF NOT EXISTS idx_device_attempts_ip ON device_code_attempts(ip_hash, route, hit, created_at);
+      CREATE INDEX IF NOT EXISTS idx_device_attempts_at ON device_code_attempts(hit, created_at);
       -- Where each signup came from (src/lib/signup-attribution.ts): the campaign
       -- tag our links carry, whether a browser was involved, and what that
       -- browser knew on arrival. No retention: a path, a host and labels are

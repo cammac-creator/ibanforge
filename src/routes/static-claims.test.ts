@@ -105,6 +105,8 @@ const MIGRATED = [
   'src/middleware/enrich-402.ts',
   'src/routes/api-keys.ts',
   'src/routes/artifacts.ts',
+  'src/routes/device-grant.ts',
+  'src/lib/device-grant.ts',
   'src/routes/discovery.ts',
   'src/routes/landing.ts',
   'src/routes/mcp-http.ts',

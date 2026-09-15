@@ -72,6 +72,8 @@ import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './lib/tiers.js
 import { CONSENT_ASK, CONSENT_BOUNDARY, CONSENT_FIELDS } from './lib/consent.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
+import { deviceGrant } from './routes/device-grant.js';
+import { corsConfiguredOrigins, LOCALHOST_ORIGIN } from './lib/cors-origins.js';
 import { creditsBuy } from './routes/credits-buy.js';
 import { stripeWebhook } from './routes/stripe-webhook.js';
 import { stripeRetrieve } from './routes/stripe-retrieve.js';
@@ -574,8 +576,11 @@ export function buildApp(): Hono<HonoEnv> {
         'Example: CORS_ORIGIN=https://ibanforge.com,https://www.ibanforge.com',
     );
   }
-  const configuredOrigins = (corsRaw || '*').split(',').map((s) => s.trim());
-  const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+  // La même liste que les routes du device grant contrôlent quand un `Origin`
+  // est présent sur une écriture d'état : une seconde copie aurait divergé au
+  // premier ajout de domaine (src/lib/cors-origins.ts).
+  const configuredOrigins = corsConfiguredOrigins();
+  const localhostPattern = LOCALHOST_ORIGIN;
 
   app.use(
     '*',
@@ -964,6 +969,13 @@ export function buildApp(): Hono<HonoEnv> {
 
   // Key management routes (free, before x402)
   app.route('/', apiKeys);
+
+  // Le device grant (RFC 8628) : cinq routes publiques, sans clé et sans
+  // paiement. 🚨 Montées ICI, à côté d'apiKeys et donc AVANT
+  // apiKeyMiddleware() : montées après, elles exigeraient un Bearer que
+  // l'appelant vient précisément chercher, et tomberaient dans le chemin de
+  // remboursement des 4xx.
+  app.route('/', deviceGrant);
 
   // Stripe routes (free — auth via Stripe signature for webhook, via session_id
   // for the one-time retrieval endpoint). MUST be mounted BEFORE the api-key
