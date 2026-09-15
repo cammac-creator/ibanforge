@@ -223,6 +223,16 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
   }
 
+  // 🚨 Le contrôle de TYPE, avant tout usage de chaîne. `{"email": 42}`,
+  // `{"email": true}` ou `{"email": {}}` sont des tentatives d'adresse, pas des
+  // intentions anonymes — et `.includes('@')` sur un nombre ou un booléen
+  // JETTE, donc rend un 500 sur la route publique la plus chaude là où le
+  // contrat promet un 400 qui dit quoi corriger. Un `as string` est une
+  // assertion, pas une conversion : rien ne le rattrape à la compilation, et
+  // aucun test qui ne poste que des chaînes ne le voit.
+  if (wantsEmail && typeof rawEmail !== 'string') {
+    return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
+  }
   const email = wantsEmail ? (rawEmail as string) : null;
 
   if (email !== null) {

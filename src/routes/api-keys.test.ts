@@ -1546,6 +1546,25 @@ describe('POST /v1/keys/generate — la branche anonyme', () => {
     expect(after).toBe(before);
   });
 
+  it.each(['{"email":42}', '{"email":true}', '{"email":{}}', '{"email":[]}'])(
+    'une adresse qui n’est pas une chaîne reste un 400 : %s',
+    async (body) => {
+      // 🚨 Une tentative d'adresse n'est PAS une intention anonyme, quel que
+      // soit son type. Et sans le contrôle de type, `.includes('@')` sur un
+      // nombre ou un booléen jette — donc un 500 sur la route publique la plus
+      // chaude, là où le contrat promet un 400 qui dit quoi corriger. Le cas
+      // est nommé dans la spec ; il ne se voit dans aucun test qui ne poste que
+      // des chaînes.
+      const res = await makeApp().request('/v1/keys/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe('invalid_email');
+    },
+  );
+
   it('une adresse MALFORMÉE reste un 400, elle ne bascule pas en anonyme', async () => {
     const res = await makeApp().request('/v1/keys/generate', {
       method: 'POST',
