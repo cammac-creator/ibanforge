@@ -60,7 +60,7 @@ function staleness(lastWriteAt: string | null | undefined): { stale: boolean; mi
  * Polls /health from the browser every 60s. Renders a neutral "checking" state
  * on first paint (no data yet), so it is safe in a one-shot screenshot.
  */
-export function LiveHealthStrip({ lastWriteAt }: { lastWriteAt?: string | null }) {
+export function LiveHealthStrip({ lastWriteAt, compact = false }: { lastWriteAt?: string | null; compact?: boolean }) {
   const locale = useLocale();
   const t = useTranslations('dashboard');
   const fmt = (n: number) => formatGrouped(n, locale);
@@ -143,6 +143,7 @@ export function LiveHealthStrip({ lastWriteAt }: { lastWriteAt?: string | null }
         value={loading ? '—' : `${ms} ms`}
         valueClass={loading ? 'text-[var(--fg-4)]' : msColor(ms)}
       />
+      {!compact && <>
       <Metric label={t('monitoring.version')} value={health ? `v${health.version}` : '—'} />
       <Metric label={t('monitoring.uptime')} value={health ? fmtUptime(health.uptime_seconds) : '—'} />
       <Metric
@@ -156,6 +157,7 @@ export function LiveHealthStrip({ lastWriteAt }: { lastWriteAt?: string | null }
           valueClass={fresh.stale ? 'text-red-400' : fresh.minutes <= 10 ? 'text-green-400' : 'text-yellow-400'}
         />
       )}
+      </>}
     </div>
     </div>
   );

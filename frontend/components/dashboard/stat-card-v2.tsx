@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { InfoDot } from './info-dot';
+import styles from './workspace.module.css';
 
 interface TrendProps {
   direction: 'up' | 'down' | 'neutral';
@@ -97,7 +98,7 @@ export function StatCardV2({
   hint,
 }: StatCardV2Props) {
   return (
-    <div className="bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 border border-[var(--ink-4)]/60 rounded-xl p-4">
+    <div className={styles.statCard}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="mb-2 flex items-center gap-1.5">
@@ -106,7 +107,7 @@ export function StatCardV2({
             </p>
             {hint && <InfoDot>{hint}</InfoDot>}
           </div>
-          <p className="text-2xl font-bold font-mono text-white leading-none mb-2 [overflow-wrap:anywhere]">
+          <p data-stat-value className="text-2xl font-bold font-mono text-white leading-none mb-2 [overflow-wrap:anywhere]">
             {value}
           </p>
           {trend && <TrendBadge trend={trend} />}

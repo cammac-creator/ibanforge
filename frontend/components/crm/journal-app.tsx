@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
+import { ArrowUpRight, Search, X } from 'lucide-react';
+import styles from './workspace.module.css';
 import { contactsOpenHref } from '@/lib/crm/deep-link';
 import { formatStamp } from '@/lib/crm/format';
 import {
@@ -117,48 +119,48 @@ function JournalLine({ row, locale }: { row: JournalRow; locale: string }) {
   const badge = row.scheduled ? SCHEDULED_BADGE : DIRECTION_BADGE[row.direction];
   const origin = row.origin ? ORIGIN_BADGE[row.origin] : null;
   return (
-    <li className="grid grid-cols-1 gap-x-3 gap-y-0.5 border-b border-[var(--ink-4)]/40 px-3 py-2 last:border-b-0 sm:grid-cols-[82px_minmax(0,1fr)]">
-      <span
-        // The shelf above already names the day; this repeats it in the compact
-        // form because the eye scanning a fortnight of lines should not have to
-        // look back up to know what it is reading. Tabular so the column stays
-        // a column, and the raw stamp is on the title for the seconds.
-        title={row.date}
-        className="font-mono text-[12px] tabular-nums text-[var(--fg-4)]"
+    <li className="border-b border-[var(--ink-4)]/50 last:border-b-0">
+      <Link
+        href={contactsOpenHref(locale, row.contact.id)}
+        prefetch={false}
+        className="group grid grid-cols-1 gap-x-4 gap-y-2 px-4 py-4 hover:bg-[var(--ink-3)] sm:grid-cols-[90px_minmax(0,1fr)_20px]"
       >
-        {formatStamp(row.date)}
-      </span>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge className={badge.className} title={badge.title}>
-            {badge.label}
-          </Badge>
-          {origin && (
-            <Badge className={origin.className} title={origin.title}>
-              {origin.label}
-            </Badge>
-          )}
-          <Link
-            href={contactsOpenHref(locale, row.contact.id)}
-            className="inline-flex min-w-0 items-center gap-1.5 text-[13px] text-[var(--fg-2)] underline decoration-[var(--ink-5)] underline-offset-2 hover:text-[var(--fg-1)] hover:decoration-[var(--fg-3)]"
-          >
-            {/* The kind, in the colour the contacts table already gives it, so
-                the rail and this dot never disagree about the same person. The
-                colour cannot be read aloud, hence the word beside it. */}
+        <span title={row.date} className="text-xs tabular-nums text-[var(--fg-4)]">
+          {formatStamp(row.date)}
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
             <span
               aria-hidden
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: railColorOf(row.contact.kind) }}
             />
             <span className="sr-only">{kindWord(row.contact.kind)} : </span>
-            <span className="truncate">{row.contact.label}</span>
-          </Link>
+            <span className="truncate text-sm font-semibold text-[var(--fg-1)]">
+              {row.contact.label}
+            </span>
+            <Badge className={badge.className} title={badge.title}>
+              {badge.label}
+            </Badge>
+            {origin && (
+              <Badge className={origin.className} title={origin.title}>
+                {origin.label}
+              </Badge>
+            )}
+          </div>
+          {row.subject && <p className="mt-2 truncate text-sm text-[var(--fg-2)]">{row.subject}</p>}
+          {row.snippet && (
+            <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[var(--fg-4)]">
+              {row.snippet}
+            </p>
+          )}
         </div>
-        {row.subject && (
-          <p className="mt-0.5 truncate text-[13.5px] text-[var(--fg-1)]">{row.subject}</p>
-        )}
-        {row.snippet && <p className="truncate text-[12.5px] text-[var(--fg-3)]">{row.snippet}</p>}
-      </div>
+        <ArrowUpRight
+          size={16}
+          className="hidden text-[var(--fg-4)] group-hover:text-amber-300 sm:block"
+          aria-hidden
+        />
+      </Link>
     </li>
   );
 }
@@ -193,18 +195,17 @@ export function JournalApp({
     filter.direction !== 'all' || filter.origin !== 'all' || filter.query.trim() !== '';
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
+    <div className={styles.table}>
       {/* Sticky on a phone, for the same reason as the Contacts bar: scrolling
           a long list used to scroll its own controls away, and coming back to
           them meant coming back to the top. */}
-      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-[var(--ink-4)]/60 bg-[var(--ink-2)] px-3 py-2.5 sm:static sm:bg-transparent">
-        <input
-          value={filter.query}
-          onChange={(e) => set({ query: e.target.value })}
-          placeholder="Rechercher (contact, objet, aperçu)…"
-          aria-label="Rechercher dans le courrier"
-          className="min-w-[180px] flex-1 basis-[220px] rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-2.5 py-1.5 text-base text-[var(--fg-1)] placeholder:text-[var(--fg-4)] focus:border-[var(--amber-500)]/50 focus:outline-none sm:text-[13px]"
-        />
+      <div className={`${styles.toolbar} flex flex-wrap items-center gap-3`}>
+        <div className={`${styles.searchField} basis-full`}>
+          <Search size={18} aria-hidden />
+          <input type="search" value={filter.query} onChange={(e) => set({ query: e.target.value })}
+            placeholder="Contact, objet ou contenu du message…" aria-label="Rechercher dans le courrier" />
+          {filter.query && <button type="button" onClick={() => set({ query: '' })} aria-label="Effacer la recherche"><X size={16} aria-hidden /></button>}
+        </div>
 
         {/* The sense. A segmented control and not a select: four positions that
             are always all worth seeing, and the one axis the reader changes
@@ -226,7 +227,7 @@ export function JournalApp({
                   onClick={() => set({ direction: d.key })}
                   aria-pressed={on}
                   className={[
-                    'shrink-0 border-r border-[var(--ink-4)] px-2.5 py-1.5 text-[12.5px] font-semibold whitespace-nowrap last:border-r-0 transition-colors',
+                    'shrink-0 border-r border-[var(--ink-4)] min-h-11 px-3 py-2 text-[12.5px] font-semibold whitespace-nowrap last:border-r-0 transition-colors',
                     on
                       ? 'bg-[var(--ink-3)] text-[var(--fg-1)] shadow-[inset_0_-2px_0_var(--amber-500)]'
                       : 'text-[var(--fg-3)] hover:text-[var(--fg-2)]',
@@ -247,7 +248,7 @@ export function JournalApp({
           value={filter.origin}
           onChange={(e) => set({ origin: e.target.value as JournalFilter['origin'] })}
           aria-label="Origine des envois"
-          className="shrink-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-2 py-1.5 text-[12.5px] text-[var(--fg-2)] focus:border-[var(--amber-500)]/50 focus:outline-none"
+          className="shrink-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] min-h-11 px-3 py-2 text-[12.5px] text-[var(--fg-2)] focus:border-[var(--amber-500)]/50 focus:outline-none"
         >
           {ORIGIN_OPTIONS.map((o) => (
             <option key={o.key} value={o.key}>
@@ -260,7 +261,7 @@ export function JournalApp({
           value={filter.days}
           onChange={(e) => set({ days: Number(e.target.value) })}
           aria-label="Période"
-          className="shrink-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-2 py-1.5 text-[12.5px] text-[var(--fg-2)] focus:border-[var(--amber-500)]/50 focus:outline-none"
+          className="shrink-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] min-h-11 px-3 py-2 text-[12.5px] text-[var(--fg-2)] focus:border-[var(--amber-500)]/50 focus:outline-none"
         >
           {JOURNAL_PERIODS.map((d) => (
             <option key={d} value={d}>
@@ -302,6 +303,7 @@ export function JournalApp({
         {summary.drafts} brouillon{summary.drafts > 1 ? 's' : ''} en attente
       </p>
 
+      <p className={styles.results} aria-live="polite">{shown.length} message{shown.length > 1 ? 's' : ''} affiché{shown.length > 1 ? 's' : ''}</p>
       {days.length === 0 ? (
         <div className="px-4 py-10 text-center text-[13.5px] text-[var(--fg-3)]">
           <p>Rien sur cette période avec ces filtres.</p>

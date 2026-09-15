@@ -148,7 +148,8 @@ export function ContactDrawer({
         change with it.
       */}
       <div className="relative flex h-full min-w-0 flex-col p-4">
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5">
+        <div className="mb-4 flex shrink-0 items-center justify-end gap-2 border-b border-[var(--ink-4)] pb-3">
+          <span className="mr-auto text-xs font-medium text-[var(--fg-3)]">Conversation</span>
           {/* Walking the list from inside the drawer: five answers become one
               sequence instead of five returns to the table. j / k do the same
               from the keyboard when no field has the focus. */}
@@ -160,7 +161,7 @@ export function ContactDrawer({
                 disabled={!nav.onPrev}
                 aria-label="Fiche précédente (k)"
                 title="Fiche précédente (k)"
-                className="px-1.5 py-0.5 hover:text-[var(--fg-1)] disabled:opacity-30"
+                className="min-h-10 min-w-10 px-2 hover:text-[var(--fg-1)] disabled:opacity-30"
               >
                 ◀
               </button>
@@ -173,7 +174,7 @@ export function ContactDrawer({
                 disabled={!nav.onNext}
                 aria-label="Fiche suivante (j)"
                 title="Fiche suivante (j)"
-                className="px-1.5 py-0.5 hover:text-[var(--fg-1)] disabled:opacity-30"
+                className="min-h-10 min-w-10 px-2 hover:text-[var(--fg-1)] disabled:opacity-30"
               >
                 ▶
               </button>
@@ -184,7 +185,7 @@ export function ContactDrawer({
             type="button"
             onClick={() => onClose('button')}
             aria-label="Fermer la fiche"
-            className="rounded-md border border-[var(--ink-5)] bg-[var(--ink-2)] px-2 py-0.5 text-[13px] text-[var(--fg-3)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)]"
+            className="rounded-md border border-[var(--ink-5)] bg-[var(--ink-2)] min-h-10 min-w-10 px-2 text-[13px] text-[var(--fg-3)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)]"
           >
             ✕
           </button>

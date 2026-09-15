@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toZurich } from '@/lib/crm/zurich';
 
@@ -13,7 +14,7 @@ import { toZurich } from '@/lib/crm/zurich';
  */
 export function FreshnessBadge({ fetchedAtIso }: { fetchedAtIso: string }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [busy, startRefresh] = useTransition();
   const [ageMin, setAgeMin] = useState(0);
 
   useEffect(() => {
@@ -39,19 +40,23 @@ export function FreshnessBadge({ fetchedAtIso }: { fetchedAtIso: string }) {
       <button
         type="button"
         onClick={() => {
-          setBusy(true);
-          router.refresh();
-          setTimeout(() => setBusy(false), 1500);
+          startRefresh(() => router.refresh());
         }}
         disabled={busy}
-        title="Recharger les données (jamais automatique)"
-        className={`rounded border px-1.5 py-0.5 transition-colors ${
+        title="Recharger les données"
+        aria-label="Actualiser les données"
+        aria-busy={busy}
+        className={`grid min-h-10 min-w-10 place-items-center rounded-lg border transition-colors ${
           stale
             ? 'border-amber-500/40 text-amber-400 hover:bg-amber-500/10'
             : 'border-[var(--ink-4)] text-[var(--fg-4)] hover:text-[var(--fg-2)]'
         } disabled:opacity-40`}
       >
-        {busy ? '…' : '↻'}
+        <RefreshCw
+          size={15}
+          className={busy ? 'animate-spin motion-reduce:animate-none' : undefined}
+          aria-hidden
+        />
       </button>
     </span>
   );

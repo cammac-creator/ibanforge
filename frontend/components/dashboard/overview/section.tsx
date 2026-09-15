@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { InfoDot } from '../info-dot';
+import { Activity, ChartNoAxesCombined, CircleDollarSign, ListChecks, Sparkles, SlidersHorizontal } from 'lucide-react';
+import styles from '../workspace.module.css';
 
 /**
  * The cockpit's section shell.
@@ -25,18 +27,14 @@ export function OverviewSection({
   aside?: ReactNode;
   children: ReactNode;
 }) {
+  const Icon = [CircleDollarSign, ChartNoAxesCombined, ListChecks, Activity, Sparkles, SlidersHorizontal][step - 1] ?? Activity;
   return (
-    <section className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-[var(--ink-4)]/60 pb-1.5">
-        <span
-          aria-hidden
-          className="font-mono text-[11px] font-bold text-[var(--fg-5)]"
-        >
-          {step}
-        </span>
-        <h2 className="text-[15px] font-semibold text-white">{title}</h2>
+    <section className={styles.section}>
+      <div className={styles.sectionHeading}>
+        <span className={styles.sectionIcon} aria-hidden><Icon size={17} /></span>
+        <h2>{title}</h2>
         {hint && <InfoDot>{hint}</InfoDot>}
-        {lead && <p className="text-[12px] text-[var(--fg-4)]">{lead}</p>}
+        {lead && <p className={styles.sectionLead}>{lead}</p>}
         {aside && <div className="ml-auto flex items-center gap-2">{aside}</div>}
       </div>
       {children}

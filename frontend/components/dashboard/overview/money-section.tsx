@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { localePath } from '@/lib/locale-path';
 import { getTranslations } from 'next-intl/server';
 import { StatCardV2 } from '../stat-card-v2';
 import { RevenueCard } from '../revenue-card';
@@ -16,6 +18,7 @@ import type { HistoryEntry, StatsResponse } from './types';
 
 /** Montants conservés, crédits recensés et portefeuille gardent leurs périmètres propres. */
 export async function MoneySection({
+  compact = false,
   locale,
   period,
   nowIso,
@@ -27,6 +30,7 @@ export async function MoneySection({
   packSalesPromise,
   failedPaymentsPromise,
 }: {
+  compact?: boolean;
   locale: string;
   period: number;
   /** The page's single instant: see one-clock.ts. */
@@ -40,6 +44,7 @@ export async function MoneySection({
   failedPaymentsPromise: Promise<Fetched<unknown>>;
 }) {
   const t = await getTranslations('dashboard.overview');
+  const w = await getTranslations('dashboard.workspace');
   const [statsRes, historyRes, clientsRes, crm, digestRes, packsRes, refusRes] = await Promise.all([
     statsPromise,
     historyPromise,
@@ -76,8 +81,8 @@ export async function MoneySection({
   const isMonday = now.getUTCDay() === 1;
 
   return (
-    <OverviewSection step={1} title={t('money.title')} lead={t('money.lead')}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <OverviewSection step={1} title={t('money.title')} lead={t('money.lead')} aside={compact ? <Link href={`${localePath(locale, '/dashboard')}?view=revenue&period=${period}`} className="rounded-lg border border-[var(--ink-4)] px-3 py-2 text-xs text-amber-300">{w('revenueDetails')} →</Link> : undefined}>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCardV2
           title={t('money.packs')}
           value={packUsdLabel(packs, locale)}
@@ -111,12 +116,15 @@ export async function MoneySection({
       </div>
 
       <p className="text-xs text-[var(--fg-4)]">{t('money.retainedKeysNote')}</p>
+      {!compact && <>
       <PackSalesCard data={packs} locale={locale} />
 
+      </>}
       {/* Un refus de paiement est le signal le plus actionnable de cette section :
           quelqu'un a sorti sa carte et il est reparti sans rien. */}
       <FailedPaymentsCard value={refusRes.ok ? refusRes.data : null} locale={locale} />
 
+      {!compact && <>
       {/* Les comptes à crédits restent accessibles sans les confondre avec des ventes. */}
       <div className={overviewCard}>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -171,6 +179,7 @@ export async function MoneySection({
       )}
 
       <p className="text-[11px] text-[var(--fg-5)]">{t('money.windows', { days: period })}</p>
+      </>}
     </OverviewSection>
   );
 }

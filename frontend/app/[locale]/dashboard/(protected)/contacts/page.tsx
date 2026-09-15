@@ -34,69 +34,27 @@ export default async function ContactsPage() {
 
   // One reading of the base, and the only one this page makes. Nothing below
   // derives a figure of its own.
-  const { contacts, situations, snoozed, woke, active, ballWithUs, followupDue, sentToday } =
+  const { contacts, situations, snoozed, woke, active, sentToday } =
     crmSnapshot(data);
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
-      {/* One line, and the pane below gets the rest. Said in words, no card and
-          no capsule: the first figure carries the accent, the others are grey
-          until one of them has something to say. */}
-      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <h1 className="text-base font-semibold text-white">Contacts</h1>
-        <p className="text-sm text-[var(--fg-3)]">
-          <span className="text-amber-400">
-            {active.length} contact{active.length > 1 ? 's' : ''} suivi
-            {active.length > 1 ? 's' : ''}
-          </span>
-          {' · '}
-          {ballWithUs} attend{ballWithUs > 1 ? 'ent' : ''} ta réponse
-          {' · '}
-          {followupDue} relance{followupDue > 1 ? 's' : ''} due{followupDue > 1 ? 's' : ''}
-          {' · '}
-          {/* The only place the day's cadence is said. The rail that used to
-              carry it is gone, and without this the guardrail only speaks at
-              the moment a send is refused, which is after the mail is written.
-              Amber from SOFT_CAP, imported and never retyped, so the operator
-              sees the pace before deciding to write rather than after. */}
-          <span
-            className={
-              sentToday >= HARD_CAP
-                ? 'font-medium text-red-400'
-                : sentToday >= SOFT_CAP
-                  ? 'text-amber-400'
-                  : undefined
-            }
-          >
-            {sentToday} envoyé{sentToday > 1 ? 's' : ''} aujourd’hui
-            {/* Two colours for two different facts. Amber says slow down; red
-                says the prospecting door is shut for the day, which the
-                guardrail would otherwise only say once a mail was written. */}
-            <span className="hidden sm:inline">
-              {sentToday >= HARD_CAP
-                ? ' — plafond atteint, tout envoi de prospection est bloqué jusqu’à demain'
-                : sentToday >= SOFT_CAP
-                  ? ` — encore ${HARD_CAP - sentToday} avant le plafond`
-                  : ''}
-            </span>
-            {sentToday >= HARD_CAP && <span className="sm:hidden"> — plafond atteint</span>}
-          </span>
-          {(() => {
-            const drafts = contacts.filter((c) => c.draft !== null).length;
-            return drafts > 0 ? (
-              <>
-                {' · '}
-                <span className="text-amber-400">
-                  ✎ {drafts} brouillon{drafts > 1 ? 's' : ''} en attente
-                </span>
-              </>
-            ) : null;
-          })()}
-        </p>
-        <span className="ml-auto">
+      <header>
+        <p className="mb-2 hidden text-xs text-[var(--fg-4)] sm:block">CRM / Relations</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="font-semibold text-white">Contacts</h1>
           <FreshnessBadge fetchedAtIso={new Date().toISOString()} />
-        </span>
-      </div>
+        </div>
+        <p className="mt-2 hidden text-sm text-[var(--fg-3)] sm:block">Retrouver un échange, répondre et préparer la suite.</p>
+        <p className="mt-3 text-xs text-[var(--fg-4)]">
+          {active.length} contact{active.length > 1 ? 's' : ''} suivi{active.length > 1 ? 's' : ''}
+          {' · '}
+          <span className={sentToday >= HARD_CAP ? 'font-medium text-red-400' : sentToday >= SOFT_CAP ? 'text-amber-400' : undefined}>
+            {sentToday} envoyé{sentToday > 1 ? 's' : ''} aujourd’hui
+            {sentToday >= HARD_CAP ? ' · plafond de prospection atteint pour aujourd’hui' : sentToday >= SOFT_CAP ? ` · encore ${HARD_CAP - sentToday} avant le plafond` : ''}
+          </span>
+        </p>
+      </header>
 
       <CrmApp
         contacts={contacts}
