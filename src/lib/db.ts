@@ -12,6 +12,7 @@ import { resetOfficialIdentityStatements } from './official-identity.js';
 import { resetPsdRegisterStatements } from './psd-register.js';
 import { resetBgBaeStatements } from './bg-bae.js';
 import { resetBlzStatements } from './de-blz.js';
+import { normalizeEmail } from './email-norm.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -867,6 +868,136 @@ function openStatsDB(): DatabaseType.Database {
       statsDB.exec(
         'CREATE INDEX IF NOT EXISTS idx_api_keys_x402_ref ON api_keys(x402_payment_ref)',
       );
+    }
+    // ── Palier de clé (chantier « clé sans e-mail », lot 2, 15/09/2026) ──────
+    //
+    // PLACEMENT : après la migration x402_payment_ref, et jamais dans le bloc
+    // de migrations qui commence avec `keyCols` plus haut. Le backfill
+    // ci-dessous nomme credits_remaining, stripe_session_id et
+    // x402_payment_ref : posé plus haut, il jetterait « no such column » sur
+    // une base neuve comme sur une base ancienne, et ferait échouer TOUTE
+    // l'initialisation du schéma. C'est la leçon déjà écrite sur key_creations.
+    //
+    // Défaut 'email' : toute clé antérieure à cette colonne est née d'un chemin
+    // qui exigeait une adresse, donc le défaut est vrai pour chacune, pas
+    // seulement commode. Le backfill ne corrige qu'un cas, celui où de l'argent
+    // a changé de main : ces clés-là n'ont jamais été un palier gratuit, et les
+    // lire comme tel ferait mentir tout compteur de « clés gratuites ».
+    //
+    // 🚨 Il ne pose claimed_at sur AUCUNE ligne ancienne. Rétroactivement, on
+    // ne sait pas laquelle a réellement prouvé sa boîte (le code n'était exigé
+    // qu'à partir de la deuxième clé d'un réseau) : inventer une preuve serait
+    // pire qu'en manquer une. Sans conséquence : la dégradation du bouclier ne
+    // s'applique qu'à la naissance, et le radar ne charge que des clés récentes.
+    if (!keyCols.includes('tier')) {
+      statsDB.exec("ALTER TABLE api_keys ADD COLUMN tier TEXT NOT NULL DEFAULT 'email'");
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN claimed_at TEXT');
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN claim_method TEXT');
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN email_norm TEXT');
+      statsDB.exec(
+        `UPDATE api_keys SET tier = 'paid'
+          WHERE credits_remaining IS NOT NULL
+             OR stripe_session_id IS NOT NULL
+             OR x402_payment_ref IS NOT NULL`,
+      );
+      // email_norm : backfill par la MÊME fonction que le code appellera
+      // ensuite, en JS et pas en SQL, parce que le retrait des points sur les
+      // deux seuls domaines qui les ignorent ne s'écrit pas en SQLite.
+      const rows = statsDB.prepare('SELECT id, email FROM api_keys').all() as Array<{
+        id: number;
+        email: string;
+      }>;
+      const setNorm = statsDB.prepare('UPDATE api_keys SET email_norm = ? WHERE id = ?');
+      statsDB.transaction(() => {
+        for (const r of rows) setNorm.run(normalizeEmail(r.email), r.id);
+      })();
+    }
+    // La lignée qui survit à /rotate (origin_prefix, écrit par rotateApiKey) et
+    // l'épisode de bouclier (shield_episode, écrit par le disjoncteur, lot 5).
+    // Sans origin_prefix, une clé tournée sort du rayon du radar pour un seul
+    // appel sur une route libre-service sans plafond.
+    if (!keyCols.includes('origin_prefix')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN origin_prefix TEXT');
+    }
+    if (!keyCols.includes('shield_episode')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN shield_episode TEXT');
+    }
+    // Les index viennent APRÈS les ALTER, inconditionnellement : à ce stade les
+    // colonnes existent par les deux chemins (base neuve ou base migrée).
+    statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_tier ON api_keys(tier, created_at)');
+    statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_email_norm ON api_keys(email_norm)');
+    statsDB.exec(
+      'CREATE INDEX IF NOT EXISTS idx_api_keys_origin_prefix ON api_keys(origin_prefix)',
+    );
+    statsDB.exec(
+      'CREATE INDEX IF NOT EXISTS idx_api_keys_shield_episode ON api_keys(shield_episode)',
+    );
+    // key_prefix n'a jamais porté d'unicité, et toute lecture clée dessus (le
+    // rapport d'usage, le radar) mélange les porteurs d'un même préfixe. Le
+    // mint refait désormais un tirage en cas de collision ; l'index ne fait que
+    // figer ce que le code garantit. Sous garde : un CREATE UNIQUE INDEX nu
+    // jette si un doublon existe déjà et ferait échouer TOUTE l'ouverture de la
+    // base — une API qui ne démarre plus est pire qu'un index absent.
+    const dupePrefixes = (
+      statsDB
+        .prepare(
+          'SELECT COUNT(*) AS n FROM (SELECT key_prefix FROM api_keys GROUP BY key_prefix HAVING COUNT(*) > 1)',
+        )
+        .get() as { n: number }
+    ).n;
+    if (dupePrefixes === 0) {
+      statsDB.exec(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_prefix_unique ON api_keys(key_prefix)',
+      );
+    } else {
+      console.error(
+        `[schema] ${dupePrefixes} duplicate key_prefix values: the unique index is NOT created. ` +
+          'Every read keyed on key_prefix (usage report, cohort radar) mixes those holders. Resolve by hand.',
+      );
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys(key_prefix)');
+    }
+    // Deux journaux en ajout seul, que l'appelant ne contrôle pas (spec 01
+    // §3.4 et §3.5). key_claims : réclamations et envois de code, lus par la
+    // clause « cette adresse porte déjà une clé », par le plafond par réseau et
+    // par le détecteur d'armement. key_settlements : une ligne par règlement,
+    // référence unique, montant COTÉ par le paywall et non confirmé.
+    // 🚨 Les tables neuves n'entrent pas d'elles-mêmes dans la sauvegarde :
+    // src/lib/backup.ts les nomme explicitement (format 2).
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS key_claims (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event TEXT NOT NULL,
+        email_norm TEXT,
+        key_prefix TEXT NOT NULL,
+        key_hash TEXT NOT NULL,
+        method TEXT,
+        ip_hash TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_key_claims_email ON key_claims(email_norm, event, created_at);
+      CREATE INDEX IF NOT EXISTS idx_key_claims_at ON key_claims(created_at);
+      CREATE INDEX IF NOT EXISTS idx_key_claims_ip ON key_claims(ip_hash, event, created_at);
+      CREATE TABLE IF NOT EXISTS key_settlements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT NOT NULL,
+        key_prefix TEXT NOT NULL,
+        payment_ref TEXT NOT NULL UNIQUE,
+        quoted_amount_usd REAL NOT NULL,
+        route TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_key_settlements_hash ON key_settlements(key_hash, created_at);
+      CREATE INDEX IF NOT EXISTS idx_key_creations_created ON key_creations(created_at);
+    `);
+    // pending_verifications.key_prefix : NULL = défi du chemin de création,
+    // comportement inchangé octet pour octet ; sinon la clé qu'un défi de
+    // réclamation vise. Sans elle, un code émis pour CRÉER une clé serait
+    // consommable pour en RÉCLAMER une autre, et l'inverse.
+    const pvCols = (
+      statsDB.prepare('PRAGMA table_info(pending_verifications)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (pvCols.length > 0 && !pvCols.includes('key_prefix')) {
+      statsDB.exec('ALTER TABLE pending_verifications ADD COLUMN key_prefix TEXT');
     }
     // Web Bot Auth (RFC 9421): who signed the request, in one column.
     //

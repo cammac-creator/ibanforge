@@ -124,6 +124,13 @@ CREATE TABLE IF NOT EXISTS api_keys (
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 CREATE INDEX IF NOT EXISTS idx_api_keys_email ON api_keys(email);
+-- Colonnes ajoutées par migration dans src/lib/db.ts (copie documentaire, non normative) :
+--   tier TEXT NOT NULL DEFAULT 'email'   -- 'anonymous' | 'email' | 'claimed' | 'paid'
+--   claimed_at TEXT, claim_method TEXT   -- la date et la porte d'une PREUVE (code vérifié, paiement)
+--   email_norm TEXT                      -- forme normalisée ; NULL pour une sentinelle sans adresse
+--   origin_prefix TEXT                   -- la lignée qui survit à /rotate
+--   shield_episode TEXT                  -- l'épisode du disjoncteur sous lequel la clé est née
+-- Tables neuves du même lot : key_claims, key_settlements (voir src/lib/db.ts).
 
 CREATE TABLE IF NOT EXISTS api_usage (
   key_hash TEXT NOT NULL,

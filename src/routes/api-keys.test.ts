@@ -1,3 +1,4 @@
+import { BACKUP_FORMAT } from '../lib/backup.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { apiKeys } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
@@ -998,7 +999,9 @@ describe('/v1/admin/backup', () => {
       counts: { api_keys: number; api_usage: number };
       api_keys: unknown[];
     };
-    expect(body.format).toBe(1);
+    // Le format suit la constante : un dump doit annoncer ce qu'il contient,
+    // et il contient les deux journaux du palier de clé depuis le lot 2.
+    expect(body.format).toBe(BACKUP_FORMAT);
     expect(body.taken_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     // The declared count must match what is actually in the payload: a dump
     // that says 300 and carries 200 is the failure nobody notices until the

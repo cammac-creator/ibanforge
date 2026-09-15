@@ -12,10 +12,14 @@ const created: string[] = [];
 /** Mint a key and log its signup as if it came from this client. */
 function signup(localPart: string, ua: string): { prefix: string; key: string } {
   const email = `${localPart}@alpha.example.net`;
-  const result = generateApiKey(email);
+  // La naissance est écrite par generateApiKey (lot 2) : lui passer le réseau
+  // et le client, sinon la cohorte compterait double.
+  const result = generateApiKey(email, undefined, undefined, false, {
+    ipHash: `cohort-test-${RUN}`,
+    userAgent: ua,
+  });
   if (!result) throw new Error(`could not mint ${email}`);
   created.push(result.key_prefix);
-  recordKeyCreation(`cohort-test-${RUN}`, ua, result.key_prefix);
   return { prefix: result.key_prefix, key: result.api_key };
 }
 

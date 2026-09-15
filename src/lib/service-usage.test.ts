@@ -40,6 +40,12 @@ function request(
 }
 
 beforeEach(() => {
+  // Deux cas ci-dessous insèrent volontairement un même préfixe sous deux
+  // comptes : c'est la base HÉRITÉE qu'ils simulent, celle où key_prefix ne
+  // portait aucune unicité et où la garde du schéma refuse justement de poser
+  // l'index unique. Sur une base neuve l'index existe : on le retire ici pour
+  // que la règle d'ambiguïté de service-usage.ts reste prouvée.
+  getStatsDB().exec('DROP INDEX IF EXISTS idx_api_keys_prefix_unique');
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
   vi.stubEnv('CRM_INTERNAL_EMAILS', 'operator@alpha.example.net');

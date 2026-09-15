@@ -1,5 +1,6 @@
 import { opsFail } from '../lib/ops-alert.js';
 import { FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import { normalizeEmail } from '../lib/email-norm.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
@@ -22,7 +23,6 @@ import {
   VERIFY_WINDOW_DAYS,
   keyCreationSource,
   countKeyCreations,
-  recordKeyCreation,
   createVerificationChallenge,
   checkVerificationCode,
   challengeSendAllowed,
@@ -333,7 +333,14 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       ? body.source.trim().toLowerCase()
       : undefined;
 
-  const result = generateApiKey(email.trim().toLowerCase(), undefined, source);
+  // La ligne de naissance (key_creations) est écrite par generateApiKey
+  // elle-même, dans la transaction de la frappe : c'est le seul point de
+  // frappe d'une clé libre depuis le lot 2. Le handler ne fait que passer ce
+  // qu'il sait de l'appelant.
+  const result = generateApiKey(email.trim().toLowerCase(), undefined, source, false, {
+    ipHash: creationSource,
+    userAgent: c.req.header('user-agent') ?? null,
+  });
 
   if (!result) {
     return c.json(
@@ -344,9 +351,6 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       429,
     );
   }
-
-  if (creationSource)
-    recordKeyCreation(creationSource, c.req.header('user-agent') ?? null, result.key_prefix);
 
   // Where this signup came from: the landing page, the referring site and the
   // campaign labels the dialog captured on arrival. Telemetry, never a gate.
@@ -750,8 +754,14 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
   }
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit) VALUES (?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, email.trim().toLowerCase(), monthlyLimit);
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit) VALUES (?, ?, ?, ?, ?)',
+  ).run(
+    keyHash,
+    keyPrefix,
+    email.trim().toLowerCase(),
+    normalizeEmail(email.trim().toLowerCase()),
+    monthlyLimit,
+  );
 
   return c.json(
     {

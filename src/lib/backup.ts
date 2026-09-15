@@ -36,15 +36,32 @@ import { getStatsDB } from './db.js';
 import { recordEvent } from './events.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
-export const BACKUP_FORMAT = 1;
+export const BACKUP_FORMAT = 2;
+/**
+ * Ce qu'un restaurateur d'aujourd'hui sait lire. Le format 1 n'a pas les deux
+ * journaux du palier de clé (key_claims, key_settlements) : ils y valent [] et
+ * le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
+ * le format rend irrestaurable tout dump pris avant la livraison — sur une base
+ * qui n'a pas d'autre sauvegarde. Et incrémenter plutôt que ne rien faire :
+ * sans numéro, un dump tronqué et un dump légitimement ancien seraient
+ * indiscernables, et le `?? []` masquerait l'un comme l'autre.
+ */
+export const READABLE_FORMATS = [1, 2] as const;
 
 export interface BackupPayload {
   format: number;
   /** Stamped by the caller, not by this module: the clock is not our business. */
   taken_at: string;
-  counts: { api_keys: number; api_usage: number };
+  counts: { api_keys: number; api_usage: number; key_claims?: number; key_settlements?: number };
   api_keys: Array<Record<string, unknown>>;
   api_usage: Array<Record<string, unknown>>;
+  /**
+   * 🚨 Les colonnes voyagent seules (SELECT *), les TABLES non : chaque table
+   * neuve doit être nommée ici, sinon une restauration la perd en silence.
+   * Facultatives pour lire un dump au format 1.
+   */
+  key_claims?: Array<Record<string, unknown>>;
+  key_settlements?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -85,6 +102,10 @@ export function exportPaidState(takenAt: string): BackupPayload {
     },
   );
   const usage = db.prepare('SELECT * FROM api_usage').all() as Array<Record<string, unknown>>;
+  const claims = db.prepare('SELECT * FROM key_claims').all() as Array<Record<string, unknown>>;
+  const settlements = db.prepare('SELECT * FROM key_settlements').all() as Array<
+    Record<string, unknown>
+  >;
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
   // indistinguishable from any other call. This annotation puts it on the
@@ -101,9 +122,16 @@ export function exportPaidState(takenAt: string): BackupPayload {
   return {
     format: BACKUP_FORMAT,
     taken_at: takenAt,
-    counts: { api_keys: keys.length, api_usage: usage.length },
+    counts: {
+      api_keys: keys.length,
+      api_usage: usage.length,
+      key_claims: claims.length,
+      key_settlements: settlements.length,
+    },
     api_keys: keys,
     api_usage: usage,
+    key_claims: claims,
+    key_settlements: settlements,
   };
 }
 
@@ -112,6 +140,10 @@ export interface RestoreReport {
   keys_skipped: number;
   usage_inserted: number;
   usage_skipped: number;
+  claims_inserted: number;
+  claims_skipped: number;
+  settlements_inserted: number;
+  settlements_skipped: number;
 }
 
 /**
@@ -128,9 +160,10 @@ export interface RestoreReport {
  * it looks like it worked.
  */
 export function restorePaidState(payload: BackupPayload): RestoreReport {
-  if (payload?.format !== BACKUP_FORMAT) {
+  if (!READABLE_FORMATS.includes(payload?.format as (typeof READABLE_FORMATS)[number])) {
     throw new Error(
-      `unsupported backup format: ${payload?.format ?? 'missing'} (expected ${BACKUP_FORMAT})`,
+      `unsupported backup format: ${payload?.format ?? 'missing'} ` +
+        `(readable: ${READABLE_FORMATS.join(', ')})`,
     );
   }
   const db = getStatsDB();
@@ -139,6 +172,10 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     keys_skipped: 0,
     usage_inserted: 0,
     usage_skipped: 0,
+    claims_inserted: 0,
+    claims_skipped: 0,
+    settlements_inserted: 0,
+    settlements_skipped: 0,
   };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
@@ -161,6 +198,16 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     for (const row of payload.api_usage ?? []) {
       if (insertRow('api_usage', row)) report.usage_inserted++;
       else report.usage_skipped++;
+    }
+    // Absents d'un dump au format 1 : rien à remettre, et ce n'est pas une
+    // erreur. Un dump au format 2 les porte toujours, même vides.
+    for (const row of payload.key_claims ?? []) {
+      if (insertRow('key_claims', row)) report.claims_inserted++;
+      else report.claims_skipped++;
+    }
+    for (const row of payload.key_settlements ?? []) {
+      if (insertRow('key_settlements', row)) report.settlements_inserted++;
+      else report.settlements_skipped++;
     }
   });
   run();

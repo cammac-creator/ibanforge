@@ -2,6 +2,15 @@ import { createHash, randomBytes } from 'node:crypto';
 import { getStatsDB } from './db.js';
 
 import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
+import {
+  ANONYMOUS_CONTACT,
+  ANONYMOUS_MONTHLY_LIMIT,
+  FREE_TIER_MONTHLY_LIMIT as CLAIMED_LIMIT,
+  type KeyTier,
+} from './tiers.js';
+import { normalizeEmail } from './email-norm.js';
+import { recordKeyCreation } from './key-creation-guard.js';
+import { recordKeyClaim, type KeyClaimMethod } from './key-claims.js';
 
 /** Ré-export conservé pour les consommateurs du middleware. */
 export { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
@@ -11,31 +20,90 @@ function hashKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
 }
 
+/** Ce que le handler sait de la naissance d'une clé ; tout est facultatif. */
+export interface KeyBirth {
+  ipHash?: string | null;
+  userAgent?: string | null;
+}
+
 /**
  * `issuedByUs` marks a key WE minted and handed over, as opposed to one its
  * holder asked for. It changes nothing about quota, billing or auth — see the
  * migration in lib/db.ts for the single reading it exists to correct.
+ *
+ * Depuis le lot 2 du chantier « clé sans e-mail » (15/09/2026), cette fonction
+ * est LE SEUL point de frappe d'une clé libre, et elle écrit elle-même la
+ * ligne de naissance dans `key_creations`, inconditionnellement. Avant, la
+ * ligne n'était écrite que par la route publique : le mint administratif et
+ * la frappe sous nonce à venir produisaient des clés invisibles au disjoncteur
+ * et définitivement irrévocables. La sentinelle 'unknown' compte sans ancre ;
+ * la garde par réseau interroge un hash précis et l'ignore d'elle-même.
+ *
+ * `email` peut être null : la clé naît alors au palier anonyme, avec la
+ * sentinelle (sans arobase, donc inatteignable par tout chemin de mail) et un
+ * plafond ÉCRIT de 25. Pas laissé NULL : un NULL se relit `?? 200` plus bas, ce
+ * qui donnerait silencieusement à une clé anonyme exactement ce que le palier
+ * existe pour ne pas donner.
+ *
+ * 🚨 La garde « une clé par adresse et par jour » ne s'exécute que si une
+ * adresse est fournie : la sentinelle étant partagée, elle trouverait la clé
+ * anonyme précédente et rendrait null — une seule clé anonyme par jour pour le
+ * monde entier. Elle porte sur la forme normalisée (plus d'étiquette, points
+ * retirés chez gmail), sinon you+1@ et y.o.u@ sont trois personnes pour la
+ * base et une boîte pour leur porteur.
  */
 export function generateApiKey(
-  email: string,
+  email: string | null,
   monthlyLimit?: number,
   source?: string,
   issuedByUs = false,
-): { api_key: string; key_prefix: string } | null {
+  birth?: KeyBirth,
+): { api_key: string; key_prefix: string; key_hash: string } | null {
   const db = getStatsDB();
-  const existing = db
-    .prepare("SELECT id FROM api_keys WHERE email = ? AND created_at >= datetime('now', '-1 day')")
-    .get(email) as { id: number } | undefined;
-  if (existing) return null;
+  const emailNorm = email ? normalizeEmail(email) : null;
+  if (emailNorm) {
+    const existing = db
+      .prepare(
+        "SELECT id FROM api_keys WHERE email_norm = ? AND created_at >= datetime('now', '-1 day')",
+      )
+      .get(emailNorm) as { id: number } | undefined;
+    if (existing) return null;
+  }
+  const tier: KeyTier = email ? 'email' : 'anonymous';
+  const limit = monthlyLimit ?? (email ? null : ANONYMOUS_MONTHLY_LIMIT);
 
-  const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
-  const keyHash = hashKey(rawKey);
-  const keyPrefix = rawKey.slice(0, 12);
-
-  db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, source, issued_by_us) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, email, monthlyLimit ?? null, source ?? null, issuedByUs ? 1 : 0);
-  return { api_key: rawKey, key_prefix: keyPrefix };
+  // Trois tentatives, puis on laisse remonter : à 2^32 préfixes possibles,
+  // trois collisions d'affilée ne sont pas de la malchance, c'est un
+  // générateur cassé, et une clé de plus dans ce cas serait pire qu'une erreur.
+  // key_prefix sert de clé de lecture au rapport d'usage et au radar : deux
+  // porteurs sous un même préfixe se liraient l'un l'autre.
+  const clash = db.prepare('SELECT 1 AS one FROM api_keys WHERE key_prefix = ?');
+  const insert = db.prepare(
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, source, issued_by_us, tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  );
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
+    const keyHash = hashKey(rawKey);
+    const keyPrefix = rawKey.slice(0, 12);
+    if (clash.get(keyPrefix)) continue;
+    // La clé et sa ligne de naissance dans la même transaction : l'invariant
+    // « exactement une ligne par clé libre » ne souffre pas un crash entre les deux.
+    db.transaction(() => {
+      insert.run(
+        keyHash,
+        keyPrefix,
+        email ?? ANONYMOUS_CONTACT,
+        emailNorm,
+        limit,
+        source ?? null,
+        issuedByUs ? 1 : 0,
+        tier,
+      );
+      recordKeyCreation(birth?.ipHash ?? 'unknown', birth?.userAgent ?? null, keyPrefix);
+    })();
+    return { api_key: rawKey, key_prefix: keyPrefix, key_hash: keyHash };
+  }
+  throw new Error('key_prefix collided three times in a row: the key generator is broken');
 }
 
 /**
@@ -75,15 +143,17 @@ export function generateCreditKey(
   // bundle behind one.
   const storedEmail = email && email.includes('@') ? email : 'credits-buyer';
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view, tier) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
     storedEmail,
+    normalizeEmail(storedEmail),
     credits,
     credits,
     paymentRef ?? null,
     paymentRef ? rawKey : null,
+    'paid',
   );
   return { api_key: rawKey, key_prefix: keyPrefix, credits };
 }
@@ -135,8 +205,18 @@ export function generateStripeKey(
   const storedEmail = email && email.includes('@') ? email : 'stripe-buyer';
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, storedEmail, credits, credits, stripeSessionId, rawKey);
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view, tier) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)',
+  ).run(
+    keyHash,
+    keyPrefix,
+    storedEmail,
+    normalizeEmail(storedEmail),
+    credits,
+    credits,
+    stripeSessionId,
+    rawKey,
+    'paid',
+  );
 
   return { api_key: rawKey, key_prefix: keyPrefix, credits, idempotent: false };
 }
@@ -189,15 +269,17 @@ export function generateOemKey(
   const storedEmail = email && email.includes('@') ? email : 'oem-subscriber';
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view, tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
     storedEmail,
+    normalizeEmail(storedEmail),
     monthlyLimit,
     stripeSessionId,
     stripeSubscriptionId,
     rawKey,
+    'paid',
   );
 
   return { api_key: rawKey, key_prefix: keyPrefix, monthly_limit: monthlyLimit, idempotent: false };
@@ -302,6 +384,8 @@ export interface ApiKeyValidation {
   valid: boolean;
   keyHash: string;
   email?: string;
+  /** Le palier : 'anonymous' | 'email' | 'claimed' | 'paid'. Absent quand la clé est invalide. */
+  tier?: KeyTier;
   monthlyLimit: number;
   /** When set, the key is a credit-based bundle key (NOT monthly subscription). */
   creditsRemaining?: number;
@@ -341,24 +425,39 @@ export function revokeApiKey(key: string): boolean {
 export function rotateApiKey(oldKey: string): {
   api_key: string;
   key_prefix: string;
+  key_hash: string;
   monthly_limit: number | null;
   credits_remaining: number | null;
+  tier: KeyTier;
+  no_recredit: number;
 } | null {
   if (!oldKey.startsWith(KEY_PREFIX)) return null;
   const db = getStatsDB();
   const oldHash = hashKey(oldKey);
   const row = db
     .prepare(
-      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit, stripe_subscription_id FROM api_keys WHERE key_hash = ? AND active = 1',
+      `SELECT key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, no_recredit,
+              stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
+              shield_episode, origin_prefix
+         FROM api_keys WHERE key_hash = ? AND active = 1`,
     )
     .get(oldHash) as
     | {
+        key_prefix: string;
         email: string;
+        email_norm: string | null;
         monthly_limit: number | null;
         credits_remaining: number | null;
         credits_total: number | null;
         no_recredit: number | null;
         stripe_subscription_id: string | null;
+        source: string | null;
+        issued_by_us: number | null;
+        tier: KeyTier;
+        claimed_at: string | null;
+        claim_method: string | null;
+        shield_episode: string | null;
+        origin_prefix: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -370,23 +469,53 @@ export function rotateApiKey(oldKey: string): {
   const tx = db.transaction(() => {
     // Carry the opt-out flag across — without it, a key the cohort radar took
     // off the monthly reset would clear itself in one self-service /rotate call.
-    // Conserver le lien d’abonnement : sa résiliation doit révoquer la nouvelle clé.
+    // Conserver le lien d'abonnement : sa résiliation doit révoquer la nouvelle clé.
+    //
+    // Le palier, la preuve (claimed_at, claim_method), l'adresse normalisée et
+    // l'épisode de bouclier voyagent pour la même raison que no_recredit : une
+    // clé tournée qui retomberait sur le DEFAULT 'email' se lirait comme
+    // réclamée sans jamais l'avoir été, et une clé dégradée remonterait à 200.
+    //
+    // 🚨 origin_prefix : le préfixe de la clé d'ORIGINE, celle dont la naissance
+    // a une ligne dans key_creations, stable à travers N rotations. C'est ce qui
+    // garde une clé tournée dans le rayon du radar. Aucune ligne key_creations
+    // n'est recopiée sous le nouveau préfixe : le disjoncteur COMPTE ces lignes,
+    // et une copie à chaque /rotate (route sans plafond) offrirait un moyen de
+    // l'armer à volonté, donc de dégrader les clés que les autres créent.
     db.prepare(
-      'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, no_recredit, stripe_subscription_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total,
+                             no_recredit, stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
+                             shield_episode, origin_prefix)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       newHash,
       keyPrefix,
       row.email,
+      row.email_norm,
       row.monthly_limit,
       row.credits_remaining,
       row.credits_total,
       row.no_recredit ?? 0,
       row.stripe_subscription_id,
+      row.source,
+      row.issued_by_us ?? 0,
+      row.tier,
+      row.claimed_at,
+      row.claim_method,
+      row.shield_episode,
+      row.origin_prefix ?? row.key_prefix,
     );
     // Move the usage ledger to the new key hash too. Otherwise the lifetime sum
     // (and the plain monthly count) restart at zero on rotation — which would
     // make rotation a one-call quota reset for anyone, flagged or not.
     db.prepare('UPDATE api_usage SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
+    // Et le journal de paiement : sinon une clé tournée repart d'un cumul de 0
+    // et peut racheter la promotion à 1 $ autant de fois qu'elle tourne.
+    db.prepare('UPDATE key_settlements SET key_hash = ?, key_prefix = ? WHERE key_hash = ?').run(
+      newHash,
+      keyPrefix,
+      oldHash,
+    );
     db.prepare(
       "UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?",
     ).run(oldHash);
@@ -396,8 +525,11 @@ export function rotateApiKey(oldKey: string): {
   return {
     api_key: rawKey,
     key_prefix: keyPrefix,
+    key_hash: newHash,
     monthly_limit: row.monthly_limit,
     credits_remaining: row.credits_remaining,
+    tier: row.tier,
+    no_recredit: row.no_recredit ?? 0,
   };
 }
 
@@ -407,7 +539,7 @@ export function validateApiKey(key: string): ApiKeyValidation {
   const keyHash = hashKey(key);
   const row = getStatsDB()
     .prepare(
-      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit FROM api_keys WHERE key_hash = ? AND active = 1',
+      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit, tier FROM api_keys WHERE key_hash = ? AND active = 1',
     )
     .get(keyHash) as
     | {
@@ -416,6 +548,7 @@ export function validateApiKey(key: string): ApiKeyValidation {
         credits_remaining: number | null;
         credits_total: number | null;
         no_recredit: number | null;
+        tier: KeyTier;
       }
     | undefined;
   if (!row) return { valid: false, keyHash, monthlyLimit: DEFAULT_MONTHLY_LIMIT };
@@ -423,6 +556,7 @@ export function validateApiKey(key: string): ApiKeyValidation {
     valid: true,
     keyHash,
     email: row.email,
+    tier: row.tier,
     monthlyLimit: row.monthly_limit ?? DEFAULT_MONTHLY_LIMIT,
     creditsRemaining: row.credits_remaining ?? undefined,
     creditsTotal: row.credits_total ?? undefined,
@@ -679,14 +813,24 @@ export function recordMonthlyObservation(keyHash: string, units = 1): string {
 export function getUsage(
   keyHash: string,
   monthlyLimit: number = DEFAULT_MONTHLY_LIMIT,
+  noRecredit = false,
 ): { used: number; limit: number; remaining: number; month: string } {
   const db = getStatsDB();
   const month = new Date().toISOString().slice(0, 7);
-  const row = db
-    .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
-    .get(keyHash, month) as { count: number } | undefined;
-  const used = row?.count ?? 0;
-  return { used, limit: monthlyLimit, remaining: monthlyLimit - used, month };
+  // Même base que le plafond : une clé hors du reset mensuel se mesure sur la
+  // somme de vie, sinon /usage annoncerait un solde que le middleware refuse.
+  const used = noRecredit
+    ? (
+        db
+          .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
+          .get(keyHash) as { n: number }
+      ).n
+    : ((
+        db
+          .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+          .get(keyHash, month) as { count: number } | undefined
+      )?.count ?? 0);
+  return { used, limit: monthlyLimit, remaining: Math.max(0, monthlyLimit - used), month };
 }
 
 /**
@@ -707,4 +851,93 @@ export function decrementQuota(keyHash: string, units = 1, month?: string): void
     keyHash,
     m,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Paliers (chantier « clé sans e-mail », lot 2)
+// ---------------------------------------------------------------------------
+
+export interface KeyTierRow {
+  tier: KeyTier;
+  monthly_limit: number | null;
+  claimed_at: string | null;
+  claim_method: string | null;
+  no_recredit: number;
+  shield_episode: string | null;
+  origin_prefix: string | null;
+  key_prefix: string;
+}
+
+/** Le palier d'une clé, par hash. Un seul nom pour cette lecture. */
+export function getKeyTier(keyHash: string): KeyTierRow | null {
+  const row = getStatsDB()
+    .prepare(
+      'SELECT tier, monthly_limit, claimed_at, claim_method, no_recredit, shield_episode, origin_prefix, key_prefix FROM api_keys WHERE key_hash = ?',
+    )
+    .get(keyHash) as KeyTierRow | undefined;
+  return row ?? null;
+}
+
+/**
+ * Faire passer une clé anonyme à un palier supérieur. Idempotente par
+ * construction : le WHERE ne retient que le palier anonyme, donc un second
+ * appel touche zéro ligne et renvoie false. C'est ce qui rend la réclamation
+ * implicite (un règlement au seuil) sûre à appeler depuis un middleware, où
+ * elle peut se déclencher deux fois sur une requête rejouée.
+ *
+ * `key_hash` et non `key_prefix` : key_prefix ne portait aucune unicité dans
+ * la base héritée, et un UPDATE sans LIMIT sur une colonne non unique promeut
+ * TOUTES les lignes du préfixe.
+ *
+ * no_recredit, et c'est le point que le contrat de mesure du 15/09 tranche :
+ *   - code vérifié (email_code), signature d'agent, geste admin : EFFACÉ. Une
+ *     boîte prouvée est le signe de vie que ce drapeau existe pour exiger ;
+ *     sans cela une clé née sous bouclier vaudrait 200 À VIE pendant qu'on lui
+ *     annonce 200 par mois.
+ *   - rails payants (x402, credits, stripe) : POSÉ. 200 unités une fois pour
+ *     CLAIM_MIN_PAID_USD, c'est le prix catalogue exact. Récurrent, ce serait
+ *     un cadeau qui se revend.
+ * shield_episode est effacé dans les deux cas : la réclamation est précisément
+ * la preuve que la dégradation ne visait pas cette clé.
+ *
+ * 🚨 La ligne key_claims s'écrit dans la MÊME transaction que l'UPDATE, avant
+ * que le 200 ne parte : une promotion qui ne se journalise pas est invisible
+ * au plafond par réseau et non mesurable après coup.
+ */
+export function claimKey(
+  keyHash: string,
+  method: KeyClaimMethod,
+  opts: { email?: string | null; ipHash?: string | null } = {},
+): boolean {
+  const byMailbox = method === 'email_code' || method === 'agent_signature' || method === 'admin';
+  const tier: KeyTier = byMailbox ? 'claimed' : 'paid';
+  const email = opts.email ?? null;
+  const emailNorm = email ? normalizeEmail(email) : null;
+  const db = getStatsDB();
+  const tx = db.transaction((): boolean => {
+    const res = db
+      .prepare(
+        `UPDATE api_keys
+            SET tier = ?, monthly_limit = ?, claimed_at = datetime('now'), claim_method = ?,
+                no_recredit = ?, shield_episode = NULL,
+                email = COALESCE(?, email),
+                email_norm = COALESCE(?, email_norm)
+          WHERE key_hash = ? AND tier = 'anonymous' AND active = 1`,
+      )
+      .run(tier, CLAIMED_LIMIT, method, byMailbox ? 0 : 1, email, emailNorm, keyHash);
+    if (res.changes === 0) return false;
+    const row = db.prepare('SELECT key_prefix FROM api_keys WHERE key_hash = ?').get(keyHash) as {
+      key_prefix: string;
+    };
+    recordKeyClaim({
+      event: 'claim',
+      emailNorm,
+      keyPrefix: row.key_prefix,
+      keyHash,
+      method,
+      ipHash: opts.ipHash ?? null,
+    });
+    return true;
+  });
+  return tx();
 }

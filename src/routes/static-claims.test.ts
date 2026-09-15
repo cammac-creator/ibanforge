@@ -50,6 +50,11 @@ const EXTS = /\.(ts|tsx|js|mjs|json|md|mdx|txt|html|py|cs|java)$/;
  * other guard tests cite the banned variants by trade (one asserts their
  * absence, one documents the audit that killed them). */
 const ALLOWED = new Set([
+  // Artefact GÉNÉRÉ par `npm run openapi:dump` depuis src/routes/openapi.ts,
+  // gitignoré : absent d'un poste propre et de la CI, présent chez qui a lancé
+  // le dump. Le garde lit déjà openapi.ts ; compter aussi sa copie doublait
+  // les mêmes lignes et faisait dépendre le budget de l'environnement.
+  'openapi.generated.json',
   'CHANGELOG.md',
   'src/routes/static-claims.test.ts',
   'src/routes/dataset-claims.test.ts',
