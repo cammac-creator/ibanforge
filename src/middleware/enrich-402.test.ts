@@ -9,6 +9,7 @@ import {
   PRO_PAYMENT_LINK,
 } from '../lib/payment-links.js';
 import type { HonoEnv, PaywallCause } from '../types.js';
+import { CONSENT_FIELDS } from '../lib/consent.js';
 
 /**
  * Reco-IA audit 2026-07-25. The x402 SDK emits an EMPTY 402 body ({}) for every
@@ -518,6 +519,43 @@ describe('every 402 carries a card link a machine can follow', () => {
     }
     expect(body.free_tier.signup).toContain('/v1/keys/generate');
     expect(body.x402.discovery).toContain('/.well-known/x402');
+  });
+
+  /**
+   * 🚨 Le rail carte n'est PAS un rail de réclamation, et ce test le rend
+   * opposable.
+   *
+   * Payer par carte rend une clé NEUVE préchargée en crédits : rien n'est
+   * écrit dans le palier de la clé qu'on tient déjà. Un champ `by_card` DANS
+   * `claim_to_200` a été écrit une fois, et il promettait à un agent qui règle
+   * le prix catalogue un palier mensuel qu'il n'obtient pas. Le rail carte vit
+   * donc dans un bloc FRÈRE.
+   */
+  it('sépare la réclamation de l’achat par carte, champ par champ', async () => {
+    const body = (await (await anonymous402()).json()) as {
+      free_tier: Record<string, unknown>;
+      claim_to_200: Record<string, unknown>;
+      buy_credits_by_card?: Record<string, unknown>;
+    };
+    // La voie la plus courte, mot pour mot celle de l'atome partagé.
+    expect(body.free_tier).toEqual(CONSENT_FIELDS.free_tier);
+    expect(body.free_tier.signup).toContain('with no body at all');
+    // Les six clés exactes attendues par l'e2e, et `by_card` n'en fait pas partie.
+    expect(Object.keys(body.claim_to_200).sort()).toEqual([
+      'auth',
+      'by_agent_approval',
+      'by_email',
+      'by_payment',
+      'description',
+      'endpoint',
+    ]);
+    expect(Object.keys(body.claim_to_200)).not.toContain('by_card');
+    // L'en-tête est dit sur la réclamation (la clé y voyage), et JAMAIS sur le
+    // checkout, qui n'accepte aucune clé : l'exiger là serait publier une
+    // instruction fausse.
+    expect(body.claim_to_200.auth).toMatch(/Authorization|Bearer/);
+    expect(body.buy_credits_by_card?.auth).not.toMatch(/Authorization|Bearer/);
+    expect(String(body.buy_credits_by_card?.description)).toMatch(/separate purchase/i);
   });
 
   /**

@@ -26,6 +26,8 @@
  * `payment-links.ts` exists.
  */
 
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+
 /** Calls served per source per UTC day. A taster, not a tier. */
 export const REST_TRIAL_DAILY_LIMIT = 25;
 
@@ -66,16 +68,27 @@ export const TRIAL_SIGNUP_SOURCE = 'api-trial';
  * changes the hint keeps minting keys under the old label and the card reads
  * zero.
  *
- * 🚨 `you@company.com`, never `you@example.com`: `example.com` is on our own
- * disposable blocklist, so the address we would be telling the reader to send
- * is the one the signup route answers `400 disposable_email` to. That exact
- * mistake shipped on eight surfaces at once in August 2026;
- * src/routes/example-emails.test.ts now drives the real route with every
- * address published anywhere in the repository.
+ * 🚨 Plus aucune adresse depuis le 15/09/2026 : la voie sans e-mail existe, et
+ * cette phrase est servie à quelqu'un qui n'a donné ni clé ni adresse. Elle
+ * garde en revanche `{"source":"…"}`, et c'est la SEULE surface du produit qui
+ * publie un corps : ce jeton EST la mesure de conversion (voir
+ * `TRIAL_SIGNUP_SOURCE` ci-dessus), et un implémenteur qui « simplifierait »
+ * vers le POST sans corps mettrait la carte des portes d'entrée du tableau de
+ * bord à zéro pour toujours, sans faire rougir un test. Un garde l'épingle
+ * (`src/routes/static-claims.test.ts`).
+ *
+ * 🚨 Et les deux 25 n'ont RIEN à voir : 25 par jour ici, sur cette seule
+ * route ; 25 par mois pour la clé, sur tous les endpoints. Un développeur qui
+ * lit les deux dans cet ordre conclut, avec raison sur les validations, que la
+ * clé est trente fois pire que pas de clé. La clé n'achète pas du volume, elle
+ * achète les endpoints que l'essai ne sert pas et la porte vers le palier
+ * complet — donc l'unité et la portée sont écrites, toutes les deux.
  */
 export const TRIAL_FREE_KEY_HINT =
-  `POST https://api.ibanforge.com/v1/keys/generate with {"email":"you@company.com","source":"${TRIAL_SIGNUP_SOURCE}"}` +
-  ' — 200 requests a month, no card';
+  `POST https://api.ibanforge.com/v1/keys/generate with {"source":"${TRIAL_SIGNUP_SOURCE}"}` +
+  ` — no e-mail, no card, nothing to confirm: an ifk_ key worth ${ANONYMOUS_MONTHLY_LIMIT} requests a MONTH, ` +
+  `on every endpoint (these ${REST_TRIAL_DAILY_LIMIT} are a DAY, on this route only). ` +
+  `One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to ${FREE_TIER_MONTHLY_LIMIT} a month.`;
 
 /** Where the free key is explained. The page is content/<lang>/docs/api-keys.mdx. */
 export const TRIAL_DOCS_URL = `https://ibanforge.com/docs/api-keys?src=${TRIAL_SIGNUP_SOURCE}`;

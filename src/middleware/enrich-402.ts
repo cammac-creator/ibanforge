@@ -8,6 +8,8 @@ import {
   routeTemplateOf,
 } from '../lib/x402-discovery.js';
 import { canonicalPaidPath } from './x402.js';
+import { CONSENT_FIELDS } from '../lib/consent.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 import {
   ENTRY_PAYMENT_LINK,
   PRICING_PAGE,
@@ -496,20 +498,24 @@ export function projectAnnouncementForHeader(
 
 /**
  * Human- and agent-readable access ramp shared by both 402 enrichment paths.
- * Lists the three ways to call a paid endpoint: a free API key, prepaid
- * credit packs (card or USDC), and pay-per-call x402. The machine `accepts`
- * array is built separately and never lives here.
+ * Lists the ways to call a paid endpoint, and since 15/09/2026 the FIRST one
+ * asks for nothing at all: an anonymous key, the same key claimed to the full
+ * free allowance, prepaid credit packs (card or USDC), and pay-per-call x402.
+ * The machine `accepts` array is built separately and never lives here.
+ *
+ * 🚨 Les trois blocs de palier viennent de `CONSENT_FIELDS` (src/lib/consent.ts)
+ * et ne sont pas rédigés ici. Ce corps de 402 est la surface agent la plus lue
+ * du produit ; une seconde rédaction voisine est exactement ce qui a fait servir
+ * neuf versions du même quota. La phrase de consentement et son interdit
+ * voyagent donc ensemble, par construction.
  */
 function buildAccessRamp(): Record<string, unknown> {
   return {
     message:
-      'Authentication or payment required. Three ways in: a free API key ' +
-      '(200 req/month), prepaid credit packs (card or USDC), or pay-per-call via x402.',
-    free_tier: {
-      description: '200 requests/month — no credit card, no subscription',
-      signup: 'POST /v1/keys/generate with body {"email":"you@company.com"}',
-      usage: 'Add header: Authorization: Bearer ifk_your_key_here',
-    },
+      'Authentication or payment required. Four ways in, and the first needs no e-mail: an anonymous API key ' +
+      `(${ANONYMOUS_MONTHLY_LIMIT} req/month, empty body, nothing to confirm), the same key claimed to ` +
+      `${FREE_TIER_MONTHLY_LIMIT} req/month, prepaid credit packs (card or USDC), or pay-per-call via x402.`,
+    ...CONSENT_FIELDS,
     // The structural verdict is free and needs no key: format, checksum,
     // country, BBAN. Until 02/09/2026 a caller who hit this wall had to guess
     // that; the paid call is what adds the registry (BIC, bank, SEPA, sanctions,
@@ -659,9 +665,41 @@ const ALLOWANCE_EXHAUSTED: ReadonlySet<PaywallCause['reason']> = new Set([
 ]);
 
 /**
+ * Réclamer n'est pas frapper une clé.
+ *
+ * L'audit du 25/07/2026 a retiré `free_tier` d'un 402 épuisé parce qu'un client
+ * pouvait frapper une SECONDE clé gratuite et se remettre en service sans
+ * payer. `claim_to_200` ne frappe rien : il relève l'allocation de la clé DÉJÀ
+ * en main, contre un code, un paiement ou une approbation. Le retirer d'une clé
+ * ANONYME épuisée reconstruirait le cul-de-sac exact que ce palier existe pour
+ * supprimer — et une clé née pendant une rafale est une clé anonyme à
+ * allocation réduite, donc elle garde le rail aussi.
+ *
+ * 🚨 Le test porte sur le PALIER, jamais sur le nombre : une clé bouclier
+ * porte 5 et non 25, et tester le nombre laisserait sans issue exactement
+ * l'utilisateur honnête qu'on vient de dégrader.
+ *
+ * Sur une clé RÉCLAMÉE, les deux rails partent : cet appelant a déjà consommé
+ * la seule marche gratuite qui existe.
+ */
+function keepsClaimRail(cause: PaywallCause): boolean {
+  // Le palier vient du middleware de clé, qui le lit dans la base. Repli
+  // assumé et écrit comme tel quand il manque (une cause posée par un autre
+  // chemin) : le plafond anonyme est le plus petit des paliers à quota, donc
+  // « au plus 25 » couvre la clé anonyme et la clé bouclier sans couvrir la
+  // clé réclamée. Il se casserait le jour où un quatrième palier passerait en
+  // dessous de 25 — d'où le palier explicite dès qu'il est là.
+  if (cause.tier) return cause.tier === 'anonymous';
+  const limit = cause.quota?.limit;
+  return typeof limit === 'number' && limit <= ANONYMOUS_MONTHLY_LIMIT;
+}
+
+/**
  * Strips the free-tier signup rail from a 402 whose cause is an exhausted
  * allowance, leaving the paid rails (`credit_packs` first, then `x402`) as the
  * only ways forward. No-op for every other cause.
+ *
+ * `claim_to_200` survit sur une clé anonyme : voir `keepsClaimRail`.
  */
 function stripFreeTierWhenExhausted(
   body: Record<string, unknown>,
@@ -670,6 +708,7 @@ function stripFreeTierWhenExhausted(
   if (!cause || !ALLOWANCE_EXHAUSTED.has(cause.reason)) return body;
   const rest = { ...body };
   delete rest.free_tier;
+  if (!keepsClaimRail(cause)) delete rest.claim_to_200;
   return rest;
 }
 

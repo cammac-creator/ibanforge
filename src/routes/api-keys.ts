@@ -291,8 +291,14 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       return c.json(
         {
           error: 'disposable_email',
+          // 🚨 Ne dit PLUS que le palier gratuit EXIGE une adresse : depuis le
+          // palier anonyme, un POST sans corps rend une clé sans rien demander.
+          // Ce refus ne vaut que parce qu'une adresse a été fournie, et la
+          // phrase donne la sortie qui n'en demande aucune.
           message:
-            'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
+            'An address was supplied, and this one is a disposable domain: example.com, mailinator and the ' +
+            'like are blocked. Either send an address you can read, or send no body at all — a key with no ' +
+            'address is issued on the spot.',
         },
         400,
       );

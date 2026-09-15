@@ -64,6 +64,12 @@ import { createX402Middleware } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
 import { anonymousTrialMiddleware } from './middleware/anonymous-trial.js';
 import { REST_TRIAL_DAILY_LIMIT, TRIAL_RESET } from './lib/trial.js';
+// Les deux plafonds de palier et les phrases de consentement viennent de leurs
+// modules feuilles : `llms.txt` est la surface que les agents lisent avant de
+// décider s'ils doivent inscrire quelqu'un, et une phrase recopiée ici
+// dériverait de celle du 402 au premier réglage.
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './lib/tiers.js';
+import { CONSENT_ASK, CONSENT_BOUNDARY, CONSENT_FIELDS } from './lib/consent.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
 import { creditsBuy } from './routes/credits-buy.js';
@@ -341,7 +347,9 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 
 - **Free demo (no auth):** GET https://api.ibanforge.com/v1/demo
 - **Privacy by default:** submitted IBANs are never stored (validation runs in memory); IPs only as salted hashes; telemetry auto-purged after 12 months, and erased 30 days after a customer terminates (default, DPA clause 4.7: https://ibanforge.com/en/legal/dpa). Pre-signed DPA + published SLA + live status page.
-- **Free tier (200 req/month):** POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`). Batch validation counts 1 request per IBAN — on API keys and credit packs alike.
+- **Free key, no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month):** POST https://api.ibanforge.com/v1/keys/generate with no body at all returns an \`ifk_\` key on the spot — no address, no card, nothing to confirm. Nothing is mailed and no record is opened. Then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`). Batch validation counts 1 request per IBAN — on API keys and credit packs alike.
+- **Claim the same key to ${FREE_TIER_MONTHLY_LIMIT} req/month:** POST https://api.ibanforge.com/v1/keys/claim with header \`Authorization: Bearer ifk_...\` (never in the body), once the key has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "${CONSENT_ASK}" — or an x402 payment made on the key. ${CONSENT_BOUNDARY} The mailed code gives ${FREE_TIER_MONTHLY_LIMIT} every month; a payment gives ${FREE_TIER_MONTHLY_LIMIT} once.
+- **Optional at creation:** POST /v1/keys/generate with \`{"email":"you@company.com"}\` skips straight to the claim step. The address is never required, and the ${REST_TRIAL_DAILY_LIMIT} keyless validations a day above need no key at all.
 - **See what a key did:** GET https://api.ibanforge.com/v1/keys/report with the key itself. Returns its traffic, the endpoints it called, what failed WITH the cause and a fix, and how many distinct networks used it. Human-readable at https://ibanforge.com/en/account. No account, no password: the key is the credential.
 - **Credit packs (card or USDC):** prepaid credits, never expire. Card: https://api.ibanforge.com/#pricing — USDC: POST /v1/credits/buy/1k|5k|25k (list: GET /v1/credits/bundles)
 - **Pro subscription (card):** $29/month for 10,000 requests, resets on the 1st, cancel anytime: https://ibanforge.com/pricing (checkout link in GET /v1/credits/bundles → subscription)
@@ -349,8 +357,8 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - **Paying as an agent, zero to first payment in 3 steps** (wallet with budget → USDC on Base → one $5 payment for 1,000 credits, or pay-per-call): https://ibanforge.com/docs/pay-as-an-agent
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\` (${MCP_TOOLS.length} tools, no signup)
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp
-- **Try it with zero setup, as an agent (${MCP_DAILY_LIMIT} free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_DAILY_LIMIT} calls/day you get JSON-RPC error -32000, so move to the free API key (200 req/month) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
-- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"CH9300762011623852957"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take the free key. Past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`paywall_cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC, is counted per source address (IPv6 counted per /64), and lives in the service database, so it survives a redeploy. The HTTP MCP transport has its own, smaller allowance (${MCP_DAILY_LIMIT} tool calls/day): one MCP call can be a $0.02 compliance screening, a REST validation is $0.005.
+- **Try it with zero setup, as an agent (${MCP_DAILY_LIMIT} free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_DAILY_LIMIT} calls/day you get JSON-RPC error -32000, so move to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
+- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"CH9300762011623852957"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take a key that needs no e-mail at all. These ${REST_TRIAL_DAILY_LIMIT} are a day, on this route only; the key's ${ANONYMOUS_MONTHLY_LIMIT} are a month, on every endpoint, and one call at POST /v1/keys/claim raises it to ${FREE_TIER_MONTHLY_LIMIT} a month. Past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`paywall_cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC, is counted per source address (IPv6 counted per /64), and lives in the service database, so it survives a redeploy. The HTTP MCP transport has its own, smaller allowance (${MCP_DAILY_LIMIT} tool calls/day): one MCP call can be a $0.02 compliance screening, a REST validation is $0.005.
 
 ## Discovery endpoints
 
@@ -606,6 +614,9 @@ export function buildApp(): Hono<HonoEnv> {
         'X-Quota-Limit',
         'X-Quota-Remaining',
         'X-Quota-Month',
+        // Sur une clé sans recrédit mensuel, le mois ci-dessus n'est pas
+        // l'assiette du plafond : cet en-tête dit laquelle des deux c'est.
+        'X-Quota-Basis',
         'X-Quota-Charged',
         'X-Quota-Required',
         'X-Quota-Exhausted',
@@ -879,10 +890,18 @@ export function buildApp(): Hono<HonoEnv> {
           'POST /v1/address/check',
           'GET /v1/credits/bundles',
           'POST /v1/keys/generate',
+          'POST /v1/keys/claim',
           'GET /v1/keys/usage',
           'GET /v1/keys/report',
         ],
       },
+      // 🚨 Les mêmes octets que le corps du 402 et que `GET /mcp`, importés et
+      // non recopiés : ce point de découverte était muet sur la voie sans
+      // e-mail, et un agent qui ne lit que du JSON n'apprenait la porte
+      // gratuite nulle part. `claim_to_200` ne contient PAS de rail carte :
+      // payer par carte rend une clé NEUVE préchargée, cela ne relève pas la
+      // clé en main (voir `credit_packs` du 402).
+      ...CONSENT_FIELDS,
     }),
   );
 

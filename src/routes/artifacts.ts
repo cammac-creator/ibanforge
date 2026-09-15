@@ -1,7 +1,10 @@
 import { Hono } from 'hono';
 import { RATE_LIMIT } from '../middleware/rate-limit.js';
 import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
-import { FREE_TIER_MONTHLY_LIMIT as FREE_MONTHLY } from '../lib/tiers.js';
+import {
+  ANONYMOUS_MONTHLY_LIMIT as ANON_MONTHLY,
+  FREE_TIER_MONTHLY_LIMIT as FREE_MONTHLY,
+} from '../lib/tiers.js';
 import { MCP_DAILY_LIMIT as MCP_FREE_DAILY } from '../lib/mcp-limits.js';
 
 /**
@@ -107,7 +110,12 @@ operations:
           top up its own balance without an explicit mandate.
         effect: payment
       - operation: POST /v1/keys/generate
-        reason: Mints a credential bound to an email address.
+        reason: Mints a credential. An empty body mints an anonymous one and
+          asks for nothing; an optional email address starts the claim.
+        effect: credential
+      - operation: POST /v1/keys/claim
+        reason: Raises the allowance of the key already in hand, against an
+          address a human chose to give or a payment. Never mints a second key.
         effect: credential
 
 payment:
@@ -117,7 +125,8 @@ payment:
       network: eip155:8453
       discovery: https://api.ibanforge.com/.well-known/x402
     - name: api_key
-      description: Bearer key. Free tier ${FREE_MONTHLY} requests/month, or prepaid credits.
+      description: Bearer key. ${ANON_MONTHLY} requests/month on a key that needs
+        no email at all, ${FREE_MONTHLY} a month once claimed, or prepaid credits.
   refusal_behaviour: >-
     An unpaid call to a paid endpoint returns 402 with the full payment
     requirements. It never returns a partial or degraded answer, so an agent
@@ -152,10 +161,18 @@ exemptions:
   - /v1/demo
 
 quotas:
+  anonymous_key:
+    requests: ${ANON_MONTHLY}
+    window: 1 month
+    scope: per API key
+    signup: POST /v1/keys/generate with no body at all — no email, no card
+    note: A named allowance of its own, not shared with the other callers on
+      the same address, and it opens every endpoint.
   free_tier:
     requests: ${FREE_MONTHLY}
     window: 1 month
     scope: per API key
+    signup: POST /v1/keys/claim on an anonymous key — a mailed 6-digit code
   mcp_anonymous:
     requests: ${MCP_FREE_DAILY}
     window: 1 day
@@ -304,8 +321,10 @@ plans:
   - name: Free
     price: 0
     included_requests: ${FREE_MONTHLY}
+    anonymous_included_requests: ${ANON_MONTHLY}
     period: month
-    signup: Email address, no card.
+    signup: Nothing at all for ${ANON_MONTHLY}/month; an email address or a
+      payment to claim ${FREE_MONTHLY}. No card either way.
     limits: Same per-minute rate limit as every other plan.
   - name: Pay per call (x402)
     price: metered
@@ -461,9 +480,12 @@ response header. A v1 \`X-PAYMENT\` signature is still accepted.
 Authorization: Bearer ifk_xxxxxxxx
 \`\`\`
 
-- Free tier: ${FREE_MONTHLY} requests per month against an emailed key.
+- Free: ${ANON_MONTHLY} requests per month against a key that needs no email at
+  all, ${FREE_MONTHLY} a month once that same key is claimed.
 - Prepaid credits: one payment, one key, no expiry.
-- Mint one: \`POST /v1/keys/generate\` with an email address.
+- Mint one: \`POST /v1/keys/generate\` with no body at all. An email address is
+  optional, and it starts the claim to the full allowance.
+- Claim it: \`POST /v1/keys/claim\`, key in the \`Authorization\` header.
 - Check remaining allowance: \`GET /v1/keys/usage\`.
 
 The key goes in the \`Authorization\` header only. It is never accepted in a

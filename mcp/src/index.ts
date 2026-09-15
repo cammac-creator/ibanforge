@@ -1023,16 +1023,26 @@ function contentTypeFor(filename: string): string {
  */
 const INSTRUCTIONS =
   'Start with validate_iban on any IBAN-looking string (e.g. DE89370400440532013000) — one call returns validity, the issuing bank + BIC, virtual-IBAN/EMI detection, SEPA reachability and VoP readiness. ' +
-  // 2026-08-17: this sentence used to read "For unlimited use … in one
-  // step" — an agent took it literally and scripted 42 keys in a
-  // morning. Sell the same path truthfully: one key per developer, and
-  // repeat creations from one network go through mailbox verification.
-  // The example address has to pass the signup guard: example.com is on
-  // the disposable-domain blocklist, so the literal copy of the previous
-  // wording ("you@example.com") answered 400 disposable_email.
-  'Free tier: 10 tool calls/IP/day, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@company.com"} issues a free API key (200 REST calls/month, one per developer — repeat creations from the same network require e-mail verification); prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+  // 2026-09-15 : cette phrase s'ouvrait sur {"email":…}. Un agent l'a lue comme
+  // « inscris ton utilisateur quelque part » et a refusé tout le chemin (test en
+  // aveugle du 08/09). L'e-mail est devenu OPTIONNEL et passe en second ; le
+  // corps vide passe en premier.
+  //
+  // 🚨 Les chiffres sont écrits, pas interpolés, et ce n'est pas un oubli :
+  // l'extracteur de `src/mcp/instructions.test.ts` ne reconnaît que des chaînes
+  // entre apostrophes simples, donc un gabarit à backticks casserait les trois
+  // tests de parité avec la copie du paquet npm. Deux assertions du même
+  // fichier relient ces chiffres à `src/lib/tiers.ts`.
+  //
+  // 🚨 Aucun outil qui n'existe pas n'est nommé ici : ce bloc est injecté dans
+  // le contexte du modèle AVANT `tools/list`, donc citer un outil absent
+  // apprendrait à l'agent que la documentation mente. Un test vérifie que tout
+  // nom d'outil cité est bien enregistré.
+  'Free tier: 10 tool calls/IP/day here, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
+  'POST https://api.ibanforge.com/v1/keys/claim lifts that same key to 200 REST calls/month — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. The mailed code gives 200 every month; a payment gives 200 once. ' +
+  'Prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
   'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
-  'Paying as an agent (wallet, USDC on Base, one $5 payment for 1,000 calls): https://ibanforge.com/docs/pay-as-an-agent — ' +
+  'Paying as an agent (wallet, USDC on Base, prepaid packs): https://ibanforge.com/docs/pay-as-an-agent — ' +
   'Docs and code samples: https://ibanforge.com/docs/recipes';
 
 const server = new Server(
@@ -1083,9 +1093,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // without requiring an API key while still surfacing the upgrade path.
   const ANON_NOTE =
     'Anonymous mode — basic format validation only. For BIC, SEPA reachability, ' +
-    'issuer classification, sanctions, Swiss BC-Nummer and risk score: get a ' +
-    'free API key (200 req/month) by POSTing your email to /v1/keys/generate, ' +
-    'or pay per call via x402 (see https://api.ibanforge.com/.well-known/x402).';
+    'issuer classification, sanctions, Swiss BC-Nummer and risk score: take a key ' +
+    'with no e-mail at all — POST /v1/keys/generate with no body, 25 REST calls a ' +
+    'month — then POST /v1/keys/claim with the key in the Authorization header to ' +
+    'lift it to 200 a month, or pay per call via x402 ' +
+    '(see https://api.ibanforge.com/.well-known/x402).';
 
   // When the 402 carried a cause (exhausted quota/credits, invalid key), the
   // degraded fallback result must say so: the user HAS a key and would

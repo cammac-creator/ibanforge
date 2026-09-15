@@ -4,7 +4,7 @@
 
 ## What is IBANforge?
 
-IBANforge is a compliance-grade API built for AI agents and developers. It validates IBANs, resolves BIC/SWIFT codes, exposes Swiss BC-Nummer clearing data (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), detects EMI/virtual IBANs, checks SEPA Instant + VoP reachability, and returns a compliance risk score. Three payment rails with no dead-ends: a free API-key tier (200 req/month), prepaid credit packs (card or USDC), and x402 micropayments (USDC on Base L2, no signup).
+IBANforge is a compliance-grade API built for AI agents and developers. It validates IBANs, resolves BIC/SWIFT codes, exposes Swiss BC-Nummer clearing data (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), detects EMI/virtual IBANs, checks SEPA Instant + VoP reachability, and returns a compliance risk score. Four payment rails with no dead-ends, and the first asks for nothing: an API key that needs no e-mail (25 req/month, one empty POST), that same key claimed to 200 a month, prepaid credit packs (card or USDC), and x402 micropayments (USDC on Base L2, no signup).
 
 121k+ BIC entries (39k+ LEI-enriched via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 countries · 900+ non-bank issuer classifications (EMI, payment institutions, digital banks). Live counts: https://api.ibanforge.com/llms.txt
 
@@ -30,15 +30,16 @@ Three rails, pick what fits — agents never hit a dead-end. And before any of
 them, a taster that needs nothing at all:
 
 **Keyless trial (no key, no wallet, no email):**
-- `POST /v1/iban/validate` with a real `iban` is served 10 times a day per IP, full enrichment included
+- `POST /v1/iban/validate` with a real `iban` is served 25 times a day per IP, full enrichment included
 - The response carries a `trial` block: calls left today, the reset (midnight UTC), and the one request that mints a free key
-- Past 10/day the route answers 402 again, `cause.reason = "trial_exhausted"`
-- The HTTP MCP transport has the same allowance: 10 tool calls/day per IP
+- Past 25/day the route answers 402 again, `cause.reason = "trial_exhausted"`
+- The HTTP MCP transport has its own, smaller allowance: 10 tool calls/day per IP
 - An empty `{}` body always gets the 402 discovery envelope, never a trial — that probe belongs to the x402 indexers
 
-**Free tier (API key):**
-- POST /v1/keys/generate {"email":"you@company.com"} → use `Authorization: Bearer ifk_...`
-- 200 requests/month
+**Free key (no e-mail, no card):**
+- POST /v1/keys/generate with no body at all → use `Authorization: Bearer ifk_...`
+- 25 requests a MONTH, on every endpoint — not a day, and not one route: the two figures above and this one are unrelated allowances that happen to share a number
+- POST /v1/keys/claim, key in the Authorization header, raises that same key to 200 a month: a 6-digit code mailed to an address your human gave you for this, and never send an address your human has not handed you for this purpose. An x402 payment made on the key raises it to 200 once instead.
 
 **Credit packs (card or USDC, never expire):**
 - 1,000 calls = $5 · 5,000 = $20 · 25,000 = $80

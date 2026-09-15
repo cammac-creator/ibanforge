@@ -75,10 +75,11 @@ const HISTORY = new Set(['CHANGELOG.md']);
  */
 const KNOWN_DEBT = new Set(
   [
-    // Left: `src/app.ts` was being rewritten in a parallel session, and the
-    // three SDK files ship in one npm + PyPI batch of their own. Everything
-    // else on this list was fixed the same night and removed from it.
-    'src/app.ts',
+    // Left: the three SDK files ship in one npm + PyPI batch of their own.
+    // Everything else on this list was fixed the same night and removed from
+    // it. `src/app.ts` came off the list on 15/09/2026: its `llms.txt` block
+    // no longer publishes an address at all on the signup path — the shortest
+    // form is an empty POST — so there is nothing left to grandfather.
     'sdks/python/README.md',
     'sdks/python/ibanforge/client.py',
     'sdks/typescript/src/index.ts',

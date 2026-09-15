@@ -1,6 +1,6 @@
 # IBANforge
 
-> Know the bank behind any IBAN: IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — full payment-rail participation, the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions and compliance risk scoring, for developers and AI agents, by REST or MCP — with x402 micropayments, no API-key signup required.
+> Know the bank behind any IBAN: IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — full payment-rail participation, the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions and compliance risk scoring, for developers and AI agents, by REST or MCP — with x402 micropayments, and an API key that needs no e-mail, no card and no signup.
 
 121k+ BIC entries (39k+ LEI-enriched via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 countries · 900+ non-bank issuer classifications (EMI, payment institutions, digital banks) — live counts at https://api.ibanforge.com/llms.txt
 
@@ -18,13 +18,13 @@ https://api.ibanforge.com
 
 ### Try it right now, no key, no wallet (REST)
 curl -s -X POST https://api.ibanforge.com/v1/iban/validate -H 'Content-Type: application/json' -d '{"iban":"CH9300762011623852957"}'
-The first 10 calls a day from one IP are served in full, free. The answer carries a `trial` block saying how many are left today and how to take the free key (200 req/month). Past 10 the route answers 402 again, `cause.reason = "trial_exhausted"`. Send a REAL iban: an empty `{}` body is the x402 discovery probe and always gets the 402.
+The first 25 calls a day from one IP are served in full, free. The answer carries a `trial` block saying how many are left today and how to take a key that needs no e-mail at all (25 a month, claimable to 200 a month). These 25 are a day, on this route only; the key's 25 are a month, on every route — a different thing, not a bigger one. Past 25 the route answers 402 again, `cause.reason = "trial_exhausted"`. Send a REAL iban: an empty `{}` body is the x402 discovery probe and always gets the 402.
 
 ### MCP server (stdio — easiest, no signup)
 npx -y ibanforge-mcp
 Claude Desktop / Cursor / Cline config:
 {"mcpServers": {"ibanforge": {"command": "npx", "args": ["-y", "ibanforge-mcp"]}}}
-Optional: set IBANFORGE_API_KEY=ifk_... in env for the free tier (200 req/month).
+Optional: set IBANFORGE_API_KEY=ifk_... in env. Get one with no e-mail: POST https://api.ibanforge.com/v1/keys/generate with no body at all (25 req/month), then POST /v1/keys/claim with the key in the Authorization header to raise it to 200 a month.
 
 ### MCP server (streamable HTTP — no install)
 POST https://api.ibanforge.com/mcp  (JSON-RPC: initialize → tools/list → tools/call)
@@ -49,7 +49,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
 
 ## REST endpoints
-- POST /v1/iban/validate — single IBAN, full enrichment ($0.005; first 10/day per IP free, no key — see the keyless trial above)
+- POST /v1/iban/validate — single IBAN, full enrichment ($0.005; first 25/day per IP free, no key — see the keyless trial above)
 - POST /v1/iban/batch — up to 100 IBANs ($0.002 each)
 - GET  /v1/bic/{code} — BIC/SWIFT lookup with LEI ($0.003)
 - GET  /v1/ch/clearing/{iid} — Swiss clearing lookup ($0.003)
@@ -61,11 +61,14 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - POST /v1/address/check — free ISO 20022 postal address conformity check: sps, hvps_plus, fedwire (no auth)
 - GET  /v1/credits/bundles — free, list prepaid credit bundles
 - GET  /v1/demo — free example validations
-- POST /v1/keys/generate {"email":"you@company.com"} — free API key (200 req/month)
+- POST /v1/keys/generate (no body at all) — free API key, no e-mail, no card, 25 req/month
+- POST /v1/keys/generate {"email":"you@company.com"} — same route, optional address, and it starts the claim
+- POST /v1/keys/claim (key in the Authorization header, never the body) — raises that same key to 200 a month with a mailed 6-digit code, or to 200 once with an x402 payment on the key
 
-## How to pay (3 rails, no dead-ends)
-- Try before anything: 10 keyless validations/day per IP on POST /v1/iban/validate, and 10 MCP tool calls/day per IP. Tasters, not tiers.
-- Free tier: POST /v1/keys/generate → Authorization: Bearer ifk_... (200 req/month)
+## How to pay (4 rails, no dead-ends)
+- Try before anything: 25 keyless validations/day per IP on POST /v1/iban/validate, and 10 MCP tool calls/day per IP. Tasters, not tiers.
+- Free key, nothing asked: POST /v1/keys/generate with no body at all → an ifk_ key, 25 requests a month, on every endpoint. Nothing is mailed and no record is opened.
+- Same key, full free allowance: POST /v1/keys/claim with `Authorization: Bearer ifk_...` (never in the body), once the key has served one call. A 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose — gives 200 every month; an x402 payment made on the key gives 200 once.
 - Credit packs (card or USDC, never expire): 1k = $5, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
 - Pro subscription (card): $29/month for 10,000 requests, resets on the 1st, cancel anytime → https://ibanforge.com/pricing?src=llms
 - x402 micropayments: pay per call in USDC on Base L2, no signup

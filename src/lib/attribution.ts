@@ -14,12 +14,19 @@ import type { Attribution, HonoEnv } from '../types.js';
  * a field that says what to display and where to link is what actually gets
  * displayed. The terms (§2, free tier) state the obligation; this states it
  * on every response so that no one has to read the terms to learn it.
+ *
+ * 🚨 Depuis le 15/09/2026, le palier gratuit a DEUX marches et l'attribution
+ * vaut sur les deux : le seuil qui décide reste `FREE_TIER_MONTHLY_LIMIT`
+ * (`src/middleware/api-key.ts`, `freeTier = monthlyLimit <= …`), et une clé
+ * anonyme à 25 comme une clé née sous alerte à 5 sont SOUS ce seuil. Le
+ * mécanisme tient donc sans une ligne de code de plus — cette phrase est là
+ * pour que le prochain lecteur n'y voie pas un oubli.
  */
 export const ATTRIBUTION: Attribution = {
   required: true,
   text: 'Powered by IBANforge',
   url: 'https://ibanforge.com/?utm_source=attribution',
-  note: 'Free tier: when these results are shown to people (a page, a screen, a document), display this credit with the link. Backend-only use owes nothing. Paid plans carry no attribution.',
+  note: 'Free tiers (the anonymous key and the claimed one alike): when these results are shown to people (a page, a screen, a document), display this credit with the link. Backend-only use owes nothing. Paid plans carry no attribution.',
 };
 
 /** Adds the attribution block to a paid-endpoint response body when the request was served on the free tier. */

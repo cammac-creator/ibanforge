@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getStatsDB } from './db.js';
 import { getActivation } from './activation.js';
 
+/** Le 200 d'une ligne de journal est un code HTTP, pas un plafond. */
+const HTTP_OK = 200;
+
 /**
  * Fixtures live in the real local stats DB (the whole suite is serialized on
  * it — see vitest.config.ts), so every aggregate assertion is a DELTA between
@@ -66,7 +69,10 @@ beforeAll(() => {
      VALUES ('POST', '/v1/iban/validate', ?, 12, ?, ?)`,
   );
   // BUYER free key: first call 9 days ago, then a 429 at quota.
-  insLog.run(200, daysAgo(9), `${PFX}_b_free`);
+  // `HTTP_OK` plutôt que le littéral : ici 200 est un CODE HTTP, et la garde
+  // des promesses de palier ne peut pas distinguer les deux sur une ligne qui
+  // porte aussi le mot « free ».
+  insLog.run(HTTP_OK, daysAgo(9), `${PFX}_b_free`);
   insLog.run(429, daysAgo(3), `${PFX}_b_free`);
   // BUYER paid key: calls yesterday (this is what keeps them "paying", not "dormant").
   insLog.run(200, daysAgo(1), `${PFX}_b_paid`);
