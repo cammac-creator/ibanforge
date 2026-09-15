@@ -26,6 +26,19 @@ import {
   VERIFICATION_TTL_MINUTES,
   VERIFY_WINDOW_DAYS,
 } from '../lib/key-creation-guard.js';
+// Même motif encore : les échéances et les plafonds du device grant sont ceux
+// que le module applique. 🚨 `DEVICE_USER_CODE_LENGTH` et les secondes sont des
+// NOMBRES, qu'aucune garde de prose ne voit passer.
+import {
+  DEVICE_APPROVAL_TOKEN_TTL_SECONDS,
+  DEVICE_CODES_PER_IP_HOUR,
+  DEVICE_CODE_TTL_SECONDS,
+  DEVICE_COLLECT_WINDOW_SECONDS,
+  DEVICE_POLL_INTERVAL_SECONDS,
+  DEVICE_SLOW_DOWN_INCREMENT_SECONDS,
+  DEVICE_USER_CODE_LENGTH,
+  DEVICE_VERIFICATION_URI,
+} from '../lib/device-grant.js';
 
 const openapi = new Hono();
 
@@ -940,6 +953,365 @@ const buildRawSpec = () => ({
               'issued and no code is pending. Retry in a few minutes. An address the mail server refuses ' +
               'answers 400 "undeliverable_email" instead.',
           },
+        },
+      },
+    },
+    // ── Device grant (RFC 8628) ─────────────────────────────────────────────
+    // Five public routes, no key and no payment. Two belong to the AGENT path
+    // (open a request, collect the key); three belong to the HUMAN who
+    // approves it on a web page. Documented here because this document is how
+    // machines learn an endpoint: an agent that cannot read the flow from the
+    // contract will invent one, and the one it invents opens a browser.
+    '/v1/keys/device': {
+      post: {
+        operationId: 'openDeviceGrant',
+        summary: 'Open a device authorization request (RFC 8628)',
+        description:
+          'Opens a device authorization request and returns a short code plus an address. Show BOTH to a ' +
+          'human — the ready-made link to click, and the plain address with the code to type on a phone — ' +
+          'and never open the link yourself. Then poll POST /v1/keys/device/token with the device_code. ' +
+          `The request lives ${DEVICE_CODE_TTL_SECONDS} seconds. Approving it hands the agent an anonymous ` +
+          `key (${ANONYMOUS_MONTHLY_LIMIT} requests/month, no address of any kind); the human may instead ` +
+          `verify a mailbox on the page and the key is issued at ${FREE_TIER_MONTHLY_LIMIT} requests/month. ` +
+          'Nothing personal passes through the model: it relays a code and waits. ' +
+          `Every request opened counts against the same allowance as POST /v1/keys/generate — ${DAILY_KEY_CREATION_LIMIT} ` +
+          'per network per day, requests still awaiting approval included, because a pending request is a ' +
+          'promised key. The two doors share that allowance, they do not each get one.',
+        tags: ['API Keys'],
+        security: [],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  client_name: {
+                    type: 'string',
+                    maxLength: 60,
+                    example: 'Claude Code',
+                    description:
+                      'Optional. Who is asking, shown to the human on the approval page. Truncated and ' +
+                      'stripped of control characters and URLs; a value that survives none of that is ' +
+                      'displayed as a fallback label instead of being refused.',
+                  },
+                  reason: {
+                    type: 'string',
+                    maxLength: 200,
+                    example: 'validate supplier IBANs before payout',
+                    description:
+                      'Optional. What the key is for, shown to the human on the approval page. Same cleaning.',
+                  },
+                  source: {
+                    type: 'string',
+                    pattern: '^[a-z0-9_-]{1,40}$',
+                    example: 'mcp-device',
+                    description:
+                      'Optional attribution label, same rule as POST /v1/keys/generate. Telemetry only: the ' +
+                      'per-network allowance is counted on the caller network, so changing this value on ' +
+                      'every call changes nothing.',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description:
+              'Request opened. Answers device_code (the secret the agent keeps), user_code (what the human ' +
+              `types, ${DEVICE_USER_CODE_LENGTH} letters with no vowel and no digit, so nothing to misread), ` +
+              `verification_uri (${DEVICE_VERIFICATION_URI}), verification_uri_complete (the same with the ` +
+              `code pre-filled), expires_in, interval (${DEVICE_POLL_INTERVAL_SECONDS} seconds) and message.`,
+          },
+          '400': { description: '"invalid_json": the body was present and is not a JSON object.' },
+          '429': {
+            description:
+              '"device_rate_limited": this network has taken its free keys for today, counting the requests ' +
+              `still awaiting approval, or it opened more than ${DEVICE_CODES_PER_IP_HOUR} requests in the ` +
+              'last hour. Existing keys keep working, the keyless trial needs nothing, and x402 needs no key.',
+          },
+          '503': {
+            description:
+              '"device_unavailable": the request could not be opened. Validation is unaffected; retry in a minute.',
+          },
+        },
+      },
+    },
+    '/v1/keys/device/token': {
+      post: {
+        operationId: 'collectDeviceGrantKey',
+        summary: 'Collect the key once a human has approved (long-polling)',
+        description:
+          'RFC 8628 §3.4. Accepts application/json and application/x-www-form-urlencoded, so an existing ' +
+          'OAuth client works unchanged. grant_type is OPTIONAL; when present it must be ' +
+          '"urn:ietf:params:oauth:grant-type:device_code". The server holds the request open for up to ' +
+          'thirty seconds and answers as soon as the state changes, so a conforming client makes one or two ' +
+          `calls a minute. Wait for "interval" between calls: closer than ${DEVICE_POLL_INTERVAL_SECONDS} ` +
+          'seconds answers "slow_down" immediately. The key is handed over EXACTLY ONCE — store it before ' +
+          'doing anything else. The answer also carries config_line, the command to hand the human so they ' +
+          'can register the key with their MCP client; this endpoint never edits any configuration file. ' +
+          `An approval opens a collection window of at least ${DEVICE_COLLECT_WINDOW_SECONDS} seconds even ` +
+          'when the original request was about to expire, so an approval at the last minute is still ' +
+          'collectable. Requests are never held open for a browser: a call carrying Origin or ' +
+          'Sec-Fetch-Mode is answered at once, which costs a conforming client nothing.',
+        tags: ['API Keys'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['device_code'],
+                properties: {
+                  device_code: {
+                    type: 'string',
+                    example: 'ifd_1a2b3c',
+                    description: 'The secret returned by POST /v1/keys/device.',
+                  },
+                  grant_type: {
+                    type: 'string',
+                    enum: ['urn:ietf:params:oauth:grant-type:device_code'],
+                    description: 'Optional. Any other value is refused as "unsupported_grant_type".',
+                  },
+                },
+              },
+            },
+            'application/x-www-form-urlencoded': {
+              schema: {
+                type: 'object',
+                required: ['device_code'],
+                properties: {
+                  device_code: { type: 'string' },
+                  grant_type: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description:
+              'The key, once and only once: api_key, key_prefix, tier ("anonymous" or "email"), ' +
+              'monthly_limit, message, terms_url and config_line. There is NO "email" field on an ' +
+              'anonymous key — not null and not a placeholder; the field appears only when a mailbox was ' +
+              'verified during approval.',
+          },
+          '400': {
+            description:
+              'Every wait and every failure of this endpoint, as RFC 6749 §5.2 requires. ' +
+              '"authorization_pending": nobody has approved yet — wait for "interval" and call again, ' +
+              'nothing is wrong (the body carries expires_in and interval). ' +
+              `"slow_down": you are calling faster than the interval — add ${DEVICE_SLOW_DOWN_INCREMENT_SECONDS} ` +
+              'seconds to it. "access_denied": somebody refused the request — tell your human and ask ' +
+              'whether to try again; open at most one more request. "expired_token": nobody approved in ' +
+              'time — ask for a new request at most once, then fall back to the keyless allowance or to ' +
+              'x402. "invalid_grant": unknown device_code, or the key was already collected, or the secret ' +
+              'belongs to another flow — stop. "unsupported_grant_type": grant_type was present and wrong. ' +
+              '"invalid_json": the body is neither valid JSON nor form-encoded.',
+          },
+        },
+      },
+    },
+    '/v1/keys/device/lookup': {
+      post: {
+        operationId: 'lookupDeviceGrant',
+        summary: 'Read a pending device request, and take its approval token',
+        description:
+          'Read by the approval page so it can show what it is about to approve. POST and not GET on ' +
+          'purpose: a code in a query string enters the browser history, the access logs of whoever serves ' +
+          'the page, and leaks as a Referer to any third-party resource that page loads. The answer carries ' +
+          'an approval_token that POST /v1/keys/device/approve and POST /v1/keys/device/deny both require: ' +
+          'they are state-changing writes, and without a token they would be reachable from any web page ' +
+          'with no prior request. One live token per request — a later lookup replaces it, and it lasts ' +
+          `${DEVICE_APPROVAL_TOKEN_TTL_SECONDS} seconds, so a tab left open must be reloaded before it can ` +
+          'approve. Unknown, expired and already-decided codes all answer the SAME 404 body after the SAME ' +
+          'delay: telling them apart would hand a guesser an oracle.',
+        tags: ['API Keys'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['user_code'],
+                properties: {
+                  user_code: {
+                    type: 'string',
+                    example: 'WDJB-MJHT',
+                    description:
+                      'The code the human typed. Case, spaces and dashes are normalised away before lookup.',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description:
+              'user_code, client_name, reason, expires_in, status, anonymous_monthly_limit, ' +
+              'claimed_monthly_limit and approval_token. client_name and reason are written by an agent: ' +
+              'escape them before display and never render them as markup.',
+          },
+          '400': { description: '"invalid_json": the body is not a JSON object.' },
+          '404': {
+            description:
+              '"invalid_or_expired": unknown, expired, or already approved or refused. One body and one ' +
+              'status for all four, on purpose.',
+          },
+        },
+      },
+    },
+    '/v1/keys/device/approve': {
+      post: {
+        operationId: 'approveDeviceGrant',
+        summary: 'Approve a device request and mint the key',
+        description:
+          'Called by the human, from the approval page. Requires the approval_token from POST ' +
+          '/v1/keys/device/lookup, and requires Content-Type: application/json — which is what forces a ' +
+          'CORS preflight, so the origin check actually applies. Origin is checked when the header is ' +
+          'present and never when it is absent, so command-line use keeps working. Three branches: ' +
+          `user_code plus token mints an anonymous key at ${ANONYMOUS_MONTHLY_LIMIT} requests/month; adding ` +
+          '"email" mails a 6-digit code instead and answers 202 while the request stays pending; adding ' +
+          `"email" and "code" verifies the mailbox and mints at ${FREE_TIER_MONTHLY_LIMIT} requests/month. ` +
+          'The mail branch extends the deadline ONCE, because the code starts its own clock when the human ' +
+          'arrives and not when the request was opened. ' +
+          'The key is NEVER returned here. It goes only to the agent, through POST ' +
+          '/v1/keys/device/token; this answer says what was granted, and the page tells the human to go ' +
+          'back to their agent.',
+        tags: ['API Keys'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['user_code', 'approval_token'],
+                properties: {
+                  user_code: { type: 'string', example: 'WDJB-MJHT' },
+                  approval_token: {
+                    type: 'string',
+                    example: 'ifa_1a2b3c',
+                    description: 'From the most recent POST /v1/keys/device/lookup on this code.',
+                  },
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    description:
+                      `Optional. Supply it to raise the key to ${FREE_TIER_MONTHLY_LIMIT} requests/month ` +
+                      'by proving the mailbox. Omit it and a key is issued with no address at all.',
+                  },
+                  code: {
+                    type: 'string',
+                    pattern: '^[0-9]{6}$',
+                    example: '123456',
+                    description:
+                      'Optional. The code mailed by the previous call, submitted within ' +
+                      `${VERIFICATION_TTL_MINUTES} minutes. The challenge locks after ` +
+                      `${VERIFICATION_MAX_ATTEMPTS} wrong attempts.`,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description:
+              'Approved and minted: ok, tier ("anonymous" or "email"), monthly_limit, "email" when a ' +
+              'mailbox was verified, and "notice" when a global shield reduced the allowance. NO field of ' +
+              'this answer ever contains the key.',
+          },
+          '202': {
+            description:
+              '"code_sent": a 6-digit code was mailed to the address supplied. The request is STILL pending ' +
+              'and its expires_in is renewed once; submit the code with the same user_code and token.',
+          },
+          '400': {
+            description:
+              '"invalid_json"; "invalid_email"; "disposable_email" (an address supplied here must be a ' +
+              'real, non-disposable mailbox — or approve with no address at all); "undeliverable_email" ' +
+              '(the mail server for that domain refused the address).',
+          },
+          '403': {
+            description:
+              '"approval_token_required": the token is absent, unknown, expired, or superseded by a later ' +
+              'lookup — reload the page. "verification_failed": the 6-digit code was wrong or expired, and ' +
+              '"reason" says which. "forbidden_origin": the Origin header was present and is not allowed.',
+          },
+          '404': {
+            description:
+              '"invalid_or_expired": unknown, expired, or already decided. Same body and same delay as the ' +
+              'lookup 404.',
+          },
+          '409': {
+            description:
+              '"verification_in_flight": a code for that address was issued moments ago for a different ' +
+              'purpose and is not overwritten while its recipient is still copying it.',
+          },
+          '415': {
+            description: '"unsupported_media_type": send this request as application/json.',
+          },
+          '429': {
+            description:
+              '"verification_rate_limited": too many codes were mailed to this address, to this domain, or ' +
+              'from this network today. "key_rate_limited": a key was already issued to that address in ' +
+              'the last day — the request stays pending, so the same button still works to take a key with ' +
+              'no address, or come back tomorrow.',
+          },
+          '503': {
+            description:
+              '"verification_unavailable": the mail relay is down on our side, so no code is pending and ' +
+              'no key was issued.',
+          },
+        },
+      },
+    },
+    '/v1/keys/device/deny': {
+      post: {
+        operationId: 'denyDeviceGrant',
+        summary: 'Refuse a device request',
+        description:
+          'Called by the human from the approval page when the request is not theirs. Same guards as ' +
+          'approve: the approval_token is mandatory, Content-Type must be application/json, and Origin is ' +
+          'checked when present. The token matters MORE here than on approve: a cross-site refusal creates ' +
+          'nothing, it destroys. The next POST /v1/keys/device/token answers "access_denied", and the agent ' +
+          'is allowed to ask its human whether to open one more request — a refusal obtained by somebody ' +
+          'else does not end the attempt for good.',
+        tags: ['API Keys'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['user_code', 'approval_token'],
+                properties: {
+                  user_code: { type: 'string', example: 'WDJB-MJHT' },
+                  approval_token: { type: 'string', example: 'ifa_1a2b3c' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Refused: { "ok": true }. No key exists and none will.' },
+          '400': { description: '"invalid_json": the body is not a JSON object.' },
+          '403': {
+            description:
+              '"approval_token_required": the token is absent, unknown, expired, or superseded by a later ' +
+              'lookup. "forbidden_origin": the Origin header was present and is not allowed.',
+          },
+          '404': {
+            description:
+              '"invalid_or_expired": unknown, expired, or already decided. Same body and same delay as the lookup 404.',
+          },
+          '415': { description: '"unsupported_media_type": send this request as application/json.' },
         },
       },
     },
