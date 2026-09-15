@@ -340,8 +340,11 @@ loader's `no_recredit = 0` and `monthly_limit IS NULL` clauses are false by cons
 anonymous key — copying it would silently scan nothing), finds the global burst first
 (`findBurst`: the longest uninterrupted run, never the first trigger), then groups by anchor
 (User-Agent, or network when the UA is empty) within that burst only. It cuts nothing on its own:
-`IBANFORGE_REVOCATION_ENABLED` is absent in production and `CLAIM_REPAIR_LANDED` in
-`src/lib/tiers.ts` stays `false` until `/v1/keys/claim` accepts a key cut for a burst. Three rules
+`IBANFORGE_REVOCATION_ENABLED` is absent in production; `CLAIM_REPAIR_LANDED` in
+`src/lib/tiers.ts` is `true` since the same day (lot 6b): `/v1/keys/claim` recognises a key cut for
+a burst (`findBurstRevokedKey`, the one inactive key it accepts) and a successful claim restores it
+and raises it in one transaction (`restoreBurstRevocation`) — so switching the flag on is the only
+step left before automatic cuts, and it is a decision, not a deploy. Three rules
 to keep: a cohort seen from fewer than `BREAKER_MIN_DISTINCT_SOURCES` (5) networks is never cut
 automatically, so a single-IP farm — which is also what a corporate NAT looks like — is reported
 and cut by hand (`POST /v1/admin/cohorts/cut`); a cut key answers 402 `key_revoked_burst` through the
