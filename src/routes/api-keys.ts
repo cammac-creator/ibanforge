@@ -4,7 +4,9 @@ import {
   CLAIM_MIN_PAID_USD,
   FREE_TIER_MONTHLY_LIMIT,
   KEY_CLAIM_URL,
+  SHIELD_MONTHLY_LIMIT,
 } from '../lib/tiers.js';
+import { evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
 import { normalizeEmail } from '../lib/email-norm.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -17,6 +19,7 @@ import {
   rotateApiKey,
   getKeyTier,
   claimKey,
+  markShieldBirth,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
@@ -176,6 +179,33 @@ const BLOCKED_EMAIL_DOMAINS =
 function anonymousTierDisabled(): boolean {
   const v = (process.env.ANONYMOUS_TIER_DISABLED ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'yes';
+}
+
+/**
+ * Ce que la réponse 201 dit d'une clé née pendant une alerte du disjoncteur.
+ *
+ * 🚨 AUCUN champ `shield`, et ce texte ne nomme JAMAIS la rafale. Le plafond
+ * servi est déjà un oracle : `monthly_limit` réduit apprend au lecteur que
+ * l'alerte court, aussi sûrement qu'un booléen, et il n'existe pas de version
+ * de ce module qui serve un quota dégradé sans le dire. Puisque le secret
+ * n'existe pas, la réponse ne gagne rien à être muette — mais elle ne gagne
+ * rien non plus à commenter l'incident. Elle dit donc le plafond attribué et
+ * le chemin pour le relever, rien de plus.
+ *
+ * 🚨 « It goes back up on its own » est une promesse TENUE : c'est la remontée
+ * automatique au désarmement (`undegradeEpisode`). Ce texte n'aurait pas dû
+ * exister tant que cette remontée n'existait pas.
+ *
+ * Les deux nombres viennent des constantes de paliers, jamais d'un littéral :
+ * une valeur tapée ici serait une énième autorité sur un plafond, et elle
+ * mentirait le jour où le palier bouge.
+ */
+function shieldNotice(): string {
+  return (
+    `This key was issued with a reduced allowance of ${SHIELD_MONTHLY_LIMIT} requests this month. ` +
+    'It goes back up on its own within a few hours. To lift it to ' +
+    `${FREE_TIER_MONTHLY_LIMIT} right away, claim it: POST /v1/keys/claim.`
+  );
 }
 
 apiKeys.post('/v1/keys/generate', async (c) => {
@@ -443,6 +473,31 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       ? body.source.trim().toLowerCase()
       : undefined;
 
+  // Disjoncteur global, TOUTES IP CONFONDUES (lot 5). Il ne refuse JAMAIS : il
+  // dégrade. Évalué AVANT la frappe, donc le compteur porte sur les créations
+  // PRÉCÉDENTES, et la première clé au-delà du seuil est la première dégradée.
+  const shield = evaluateBreakerOnCreation();
+
+  // 🚨 LE PRÉDICAT EST « alerte armée ET pas de boîte prouvée », jamais
+  // « alerte armée ET palier anonyme ».
+  //
+  // Le code à 6 chiffres n'est exigé qu'à partir de la DEUXIÈME clé du réseau
+  // en 7 jours : la première clé d'un réseau neuf part donc avec une adresse
+  // NON vérifiée, au palier de l'adresse, à plein tarif. Une ferme montée sur
+  // un parc de réseaux sans historique n'utilise que ce chemin-là. Un prédicat
+  // écrit sur le palier anonyme dégraderait le seul palier que la ferme
+  // n'emprunte pas, et le module entier ne servirait à rien.
+  //
+  // `provenMailbox` est exactement « `claimed_at` sera posé à la naissance » :
+  // generateApiKey écrit `claimed_at = datetime('now')` sur cette seule
+  // branche, et l'ignore quand il n'y a pas d'adresse. Le prédicat de la spec,
+  // `claimed_at IS NULL`, se lit donc ici comme `!provenMailbox` — avant même
+  // que la ligne existe, ce qui évite un aller-retour en base.
+  //
+  // Les clés PAYANTES ne passent pas par cette route (elles sont frappées par
+  // les rails à crédits et Stripe) : aucune clé payée ne peut tomber ici.
+  const degrade = shield.armed && !provenMailbox;
+
   // La ligne de naissance (key_creations) est écrite par generateApiKey
   // elle-même, dans la transaction de la frappe : c'est le seul point de
   // frappe d'une clé libre depuis le lot 2. Le handler ne fait que passer ce
@@ -451,12 +506,22 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     // null = palier anonyme : la clé naît avec la sentinelle sans arobase et un
     // plafond ÉCRIT, jamais laissé NULL (un NULL se relit « palier gratuit »).
     email === null ? null : email.trim().toLowerCase(),
-    undefined,
+    // undefined = le plafond du palier, inchangé. Le plafond réduit se passe
+    // ici plutôt que par un UPDATE d'après-coup : la colonne ne doit jamais
+    // porter une valeur que la réponse contredit.
+    degrade ? SHIELD_MONTHLY_LIMIT : undefined,
     source,
     false,
     { ipHash: creationSource, userAgent: c.req.header('user-agent') ?? null },
     provenMailbox,
   );
+
+  // 🚨 Par key_hash et par objet nommé : voir markShieldBirth. Ce qui s'écrit
+  // ici est ce qui rend la dégradation réparable — sans l'épisode, la clé est
+  // invisible à la remontée automatique du désarmement.
+  if (result && degrade) {
+    markShieldBirth({ keyHash: result.key_hash, episodeId: shield.episode_id });
+  }
 
   if (!result) {
     return c.json(
@@ -524,13 +589,15 @@ apiKeys.post('/v1/keys/generate', async (c) => {
         api_key: result.api_key,
         key_prefix: result.key_prefix,
         tier: 'anonymous',
-        monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
+        monthly_limit: degrade ? SHIELD_MONTHLY_LIMIT : ANONYMOUS_MONTHLY_LIMIT,
         claim_url: KEY_CLAIM_URL,
-        message:
-          `Save this key - it will not be shown again. ${ANONYMOUS_MONTHLY_LIMIT} requests a month that are yours alone: ` +
-          'a named quota nobody else on your network shares, a stable identity across restarts, and a usage report at ' +
-          `GET /v1/keys/usage. No email, no card. Claim it with a mailbox you can read to raise it to ${FREE_TIER_MONTHLY_LIMIT} ` +
-          'a month: POST /v1/keys/claim.',
+        ...(degrade ? { notice: shieldNotice() } : {}),
+        message: degrade
+          ? 'Save this key - it will not be shown again.'
+          : `Save this key - it will not be shown again. ${ANONYMOUS_MONTHLY_LIMIT} requests a month that are yours alone: ` +
+            'a named quota nobody else on your network shares, a stable identity across restarts, and a usage report at ' +
+            `GET /v1/keys/usage. No email, no card. Claim it with a mailbox you can read to raise it to ${FREE_TIER_MONTHLY_LIMIT} ` +
+            'a month: POST /v1/keys/claim.',
         terms_url: 'https://ibanforge.com/legal/terms',
       },
       201,
@@ -546,7 +613,8 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       // pas à le déduire de la présence d'un champ. Pas de claim_url ici, il
       // n'y a rien à réclamer.
       tier: 'email',
-      monthly_limit: FREE_TIER_MONTHLY_LIMIT,
+      monthly_limit: degrade ? SHIELD_MONTHLY_LIMIT : FREE_TIER_MONTHLY_LIMIT,
+      ...(degrade ? { notice: shieldNotice() } : {}),
       message: 'Save this key — it will not be shown again.',
       terms_url: 'https://ibanforge.com/legal/terms',
     },

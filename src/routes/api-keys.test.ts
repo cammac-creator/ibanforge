@@ -1467,6 +1467,40 @@ function anonKey(ipHash: string) {
 }
 
 describe('POST /v1/keys/generate — la branche anonyme', () => {
+  // 🚨 CE BLOC EST DU TEMPS DE PAIX, ET IL FAUT LE DIRE AU DISJONCTEUR.
+  //
+  // Ce fichier pilote la route de création des dizaines de fois, et plusieurs de
+  // ses blocs posent un `X-Forwarded-For` différent à chaque appel pour
+  // exercer le plafond par réseau. Vu du disjoncteur (lot 5), c'est exactement
+  // la forme d'une rafale : assez de créations dans l'heure, depuis assez de
+  // réseaux distincts. Il s'arme donc en cours de fichier, et les clés nées
+  // ensuite sortent au plafond réduit — ce qui fait rougir les deux assertions
+  // « le chemin actuel, intact » sans qu'aucun bug n'existe.
+  //
+  // Patron imposé pour les trois gardes d'environnement du chantier :
+  // sauvegarder, poser, restaurer DANS LE TEST. Jamais dans
+  // `test/hermetic-stats.ts` ni dans un `setupFiles` — un drapeau posé
+  // globalement ferait passer au VERT toute la suite en testant une branche
+  // que personne n'a demandée, et rien ne le signalerait. Portée réduite à ce
+  // bloc, pas au fichier, pour la même raison.
+  //
+  // L'armement et la dégradation se prouvent ailleurs, sur leurs propres
+  // fixtures : `src/lib/creation-breaker.integration.test.ts`.
+  //
+  // 🚨 `beforeEach` et NON `beforeAll` : l'`afterEach` de ce fichier remplace
+  // `process.env` en entier par l'instantané pris à l'import (ligne 41). Un
+  // `beforeAll` serait donc effacé après le PREMIER test du bloc, et seuls les
+  // suivants rougiraient — une panne qui se lit comme un bug du code.
+  let breakerBefore: string | undefined;
+  beforeEach(() => {
+    breakerBefore = process.env.IBANFORGE_BREAKER_DISABLED;
+    process.env.IBANFORGE_BREAKER_DISABLED = '1';
+  });
+  afterEach(() => {
+    if (breakerBefore === undefined) delete process.env.IBANFORGE_BREAKER_DISABLED;
+    else process.env.IBANFORGE_BREAKER_DISABLED = breakerBefore;
+  });
+
   it('sans corps du tout : 201, palier anonyme, AUCUN champ email', async () => {
     const res = await makeApp().request('/v1/keys/generate', { method: 'POST' });
     expect(res.status).toBe(201);

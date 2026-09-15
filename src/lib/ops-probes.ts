@@ -17,6 +17,12 @@ import { getStatsDB } from './db.js';
 import { getComplianceMeta } from './compliance-db.js';
 import { FATF_AS_OF } from './compliance-static.js';
 import { opsFail, opsOk, checkHeartbeats } from './ops-alert.js';
+import {
+  readBreakerState,
+  BREAKER_BLIND_STREAK,
+  BREAKER_EPISODE_MAX_HOURS,
+  BREAKER_STUCK_HOURS,
+} from './creation-breaker.js';
 
 /**
  * Le point de montage du volume Railway (`railway.toml` → mountPath /app/data).
@@ -180,6 +186,47 @@ async function probeFatfAge(): Promise<void> {
   }
 }
 
+/**
+ * S9 et S10 — le disjoncteur de création (lot 5).
+ *
+ * 🚨 `breaker:stuck` n'est PAS le témoin d'une ferme qui tient : un épisode se
+ * désarme tout seul à `BREAKER_EPISODE_MAX_HOURS`, et le seuil de cette sonde
+ * est au double. Elle est donc le témoin d'une BORNE QUI N'A PAS FONCTIONNÉ —
+ * le tick du radar mort, `kv_state` figé, le balayage jamais appelé. Un épisode
+ * armé au-delà de six heures dégrade silencieusement toutes les clés neuves.
+ *
+ * 🚨 `breaker:blind` existe parce qu'un compteur qui ne répond plus rend le
+ * disjoncteur AVEUGLE sans rien casser : le chemin chaud rend l'état persistant
+ * et l'inscription passe. Sans cette sonde, l'échec ne se lirait nulle part.
+ */
+async function probeBreaker(): Promise<void> {
+  try {
+    const st = readBreakerState();
+    const armedForMs = st.armed && st.armed_at ? Date.now() - Date.parse(st.armed_at) : 0;
+    if (Number.isFinite(armedForMs) && armedForMs > BREAKER_STUCK_HOURS * 3_600_000) {
+      const hours = (armedForMs / 3_600_000).toFixed(1);
+      await opsFail(
+        'breaker:stuck',
+        `Épisode ${st.episode_id} armé depuis ${hours} h, au-delà de la borne de ` +
+          `${BREAKER_EPISODE_MAX_HOURS} h : le balayage du radar ne tourne probablement plus.`,
+      );
+    } else {
+      await opsOk('breaker:stuck');
+    }
+    if (st.blind_streak >= BREAKER_BLIND_STREAK) {
+      await opsFail(
+        'breaker:blind',
+        `${st.blind_streak} mesures du disjoncteur en échec d'affilée : le compteur de ` +
+          'créations ne se lit plus, les clés neuves naissent au plafond de leur palier.',
+      );
+    } else {
+      await opsOk('breaker:blind');
+    }
+  } catch (err) {
+    console.error('[ops-probe] breaker:', err instanceof Error ? err.message : err);
+  }
+}
+
 /** Tick horaire unique : toutes les sondes + les hommes morts. */
 async function tick(): Promise<void> {
   await checkHeartbeats();
@@ -187,6 +234,7 @@ async function tick(): Promise<void> {
   await probeServerErrors();
   await probeComplianceAge();
   await probeFatfAge();
+  await probeBreaker();
 }
 
 const TICK_MS = 60 * 60 * 1000;

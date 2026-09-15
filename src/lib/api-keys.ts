@@ -968,3 +968,103 @@ export function claimKey(
   });
   return tx();
 }
+
+// ---------------------------------------------------------------------------
+// Bouclier du disjoncteur (chantier « clé sans e-mail », lot 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Marque une clé comme NÉE SOUS ALERTE.
+ *
+ * Le plafond réduit lui-même est passé à `generateApiKey` et vit dans
+ * `monthly_limit` ; ce qui s'écrit ici est ce qui rend la dégradation
+ * RÉPARABLE : le drapeau anti-recharge, et l'épisode qui désigne le lot à
+ * remonter au désarmement.
+ *
+ * 🚨 Par `key_hash`, jamais par `key_prefix`, et par un OBJET NOMMÉ. Deux
+ * motifs, tous deux constatés dans ce dépôt :
+ *   - `api_keys.key_prefix` n'a porté aucune contrainte d'unicité dans la base
+ *     héritée, et un UPDATE sans LIMIT sur une colonne non unique touche TOUTES
+ *     les lignes du préfixe ;
+ *   - avec deux paramètres positionnels dont l'un ressemble à l'autre, un
+ *     appelant qui passe le préfixe produit un UPDATE qui ne touche AUCUNE
+ *     ligne : la clé sort bien au plafond réduit (il vient d'ailleurs) mais
+ *     SANS `no_recredit` et SANS épisode. Elle se recharge donc au plafond
+ *     réduit tous les mois, elle est invisible à la remontée du désarmement et
+ *     inauditable — et rien ne le dit. L'objet nommé rend la faute impossible
+ *     à écrire.
+ *
+ * Ne vit pas dans `creation-breaker.ts` : c'est une écriture sur `api_keys`, et
+ * ce fichier est le propriétaire de cette table. Le disjoncteur importe d'ici,
+ * jamais l'inverse — c'est ce qui garde le graphe d'import acyclique.
+ */
+export function markShieldBirth(p: { keyHash: string; episodeId: string | null }): void {
+  getStatsDB()
+    .prepare('UPDATE api_keys SET no_recredit = 1, shield_episode = ? WHERE key_hash = ?')
+    .run(p.episodeId, p.keyHash);
+}
+
+/**
+ * Rend son quota au lot d'un épisode qui se termine, et dit combien de clés ont
+ * été remontées.
+ *
+ * 🚨 POURQUOI LA REMONTÉE EXISTE. Sans elle, quelques créations par heure
+ * depuis un parc suffisent à maintenir l'alerte en permanence, et
+ * `no_recredit` se mesure sur le total TOUS MOIS CONFONDUS : chaque clé
+ * honnête née pendant l'épisode vaudrait le plafond réduit pour LA VIE DE LA
+ * CLÉ. Ce que la remontée concède en face est un délai de une à trois heures à
+ * une ferme patiente, qui retrouve le palier de départ et non le palier
+ * gratuit. Le délai est le prix, et il est plus petit que l'autre.
+ *
+ * 🚨 LE PALIER RENDU DÉPEND DU PALIER DE LA CLÉ, et une constante unique serait
+ * un bug muet : une clé née avec une adresse non vérifiée vaut le plafond
+ * gratuit, pas le plafond de départ anonyme. Écrire une seule valeur
+ * rétrograderait silencieusement toutes ces clés, et ni la réponse ni le
+ * journal ne le diraient.
+ *
+ * 🚨 QUI EST REMONTÉ, ET POURQUOI CE PÉRIMÈTRE EXACTEMENT. Sont remontées les
+ * clés ACTIVES de l'épisode qu'aucune cohorte n'a nommées. Le piège évité : le
+ * déclenchement du radar est AVEUGLE À L'ANCRE, donc toute clé née dans la
+ * fenêtre d'une rafale est « dans une rafale détectée », y compris le nouveau
+ * venu isolé que le plancher d'ancre vient précisément d'épargner. Exclure
+ * « les clés nées pendant une rafale » refuserait le remboursement exactement
+ * à la population que ce plancher existe pour protéger. On exclut donc les clés
+ * RÉELLEMENT coupées ou relabellisées, jamais les clés simplement
+ * contemporaines d'une rafale.
+ *
+ * `all: true` lève cette dernière exclusion, pour la voie d'administration : un
+ * opérateur qui a relu un épisode et conclu au faux positif rend tout.
+ * `active = 1` reste dans les deux cas — cette fonction ne touche jamais à
+ * `active`, et rendre une clé coupée est le travail du journal d'annulation,
+ * qui seul porte son état d'avant.
+ */
+export function undegradeEpisode(episodeId: string, opts: { all?: boolean } = {}): number {
+  if (!episodeId) return 0;
+  const named = opts.all
+    ? ''
+    : `AND NOT EXISTS (SELECT 1 FROM key_revocations r WHERE r.key_hash = api_keys.key_hash)
+       AND NOT EXISTS (SELECT 1 FROM cohort_relabels cr
+                        WHERE cr.key_prefix = api_keys.key_prefix
+                           OR cr.key_prefix = api_keys.origin_prefix)`;
+  try {
+    const res = getStatsDB()
+      .prepare(
+        `UPDATE api_keys
+            SET monthly_limit = CASE WHEN tier = 'email' THEN ? ELSE ? END,
+                no_recredit = 0,
+                shield_episode = NULL
+          WHERE shield_episode = ?
+            AND active = 1
+            AND claimed_at IS NULL
+            AND tier IN ('anonymous', 'email')
+            ${named}`,
+      )
+      .run(CLAIMED_LIMIT, ANONYMOUS_MONTHLY_LIMIT, episodeId);
+    return res.changes;
+  } catch (err) {
+    // Un désarmement ne doit pas échouer parce que la remontée a échoué : la
+    // route d'administration la rejoue, et le journal garde la bascule.
+    console.error('[keys] remontée du bouclier:', err instanceof Error ? err.message : err);
+    return 0;
+  }
+}

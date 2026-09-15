@@ -1057,6 +1057,53 @@ function openStatsDB(): DatabaseType.Database {
       CREATE INDEX IF NOT EXISTS idx_key_revocations_prefix ON key_revocations(key_prefix);
       CREATE INDEX IF NOT EXISTS idx_key_revocations_hash ON key_revocations(key_hash, restored_at);
     `);
+    // ── Journal des bascules du disjoncteur (lot 5, 15/09/2026) ──────────────
+    //
+    // Une ligne par bascule, dans les deux sens. C'est la seule trace qui
+    // permette de relire un épisode APRÈS coup : quand il s'est armé, avec
+    // quel volume et depuis combien de réseaux, quand et pourquoi il est
+    // retombé, et combien de clés la remontée automatique a rendues.
+    //
+    // 🚨 `direction` et `reason` sont DEUX colonnes, pas une. Un opérateur
+    // filtre sur le sens (« montre-moi les armements ») et lit le motif ;
+    // un seul jeton `disarmed_capped` obligerait chaque requête à connaître
+    // par cœur la liste des variantes de désarmement pour compter les
+    // désarmements.
+    //
+    // 🚨 `"trigger"` est cité entre guillemets partout où il apparaît : c'est
+    // un mot-clé SQL. SQLite l'accepte nu comme nom de colonne, mais la
+    // requête recopiée ailleurs ne passerait pas, et un lecteur pressé ne le
+    // saurait qu'au moment de la panne. Seule la valeur `'creations'` est
+    // écrite aujourd'hui ; `'claims'` et `'trial'` sont RÉSERVÉES pour les
+    // deux détecteurs qui partiront en observation seule, et qui n'existent
+    // pas encore. Une colonne prévue coûte zéro ; une migration de plus sur
+    // `api_keys` coûte une soirée.
+    //
+    // `threshold` et `window_minutes` sont consignés à chaque bascule : le jour
+    // où ces bornes seront re-calées sur un nouveau relevé de la ligne de base,
+    // les anciennes lignes doivent rester lisibles avec les réglages qui
+    // avaient cours.
+    //
+    // Rétention : aucune purge. Deux lignes par épisode, quelques épisodes par
+    // an — et une table qui explique une dégradation ne se jette pas.
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS breaker_transitions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        episode_id TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        "trigger" TEXT NOT NULL,
+        creations_in_window INTEGER NOT NULL,
+        distinct_sources INTEGER NOT NULL,
+        threshold INTEGER NOT NULL,
+        window_minutes INTEGER NOT NULL,
+        undegraded INTEGER NOT NULL DEFAULT 0,
+        telegram_sent INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_breaker_transitions_at ON breaker_transitions(created_at);
+      CREATE INDEX IF NOT EXISTS idx_breaker_transitions_ep ON breaker_transitions(episode_id, created_at);
+    `);
     // Web Bot Auth (RFC 9421): who signed the request, in one column.
     //
     // Four readings:
