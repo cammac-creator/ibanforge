@@ -230,7 +230,7 @@ function loadAnonymousCreations(sinceSql: string): AnonCreationRow[] {
   registerInternalEmailFn(db);
   return db
     .prepare(
-      `SELECT c.key_prefix AS origin_prefix, c.user_agent, c.created_at, c.ip_hash,
+      `SELECT c.key_prefix AS birth_prefix, c.user_agent, c.created_at, c.ip_hash,
               k.key_hash, k.key_prefix,
               CASE WHEN c.ip_hash = ? THEN NULL ELSE (
                 SELECT MIN(p.created_at) FROM key_creations p WHERE p.ip_hash = c.ip_hash
@@ -402,8 +402,10 @@ function toRevocationInput(
   return {
     keyHash: row.key_hash,
     keyPrefix: row.key_prefix,
-    // NULL quand la clé n'a jamais tourné : son préfixe courant EST sa lignée.
-    originPrefix: row.origin_prefix === row.key_prefix ? null : row.origin_prefix,
+    // `key_revocations.origin_prefix` suit la convention d'`api_keys` : NULL
+    // quand la clé n'a jamais tourné, puisque son préfixe courant EST sa lignée.
+    // Le renseigner quand même ferait croire à une rotation qui n'a pas eu lieu.
+    originPrefix: row.birth_prefix === row.key_prefix ? null : row.birth_prefix,
     episodeId,
     anchor: cohort.anchor,
     anchorShare: cohort.rows.length / burst.keys,

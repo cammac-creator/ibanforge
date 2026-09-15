@@ -236,7 +236,7 @@ function anon(
 ): AnonCreationRow {
   const prefix = extra.prefix ?? `ifk_${msAfter}${ua ?? ''}${ipHash}`.slice(0, 12);
   return {
-    origin_prefix: prefix,
+    birth_prefix: prefix,
     key_prefix: prefix,
     key_hash: `hash-${prefix}`,
     user_agent: ua,

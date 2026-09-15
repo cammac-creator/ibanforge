@@ -434,8 +434,19 @@ export function toSqliteUtc(ms: number): string {
 
 /** Une création anonyme chargée par le radar, telle qu'elle sort du SQL. */
 export interface AnonCreationRow {
-  /** Le préfixe qui porte la ligne de naissance : la lignée, pas la clé courante. */
-  origin_prefix: string;
+  /**
+   * Le préfixe qui porte la LIGNE DE NAISSANCE, c'est-à-dire
+   * `key_creations.key_prefix`.
+   *
+   * 🚨 Ce n'est PAS `api_keys.origin_prefix`, et les deux ne se valent jamais :
+   * cette colonne-là est `NULL` pour une clé qui n'a jamais tourné, alors que ce
+   * champ-ci porte toujours une valeur — le préfixe courant quand la clé n'a
+   * jamais tourné, celui de la clé d'origine sinon. Le chargeur les réconcilie
+   * par `COALESCE(k.origin_prefix, k.key_prefix) = c.key_prefix`. Nommer ce champ
+   * `origin_prefix` faisait porter deux sens à un mot dans le seul module où la
+   * lignée referme une évasion.
+   */
+  birth_prefix: string;
   key_prefix: string;
   key_hash: string;
   user_agent: string | null;
