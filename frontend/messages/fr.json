@@ -2422,5 +2422,32 @@
       "text": "Cet outil est gratuit et sans clé. Avec votre propre clé, l'API fait la même chose depuis votre code : 25 appels par mois sans donner d'adresse, 200 par mois une fois la clé réclamée.",
       "cta": "Obtenir une clé gratuite"
     }
+  },
+  "device": {
+    "title": "Un agent demande une clé API",
+    "subtitle": "Vérifiez que le code correspond à celui affiché par votre agent, puis approuvez.",
+    "codeLabel": "Code",
+    "whoLabel": "Qui demande",
+    "whyLabel": "Pour quoi faire",
+    "whoUnknown": "Un agent qui n'a pas donné son nom",
+    "whyUnknown": "Aucune raison donnée",
+    "expiresIn": "Ce code cesse de fonctionner dans {minutes} min {seconds} s.",
+    "approveAnon": "Obtenir la clé ({limit} requêtes par mois)",
+    "approveAnonNote": "Sans e-mail, sans carte, sans compte.",
+    "approveEmail": "Plutôt donner une adresse e-mail ({limit} par mois)",
+    "approveEmailNote": "Nous envoyons un code à 6 chiffres pour vérifier que la boîte est bien la vôtre. L'adresse sert à la clé, à rien d'autre.",
+    "codeSent": "Code envoyé. Saisissez les 6 chiffres ci-dessous.",
+    "deny": "Ce n'est pas moi qui ai demandé",
+    "doneTitle": "C'est fait. Retournez à votre agent.",
+    "doneBody": "La clé est partie directement à l'agent qui l'a demandée. Elle n'est jamais affichée sur cette page, et elle n'est montrée qu'une fois.",
+    "deniedTitle": "Refusé. Rien n'a été créé.",
+    "expiredTitle": "Ce code a expiré",
+    "expiredBody": "Demandez-en un nouveau à votre agent.",
+    "invalidTitle": "Ce code n'est pas valide",
+    "tokenStaleTitle": "Cette page a trop attendu",
+    "tokenStaleBody": "Rechargez-la et approuvez à nouveau. Rien n'a été créé, et votre code fonctionne toujours.",
+    "keyRateLimitedTitle": "Cette adresse a déjà reçu une clé aujourd'hui",
+    "keyRateLimitedBody": "Une clé par adresse et par jour. Prenez plutôt la clé sans adresse, elle marche tout de suite, ou revenez demain avec celle-ci.",
+    "safetyNote": "IBANforge ne vous demandera jamais de mot de passe, de numéro de carte ni de coordonnée bancaire sur cette page."
   }
 }
