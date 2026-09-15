@@ -326,8 +326,15 @@ export function formatUserCode(normalized: string): string {
   return `${normalized.slice(0, half)}-${normalized.slice(half)}`;
 }
 
-/** `randomInt` de node:crypto, jamais `Math.random` : c'est un secret. */
-function drawUserCode(): string {
+/**
+ * `randomInt` de node:crypto, jamais `Math.random` : c'est un secret.
+ *
+ * Exporté pour son test, qui tire dix mille codes et vérifie qu'aucun caractère
+ * ne sort du jeu. Le faire en passant par `openGrant` coûterait dix mille
+ * insertions, et la garantie « aucune voyelle, aucun chiffre » doit être
+ * ASSERTÉE et non espérée : c'est elle qui rend le code dictable à l'oral.
+ */
+export function drawUserCode(): string {
   let out = '';
   for (let i = 0; i < DEVICE_USER_CODE_LENGTH; i++) {
     out += DEVICE_USER_CODE_CHARSET[randomInt(0, DEVICE_USER_CODE_CHARSET.length)];
@@ -396,13 +403,20 @@ const GRANT_COLUMNS = `device_code_hash, user_code, grant_type, status, tier, ke
 export function grantReservationCount(ipHash: string): number {
   const row = getStatsDB()
     .prepare(
+      // ⚠️ Deux `?` ANONYMES et l'empreinte passée deux fois, pas un `?1`
+      // réutilisé : better-sqlite3 compte les emplacements et refuse la requête
+      // numérotée avec « Too many parameter values were provided ». La forme
+      // numérotée, plus lisible, rendait la réservation morte à l'exécution
+      // alors que `tsc` et toute la suite restaient verts — seul un test qui
+      // passe une VRAIE adresse l'attrape, un appel sans adresse ne descendant
+      // jamais jusqu'ici (fail-open).
       `SELECT (SELECT COUNT(*) FROM key_creations
-                 WHERE ip_hash = ?1 AND created_at >= datetime('now','-24 hours'))
+                 WHERE ip_hash = ? AND created_at >= datetime('now','-24 hours'))
             + (SELECT COUNT(*) FROM device_codes
-                 WHERE ip_hash = ?1 AND grant_type = 'device'
+                 WHERE ip_hash = ? AND grant_type = 'device'
                    AND status = 'pending' AND expires_at > datetime('now')) AS n`,
     )
-    .get(ipHash) as { n: number };
+    .get(ipHash, ipHash) as { n: number };
   return row.n;
 }
 
