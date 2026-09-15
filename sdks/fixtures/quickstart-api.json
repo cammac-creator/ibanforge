@@ -14,7 +14,7 @@
   "calls": [
     {
       "name": "keys-generate",
-      "why": "the one-line free key. The address must survive our own disposable-domain guard. Recorded FIRST: the key it returns authenticates every call below, so recording needs no key handed in. `--check` skips it — a second creation from the same network is legitimately guarded (403/429), not drift.",
+      "why": "Création sans e-mail depuis les deux SDK. Réponse enregistrée depuis la vraie route locale, avec une base temporaire vierge ; clé masquée avant écriture.",
       "first_run_only": true,
       "used_by": [
         "typescript",
@@ -23,21 +23,21 @@
       "request": {
         "method": "POST",
         "path": "/v1/keys/generate",
-        "body": {
-          "email": "you@company.com"
-        }
+        "body": {}
       },
       "response": {
         "status": 201,
         "body": {
           "api_key": "ifk_REDACTED",
           "key_prefix": "ifk_REDACTED",
-          "email": "you@company.com",
-          "monthly_limit": 200,
-          "message": "Save this key — it will not be shown again.",
+          "tier": "anonymous",
+          "monthly_limit": 25,
+          "claim_url": "https://api.ibanforge.com/v1/keys/claim",
+          "message": "Save this key - it will not be shown again. 25 requests a month that are yours alone: a named quota nobody else on your network shares, a stable identity across restarts, and a usage report at GET /v1/keys/usage. No email, no card. Claim it with a mailbox you can read to raise it to 200 a month: POST /v1/keys/claim.",
           "terms_url": "https://ibanforge.com/legal/terms"
         }
-      }
+      },
+      "recorded_at": "2026-09-15T15:17:37.852Z"
     },
     {
       "name": "format-ok",

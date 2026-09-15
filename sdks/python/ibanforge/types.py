@@ -320,6 +320,8 @@ class ComplianceResult(TypedDict, total=False):
 
 
 class APIKey(TypedDict, total=False):
+    tier: Literal["anonymous", "email"]
+    claim_url: str
     api_key: str  # shown once, never again
     key_prefix: str
     email: str

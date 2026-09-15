@@ -46,6 +46,8 @@ import {
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { createRequire } from 'node:module';
+import { createApiClient, requestTimeout, type JsonRecord } from './api-client.js';
+import { stdioInstructions } from './stdio-instructions.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -98,7 +100,7 @@ const TOOLS: Tool[] = [
       'source and free_of_charge are licence conditions that must travel with the data — do not strip them when relaying the answer. ' +
       'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
       'is open, or belongs to any particular person. Verify the payee by name before sending funds. ' +
-      'COST: 0.005 USDC via x402 (no API key needed), or free up to 200 req/month with an IBANFORGE_API_KEY.',
+      'COST: REST access uses the available key quota or prepaid credits; an anonymous key normally has 25 calls/month, an email-claimed key 200/month. The HTTP API also accepts x402 (0.005 USDC), but this package does not sign payments.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -895,108 +897,12 @@ const TOOLS: Tool[] = [
   },
 ];
 
-interface JsonRecord {
-  [k: string]: unknown;
-}
-
-/**
- * A `fetch` that never produced a response, turned into the same shape an
- * upstream failure has, plus `_transport_error` so a tool can take its free
- * fallback instead of dead-ending on `fetch failed`.
- *
- * `status: 0` on purpose: no HTTP status was ever read, and reporting 402 here
- * would put words in the server's mouth.
- */
-function transportError(err: unknown): JsonRecord {
-  const e = err as { message?: string; cause?: { code?: string } };
-  const code = e?.cause?.code;
-  return {
-    _error: true,
-    _transport_error: true,
-    status: 0,
-    error: 'transport_error',
-    message: e?.message ?? String(err),
-    ...(code ? { code } : {}),
-    _hint:
-      code === 'UND_ERR_HEADERS_OVERFLOW'
-        ? 'The response headers exceeded Node\'s http.maxHeaderSize (16 KB by default), so the response was dropped before it could be read. Retry with `node --max-http-header-size=65536`, or set IBANFORGE_API_KEY (free, 200 req/month via POST https://api.ibanforge.com/v1/keys/generate) so the call never hits the paywall.'
-        : 'Network error reaching the IBANforge API. Check connectivity, or set IBANFORGE_API_BASE for self-hosted instances.',
-  };
-}
-
-async function apiCall(
-  method: 'GET' | 'POST',
-  path: string,
-  body?: JsonRecord,
-  form?: FormData,
-): Promise<JsonRecord> {
-  const headers: Record<string, string> = {
-    'User-Agent': `ibanforge-mcp/${pkg.version}`,
-    Accept: 'application/json',
-  };
-  if (API_KEY) {
-    headers.Authorization = `Bearer ${API_KEY}`;
-  }
-  // multipart/form-data carries its own boundary in the Content-Type header;
-  // fetch/undici compute it from the FormData instance. Setting a
-  // Content-Type by hand here would drop that boundary, and Hono's
-  // c.req.parseBody() would answer invalid_multipart on an otherwise
-  // well-formed request.
-  if (body && !form) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}${path}`, {
-      method,
-      headers,
-      body: form ?? (body ? JSON.stringify(body) : undefined),
-    });
-  } catch (err) {
-    // A throw here means no response object at all, and the caller could not
-    // tell that apart from a genuine outage. On 2026-09-01 the MCP audit found
-    // the commonest case was neither: the 402 arrived, but its headers were
-    // over Node's 16 KB `http.maxHeaderSize`, so undici aborted with
-    // UND_ERR_HEADERS_OVERFLOW and validate_iban answered `fetch failed` while
-    // the free fallback right below it sat unused. The server side is fixed
-    // (audit MCP-01), and this is the belt: a transport failure on a paid route
-    // is reported like the paywall it probably was, so the degraded free path
-    // runs instead of dead-ending.
-    return transportError(err);
-  }
-
-  const text = await res.text();
-  let parsed: unknown;
-  try {
-    parsed = text ? JSON.parse(text) : {};
-  } catch {
-    parsed = { raw: text };
-  }
-
-  if (!res.ok) {
-    const obj = parsed as JsonRecord;
-    // The API tells us WHY the paywall triggered (exhausted quota/credits,
-    // broken key) via a `cause` object in the 402 body — relay that truth
-    // instead of the generic "set a key" advice, which is wrong (and
-    // confusing) when a key is already configured.
-    const cause = (obj?.cause ?? undefined) as { reason?: string; detail?: string } | undefined;
-    return {
-      _error: true,
-      status: res.status,
-      ...(obj || {}),
-      _hint:
-        res.status === 402
-          ? (cause?.detail ??
-            'Payment required. Set IBANFORGE_API_KEY (Bearer ifk_*) for the free 200 req/month tier, or pay per call via x402 (price in the `accepts` array). See https://api.ibanforge.com/.well-known/x402')
-          : res.status === 429
-            ? 'Rate limited (per-IP, 100 req/min). Wait for `retry_after` seconds, then retry.'
-            : undefined,
-    };
-  }
-
-  return parsed as JsonRecord;
-}
+const apiCall = createApiClient({
+  baseUrl: API_BASE,
+  apiKey: API_KEY,
+  version: pkg.version,
+  timeoutMs: requestTimeout(process.env.IBANFORGE_TIMEOUT_MS),
+});
 
 /**
  * Best-effort content type for the multipart part carrying the uploaded
@@ -1047,7 +953,7 @@ const INSTRUCTIONS =
 
 const server = new Server(
   { name: 'ibanforge', version: pkg.version },
-  { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
+  { capabilities: { tools: {} }, instructions: stdioInstructions(INSTRUCTIONS) },
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
@@ -1081,12 +987,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // a failure whatever the tool, and it never matches the success schema.
   const relay = async (data: JsonRecord) => (data._error ? fail(data) : out(data));
 
-  // The two cases where a degraded free answer beats no answer: the paywall
-  // said so (402), or the response never arrived at all. The second one is
-  // audit MCP-02 of 2026-09-01 — an oversized 402 header made undici throw, and
-  // the fallback below, which existed and was good, never ran.
+  // Le repli de format reste réservé à l'essai sans clé. Une clé épuisée ou
+  // une panne ne doivent jamais changer le contrat de validation en silence.
   const wantsFreeFallback = (result: JsonRecord): boolean =>
-    result._error === true && (result.status === 402 || result._transport_error === true);
+    !API_KEY && result._error === true &&
+    (result.status === 402 || result.code === 'UND_ERR_HEADERS_OVERFLOW');
 
   // Fallback message appended to anonymous-mode results so MCP inspectors
   // and discovery tools (Glama, Smithery, MCP.so) get a useful payload
@@ -1121,7 +1026,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (wantsFreeFallback(result)) {
           const free = await apiCall('GET', `/v1/iban/format?iban=${encodeURIComponent(a.iban)}`);
           if (!free._error) {
-            return out({ ...free, _note: degradedNote(result) });
+            return out({
+              ...free,
+              _degraded: true,
+              _scope: 'format_only',
+              _upstream_error: { status: result.status, error: result.error },
+              _note: degradedNote(result),
+            });
           }
           // The free endpoint rejected the input itself (e.g. length out of
           // bounds): that 400 is the real cause — don't mask it as "payment
@@ -1134,26 +1045,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'batch_validate_iban': {
-        if (!Array.isArray(a.ibans) || a.ibans.length === 0) {
+        if (!Array.isArray(a.ibans) || a.ibans.length === 0 || a.ibans.some((iban) => typeof iban !== 'string' || !iban.trim())) {
           return fail({ error: 'invalid_input', message: 'Argument `ibans` must be a non-empty array of strings.' });
         }
         if (a.ibans.length > 100) {
           return fail({ error: 'too_many_ibans', message: 'Max 100 IBANs per batch. Split your input.' });
         }
         const result = await apiCall('POST', '/v1/iban/batch', { ibans: a.ibans as string[] });
-        if (wantsFreeFallback(result)) {
-          const ibans = a.ibans as string[];
-          const results = await Promise.all(
-            ibans.map((iban) => apiCall('GET', `/v1/iban/format?iban=${encodeURIComponent(iban)}`)),
-          );
-          const validCount = results.filter((r) => r.valid === true).length;
-          return out({
-            results,
-            count: results.length,
-            valid_count: validCount,
-            _note: degradedNote(result),
-          });
-        }
+        // Un lot refusé reste un seul appel refusé. Le convertir en cent
+        // appels de format épuiserait le quota et masquerait des erreurs par ligne.
         return relay(result);
       }
 
