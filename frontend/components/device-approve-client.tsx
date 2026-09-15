@@ -120,16 +120,24 @@ export function DeviceApproveClient() {
   /** Le jeton d'approbation, et le verrou d'appel : ni l'un ni l'autre ne se rend. */
   const tokenRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
+  /** Le `?code=` ne se consomme qu'une fois, même si l'URL est relue. */
+  const urlConsumedRef = useRef(false);
 
   const search = useSyncExternalStore<string | null>(
     subscribeToNothing,
     () => window.location.search,
     () => null,
   );
-  const urlCode = useMemo(
-    () => (search === null ? null : normalizeUserCode(new URLSearchParams(search).get('code') ?? '')),
-    [search],
-  );
+  /**
+   * Ce que l'URL portait. `null` veut dire « pas de paramètre `code` du tout »
+   * — ce qui n'est PAS la même chose qu'un paramètre illisible, et la
+   * différence décide si l'URL doit être nettoyée.
+   */
+  const urlParam = useMemo(() => {
+    if (search === null) return null;
+    const raw = new URLSearchParams(search).get('code');
+    return raw === null ? null : { clean: normalizeUserCode(raw) };
+  }, [search]);
 
   const noticeOf = useCallback(
     (notice: 'keyRateLimited' | 'apiMessage', body: Record<string, unknown>): Notice =>
@@ -191,18 +199,29 @@ export function DeviceApproveClient() {
    * ferait fuir en `Referer`. Le retirer d'abord réduit cette fenêtre à zéro
    * au lieu de la fixer à la durée d'un aller-retour réseau.
    *
+   * 🚨 Et le nettoyage est INCONDITIONNEL : il a lieu dès qu'un paramètre
+   * `code` existe, avant même de savoir s'il est lisible. Le gardait-on pour
+   * les seuls codes complets, un collage tronqué ou une faute de frappe
+   * resterait dans l'URL et dans l'historique — c'est-à-dire exactement les
+   * cas où la page ne peut rien faire d'autre que laisser l'humain retaper.
+   *
+   * `urlConsumedRef` rend l'effet idempotent : `window.location.search` change
+   * sous nos pieds à cause du `replaceState`, donc l'instantané relu par React
+   * peut faire rejouer cet effet, et un second `lookup` n'aurait aucun sens.
+   *
    * Le `setTimeout(0)` fait partir l'appel hors du corps synchrone de l'effet
-   * (`react-hooks/set-state-in-effect` est une erreur dans ce dépôt) et donne
-   * un vrai point d'annulation si la page est quittée entre-temps.
+   * (`react-hooks/set-state-in-effect` est une erreur dans ce dépôt).
    */
   useEffect(() => {
-    if (urlCode === null || !isCompleteUserCode(urlCode)) return;
+    if (urlParam === null || urlConsumedRef.current) return;
+    urlConsumedRef.current = true;
     window.history.replaceState(null, '', window.location.pathname);
+    if (!isCompleteUserCode(urlParam.clean)) return;
     const timer = setTimeout(() => {
-      void lookup(urlCode);
+      void lookup(urlParam.clean);
     }, 0);
     return () => clearTimeout(timer);
-  }, [urlCode, lookup]);
+  }, [urlParam, lookup]);
 
   /**
    * Le décompte. Il ne tourne que sur les deux écrans où le temps compte, et
@@ -212,6 +231,12 @@ export function DeviceApproveClient() {
    * Zéro atteint sous les yeux de l'humain est le SEUL cas où la page sait que
    * le code est expiré plutôt que simplement refusé — d'où l'écran `expired`
    * ici, et `invalid` sur un 404.
+   *
+   * 🚨 Le passage à `expired` est conditionnel À L'INTÉRIEUR du battement. La
+   * garde d'écran ci-dessus est évaluée au montage de l'effet, pas à chaque
+   * tour : un battement tombé entre l'approbation et le nettoyage de l'effet
+   * remplacerait « c'est fait » par « ce code a expiré » chez quelqu'un dont
+   * l'agent vient de recevoir sa clé.
    */
   useEffect(() => {
     if (expiresAt === null) return;
@@ -220,7 +245,7 @@ export function DeviceApproveClient() {
       const left = Math.round((expiresAt - Date.now()) / 1000);
       if (left <= 0) {
         setRemaining(0);
-        setScreen('expired');
+        setScreen((s) => (s === 'review' || s === 'emailCode' ? 'expired' : s));
         return;
       }
       setRemaining(left);
@@ -467,6 +492,26 @@ export function DeviceApproveClient() {
           <Button type="submit" size="lg" disabled={busy || emailCode.length !== 6} className="w-full">
             {busy ? tKey('verify.submitting') : tKey('verify.submit')}
           </Button>
+          {/*
+            Sans cette porte de sortie, une adresse mal tapée enferme l'humain
+            sur un champ qui ne recevra jamais son code, jusqu'à l'expiration du
+            grant — alors que le bouton sans adresse, deux écrans plus haut,
+            marche tout de suite. Le libellé est celui du dialogue de clé
+            existant, qui fait déjà exactement ce geste.
+          */}
+          <button
+            type="button"
+            onClick={() => {
+              setEmailCode('');
+              setNotice(null);
+              setEmailOpen(true);
+              setScreen('review');
+            }}
+            disabled={busy}
+            className="w-full text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+          >
+            {tKey('verify.changeEmail')}
+          </button>
         </form>
         {clock}
         {safety}
