@@ -484,7 +484,7 @@ curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \\
 
 Takes the text inside a Swiss QR-bill code (\`payload\`, real line breaks) and returns every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON checksum and pairing with the IBAN, amount, currency, and \`ready_for_2026_11_14\`: whether the addresses are structured (type S) or still combined (type K), which banks stop processing on 14 November 2026. A combined address comes back with \`proposed_structured\`.
 
-### 9. request_api_key + poll_api_key — a durable key, approved by a human (${toolPriceLabel('request_api_key')})
+### 8b. request_api_key + poll_api_key — a durable key, approved by a human (${toolPriceLabel('request_api_key')})
 
 \`\`\`bash
 curl -s -X POST https://api.ibanforge.com/v1/keys/device \\

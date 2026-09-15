@@ -49,13 +49,19 @@ them, a taster that needs nothing at all:
 - Validate IBAN: $0.005 · Batch: $0.002/IBAN · BIC lookup: $0.003 · CH clearing: $0.003 · Compliance: $0.02
 - Discovery: GET https://api.ibanforge.com/.well-known/x402
 
-## MCP Tools (5)
+## MCP Tools (11)
 
-- `validate_iban` — Validate one IBAN with full enrichment ($0.005)
-- `batch_validate_iban` — Validate up to 100 IBANs, $0.002 each ($0.20 for 100)
-- `lookup_bic` — BIC/SWIFT → bank, country, city, LEI ($0.003)
-- `lookup_ch_clearing` — Swiss BC-Nummer / IID → institution, address, full rail participation, QR-IID — the deepest Swiss clearing data in any public API ($0.003)
-- `check_compliance` — bank-BIC sanctions + FATF + SEPA + VoP + risk score ($0.02; informational, not regulated AML/CFT)
+- validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005
+- batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 per IBAN (e.g. 100 = $0.20)
+- lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
+- lookup_ch_clearing — Swiss BC-Nummer / IID → institution, address, full rail participation (SIC, euroSIC, CHF instant, LSV+/BDD), QR-IID. The deepest Swiss clearing data in any public API. Cost: $0.003
+- check_compliance — sanctions (OFAC, bank-BIC level) + FATF + SEPA Instant + VoP + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
+- validate_payment_reference — RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero checksums against the dated document that publishes each rule, plus the QRR/QR-IBAN pairing verdict. Cost: free
+- check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
+- check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
+- send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
+- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the daily limit. Cost: free
+- poll_api_key — collect the key once a human has approved it, handed over exactly once, with the config line to paste. Cost: free
 
 Install: `npx -y ibanforge-mcp` — or HTTP at https://api.ibanforge.com/mcp
 
