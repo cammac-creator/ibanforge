@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
+import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
 import { apiJson, atBlzFile, formatIban, getAtCode } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
@@ -71,11 +72,23 @@ export default async function AtCodePage({ params }: { params: Promise<{ locale:
         <p className="text-xs text-muted-foreground">{t("common.exampleNote")}</p>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">{t("common.apiTitle")}</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">{t("common.apiText")}</p>
-        <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
+      {/* Page pilote du contrat de mesure (15.09.2026) : l'essai avec l'API est
+          proposé tout de suite après la réponse bancaire, atteignable sur
+          téléphone sans défiler ; la réponse brute de l'API se déplie à la demande. */}
+      <section className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground leading-relaxed">{t("common.tryApiText")}</p>
+        <GetKeyButton variant="amber" size="sm" className="w-fit" evt="cta:try-api-register">
+          {t("common.ctaTryApi")}
+        </GetKeyButton>
       </section>
+
+      <details className="group rounded-md border" style={{ borderColor: "var(--hairline)" }}>
+        <summary className="cursor-pointer px-3 py-2 text-lg font-semibold">{t("common.apiTitle")}</summary>
+        <div className="flex flex-col gap-2 px-3 pb-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">{t("common.apiText")}</p>
+          <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
+        </div>
+      </details>
 
       {related.length > 0 && (
         <section className="flex flex-col gap-2">

@@ -2174,6 +2174,8 @@
       "exampleNote": "Synthetisches Beispiel: der Kontoteil ist ein Platzhalter, diese IBAN gehört niemandem. Sie zeigt, wo der Code in der IBAN steht.",
       "relatedTitle": "Weitere Codes desselben Instituts",
       "ctaCheck": "Eine IBAN im Playground prüfen",
+      "ctaTryApi": "Diese Prüfung per API testen",
+      "tryApiText": "Dieselbe Antwort, aus Ihrem eigenen Code: Holen Sie sich einen kostenlosen Schlüssel (ohne E-Mail-Adresse, ohne Karte), der erste Aufruf läuft direkt hier.",
       "ctaAudit": "Eine ganze Kreditorendatei prüfen",
       "sourceLabel": "Quelle",
       "asOfLabel": "Registerstand",
@@ -2296,7 +2298,8 @@
       "docLink": "Wie das belgische Register antwortet",
       "indexTitle": "Belgische Bankcodes (BNB-Liste)",
       "indexIntro": "Jede in der Liste der Belgischen Nationalbank zugewiesene Bankkennung, eine Seite pro Institut, mit dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat.",
-      "countryLink": "Das Format der belgischen IBAN, mit dem offiziellen Beispiel"
+      "countryLink": "Das Format der belgischen IBAN, mit dem offiziellen Beispiel",
+      "integrateLink": "Belgische Bankcodes in Ihrer Anwendung prüfen"
     },
     "sk": {
       "metaTitle": "Slowakische Bankleitzahl {code}: {name}",

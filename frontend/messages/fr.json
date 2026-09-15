@@ -2174,6 +2174,8 @@
       "exampleNote": "Exemple synthétique : la partie compte est un espace réservé, cet IBAN n'appartient à personne. Il montre où le code se place dans l'IBAN.",
       "relatedTitle": "Autres codes du même établissement",
       "ctaCheck": "Contrôler un IBAN dans le playground",
+      "ctaTryApi": "Tester cette vérification avec l'API",
+      "tryApiText": "La même réponse, depuis votre propre code : prenez une clé gratuite (sans adresse e-mail, sans carte) et le premier appel s'exécute ici même.",
       "ctaAudit": "Auditer un fichier de créanciers entier",
       "sourceLabel": "Source",
       "asOfLabel": "registre au",
@@ -2296,7 +2298,8 @@
       "docLink": "Comment répond le registre belge",
       "indexTitle": "Codes banque belges (liste BNB)",
       "indexIntro": "Chaque identifiant bancaire attribué dans la liste de la Banque nationale de Belgique, une page par établissement, avec le BIC qui lui est associé et la réponse exacte de l'API IBANforge. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée.",
-      "countryLink": "Le format de l'IBAN belge, avec l'exemple officiel"
+      "countryLink": "Le format de l'IBAN belge, avec l'exemple officiel",
+      "integrateLink": "Contrôler les codes banque belges dans votre application"
     },
     "sk": {
       "metaTitle": "Code banque slovaque {code} : {name}",

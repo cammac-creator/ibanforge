@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createElement, type ComponentProps } from 'react';
 import { notFound } from 'next/navigation';
+import { TryApi } from '@/components/try-api';
 import { SLUG_PATTERN } from './content-slug';
 import matter from 'gray-matter';
 import remarkGfm from 'remark-gfm';
@@ -37,6 +38,11 @@ export const mdxOptions = {
  * `.prose`). Written with createElement to keep this a plain .ts module.
  */
 export const mdxComponents = {
+  // `<TryApi>` : le bouton d'essai avec l'API, à placer dans un document après
+  // le résultat expliqué (pages pilotes du contrat de mesure, 15.09.2026). Le
+  // garde de lib/changelog-mdx.test.ts lit cette table : toute balise
+  // capitalisée d'un document doit y figurer, sinon le rendu jette.
+  TryApi,
   table: (props: ComponentProps<'table'>) =>
     createElement(
       'div',

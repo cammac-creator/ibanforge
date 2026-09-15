@@ -62,6 +62,10 @@ Le fichier belge est un registre **de noms seulement** : aucune adresse, dans au
 
 `authoritative: true` en fait le verdict du registre lui-même : dans un espace de codes où chacun des 1 000 créneaux a un état publié, le code n'est attribué à aucun établissement. Pour un paiement sur le point de partir, c'est une raison forte de s'arrêter et de revérifier les coordonnées du bénéficiaire — pendant que la clé de contrôle de l'IBAN, elle, continue de dire `valid: true`, puisque mod-97 n'attrape que les erreurs de recopie.
 
+<TryApi>Tester cette vérification avec l'API</TryApi>
+
+La même réponse, depuis votre propre code : une clé gratuite se prend ici, sans adresse e-mail ni carte, et le premier appel s'exécute tout de suite. Pour la suite, [les clés d'API](/docs/api-keys) expliquent les paliers et [l'intégration](/vendors) montre où brancher la vérification dans un ERP ou un outil de paiement.
+
 ## Les limites honnêtes
 
 - **Nous contrôlons le code banque, jamais le compte ni son titulaire.** Un code belge `verified` nomme l'établissement titulaire des trois chiffres, et s'arrête là.
@@ -70,3 +74,5 @@ Le fichier belge est un registre **de noms seulement** : aucune adresse, dans au
 - **Un créneau réservé peut être activé plus tard.** `Onbeschikbaar` aujourd'hui ne veut pas dire pour toujours : cela veut dire que la BNB ne l'a pas attribué à la date de l'édition qui a répondu.
 
 Voir aussi : [Ce que « verified » veut dire](/docs/iban-validate) · [Sources & provenance](/docs/data-sources) · [IBAN vers BIC](/docs/iban-to-bic) · [Contrôle de BLZ allemande](/docs/blz-check)
+
+{/* Modifié le 15.09.2026 : essai avec l'API placé après le résultat expliqué (page pilote du contrat de mesure). */}
