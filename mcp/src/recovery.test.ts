@@ -234,3 +234,172 @@ describe('un agent peut comprendre et reprendre un appel refusé', () => {
     expect(requestTimeout('4500')).toBe(4500);
   });
 });
+
+/**
+ * Le device grant vu du paquet publié, et le piège que ce fichier existe pour
+ * attraper.
+ *
+ * 🚨 `apiCall` marque TOUT `!res.ok` en `_error: true`. Or le protocole RFC 8628
+ * répond `authorization_pending` en **400** et `device_rate_limited` en **429** :
+ * ce sont des réponses NORMALES, pas des pannes. Sans le rattrapage qui inspecte
+ * le champ `error` du CORPS, `poll_api_key` rendrait `isError: true` au premier
+ * tour et l'agent abandonnerait avant que l'humain n'ait cliqué, et
+ * `request_api_key` présenterait un plafond partagé comme un service en panne.
+ *
+ * Ces deux tests sont les seuls qui l'attrapent, et ils travaillent sur `dist/`
+ * par un vrai client stdio : un test qui importerait la source ne verrait pas ce
+ * que le paquet publié fait réellement.
+ */
+describe('device grant — un 400 ou un 429 du protocole n’est pas une panne', () => {
+  const OPENED = {
+    device_code: 'ifd_' + 'a'.repeat(64),
+    user_code: 'WDJB-MJHT',
+    verification_uri: 'https://ibanforge.com/device',
+    verification_uri_complete: 'https://ibanforge.com/device?code=WDJB-MJHT',
+    expires_in: 900,
+    interval: 5,
+    message: 'Show the user_code and the verification_uri to a human.',
+    display_to_human:
+      'IBANforge needs one approval from you, and it takes about fifteen seconds.\n\n' +
+      '  1. Open:  https://ibanforge.com/device?code=WDJB-MJHT\n' +
+      '  2. Check the code shown on the page reads:  WDJB-MJHT\n' +
+      '  3. Click "Get the key". No e-mail, no card, no account.',
+  };
+
+  // ── 31 ──────────────────────────────────────────────────────────────────────
+  it('31. le 400 authorization_pending de l’API ne devient pas un isError', async () => {
+    await connected(
+      (req, res) => {
+        res.setHeader('content-type', 'application/json');
+        if (req.url === '/v1/keys/device') {
+          res.writeHead(201).end(JSON.stringify(OPENED));
+          return;
+        }
+        // Le premier tour du parcours honnête : personne n'a encore approuvé.
+        res.writeHead(400).end(
+          JSON.stringify({
+            error: 'authorization_pending',
+            message: 'Nobody has approved this code yet. Wait for the interval, then call again.',
+            expires_in: 880,
+            interval: 5,
+          }),
+        );
+      },
+      async (client) => {
+        await client.callTool({ name: 'request_api_key', arguments: {} });
+        const result = await client.callTool({ name: 'poll_api_key', arguments: {} });
+
+        expect(
+          result.isError,
+          'un authorization_pending est arrivé comme un échec : l’agent abandonne au premier tour',
+        ).not.toBe(true);
+        expect(result.structuredContent).toMatchObject({
+          status: 'authorization_pending',
+          api_key: null,
+          retry_in_seconds: 5,
+        });
+      },
+    );
+  });
+
+  // ── 31bis ───────────────────────────────────────────────────────────────────
+  it('31bis. le 429 device_rate_limited non plus', async () => {
+    await connected(
+      (_req, res) => {
+        res.setHeader('content-type', 'application/json');
+        res.writeHead(429).end(
+          JSON.stringify({
+            error: 'device_rate_limited',
+            message: 'This network has already taken its free keys for today.',
+            display_to_human: 'This network has already taken its free keys for today.',
+          }),
+        );
+      },
+      async (client) => {
+        const result = await client.callTool({ name: 'request_api_key', arguments: {} });
+
+        expect(
+          result.isError,
+          'un plafond partagé est arrivé comme une panne : l’agent ne prend pas le chemin de repli',
+        ).not.toBe(true);
+        expect(result.structuredContent).toMatchObject({
+          status: 'device_rate_limited',
+          user_code: null,
+        });
+        // Peuplé : c'est ce bloc qui envoie l'agent vers l'essai sans clé ou x402.
+        expect(String(payload(result).display_to_human).length).toBeGreaterThan(0);
+      },
+    );
+  });
+
+  // ── 30, versant surface A ───────────────────────────────────────────────────
+  it('30. le device_code ne sort JAMAIS de la sortie structurée', async () => {
+    await connected(
+      (req, res) => {
+        res.setHeader('content-type', 'application/json');
+        if (req.url === '/v1/keys/device') res.writeHead(201).end(JSON.stringify(OPENED));
+        else res.writeHead(400).end('{"error":"authorization_pending","interval":5}');
+      },
+      async (client) => {
+        const result = await client.callTool({ name: 'request_api_key', arguments: {} });
+        // 🚨 Le corps HTTP le contient — c'est la fixture ci-dessus — donc ce
+        // test mesure bien un filtrage, pas une absence de donnée. Le
+        // `device_code` est le porteur UNIQUE de la clé, et une sortie d'outil
+        // traverse le transcript du modèle, les journaux du client MCP et les
+        // copier-coller de rapport d'incident.
+        expect(OPENED.device_code).toContain('ifd_');
+        expect(JSON.stringify(result.structuredContent)).not.toContain('ifd_');
+        expect(JSON.stringify(result.content)).not.toContain('ifd_');
+      },
+    );
+  });
+
+  // ── Le relais reprend le dernier code sans argument ─────────────────────────
+  it('poll_api_key sans argument reprend le dernier code, et l’oublie après le retrait', async () => {
+    const polled: string[] = [];
+    await connected(
+      (req, res) => {
+        res.setHeader('content-type', 'application/json');
+        if (req.url === '/v1/keys/device') {
+          res.writeHead(201).end(JSON.stringify(OPENED));
+          return;
+        }
+        let body = '';
+        req.on('data', (chunk) => (body += chunk));
+        req.on('end', () => {
+          polled.push(JSON.parse(body || '{}').device_code ?? '');
+          res.writeHead(200).end(
+            JSON.stringify({
+              api_key: 'ifk_test_only_fixture',
+              key_prefix: 'ifk_test',
+              tier: 'anonymous',
+              monthly_limit: 25,
+              message: 'Save this key — it will not be shown again.',
+              config_line:
+                'claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_test_only_fixture -- npx -y ibanforge-mcp',
+            }),
+          );
+        });
+      },
+      async (client) => {
+        await client.callTool({ name: 'request_api_key', arguments: {} });
+        const first = await client.callTool({ name: 'poll_api_key', arguments: {} });
+        expect(first.structuredContent).toMatchObject({
+          status: 'approved',
+          api_key: 'ifk_test_only_fixture',
+        });
+        // Le code mémorisé a bien été envoyé à la route, sans que l'agent le
+        // repasse en argument.
+        expect(polled).toEqual([OPENED.device_code]);
+
+        // Une clé est remise exactement une fois : le code est oublié, et un
+        // second appel sans argument ne redemande RIEN à la route.
+        const second = await client.callTool({ name: 'poll_api_key', arguments: {} });
+        expect(second.structuredContent).toMatchObject({ status: 'invalid_grant', api_key: null });
+        expect(polled, 'le paquet a redemandé la clé après l’avoir déjà remise').toEqual([
+          OPENED.device_code,
+        ]);
+      },
+    );
+  });
+});

@@ -1022,7 +1022,10 @@ const buildRawSpec = () => ({
               'Request opened. Answers device_code (the secret the agent keeps), user_code (what the human ' +
               `types, ${DEVICE_USER_CODE_LENGTH} letters with no vowel and no digit, so nothing to misread), ` +
               `verification_uri (${DEVICE_VERIFICATION_URI}), verification_uri_complete (the same with the ` +
-              `code pre-filled), expires_in, interval (${DEVICE_POLL_INTERVAL_SECONDS} seconds) and message.`,
+              `code pre-filled), expires_in, interval (${DEVICE_POLL_INTERVAL_SECONDS} seconds), message, ` +
+              'and display_to_human: a ready-made block of text to show a human VERBATIM, carrying the code ' +
+              'and the link. It is built here so that every surface shows the same words; do not paraphrase ' +
+              'it, and note that it deliberately contains no device_code.',
           },
           '400': { description: '"invalid_json": the body was present and is not a JSON object.' },
           '429': {

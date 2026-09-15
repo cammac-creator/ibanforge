@@ -2,7 +2,7 @@
 /**
  * IBANforge MCP Server
  *
- * Exposes 11 tools backed by the IBANforge HTTP API (api.ibanforge.com):
+ * Exposes 13 tools backed by the IBANforge HTTP API (api.ibanforge.com):
  *   - validate_iban
  *   - batch_validate_iban
  *   - lookup_bic
@@ -14,6 +14,8 @@
  *   - audit_creditor_file
  *   - audit_status
  *   - send_feedback
+ *   - request_api_key
+ *   - poll_api_key
  *
  * `audit_creditor_file` / `audit_status` (added 07/09/2026) wrap the paid
  * creditor-file audit (POST /v1/audit/upload, /v1/audit/checkout/:job,
@@ -895,6 +897,141 @@ const TOOLS: Tool[] = [
       required: ['ok', 'id'],
     },
   },
+  // ── Device grant (RFC 8628) ──────────────────────────────────────────────
+  //
+  // PAS de READ_ONLY : ces deux outils écrivent une ligne, comme
+  // send_feedback. Relayés vers POST /v1/keys/device et
+  // POST /v1/keys/device/token, donc ils héritent de la réservation par réseau
+  // que `openGrant()` porte dans la route — ce paquet est publié séparément et
+  // ne connaît que l'API HTTP, il n'a aucune serrure à écrire.
+  {
+    name: 'request_api_key',
+    title: 'Request an IBANforge API key',
+    annotations: { title: 'Request an IBANforge API key' },
+    description:
+      'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
+      'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+      'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
+      'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
+      'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
+      'Then call poll_api_key. ' +
+      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_name: {
+          type: 'string',
+          maxLength: 60,
+          description: 'Optional. Who is asking, shown to the human on the approval page.',
+        },
+        reason: {
+          type: 'string',
+          maxLength: 200,
+          description: 'Optional. What the key is for, shown to the human on the approval page.',
+        },
+      },
+    },
+    // 🚨 `device_code` n'est PAS dans ce schéma, et ce n'est pas un oubli : il
+    // est le porteur unique de la clé, et une sortie d'outil traverse le
+    // transcript du modèle. `poll_api_key` reprend le dernier code demandé.
+    outputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['ok', 'device_rate_limited', 'device_unavailable'],
+          description:
+            'ok means a code was issued. Anything else: read display_to_human and fall back.',
+        },
+        user_code: {
+          type: ['string', 'null'],
+          description: 'Show this to the human, exactly as written, e.g. WDJB-MJHT.',
+        },
+        verification_uri: {
+          type: ['string', 'null'],
+          description: 'The page the human opens. Never open it yourself.',
+        },
+        verification_uri_complete: {
+          type: ['string', 'null'],
+          description: 'Same page with the code pre-filled. This is the one to show.',
+        },
+        expires_in: { type: ['number', 'null'], description: 'Seconds until the code stops working.' },
+        interval: {
+          type: ['number', 'null'],
+          description: 'Minimum seconds between two poll_api_key calls.',
+        },
+        display_to_human: {
+          type: 'string',
+          description: 'A ready-made block of text to show verbatim. Do not paraphrase it.',
+        },
+      },
+      required: ['status', 'display_to_human'],
+    },
+  },
+  {
+    name: 'poll_api_key',
+    title: 'Collect the approved IBANforge API key',
+    annotations: { title: 'Collect the approved IBANforge API key' },
+    description:
+      'Collect the API key once a human has approved the request opened by request_api_key. ' +
+      'USE WHEN: you have called request_api_key and shown the code to your human. ' +
+      'HOW TO CALL IT: leave `device_code` empty to reuse the last request from this session. ' +
+      'The server usually waits up to thirty seconds before answering, and sometimes answers at once when it is busy — either way, calling it once per minute is enough, never in a tight loop. ' +
+      'WHAT THE ANSWERS MEAN: `authorization_pending` is normal and means nobody has approved yet — wait `retry_in_seconds` and call again; ' +
+      '`approved` carries the key ONCE and never again, so hand it to your human immediately together with `config_line`; ' +
+      '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
+      '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
+      '`invalid_grant` means this code can no longer be used at all — stop. ' +
+      'This tool is free and does NOT count against the daily free-tier limit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        device_code: {
+          type: 'string',
+          description: 'Optional. Leave it empty to reuse the last request from this session.',
+        },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: [
+            'authorization_pending',
+            'approved',
+            'access_denied',
+            'expired_token',
+            'invalid_grant',
+          ],
+          description: 'authorization_pending is normal: wait `retry_in_seconds` and call again.',
+        },
+        api_key: {
+          type: ['string', 'null'],
+          description: 'Present exactly once, on the first approved poll.',
+        },
+        key_prefix: { type: ['string', 'null'] },
+        tier: {
+          type: ['string', 'null'],
+          enum: ['anonymous', 'email', 'claimed', 'paid', null],
+          description: 'anonymous = the entry allowance, email/claimed/paid = the raised one.',
+        },
+        monthly_limit: { type: ['number', 'null'] },
+        email: {
+          type: ['string', 'null'],
+          description: 'Absent on the anonymous tier: no address was ever given.',
+        },
+        retry_in_seconds: { type: ['number', 'null'] },
+        expires_in: { type: ['number', 'null'] },
+        config_line: {
+          type: ['string', 'null'],
+          description: 'The exact command line to give the human. Do not run it yourself.',
+        },
+        message: { type: 'string', description: 'One sentence for the human.' },
+      },
+      required: ['status', 'message'],
+    },
+  },
 ];
 
 const apiCall = createApiClient({
@@ -903,6 +1040,50 @@ const apiCall = createApiClient({
   version: pkg.version,
   timeoutMs: requestTimeout(process.env.IBANFORGE_TIMEOUT_MS),
 });
+
+/**
+ * 🚨 L'ATTENTE DU CLIENT DOIT DÉPASSER CELLE DU SERVEUR, et le défaut ne le
+ * faisait pas.
+ *
+ * `POST /v1/keys/device/token` retient la requête jusqu'à `DEVICE_POLL_WAIT_MS`
+ * (30 s en production) : c'est un long-polling, c'est voulu, et c'est ce qui
+ * évite à l'agent de boucler. Or `DEFAULT_TIMEOUT_MS` de ce paquet vaut
+ * exactement 30 s aussi. Le client perdait donc la course à l'instant près — il
+ * abandonnait pendant que le serveur répondait —, `poll_api_key` rendait un
+ * `request_timeout` au premier tour, et l'agent renonçait avant même que
+ * l'humain n'ait cliqué. Exactement le défaut que ce module existe pour éviter,
+ * par une porte que rien ne nommait.
+ *
+ * D'où un second client, réglé plus large que le serveur, et pour ces deux
+ * outils SEULEMENT : les autres gardent le délai réglable de l'utilisateur, un
+ * appel de validation qui traîne trente secondes est une panne.
+ *
+ * ⚠️ La valeur ne passe PAS par `requestTimeout()` : cette lecture borne à
+ * 120 s et retombe sur le défaut hors bornes, donc elle annulerait en silence
+ * la marge qu'on vient de poser. `scripts/mcp-parity.test.ts` vérifie que ce
+ * nombre reste supérieur au `DEVICE_POLL_WAIT_MS` de
+ * `src/lib/device-grant.ts` — c'est le même idiome que `AUDIT_MAX_BYTES` : un
+ * nombre recopié, mais gardé.
+ */
+const DEVICE_POLL_TIMEOUT_MS = 45_000;
+
+const deviceApiCall = createApiClient({
+  baseUrl: API_BASE,
+  apiKey: API_KEY,
+  version: pkg.version,
+  timeoutMs: DEVICE_POLL_TIMEOUT_MS,
+});
+
+/**
+ * Le dernier `device_code` demandé, pour que `poll_api_key` marche sans
+ * argument.
+ *
+ * Une variable de module suffit, et ce n'est pas un raccourci : ce processus
+ * appartient à un seul humain, il n'y a aucun locataire à isoler. La liaison à
+ * l'empreinte de réseau est propre à la surface HTTP distante, la seule qui
+ * soit multi-locataire.
+ */
+let lastDeviceCode: string | null = null;
 
 /**
  * Best-effort content type for the multipart part carrying the uploaded
@@ -946,6 +1127,10 @@ const INSTRUCTIONS =
   // nom d'outil cité est bien enregistré.
   'Free tier: 10 tool calls/IP/day here, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
   'POST https://api.ibanforge.com/v1/keys/claim lifts that same key to 200 REST calls/month — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. The mailed code gives 200 every month; a payment gives 200 once. ' +
+  // 2026-09-15 : copie CARACTÈRE POUR CARACTÈRE de la phrase device grant de
+  // src/mcp/instructions.ts. Ce paquet est publié séparément et ne peut pas
+  // importer depuis src/ ; `src/mcp/instructions.test.ts` compare les deux.
+  'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the daily limit. ' +
   'Prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
   'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
   'Paying as an agent (wallet, USDC on Base, prepaid packs): https://ibanforge.com/docs/pay-as-an-agent — ' +
@@ -1225,6 +1410,142 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return out({ ok: true, id: result.id });
       }
 
+      // ── Device grant (RFC 8628) ──────────────────────────────────────────
+      //
+      // 🚨 LE PIÈGE LE PLUS PROBABLE DE TOUT CE MODULE, ET IL EST ICI.
+      //
+      // `apiCall` marque TOUT `!res.ok` en `_error: true`. Or
+      // `authorization_pending` et `slow_down` arrivent en 400, et
+      // `device_rate_limited` en 429 : ce sont des réponses NORMALES du
+      // protocole, pas des pannes. Sans le rattrapage ci-dessous,
+      // `poll_api_key` rendrait `isError: true` au premier tour et l'agent
+      // abandonnerait avant que l'humain n'ait cliqué, et `request_api_key`
+      // présenterait un plafond partagé comme une panne de service. On inspecte
+      // donc le champ `error` du CORPS avant de conclure à un échec.
+
+      case 'request_api_key': {
+        const result = await apiCall('POST', '/v1/keys/device', {
+          client_name: a.client_name,
+          reason: a.reason,
+          source: 'mcp-npm-device',
+        });
+
+        if (result._error) {
+          const refused = result.error === 'device_rate_limited';
+          // Refus ou panne, l'agent reçoit une DONNÉE lisible et son chemin de
+          // repli — jamais un échec d'outil qui lui ferait croire le service
+          // cassé. Un transport qui n'a rien rendu du tout garde `fail`.
+          if (refused || result.error === 'device_unavailable' || result.status === 503) {
+            return out({
+              status: refused ? 'device_rate_limited' : 'device_unavailable',
+              user_code: null,
+              verification_uri: null,
+              verification_uri_complete: null,
+              expires_in: null,
+              interval: null,
+              display_to_human:
+                typeof result.display_to_human === 'string'
+                  ? result.display_to_human
+                  : typeof result.message === 'string'
+                    ? result.message
+                    : 'The key service did not open a request. Validation still works; try again in a minute.',
+            });
+          }
+          return fail(result);
+        }
+
+        // Le `device_code` reste DANS ce processus : il arrive par le corps
+        // HTTP et n'entre jamais dans la sortie de l'outil.
+        lastDeviceCode = typeof result.device_code === 'string' ? result.device_code : null;
+
+        return out({
+          status: 'ok',
+          user_code: result.user_code ?? null,
+          verification_uri: result.verification_uri ?? null,
+          verification_uri_complete: result.verification_uri_complete ?? null,
+          expires_in: result.expires_in ?? null,
+          interval: result.interval ?? null,
+          // Construit par le SERVEUR, jamais composé ici : trois compositions
+          // locales auraient donné trois textes, et c'est celui qu'un humain
+          // lit sur son écran.
+          display_to_human: typeof result.display_to_human === 'string' ? result.display_to_human : '',
+        });
+      }
+
+      case 'poll_api_key': {
+        const secret =
+          typeof a.device_code === 'string' && a.device_code.trim()
+            ? a.device_code.trim()
+            : lastDeviceCode;
+        if (!secret) {
+          return out({
+            status: 'invalid_grant',
+            api_key: null,
+            key_prefix: null,
+            tier: null,
+            monthly_limit: null,
+            email: null,
+            retry_in_seconds: null,
+            expires_in: null,
+            config_line: null,
+            message:
+              'No device code to collect. Call request_api_key first, and show the code to your human.',
+          });
+        }
+
+        const result = await deviceApiCall('POST', '/v1/keys/device/token', {
+          device_code: secret,
+        });
+
+        if (result._error) {
+          const PENDING = new Set(['authorization_pending', 'slow_down']);
+          const TERMINAL = new Set(['access_denied', 'expired_token', 'invalid_grant']);
+          const error = typeof result.error === 'string' ? result.error : '';
+          // `slow_down` n'est pas une valeur du schéma : un agent qui poll trop
+          // vite est un agent qui doit attendre, ce que
+          // `authorization_pending` plus `retry_in_seconds` dit déjà.
+          const status = PENDING.has(error)
+            ? 'authorization_pending'
+            : TERMINAL.has(error)
+              ? error
+              : null;
+          if (status === null) return fail(result);
+          return out({
+            status,
+            api_key: null,
+            key_prefix: null,
+            tier: null,
+            monthly_limit: null,
+            email: null,
+            retry_in_seconds: result.interval ?? null,
+            expires_in: result.expires_in ?? null,
+            config_line: null,
+            message:
+              typeof result.message === 'string'
+                ? result.message
+                : 'Nobody has approved this code yet. Wait for the interval, then call again.',
+          });
+        }
+
+        // Retiré une fois, jamais deux : on oublie le code dès qu'il a rendu sa clé.
+        lastDeviceCode = null;
+        return out({
+          status: 'approved',
+          api_key: result.api_key ?? null,
+          key_prefix: result.key_prefix ?? null,
+          tier: result.tier ?? null,
+          monthly_limit: result.monthly_limit ?? null,
+          email: result.email ?? null,
+          retry_in_seconds: null,
+          expires_in: null,
+          config_line: result.config_line ?? null,
+          message:
+            typeof result.message === 'string'
+              ? result.message
+              : 'Save this key — it will not be shown again.',
+        });
+      }
+
       default:
         return fail({ error: 'unknown_tool', message: `Tool "${name}" is not implemented.` });
     }
@@ -1241,4 +1562,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-process.stderr.write('IBANforge MCP server ready (stdio). 11 tools exposed.\n');
+process.stderr.write('IBANforge MCP server ready (stdio). 13 tools exposed.\n');

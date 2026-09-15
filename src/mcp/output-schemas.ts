@@ -709,6 +709,84 @@ const CHECK_SWISS_QR_BILL_OUTPUT_SCHEMA = {
   source: z.string(),
 };
 
+/**
+ * `request_api_key` — le device grant vu par l'agent.
+ *
+ * 🚨 `device_code` N'EST PAS DANS CE SCHÉMA, et ce n'est pas un oubli. C'est le
+ * porteur UNIQUE de la clé : quiconque le lit appelle
+ * `POST /v1/keys/device/token` et retire la clé à la place de l'agent, sans
+ * jeton et sans adresse. Une sortie d'outil traverse le transcript du modèle
+ * conservé chez son fournisseur, les journaux du client MCP et les
+ * copier-coller de rapport d'incident ; une consigne adressée à un modèle
+ * (« ne le montre à personne ») n'est pas un contrôle d'accès. Il n'est de
+ * surcroît utile à aucune surface : `poll_api_key` reprend le dernier
+ * `device_code` demandé. Il reste rendu par la réponse HTTP 201, pour les
+ * clients REST qui n'ont pas de mémoire de session.
+ *
+ * L'identifiant journalisable sans risque existe déjà : le `user_code`, qui ne
+ * retire aucune clé.
+ */
+export const REQUEST_API_KEY_OUTPUT_SCHEMA = {
+  // 🚨 `status` D'ABORD : cet outil peut être REFUSÉ, parce que `openGrant()`
+  // porte la réservation sur les trois surfaces. Un refus arrive comme une
+  // DONNÉE, jamais comme une erreur d'outil — sinon l'agent conclut à une panne
+  // au lieu de prendre le chemin de repli que ce module existe pour ouvrir.
+  status: z
+    .enum(['ok', 'device_rate_limited', 'device_unavailable'])
+    .describe('ok means a code was issued. Anything else: read display_to_human and fall back.'),
+  user_code: z
+    .string()
+    .nullable()
+    .describe('Show this to the human, exactly as written, e.g. WDJB-MJHT.'),
+  verification_uri: z
+    .string()
+    .nullable()
+    .describe('The page the human opens. Never open it yourself.'),
+  verification_uri_complete: z
+    .string()
+    .nullable()
+    .describe('Same page with the code pre-filled. This is the one to show.'),
+  expires_in: z.number().nullable().describe('Seconds until the code stops working.'),
+  interval: z.number().nullable().describe('Minimum seconds between two poll_api_key calls.'),
+  display_to_human: z
+    .string()
+    .describe('A ready-made block of text to show verbatim. Do not paraphrase it.'),
+} satisfies z.ZodRawShape;
+
+/**
+ * `poll_api_key` — le retrait, unique.
+ *
+ * 🚨 Seuls `status` et `message` sont TOUJOURS présents ; tout le reste est
+ * `nullable`. Le SDK **valide** la charge contre ce schéma et abandonne
+ * `structuredContent` EN SILENCE sur divergence : un champ non déclaré est un
+ * champ qu'aucun agent ne verra jamais, et un champ déclaré non nullable qui
+ * arrive nul emporte toute la sortie structurée avec lui.
+ */
+export const POLL_API_KEY_OUTPUT_SCHEMA = {
+  status: z
+    .enum(['authorization_pending', 'approved', 'access_denied', 'expired_token', 'invalid_grant'])
+    .describe('authorization_pending is normal: wait `retry_in_seconds` and call again.'),
+  api_key: z.string().nullable().describe('Present exactly once, on the first approved poll.'),
+  key_prefix: z.string().nullable(),
+  // 🚨 LES QUATRE valeurs de KeyTier, pas deux : un enum trop étroit fait
+  // tomber `structuredContent` en silence. `claimed` et `paid` n'arrivent pas
+  // par cette route aujourd'hui, mais une clé montée entre deux polls les
+  // rendrait, et le rail de paiement les rendra.
+  tier: z
+    .enum(['anonymous', 'email', 'claimed', 'paid'])
+    .nullable()
+    .describe('anonymous = the entry allowance, email/claimed/paid = the raised one.'),
+  monthly_limit: z.number().nullable(),
+  email: z.string().nullable().describe('Absent on the anonymous tier: no address was ever given.'),
+  retry_in_seconds: z.number().nullable(),
+  expires_in: z.number().nullable(),
+  config_line: z
+    .string()
+    .nullable()
+    .describe('The exact command line to give the human. Do not run it yourself.'),
+  message: z.string().describe('One sentence for the human.'),
+} satisfies z.ZodRawShape;
+
 export const TOOL_OUTPUT_SCHEMAS = {
   validate_iban: VALIDATE_IBAN_OUTPUT_SCHEMA,
   batch_validate_iban: BATCH_VALIDATE_IBAN_OUTPUT_SCHEMA,
@@ -719,4 +797,6 @@ export const TOOL_OUTPUT_SCHEMAS = {
   check_swiss_qr_bill: CHECK_SWISS_QR_BILL_OUTPUT_SCHEMA,
   lookup_ch_clearing: LOOKUP_CH_CLEARING_OUTPUT_SCHEMA,
   send_feedback: SEND_FEEDBACK_OUTPUT_SCHEMA,
+  request_api_key: REQUEST_API_KEY_OUTPUT_SCHEMA,
+  poll_api_key: POLL_API_KEY_OUTPUT_SCHEMA,
 } satisfies Record<string, z.ZodRawShape>;

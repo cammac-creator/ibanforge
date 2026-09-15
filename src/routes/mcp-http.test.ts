@@ -9,7 +9,20 @@
  * structuredContent so the SDK's runtime validation passes.
  *
  * Without these checks a regression on /mcp would silently break listings.
+ *
+ * 🚨 LES DEUX RÉGLAGES QUI RENDENT LES TESTS DU DEVICE GRANT EXÉCUTABLES, et
+ * ils doivent être posés AVANT les imports.
+ *
+ * `vitest.config.ts` ne définit aucun `testTimeout`, donc le défaut de vitest
+ * (5 000 ms) s'applique. `poll_api_key` fait du long-polling : avec l'attente de
+ * production (30 s), tout test qui poll avant approbation expirerait avant la
+ * réponse. Les valeurs passent par les lectures gardées du module — jamais par
+ * des constantes figées, ce qui est exactement pourquoi ces lectures existent.
+ * Même patron que `src/routes/device-grant.test.ts`.
  */
+process.env.DEVICE_POLL_WAIT_MS = '200';
+process.env.DEVICE_POLL_TICK_MS = '20';
+
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
@@ -18,9 +31,14 @@ import {
   mcpHttp,
   mcpSessions,
   createMcpSessionStore,
+  MCP_FREE_TOOLS,
   MCP_SESSIONS_PER_IP_DAY,
 } from './mcp-http.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
+import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { deviceGrant } from './device-grant.js';
+import { getStatsDB } from '../lib/db.js';
+import { DAILY_KEY_CREATION_LIMIT, keyCreationSource } from '../lib/key-creation-guard.js';
 import type { HonoEnv } from '../types.js';
 
 function makeApp() {
@@ -171,7 +189,10 @@ describe('GET /mcp (no session) — discovery hint', () => {
     expect([...hint.tools].sort(), 'the discovery hint and tools/list disagree').toEqual(
       [...served].sort(),
     );
-    expect(hint.tools.length).toBe(9);
+    // 🚨 Lu a l'inventaire et non ecrit : ce fichier importe deja MCP_TOOLS, et
+    // un litteral a cote d'une liste qui bouge est exactement le defaut que
+    // src/mcp/inventory.ts existe pour soigner.
+    expect(hint.tools.length).toBe(MCP_TOOLS.length);
     expect(hint.version).toBe(LATEST_PROTOCOL_VERSION);
   });
 
@@ -215,7 +236,7 @@ describe('POST /mcp — full handshake', () => {
         tools: Array<{ name: string; outputSchema?: unknown; inputSchema?: unknown }>;
       }
     ).tools;
-    expect(tools).toHaveLength(9);
+    expect(tools).toHaveLength(MCP_TOOLS.length);
 
     const expectedNames = [
       'validate_iban',
@@ -227,6 +248,8 @@ describe('POST /mcp — full handshake', () => {
       'validate_payment_reference',
       'check_postal_address',
       'check_swiss_qr_bill',
+      'request_api_key',
+      'poll_api_key',
     ];
     for (const expected of expectedNames) {
       const tool = tools.find((t) => t.name === expected);
@@ -850,7 +873,14 @@ describe('tools/list and tools/call — the price is stated, the bill is honest'
     const tools = (listResp.result as { tools: Array<{ name: string; description?: string }> })
       .tools;
     for (const tool of tools) {
-      if (tool.name === 'send_feedback') continue; // free by design, and says so in its own words
+      // 🚨 Le MEME ensemble que `mcpToolUnits`, importe et non recopie : un
+      // outil gratuit dans l'un et pas dans l'autre est soit facture en
+      // silence, soit documente a tort. Ces trois-la sont gratuits par
+      // construction et le disent dans leurs propres mots — et les deux du
+      // device grant ne peuvent PAS porter `costLine()`, qui renvoie vers la
+      // clef gratuite : un outil dont le role est de DONNER la clef qui
+      // afficherait « ou prenez une clef gratuite » serait une boucle.
+      if (MCP_FREE_TOOLS.has(tool.name)) continue;
       expect(tool.description, `${tool.name} states no price`).toContain('COST:');
       expect(tool.description, `${tool.name} states no free allowance`).toContain(
         '/v1/keys/generate',
@@ -963,5 +993,296 @@ describe('POST /mcp — Host allow-list', () => {
     } finally {
       delete process.env.MCP_ALLOWED_HOSTS;
     }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Device grant (RFC 8628) sur la surface HTTP distante
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Les deux outils du device grant, sur la seule surface MCP multi-locataire.
+ *
+ * Ce qui se joue ici n'est pas « l'outil répond » : c'est que la porte de
+ * SORTIE du plafond ne soit pas fermée par la serrure qu'elle doit ouvrir, que
+ * le refus arrive comme une DONNÉE et non comme une panne, et que
+ * l'identifiant de session ne devienne pas un porteur de clé API.
+ */
+describe('device grant — les deux outils sur le transport HTTP', () => {
+  /** Une réponse brute, pour les tests qui regardent les EN-TÊTES. */
+  async function rpcRaw(
+    app: ReturnType<typeof makeApp>,
+    sessionId: string,
+    params: Record<string, unknown>,
+    clientIp: string,
+  ): Promise<Response> {
+    return app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        'x-real-ip': clientIp,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params }),
+    });
+  }
+
+  interface ToolResult {
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+    content?: Array<{ type: string; text: string }>;
+  }
+
+  async function callTool(
+    app: ReturnType<typeof makeApp>,
+    sessionId: string,
+    name: string,
+    args: Record<string, unknown> = {},
+    clientIp: string = freshIp(),
+  ): Promise<ToolResult> {
+    const resp = await rpc(app, sessionId, 'tools/call', { name, arguments: args }, 8, clientIp);
+    expect(resp.error, `${name} a répondu une erreur JSON-RPC`).toBeUndefined();
+    return resp.result as ToolResult;
+  }
+
+  /**
+   * Approuver comme la page le fait : par les DEUX routes humaines.
+   *
+   * 🚨 Pas `approveGrant()` en direct. C'est `generateApiKey` qui frappe la clé
+   * ET écrit sa ligne de naissance dans `key_creations`, et c'est précisément
+   * cet invariant que le test 28 mesure. Approuver par le module sauterait la
+   * frappe et le test compterait zéro ligne en se croyant vert.
+   */
+  async function approveByPage(userCode: string): Promise<void> {
+    const app = new Hono();
+    app.route('/', deviceGrant);
+    const lookup = await app.request('/v1/keys/device/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_code: userCode }),
+    });
+    expect(lookup.status, `lookup a refusé ${userCode}`).toBe(200);
+    const { approval_token } = (await lookup.json()) as { approval_token: string };
+    const approve = await app.request('/v1/keys/device/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_code: userCode, approval_token }),
+    });
+    expect(approve.status, `approve a refusé ${userCode}`).toBe(200);
+  }
+
+  // ── 22 ──────────────────────────────────────────────────────────────────────
+  it('22. ne coûtent rien : ils répondent encore après le plafond d’unités', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.201';
+    const sessionId = await initialize(app, ip);
+
+    // Le plafond d'unités épuisé sur la même adresse, par le chemin normal.
+    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+      await rpc(
+        app,
+        sessionId,
+        'tools/call',
+        { name: 'validate_iban', arguments: { iban: 'DE89370400440532013000' } },
+        10 + i,
+        ip,
+      );
+    }
+
+    // 🚨 Le cœur du lot : la porte de sortie doit rester ouverte APRÈS le mur.
+    // `allowed = count <= limit` est faux dès le quota dépassé, donc un outil
+    // qui coûterait une unité serait refusé ici.
+    const opened = await callTool(app, sessionId, 'request_api_key', {}, ip);
+    expect(opened.isError, 'request_api_key refusé après le plafond').toBeFalsy();
+    expect(opened.structuredContent!.status).toBe('ok');
+
+    const polled = await callTool(app, sessionId, 'poll_api_key', {}, ip);
+    expect(polled.isError, 'poll_api_key refusé après le plafond').toBeFalsy();
+    expect(polled.structuredContent!.status).toBe('authorization_pending');
+  });
+
+  // ── 29bis ───────────────────────────────────────────────────────────────────
+  it('29bis. et le plafond d’unités n’a pas bougé pour les autres outils', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.202';
+    const sessionId = await initialize(app, ip);
+    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+      await rpc(
+        app,
+        sessionId,
+        'tools/call',
+        { name: 'validate_iban', arguments: { iban: 'DE89370400440532013000' } },
+        20 + i,
+        ip,
+      );
+    }
+    const refused = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      { name: 'validate_iban', arguments: { iban: 'DE89370400440532013000' } },
+      99,
+      ip,
+    );
+    expect(refused.error, 'validate_iban a perdu son refus au plafond').toBeDefined();
+    expect(refused.error!.code).toBe(-32000);
+  });
+
+  // ── 26 ──────────────────────────────────────────────────────────────────────
+  it('26. authorization_pending n’est PAS une erreur MCP', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.203';
+    const sessionId = await initialize(app, ip);
+    await callTool(app, sessionId, 'request_api_key', {}, ip);
+
+    const polled = await callTool(app, sessionId, 'poll_api_key', {}, ip);
+    // Sans cela, l'agent conclut à une panne au premier tour et abandonne
+    // avant même que l'humain n'ait eu le temps de cliquer.
+    expect(polled.structuredContent!.status).toBe('authorization_pending');
+    expect(polled.isError, 'un pending ne doit JAMAIS porter isError').toBeFalsy();
+  });
+
+  // ── 26bis ───────────────────────────────────────────────────────────────────
+  it('26bis. device_rate_limited n’est pas une erreur MCP non plus', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.204';
+    const sessionId = await initialize(app, ip);
+    // Le budget de créations du réseau, épuisé par des grants en attente : une
+    // réservation compte, même sans approbation.
+    for (let i = 0; i < DAILY_KEY_CREATION_LIMIT; i++) {
+      const ok = await callTool(app, sessionId, 'request_api_key', {}, ip);
+      expect(ok.structuredContent!.status, `le grant ${i + 1} aurait dû passer`).toBe('ok');
+    }
+
+    const refused = await callTool(app, sessionId, 'request_api_key', {}, ip);
+    expect(refused.structuredContent!.status).toBe('device_rate_limited');
+    expect(refused.structuredContent!.user_code).toBeNull();
+    // Peuplé, pas vide : c'est ce bloc qui envoie l'agent vers l'essai sans clé
+    // ou x402 au lieu de le laisser croire le service en panne.
+    expect(String(refused.structuredContent!.display_to_human).length).toBeGreaterThan(0);
+    expect(refused.isError, 'un refus de plafond ne doit pas porter isError').toBeFalsy();
+  });
+
+  // ── 27 et 27ter ─────────────────────────────────────────────────────────────
+  it('27. poll_api_key sans argument reprend le dernier code, 27ter. et l’entrée est purgée au premier retrait', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.205';
+    const sessionId = await initialize(app, ip);
+
+    const opened = await callTool(app, sessionId, 'request_api_key', {}, ip);
+    const userCode = String(opened.structuredContent!.user_code);
+    await approveByPage(userCode);
+
+    // Sans argument : l'outil retrouve le code de la session.
+    const collected = await callTool(app, sessionId, 'poll_api_key', {}, ip);
+    expect(collected.structuredContent!.status).toBe('approved');
+    expect(String(collected.structuredContent!.api_key)).toMatch(/^ifk_/);
+    expect(String(collected.structuredContent!.config_line)).toContain('IBANFORGE_API_KEY=ifk_');
+
+    // 27ter : l'entrée est partie. Un second appel sans argument ne doit PAS
+    // répondre « clé déjà remise sur le grant précédent » — il n'y a plus de
+    // grant du tout.
+    const again = await callTool(app, sessionId, 'poll_api_key', {}, ip);
+    expect(again.structuredContent!.status).toBe('invalid_grant');
+    expect(again.structuredContent!.api_key).toBeNull();
+  });
+
+  // ── 27bis ───────────────────────────────────────────────────────────────────
+  it('27bis. le retrait implicite est lié à l’EMPREINTE, pas à la session', async () => {
+    const app = makeApp();
+    const ip1 = '198.51.100.206';
+    const ip2 = '203.0.113.206';
+    // La session s'ouvre depuis l'IP 1, et le grant aussi.
+    const sessionId = await initialize(app, ip1);
+    const opened = await callTool(app, sessionId, 'request_api_key', {}, ip1);
+    const userCode = String(opened.structuredContent!.user_code);
+    await approveByPage(userCode);
+
+    // 🚨 MÊME session, AUTRE adresse. Sans la liaison, l'identifiant de session
+    // — qui voyage en clair dans un en-tête à travers les passerelles d'agents
+    // et les proxys MCP — serait un porteur de clé API : son vol donnerait une
+    // clé vivante retirée par un poll sans argument.
+    const stolen = await callTool(app, sessionId, 'poll_api_key', {}, ip2);
+    expect(stolen.structuredContent!.status).toBe('invalid_grant');
+    expect(
+      stolen.structuredContent!.api_key,
+      'une clé est sortie sur la mauvaise empreinte',
+    ).toBeNull();
+
+    // Et l'appelant légitime, lui, retire bien sa clé.
+    const legit = await callTool(app, sessionId, 'poll_api_key', {}, ip1);
+    expect(legit.structuredContent!.status).toBe('approved');
+    expect(String(legit.structuredContent!.api_key)).toMatch(/^ifk_/);
+  });
+
+  // ── 28 ──────────────────────────────────────────────────────────────────────
+  it('28. la garde de quota vaut AUSSI sur la surface MCP HTTP, et une clé = une ligne de naissance', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.207';
+    const sessionId = await initialize(app, ip);
+
+    const codes: string[] = [];
+    for (let i = 0; i < DAILY_KEY_CREATION_LIMIT; i++) {
+      const opened = await callTool(app, sessionId, 'request_api_key', {}, ip);
+      expect(opened.structuredContent!.status, `le grant ${i + 1} aurait dû passer`).toBe('ok');
+      codes.push(String(opened.structuredContent!.user_code));
+    }
+
+    // 🚨 Sans cette assertion, tout le constat « la porte MCP ne compte pas »
+    // peut revenir en silence.
+    const refused = await callTool(app, sessionId, 'request_api_key', {}, ip);
+    expect(
+      refused.structuredContent!.status,
+      'la porte MCP a ouvert un grant de plus que le budget du réseau',
+    ).toBe('device_rate_limited');
+
+    for (const code of codes) await approveByPage(code);
+
+    // L'invariant de naissance, rejoué sur ce chemin : exactement une ligne
+    // `key_creations` par clé frappée, et pas une de plus.
+    const source = keyCreationSource(ip)!;
+    const row = getStatsDB()
+      .prepare('SELECT COUNT(*) AS n FROM key_creations WHERE ip_hash = ?')
+      .get(source) as { n: number };
+    expect(row.n, 'double comptage : le disjoncteur s’armerait à la moitié du volume réel').toBe(
+      DAILY_KEY_CREATION_LIMIT,
+    );
+  });
+
+  // ── 29 ──────────────────────────────────────────────────────────────────────
+  it('29. un appel gratuit reste un événement MESURÉ', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.208';
+    const sessionId = await initialize(app, ip);
+
+    const res = await rpcRaw(app, sessionId, { name: 'request_api_key', arguments: {} }, ip);
+    expect(res.status).toBe(200);
+    // 🚨 L'assertion vise le bloc qui pose l'en-tête sur l'objet Response du
+    // SDK, pas celui du plafond : ce sont deux blocs et deux éditions. Zéro
+    // unité n'est pas zéro événement, et la porte de sortie du plafond est la
+    // dernière chose qu'on peut se permettre de ne pas mesurer.
+    expect(
+      res.headers.get('x-mcp-tool'),
+      'un outil gratuit a tourné sans que la télémétrie le sache',
+    ).toBe('request_api_key');
+  });
+
+  // ── 30 ──────────────────────────────────────────────────────────────────────
+  it('30. la sortie structurée ne porte AUCUN ifd_', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.209';
+    const sessionId = await initialize(app, ip);
+
+    const opened = await callTool(app, sessionId, 'request_api_key', {}, ip);
+    // 🚨 Le `device_code` est le porteur UNIQUE de la clé : quiconque le lit
+    // retire la clé à la place de l'agent, sans jeton et sans adresse. Or une
+    // sortie d'outil traverse le transcript du modèle conservé chez son
+    // fournisseur, les journaux du client MCP et les copier-coller de rapport
+    // d'incident. Il ne sort donc pas — ni en champ, ni dans le bloc destiné à
+    // l'humain.
+    expect(JSON.stringify(opened.structuredContent)).not.toContain('ifd_');
+    expect(JSON.stringify(opened.content)).not.toContain('ifd_');
+    expect(String(opened.structuredContent!.display_to_human)).not.toContain('ifd_');
   });
 });

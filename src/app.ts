@@ -484,6 +484,16 @@ curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \\
 
 Takes the text inside a Swiss QR-bill code (\`payload\`, real line breaks) and returns every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON checksum and pairing with the IBAN, amount, currency, and \`ready_for_2026_11_14\`: whether the addresses are structured (type S) or still combined (type K), which banks stop processing on 14 November 2026. A combined address comes back with \`proposed_structured\`.
 
+### 9. request_api_key + poll_api_key — a durable key, approved by a human (${toolPriceLabel('request_api_key')})
+
+\`\`\`bash
+curl -s -X POST https://api.ibanforge.com/v1/keys/device \\
+  -H "Content-Type: application/json" \\
+  -d '{"client_name":"my agent","reason":"validate supplier IBANs before payout"}'
+\`\`\`
+
+Two MCP tools, and the only door that asks the agent for **nothing at all** — not an address, not a card, not even a REST call. \`request_api_key\` answers a short spoken-friendly code, a link, and a \`display_to_human\` block to show your human **verbatim**; they open the page, check the code matches, and click. Then \`poll_api_key\` (no argument needed) returns the key **once**, with the exact \`config_line\` to paste into an MCP client. The key is ${ANONYMOUS_MONTHLY_LIMIT} requests a month with no address of any kind, or ${FREE_TIER_MONTHLY_LIMIT} if your human chooses to add one on that page. Both tools are free and keep answering **after** the daily limit — that is what they are for. Over REST the same pair is \`POST /v1/keys/device\` then \`POST /v1/keys/device/token\` (long-polling; \`authorization_pending\` is normal, never loop tighter than the \`interval\`).
+
 ### 9. /v1/iban/format — free pre-flight (no auth, no payment)
 
 \`\`\`bash
@@ -896,6 +906,11 @@ export function buildApp(): Hono<HonoEnv> {
           'GET /v1/credits/bundles',
           'POST /v1/keys/generate',
           'POST /v1/keys/claim',
+          // Le chemin agent du device grant : aucune clé, aucun paiement, et
+          // c'est la seule porte qui ne demande pas à l'agent de manier une
+          // adresse. Liste tenue à la main ; aucun test ne la garde.
+          'POST /v1/keys/device',
+          'POST /v1/keys/device/token',
           'GET /v1/keys/usage',
           'GET /v1/keys/report',
         ],

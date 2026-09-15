@@ -97,6 +97,13 @@ const CONSTANT_DECLARATION = /^export const [A-Z0-9_]+ = \d+;/;
 const MIGRATED = [
   'src/app.ts',
   'src/lib/attribution.ts',
+  // Ajoutés par le lot des surfaces MCP (15/09/2026), chacun MESURÉ à zéro
+  // avant d'entrer ici : ils portent désormais les textes du device grant, donc
+  // ils appartiennent à la même discipline que les autres surfaces d'agents.
+  'src/lib/consent.ts',
+  'src/mcp/inventory.ts',
+  'src/mcp/output-schemas.ts',
+  'src/mcp/server.ts',
   'src/lib/forum-draft-gen.ts',
   'src/lib/mcp-resources.ts',
   'src/lib/trial.ts',

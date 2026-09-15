@@ -41,6 +41,85 @@ const F = datasetFacts();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
+// ────────────────────────────────────────────────────────────────────────────
+// 🚨 LE SEUL APPEL RÉSEAU DE CE FICHIER, ET IL EST LÀ POUR UNE RAISON
+// ────────────────────────────────────────────────────────────────────────────
+// Un device grant est une ligne de la base de PRODUCTION, et l'humain approuve
+// sur le site de production. Ce serveur-ci est son PROPRE processus, lancé sur
+// la machine d'un développeur ou chez un hébergeur tiers : le `getStatsDB()`
+// qu'il ouvre est la base locale de ce processus, pas celle de la production.
+// Une clé frappée là n'existe pas dans api.ibanforge.com — l'agent la rendrait
+// à son humain, qui la collerait, et elle répondrait 401. Le grant est par
+// nature une opération DISTANTE ; les deux outils sont donc un relais, pas une
+// frappe, et le reste du fichier ne parle toujours à personne.
+//
+// Même variable d'environnement que le paquet npm, pour qu'une instance
+// auto-hébergée se règle une fois.
+const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
+
+/**
+ * 🚨 L'attente du client DOIT dépasser celle du serveur.
+ *
+ * `POST /v1/keys/device/token` retient la requête jusqu'à `DEVICE_POLL_WAIT_MS`
+ * (30 s en production). Un client réglé sur la même valeur perd la course :
+ * il abandonne à l'instant où le serveur répond, et `poll_api_key` rendrait une
+ * erreur de transport au premier tour — l'agent abandonnerait avant que
+ * l'humain n'ait cliqué, ce qui est exactement le défaut que ce module existe
+ * pour éviter. La marge est vérifiée par `scripts/mcp-parity.test.ts`.
+ */
+const DEVICE_RELAY_TIMEOUT_MS = 45_000;
+
+/** Le relais HTTP des deux outils du device grant, et rien d'autre. */
+async function deviceRelay(
+  path: '/v1/keys/device' | '/v1/keys/device/token',
+  body: Record<string, unknown>,
+): Promise<{ status: number; data: Record<string, unknown> }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEVICE_RELAY_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = undefined;
+    }
+    const data =
+      parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    return { status: res.status, data };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function relayString(data: Record<string, unknown>, field: string): string | null {
+  const value = data[field];
+  return typeof value === 'string' ? value : null;
+}
+
+function relayNumber(data: Record<string, unknown>, field: string): number | null {
+  const value = data[field];
+  return typeof value === 'number' ? value : null;
+}
+
+/**
+ * Le dernier `device_code` demandé sur cette surface.
+ *
+ * Une variable de module suffit ici, et ce n'est pas un raccourci : ce
+ * processus appartient à un seul humain, il n'y a aucun locataire à isoler. La
+ * liaison à l'empreinte de réseau est propre à la surface HTTP distante, qui
+ * est la seule multi-locataire.
+ */
+let lastDeviceCode: string | null = null;
+
 const server = new McpServer(
   {
     name: 'ibanforge',
@@ -719,6 +798,209 @@ server.registerTool(
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
       structuredContent: payload as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+// ── Device grant (RFC 8628) : RELAIS, PAS FRAPPE ─────────────────────────────
+
+server.registerTool(
+  'request_api_key',
+  {
+    title: 'Request an IBANforge API key',
+    description:
+      'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
+      'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+      'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
+      'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
+      'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
+      'Then call poll_api_key. ' +
+      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+    inputSchema: {
+      client_name: z
+        .string()
+        .max(60)
+        .optional()
+        .describe('Optional. Who is asking, shown to the human on the approval page.'),
+      reason: z
+        .string()
+        .max(200)
+        .optional()
+        .describe('Optional. What the key is for, shown to the human on the approval page.'),
+    },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.request_api_key,
+    annotations: {
+      title: 'Request an IBANforge API key',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  },
+  async ({ client_name, reason }) => {
+    // 🚨 Aucune serrure recopiée ici : la route porte la réservation par réseau
+    // et le plafond horaire dans `openGrant()`, et ce relais en hérite sans
+    // rien écrire. Un plafond réimplémenté dans ce fichier serait un second
+    // chiffre à tenir d'accord avec le premier.
+    const { status, data } = await deviceRelay('/v1/keys/device', {
+      client_name,
+      reason,
+      source: 'mcp-stdio-device',
+    });
+
+    // 🚨 Un refus n'est PAS une erreur d'outil : l'agent doit pouvoir lire le
+    // refus et prendre le chemin de repli. Le corps du 429 porte déjà son
+    // `display_to_human`, construit par le serveur.
+    if (status !== 201) {
+      const error = relayString(data, 'error');
+      const refused = {
+        status: error === 'device_rate_limited' ? 'device_rate_limited' : 'device_unavailable',
+        user_code: null,
+        verification_uri: null,
+        verification_uri_complete: null,
+        expires_in: null,
+        interval: null,
+        display_to_human:
+          relayString(data, 'display_to_human') ??
+          relayString(data, 'message') ??
+          'The key service did not open a request. Validation still works; try again in a minute.',
+      };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(refused) }],
+        structuredContent: refused as unknown as Record<string, unknown>,
+      };
+    }
+
+    // Le `device_code` reste DANS ce processus : il arrive par le corps HTTP et
+    // n'entre jamais dans la sortie de l'outil.
+    lastDeviceCode = relayString(data, 'device_code');
+
+    const payload = {
+      status: 'ok' as const,
+      user_code: relayString(data, 'user_code'),
+      verification_uri: relayString(data, 'verification_uri'),
+      verification_uri_complete: relayString(data, 'verification_uri_complete'),
+      expires_in: relayNumber(data, 'expires_in'),
+      interval: relayNumber(data, 'interval'),
+      display_to_human: relayString(data, 'display_to_human') ?? '',
+    };
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+      structuredContent: payload as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'poll_api_key',
+  {
+    title: 'Collect the approved IBANforge API key',
+    description:
+      'Collect the API key once a human has approved the request opened by request_api_key. ' +
+      'USE WHEN: you have called request_api_key and shown the code to your human. ' +
+      'HOW TO CALL IT: leave `device_code` empty to reuse the last request from this session. ' +
+      'The server usually waits up to thirty seconds before answering, and sometimes answers at once when it is busy — either way, calling it once per minute is enough, never in a tight loop. ' +
+      'WHAT THE ANSWERS MEAN: `authorization_pending` is normal and means nobody has approved yet — wait `retry_in_seconds` and call again; ' +
+      '`approved` carries the key ONCE and never again, so hand it to your human immediately together with `config_line`; ' +
+      '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
+      '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
+      '`invalid_grant` means this code can no longer be used at all — stop. ' +
+      'This tool is free and does NOT count against the daily free-tier limit.',
+    inputSchema: {
+      device_code: z
+        .string()
+        .optional()
+        .describe('Optional. Leave it empty to reuse the last request from this session.'),
+    },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.poll_api_key,
+    annotations: {
+      title: 'Collect the approved IBANforge API key',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  },
+  async ({ device_code }) => {
+    const secret = device_code?.trim() || lastDeviceCode;
+    const pending = (
+      partial: Partial<Record<string, unknown>> & { status: string; message: string },
+    ) => ({
+      api_key: null,
+      key_prefix: null,
+      tier: null,
+      monthly_limit: null,
+      email: null,
+      retry_in_seconds: null,
+      expires_in: null,
+      config_line: null,
+      ...partial,
+    });
+
+    if (!secret) {
+      const answer = pending({
+        status: 'invalid_grant',
+        message:
+          'No device code to collect. Call request_api_key first, and show the code to your human.',
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(answer) }],
+        structuredContent: answer as unknown as Record<string, unknown>,
+      };
+    }
+
+    const { status, data } = await deviceRelay('/v1/keys/device/token', { device_code: secret });
+
+    // 🚨 `authorization_pending` ET `slow_down` arrivent en 400, et ce ne sont
+    // PAS des échecs. Conclure à l'erreur sur le statut HTTP seul ferait
+    // abandonner l'agent au premier tour, avant que l'humain n'ait cliqué.
+    if (status !== 200) {
+      const error = relayString(data, 'error');
+      const known = new Set([
+        'authorization_pending',
+        'slow_down',
+        'access_denied',
+        'expired_token',
+        'invalid_grant',
+      ]);
+      // `slow_down` n'est pas une valeur du schéma de sortie : un agent qui
+      // poll trop vite est un agent qui doit attendre, ce que
+      // `authorization_pending` plus `retry_in_seconds` dit déjà.
+      const mapped =
+        error === 'slow_down'
+          ? 'authorization_pending'
+          : known.has(error ?? '')
+            ? error!
+            : 'invalid_grant';
+      const answer = pending({
+        status: mapped,
+        retry_in_seconds: relayNumber(data, 'interval'),
+        expires_in: relayNumber(data, 'expires_in'),
+        message:
+          relayString(data, 'message') ??
+          'The key service did not answer. Validation still works; try again in a minute.',
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(answer) }],
+        structuredContent: answer as unknown as Record<string, unknown>,
+      };
+    }
+
+    // Retiré une fois, jamais deux : on oublie le code dès qu'il a rendu sa clé.
+    lastDeviceCode = null;
+    const answer = pending({
+      status: 'approved',
+      api_key: relayString(data, 'api_key'),
+      key_prefix: relayString(data, 'key_prefix'),
+      tier: relayString(data, 'tier'),
+      monthly_limit: relayNumber(data, 'monthly_limit'),
+      email: relayString(data, 'email'),
+      config_line: relayString(data, 'config_line'),
+      message: relayString(data, 'message') ?? 'Save this key — it will not be shown again.',
+    });
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(answer) }],
+      structuredContent: answer as unknown as Record<string, unknown>,
     };
   },
 );

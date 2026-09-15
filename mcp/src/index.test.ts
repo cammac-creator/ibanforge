@@ -193,7 +193,7 @@ afterAll(async () => {
 });
 
 describe('every tool declaring an outputSchema honours it', () => {
-  it('exposes eleven tools, all of them declaring an output schema', async () => {
+  it('exposes thirteen tools, all of them declaring an output schema', async () => {
     const { tools } = await client.listTools();
     // Six depuis le 21/08/2026 : `send_feedback` a rejoint les 5 outils de
     // donnée (audit B3 — le paquet npm était la seule surface sans boîte à
@@ -202,7 +202,15 @@ describe('every tool declaring an outputSchema honours it', () => {
     // Onze depuis le 07/09/2026 : `audit_creditor_file` et `audit_status`,
     // l'audit de fichier créanciers payant — voir l'en-tête de
     // mcp/src/index.ts pour le motif du gap avec les deux autres surfaces MCP.
-    expect(tools).toHaveLength(11);
+    // Treize depuis le 15/09/2026 : `request_api_key` et `poll_api_key`, le
+    // device grant. Ces deux-là sont sur les TROIS surfaces, donc ils
+    // n'entrent pas dans A_ONLY_TOOLS.
+    //
+    // 🚨 Le chiffre reste écrit ici, contrairement aux tests de l'API qui
+    // lisent `MCP_TOOLS.length` : ce paquet est publié séparément et ne peut
+    // pas importer depuis `src/`. C'est `scripts/mcp-parity.test.ts` qui relie
+    // les deux listes.
+    expect(tools).toHaveLength(13);
     for (const t of tools) {
       expect(t.outputSchema, `${t.name} declares no outputSchema`).toBeDefined();
     }

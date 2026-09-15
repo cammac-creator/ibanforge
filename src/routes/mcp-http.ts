@@ -1,8 +1,18 @@
 /**
  * HTTP transport for the MCP server.
- * Exposes the 7 data tools of the stdio MCP server plus send_feedback (validate_iban, batch_validate_iban,
- * lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference, check_postal_address) via
- * Streamable HTTP at /mcp — compatible with Smithery, remote MCP clients, etc.
+ *
+ * Exposes, via Streamable HTTP at /mcp and compatible with Smithery and remote
+ * MCP clients: the eight data tools of the stdio MCP server (validate_iban,
+ * batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing,
+ * validate_payment_reference, check_postal_address, check_swiss_qr_bill), plus
+ * the three tools that write — send_feedback, and the device grant pair
+ * request_api_key / poll_api_key.
+ *
+ * 🚨 The count is not written here on purpose. This header claimed "7 data
+ * tools plus send_feedback" while the transport served nine, which is the same
+ * defect `src/mcp/inventory.ts` exists to cure: a literal beside a moving list
+ * always loses. `src/mcp/inventory.ts` is the list; this is a sentence about
+ * shape.
  */
 
 import { Hono } from 'hono';
@@ -50,6 +60,26 @@ import {
   KEY_CLAIM_URL,
   KEY_GENERATE_URL,
 } from '../lib/tiers.js';
+import { keyCreationSource } from '../lib/key-creation-guard.js';
+import {
+  DEVICE_CODE_TTL_SECONDS,
+  DEVICE_POLL_INTERVAL_SECONDS,
+  DEVICE_SLOW_DOWN_INCREMENT_SECONDS,
+  DEVICE_TEXTS,
+  DEVICE_VERIFICATION_URI,
+  awaitGrantSettlement,
+  consumeGrantKey,
+  deviceConfigLine,
+  displayToHuman,
+  findGrantBySecret,
+  type GrantRow,
+  grantMonthlyLimit,
+  hashGrantSecret,
+  openGrant,
+  sanitizeDisplayField,
+  secondsUntil,
+  touchPoll,
+} from '../lib/device-grant.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -216,7 +246,200 @@ const READ_ONLY_ANNOTATIONS = {
   openWorldHint: false,
 } as const;
 
-function createMcpServer(): McpServer {
+/**
+ * What the tool handlers are allowed to know about the CURRENT caller.
+ *
+ * 🚨 MUTABLE, and refreshed by the POST handler on every request. Until the
+ * device grant landed, no tool handler had any access to the caller at all —
+ * `createMcpServer()` took no parameter and the one write this surface did
+ * (send_feedback) passed `ipHash: null`.
+ *
+ * Mutable and not a value, because `createMcpServer()` is called ONCE per
+ * session while `request_api_key` and `poll_api_key` are called many times
+ * afterwards, potentially from other addresses: the session id travels in a
+ * plain header through agent gateways and MCP proxies. A context captured by
+ * value at session creation would freeze the address of the session OPENING for
+ * the whole of its life, and then:
+ *   - the per-network reservation would meter the opening address, not the
+ *     caller's;
+ *   - and the fingerprint binding below would have no CURRENT fingerprint left
+ *     to compare against.
+ */
+export interface McpCallContext {
+  ip: string | null;
+  userAgent: string | null;
+}
+
+/**
+ * The context objects the live tool closures hold, by session id.
+ *
+ * Kept beside the session store rather than inside it: the store owns
+ * transports and its eviction closes them, while this is plain data whose only
+ * job is to be mutated in place.
+ */
+const sessionCtx = new Map<string, McpCallContext>();
+
+/**
+ * The last `device_code` requested on a session, WITH the fingerprint that
+ * opened it.
+ *
+ * 🚨 The fingerprint is half of this entry, and it is the half that matters.
+ * `poll_api_key` accepts no argument and reuses the last request, so without
+ * the binding the session id would become a BEARER OF AN API KEY: the store
+ * above attaches a session to no address, and the id travels in clear through
+ * every proxy between an agent and here. The generator is sound
+ * (`crypto.randomUUID()`), so the id cannot be guessed — what changes without
+ * the binding is the blast radius of a LEAK, not its probability. Today a
+ * stolen id is worth at most the daily unit allowance; without this, it would
+ * be worth a live API key, collected by an argument-less `poll_api_key`.
+ *
+ * Purged on the first successful collection (a grant is collected once anyway)
+ * and on `onsessionclosed`.
+ *
+ * The fingerprint is the one that OPENED the grant, hashed exactly as
+ * `openGrant` hashes it — the `'unknown'` sentinel an MCP surface substitutes
+ * for an absent address is treated there as an absence, so it is treated as one
+ * here too. Hashing it differently would make the binding test pass for the
+ * wrong reason.
+ */
+const sessionDeviceCode = new Map<string, { deviceCode: string; ipHash: string | null }>();
+
+/** The same mapping `openGrant` applies before `keyCreationSource`. */
+function mcpFingerprint(ctx: McpCallContext): string | null {
+  return ctx.ip && ctx.ip !== 'unknown' ? keyCreationSource(ctx.ip) : null;
+}
+
+/** The structured answer of `poll_api_key`, exactly the declared schema. */
+interface PollAnswer {
+  status:
+    'authorization_pending' | 'approved' | 'access_denied' | 'expired_token' | 'invalid_grant';
+  api_key: string | null;
+  key_prefix: string | null;
+  tier: 'anonymous' | 'email' | 'claimed' | 'paid' | null;
+  monthly_limit: number | null;
+  email: string | null;
+  retry_in_seconds: number | null;
+  expires_in: number | null;
+  config_line: string | null;
+  message: string;
+}
+
+function pollAnswer(
+  partial: Partial<PollAnswer> & { status: PollAnswer['status']; message: string },
+): PollAnswer {
+  // 🚨 Every field is declared and present, `null` where there is nothing to
+  // say. The SDK validates the payload against the output schema and drops
+  // `structuredContent` SILENTLY on a mismatch, so a field left out is a field
+  // no agent will ever see — and the whole answer goes with it.
+  return {
+    api_key: null,
+    key_prefix: null,
+    tier: null,
+    monthly_limit: null,
+    email: null,
+    retry_in_seconds: null,
+    expires_in: null,
+    config_line: null,
+    ...partial,
+  };
+}
+
+/**
+ * The answer when the grant is no longer pending, or no longer alive. `null`
+ * means "pending and alive", the only case where we wait.
+ *
+ * 🚨 The collection is attempted BEFORE the interval check, exactly as the HTTP
+ * route does it: an approved key is the terminal answer, and putting two
+ * concurrent collections through a `slow_down` would make uniqueness
+ * untestable. `consumeGrantKey` stays the sole judge of the race.
+ */
+function settleDeviceGrant(grant: GrantRow, secretHash: string): PollAnswer | null {
+  if (grant.status === 'denied') {
+    return pollAnswer({ status: 'access_denied', message: DEVICE_TEXTS.access_denied });
+  }
+  if (grant.status === 'delivered') {
+    return pollAnswer({ status: 'invalid_grant', message: DEVICE_TEXTS.invalid_grant });
+  }
+  if (grant.status === 'approved') {
+    // 🚨 Le second argument est le RAIL, et il est obligatoire : un nonce de
+    // paiement présenté ici ne rend rien.
+    const minted = consumeGrantKey(secretHash, 'device');
+    if (minted) {
+      return pollAnswer({
+        status: 'approved',
+        api_key: minted.api_key,
+        key_prefix: minted.key_prefix,
+        tier: minted.tier,
+        monthly_limit: grantMonthlyLimit(minted.tier, minted.monthly_limit),
+        // Absent on the anonymous tier on the REST route; here the schema
+        // declares the field, so it is `null` rather than missing — and `null`
+        // is not a word an agent can mistake for an address.
+        email: minted.email,
+        config_line: deviceConfigLine(minted.api_key),
+        message: DEVICE_TEXTS.saved,
+      });
+    }
+    // Approved but nothing left to hand over: either the collection window
+    // closed, or a concurrent race won. Both answers are honest and different,
+    // and that is what lets the agent know whether it may re-open a grant.
+    return grant.expired === 1
+      ? pollAnswer({ status: 'expired_token', message: DEVICE_TEXTS.expired_token })
+      : pollAnswer({ status: 'invalid_grant', message: DEVICE_TEXTS.invalid_grant });
+  }
+  if (grant.status === 'expired' || grant.expired === 1) {
+    return pollAnswer({ status: 'expired_token', message: DEVICE_TEXTS.expired_token });
+  }
+  return null;
+}
+
+/**
+ * `poll_api_key` on this surface: the database directly, no HTTP.
+ *
+ * The long wait is `awaitGrantSettlement` — the SAME loop the HTTP route runs,
+ * with the same three `pollsInFlight` ceilings. Two loops would have given two
+ * behaviours under saturation, and both answer `authorization_pending`, so
+ * nothing would say which one was right.
+ */
+async function collectDeviceGrant(secret: string, ipHash: string | null): Promise<PollAnswer> {
+  const secretHash = hashGrantSecret(secret);
+  const grant = findGrantBySecret(secret, 'device');
+  if (!grant) {
+    return pollAnswer({ status: 'invalid_grant', message: DEVICE_TEXTS.invalid_grant });
+  }
+
+  const settled = settleDeviceGrant(grant, secretHash);
+  if (settled) return settled;
+
+  // 🚨 `slow_down` has no place in the output enum (§2.7 names five statuses),
+  // and inventing a sixth would drop `structuredContent` in silence. An agent
+  // polling too fast is an agent that must wait, which is exactly what
+  // `authorization_pending` plus `retry_in_seconds` already says — so it is
+  // reported as that, with the RFC 8628 increment added to the interval.
+  if (touchPoll(secretHash, 'device') === 'slow_down') {
+    return pollAnswer({
+      status: 'authorization_pending',
+      retry_in_seconds: DEVICE_POLL_INTERVAL_SECONDS + DEVICE_SLOW_DOWN_INCREMENT_SECONDS,
+      expires_in: grant.expires_in,
+      message: DEVICE_TEXTS.slow_down,
+    });
+  }
+
+  const waited = await awaitGrantSettlement(secret, 'device', grant, ipHash);
+  if (waited.kind === 'vanished') {
+    return pollAnswer({ status: 'invalid_grant', message: DEVICE_TEXTS.invalid_grant });
+  }
+
+  const after = settleDeviceGrant(waited.grant, secretHash);
+  if (after) return after;
+  return pollAnswer({
+    status: 'authorization_pending',
+    retry_in_seconds: DEVICE_POLL_INTERVAL_SECONDS,
+    expires_in: secondsUntil(waited.grant.expires_at),
+    message: DEVICE_TEXTS.authorization_pending,
+  });
+}
+
+function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefined): McpServer {
   const server = new McpServer(
     {
       name: 'ibanforge',
@@ -730,12 +953,192 @@ function createMcpServer(): McpServer {
         got,
         contact: contact ?? null,
         agent: agent ?? 'mcp',
-        ipHash: null,
+        // Was `null` until the call context landed (2026-09-15), which made
+        // every report from this transport untraceable. Free benefit of the
+        // signature change, taken because it was free.
+        ipHash: mcpFingerprint(ctx),
       });
       const payload = { ok: true, id };
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
         structuredContent: payload as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── Device grant (RFC 8628) ────────────────────────────────────────────────
+  //
+  // 🚨 Ces deux outils appellent le module EN DIRECT, sans HTTP, comme
+  // send_feedback — et en passant par `openGrant()`, qui porte la réservation
+  // par réseau et le plafond horaire. Aucune serrure n'est recopiée ici : une
+  // garde laissée dans le handler serait une porte sans plafond et sans journal
+  // pour les deux autres surfaces.
+  //
+  // 🚨 Ni l'un ni l'autre ne porte `costLine()`. Un outil dont le rôle est de
+  // DONNER la clé ne peut pas afficher « ou prenez une clé gratuite » : ce
+  // serait une boucle. Ils le disent dans leurs propres mots à la place.
+
+  server.registerTool(
+    'request_api_key',
+    {
+      title: 'Request an IBANforge API key',
+      description:
+        'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
+        'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+        'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
+        'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
+        'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
+        'Then call poll_api_key. ' +
+        'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+      inputSchema: {
+        client_name: z
+          .string()
+          .max(60)
+          .optional()
+          .describe('Optional. Who is asking, shown to the human on the approval page.'),
+        reason: z
+          .string()
+          .max(200)
+          .optional()
+          .describe('Optional. What the key is for, shown to the human on the approval page.'),
+      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.request_api_key,
+      annotations: {
+        title: 'Request an IBANforge API key',
+        // It writes a row, so it is not read-only — the same reasoning as
+        // send_feedback, which deliberately carries no READ_ONLY either.
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ client_name, reason }) => {
+      const result = openGrant({
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+        // Cleaned here because both will be SHOWN TO A HUMAN on a page they
+        // believe is ours. A field that survives none of the cleaning is not an
+        // error: it becomes null and the page shows its fallback label.
+        clientName: sanitizeDisplayField(client_name, 60),
+        reason: sanitizeDisplayField(reason, 200),
+        source: 'mcp-device',
+      });
+
+      if (!result.ok) {
+        // 🚨 NI `isError` NI une erreur d'outil. Depuis que `openGrant()` porte
+        // la réservation sur les trois surfaces, cet outil PEUT être refusé, et
+        // un agent qui reçoit un échec dur conclut à une panne au lieu de
+        // prendre le chemin de repli — l'essai sans clé, x402 — que ce module
+        // existe précisément pour ouvrir. Le refus arrive donc peuplé, avec son
+        // `display_to_human`.
+        const refused = {
+          status: result.error,
+          user_code: null,
+          verification_uri: null,
+          verification_uri_complete: null,
+          expires_in: null,
+          interval: null,
+          display_to_human: displayToHuman({ status: result.error }),
+        };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(refused) }],
+          structuredContent: refused as unknown as Record<string, unknown>,
+        };
+      }
+
+      // 🚨 Le `device_code` va dans la mémoire de session, JAMAIS dans la
+      // sortie. C'est le porteur unique de la clé, et une sortie d'outil
+      // traverse le transcript du modèle, les journaux du client et les
+      // copier-coller de rapport d'incident.
+      const id = sessionKey();
+      if (id) {
+        sessionDeviceCode.set(id, {
+          deviceCode: result.deviceCode,
+          ipHash: mcpFingerprint(ctx),
+        });
+      }
+
+      const verificationUriComplete = `${DEVICE_VERIFICATION_URI}?code=${encodeURIComponent(result.userCode)}`;
+      const payload = {
+        status: 'ok' as const,
+        user_code: result.userCode,
+        verification_uri: DEVICE_VERIFICATION_URI,
+        verification_uri_complete: verificationUriComplete,
+        expires_in: result.expiresIn,
+        interval: DEVICE_POLL_INTERVAL_SECONDS,
+        display_to_human: displayToHuman({
+          status: 'ok',
+          userCode: result.userCode,
+          verificationUriComplete,
+        }),
+      };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+        structuredContent: payload as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  server.registerTool(
+    'poll_api_key',
+    {
+      title: 'Collect the approved IBANforge API key',
+      description:
+        'Collect the API key once a human has approved the request opened by request_api_key. ' +
+        'USE WHEN: you have called request_api_key and shown the code to your human. ' +
+        'HOW TO CALL IT: leave `device_code` empty to reuse the last request from this session. ' +
+        'The server usually waits up to thirty seconds before answering, and sometimes answers at once when it is busy — either way, calling it once per minute is enough, never in a tight loop. ' +
+        'WHAT THE ANSWERS MEAN: `authorization_pending` is normal and means nobody has approved yet — wait `retry_in_seconds` and call again; ' +
+        '`approved` carries the key ONCE and never again, so hand it to your human immediately together with `config_line`; ' +
+        '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
+        '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
+        '`invalid_grant` means this code can no longer be used at all — stop. ' +
+        'This tool is free and does NOT count against the daily free-tier limit.',
+      inputSchema: {
+        device_code: z
+          .string()
+          .optional()
+          .describe('Optional. Leave it empty to reuse the last request from this session.'),
+      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.poll_api_key,
+      annotations: {
+        title: 'Collect the approved IBANforge API key',
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ device_code }) => {
+      const id = sessionKey();
+      const remembered = id ? sessionDeviceCode.get(id) : undefined;
+      const explicit = typeof device_code === 'string' && device_code.trim() !== '';
+      let answer: PollAnswer;
+
+      if (explicit) {
+        answer = await collectDeviceGrant(device_code!.trim(), mcpFingerprint(ctx));
+      } else if (!remembered) {
+        answer = pollAnswer({ status: 'invalid_grant', message: DEVICE_TEXTS.invalid_grant });
+      } else if (remembered.ipHash !== mcpFingerprint(ctx)) {
+        // 🚨 LA LIAISON À L'EMPREINTE, et c'est elle qui empêche l'identifiant
+        // de session de devenir un porteur de clé API. Sans elle, le vol d'un
+        // `mcp-session-id` — qui voyage en clair dans un en-tête à travers les
+        // passerelles d'agents et les proxys MCP — donnerait une clé vivante,
+        // retirée par un `poll_api_key` sans argument.
+        answer = pollAnswer({ status: 'invalid_grant', message: DEVICE_TEXTS.invalid_grant });
+      } else {
+        answer = await collectDeviceGrant(remembered.deviceCode, remembered.ipHash);
+      }
+
+      // Purgée au PREMIER retrait réussi : le grant ne se retire qu'une fois de
+      // toute façon, et laisser l'entrée ferait répondre « clé déjà remise »
+      // sur un grant que l'agent croit encore ouvert.
+      if (id && answer.status === 'approved') sessionDeviceCode.delete(id);
+
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(answer) }],
+        structuredContent: answer as unknown as Record<string, unknown>,
       };
     },
   );
@@ -783,7 +1186,12 @@ function createMcpServer(): McpServer {
 let toolNamesCache: string[] | null = null;
 function registeredToolNames(): string[] {
   if (toolNamesCache) return toolNamesCache;
-  const probe = createMcpServer() as unknown as { _registeredTools?: Record<string, unknown> };
+  // An empty context and no session: this instance only ever has its catalogue
+  // read, no handler of it ever runs. Handing it a real caller would be a lie
+  // about who asked.
+  const probe = createMcpServer({ ip: null, userAgent: null }, () => undefined) as unknown as {
+    _registeredTools?: Record<string, unknown>;
+  };
   toolNamesCache = Object.keys(probe._registeredTools ?? {});
   return toolNamesCache;
 }
@@ -867,9 +1275,26 @@ function mcpBucket(ip: string, prefix: '' | 'init:'): string {
  * complaint box with the limit that produced the complaint would silence
  * exactly the reports it was built for.
  */
+
+/**
+ * The tools that are free all the way: they keep being served AFTER the cap,
+ * because each of them is the only way out of the dead end the cap just
+ * created.
+ *
+ * 🚨 A named set rather than three `name === '…'` tests, because the same list
+ * is needed in two places that must never disagree: `mcpToolUnits` below, and
+ * the exclusion list of the "names a cost in every tool description" test. A
+ * tool free in one and not the other is either billed silently or documented
+ * wrong.
+ */
+export const MCP_FREE_TOOLS: ReadonlySet<string> = new Set([
+  'send_feedback',
+  'request_api_key',
+  'poll_api_key',
+]);
 function mcpToolUnits(params: { name?: unknown; arguments?: unknown } | undefined): number {
   const name = typeof params?.name === 'string' ? params.name : '';
-  if (name === 'send_feedback') return 0;
+  if (MCP_FREE_TOOLS.has(name)) return 0;
   if (name !== 'batch_validate_iban') return 1;
   const args = params?.arguments as { ibans?: unknown } | undefined;
   const ibans = args?.ibans;
@@ -920,6 +1345,10 @@ mcpHttp.post('/mcp', async (c) => {
   let toolUnits = 0;
   let toolName: string | null = null;
   let rpcId: unknown = null;
+  // 🚨 Le NOMBRE d'appels d'outils, distinct de leur COÛT. Zéro unité n'est pas
+  // zéro événement : `request_api_key` coûte 0 et reste un appel à mesurer.
+  // Hissé ici parce que `calls` vit dans le `try` ci-dessous.
+  let toolCalls = 0;
   try {
     const body = await cloned.json();
     // JSON-RPC allows a BATCH: the body may be an array of messages. On an
@@ -935,6 +1364,7 @@ mcpHttp.post('/mcp', async (c) => {
       params?: { name?: unknown; arguments?: unknown };
     }> = Array.isArray(body) ? body : [body];
     const calls = messages.filter((m) => m?.method === 'tools/call');
+    toolCalls = calls.length;
     toolUnits = calls.reduce((sum, m) => sum + mcpToolUnits(m?.params), 0);
     toolName =
       calls
@@ -1000,14 +1430,42 @@ mcpHttp.post('/mcp', async (c) => {
         },
       });
     }
-    // Mark the request for the stats middleware: /mcp alone cannot tell a
-    // handshake from real usage, and 14k discovery requests once read as a
-    // traffic spike nobody could explain. Set AFTER the cap, so it means
-    // "a tool ran", not "a tool was asked for".
-    c.set('mcpToolCall', true);
   }
 
+  // Mark the request for the stats middleware: /mcp alone cannot tell a
+  // handshake from real usage, and 14k discovery requests once read as a
+  // traffic spike nobody could explain.
+  //
+  // 🚨 Conditionné au NOMBRE d'appels, pas à leur coût, et c'est le seul des
+  // deux blocs à bouger. Un `request_api_key` coûte zéro unité et reste un
+  // appel d'outil : laissé sous `toolUnits > 0`, il disparaissait de la
+  // télémétrie, et la porte de sortie du plafond était la seule chose qu'on ne
+  // mesurait pas. La garde `toolUnits > 0` RESTE autour de `checkMcpRateLimit`
+  // au-dessus : la déplacer ferait entrer les outils gratuits dans la branche
+  // de refus, et comme `allowed = count <= limit` est faux dès le quota
+  // dépassé, `request_api_key` serait refusé APRÈS le plafond — l'inverse exact
+  // de ce que cet outil existe pour faire.
+  if (toolCalls > 0) c.set('mcpToolCall', true);
+
   const sessionId = c.req.header('mcp-session-id');
+
+  // 🚨 LE PORTEUR EST PRÉPARÉ ICI, AVANT DE SAVOIR S'IL Y A UNE SESSION, et
+  // l'ordre des gestes est la moitié de la correction.
+  //
+  // Sur une requête `initialize`, `sessionId` N'EXISTE PAS ENCORE : il vient de
+  // l'en-tête, et il n'est engendré qu'à l'intérieur du constructeur du
+  // transport, donc APRÈS. On prépare donc un objet, on le MUTE, et on ne
+  // l'enregistre qu'à l'ouverture de session, dans le crochet
+  // `onsessioninitialized`. C'est cet objet-là que les fermetures des outils
+  // tiennent.
+  //
+  // ⚠️ Mutation, JAMAIS remplacement. `sessionCtx.set(id, { ...ip })` à chaque
+  // requête laisserait les outils sur l'objet de l'ouverture, c'est-à-dire
+  // exactement l'empreinte figée que ce bloc existe pour éviter.
+  const known = sessionId ? sessionCtx.get(sessionId) : undefined;
+  const callCtx: McpCallContext = known ?? { ip: null, userAgent: null };
+  callCtx.ip = ip === 'unknown' ? null : ip;
+  callCtx.userAgent = c.req.header('user-agent') ?? null;
 
   let transport = sessionId ? mcpSessions.get(sessionId) : undefined;
 
@@ -1079,6 +1537,10 @@ mcpHttp.post('/mcp', async (c) => {
       ...mcpDnsRebindingOptions(),
       onsessioninitialized: (id) => {
         mcpSessions.set(id, transport!);
+        // Le MÊME objet que celui muté au-dessus, désormais joignable par
+        // l'en-tête de session. Un `{ ...callCtx }` ici couperait le lien avec
+        // ce que les outils tiennent.
+        sessionCtx.set(id, callCtx);
       },
       // Purge the session as soon as the SDK reports it closed. This is the
       // fastest door, not the only one: most MCP clients and directory crawlers
@@ -1087,15 +1549,27 @@ mcpHttp.post('/mcp', async (c) => {
       // in the store above are what catch those.
       onsessionclosed: (id) => {
         mcpSessions.delete(id);
+        sessionCtx.delete(id);
+        // Avec le device_code mémorisé : une session fermée ne doit pas laisser
+        // derrière elle un porteur de clé que le prochain occupant du même
+        // identifiant pourrait retirer.
+        sessionDeviceCode.delete(id);
       },
     });
 
     const localTransport = transport;
     transport.onclose = () => {
-      if (localTransport.sessionId) mcpSessions.delete(localTransport.sessionId);
+      if (localTransport.sessionId) {
+        mcpSessions.delete(localTransport.sessionId);
+        sessionCtx.delete(localTransport.sessionId);
+        sessionDeviceCode.delete(localTransport.sessionId);
+      }
     };
 
-    const server = createMcpServer();
+    // Le porteur, pas une copie. Et l'identifiant de session est lu PARESSEUSEMENT :
+    // il n'existe pas encore à cet instant, le SDK le pose sur le transport à
+    // l'`initialize`.
+    const server = createMcpServer(callCtx, () => localTransport.sessionId);
     await server.connect(transport);
   }
 
@@ -1104,10 +1578,14 @@ mcpHttp.post('/mcp', async (c) => {
   // builds its own Response and returning it bypasses the context's prepared
   // headers, so a served tool call reached the telemetry middleware carrying
   // nothing at all. The refusals above go through `c.json()` and keep theirs.
-  if (toolUnits > 0) {
-    response.headers.set('X-MCP-Outcome', 'ok');
-    if (toolName) response.headers.set('X-MCP-Tool', toolName);
-  }
+  // 🚨 DEUXIÈME édition du point « zéro unité n'est pas zéro événement », et
+  // c'est bien un second bloc : l'en-tête est posé ICI, sur l'objet Response du
+  // SDK. `X-MCP-Tool` passe sous le NOMBRE d'appels, pour qu'un
+  // `request_api_key` gratuit nomme quand même l'outil qui a tourné ;
+  // `X-MCP-Outcome: ok` reste sur le coût, puisque c'est le compteur d'unités
+  // qu'il raconte.
+  if (toolUnits > 0) response.headers.set('X-MCP-Outcome', 'ok');
+  if (toolCalls > 0 && toolName) response.headers.set('X-MCP-Tool', toolName);
   return response;
 });
 
@@ -1165,6 +1643,12 @@ mcpHttp.get('/mcp', async (c) => {
           // champs NOMMÉS, donc retirer un nom qu'ils lisent déjà efface la
           // porte gratuite de leur fiche. On ajoute sans retirer.
           rest_api_signup: `POST /v1/keys/generate with no body at all — no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST req/month`,
+          // AJOUTÉ à côté, jamais à la place : les moissonneurs d'annuaires
+          // affichent des champs NOMMÉS, donc on ajoute sans retirer. C'est la
+          // seule porte qui ne demande RIEN à l'agent — pas même de savoir
+          // poster sur une route REST : deux appels d'outil et un humain qui
+          // clique.
+          device_grant: `Call the request_api_key tool, show the code to a human, then poll_api_key — a human approves in a browser, the agent never handles an address. The code lives ${DEVICE_CODE_TTL_SECONDS / 60} minutes and the key comes back at ${ANONYMOUS_MONTHLY_LIMIT} REST req/month, or ${FREE_TIER_MONTHLY_LIMIT} if the human adds an address on that page.`,
         },
         x402: 'https://api.ibanforge.com/.well-known/x402',
         documentation: 'https://ibanforge.com/docs',

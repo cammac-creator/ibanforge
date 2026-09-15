@@ -187,6 +187,36 @@
           "message"
         ]
       }
+    },
+    {
+      "name": "request_api_key",
+      "description": "Open a key request a human approves in a browser, with no e-mail address and no account. Show the code and the link to your human, then call poll_api_key. Cost: free.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "description": "Who is asking, shown to the human on the approval page"
+          },
+          "reason": {
+            "type": "string",
+            "description": "What the key is for, shown to the human on the approval page"
+          }
+        }
+      }
+    },
+    {
+      "name": "poll_api_key",
+      "description": "Collect the key once a human has approved the request opened by request_api_key. Handed over exactly once, with the config line to paste. Cost: free.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "description": "Leave empty to reuse the last request from this session"
+          }
+        }
+      }
     }
   ],
   "homepage": "https://ibanforge.com",

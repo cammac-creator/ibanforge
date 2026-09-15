@@ -177,7 +177,7 @@ describe('the surfaces that describe the server itself carry all tools', () => {
 });
 
 describe('the free endpoints are advertised where an agent looks before paying', () => {
-  it('the x402 document lists all six', async () => {
+  it('the x402 document lists every one of them', async () => {
     const doc = await fetchJson('/.well-known/x402');
     const paths = (doc.free_endpoints as Array<{ path: string }>).map((e) => e.path);
     for (const endpoint of FREE_ENDPOINTS) {

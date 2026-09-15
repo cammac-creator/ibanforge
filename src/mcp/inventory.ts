@@ -161,6 +161,36 @@ export const MCP_TOOLS: readonly InventoryTool[] = [
     readOnly: false,
     capability: null,
   },
+  // ── Le device grant (RFC 8628), livré le 15/09/2026 ───────────────────────
+  //
+  // Les deux seuls outils qui ÉCRIVENT en dehors de `send_feedback`, donc les
+  // deux seuls autres à porter `readOnly: false`. Ils restent hors de
+  // `dataTools()`, et c'est la bonne sémantique en plus d'être la règle du
+  // fichier : « demander une clé » n'est pas une capacité qu'un annuaire doit
+  // vendre, et les quatre documents qui ne listent que `dataTools()` (carte
+  // MCP, carte A2A, document x402, agents.json) ne bougent donc pas.
+  //
+  // 🚨 `capability: null` est IMPOSÉ par `inventory.test.ts` pour tout outil
+  // non `readOnly`, pas un choix de rédaction.
+  {
+    name: 'request_api_key',
+    title: 'Request an IBANforge API key',
+    restRoute: 'POST /v1/keys/device',
+    price: 'free',
+    description:
+      'Open a key request a human approves in a browser, with no e-mail address and no account.',
+    readOnly: false,
+    capability: null,
+  },
+  {
+    name: 'poll_api_key',
+    title: 'Collect the approved IBANforge API key',
+    restRoute: 'POST /v1/keys/device/token',
+    price: 'free',
+    description: 'Collect the key once a human has approved the request, handed over exactly once.',
+    readOnly: false,
+    capability: null,
+  },
 ];
 
 /**
@@ -168,9 +198,12 @@ export const MCP_TOOLS: readonly InventoryTool[] = [
  *
  * `/.well-known/x402` used to advertise only `/v1/demo` plus its own metadata
  * routes, so an agent asking "what can I try before paying?" concluded there
- * was a demo and nothing else (audit 2026-09-01, DX-13 and MCP-18). These six
- * are API endpoints, not documents: the discovery routes add their own
- * metadata paths around them.
+ * was a demo and nothing else (audit 2026-09-01, DX-13 and MCP-18). These are
+ * API endpoints, not documents: the discovery routes add their own metadata
+ * paths around them.
+ *
+ * The count is deliberately not written here — it said "six" while the table
+ * held six, and the table has since grown. Read the list.
  */
 export interface FreeEndpoint {
   path: string;
@@ -198,6 +231,17 @@ export const FREE_ENDPOINTS: readonly FreeEndpoint[] = [
   },
   { path: '/v1/demo', description: 'Free demo with example IBAN/BIC validations' },
   { path: '/v1/credits/bundles', description: 'Free list of prepaid credit bundles' },
+  // Les deux routes du chemin agent du device grant. Elles n'ont besoin ni de
+  // clé ni de paiement, et c'est précisément leur rôle : un agent au plafond
+  // lit ce document pour savoir comment en sortir.
+  {
+    path: '/v1/keys/device',
+    description: 'Free device authorization request (RFC 8628) — a human approves in a browser',
+  },
+  {
+    path: '/v1/keys/device/token',
+    description: 'Free collection of the approved key, long-polling, handed over exactly once',
+  },
 ];
 
 /**

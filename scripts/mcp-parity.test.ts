@@ -91,6 +91,12 @@ const CONTRACT_TOOLS = [
   'check_swiss_qr_bill',
   'lookup_bic',
   'lookup_ch_clearing',
+  // Le device grant, livré le 15/09/2026 sur les TROIS surfaces d'emblée,
+  // précisément pour ne pas refaire le coup de `send_feedback` resté HTTP-only
+  // pendant des mois : l'agent qui se heurte au plafond doit trouver la sortie
+  // sur le canal qu'il utilise, pas sur celui qu'on préfère.
+  'poll_api_key',
+  'request_api_key',
   'send_feedback',
   'validate_iban',
   'validate_payment_reference',
@@ -158,8 +164,12 @@ describe("parité MCP — aucun écart entre les trois listes d'outils", () => {
   it('A (hors A_ONLY_TOOLS), B et C exposent la MÊME liste', () => {
     const [a, b, c] = IDS.map((id) => toolNames(id));
     const aShared = a.filter((t) => !A_ONLY_NAMES.includes(t));
-    expect(b, `${SURFACES.B.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(aShared);
-    expect(c, `${SURFACES.C.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(aShared);
+    expect(b, `${SURFACES.B.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(
+      aShared,
+    );
+    expect(c, `${SURFACES.C.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(
+      aShared,
+    );
   });
 
   for (const tool of CONTRACT_TOOLS) {
@@ -186,9 +196,8 @@ describe('parité MCP — la limite de taille du fichier audit ne diverge pas de
    * côté d'un nombre qui bouge finit par diverger en silence.
    */
   it('mcp/src/index.ts AUDIT_MAX_BYTES == src/lib/audit-file.ts AUDIT_MAX_BYTES', () => {
-    const routeValue = read('src/lib/audit-file.ts').match(
-      /export const AUDIT_MAX_BYTES\s*=\s*([^;]+);/,
-    )?.[1]
+    const routeValue = read('src/lib/audit-file.ts')
+      .match(/export const AUDIT_MAX_BYTES\s*=\s*([^;]+);/)?.[1]
       ?.trim();
     const mcpValue = SRC.A.match(/const AUDIT_MAX_BYTES\s*=\s*([^;]+);/)?.[1]?.trim();
     expect(routeValue, 'AUDIT_MAX_BYTES introuvable dans src/lib/audit-file.ts').toBeDefined();
@@ -251,6 +260,139 @@ describe('parité MCP — send_feedback écrit, donc il est plafonné partout', 
       mirrored,
       'la copie de FEEDBACK_ERROR_TYPES dans mcp/src/index.ts a divergé de src/routes/feedback.ts — un agent enverrait une catégorie que la route refuse.',
     ).toEqual(truth);
+  });
+});
+
+describe("parité MCP — l'attente du client dépasse celle du serveur", () => {
+  /**
+   * 🚨 Le piège que rien ne nommait, et qui aurait cassé `poll_api_key` sur les
+   * deux surfaces stdio en production sans rien casser en test.
+   *
+   * `POST /v1/keys/device/token` fait du long-polling : il retient la requête
+   * jusqu'à `DEVICE_POLL_WAIT_MS`, 30 s par défaut. Or le défaut de
+   * `mcp/src/api-client.ts` valait EXACTEMENT 30 s aussi : le client abandonnait
+   * à l'instant où le serveur répondait, `poll_api_key` rendait une erreur de
+   * transport au premier tour, et l'agent renonçait avant que l'humain n'ait
+   * cliqué.
+   *
+   * Les deux surfaces posent donc un délai plus large, et ce nombre est recopié
+   * (aucune des deux ne peut lire la constante : A est un paquet publié à part,
+   * B pourrait l'importer mais son relais est du `fetch` nu). Même risque, même
+   * remède que `AUDIT_MAX_BYTES` ci-dessus : recopié, mais gardé.
+   */
+  const serverWait = Number(
+    read('src/lib/device-grant.ts')
+      .match(/readPositiveEnv\('DEVICE_POLL_WAIT_MS',\s*([\d_]+)\)/)?.[1]
+      ?.replace(/_/g, '') ?? NaN,
+  );
+
+  it('la valeur de repli du serveur est bien lisible (sinon ce bloc ne mesure rien)', () => {
+    expect(
+      serverWait,
+      "le repli de DEVICE_POLL_WAIT_MS n'est plus lisible dans src/lib/device-grant.ts — la regex de ce test est à revoir, sinon les deux assertions suivantes passent en ne comparant rien.",
+    ).toBeGreaterThan(0);
+  });
+
+  for (const [surface, path, name] of [
+    ['A', 'mcp/src/index.ts', 'DEVICE_POLL_TIMEOUT_MS'],
+    ['B', 'src/mcp/server.ts', 'DEVICE_RELAY_TIMEOUT_MS'],
+  ] as const) {
+    it(`surface ${surface} attend plus longtemps que le serveur`, () => {
+      const raw = read(path).match(new RegExp(`const ${name}\\s*=\\s*([\\d_]+);`))?.[1];
+      expect(raw, `${name} introuvable dans ${path}`).toBeDefined();
+      expect(
+        Number(raw!.replace(/_/g, '')),
+        `${name} (${path}) doit dépasser le DEVICE_POLL_WAIT_MS du serveur (${serverWait} ms), sinon le client abandonne pendant que le serveur répond et poll_api_key rend une panne au premier tour.`,
+      ).toBeGreaterThan(serverWait);
+    });
+  }
+});
+
+describe('parité MCP — le device grant frappe des clés, donc il est plafonné partout', () => {
+  /**
+   * Le bloc jumeau de celui de `send_feedback`, et pour un enjeu plus lourd :
+   * ces deux outils FRAPPENT UNE CLÉ API. Chaque surface a sa serrure, parce
+   * qu'elles n'ont pas la même porte :
+   *   A et B relaient POST /v1/keys/device → héritent de la réservation par
+   *     réseau que `openGrant()` porte DANS la route ;
+   *   C appelle le module en direct, sans HTTP → doit donc citer `openGrant`
+   *     elle-même, sinon elle serait une porte sans plafond et sans journal.
+   *
+   * 🚨 Ne PAS chercher `recordKeyCreation` ici. Cet appel a migré dans
+   * `generateApiKey`, qui écrit la ligne de naissance dans sa propre
+   * transaction ; un second appel armerait le disjoncteur à la moitié du volume
+   * réel. Un test qui chercherait encore ce nom serait rouge pour la bonne
+   * raison écrite au mauvais endroit.
+   */
+  it('A relaie la route publique (et hérite donc de sa réservation par réseau)', () => {
+    expect(
+      SRC.A,
+      "mcp/src/index.ts n'appelle plus POST /v1/keys/device : s'il ouvre désormais des grants autrement, il a perdu la réservation par réseau de la route.",
+    ).toContain("'/v1/keys/device'");
+    expect(SRC.A, 'mcp/src/index.ts ne vient plus chercher la clé sur la route').toContain(
+      "'/v1/keys/device/token'",
+    );
+  });
+
+  it('B relaie la route publique, et ne frappe rien dans sa base locale', () => {
+    expect(
+      SRC.B,
+      "src/mcp/server.ts n'appelle plus /v1/keys/device : une clé frappée dans son data/stats.sqlite local n'existe pas en production, et répondrait 401 à l'humain qui la colle.",
+    ).toContain("'/v1/keys/device'");
+    expect(SRC.B, 'src/mcp/server.ts ne vient plus chercher la clé sur la route').toContain(
+      "'/v1/keys/device/token'",
+    );
+    // 🚨 La propriété testée est « B ne TOUCHE PAS le module », pas « le mot
+    // openGrant est absent du fichier » : le commentaire qui explique pourquoi
+    // B relaie nomme forcément `openGrant()`, et un test sur le mot serait
+    // rouge à cause de sa propre explication. C'est l'IMPORT qui prouve
+    // l'accès à la base locale.
+    expect(
+      SRC.B,
+      "src/mcp/server.ts importe src/lib/device-grant.js : il frapperait des clés dans son data/stats.sqlite local, pas dans celui de la production, et l'humain collerait une clé qui répond 401.",
+    ).not.toMatch(/from '\.\.\/lib\/device-grant\.js'/);
+  });
+
+  it('C passe par le module, et cite donc openGrant', () => {
+    expect(
+      SRC.C,
+      "src/routes/mcp-http.ts n'appelle plus openGrant() : la réservation par réseau, le plafond horaire et la capture d'empreinte vivent LÀ-DEDANS, et cette surface écrit sans passer par HTTP. Sans cet appel, elle est une porte sans plafond et sans journal.",
+    ).toContain('openGrant(');
+  });
+
+  /**
+   * 🚨 LA GARDE DE RAIL, et c'est la seule chose qui relie le device grant au
+   * rail de paiement.
+   *
+   * `device_codes` porte deux rails sous `grant_type` : le grant gratuit de
+   * quinze minutes, et le nonce d'un paiement, payé, retrait ouvert sept jours.
+   * `consumeGrantKey(hash)` sans son second argument servirait l'un à la place
+   * de l'autre — un nonce de paiement présenté sur la porte device rendrait la
+   * clé payée, et la purge du rail gratuit détruirait une clé achetée.
+   */
+  it('consumeGrantKey est TOUJOURS appelée avec son rail, partout dans src/', () => {
+    const offenders: string[] = [];
+    for (const rel of [
+      'src/routes/device-grant.ts',
+      'src/routes/mcp-http.ts',
+      'src/mcp/server.ts',
+    ]) {
+      read(rel)
+        .split('\n')
+        .forEach((line, i) => {
+          for (const call of line.matchAll(/consumeGrantKey\(([^)]*)\)/g)) {
+            // Le rail est le SECOND argument. Un appel à un seul argument (ou
+            // à zéro) est le défaut qu'on cherche.
+            if (!call[1].includes(',')) offenders.push(`${rel}:${i + 1} ${line.trim()}`);
+          }
+        });
+    }
+    expect(
+      offenders,
+      'consumeGrantKey appelée sans son rail :\n' +
+        offenders.join('\n') +
+        "\nLe second argument n'a PAS de valeur par défaut, et c'est voulu : un défaut servirait un rail à la place de l'autre en silence.",
+    ).toEqual([]);
   });
 });
 
