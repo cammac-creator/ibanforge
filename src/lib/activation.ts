@@ -96,6 +96,7 @@ interface KeyRow {
   credits_total: number | null;
   credits_remaining: number | null;
   source: string | null;
+  tier: string;
 }
 
 interface LogAgg {
@@ -146,12 +147,19 @@ export function getActivation(days = 30): ActivationResponse {
 
   const keyRows = db
     .prepare(
-      `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source
+      `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier
        FROM api_keys ORDER BY email, created_at`,
     )
     .all() as KeyRow[];
 
-  const external = keyRows.filter((k) => !isInternalEmail(k.email));
+  // 🚨 Le palier anonyme est écarté, et pas seulement par élégance : le
+  // regroupement plus bas se fait par ADRESSE, et toutes les clés anonymes
+  // partagent une sentinelle. Sans l'exclusion, elles se rassembleraient en un
+  // seul « client » nommé anonymous, avec la somme de leurs appels — et c'est
+  // cette vue qui répond « combien de clés n'ont jamais servi ». Une clé
+  // anonyme n'a d'ailleurs aucune relation client à activer, ce qui est
+  // exactement ce que la vue mesure ; elle a sa propre mesure, dans stats.ts.
+  const external = keyRows.filter((k) => !isInternalEmail(k.email) && k.tier !== 'anonymous');
 
   // One batched aggregate over request_log for every external prefix; the
   // first/last call windows are unbounded on purpose (a first call is a fact

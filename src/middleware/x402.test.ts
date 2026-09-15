@@ -179,6 +179,40 @@ describe('every priced route stays payable', () => {
     expect(Object.keys(TABLE()).length).toBeGreaterThanOrEqual(5);
   });
 
+  it('aucune entrée n’est sans prix LISIBLE — sinon un règlement s’écrit sans montant', () => {
+    // 🚨 Le journal de règlement capture la cotation du paywall, et une
+    // cotation illisible n'écrit AUCUNE ligne (la référence de paiement est
+    // unique : une ligne à zéro la consommerait à jamais). Ce test échoue donc
+    // le jour où une route entre au catalogue sans prix résoluble, avant que
+    // des règlements muets ne commencent à se perdre.
+    //
+    // ⚠️ Assertion « chaque entrée PRÉSENTE a un prix lisible », jamais un
+    // compte figé : le registre britannique n'entre dans la table que si sa
+    // clé d'API est configurée, donc le nombre d'entrées vaut 6 ou 7 selon
+    // l'environnement et un compte exact serait instable en CI.
+    for (const [route, config] of Object.entries(TABLE())) {
+      const { accepts } = config as { accepts?: { price?: unknown } };
+      expect(accepts, route).toBeDefined();
+      const price = accepts!.price;
+      const readable =
+        typeof price === 'function' || (typeof price === 'string' && /^\$\d/.test(price));
+      expect(readable, `${route} has no readable price: ${String(price)}`).toBe(true);
+    }
+  });
+
+  it('la table PUBLIÉE porte des nombres, jamais une fonction à la place d’un prix fixe', () => {
+    // L'enrobage qui retient la cotation ne s'applique qu'à l'objet local du
+    // middleware, une requête à la fois. Posé sur la sortie de buildRouteTable,
+    // il casserait silencieusement le catalogue que les facilitateurs indexent :
+    // /.well-known/x402 et le texte /v1 publient des nombres.
+    const validate = buildRouteTable(
+      '0x0000000000000000000000000000000000000001',
+      'POST',
+      '/v1/iban/validate',
+    )['POST /v1/iban/validate'] as { accepts: { price: unknown } };
+    expect(validate.accepts.price).toBe('$0.005');
+  });
+
   it('caps a description that grows past the limit rather than losing the sale', () => {
     const long = 'x'.repeat(MAX_RESOURCE_DESCRIPTION + 200);
     expect(capDescription(long).length).toBeLessThanOrEqual(MAX_RESOURCE_DESCRIPTION);
@@ -572,6 +606,15 @@ describe('a timed-out settle reaches the response builder', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('le slot part SANS cotation : une cotation inconnue n’écrit rien', () => {
+    // La valeur par défaut est le comportement sûr : tant que le paywall n'a
+    // pas coté cette requête-ci, le crochet de règlement n'a pas de montant et
+    // n'écrit aucune ligne. Sur l'argent, on échoue fermé en n'écrivant pas.
+    const { slot } = runInSettlementSlot(() => null);
+    expect(slot.quotedUsd).toBeNull();
+    expect(slot.unconfirmed).toBeNull();
   });
 
   it('leaves the slot clean when the facilitator answers', async () => {

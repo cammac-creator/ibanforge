@@ -112,6 +112,16 @@ export interface KeyRow {
    */
   issued_by_us?: number | null;
   /**
+   * Le palier de la clé, servi par GET /v1/admin/keys depuis le chantier
+   * « clé sans e-mail ».
+   *
+   * Optionnel sur le fil pour la même raison de déploiement que les colonnes
+   * ci-dessus : Vercel et Railway partent indépendamment, donc ce frontend
+   * tourne un temps contre une API qui ne sert pas encore le champ. Absent, il
+   * se lit « palier inconnu » et le CRM est exactement le CRM d'avant.
+   */
+  tier?: string | null;
+  /**
    * What Stripe actually charged, in minor units, and in which currency.
    *
    * ⚠️ Optional because GET /v1/admin/keys does NOT serve these two columns
@@ -391,6 +401,16 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
   const keysByAddress = new Map<string, KeyRow[]>();
   for (const row of input.keys) {
     if (isInternalAccount(row.email)) continue;
+    // 🚨 Le filtre se fait sur le PALIER, pas sur l'adresse : `anonymous` n'est
+    // surtout PAS ajouté à INTERNAL_RE, qui est comparé caractère pour
+    // caractère à son jumeau côté API.
+    //
+    // Une clé anonyme ne crée aucun contact : elle n'a pas d'adresse, et toutes
+    // partagent une sentinelle, donc elles se regrouperaient en un dossier
+    // unique. Une clé promue par PAIEMENT non plus, pour la même raison — elle
+    // n'a jamais donné d'adresse. Une clé réclamée, elle, en crée un : elle a
+    // fourni une vraie adresse et prouvé qu'elle la lit.
+    if (row.tier === 'anonymous' || row.tier === 'paid') continue;
     const id = row.email.toLowerCase();
     const group = keysByAddress.get(id);
     if (group) group.push(row);

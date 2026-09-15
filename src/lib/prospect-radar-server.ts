@@ -252,9 +252,15 @@ export async function enrichClientCompanies(limit = CLIENT_ENRICH_PER_RUN): Prom
         .all() as Array<{ e: string }>
     ).map((r) => r.e),
   );
+  // 🚨 `AND tier <> 'anonymous'` : la sentinelle du palier anonyme n'est pas
+  // interne (elle ne matche aucun terme de la liste des comptes internes), donc
+  // elle deviendrait UN prospect unique agrégeant les préfixes de toutes les
+  // clés anonymes. Pire : le domaine d'une adresse sans arobase est vide, donc
+  // l'identification basculerait sur le user-agent et enverrait un agent de
+  // collecte sur le site du premier client venu.
   const keyRows = db
     .prepare(
-      'SELECT lower(email) AS email, key_prefix FROM api_keys ORDER BY datetime(created_at) DESC',
+      "SELECT lower(email) AS email, key_prefix FROM api_keys WHERE tier <> 'anonymous' ORDER BY datetime(created_at) DESC",
     )
     .all() as Array<{ email: string; key_prefix: string }>;
 

@@ -172,6 +172,27 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
     cleanup([prefix]);
   });
 
+  it('purge une clé anonyme MORTE alors qu’une autre est vivante', () => {
+    // 🚨 Nécessaire, pas cosmétique. La garde de cette purge est « il ne reste
+    // aucune clé ACTIVE portant la même adresse », et toutes les clés anonymes
+    // partagent une sentinelle : sans elle dans la liste des adresses
+    // partagées, UNE seule clé anonyme vivante dans toute la base empêcherait
+    // indéfiniment la purge de TOUTES les autres. Croissance non bornée, et
+    // aucun test ne la rougissait.
+    const dead = `ifk_anon_d${RUN}`.slice(0, 12);
+    const alive = `ifk_anon_a${RUN}`.slice(0, 12);
+    seedKey({ prefix: dead, email: 'anonymous', active: 0, deactivatedAt: '2026-01-01 00:00:00' });
+    seedKey({ prefix: alive, email: 'anonymous', active: 1, deactivatedAt: null });
+    seedLog(dead);
+    seedLog(alive);
+
+    purgeTerminatedKeyTelemetry(30);
+    expect(countLogs(dead)).toBe(0);
+    // La clé vivante garde la sienne : la purge est par clé, jamais par adresse.
+    expect(countLogs(alive)).toBe(1);
+    cleanup([dead, alive]);
+  });
+
   it('keeps telemetry inside the 30-day window, and of active keys', () => {
     const recent = `ifk_dpa_rec${RUN}`.slice(0, 12);
     const live = `ifk_dpa_liv${RUN}`.slice(0, 12);

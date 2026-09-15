@@ -16,6 +16,7 @@ import {
   classifyClient,
   extractClientIp,
   normalizeRequestPath,
+  anonymousTierCounts,
 } from './stats.js';
 import { generateApiKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
@@ -945,5 +946,77 @@ describe('the revenue figure says what it is', () => {
   it('reports attempted and total as the same number, since they are', () => {
     const s = getStats();
     expect(s.total_revenue_usdc).toBe(s.total_revenue_attempted_usdc);
+  });
+});
+
+describe('anonymousTierCounts — ce que le palier anonyme produit', () => {
+  it('rend ses six champs, et ne compte comme réclamée que ce qui l’a été', () => {
+    const db = getStatsDB();
+    const RUN = Date.now();
+    // Quatre lignes, chacune posée pour un piège de définition précis.
+    const seed = (
+      prefix: string,
+      email: string,
+      tier: string,
+      claimMethod: string | null,
+      claimedAt: string | null,
+    ) =>
+      db
+        .prepare(
+          `INSERT INTO api_keys (key_hash, key_prefix, email, tier, claim_method, claimed_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          `h-${prefix}-${RUN}`,
+          prefix,
+          email,
+          tier,
+          claimMethod,
+          claimedAt,
+          '2026-09-01 10:00:00',
+        );
+
+    seed(`ifk_atc_an${RUN}`.slice(0, 12), 'anonymous', 'anonymous', null, null);
+    // Réclamée par code : 90 secondes après sa naissance.
+    seed(
+      `ifk_atc_cl${RUN}`.slice(0, 12),
+      `atc-${RUN}@alpha-corp.example.net`,
+      'claimed',
+      'email_code',
+      '2026-09-01 10:01:30',
+    );
+    // Promue par paiement : 30 secondes après.
+    seed(`ifk_atc_pd${RUN}`.slice(0, 12), 'anonymous', 'paid', 'x402', '2026-09-01 10:00:30');
+    // 🚨 Le piège : un acheteur de paquet historique porte tier = 'paid' par le
+    // backfill de la migration, SANS claim_method. Le compter comme une
+    // promotion ferait mentir le taux de conversion du palier.
+    seed(`ifk_atc_bf${RUN}`.slice(0, 12), 'stripe-buyer', 'paid', null, null);
+
+    const counts = anonymousTierCounts();
+    expect(counts.keys).toBe(1);
+    expect(counts.claimed).toBe(1);
+    expect(counts.paid).toBe(1);
+    expect(counts.by_method).toEqual(
+      expect.arrayContaining([
+        { method: 'email_code', n: 1 },
+        { method: 'x402', n: 1 },
+      ]),
+    );
+    expect(typeof counts.paid_usd_total).toBe('number');
+    // La médiane de 90 s et 30 s. Ce n'est pas de la curiosité : une clé
+    // réclamée sort du rayon de révocation par construction, donc une ferme qui
+    // réclame dans la minute ne laisse que la brièveté du délai comme trace.
+    expect(counts.claim_delay_median_s).toBe(60);
+  });
+
+  it('rend une médiane nulle et des compteurs à zéro sur une base sans palier anonyme', () => {
+    const db = getStatsDB();
+    db.prepare("DELETE FROM api_keys WHERE tier IN ('anonymous', 'claimed', 'paid')").run();
+    const counts = anonymousTierCounts();
+    expect(counts.keys).toBe(0);
+    expect(counts.claimed).toBe(0);
+    expect(counts.paid).toBe(0);
+    expect(counts.by_method).toEqual([]);
+    expect(counts.claim_delay_median_s).toBeNull();
   });
 });

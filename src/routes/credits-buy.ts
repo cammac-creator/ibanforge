@@ -13,6 +13,8 @@ import { createHash } from 'node:crypto';
 import type { Context } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { findCreditKeyByPaymentRef, generateCreditKey } from '../lib/api-keys.js';
+import { settleAndMaybeClaim } from '../lib/key-settlements.js';
+import { opsFail } from '../lib/ops-alert.js';
 import { recordCreditsPurchase } from '../lib/stats.js';
 import { buildFirstCallCurl } from '../lib/first-call.js';
 import { sendApiKeyEmail, alertKeyDeliveryFailure } from '../lib/email.js';
@@ -112,6 +114,35 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
   // handed out was writing a phantom sale next to the real ones. A sale that
   // nobody paid for is not a sale with a price of zero, it is not a sale.
   if (ref !== null) recordCreditsPurchase(slug, bundle.price_usdc, true);
+
+  // Le paquet est une clé NEUVE, et ce bloc ne la touche pas : il journalise le
+  // règlement au nom de la clé PRÉSENTÉE, si une clé l'était. Le paquet le moins
+  // cher franchit à lui seul le seuil de promotion, donc une clé anonyme qui
+  // achète un paquet monte de palier, une fois. Courtoisie assumée, bornée à la
+  // clé de cette requête-ci.
+  //
+  // Sous try/catch, et l'échec part en alerte plutôt qu'en console : l'acheteur
+  // a payé, sa clé est frappée, et un journal qui refuse une écriture ne doit
+  // jamais transformer sa réponse en 500.
+  const presentedHash = c.get('apiKeyHash');
+  if (ref !== null && presentedHash) {
+    try {
+      settleAndMaybeClaim({
+        keyHash: presentedHash,
+        keyPrefix: c.get('apiKeyPrefix') ?? '',
+        paymentRef: ref,
+        route: `${c.req.method} ${new URL(c.req.url).pathname}`,
+        quotedAmountUsd: bundle.price_usdc,
+        method: 'credits',
+      });
+    } catch (err) {
+      void opsFail(
+        'x402:settlement-ledger',
+        `The settlement ledger refused a pack write: ${err instanceof Error ? err.message : String(err)}`,
+        3,
+      );
+    }
+  }
 
   // Mail delivery on the USDC rail, matching the card rail (BIZ-04, 2026-09-01).
   //
