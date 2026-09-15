@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-08-06"
+updated: "2026-09-16"
 ---
 
 # Privacy Policy
 
-**Last updated: August 6, 2026 · Version 1.2**
+**Last updated: September 16, 2026 · Version 1.3**
+
+*Revision 1.3 (September 16, 2026): the website and the dashboard moved from Vercel Inc. (global CDN, USA) to a virtual server operated by Infomaniak Network SA in Geneva, Switzerland — a sub-processor already listed for email. No new sub-processor; the Vercel row is removed.*
 
 *Revision 1.2 (August 6, 2026): the daily account-lifecycle job moved from CI into the API runtime itself — GitHub's runners no longer process account data at all; the GitHub row below is updated accordingly.*
 
@@ -37,7 +39,7 @@ The API and its databases run on Railway infrastructure in the **Amsterdam, Neth
 | Processor | Role | Location/region |
 |---|---|---|
 | Railway Corp. | API hosting & storage | Region: Amsterdam (EU) |
-| Vercel Inc. | Website & dashboard hosting — customer data transits its functions when the operator uses the dashboard, and playground submissions are relayed to the API | Global CDN |
+| Infomaniak Network SA | Website & dashboard hosting (virtual server, Geneva) — customer data transits it when the operator uses the dashboard, and playground submissions are relayed to the API | Switzerland |
 | Stripe Payments Europe | Card payments | EU |
 | Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US |
 | Infomaniak Network SA | Transactional & support email (operator-managed relay) | Switzerland |

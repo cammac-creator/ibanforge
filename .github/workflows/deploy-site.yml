@@ -1,0 +1,70 @@
+name: Deploy site (VPS)
+
+# Le site (frontend/) vit sur le VPS Infomaniak depuis le rapatriement de
+# septembre 2026. GitHub construit l'image et la publie sur ghcr.io ; le VPS ne
+# construit jamais (4 Go de RAM). La mise en ligne passe par une clé SSH dédiée
+# dont la seule commande autorisée est « deploy <sha> » (authorized_keys,
+# restrict,command=). L'API (src/) reste déployée par Railway.
+
+on:
+  push:
+    branches: [main, vps-migration]   # vps-migration : le temps de la phase de test, à retirer à la fusion
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/cammac-creator/ibanforge-web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha,scope=site
+          cache-to: type=gha,mode=max,scope=site
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.ibanforge.com
+            API_URL=https://ibanforge-production.up.railway.app
+            GIT_SHA=${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - name: Mise en ligne sur le VPS (commande forcée « deploy <sha> », jeton ghcr sur stdin)
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$VPS_HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPYUhF/MiJIhunHMdPZGimuVdZj3+T6aKt1gPDoAlY7j" > ~/.ssh/known_hosts
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$VPS_USER@$VPS_HOST" "deploy ${{ github.sha }}"
