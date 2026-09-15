@@ -21,6 +21,7 @@ import {
   nationalRegisterEdition,
 } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
+import { lookupLuCode } from './lu-register.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
@@ -482,6 +483,19 @@ function decideBankCode(
   // beats a BIC directory agreeing with it — and consulted on its own path,
   // because a miss here must fall through to exactly what this country answered
   // before, `registerDown` untouched. See NON_EXHAUSTIVE_REGISTERS.
+  // Le registre privé LU confirme un titulaire ; une absence n'autorise aucun rejet.
+  const lu = cc === 'LU' ? lookupLuCode(bankCode) : null;
+  if (lu) {
+    return {
+      value: bankCode,
+      status: 'verified',
+      match: 'register',
+      register: lu.source,
+      authoritative: false,
+      as_of: lu.published.slice(0, 7),
+      institution: { name: lu.name, street: null, post_code: null, town: null, country: 'LU' },
+    };
+  }
   const partial = NON_EXHAUSTIVE_REGISTERS[cc];
   if (partial && nationalRegisterAvailable(cc)) {
     // Unguarded, like the authoritative registers: a read failure escapes to
@@ -835,6 +849,23 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // (`bank_code_check.authoritative: false`) yet the BIC it prints beside a code
   // it does list is its own pairing, not ours. The two flags are about two
   // different claims, and San Marino is where they part in the other direction.
+  if (cc === 'LU') {
+    try {
+      const reg = lookupLuCode(bankCode);
+      if (reg) {
+        bic = {
+          code: reg.bic,
+          bank_name: reg.name,
+          city: null,
+          source: reg.source,
+          as_of: reg.published.slice(0, 7),
+          ...bicProvenance('national_register'),
+        };
+      }
+    } catch {
+      lookupFailed = true;
+    }
+  }
   if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'SM') {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;

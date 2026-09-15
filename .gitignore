@@ -37,6 +37,8 @@ scripts/x402-pay.mjs
 
 # UK modulus weight table — fetched at build/boot from Vocalink, never redistributed
 data/uk-modulus.json
+# Registre ABBL : fichier privé, jamais de redistribution dans le dépôt.
+data/lu-register.json
 
 # Regenerated from source for the contract linter — never committed
 openapi.generated.json

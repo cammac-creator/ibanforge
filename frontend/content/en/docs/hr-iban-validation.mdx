@@ -1,0 +1,52 @@
+---
+title: "HR: check an IBAN when it is entered"
+description: "A server-side recipe that separates input errors, valid formats and unavailable checks, without treating format validation as proof of account ownership."
+order: 13
+---
+
+# Check IBANs in an HR application
+
+When an employee enters an IBAN, check it on your server before confirming the input. Keep the API key server-side. Send only the IBAN: the employee’s name, salary and HR record are not needed for this request.
+
+HTTP 200 means the request was processed. **Read `valid`** for the format-check result. A valid format and an identified bank prove neither that the account exists nor that it belongs to the employee. This check does not authorise a payment.
+
+## Three separate outcomes
+
+| Recipe result | Suggested behaviour |
+|---|---|
+| `invalid_input` | Ask the employee to check the entered IBAN. |
+| `format_valid` | The format passes; keep any bank and ownership checks separate. |
+| `check_unavailable` | The check could not be completed. Show “Check temporarily unavailable” and keep verification pending. |
+
+A missing BIC is not, by itself, an input error. `bank_code_check` describes the register result separately. Absence from partial reference data does not establish that an account is invalid. See [result semantics](/docs/iban-validate).
+
+## TypeScript example to adapt
+
+The [complete, tested example](https://github.com/cammac-creator/ibanforge/blob/main/scripts/hr-iban-example.ts) exports `reviewEmployeeIban`. Copy that file into your server-side project, then call it:
+
+```ts
+import { reviewEmployeeIban } from './hr-iban-example.js';
+
+const key = process.env.IBANFORGE_API_KEY;
+if (!key) throw new Error('Missing API key');
+
+const review = await reviewEmployeeIban('DE89370400440532013000', key);
+
+if (review.status === 'invalid_input') {
+  // Ask for the input to be checked.
+} else if (review.status === 'check_unavailable') {
+  // Keep verification pending; do not label the IBAN invalid.
+} else {
+  // Format passed; ownership verification remains separate.
+}
+```
+
+The example limits each request to 15 seconds and logs neither IBANs nor keys. It does not store employee records or retry automatically. The IBAN above is a public documentation example.
+
+## Handle interruptions
+
+**401:** check the key. **402:** check access and credit. **429:** respect the service’s indicated delay before another attempt. **5xx or a network interruption:** offer another attempt later. None of these results means the IBAN is wrong.
+
+In production, check when the field is submitted, not on every keystroke. Never put the key in a browser, mobile app, URL or logs. For file imports, see [batch validation](/docs/iban-batch).
+
+Before using a real record, test a public example, an intentional typo, a result without a BIC and an unavailable service. Use an [API key](/docs/api-keys) for server-side integration; anonymous access is intended for evaluating the service.

@@ -1,0 +1,52 @@
+---
+title: "Personalsoftware: IBAN bei der Eingabe prüfen"
+description: "Serverseitiges Beispiel für Eingabefehler, gültige Formate und nicht verfügbare Prüfungen, ohne Formatprüfung mit Kontoinhaberschaft gleichzusetzen."
+order: 13
+---
+
+# IBANs in einer Personalsoftware prüfen
+
+Prüfen Sie eine eingegebene IBAN auf Ihrem Server, bevor Sie die Eingabe bestätigen. Der API-Schlüssel bleibt auf dem Server. Senden Sie nur die IBAN: Name, Gehalt und Personalakte werden für diese Anfrage nicht benötigt.
+
+HTTP 200 bedeutet, dass die Anfrage verarbeitet wurde. **Lesen Sie das Feld `valid`** für das Ergebnis der Formatprüfung. Ein gültiges Format und eine identifizierte Bank belegen weder die Existenz des Kontos noch, dass es dem Mitarbeitenden gehört. Diese Prüfung ist keine Zahlungsfreigabe.
+
+## Drei getrennte Ergebnisse
+
+| Ergebnis des Beispiels | Empfohlenes Verhalten |
+|---|---|
+| `invalid_input` | Um Überprüfung der eingegebenen IBAN bitten. |
+| `format_valid` | Das Format ist gültig; Bank- und Inhaberprüfungen bleiben getrennt. |
+| `check_unavailable` | Die Prüfung konnte nicht abgeschlossen werden. „Prüfung vorübergehend nicht verfügbar“ anzeigen und die Überprüfung offenhalten. |
+
+Ein fehlender BIC ist für sich allein kein Eingabefehler. `bank_code_check` beschreibt das Registerergebnis separat. Ein fehlender Eintrag in unvollständigen Referenzdaten belegt keine ungültige Kontoverbindung. Siehe [Bedeutung der Ergebnisse](/de/docs/iban-validate).
+
+## TypeScript-Beispiel zum Anpassen
+
+Das [vollständige, getestete Beispiel](https://github.com/cammac-creator/ibanforge/blob/main/scripts/hr-iban-example.ts) exportiert `reviewEmployeeIban`. Kopieren Sie die Datei in Ihr serverseitiges Projekt und rufen Sie die Funktion auf:
+
+```ts
+import { reviewEmployeeIban } from './hr-iban-example.js';
+
+const key = process.env.IBANFORGE_API_KEY;
+if (!key) throw new Error('API-Schlüssel fehlt');
+
+const review = await reviewEmployeeIban('DE89370400440532013000', key);
+
+if (review.status === 'invalid_input') {
+  // Eingabe überprüfen lassen.
+} else if (review.status === 'check_unavailable') {
+  // Prüfung offenhalten, IBAN nicht als ungültig bezeichnen.
+} else {
+  // Format gültig; Kontoinhaberschaft bleibt separat zu prüfen.
+}
+```
+
+Das Beispiel begrenzt jeden Aufruf auf 15 Sekunden und protokolliert weder IBANs noch Schlüssel. Es speichert keine Personalakten und wiederholt Anfragen nicht automatisch. Die oben angegebene IBAN ist ein öffentliches Dokumentationsbeispiel.
+
+## Unterbrechungen behandeln
+
+**401:** Schlüssel prüfen. **402:** Zugang und Guthaben prüfen. **429:** die vom Dienst angegebene Wartezeit vor einem neuen Versuch beachten. **5xx oder Netzwerkausfall:** einen späteren Versuch anbieten. Keiner dieser Fälle bedeutet, dass die IBAN falsch ist.
+
+Prüfen Sie bei der Bestätigung des Feldes, nicht nach jedem Tastendruck. Der Schlüssel gehört weder in den Browser noch in eine mobile App, eine URL oder Protokolle. Für Dateiimporte siehe [Stapelverarbeitung](/de/docs/iban-batch).
+
+Testen Sie vor echten Datensätzen ein öffentliches Beispiel, einen absichtlichen Tippfehler, ein Ergebnis ohne BIC und einen Dienstausfall. Nutzen Sie einen [API-Schlüssel](/de/docs/api-keys) für die serverseitige Integration; der anonyme Zugang dient der Erprobung.
