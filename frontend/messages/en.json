@@ -2167,6 +2167,8 @@
       "exampleNote": "Synthetic example: the account part is a placeholder, this IBAN belongs to nobody. It shows where the code sits inside the IBAN.",
       "relatedTitle": "Other codes of the same institution",
       "ctaCheck": "Check an IBAN in the playground",
+      "ctaTryApi": "Test this check with the API",
+      "tryApiText": "The same answer, from your own code: take a free key (no e-mail address, no card) and the first call runs right here.",
       "ctaAudit": "Audit a whole creditor file",
       "sourceLabel": "Source",
       "asOfLabel": "register as of",
@@ -2289,7 +2291,8 @@
       "docLink": "How the Belgian register answers",
       "indexTitle": "Belgian bank codes (NBB list)",
       "indexIntro": "Every bank identifier allocated in the National Bank of Belgium list, one page per institution, with the BIC it pairs with it and the exact answer of the IBANforge API. The register publishes names only: no address appears here that the register did not publish.",
-      "countryLink": "The Belgian IBAN format, with the official example"
+      "countryLink": "The Belgian IBAN format, with the official example",
+      "integrateLink": "Check Belgian bank codes in your application"
     },
     "sk": {
       "metaTitle": "Slovak bank code {code}: {name}",

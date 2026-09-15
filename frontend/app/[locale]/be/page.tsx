@@ -26,8 +26,11 @@ export default async function BeIndexPage({ params }: { params: Promise<{ locale
         <p className="text-muted-foreground leading-relaxed max-w-prose">{t("be.indexIntro")}</p>
         <RegisterSearch locale={locale} kind="be" label={t("common.searchLabel")} button={t("common.searchButton")} placeholder="001" />
         <p className="text-xs text-muted-foreground">{t("be.groupNote")} {t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {file.generated_at}.</p>
-        <p className="text-sm">
+        {/* Page pilote du contrat de mesure (15.09.2026) : à côté de la recherche
+            ponctuelle, une suite vers la documentation et l'intégration. */}
+        <p className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Link href={localePath(locale, "/iban/be")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("be.countryLink")}</Link>
+          <Link href={localePath(locale, "/docs/be-bank-codes")} data-evt="cta:be-integrate" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("be.integrateLink")}</Link>
         </p>
       </header>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
