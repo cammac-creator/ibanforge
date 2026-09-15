@@ -65,13 +65,6 @@ export default async function AtCodePage({ params }: { params: Promise<{ locale:
         </table>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">{t("common.exampleTitle")}</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">{t("at.structure")}</p>
-        <p className="font-mono text-sm sm:text-base tracking-wider">{formatIban(entry.example_iban)}</p>
-        <p className="text-xs text-muted-foreground">{t("common.exampleNote")}</p>
-      </section>
-
       {/* Page pilote du contrat de mesure (15.09.2026) : l'essai avec l'API est
           proposé tout de suite après la réponse bancaire, atteignable sur
           téléphone sans défiler ; la réponse brute de l'API se déplie à la demande. */}
@@ -80,6 +73,13 @@ export default async function AtCodePage({ params }: { params: Promise<{ locale:
         <GetKeyButton variant="amber" size="sm" className="w-fit" evt="cta:try-api-register">
           {t("common.ctaTryApi")}
         </GetKeyButton>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">{t("common.exampleTitle")}</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">{t("at.structure")}</p>
+        <p className="font-mono text-sm sm:text-base tracking-wider">{formatIban(entry.example_iban)}</p>
+        <p className="text-xs text-muted-foreground">{t("common.exampleNote")}</p>
       </section>
 
       <details className="group rounded-md border" style={{ borderColor: "var(--hairline)" }}>
