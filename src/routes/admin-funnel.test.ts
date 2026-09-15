@@ -61,6 +61,61 @@ describe('GET /v1/admin/funnel', () => {
     expect(body.window).toHaveProperty('to');
   });
 
+  it('les ajouts du chantier « mesure agents » sont là, et les six indicateurs INTACTS', async () => {
+    // 🚨 Rétro-compatibilité : les six clés de `indicators` sont assertées au
+    // test précédent et n'ont pas bougé. Ce test-ci ne vérifie que les AJOUTS.
+    const res = await app.request('/v1/admin/funnel', { headers });
+    const body = (await res.json()) as {
+      by_birth_source: Array<{ name: string; lineages: number }>;
+      by_first_client: Array<{ name: string }>;
+      device: Record<string, unknown>;
+    };
+    expect(Array.isArray(body.by_birth_source)).toBe(true);
+    // Liste FERMÉE : les huit familles plus le seau « jamais activée ».
+    expect(body.by_first_client.map((b) => b.name)).toEqual([
+      'mcp-npm',
+      'sdk-ts',
+      'sdk-python',
+      'sdk-java',
+      'sdk-dotnet',
+      'browser',
+      'curl',
+      'other',
+      '(unknown)',
+      '(none)',
+    ]);
+    expect(Object.keys(body.device).sort()).toEqual([
+      'by_door',
+      'chain',
+      'counters',
+      'indicators',
+      'lineages',
+      'mcp_remote',
+      'notes',
+      'window_days',
+    ]);
+  });
+
+  it('le corps reste un AGRÉGAT : aucun hachage, aucune adresse, aucun user_code', async () => {
+    // Une lignée réelle, avec sa clé, son adresse et son préfixe : rien de tout
+    // cela ne doit apparaître dans la réponse.
+    const key = generateApiKey(
+      `fn-agg-${Date.now()}@alpha.example.net`,
+      undefined,
+      'mcp-device',
+      false,
+      {
+        ipHash: `fn-agg-${Date.now()}`,
+      },
+    );
+    expect(key).not.toBeNull();
+    const res = await app.request('/v1/admin/funnel', { headers });
+    const raw = await res.text();
+    expect(raw).not.toContain(key!.key_hash);
+    expect(raw).not.toContain(key!.key_prefix);
+    expect(raw).not.toContain('alpha.example.net');
+  });
+
   it('un `since` mal formé est ignoré, et la réponse DIT ce qui a été demandé', async () => {
     const res = await app.request('/v1/admin/funnel?since=hier&days=7', { headers });
     const body = (await res.json()) as {

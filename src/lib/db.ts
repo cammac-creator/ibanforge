@@ -1421,6 +1421,73 @@ function openStatsDB(): DatabaseType.Database {
         shield_minutes          INTEGER NOT NULL DEFAULT 0,
         created_at              TEXT    DEFAULT (datetime('now'))
       ) WITHOUT ROWID;
+      -- ─── Les deux portes d'une identité d'AGENT, par jour ────────────────
+      -- (chantier « mesure agents », 15/09/2026)
+      --
+      -- Pourquoi des agrégats plutôt qu'une lecture de l'existant : device_codes
+      -- est purgée a 24 h, donc toute lecture d'hier rendrait zero, sans erreur
+      -- et sans test rouge ; et la surface MCP distante ne laisse dans
+      -- request_log que le chemin /mcp, jamais le nom de l'outil, ou
+      -- request_api_key est indiscernable d'une validation.
+      --
+      -- Bloc AUTONOME, comme le registre d'essai juste au-dessus : deux
+      -- CREATE TABLE IF NOT EXISTS, aucun ALTER, donc aucune garde
+      -- PRAGMA table_info et aucun index posé sur une colonne créée plus bas
+      -- (le piege du 19/08, qui empechait l'API de demarrer).
+      --
+      -- Pas de contre-apostrophe et pas de point d'interrogation dans ces
+      -- commentaires : ils vivent dans un litteral de gabarit JS, ou la
+      -- contre-apostrophe termine la chaine.
+      --
+      -- 🚨 DES COMPTES, JAMAIS UNE SOURCE INDIVIDUELLE. Aucune adresse meme
+      -- hachee, aucun User-Agent, aucun user_code, aucun device_code, aucune
+      -- cle. C'est cette pauvrete qui autorise ces deux tables a vivre sans
+      -- politique de retention, exactement comme trial_daily.
+      --
+      -- 🚨 La colonne source est reduite a TROIS valeurs
+      -- ('web-device', 'mcp-device', 'other') par normalizeDeviceDoor. La
+      -- source d'un grant est une chaine LIBRE choisie par l'appelant
+      -- (normalizeGrantSource accepte [a-z0-9_-]{1,40}) : la stocker telle
+      -- quelle ferait de cette colonne un jeu d'identifiants non borne, choisi
+      -- par l'appelant, conserve pour toujours. Trois lignes par jour au plus.
+      --
+      -- Les compteurs sont incrementes AU MOMENT DE LA DECISION, par les routes
+      -- et par la purge, jamais recalcules. Consequence a lire avant de lire
+      -- les chiffres : expired veut dire « expiration TRANCHEE par la purge ce
+      -- jour-la », pas « grant dont le TTL est passe » ; et opened ne s'additionne
+      -- pas en approved + denied + expired + delivered, parce qu'un grant encore
+      -- en attente au moment de la lecture n'est dans aucun seau terminal.
+      CREATE TABLE IF NOT EXISTS device_grant_daily (
+        day                TEXT    NOT NULL,
+        source             TEXT    NOT NULL,
+        opened             INTEGER NOT NULL DEFAULT 0,
+        rate_limited       INTEGER NOT NULL DEFAULT 0,
+        approved_anonymous INTEGER NOT NULL DEFAULT 0,
+        approved_email     INTEGER NOT NULL DEFAULT 0,
+        denied             INTEGER NOT NULL DEFAULT 0,
+        expired            INTEGER NOT NULL DEFAULT 0,
+        delivered          INTEGER NOT NULL DEFAULT 0,
+        created_at         TEXT    DEFAULT (datetime('now')),
+        PRIMARY KEY (day, source)
+      ) WITHOUT ROWID;
+      -- Le haut de l'entonnoir MCP distant : ouvertures de session, appels
+      -- d'outils, et appels de l'outil qui demande une cle.
+      --
+      -- 🚨 Ces trois compteurs sont des APPELS SANS IDENTITE : cette surface
+      -- sert sans cle, donc AUCUNE de ces lignes n'est rattachable a une
+      -- lignee. Le funnel les publie dans un bloc a part avec cette note.
+      --
+      -- tool_calls compte des APPELS D'OUTILS et non des unites facturees :
+      -- request_api_key coute zero unite (MCP_FREE_TOOLS) et reste un appel a
+      -- mesurer, alors que le registre trial_ledger, lui, ne compte que des
+      -- unites et ne le voit donc pas du tout.
+      CREATE TABLE IF NOT EXISTS mcp_remote_daily (
+        day          TEXT    PRIMARY KEY,
+        sessions     INTEGER NOT NULL DEFAULT 0,
+        tool_calls   INTEGER NOT NULL DEFAULT 0,
+        key_requests INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT    DEFAULT (datetime('now'))
+      ) WITHOUT ROWID;
     `);
     migrateLineageFacts(statsDB);
   }
@@ -1546,6 +1613,29 @@ function migrateLineageFacts(statsDB: DatabaseType.Database): void {
     CREATE INDEX IF NOT EXISTS idx_lineage_facts_paid ON lineage_facts(paid_key_hash);
     CREATE INDEX IF NOT EXISTS idx_lineage_facts_first ON lineage_facts(first_success_at);
   `);
+
+  // ─── 2bis. La FAMILLE de client d'un succès (« mesure agents », 15/09) ────
+  //
+  // Deux colonnes ajoutées APRÈS le CREATE ci-dessus, gardées par
+  // `PRAGMA table_info` : sur une base neuve la table vient d'être créée sans
+  // elles, sur une base migrée elles peuvent déjà être là, et un ALTER répété
+  // ferait échouer TOUTE l'ouverture (le piège du 19/08 : l'API ne démarre
+  // plus). Aucun index dessus, volontairement : la ventilation du funnel est un
+  // balayage de la cohorte déjà filtrée par `idx_lineage_facts_birth`, et un
+  // index de faible cardinalité (huit valeurs) ne servirait qu'à coûter une
+  // écriture de plus sur le chemin chaud.
+  //
+  // 🚨 Une FAMILLE prise dans une liste fermée, jamais l'User-Agent lui-même :
+  // voir `lineage-clients.ts`, qui porte la liste et la raison.
+  const lineageCols = (
+    statsDB.prepare('PRAGMA table_info(lineage_facts)').all() as Array<{ name: string }>
+  ).map((r) => r.name);
+  if (!lineageCols.includes('first_success_client')) {
+    statsDB.exec('ALTER TABLE lineage_facts ADD COLUMN first_success_client TEXT');
+  }
+  if (!lineageCols.includes('last_success_client')) {
+    statsDB.exec('ALTER TABLE lineage_facts ADD COLUMN last_success_client TEXT');
+  }
 
   // ─── 3. Rattrapage de lineage_hash, en JS, une fois ───────────────────────
   //

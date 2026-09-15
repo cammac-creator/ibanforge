@@ -45,6 +45,11 @@
  */
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { getStatsDB } from './db.js';
+import {
+  bumpDeviceGrantApproval,
+  bumpDeviceGrantDaily,
+  bumpDeviceGrantExpiries,
+} from './agent-entry-daily.js';
 import { DAILY_KEY_CREATION_LIMIT, keyCreationSource } from './key-creation-guard.js';
 import {
   ANONYMOUS_CONTACT,
@@ -465,10 +470,17 @@ export function openGrant(input: {
   const creator = keyCreationSource(rawIp);
 
   if (creator) {
+    // Les deux refus de plafond comptent dans la MÊME colonne : « ce réseau
+    // s'est vu fermer la porte », que ce soit par la réservation du jour ou par
+    // le plafond horaire de lignes. Deux colonnes auraient demandé au lecteur de
+    // connaître la différence entre les deux serrures pour lire un chiffre qui
+    // ne dit qu'une chose (chantier « mesure agents », 15/09).
     if (grantReservationCount(creator) >= DAILY_KEY_CREATION_LIMIT) {
+      bumpDeviceGrantDaily('rate_limited', input.source);
       return { ok: false, error: 'device_rate_limited' };
     }
     if (grantsOpenedThisHour(creator) >= DEVICE_CODES_PER_IP_HOUR) {
+      bumpDeviceGrantDaily('rate_limited', input.source);
       return { ok: false, error: 'device_rate_limited' };
     }
   }
@@ -509,6 +521,10 @@ export function openGrant(input: {
            FROM device_codes WHERE device_code_hash = ?`,
       )
       .get(hashGrantSecret(deviceCode)) as { expires_at: string; expires_in: number };
+    // Après l'INSERT réussi, jamais avant : un tirage de `user_code` en
+    // collision recommence la boucle, et compter avant aurait compté deux
+    // ouvertures pour un seul grant.
+    bumpDeviceGrantDaily('opened', input.source);
     return {
       ok: true,
       deviceCode,
@@ -518,6 +534,26 @@ export function openGrant(input: {
     };
   }
   return { ok: false, error: 'device_unavailable' };
+}
+
+/**
+ * La porte d'un grant, pour le compteur du jour seulement.
+ *
+ * Une lecture d'une ligne par décision humaine (approbation, refus, retrait),
+ * et elle n'échoue jamais bruyamment : un compteur qui ne sait pas sa porte
+ * compte sous `other` plutôt que de ne rien compter. Sous try/catch parce que
+ * ce module est appelé sur le chemin qui remet une clé — un défaut de mesure ne
+ * doit coûter sa clé à personne (chantier « mesure agents », 15/09).
+ */
+function grantDoorOf(secretHash: string): string | null {
+  try {
+    const row = getStatsDB()
+      .prepare('SELECT source FROM device_codes WHERE device_code_hash = ?')
+      .get(secretHash) as { source: string | null } | undefined;
+    return row?.source ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -655,6 +691,14 @@ export function approveGrant(
       secretHash,
       expected,
     );
+  // 🚨 Sur `changes`, et sur le rail DEVICE seulement : un checkout approuvé est
+  // un paiement, pas un humain qui donne une clé gratuite à un agent, et les
+  // mélanger ferait lire le rail gratuit à travers les ventes. Le palier décide
+  // de la colonne — c'est la seule question que ce rail pose : combien
+  // d'approbations sans rien donner, combien avec une adresse.
+  if (info.changes > 0 && expected === 'device') {
+    bumpDeviceGrantApproval(minted.tier, grantDoorOf(secretHash));
+  }
   return info.changes > 0;
 }
 
@@ -677,6 +721,9 @@ export function denyGrant(secretHash: string, token: string): boolean {
           AND approval_token_expires_at > datetime('now')`,
     )
     .run(secretHash, hashGrantSecret(token));
+  // `denyGrant` ne vit que sur le rail device (son `WHERE` le dit), donc aucune
+  // garde de rail n'est nécessaire ici.
+  if (info.changes > 0) bumpDeviceGrantDaily('denied', grantDoorOf(secretHash));
   return info.changes > 0;
 }
 
@@ -700,7 +747,11 @@ export function consumeGrantKey(secretHash: string, expected: GrantRail): Minted
   const db = getStatsDB();
   const row = db
     .prepare(
+      // `d.source` est lu ICI plutôt que par une seconde requête après le
+      // retrait : la ligne est déjà sous les yeux, et le compteur du jour n'a
+      // pas à coûter une lecture de plus sur le chemin qui remet la clé.
       `SELECT d.raw_key_once AS raw_key_once, d.key_hash AS key_hash, d.tier AS tier,
+              d.source AS source,
               k.key_prefix AS key_prefix, k.monthly_limit AS monthly_limit, k.email AS email
          FROM device_codes d
          LEFT JOIN api_keys k ON k.key_hash = d.key_hash
@@ -712,6 +763,7 @@ export function consumeGrantKey(secretHash: string, expected: GrantRail): Minted
         raw_key_once: string;
         key_hash: string | null;
         tier: KeyTier | null;
+        source: string | null;
         key_prefix: string | null;
         monthly_limit: number | null;
         email: string | null;
@@ -727,6 +779,9 @@ export function consumeGrantKey(secretHash: string, expected: GrantRail): Minted
     )
     .run(secretHash, expected);
   if (info.changes === 0) return null;
+  // Le rail device seulement : un retrait de checkout est la collecte d'une clé
+  // PAYÉE, qui n'a rien à faire dans l'entonnoir de la porte gratuite.
+  if (expected === 'device') bumpDeviceGrantDaily('delivered', row.source);
   return {
     api_key: row.raw_key_once,
     key_prefix: row.key_prefix ?? row.raw_key_once.slice(0, 12),
@@ -1209,12 +1264,27 @@ export function purgeExpiredDeviceCodes(): DevicePurgeResult {
     .run().changes;
 
   // 2a. Le clair ne survit jamais à la fenêtre de retrait. Rail device.
+  //
+  // 🚨 Le compteur du jour est incrémenté AVANT l'UPDATE, avec le MÊME prédicat
+  // (chantier « mesure agents », 15/09) : après, les lignes ne sont plus
+  // 'pending' ni 'approved' et le compte serait nul. L'ordre est sûr parce que
+  // better-sqlite3 est synchrone et Node mono-fil — entre les deux
+  // instructions il n'y a aucun point de reprise, c'est l'argument que ce
+  // module fait déjà valoir pour « la clé est remise exactement une fois ».
+  //
+  // 🚨 Et c'est cette purge qui rend le compteur indispensable : la rétention de
+  // l'étape 3 supprime les lignes du rail device à 24 h. Un `expired` recalculé
+  // depuis `device_codes` le lendemain rendrait zéro, sans erreur et sans test
+  // rouge — c'est-à-dire exactement le chiffre dont la décision d'ouvrir
+  // l'essai a besoin, avec la valeur d'un silence.
+  const EXPIRING_DEVICE_GRANTS = `grant_type = 'device' AND status IN ('pending','approved')
+        AND expires_at < datetime('now', '-1 hour')`;
+  bumpDeviceGrantExpiries(EXPIRING_DEVICE_GRANTS);
   db.prepare(
     `UPDATE device_codes
         SET raw_key_once = NULL, approval_token_hash = NULL,
             approval_token_expires_at = NULL, status = 'expired'
-      WHERE grant_type = 'device' AND status IN ('pending','approved')
-        AND expires_at < datetime('now', '-1 hour')`,
+      WHERE ${EXPIRING_DEVICE_GRANTS}`,
   ).run();
 
   // 2b. Rail checkout : une ligne 'pending' jamais payée ne porte AUCUNE clé.

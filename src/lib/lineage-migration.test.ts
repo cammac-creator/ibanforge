@@ -106,10 +106,61 @@ describe('migration des faits de lignée', () => {
       'paid_first_success_at',
       'backfilled',
       'updated_at',
+      // Chantier « mesure agents » : les deux familles de client.
+      'first_success_client',
+      'last_success_client',
     ]) {
       expect(columns(db, 'lineage_facts'), c).toContain(c);
     }
+    // Les deux agrégats journaliers des portes d'agent, avec leurs clés.
+    for (const c of [
+      'day',
+      'source',
+      'opened',
+      'rate_limited',
+      'approved_anonymous',
+      'approved_email',
+      'denied',
+      'expired',
+      'delivered',
+    ]) {
+      expect(columns(db, 'device_grant_daily'), c).toContain(c);
+    }
+    for (const c of ['day', 'sessions', 'tool_calls', 'key_requests']) {
+      expect(columns(db, 'mcp_remote_daily'), c).toContain(c);
+    }
     mod.closeAll();
+  });
+
+  it('sur une base ANCIENNE, les deux colonnes de client sont ajoutées UNE fois', async () => {
+    // Le cas que la garde `PRAGMA table_info` existe pour couvrir : la table
+    // existe déjà sans ces colonnes, l'ALTER doit passer une fois et une seule.
+    // Un ALTER répété fait échouer TOUTE l'ouverture, et l'API ne démarre plus
+    // (le piège du 19/08).
+    const path = freshPath();
+    aprilSchema(
+      path,
+      `INSERT INTO api_keys (key_hash, key_prefix, email, created_at)
+         VALUES ('h-cli', 'ifk_cli00001', 'h@alpha.example.net', '2026-07-01 10:00:00');`,
+    );
+    const first = await openAt(path);
+    first.getStatsDB();
+    first.closeAll();
+    // Deuxième ouverture sur la MÊME base : la colonne est déjà là.
+    const again = await openAt(path);
+    const db = again.getStatsDB();
+    expect(columns(db, 'lineage_facts').filter((c) => c === 'first_success_client')).toHaveLength(
+      1,
+    );
+    expect(columns(db, 'lineage_facts').filter((c) => c === 'last_success_client')).toHaveLength(1);
+    // Et les deux agrégats ne se dupliquent pas non plus.
+    expect(
+      (db.prepare('SELECT COUNT(*) AS n FROM device_grant_daily').get() as { n: number }).n,
+    ).toBe(0);
+    expect(
+      (db.prepare('SELECT COUNT(*) AS n FROM mcp_remote_daily').get() as { n: number }).n,
+    ).toBe(0);
+    again.closeAll();
   });
 
   it('sur une base ANCIENNE, chaque clé devient sa propre lignée et sa naissance est reconstituée', async () => {
