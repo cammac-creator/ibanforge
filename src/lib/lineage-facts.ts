@@ -191,6 +191,12 @@ export function recordLineageSuccess(p: {
     cachedDay = day;
     seenToday.clear();
   }
+  // Court-circuit AVANT toute lecture de base, et c'est là tout le coût sur le
+  // chemin chaud : une clé déjà vue aujourd'hui dans ce contexte ne déclenche
+  // plus rien du tout. Sans lui, chaque appel métier payait la résolution de la
+  // lignée, soit une lecture indexée par requête servie.
+  const fastKey = `k:${p.keyHash}|${context}`;
+  if (seenToday.has(fastKey)) return;
   try {
     const db = getStatsDB();
     const row = db
@@ -201,7 +207,13 @@ export function recordLineageSuccess(p: {
     if (!row) return;
     const lineage = row.lineage_hash ?? p.keyHash;
     const contextKey = `${lineage}|${context}`;
-    if (seenToday.has(contextKey)) return;
+    // La lignée a déjà écrit aujourd'hui dans ce contexte, par une AUTRE clé
+    // (le cas d'une lignée qui porterait deux clés actives). On mémorise aussi
+    // le raccourci par clé, pour que l'appel suivant s'arrête plus haut.
+    if (seenToday.has(contextKey)) {
+      seenToday.add(fastKey);
+      return;
+    }
     // Le porteur d'une clé payée reliée à une lignée d'essai : l'usage payé se
     // lit sur la lignée qui a ACHETÉ, pas sur la clé qui sert. La garde
     // `IS NULL` le rend sans effet dès le deuxième appel.
@@ -253,6 +265,7 @@ export function recordLineageSuccess(p: {
          updated_at       = excluded.updated_at`,
     ).run(lineage, lineage, lineage, lineage, route, context, context);
     seenToday.add(contextKey);
+    seenToday.add(fastKey);
   } catch (err) {
     complain(err);
   }
