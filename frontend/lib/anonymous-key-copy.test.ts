@@ -55,14 +55,32 @@ const applati = (s: string) => s.replace(/\s+/g, ' ');
 // Motifs recopiés de src/routes/static-claims.test.ts (zone C, §3.1 du chantier).
 const N200 = String.raw`(?<![.,\d])200(?![.,]?\d)`;
 const FREE = String.raw`free[ _-]?tier|free[ _-]?(?:API[ _-]?)?key|offre gratuite|cl[ée]s? (?:API )?gratuites?|kostenlose[rns]?[ _-]?(?:API-)?(?:Schl[üu]ssel|Kontingent)|Gratis-?(?:Stufe|Tarif)`;
+// Les quatre mots dans leur propre constante, et non en clair dans le motif :
+// écrits sur la même ligne que le 200, ils font de ce fichier sa propre
+// infraction, et le prochain qui mènera le budget à zéro devra l'exempter.
+// Le NOM de la constante les évite aussi, pour la même raison — « gratuit »
+// dans un identifiant se lit comme « gratuit » dans une phrase.
+const MOTS_SANS_FRAIS = String.raw`free|gratuit|kostenlos|gratis`;
+// Les trois formules de l'ancienne règle « une clé par personne », chacune
+// coupée en deux morceaux : écrites d'un trait, elles se trouveraient
+// elles-mêmes. C'est le prix pour qu'un fichier de garde n'ait pas besoin de sa
+// propre exemption — et l'exemption est précisément ce qui laisse pourrir un
+// budget qu'on croit à zéro.
+const UNE_PAR_PERSONNE = [
+  ['one per develop', 'er'],
+  ['une par dévelop', 'peur'],
+  ['einer pro Entwick', 'ler'],
+]
+  .map((morceaux) => morceaux.join(''))
+  .join('|');
 const PERIMES: RegExp[] = [
   new RegExp(`(?:${FREE})[^\\n]{0,60}?${N200}`, 'i'),
-  new RegExp(`${N200}[^\\n]{0,60}?(?:free|gratuit|kostenlos|gratis)`, 'i'),
-  /\bemailed key\b/i,
+  new RegExp(`${N200}[^\\n]{0,60}?(?:${MOTS_SANS_FRAIS})`, 'i'),
+  new RegExp(['\\bemailed', ' key\\b'].join(''), 'i'),
   /POST(ing)? (your|any) e-?mail/i,
   /POSTez (n'importe quel |un )?e-?mail/i,
   /POSTen Sie (eine|die)[^.\n]{0,25}E-Mail/i,
-  /one per developer|une par développeur|einer pro Entwickler/i,
+  new RegExp(UNE_PAR_PERSONNE, 'i'),
 ];
 /** Une ligne qui date son chiffre est un instantané, pas une promesse. */
 const DATEE = /as of|refresh|Breakdown|20\d{2}-\d{2}/i;
@@ -101,9 +119,17 @@ describe('les textes de la clé sans e-mail', () => {
   });
 
   it('n’annoncent rien de la vague 2 comme existant', () => {
-    // Le device grant et le rail carte sont spécifiés, pas livrés : les routes
-    // rendent 404. Un seul de ces mots au présent dans un texte publié suffit à
-    // promettre une porte qui n'existe pas.
+    // Le device grant et le rail carte du CHANTIER sont spécifiés, pas livrés :
+    // `/v1/keys/device` et `/v1/keys/checkout` rendent 404. Un seul de ces mots
+    // au présent dans un texte publié suffit à promettre une porte qui n'existe
+    // pas.
+    //
+    // 🚨 La liste nomme des ROUTES et des NOMS D'OUTILS, jamais un prestataire.
+    // Payer un pack par carte via Stripe existe depuis août et se raconte
+    // librement dans les tarifs et les CGU : bannir le mot « Stripe » ici
+    // rendrait un texte VRAI impossible à écrire, et le lot suivant
+    // supprimerait l'assertion au lieu de la comprendre. Quand la vague 2 sera
+    // livrée, on retire la ligne concernée — pas le test.
     const interdits = [
       'request_api_key',
       'poll_api_key',
@@ -115,7 +141,6 @@ describe('les textes de la clé sans e-mail', () => {
       'approbation dans le navigateur',
       'approbation navigateur',
       'Browser-Freigabe',
-      'Stripe Checkout',
     ];
     const fautes: string[] = [];
     for (const rel of FICHIERS) {
