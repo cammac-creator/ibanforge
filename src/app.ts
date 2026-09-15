@@ -79,6 +79,7 @@ import { adminPackSales } from './routes/admin-pack-sales.js';
 import { adminTrial } from './routes/admin-trial.js';
 import { adminFunnel } from './routes/admin-funnel.js';
 import { adminCohorts } from './routes/admin-cohorts.js';
+import { adminBreaker } from './routes/admin-breaker.js';
 import { adminFailedPayments } from './routes/admin-failed-payments.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
@@ -1020,6 +1021,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', adminTrial);
   app.route('/', adminFunnel);
   app.route('/', adminCohorts);
+  app.route('/', adminBreaker);
   app.route('/', adminFailedPayments);
   app.route('/', adminSearchConsole);
   app.route('/', adminBusiness);

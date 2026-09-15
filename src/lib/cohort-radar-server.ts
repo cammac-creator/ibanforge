@@ -59,6 +59,10 @@ import {
 } from './cohort-radar.js';
 import { CLAIM_REPAIR_LANDED } from './tiers.js';
 import { isShieldArmed, shieldArmedAtMs, shieldEpisodeId } from './shield-state.js';
+import {
+  sweepBreaker,
+  breakerDisabledByEnv as breakerDisabledByEnvOwner,
+} from './creation-breaker.js';
 import { revokeBurstBatch, type BurstRevocationInput } from './key-revocations.js';
 
 /**
@@ -336,12 +340,14 @@ function revocationEnabled(): boolean {
 /**
  * L'interrupteur de crise du disjoncteur, qui éteint aussi la révocation.
  *
- * Lu ici en clair : le lot 5 exportera `breakerDisabledByEnv()` depuis
- * `creation-breaker.ts`, et ce lecteur devra alors y déléguer plutôt que de
- * relire la variable une seconde fois.
+ * DÉLÈGUE au propriétaire, `creation-breaker.ts` (lot 5), depuis le 15/09/2026.
+ * Ce fichier relisait `process.env` une seconde fois en attendant ce lot : deux
+ * lecteurs de la même variable finissent toujours par diverger sur la forme
+ * acceptée (`1`, `true`, espaces) et l'un des deux éteint alors ce que l'autre
+ * croit allumé.
  */
 function breakerDisabledByEnv(): boolean {
-  return process.env.IBANFORGE_BREAKER_DISABLED === '1';
+  return breakerDisabledByEnvOwner();
 }
 
 interface SeenAnchors {
@@ -795,11 +801,21 @@ export function getCohortRelabels(
  * 🚨 Le drapeau est consommé AVANT le scan : deux ticks ne le rejouent pas, et un
  * scan qui échoue ne le réarme pas tout seul en boucle.
  *
- * 🚨 Le lot 5 ajoutera ici son `sweepBreaker()`, en PREMIÈRE ligne du tick, pour
- * qu'un épisode calme ou capé se désarme même sans trafic.
+ * 🚨 `sweepBreaker()` est la PREMIÈRE ligne du tick, et elle y est AVANT la
+ * garde de dû : c'est le seul battement du service qui ne dépende d'aucun
+ * trafic, donc le seul endroit où un épisode calme, capé, ou laissé armé par
+ * l'interrupteur de crise puisse retomber sans qu'une clé soit créée. Placée
+ * après la garde de dû, elle ne tournerait qu'une fois par heure en paix — et
+ * un épisode armé par la dernière création d'une ferme resterait armé.
  */
 export function startCohortRadar(): void {
   const tick = async (): Promise<void> => {
+    try {
+      sweepBreaker();
+    } catch (err) {
+      // Le balayage ne jette pas, mais le radar ne doit pas mourir s'il change.
+      console.error('[breaker] balayage:', err instanceof Error ? err.message : err);
+    }
     try {
       const forced = kvGet(KV_SCAN_DUE) === '1';
       if (forced) kvSet(KV_SCAN_DUE, '0');
