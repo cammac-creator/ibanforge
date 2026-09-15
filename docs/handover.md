@@ -214,6 +214,16 @@ npm version currently carries a provenance attestation, which means none of them
 of a workflow. Checking and, if needed, registering trusted publishers is the fix — not
 publishing by hand again.
 
+Measured on 15 September 2026, releasing 1.6.0: the documented order works and is the only
+one that does. `npm publish --access public` by hand from `mcp/` and from `sdks/typescript/`
+(the granular token in the operator's `~/.npmrc`), **then** `gh workflow run
+release-publish.yml --ref main -f version=1.6.0`, which uploaded PyPI, published the MCP
+Registry (it validates that the npm version exists first), created the tag at the commit it
+checked out and the GitHub release. The trusted publisher is still not registered on
+npmjs.com, so the two npm steps of the workflow still end in "already on npm — skipping".
+One command that does not do what it looks like: `npm --prefix <dir> publish` publishes the
+package of the **current** directory, not `<dir>`.
+
 ---
 
 ## 7. What a green suite does not prove
@@ -272,7 +282,11 @@ place.
 **Parallel sessions share this repository.** Fetch before every push — except when local
 `main` carries a merge commit, where `git pull --rebase` flattens the merge and reopens
 resolved conflicts; use `git fetch` then `git merge --ff-only`. Never check out another
-branch in the main working tree; use a worktree. And `.gitignore` must say `node_modules`
+branch in the main working tree; use a worktree. In a worktree, `frontend/node_modules` must be a
+**copy** (an APFS clone, `cp -Rc`, costs nothing), never a symlink: `next.config.ts` pins
+Turbopack's root on `frontend/`, and `next build` refuses a link that points outside it
+(`Symlink [project]/node_modules is invalid, it points out of the filesystem root`). A
+symlink at the worktree root for the API's `node_modules` is fine. And `.gitignore` must say `node_modules`
 without a trailing slash, or an agent's symlink gets committed and replaces the real
 directory at merge time.
 
@@ -578,8 +592,11 @@ but the number is written out by hand in roughly twenty documentation surfaces, 
 message catalogues, the machine-readable files and the README. Changing only the constant
 would leave those lying.
 
-**Version 1.6.0 is unreleased.** Two audit tools are written and tested in the MCP package
-(eleven tools) and wait for it.
+**Version 1.6.0 was released on 15 September 2026** (PR 197: the MCP output schemas now
+match what the enrichment serves, so the official client stops rejecting valid answers; the
+npm package bounds its requests and no longer expands a refused batch; both SDKs create a key
+without an address; the two audit tools of the npm package ship with it). The device-grant
+tools (`request_api_key`, `poll_api_key`, wave 2 of the keyless chantier) wait for 1.7.0.
 
 **The UK firm lookup answers 503** (`not_configured`) until two environment variables are
 set. It was built blind, with a one-day cache and no stale grace because the described
