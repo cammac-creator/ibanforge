@@ -71,6 +71,14 @@ starts the claim in the same call. It is never required.
 unless they have handed it to you for this. The sentence to put to them is
 *"Use my address you@company.com to create a free IBANforge key."*
 
+### During a signup alert
+
+When keys are being created in bursts by robots, the service spends a few hours on alert. A new key
+that has not proven a mailbox is then born with a reduced allowance, not refilled on the 1st; the
+`201` answer says so in a `notice` field, and the allowance goes back up on its own once the alert
+ends. Claiming the key with a code raises it to its allowance right away, alert or not. Nothing is
+refused: a signup during an alert works, it just starts smaller.
+
 ## Claiming: 25 → 200 a month
 
 `POST /v1/keys/claim` raises the key you already hold. It mints nothing: same key, same prefix,

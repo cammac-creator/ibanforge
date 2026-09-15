@@ -73,6 +73,14 @@ lance la réclamation dans le même appel. Ce n'est jamais obligatoire.
 votre utilisateur tant qu'il ne vous l'a pas confiée pour cet usage. La phrase à lui soumettre est
 *« Use my address you@company.com to create a free IBANforge key. »*
 
+### Pendant une alerte de création
+
+Quand des clés sont créées en rafale par des robots, le service passe quelques heures en alerte. Une
+clé neuve qui n'a pas prouvé une boîte mail naît alors avec un plafond réduit, sans recharge le 1er ;
+la réponse `201` le dit dans un champ `notice`, et le plafond remonte de lui-même quand l'alerte
+retombe. La réclamer par code la porte tout de suite à son quota, alerte ou pas. Rien n'est refusé :
+une inscription pendant une alerte fonctionne, elle démarre seulement plus petit.
+
 ## Réclamer : 25 → 200 par mois
 
 `POST /v1/keys/claim` relève la clé que vous avez déjà. Il n'en crée aucune : même clé, même

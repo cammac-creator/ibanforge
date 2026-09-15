@@ -71,6 +71,15 @@ startet die Beanspruchung im selben Aufruf. Erforderlich ist sie nie.
 Adresse Ihrer Nutzerin oder Ihres Nutzers nicht, solange sie Ihnen nicht dafür gegeben wurde. Der
 Satz, den Sie vorlegen: *„Use my address you@company.com to create a free IBANforge key."*
 
+### Während eines Anmeldealarms
+
+Wenn Roboter Schlüssel in Serie anlegen, geht der Dienst für einige Stunden in Alarmbereitschaft.
+Ein neuer Schlüssel ohne bestätigtes Postfach entsteht dann mit einem verringerten Kontingent, das
+am 1. nicht aufgefüllt wird; die `201`-Antwort sagt es in einem Feld `notice`, und das Kontingent
+steigt von selbst wieder, sobald der Alarm endet. Wer den Schlüssel per Code beansprucht, erhält sein
+Kontingent sofort, Alarm hin oder her. Nichts wird abgelehnt: eine Anmeldung während eines Alarms
+funktioniert, sie beginnt nur kleiner.
+
 ## Beanspruchen: 25 → 200 pro Monat
 
 `POST /v1/keys/claim` hebt den Schlüssel an, den Sie bereits haben. Es entsteht kein neuer: gleicher
