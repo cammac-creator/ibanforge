@@ -190,6 +190,33 @@ describe('service_usage — réponses métier observées', () => {
     expect(getServiceUsage(30, NOW).active_accounts).toBe(0);
   });
 
+  it('ne fabrique pas un compte qui revient à partir de deux clés anonymes', () => {
+    key('ifk_anon_a', 'anonymous');
+    key('ifk_anon_b', ' ANONYMOUS ');
+    request('ifk_anon_a', '2026-09-10 10:00:00');
+    request('ifk_anon_b', '2026-09-11 10:00:00');
+    key('ifk_member', 'member@alpha.example.net');
+    request('ifk_member');
+
+    expect(getServiceUsage(30, NOW)).toMatchObject({
+      unit: 'account',
+      active_accounts: 1,
+      returning_accounts: 0,
+      first_observed_accounts: 1,
+    });
+  });
+
+  it('exclut aussi une nouvelle sentinelle sans adresse, sans liste à entretenir', () => {
+    key('ifk_future_rail', 'future-buyer');
+    request('ifk_future_rail');
+
+    expect(getServiceUsage(30, NOW)).toMatchObject({
+      active_accounts: 0,
+      returning_accounts: 0,
+      first_observed_accounts: 0,
+    });
+  });
+
   it('un préfixe répété pour le même compte ne multiplie pas le résultat', () => {
     key('ifk_same');
     key('ifk_same');
