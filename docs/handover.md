@@ -319,6 +319,40 @@ made every dump taken before this day unrestorable, on a database that has no ot
 bumping would have made a truncated dump indistinguishable from an old one. Restore order matters:
 start the service once so the migration runs, then restore.
 
+**The keyless trial moved into the database on 15 September (lot 4).** `trial_ledger` (one row per
+UTC day and per source bucket) and `trial_daily` (the aggregate the breaker will calibrate on) replace
+the in-memory counter that a redeploy used to reset. The bucket is `hashIp(normalizeIpForGuard(ip))`
+— IPv6 collapsed to its /64 first, so one subscriber is one bucket, computed once in
+`src/lib/ledger-bucket.ts` for both doors (REST and MCP). The allowance is `REST_TRIAL_DAILY_LIMIT`
+(25) in `src/lib/trial.ts`; every published figure derives from it and
+`src/lib/trial-figures-static.test.ts` caps the lines that still spell a number. What to know:
+`countDailyUnits` short-circuits in memory once a bucket is over the limit (no write per refused
+call), falls back to memory with `degraded: true` when the database refuses, and the hourly tick in
+`src/index.ts` snapshots yesterday, sweeps the ledger and reviews its volume — in that order.
+`effectiveTrialLimit()` in `src/middleware/anonymous-trial.ts` is the single hook for a stricter
+limit under alert; it is deliberately not wired until the daily peak has been measured
+(`GET /v1/admin/trial?days=14`, `peak_hour_buckets`). Proof of the port: a keyless call that answers
+402 keeps answering 402 across a redeploy.
+
+**The cohort radar sees anonymous keys since 15 September (lot 6), in report mode.** A second pass
+in `src/lib/cohort-radar-server.ts` loads anonymous and claimed keys with its OWN query (the e-mail
+loader's `no_recredit = 0` and `monthly_limit IS NULL` clauses are false by construction for an
+anonymous key — copying it would silently scan nothing), finds the global burst first
+(`findBurst`: the longest uninterrupted run, never the first trigger), then groups by anchor
+(User-Agent, or network when the UA is empty) within that burst only. It cuts nothing on its own:
+`IBANFORGE_REVOCATION_ENABLED` is absent in production and `CLAIM_REPAIR_LANDED` in
+`src/lib/tiers.ts` stays `false` until `/v1/keys/claim` accepts a key cut for a burst. Three rules
+to keep: a cohort seen from fewer than `BREAKER_MIN_DISTINCT_SOURCES` (5) networks is never cut
+automatically, so a single-IP farm — which is also what a corporate NAT looks like — is reported
+and cut by hand (`POST /v1/admin/cohorts/cut`); a cut key answers 402 `key_revoked_burst` through the
+x402 rail, never a bare 403, with the claim route named first; and every cut writes its previous
+balance to `key_revocations` in the same transaction (`GET /v1/admin/key-revocations`, hash never
+served). The breaker (lot 5) arms the radar through three bare `kv_state` strings —
+`creation_breaker:armed`, `creation_breaker:armed_at`, `creation_breaker:episode_id` — plus
+`cohort_scan_due`; it imports `BREAKER_MIN_DISTINCT_SOURCES` and `BREAKER_WINDOW_MINUTES` from
+`src/lib/cohort-radar.ts` rather than redeclaring them. The backup format is 3 (readable `[1, 2, 3]`)
+so that a dump taken before the journal existed stays distinguishable from a truncated one.
+
 **Dashboard numbers now render identically on both sides (#182, 11 September).** Five client
 components — `status-by-path-table`, `live-health-strip`, `usage-chart`, `stacked-bar-chart` and
 the CRM `freshness-badge` — used `toLocaleString`, `toLocaleDateString` or `Intl.DateTimeFormat`.
