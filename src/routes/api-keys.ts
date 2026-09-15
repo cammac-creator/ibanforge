@@ -1,5 +1,10 @@
 import { opsFail } from '../lib/ops-alert.js';
-import { FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import {
+  ANONYMOUS_MONTHLY_LIMIT,
+  CLAIM_MIN_PAID_USD,
+  FREE_TIER_MONTHLY_LIMIT,
+  KEY_CLAIM_URL,
+} from '../lib/tiers.js';
 import { normalizeEmail } from '../lib/email-norm.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -10,8 +15,12 @@ import {
   getUsage,
   revokeApiKey,
   rotateApiKey,
+  getKeyTier,
+  claimKey,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
+import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
+import { paidSoFarUsd } from '../lib/key-settlements.js';
 import { PRO_PAYMENT_LINK, PRO_PRICE_USD } from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
 import { getKeyReport } from '../lib/key-report.js';
@@ -21,6 +30,9 @@ import { isDisposableDomain } from '../lib/disposable-domains.js';
 import {
   DAILY_KEY_CREATION_LIMIT,
   VERIFY_WINDOW_DAYS,
+  VERIFICATION_TTL_MINUTES,
+  VERIFICATION_MAX_ATTEMPTS,
+  CLAIM_SUCCESS_PER_SOURCE_DAY,
   keyCreationSource,
   countKeyCreations,
   createVerificationChallenge,
@@ -147,60 +159,119 @@ export function isAdminAuthorized(provided: string | undefined): boolean {
 const BLOCKED_EMAIL_DOMAINS =
   /@(example|test|invalid|localhost|mailinator|tempmail|guerrillamail|10minutemail|throwaway|dispostable|trashmail|fakeinbox|getnada|maildrop|sharklasers|yopmail)\.(com|org|net|io|me|fr|ch|de)$/i;
 
+/**
+ * L'interrupteur du palier anonyme (A10).
+ *
+ * Il existe pour une raison de sûreté : si la porte sans e-mail se faisait
+ * moissonner le premier jour, le seul recours aurait été un redéploiement, sous
+ * la pression, sur le chemin le plus chaud du service. Même forme que les
+ * autres interrupteurs du dépôt (ACTIVATION_NUDGE_DISABLED, OPS_*_DISABLED).
+ *
+ * 🚨 Appelé DANS le handler, à chaque requête, jamais au niveau du module : un
+ * drapeau lu à l'import demanderait justement le redéploiement qu'il évite.
+ * Absent = palier ACTIF : ce qui protège part armé, ce qui coupe part éteint.
+ * Les clés anonymes déjà nées continuent de servir, et la réclamation continue
+ * de fonctionner : le drapeau arrête le FLUX, il n'annule rien.
+ */
+function anonymousTierDisabled(): boolean {
+  const v = (process.env.ANONYMOUS_TIER_DISABLED ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
 apiKeys.post('/v1/keys/generate', async (c) => {
-  let body: { email?: unknown; source?: unknown; attribution?: unknown };
-  try {
-    body = await c.req.json<{ email?: unknown; source?: unknown; attribution?: unknown }>();
-  } catch {
-    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  // 🚨 Lecture par TEXTE, et c'est la seule forme correcte. `c.req.json()`
+  // jette sur un corps ABSENT comme sur un corps CASSÉ, et le catch répondait
+  // 400 aux deux. Faire de ce catch la branche anonyme aurait rendu une clé au
+  // palier de départ à l'appelant qui a mal tapé son JSON, au lieu du 400 qui
+  // lui dit quoi corriger. Seul le VIDE est anonyme ; l'illisible garde son 400.
+  const raw = (await c.req.text().catch(() => '')).trim();
+  let body: {
+    email?: unknown;
+    source?: unknown;
+    attribution?: unknown;
+    code?: unknown;
+    anonymous?: unknown;
+  } = {};
+  if (raw !== '') {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+    }
+    // Un scalaire ou un tableau est du JSON valide et n'est pas un corps de
+    // requête : le refuser ici évite de lire `.email` sur `null` plus bas.
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return c.json({ error: 'invalid_json', message: 'Request body must be a JSON object' }, 400);
+    }
+    body = parsed as typeof body;
   }
 
-  const email = body.email;
-  if (!email || typeof email !== 'string' || !email.includes('@') || email.length > 255) {
+  const rawEmail = body.email;
+  // `{"email": null}` et `{"email": ""}` partent en anonyme : ne rien donner et
+  // donner du vide sont la même intention. `{"email": 42}` n'en est pas une —
+  // c'est une tentative d'adresse, elle garde son 400 `invalid_email`.
+  const wantsEmail = typeof rawEmail === 'string' ? rawEmail.trim() !== '' : rawEmail != null;
+
+  if (!wantsEmail && anonymousTierDisabled()) {
+    // A10 : l'interrupteur du palier anonyme, lu à CHAQUE requête et jamais au
+    // niveau du module — un drapeau lu à l'import demanderait un redéploiement
+    // pour s'appliquer, ce qui annule exactement ce pour quoi il existe :
+    // refermer la porte anonyme sans redéployer sous la pression. Drapeau
+    // ABSENT = palier ACTIF (ce qui protège part armé, ce qui coupe part
+    // éteint). Le refus est le 400 d'avant le chantier, mot pour mot.
     return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
   }
 
-  // Stricter shape check: local-part@domain.tld (avoids "test@" or "foo@bar")
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-    return c.json(
-      { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
-      400,
-    );
-  }
+  const email = wantsEmail ? (rawEmail as string) : null;
 
-  // Block disposable / fictional domains unless explicitly allowed (CI tests).
-  // Two layers: the historical exact-TLD regex, plus the curated suffix +
-  // brand-substring library — the 2026-08-17 signup wave used
-  // tempmail.edu.ge, a suffix the regex could not carry.
-  if (
-    process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' &&
-    (BLOCKED_EMAIL_DOMAINS.test(email) || isDisposableDomain(email))
-  ) {
-    return c.json(
-      {
-        error: 'disposable_email',
-        message:
-          'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
-      },
-      400,
-    );
-  }
+  if (email !== null) {
+    if (!email.includes('@') || email.length > 255) {
+      return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
+    }
 
-  // A domain with no mail server cannot receive the key, the code or anything
-  // else, and every send to one costs the mailbox's reputation at the provider
-  // (02/09/2026: blocked for "spam" after days of exactly that). Refused here,
-  // before a key exists. Skipped under vitest: the suite's fixture domains are
-  // documentation names, and a test must not depend on a resolver.
-  if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(email)))) {
-    return c.json(
-      {
-        error: 'undeliverable_email',
-        message:
-          'The domain of this address has no mail server, so no key or verification code could reach it. ' +
-          'Check the address, or use another mailbox you can read.',
-      },
-      400,
-    );
+    // Stricter shape check: local-part@domain.tld (avoids "test@" or "foo@bar")
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      return c.json(
+        { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
+        400,
+      );
+    }
+
+    // Block disposable / fictional domains unless explicitly allowed (CI tests).
+    // Two layers: the historical exact-TLD regex, plus the curated suffix +
+    // brand-substring library — the 2026-08-17 signup wave used
+    // tempmail.edu.ge, a suffix the regex could not carry.
+    if (
+      process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' &&
+      (BLOCKED_EMAIL_DOMAINS.test(email) || isDisposableDomain(email))
+    ) {
+      return c.json(
+        {
+          error: 'disposable_email',
+          message:
+            'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
+        },
+        400,
+      );
+    }
+
+    // A domain with no mail server cannot receive the key, the code or anything
+    // else, and every send to one costs the mailbox's reputation at the provider
+    // (02/09/2026: blocked for "spam" after days of exactly that). Refused here,
+    // before a key exists. Skipped under vitest: the suite's fixture domains are
+    // documentation names, and a test must not depend on a resolver.
+    if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(email)))) {
+      return c.json(
+        {
+          error: 'undeliverable_email',
+          message:
+            'The domain of this address has no mail server, so no key or verification code could reach it. ' +
+            'Check the address, or use another mailbox you can read.',
+        },
+        400,
+      );
+    }
   }
 
   // Per-NETWORK creation guard. The per-email one-per-day rule below is
@@ -216,6 +287,10 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     'x-real-ip': c.req.header('x-real-ip') ?? null,
   });
   const creationSource = keyCreationSource(clientIp);
+  // Vrai seulement si un code à 6 chiffres a été vérifié ci-dessous. Il fait
+  // écrire `claimed_at` et `claim_method = 'email_code'` à la naissance : voir
+  // generateApiKey pour ce que le bouclier à venir en tire.
+  let provenMailbox = false;
   if (creationSource && process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true') {
     if (countKeyCreations(creationSource, 24) >= DAILY_KEY_CREATION_LIMIT) {
       return c.json(
@@ -229,7 +304,12 @@ apiKeys.post('/v1/keys/generate', async (c) => {
         429,
       );
     }
-    if (countKeyCreations(creationSource, 24 * VERIFY_WINDOW_DAYS) >= 1) {
+    // 🚨 Le pas d'identité par boîte ne s'applique QU'À la branche avec
+    // adresse. Sur la branche anonyme il n'a aucun objet : il n'y a pas de
+    // boîte à prouver, et c'est cette branche-là qui a posté des codes à des
+    // adresses inventées pendant trois jours. Ce qui tient le palier anonyme
+    // est le plafond par réseau ci-dessus, puis le disjoncteur global.
+    if (email !== null && countKeyCreations(creationSource, 24 * VERIFY_WINDOW_DAYS) >= 1) {
       const code =
         typeof (body as { code?: unknown }).code === 'string'
           ? String((body as { code?: unknown }).code).trim()
@@ -333,11 +413,15 @@ apiKeys.post('/v1/keys/generate', async (c) => {
             message:
               check.reason === 'expired' || check.reason === 'no_challenge'
                 ? 'This code is no longer valid — request a key again without a code to receive a fresh one.'
-                : 'Wrong code. Check the most recent mail; the challenge locks after 5 attempts.',
+                : `Wrong code. Check the most recent mail; the challenge locks after ${VERIFICATION_MAX_ATTEMPTS} attempts.`,
           },
           403,
         );
       }
+      // Cette clé-ci naît avec une boîte PROUVÉE. Le palier reste 'email' —
+      // elle n'a jamais été anonyme, rien n'a été « réclamé » — et c'est
+      // claimed_at qui porte la preuve.
+      provenMailbox = true;
     }
   }
 
@@ -353,10 +437,16 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   // elle-même, dans la transaction de la frappe : c'est le seul point de
   // frappe d'une clé libre depuis le lot 2. Le handler ne fait que passer ce
   // qu'il sait de l'appelant.
-  const result = generateApiKey(email.trim().toLowerCase(), undefined, source, false, {
-    ipHash: creationSource,
-    userAgent: c.req.header('user-agent') ?? null,
-  });
+  const result = generateApiKey(
+    // null = palier anonyme : la clé naît avec la sentinelle sans arobase et un
+    // plafond ÉCRIT, jamais laissé NULL (un NULL se relit « palier gratuit »).
+    email === null ? null : email.trim().toLowerCase(),
+    undefined,
+    source,
+    false,
+    { ipHash: creationSource, userAgent: c.req.header('user-agent') ?? null },
+    provenMailbox,
+  );
 
   if (!result) {
     return c.json(
@@ -389,7 +479,13 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   // Skipped under vitest because example-emails.test.ts drives this very route
   // with every example address published in the repo; with a relay configured
   // in the shell, `npm run check` would mail real people documentation samples.
-  if (!process.env.VITEST) {
+  //
+  // 🚨 Sauté ENTIÈREMENT sur la branche anonyme : il n'y a pas d'adresse.
+  // L'appeler avec la sentinelle poserait un envoi vers « anonymous », sans
+  // arobase, refusé par le relais, et compté comme un échec de délivrance qui
+  // réveillerait l'alerte de livraison. Aucun mail ne part pour une clé
+  // anonyme, et aucune fiche de prospection n'est ouverte.
+  if (email !== null && !process.env.VITEST) {
     // QUA-13 (2026-09-01): a free key that never reaches its mailbox is the
     // cheapest possible explanation for "this key never made a call", and until
     // now it produced nothing at all. The relay's own refusal alerts from inside
@@ -404,11 +500,42 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     });
   }
 
+  if (email === null) {
+    // 🚨 AUCUN champ `email` : la sentinelle est un détail de stockage, et la
+    // publier apprendrait à un agent à recopier le mot « anonymous » comme si
+    // c'était une adresse. Il finirait dans un formulaire.
+    //
+    // Le message vend ce que la clé a de vrai et de non chiffrable — un quota
+    // NOMMÉ que les autres locataires du réseau ne partagent pas, une identité
+    // stable entre deux redémarrages, un rapport d'usage — plutôt qu'un volume
+    // que l'essai sans clé bat. Les nombres viennent des constantes.
+    return c.json(
+      {
+        api_key: result.api_key,
+        key_prefix: result.key_prefix,
+        tier: 'anonymous',
+        monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
+        claim_url: KEY_CLAIM_URL,
+        message:
+          `Save this key - it will not be shown again. ${ANONYMOUS_MONTHLY_LIMIT} requests a month that are yours alone: ` +
+          'a named quota nobody else on your network shares, a stable identity across restarts, and a usage report at ' +
+          `GET /v1/keys/usage. No email, no card. Claim it with a mailbox you can read to raise it to ${FREE_TIER_MONTHLY_LIMIT} ` +
+          'a month: POST /v1/keys/claim.',
+        terms_url: 'https://ibanforge.com/legal/terms',
+      },
+      201,
+    );
+  }
+
   return c.json(
     {
       api_key: result.api_key,
       key_prefix: result.key_prefix,
       email: email.trim().toLowerCase(),
+      // Additif : le palier que la clé porte en base, pour que l'appelant n'ait
+      // pas à le déduire de la présence d'un champ. Pas de claim_url ici, il
+      // n'y a rien à réclamer.
+      tier: 'email',
       monthly_limit: FREE_TIER_MONTHLY_LIMIT,
       message: 'Save this key — it will not be shown again.',
       terms_url: 'https://ibanforge.com/legal/terms',
@@ -503,11 +630,28 @@ apiKeys.get('/v1/credits/balance', (c) => {
  * and a holder must not read one figure on one and another on the other.
  */
 function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> {
-  const usage = getUsage(v.keyHash, v.monthlyLimit);
   const isCreditKey = typeof v.creditsRemaining === 'number';
+  const noRecredit = v.noRecredit === true;
+  // 🚨 Mesuré sur la MÊME assiette que le plafond. `checkAndIncrementQuota`
+  // compare une clé hors du reset mensuel à la somme de TOUS ses mois ; ce bloc
+  // annonçait le mois courant et un `remaining` calculé contre le mauvais
+  // total, pendant qu'un plafond de vie l'arrêtait. Défaut pré-existant devenu
+  // visible : jusqu'ici seules des clés qui ne lisent pas leur rapport
+  // portaient ce drapeau ; le chantier en crée deux populations qui le liront.
+  const usage = getUsage(v.keyHash, v.monthlyLimit, noRecredit);
+  const tier = v.tier ?? 'email';
   return {
     ...usage,
-    basis: isCreditKey ? 'credits' : 'monthly',
+    // Trois valeurs, et c'est `basis` qui dit laquelle gouverne :
+    //   credits  — un solde prépayé, rien n'est opposé à limit/remaining ;
+    //   lifetime — le plafond se mesure sur la vie de la clé (no_recredit) ;
+    //   monthly  — le cas normal, remis à zéro le 1er.
+    // Une clé anonyme ORDINAIRE est mensuelle : 25 par mois. Seules une clé
+    // née sous alerte et une clé promue par paiement sont « à vie ».
+    basis: isCreditKey ? 'credits' : noRecredit ? 'lifetime' : 'monthly',
+    // Le palier, servi ici parce que c'est le seul endroit où un porteur lit sa
+    // propre clé. Il n'existait pas, et la preuve de bout en bout l'attend.
+    tier,
     ...(isCreditKey
       ? {
           credits_remaining: v.creditsRemaining,
@@ -516,6 +660,26 @@ function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
             'This key draws on a prepaid credit bundle. `used` counts the calls billed this month, for information only — ' +
             'nothing is enforced against `limit`/`remaining`. What can turn a call away is credits_remaining. ' +
             'Full balance: GET /v1/credits/balance.',
+        }
+      : {}),
+    ...(!isCreditKey && noRecredit
+      ? {
+          note:
+            '`month` is the current calendar month, not the basis: this key is measured over its whole life, so ' +
+            '`used` and `remaining` count every month it has ever served. The allowance does not start over on the 1st.',
+        }
+      : {}),
+    // Le chemin de sortie, servi uniquement à qui peut l'emprunter. Structuré
+    // et non en prose : un agent lit mieux un compteur qu'une phrase.
+    ...(tier === 'anonymous'
+      ? {
+          claim: {
+            url: KEY_CLAIM_URL,
+            raises_limit_to: FREE_TIER_MONTHLY_LIMIT,
+            methods: ['email_code', 'x402', 'credits'],
+            paid_so_far_usd: paidSoFarUsd(v.keyHash),
+            paid_needed_usd: CLAIM_MIN_PAID_USD,
+          },
         }
       : {}),
   };
@@ -690,9 +854,359 @@ apiKeys.post('/v1/keys/rotate', (c) => {
       key_prefix: rotated.key_prefix,
       monthly_limit: rotated.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT,
       credits_remaining: rotated.credits_remaining,
+      // Le palier SURVIT à la rotation, et le dire ici est ce qui le prouve à
+      // son porteur : une clé anonyme tournée reste anonyme, une clé réclamée
+      // reste réclamée. Le `basis` suit le drapeau recopié par la rotation,
+      // sans quoi une clé « à vie » se relirait « par mois » après un /rotate.
+      tier: rotated.tier,
+      basis:
+        typeof rotated.credits_remaining === 'number'
+          ? 'credits'
+          : rotated.no_recredit === 1
+            ? 'lifetime'
+            : 'monthly',
       message: 'New key issued and the old one revoked. Save this — it will not be shown again.',
     },
     201,
+  );
+});
+
+/**
+ * POST /v1/keys/claim — faire passer une clé anonyme au palier gratuit.
+ *
+ * La clé se présente par EN-TÊTE, via `presentedKey`, jamais dans le corps :
+ * une clé dans un corps JSON finit dans un journal de requêtes, un historique
+ * de shell et un exemple de documentation, et les trois dialectes d'en-tête
+ * existent précisément pour cela. La clé ne change pas — une réclamation qui
+ * obligerait à la remplacer dans une configuration serait une raison de ne pas
+ * réclamer.
+ *
+ * Deux temps sur le rail de l'adresse : `{"email":"…"}` rend 202 et poste un
+ * code à 6 chiffres, puis la MÊME requête avec `"code"` réclame. Le rail payant
+ * est implicite et n'est pas ici : une route qui demande un paiement entre dans
+ * la table x402, et une route de cette table est cotée 402 à CHAQUE appel, ce
+ * qui tuerait le rail gratuit sur le même chemin.
+ *
+ * 🚨 Trois règles portent la sûreté de cette route, et chacune a son motif :
+ *  1. la clé doit avoir SERVI au moins un appel. Sans cette condition, une clé
+ *     gratuite obtenue n'importe où ouvrait un mail vers une adresse
+ *     arbitraire ; avec elle, chaque mail coûte un appel réellement servi ;
+ *  2. `already_claimed_elsewhere` ne se déclenche qu'APRÈS le bon code. Avant,
+ *     ce serait un oracle d'existence de compte offert à n'importe qui ;
+ *  3. le plafond par réseau se vérifie après le code et avant la promotion :
+ *     avant le code il serait un oracle, après la promotion il ne servirait à
+ *     rien.
+ */
+apiKeys.post('/v1/keys/claim', async (c) => {
+  const key = presentedKey(c);
+  if (!key) {
+    return c.json({ error: 'missing_key', message: MISSING_KEY_MESSAGE }, 401);
+  }
+  const validation = validateApiKey(key);
+  if (!validation.valid) {
+    return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
+  }
+
+  // Même lecture que /v1/keys/generate, pour la même raison : un corps vide est
+  // légitime (il ne mène nulle part ici, mais il ne doit pas passer pour cassé)
+  // et un corps illisible garde son 400.
+  const raw = (await c.req.text().catch(() => '')).trim();
+  let body: { email?: unknown; code?: unknown } = {};
+  if (raw !== '') {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return c.json({ error: 'invalid_json', message: 'Request body must be a JSON object' }, 400);
+    }
+    body = parsed as typeof body;
+  }
+
+  const tierRow = getKeyTier(validation.keyHash);
+  if (!tierRow || tierRow.tier !== 'anonymous') {
+    return c.json(
+      {
+        error: 'already_claimed',
+        message:
+          'This key is already past the anonymous tier - nothing to claim. ' +
+          'Check GET /v1/keys/usage for its current allowance.',
+      },
+      409,
+    );
+  }
+
+  const rawEmail = body.email;
+  if (typeof rawEmail !== 'string' || rawEmail.trim() === '' || rawEmail.length > 255) {
+    return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
+  }
+  const email = rawEmail.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return c.json(
+      { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
+      400,
+    );
+  }
+  // Les deux mêmes couches que /generate, et pour la même raison : un code
+  // posté vers un domaine jetable ou sans serveur de mail coûte la réputation
+  // de la boîte d'envoi sans rien prouver.
+  if (
+    process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' &&
+    (BLOCKED_EMAIL_DOMAINS.test(email) || isDisposableDomain(email))
+  ) {
+    return c.json(
+      {
+        error: 'disposable_email',
+        message:
+          'Claiming a key needs a real mailbox you can read. example.com, mailinator and other disposable domains are blocked.',
+      },
+      400,
+    );
+  }
+  if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(email)))) {
+    return c.json(
+      {
+        error: 'undeliverable_email',
+        message:
+          'The domain of this address has no mail server, so no verification code could reach it. ' +
+          'Check the address, or use another mailbox you can read.',
+      },
+      400,
+    );
+  }
+  const emailNorm = normalizeEmail(email) ?? email;
+
+  // 🚨 SUM(count) et non l'existence d'une ligne. `checkAndIncrementQuota`
+  // insère la ligne du mois à zéro AVANT de décider, dans une transaction qui
+  // commit même quand la décision est « refusé », et un 4xx remboursé laisse
+  // une ligne à 0 : la condition était donc satisfaite pour ZÉRO unité, par un
+  // seul appel volontairement invalide. La somme couvre aussi les mois
+  // antérieurs — une clé qui a servi le mois dernier et rien ce mois-ci passe.
+  const served = (
+    getStatsDB()
+      .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
+      .get(validation.keyHash) as { n: number }
+  ).n;
+  if (served <= 0) {
+    return c.json(
+      {
+        error: 'unused_key',
+        message:
+          'This key has not served a call yet. Validate one IBAN with it first, then claim it - ' +
+          'a key that has never been used has nothing to raise.',
+      },
+      403,
+    );
+  }
+
+  const clientIp = extractClientIp({
+    'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
+    'x-real-ip': c.req.header('x-real-ip') ?? null,
+  });
+  const claimSource = keyCreationSource(clientIp);
+  const code = typeof body.code === 'string' ? body.code.trim() : '';
+
+  // ── Temps 1 : poster le code ───────────────────────────────────────────────
+  //
+  // 🚨 L'ordre des quatre gestes est une contrainte du contrat, reprise à
+  // l'identique de /generate : plafond d'envoi, enregistrement de l'envoi,
+  // création du défi, envoi réel. Créer le défi avant de mesurer l'envoi
+  // offrirait des remises à zéro gratuites du compteur d'essais ; le créer
+  // après un envoi réussi laisserait partir un code sans défi en base. Le
+  // budget d'envoi est donc consommé même quand le relais refuse, et c'est
+  // voulu.
+  if (!code) {
+    const sendCheck = challengeSendAllowed(claimSource, email);
+    if (!sendCheck.ok) {
+      return c.json(
+        {
+          error: 'verification_rate_limited',
+          message:
+            sendCheck.reason === 'recipient'
+              ? 'Too many verification codes were requested for this address today. Try again tomorrow, or use the most recent code you already received.'
+              : 'Too many verification codes were requested from this network today. Existing keys keep working, and this one keeps its current allowance.',
+        },
+        429,
+      );
+    }
+    const sendId = recordVerificationSend(claimSource, email);
+    // La cible : ce défi vise CETTE clé. Sans elle, le code serait consommable
+    // pour créer une autre clé, ou pour réclamer une clé voisine.
+    const challenge = createVerificationChallenge(email, claimSource, tierRow.key_prefix);
+    if (typeof challenge !== 'string') {
+      return c.json(
+        {
+          error: 'verification_in_flight',
+          message:
+            'A verification code for that address was issued moments ago for another key. ' +
+            'Use it, or try again in a couple of minutes.',
+        },
+        409,
+      );
+    }
+    const outcome = await deliverKeyVerificationEmail({ to: email, code: challenge });
+    const sent = outcome === 'sent';
+    markVerificationOutcome(sendId, sent);
+    if (outcome === 'undeliverable') {
+      return c.json(
+        {
+          error: 'undeliverable_email',
+          message:
+            'The mail server for this address refused it, so no verification code could be delivered. ' +
+            'Check the address, or use another mailbox you can read.',
+        },
+        400,
+      );
+    }
+    if (!sent) {
+      // Fail-CLOSED, comme sur /generate : sans relais, aucune clé ne monte de
+      // palier. Le seuil de 3 évite de réveiller quelqu'un pour un hoquet.
+      void opsFail(
+        'mail:verification',
+        'Verification codes are not leaving: the key claim answers 503 while the relay refuses or cannot be reached.',
+        3,
+      );
+      return c.json(
+        {
+          error: 'verification_unavailable',
+          message: 'A verification mail could not be sent right now. Try again in a few minutes.',
+        },
+        503,
+      );
+    }
+    // Le journal des envois de réclamation, en ajout seul. Il ne compte pas
+    // contre le plafond par réseau (qui ne lit que les SUCCÈS) : il est là pour
+    // que la conversion du palier soit mesurable après coup.
+    try {
+      recordKeyClaim({
+        event: 'send',
+        emailNorm,
+        keyPrefix: tierRow.key_prefix,
+        keyHash: validation.keyHash,
+        method: 'email_code',
+        ipHash: claimSource,
+      });
+    } catch (err) {
+      // Un journal qui refuse une écriture ne doit pas annuler un code déjà
+      // parti : l'appelant a son code, la promotion reste possible.
+      console.error('[keys] claim send journal failed:', err instanceof Error ? err.message : err);
+    }
+    // 202 et non 403 : le 403 `verification_required` de /generate est juste
+    // là-bas, où la mission est de créer une clé et où l'on refuse de la créer.
+    // Ici la mission est de réclamer, et l'étape 1 sur 2 a RÉUSSI.
+    return c.json(
+      {
+        status: 'code_sent',
+        key_prefix: tierRow.key_prefix,
+        expires_in_minutes: VERIFICATION_TTL_MINUTES,
+        message:
+          `A 6-digit code was sent to that address. Repeat this request within ${VERIFICATION_TTL_MINUTES} minutes ` +
+          `as {"email":"...","code":"123456"} to raise this key to ${FREE_TIER_MONTHLY_LIMIT} requests a month.`,
+      },
+      202,
+    );
+  }
+
+  // ── Temps 2 : le code, puis les deux plafonds, puis la promotion ──────────
+  const check = checkVerificationCode(email, code, tierRow.key_prefix);
+  if (!check.ok) {
+    return c.json(
+      {
+        error: 'verification_failed',
+        reason: check.reason,
+        message:
+          check.reason === 'expired' || check.reason === 'no_challenge'
+            ? 'This code is no longer valid — repeat this request without a code to receive a fresh one.'
+            : // Mêmes mots pour `wrong_code` et `wrong_target`, délibérément :
+              // l'appelant ne doit pas pouvoir distinguer « mauvaise cible » de
+              // « mauvais code », sinon la réponse devient un oracle.
+              `Wrong code. Check the most recent mail; the challenge locks after ${VERIFICATION_MAX_ATTEMPTS} attempts.`,
+      },
+      403,
+    );
+  }
+
+  // (a) multiplicité : l'adresse porte déjà une clé VIVANTE au palier gratuit.
+  //     C'est la règle des CGU — le palier gratuit est attaché à la personne,
+  //     pas à la boîte.
+  const holder = getStatsDB()
+    .prepare(
+      `SELECT key_prefix FROM api_keys
+        WHERE email_norm = ? AND active = 1 AND tier IN ('email', 'claimed') LIMIT 1`,
+    )
+    .get(emailNorm) as { key_prefix: string } | undefined;
+  // (b) rythme : l'adresse a réclamé récemment, clés MORTES comprises. Mesuré
+  //     sur un journal que le porteur ne peut pas effacer : la révocation est
+  //     en libre-service, donc « porte-t-elle une clé active » s'efface dans
+  //     l'instant. Ce que la règle fait, dit sans l'arrondir : elle ne rend pas
+  //     la boucle impossible, elle la ramène à la parité de /generate, soit une
+  //     clé au palier gratuit par adresse et par jour.
+  const recentlyClaimed = hasClaimedRecently(emailNorm, 24);
+  if (holder || recentlyClaimed) {
+    return c.json(
+      {
+        error: 'already_claimed_elsewhere',
+        message:
+          (holder
+            ? `That address already holds an active key (${holder.key_prefix}) with ${FREE_TIER_MONTHLY_LIMIT} requests a month. `
+            : 'That address claimed a key in the last 24 hours. ') +
+          'The free tier is attached to the person, not to the mailbox, so it is not raised twice: ' +
+          `use that key here too, or keep this one at ${ANONYMOUS_MONTHLY_LIMIT} a month, which needs nothing from you.`,
+      },
+      409,
+    );
+  }
+
+  // Fail-open quand la source est inconnue, comme la garde de création : bloquer
+  // les réclamations sur un changement d'en-tête coûterait plus qu'une ferme.
+  if (claimSource && countClaimsBySource(claimSource, 24) >= CLAIM_SUCCESS_PER_SOURCE_DAY) {
+    return c.json(
+      {
+        error: 'claim_rate_limited',
+        message:
+          `Too many keys were raised from this network today (at most ${CLAIM_SUCCESS_PER_SOURCE_DAY} per day, ` +
+          'the same cap POST /v1/keys/generate applies to key creation). Existing keys keep working; ' +
+          `this one stays at ${ANONYMOUS_MONTHLY_LIMIT} a month and can be claimed tomorrow.`,
+      },
+      429,
+    );
+  }
+
+  // La promotion et sa ligne de journal dans la MÊME transaction (voir
+  // claimKey) : une promotion qui ne se journalise pas est invisible au plafond
+  // par réseau. Idempotente par son WHERE sur le palier anonyme.
+  const promoted = claimKey(validation.keyHash, 'email_code', { email, ipHash: claimSource });
+  if (!promoted) {
+    return c.json(
+      {
+        error: 'already_claimed',
+        message:
+          'This key is already past the anonymous tier - nothing to claim. ' +
+          'Check GET /v1/keys/usage for its current allowance.',
+      },
+      409,
+    );
+  }
+  const after = getKeyTier(validation.keyHash);
+  return c.json(
+    {
+      claimed: true,
+      key_prefix: tierRow.key_prefix,
+      tier: after?.tier ?? 'claimed',
+      claim_method: 'email_code',
+      monthly_limit: FREE_TIER_MONTHLY_LIMIT,
+      // 'monthly' et non 'lifetime' : le rail de l'adresse EFFACE no_recredit.
+      // Une boîte prouvée est le signe de vie que ce drapeau existe pour
+      // exiger, et sans l'effacement la clé vaudrait 200 à vie pendant qu'on
+      // lui annonce 200 par mois. Les rails payants, eux, le POSENT.
+      basis: 'monthly',
+      previous_monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
+      claimed_at: after?.claimed_at ?? null,
+      message: `This key now allows ${FREE_TIER_MONTHLY_LIMIT} requests a month. Same key, nothing to replace.`,
+    },
+    200,
   );
 });
 
@@ -916,7 +1430,13 @@ apiKeys.get('/v1/admin/keys', (c) => {
   // reads exactly like one that was never built: silence.
   const rows = db
     .prepare(
+      // k.tier, k.claimed_at et k.claim_method traversent tels quels vers le
+      // JSON par le `...r` plus bas. Trois lecteurs en ont besoin : le radar de
+      // cycle de vie (qui pousse sur Telegram et ne doit PAS voir les clés
+      // anonymes), le CRM du site (qui n'en fait aucun contact) et la lecture
+      // « cette clé a-t-elle prouvé une boîte ».
       `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
+            k.tier, k.claimed_at, k.claim_method,
             k.credits_total, k.credits_remaining, k.amount_paid_minor, k.amount_paid_currency, k.issued_by_us, k.source,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,

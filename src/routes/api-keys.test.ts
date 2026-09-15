@@ -2,7 +2,18 @@ import { BACKUP_FORMAT } from '../lib/backup.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { apiKeys } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
-import { generateApiKey } from '../lib/api-keys.js';
+import { generateApiKey, getKeyTier } from '../lib/api-keys.js';
+import {
+  ANONYMOUS_MONTHLY_LIMIT,
+  CLAIM_MIN_PAID_USD,
+  FREE_TIER_MONTHLY_LIMIT,
+  KEY_CLAIM_URL,
+} from '../lib/tiers.js';
+import {
+  CLAIM_SUCCESS_PER_SOURCE_DAY,
+  createVerificationChallenge,
+  keyCreationSource,
+} from '../lib/key-creation-guard.js';
 import { Hono } from 'hono';
 
 function makeApp() {
@@ -657,7 +668,6 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     // Read the code straight from the challenge we just planted (the mail
     // relay is unset in tests). checkVerificationCode consumes it, so plant a
     // fresh one exactly like the route did.
-    const { createVerificationChallenge } = await import('../lib/key-creation-guard.js');
     // `plant` narrows the string | { refused } the challenge now returns: the
     // claim path shares this table, and only a COMPETING target can refuse.
     const code = plant(
@@ -675,7 +685,6 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     const ts = Date.now();
     const ip = `198.52.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
     const suffix = ts + 1;
-    const { createVerificationChallenge } = await import('../lib/key-creation-guard.js');
 
     expect((await gen(app, `cap-1-${suffix}@alpha-corp.example.net`, ip)).status).toBe(201);
     for (const n of [2, 3]) {
@@ -1430,5 +1439,544 @@ describe('POST /v1/admin/email-messages — one message, one row, whatever id it
     ]);
     const rows = (await rowsTo()).filter((m) => /letter$/.test(String(m.subject)));
     expect(rows.map((m) => m.id).sort()).toEqual([`a-${RUN_TAG}`, `b-${RUN_TAG}`]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Le palier anonyme et la réclamation (chantier « clé sans e-mail », lot 3)
+// ---------------------------------------------------------------------------
+
+/** Faire servir des appels à une clé, sans monter tout le middleware. */
+function fakeUsage(keyHash: string, count: number): void {
+  const month = new Date().toISOString().slice(0, 7);
+  getStatsDB()
+    .prepare(
+      'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, ?) ON CONFLICT(key_hash, month) DO UPDATE SET count = excluded.count',
+    )
+    .run(keyHash, month, count);
+}
+
+/** Une clé anonyme née par la fonction de frappe, comme la route le fait. */
+function anonKey(ipHash: string) {
+  const k = generateApiKey(null, undefined, undefined, false, {
+    ipHash,
+    userAgent: 'demo-http-client/1.0',
+  });
+  if (!k) throw new Error('mint anonyme impossible');
+  return k;
+}
+
+describe('POST /v1/keys/generate — la branche anonyme', () => {
+  it('sans corps du tout : 201, palier anonyme, AUCUN champ email', async () => {
+    const res = await makeApp().request('/v1/keys/generate', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(json.api_key).toMatch(/^ifk_/);
+    expect(json.tier).toBe('anonymous');
+    expect(json.monthly_limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    expect(json.claim_url).toBe(KEY_CLAIM_URL);
+    // 🚨 La sentinelle est un détail de stockage : la publier apprendrait à un
+    // agent à recopier le mot comme si c'était une adresse.
+    expect(json).not.toHaveProperty('email');
+    expect(String(json.message)).toContain('/v1/keys/claim');
+    // Le plafond est ÉCRIT en base, jamais laissé NULL (un NULL se relit
+    // « palier gratuit » et donnerait 200 à une clé qui existe pour avoir 25).
+    const row = getStatsDB()
+      .prepare('SELECT tier, monthly_limit, email, email_norm FROM api_keys WHERE key_prefix = ?')
+      .get(json.key_prefix) as {
+      tier: string;
+      monthly_limit: number | null;
+      email: string;
+      email_norm: string | null;
+    };
+    expect(row.tier).toBe('anonymous');
+    expect(row.monthly_limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    expect(row.email).toBe('anonymous');
+    expect(row.email_norm).toBeNull();
+  });
+
+  it.each([
+    ['{}', '{}'],
+    ['le drapeau explicite', '{"anonymous":true}'],
+    ['une adresse nulle', '{"email":null}'],
+    ['une adresse vide', '{"email":""}'],
+  ])('corps « %s » : 201 anonyme', async (_label, body) => {
+    const res = await makeApp().request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { tier: string }).tier).toBe('anonymous');
+  });
+
+  it('garde la source d’acquisition sur la branche anonyme', async () => {
+    const res = await makeApp().request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"source":"npm"}',
+    });
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { key_prefix: string };
+    const row = getStatsDB()
+      .prepare('SELECT source FROM api_keys WHERE key_prefix = ?')
+      .get(json.key_prefix) as { source: string | null };
+    expect(row.source).toBe('npm');
+  });
+
+  it('un corps ILLISIBLE garde son 400 et ne consomme aucune création', async () => {
+    // 🚨 Le piège que ce test ferme : si le catch de JSON.parse devenait la
+    // branche anonyme, un appelant qui a mal tapé son corps recevrait
+    // silencieusement une clé au lieu du 400 qui lui dit quoi corriger.
+    // L'en-tête content-type est indispensable — sans lui la requête n'emprunte
+    // pas le même chemin de lecture.
+    const before = (
+      getStatsDB().prepare('SELECT COUNT(*) AS n FROM key_creations').get() as { n: number }
+    ).n;
+    const res = await makeApp().request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{oops',
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_json');
+    const after = (
+      getStatsDB().prepare('SELECT COUNT(*) AS n FROM key_creations').get() as { n: number }
+    ).n;
+    expect(after).toBe(before);
+  });
+
+  it('une adresse MALFORMÉE reste un 400, elle ne bascule pas en anonyme', async () => {
+    const res = await makeApp().request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"email":"pasuneadresse"}',
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_email');
+  });
+
+  it('avec une adresse : le chemin actuel, intact', async () => {
+    const res = await makeApp().request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: `owner-${Date.now()}@alpha-corp.example.net` }),
+    });
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(json.tier).toBe('email');
+    expect(json.monthly_limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    expect(json.email).toBeDefined();
+    expect(json).not.toHaveProperty('claim_url');
+  });
+
+  it('ANONYMOUS_TIER_DISABLED=1 referme la porte, son retrait la rouvre', async () => {
+    // Patron imposé : sauvegarder, poser, restaurer DANS le test. Posé
+    // globalement, ce drapeau ferait passer au VERT tous les tests du palier
+    // anonyme en testant la branche 400 — la panne silencieuse classique.
+    const before = process.env.ANONYMOUS_TIER_DISABLED;
+    try {
+      process.env.ANONYMOUS_TIER_DISABLED = '1';
+      const closed = await makeApp().request('/v1/keys/generate', { method: 'POST' });
+      expect(closed.status).toBe(400);
+      expect(((await closed.json()) as { error: string }).error).toBe('invalid_email');
+
+      delete process.env.ANONYMOUS_TIER_DISABLED;
+      const open = await makeApp().request('/v1/keys/generate', { method: 'POST' });
+      expect(open.status).toBe(201);
+      expect(((await open.json()) as { tier: string }).tier).toBe('anonymous');
+    } finally {
+      if (before === undefined) delete process.env.ANONYMOUS_TIER_DISABLED;
+      else process.env.ANONYMOUS_TIER_DISABLED = before;
+    }
+  });
+});
+
+describe('POST /v1/keys/claim', () => {
+  const claim = (app: Hono, key: string | null, body: Record<string, unknown>, ip?: string) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (key) headers.Authorization = `Bearer ${key}`;
+    if (ip) headers['X-Forwarded-For'] = ip;
+    return app.request('/v1/keys/claim', { method: 'POST', headers, body: JSON.stringify(body) });
+  };
+
+  it('sans clé : 401 — et la clé dans le CORPS ne compte pas', async () => {
+    const app = makeApp();
+    const k = anonKey(`claim-body-${RUN_TAG}`);
+    const none = await claim(app, null, { email: `a-${RUN_TAG}@alpha-corp.example.net` });
+    expect(none.status).toBe(401);
+    expect(((await none.json()) as { error: string }).error).toBe('missing_key');
+    // 🚨 Une clé dans un corps JSON finit dans un journal de requêtes, un
+    // historique de shell et un exemple de documentation.
+    const inBody = await claim(app, null, {
+      api_key: k.api_key,
+      email: `b-${RUN_TAG}@alpha-corp.example.net`,
+    });
+    expect(inBody.status).toBe(401);
+    expect(((await inBody.json()) as { error: string }).error).toBe('missing_key');
+  });
+
+  it('une clé inconnue : 401 invalid_key', async () => {
+    const res = await claim(makeApp(), `ifk_${'0'.repeat(64)}`, {
+      email: `c-${RUN_TAG}@alpha-corp.example.net`,
+    });
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_key');
+  });
+
+  it('une clé qui n’a JAMAIS servi ne se réclame pas, même avec une ligne d’usage à zéro', async () => {
+    const app = makeApp();
+    // (a) La moitié qui prouve quelque chose : une clé qui n'a reçu qu'un 4xx
+    // remboursé PORTE une ligne api_usage, à 0. Avec un test d'existence de
+    // ligne, la condition d'entrée coûtait ZÉRO unité — un seul appel
+    // volontairement invalide suffisait.
+    const refunded = anonKey(`claim-unused-${RUN_TAG}`);
+    fakeUsage(refunded.key_hash, 0);
+    const a = await claim(app, refunded.api_key, { email: `d-${RUN_TAG}@alpha-corp.example.net` });
+    expect(a.status).toBe(403);
+    expect(((await a.json()) as { error: string }).error).toBe('unused_key');
+
+    // (b) Une clé qui a réellement servi passe la condition : sans relais de
+    // mail configuré, la route va jusqu'au 503 fail-CLOSED, ce qui prouve
+    // qu'elle a franchi la précondition.
+    const served = anonKey(`claim-served-${RUN_TAG}`);
+    fakeUsage(served.key_hash, 1);
+    const b = await claim(app, served.api_key, { email: `e-${RUN_TAG}@alpha-corp.example.net` });
+    expect(b.status).toBe(503);
+    expect(((await b.json()) as { error: string }).error).toBe('verification_unavailable');
+  });
+
+  it('une clé qui n’est plus anonyme : 409 already_claimed', async () => {
+    const withEmail = generateApiKey(`held-${RUN_TAG}@alpha-corp.example.net`);
+    if (!withEmail) throw new Error('mint impossible');
+    fakeUsage(withEmail.key_hash, 5);
+    const res = await claim(makeApp(), withEmail.api_key, {
+      email: `held-${RUN_TAG}@alpha-corp.example.net`,
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe('already_claimed');
+  });
+
+  it('rail complet : le bon code promeut la clé, et /usage le dit', async () => {
+    const app = makeApp();
+    const k = anonKey(`claim-ok-${RUN_TAG}`);
+    fakeUsage(k.key_hash, 3);
+    const email = `raise-${RUN_TAG}@alpha-corp.example.net`;
+    // Le défi posé à la main, comme la suite le fait déjà ailleurs : aucun
+    // relais n'est configuré en test, donc le temps 1 ne rend jamais 202. La
+    // CIBLE est la clé présentée — c'est ce que la colonne key_prefix porte.
+    const code = plant(createVerificationChallenge(email, 'test', k.key_prefix));
+
+    const res = await claim(app, k.api_key, { email, code });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(json.claimed).toBe(true);
+    expect(json.tier).toBe('claimed');
+    expect(json.claim_method).toBe('email_code');
+    expect(json.monthly_limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    // 'monthly' : le rail de l'adresse EFFACE no_recredit. Sans cela la clé
+    // vaudrait 200 à vie pendant qu'on lui annonce 200 par mois.
+    expect(json.basis).toBe('monthly');
+    expect(json.previous_monthly_limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    expect(json.claimed_at).toBeTruthy();
+
+    // La ligne de journal est écrite, exactement une, dans la transaction.
+    const claims = getStatsDB()
+      .prepare("SELECT COUNT(*) AS n FROM key_claims WHERE event = 'claim' AND key_hash = ?")
+      .get(k.key_hash) as { n: number };
+    expect(claims.n).toBe(1);
+
+    const usage = await app.request('/v1/keys/usage', {
+      headers: { Authorization: `Bearer ${k.api_key}` },
+    });
+    const block = (await usage.json()) as Record<string, unknown>;
+    expect(block.tier).toBe('claimed');
+    expect(block.limit).toBe(FREE_TIER_MONTHLY_LIMIT);
+    expect(block.basis).toBe('monthly');
+    // Plus rien à réclamer : le bloc disparaît.
+    expect(block).not.toHaveProperty('claim');
+  });
+
+  it('un MAUVAIS code : 403, la clé reste au palier anonyme et rien n’est journalisé', async () => {
+    const app = makeApp();
+    const k = anonKey(`claim-bad-${RUN_TAG}`);
+    fakeUsage(k.key_hash, 2);
+    const email = `bad-${RUN_TAG}@alpha-corp.example.net`;
+    plant(createVerificationChallenge(email, 'test', k.key_prefix));
+    const res = await claim(app, k.api_key, { email, code: '000000' });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe('verification_failed');
+    expect(getKeyTier(k.key_hash)!.tier).toBe('anonymous');
+    const claims = getStatsDB()
+      .prepare("SELECT COUNT(*) AS n FROM key_claims WHERE event = 'claim' AND key_hash = ?")
+      .get(k.key_hash) as { n: number };
+    expect(claims.n).toBe(0);
+  });
+
+  it('un code émis pour une AUTRE clé est refusé, sans punir la victime', async () => {
+    const app = makeApp();
+    const target = anonKey(`claim-target-${RUN_TAG}`);
+    const other = anonKey(`claim-other-${RUN_TAG}`);
+    fakeUsage(other.key_hash, 1);
+    const email = `target-${RUN_TAG}@alpha-corp.example.net`;
+    const code = plant(createVerificationChallenge(email, 'test', target.key_prefix));
+    const res = await claim(app, other.api_key, { email, code });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: string; reason: string };
+    expect(body.error).toBe('verification_failed');
+    expect(body.reason).toBe('wrong_target');
+    // 🚨 Le compteur d'essais de la VICTIME n'a pas bougé : sinon cinq requêtes
+    // de ce type bloquaient son défi en cours jusqu'à expiration.
+    const row = getStatsDB()
+      .prepare('SELECT attempts FROM pending_verifications WHERE email = ?')
+      .get(email) as { attempts: number };
+    expect(row.attempts).toBe(0);
+    // Et le défi de la victime marche toujours, pour SA clé.
+    fakeUsage(target.key_hash, 1);
+    const good = await claim(app, target.api_key, { email, code });
+    expect(good.status).toBe(200);
+  });
+
+  it('une adresse qui porte déjà une clé vivante au palier gratuit : 409, et seulement après le bon code', async () => {
+    const app = makeApp();
+    const email = `dup-${RUN_TAG}@alpha-corp.example.net`;
+    const held = generateApiKey(email);
+    if (!held) throw new Error('mint impossible');
+    const k = anonKey(`claim-dup-${RUN_TAG}`);
+    fakeUsage(k.key_hash, 1);
+    const code = plant(createVerificationChallenge(email, 'test', k.key_prefix));
+    const res = await claim(app, k.api_key, { email, code });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('already_claimed_elsewhere');
+    // Le message nomme la clé à réutiliser, et ne dit JAMAIS « réclamez plutôt
+    // celle-là » : celle-là est déjà au palier gratuit.
+    expect(body.message).toContain(held.key_prefix);
+    expect(body.message).not.toContain('claim that one');
+    expect(getKeyTier(k.key_hash)!.tier).toBe('anonymous');
+  });
+
+  it('réclamer, révoquer, re-réclamer le même jour avec la même adresse : 409 ; passé 24 h : 200', async () => {
+    const app = makeApp();
+    const email = `loop-${RUN_TAG}@alpha-corp.example.net`;
+    const first = anonKey(`claim-loop-${RUN_TAG}`);
+    fakeUsage(first.key_hash, 1);
+    const c1 = plant(createVerificationChallenge(email, 'test', first.key_prefix));
+    expect((await claim(app, first.api_key, { email, code: c1 })).status).toBe(200);
+
+    // La révocation est en LIBRE-SERVICE : c'est elle qui rendait la boucle
+    // gratuite, puisque « cette adresse porte-t-elle une clé active » s'efface
+    // dans l'instant. Le journal des réclamations, lui, survit.
+    const revoked = await app.request('/v1/keys/revoke', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.api_key}` },
+    });
+    expect(revoked.status).toBe(200);
+
+    const second = anonKey(`claim-loop2-${RUN_TAG}`);
+    fakeUsage(second.key_hash, 1);
+    const c2 = plant(createVerificationChallenge(email, 'test', second.key_prefix));
+    const again = await claim(app, second.api_key, { email, code: c2 });
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { error: string }).error).toBe('already_claimed_elsewhere');
+
+    // Le jumeau POSITIF, et il compte autant : la règle borne le RYTHME, elle
+    // n'interdit pas la suivante. Croire qu'elle ferme le débit à zéro serait
+    // faux, et une session future doit pouvoir le lire ici.
+    getStatsDB()
+      .prepare(
+        "UPDATE key_claims SET created_at = datetime('now', '-30 hours') WHERE email_norm = ?",
+      )
+      .run(email);
+    const third = anonKey(`claim-loop3-${RUN_TAG}`);
+    fakeUsage(third.key_hash, 1);
+    const c3 = plant(createVerificationChallenge(email, 'test', third.key_prefix));
+    expect((await claim(app, third.api_key, { email, code: c3 })).status).toBe(200);
+  });
+
+  it('une étiquette et des points ne font pas deux personnes', async () => {
+    const app = makeApp();
+    const base = `alias${RUN_TAG}@gmail.com`;
+    const aliased = `alias.${RUN_TAG}+ci@gmail.com`;
+    const first = anonKey(`claim-alias-${RUN_TAG}`);
+    fakeUsage(first.key_hash, 1);
+    const c1 = plant(createVerificationChallenge(base, 'test', first.key_prefix));
+    expect((await claim(app, first.api_key, { email: base, code: c1 })).status).toBe(200);
+
+    const second = anonKey(`claim-alias2-${RUN_TAG}`);
+    fakeUsage(second.key_hash, 1);
+    const c2 = plant(createVerificationChallenge(aliased, 'test', second.key_prefix));
+    const res = await claim(app, second.api_key, { email: aliased, code: c2 });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe('already_claimed_elsewhere');
+  });
+
+  it('plafond par réseau : la parité avec la création, et un mauvais code ne le consomme pas', async () => {
+    const app = makeApp();
+    const ip = `198.53.${(Date.now() % 240) + 1}.${(Math.floor(Date.now() / 240) % 240) + 1}`;
+    for (let i = 0; i < CLAIM_SUCCESS_PER_SOURCE_DAY; i++) {
+      const k = anonKey(`claim-cap-${RUN_TAG}-${i}`);
+      fakeUsage(k.key_hash, 1);
+      const email = `cap${i}-${RUN_TAG}@alpha-corp.example.net`;
+      const code = plant(createVerificationChallenge(email, 'test', k.key_prefix));
+      expect((await claim(app, k.api_key, { email, code }, ip)).status).toBe(200);
+    }
+    const over = anonKey(`claim-cap-${RUN_TAG}-over`);
+    fakeUsage(over.key_hash, 1);
+    const email = `capover-${RUN_TAG}@alpha-corp.example.net`;
+    const code = plant(createVerificationChallenge(email, 'test', over.key_prefix));
+    const res = await claim(app, over.api_key, { email, code }, ip);
+    expect(res.status).toBe(429);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('claim_rate_limited');
+    // La phrase NOMME la parité plutôt qu'un chiffre isolé : c'est ce qui
+    // empêche une session future de relever l'un des deux sans l'autre.
+    expect(body.message).toContain('/v1/keys/generate');
+    expect(getKeyTier(over.key_hash)!.tier).toBe('anonymous');
+
+    // Le plafond compte des SUCCÈS : un code faux ne le consomme pas, sinon un
+    // tiers derrière le même NAT épuiserait le budget d'un bureau entier.
+    const budgetBefore = (
+      getStatsDB()
+        .prepare("SELECT COUNT(*) AS n FROM key_claims WHERE event = 'claim' AND ip_hash = ?")
+        .get(keyCreationSource(ip)) as { n: number }
+    ).n;
+    const k = anonKey(`claim-cap-${RUN_TAG}-wrong`);
+    fakeUsage(k.key_hash, 1);
+    const e2 = `capwrong-${RUN_TAG}@alpha-corp.example.net`;
+    plant(createVerificationChallenge(e2, 'test', k.key_prefix));
+    await claim(app, k.api_key, { email: e2, code: '000000' }, ip);
+    const budgetAfter = (
+      getStatsDB()
+        .prepare("SELECT COUNT(*) AS n FROM key_claims WHERE event = 'claim' AND ip_hash = ?")
+        .get(keyCreationSource(ip)) as { n: number }
+    ).n;
+    expect(budgetAfter).toBe(budgetBefore);
+  });
+
+  it('un corps illisible garde son 400 sur la réclamation aussi', async () => {
+    const k = anonKey(`claim-json-${RUN_TAG}`);
+    const res = await makeApp().request('/v1/keys/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+      body: '{oops',
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_json');
+  });
+});
+
+describe('le palier se lit et survit', () => {
+  it('GET /v1/keys/usage porte le palier, l’assiette et le chemin de sortie', async () => {
+    const app = makeApp();
+    const k = anonKey(`usage-anon-${RUN_TAG}`);
+    fakeUsage(k.key_hash, 7);
+    const res = await app.request('/v1/keys/usage', {
+      headers: { Authorization: `Bearer ${k.api_key}` },
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(json.tier).toBe('anonymous');
+    expect(json.limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    // 🚨 Une clé anonyme ORDINAIRE est MENSUELLE : 25 par mois. Seules une clé
+    // née sous limite protectrice et une clé promue par paiement sont « à vie ».
+    expect(json.basis).toBe('monthly');
+    expect(json.used).toBe(7);
+    const claimBlock = json.claim as Record<string, unknown>;
+    expect(claimBlock.url).toBe(KEY_CLAIM_URL);
+    expect(claimBlock.raises_limit_to).toBe(FREE_TIER_MONTHLY_LIMIT);
+    expect(claimBlock.paid_so_far_usd).toBe(0);
+    expect(claimBlock.paid_needed_usd).toBe(CLAIM_MIN_PAID_USD);
+    expect(claimBlock.methods).toEqual(['email_code', 'x402', 'credits']);
+  });
+
+  it('une clé hors du reset mensuel s’annonce « à vie », sur la même assiette que son plafond', async () => {
+    const app = makeApp();
+    const k = anonKey(`usage-life-${RUN_TAG}`);
+    // Ce que pose une promotion payante, et ce que posera le bouclier.
+    getStatsDB().prepare('UPDATE api_keys SET no_recredit = 1 WHERE key_hash = ?').run(k.key_hash);
+    fakeUsage(k.key_hash, 4);
+    const json = (await (
+      await app.request('/v1/keys/usage', { headers: { Authorization: `Bearer ${k.api_key}` } })
+    ).json()) as Record<string, unknown>;
+    expect(json.basis).toBe('lifetime');
+    expect(String(json.note)).toContain('whole life');
+  });
+
+  it('POST /v1/keys/rotate ne perd pas le palier', async () => {
+    const app = makeApp();
+    const k = anonKey(`rotate-anon-${RUN_TAG}`);
+    const res = await app.request('/v1/keys/rotate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${k.api_key}` },
+    });
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(json.tier).toBe('anonymous');
+    expect(json.monthly_limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+    expect(json.basis).toBe('monthly');
+    const rotated = getStatsDB()
+      .prepare('SELECT tier, monthly_limit FROM api_keys WHERE key_prefix = ?')
+      .get(json.key_prefix) as { tier: string; monthly_limit: number };
+    expect(rotated.tier).toBe('anonymous');
+    expect(rotated.monthly_limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
+  });
+
+  it('GET /v1/admin/keys expose tier, claimed_at et claim_method', async () => {
+    const app = makeApp();
+    anonKey(`admin-tier-${RUN_TAG}`);
+    const res = await app.request('/v1/admin/keys', {
+      headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' },
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { keys: Array<Record<string, unknown>> };
+    const anon = json.keys.find((k) => k.tier === 'anonymous');
+    expect(anon, 'la route doit servir le palier, le CRM et le radar le lisent').toBeDefined();
+    expect(anon!).toHaveProperty('claimed_at');
+    expect(anon!).toHaveProperty('claim_method');
+  });
+
+  it('une création avec code vérifié porte la preuve de sa boîte dès la naissance', async () => {
+    // 🚨 L'autre moitié de la garde du bouclier : la PREMIÈRE clé d'un réseau
+    // neuf n'exige aucun code et naît au palier gratuit sans être dégradée,
+    // donc un prédicat par palier laisserait passer une ferme montée sur des
+    // réseaux sans historique. C'est claimed_at qui porte la preuve.
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const app = makeApp();
+    const ts = Date.now();
+    const ip = `198.55.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+    const gen = (email: string, code?: string) =>
+      app.request('/v1/keys/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+        body: JSON.stringify(code ? { email, code } : { email }),
+      });
+    const firstEmail = `proof-a-${ts}@alpha-corp.example.net`;
+    const first = await gen(firstEmail);
+    expect(first.status).toBe(201);
+    const firstPrefix = ((await first.json()) as { key_prefix: string }).key_prefix;
+    // Sans code : aucune preuve, quel que soit le palier.
+    const firstRow = getStatsDB()
+      .prepare('SELECT tier, claimed_at FROM api_keys WHERE key_prefix = ?')
+      .get(firstPrefix) as { tier: string; claimed_at: string | null };
+    expect(firstRow.tier).toBe('email');
+    expect(firstRow.claimed_at).toBeNull();
+
+    const secondEmail = `proof-b-${ts}@alpha-corp.example.net`;
+    const code = plant(createVerificationChallenge(secondEmail, 'test'));
+    const second = await gen(secondEmail, code);
+    expect(second.status).toBe(201);
+    const secondPrefix = ((await second.json()) as { key_prefix: string }).key_prefix;
+    const secondRow = getStatsDB()
+      .prepare('SELECT tier, claimed_at, claim_method FROM api_keys WHERE key_prefix = ?')
+      .get(secondPrefix) as {
+      tier: string;
+      claimed_at: string | null;
+      claim_method: string | null;
+    };
+    // Le palier reste 'email' : cette clé n'a jamais été anonyme, rien n'a été
+    // « réclamé ». Seule la preuve change.
+    expect(secondRow.tier).toBe('email');
+    expect(secondRow.claimed_at).not.toBeNull();
+    expect(secondRow.claim_method).toBe('email_code');
   });
 });

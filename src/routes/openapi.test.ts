@@ -69,13 +69,13 @@ const HANDLER_ERRORS = [
 const PATHS = buildSpec().paths as unknown as Record<string, { post: Record<string, unknown> }>;
 const OPERATION = PATHS['/v1/keys/generate'].post;
 const OPERATION_TEXT = JSON.stringify(OPERATION);
-const SCHEMA = (
-  OPERATION.requestBody as {
-    content: {
-      'application/json': { schema: { required: string[]; properties: Record<string, unknown> } };
-    };
-  }
-).content['application/json'].schema;
+const REQUEST_BODY = OPERATION.requestBody as {
+  required?: boolean;
+  content: {
+    'application/json': { schema: { required?: string[]; properties: Record<string, unknown> } };
+  };
+};
+const SCHEMA = REQUEST_BODY.content['application/json'].schema;
 
 describe('/v1/keys/generate: the spec documents the whole signup, verification included', () => {
   it('documents every status the handler can return', () => {
@@ -105,12 +105,32 @@ describe('/v1/keys/generate: the spec documents the whole signup, verification i
     expect(Object.keys(SCHEMA.properties)).toContain('code');
   });
 
-  it('leaves "code" optional, so clients that predate the step keep working', () => {
-    // The whole reason the step is survivable: the first key of a network never
-    // needs a code. Putting it in `required` would break every client generated
-    // from an earlier version of this document, which is a breaking change no
-    // matter how additive the diff looks.
-    expect(SCHEMA.required).toEqual(['email']);
+  it('ne demande plus AUCUN champ : le corps entier est facultatif', () => {
+    // « code » n'a jamais été requis (la première clé d'un réseau n'en a pas
+    // besoin), et depuis le palier anonyme « email » ne l'est plus non plus :
+    // un POST sans corps du tout est un cas SERVI, pas une erreur. C'est la
+    // commande la plus courte qu'un agent puisse émettre, et un client généré
+    // depuis ce document doit pouvoir l'écrire.
+    //
+    // `required` est ABSENT plutôt que vide : un tableau vide est refusé par
+    // le schéma d'OpenAPI 3.x, donc `npm run openapi:lint` rougirait.
+    expect(SCHEMA.required).toBeUndefined();
+    expect(REQUEST_BODY.required).toBe(false);
+  });
+
+  it('documente le corps anonyme et le chemin de sortie', () => {
+    // Un agent qui lit ce contrat doit apprendre les DEUX formes ici : la
+    // clé sans adresse, et la route qui la fait monter de palier. Les trouver
+    // ailleurs (llms.txt, instructions MCP) a déjà coûté un pas de signup
+    // qu'aucun client généré ne pouvait franchir.
+    expect(Object.keys(SCHEMA.properties)).toContain('anonymous');
+    expect(OPERATION_TEXT).toContain('/v1/keys/claim');
+    const claim = (PATHS['/v1/keys/claim'] as { post: Record<string, unknown> } | undefined)?.post;
+    expect(claim, 'POST /v1/keys/claim is missing from the contract').toBeDefined();
+    expect(claim!.operationId).toBe('claimApiKey');
+    // La condition d'entrée est la surprise la plus probable pour un lecteur :
+    // elle doit être dans le contrat, pas seulement dans la prose des docs.
+    expect(JSON.stringify(claim)).toContain('unused_key');
   });
 
   it('renames and removes nothing that existing clients already read', () => {

@@ -7,6 +7,21 @@ import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 // flood cap are what the handler enforces, and a contract that quotes its own
 // copy of them is a contract that will be wrong one refactor from now.
 import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedback.js';
+// Même raison : les deux plafonds de palier sont ce que le code applique, et un
+// contrat qui recopie son propre chiffre sera faux au prochain réglage.
+import {
+  ANONYMOUS_MONTHLY_LIMIT,
+  CLAIM_MIN_PAID_USD,
+  FREE_TIER_MONTHLY_LIMIT,
+  KEY_CLAIM_URL,
+} from '../lib/tiers.js';
+import {
+  CLAIM_SUCCESS_PER_SOURCE_DAY,
+  DAILY_KEY_CREATION_LIMIT,
+  VERIFICATION_MAX_ATTEMPTS,
+  VERIFICATION_TTL_MINUTES,
+  VERIFY_WINDOW_DAYS,
+} from '../lib/key-creation-guard.js';
 
 const openapi = new Hono();
 
@@ -804,38 +819,61 @@ const buildRawSpec = () => ({
         // generated from this spec could not send the code and did not expect the
         // 403: it looped or gave up on a step the product answers in one retry.
         description:
-          'Generates a free API key with 200 requests/month quota (batch validation counts 1 request per IBAN). ' +
-          'The first key issued to a network is instant. A repeat creation from the same network within 7 days ' +
-          'must prove the mailbox is readable: that call answers 403 "verification_required" and mails a 6-digit ' +
-          'code to the address supplied, and the SAME request is then repeated with a "code" field within 15 ' +
-          'minutes. At most 3 keys per network per day. A caller that cannot receive mail does not need this ' +
-          'endpoint at all: prepaid credits (POST /v1/credits/buy/1k) and x402 pay-per-call need no key.',
+          'Generates a free API key. NO BODY AT ALL is the shortest form and it works: an empty request returns ' +
+          `an anonymous key with ${ANONYMOUS_MONTHLY_LIMIT} requests/month, no email and no card, and a ` +
+          '"claim_url". The response of an anonymous key carries no "email" field. ' +
+          `Supply {"email": "..."} instead and the key is issued at ${FREE_TIER_MONTHLY_LIMIT} requests/month ` +
+          'on the historical path (batch validation counts 1 request per IBAN): the first key issued to a network ' +
+          `is instant, while a repeat creation from the same network within ${VERIFY_WINDOW_DAYS} days must prove ` +
+          'the mailbox is readable — that call answers 403 "verification_required" and mails a 6-digit code to the ' +
+          `address supplied, and the SAME request is then repeated with a "code" field within ${VERIFICATION_TTL_MINUTES} ` +
+          `minutes. A body that is not empty and not valid JSON keeps its 400. At most ${DAILY_KEY_CREATION_LIMIT} ` +
+          'keys per network per day, on both paths. An anonymous key is raised later with ' +
+          `POST /v1/keys/claim — same key, nothing to replace. A caller that cannot receive mail needs neither ` +
+          'path: prepaid credits (POST /v1/credits/buy/1k) and x402 pay-per-call need no key.',
         tags: ['API Keys'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
         // 'the author forgot to say'.
         security: [],
         requestBody: {
-          required: true,
+          // Facultatif depuis le palier anonyme : la commande la plus courte
+          // qu'un agent puisse émettre est un POST sans corps, et un client
+          // généré depuis ce document doit pouvoir l'écrire.
+          required: false,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                // "code" is deliberately NOT in `required`: the first key of a
-                // network never needs one, and every client generated against
-                // this spec before 2026-08 posts {email} alone. Requiring it
-                // would be a breaking change wearing an additive costume.
-                required: ['email'],
+                // AUCUN champ requis. "email" est sorti de `required` (son
+                // absence est désormais un cas servi, pas une erreur) et
+                // "code" n'y a jamais été : le premier clé d'un réseau n'en a
+                // pas besoin, et l'y mettre aurait été une rupture déguisée en
+                // ajout.
                 properties: {
-                  email: { type: 'string', format: 'email', description: 'Email address for key registration' },
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    description:
+                      'Optional. Supply it for the historical path (' +
+                      `${FREE_TIER_MONTHLY_LIMIT} requests/month). Omit it, send an empty body, or send null for ` +
+                      `an anonymous key at ${ANONYMOUS_MONTHLY_LIMIT} requests/month.`,
+                  },
+                  anonymous: {
+                    type: 'boolean',
+                    example: true,
+                    description:
+                      'Optional and never required: an explicit way to say what an empty body already says. ' +
+                      'Accepted so documentation and SDKs have a form to show.',
+                  },
                   code: {
                     type: 'string',
                     pattern: '^[0-9]{6}$',
                     example: '123456',
                     description:
                       'Optional. The 6-digit code mailed after a 403 "verification_required". Repeat the same ' +
-                      'request with it within 15 minutes; omit it to be mailed a fresh one. The challenge locks ' +
-                      'after 5 wrong attempts.',
+                      `request with it within ${VERIFICATION_TTL_MINUTES} minutes; omit it to be mailed a fresh ` +
+                      `one. The challenge locks after ${VERIFICATION_MAX_ATTEMPTS} wrong attempts.`,
                   },
                 },
               },
@@ -843,7 +881,12 @@ const buildRawSpec = () => ({
           },
         },
         responses: {
-          '201': { description: 'API key generated (shown only once)' },
+          '201': {
+            description:
+              'API key generated (shown only once). An anonymous key answers api_key, key_prefix, tier, ' +
+              'monthly_limit, claim_url, message and terms_url — and NO "email" field. A key created with an ' +
+              'address answers the historical body plus "tier".',
+          },
           '400': {
             description:
               'Body rejected before any key was considered. "error" is "invalid_json", "invalid_email", ' +
@@ -884,17 +927,24 @@ const buildRawSpec = () => ({
         summary: 'Check API key usage',
         description:
           'Returns current month usage and remaining quota for the provided API key. ' +
+          '`tier` names the key\'s tier ("anonymous", "email", "claimed" or "paid"). ' +
           '`basis` says which ceiling actually governs the key: "monthly" for a free or subscription key, ' +
-          '"credits" for a prepaid bundle. On a bundle key, `used` counts the calls billed this month for ' +
+          '"credits" for a prepaid bundle, "lifetime" when the allowance does NOT start over on the 1st (a key ' +
+          'raised by payment, or one born under a protective limit) — on that basis `used` and `remaining` count ' +
+          'every month the key has ever served and `month` is only the current calendar month. On a bundle key, ' +
+          '`used` counts the calls billed this month for ' +
           'information only — nothing is enforced against `limit`/`remaining`, and the balance that can turn a ' +
-          'call away is served alongside as `credits_remaining` / `credits_total`.',
+          `call away is served alongside as \`credits_remaining\` / \`credits_total\`. An anonymous key also ` +
+          `carries a "claim" block: where to raise it (${KEY_CLAIM_URL}), to what, by which methods, how much has ` +
+          'been settled on it so far and how much is needed.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
           '200': {
             description:
-              'Usage for the current month: used, limit, remaining, month, key_prefix, basis — plus ' +
-              'credits_remaining, credits_total and an explanatory note when basis is "credits"',
+              'Usage for the current month: used, limit, remaining, month, key_prefix, basis, tier — plus ' +
+              'credits_remaining, credits_total and an explanatory note when basis is "credits", a note when ' +
+              'basis is "lifetime", and a "claim" block on an anonymous key',
           },
           '401': { description: 'Missing or invalid API key' },
         },
@@ -950,18 +1000,122 @@ const buildRawSpec = () => ({
         },
       },
     },
+    // La sortie du palier anonyme. Documentée ici parce que c'est le seul
+    // endroit où une machine peut l'apprendre : un agent qui lit ce contrat
+    // doit pouvoir écrire les deux temps sans les deviner, et surtout
+    // découvrir la condition d'entrée (la clé doit avoir servi), qui est la
+    // surprise la plus probable pour un lecteur des docs.
+    '/v1/keys/claim': {
+      post: {
+        operationId: 'claimApiKey',
+        summary: 'Raise the presented anonymous key to the free tier',
+        description:
+          `Raises the presented anonymous key from ${ANONYMOUS_MONTHLY_LIMIT} to ${FREE_TIER_MONTHLY_LIMIT} ` +
+          'requests a month. THE KEY DOES NOT CHANGE: same key, same prefix, same history, nothing to replace. ' +
+          'Authentication is the key itself, in any of the three accepted dialects — never in the body. ' +
+          'Two steps on the free rail: POST {"email": "..."} answers 202 and mails a 6-digit code, then the SAME ' +
+          `request repeated with "code" within ${VERIFICATION_TTL_MINUTES} minutes answers 200. ` +
+          'PRECONDITION: the key must have served at least one call, otherwise the answer is 403 "unused_key" — ' +
+          'a key that has never been used has nothing to raise. ' +
+          'A verified mailbox is the only rail that grants the allowance EVERY month. There is also an implicit ' +
+          `paid rail with no call to make here: once ${CLAIM_MIN_PAID_USD} USD of x402 settlements or a credit ` +
+          `pack have been settled while presenting the key, it is raised to ${FREE_TIER_MONTHLY_LIMIT} requests ` +
+          'ONCE, with no monthly renewal. GET /v1/keys/usage serves the counter as a "claim" block.',
+        tags: ['API Keys'],
+        security: [{ apiKey: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    description:
+                      'A mailbox you can read. The free tier is attached to the person, not to the address: an ' +
+                      'address that already holds an active free-tier key, or claimed one in the last 24 hours, ' +
+                      'answers 409 "already_claimed_elsewhere".',
+                  },
+                  code: {
+                    type: 'string',
+                    pattern: '^[0-9]{6}$',
+                    example: '123456',
+                    description:
+                      'The 6-digit code mailed by the first call. Omit it to be mailed one; repeat the request ' +
+                      `with it within ${VERIFICATION_TTL_MINUTES} minutes. The challenge locks after ` +
+                      `${VERIFICATION_MAX_ATTEMPTS} wrong attempts, and a code issued for one key is refused ` +
+                      'for another.',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description:
+              'Claimed. Returns claimed: true, key_prefix, tier ("claimed"), claim_method ("email_code"), ' +
+              'monthly_limit, basis ("monthly"), previous_monthly_limit and claimed_at.',
+          },
+          '202': {
+            description:
+              'Code sent. Returns status "code_sent", key_prefix and expires_in_minutes. Repeat the same request ' +
+              'with "code" to finish.',
+          },
+          '400': {
+            description:
+              '"invalid_json" (a non-empty body that is not a JSON object), "invalid_email", "disposable_email" ' +
+              '(claiming needs a real mailbox), or "undeliverable_email" (the mail server for that domain refused ' +
+              'the address).',
+          },
+          '401': {
+            description:
+              '"missing_key": no key was presented — it goes in the header, never in the body. "invalid_key": the ' +
+              'key is unknown or inactive.',
+          },
+          '403': {
+            description:
+              '"unused_key": the key has never served a call. "verification_failed": the code was wrong, expired, ' +
+              'absent, locked, or issued for a different key; "reason" says which ("wrong_code", "expired", ' +
+              '"no_challenge", "too_many_attempts", "wrong_target").',
+          },
+          '409': {
+            description:
+              '"already_claimed": the key is already past the anonymous tier. "already_claimed_elsewhere": that ' +
+              'address already holds an active free-tier key or claimed one in the last 24 hours — reuse that key, ' +
+              'or keep this one at its anonymous allowance. "verification_in_flight": a code for that address was ' +
+              'issued moments ago for a different key.',
+          },
+          '429': {
+            description:
+              `"claim_rate_limited": at most ${CLAIM_SUCCESS_PER_SOURCE_DAY} keys raised per network per day, the ` +
+              'same cap key creation applies. "verification_rate_limited": too many codes were requested for this ' +
+              'address or from this network today. Existing keys keep working in both cases.',
+          },
+          '503': {
+            description:
+              '"verification_unavailable": the mail relay is down or misconfigured on our side, so no code is ' +
+              'pending and the key was not raised. Retry in a few minutes.',
+          },
+        },
+      },
+    },
     '/v1/keys/rotate': {
       post: {
         operationId: 'rotateApiKey',
         summary: 'Replace the presented API key with a fresh one',
         description:
-          'Mints a new key inheriting the same plan and the same remaining credits, and revokes the presented one in the same operation. Authentication is the (still valid) key itself. The new key is returned once and never shown again: store it before doing anything else.',
+          'Mints a new key inheriting the same plan and the same remaining credits, and revokes the presented one in the same operation. Authentication is the (still valid) key itself. The new key is returned once and never shown again: store it before doing anything else. ' +
+          'The TIER survives too: an anonymous key rotates to an anonymous key, a claimed key stays claimed, and the response carries "tier" and "basis" so the holder can see it. Rotation is not a quota reset — the usage ledger moves to the new key.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
           '201': {
             description:
-              'New key issued and the old one revoked. Returns api_key (once), key_prefix, monthly_limit and credits_remaining.',
+              'New key issued and the old one revoked. Returns api_key (once), key_prefix, monthly_limit, credits_remaining, tier and basis.',
           },
           '401': { description: 'No Authorization: Bearer ifk_… header ("missing_key")' },
           '404': { description: 'Key not found or inactive ("invalid_key")' },
