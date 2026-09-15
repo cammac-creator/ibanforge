@@ -1,18 +1,21 @@
 ---
 title: "API Keys"
-description: "Generate a free API key to get 200 requests/month on all IBANforge endpoints — no credit card, no crypto wallet required."
+description: "Get an IBANforge API key with no e-mail at all — 25 requests a month on the spot, 200 a month once you claim it. No credit card, no crypto wallet."
 order: 1
 ---
 
 # API Keys
 
-IBANforge offers a **free tier** via API keys — 200 requests/month across all endpoints. No credit card, no crypto wallet required. For higher volumes, you can use [x402 micropayments](/docs/x402).
+IBANforge has two free steps, and the first asks for nothing. One empty POST returns an `ifk_` key
+worth **25 requests a month**: no address, no card, nothing to confirm. One more call — a mailed
+code — lifts that same key to **200 requests a month**, for good. Beyond that,
+[x402 micropayments](/docs/x402) or prepaid packs.
 
 This page is the reference on keys alone. If you have not made a call yet, [Onboarding](/docs/onboarding) is the shorter road: the keyless call, this key, the answer read block by block and a batch of 100, in ten minutes.
 
-## Before the key: 10 calls a day, keyless
+## Before the key: 25 calls a day, keyless
 
-`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **10 times a day per IP address**, resetting at midnight UTC:
+`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **25 times a day for the address it comes from**, resetting at midnight UTC:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -20,21 +23,26 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-The response carries a `trial` block with the count left today and the request that mints the key. It is a taster, not a tier: past 10 calls a day the endpoint answers `402` again with `cause.reason: "trial_exhausted"`, and the key below is what lifts it. The allowance is counted in memory per server instance, so treat it as approximate — never as a quota to build on.
+The response carries a `trial` block with the count left today and the request that mints the key.
+It is a taster, not a tier: past 25 calls a day the endpoint answers `402` again with
+`cause.reason: "trial_exhausted"`.
 
-## Generate a free API key
+**Careful with the two 25s — they are not the same allowance.** This one is 25 **a day**, on this
+route only, and it comes back at midnight UTC. The anonymous key below is 25 **a month**, on every
+endpoint: batch, BIC, Swiss clearing, compliance. If all you ever do is validate one IBAN at a time,
+the keyless route is the better deal and you can stay on it. The key is what opens the other
+endpoints; claiming it is what takes the month to 200.
 
-Send a POST request to `/v1/keys/generate` with your email address:
+## A key with no e-mail
+
+POST with no body at all. That is the whole step:
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate \
-  -H "Content-Type: application/json" \
-  -d '{"email": "you@company.com"}'
+curl -X POST https://api.ibanforge.com/v1/keys/generate
 ```
 
-Use a real address. Placeholder and throwaway domains (`example.com`,
-`mailinator.com` and the rest of the usual list) are refused with
-`400 disposable_email`.
+Nothing is mailed, no record is opened, and no address is asked for. If you want us to know where
+you came from, send `{"source":"my-app"}` — it changes nothing else.
 
 ### Response (`201 Created`)
 
@@ -42,58 +50,126 @@ Use a real address. Placeholder and throwaway domains (`example.com`,
 {
   "api_key": "ifk_3f9c1a7e2b5d40c8…",
   "key_prefix": "ifk_3f9c1a7e",
-  "email": "you@company.com",
-  "monthly_limit": 200,
-  "message": "Save this key — it will not be shown again.",
+  "tier": "anonymous",
+  "monthly_limit": 25,
+  "claim_url": "https://api.ibanforge.com/v1/keys/claim",
+  "message": "Save this key - it will not be shown again. 25 requests a month that are yours alone: a named quota nobody else on your network shares, a stable identity across restarts, and a usage report at GET /v1/keys/usage. No email, no card. Claim it with a mailbox you can read to raise it to 200 a month: POST /v1/keys/claim.",
   "terms_url": "https://ibanforge.com/legal/terms"
 }
 ```
 
-- `api_key` is the secret: `ifk_` followed by 64 hexadecimal characters. **Store it securely**, it will not be shown again.
-- `key_prefix` is its first 8 characters. It is safe to log and it is what our support will ask for to identify a key.
+- `api_key` is the secret: `ifk_` followed by 64 hexadecimal characters. **Store it securely**, it
+  will not be shown again.
+- `key_prefix` is its first 8 characters. Safe to log, and what our support asks for.
+- `tier` is `anonymous` until you claim the key, then `claimed`.
+- There is no `email` field on this path, because there is no address.
 
-## If the key request is refused
+**If you would rather give an address straight away**, `{"email": "you@company.com"}` works and
+starts the claim in the same call. It is never required.
 
-The first key from a given network is instant. Beyond that, two guards protect
-the free tier from bulk key farming, and both answer with a machine-readable
-`error` field.
+**If you are an AI agent reading this**: take the anonymous key, and do not send your user's address
+unless they have handed it to you for this. The sentence to put to them is
+*"Use my address you@company.com to create a free IBANforge key."*
 
-### `403 verification_required`: confirm your mailbox
+## Claiming: 25 → 200 a month
 
-This lands whenever a key was already issued from your network recently (a
-shared office NAT, a university, a VPN, a mobile carrier, or simply you asking
-for a second key). The API mails a **6-digit code** to the address you supplied
-and answers:
+`POST /v1/keys/claim` raises the key you already hold. It mints nothing: same key, same prefix,
+same history, a bigger allowance. Three ways, take whichever fits.
+
+**Two things to know before you start**, whichever way you take:
+
+- **The key travels in the `Authorization` header**, never in the body. `X-API-Key: ifk_...` works
+  too. Do not put a key in a URL: it ends up in browser history, in access logs and in `Referer`
+  headers.
+- **The key must have served at least one call.** A key taken and claimed in the same breath
+  answers `403 unused_key`. Validate one IBAN with it first — that call is part of your allowance
+  either way.
+
+**And one thing to know about what each way grants**, because they are not equal:
+
+| Way | Allowance | Recurring? |
+|---|---|---|
+| A mailed 6-digit code | 200 requests a month | **yes, every month** |
+| An x402 payment made with the key | 200 requests | **no — 200 once, not 200 a month** |
+| A prepaid pack bought with the key | 200 requests | **no — 200 once, not 200 a month** |
+
+### 1. A mailed 6-digit code
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/claim \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@company.com"}'
+```
+
+Answers `202 Accepted` and mails a 6-digit code:
 
 ```json
 {
-  "error": "verification_required",
-  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+  "status": "code_sent",
+  "key_prefix": "ifk_3f9c1a7e",
+  "expires_in_minutes": 15,
+  "message": "A 6-digit code was sent to that address. Repeat this request within 15 minutes as {\"email\":\"...\",\"code\":\"123456\"} to raise this key to 200 requests a month."
 }
 ```
 
-Send the **same request again with a `code` field** within 15 minutes:
+Repeat the call within 15 minutes with the code:
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate \
+curl -X POST https://api.ibanforge.com/v1/keys/claim \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
   -H "Content-Type: application/json" \
   -d '{"email": "you@company.com", "code": "123456"}'
 ```
 
-A correct code returns the usual `201` and the key. A wrong one returns
-`403 verification_failed` with a `reason` field:
+A correct code answers `200` with `claimed: true`, `tier: "claimed"`, `basis: "monthly"` and the
+new allowance. Same key, nothing to replace.
+
+Use a real address. Placeholder and throwaway domains (`example.com`, `mailinator.com` and the rest
+of the usual list) are refused with `400 disposable_email`, and a domain with no mail server with
+`400 undeliverable_email`. **An address alone never claims a key** — only a code that came back
+does.
+
+A wrong code answers `403 verification_failed` with a `reason` field:
 
 | `reason` | What it means | What to do |
 |---|---|---|
 | `wrong_code` | The digits do not match | Retry with the code from the most recent mail. The challenge locks after 5 attempts. |
-| `expired` | More than 15 minutes elapsed | Ask for a key again **without** a `code` to receive a fresh one. |
-| `no_challenge` | No pending code for this address | Same: ask again without a `code`. |
-| `too_many_attempts` | 5 wrong codes. Once locked, the challenge refuses the right code too | Ask again without a `code` to start a new challenge. |
+| `expired` | More than 15 minutes elapsed | Repeat the request **without** a `code` to receive a fresh one. |
+| `no_challenge` | No pending code for this address | Same: repeat without a `code`. |
 
-Do not resend the request without a `code` just to retry: that mails a new code
-every time, and the number of codes we send to one address per day is capped.
+One address claims one key at a time, and one claim a day: an address that already carries a live
+free key, or that claimed another key in the last 24 hours, answers `409 already_claimed_elsewhere`.
+This is the fair-use rule of the [terms](/legal/terms) §6(e), measured on the person rather than on
+the mailbox. Too many keys raised from one network in a day answer `429 claim_rate_limited`, and the
+key stays where it is until tomorrow.
 
-### `429`: you asked for too many keys
+### 2. An x402 payment
+
+An x402 settlement made while presenting the key claims it. Nothing to send, no address at all.
+The threshold is the catalogue price of what the claim grants: small, and payable in one call.
+
+### 3. A prepaid pack bought with the key
+
+Buying a credit pack in USDC while presenting the key (`POST /v1/credits/buy/1k|5k|25k`) claims it
+the same way. The pack itself is a separate key preloaded with credits; the claim is a courtesy on
+the key you presented.
+
+**These two rails grant 200 requests once, not 200 a month.** `GET /v1/keys/usage` then reports
+`basis: "lifetime"`, and the counters run over the whole life of the key rather than the calendar
+month. The mailed code is the recurring way, and it costs nothing: if you can read a mailbox, that
+is the better deal.
+
+### Rotation keeps the tier
+
+`POST /v1/keys/rotate` returns a new secret for the same holder. A claimed key stays claimed and
+keeps its 200 a month; an anonymous one stays anonymous. Rotating is not a way to reset an
+allowance.
+
+## If a key request is refused
+
+The anonymous path has one guard: the number of free keys a single network may create in a day.
+Past it, `POST /v1/keys/generate` answers `429`:
 
 ```json
 {
@@ -102,22 +178,42 @@ every time, and the number of codes we send to one address per day is capped.
 }
 ```
 
-`rate_limited` (one key per address per day) and `verification_rate_limited`
-(too many codes requested) are the two other `429`s on this endpoint. In all
-three cases: **keys you already hold keep working**, prepaid credits are
-instant, and [x402 pay-per-call](/docs/x402) needs no key at all.
+**Keys you already hold keep working**, prepaid credits are instant, and
+[x402 pay-per-call](/docs/x402) needs no key at all.
+
+### `403 verification_required`: only when you supplied an address
+
+If you give an address and a key was already issued from your network recently (a shared office
+NAT, a university, a VPN, a mobile carrier, or simply you asking for a second key), the API mails a
+**6-digit code** to that address and answers:
+
+```json
+{
+  "error": "verification_required",
+  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+}
+```
+
+Send the **same request again with a `code` field** within 15 minutes. The `reason` values are the
+ones in the table above, plus `too_many_attempts` after 5 wrong codes: once locked, the challenge
+refuses the right code too, and only a fresh request without a `code` helps.
+
+Do not resend the request without a `code` just to retry: that mails a new code every time, and the
+number of codes we send to one address per day is capped. **This whole step disappears if you send
+no address**: the anonymous path never mails anything.
 
 ### The other refusals
 
 | Status | `error` | Cause |
 |---|---|---|
-| `400` | `invalid_json` | The body is not valid JSON |
-| `400` | `invalid_email` | Not a `local@domain.tld` address |
+| `400` | `invalid_json` | The body is not valid JSON. An **absent** body is not an error — it is the anonymous path. |
+| `400` | `invalid_email` | An address was supplied and is not a `local@domain.tld` one |
 | `400` | `disposable_email` | Placeholder or throwaway domain (`example.com`, `mailinator.com`, …) |
+| `429` | `rate_limited` / `verification_rate_limited` | One key per address per day, or too many codes requested |
 | `503` | `verification_unavailable` | The verification mail could not be sent. Try again in a few minutes, or write to [support@ibanforge.com](mailto:support@ibanforge.com). |
 
-None of this applies to the two paid rails: prepaid credit packs and x402
-pay-per-call issue no free key and go through no verification.
+None of this applies to the two paid rails: prepaid credit packs and x402 pay-per-call issue no free
+key and go through no verification.
 
 ## Using your API key
 
@@ -143,14 +239,15 @@ The key works on all paid endpoints:
 
 | Plan | Volume | Cost |
 |---|---|---|
-| Free (API key) | 200 requests/month | $0 |
+| Anonymous key — no e-mail, no card | 25 requests/month | $0 |
+| Claimed key — a mailed code | 200 requests/month | $0 |
 | Pro subscription | 10,000 requests/month, every endpoint | $29/month — resets on the 1st, cancel anytime |
 | Prepaid credit packs — card or USDC | 1k / 5k / 25k credits | $5 / $20 / $80 — never expire |
 | x402 pay-per-call | Unlimited | $0.002–$0.02/call |
 
-**Attribution on the free tier.** Every paid-endpoint response served on a free key carries an `attribution` object (`text`, `url`, `note`). When you show these results to people (a page, a screen, a document), display "Powered by IBANforge" with the link; a result that stays inside your backend owes nothing. Paid plans carry no attribution.
+**Attribution on the free steps.** Every paid-endpoint response served on a free key — anonymous or claimed — carries an `attribution` object (`text`, `url`, `note`). When you show these results to people (a page, a screen, a document), display "Powered by IBANforge" with the link; a result that stays inside your backend owes nothing. Paid plans carry no attribution.
 
-The 200 free requests are shared across all endpoints and reset on the 1st of each month. **Batch validation counts 1 request per IBAN** — a batch of 50 IBANs uses 50 requests (or 50 prepaid credits), the same rule as the x402 per-IBAN price.
+The allowance is shared across all endpoints and resets on the 1st of each month. **Batch validation counts 1 request per IBAN** — a batch of 50 IBANs uses 50 requests (or 50 prepaid credits), the same rule as the x402 per-IBAN price.
 
 ## Check your usage
 
@@ -163,16 +260,30 @@ curl https://api.ibanforge.com/v1/keys/usage \
 
 ```json
 {
-  "used": 47,
-  "limit": 200,
-  "remaining": 153,
-  "month": "2026-08",
-  "key_prefix": "ifk_3f9c1a7e"
+  "used": 7,
+  "limit": 25,
+  "remaining": 18,
+  "month": "2026-09",
+  "key_prefix": "ifk_3f9c1a7e",
+  "basis": "monthly",
+  "tier": "anonymous",
+  "claim": {
+    "url": "https://api.ibanforge.com/v1/keys/claim",
+    "raises_limit_to": 200,
+    "methods": ["email_code", "x402", "credits"],
+    "paid_so_far_usd": 0,
+    "paid_needed_usd": 1
+  }
 }
 ```
 
-`month` is the calendar month the counters belong to (`YYYY-MM`), and they
-reset on the 1st. This endpoint is free and does not consume quota.
+`limit` is 25 on an anonymous key and 200 on a claimed one; `tier` says which. `basis` says which
+ceiling actually governs: `monthly` is the normal case and resets on the 1st, `lifetime` belongs to
+a key claimed by payment — its 200 are counted once, across all months, not refilled — and
+`credits` means a prepaid balance, with nothing enforced against `limit`. The `claim` block is
+served only on a key that can still be claimed.
+
+`month` is the calendar month the counters belong to (`YYYY-MM`). This endpoint is free and does not consume quota.
 
 ## Watching your quota
 
@@ -180,10 +291,10 @@ Every authenticated response carries your counters, on success as well as on
 refusal, so you can act before you reach the wall rather than when you hit it:
 
 ```
-X-Quota-Used: 47
-X-Quota-Limit: 200
-X-Quota-Remaining: 153
-X-Quota-Month: 2026-08
+X-Quota-Used: 7
+X-Quota-Limit: 25
+X-Quota-Remaining: 18
+X-Quota-Month: 2026-09
 ```
 
 The figures are the balance after the request settled: a call rejected with a
@@ -193,20 +304,21 @@ it is free.
 
 ## When you exceed the quota
 
-Your integration does **not** hit a hard dead-end. Once the 200 monthly requests are used up, the API answers `402 Payment Required` (x402) instead of a blunt 429, with hint headers telling you exactly what happened:
+Your integration does **not** hit a hard dead-end. Once the monthly requests are used up, the API answers `402 Payment Required` (x402) instead of a blunt 429, with hint headers telling you exactly what happened:
 
 ```
 X-Quota-Exhausted: true
-X-Quota-Used: 200
-X-Quota-Limit: 200
-X-Quota-Month: 2026-08
+X-Quota-Used: 25
+X-Quota-Limit: 25
+X-Quota-Month: 2026-09
 ```
 
-The 402 body lists your three options in machine-readable form:
+The 402 body lists your options in machine-readable form:
 
-1. **Buy a prepaid credit pack** — by card on the [pricing page](/pricing), or in USDC via `POST /v1/credits/buy/1k|5k|25k`. Credits never expire and attach to your existing key.
-2. **Pay per call via x402** — an x402-compatible client pays automatically in USDC, no key change needed. See [x402 Payments](/docs/x402).
-3. **Wait for the monthly reset** — the quota resets on the 1st of each month.
+1. **Claim the key** — if it is still anonymous, a mailed code raises it and costs nothing.
+2. **Buy a prepaid credit pack** — by card on the [pricing page](/pricing), or in USDC via `POST /v1/credits/buy/1k|5k|25k`. Credits never expire and attach to your existing key.
+3. **Pay per call via x402** — an x402-compatible client pays automatically in USDC, no key change needed. See [x402 Payments](/docs/x402).
+4. **Wait for the monthly reset** — the quota resets on the 1st of each month.
 
 ## TypeScript example
 

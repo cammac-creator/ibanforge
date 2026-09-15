@@ -56,7 +56,7 @@
   },
   "home": {
     "metadata": {
-      "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing data and compliance risk for developers and AI agents. Free tier — 200 requests/month; pay by card or in USDC as you grow."
+      "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing data and compliance risk for developers and AI agents. A key with no e-mail at all: 25 requests a month, 200 a month once claimed. MCP-native, x402 micropayments."
     },
     "badge": "Online · {rate} % error-free over 30 days",
     "hero": {
@@ -156,13 +156,13 @@
         "description": "ISO 20022 address rules (SPS, T2, Fedwire) ahead of the November 2026 changes"
       },
       "heading": "Endpoints & pricing",
-      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card or in USDC.",
-      "plans": "Free: 200 requests a month · Pro: $29 a month for 10,000 requests · credit packs from $5 · vendor licence from $149 a month · file audit CHF 149.",
+      "subtitle": "Start free with 25 requests a month and no e-mail. Claim the same key for 200 a month. Pay as you grow — by card or in USDC.",
+      "plans": "Free: 25 requests a month with no e-mail, 200 a month once claimed · Pro: $29 a month for 10,000 requests · credit packs from $5 · vendor licence from $149 a month · file audit CHF 149.",
       "plansLink": "See pricing"
     },
     "cta": {
       "heading": "Ready to build?",
-      "description": "Start with a free key — 200 requests a month, no card required. Scale with prepaid credits by card, or pay per call in USDC.",
+      "description": "Start with a free key — 25 requests a month, no e-mail and no card. Claiming the same key takes it to 200 a month. Scale with prepaid credits by card, or pay per call in USDC.",
       "button": "Start building",
       "getKeyButton": "Get a free key"
     },
@@ -284,13 +284,13 @@
     },
     "badgeFallback": "API online · live status",
     "share": {
-      "tagline": "ibanforge.com · REST · SDK · MCP · 200 free requests a month"
+      "tagline": "ibanforge.com · REST · SDK · MCP · 25 free requests a month, no e-mail"
     }
   },
   "pricing": {
     "metadata": {
       "title": "IBAN API pricing: free, Pro $29, packs, OEM",
-      "description": "200 free requests a month, Pro at $29 a month for 10,000 requests, credit packs from $5 that never expire, vendor licence from $149 a month, file audit CHF 149."
+      "description": "25 free requests a month with no e-mail, 200 a month once claimed, Pro at $29 a month for 10,000 requests, credit packs from $5 that never expire, vendor licence from $149 a month, file audit CHF 149."
     },
     "badge": "Transparent pricing",
     "hero": {
@@ -298,7 +298,7 @@
         "prefix": "Pay per",
         "highlight": "call"
       },
-      "description": "Start with a free key (200 requests/month), top up prepaid credits by card or USDC, or let your agent pay per call with x402. Fractions of a cent per request.",
+      "description": "Start with a free key (25 requests a month, no e-mail); claiming the same key takes it to 200 a month. Top up prepaid credits by card or USDC, or let your agent pay per call with x402. Fractions of a cent per request.",
       "cta": {
         "tryFree": "Try it free",
         "x402Explained": "x402 explained →"
@@ -306,7 +306,7 @@
     },
     "table": {
       "heading": "Endpoint pricing",
-      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card, or per request in USDC via x402 on Base L2."
+      "subtitle": "Start free with 25 requests a month and no e-mail. Claim the same key for 200 a month. Pay as you grow — by card, or per request in USDC via x402 on Base L2."
     },
     "endpoints": {
       "0": {
@@ -372,7 +372,7 @@
         "total": "Estimated monthly total",
         "payg": "pay-per-call via x402",
         "note": "You only pay for what you actually call",
-        "freeKey": "This volume fits in the free API key — 200 requests/month, $0.",
+        "freeKey": "This volume fits in the free API key: 25 requests a month, and no address to give. Claiming the same key raises it to 200 a month. $0 either way.",
         "packs": "Or prepay {credits} credits for {price} — they never expire (−{percent} vs pay-per-call).",
         "packsEven": "Or prepay {credits} credits for {price} — same price, and they never expire."
       },
@@ -406,7 +406,7 @@
       },
       "2": {
         "question": "Is there a free tier?",
-        "answer": "Yes! Generate a free API key at POST /v1/keys/generate with your email. Get 200 requests/month on all endpoints — batch validation counts 1 request per IBAN. No credit card, no crypto wallet needed. For higher volumes, buy a prepaid credit pack by card — or pay per call in USDC via x402."
+        "answer": "Yes, and it starts before any key: POST /v1/iban/validate with a real IBAN and no credential at all is served 25 times a day for the address it comes from, in full. For every other endpoint, POST /v1/keys/generate with no body at all returns an ifk_ key worth 25 requests a month across all of them — no e-mail, no card, no captcha — and POST /v1/keys/claim raises that same key to 200 a month with a 6-digit code on an address you choose to give. The two 25s are different allowances: 25 a day on one route, 25 a month on all of them. Batch validation counts 1 request per IBAN. For higher volumes, buy a prepaid credit pack by card, or pay per call in USDC via x402."
       },
       "3": {
         "question": "What about high volume?",
@@ -434,7 +434,7 @@
       "key": {
         "tag": "Free tier",
         "title": "Free API key",
-        "body": "200 requests/month, no card. One email and you get an ifk_ key instantly.",
+        "body": "25 requests a month, no e-mail and no card. One empty POST and you hold an ifk_ key; claim it for 200 a month.",
         "cta": "Get a free key"
       },
       "packs": {
@@ -606,7 +606,7 @@
         "neverCalled": "never called",
         "digest": "The week in review (open on Mondays)",
         "windows": "Scope: packs use all retained references; credits and accounts use recorded keys; x402 is cumulative since 18 April, with change against yesterday and a 7-day sparkline. The {days}-day selection does not filter these four tiles.",
-        "retainedKeysNote": "Credits and accounts: replaced keys remain in these counts. A quota above 200 may be a subscription; these categories do not separate free and paid usage. Recorded credits are not a usable balance.",
+        "retainedKeysNote": "Credits and accounts: replaced keys remain in these counts. A quota above 200 may be a subscription; these categories mix paid and unpaid usage. Recorded credits are not a usable balance.",
         "packSales": {
           "title": "Packs · known Stripe amount details",
           "unavailable": "Retained amounts unavailable. No catalogue price used as a replacement.",
@@ -1258,10 +1258,12 @@
   "apiKeyDialog": {
     "eyebrow": "Free tier",
     "title": "Get your free API key",
-    "subtitle": "200 free calls per month. No credit card. The key is shown only once.",
-    "emailLabel": "Email",
-    "emailPlaceholder": "your@email.com",
+    "subtitle": "No e-mail needed: 25 free calls a month, on the spot. Give an address and we raise the same key to 200 a month. No credit card either way. The key is shown only once.",
+    "emailLabel": "Email (optional)",
+    "emailPlaceholder": "you@company.com — leave empty for a key with no e-mail",
+    "emailHint": "An address is only used to raise this same key to 200 a month, with a 6-digit code. It is never required, and nothing else is mailed to you.",
     "submit": "Generate my key",
+    "submitAnonymous": "Get a key without an e-mail",
     "submitting": "Generating…",
     "termsNotice": "By requesting a key you agree to the <terms>Terms of Service</terms> and the <privacy>Privacy Policy</privacy>.",
     "keyCreated": "Key created",
@@ -1269,6 +1271,9 @@
     "successWarn": "⚠ This key will not be shown again. Copy it and store it somewhere safe.",
     "copy": "Copy key",
     "monthly": "Monthly limit",
+    "anonymousTier": "No address attached: {limit} requests a month on every endpoint, yours alone — batch, BIC, Swiss clearing, compliance.",
+    "emailTier": "{limit} requests a month on every endpoint, and the key is attached to the address you gave.",
+    "claimHint": "When you need more: make one call with this key, then POST /v1/keys/claim with an address you can read. Same key, same prefix, 200 a month.",
     "nextSteps": "Next steps",
     "step1": "Add the key as a header: Authorization: Bearer ifk_…",
     "step2": "Call /v1/iban/validate with an IBAN to validate",
@@ -1292,7 +1297,7 @@
     },
     "errors": {
       "invalidEmail": "Please enter a valid email address, for example you@company.com.",
-      "disposableEmail": "The free tier needs a real address. Placeholder and throwaway domains such as example.com or mailinator.com are refused.",
+      "disposableEmail": "That address is a placeholder or a throwaway (example.com, mailinator.com and the like), so no code could reach it. You do not need an address at all: leave the field empty and the key is issued right away.",
       "verificationRateLimited": "Too many verification codes were requested. Try again tomorrow, or use the most recent code you received. Keys you already hold keep working, and prepaid credits need no verification.",
       "verificationUnavailable": "We could not send the verification mail right now. Try again in a few minutes, or write to support@ibanforge.com.",
       "keyCreationLimit": "This network has reached its daily limit of free keys. Keys you already hold keep working. Prepaid credits are instant, and x402 pay-per-call needs no key at all.",
@@ -1301,6 +1306,7 @@
     "firstCall": {
       "title": "Run your first call now",
       "hint": "One real call with your new key, on a sample Swiss IBAN. It uses 1 of your {limit} monthly calls.",
+      "demoNote": "This run is a demonstration from this page, and it is marked as one. The snippets below are your own calls.",
       "run": "Run this call",
       "running": "Calling the API…",
       "done": "Answered in {ms} ms",
@@ -1309,6 +1315,7 @@
       "quota": "{used} of {limit} calls used this month",
       "showJson": "Show the full response",
       "snippets": "Now in your code",
+      "snippetsNote": "These are yours, without the demonstration marker: paste one into your code.",
       "copy": "Copy",
       "copied": "Copied",
       "error": "The call failed: {message}",
@@ -1319,7 +1326,7 @@
   "agents": {
     "meta": {
       "title": "MCP Server for IBAN Validation — 8 tools, no signup",
-      "description": "Integrate IBANforge in 60 seconds — Claude Desktop, Cursor, Cline. Native MCP server with 8 tools. Free API key (200 req/month, no credit card). Pay-per-call in USDC via x402 on Base L2 — agents pay autonomously."
+      "description": "Integrate IBANforge in 60 seconds — Claude Desktop, Cursor, Cline. Native MCP server with 8 tools. An API key that needs no e-mail at all: 25 requests a month, 200 a month once claimed. Pay-per-call in USDC via x402 on Base L2 — agents pay autonomously."
     },
     "eyebrow": "For AI Agents",
     "hero": {
@@ -1341,7 +1348,7 @@
       "apiKey": {
         "badge": "Path 2 · Free key",
         "title": "Free API key",
-        "description": "POST any email, get a key with 200 free calls/month. No verification, no captcha. Best for prototyping or low-volume agents.",
+        "description": "POST with no body at all, get a key worth 25 calls a month across every endpoint. No e-mail, no verification, no captcha. POST /v1/keys/claim with a mailbox you can read raises that same key to 200 a month. Best for prototyping or low-volume agents.",
         "tradeoff": "Header: Authorization: Bearer ifk_…"
       },
       "x402": {
@@ -1363,8 +1370,8 @@
     },
     "apiKey": {
       "eyebrow": "Path 2 · Free key",
-      "heading": "200 free calls/month — no signup",
-      "description": "POST your agent's email and receive a key. The key is shown once. Add it as Authorization: Bearer ifk_… on every call.",
+      "heading": "25 free calls a month — no e-mail, no signup",
+      "description": "POST an empty body and receive a key. The key is shown once. Add it as Authorization: Bearer ifk_… on every call. To reach 200 a month, call /v1/keys/claim with an address you can read.",
       "fallbackNote": "When the monthly quota is exhausted, the API automatically falls back to x402: the same agent can keep calling, paying $0.005 per request, with no extra setup until the quota resets on the 1st of the next month."
     },
     "x402": {
@@ -1569,7 +1576,7 @@
       "rows": {
         "pricing": {
           "label": "Pricing model",
-          "ibanforge": "Prepaid packs: $5 / 1,000 credits, never expire. Or $0.002–0.02 per call (x402). Free: 200/month.",
+          "ibanforge": "Prepaid packs: $5 / 1,000 credits, never expire. Or $0.002–0.02 per call (x402). Free: 25 a month with no e-mail, 200 a month once claimed.",
           "ibancom": "Annual subscription: €530/year (2,000 lookups) to €4,150/year (unlimited), 1-year minimum, VAT excl.",
           "ibanapi": "Prepaid credits that expire with the plan: $15 for 60 days (2,000 basic + 400 bank lookups) to $115 for a year (30,000 + 5,000).",
           "libs": "Free (MIT/LGPL). Your time is the cost.",
@@ -1585,7 +1592,7 @@
         },
         "freeTier": {
           "label": "Free tier",
-          "ibanforge": "200 requests/month, no card, key by email in one call",
+          "ibanforge": "25 requests a month with no e-mail at all, 200 a month once claimed, no card",
           "ibancom": "100-query trial, expires after one month",
           "ibanapi": "100 basic + 20 bank credits, 30 days",
           "libs": "Everything is free",
@@ -1661,7 +1668,7 @@
     },
     "cta": {
       "heading": "Try it against your own IBANs",
-      "description": "200 free requests a month, no card. The playground runs the real API.",
+      "description": "25 free requests a month, no e-mail and no card. The playground runs the real API.",
       "getKey": "Get a free key",
       "playground": "Open the playground"
     },
@@ -2113,7 +2120,7 @@
   },
   "sheets": {
     "metaTitle": "IBANforge for Google Sheets",
-    "metaDescription": "Four formulas that check a column of IBANs against the bank registers: valid, bank, BIC, bank-code verdict, SEPA. Your own key, 200 checks a month free.",
+    "metaDescription": "Four formulas that check a column of IBANs against the bank registers: valid, bank, BIC, bank-code verdict, SEPA. Your own key, 25 checks a month free without an address.",
     "eyebrow": "Google Sheets add-on",
     "title": "Check a column of IBANs from a formula",
     "intro": "=IBAN_CHECK(A2:A200) fills five columns next to your IBANs: valid, the bank the register names, the BIC, the bank-code verdict and SEPA reach. Batches of 100, cached six hours, on your own IBANforge key.",
@@ -2153,7 +2160,7 @@
     },
     "billing": {
       "title": "What it costs, what it sends",
-      "text": "One request per IBAN, on your own key: 200 a month free, no card, then prepaid packs or the Pro plan at 29 dollars a month for 10,000. Results are cached six hours per user, so recalculating a sheet does not pay twice.",
+      "text": "One request per IBAN, on your own key: 25 a month free without giving an address, 200 a month once you claim the key, then prepaid packs or the Pro plan at 29 dollars a month for 10,000. Results are cached six hours per user, so recalculating a sheet does not pay twice.",
       "privacy": "Nothing leaves the sheet except the IBAN strings the functions receive; the key stays in your own script properties, never in the spreadsheet.",
       "privacyLink": "Privacy policy",
       "limits": "IBANforge is not a Verification of Payee service and never says that an account belongs to a person: it tells you what the registers know about the bank behind the IBAN."
@@ -2409,7 +2416,7 @@
   },
   "tools": {
     "keyBlock": {
-      "text": "This tool is free and needs no key. With a free key the API does the same from your code: 200 calls a month, no card.",
+      "text": "This tool is free and needs no key. With your own key the API does the same from your code: 25 calls a month without giving an address, 200 a month once you claim it.",
       "cta": "Get a free key"
     }
   }

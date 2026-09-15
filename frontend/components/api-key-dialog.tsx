@@ -16,11 +16,23 @@ interface ApiKeyDialogContextValue {
 
 const Ctx = createContext<ApiKeyDialogContextValue>({ open: () => {} });
 
+/**
+ * Les deux formes du `201`, telles que la route les sert.
+ *
+ * Sans corps : `tier: "anonymous"`, `monthly_limit` réduit, `claim_url`, et
+ * **aucun champ `email`** — la sentinelle de stockage n'est pas publiée. Avec
+ * une adresse : le corps historique plus `tier: "email"`. Le champ `email` est
+ * donc facultatif ici, et `tier` est ce qui décide du texte affiché : déduire
+ * le palier de la présence d'un champ est exactement ce que la route a arrêté
+ * de demander.
+ */
 interface KeyResponse {
   api_key: string;
   key_prefix: string;
-  email: string;
+  email?: string;
+  tier?: string;
   monthly_limit: number;
+  claim_url?: string;
   message: string;
 }
 
@@ -206,11 +218,16 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
         // carry, plus the landing page, the referrer and the utm labels.
         const arrival = readArrival();
         const src = arrival?.src ?? null;
+        const address = email.trim().toLowerCase();
         const r = await fetch(`${API_BASE}/v1/keys/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: email.trim().toLowerCase(),
+            // 🚨 Le champ n'est envoyé QUE s'il est rempli. Poster
+            // `{"email": ""}` vaut un 400 `invalid_email` : le chemin par
+            // défaut de ce dialogue est la clé sans adresse, et il doit
+            // ressembler côté réseau à ce que la documentation publie.
+            ...(address ? { email: address } : {}),
             ...(verificationCode ? { code: verificationCode } : {}),
             ...(src ? { source: src } : {}),
             // Always an object from a browser, even an empty one: that is how
@@ -235,9 +252,13 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
     [email, handleFailure],
   );
 
-  const submitEmail = (e: FormEvent) => {
+  /**
+   * Le champ vide est le chemin NORMAL, pas une erreur à retenir : la garde
+   * historique `!email.trim()` bloquait précisément la clé sans adresse.
+   */
+  const submitForm = (e: FormEvent) => {
     e.preventDefault();
-    if (busy || !email.trim()) return;
+    if (busy) return;
     void requestKey();
   };
 
@@ -296,7 +317,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
             </button>
 
             {stage === 'form' && (
-              <form onSubmit={submitEmail}>
+              <form onSubmit={submitForm}>
                 <div
                   className="font-mono text-xs uppercase tracking-caps mb-2"
                   style={{ color: 'var(--amber-400)' }}
@@ -327,33 +348,44 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                     {notice}
                   </p>
                 )}
-                <label
-                  htmlFor="apikey-email"
-                  className="font-sans text-xs font-medium uppercase tracking-caps mb-1.5 block"
-                  style={{ color: 'var(--fg-3)' }}
-                >
-                  {t('emailLabel')}
-                </label>
-                <input
-                  id="apikey-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t('emailPlaceholder')}
-                  autoFocus
-                  disabled={busy}
-                  className="w-full px-3 py-2.5 font-mono text-sm rounded-md border outline-none mb-5"
-                  style={{
-                    background: 'var(--ink-2)',
-                    borderColor: 'var(--ink-4)',
-                    color: 'var(--fg-1)',
-                  }}
-                />
+                {/*
+                  L'action par défaut D'ABORD, l'adresse ensuite.
+                  Sur 390 px, ce qui est au-dessus du bouton décide : un champ
+                  en premier se lit comme obligatoire, et il poussait le bouton
+                  sous la ligne de flottaison dès que le clavier s'ouvrait.
+                  Le libellé change avec le champ, si bien qu'un seul bouton
+                  porte les deux chemins et qu'aucun des deux ne se devine.
+                */}
                 <Button type="submit" disabled={busy} className="w-full">
-                  {busy ? t('submitting') : t('submit')}
+                  {busy ? t('submitting') : email.trim() ? t('submit') : t('submitAnonymous')}
                 </Button>
-                <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--fg-3, #71717a)' }}>
+                <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--ink-4)' }}>
+                  <label
+                    htmlFor="apikey-email"
+                    className="font-sans text-xs font-medium uppercase tracking-caps mb-1.5 block"
+                    style={{ color: 'var(--fg-3)' }}
+                  >
+                    {t('emailLabel')}
+                  </label>
+                  <input
+                    id="apikey-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t('emailPlaceholder')}
+                    disabled={busy}
+                    className="w-full px-3 py-2.5 font-mono text-sm rounded-md border outline-none"
+                    style={{
+                      background: 'var(--ink-2)',
+                      borderColor: 'var(--ink-4)',
+                      color: 'var(--fg-1)',
+                    }}
+                  />
+                  <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--fg-3, #71717a)' }}>
+                    {t('emailHint')}
+                  </p>
+                </div>
+                <p className="mt-4 text-[11px] leading-relaxed" style={{ color: 'var(--fg-3, #71717a)' }}>
                   {t.rich('termsNotice', {
                     terms: (chunks) => (
                       <a href={localePath(locale, '/legal/terms')} target="_blank" rel="noreferrer" className="underline underline-offset-2">
@@ -490,7 +522,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                 >
                   {result.api_key}
                 </div>
-                <div className="flex gap-2 mb-6 items-center">
+                <div className="flex gap-2 mb-3 items-center flex-wrap">
                   <Button onClick={copyKey} type="button">
                     {copied ? `✓ ${tCommon('copied')}` : t('copy')}
                   </Button>
@@ -498,6 +530,24 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                     {t('monthly')}: {result.monthly_limit}/mo
                   </span>
                 </div>
+                {/*
+                  🚨 Le palier vient du champ `tier` de la réponse, et le
+                  quota du champ `monthly_limit` : jamais d'un chiffre écrit
+                  ici. Une clé née sous disjoncteur porte un plafond plus
+                  petit encore, et cet écran doit dire ce que la clé vaut
+                  vraiment. Les nombres traversent en chaîne, pour qu'aucun
+                  formatage de nombre n'entre dans un composant client.
+                */}
+                <p className="text-sm mb-4" style={{ color: 'var(--fg-2)', lineHeight: 1.55 }}>
+                  {result.tier === 'anonymous'
+                    ? t('anonymousTier', { limit: String(result.monthly_limit) })
+                    : t('emailTier', { limit: String(result.monthly_limit) })}
+                </p>
+                {result.tier === 'anonymous' && (
+                  <p className="text-xs mb-5" style={{ color: 'var(--fg-3)', lineHeight: 1.55 }}>
+                    {t('claimHint')}
+                  </p>
+                )}
                 <FirstCallPanel apiBase={API_BASE} apiKey={result.api_key} monthlyLimit={result.monthly_limit} />
                 <div className="border-t pt-4" style={{ borderColor: 'var(--ink-4)' }}>
                   <div

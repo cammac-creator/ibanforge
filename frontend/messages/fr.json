@@ -56,7 +56,7 @@
   },
   "home": {
     "metadata": {
-      "description": "Validation IBAN, recherche BIC/SWIFT, données de clearing suisses et risque de conformité pour développeurs et agents IA. Offre gratuite — 200 requêtes/mois ; ensuite carte ou USDC."
+      "description": "Validation IBAN, recherche BIC/SWIFT, données de clearing suisses et risque de conformité pour développeurs et agents IA. Une clé sans aucun e-mail : 25 requêtes par mois, 200 par mois une fois réclamée. Native MCP, micropaiements x402."
     },
     "badge": "En ligne · {rate} % sans erreur sur 30 jours",
     "hero": {
@@ -156,13 +156,13 @@
         "description": "Règles d'adresses ISO 20022 (SPS, T2, Fedwire) avant les échéances de novembre 2026"
       },
       "heading": "Endpoints et tarifs",
-      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
-      "plans": "Gratuit : 200 requêtes par mois · Pro : 29 $ par mois pour 10 000 requêtes · packs de crédits dès 5 $ · licence éditeur dès 149 $ par mois · audit de fichier 149 CHF.",
+      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
+      "plans": "Gratuit : 25 requêtes par mois sans e-mail, 200 par mois une fois réclamée · Pro : 29 $ par mois pour 10 000 requêtes · packs de crédits dès 5 $ · licence éditeur dès 149 $ par mois · audit de fichier 149 CHF.",
       "plansLink": "Voir les tarifs"
     },
     "cta": {
       "heading": "Prêt à développer ?",
-      "description": "Commencez avec une clé gratuite — 200 requêtes par mois, sans carte. Passez à l’échelle en crédits prépayés par carte, ou payez à l’appel en USDC.",
+      "description": "Commencez avec une clé gratuite — 25 requêtes par mois, sans e-mail et sans carte. Réclamer cette même clé la porte à 200 par mois. Passez à l’échelle en crédits prépayés par carte, ou payez à l’appel en USDC.",
       "button": "Commencer à développer",
       "getKeyButton": "Obtenir une clé gratuite"
     },
@@ -284,13 +284,13 @@
     },
     "badgeFallback": "API en ligne · état en direct",
     "share": {
-      "tagline": "ibanforge.com · REST · SDK · MCP · 200 requêtes par mois gratuites"
+      "tagline": "ibanforge.com · REST · SDK · MCP · 25 requêtes gratuites par mois, sans e-mail"
     }
   },
   "pricing": {
     "metadata": {
       "title": "Tarifs de l'API IBAN : gratuit, Pro 29 $, OEM",
-      "description": "200 requêtes par mois gratuites, Pro à 29 $ par mois pour 10 000 requêtes, packs de crédits dès 5 $ sans expiration, licence éditeur dès 149 $ par mois, audit de fichier 149 CHF."
+      "description": "25 requêtes gratuites par mois sans e-mail, 200 par mois une fois réclamée, Pro à 29 $ par mois pour 10 000 requêtes, packs de crédits dès 5 $ sans expiration, licence éditeur dès 149 $ par mois, audit de fichier 149 CHF."
     },
     "badge": "Tarification transparente",
     "hero": {
@@ -298,7 +298,7 @@
         "prefix": "Paiement à",
         "highlight": "l'appel"
       },
-      "description": "Commencez avec une clé gratuite (200 requêtes/mois), rechargez des crédits prépayés par carte ou USDC, ou laissez votre agent payer à l’appel via x402. Quelques fractions de centime par requête.",
+      "description": "Commencez avec une clé gratuite (25 requêtes par mois, sans e-mail) ; réclamer cette même clé la porte à 200 par mois. Rechargez des crédits prépayés par carte ou USDC, ou laissez votre agent payer à l’appel via x402. Quelques fractions de centime par requête.",
       "cta": {
         "tryFree": "Essayer gratuitement",
         "x402Explained": "x402 expliqué →"
@@ -306,7 +306,7 @@
     },
     "table": {
       "heading": "Tarifs par endpoint",
-      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte, ou à la requête en USDC via x402 sur Base L2."
+      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte, ou à la requête en USDC via x402 sur Base L2."
     },
     "endpoints": {
       "0": {
@@ -372,7 +372,7 @@
         "total": "Total mensuel estimé",
         "payg": "paiement à l’appel via x402",
         "note": "Vous ne payez que ce que vous appelez réellement",
-        "freeKey": "Ce volume tient dans la clé API gratuite — 200 requêtes/mois, 0 $.",
+        "freeKey": "Ce volume tient dans la clé API gratuite : 25 requêtes par mois, sans adresse à donner. Réclamer cette même clé la porte à 200 par mois. 0 $ dans les deux cas.",
         "packs": "Ou prépayez {credits} crédits pour {price} — sans expiration (−{percent} vs paiement à l’appel).",
         "packsEven": "Ou prépayez {credits} crédits pour {price} — même prix, et ils n’expirent jamais."
       },
@@ -406,7 +406,7 @@
       },
       "2": {
         "question": "Existe-t-il une offre gratuite ?",
-        "answer": "Oui ! Générez une clé API gratuite via POST /v1/keys/generate avec votre email. Obtenez 200 requêtes/mois sur tous les endpoints — la validation par lot compte 1 requête par IBAN. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte — ou payez à l’appel en USDC via x402."
+        "answer": "Oui, et elle commence avant toute clé : POST /v1/iban/validate avec un vrai IBAN et aucun identifiant est servi 25 fois par jour pour l’adresse d’où il vient, en entier. Pour tous les autres endpoints, POST /v1/keys/generate sans aucun corps renvoie une clé ifk_ de 25 requêtes par mois sur l’ensemble d’entre eux — sans e-mail, sans carte, sans captcha — et POST /v1/keys/claim porte cette même clé à 200 par mois avec un code à 6 chiffres sur une adresse que vous choisissez de donner. Les deux 25 ne sont pas le même quota : 25 par jour sur une route, 25 par mois sur toutes. La validation par lot compte 1 requête par IBAN. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte, ou payez à l’appel en USDC via x402."
       },
       "3": {
         "question": "Et pour les gros volumes ?",
@@ -434,7 +434,7 @@
       "key": {
         "tag": "Offre gratuite",
         "title": "Clé API gratuite",
-        "body": "200 requêtes/mois, sans carte. Un email et vous obtenez une clé ifk_ instantanément.",
+        "body": "25 requêtes par mois, sans e-mail et sans carte. Un POST au corps vide et vous avez une clé ifk_ ; réclamez-la pour 200 par mois.",
         "cta": "Obtenir une clé gratuite"
       },
       "packs": {
@@ -606,7 +606,7 @@
         "neverCalled": "jamais appelé",
         "digest": "Le point de la semaine (déplié le lundi)",
         "windows": "Périmètres : packs sur toutes les références conservées ; crédits et comptes sur les clés recensées ; x402 cumulé depuis le 18 avril, variation contre la veille et courbe sur 7 jours. Le choix {days} j ne filtre pas ces quatre tuiles.",
-        "retainedKeysNote": "Crédits et comptes : les anciennes clés remplacées restent dans ces compteurs. Un quota supérieur à 200 peut être un abonnement ; ces catégories ne distinguent pas le gratuit du payant. Les crédits recensés ne sont pas un solde utilisable.",
+        "retainedKeysNote": "Crédits et comptes : les anciennes clés remplacées restent dans ces compteurs. Un quota supérieur à 200 peut être un abonnement ; ces catégories mélangent l’usage payant et l’usage non payant. Les crédits recensés ne sont pas un solde utilisable.",
         "packSales": {
           "title": "Packs · détail des montants Stripe connus",
           "unavailable": "Montants conservés indisponibles. Aucun prix catalogue utilisé en remplacement.",
@@ -1258,10 +1258,12 @@
   "apiKeyDialog": {
     "eyebrow": "Offre gratuite",
     "title": "Obtenir une clé API gratuite",
-    "subtitle": "200 appels gratuits par mois. Pas de carte bancaire. La clé est affichée une seule fois.",
-    "emailLabel": "Email",
-    "emailPlaceholder": "votre@email.com",
+    "subtitle": "Aucun e-mail nécessaire : 25 appels gratuits par mois, immédiatement. Donnez une adresse et nous portons cette même clé à 200 par mois. Sans carte bancaire dans les deux cas. La clé est affichée une seule fois.",
+    "emailLabel": "Email (facultatif)",
+    "emailPlaceholder": "you@company.com — laissez vide pour une clé sans e-mail",
+    "emailHint": "Une adresse ne sert qu’à porter cette même clé à 200 par mois, avec un code à 6 chiffres. Elle n’est jamais obligatoire, et rien d’autre ne vous est envoyé.",
     "submit": "Générer ma clé",
+    "submitAnonymous": "Obtenir une clé sans e-mail",
     "submitting": "Génération…",
     "termsNotice": "En demandant une clé, vous acceptez les <terms>Conditions d'utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.",
     "keyCreated": "Clé créée",
@@ -1269,6 +1271,9 @@
     "successWarn": "⚠ Cette clé ne sera plus affichée. Copiez-la et stockez-la quelque part de sûr.",
     "copy": "Copier la clé",
     "monthly": "Limite mensuelle",
+    "anonymousTier": "Aucune adresse rattachée : {limit} requêtes par mois sur tous les endpoints, à vous seul — lot, BIC, clearing suisse, conformité.",
+    "emailTier": "{limit} requêtes par mois sur tous les endpoints, et la clé est rattachée à l’adresse que vous avez donnée.",
+    "claimHint": "Quand il vous en faudra plus : faites un appel avec cette clé, puis POST /v1/keys/claim avec une adresse que vous pouvez lire. Même clé, même préfixe, 200 par mois.",
     "nextSteps": "Prochaines étapes",
     "step1": "Ajoutez la clé dans l'en-tête : Authorization: Bearer ifk_…",
     "step2": "Appelez /v1/iban/validate avec un IBAN à valider",
@@ -1292,7 +1297,7 @@
     },
     "errors": {
       "invalidEmail": "Saisissez une adresse email valide, par exemple you@company.com.",
-      "disposableEmail": "L'offre gratuite demande une vraie adresse. Les domaines jetables ou fictifs comme example.com ou mailinator.com sont refusés.",
+      "disposableEmail": "Cette adresse est un domaine fictif ou jetable (example.com, mailinator.com et compagnie) : aucun code ne pourrait y arriver. Une adresse n'est de toute façon pas nécessaire : laissez le champ vide et la clé est délivrée tout de suite.",
       "verificationRateLimited": "Trop de codes de vérification ont été demandés. Réessayez demain, ou utilisez le dernier code reçu. Les clés que vous détenez déjà continuent de fonctionner, et les crédits prépayés ne demandent aucune vérification.",
       "verificationUnavailable": "Le mail de vérification n'a pas pu partir. Réessayez dans quelques minutes, ou écrivez à support@ibanforge.com.",
       "keyCreationLimit": "Ce réseau a atteint sa limite quotidienne de clés gratuites. Les clés que vous détenez déjà continuent de fonctionner. Les crédits prépayés sont instantanés, et le paiement à l'appel x402 ne demande aucune clé.",
@@ -1301,6 +1306,7 @@
     "firstCall": {
       "title": "Lancez votre premier appel",
       "hint": "Un vrai appel avec votre nouvelle clé, sur un IBAN suisse d'exemple. Il consomme 1 de vos {limit} appels mensuels.",
+      "demoNote": "Cet appel est une démonstration lancée depuis cette page, et il est marqué comme tel. Les extraits ci-dessous sont vos propres appels.",
       "run": "Lancer cet appel",
       "running": "Appel en cours…",
       "done": "Réponse en {ms} ms",
@@ -1309,6 +1315,7 @@
       "quota": "{used} appel(s) sur {limit} ce mois",
       "showJson": "Voir la réponse complète",
       "snippets": "Le même appel dans votre code",
+      "snippetsNote": "Ceux-là sont à vous, sans le marqueur de démonstration : collez-en un dans votre code.",
       "copy": "Copier",
       "copied": "Copié",
       "error": "L'appel a échoué : {message}",
@@ -1319,7 +1326,7 @@
   "agents": {
     "meta": {
       "title": "Serveur MCP de validation d’IBAN — 8 outils, sans inscription",
-      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 8 outils. Clé API gratuite (200 requêtes/mois, sans carte). Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
+      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 8 outils. Une clé API sans aucun e-mail : 25 requêtes par mois, 200 par mois une fois réclamée. Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
     },
     "eyebrow": "Pour les agents IA",
     "hero": {
@@ -1341,7 +1348,7 @@
       "apiKey": {
         "badge": "Voie 2 · Clé gratuite",
         "title": "Clé API gratuite",
-        "description": "POST avec un email, vous recevez une clé avec 200 appels gratuits/mois. Pas de vérification, pas de captcha. Parfait pour prototyper ou les agents à faible volume.",
+        "description": "POST sans aucun corps, vous recevez une clé de 25 appels par mois sur tous les endpoints. Pas d’e-mail, pas de vérification, pas de captcha. POST /v1/keys/claim avec une boîte mail que vous pouvez lire porte cette même clé à 200 par mois. Parfait pour prototyper ou les agents à faible volume.",
         "tradeoff": "Header : Authorization: Bearer ifk_…"
       },
       "x402": {
@@ -1363,8 +1370,8 @@
     },
     "apiKey": {
       "eyebrow": "Voie 2 · Clé gratuite",
-      "heading": "200 appels gratuits/mois — sans inscription",
-      "description": "POST l'email de votre agent, recevez la clé. La clé n'est affichée qu'une fois. Ajoutez-la dans Authorization: Bearer ifk_… à chaque appel.",
+      "heading": "25 appels gratuits par mois — sans e-mail, sans inscription",
+      "description": "POSTez un corps vide, recevez la clé. Elle n'est affichée qu'une fois. Ajoutez-la dans Authorization: Bearer ifk_… à chaque appel. Pour atteindre 200 par mois, appelez /v1/keys/claim avec une adresse que vous pouvez lire.",
       "fallbackNote": "Quand le quota mensuel est épuisé, l'API bascule automatiquement sur x402 : le même agent peut continuer à appeler, en payant 0,005 $ par requête, sans setup supplémentaire jusqu'au reset du quota le 1er du mois suivant."
     },
     "x402": {
@@ -1569,7 +1576,7 @@
       "rows": {
         "pricing": {
           "label": "Modèle de prix",
-          "ibanforge": "Packs prépayés : 5 $ / 1 000 crédits, sans expiration. Ou 0,002–0,02 $ par appel (x402). Gratuit : 200/mois.",
+          "ibanforge": "Packs prépayés : 5 $ / 1 000 crédits, sans expiration. Ou 0,002–0,02 $ par appel (x402). Gratuit : 25 par mois sans e-mail, 200 par mois une fois réclamée.",
           "ibancom": "Abonnement annuel : 530 €/an (2 000 lookups) à 4 150 €/an (illimité), engagement 1 an, hors TVA.",
           "ibanapi": "Crédits prépayés qui expirent avec le plan : 15 $ pour 60 jours (2 000 basiques + 400 recherches banque) à 115 $ pour un an (30 000 + 5 000).",
           "libs": "Gratuit (MIT/LGPL). Le coût, c'est votre temps.",
@@ -1585,7 +1592,7 @@
         },
         "freeTier": {
           "label": "Offre gratuite",
-          "ibanforge": "200 requêtes/mois, sans carte, clé par email en un appel",
+          "ibanforge": "25 requêtes par mois sans aucun e-mail, 200 par mois une fois réclamée, sans carte",
           "ibancom": "Essai de 100 requêtes, expire après un mois",
           "ibanapi": "100 basic + 20 bank credits, 30 jours",
           "libs": "Tout est gratuit",
@@ -1661,7 +1668,7 @@
     },
     "cta": {
       "heading": "Essayez sur vos propres IBAN",
-      "description": "200 requêtes gratuites par mois, sans carte. Le playground appelle la vraie API.",
+      "description": "25 requêtes gratuites par mois, sans e-mail et sans carte. Le playground appelle la vraie API.",
       "getKey": "Obtenir une clé gratuite",
       "playground": "Ouvrir le playground"
     },
@@ -2113,7 +2120,7 @@
   },
   "sheets": {
     "metaTitle": "IBANforge pour Google Sheets",
-    "metaDescription": "Quatre formules qui contrôlent une colonne d'IBAN contre les registres bancaires : valide, banque, BIC, verdict du code banque, SEPA. Votre propre clé, 200 contrôles par mois gratuits.",
+    "metaDescription": "Quatre formules qui contrôlent une colonne d'IBAN contre les registres bancaires : valide, banque, BIC, verdict du code banque, SEPA. Votre propre clé, 25 contrôles par mois gratuits sans adresse.",
     "eyebrow": "Add-on Google Sheets",
     "title": "Contrôler une colonne d'IBAN depuis une formule",
     "intro": "=IBAN_CONTROLE(A2:A200) remplit cinq colonnes à côté de vos IBAN : valide, la banque que le registre nomme, le BIC, le verdict du code banque et la portée SEPA. Par lots de 100, en cache six heures, sur votre propre clé IBANforge.",
@@ -2153,7 +2160,7 @@
     },
     "billing": {
       "title": "Ce que ça coûte, ce que ça envoie",
-      "text": "Une requête par IBAN, sur votre propre clé : 200 par mois gratuites, sans carte, puis des packs prépayés ou l'abonnement Pro à 29 dollars par mois pour 10 000. Les résultats sont gardés six heures en cache par utilisateur, donc recalculer une feuille ne paie pas deux fois.",
+      "text": "Une requête par IBAN, sur votre propre clé : 25 par mois gratuites sans donner d'adresse, 200 par mois une fois la clé réclamée, puis des packs prépayés ou l'abonnement Pro à 29 dollars par mois pour 10 000. Les résultats sont gardés six heures en cache par utilisateur, donc recalculer une feuille ne paie pas deux fois.",
       "privacy": "Rien ne sort de la feuille sauf les chaînes IBAN que les fonctions reçoivent ; la clé reste dans vos propres propriétés de script, jamais dans la feuille.",
       "privacyLink": "Politique de confidentialité",
       "limits": "IBANforge n'est pas un service de Verification of Payee et n'affirme jamais qu'un compte appartient à une personne : il dit ce que les registres savent de la banque derrière l'IBAN."
@@ -2409,7 +2416,7 @@
   },
   "tools": {
     "keyBlock": {
-      "text": "Cet outil est gratuit et sans clé. Avec une clé gratuite, l'API fait la même chose depuis votre code : 200 appels par mois, sans carte.",
+      "text": "Cet outil est gratuit et sans clé. Avec votre propre clé, l'API fait la même chose depuis votre code : 25 appels par mois sans donner d'adresse, 200 par mois une fois la clé réclamée.",
       "cta": "Obtenir une clé gratuite"
     }
   }
