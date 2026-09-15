@@ -54,10 +54,12 @@ adminCohorts.get('/v1/admin/key-revocations', (c) => {
  * (`GET /v1/admin/cohort-scan`) ou dans l'alerte « rafale VUE, non coupée ».
  * `episode_id` est facultatif : absent, l'épisode en cours est utilisé.
  *
- * Réponse `{ revoked, skipped, pending, candidates }`, plus `reason` quand rien
- * n'a pu être fait : `no_burst` (plus aucune rafale dans la fenêtre de six
- * heures — la cohorte a vieilli, il n'y a plus de bornes à consigner) ou
- * `anchor_not_found` (l'ancre n'est plus dans le rayon).
+ * Réponse `{ revoked, skipped, pending, candidates, distinct_sources }`, plus
+ * `reason` quand rien n'a pu être fait : `no_burst` (plus aucune rafale dans la
+ * fenêtre de six heures — la cohorte a vieilli, il n'y a plus de bornes à
+ * consigner), `anchor_not_found` (l'ancre n'est plus dans le rayon) ou
+ * `below_source_floor` (moins de cinq réseaux dans le rayon ; `"force": true`
+ * dans le corps lève cette garde, en connaissance de cause).
  *
  * 🚨 Cette route coupe pour de vrai, et son effet n'est réparable QUE par les
  * anciens soldes consignés dans `key_revocations`. Elle applique les clauses SQL
@@ -78,13 +80,17 @@ adminCohorts.post('/v1/admin/cohorts/cut', async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
     anchor?: unknown;
     episode_id?: unknown;
+    force?: unknown;
   } | null;
   const anchor = typeof body?.anchor === 'string' ? body.anchor.trim() : '';
   if (!anchor) {
     return c.json({ error: 'anchor_required' }, 400);
   }
   const episodeId = typeof body?.episode_id === 'string' ? body.episode_id : null;
-  const out = await cutCohortNow({ anchor, episodeId });
+  // `force: true` lève la garde de diversité (cinq réseaux) : voir cutCohortNow.
+  // Sans lui, une cohorte `ip:` (un seul réseau par construction) est refusée
+  // avec reason 'below_source_floor', comme par la passe automatique.
+  const out = await cutCohortNow({ anchor, episodeId, force: body?.force === true });
   c.header('Cache-Control', 'private, no-store');
   return c.json(out);
 });

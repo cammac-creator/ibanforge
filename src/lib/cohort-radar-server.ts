@@ -169,6 +169,21 @@ export interface CohortRadarReport {
  *    changed hands;
  *  - a key already switched off — nothing left to decide.
  */
+/**
+ * 🚨 Chargé sur le PALIER (`tier = 'email'`), plus sur des valeurs dérivées.
+ *
+ * Jusqu'au 15/09/2026 ce chargeur exigeait `no_recredit = 0 AND monthly_limit
+ * IS NULL` : deux valeurs qui décrivaient « une clé gratuite ordinaire » tant
+ * que rien d'autre ne les écrivait. Le bouclier du disjoncteur (lot 5) pose
+ * `monthly_limit = 5` et `no_recredit = 1` sur toute clé née sous alerte, et la
+ * remontée écrit `monthly_limit = 200` (une VALEUR, là où l'historique portait
+ * NULL) : ces clés sortaient des deux passes du radar, définitivement — vues
+ * par personne, jamais regroupées (revue adversariale du 15/09, lentille panne
+ * silencieuse, constat R1). Le palier dit l'intention sans dépendre de ce que
+ * d'autres modules écrivent dans les colonnes de quota. Les clés relabellisées
+ * par une cohorte restent exclues par leur adresse `@cohorte.invalid`, les
+ * payantes par leur palier, les nôtres par `issued_by_us`.
+ */
 function loadCreations(): CreationRow[] {
   return getStatsDB()
     .prepare(
@@ -179,10 +194,10 @@ function loadCreations(): CreationRow[] {
           AND c.key_prefix IS NOT NULL
           AND c.user_agent IS NOT NULL
           AND k.active = 1
-          AND k.no_recredit = 0
+          AND k.tier = 'email'
+          AND k.issued_by_us = 0
           AND k.credits_remaining IS NULL
           AND k.credits_total IS NULL
-          AND k.monthly_limit IS NULL
           AND k.email NOT LIKE '%@cohorte.invalid'`,
     )
     .all(`-${LOOKBACK_HOURS} hours`)
@@ -709,12 +724,25 @@ export async function cutCohortNow(p: {
   anchor: string;
   episodeId?: string | null;
   now?: Date;
+  /**
+   * Lève la garde de diversité (au moins `BREAKER_MIN_DISTINCT_SOURCES` réseaux
+   * dans le rayon). Sans ce drapeau, une cohorte vue depuis moins de réseaux est
+   * REFUSÉE ici aussi : le rapport et l'alerte invitent l'opérateur à recopier
+   * une ancre dans cette route, et l'ancre qu'il recopie est parfois celle que
+   * la garde vient précisément d'épargner (`below_source_floor`) — un nouveau
+   * venu isolé sous une chaîne générique, ou tout un NAT d'entreprise (revue
+   * adversariale du 15/09, lentille empoisonnement, constat P2). `force: true`
+   * reste possible, pour une ferme mono-IP relue et jugée : la décision est
+   * alors écrite dans le corps de l'appel, pas prise par omission.
+   */
+  force?: boolean;
 }): Promise<{
   revoked: number;
   skipped: number;
   pending: number;
   candidates: number;
-  reason?: 'no_burst' | 'anchor_not_found';
+  distinct_sources?: number;
+  reason?: 'no_burst' | 'anchor_not_found' | 'below_source_floor';
 }> {
   const nowMs = (p.now ?? new Date()).getTime();
   const rows = loadAnonymousCreations(anonSince(nowMs));
@@ -730,6 +758,16 @@ export async function cutCohortNow(p: {
   if (!cohort) {
     return { revoked: 0, skipped: 0, pending: 0, candidates: 0, reason: 'anchor_not_found' };
   }
+  if (!p.force && cohort.distinctSources < BREAKER_MIN_DISTINCT_SOURCES) {
+    return {
+      revoked: 0,
+      skipped: 0,
+      pending: 0,
+      candidates: cohort.rows.length,
+      distinct_sources: cohort.distinctSources,
+      reason: 'below_source_floor',
+    };
+  }
 
   const episodeId = p.episodeId ?? shieldEpisodeId();
   const target = cohort.rows.slice(0, ANON_REVOCATIONS_PER_TICK_MAX);
@@ -741,6 +779,7 @@ export async function cutCohortNow(p: {
     skipped: cut.skipped,
     pending: cohort.rows.length - target.length,
     candidates: cohort.rows.length,
+    distinct_sources: cohort.distinctSources,
   };
 }
 

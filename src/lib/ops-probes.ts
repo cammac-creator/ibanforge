@@ -23,6 +23,7 @@ import {
   BREAKER_EPISODE_MAX_HOURS,
   BREAKER_STUCK_HOURS,
 } from './creation-breaker.js';
+import { LINEAGE_BLIND_STREAK, lineageWriteFailures } from './lineage-facts.js';
 
 /**
  * Le point de montage du volume Railway (`railway.toml` → mountPath /app/data).
@@ -227,6 +228,31 @@ async function probeBreaker(): Promise<void> {
   }
 }
 
+/**
+ * S11 — la mesure des lignées (lot M).
+ *
+ * Ses écritures avalent leurs erreurs par doctrine (un écrit de télémétrie ne
+ * transforme pas un 200 en 500), donc sans cette sonde une base qui refuse
+ * l'écriture rend un tableau de cohortes à zéros que rien ne distingue d'un
+ * silence réel (revue adversariale du 15/09, constat R4).
+ */
+async function probeLineage(): Promise<void> {
+  try {
+    const streak = lineageWriteFailures();
+    if (streak >= LINEAGE_BLIND_STREAK) {
+      await opsFail(
+        'lineage:blind',
+        `${streak} écritures de mesure des lignées en échec d'affilée : le tableau ` +
+          'GET /v1/admin/funnel se remplit de zéros qui ne veulent rien dire.',
+      );
+    } else {
+      await opsOk('lineage:blind');
+    }
+  } catch (err) {
+    console.error('[ops-probe] lineage:', err instanceof Error ? err.message : err);
+  }
+}
+
 /** Tick horaire unique : toutes les sondes + les hommes morts. */
 async function tick(): Promise<void> {
   await checkHeartbeats();
@@ -235,6 +261,7 @@ async function tick(): Promise<void> {
   await probeComplianceAge();
   await probeFatfAge();
   await probeBreaker();
+  await probeLineage();
 }
 
 const TICK_MS = 60 * 60 * 1000;

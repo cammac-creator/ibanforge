@@ -302,6 +302,13 @@ export function cohortAddress(userAgent: string, day: string): string {
 export const ANON_BURST_WINDOWS: CohortWindow[] = [
   { hours: 30 / 3600, minKeys: 15 }, // 15 clés en 30 s, toutes ancres confondues
   { hours: 5 / 60, minKeys: 30 }, // 30 clés en 5 min, toutes ancres confondues
+  // La ferme qui ÉTALE : une création toutes les trois minutes ne forme jamais
+  // une rafale de trente secondes, et sans cette ligne elle sortait de la passe
+  // avant tout regroupement, quel que soit son User-Agent (revue adversariale du
+  // 15/09, lentille contournement, constat R7). Soixante clés en six heures, la
+  // fenêtre de chargement entière : dix par heure, le seuil du disjoncteur, sur
+  // toute la fenêtre — un pic de découverte honnête ne tient pas six heures.
+  { hours: 6, minKeys: 60 },
 ];
 
 /**

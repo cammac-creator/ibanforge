@@ -294,8 +294,17 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     expect(activeCount(keys.map((k) => k.prefix))).toBe(41);
     expect(report.anon_revoked).toBe(0);
 
-    // La voie manuelle, elle, coupe : un humain a lu le rapport.
-    const cut = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now) });
+    // La voie manuelle applique la MÊME garde de diversité (revue du 15/09,
+    // constat P2) : sans `force`, une cohorte mono-IP est refusée ici aussi —
+    // l'opérateur qui recopie l'ancre de l'alerte ne coupe pas un NAT par omission.
+    const refused = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now) });
+    expect(refused.reason).toBe('below_source_floor');
+    expect(refused.revoked).toBe(0);
+    expect(refused.candidates).toBe(41);
+    expect(refused.distinct_sources).toBe(1);
+    expect(activeCount(keys.map((k) => k.prefix))).toBe(41);
+    // Avec `force`, un humain a lu le rapport et porte la décision, écrite dans l'appel.
+    const cut = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now), force: true });
     expect(cut.revoked).toBe(41);
     expect(cut.skipped).toBe(0);
     expect(activeCount(keys.map((k) => k.prefix))).toBe(0);
@@ -325,7 +334,7 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     expect(bounds.n).toBe(41);
 
     // Idempotence : la clé est déjà coupée, donc hors du chargeur.
-    const again = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now) });
+    const again = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now), force: true });
     expect(again.revoked).toBe(0);
     expect(listKeyRevocations({ limit: 1000 }).total).toBe(41);
   });

@@ -59,8 +59,89 @@ export const VERIFICATION_MAX_ATTEMPTS = 5;
  *   - per SOURCE: generous enough for a shared NAT (an office/university sits
  *     behind one public IP) yet a hard ceiling on a distributed spray.
  */
+/**
+ * Codes envoyés à UNE adresse depuis UN réseau, par 24 h.
+ *
+ * 🚨 Compté par (adresse, réseau) et non par adresse seule depuis le 15/09/2026
+ * (revue adversariale, lentille empoisonnement, constat P4) : compté par
+ * adresse seule, ce plafond était l'ARME — un tiers muni de n'importe quelle
+ * clé anonyme postait trois codes vers l'adresse d'une victime, et celle-ci ne
+ * pouvait plus recevoir de code pendant 24 h, ni pour créer ni pour réclamer.
+ * Par (adresse, réseau), le tiers ne brûle que son propre créneau.
+ */
 export const VERIFICATION_SENDS_PER_EMAIL_DAY = 3;
+/**
+ * Codes envoyés à UNE adresse, tous réseaux confondus, par 24 h : la garde
+ * anti-bombardement qui reste quand la précédente est partagée par réseau.
+ */
+export const VERIFICATION_SENDS_PER_EMAIL_DAY_TOTAL = 6;
 export const VERIFICATION_SENDS_PER_SOURCE_DAY = 15;
+/**
+ * Codes envoyés vers UN domaine de destinataire, tous réseaux et toutes
+ * adresses confondus, par 24 h — sauf les fournisseurs de boîtes publics.
+ *
+ * Deux motifs (revue du 15/09, lentille contournement, constats R1/R2 et R9) :
+ * un domaine « attrape-tout » rend le code à six chiffres gratuit et illimité,
+ * donc la preuve de boîte ne coûte plus rien à une ferme qui dépense un nom de
+ * domaine ; et chaque code est un message sortant de notre relais, celui qui a
+ * été bloqué pour spam le 02/09 après des envois en série vers un même domaine.
+ * Vingt par jour couvre une entreprise entière ; un domaine qui en demande plus
+ * en un jour n'est pas une entreprise.
+ */
+export const VERIFICATION_SENDS_PER_DOMAIN_DAY = 20;
+
+/**
+ * Les domaines où des inconnus sans rapport partagent un même nom : jamais
+ * comptés par domaine, sinon le vingt-et-unième utilisateur de gmail.com de la
+ * journée serait refusé pour ce que vingt autres ont fait.
+ */
+export const PUBLIC_MAILBOX_DOMAINS: ReadonlySet<string> = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'hotmail.fr',
+  'hotmail.de',
+  'hotmail.ch',
+  'live.com',
+  'live.fr',
+  'msn.com',
+  'yahoo.com',
+  'yahoo.fr',
+  'yahoo.de',
+  'ymail.com',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'proton.me',
+  'protonmail.com',
+  'protonmail.ch',
+  'pm.me',
+  'gmx.de',
+  'gmx.net',
+  'gmx.ch',
+  'gmx.at',
+  'gmx.com',
+  'web.de',
+  't-online.de',
+  'bluewin.ch',
+  'sunrise.ch',
+  'hispeed.ch',
+  'orange.fr',
+  'wanadoo.fr',
+  'free.fr',
+  'sfr.fr',
+  'laposte.net',
+  'aol.com',
+  'zoho.com',
+  'fastmail.com',
+  'tutanota.com',
+  'tuta.io',
+  'posteo.de',
+  'mail.com',
+  'qq.com',
+  '163.com',
+]);
 
 /**
  * Plafond de RÉCLAMATIONS RÉUSSIES par réseau et par 24 h.
@@ -199,20 +280,62 @@ function sendBudgetKey(email: string): string {
 }
 
 /**
+ * La forme sur laquelle le budget par DOMAINE se compte : le domaine haché, ou
+ * null pour un fournisseur public (jamais compté) et pour une chaîne sans
+ * arobase (rien à compter).
+ */
+export function domainBudgetKey(email: string): string | null {
+  const at = email.lastIndexOf('@');
+  if (at < 0) return null;
+  const domain = email
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
+  if (!domain || PUBLIC_MAILBOX_DOMAINS.has(domain)) return null;
+  return sha256(domain);
+}
+
+/**
  * May we mail a verification code for this (source, recipient) right now?
  * Both windows are 24h. Returns the reason so the caller can answer precisely.
  */
-export type ChallengeSendCheck = { ok: true } | { ok: false; reason: 'recipient' | 'source' };
+export type ChallengeSendCheck =
+  { ok: true } | { ok: false; reason: 'recipient' | 'source' | 'domain' };
 export function challengeSendAllowed(source: string | null, email: string): ChallengeSendCheck {
   const db = getStatsDB();
+  const emailKey = sendBudgetKey(email);
   const toEmail = (
     db
       .prepare(
         "SELECT COUNT(*) AS n FROM verification_sends WHERE email_hash = ? AND created_at >= datetime('now', '-24 hours')",
       )
-      .get(sendBudgetKey(email)) as { n: number }
+      .get(emailKey) as { n: number }
   ).n;
-  if (toEmail >= VERIFICATION_SENDS_PER_EMAIL_DAY) return { ok: false, reason: 'recipient' };
+  if (toEmail >= VERIFICATION_SENDS_PER_EMAIL_DAY_TOTAL) return { ok: false, reason: 'recipient' };
+  // Le créneau (adresse, réseau). Sans réseau connu, l'ancien plafond par
+  // adresse seule reprend : fermé, jamais ouvert, quand on ne sait pas d'où ça vient.
+  const toEmailFromHere = source
+    ? (
+        db
+          .prepare(
+            "SELECT COUNT(*) AS n FROM verification_sends WHERE email_hash = ? AND ip_hash = ? AND created_at >= datetime('now', '-24 hours')",
+          )
+          .get(emailKey, source) as { n: number }
+      ).n
+    : toEmail;
+  if (toEmailFromHere >= VERIFICATION_SENDS_PER_EMAIL_DAY)
+    return { ok: false, reason: 'recipient' };
+  const domainKey = domainBudgetKey(email);
+  if (domainKey) {
+    const toDomain = (
+      db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM verification_sends WHERE domain_hash = ? AND created_at >= datetime('now', '-24 hours')",
+        )
+        .get(domainKey) as { n: number }
+    ).n;
+    if (toDomain >= VERIFICATION_SENDS_PER_DOMAIN_DAY) return { ok: false, reason: 'domain' };
+  }
   // A null source (unknown IP) cannot be rate-limited by source, only by
   // recipient — same fail-open stance as the creation guard. In prod Railway
   // always supplies the IP, so source is never null there.
@@ -237,8 +360,8 @@ export function challengeSendAllowed(source: string | null, email: string): Chal
 export function recordVerificationSend(source: string | null, email: string): number {
   const db = getStatsDB();
   const info = db
-    .prepare('INSERT INTO verification_sends (ip_hash, email_hash) VALUES (?, ?)')
-    .run(source, sendBudgetKey(email));
+    .prepare('INSERT INTO verification_sends (ip_hash, email_hash, domain_hash) VALUES (?, ?, ?)')
+    .run(source, sendBudgetKey(email), domainBudgetKey(email));
   db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run();
   db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run();
   return Number(info.lastInsertRowid);

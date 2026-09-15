@@ -74,7 +74,22 @@ const seenToday = new Set<string>();
 /** Dernière plainte journalisée, pour n'en écrire qu'une par minute. */
 let lastComplaintMs = 0;
 
+/**
+ * Écritures de mesure en échec D'AFFILÉE, remises à zéro par la première
+ * écriture qui réussit. Lu par la sonde `lineage:blind` (ops-probes) : une base
+ * qui refuse l'écriture produisait un tableau à zéros, indiscernable de
+ * « personne n'active » — exactement l'indicateur sur lequel la décision
+ * d'ouvrir l'essai va se prendre (revue du 15/09, constat R4).
+ */
+let failureStreak = 0;
+/** Échecs d'affilée au-delà desquels la sonde `lineage:blind` crie. */
+export const LINEAGE_BLIND_STREAK = 3;
+export function lineageWriteFailures(): number {
+  return failureStreak;
+}
+
 function complain(err: unknown): void {
+  failureStreak++;
   const now = Date.now();
   if (now - lastComplaintMs < 60_000) return;
   lastComplaintMs = now;
@@ -89,6 +104,7 @@ export function resetLineageDayCache(): void {
   cachedDay = '';
   seenToday.clear();
   lastComplaintMs = 0;
+  failureStreak = 0;
 }
 
 /**
@@ -266,6 +282,7 @@ export function recordLineageSuccess(p: {
     ).run(lineage, lineage, lineage, lineage, route, context, context);
     seenToday.add(contextKey);
     seenToday.add(fastKey);
+    failureStreak = 0;
   } catch (err) {
     complain(err);
   }

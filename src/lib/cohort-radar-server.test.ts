@@ -131,3 +131,49 @@ describe('cohort radar, end to end', () => {
     expect(after.noRecredit).toBe(false);
   });
 });
+
+describe('la passe e-mail charge sur le PALIER, pas sur les colonnes de quota (revue du 15/09, R1)', () => {
+  it('une clé à adresse née sous alerte (plafond 5, no_recredit 1) puis remontée (200) reste scannée', async () => {
+    const db = getStatsDB();
+    const tag = `shield-${Date.now()}`;
+    const hashes: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const k = generateApiKey(`${tag}-${i}@alpha.example.net`, undefined, undefined, false, {
+        ipHash: `${tag}-net-${i}`,
+        userAgent: `${tag}-ua/1.0`,
+      })!;
+      hashes.push(k.key_hash);
+    }
+    // Ce que le bouclier du disjoncteur écrit à la naissance…
+    for (const h of hashes) {
+      db.prepare(
+        "UPDATE api_keys SET monthly_limit = 5, no_recredit = 1, shield_episode = 'ep-test' WHERE key_hash = ?",
+      ).run(h);
+    }
+    const under = await runCohortScan();
+    const seenUnder = under.scanned;
+    // … puis ce que la remontée écrit au désarmement : une VALEUR, pas NULL.
+    for (const h of hashes) {
+      db.prepare(
+        'UPDATE api_keys SET monthly_limit = 200, no_recredit = 0, shield_episode = NULL WHERE key_hash = ?',
+      ).run(h);
+    }
+    const after = await runCohortScan();
+    // Le chargeur historique (`no_recredit = 0 AND monthly_limit IS NULL`) rendait
+    // zéro ligne pour ces trois clés dans les DEUX états. Sur le palier, il les voit.
+    const mine = (state: string) =>
+      (
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM key_creations c JOIN api_keys k ON k.key_prefix = c.key_prefix
+              WHERE k.key_hash IN (${hashes.map(() => '?').join(',')}) AND k.active = 1`,
+          )
+          .get(...hashes) as { n: number }
+      ).n +
+      0 * state.length;
+    expect(mine('under')).toBe(3);
+    expect(seenUnder).toBeGreaterThanOrEqual(3);
+    expect(after.scanned).toBeGreaterThanOrEqual(3);
+    for (const h of hashes) db.prepare('DELETE FROM api_keys WHERE key_hash = ?').run(h);
+  });
+});

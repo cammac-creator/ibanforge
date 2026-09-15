@@ -14,6 +14,7 @@ import { resetBgBaeStatements } from './bg-bae.js';
 import { resetBlzStatements } from './de-blz.js';
 import { normalizeEmail } from './email-norm.js';
 import { resetDailyLedgerStatements } from './daily-ip-ledger.js';
+import { resetLineageDayCache } from './lineage-facts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -585,6 +586,7 @@ function openStatsDB(): DatabaseType.Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip_hash TEXT,
         email_hash TEXT NOT NULL,
+        domain_hash TEXT,
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_verification_sends_ip ON verification_sends(ip_hash, created_at);
@@ -722,6 +724,19 @@ function openStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_marketplace_events_at ON marketplace_events(created_at);
     `);
+    // Le plafond d'envoi par DOMAINE de destinataire (revue du 15/09, constats
+    // R9 et P4) : la colonne est ajoutée aux bases existantes, l'index APRÈS
+    // l'ALTER (piège 1 du 19/08), et ne compte que les domaines qui ne sont pas
+    // des fournisseurs de boîtes publics (src/lib/key-creation-guard.ts).
+    const sendCols = (
+      statsDB.prepare('PRAGMA table_info(verification_sends)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (sendCols.length > 0 && !sendCols.includes('domain_hash')) {
+      statsDB.exec('ALTER TABLE verification_sends ADD COLUMN domain_hash TEXT');
+    }
+    statsDB.exec(
+      'CREATE INDEX IF NOT EXISTS idx_verification_sends_domain ON verification_sends(domain_hash, created_at)',
+    );
     // La réservation Checkout disparaît avec le rapport ; aucun fichier ni délai ajouté.
     const auditCols = (
       statsDB.prepare('PRAGMA table_info(audit_jobs)').all() as Array<{ name: string }>
@@ -1677,6 +1692,10 @@ export function closeAll(): void {
     // sans cette ligne, la première dépense après une réouverture répondrait
     // depuis une connexion morte (même motif que resetBlzStatements ci-dessus).
     resetDailyLedgerStatements();
+    // Le cache de jour de la mesure des lignées (lot M) survivait à une
+    // réouverture : une écriture sautée après fermeture puis réouverture, sans
+    // qu'aucun test ne rougisse (revue du 15/09, constat R5).
+    resetLineageDayCache();
   }
   // A recorded open failure must not outlive the connection it described: after
   // a close the next getStatsDB() decides afresh, otherwise a test (or a reseed)

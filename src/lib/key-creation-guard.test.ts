@@ -13,6 +13,8 @@ import {
   verificationDelivery,
   purgeExpiredVerifications,
   VERIFICATION_SENDS_PER_EMAIL_DAY,
+  VERIFICATION_SENDS_PER_EMAIL_DAY_TOTAL,
+  VERIFICATION_SENDS_PER_DOMAIN_DAY,
   VERIFICATION_SENDS_PER_SOURCE_DAY,
   CHALLENGE_GRACE_MINUTES,
   CLAIM_SUCCESS_PER_SOURCE_DAY,
@@ -142,15 +144,51 @@ describe('verification challenge', () => {
 });
 
 describe('verification send limits (mail-bombing guard)', () => {
-  it('caps sends per recipient — nobody needs a 4th code in a day', () => {
+  it('caps sends per (recipient, network) — a third party cannot burn the recipient budget', () => {
     const src = `send-src-${RUN}-a`;
     const email = `victim-${RUN}@bank.example.net`;
     for (let i = 0; i < VERIFICATION_SENDS_PER_EMAIL_DAY; i++) {
       expect(challengeSendAllowed(src, email)).toEqual({ ok: true });
       recordVerificationSend(src, email);
     }
-    // Even from a DIFFERENT source, the recipient is now protected.
-    expect(challengeSendAllowed(`${src}-other`, email)).toEqual({ ok: false, reason: 'recipient' });
+    // Ce réseau-ci a épuisé son créneau pour cette adresse…
+    expect(challengeSendAllowed(src, email)).toEqual({ ok: false, reason: 'recipient' });
+    // … mais un AUTRE réseau (la victime elle-même, depuis chez elle) garde le
+    // sien : trois codes postés par un tiers ne la bloquent plus pendant 24 h
+    // (revue adversariale du 15/09, constat P4).
+    expect(challengeSendAllowed(`${src}-victim-home`, email)).toEqual({ ok: true });
+  });
+
+  it('still caps sends per recipient across all networks — the mail-bombing guard survives', () => {
+    const email = `bombed-${RUN}@bank.example.net`;
+    for (let i = 0; i < VERIFICATION_SENDS_PER_EMAIL_DAY_TOTAL; i++) {
+      const src = `send-src-${RUN}-bomb-${i}`;
+      expect(challengeSendAllowed(src, email)).toEqual({ ok: true });
+      recordVerificationSend(src, email);
+    }
+    expect(challengeSendAllowed(`send-src-${RUN}-bomb-final`, email)).toEqual({
+      ok: false,
+      reason: 'recipient',
+    });
+  });
+
+  it('caps sends per recipient DOMAIN — a catch-all domain stops feeding six-digit codes', () => {
+    // Adresses toutes distinctes, réseaux tous distincts : seuls le domaine les relie.
+    for (let i = 0; i < VERIFICATION_SENDS_PER_DOMAIN_DAY; i++) {
+      const email = `box-${i}@catchall-${RUN}.example.net`;
+      expect(challengeSendAllowed(`send-src-${RUN}-dom-${i}`, email)).toEqual({ ok: true });
+      recordVerificationSend(`send-src-${RUN}-dom-${i}`, email);
+    }
+    expect(
+      challengeSendAllowed(`send-src-${RUN}-dom-final`, `box-final@catchall-${RUN}.example.net`),
+    ).toEqual({ ok: false, reason: 'domain' });
+    // Un fournisseur public n'est JAMAIS compté par domaine : le vingt-et-unième
+    // utilisateur de gmail.com de la journée n'est pas refusé pour les vingt autres.
+    for (let i = 0; i < VERIFICATION_SENDS_PER_DOMAIN_DAY + 1; i++) {
+      const email = `someone-${RUN}-${i}@gmail.com`;
+      expect(challengeSendAllowed(`send-src-${RUN}-pub-${i}`, email)).toEqual({ ok: true });
+      recordVerificationSend(`send-src-${RUN}-pub-${i}`, email);
+    }
   });
 
   it('caps sends per source — bounds a distributed spray', () => {

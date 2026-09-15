@@ -376,7 +376,9 @@ apiKeys.post('/v1/keys/generate', async (c) => {
               message:
                 sendCheck.reason === 'recipient'
                   ? 'Too many verification codes were requested for this address today. Try again tomorrow, or use the most recent code you already received.'
-                  : 'Too many verification codes were requested from this network today. Existing keys keep working; prepaid credits are instant (POST /v1/credits/buy/1k) and x402 needs no key.',
+                  : sendCheck.reason === 'domain'
+                    ? 'Too many verification codes were sent to addresses at this domain today. Existing keys keep working; try again tomorrow, or use another mailbox you can read.'
+                    : 'Too many verification codes were requested from this network today. Existing keys keep working; prepaid credits are instant (POST /v1/credits/buy/1k) and x402 needs no key.',
             },
             429,
           );
@@ -1118,7 +1120,9 @@ apiKeys.post('/v1/keys/claim', async (c) => {
           message:
             sendCheck.reason === 'recipient'
               ? 'Too many verification codes were requested for this address today. Try again tomorrow, or use the most recent code you already received.'
-              : 'Too many verification codes were requested from this network today. Existing keys keep working, and this one keeps its current allowance.',
+              : sendCheck.reason === 'domain'
+                ? 'Too many verification codes were sent to addresses at this domain today. Existing keys keep working; try again tomorrow, or use another mailbox you can read.'
+                : 'Too many verification codes were requested from this network today. Existing keys keep working, and this one keeps its current allowance.',
         },
         429,
       );

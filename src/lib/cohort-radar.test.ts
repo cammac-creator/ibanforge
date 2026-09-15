@@ -447,3 +447,23 @@ describe('groupAnonymousCohorts : le rayon, borné par une ancre', () => {
     expect(his.rows.length).toBeLessThan(ANON_ANCHOR_MIN_KEYS);
   });
 });
+
+describe('la fenêtre longue de la rafale anonyme (revue du 15/09, R7)', () => {
+  const spreadMs = (n: number, spanMs: number, start = 1_800_000_000_000): number[] =>
+    Array.from({ length: n }, (_, i) => start + Math.round((i * spanMs) / Math.max(n - 1, 1)));
+  it('une ferme qui étale soixante créations sur six heures forme une rafale', () => {
+    const burst = findBurst(spreadMs(60, 6 * 3600 * 1000), ANON_BURST_WINDOWS);
+    expect(burst).not.toBeNull();
+    expect(burst!.window.hours).toBe(6);
+    expect(burst!.keys).toBe(60);
+  });
+  it('cinquante-neuf créations sur six heures, sans pic court, n’en forment pas', () => {
+    expect(findBurst(spreadMs(59, 6 * 3600 * 1000), ANON_BURST_WINDOWS)).toBeNull();
+  });
+  it('une création toutes les trois minutes pendant six heures est vue, quel que soit le User-Agent', () => {
+    // 121 créations à 3 min d'écart : jamais 15 en 30 s ni 30 en 5 min, mais 60 en 6 h.
+    const burst = findBurst(spreadMs(121, 6 * 3600 * 1000), ANON_BURST_WINDOWS);
+    expect(burst).not.toBeNull();
+    expect(burst!.window.hours).toBe(6);
+  });
+});

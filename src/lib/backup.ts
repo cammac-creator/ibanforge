@@ -36,20 +36,21 @@ import { getStatsDB } from './db.js';
 import { recordEvent } from './events.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
-export const BACKUP_FORMAT = 5;
+export const BACKUP_FORMAT = 6;
 /**
  * Ce qu'un restaurateur d'aujourd'hui sait lire. Le format 1 n'a pas les deux
  * journaux du palier de clé (key_claims, key_settlements), le format 2 n'a pas
  * le journal d'annulation du radar (key_revocations, lot 6), le format 3 n'a pas
  * les faits de mesure de l'essai (lineage_facts, lot M), le format 4 n'a pas le
- * journal des bascules du disjoncteur (breaker_transitions, lot 5) : ils y
+ * journal des bascules du disjoncteur (breaker_transitions, lot 5), le format 5
+ * n'a pas les naissances de clés (key_creations, revue du 15/09) : ils y
  * valent [] et le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
  * le format rend irrestaurable tout dump pris avant la livraison — sur une base
  * qui n'a pas d'autre sauvegarde. Et incrémenter plutôt que ne rien faire :
  * sans numéro, un dump tronqué et un dump légitimement ancien seraient
  * indiscernables, et le `?? []` masquerait l'un comme l'autre.
  */
-export const READABLE_FORMATS = [1, 2, 3, 4, 5] as const;
+export const READABLE_FORMATS = [1, 2, 3, 4, 5, 6] as const;
 
 export interface BackupPayload {
   format: number;
@@ -63,6 +64,7 @@ export interface BackupPayload {
     key_revocations?: number;
     lineage_facts?: number;
     breaker_transitions?: number;
+    key_creations?: number;
   };
   api_keys: Array<Record<string, unknown>>;
   api_usage: Array<Record<string, unknown>>;
@@ -93,6 +95,14 @@ export interface BackupPayload {
    * la seule trace qui explique après coup pourquoi des clés sont nées dégradées.
    */
   breaker_transitions?: Array<Record<string, unknown>>;
+  /**
+   * Format 6. Les naissances de clés : la matière que lisent le disjoncteur et
+   * les deux passes du radar. Sans elle, une base restaurée rendrait toute clé
+   * restaurée invisible aux protections et « définitivement irrévocable »
+   * (arbitrage A8 annulé en silence par la restauration — revue du 15/09,
+   * constat R3). Une ligne par création libre, aucune donnée client.
+   */
+  key_creations?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -146,6 +156,9 @@ export function exportPaidState(takenAt: string): BackupPayload {
   const transitions = db.prepare('SELECT * FROM breaker_transitions').all() as Array<
     Record<string, unknown>
   >;
+  const creations = db.prepare('SELECT * FROM key_creations').all() as Array<
+    Record<string, unknown>
+  >;
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
   // indistinguishable from any other call. This annotation puts it on the
@@ -170,6 +183,7 @@ export function exportPaidState(takenAt: string): BackupPayload {
       key_revocations: revocations.length,
       lineage_facts: lineages.length,
       breaker_transitions: transitions.length,
+      key_creations: creations.length,
     },
     api_keys: keys,
     api_usage: usage,
@@ -178,6 +192,7 @@ export function exportPaidState(takenAt: string): BackupPayload {
     key_revocations: revocations,
     lineage_facts: lineages,
     breaker_transitions: transitions,
+    key_creations: creations,
   };
 }
 
@@ -196,6 +211,8 @@ export interface RestoreReport {
   lineages_skipped: number;
   transitions_inserted: number;
   transitions_skipped: number;
+  creations_inserted: number;
+  creations_skipped: number;
 }
 
 /**
@@ -234,6 +251,8 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     lineages_skipped: 0,
     transitions_inserted: 0,
     transitions_skipped: 0,
+    creations_inserted: 0,
+    creations_skipped: 0,
   };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
@@ -284,6 +303,11 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     for (const row of payload.breaker_transitions ?? []) {
       if (insertRow('breaker_transitions', row)) report.transitions_inserted++;
       else report.transitions_skipped++;
+    }
+    // Absent d'un dump aux formats 1 à 5 ; un dump au format 6 le porte toujours.
+    for (const row of payload.key_creations ?? []) {
+      if (insertRow('key_creations', row)) report.creations_inserted++;
+      else report.creations_skipped++;
     }
   });
   run();

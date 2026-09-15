@@ -277,4 +277,47 @@ describe('sauvegarde du palier de clé', () => {
     expect(f4.transitions_skipped).toBe(0);
     db.prepare('DELETE FROM breaker_transitions WHERE episode_id = ?').run(episode);
   });
+
+  it('23sexies. un aller-retour conserve les naissances de clés, et un dump au format 5 se restaure sans elles', () => {
+    expect(READABLE_FORMATS).toContain(5);
+    const db = getStatsDB();
+    const prefix = `ifk_bk6${String(RUN).slice(-5)}`;
+    db.prepare(
+      "INSERT INTO key_creations (ip_hash, user_agent, key_prefix) VALUES ('bk6-net', 'bk6-ua/1.0', ?)",
+    ).run(prefix);
+    const dump = exportPaidState('2026-09-15T12:00:00Z');
+    expect(dump.format).toBe(BACKUP_FORMAT);
+    const mine = dump.key_creations!.filter((r) => r.key_prefix === prefix);
+    expect(mine).toHaveLength(1);
+    expect(dump.counts.key_creations).toBeGreaterThanOrEqual(1);
+    db.prepare('DELETE FROM key_creations WHERE key_prefix = ?').run(prefix);
+    const only = {
+      ...dump,
+      api_keys: [],
+      api_usage: [],
+      key_claims: [],
+      key_settlements: [],
+      key_revocations: [],
+      lineage_facts: [],
+      breaker_transitions: [],
+    };
+    const report = restorePaidState({ ...only, key_creations: mine });
+    expect(report.creations_inserted).toBe(1);
+    const again = restorePaidState({ ...only, key_creations: mine });
+    expect(again.creations_inserted).toBe(0);
+    expect(again.creations_skipped).toBe(1);
+    const back = db
+      .prepare('SELECT ip_hash, user_agent FROM key_creations WHERE key_prefix = ?')
+      .all(prefix);
+    expect(back).toEqual([{ ip_hash: 'bk6-net', user_agent: 'bk6-ua/1.0' }]);
+    const f5 = restorePaidState({
+      format: 5,
+      taken_at: '2026-09-15T00:00:00Z',
+      counts: { api_keys: 0, api_usage: 0 },
+      api_keys: [],
+      api_usage: [],
+    });
+    expect(f5.creations_inserted).toBe(0);
+    db.prepare('DELETE FROM key_creations WHERE key_prefix = ?').run(prefix);
+  });
 });
