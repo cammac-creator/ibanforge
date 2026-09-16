@@ -50,6 +50,7 @@ export default function PlaygroundPage() {
     clearing: null,
   })
   const [loading, setLoading] = useState<PlaygroundMode | null>(null)
+  const [received, setReceived] = useState<Partial<Record<PlaygroundMode, boolean>>>({})
   const [seq, setSeq] = useState(0)
 
   async function run(mode: PlaygroundMode, value: string) {
@@ -69,6 +70,7 @@ export default function PlaygroundPage() {
 
       if (hasResult) {
         // Field-level "invalid"/"not found" is a legitimate result, not an error.
+        setReceived((r) => ({ ...r, [mode]: true }))
         setResults((r) => ({ ...r, [mode]: data }))
         setSeq((s) => s + 1)
       } else {
@@ -206,7 +208,7 @@ export default function PlaygroundPage() {
         {isLoading ? (
           <SkeletonCard />
         ) : (
-          result && <ResultCard mode={activeTab} data={result} animateKey={seq} />
+          result && <ResultCard mode={activeTab} data={result} animateKey={seq} received={received[activeTab] === true} />
         )}
       </section>
 
@@ -220,7 +222,7 @@ export default function PlaygroundPage() {
           <GetKeyButton variant="amber" className="px-6">
             {t("getKey")}
           </GetKeyButton>
-          <Button variant="outline" className="px-6" render={<Link href={localePath(locale, '/docs')} />}>
+          <Button nativeButton={false} variant="outline" className="px-6" render={<Link href={localePath(locale, '/docs')} />}>
             {t("docsLink")}
           </Button>
         </div>

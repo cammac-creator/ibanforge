@@ -1,3 +1,4 @@
+import catalogue from "@/data/onboarding.json";
 import { JourneyActions } from "@/components/journey-actions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -33,8 +34,8 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "agents" });
   return {
-    title: t("meta.title"),
-    description: t("meta.description"),
+    title: t("meta.title", counts),
+    description: t("meta.description", counts),
     alternates: alternatesFor(locale, "/agents"),
   };
 }
@@ -48,17 +49,16 @@ const MCP_CLAUDE_DESKTOP_JSON = `{
   }
 }`;
 
-const FREE_KEY_CURL = `curl -X POST https://api.ibanforge.com/v1/keys/generate \\
-  -H "Content-Type: application/json" \\
-  -d '{"email":"agent@yourdomain.com"}'
+const counts = { remote: catalogue.remote.length, installed: catalogue.installed.length };
+const FREE_KEY_CURL = `curl -X POST https://api.ibanforge.com/v1/keys/generate
 
-# → returns { "api_key": "ifk_...", "monthly_limit": 200 }`;
+# → { "api_key": "ifk_...", "monthly_limit": ${catalogue.anonymousMonthly} }`;
 
 const SDK_PYTHON_QUICKSTART = `# pip install ibanforge
 from ibanforge import IBANforge
 
-# Generate a free key in one line
-key = IBANforge.generate_api_key("agent@yourdomain.com")
+# Créer une clé sans adresse e-mail
+key = IBANforge.generate_api_key()
 
 with IBANforge(api_key=key["api_key"]) as client:
     out = client.validate_iban("CH1000230000000012345")
@@ -116,53 +116,6 @@ const r = await paid("https://api.ibanforge.com/v1/iban/validate", {
 });
 // pays $0.005 USDC autonomously, returns 200 with the response`;
 
-// DX-01 (audit 2026-09-01): the MCP server actually exposes 8 tools
-// (`tools/list` in prod returns count=8), but this array stopped at 7 and
-// left `send_feedback` out, while the page copy already said "8 tools" in
-// every locale. `mcp/src/index.ts` is the source of truth this list mirrors.
-const TOOLS = [
-  {
-    name: "validate_iban",
-    price: "$0.005",
-    description: "Validate any IBAN. Returns BIC, country, EMI/vIBAN flag, SEPA + VoP, risk score, Swiss BC-Nummer for CH/LI.",
-  },
-  {
-    name: "batch_validate_iban",
-    price: "$0.002 / IBAN",
-    description: "Up to 100 IBANs in one call — CSV cleanup, payout list triage.",
-  },
-  {
-    name: "lookup_bic",
-    price: "$0.003",
-    description: "Resolve a BIC/SWIFT into bank name, country, city, LEI, and registered HQ address (where available). 121k+ BIC entries (38K LEI-enriched via GLEIF).",
-  },
-  {
-    name: "lookup_ch_clearing",
-    price: "$0.003",
-    description: "Resolve a Swiss BC-Nummer / IID — full SIX rail participation (SIC, euroSIC, CHF instant) + QR-IID. 1,100+ SIX entries, the deepest Swiss clearing data in any public API.",
-  },
-  {
-    name: "check_compliance",
-    price: "$0.02",
-    description: "Pre-flight risk triage: sanctions (OFAC), FATF, SEPA Instant, VoP. Returns risk_score 0-100.",
-  },
-  {
-    name: "validate_payment_reference",
-    price: "Free",
-    description: "Payment reference checksums — RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero — each judged against the dated document that publishes the rule. Add an IBAN for the QRR↔QR-IBAN pairing verdict.",
-  },
-  {
-    name: "check_postal_address",
-    price: "Free",
-    description: "ISO 20022 postal address rules for SPS, T2 and Fedwire ahead of the November 2026 changes — every finding cites its source document.",
-  },
-  {
-    name: "send_feedback",
-    price: "Free",
-    description: "Report a wrong result, missing data or anything blocking payment. A human reads every report.",
-  },
-];
-
 export default async function AgentsPage({
   params,
 }: {
@@ -193,6 +146,7 @@ export default async function AgentsPage({
             size="lg"
             variant="amber"
             className="px-6"
+            nativeButton={false}
             render={<a href="#mcp-quickstart" />}
           >
             {t("hero.cta.mcp")}
@@ -201,6 +155,7 @@ export default async function AgentsPage({
             size="lg"
             variant="outline"
             className="px-6"
+            nativeButton={false}
             render={<a href="#x402-quickstart" />}
           >
             {t("hero.cta.x402")}
@@ -232,7 +187,7 @@ export default async function AgentsPage({
               </Badge>
               <h3 className="font-semibold text-foreground">{t(`paths.${p}.title`)}</h3>
               <p className="text-sm text-muted-foreground" style={{ lineHeight: 1.65 }}>
-                {t(`paths.${p}.description`)}
+                {t(`paths.${p}.description`, counts)}
               </p>
               <p className="text-xs font-mono text-muted-foreground mt-2">
                 {t(`paths.${p}.tradeoff`)}
@@ -252,7 +207,7 @@ export default async function AgentsPage({
           {t("mcp.heading")}
         </h2>
         <p className="text-muted-foreground mb-8 text-sm" style={{ lineHeight: 1.65 }}>
-          {t("mcp.description")}
+          {t("mcp.description", counts)}
         </p>
 
         <div className="rounded-lg border p-5 mb-6" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
@@ -277,23 +232,26 @@ export default async function AgentsPage({
           </code>
         </div>
 
-        <h3 className="font-semibold mt-10 mb-4">{t("mcp.toolsHeading")}</h3>
+        <h3 className="font-semibold mt-10 mb-4">{t("mcp.toolsHeading", counts)}</h3>
         <div className="flex flex-col gap-3">
-          {TOOLS.map((tool) => (
+          {catalogue.installed.map((name) => {
+            const tool = catalogue.tools.find((item) => item.name === name);
+            return (
             <div
-              key={tool.name}
+              key={name}
               className="rounded-lg border px-5 py-4"
               style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
             >
               <div className="flex items-center justify-between gap-3 mb-1">
-                <code className="font-mono text-sm text-amber-500">{tool.name}</code>
-                <span className="font-mono text-xs text-muted-foreground">{tool.price}</span>
+                <code className="font-mono text-sm text-amber-500 break-all">{name}</code>
+                <span className="font-mono text-xs text-muted-foreground">{(tool?.price === "free" || name === "audit_status") ? t("mcp.free") : tool ? `$${tool.price}${name === "batch_validate_iban" ? " / IBAN" : ""}` : t("mcp.auditPrice")}</span>
               </div>
+              <p className="text-xs font-medium mb-2">{t(catalogue.remote.includes(name) ? "mcp.bothTransports" : "mcp.installedOnly")}</p>
               <p className="text-xs text-muted-foreground" style={{ lineHeight: 1.65 }}>
-                {tool.description}
+                {t(`toolDescriptions.${name}`)}
               </p>
             </div>
-          ))}
+          ); })}
         </div>
       </section>
 

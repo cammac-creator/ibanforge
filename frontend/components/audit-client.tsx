@@ -18,17 +18,21 @@ export function AuditClient({ locale }: { locale: string }) {
   const [job, setJob] = useState<AuditStatus | null>(null);
   const [email, setEmail] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [demonstration, setDemonstration] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const requestRef = useRef(0);
 
   // Back from a cancelled Checkout: the job is in the URL, show its preview again.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("job");
     if (!id) return;
+    const request = ++requestRef.current;
     fetch(`${API_BASE}/v1/audit/status/${encodeURIComponent(id)}`)
       .then(async (r) => (r.ok ? ((await r.json()) as AuditStatus) : null))
       .then((s) => {
-        if (s && !s.paid) {
+        if (request === requestRef.current && s && !s.paid) {
+          setDemonstration(false);
           setJob(s);
           setStage("preview");
         }
@@ -37,8 +41,11 @@ export function AuditClient({ locale }: { locale: string }) {
   }, []);
 
   const upload = useCallback(
-    async (file: File) => {
+    async (file: File, example = false) => {
+      const request = ++requestRef.current;
       setError(null);
+      setJob(null);
+      setDemonstration(example);
       setStage("uploading");
       const form = new FormData();
       form.append("file", file);
@@ -46,6 +53,7 @@ export function AuditClient({ locale }: { locale: string }) {
       try {
         const r = await fetch(`${API_BASE}/v1/audit/upload`, { method: "POST", body: form });
         const body = (await r.json()) as AuditStatus & { error?: string; message?: string };
+        if (request !== requestRef.current) return;
         if (!r.ok) {
           setError(auditErrorText(t, body.error, body.message));
           setStage("idle");
@@ -54,6 +62,7 @@ export function AuditClient({ locale }: { locale: string }) {
         setJob(body);
         setStage("preview");
       } catch {
+        if (request !== requestRef.current) return;
         setError(t("upload.error.network"));
         setStage("idle");
       }
@@ -62,7 +71,7 @@ export function AuditClient({ locale }: { locale: string }) {
   );
 
   const pay = useCallback(async () => {
-    if (!job) return;
+    if (!job || demonstration) return;
     setError(null);
     setStage("paying");
     try {
@@ -82,7 +91,7 @@ export function AuditClient({ locale }: { locale: string }) {
       setError(t("upload.error.network"));
       setStage("preview");
     }
-  }, [job, email, locale, t]);
+  }, [job, demonstration, email, locale, t]);
 
   return (
     <section className="flex flex-col gap-6" id="audit">
@@ -129,7 +138,7 @@ export function AuditClient({ locale }: { locale: string }) {
             type="button"
             variant="outline"
             disabled={stage === "uploading" || stage === "paying"}
-            onClick={() => void upload(new File([sampleCsv()], "exemple-creanciers.csv", { type: "text/csv" }))}
+            onClick={() => void upload(new File([sampleCsv()], "exemple-creanciers.csv", { type: "text/csv" }), true)}
           >
             {t("upload.sample")}
           </Button>
@@ -143,7 +152,24 @@ export function AuditClient({ locale }: { locale: string }) {
 
       {job && stage !== "idle" ? (
         <div className="flex flex-col gap-6 ibf-rise">
-          <AuditSummaryView status={job} masked />
+          {demonstration ? (
+            <div role="status" className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-5">
+              <h3 className="font-semibold">{t("demo.title")}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{t("demo.description")}</p>
+            </div>
+          ) : null}
+          <AuditSummaryView status={job} masked demonstration={demonstration} />
+          {demonstration ? (
+            <div className="rounded-xl border p-5 flex flex-col gap-4" data-audit-demonstration>
+              <p className="text-sm text-muted-foreground">{t("demo.next")}</p>
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" onClick={() => inputRef.current?.click()}>{t("demo.upload")}</Button>
+                <a className="rounded-md border px-4 py-2 text-sm underline underline-offset-4" href={`${API_BASE}/v1/audit/sample-report.xlsx?lang=${locale}`}>
+                  {t("demo.download")}
+                </a>
+              </div>
+            </div>
+          ) : (
           <div className="rounded-lg border p-5 flex flex-col gap-4">
             <h3 className="font-semibold">
               {t("pay.title", { price: job.price_chf, rows: job.rows })}
@@ -171,6 +197,7 @@ export function AuditClient({ locale }: { locale: string }) {
             </Button>
             <p className="text-xs text-muted-foreground">{t("pay.retention")}</p>
           </div>
+          )}
         </div>
       ) : null}
     </section>

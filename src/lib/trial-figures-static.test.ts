@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { TRIAL_FREE_KEY_HINT } from './trial.js';
 
 /**
  * Le chiffre de l'essai dans la PROSE, celle qu'aucune constante n'alimente.
@@ -135,6 +136,14 @@ function tally(): Tally {
       const ref = `${file}:${i + 1}`;
       if (SHARING_CLAIM.test(line)) out.sharing.push(ref);
       if (SECOND_PERSON.test(line)) out.secondPerson.push(ref);
+      // L'exemple de démarrage est désormais exporté depuis le contrat. Seule
+      // la ligne EXACTE est exemptée ; onboarding-parity.test.ts contrôle le
+      // bloc complet dans les trois langues. Le plafond de prose ne remonte pas.
+      if (
+        file.endsWith('/docs/index.mdx') &&
+        line.trim() === `"free_key": ${JSON.stringify(TRIAL_FREE_KEY_HINT)},`
+      )
+        return;
       if (!ABOUT_THE_TRIAL.test(line)) return;
       if (SPELLED_OUT.some((p) => p.test(line))) out.spelled.push(ref);
       if (ORDINALS.some((p) => p.test(line))) out.ordinal.push(ref);

@@ -87,7 +87,7 @@
       },
       "1": {
         "badge": "MCP-native — pour agents",
-        "title": "9 outils, sans inscription",
+        "title": "Outils MCP, sans inscription",
         "description": "Serveur Model Context Protocol natif (stdio + HTTP). Claude, Cursor et tout agent MCP s’installent en une ligne : npx -y ibanforge-mcp."
       },
       "2": {
@@ -243,7 +243,7 @@
       "heading": "Les agents ont leur propre rail",
       "sub": "Cette page parle aussi robot — chaque affirmation ci-dessus est lisible par machine, et chaque endpoint est payable sans humain dans la boucle.",
       "mcpTitle": "MCP natif",
-      "mcpBody": "9 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
+      "mcpBody": "Outils MCP, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
       "x402Title": "Micropaiements x402",
       "x402Body": "Les agents autonomes paient à la requête en USDC — sans compte, sans checkout, règlement on-chain.",
       "docsTitle": "Docs lisibles par machine",
@@ -471,7 +471,7 @@
       "prefix": "Play",
       "highlight": "ground"
     },
-    "subtitle": "Testez l'API gratuitement — sans paiement, sans inscription. Chaque réponse ci-dessous est réelle et en direct.",
+    "subtitle": "Testez l’API gratuitement, sans paiement ni inscription. L’exemple est préenregistré ; lancez un contrôle pour recevoir une réponse actuelle.",
     "metaTitle": "Playground",
     "sectionTitle": "Essayer un appel en direct",
     "tabs": {
@@ -562,7 +562,47 @@
     },
     "docsPrompt": "Vous souhaitez utiliser ceci dans votre code ?",
     "docsLink": "Voir la documentation →",
-    "getKey": "Obtenir une clé gratuite"
+    "getKey": "Obtenir une clé gratuite",
+    "verdict": {
+      "title": "Ce que ce contrôle établit",
+      "structure": "Structure et clé de l’IBAN",
+      "valid": "Valides",
+      "invalid": "Invalides",
+      "notChecked": "Non contrôlé",
+      "structureValid": "Structure valide",
+      "structureInvalid": "Structure invalide",
+      "structureScope": "Contrôle du format et de la somme de contrôle uniquement.",
+      "bankCode": "Code banque",
+      "verified": "Confirmé par le registre national",
+      "matched": "Correspondance dans une source partielle",
+      "notAllocated": "Non attribué dans le registre national",
+      "retired": "Code signalé comme retiré",
+      "ambiguous": "Plusieurs correspondances possibles",
+      "unknown": "Non confirmé",
+      "bicScope": "La provenance du BIC peut différer de celle du code banque.",
+      "sanctions": "Sanctions de la banque",
+      "sanctionsScope": "Contrôle au niveau de la banque (BIC8), sans vérification du nom du titulaire.",
+      "matchedSanctions": "Correspondance signalée",
+      "noMatch": "Aucune correspondance signalée",
+      "holder": "Compte et titulaire",
+      "holderScope": "Ce résultat ne confirme ni l’existence du compte, ni son titulaire, ni la réussite du paiement.",
+      "source": "Source",
+      "date": "Date de la source",
+      "notProvided": "Non communiqué",
+      "nextTitle": "Prochaine étape",
+      "fixStructure": "Vérifiez la saisie de l’IBAN avant de poursuivre.",
+      "confirmDetails": "Faites confirmer les coordonnées par votre interlocuteur avant d’utiliser cet IBAN.",
+      "checkBank": "Vérifiez les informations bancaires : cette source ne suffit pas à confirmer une correspondance actuelle et unique.",
+      "reviewScope": "Relisez les constats de conformité et leur portée avant de poursuivre vos propres contrôles.",
+      "screenBank": "Si vous avez besoin d’un filtrage sanctions de la banque, lancez le contrôle de conformité.",
+      "details": "Voir les détails techniques",
+      "yes": "Oui",
+      "no": "Non",
+      "retry": "Relancez le contrôle pour obtenir un verdict exploitable.",
+      "savedExample": "Exemple préenregistré · relancez pour un contrôle actuel",
+      "apiResponse": "Réponse reçue de l’API",
+      "localCheckInvalid": "Un contrôle national supplémentaire échoue. La structure IBAN valide ne suffit pas : faites confirmer ces coordonnées avant le paiement."
+    }
   },
   "dashboard": {
     "overview": {
@@ -1573,8 +1613,8 @@
   },
   "agents": {
     "meta": {
-      "title": "Serveur MCP de validation d’IBAN — 9 outils, sans inscription",
-      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 9 outils. Une clé API sans aucun e-mail : 25 requêtes par mois, 200 par mois une fois réclamée. Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
+      "title": "Serveur MCP de validation d’IBAN — {remote} outils à distance",
+      "description": "{remote} outils sur le serveur HTTP distant, {installed} dans le module npm installé. Les deux outils supplémentaires analysent un fichier de créanciers et suivent son rapport."
     },
     "eyebrow": "Pour les agents IA",
     "hero": {
@@ -1590,7 +1630,7 @@
       "mcp": {
         "badge": "Voie 1 · MCP",
         "title": "Serveur MCP natif",
-        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 9 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
+        "description": "{remote} outils sur le serveur HTTP distant, {installed} dans le module npm installé. Les deux outils supplémentaires analysent un fichier de créanciers et suivent son rapport.",
         "tradeoff": "Stdio ou HTTP · npm ou distant"
       },
       "apiKey": {
@@ -1609,12 +1649,16 @@
     "mcp": {
       "eyebrow": "Voie 1 · MCP",
       "heading": "Installer dans Claude Desktop, Cursor ou Cline",
-      "description": "Le serveur MCP IBANforge expose 9 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
+      "description": "{remote} outils sur le serveur HTTP distant, {installed} dans le module npm installé. Les deux outils supplémentaires analysent un fichier de créanciers et suivent son rapport.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Ajouter à ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) ou %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · endpoint distant",
       "httpDescription": "Pointez n'importe quel client MCP compatible vers :",
-      "toolsHeading": "9 outils disponibles"
+      "toolsHeading": "{remote} outils à distance · {installed} avec npm",
+      "bothTransports": "HTTP distant + module npm",
+      "installedOnly": "Module npm uniquement",
+      "free": "Gratuit",
+      "auditPrice": "Aperçu gratuit / rapport payant"
     },
     "apiKey": {
       "eyebrow": "Voie 2 · Clé gratuite",
@@ -1641,6 +1685,21 @@
       "heading": "Prêt quand votre agent est prêt.",
       "description": "Clé gratuite en 1 ligne. Install MCP en 30 secondes. x402 settle en 2 secondes.",
       "button": "Ouvrir le playground"
+    },
+    "toolDescriptions": {
+      "validate_iban": "Structure IBAN, code banque, banque et BIC : chaque verdict conserve sa portée. Ne prouve ni le titulaire ni l’existence du compte.",
+      "batch_validate_iban": "Jusqu’à 100 IBAN par appel, avec les mêmes contrôles que la validation individuelle.",
+      "lookup_bic": "Recherche de banque et de données publiques à partir d’un BIC/SWIFT.",
+      "check_compliance": "Sanctions au niveau bancaire, juridiction et joignabilité SEPA. Aucun contrôle du titulaire.",
+      "lookup_ch_clearing": "Recherche d’un numéro de clearing suisse et des réseaux de paiement de la banque.",
+      "validate_payment_reference": "Contrôle des références de paiement RF, QRR, OGM et finlandaises, avec la source de chaque règle.",
+      "check_postal_address": "Contrôle d’une adresse structurée selon le rail SPS, T2 ou Fedwire.",
+      "check_swiss_qr_bill": "Contrôle du contenu d’une QR-facture suisse : IBAN, référence, montant et adresses.",
+      "send_feedback": "Signaler une donnée incorrecte ou demander un remboursement x402.",
+      "request_api_key": "Demander une clé qu’une personne approuve dans son navigateur.",
+      "poll_api_key": "Récupérer une seule fois la clé après son approbation.",
+      "audit_creditor_file": "Analyser un fichier CSV/XLSX : aperçu gratuit, rapport complet payant.",
+      "audit_status": "Consulter l’avancement et le lien du rapport d’un fichier déjà envoyé."
     }
   },
   "legal": {
@@ -2054,7 +2113,7 @@
     "leaveDone": "Cette clé est révoquée. Elle ne fonctionnera plus, et ses données de télémétrie seront supprimées dans 30 jours.",
     "leaveFailed": "La clé n'a pas pu être révoquée. Rien n'a changé, elle fonctionne toujours.",
     "leaveDpa": "Lire l'accord de traitement des données",
-    "noKeyYet": "Pas encore de clé ? Deux cents appels par mois, sans carte.",
+    "noKeyYet": "Pas encore de clé ? 25 appels par mois sans e-mail ; 200 par mois après confirmation de votre adresse. Sans carte.",
     "getKey": "Obtenir une clé gratuite"
   },
   "sources": {
@@ -2326,6 +2385,14 @@
       "a4": "Coupez le fichier : chaque partie est un audit au prix affiché. Pour un besoin récurrent, l'API et son endpoint de lot coûtent moins par ligne ; écrivez à support@ibanforge.com.",
       "q5": "Puis-je repasser le fichier corrigé ?",
       "a5": "Oui. Déposez-le à nouveau : l'aperçu gratuit vous dit si tout est réglé avant de payer une seconde fois, et souvent vous n'en aurez pas besoin."
+    },
+    "demo": {
+      "title": "Démonstration : données fictives",
+      "description": "Ce fichier d’exemple montre comment lire les constats. Il ne contient aucune donnée client et son rapport est gratuit.",
+      "next": "Pour contrôler vos coordonnées bancaires, déposez votre propre fichier. Vous verrez son aperçu gratuit avant de choisir le rapport payant.",
+      "upload": "Analyser mon propre fichier",
+      "download": "Télécharger le rapport d’exemple gratuit",
+      "masked": "Exemple fictif, IBAN masqués pour illustrer l’aperçu. Le rapport d’exemple complet est gratuit."
     }
   },
   "qrBill": {

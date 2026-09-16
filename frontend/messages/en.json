@@ -87,7 +87,7 @@
       },
       "1": {
         "badge": "MCP-native — agent ready",
-        "title": "9 tools, no signup",
+        "title": "MCP tools, no signup",
         "description": "Native Model Context Protocol server (stdio + HTTP). Claude, Cursor and any MCP agent install in one line: npx -y ibanforge-mcp."
       },
       "2": {
@@ -243,7 +243,7 @@
       "heading": "Agents get their own rail",
       "sub": "This page speaks robot too — every claim above is machine-readable, and every endpoint is payable without a human in the loop.",
       "mcpTitle": "MCP-native",
-      "mcpBody": "9 tools, no signup. Claude, Cursor and any MCP agent install in one line:",
+      "mcpBody": "MCP tools, no signup. Claude, Cursor and any MCP agent install in one line:",
       "x402Title": "x402 micropayments",
       "x402Body": "Autonomous agents pay per request in USDC — no account, no checkout, settlement on-chain.",
       "docsTitle": "Machine-readable docs",
@@ -471,7 +471,7 @@
       "prefix": "Play",
       "highlight": "ground"
     },
-    "subtitle": "Test the API for free — no payment, no signup. Every answer below is a real, live response.",
+    "subtitle": "Test the API for free, without payment or signup. The example is saved; run a check to receive a current response.",
     "metaTitle": "Playground",
     "sectionTitle": "Try a live call",
     "tabs": {
@@ -562,7 +562,47 @@
     },
     "docsPrompt": "Want to use this in your code?",
     "docsLink": "See the docs →",
-    "getKey": "Get a free key"
+    "getKey": "Get a free key",
+    "verdict": {
+      "title": "What this check establishes",
+      "structure": "IBAN structure and checksum",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "notChecked": "Not checked",
+      "structureValid": "Valid structure",
+      "structureInvalid": "Invalid structure",
+      "structureScope": "Format and checksum checks only.",
+      "bankCode": "Bank code",
+      "verified": "Confirmed by the national register",
+      "matched": "Match in a partial source",
+      "notAllocated": "Not allocated in the national register",
+      "retired": "Code marked as retired",
+      "ambiguous": "Several possible matches",
+      "unknown": "Not confirmed",
+      "bicScope": "The BIC source may differ from the bank-code source.",
+      "sanctions": "Bank sanctions",
+      "sanctionsScope": "Bank-level check (BIC8), without screening the account holder’s name.",
+      "matchedSanctions": "Match reported",
+      "noMatch": "No match reported",
+      "holder": "Account and holder",
+      "holderScope": "This result confirms neither account existence, nor account ownership, nor payment success.",
+      "source": "Source",
+      "date": "Source date",
+      "notProvided": "Not provided",
+      "nextTitle": "Next step",
+      "fixStructure": "Check the IBAN entry before proceeding.",
+      "confirmDetails": "Have your counterparty confirm the bank details before using this IBAN.",
+      "checkBank": "Review the bank details: this source cannot establish a current, unique match.",
+      "reviewScope": "Review the compliance findings and their scope before continuing your own checks.",
+      "screenBank": "If you need bank sanctions screening, run the compliance check.",
+      "details": "View technical details",
+      "yes": "Yes",
+      "no": "No",
+      "retry": "Run the check again to obtain a usable verdict.",
+      "savedExample": "Saved example · run again for a current check",
+      "apiResponse": "Response received from the API",
+      "localCheckInvalid": "An additional national check failed. A valid IBAN structure is not enough: confirm these details before payment."
+    }
   },
   "dashboard": {
     "overview": {
@@ -1573,8 +1613,8 @@
   },
   "agents": {
     "meta": {
-      "title": "MCP Server for IBAN Validation — 9 tools, no signup",
-      "description": "Integrate IBANforge in 60 seconds — Claude Desktop, Cursor, Cline. Native MCP server with 9 tools. An API key that needs no e-mail at all: 25 requests a month, 200 a month once claimed. Pay-per-call in USDC via x402 on Base L2 — agents pay autonomously."
+      "title": "MCP Server for IBAN Validation — {remote} remote tools",
+      "description": "{remote} tools on the remote HTTP server, {installed} in the installed npm package. The two additional tools analyse a creditor file and track its report."
     },
     "eyebrow": "For AI Agents",
     "hero": {
@@ -1590,7 +1630,7 @@
       "mcp": {
         "badge": "Path 1 · MCP",
         "title": "Native MCP server",
-        "description": "Drop into Claude Desktop, Cursor, or Cline. 9 tools auto-discovered. Best for desktop agents and IDE assistants.",
+        "description": "{remote} tools on the remote HTTP server, {installed} in the installed npm package. The two additional tools analyse a creditor file and track its report.",
         "tradeoff": "Stdio or HTTP · npm or remote"
       },
       "apiKey": {
@@ -1609,12 +1649,16 @@
     "mcp": {
       "eyebrow": "Path 1 · MCP",
       "heading": "Install in Claude Desktop, Cursor or Cline",
-      "description": "The IBANforge MCP server exposes 9 tools to your AI client. Two transports: stdio via npm package or remote streamable-HTTP.",
+      "description": "{remote} tools on the remote HTTP server, {installed} in the installed npm package. The two additional tools analyse a creditor file and track its report.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Add to ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · remote endpoint",
       "httpDescription": "Point any MCP-compatible client to:",
-      "toolsHeading": "9 tools available"
+      "toolsHeading": "{remote} remote tools · {installed} with npm",
+      "bothTransports": "Remote HTTP + npm package",
+      "installedOnly": "npm package only",
+      "free": "Free",
+      "auditPrice": "Free preview / paid report"
     },
     "apiKey": {
       "eyebrow": "Path 2 · Free key",
@@ -1641,6 +1685,21 @@
       "heading": "Ready when your agent is.",
       "description": "Free key in 1 line. MCP install in 30 seconds. x402 settles in 2 seconds.",
       "button": "Open the playground"
+    },
+    "toolDescriptions": {
+      "validate_iban": "IBAN structure, bank code, bank and BIC, with the scope of each verdict. Does not prove the holder or account existence.",
+      "batch_validate_iban": "Up to 100 IBANs per call, with the same checks as individual validation.",
+      "lookup_bic": "Look up a bank and public institution data from a BIC/SWIFT code.",
+      "check_compliance": "Bank-level sanctions, jurisdiction and SEPA reachability. No account-holder check.",
+      "lookup_ch_clearing": "Look up a Swiss clearing number and the bank’s payment rails.",
+      "validate_payment_reference": "Check RF, QRR, OGM and Finnish payment references, with the source of each rule.",
+      "check_postal_address": "Check a structured address against SPS, T2 or Fedwire rules.",
+      "check_swiss_qr_bill": "Check a Swiss QR-bill payload: IBAN, reference, amount and addresses.",
+      "send_feedback": "Report incorrect data or request an x402 refund.",
+      "request_api_key": "Request a key for a person to approve in their browser.",
+      "poll_api_key": "Collect the key once, after approval.",
+      "audit_creditor_file": "Analyse a CSV/XLSX file: free preview, paid full report.",
+      "audit_status": "Check the progress and report link for a previously uploaded file."
     }
   },
   "legal": {
@@ -2054,7 +2113,7 @@
     "leaveDone": "This key is revoked. It will not work again, and its telemetry is deleted in 30 days.",
     "leaveFailed": "The key could not be revoked. Nothing changed and it still works.",
     "leaveDpa": "Read the data processing agreement",
-    "noKeyYet": "No key yet? Two hundred calls a month, no card.",
+    "noKeyYet": "No key yet? 25 calls a month without email; 200 a month after confirming your address. No card.",
     "getKey": "Get a free key"
   },
   "sources": {
@@ -2326,6 +2385,14 @@
       "a4": "Split the file: each part is its own audit at the displayed price. For a recurring need, the API and its batch endpoint cost less per row; write to support@ibanforge.com.",
       "q5": "Can I re-run the corrected file?",
       "a5": "Yes. Upload it again: the free preview tells you whether everything is fixed before you pay a second time, and often you will not need to."
+    },
+    "demo": {
+      "title": "Demo: fictional data",
+      "description": "This sample file shows how to read the findings. It contains no customer data and its report is free.",
+      "next": "To check your bank details, upload your own file. You can review its free preview before choosing the paid report.",
+      "upload": "Analyse my own file",
+      "download": "Download the free sample report",
+      "masked": "Fictional example, with IBANs masked to illustrate the preview. The complete sample report is free."
     }
   },
   "qrBill": {

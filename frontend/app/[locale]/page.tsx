@@ -50,7 +50,7 @@ const INTEGRATIONS = [
   { key: 'mcp', cmd: 'npx -y ibanforge-mcp', href: 'https://www.npmjs.com/package/ibanforge-mcp' },
   { key: 'n8n', cmd: 'npm install n8n-nodes-ibanforge', href: 'https://www.npmjs.com/package/n8n-nodes-ibanforge' },
   { key: 'odoo', cmd: 'ibanforge_bank_autofill', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/odoo' },
-  { key: 'sheets', cmd: '=IBANFORGE_VALIDATE(A2)', href: '/sheets' },
+  { key: 'sheets', cmd: '=IBAN_CONTROLE(A2)', href: '/sheets' },
   { key: 'postman', cmd: 'ibanforge.postman_collection.json', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman' },
 ] as const
 

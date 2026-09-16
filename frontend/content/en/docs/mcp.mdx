@@ -1,6 +1,6 @@
 ---
 title: "MCP Integration"
-description: "Connect IBANforge to Claude, Cursor and any MCP agent: the ibanforge-mcp npm package, a hosted endpoint with nothing to install, eleven tools, and results that say what to do next."
+description: "Connect IBANforge to Claude, Cursor and any MCP agent: the ibanforge-mcp npm package, a hosted endpoint with nothing to install, a catalogue by transport, and results that say what to do next."
 order: 5
 ---
 
@@ -38,9 +38,9 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standa
 claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_your_key -- npx -y ibanforge-mcp
 ```
 
-The key is optional and free: [create one](/) with an email address (200 requests/month, no card). Without a key the server still starts, and paid tools answer with x402 payment instructions that an agent holding USDC on Base can settle per call.
+The key is optional and free — 25 requests/month without email. [Generate one](/docs/api-keys) with a bodyless POST, then send `Authorization: Bearer ifk_...`. Claim the same key with an emailed code to raise its quota to 200/month, without a card.
 
-After saving, restart the client. Eleven IBANforge tools appear in the tools menu (nine on the hosted endpoint below — see the note under audit_status).
+After saving, restart the client. The npm package exposes **13 tools**, the remote HTTP server **11**. The two file-audit tools are only available in the npm package. See the [catalogue by transport](/agents#mcp-quickstart).
 
 ## Option 2 — the hosted endpoint (nothing to install)
 
@@ -52,7 +52,7 @@ Streamable HTTP transport, **10 free tool calls per IP per day**, no key at all:
 
 On the official MCP registry the server is listed as `io.github.cammac-creator/ibanforge`.
 
-## The eleven tools
+## Available tools
 
 ### validate_iban
 
@@ -146,6 +146,14 @@ Report a wrong result, stale or missing data, or anything blocking you from usin
 { "error_type": "wrong_bic", "notes": "BIC resolved to a bank that merged in 2024", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }
 ```
 
+### request_api_key
+
+Request a key without email: the tool returns a link for a person to open and approve in their browser. Available on both transports.
+
+### poll_api_key
+
+Collect the approved key with the `device_code` returned by `request_api_key`. The key is returned only once: keep it. Available on both transports.
+
 ## Results that say what to do next
 
 Every validation result carries an ordered `next_steps` field: what blocks a payment comes first, what merely enriches it after. Each entry has a stable `code` to branch on, a `do` sentence the agent can relay, and a `because` naming the response field that produced it, so the advice is auditable rather than taken on trust. `bank_code_not_allocated` means stop; `verify_payee_name` means carry on and let a beneficiary name check decide.
@@ -180,7 +188,7 @@ Every validation result carries an ordered `next_steps` field: what blocks a pay
 ## Notes
 
 - The npm package is a thin client for `api.ibanforge.com`: the data lives server-side, there is nothing to download, and results always reflect the latest register refresh.
-- All eleven tools return the same JSON as the REST API, both as text and as MCP `structuredContent` (nine of them on the hosted HTTP endpoint — see the note under audit_status).
+- Results are returned as text and MCP `structuredContent`. Two audit tools are exclusive to the npm package; all other tools are also available remotely.
 - Releases are published on [npm](https://www.npmjs.com/package/ibanforge-mcp) and mirrored to the MCP registry.
 
 Related: [Recipes](/docs/recipes) · [What "verified" means](/docs/iban-validate) · [Data sources](/docs/data-sources)

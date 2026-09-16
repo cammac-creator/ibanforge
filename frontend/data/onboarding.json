@@ -1,0 +1,78 @@
+{
+  "remote": [
+    "validate_iban",
+    "batch_validate_iban",
+    "lookup_bic",
+    "check_compliance",
+    "lookup_ch_clearing",
+    "validate_payment_reference",
+    "check_postal_address",
+    "check_swiss_qr_bill",
+    "send_feedback",
+    "request_api_key",
+    "poll_api_key"
+  ],
+  "installed": [
+    "validate_iban",
+    "batch_validate_iban",
+    "lookup_bic",
+    "lookup_ch_clearing",
+    "validate_payment_reference",
+    "check_swiss_qr_bill",
+    "check_postal_address",
+    "check_compliance",
+    "audit_creditor_file",
+    "audit_status",
+    "send_feedback",
+    "request_api_key",
+    "poll_api_key"
+  ],
+  "tools": [
+    {
+      "name": "validate_iban",
+      "price": 0.005
+    },
+    {
+      "name": "batch_validate_iban",
+      "price": 0.002
+    },
+    {
+      "name": "lookup_bic",
+      "price": 0.003
+    },
+    {
+      "name": "check_compliance",
+      "price": 0.02
+    },
+    {
+      "name": "lookup_ch_clearing",
+      "price": 0.003
+    },
+    {
+      "name": "validate_payment_reference",
+      "price": "free"
+    },
+    {
+      "name": "check_postal_address",
+      "price": "free"
+    },
+    {
+      "name": "check_swiss_qr_bill",
+      "price": "free"
+    },
+    {
+      "name": "send_feedback",
+      "price": "free"
+    },
+    {
+      "name": "request_api_key",
+      "price": "free"
+    },
+    {
+      "name": "poll_api_key",
+      "price": "free"
+    }
+  ],
+  "anonymousMonthly": 25,
+  "claimedMonthly": 200
+}
