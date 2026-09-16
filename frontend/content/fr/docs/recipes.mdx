@@ -120,7 +120,7 @@ Passez votre propre `HttpClient` (IHttpClientFactory) au constructeur si vous en
 
 Utilisez les fonctions officielles qui stockent la clé dans vos propriétés utilisateur et envoient les colonnes par lots, plutôt qu’une clé écrite dans une cellule.
 
-1. [Téléchargez les trois fichiers Apps Script](/integrations/ibanforge-sheets-e3a66243a652.zip) et décompressez le ZIP. Dans un classeur de test, ouvrez **Extensions → Apps Script**.
+1. [Téléchargez les trois fichiers Apps Script](/integrations/ibanforge-sheets-6e5f9116f305.zip) et décompressez le ZIP. Dans un classeur de test, ouvrez **Extensions → Apps Script**.
 2. Remplacez `Code.gs`, ajoutez un fichier HTML nommé `Sidebar`, puis copiez `Sidebar.html`. Dans les paramètres du projet, affichez `appsscript.json` et remplacez son contenu par le manifeste fourni. Enregistrez.
 3. Dans l’éditeur, exécutez `ibfShowSidebar` et autorisez le script. Revenez au classeur ; enregistrez votre clé dans la barre latérale. Ne la collez pas dans les cellules.
 4. [Importez ces deux IBAN de test en colonne A](/integrations/ibanforge-exemples-e69b509f4ab1.csv) avec **Fichier → Importer**. Ce sont un exemple public de documentation et sa variante à clé invalide, pas des comptes à payer. En B2, saisissez `=IBAN_CONTROLE(A2:A3)` et laissez cinq colonnes libres.

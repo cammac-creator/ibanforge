@@ -120,7 +120,7 @@ Einen eigenen `HttpClient` (IHttpClientFactory) an den Konstruktor übergeben, w
 
 Die offiziellen Funktionen speichern den Schlüssel in Ihren Nutzereigenschaften und senden Spalten in Batches. Kein Schlüssel gehört in eine Zelle.
 
-1. [Laden Sie die drei Apps-Script-Dateien herunter](/integrations/ibanforge-sheets-e3a66243a652.zip) und entpacken Sie das ZIP. Öffnen Sie in einer Testtabelle **Erweiterungen → Apps Script**.
+1. [Laden Sie die drei Apps-Script-Dateien herunter](/integrations/ibanforge-sheets-6e5f9116f305.zip) und entpacken Sie das ZIP. Öffnen Sie in einer Testtabelle **Erweiterungen → Apps Script**.
 2. Ersetzen Sie `Code.gs`, fügen Sie eine HTML-Datei namens `Sidebar` hinzu und übernehmen Sie `Sidebar.html`. Blenden Sie `appsscript.json` in den Projekteinstellungen ein und ersetzen Sie den Inhalt durch das mitgelieferte Manifest. Speichern.
 3. Führen Sie `ibfShowSidebar` im Editor aus und autorisieren Sie das Script. Zurück in der Tabelle speichern Sie Ihren Schlüssel in der Seitenleiste, niemals in einer Zelle.
 4. [Importieren Sie diese beiden Test-IBANs in Spalte A](/integrations/ibanforge-exemples-e69b509f4ab1.csv) über **Datei → Importieren**. Es sind ein öffentliches Dokumentationsbeispiel und seine Variante mit falscher Prüfziffer, keine Zahlungskonten. In B2 geben Sie `=IBAN_PRUEFUNG(A2:A3)` ein und lassen fünf Spalten frei.

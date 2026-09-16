@@ -120,7 +120,7 @@ Pass your own `HttpClient` (IHttpClientFactory) to the constructor when you have
 
 Use the official functions: they keep the key in your user properties and send columns in batches, without putting a key in a cell.
 
-1. [Download the three Apps Script files](/integrations/ibanforge-sheets-e3a66243a652.zip) and unzip them. In a test spreadsheet, open **Extensions → Apps Script**.
+1. [Download the three Apps Script files](/integrations/ibanforge-sheets-6e5f9116f305.zip) and unzip them. In a test spreadsheet, open **Extensions → Apps Script**.
 2. Replace `Code.gs`, add an HTML file named `Sidebar` and paste `Sidebar.html`. In project settings, show `appsscript.json` and replace its content with the supplied manifest. Save.
 3. Run `ibfShowSidebar` in the editor and authorize the script. Return to the spreadsheet and save your key in the sidebar, never in a cell.
 4. [Import these two test IBANs into column A](/integrations/ibanforge-exemples-e69b509f4ab1.csv) through **File → Import**. They are a public documentation example and its invalid-checksum variant, not accounts to pay. Enter `=IBAN_CHECK(A2:A3)` in B2 and leave five columns empty.
