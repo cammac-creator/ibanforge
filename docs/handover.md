@@ -605,11 +605,11 @@ the candidate server before touching DNS**, and do not delete the SEO redirects 
 locale detection means an unprefixed URL legitimately serves a different language depending
 on the browser, so a naive fix breaks something that works.
 
-**The keyless trial goes from ten calls a day to twenty-five, with no e-mail and no key.**
-Decided 9 September, **not yet in the code**. The constant is used properly inside `src/`,
-but the number is written out by hand in roughly twenty documentation surfaces, the three
-message catalogues, the machine-readable files and the README. Changing only the constant
-would leave those lying.
+**The keyless trial is twenty-five calls a day, with no e-mail and no key — in the code
+since 15 September (lot 4 of the "key without e-mail" chantier).** The constant is used
+properly inside `src/`; the surfaces that still write the number by hand are counted by
+`src/lib/trial-figures-static.test.ts`, whose cap only goes down. The README and the
+onboarding page were the last two to say ten (fixed 16 September).
 
 **Versions 1.6.0 and 1.7.0 were both released on 15 September 2026.** 1.6.0 carried PR 197
 (the MCP output schemas now match what the enrichment serves, so the official client stops
@@ -661,6 +661,19 @@ the backticks of the brief it writes; quote it and substitute variables with `se
 **The UK firm lookup answers 503** (`not_configured`) until two environment variables are
 set. It was built blind, with a one-day cache and no stale grace because the described
 usage promises exactly that, plus a test that fails if any CRM module imports the client.
+
+**Full audit of 16 September 2026.** Five read-only audits (security, data and registers,
+product and revenue, code and delivery, production operations) live in
+`docs/internal/audit-2026-09-16/` with an HTML report beside the roadmap. What they changed the
+same day: the daily backup of the paid state on the VPS had refused the new export format since
+that morning (fixed and re-run), the ops feed cursor is now AES-encrypted instead of XOR-masked
+(consecutive cursors carried the throughput), the key-delivery alert closes itself again after a
+delivered key, the bazaar extension carries the `schema` the x402 core requires, the UK firm
+route leaves the OpenAPI contract while the FCA credential is absent, `localhost` is no longer an
+accepted CORS origin in production, the forget-customer script covers every table that stores an
+address (guarded by a discovery test, like the admin routes now are), `next build` and the IBAN
+registry drift run in CI, and `main` refuses force-pushes and deletion. What still waits for a
+decision is listed in the report.
 
 ---
 

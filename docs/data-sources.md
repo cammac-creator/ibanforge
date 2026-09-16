@@ -15,18 +15,18 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 
 | Source | Lignes | Licence | Établie ? |
 |---|---:|---|---|
-| PeterNotenboom/SwiftCodes | 82 085 | MIT | ✅ licence dans le dépôt |
-| GLEIF (BIC↔LEI) | 39 265 | **CC0** | ✅ **vérifié à la source le 23/08/2026** |
+| PeterNotenboom/SwiftCodes | 82 102 | MIT | ✅ licence dans le dépôt |
+| GLEIF (BIC↔LEI) | 39 297 | **CC0** | ✅ **vérifié à la source le 23/08/2026** |
 | Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
-| SIX BankMaster (clearing suisse) | 1 165 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
-| SIX Group (BIC) | 19 | même publication que le BankMaster | ⚠️ à confirmer séparément |
-| EBA Clearing STEP2 SCT | 183 | « All rights reserved by EBA CLEARING », aucune licence publiée | ❌ **non établie — lu à la source le 24/08/2026**, voir ci-dessous |
+| SIX BankMaster (clearing suisse) | 1 164 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
+| SIX Group (BIC) | 20 | même publication que le BankMaster | ⚠️ à confirmer séparément |
+| EBA Clearing STEP2 SCT | 189 | « All rights reserved by EBA CLEARING », aucune licence publiée | ❌ **non établie — lu à la source le 24/08/2026**, voir ci-dessous |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
 | OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
 | ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
 | UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
 | Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
-| BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 374 au 2026-08-25 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
+| BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 373 au 2026-09-16 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation et traitement confirmés par écrit le 09/09/2026, **citation de la NBS obligatoire** ; conditions du fichier conservées | ✅ **réponse du 09/09/2026 relue le 14/09/2026** — ingérée le 06/09/2026, voir ci-dessous |
 | Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | ❓ **AUCUNE condition d'utilisation publiée** — ni licence, ni interdiction | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, licence `unknown`, lettre à écrire, voir ci-dessous |

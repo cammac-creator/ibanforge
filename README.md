@@ -126,13 +126,13 @@ out = IBANforge().format_iban("DE89370400440532013000")
 ## For developers — REST API
 
 ```bash
-# Validate IBAN — no key needed for the first 10 calls a day per IP.
+# Validate IBAN — no key needed for the first 25 calls a day per source address.
 # The answer carries a `trial` block with the count left and how to get a key.
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -d '{"iban":"CH10 0023 0000 0000 1234 5"}'
 
-# Past 10/day, add the free key (200 req/month, one POST, no card)
+# Past 25/day, add the free key (25 req/month with no e-mail, 200 once claimed; one POST, no card)
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ifk_..." \
@@ -211,7 +211,7 @@ Push to `main` — Railway auto-deploys via Dockerfile.
   - 19 from [SIX Group BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) Swiss BICs not covered elsewhere
 - **LEI enrichment** for the GLEIF rows: [GLEIF API](https://api.gleif.org)
 - **1,100+ Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
-- **EMI / vIBAN classification**: Curated set of 85+ known issuer BIC8 prefixes (Wise, Revolut, N26, Mercury, Modulr, etc.)
+- **EMI / vIBAN classification**: Curated set of 900+ non-bank issuer classifications — EMI, payment institutions, digital banks (Wise, Revolut, N26, Mercury, Modulr, etc.); the live count is served at `/llms.txt`
 - **VoP participants**: EBA RT1 / SCT Inst directories
 - **Country names**: Node.js `Intl.DisplayNames` API
 

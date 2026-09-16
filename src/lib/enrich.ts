@@ -14,7 +14,7 @@ import {
   type BankLookupHit,
 } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
-import { lookupFiInstitution } from './fi-register.js';
+import { FI_REGISTER_AS_OF, lookupFiInstitution } from './fi-register.js';
 import {
   lookupNationalCode,
   nationalRegisterAvailable,
@@ -124,7 +124,7 @@ const BG_REGISTER_NAME = 'Bulgarian National Bank, BAE register';
  * SIX BankMaster is the Swiss register of IIDs (BC-Nummern); it is downloaded
  * and reseeded monthly by the same workflow that refreshes the BIC set, and it
  * covers Liechtenstein alongside Switzerland. Nothing else we hold is a national
- * register: `source='bundesbank'` is 144 rows, `nbp` 21, `eba_step2` 189 — those
+ * register: `source='bundesbank'` is 143 rows, `nbp` 21, `eba_step2` 189 — those
  * are supplementary, not exhaustive, so promoting them would be an overclaim.
  *
  * Adding a country here is a claim that a miss means non-existence. It requires
@@ -258,9 +258,13 @@ function askNationalRegister(
     if (!bban) return null;
     const hit = lookupFiInstitution(bban);
     if (!hit) return null;
-    if (hit.status === 'unknown') return { allocated: false, inconclusive: true };
-    if (hit.status === 'not_allocated') return { allocated: false };
-    return { allocated: true, value: hit.code };
+    // Dated from the transcribed Finance Finland list itself: a denial a caller
+    // will act on has to say how old the list behind it is, and the reference
+    // month of the BIC refresh is not that date (audit of 16/09/2026, I1).
+    const fiDate = FI_REGISTER_AS_OF.slice(0, 7);
+    if (hit.status === 'unknown') return { allocated: false, inconclusive: true, as_of: fiDate };
+    if (hit.status === 'not_allocated') return { allocated: false, as_of: fiDate };
+    return { allocated: true, value: hit.code, as_of: fiDate };
   }
   if (cc === 'AT' || cc === 'BE' || cc === 'SK') {
     // Same safe failure as Germany: no table means no ground truth, so decline

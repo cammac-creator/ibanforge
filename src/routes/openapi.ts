@@ -11,6 +11,7 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // middleware applique, jamais une copie retapée. 🚨 Y compris `example`, qui
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
 import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
 // contrat qui recopie son propre chiffre sera faux au prochain réglage.
 import {
@@ -2983,12 +2984,26 @@ function withErrorContract<T>(spec: T): T {
   return spec;
 }
 
-const buildSpec = () => withErrorContract(buildRawSpec());
+const buildSpec = () => {
+  const spec = withErrorContract(buildRawSpec());
+  // The UK firm lookup answers 503 `not_configured` on a deployment without the
+  // FCA Register credential — which production is. A contract must not promise
+  // a route that answers 503 to everyone: agents read it and try it as written
+  // (production audit of 16/09/2026, I2: 31 such calls in two weeks). The path
+  // comes back the day the credential is set.
+  if (!isFcaRegisterConfigured()) {
+    delete (spec.paths as Record<string, unknown>)['/v1/gb/firm/{frn}'];
+  }
+  return spec;
+};
 
 let specCache: ReturnType<typeof buildSpec> | null = null;
 
 openapi.get('/openapi.json', (c) => {
   if (!specCache) specCache = buildSpec();
+  // 137 KB served without a key and exempt from the rate limiter: let caches
+  // and proxies keep it an hour (audit of 16/09/2026, constat 8).
+  c.header('Cache-Control', 'public, max-age=3600');
   return c.json(specCache);
 });
 

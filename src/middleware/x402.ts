@@ -10,6 +10,7 @@ import {
 } from '../lib/bank-code-schema.js';
 import {
   buildBazaarInfo,
+  buildBazaarSchema,
   discoveryForRoute,
   findDiscovery,
   routeTemplateOf,
@@ -875,6 +876,9 @@ export function buildRouteTable(
     const discovery = discoveryForRoute(key);
     if (discovery && entry.extensions?.bazaar) {
       entry.extensions.bazaar.info = buildBazaarInfo(discovery);
+      // Without `schema` next to `info`, the x402 core logs the extension as
+      // malformed on every 402 and the catalog ignores it (audit of 16/09/2026).
+      entry.extensions.bazaar.schema = buildBazaarSchema(discovery);
     }
   }
 

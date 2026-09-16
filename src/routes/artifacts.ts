@@ -145,7 +145,7 @@ safety:
 const RATE_LIMITS = `# Rate limits — IBANforge
 specification: rate-limits
 version: '1.0'
-updated: '2026-08-14'
+updated: '2026-09-15'
 
 default:
   requests: ${RATE_PER_MIN}

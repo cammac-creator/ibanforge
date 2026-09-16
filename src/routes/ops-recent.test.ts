@@ -57,6 +57,10 @@ describe('GET /v1/ops/recent', () => {
       // never the table's auto-increment id (the API's throughput in clear).
       expect(op.cursor).toBeTypeOf('string');
       expect(op.cursor).not.toMatch(/^\d+$/);
+      // Audit of 16/09/2026: "not a decimal number" let a XOR mask through,
+      // whose cursors were still one apart. The property that matters is that
+      // no reading of the cursors as numbers gives constant gaps between rows.
+      expect(op.cursor).toMatch(/^[A-Za-z0-9_-]{22}$/);
       expect(op.t).toBeTypeOf('string');
     }
   });

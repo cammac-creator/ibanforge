@@ -34,6 +34,8 @@ export function isAllowedOrigin(origin: string): boolean {
   if (origin === '') return false;
   const configured = corsConfiguredOrigins();
   if (process.env.NODE_ENV !== 'production' && configured.includes('*')) return true;
-  if (LOCALHOST_ORIGIN.test(origin)) return true;
+  // La tolérance localhost est un confort de développement : en production elle
+  // n'a rien à faire (audit du 16/09/2026, constat 7).
+  if (process.env.NODE_ENV !== 'production' && LOCALHOST_ORIGIN.test(origin)) return true;
   return configured.includes(origin);
 }

@@ -123,12 +123,13 @@ GitHub and ships to the VPS over a restricted SSH key, and the legal texts updat
 records, a decision on a CDN in front, and the cutover. The reasoning is in the internal
 report named below.
 
-**The keyless trial goes from ten to twenty-five calls a day.** Decided 9 September, **not
-yet in the code**: `REST_TRIAL_DAILY_LIMIT` in `src/lib/trial.ts` still reads 10. No e-mail
-and no key are required for those calls — that is the point of the change, and it should be
-said plainly wherever the trial is described. Changing it means the constant, its tests, and
-the surfaces that quote it (the `/v1` text in `src/app.ts`, the rate-limit artifact, the
-docs under `frontend/content/*/docs/`, the three message catalogues).
+**The keyless trial is twenty-five calls a day, in the code since 15 September.**
+`REST_TRIAL_DAILY_LIMIT` in `src/lib/trial.ts` reads 25, counted per source address (IPv6
+per /64) and stored in the service database. No e-mail and no key are required for those
+calls, and a key that needs no e-mail exists beside it (25 requests a month, 200 once
+claimed). Every surface that quotes a figure is meant to read the constants;
+`src/lib/trial-figures-static.test.ts` caps the prose that still writes numbers by hand, so
+that cap can only go down.
 
 ---
 

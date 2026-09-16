@@ -5,7 +5,7 @@ import {
   isRelayConfigured,
   type RelayOutcome,
 } from './mail-transport.js';
-import { opsFail } from './ops-alert.js';
+import { opsFail, opsOk } from './ops-alert.js';
 import {
   ACCOUNT_PAGE,
   KEY_PLACEHOLDER,
@@ -95,6 +95,18 @@ function reportUndelivered(what: string, to: string, alert: boolean): void {
   if (alert) alertKeyDeliveryFailure(what);
 }
 
+/**
+ * The other half of the alert. `opsFail` stays silent while `firing` is true,
+ * and nothing ever called `opsOk('mail:key-delivery')`: the alert fired once on
+ * 02/09/2026 and stayed locked open, so a second undelivered key would have
+ * warned nobody (production audit of 16/09/2026, I1). A delivered key closes
+ * it, and the next failure alerts again.
+ */
+function reportKeyDelivered(what: string): void {
+  if (process.env.VITEST) return;
+  void opsOk('mail:key-delivery', `${what}: delivered.`);
+}
+
 export interface ApiKeyEmailInput {
   rawKey: string;
   credits: number;
@@ -157,6 +169,7 @@ export async function sendApiKeyEmail(p: ApiKeyEmailInput & { to: string }): Pro
   const { subject, text, html } = buildApiKeyEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
   if (!ok) reportUndelivered('purchase key delivery', p.to, true);
+  else reportKeyDelivered('purchase key delivery');
   return ok;
 }
 
@@ -224,6 +237,7 @@ export async function sendFreeKeyEmail(p: FreeKeyEmailInput & { to: string }): P
   // mailbox exist. Waking someone up for it trains them to ignore the alert
   // that matters, the one where the relay itself is down.
   if (outcome !== 'sent') reportUndelivered('free key delivery', p.to, outcome !== 'undeliverable');
+  else reportKeyDelivered('free key delivery');
   return outcome === 'sent';
 }
 
@@ -527,6 +541,7 @@ export async function sendSubscriptionKeyEmail(p: {
   const { subject, text, html } = buildSubscriptionKeyEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
   if (!ok) reportUndelivered(`${SUBSCRIPTION_EMAIL_COPY[p.plan].name} key delivery`, p.to, true);
+  else reportKeyDelivered(`${SUBSCRIPTION_EMAIL_COPY[p.plan].name} key delivery`);
   return ok;
 }
 

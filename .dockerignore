@@ -9,3 +9,8 @@ data/*.sqlite-wal
 data/*.sqlite-shm
 docs/
 .github/
+# Matière à secret de la racine, jamais dans une image (audit du 16.09.2026)
+.env*
+.secrets/
+.mcpregistry_*_token
+scripts/x402-pay.mjs

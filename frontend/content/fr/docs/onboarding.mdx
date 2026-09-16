@@ -30,10 +30,10 @@ La réponse est la réponse entière, plus un bloc que vous ne voyez jamais autr
   "…": "…",
   "trial": {
     "calls_used_today": 1,
-    "calls_left_today": 9,
-    "daily_limit": 10,
+    "calls_left_today": 24,
+    "daily_limit": 25,
     "resets": "midnight UTC",
-    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"email\":\"you@company.com\",\"source\":\"api-trial\"} — 200 requests a month, no card",
+    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: an ifk_ key worth 25 requests a MONTH, on every endpoint (these 25 are a DAY, on this route only). One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to 200 a month.",
     "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
   }
 }
@@ -41,9 +41,9 @@ La réponse est la réponse entière, plus un bloc que vous ne voyez jamais autr
 
 `trial` est une dégustation, pas un palier. Au-delà de 25 appels par jour, l'endpoint répond `402` avec `cause.reason: "trial_exhausted"`, et le décompte vit dans la base du service : il survit à un redéploiement. `trial` disparaît de la réponse dès que vous envoyez une clé.
 
-## 2. La clé gratuite — 200 requêtes par mois
+## 2. La clé gratuite — 25 requêtes par mois sans e-mail, 200 avec une adresse
 
-Un seul POST, sans carte, sans portefeuille :
+Un seul POST, sans carte, sans portefeuille. Sans corps du tout, la clé ne demande rien et vaut le quota mensuel de base sur tous les endpoints ; un appel à `POST /v1/keys/claim` la porte ensuite au plein quota. Avec une adresse, comme ci-dessous, elle naît directement au plein quota :
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \

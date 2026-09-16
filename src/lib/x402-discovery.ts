@@ -355,3 +355,51 @@ export function buildBazaarInfo(d: BazaarDiscovery): Record<string, unknown> {
     output: { type: 'json', example: markExample(d.outputExample) },
   };
 }
+
+/**
+ * The `schema` block of a Bazaar extension: the JSON Schema of the `info`
+ * block above, in the shape @x402/extensions builds for its own declarations
+ * (createBodyDiscoveryExtension / createQueryDiscoveryExtension).
+ *
+ * The x402 core refuses an extension without both `info` and `schema`
+ * ("declares a bazaar extension but it is malformed"), and did so on every
+ * paid route at every 402 — 261 of the last 500 log lines on 16/09/2026,
+ * loud enough to hide a real failure (production audit, I3). The schema
+ * describes exactly what `buildInputBlock` emits, extra keys included, so a
+ * facilitator validating `info` against it finds them consistent.
+ */
+export function buildBazaarSchema(d: BazaarDiscovery): Record<string, unknown> {
+  const withBody = !!d.bodyType;
+  const inputProperties: Record<string, unknown> = {
+    type: { type: 'string', const: 'http' },
+    method: { type: 'string', enum: [d.inputMethod] },
+    discoverable: { type: 'boolean' },
+  };
+  const required = ['type', 'method'];
+  if (withBody) {
+    inputProperties.bodyType = { type: 'string', enum: ['json', 'form-data', 'text'] };
+    inputProperties.body = d.inputJsonSchema ?? { type: 'object' };
+    required.push('bodyType', 'body');
+  }
+  if (d.inputPathParams) inputProperties.pathParams = { type: 'object' };
+  if (d.inputQueryParams) inputProperties.queryParams = { type: 'object' };
+  if (d.inputJsonSchema) inputProperties.schema = { type: 'object' };
+  return {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    type: 'object',
+    properties: {
+      input: {
+        type: 'object',
+        properties: inputProperties,
+        required,
+        additionalProperties: false,
+      },
+      output: {
+        type: 'object',
+        properties: { type: { type: 'string' }, example: { type: 'object' } },
+        required: ['type'],
+      },
+    },
+    required: ['input'],
+  };
+}

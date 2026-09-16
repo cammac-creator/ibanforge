@@ -323,9 +323,10 @@ function buildLlmsTxt(): string {
 
 ## Data sources and attribution
 
-- BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT
+- BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT. This service uses the BIC to LEI relationship file. The mapping table has been developed by SWIFT. SWIFT and BIC are registered trademarks of S.W.I.F.T. SC.
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
 - National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${smSourceLine}
+- Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}
 ${identitySourceLines}
@@ -360,7 +361,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\` (${MCP_TOOLS.length} tools, no signup)
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp
 - **Try it with zero setup, as an agent (${MCP_DAILY_LIMIT} free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_DAILY_LIMIT} calls/day you get JSON-RPC error -32000, so move to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
-- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"CH9300762011623852957"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take a key that needs no e-mail at all. These ${REST_TRIAL_DAILY_LIMIT} are a day, on this route only; the key's ${ANONYMOUS_MONTHLY_LIMIT} are a month, on every endpoint, and one call at POST /v1/keys/claim raises it to ${FREE_TIER_MONTHLY_LIMIT} a month. Past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC, is counted per source address (IPv6 counted per /64), and lives in the service database, so it survives a redeploy. The HTTP MCP transport has its own, smaller allowance (${MCP_DAILY_LIMIT} tool calls/day): one MCP call can be a $0.02 compliance screening, a REST validation is $0.005.
+- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"CH1000230000000012345"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take a key that needs no e-mail at all. These ${REST_TRIAL_DAILY_LIMIT} are a day, on this route only; the key's ${ANONYMOUS_MONTHLY_LIMIT} are a month, on every endpoint, and one call at POST /v1/keys/claim raises it to ${FREE_TIER_MONTHLY_LIMIT} a month. Past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC, is counted per source address (IPv6 counted per /64), and lives in the service database, so it survives a redeploy. The HTTP MCP transport has its own, smaller allowance (${MCP_DAILY_LIMIT} tool calls/day): one MCP call can be a $0.02 compliance screening, a REST validation is $0.005.
 
 ## Discovery endpoints
 
@@ -597,7 +598,7 @@ export function buildApp(): Hono<HonoEnv> {
     cors({
       origin: (origin) => {
         if (!isProd && configuredOrigins.includes('*')) return '*';
-        if (localhostPattern.test(origin)) return origin;
+        if (!isProd && localhostPattern.test(origin)) return origin;
         return configuredOrigins.includes(origin) ? origin : configuredOrigins[0];
       },
       allowMethods: ['GET', 'POST', 'OPTIONS'],

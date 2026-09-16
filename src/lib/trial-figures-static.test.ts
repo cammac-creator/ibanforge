@@ -139,8 +139,10 @@ function tally(): Tally {
       // L'exemple de démarrage est désormais exporté depuis le contrat. Seule
       // la ligne EXACTE est exemptée ; onboarding-parity.test.ts contrôle le
       // bloc complet dans les trois langues. Le plafond de prose ne remonte pas.
+      // Même exemption pour la page Prise en main (audit du 16/09/2026) : sa
+      // ligne d'exemple est désormais la constante servie, mot pour mot.
       if (
-        file.endsWith('/docs/index.mdx') &&
+        /\/docs\/(index|onboarding)\.mdx$/.test(file) &&
         line.trim() === `"free_key": ${JSON.stringify(TRIAL_FREE_KEY_HINT)},`
       )
         return;

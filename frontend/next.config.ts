@@ -108,6 +108,15 @@ const nextConfig: NextConfig = {
        */
       // the share card moved from the file convention to /og (2026-09-05)
       { source: "/opengraph-image", destination: "/og", permanent: true },
+      // Les trois adresses que devinent un moteur ou un partenaire répondaient 404
+      // après la détection de langue (audit du 16/09/2026, M1) : elles mènent aux
+      // vraies pages, avant le préfixe de langue comme après.
+      { source: "/terms", destination: "/legal/terms", permanent: true },
+      { source: "/privacy", destination: "/legal/privacy", permanent: true },
+      { source: "/imprint", destination: "/legal/imprint", permanent: true },
+      { source: "/:locale(fr|de)/terms", destination: "/:locale/legal/terms", permanent: true },
+      { source: "/:locale(fr|de)/privacy", destination: "/:locale/legal/privacy", permanent: true },
+      { source: "/:locale(fr|de)/imprint", destination: "/:locale/legal/imprint", permanent: true },
       { source: "/:locale(fr|de)/opengraph-image", destination: "/:locale/og", permanent: true },
       { source: "/en", destination: "/", permanent: true },
       { source: "/en/:path*", destination: "/:path*", permanent: true },

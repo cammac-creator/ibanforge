@@ -76,6 +76,31 @@ if (hasTable('prospects')) {
 if (hasTable('feedback')) {
   targets.push(['feedback', 'FROM feedback WHERE contact = ?', [email]]);
 }
+// Audit du 16/09/2026 : huit tables portaient une adresse sans oubli ni purge par
+// ancienneté. La liste n'est plus tenue à la main : scripts/forget-customer.coverage.test.ts
+// échoue dès qu'une table à colonne d'adresse n'est ni ici, ni purgée par le temps.
+if (hasTable('activation_nudges')) {
+  targets.push(['activation_nudges', 'FROM activation_nudges WHERE lower(email) = ?', [email]]);
+}
+if (hasTable('contact_notes')) {
+  targets.push(['contact_notes', 'FROM contact_notes WHERE lower(email) = ?', [email]]);
+}
+if (hasTable('thread_reads')) {
+  targets.push(['thread_reads', 'FROM thread_reads WHERE lower(email) = ?', [email]]);
+}
+if (hasTable('thread_summaries')) {
+  targets.push(['thread_summaries', 'FROM thread_summaries WHERE lower(email) = ?', [email]]);
+}
+if (hasTable('key_claims')) {
+  targets.push(['key_claims', 'FROM key_claims WHERE lower(email_norm) = ?', [email]]);
+}
+if (hasTable('cohort_relabels')) {
+  targets.push(['cohort_relabels', 'FROM cohort_relabels WHERE lower(old_email) = ? OR lower(address) = ?', [email, email]]);
+}
+if (hasTable('orphan_mail')) {
+  // sender is either the bare address or "Name <address>".
+  targets.push(['orphan_mail', "FROM orphan_mail WHERE lower(sender) = ? OR lower(sender) LIKE '%<' || ? || '>%'", [email, email]]);
+}
 
 let total = 0;
 for (const [label, where, params] of targets) {

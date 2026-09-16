@@ -30,10 +30,10 @@ The answer is the whole answer, plus one block you only ever see without a key:
   "…": "…",
   "trial": {
     "calls_used_today": 1,
-    "calls_left_today": 9,
-    "daily_limit": 10,
+    "calls_left_today": 24,
+    "daily_limit": 25,
     "resets": "midnight UTC",
-    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"email\":\"you@company.com\",\"source\":\"api-trial\"} — 200 requests a month, no card",
+    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: an ifk_ key worth 25 requests a MONTH, on every endpoint (these 25 are a DAY, on this route only). One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to 200 a month.",
     "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
   }
 }
@@ -41,9 +41,9 @@ The answer is the whole answer, plus one block you only ever see without a key:
 
 `trial` is a taster, not a tier. Past 25 calls a day the endpoint answers `402` with `cause.reason: "trial_exhausted"`, and the allowance is counted in the service database, so it survives a redeploy. `trial` disappears from the response the moment you send a key.
 
-## 2. The free key — 200 requests a month
+## 2. The free key — 25 requests a month with no e-mail, 200 with an address
 
-One POST, no card, no wallet:
+One POST, no card, no wallet. With no body at all, the key asks for nothing and is worth the base monthly allowance on every endpoint; one call to `POST /v1/keys/claim` then raises it to the full allowance. With an address, as below, it is issued at the full allowance straight away:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \

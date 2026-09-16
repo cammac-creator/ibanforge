@@ -30,10 +30,10 @@ Three rails, pick what fits — agents never hit a dead-end. And before any of
 them, a taster that needs nothing at all:
 
 **Keyless trial (no key, no wallet, no email):**
-- `POST /v1/iban/validate` with a real `iban` is served 25 times a day per IP, full enrichment included
+- `POST /v1/iban/validate` with a real `iban` is served 25 times a day per source address (IPv6 counted per /64), full enrichment included
 - The response carries a `trial` block: calls left today, the reset (midnight UTC), and the one request that mints a free key
 - Past 25/day the route answers 402 again, `cause.reason = "trial_exhausted"`
-- The HTTP MCP transport has its own, smaller allowance: 10 tool calls/day per IP
+- The HTTP MCP transport has its own, smaller allowance: 10 tool calls/day per source address
 - An empty `{}` body always gets the 402 discovery envelope, never a trial — that probe belongs to the x402 indexers
 
 **Free key (no e-mail, no card):**
