@@ -4,7 +4,7 @@
 
 ## What is IBANforge?
 
-IBANforge is a compliance-grade API built for AI agents and developers. It validates IBANs, resolves BIC/SWIFT codes, exposes Swiss BC-Nummer clearing data (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), detects EMI/virtual IBANs, checks SEPA Instant + VoP reachability, and returns a compliance risk score. Four payment rails with no dead-ends, and the first asks for nothing: an API key that needs no e-mail (25 req/month, one empty POST), that same key claimed to 200 a month, prepaid credit packs (card or USDC), and x402 micropayments (USDC on Base L2, no signup).
+IBANforge is an API for IBAN validation and bank-level reference checks, built for AI agents and developers. These checks do not prove account existence or account ownership and do not screen an individual beneficiary. It validates IBANs, resolves BIC/SWIFT codes, exposes Swiss BC-Nummer clearing data (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), detects EMI/virtual IBANs, checks SEPA Instant + VoP reachability, and returns a compliance risk score. Four payment rails with no dead-ends, and the first asks for nothing: an API key that needs no e-mail (25 req/month, one empty POST), that same key claimed to 200 a month, prepaid credit packs (card or USDC), and x402 micropayments (USDC on Base L2, no signup).
 
 121k+ BIC entries (39k+ LEI-enriched via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 countries · 900+ non-bank issuer classifications (EMI, payment institutions, digital banks). Live counts: https://api.ibanforge.com/llms.txt
 

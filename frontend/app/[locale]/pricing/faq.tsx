@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useTranslations } from "next-intl"
 import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -18,6 +18,7 @@ function FaqItem({
   isOpen: boolean
   onToggle: () => void
 }) {
+  const answerId = useId()
   return (
     <div className="border-b border-border last:border-0">
       <button
@@ -25,6 +26,7 @@ function FaqItem({
         onClick={onToggle}
         className="w-full flex items-center justify-between gap-4 py-4 text-left text-sm font-medium text-foreground hover:text-amber-500 transition-colors"
         aria-expanded={isOpen}
+        aria-controls={answerId}
       >
         <span>{question}</span>
         <ChevronDown
@@ -34,12 +36,7 @@ function FaqItem({
           )}
         />
       </button>
-      <div
-        className={cn(
-          "overflow-hidden transition-all duration-200",
-          isOpen ? "max-h-64 pb-4" : "max-h-0"
-        )}
-      >
+      <div id={answerId} hidden={!isOpen} className="pb-4">
         <p className="text-sm text-muted-foreground leading-relaxed">{answer}</p>
       </div>
     </div>

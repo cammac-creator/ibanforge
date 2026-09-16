@@ -6,29 +6,29 @@ order: 12
 
 # Recettes — valider un IBAN dans votre stack
 
-Chaque recette utilise le même point d'entrée : `POST /v1/iban/validate`, qui rend structure + clé, la banque émettrice (BIC), le contrôle du code banque au registre national, la classification EMI/vIBAN et la joignabilité SEPA/VoP. D'abord une clé gratuite (200 requêtes/mois, sans carte) :
+Commencez par créer une clé gratuite **sans adresse e-mail**. Elle donne normalement 25 requêtes par mois ; lisez `monthly_limit` dans la réponse. Réclamer cette même clé avec un code reçu à une adresse choisie la porte à 200 par mois. Conservez `api_key` dans votre gestionnaire de secrets : ne créez pas une nouvelle clé à chaque appel.
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate \
-  -H "Content-Type: application/json" \
-  -d '{"email": "vous@entreprise.com"}'
+curl -X POST https://api.ibanforge.com/v1/keys/generate
 ```
 
-La note honnête qui a sa place dans chaque intégration : un contrôle mod-97 local attrape les fautes de frappe, rien d'autre. Trois des quatre IBAN d'exemple officiels passent toutes les clés et pointent pourtant des codes banque qu'aucun registre n'a attribués — [l'histoire complète](/blog/2026-08-06-example-ibans-unallocated-bank-codes). Le contrôle au registre est la partie impossible en local.
-
-Pour un formulaire salarié, consultez la [recette RH : contrôler un IBAN à la saisie](/fr/docs/hr-iban-validation).
+Chaque recette transmet un IBAN à l’API pour contrôler son format et lire les informations bancaires disponibles. Une banque absente ou un verdict `unknown` ne valide pas le compte. Le contrôle ne prouve ni l’existence du compte ni son titulaire. [Guide du premier appel](/fr/docs/onboarding).
 
 ## Python
+
+`IBANFORGE_API_KEY` = `api_key` conservée à l’étape précédente, dans une variable d’environnement côté serveur.
 
 Avec le SDK officiel (`pip install ibanforge`) :
 
 ```python
+import os
 from ibanforge import IBANforge
 
-client = IBANforge(api_key="ifk_votre_cle")
-result = client.validate("DE89370400440532013000")
-print(result["valid"], result["bic"]["code"], result["bank_code_check"]["status"])
-# True COBADEFFXXX verified
+with IBANforge(api_key=os.environ["IBANFORGE_API_KEY"]) as client:
+    result = client.validate_iban("DE89370400440532013000")
+    print(result["valid"])
+    print(result.get("bank_code_check"))
+    print(result.get("bic"))
 ```
 
 Ou `requests` nature :
@@ -114,34 +114,39 @@ Console.WriteLine($"{r.Valid} {r.Bic?.Code} {r.BankCodeCheck?.Status}");
 
 Passez votre propre `HttpClient` (IHttpClientFactory) au constructeur si vous en avez un ; les exceptions reflètent la hiérarchie Java et TypeScript. [README](https://github.com/cammac-creator/ibanforge/tree/main/sdks/dotnet).
 
+<span id="integration-sheets" className="block scroll-mt-28" />
+
 ## Google Sheets
 
-Extensions → Apps Script, puis une fonction personnalisée utilisable en `=VALIDATE_IBAN(A2)` :
+Utilisez les fonctions officielles qui stockent la clé dans vos propriétés utilisateur et envoient les colonnes par lots, plutôt qu’une clé écrite dans une cellule.
 
-```javascript
-function VALIDATE_IBAN(iban) {
-  const res = UrlFetchApp.fetch("https://api.ibanforge.com/v1/iban/validate", {
-    method: "post",
-    contentType: "application/json",
-    headers: { Authorization: "Bearer ifk_votre_cle" },
-    payload: JSON.stringify({ iban: String(iban) }),
-    muteHttpExceptions: true,
-  });
-  const d = JSON.parse(res.getContentText());
-  return [[d.valid, d.bic ? d.bic.code : "", d.bank_code_check ? d.bank_code_check.status : ""]];
-}
-```
+1. [Téléchargez les trois fichiers Apps Script](/integrations/ibanforge-sheets-e3a66243a652.zip) et décompressez le ZIP. Dans un classeur de test, ouvrez **Extensions → Apps Script**.
+2. Remplacez `Code.gs`, ajoutez un fichier HTML nommé `Sidebar`, puis copiez `Sidebar.html`. Dans les paramètres du projet, affichez `appsscript.json` et remplacez son contenu par le manifeste fourni. Enregistrez.
+3. Dans l’éditeur, exécutez `ibfShowSidebar` et autorisez le script. Revenez au classeur ; enregistrez votre clé dans la barre latérale. Ne la collez pas dans les cellules.
+4. [Importez ces deux IBAN de test en colonne A](/integrations/ibanforge-exemples-e69b509f4ab1.csv) avec **Fichier → Importer**. Ce sont un exemple public de documentation et sa variante à clé invalide, pas des comptes à payer. En B2, saisissez `=IBAN_CONTROLE(A2:A3)` et laissez cinq colonnes libres.
+5. Vérifiez les deux lignes : `TRUE` pour le format du premier, `FALSE` pour le second. Lisez ensuite banque, BIC, verdict du code banque et SEPA. Les champs absents ne doivent pas être interprétés comme un accord de paiement.
 
-Attention au quota : un appel par évaluation de cellule. Pour une colonne entière, préférez le [endpoint batch](/docs/iban-batch) depuis un script (jusqu'à 100 IBAN par appel).
+Deux IBAN représentent deux unités de quota, pas un seul appel facturé. Le cache peut éviter une nouvelle requête pendant six heures, sans garantie de conservation. **Installation manuelle** ; ce téléchargement n’est pas une fiche Google Workspace Marketplace. [Toutes les fonctions et les limites](/fr/sheets).
 
 <span id="integration-n8n" className="block scroll-mt-28" />
 
 ## n8n
 
+### Premier essai sur n8n Cloud ou auto-hébergé
+
+1. [Téléchargez le workflow JSON](/integrations/ibanforge-n8n-52a8fcab22ed.json), puis utilisez **Import from File** dans le menu du workflow n8n. Il contient uniquement deux nœuds natifs : Manual Trigger et HTTP Request ; aucune extension ni clé n’est incluse.
+2. Ouvrez **Contrôler l’exemple de documentation** : POST vers `/v1/iban/validate`, corps JSON avec l’exemple public `DE89370400440532013000`. Exécutez manuellement une fois.
+3. Vérifiez que la sortie contient `valid`, `bank_code_check` et les sources disponibles. Le workflow ne lance aucun paiement ni action en aval. Un échec HTTP, un quota épuisé ou un délai dépassé arrête l’étape.
+4. Pour conserver un quota sur votre propre clé, choisissez **Generic Credential Type → Header Auth** dans le nœud HTTP : nom `Authorization`, valeur `Bearer ` suivie de votre clé. Gardez la clé dans les credentials, jamais dans le JSON exporté.
+
+L’essai sans clé utilise le quota REST décrit dans le [guide de démarrage](/fr/docs/onboarding), partagé par adresse réseau. Sur n8n Cloud, plusieurs utilisateurs peuvent partager une adresse ; si le quota est épuisé, configurez votre clé. [Importer un workflow](https://docs.n8n.io/workflows/export-import/) · [Paramètres HTTP Request](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/).
+
+### Extension communautaire pour n8n auto-hébergé
+
 Le paquet publié [`n8n-nodes-ibanforge@0.1.1`](https://www.npmjs.com/package/n8n-nodes-ibanforge) propose la validation IBAN, la recherche BIC, le clearing suisse et les pré-contrôles de conformité au niveau bancaire. Cette recette concerne **n8n auto-hébergé**, avec un compte propriétaire ou administrateur. L'installation d'un paquet depuis npm n'est pas disponible sur n8n Cloud, qui exige une fiche vérifiée. Voir le [guide d'installation n8n](https://docs.n8n.io/integrations/community-nodes/installation-and-management/).
 
 1. Ouvrez **Settings → Community nodes → Install** et saisissez `n8n-nodes-ibanforge@0.1.1`.
-2. Obtenez une [clé API gratuite](/fr/docs/api-keys) (200 requêtes/mois, adresse mail requise, sans carte). Dans un nouveau workflow, reliez **Manual Trigger** à **IBANforge** et collez la clé dans un identifiant **IBANforge API**.
+2. Obtenez une [clé API gratuite](/fr/docs/api-keys) (25 requêtes/mois sans e-mail, 200 après réclamation, sans carte). Dans un nouveau workflow, reliez **Manual Trigger** à **IBANforge** et collez la clé dans un identifiant **IBANforge API**.
 3. Choisissez **Validate IBAN**, saisissez l'exemple de documentation `DE89370400440532013000`, puis exécutez l'étape.
 4. Lisez le résultat JSON : `valid` doit valoir `true` pour cet exemple, `bank_code_check` décrit le résultat du registre et `bic` la banque lorsqu'elle peut être identifiée. Une opération terminée qui renvoie ces champs prouve le premier appel API ; le seul test de connexion au vert ne suffit pas.
 
@@ -179,10 +184,10 @@ Une API indisponible ou un BIC absent laisse le remplissage automatique inactif 
 
 ## Agents IA (MCP)
 
-Claude Desktop, Claude Code, Cursor et tout client MCP :
+MCP distant : ajoutez `https://api.ibanforge.com/mcp` dans un client compatible. Pour un processus local :
 
 ```bash
-npx -y ibanforge-mcp        # stdio, 5 outils, clé du palier gratuit optionnelle
+npx -y ibanforge-mcp
 ```
 
 Ou le transport hébergé, sans installation : `https://api.ibanforge.com/mcp` — 10 appels d'outils gratuits par IP et par jour, sans aucune clé : le chemin le plus rapide pour qu'un assistant évalue la donnée avant tout engagement.

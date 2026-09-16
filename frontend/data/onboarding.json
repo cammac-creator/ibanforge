@@ -1,4 +1,5 @@
 {
+  "remoteDaily": 10,
   "remote": [
     "validate_iban",
     "batch_validate_iban",

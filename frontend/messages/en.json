@@ -295,10 +295,10 @@
     "badge": "Transparent pricing",
     "hero": {
       "title": {
-        "prefix": "Pay per",
-        "highlight": "call"
+        "prefix": "The right plan for",
+        "highlight": "your usage"
       },
-      "description": "Start with a free key (25 requests a month, no e-mail); claiming the same key takes it to 200 a month. Top up prepaid credits by card or USDC, or let your agent pay per call with x402. Fractions of a cent per request.",
+      "description": "Start free. Then choose credits that never expire, a monthly subscription or per-call payments for your agent.",
       "cta": {
         "tryFree": "Try it free",
         "x402Explained": "x402 explained →"
@@ -372,9 +372,15 @@
         "total": "Estimated monthly total",
         "payg": "pay-per-call via x402",
         "note": "You only pay for what you actually call",
-        "freeKey": "This volume fits in the free API key: 25 requests a month, and no address to give. Claiming the same key raises it to 200 a month. $0 either way.",
-        "packs": "Or prepay {credits} credits for {price} — they never expire (−{percent} vs pay-per-call).",
-        "packsEven": "Or prepay {credits} credits for {price} — same price, and they never expire."
+        "basis": "Comparison uses the full volume, excluding any remaining free allowance, existing credits and network fees. Packs are one-time purchases; Pro is monthly. A batch of N IBANs consumes N units.",
+        "anonymous": "This volume fits the free no-email key’s 25 monthly requests, if its allowance is available.",
+        "claimed": "After verifying an address you choose to provide, the same key allows 200 requests per month: this volume then fits its available allowance.",
+        "packTitle": "No subscription · credit purchase",
+        "packDetail": "{credits} credits that never expire. See packs →",
+        "proTitle": "Recurring use · Pro subscription",
+        "proDetail": "Per month, up to {credits} units. Resets on the 1st; unused quota does not roll over.",
+        "overPro": "Beyond Pro",
+        "overProDetail": "This volume exceeds {credits} monthly units. See vendor plans →"
       },
       "callsHeader": "Volume / month"
     },
@@ -388,21 +394,16 @@
         "3": "Free testing available via the /v1/demo endpoint and the /playground."
       },
       "docsLink": "Full x402 documentation →",
-      "codeExample": {
-        "title": "Example — automatic payment",
-        "install": "# Install the x402 HTTP client",
-        "call": "# Then call the API normally",
-        "comment": "// Payment handled automatically"
-      }
+      "setup": "x402 payments require a compatible client, a funded wallet and permission to spend. The guide explains the setup. For a first result without a wallet, use the playground or a free API key."
     },
     "faq": {
       "0": {
         "question": "What is x402?",
-        "answer": "x402 is an open micropayment protocol that uses HTTP status code 402 (Payment Required). When you call a paid endpoint, the server responds with a 402 containing payment details. Your client automatically sends a signed USDC payment on Base, and the server re-processes your request — all within a single HTTP round-trip."
+        "answer": "x402 uses HTTP 402 to request payment. The server returns payment requirements; a compatible client configured with a wallet and permission to spend can sign a USDC payment on Base and retry the request. Without that client, the 402 remains a payment request."
       },
       "1": {
         "question": "How do I pay?",
-        "answer": "Payments are made in USDC on the Base network. Your HTTP client (or SDK) handles it automatically by attaching payment headers to each request. No wallet UI, no manual confirmation — just fractions of a cent deducted per call. Check the docs for integration examples."
+        "answer": "Buy credit packs by card through Stripe, subscribe to Pro for $29 per month, or use a vendor plan. Agents can also pay per request in USDC on Base with a configured x402 client and wallet. MCP and ordinary SDK clients do not automatically sign payments."
       },
       "2": {
         "question": "Is there a free tier?",
@@ -463,6 +464,25 @@
       "price": "$29",
       "per": "/ month",
       "cta": "Subscribe to Pro"
+    },
+    "uses": {
+      "heading": "How will you use IBANforge?",
+      "estimate": "Compare plans with my volume",
+      "occasional": {
+        "title": "Occasional checks",
+        "body": "Prepaid credits from $5, without a subscription. Use your balance when you need it.",
+        "cta": "See credit packs"
+      },
+      "regular": {
+        "title": "A service running every month",
+        "body": "Pro: $29 per month for 10,000 requests. A monthly quota and a recurring invoice.",
+        "cta": "See Pro"
+      },
+      "agent": {
+        "title": "An agent calling the API",
+        "body": "Start without a wallet. Then configure a key or an x402 client to fit your budget.",
+        "cta": "Understand x402"
+      }
     }
   },
   "playground": {
@@ -1619,9 +1639,9 @@
     "eyebrow": "For AI Agents",
     "hero": {
       "title": "Built for autonomous agents.",
-      "description": "IBANforge is the only IBAN/BIC/compliance API that combines a native MCP server, x402 micropayments, and a free API key — all without human onboarding. Three integration paths, 60-second setup.",
+      "description": "Check an IBAN from your agent: format, identified bank, available sources and dates. Start with remote MCP without installation, then choose a reusable key or a payment client for your needs.",
       "cta": {
-        "mcp": "Install MCP server",
+        "mcp": "Connect my agent",
         "x402": "Pay-per-call setup"
       }
     },
@@ -1700,6 +1720,21 @@
       "poll_api_key": "Collect the key once, after approval.",
       "audit_creditor_file": "Analyse a CSV/XLSX file: free preview, paid full report.",
       "audit_status": "Check the progress and report link for a previously uploaded file."
+    },
+    "http": {
+      "heading": "Connect an agent without installation",
+      "body": "In a client supporting remote MCP, add this HTTP server. No wallet or key is needed for the trial.",
+      "label": "Remote MCP server URL",
+      "steps": [
+        "Add this URL as a remote MCP server in your client.",
+        "Ask: “Check the documentation IBAN DE89370400440532013000 and report the register result, source and date.”",
+        "Read bank_code_check and its sources. An unknown result confirms nothing; the check does not prove that the account exists or identify its holder."
+      ],
+      "limits": "{daily} tool units per network address per day, without a key; each IBAN in a batch counts as one unit. An API key does not raise this remote allowance. {remote} remote tools, {installed} in the local package: the two file-audit tools need the installed package.",
+      "guide": "MCP guide and quotas",
+      "local": "Does your client require a local process? Use this configuration.",
+      "sdkHeading": "Integrate with an SDK",
+      "sdkBody": "Store the key obtained above in the server-side IBANFORGE_API_KEY environment variable for Python, or replace ifk_... in the TypeScript configuration. SDKs expose quota and payment errors; they do not automatically sign payments."
     }
   },
   "legal": {
@@ -2486,6 +2521,11 @@
       "privacy": "Nothing leaves the sheet except the IBAN strings the functions receive; the key stays in your own script properties, never in the spreadsheet.",
       "privacyLink": "Privacy policy",
       "limits": "IBANforge is not a Verification of Payee service and never says that an account belongs to a person: it tells you what the registers know about the bank behind the IBAN."
+    },
+    "example": {
+      "title": "Try two test IBANs",
+      "body": "Import the documentation example and its invalid variant, then inspect the five result columns.",
+      "cta": "Installation and downloadable example"
     }
   },
   "registers": {

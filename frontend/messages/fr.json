@@ -295,10 +295,10 @@
     "badge": "Tarification transparente",
     "hero": {
       "title": {
-        "prefix": "Paiement à",
-        "highlight": "l'appel"
+        "prefix": "Le bon tarif pour",
+        "highlight": "votre usage"
       },
-      "description": "Commencez avec une clé gratuite (25 requêtes par mois, sans e-mail) ; réclamer cette même clé la porte à 200 par mois. Rechargez des crédits prépayés par carte ou USDC, ou laissez votre agent payer à l’appel via x402. Quelques fractions de centime par requête.",
+      "description": "Testez gratuitement. Choisissez ensuite des crédits sans expiration, un abonnement mensuel ou le paiement à l’appel pour votre agent.",
       "cta": {
         "tryFree": "Essayer gratuitement",
         "x402Explained": "x402 expliqué →"
@@ -372,9 +372,15 @@
         "total": "Total mensuel estimé",
         "payg": "paiement à l’appel via x402",
         "note": "Vous ne payez que ce que vous appelez réellement",
-        "freeKey": "Ce volume tient dans la clé API gratuite : 25 requêtes par mois, sans adresse à donner. Réclamer cette même clé la porte à 200 par mois. 0 $ dans les deux cas.",
-        "packs": "Ou prépayez {credits} crédits pour {price} — sans expiration (−{percent} vs paiement à l’appel).",
-        "packsEven": "Ou prépayez {credits} crédits pour {price} — même prix, et ils n’expirent jamais."
+        "basis": "Comparaison sur le volume complet, hors quota gratuit restant, crédits déjà détenus et frais de réseau. Les packs sont des achats ponctuels ; Pro est mensuel. Un lot de N IBAN consomme N unités.",
+        "anonymous": "Ce volume tient dans les 25 requêtes mensuelles de la clé gratuite sans e-mail, si son quota est disponible.",
+        "claimed": "Après vérification d’une adresse choisie, cette même clé donne 200 requêtes par mois : ce volume tient alors dans le quota disponible.",
+        "packTitle": "Sans abonnement · achat de crédits",
+        "packDetail": "{credits} crédits sans expiration. Voir les packs →",
+        "proTitle": "Usage régulier · abonnement Pro",
+        "proDetail": "Par mois, jusqu’à {credits} unités. Remise à zéro le 1er ; quota non reporté.",
+        "overPro": "Au-delà de Pro",
+        "overProDetail": "Ce volume dépasse {credits} unités par mois. Consulter les offres éditeurs →"
       },
       "callsHeader": "Volume / mois"
     },
@@ -388,21 +394,16 @@
         "3": "Tests gratuits disponibles via l'endpoint /v1/demo et le /playground."
       },
       "docsLink": "Documentation complète x402 →",
-      "codeExample": {
-        "title": "Exemple — paiement automatique",
-        "install": "# Install the x402 HTTP client",
-        "call": "# Then call the API normally",
-        "comment": "// Payment handled automatically"
-      }
+      "setup": "Le paiement x402 nécessite un client compatible, un portefeuille approvisionné et une autorisation de dépenser. Le guide détaille la configuration. Pour un premier résultat sans portefeuille, utilisez le playground ou une clé gratuite."
     },
     "faq": {
       "0": {
         "question": "Qu'est-ce que x402 ?",
-        "answer": "x402 est un protocole ouvert de micropaiement qui utilise le code HTTP 402 (Payment Required). Lorsque vous appelez un endpoint payant, le serveur répond avec un 402 contenant les détails de paiement. Votre client envoie automatiquement un paiement signé en USDC sur Base, et le serveur traite à nouveau votre requête — le tout en un seul aller-retour HTTP."
+        "answer": "x402 utilise le code HTTP 402 pour demander un paiement. Le serveur renvoie les conditions ; un client compatible, configuré avec un portefeuille et une autorisation de dépenser, peut signer le paiement en USDC sur Base puis renvoyer la requête. Sans ce client, le 402 reste une demande de paiement."
       },
       "1": {
         "question": "Comment payer ?",
-        "answer": "Les paiements s'effectuent en USDC sur le réseau Base. Votre client HTTP (ou SDK) gère tout automatiquement en ajoutant des en-têtes de paiement à chaque requête. Pas d'interface de portefeuille, pas de confirmation manuelle — juste des fractions de centime déduites par appel. Consultez la documentation pour des exemples d'intégration."
+        "answer": "Vous pouvez acheter des packs par carte via Stripe, souscrire à Pro pour 29 $ par mois, ou utiliser l’offre éditeur. Les agents peuvent aussi payer à la requête en USDC sur Base avec un client x402 et un portefeuille configurés. MCP et les SDK ordinaires ne signent pas de paiement automatiquement."
       },
       "2": {
         "question": "Existe-t-il une offre gratuite ?",
@@ -463,6 +464,25 @@
       "price": "29 $",
       "per": "/ mois",
       "cta": "Souscrire à Pro"
+    },
+    "uses": {
+      "heading": "Comment allez-vous utiliser IBANforge ?",
+      "estimate": "Comparer les offres avec mon volume",
+      "occasional": {
+        "title": "Des contrôles ponctuels",
+        "body": "Crédits prépayés dès 5 $, sans abonnement. Utilisez le solde à votre rythme.",
+        "cta": "Voir les packs"
+      },
+      "regular": {
+        "title": "Un service qui tourne chaque mois",
+        "body": "Pro : 29 $ par mois pour 10 000 requêtes. Un quota mensuel et une facture régulière.",
+        "cta": "Voir Pro"
+      },
+      "agent": {
+        "title": "Un agent qui appelle l’API",
+        "body": "Démarrez sans portefeuille. Configurez ensuite une clé ou un client x402 selon votre budget.",
+        "cta": "Comprendre x402"
+      }
     }
   },
   "playground": {
@@ -1619,9 +1639,9 @@
     "eyebrow": "Pour les agents IA",
     "hero": {
       "title": "Conçu pour les agents autonomes.",
-      "description": "IBANforge est la seule API IBAN/BIC/compliance qui combine un serveur MCP natif, des micropaiements x402 et une clé API gratuite — sans aucun onboarding humain. Trois voies d'intégration, 60 secondes de setup.",
+      "description": "Contrôlez un IBAN depuis votre agent : format, banque identifiée, sources et dates disponibles. Commencez avec le serveur MCP distant sans installation, puis choisissez une clé réutilisable ou un client de paiement selon vos besoins.",
       "cta": {
-        "mcp": "Installer le serveur MCP",
+        "mcp": "Connecter mon agent",
         "x402": "Paiement à l'appel"
       }
     },
@@ -1700,6 +1720,21 @@
       "poll_api_key": "Récupérer une seule fois la clé après son approbation.",
       "audit_creditor_file": "Analyser un fichier CSV/XLSX : aperçu gratuit, rapport complet payant.",
       "audit_status": "Consulter l’avancement et le lien du rapport d’un fichier déjà envoyé."
+    },
+    "http": {
+      "heading": "Connecter un agent sans installation",
+      "body": "Dans un client compatible MCP distant, ajoutez ce serveur HTTP. Aucun portefeuille ni clé n’est nécessaire pour l’essai.",
+      "label": "Adresse du serveur MCP distant",
+      "steps": [
+        "Ajoutez cette URL comme serveur MCP distant dans votre client.",
+        "Demandez : « Contrôle l’IBAN de documentation DE89370400440532013000 et indique le résultat du registre, sa source et sa date. »",
+        "Lisez bank_code_check et ses sources. Un résultat unknown ne confirme rien ; le contrôle ne prouve ni l’existence du compte ni son titulaire."
+      ],
+      "limits": "{daily} unités d’outils par adresse réseau et par jour, sans clé ; chaque IBAN d’un lot compte pour une unité. Une clé API n’augmente pas ce quota distant. {remote} outils distants, {installed} dans le paquet local : les deux outils d’audit de fichiers nécessitent le paquet installé.",
+      "guide": "Guide MCP et quotas",
+      "local": "Votre client nécessite un processus local ? Utilisez cette configuration.",
+      "sdkHeading": "Intégrer avec un SDK",
+      "sdkBody": "Conservez la clé obtenue ci-dessus dans la variable d’environnement IBANFORGE_API_KEY côté serveur pour Python, ou remplacez ifk_... dans la configuration TypeScript. Les SDK exposent les erreurs de quota et de paiement ; ils ne signent pas de paiement automatiquement."
     }
   },
   "legal": {
@@ -2486,6 +2521,11 @@
       "privacy": "Rien ne sort de la feuille sauf les chaînes IBAN que les fonctions reçoivent ; la clé reste dans vos propres propriétés de script, jamais dans la feuille.",
       "privacyLink": "Politique de confidentialité",
       "limits": "IBANforge n'est pas un service de Verification of Payee et n'affirme jamais qu'un compte appartient à une personne : il dit ce que les registres savent de la banque derrière l'IBAN."
+    },
+    "example": {
+      "title": "Essayer sur deux IBAN de test",
+      "body": "Importez l’exemple de documentation et sa variante invalide, puis vérifiez les cinq colonnes de résultat.",
+      "cta": "Installation et exemple téléchargeable"
     }
   },
   "registers": {
