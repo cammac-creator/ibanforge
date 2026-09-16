@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, type ComponentProps, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NextIntlClientProvider } from 'next-intl';
 import { describe, expect, it, vi } from 'vitest';
@@ -10,14 +10,18 @@ import en from '@/messages/en.json';
 import de from '@/messages/de.json';
 
 const catalogues = { fr, en, de };
+// createElement reçoit les enfants en troisième argument. Le type du fournisseur
+// exige leur présence dans les propriétés, alors que React remplit ce champ lui-même.
+const TranslationProvider = NextIntlClientProvider as ComponentType<
+  Omit<ComponentProps<typeof NextIntlClientProvider>, 'children'> & { children?: ReactNode }
+>;
 function render(node: ReactNode, locale: keyof typeof catalogues = 'fr') {
   return renderToStaticMarkup(
     createElement(
-      NextIntlClientProvider,
+      TranslationProvider,
       {
         locale,
         messages: catalogues[locale],
-        children: node,
         timeZone: 'UTC',
         now: new Date('2026-06-16T12:00:00Z'),
       },
