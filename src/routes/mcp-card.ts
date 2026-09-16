@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { datasetFacts } from '../lib/dataset-facts.js';
-import { dataTools, priceLabel } from '../mcp/inventory.js';
+import { MCP_TOOLS, dataTools, priceLabel } from '../mcp/inventory.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -50,6 +50,8 @@ const MCP_SERVER_CARD = {
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,
+  tools_scope: 'read_only_data',
+  available_tools: MCP_TOOLS.map((tool) => tool.name),
   tools: dataTools().map((tool) => ({
     name: tool.name,
     description:

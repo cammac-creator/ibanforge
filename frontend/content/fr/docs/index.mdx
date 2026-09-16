@@ -28,7 +28,7 @@ Tous les endpoints sont servis en HTTPS. Les requetes HTTP sont automatiquement 
 
 Ensuite, trois portes d'entrée — choisissez ce qui vous convient, votre app ou votre agent ne tombe jamais sur un cul-de-sac :
 
-1. **Clé API gratuite** — 200 requêtes/mois, sans carte bancaire. [Générez-la](/docs/api-keys) avec un simple POST, puis envoyez `Authorization: Bearer ifk_...` avec chaque requête.
+1. **Clé API gratuite** — 25 requêtes/mois sans e-mail. [Générez-la](/docs/api-keys) avec un POST sans corps, puis envoyez `Authorization: Bearer ifk_...`. Réclamer cette même clé avec un code reçu par e-mail porte le quota à 200/mois, sans carte.
 2. **Packs de crédits prépayés** — 1k = 5 $, 5k = 20 $, 25k = 80 $. Ils n'expirent jamais, achetables **par carte** ou en USDC (`POST /v1/credits/buy/1k|5k|25k`). Voir les [tarifs](/pricing).
 3. **Micropaiements x402** — paiement à l'appel entièrement autonome en USDC pour les agents, sans aucun compte. Voir le [guide x402](/docs/x402).
 
@@ -66,10 +66,10 @@ La réponse porte alors un bloc `trial` supplémentaire :
 ```json
 "trial": {
   "calls_used_today": 1,
-  "calls_left_today": 9,
-  "daily_limit": 10,
+  "calls_left_today": 24,
+  "daily_limit": 25,
   "resets": "midnight UTC",
-  "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"email\":\"you@company.com\",\"source\":\"api-trial\"} — 200 requests a month, no card",
+  "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: an ifk_ key worth 25 requests a MONTH, on every endpoint (these 25 are a DAY, on this route only). One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to 200 a month.",
   "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
 }
 ```
@@ -123,7 +123,7 @@ Reponse :
     "qr_iid": null
   },
   "formatted": "CH10 0023 0000 0000 1234 5",
-  "cost_usdc": 0.005
+  "cost_usdc": 0
 }
 ```
 
@@ -140,7 +140,7 @@ Cela renvoie des exemples d'IBAN pre-valides de plusieurs pays afin que vous pui
 ## Etapes suivantes
 
 - [Prise en main](/docs/onboarding) — de zéro au premier lot de 100, en dix minutes
-- [Clés API](/docs/api-keys) — obtenez votre clé gratuite, 200 requêtes/mois
+- [Clés API](/docs/api-keys) — obtenez votre clé gratuite, 25/mois sans e-mail, 200/mois après confirmation par e-mail
 - [Valider un IBAN unique](/docs/iban-validate) — reference complete du endpoint
 - [Validation par lot](/docs/iban-batch) — valider jusqu'a 100 IBAN en une seule requete
 - [Recherche BIC/SWIFT](/docs/bic-lookup) — rechercher les donnees d'un etablissement par code BIC

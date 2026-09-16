@@ -130,9 +130,8 @@ describe('les textes de la clé sans e-mail', () => {
     // rendrait un texte VRAI impossible à écrire, et le lot suivant
     // supprimerait l'assertion au lieu de la comprendre. Quand la vague 2 sera
     // livrée, on retire la ligne concernée — pas le test.
+    // Les deux outils MCP sont livrés : leur présence est contrôlée par onboarding-parity.test.ts.
     const interdits = [
-      'request_api_key',
-      'poll_api_key',
       'device grant',
       'Device Grant',
       '/v1/keys/device',

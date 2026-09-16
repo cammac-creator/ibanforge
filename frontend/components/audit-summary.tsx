@@ -38,7 +38,7 @@ const STATUS_CLASS: Record<string, string> = {
   error: "text-red-700 dark:text-red-400",
 };
 
-export function AuditSummaryView({ status, masked }: { status: AuditStatus; masked: boolean }) {
+export function AuditSummaryView({ status, masked, demonstration = false }: { status: AuditStatus; masked: boolean; demonstration?: boolean }) {
   const t = useTranslations("audit");
   const s = status.summary;
   const codes = Object.entries(s.by_code).sort((a, b) => b[1] - a[1]);
@@ -99,7 +99,7 @@ export function AuditSummaryView({ status, masked }: { status: AuditStatus; mask
           </table>
           {masked ? (
             <p className="px-3 py-2 text-xs text-muted-foreground border-t">
-              {t("preview.more", { shown: status.preview.length, rows: s.rows })}
+              {demonstration ? t("demo.masked") : t("preview.more", { shown: status.preview.length, rows: s.rows })}
             </p>
           ) : null}
         </div>
