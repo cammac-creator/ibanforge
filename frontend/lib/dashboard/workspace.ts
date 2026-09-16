@@ -8,7 +8,12 @@ export function overviewView(value: unknown): OverviewView {
     : 'today';
 }
 
-export function overviewHref(pathname: string, view: OverviewView, period: number): string {
+export function overviewHref(
+  pathname: string, view: OverviewView, period: number, audience?: string,
+): string {
   const days = [7, 30, 90].includes(period) ? period : 30;
-  return `${pathname}?view=${view}&period=${days}`;
+  const tab = view === 'growth' && audience && AUDIENCE_TABS.includes(audience as AudienceTab)
+    ? `&audience=${audience}` : '';
+  return `${pathname}?view=${view}&period=${days}${tab}`;
 }
+import { AUDIENCE_TABS, type AudienceTab } from './audience-model';

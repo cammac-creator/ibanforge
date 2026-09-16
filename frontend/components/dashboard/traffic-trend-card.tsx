@@ -70,12 +70,12 @@ interface NatureMeta {
  */
 const NATURE_META: Record<NatureKey, NatureMeta> = {
   with_key: {
-    label: 'Clients',
+    label: 'Avec clé API',
     color: '#f59e0b',
-    gloss: 'appels portant une clé API — nos clients, la seule bande qui paie.',
+    gloss: 'appels portant une clé API, gratuite ou payante ; ce volume ne compte pas les clients payants.',
   },
   agent: {
-    label: 'Clients IA',
+    label: 'Agents sans clé',
     color: '#8b5cf6',
     gloss:
       'appels sans clé sur le point d’entrée MCP ou en REST : de vrais assistants, mais aussi les robots qui surveillent la disponibilité.',

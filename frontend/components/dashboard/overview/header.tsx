@@ -16,13 +16,13 @@ import type { StatsResponse } from './types';
  * (ENS-10): half the blocks below ignore it, and a period selector that
  * silently governs half a page is worse than none.
  */
-export async function OverviewHeader({ readAtIso }: { readAtIso: string }) {
+export async function OverviewHeader({ readAtIso, audience = false }: { readAtIso: string; audience?: boolean }) {
   const w = await getTranslations('dashboard.workspace');
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
       <div className="flex-1">
         <p className="mb-2 text-xs text-[var(--fg-4)]">IBANforge / {w('overview')}</p>
-        <h1 className="font-semibold text-white">{w('intro')}</h1>
+        <h1 className="font-semibold text-white">{w(audience ? 'audienceHeading' : 'intro')}</h1>
       </div>
       <div className="ml-auto">
         <FreshnessBadge fetchedAtIso={readAtIso} />
