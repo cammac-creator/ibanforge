@@ -1707,8 +1707,8 @@ html[data-js] .forge .scene {
   color: var(--hot);
 }
 
-/* Finale: the ember ridge rises behind the last call. The image is #000-black;
-   the coal fades top and bottom hide the seam with the page. */
+/* Un reflet de lentille discret prolonge les matières du premier écran.
+   Le voile sombre garde le texte et les boutons au premier plan. */
 .forge .cta-final {
   position: relative;
   text-align: center;
@@ -1718,12 +1718,12 @@ html[data-js] .forge .scene {
     linear-gradient(
       180deg,
       var(--coal) 0%,
-      rgba(12, 10, 9, 0) 32%,
-      rgba(12, 10, 9, 0) 80%,
+      rgba(16, 14, 12, 0.5) 32%,
+      rgba(16, 14, 12, 0.4) 80%,
       var(--coal) 100%
     ),
-    url('/brand/ember-ridge.2db30701.webp') center bottom / cover no-repeat,
-    #000;
+    url('/brand/lens/finale-27218f7967cc.webp') center bottom / cover no-repeat,
+    var(--coal);
 }
 .forge .cta-final .wrap {
   position: relative;
