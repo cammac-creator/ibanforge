@@ -285,6 +285,100 @@
     "badgeFallback": "API online · live status",
     "share": {
       "tagline": "ibanforge.com · REST · SDK · MCP · 25 free requests a month, no e-mail"
+    },
+    "lens": {
+      "hero": {
+        "eyebrow": "FROM IBAN TO USEFUL INFORMATION",
+        "title": "Your IBAN goes in.",
+        "titleAccent": "The data takes shape.",
+        "promise": "IBANforge is the lens that reveals the format, bank and BIC.",
+        "auditLink": "Check a supplier file",
+        "observe": "Explore the glass and metal",
+        "sceneAlt": "A copper-rimmed glass lens transforms incoming light into three outgoing rays.",
+        "signature": "A lens for your data",
+        "inputEyebrow": "YOUR IBAN",
+        "inputTitle": "A number to illuminate.",
+        "inputLabel": "IBAN to check",
+        "submit": "Reveal the data",
+        "loading": "Checking…",
+        "examples": "Choose an example",
+        "switzerland": "Switzerland",
+        "germany": "Germany",
+        "errorExample": "An error",
+        "inputNote": "No sign-up required. The IBAN is sent to the service when you run a check.",
+        "results": "Revealed data",
+        "format": "IBAN format",
+        "bank": "Bank",
+        "waitFormat": "Ready to check",
+        "waitBank": "Ready to identify",
+        "waitBic": "Ready to look up",
+        "formatHint": "The structure check",
+        "bankHint": "Depending on the country and available sources",
+        "bicHint": "The response includes its provenance",
+        "initial": "Run a check: the rays lead to the resulting data.",
+        "edited": "Input changed. Run the check again to reveal its data.",
+        "unavailable": "The service is temporarily unavailable. Please try again shortly.",
+        "rateLimited": "Too many checks in a short time. Please try again in a few minutes.",
+        "caption": "One incoming stream. Three distinct pieces of information.",
+        "pause": "Pause",
+        "animate": "Animate",
+        "fixed": "Still image",
+        "showJson": "Show JSON",
+        "hideJson": "Hide JSON",
+        "copy": "Copy result",
+        "copied": "Result copied.",
+        "selectCopy": "The text is selected. Use the Copy command.",
+        "scope": "Enrichment depends on available sources.",
+        "playgroundLink": "Open the full playground",
+        "noJs": "JavaScript is required for the checker and 3D view. Illustrations and links remain available.",
+        "detailTitle": "Glass, metal and light.",
+        "detailCaption": "Curved glass · brushed metal · studio reflections",
+        "detailUnavailable": "The close-up view is not available in this browser.",
+        "close": "Close"
+      },
+      "gallery": {
+        "eyebrow": "ONE LIGHT, THREE USES",
+        "title": "From raw data to useful information.",
+        "intro": "Read an IBAN, examine a file, feed your tools.",
+        "items": [
+          {
+            "eyebrow": "01 · READ AN IBAN",
+            "title": "Every piece of information finds its place.",
+            "text": "Format, bank, BIC: distinct data, with its provenance and its limits.",
+            "tags": [
+              "Format",
+              "Bank",
+              "Sources"
+            ],
+            "link": "Back to the checker",
+            "alt": "Light passes through a metal-rimmed lens and illuminates three separate data panels."
+          },
+          {
+            "eyebrow": "02 · EXAMINE A FILE",
+            "title": "A precise look at every line.",
+            "text": "Bank details in a file become structured results you can read and use.",
+            "tags": [
+              "Files",
+              "Checks",
+              "Results"
+            ],
+            "link": "Explore file audits",
+            "alt": "Spreadsheet pages cross the light of a lens and become an organized file."
+          },
+          {
+            "eyebrow": "03 · CONNECT YOUR TOOLS",
+            "title": "The response continues its journey.",
+            "text": "APIs, agents and automations can reuse a structured response in their own workflows.",
+            "tags": [
+              "API",
+              "Agents",
+              "Automations"
+            ],
+            "link": "Read the documentation",
+            "alt": "Rays leaving the lens reach three modules representing an API, an automation and a table."
+          }
+        ]
+      }
     }
   },
   "pricing": {

@@ -7,10 +7,9 @@ import { Button } from "@/components/ui/button"
 import { GetKeyButton } from "@/components/api-key-dialog"
 import { Reveal } from "@/components/reveal"
 import { StatsBar } from "@/components/stats-bar"
-import { ForgeFilm, type FilmStrings } from "@/components/forge/forge-film"
-import { FoldDemo } from "@/components/forge/fold-demo"
-import capturedIban from "./playground/captured-iban.json"
-import { DEFAULT_RESULT } from "./playground/examples"
+import { LensHero, type LensCopy } from "@/components/lens/lens-hero"
+import { LensGallery, type GalleryCopy } from "@/components/lens/lens-gallery"
+import "@/components/lens/lens.css"
 import {
   getLandingStats,
   P50_PROCESSING_MS,
@@ -66,6 +65,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   if (!hasLocale(routing.locales, locale)) notFound()
   setRequestLocale(locale)
   const t = await getTranslations('home');
+  const verdict = await getTranslations('playground');
   const liveStats = await getLandingStats();
 
   // One figure for the BIC base, the live one: the plaque used to say
@@ -87,19 +87,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   }))
   // The refresh date /health already reports and the page used to throw away:
   // "refreshed monthly" becomes a dated fact, never typed by hand (S4).
-  // 30-day share of answers without a 5xx, as /status computes it; null when
-  // the history is unreachable, and the badge then makes no numeric claim.
-  const rate30 = liveStats.successRate30 === null
-    ? null
-    : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(liveStats.successRate30)
-  // One latency figure for the whole page (audit 2026-09-05, n° 18): the film
-  // used to carry "0,41" typed by hand in three languages while the stats
-  // band showed the constant. Both now read the same source.
-  const msLabel = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(P50_PROCESSING_MS)
-  const dateFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-  // The fold's fallback answer says when it was captured: read from the file
-  // the monthly refresh rewrites, never typed by hand again (n° 21).
-  const capturedOn = dateFmt.format(new Date(`${capturedIban.captured_at}T00:00:00Z`))
   // Days left before SIX stops processing unstructured addresses, computed at
   // render (the page is revalidated every hour) and never by the browser.
   //
@@ -131,89 +118,11 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   ]
 
   const quoteTr = t('reviewed.quoteTranslation')
-  const film: FilmStrings = {
-    heading: t('film.heading'),
-    heat: {
-      eyebrow: t('film.heat.eyebrow'), title: t('film.heat.title'), copy: t('film.heat.copy'),
-      country: t('film.heat.country'), check: t('film.heat.check'),
-      bank: t('film.heat.bank'), account: t('film.heat.account'),
-      // What a screen reader gets instead of the split characters (n° 23).
-      ibanAria: `IBAN CH10 0023 0000 0000 1234 5 · ${t('film.heat.country')} CH · ${t('film.heat.check')} 10 · ${t('film.heat.bank')} 00230 · ${t('film.heat.account')} 000000012345`,
-    },
-    strike: { eyebrow: t('film.strike.eyebrow'), title: t('film.strike.title'), valid: t('film.strike.valid') },
-    quench: {
-      eyebrow: t('film.quench.eyebrow'), title: t('film.quench.title'), copy: t('film.quench.copy'),
-      noMatch: t('film.quench.noMatch'), lists: t('film.quench.lists'),
-      fatf: t('film.quench.fatf'), sepa: t('film.quench.sepa'), risk: t('film.quench.risk'),
-    },
-    stamp: {
-      eyebrow: t('film.stamp.eyebrow'), title: t('film.stamp.title'), copy: t('film.stamp.copy'),
-      iid: t('film.stamp.iid'), sic: t('film.stamp.sic'),
-      eurosic: t('film.stamp.eurosic'), instant: t('film.stamp.instant'),
-    },
-    ship: {
-      eyebrow: t('film.ship.eyebrow'),
-      title: t('film.ship.title', { ms: msLabel }), head: t('film.ship.head', { ms: msLabel }),
-      tryLive: t('film.ship.tryLive'), copy: t('film.ship.copy'),
-      processingMs: String(P50_PROCESSING_MS),
-    },
-  }
 
   return (
-    <div className="forge">
-      {/* ── The fold: the promise on the left, the proof on the right ──────
-          Audit 2026-09-04 (L3 + M1 + L1). The 149 px lockup repeated the
-          header's logo and dwarfed a 33 px h1; 56 % of the fold was empty;
-          nothing on it showed the product. The h1 is now the largest object
-          of the page, the sub-title carries the live figures and the buying
-          segment, and a real request plays beside it. */}
-      <section className="hero" aria-labelledby="h-hero">
-        <div className="hero-copy">
-          {/* Audit 2026-09-05 (n° 16): the badge repeated the BIC count that the
-              sub-title states one line below and the stats band 300 px further.
-              It now carries the one figure nothing else on the page shows, the
-              30-day error-free rate, and opens the status page. */}
-          <Link href={localePath(locale, '/status')} className="hero-badge" data-evt="nav:status">
-            <span className="dot" aria-hidden="true"></span>
-            {rate30 ? t('badge', { rate: rate30 }) : t('badgeFallback')}
-          </Link>
-          <h1 id="h-hero">
-            {t.rich('hero.title', {
-              accent: (chunks) => <em>{chunks}</em>,
-            })}
-          </h1>
-          <p className="hero-desc">
-            {t.rich('hero.description', {
-              bic: figures.bic,
-              ch: figures.ch,
-              b: (chunks) => <b>{chunks}</b>,
-            })}
-          </p>
-          {/* Deux usages donnent accès aux essais existants, sans ouvrir de compte. */}
-          <div className="hero-cta">
-            <Button
-              size="lg"
-              variant="amber"
-              className="px-6"
-              nativeButton={false}
-              render={<Link href={localePath(locale, '/playground')} data-evt="cta:journey-api" />}
-            >
-              {t('hero.cta.tryFree')}
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="px-6"
-              nativeButton={false}
-              render={<Link href={localePath(locale, '/audit')} data-evt="cta:journey-audit" />}
-            >
-              {t('hero.cta.audit')}
-            </Button>
-          </div>
-          <p className="hero-alt">{t('hero.trialNote')}</p>
-        </div>
-        <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} capturedOn={capturedOn} />
-      </section>
+    <div className="forge lens-landing" data-landing="lens-v1">
+      <LensHero copy={t.raw('lens.hero') as LensCopy} verdictCopy={verdict.raw('verdict') as LensCopy}
+        playgroundHref={localePath(locale, '/playground')} auditHref={localePath(locale, '/audit')} />
 
       {/* ── Trust band: sources, sanctions lists, Swiss provenance ────────── */}
       {/* Audit 2026-09-04 (M6): the only honest "logo band" this product has
@@ -257,6 +166,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <section className="stats-band">
         <StatsBar stats={STATS} locale={locale} />
       </section>
+
+      <LensGallery copy={t.raw('lens.gallery') as GalleryCopy} locale={locale} />
 
       {/* ── What a mod-97 check will never tell you: the plaques ───────────── */}
       <section className="sect" aria-labelledby="h-features">
@@ -328,9 +239,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           </div>
         </div>
       </section>
-
-      {/* ── The film: four forging stations, scrubbed by scroll ──────────── */}
-      <ForgeFilm t={film} playgroundHref={localePath(locale, '/playground')} />
 
       {/* ── Endpoints, price-stamped ──────────────────────────────────────── */}
       <section className="sect" aria-labelledby="h-endpoints" style={{ paddingTop: 0 }}>
