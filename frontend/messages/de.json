@@ -285,6 +285,100 @@
     "badgeFallback": "API online · Live-Status",
     "share": {
       "tagline": "ibanforge.com · REST · SDK · MCP · 25 kostenlose Anfragen pro Monat, ohne E-Mail"
+    },
+    "lens": {
+      "hero": {
+        "eyebrow": "VON DER IBAN ZUR NÜTZLICHEN INFORMATION",
+        "title": "Ihre IBAN kommt an.",
+        "titleAccent": "Die Daten nehmen Gestalt an.",
+        "promise": "IBANforge ist die Linse, die Format, Bank und BIC sichtbar macht.",
+        "auditLink": "Lieferantendatei prüfen",
+        "observe": "Glas und Metall näher betrachten",
+        "sceneAlt": "Eine kupfergefasste Glaslinse verwandelt einfallendes Licht in drei ausgehende Strahlen.",
+        "signature": "Die Linse für Ihre Daten",
+        "inputEyebrow": "IHRE IBAN",
+        "inputTitle": "Eine Nummer im Licht.",
+        "inputLabel": "IBAN zur Prüfung",
+        "submit": "Daten sichtbar machen",
+        "loading": "Prüfung läuft…",
+        "examples": "Beispiel auswählen",
+        "switzerland": "Schweiz",
+        "germany": "Deutschland",
+        "errorExample": "Ein Fehler",
+        "inputNote": "Ohne Registrierung. Die IBAN wird bei der Prüfung an den Dienst gesendet.",
+        "results": "Ermittelte Daten",
+        "format": "IBAN-Format",
+        "bank": "Bank",
+        "waitFormat": "Bereit zur Prüfung",
+        "waitBank": "Noch zu ermitteln",
+        "waitBic": "Noch zu suchen",
+        "formatHint": "Prüfung der Struktur",
+        "bankHint": "Je nach Land und verfügbaren Quellen",
+        "bicHint": "Die Herkunft begleitet die Antwort",
+        "initial": "Starten Sie die Prüfung: Die Strahlen führen zu den Ergebnisdaten.",
+        "edited": "Eingabe geändert. Starten Sie die Prüfung erneut.",
+        "unavailable": "Der Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es gleich erneut.",
+        "rateLimited": "Zu viele Prüfungen in kurzer Zeit. Versuchen Sie es in einigen Minuten erneut.",
+        "caption": "Ein Datenstrom. Drei unterscheidbare Informationen.",
+        "pause": "Pause",
+        "animate": "Animieren",
+        "fixed": "Standbild",
+        "showJson": "JSON anzeigen",
+        "hideJson": "JSON ausblenden",
+        "copy": "Ergebnis kopieren",
+        "copied": "Ergebnis kopiert.",
+        "selectCopy": "Der Text ist markiert. Verwenden Sie den Kopierbefehl.",
+        "scope": "Zusatzinformationen hängen von den verfügbaren Quellen ab.",
+        "playgroundLink": "Vollständigen Tester öffnen",
+        "noJs": "JavaScript ist für den Tester und die 3D-Ansicht erforderlich. Bilder und Links bleiben verfügbar.",
+        "detailTitle": "Glas, Metall und Licht.",
+        "detailCaption": "Gewölbtes Glas · gebürstetes Metall · Studioreflexe",
+        "detailUnavailable": "Die Nahansicht ist in diesem Browser nicht verfügbar.",
+        "close": "Schließen"
+      },
+      "gallery": {
+        "eyebrow": "EIN LICHT, DREI ANWENDUNGEN",
+        "title": "Von Rohdaten zu nützlichen Informationen.",
+        "intro": "Eine IBAN lesen, eine Datei prüfen, Ihre Werkzeuge versorgen.",
+        "items": [
+          {
+            "eyebrow": "01 · EINE IBAN LESEN",
+            "title": "Jede Information findet ihren Platz.",
+            "text": "Format, Bank, BIC: klar getrennte Daten mit ihrer Herkunft und ihren Grenzen.",
+            "tags": [
+              "Format",
+              "Bank",
+              "Quellen"
+            ],
+            "link": "Zurück zum Tester",
+            "alt": "Ein Lichtstrahl durchquert eine metallgefasste Linse und beleuchtet drei getrennte Datenfelder."
+          },
+          {
+            "eyebrow": "02 · EINE DATEI PRÜFEN",
+            "title": "Ein präziser Blick auf jede Zeile.",
+            "text": "Bankverbindungen in einer Datei werden zu strukturierten Ergebnissen, die Sie lesen und nutzen können.",
+            "tags": [
+              "Dateien",
+              "Prüfungen",
+              "Ergebnisse"
+            ],
+            "link": "Dateiprüfung entdecken",
+            "alt": "Tabellenblätter werden vom Licht einer Linse durchquert und zu einer geordneten Datei."
+          },
+          {
+            "eyebrow": "03 · WERKZEUGE VERBINDEN",
+            "title": "Die Antwort setzt ihren Weg fort.",
+            "text": "APIs, Agenten und Automatisierungen können eine strukturierte Antwort in ihren eigenen Abläufen weiterverwenden.",
+            "tags": [
+              "API",
+              "Agenten",
+              "Automatisierungen"
+            ],
+            "link": "Dokumentation lesen",
+            "alt": "Die Strahlen der Linse erreichen drei Module für eine API, einen automatischen Ablauf und eine Tabelle."
+          }
+        ]
+      }
     }
   },
   "pricing": {

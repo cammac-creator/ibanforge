@@ -285,6 +285,100 @@
     "badgeFallback": "API en ligne · état en direct",
     "share": {
       "tagline": "ibanforge.com · REST · SDK · MCP · 25 requêtes gratuites par mois, sans e-mail"
+    },
+    "lens": {
+      "hero": {
+        "eyebrow": "DE L’IBAN À L’INFORMATION UTILE",
+        "title": "Votre IBAN entre.",
+        "titleAccent": "Les données prennent forme.",
+        "promise": "IBANforge est la lentille qui révèle le format, la banque et le BIC.",
+        "auditLink": "Contrôler un fichier fournisseurs",
+        "observe": "Observer le verre et le métal",
+        "sceneAlt": "Une lentille de verre cerclée de cuivre transforme le flux entrant en trois rayons sortants.",
+        "signature": "La lentille de vos données",
+        "inputEyebrow": "VOTRE IBAN",
+        "inputTitle": "Un numéro à éclairer.",
+        "inputLabel": "IBAN à vérifier",
+        "submit": "Révéler les données",
+        "loading": "Contrôle en cours…",
+        "examples": "Choisir un exemple",
+        "switzerland": "Suisse",
+        "germany": "Allemagne",
+        "errorExample": "Une erreur",
+        "inputNote": "Essai sans inscription. L’IBAN est envoyé au service lors du contrôle.",
+        "results": "Données révélées",
+        "format": "Format IBAN",
+        "bank": "Banque",
+        "waitFormat": "À vérifier",
+        "waitBank": "À identifier",
+        "waitBic": "À rechercher",
+        "formatHint": "Le contrôle de la structure",
+        "bankHint": "Selon le pays et les sources disponibles",
+        "bicHint": "La provenance accompagne la réponse",
+        "initial": "Lancez le test : les rayons conduisent aux données du résultat.",
+        "edited": "Saisie modifiée. Relancez le contrôle pour révéler ses données.",
+        "unavailable": "Le service est momentanément indisponible. Réessayez dans un instant.",
+        "rateLimited": "Trop de contrôles rapprochés. Réessayez dans quelques minutes.",
+        "caption": "Un flux entre. Trois informations se distinguent.",
+        "pause": "Pause",
+        "animate": "Animer",
+        "fixed": "Vue fixe",
+        "showJson": "Voir le JSON",
+        "hideJson": "Masquer le JSON",
+        "copy": "Copier le résultat",
+        "copied": "Résultat copié.",
+        "selectCopy": "Le texte est sélectionné. Utilisez la commande Copier.",
+        "scope": "Les enrichissements dépendent des sources disponibles.",
+        "playgroundLink": "Ouvrir le testeur complet",
+        "noJs": "JavaScript est nécessaire au testeur et à la 3D. Les illustrations et les liens restent disponibles.",
+        "detailTitle": "Le verre, le métal et la lumière.",
+        "detailCaption": "Verre bombé · métal brossé · reflets de studio",
+        "detailUnavailable": "La vue rapprochée n’est pas disponible dans ce navigateur.",
+        "close": "Fermer"
+      },
+      "gallery": {
+        "eyebrow": "UNE MÊME LUMIÈRE, TROIS USAGES",
+        "title": "De la donnée brute à l’information utile.",
+        "intro": "Lire un IBAN, examiner un fichier, alimenter vos outils.",
+        "items": [
+          {
+            "eyebrow": "01 · Lire un IBAN",
+            "title": "Chaque information trouve sa place.",
+            "text": "Format, banque, BIC : les données se distinguent, avec leur provenance et leurs limites.",
+            "tags": [
+              "Format",
+              "Banque",
+              "Sources"
+            ],
+            "link": "Revenir au testeur",
+            "alt": "Un faisceau traverse une lentille cerclée de métal et éclaire trois plaques de données distinctes."
+          },
+          {
+            "eyebrow": "02 · Examiner un fichier",
+            "title": "Un regard précis sur chaque ligne.",
+            "text": "Les coordonnées bancaires d’un fichier deviennent des résultats structurés à lire et à exploiter.",
+            "tags": [
+              "Fichiers",
+              "Contrôles",
+              "Résultats"
+            ],
+            "link": "Découvrir l’audit de fichiers",
+            "alt": "Des feuilles de tableau traversées par la lumière d’une lentille deviennent un fichier organisé."
+          },
+          {
+            "eyebrow": "03 · CONNECTER LES OUTILS",
+            "title": "La réponse poursuit son chemin.",
+            "text": "API, agents et automatisations peuvent réutiliser une réponse structurée dans leurs propres parcours.",
+            "tags": [
+              "API",
+              "Agents",
+              "Automatisations"
+            ],
+            "link": "Voir la documentation",
+            "alt": "Les rayons sortant de la lentille rejoignent trois modules représentant une API, un automatisme et un tableau."
+          }
+        ]
+      }
     }
   },
   "pricing": {

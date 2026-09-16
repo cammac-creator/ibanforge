@@ -771,3 +771,19 @@ Les tests dédiés couvrent les liens vue/période, les compteurs filtrés, les 
 l’accès aux actions et le rendu des nombres dans les trois langues. La publication et la
 recette finale sur le domaine authentifié restent à l’intégrateur principal. L’ancienne
 boucle de redirection anglaise du serveur Next local (section 9) reste hors de ce chantier.
+
+## 13. Accueil autour de la lentille
+
+`frontend/components/lens/` réunit le testeur, la scène 3D chargée à la demande et les
+illustrations. Le testeur appelle le relais existant `/api/playground` uniquement à la
+demande. Il ne stocke pas la saisie, annule les requêtes périmées et efface les résultats
+dès une modification. `response.ts` reprend le verdict partagé du playground : un
+format valide ne confirme pas une banque et une absence dans une source partielle ne
+devient pas un refus. Les sources, dates, crédits et réserves reçus accompagnent la réponse.
+
+Le moteur conserve une image fixe de secours, la pause, la réduction des mouvements et
+l’arrêt hors écran. Le gros plan crée son moteur à l’ouverture et le détruit à la
+fermeture. Les images et polices de `public/brand/lens/` portent une empreinte dans leur
+nom ; si leur contenu change, renommer le fichier et actualiser `assets.ts` ou le CSS.
+Les licences des polices restent à côté des fichiers. Aucun secret ou dépendance de
+base de données ne doit entrer dans cette partie cliente.
