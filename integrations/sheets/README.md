@@ -1,8 +1,7 @@
 # IBANforge for Google Sheets
 
 An Editor add-on: four custom functions that check a column of IBANs against the bank
-registers behind `api.ibanforge.com`, on the user's own IBANforge key (free tier: 200
-requests a month, no card; then prepaid packs or the Pro plan).
+registers behind `api.ibanforge.com`, on the user's own IBANforge key (25 requests/month without email; claim the same key for 200/month, no card; then prepaid packs or the Pro plan).
 
 | Function | Returns |
 |---|---|
@@ -82,3 +81,7 @@ Eight steps, nothing to invent, every text is in `LISTING.md` next to this file:
 
 Until then the code is open source here; anyone can paste it into their own script project
 (the page on ibanforge.com says exactly that).
+
+## Générer le kit téléchargeable du site
+
+Après une modification des trois fichiers Apps Script, exécuter `python3 integrations/sheets/export-download.py` depuis la racine du dépôt. Le script génère un ZIP déterministe, nomme le fichier avec son empreinte et actualise les liens des recettes FR/EN/DE. Le kit reste une installation manuelle ; il ne publie rien sur le Marketplace.

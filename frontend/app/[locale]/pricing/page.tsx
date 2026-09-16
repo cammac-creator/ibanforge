@@ -4,7 +4,6 @@ import { getTranslations } from "next-intl/server"
 import { CreditCard, FlaskConical, Link2, Wallet, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CodeBlock } from "@/components/code-block"
 import { CostCalculator } from "./calculator"
 import { Faq } from "./faq"
 import { ClientMessages } from "@/components/client-messages"
@@ -60,22 +59,6 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     { Icon: FlaskConical, text: t('x402.items.3') },
   ]
 
-  // x402 example snippet — rendered through the shared <CodeBlock> so every
-  // code surface on the site speaks the same visual language.
-  const X402_SNIPPET = [
-    t('x402.codeExample.install'),
-    "npm install x402-fetch",
-    "",
-    t('x402.codeExample.call'),
-    'import { wrapFetch } from "x402-fetch"',
-    t('x402.codeExample.comment'),
-    "const fetch = wrapFetch()",
-    "",
-    "const res = await fetch(",
-    '  "https://api.ibanforge.com/v1/iban/validate"',
-    ")",
-  ].join("\n")
-
   // FAQPage JSON-LD removed 2026-08: Google dropped the FAQ rich result on
   // 2026-05-07. The visible FAQ section below is what humans and crawlers read.
 
@@ -106,11 +89,27 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             size="lg"
             variant="outline"
             className="px-6"
+            nativeButton={false}
             render={<Link href={localePath(locale, '/playground')} />}
           >
             {t('hero.cta.tryFree')}
           </Button>
         </div>
+      </section>
+
+      <section aria-labelledby="pricing-uses" className="px-4 pb-12 max-w-5xl mx-auto w-full">
+        <h2 id="pricing-uses" className="text-xl font-semibold mb-5">{t("uses.heading")}</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          {(["occasional", "regular", "agent"] as const).map((use, i) => (
+            <a key={use} href={["#packs", "#pro", "#x402"][i]} className="rounded-xl border border-border p-5 hover:border-amber-500/60 focus-visible:outline-2 focus-visible:outline-amber-500">
+              <span className="font-mono text-xs text-amber-500">0{i + 1}</span>
+              <h3 className="font-semibold mt-3">{t(`uses.${use}.title`)}</h3>
+              <p className="text-sm text-muted-foreground mt-2">{t(`uses.${use}.body`)}</p>
+              <span className="block text-sm text-amber-500 mt-4">{t(`uses.${use}.cta`)} →</span>
+            </a>
+          ))}
+        </div>
+        <a href="#estimate" className="inline-block mt-5 text-sm underline underline-offset-4">{t("uses.estimate")}</a>
       </section>
 
       {/* ── Three payment rails ───────────────────────────────────────────── */}
@@ -139,7 +138,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </GetKeyButton>
           </div>
           {/* 2. Credit packs — buyable via Stripe (live card checkout) */}
-          <div className="card-surface rounded-xl border p-6 flex flex-col gap-3">
+          <div id="packs" className="card-surface scroll-mt-28 rounded-xl border p-6 flex flex-col gap-3">
             <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
               {t('rails.packs.tag')}
             </span>
@@ -206,7 +205,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       {/* ── Pro: the flat monthly plan (02/09/2026). Sits right under the three
           rails because it answers the question the packs raise: what if I would
           rather budget one number a month? ── */}
-      <section className="px-4 pb-16 max-w-5xl mx-auto w-full">
+      <section id="pro" className="scroll-mt-28 px-4 pb-16 max-w-5xl mx-auto w-full">
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
           <div className="flex-1 flex flex-col gap-2">
             <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
@@ -225,6 +224,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
               size="sm"
               variant="amber"
               className="px-5"
+              nativeButton={false}
               render={<a href={PRO_PAYMENT_LINK} rel="noopener" />}
             >
               {t('pro.cta')}
@@ -313,7 +313,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       </section>
 
       {/* ── Cost calculator ───────────────────────────────────────────────── */}
-      <section className="px-4 py-16 max-w-3xl mx-auto w-full">
+      <section id="estimate" className="scroll-mt-28 px-4 py-16 max-w-3xl mx-auto w-full">
         <h2 className="text-2xl font-semibold tracking-tight mb-2 text-center">
           {t('calculator.heading')}
         </h2>
@@ -324,8 +324,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         <ClientMessages ns={["pricing"]}><CostCalculator /></ClientMessages>
       </section>
 
-      {/* ── x402 explainer ────────────────────────────────────────────────── */}
-      <section className="px-4 py-16 max-w-5xl mx-auto w-full">
+      {/* Paiement pour les clients HTTP configurés. */}
+      <section id="x402" className="px-4 py-16 max-w-5xl mx-auto w-full">
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-8 flex flex-col gap-8 sm:flex-row sm:gap-12">
           <div className="flex flex-col gap-4 flex-1">
             <Badge
@@ -353,12 +353,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </Link>
           </div>
 
-          {/* Code snippet — shared CodeBlock (same hairline/ink language as /agents and the landing) */}
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
-              {t('x402.codeExample.title')}
-            </p>
-            <CodeBlock code={X402_SNIPPET} language="typescript" />
+          <div className="flex-1 rounded-lg border border-border p-5 self-start">
+            <p className="text-sm text-muted-foreground leading-relaxed">{t("x402.setup")}</p>
           </div>
         </div>
       </section>
@@ -423,6 +419,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             variant="amber"
             size="lg"
             className="px-8"
+            nativeButton={false}
             render={<Link href={localePath(locale, '/playground')} />}
           >
             {t('cta.openPlayground')}
@@ -431,6 +428,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             size="lg"
             variant="outline"
             className="px-8"
+            nativeButton={false}
             render={<Link href={localePath(locale, '/docs')} />}
           >
             {t('cta.readDocs')}

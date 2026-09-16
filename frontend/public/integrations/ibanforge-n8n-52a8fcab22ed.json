@@ -1,0 +1,55 @@
+{
+  "name": "IBANforge — premier contrôle sans clé",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a2fe6c73-ec07-471b-9ec8-a29cbd7726ec",
+      "name": "Démarrer manuellement",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ibanforge.com/v1/iban/validate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"iban\": \"DE89370400440532013000\"}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "d3b2f4e7-c598-4a40-9bc3-c9ea63514c77",
+      "name": "Contrôler l’exemple de documentation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Démarrer manuellement": {
+      "main": [
+        [
+          {
+            "node": "Contrôler l’exemple de documentation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

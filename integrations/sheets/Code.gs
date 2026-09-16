@@ -10,7 +10,7 @@
  * French and German aliases: IBAN_VALIDE / IBAN_BANQUE / IBAN_CONTROLE and
  * IBAN_GUELTIG / IBAN_BANKNAME / IBAN_PRUEFUNG. Same code path.
  *
- * Billing: the user's own IBANforge key (free tier: 200 requests a month, no
+ * Billing: the user's own IBANforge key (25 requests/month without email; claim the same key for 200/month, no
  * card; then prepaid packs or the Pro plan). One request per IBAN, sent in
  * batches of 100 to POST /v1/iban/batch. Results are cached for six hours per
  * user, so a recalculated sheet does not pay twice for the same IBAN.
@@ -55,7 +55,7 @@ function ibfShowHelp() {
       '=IBAN_BANK(A2:A200)   bank named by the register\n' +
       '=IBAN_BIC(A2:A200)    BIC\n' +
       '=IBAN_CHECK(A2:A200)  valid, bank, BIC, bank-code verdict, SEPA\n\n' +
-      'One request per IBAN on your own key (200 free a month). Results are cached for six hours.',
+      'One request per IBAN: 25/month without email, 200/month after claiming. Results are cached for six hours.',
     ui.ButtonSet.OK
   );
 }
@@ -270,7 +270,7 @@ function ibfResolve_(ibans) {
 
   var key = PropertiesService.getUserProperties().getProperty(IBF_KEY_PROP);
   if (!key) {
-    throw new Error('IBANforge: no API key yet. Extensions > IBANforge > Set up API key (free, 200 checks a month).');
+    throw new Error('IBANforge: no API key yet. Extensions > IBANforge > Set up API key (25/month without email; 200/month after claiming).');
   }
   var toCache = {};
   for (var i = 0; i < missing.length; i += IBF_BATCH) {

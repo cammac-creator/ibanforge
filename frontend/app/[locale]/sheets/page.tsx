@@ -61,6 +61,12 @@ export default async function SheetsPage({
         </div>
       </header>
 
+      <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t("example.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("example.body")}</p>
+        <Link href={localePath(locale, "/docs/recipes#integration-sheets")} className="text-sm text-amber-500 underline underline-offset-4">{t("example.cta")} →</Link>
+      </section>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t("functions.title")}</h2>
         <div className="overflow-x-auto rounded-md border" style={{ borderColor: "var(--hairline)" }}>

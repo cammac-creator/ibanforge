@@ -1,4 +1,6 @@
 import catalogue from "@/data/onboarding.json";
+import Link from "next/link";
+import { localePath } from "@/lib/locale-path";
 import { JourneyActions } from "@/components/journey-actions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -49,38 +51,20 @@ const MCP_CLAUDE_DESKTOP_JSON = `{
   }
 }`;
 
-const counts = { remote: catalogue.remote.length, installed: catalogue.installed.length };
+const counts = { daily: catalogue.remoteDaily, remote: catalogue.remote.length, installed: catalogue.installed.length };
 const FREE_KEY_CURL = `curl -X POST https://api.ibanforge.com/v1/keys/generate
 
 # → { "api_key": "ifk_...", "monthly_limit": ${catalogue.anonymousMonthly} }`;
 
 const SDK_PYTHON_QUICKSTART = `# pip install ibanforge
+import os
 from ibanforge import IBANforge
 
-# Créer une clé sans adresse e-mail
-key = IBANforge.generate_api_key()
-
-with IBANforge(api_key=key["api_key"]) as client:
-    out = client.validate_iban("CH1000230000000012345")
-    print(out["country"]["code"])              # CH
-    print(out["bic"]["bank_name"])            # UBS Switzerland AG
-    print(out["sepa"]["member"])              # True
-    print(out["risk_indicators"]["country_risk"])  # "standard"
-
-    # Compliance triage in one call ($0.02)
-    out = client.check_compliance("GB29NWBK60161331926819")
-    print(out["compliance"]["risk_score"])    # 0-100
-    print(out["compliance"]["risk_level"])    # "low" | "medium" | "elevated" | "high" | "critical"
-
-# Async path (FastAPI / LangChain async / fan-out)
-import asyncio
-from ibanforge import AsyncIBANforge
-
-async def main():
-    async with AsyncIBANforge(api_key=key["api_key"]) as client:
-        results = await asyncio.gather(*[
-            client.validate_iban(iban) for iban in many_ibans
-        ])`;
+with IBANforge(api_key=os.environ["IBANFORGE_API_KEY"]) as client:
+    out = client.validate_iban("DE89370400440532013000")
+    print(out["valid"])
+    print(out.get("bank_code_check"))
+    print(out.get("bic"))`;
 
 const SDK_TYPESCRIPT_QUICKSTART = `// npm install @ibanforge/sdk
 import { IBANforge } from "@ibanforge/sdk";
@@ -210,11 +194,23 @@ export default async function AgentsPage({
           {t("mcp.description", counts)}
         </p>
 
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5 sm:p-7 mb-8">
+          <h3 className="text-xl font-semibold mb-2">{t("http.heading")}</h3>
+          <p className="text-sm text-muted-foreground mb-5">{t("http.body")}</p>
+          <p className="text-xs text-muted-foreground mb-2">{t("http.label")}</p>
+          <CodeBlock code="https://api.ibanforge.com/mcp" language="text" className="[&_pre]:whitespace-pre-wrap [&_code]:break-all" />
+          <ol className="list-decimal pl-5 space-y-3 text-sm mt-5">
+            {[0, 1, 2].map((step) => <li key={step}>{t(`http.steps.${step}`)}</li>)}
+          </ol>
+          <p className="text-xs text-muted-foreground mt-5">{t("http.limits", counts)}</p>
+          <Link href={localePath(locale, "/docs/mcp")} className="inline-block mt-4 text-sm text-amber-500 underline underline-offset-4">{t("http.guide")} →</Link>
+        </div>
+        <h3 className="font-semibold mb-4">{t("http.local")}</h3>
         <div className="rounded-lg border p-5 mb-6" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
           <p className="font-mono text-xs uppercase tracking-caps text-muted-foreground mb-2">
             {t("mcp.claudeLabel")}
           </p>
-          <p className="text-sm text-muted-foreground mb-3">
+          <p className="text-sm text-muted-foreground mb-3 break-all">
             {t("mcp.claudePath")}
           </p>
           <CodeBlock code={MCP_CLAUDE_DESKTOP_JSON} language="json" />
@@ -280,15 +276,14 @@ export default async function AgentsPage({
           className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3"
           style={{ letterSpacing: "-0.02em" }}
         >
-          Drop-in libraries
+          {t("http.sdkHeading")}
         </h2>
         <p className="text-muted-foreground mb-8 text-sm" style={{ lineHeight: 1.65 }}>
-          Skip the HTTP wiring. Type-safe clients with sync + async, retry-aware
-          exception classes, and a free-tier quota fallback to x402 baked in.
+          {t("http.sdkBody")}
         </p>
 
         <div className="rounded-lg border p-5 mb-6" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-          <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <p className="font-mono text-xs uppercase tracking-caps text-muted-foreground">
               Python
             </p>
@@ -305,7 +300,7 @@ export default async function AgentsPage({
         </div>
 
         <div className="rounded-lg border p-5" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-          <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <p className="font-mono text-xs uppercase tracking-caps text-muted-foreground">
               TypeScript / JavaScript
             </p>
@@ -354,19 +349,19 @@ export default async function AgentsPage({
 
         <div className="flex flex-col gap-3">
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow method="POST" path="/v1/iban/validate" price="$0.005" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/validate" price="$0.005" />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow method="POST" path="/v1/iban/batch" price="$0.002 / IBAN" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/batch" price="$0.002 / IBAN" />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow method="GET" path="/v1/bic/:code" price="$0.003" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="GET" path="/v1/bic/:code" price="$0.003" />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow method="GET" path="/v1/ch/clearing/:iid" price="$0.003" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="GET" path="/v1/ch/clearing/:iid" price="$0.003" />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow method="POST" path="/v1/iban/compliance" price="$0.02" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/compliance" price="$0.02" />
           </div>
         </div>
       </section>
