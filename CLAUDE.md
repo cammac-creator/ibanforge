@@ -221,8 +221,9 @@ Tests live next to source files (`*.test.ts`). Use vitest with no special config
 
 ## Remettre une PR à l'intégrateur (depuis le 15.09.2026)
 
-La session principale Claude Code intègre **toute seule** : tant que son terminal est ouvert, elle
-repasse toutes les quinze à vingt minutes, prend chaque PR prête l'une après l'autre, relit le
+La session principale Claude Code intègre **toute seule** : un veilleur sur le Mac de l'intégrateur
+regarde ce dépôt toutes les cinq minutes (sans terminal ouvert, sans dépenser un jeton tant que rien
+n'est prêt) et lance une passe dès qu'une PR est prête ; la passe prend chaque PR prête l'une après l'autre, relit le
 diff, fusionne dans `main` avec les contrôles locaux (dont `next build`, que la CI ne fait pas),
 surveille le déploiement, prouve le changement en ligne, pose le jalon sur la feuille de route
 privée et prévient Claude-Alain. On ne lui demande rien, sauf quand une règle dit que c'est à lui.

@@ -165,8 +165,10 @@ before you take them.
 
 ## Handing a pull request to the integrator (since 15 September 2026)
 
-The main Claude Code session integrates automatically: it polls this repository every fifteen to
-twenty minutes while its terminal is open, takes each ready pull request in turn, reads the diff,
+The main Claude Code session integrates automatically: a watcher on the integrator's Mac polls
+this repository every five minutes (no terminal needed, no tokens spent while nothing is ready)
+and starts an integration pass as soon as a pull request is ready; the pass takes each ready pull
+request in turn, reads the diff,
 merges it into `main` with the local checks (including `next build`, which CI does not run),
 watches the deployment, proves the change online, records a milestone on the private roadmap and
 tells Claude-Alain. Nothing is asked of him unless a rule says it is his decision.
