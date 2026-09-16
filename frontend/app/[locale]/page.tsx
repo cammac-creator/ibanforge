@@ -333,7 +333,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── Finale: the ember ridge behind the last call ──────────────────── */}
+      {/* Un dernier reflet de verre accompagne l’appel à l’action. */}
       <section className="cta-final" aria-labelledby="h-cta">
         <div className="wrap">
           <h2 id="h-cta">{t('cta.heading')}</h2>
