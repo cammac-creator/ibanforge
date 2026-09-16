@@ -787,3 +787,14 @@ fermeture. Les images et polices de `public/brand/lens/` portent une empreinte d
 nom ; si leur contenu change, renommer le fichier et actualiser `assets.ts` ou le CSS.
 Les licences des polices restent à côté des fichiers. Aucun secret ou dépendance de
 base de données ne doit entrer dans cette partie cliente.
+
+Deux choses relevées à l'intégration, à savoir avant de chercher une panne ailleurs :
+
+- Le périmètre de vitest du site ne couvrait que `lib/` et `app/`. Le fichier de tests
+  arrivé avec la lentille vivait sous `components/` : vitest ne le trouvait pas et
+  sortait vert sans lui. `components/**/*.test.ts` a été ajouté à l'`include` de
+  `frontend/vitest.config.ts` ; un test placé ailleurs que dans ces trois dossiers ne
+  tourne toujours pas, et son absence ressemble à un succès.
+- Les deux mesures du film (`film:start`, `film:end`) du tableau de bord affichent
+  désormais zéro en permanence : le film qui les émettait a été retiré de l'accueil avec
+  ce chantier. Ce n'est pas une panne de collecte.
