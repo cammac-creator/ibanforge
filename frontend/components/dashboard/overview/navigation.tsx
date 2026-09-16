@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Activity, ChartNoAxesCombined, CircleDollarSign, Sun } from 'lucide-react';
 import { OVERVIEW_VIEWS, overviewHref, type OverviewView } from '@/lib/dashboard/workspace';
@@ -17,6 +17,7 @@ const ICONS = {
 
 export function OverviewNavigation({ view, period }: { view: OverviewView; period: number }) {
   const pathname = usePathname();
+  const audience = useSearchParams().get('audience') ?? undefined;
   const w = useTranslations('dashboard.workspace');
   const o = useTranslations('dashboard.overview');
   return (
@@ -45,7 +46,7 @@ export function OverviewNavigation({ view, period }: { view: OverviewView; perio
           {[7, 30, 90].map((days) => (
             <Link
               key={days}
-              href={overviewHref(pathname, view, days)}
+              href={overviewHref(pathname, view, days, audience)}
               prefetch={false}
               aria-current={days === period ? 'true' : undefined}
             >
@@ -54,7 +55,7 @@ export function OverviewNavigation({ view, period }: { view: OverviewView; perio
           ))}
         </nav>
       </div>
-      <p className={styles.viewIntro}>{w(`${view}Intro`)}</p>
+      {view !== 'growth' && <p className={styles.viewIntro}>{w(`${view}Intro`)}</p>}
     </div>
   );
 }

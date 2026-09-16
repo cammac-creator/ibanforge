@@ -1,4 +1,5 @@
 import { InfoDot } from './info-dot';
+import styles from './activation-funnel.module.css';
 // The arithmetic lives in lib/ because the frontend test runner collects
 // lib/**/*.test.ts and app/**/*.test.ts only: a percentage computed inline in
 // JSX is a percentage no test can reach, which is how "300 %" shipped.
@@ -52,7 +53,7 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
   };
 
   return (
-    <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5">
+    <div className={`${styles.funnel} rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5`}>
       <div className="mb-4 flex items-center gap-2">
         <p className="flex items-center gap-2 text-sm font-medium text-[var(--fg-2)]">
           Activation des inscrits — {funnel.period_days} jours
@@ -68,7 +69,7 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
         </InfoDot>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className={styles.steps}>
         {STEPS.map((s, i) => {
           const v = values[s.key];
           // DASH-06 (audit 2026-09-01): the denominator is the population, not
@@ -80,9 +81,9 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
           const width = Math.max((v / max) * 100, v > 0 ? 3 : 0);
           const med = medians[s.key];
           return (
-            <div key={s.key} className="flex items-center gap-3">
-              <span className="w-40 shrink-0 text-right text-xs text-[var(--fg-3)]">{s.label}</span>
-              <div className="relative h-6 flex-1 overflow-hidden rounded bg-[var(--ink-4)]/40">
+            <div key={s.key} className={styles.step}>
+              <span className={styles.label}>{s.label}</span>
+              <div className={`${styles.bar} relative h-6 overflow-hidden rounded bg-[var(--ink-4)]/40`}>
                 <div
                   className="flex h-full items-center rounded pl-2"
                   style={{ width: `${width}%`, backgroundColor: `${s.color}33`, borderLeft: `3px solid ${s.color}` }}
@@ -92,8 +93,8 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
                   </span>
                 </div>
               </div>
-              {/* 176 px fixed pushed the page 7 px past a 390 px viewport (mobile audit, 2026-09-02): narrower on phones, the caption wraps. */}
-              <span className="w-32 shrink-0 text-xs text-[var(--fg-5)] sm:w-44">
+              {/* Sur téléphone, la barre occupe sa propre ligne ; aucun chiffre ne sort de la carte. */}
+              <span className={styles.caption}>
                 {pct !== null ? `${pct} % des inscrits` : ' '}
                 {med ? ` · ${med}` : ''}
               </span>

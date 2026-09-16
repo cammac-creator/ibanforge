@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import { overviewView } from '@/lib/dashboard/workspace';
 import { OverviewNavigation } from '@/components/dashboard/overview/navigation';
+import { AudienceSection } from '@/components/dashboard/audience/section';
+import { audienceSince } from '@/lib/dashboard/audience-model';
 import { getLocale } from 'next-intl/server';
 import type { BusinessFunnelDay } from '@/components/dashboard/business-funnel-chart';
 import type { ChannelRow } from '@/components/dashboard/channels-panel';
@@ -203,13 +205,23 @@ export default async function DashboardPage({
    * pass `new Date().toISOString()` to the same badge in production.
    */
   const readAtIso = new Date().toISOString();
+  // La route funnel part de `since` ; son paramètre `days` n'est pas une fenêtre glissante.
+  const audienceFunnelP = adminFor<unknown>(
+    growth, `/v1/admin/funnel?since=${audienceSince(period, readAtIso)}`,
+  );
+  const audienceWebP = period === 7 ? doorsWeekP
+    : period === 30 ? doorsMonthP
+      : adminFor<WebEventsSummary>(growth, '/v1/admin/web-events?days=90');
+  const audienceSourcesP = period === 7 ? signupSourcesWeekP
+    : period === 30 ? signupSourcesP
+      : adminFor<SignupSources>(growth, '/v1/admin/signup-sources?days=90');
   // 180 days: the card compares each window with the one before it, and the
   // 90-day window needs the 90 before it to say so.
   const trendP = growth ? fetchTrafficTrend(180) : null;
 
   return (
-    <div className="flex min-w-0 flex-col gap-7">
-      <OverviewHeader readAtIso={readAtIso} />
+    <div className={`flex min-w-0 flex-col ${growth ? 'gap-4' : 'gap-7'}`}>
+      <OverviewHeader readAtIso={readAtIso} audience={growth} />
       <OverviewNavigation view={view} period={period} />
 
       <Suspense
@@ -251,12 +263,6 @@ export default async function DashboardPage({
         </Suspense>
       )}
 
-      {trendP && (
-        <Suspense fallback={<SectionSkeleton tall />}>
-          <TrafficSection nowIso={readAtIso} trendPromise={trendP} />
-        </Suspense>
-      )}
-
       {service && (
         <Suspense fallback={<SectionSkeleton rows={3} />}>
           <BrokenSection
@@ -269,24 +275,34 @@ export default async function DashboardPage({
         </Suspense>
       )}
 
-      {growth && (
+      {growth && trendP && (
         <Suspense fallback={<SectionSkeleton tall />}>
-          <NewSection
-            locale={locale}
+          <AudienceSection
+            trendPromise={trendP}
+            webPromise={audienceWebP}
+            sourcesPromise={audienceSourcesP}
+            googlePromise={searchConsoleP}
+            funnelPromise={audienceFunnelP}
             nowIso={readAtIso}
-            activationPromise={activationP}
-            clientsPromise={clientsP}
-            crmPromise={crmP}
-            historyPromise={historyP}
-            demandGapsPromise={demandGapsP}
-            feedbackPromise={feedbackP}
-            sourcesPromise={signupSourcesP}
-            sourcesWeekPromise={signupSourcesWeekP}
-            auditStatsPromise={auditStatsP}
-            doorsWeekPromise={doorsWeekP}
-            doorsMonthPromise={doorsMonthP}
-            searchConsolePromise={searchConsoleP}
-          />
+            period={period}
+          >
+            <TrafficSection nowIso={readAtIso} trendPromise={trendP} />
+            <NewSection
+              locale={locale}
+              nowIso={readAtIso}
+              activationPromise={activationP}
+              clientsPromise={clientsP}
+              crmPromise={crmP}
+              historyPromise={historyP}
+              demandGapsPromise={demandGapsP}
+              feedbackPromise={feedbackP}
+              sourcesPromise={signupSourcesP}
+              sourcesWeekPromise={signupSourcesWeekP}
+              auditStatsPromise={auditStatsP}
+              doorsWeekPromise={doorsWeekP}
+              doorsMonthPromise={doorsMonthP}
+            />
+          </AudienceSection>
         </Suspense>
       )}
 
