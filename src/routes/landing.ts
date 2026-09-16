@@ -1261,7 +1261,7 @@ landing.get('/', (c) => {
               <div class="path-card path-stripe">
                 <div class="path-badge path-badge-blue">CREDIT PACKS</div>
                 <h3>Stripe / Card</h3>
-                <p class="path-price"><strong>From $5 / 1k credits</strong> &mdash; pay by card</p>
+                <p class="path-price"><strong>From $4 / 1k credits</strong> &mdash; pay by card</p>
                 <ul class="path-features">
                   <li><span class="check">&check;</span> Credits never expire</li>
                   <li><span class="check">&check;</span> Bearer token, all endpoints</li>
@@ -1276,7 +1276,7 @@ landing.get('/', (c) => {
                 <div class="stripe-buttons" data-stripe-guard="true">
                   <a href="${PAYMENT_LINKS['1k']}" class="stripe-pack-btn" data-stripe-bundle="1k">
                     <span class="pack-credits">1 000</span>
-                    <span class="pack-price">$5</span>
+                    <span class="pack-price">$4</span>
                     <span class="pack-rate">$0.005/call</span>
                   </a>
                   <a

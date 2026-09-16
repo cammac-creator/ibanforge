@@ -52,8 +52,8 @@ const AUDIT_UPLOAD_PAYLOAD = {
   job: AUDIT_JOB_ID,
   rows: 2,
   tier: 'standard',
-  price_chf: 149,
-  currency: 'CHF',
+  price: 149,
+  currency: 'USD',
   lang: 'fr',
   paid: false,
   paid_at: null,
@@ -69,7 +69,7 @@ const AUDIT_UPLOAD_PAYLOAD = {
     columns_detected: ['iban', 'name'],
     address_checked: false,
     tier: 'standard',
-    price_chf: 149,
+    price: 149,
   },
   preview: [
     { line: 2, iban_masked: 'CH10 **** 2346', status: 'error', findings: ['iban_invalid'], bank_name: null },
@@ -78,8 +78,8 @@ const AUDIT_UPLOAD_PAYLOAD = {
   download: null,
   processing_ms: 3.2,
   tiers: [
-    { up_to_rows: 5000, price_chf: 149 },
-    { up_to_rows: 20000, price_chf: 349 },
+    { up_to_rows: 5000, price: 149 },
+    { up_to_rows: 20000, price: 349 },
   ],
 };
 
@@ -162,7 +162,7 @@ beforeAll(async () => {
     }
     if (req.url?.startsWith('/v1/audit/checkout/') && req.method === 'POST') {
       res.writeHead(200).end(
-        JSON.stringify({ url: 'https://checkout.stripe.com/pay/cs_test_stub123', session_id: AUDIT_SESSION_ID, price_chf: 149 }),
+        JSON.stringify({ url: 'https://checkout.stripe.com/pay/cs_test_stub123', session_id: AUDIT_SESSION_ID, price: 149, currency: 'USD' }),
       );
       return;
     }
@@ -334,7 +334,7 @@ describe('audit_creditor_file / audit_status: the paid creditor-file audit', () 
     expect(sent).toContain('name="lang"');
 
     expect(res.structuredContent, 'audit_creditor_file returned no structuredContent').toBeDefined();
-    expect(res.structuredContent).toMatchObject({ job: AUDIT_JOB_ID, paid: false, price_chf: 149 });
+    expect(res.structuredContent).toMatchObject({ job: AUDIT_JOB_ID, paid: false, price: 149 });
     const note = (res.structuredContent as { _note?: string })._note ?? '';
     expect(note, 'the free preview must say the full report is a paid deliverable').toMatch(/paid|Stripe/i);
   });

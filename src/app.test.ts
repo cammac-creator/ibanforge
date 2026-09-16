@@ -327,8 +327,8 @@ describe('the 402 an indexer reads', () => {
     expect(body.accepts[0]).toMatchObject({
       scheme: 'exact',
       network: 'eip155:8453',
-      // $5.00 in USDC's 6 decimals. A change here is a price change.
-      amount: '5000000',
+      // $4.00 in USDC's 6 decimals (16/09/2026). A change here is a price change.
+      amount: '4000000',
       asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
       payTo: WALLET,
       maxTimeoutSeconds: 60,

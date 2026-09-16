@@ -10,7 +10,10 @@
  * Keep in sync with `src/routes/landing.ts` and `frontend/app/[locale]/pricing`.
  */
 export const PAYMENT_LINKS = {
-  '1k': 'https://buy.stripe.com/3cI00c18lauh1i8bqO8so00',
+  // 16/09/2026 : le pack d'entrée passe de 5 $ à 4 $ (décision de Claude-Alain sur
+  // l'audit du jour : acheter doit toujours coûter moins que payer à l'appel).
+  // Nouveau lien, même métadonnée `bundle: 1k` ; l'ancien lien à 5 $ est désactivé.
+  '1k': 'https://buy.stripe.com/bJe3coeZb31P6CsamK8so05',
   '5k': 'https://buy.stripe.com/aFafZa6sF45TaSI9iG8so01',
   '25k': 'https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02',
 } as const;
@@ -24,6 +27,13 @@ export const PAYMENT_LINKS = {
 export const PRO_PAYMENT_LINK = 'https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04';
 export const PRO_PRICE_USD = 29;
 
+/**
+ * Portail client Stripe de l'abonnement Pro (16/09/2026) : le client y gère sa
+ * carte, ses factures et sa résiliation lui-même. Page de connexion par e-mail,
+ * pas de session à créer côté API. Cité dans les CGU (§3) et le mail Pro.
+ */
+export const PRO_PORTAL_URL = 'https://billing.stripe.com/p/login/3cI00c18lauh1i8bqO8so00';
+
 /** Entry-level pack: the cheapest way to turn a blocked call into a paid one. */
 export const ENTRY_PAYMENT_LINK = PAYMENT_LINKS['1k'];
 
@@ -36,6 +46,6 @@ export const PRICING_PAGE = 'https://ibanforge.com/pricing';
  * settle, a human integrator needs a link they can actually click.
  */
 export const CARD_CHECKOUT_HINT =
-  `Pay by card in one click: ${ENTRY_PAYMENT_LINK} (1,000 credits, $5) ` +
+  `Pay by card in one click: ${ENTRY_PAYMENT_LINK} (1,000 credits, $4) ` +
   `— all packs: ${PRICING_PAGE} ` +
   `— or a flat $${PRO_PRICE_USD}/month for 10,000 requests: ${PRO_PAYMENT_LINK}`;

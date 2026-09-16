@@ -148,8 +148,9 @@ describe('GET /v1/credits/bundles', () => {
     expect(slugs).toContain('25k');
     const oneK = body.bundles.find((b) => b.slug === '1k')!;
     expect(oneK.credits).toBe(1000);
-    expect(oneK.price_usdc).toBe(5);
-    expect(oneK.price_per_call_usdc).toBe(0.005);
+    // 16/09/2026: the entry pack costs $4, so buying is always cheaper than paying per call.
+    expect(oneK.price_usdc).toBe(4);
+    expect(oneK.price_per_call_usdc).toBe(0.004);
   });
 });
 

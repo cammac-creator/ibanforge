@@ -388,7 +388,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - GET|POST /v1/reference/validate — FREE structured payment reference validation: RF/ISO 11649 ("SCOR"), Swiss QR reference ("QRR"), Belgian OGM/VCS, Finnish viitenumero, each judged against the dated primary document that publishes the rule. Add the reference to a paid /v1/iban/validate call to get the QRR↔QR-IBAN pairing verdict.
 - POST /v1/address/check — FREE ISO 20022 postal address conformity check against sps (SIX), hvps_plus (T2) or fedwire rules, every finding citing its source document. No 'cbpr+' scheme on purpose: that guideline is unreachable to automated readers and a boolean quoting an unread document would be a guess.
 - GET /v1/credits/bundles — free, list prepaid credit bundles
-- POST /v1/credits/buy/:bundle — buy credits via x402 (1k=$5, 5k=$20, 25k=$80)
+- POST /v1/credits/buy/:bundle — buy credits via x402 (1k=$4, 5k=$20, 25k=$80)
 - POST /v1/feedback — free, report incorrect data or claim x402 refunds (MCP tool: \`send_feedback\`, the only one that writes)
 
 ## Concrete examples (copy-paste curls)

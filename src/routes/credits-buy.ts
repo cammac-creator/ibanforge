@@ -20,7 +20,7 @@ import { buildFirstCallCurl } from '../lib/first-call.js';
 import { sendApiKeyEmail, alertKeyDeliveryFailure } from '../lib/email.js';
 
 const BUNDLES: Record<string, { credits: number; price_usdc: number }> = {
-  '1k': { credits: 1000, price_usdc: 5 },
+  '1k': { credits: 1000, price_usdc: 4 },
   '5k': { credits: 5000, price_usdc: 20 },
   '25k': { credits: 25000, price_usdc: 80 },
 };

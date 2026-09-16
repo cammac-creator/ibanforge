@@ -48,8 +48,8 @@ export default async function AuditPage({
     url: urlFor(locale, '/audit'),
     image: [auditImageFor(locale).url],
     offers: [
-      { "@type": "Offer", price: "149", priceCurrency: "CHF", description: t("prices.standard"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
-      { "@type": "Offer", price: "349", priceCurrency: "CHF", description: t("prices.large"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
+      { "@type": "Offer", price: "149", priceCurrency: "USD", description: t("prices.standard"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
+      { "@type": "Offer", price: "349", priceCurrency: "USD", description: t("prices.large"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
     ],
   };
 
@@ -108,10 +108,10 @@ export default async function AuditPage({
         <div className="rounded-lg border p-5 flex flex-col gap-3">
           <h2 className="font-semibold">{t("prices.title")}</h2>
           <p className="text-2xl font-semibold tracking-tight">
-            149 CHF <span className="text-sm font-normal text-muted-foreground">{t("prices.standard")}</span>
+            $149 <span className="text-sm font-normal text-muted-foreground">{t("prices.standard")}</span>
           </p>
           <p className="text-2xl font-semibold tracking-tight">
-            349 CHF <span className="text-sm font-normal text-muted-foreground">{t("prices.large")}</span>
+            $349 <span className="text-sm font-normal text-muted-foreground">{t("prices.large")}</span>
           </p>
           <p className="text-sm text-muted-foreground leading-relaxed">{t("prices.note")}</p>
         </div>

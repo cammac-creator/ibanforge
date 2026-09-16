@@ -18,7 +18,8 @@ describe('Finnish bank codes answer from the Finance Finland list', () => {
   it('verifies Nordea, whose code is one character', () => {
     const r = check('FI2112345600000785');
     expect(r.bank_code_check?.status).toBe('verified');
-    expect(r.bank_code_check?.authoritative).toBe(true);
+    // Prudent register since 16/09/2026: the list confirms, it never denies.
+    expect(r.bank_code_check?.authoritative).toBe(false);
     // The value is the institution code, not the positional 3-digit slice.
     expect(r.bank_code_check?.value).toBe('1');
   });
@@ -34,22 +35,28 @@ describe('Finnish bank codes answer from the Finance Finland list', () => {
     expect(r.bank_code_check?.register).toMatch(/banking group/i);
   });
 
-  it('denies a prefix held by nobody, which is the point of holding a register', () => {
+  it('does not deny a prefix the transcribed list does not carry (prudent since 16/09/2026)', () => {
+    // The list is a hand transcription dated 15.10.2025 that nothing refreshes:
+    // a miss on it is not a reason to stop a payment. The country answers as it
+    // did before the list existed, and the verdict claims no authority.
     const r = check('FI1499901234567890');
-    expect(r.bank_code_check?.status).toBe('not_in_register');
-    expect(r.bank_code_check?.authoritative).toBe(true);
+    // The composite answer: `not_in_register` with the soft reason, never the
+    // strong `not_allocated` that licenses a caller to stop a payment.
+    expect(r.bank_code_check?.reason).toBe('absent_from_reference_data');
+    expect(r.bank_code_check?.authoritative).toBe(false);
   });
 
-  it('tells an agent to stop on an unallocated Finnish code', () => {
+  it('never tells an agent to stop on a Finnish code', () => {
     const r = check('FI1499901234567890');
-    expect(r.next_steps?.map((s) => s.code)).toContain('bank_code_not_allocated');
+    expect(r.next_steps?.map((s) => s.code) ?? []).not.toContain('bank_code_not_allocated');
   });
 
   it('does not deny the 72-78 band the source leaves unpopulated', () => {
     // Answering not_in_register here would assert more than the document says.
     const r = check('FI2972000110000000');
-    expect(r.bank_code_check?.status).toBe('unavailable');
-    expect(r.next_steps?.map((s) => s.code)).not.toContain('bank_code_not_allocated');
+    expect(r.bank_code_check?.reason).not.toBe('not_allocated');
+    expect(r.bank_code_check?.authoritative).toBe(false);
+    expect(r.next_steps?.map((s) => s.code) ?? []).not.toContain('bank_code_not_allocated');
   });
 
   it('verifies each remaining code length', () => {

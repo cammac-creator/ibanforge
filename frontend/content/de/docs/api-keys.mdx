@@ -185,7 +185,7 @@ an einem Tag erzeugen darf. Darüber hinaus antwortet `POST /v1/keys/generate` m
 ```json
 {
   "error": "key_creation_limit",
-  "message": "At most 3 free keys per network per day — existing keys keep working. Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) and x402 pay-per-call needs no key at all."
+  "message": "At most 3 free keys per network per day — existing keys keep working. Need more capacity today? Prepaid credits are instant ($4 per 1,000, POST /v1/credits/buy/1k) and x402 pay-per-call needs no key at all."
 }
 ```
 
@@ -255,7 +255,7 @@ Der Schlüssel funktioniert auf allen kostenpflichtigen Endpunkten:
 | Anonymer Schlüssel — ohne E-Mail, ohne Karte | 25 Anfragen/Monat | $0 |
 | Beanspruchter Schlüssel — ein zugesandter Code | 200 Anfragen/Monat | $0 |
 | Pro-Abo | 10'000 Anfragen/Monat, alle Endpunkte | $29/Monat — Reset am 1., jederzeit kündbar |
-| Prepaid-Guthabenpakete — Karte oder USDC | 1k / 5k / 25k Credits | $5 / $20 / $80 — verfallen nie |
+| Prepaid-Guthabenpakete — Karte oder USDC | 1k / 5k / 25k Credits | $4 / $20 / $80 — verfallen nie |
 | x402 Pay-per-Call | Unbegrenzt | $0,002–$0,02/Aufruf |
 
 **Namensnennung auf beiden kostenlosen Stufen.** Jede Antwort eines kostenpflichtigen Endpunkts, die über einen kostenlosen Schlüssel läuft — anonym oder beansprucht —, trägt ein Objekt `attribution` (`text`, `url`, `note`). Wenn Sie diese Ergebnisse Menschen zeigen (eine Seite, ein Bildschirm, ein Dokument), blenden Sie „Powered by IBANforge" mit dem Link ein; ein Ergebnis, das in Ihrem Backend bleibt, schuldet nichts. Bezahlte Tarife tragen keine Namensnennung.

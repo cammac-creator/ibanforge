@@ -29,7 +29,7 @@ All endpoints are served over HTTPS. HTTP requests are redirected automatically.
 Then, three ways in — pick what fits, your app or agent never hits a dead-end:
 
 1. **Free API key** — 25 requests/month without email. [Generate one](/docs/api-keys) with a bodyless POST, then send `Authorization: Bearer ifk_...`. Claim the same key with an emailed code to raise its quota to 200/month, without a card.
-2. **Prepaid credit packs** — 1k = $5, 5k = $20, 25k = $80. They never expire, purchasable **by card** or in USDC (`POST /v1/credits/buy/1k|5k|25k`). See [pricing](/pricing).
+2. **Prepaid credit packs** — 1k = $4, 5k = $20, 25k = $80. They never expire, purchasable **by card** or in USDC (`POST /v1/credits/buy/1k|5k|25k`). See [pricing](/pricing).
 3. **x402 micropayments** — fully autonomous pay-per-call in USDC for agents, no account at all. See the [x402 guide](/docs/x402).
 
 A request without a valid key or payment gets a `402` response with machine-readable instructions for all three paths — autonomous agents can self-onboard.
@@ -47,7 +47,7 @@ A request without a valid key or payment gets a `402` response with machine-read
 | `/v1/reference/validate` | GET/POST | Free | Payment reference checksum (RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero) |
 | `/v1/address/check` | POST | Free | ISO 20022 postal address conformity (SPS, HVPS+/T2, Fedwire), every finding sourced |
 | `/v1/ch/qr-bill/check` | POST | Free | Swiss QR-bill payload: header, QR-IBAN and reference pairing, checksums, structured (S) or combined (K) addresses before 14.11.2026, with a proposed structured form |
-| `/v1/audit/upload` | POST | Free preview, then 149 CHF | A whole creditor file (CSV or XLSX): every row against the same registers, duplicates, BIC and address checks; masked preview for free, annotated workbook after payment. The page for non-developers is [/audit](/audit) |
+| `/v1/audit/upload` | POST | Free preview, then $149 | A whole creditor file (CSV or XLSX): every row against the same registers, duplicates, BIC and address checks; masked preview for free, annotated workbook after payment. The page for non-developers is [/audit](/audit) |
 | `/v1/demo` | GET | Free | Example validations (no payment needed) |
 | `/health` | GET | Free | Service health check |
 

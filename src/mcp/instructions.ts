@@ -42,7 +42,7 @@ export const MCP_INSTRUCTIONS =
   // maintenant parce que les deux noms sont dans `MCP_TOOLS`, pas parce qu'on
   // l'a desserrée.
   'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the daily limit. ' +
-  'Prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+  'Prepaid credit packs from $4 per 1,000 calls, no expiry. ' +
   'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
   'Paying as an agent (wallet, USDC on Base, prepaid packs): https://ibanforge.com/docs/pay-as-an-agent — ' +
   'Docs and code samples: https://ibanforge.com/docs/recipes';

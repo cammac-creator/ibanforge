@@ -18,7 +18,6 @@ In these countries, the reference set consulted **is** the national register: `n
 | **DE** | Deutsche Bundesbank, Bankleitzahlendatei | monthly | name, postal code + town (the register has no street column), retirement + successor BLZ |
 | **AT** | Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis | monthly (source republishes daily) | full seat address, BIC, LEI |
 | **BE** | Banque nationale de Belgique, bank identification codes | monthly | name in up to four languages — the file publishes no addresses; reserved slots (*VRIJ*, *Onbeschikbaar*) are treated as unallocated |
-| **FI** | Finance Finland, monetary institution codes | on republication | codes are allocated to **banking groups**, not institutions — a hit confirms the group, so the positive claim is weaker and the response says so |
 | **BG** | Bulgarian National Bank, BAE register | re-read monthly (the register itself is republished **on request**, not on a calendar — `as_of` carries its own effective date, not ours) | name only, in Cyrillic as published, plus the head-office BIC. The verdict is made on the **four-letter bank code** (IBAN positions 5-8): a BAE code also covers the branch digits in positions 9-12, but the register does not enumerate every bank's branches to one standard, so branch digits are never used to deny |
 | **SK** | Národná banka Slovenska, directory of identification codes for the domestic payment system (the *prevodník*) | re-read monthly (the register is published as a **numbered edition** with its own effective date — `as_of` carries that date, not ours) | name and BIC only, verbatim with Slovak diacritics; no address at all. Eight Czech institutions hold a Slovak payment code and publish a Czech BIC — the register lists them, so we serve them |
 
@@ -37,6 +36,7 @@ We wrote to the NBS on 26/08/2026 to ask whether extracting fields from the file
 | Country | Register | Refresh | What it publishes beyond the code |
 |---|---|---|---|
 | **SM** | Central Bank of the Republic of San Marino, list of operating banks | re-read monthly (the page states **no edition and no revision date**, so `as_of` is the day we read it, and the credit says "read on") | name, BIC, and the full registered office — deeper than BE, BG or SK publish |
+| **FI** | Finance Finland, monetary institution codes (transcribed list dated 15.10.2025) | on republication | codes are allocated to **banking groups**, not institutions: a hit confirms the group and its BIC, dated from the list itself. Since 16 September 2026 an absence from the list is **not** a denial: the list is a hand transcription that nothing refreshes, so Finland answers as it did before the list existed, `authoritative: false` |
 
 San Marino sits on its own because it breaks the rule the table above is built on. The Central Bank publishes the four banks it **supervises**; it does not publish the allocation of the ABI code space. San Marino also licenses payment and e-money institutions that are not banks (one holds a San Marino BIC and settles through EBA STEP2), and the official San Marino example IBAN carries an ABI absent from the page. So:
 
@@ -46,6 +46,8 @@ San Marino sits on its own because it breaks the rule the table above is built o
 One flag does go the other way: `bic.basis` is `national_register` and `bic.authoritative` is `true`, because the BIC printed beside a listed code is the Central Bank's own pairing. San Marino is where the two authority flags part company in the opposite direction from Switzerland.
 
 **The licence is unknown, and recorded as unknown.** bcsm.sm publishes no terms of use — only a privacy policy and a copyright footer (checked 06/09/2026). Our position: four lines of routing data published by the supervisor to be used, served one record per request, credited *Source: Central Bank of the Republic of San Marino, operating banks (read on …)* by choice rather than by obligation. A letter to the Central Bank is queued; if it objects, the register is withdrawn. No clause is invented in the meantime.
+
+Finland moved here on 16 September 2026, from the authoritative table above: a refusal built on an eleven-month-old transcription is not a reason to stop a payment. It goes back up once the list is re-read against a current publication.
 
 ## The composite BIC map — where `authoritative: false`
 

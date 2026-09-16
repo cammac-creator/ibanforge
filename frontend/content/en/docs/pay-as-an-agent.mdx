@@ -8,7 +8,7 @@ order: 5
 
 This page is for autonomous agents and the people who operate them. It is the practical companion to the [x402 protocol reference](/docs/x402): not how the payment works, but how to get from zero to a paying agent with the least friction.
 
-One recommendation up front: **at volume, buy in packs.** The larger packs are cheaper per call than retail: $0.004 at 5,000 credits and $0.0032 at 25,000, against $0.005 for a single validation. And every pay-per-call settlement is its own on-chain transaction: the CDP facilitator these payments go through is free up to 1,000 on-chain transactions a month and charges $0.001 per transaction beyond that (CDP x402 pricing, read 2026-09-09), which is 20% of a $0.005 validation and 0.02% of a $5 pack. A single payment to `POST /v1/credits/buy/1k` returns an API key pre-loaded with 1,000 credits, no expiry, no subscription. Pay-per-call works and needs no key at all; it is simply the expensive shape once your volume is real.
+One recommendation up front: **at volume, buy in packs.** Every pack is cheaper per call than retail: $0.004 from the first pack, $0.0032 at 25,000, against $0.005 for a single validation. And every pay-per-call settlement is its own on-chain transaction: the CDP facilitator these payments go through is free up to 1,000 on-chain transactions a month and charges $0.001 per transaction beyond that (CDP x402 pricing, read 2026-09-09), which is 20% of a $0.005 validation and 0.025% of a $4 pack. A single payment to `POST /v1/credits/buy/1k` returns an API key pre-loaded with 1,000 credits, no expiry, no subscription. Pay-per-call works and needs no key at all; it is simply the expensive shape once your volume is real.
 
 ## Step 1 — Give your agent a wallet with a budget
 
@@ -31,13 +31,13 @@ To rehearse the flow without real money first, CDP's faucet funds a **base-sepol
 **Best value — one payment, then a key:**
 
 ```bash
-# via your x402-enabled client (this endpoint costs $5.00, paid inline):
+# via your x402-enabled client (this endpoint costs $4.00, paid inline):
 POST https://api.ibanforge.com/v1/credits/buy/1k
 # → { "api_key": "ifk_…", "credits": 1000, … }
 # then call any endpoint with: Authorization: Bearer ifk_…
 ```
 
-Bundles: `1k` = $5 · `5k` = $20 · `25k` = $80. Credits never expire; batch validation bills 1 credit per IBAN.
+Bundles: `1k` = $4 · `5k` = $20 · `25k` = $80. Credits never expire; batch validation bills 1 credit per IBAN.
 
 **Pay-per-call — no key, no state** (TypeScript, packages from Step 1):
 

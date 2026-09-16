@@ -1685,7 +1685,7 @@ const buildRawSpec = () => ({
         operationId: 'buyCreditBundle',
         summary: 'Buy a prepaid credit bundle (x402, USDC)',
         description:
-          'Pay once via x402 (USDC on Base) and receive a fresh API key preloaded with the bundle credits. Bundles: 1k = $5, 5k = $20, 25k = $80. Credits never expire. Optionally pass {"email": "..."} in the body to attach the key to an email — anonymous keys are fully functional too. Check the balance with GET /v1/credits/balance.',
+          'Pay once via x402 (USDC on Base) and receive a fresh API key preloaded with the bundle credits. Bundles: 1k = $4, 5k = $20, 25k = $80. Credits never expire. Optionally pass {"email": "..."} in the body to attach the key to an email — anonymous keys are fully functional too. Check the balance with GET /v1/credits/balance.',
         tags: ['Credits'],
         security: [{ x402Payment: [] }],
         parameters: [

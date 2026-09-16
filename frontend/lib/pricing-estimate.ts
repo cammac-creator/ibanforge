@@ -17,7 +17,7 @@ export const ENDPOINTS: readonly EndpointDef[] = [
 
 export const MAX_VOLUME = 10_000_000
 
-const PACK_1K = 5
+const PACK_1K = 4
 const PACK_5K = 20
 const PACK_25K = 80
 

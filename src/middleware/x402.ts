@@ -622,12 +622,12 @@ export function buildRouteTable(
     // -- Bundle credits ----------------------------------------------------
     // 3 prepaid bundles. Once the agent pays, the handler in
     // src/routes/api-keys.ts mints a fresh key with N credits.
-    // Pricing is: 1k=$5 (0.005/credit), 5k=$20 (0.004/credit), 25k=$80 (0.0032/credit).
+    // Pricing is: 1k=$4 (0.004/credit), 5k=$20 (0.004/credit), 25k=$80 (0.0032/credit).
     'POST /v1/credits/buy/1k': {
       accepts: {
         scheme: 'exact',
         network: 'eip155:8453' as const,
-        price: '$5.00',
+        price: '$4.00',
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },

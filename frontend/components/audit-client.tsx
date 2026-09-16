@@ -172,7 +172,7 @@ export function AuditClient({ locale }: { locale: string }) {
           ) : (
           <div className="rounded-lg border p-5 flex flex-col gap-4">
             <h3 className="font-semibold">
-              {t("pay.title", { price: job.price_chf, rows: job.rows })}
+              {t("pay.title", { price: job.price, rows: job.rows })}
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">{t("pay.text")}</p>
             <label className="flex flex-col gap-1 text-sm">
@@ -192,7 +192,7 @@ export function AuditClient({ locale }: { locale: string }) {
                   {t("pay.redirecting")}
                 </>
               ) : (
-                t("pay.button", { price: job.price_chf })
+                t("pay.button", { price: job.price })
               )}
             </Button>
             <p className="text-xs text-muted-foreground">{t("pay.retention")}</p>

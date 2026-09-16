@@ -37,7 +37,7 @@ Function-calling (Chat Completions / Responses): wire tools to the OpenAPI at /o
 
 ### Pay-per-call without an API key (x402, USDC on Base L2)
 GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any agent with a Base wallet can discover, pay, and call.
-Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5 payment for 1,000 credits): https://ibanforge.com/docs/pay-as-an-agent?src=llms
+Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4 payment for 1,000 credits): https://ibanforge.com/docs/pay-as-an-agent?src=llms
 
 ## 11 MCP tools
 - validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005
@@ -73,7 +73,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - Try before anything: 25 keyless validations/day per source address (IPv6 counted per /64) on POST /v1/iban/validate, and 10 MCP tool calls/day per source address. Tasters, not tiers.
 - Free key, nothing asked: POST /v1/keys/generate with no body at all → an ifk_ key, 25 requests a month, on every endpoint. Nothing is mailed and no record is opened.
 - Same key, full free allowance: POST /v1/keys/claim with `Authorization: Bearer ifk_...` (never in the body), once the key has served one call. A 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose — gives 200 every month; an x402 payment made on the key gives 200 once.
-- Credit packs (card or USDC, never expire): 1k = $5, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
+- Credit packs (card or USDC, never expire): 1k = $4, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
 - Pro subscription (card): $29/month for 10,000 requests, resets on the 1st, cancel anytime → https://ibanforge.com/pricing?src=llms
 - x402 micropayments: pay per call in USDC on Base L2, no signup
 

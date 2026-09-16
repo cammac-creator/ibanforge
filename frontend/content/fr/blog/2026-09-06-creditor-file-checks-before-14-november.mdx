@@ -10,7 +10,7 @@ faq:
   - q: "Swift a reporté sa date le 27 août 2026 : puis-je attendre ?"
     a: "Le calendrier suisse doit être vérifié séparément. SIX publie toujours le 14 novembre 2026. Swift a reporté ses changements de paiement le 27 août ; l’EPC a aussi reporté son échéance du 15 novembre le 9 septembre et prévoit une nouvelle date en octobre. Ces annonces ne changent pas à elles seules le calendrier SIX."
   - q: "Combien coûte l'audit de fichier ?"
-    a: "L'aperçu est gratuit : les compteurs et vingt lignes, IBAN masqués. Le classeur annoté coûte 149 CHF jusqu'à 5 000 lignes et 349 CHF jusqu'à 20 000, payé par carte, téléchargeable pendant 24 heures."
+    a: "L'aperçu est gratuit : les compteurs et vingt lignes, IBAN masqués. Le classeur annoté coûte 149 $ jusqu'à 5 000 lignes et 349 $ jusqu'à 20 000, payé par carte, téléchargeable pendant 24 heures."
 ---
 
 Les Swiss Payment Standards publient toujours le 14 novembre 2026 pour l’adresse structurée ou hybride dans les ordres de paiement, lorsqu’une adresse est utilisée. L’EPC a reporté son échéance distincte du 15 novembre le 9 septembre ; Swift avait déjà reporté ses changements de paiement le 27 août. Ces annonces ne modifient pas à elles seules le calendrier suisse. Voir [les décisions datées, rail par rail](/fr/blog/2026-09-02-which-date-structured-addresses).
@@ -51,7 +51,7 @@ Depuis le 9 octobre 2025, les banques de la zone euro comparent le nom que vous 
 
 Exportez le fichier en CSV ou en XLSX, avec au minimum une colonne IBAN ; les colonnes nom, BIC et adresse sont utilisées si elles existent. Déposez-le sur [l'audit de fichier](/fr/audit). L'aperçu est gratuit et immédiat : les compteurs par type de constat, vingt lignes avec leurs IBAN masqués, et la phrase qui compte, combien de paiements de ce fichier seraient rejetés. Chaque ligne passe par les mêmes registres que l'API IBANforge : structure et clé de l'IBAN, code banque contre le registre national, BIC du fichier contre le registre, doublons, pays de l'adresse contre pays de l'IBAN, et l'adresse contre les règles suisses quand le fichier a des colonnes d'adresse.
 
-Le classeur annoté, 149 CHF jusqu'à 5 000 lignes, montre chaque ligne en entier avec la banque et le BIC du registre, le détail de chaque constat, et une feuille de synthèse à transmettre. Il reste téléchargeable pendant 24 heures.
+Le classeur annoté, 149 $ jusqu'à 5 000 lignes, montre chaque ligne en entier avec la banque et le BIC du registre, le détail de chaque constat, et une feuille de synthèse à transmettre. Il reste téléchargeable pendant 24 heures.
 
 Si vous préférez l'intégrer, les trois routes qui font ce travail sont publiques : [`POST /v1/iban/validate`](/fr/docs/iban-validate) pour l'IBAN et son code banque, [`POST /v1/address/check`](/fr/docs/structured-addresses) pour dire, gratuitement, si une adresse passe les règles suisses en nommant le document, et [`POST /v1/ch/qr-bill/check`](/fr/docs/swiss-qr-iban) pour une QR-facture entière.
 

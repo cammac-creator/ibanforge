@@ -710,7 +710,8 @@ function openStatsDB(): DatabaseType.Database {
         filename TEXT,
         rows INTEGER NOT NULL,
         tier TEXT NOT NULL,
-        price_chf INTEGER NOT NULL,
+        price INTEGER NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'USD',
         lang TEXT NOT NULL DEFAULT 'en',
         summary_json TEXT NOT NULL,
         preview_json TEXT NOT NULL,
@@ -733,7 +734,8 @@ function openStatsDB(): DatabaseType.Database {
         paid_at TEXT DEFAULT (datetime('now')),
         rows INTEGER NOT NULL,
         tier TEXT NOT NULL,
-        price_chf INTEGER NOT NULL,
+        price INTEGER NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'USD',
         amount_paid_minor INTEGER,
         amount_paid_currency TEXT,
         stripe_session_id TEXT,
@@ -832,6 +834,19 @@ function openStatsDB(): DatabaseType.Database {
     ).map((r) => r.name);
     if (!auditCols.includes('checkout_params_json')) {
       statsDB.exec('ALTER TABLE audit_jobs ADD COLUMN checkout_params_json TEXT');
+    }
+    // 16/09/2026 : l'audit de fichier est vendu en dollars. La colonne garde le
+    // prix affiché ; sa devise vit à côté, CHF pour les lignes d'avant, USD ensuite.
+    for (const table of ['audit_jobs', 'audit_sales']) {
+      const cols = (
+        statsDB.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+      ).map((r) => r.name);
+      if (cols.includes('price_chf')) {
+        statsDB.exec(`ALTER TABLE ${table} RENAME COLUMN price_chf TO price`);
+      }
+      if (!cols.includes('currency')) {
+        statsDB.exec(`ALTER TABLE ${table} ADD COLUMN currency TEXT NOT NULL DEFAULT 'CHF'`);
+      }
     }
     // Forums tab: the reply is WRITTEN in the thread's language but READ in
     // French — two texts, two columns (draft = what gets copied/posted,

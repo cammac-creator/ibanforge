@@ -1,4 +1,4 @@
-import { PAYMENT_LINKS, PRICING_PAGE } from './payment-links.js';
+import { PAYMENT_LINKS, PRICING_PAGE, PRO_PORTAL_URL } from './payment-links.js';
 import {
   sendViaRelay,
   deliverViaRelay,
@@ -327,7 +327,7 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
     `Heads up: key ${p.keyPrefix} has used ${p.used} of its ${p.limit} free requests for ${p.month}.\n` +
     `About ${left} calls left before validation stops until the 1st of next month.\n\n` +
     `Keep it running, pay by card in one click:\n` +
-    `  1,000 credits  $5   ${PAYMENT_LINKS['1k']}\n` +
+    `  1,000 credits  $4   ${PAYMENT_LINKS['1k']}\n` +
     `  5,000 credits  $20  ${PAYMENT_LINKS['5k']}\n` +
     ` 25,000 credits  $80  ${PAYMENT_LINKS['25k']}\n\n` +
     `See where those calls went: https://ibanforge.com/en/account\n` +
@@ -343,7 +343,7 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
     <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${p.used} of ${p.limit}</b> requests for ${p.month}. About <b style="color:#fafafa">${left}</b> left before calls stop until the 1st.</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 18px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Keep it running, pay by card</div>
-      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $5 →</a></p>
+      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
       <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
       <p style="margin:0"><a href="${PAYMENT_LINKS['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
     </div>
@@ -451,8 +451,7 @@ const SUBSCRIPTION_EMAIL_COPY: Record<
   // the first question a subscriber asks.
   pro: {
     name: 'Pro',
-    support:
-      'Questions, invoices, a plan change or a cancellation: support@ibanforge.com (mention Pro). Cancelling stops the next renewal; the key keeps working until the end of the paid month.',
+    support: `Your card, your invoices and your cancellation are in your hands in the customer portal: ${PRO_PORTAL_URL} (sign in with the e-mail used at checkout). Cancelling stops the next renewal; the key keeps working until the end of the paid month. Questions or a plan change: support@ibanforge.com (mention Pro).`,
     footer: 'IBAN and bank data API',
     legalLinks: false,
   },
@@ -562,15 +561,17 @@ export interface AuditReadyEmailInput {
   lang: 'en' | 'fr' | 'de';
   link: string;
   rows: number;
-  price_chf: number;
+  price: number;
+  /** ISO 4217 code of `price` (USD since 16/09/2026, CHF for older jobs). */
+  currency: string;
 }
 
 const AUDIT_READY_COPY = {
   en: {
     subject: (rows: number) => `Your creditor file audit is ready (${rows} rows)`,
     title: 'Your audit is ready',
-    body: (rows: number, price: number) =>
-      `Thanks for your purchase (${price} CHF). The annotated workbook for your ${rows}-row file is ready to download.`,
+    body: (rows: number, price: number, currency: string) =>
+      `Thanks for your purchase (${price} ${currency}). The annotated workbook for your ${rows}-row file is ready to download.`,
     button: 'Open the report',
     retention:
       'The report stays available for 24 hours after payment, then it is deleted. The link works from any browser.',
@@ -579,8 +580,8 @@ const AUDIT_READY_COPY = {
   fr: {
     subject: (rows: number) => `Votre audit de fichier de créanciers est prêt (${rows} lignes)`,
     title: 'Votre audit est prêt',
-    body: (rows: number, price: number) =>
-      `Merci pour votre achat (${price} CHF). Le classeur annoté de votre fichier de ${rows} lignes est prêt à télécharger.`,
+    body: (rows: number, price: number, currency: string) =>
+      `Merci pour votre achat (${price} ${currency}). Le classeur annoté de votre fichier de ${rows} lignes est prêt à télécharger.`,
     button: 'Ouvrir le rapport',
     retention:
       "Le rapport reste disponible 24 heures après le paiement, puis il est effacé. Le lien fonctionne depuis n'importe quel navigateur.",
@@ -589,8 +590,8 @@ const AUDIT_READY_COPY = {
   de: {
     subject: (rows: number) => `Ihre Prüfung der Kreditorendatei ist bereit (${rows} Zeilen)`,
     title: 'Ihre Prüfung ist bereit',
-    body: (rows: number, price: number) =>
-      `Danke für Ihren Kauf (${price} CHF). Die kommentierte Arbeitsmappe Ihrer Datei mit ${rows} Zeilen steht zum Download bereit.`,
+    body: (rows: number, price: number, currency: string) =>
+      `Danke für Ihren Kauf (${price} ${currency}). Die kommentierte Arbeitsmappe Ihrer Datei mit ${rows} Zeilen steht zum Download bereit.`,
     button: 'Bericht öffnen',
     retention:
       'Der Bericht bleibt 24 Stunden nach der Zahlung verfügbar und wird dann gelöscht. Der Link funktioniert in jedem Browser.',
@@ -604,12 +605,12 @@ export function buildAuditReadyEmail(p: AuditReadyEmailInput): {
   html: string;
 } {
   const c = AUDIT_READY_COPY[p.lang] ?? AUDIT_READY_COPY.en;
-  const text = `${c.title}\n\n${c.body(p.rows, p.price_chf)}\n\n${c.button}: ${p.link}\n\n${c.retention}\n${c.support}\n\nIBANforge`;
+  const text = `${c.title}\n\n${c.body(p.rows, p.price, p.currency)}\n\n${c.button}: ${p.link}\n\n${c.retention}\n${c.support}\n\nIBANforge`;
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${c.title}</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">${c.body(p.rows, p.price_chf)}</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">${c.body(p.rows, p.price, p.currency)}</p>
     <p style="margin:0 0 22px"><a href="${p.link}" style="display:inline-block;background:#f59e0b;color:#111;font-weight:600;padding:12px 18px;border-radius:10px;text-decoration:none">${c.button}</a></p>
     <p style="color:#71717a;font-size:12px;margin:0 0 6px">${c.retention}</p>
     <p style="color:#71717a;font-size:12px;margin:0">${c.support}</p>

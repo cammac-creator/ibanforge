@@ -430,7 +430,7 @@ export interface AuditStats {
   conversion: number | null;
   /** Each upload of the window, newest first (the API keeps the row count, a key prefix when one was sent, nothing else). */
   recent_uploads?: Array<{ at: string; rows: number | null; tier: string | null; key_prefix: string | null; internal: boolean }>;
-  recent_sales?: Array<{ paid_at: string; rows: number; tier: string; price_chf: number; amount_paid_minor?: number | null; amount_paid_currency?: string | null }>;
+  recent_sales?: Array<{ paid_at: string; rows: number; tier: string; price: number; amount_paid_minor?: number | null; amount_paid_currency?: string | null }>;
 }
 
 /**

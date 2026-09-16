@@ -15,7 +15,7 @@ describe("Choisir une offre sans surestimer son quota", () => {
         for (let medium = 0; medium <= 12; medium++) {
           for (let small = 0; small <= 60; small++) {
             const credits = large * 25000 + medium * 5000 + small * 1000
-            if (credits >= units) candidates.push({ credits, price: large * 80 + medium * 20 + small * 5 })
+            if (credits >= units) candidates.push({ credits, price: large * 80 + medium * 20 + small * 4 })
           }
         }
       }

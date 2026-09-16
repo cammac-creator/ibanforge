@@ -28,11 +28,16 @@ export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
  * cap + 1 data rows. Everything beyond is never read (see readTable).
  */
 export const SHEET_ROWS_CAP = AUDIT_MAX_ROWS + 2;
-/** Price tiers, in CHF. The tier is decided by the row count, nothing else. */
+/**
+ * Price tiers, in US dollars (16/09/2026; the same figures were charged in CHF
+ * until then, on Claude-Alain's decision to sell everything in one currency).
+ * The tier is decided by the row count, nothing else.
+ */
 export const AUDIT_TIERS = [
-  { max_rows: 5_000, price_chf: 149, code: 'standard' },
-  { max_rows: AUDIT_MAX_ROWS, price_chf: 349, code: 'large' },
+  { max_rows: 5_000, price: 149, code: 'standard' },
+  { max_rows: AUDIT_MAX_ROWS, price: 349, code: 'large' },
 ] as const;
+export const AUDIT_CURRENCY = 'USD';
 export type AuditTierCode = (typeof AUDIT_TIERS)[number]['code'];
 
 export type AuditLang = 'en' | 'fr' | 'de';
@@ -105,7 +110,9 @@ export interface AuditSummary {
   columns_detected: Array<keyof AuditColumnMap>;
   address_checked: boolean;
   tier: AuditTierCode;
-  price_chf: number;
+  price: number;
+  /** ISO 4217 code of `price`: USD since 16/09/2026. */
+  currency: string;
 }
 
 export interface AuditResult {
@@ -513,7 +520,8 @@ export function auditTable(
     ),
     address_checked: hasAddress,
     tier: tier.code,
-    price_chf: tier.price_chf,
+    price: tier.price,
+    currency: AUDIT_CURRENCY,
   };
   return { headers, columns: cols, rows: out, source_rows: rows, summary };
 }

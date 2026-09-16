@@ -29,7 +29,7 @@ describe('credit-pack purchase routes are payable by a machine', () => {
   }
 
   it.each([
-    ['1k', '5000000'],
+    ['1k', '4000000'],
     ['5k', '20000000'],
     ['25k', '80000000'],
   ])('bundle %s advertises a payable offer of %s (USDC, 6 decimals)', async (slug, amount) => {
@@ -142,7 +142,7 @@ describe('enrich402Middleware', () => {
     // constant every other card surface uses.
     expect(body.credit_packs.pay_by_card).toBe(ENTRY_PAYMENT_LINK);
     expect(body.credit_packs.pay_by_usdc).toContain('/v1/credits/buy');
-    expect(body.credit_packs.pricing).toContain('$5');
+    expect(body.credit_packs.pricing).toContain('$4');
     // message now names the packs rail
     expect(body.message).toContain('credit pack');
     // existing blocks keep their field names

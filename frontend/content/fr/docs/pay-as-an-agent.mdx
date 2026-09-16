@@ -8,7 +8,7 @@ order: 5
 
 Cette page s'adresse aux agents autonomes et aux personnes qui les opèrent. C'est le compagnon pratique de la [référence du protocole x402](/docs/x402) : non pas comment le paiement fonctionne, mais comment passer de zéro à un agent qui paie, avec le moins de friction possible.
 
-Une recommandation d'entrée : **au volume, achetez par packs.** Les gros packs coûtent moins cher à l'appel que le détail : 0,004 $ à 5 000 crédits et 0,0032 $ à 25 000, contre 0,005 $ pour une validation à l'unité. Et chaque règlement à l'appel est une transaction on-chain à lui seul : le facilitateur CDP par lequel ces paiements passent est gratuit jusqu'à 1 000 transactions on-chain par mois et facture 0,001 $ par transaction au-delà (tarifs x402 de CDP, lus le 2026-09-09), soit 20 % d'une validation à 0,005 $ et 0,02 % d'un pack à 5 $. Un seul paiement vers `POST /v1/credits/buy/1k` renvoie une clé API préchargée de 1 000 crédits, sans expiration, sans abonnement. Le paiement à l'appel fonctionne et ne demande aucune clé ; c'est simplement la forme chère dès que le volume devient réel.
+Une recommandation d'entrée : **au volume, achetez par packs.** Chaque pack coûte moins cher à l'appel que le détail : 0,004 $ dès le premier pack, 0,0032 $ à 25 000, contre 0,005 $ pour une validation à l'unité. Et chaque règlement à l'appel est une transaction on-chain à lui seul : le facilitateur CDP par lequel ces paiements passent est gratuit jusqu'à 1 000 transactions on-chain par mois et facture 0,001 $ par transaction au-delà (tarifs x402 de CDP, lus le 2026-09-09), soit 20 % d'une validation à 0,005 $ et 0,025 % d'un pack à 4 $. Un seul paiement vers `POST /v1/credits/buy/1k` renvoie une clé API préchargée de 1 000 crédits, sans expiration, sans abonnement. Le paiement à l'appel fonctionne et ne demande aucune clé ; c'est simplement la forme chère dès que le volume devient réel.
 
 ## Étape 1 — Donnez à votre agent un wallet avec un budget
 
@@ -31,13 +31,13 @@ Pour répéter le flux sans argent réel, le faucet CDP alimente un wallet de te
 **Meilleur rapport — un paiement, puis une clé :**
 
 ```bash
-# via votre client x402 (cet endpoint coûte 5,00 $, payés dans la requête) :
+# via votre client x402 (cet endpoint coûte 4,00 $, payés dans la requête) :
 POST https://api.ibanforge.com/v1/credits/buy/1k
 # → { "api_key": "ifk_…", "credits": 1000, … }
 # puis appelez n'importe quel endpoint avec : Authorization: Bearer ifk_…
 ```
 
-Packs : `1k` = 5 $ · `5k` = 20 $ · `25k` = 80 $. Les crédits n'expirent jamais ; la validation par lot facture 1 crédit par IBAN.
+Packs : `1k` = 4 $ · `5k` = 20 $ · `25k` = 80 $. Les crédits n'expirent jamais ; la validation par lot facture 1 crédit par IBAN.
 
 **Paiement à l'appel — sans clé, sans état** (TypeScript, paquets de l'étape 1) :
 

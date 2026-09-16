@@ -180,7 +180,7 @@ Past it, `POST /v1/keys/generate` answers `429`:
 ```json
 {
   "error": "key_creation_limit",
-  "message": "At most 3 free keys per network per day — existing keys keep working. Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) and x402 pay-per-call needs no key at all."
+  "message": "At most 3 free keys per network per day — existing keys keep working. Need more capacity today? Prepaid credits are instant ($4 per 1,000, POST /v1/credits/buy/1k) and x402 pay-per-call needs no key at all."
 }
 ```
 
@@ -248,7 +248,7 @@ The key works on all paid endpoints:
 | Anonymous key — no e-mail, no card | 25 requests/month | $0 |
 | Claimed key — a mailed code | 200 requests/month | $0 |
 | Pro subscription | 10,000 requests/month, every endpoint | $29/month — resets on the 1st, cancel anytime |
-| Prepaid credit packs — card or USDC | 1k / 5k / 25k credits | $5 / $20 / $80 — never expire |
+| Prepaid credit packs — card or USDC | 1k / 5k / 25k credits | $4 / $20 / $80 — never expire |
 | x402 pay-per-call | Unlimited | $0.002–$0.02/call |
 
 **Attribution on the free steps.** Every paid-endpoint response served on a free key — anonymous or claimed — carries an `attribution` object (`text`, `url`, `note`). When you show these results to people (a page, a screen, a document), display "Powered by IBANforge" with the link; a result that stays inside your backend owes nothing. Paid plans carry no attribution.

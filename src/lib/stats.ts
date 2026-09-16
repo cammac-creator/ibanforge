@@ -439,7 +439,7 @@ export const CREDITS_PURCHASE_TYPE = 'credits_purchase';
  *
  * 🚨 The consumption endpoints have always recorded what they collected. The
  * routes that SELL recorded nothing at all — so the single largest ticket we
- * can take on the USDC rail ($5 to $80, against $0.002–$0.02 per call) left no
+ * can take on the USDC rail ($4 to $80, against $0.002–$0.02 per call) left no
  * trace in `daily_stats`, and every revenue reading understated the business by
  * exactly the amount that mattered most. Audit B2.
  *

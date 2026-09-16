@@ -8,7 +8,7 @@
  *
  * The engine (src/lib/audit-file.ts) runs in-process on the same data the
  * API serves per call; no key, no quota, no relay. Payment is a one-off
- * Stripe Checkout Session with an inline price (149 or 349 CHF by row
+ * Stripe Checkout Session with an inline price (149 or 349 USD by row
  * count); the webhook marks the job paid (stripe-webhook.ts), and the status
  * route double-checks with Stripe when the webhook is late, so a customer
  * back from the payment page never waits on a retry.
@@ -125,8 +125,8 @@ function publicJob(
     job: job.id,
     rows: job.rows,
     tier: job.tier,
-    price_chf: job.price_chf,
-    currency: 'CHF',
+    price: job.price,
+    currency: job.currency,
     lang: job.lang,
     paid,
     paid_at: job.paid_at,
@@ -223,7 +223,8 @@ audit.post('/v1/audit/upload', async (c) => {
     filename: file.name || null,
     rows: result.summary.rows,
     tier: result.summary.tier,
-    price_chf: result.summary.price_chf,
+    price: result.summary.price,
+    currency: result.summary.currency,
     lang,
     summary: result.summary,
     preview,
@@ -244,7 +245,7 @@ audit.post('/v1/audit/upload', async (c) => {
   return c.json({
     ...publicJob(job, { sessionId: null }),
     processing_ms: Math.round((performance.now() - started) * 100) / 100,
-    tiers: AUDIT_TIERS.map((t) => ({ up_to_rows: t.max_rows, price_chf: t.price_chf })),
+    tiers: AUDIT_TIERS.map((t) => ({ up_to_rows: t.max_rows, price: t.price })),
   });
 });
 
@@ -312,8 +313,10 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
       {
         quantity: 1,
         price_data: {
-          currency: 'chf',
-          unit_amount: job.price_chf * 100,
+          // The job's own currency: a job created before the switch to dollars
+          // is still charged in the currency its price was displayed in.
+          currency: job.currency.toLowerCase(),
+          unit_amount: job.price * 100,
           product_data: {
             name: PRODUCT_NAME[locale](job.rows),
             description:
@@ -376,7 +379,8 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
         return c.json({
           url: `${SITE}/${result.job.lang}/audit/done?job=${job.id}&session_id=${encodeURIComponent(session.id)}`,
           session_id: session.id,
-          price_chf: job.price_chf,
+          price: job.price,
+          currency: job.currency,
         });
       }
       return c.json(
@@ -402,14 +406,20 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
         return c.json({
           url: `${SITE}/${current.lang}/audit/done?job=${job.id}&session_id=${encodeURIComponent(session.id)}`,
           session_id: session.id,
-          price_chf: job.price_chf,
+          price: job.price,
+          currency: job.currency,
         });
       }
       // Ne pas exposer une deuxième session ouverte si un paiement a gagné la course.
       if (current.paid_at) await stripe.checkout.sessions.expire(session.id);
       return pending();
     }
-    return c.json({ url: session.url, session_id: session.id, price_chf: job.price_chf });
+    return c.json({
+      url: session.url,
+      session_id: session.id,
+      price: job.price,
+      currency: job.currency,
+    });
   } catch (error) {
     if (error instanceof Stripe.errors.StripeInvalidRequestError && error.param === 'expires_at') {
       // Une réservation tardivement rejouée n'avait peut-être jamais atteint Stripe.

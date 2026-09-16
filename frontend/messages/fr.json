@@ -157,7 +157,7 @@
       },
       "heading": "Endpoints et tarifs",
       "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
-      "plans": "Gratuit : 25 requêtes par mois sans e-mail, 200 par mois une fois réclamée · Pro : 29 $ par mois pour 10 000 requêtes · packs de crédits dès 5 $ · licence éditeur dès 149 $ par mois · audit de fichier 149 CHF.",
+      "plans": "Gratuit : 25 requêtes par mois sans e-mail, 200 par mois une fois réclamée · Pro : 29 $ par mois pour 10 000 requêtes · packs de crédits dès 4 $ · licence éditeur dès 149 $ par mois · audit de fichier 149 $.",
       "plansLink": "Voir les tarifs"
     },
     "cta": {
@@ -279,7 +279,7 @@
     },
     "audit": {
       "heading": "Contrôlez votre fichier fournisseurs avant le prochain paiement",
-      "text": "Déposez un CSV ou un fichier Excel et consultez gratuitement les anomalies détectées. Le classeur annoté coûte 149 CHF jusqu’à 5 000 lignes, ou 349 CHF jusqu’à 20 000 lignes.",
+      "text": "Déposez un CSV ou un fichier Excel et consultez gratuitement les anomalies détectées. Le classeur annoté coûte 149 $ jusqu’à 5 000 lignes, ou 349 $ jusqu’à 20 000 lignes.",
       "cta": "Contrôler un fichier fournisseurs"
     },
     "badgeFallback": "API en ligne · état en direct",
@@ -290,7 +290,7 @@
   "pricing": {
     "metadata": {
       "title": "Tarifs de l'API IBAN : gratuit, Pro 29 $, OEM",
-      "description": "25 requêtes gratuites par mois sans e-mail, 200 par mois une fois réclamée, Pro à 29 $ par mois pour 10 000 requêtes, packs de crédits dès 5 $ sans expiration, licence éditeur dès 149 $ par mois, audit de fichier 149 CHF."
+      "description": "25 requêtes gratuites par mois sans e-mail, 200 par mois une fois réclamée, Pro à 29 $ par mois pour 10 000 requêtes, packs de crédits dès 4 $ sans expiration, licence éditeur dès 149 $ par mois, audit de fichier 149 $."
     },
     "badge": "Tarification transparente",
     "hero": {
@@ -441,7 +441,7 @@
       "packs": {
         "tag": "Packs de crédits",
         "title": "Crédits prépayés",
-        "body": "Achat en volume, sans expiration : 1k = 5 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/crédit). Un crédit = une validation ou un lookup — un lot de N IBANs consomme N crédits.",
+        "body": "Achat en volume, sans expiration : 1k = 4 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/crédit). Un crédit = une validation ou un lookup — un lot de N IBANs consomme N crédits.",
         "note": "Paiement Stripe — clé API livrée par email. Les agents peuvent acheter en USDC : POST /v1/credits/buy/1k|5k|25k.",
         "cardLabel": "Payer par carte"
       }
@@ -453,24 +453,25 @@
     },
     "audit": {
       "label": "Audit de fichier de créanciers",
-      "text": "Pas développeur ? Déposez le CSV ou XLSX depuis lequel vous payez et chaque ligne est contrôlée contre les mêmes registres : 149 CHF jusqu'à 5 000 lignes, 349 CHF jusqu'à 20 000, aperçu gratuit d'abord, classeur annoté dès le paiement.",
+      "text": "Pas développeur ? Déposez le CSV ou XLSX depuis lequel vous payez et chaque ligne est contrôlée contre les mêmes registres : 149 $ jusqu'à 5 000 lignes, 349 $ jusqu'à 20 000, aperçu gratuit d'abord, classeur annoté dès le paiement.",
       "cta": "Auditer un fichier"
     },
     "pro": {
       "label": "Abonnement Pro",
       "title": "Vous préférez une facture mensuelle fixe ?",
-      "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro le 1er, résiliable à tout moment. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
+      "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro le 1er, résiliable à tout moment depuis le portail client. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
       "note": "L’intégration dans votre produit est permise dans les limites et conditions de votre offre. Pour un SLA écrit, des engagements de support ou des volumes plus élevés, consultez l’offre éditeur/OEM.",
       "price": "29 $",
       "per": "/ mois",
-      "cta": "Souscrire à Pro"
+      "cta": "Souscrire à Pro",
+      "portal": "Gérez votre abonnement, vos factures et votre résiliation dans le portail client"
     },
     "uses": {
       "heading": "Comment allez-vous utiliser IBANforge ?",
       "estimate": "Comparer les offres avec mon volume",
       "occasional": {
         "title": "Des contrôles ponctuels",
-        "body": "Crédits prépayés dès 5 $, sans abonnement. Utilisez le solde à votre rythme.",
+        "body": "Crédits prépayés dès 4 $, sans abonnement. Utilisez le solde à votre rythme.",
         "cta": "Voir les packs"
       },
       "regular": {
@@ -1918,7 +1919,7 @@
       "rows": {
         "pricing": {
           "label": "Modèle de prix",
-          "ibanforge": "Packs prépayés : 5 $ / 1 000 crédits, sans expiration. Ou 0,002–0,02 $ par appel (x402). Gratuit : 25 par mois sans e-mail, 200 par mois une fois réclamée.",
+          "ibanforge": "Packs prépayés : 4 $ / 1 000 crédits, sans expiration. Ou 0,002–0,02 $ par appel (x402). Gratuit : 25 par mois sans e-mail, 200 par mois une fois réclamée.",
           "ibancom": "Abonnement annuel : 530 €/an (2 000 lookups) à 4 150 €/an (illimité), engagement 1 an, hors TVA.",
           "ibanapi": "Crédits prépayés qui expirent avec le plan : 15 $ pour 60 jours (2 000 basiques + 400 recherches banque) à 115 $ pour un an (30 000 + 5 000).",
           "libs": "Gratuit (MIT/LGPL). Le coût, c'est votre temps.",
@@ -2228,8 +2229,8 @@
     }
   },
   "audit": {
-    "metaTitle": "Audit de fichier de créanciers : 149 CHF, résultat immédiat",
-    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 CHF jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX du 14 novembre 2026.",
+    "metaTitle": "Audit de fichier de créanciers : 149 $, résultat immédiat",
+    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 $ jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX du 14 novembre 2026.",
     "eyebrow": "Audit de fichier de créanciers",
     "title": "Contrôlez votre fichier de créanciers avant le prochain lot de paiements",
     "intro": "Chaque ligne passe par les mêmes registres que l'API IBANforge : IBAN, code banque, nom de banque et BIC, joignabilité SEPA, règles d'adresse ISO 20022. Vous voyez gratuitement quoi corriger ; le classeur annoté a un prix affiché, payé par carte, téléchargeable sur-le-champ.",
@@ -2309,10 +2310,10 @@
       "address_not_structured": "Adresse non structurée (ISO 20022)"
     },
     "pay": {
-      "title": "Obtenir le classeur annoté : {price} CHF pour {rows} lignes",
+      "title": "Obtenir le classeur annoté : {price} $ pour {rows} lignes",
       "text": "Paiement par carte sur Stripe. Le téléchargement s'ouvre juste après, avec chaque ligne, la banque et le BIC du registre, le détail de chaque constat et une feuille de synthèse.",
       "email": "E-mail pour le reçu (facultatif)",
-      "button": "Payer {price} CHF et télécharger",
+      "button": "Payer {price} $ et télécharger",
       "redirecting": "Ouverture de la page de paiement",
       "retention": "Le rapport est conservé 24 heures après le paiement, puis effacé. Un dépôt non payé est effacé après 2 heures."
     },
@@ -2335,7 +2336,7 @@
       "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
       "back": "Retour à la page d'audit"
     },
-    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant le 14 novembre 2026.",
+    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 $ pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant le 14 novembre 2026.",
     "steps": {
       "title": "Trois étapes, un fichier",
       "s1t": "Déposez votre fichier",
@@ -2343,7 +2344,7 @@
       "s2t": "Voyez quoi corriger, gratuitement",
       "s2": "Compteurs, constats par type, vingt lignes masquées.",
       "s3t": "Payez, téléchargez",
-      "s3": "149 CHF par carte, le classeur annoté tout de suite, plus le lien par mail."
+      "s3": "149 $ par carte, le classeur annoté tout de suite, plus le lien par mail."
     },
     "workbook": {
       "title": "Ce que vous téléchargez",

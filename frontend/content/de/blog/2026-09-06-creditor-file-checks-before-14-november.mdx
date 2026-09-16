@@ -10,7 +10,7 @@ faq:
   - q: "Swift hat seinen Termin am 27. August 2026 verschoben: Kann ich warten?"
     a: "Der Schweizer Zeitplan ist separat zu prüfen. SIX nennt weiterhin den 14. November 2026. Swift verschob die Zahlungsverkehrsänderungen am 27. August; der EPC verschob seine Frist vom 15. November am 9. September ebenfalls und will im Oktober ein neues Datum festlegen. Diese Mitteilungen ändern den SIX-Zeitplan nicht für sich allein."
   - q: "Was kostet die Dateiprüfung?"
-    a: "Die Vorschau ist kostenlos: die Zähler und zwanzig Zeilen, IBAN maskiert. Die kommentierte Arbeitsmappe kostet 149 CHF bis 5 000 Zeilen und 349 CHF bis 20 000, per Karte bezahlt, 24 Stunden lang herunterladbar."
+    a: "Die Vorschau ist kostenlos: die Zähler und zwanzig Zeilen, IBAN maskiert. Die kommentierte Arbeitsmappe kostet 149 $ bis 5 000 Zeilen und 349 $ bis 20 000, per Karte bezahlt, 24 Stunden lang herunterladbar."
 ---
 
 Die Swiss Payment Standards nennen weiterhin den 14. November 2026 für strukturierte oder hybride Adressen in Zahlungsaufträgen, wenn eine Adresse verwendet wird. Der EPC hat seine separate Frist vom 15. November am 9. September verschoben; Swift hatte seine Zahlungsverkehrsänderungen bereits am 27. August vertagt. Diese Mitteilungen ändern den Schweizer Zeitplan nicht für sich allein. Siehe [die datierten Entscheidungen je Zahlungsweg](/de/blog/2026-09-02-which-date-structured-addresses).
@@ -51,7 +51,7 @@ Seit dem 9. Oktober 2025 vergleichen die Banken des Euroraums den von Ihnen ange
 
 Exportieren Sie die Datei als CSV oder XLSX mit mindestens einer IBAN-Spalte; die Spalten Name, BIC und Adresse werden genutzt, wenn sie vorhanden sind. Legen Sie sie in der [Dateiprüfung](/de/audit) ab. Die Vorschau ist kostenlos und sofort da: die Zähler je Befundtyp, zwanzig Zeilen mit maskierten IBAN und der Satz, auf den es ankommt: wie viele Zahlungen dieser Datei abgewiesen würden. Jede Zeile durchläuft dieselben Register wie die IBANforge-API: Aufbau und Prüfziffern der IBAN, Bankcode gegen das nationale Register, BIC der Datei gegen das Register, Dubletten, Land der Adresse gegen Land der IBAN, und die Adresse gegen die Schweizer Regeln, wenn die Datei Adressspalten hat.
 
-Die kommentierte Arbeitsmappe, 149 CHF bis 5 000 Zeilen, zeigt jede Zeile vollständig mit Bank und BIC aus dem Register, das Detail jedes Befunds und ein Übersichtsblatt zum Weitergeben. Sie bleibt 24 Stunden lang herunterladbar.
+Die kommentierte Arbeitsmappe, 149 $ bis 5 000 Zeilen, zeigt jede Zeile vollständig mit Bank und BIC aus dem Register, das Detail jedes Befunds und ein Übersichtsblatt zum Weitergeben. Sie bleibt 24 Stunden lang herunterladbar.
 
 Wer es lieber integriert: Die drei Routen, die diese Arbeit tun, sind öffentlich: [`POST /v1/iban/validate`](/de/docs/iban-validate) für die IBAN und ihren Bankcode, [`POST /v1/address/check`](/de/docs/structured-addresses), um kostenlos und unter Nennung des Dokuments zu sagen, ob eine Adresse die Schweizer Regeln besteht, und [`POST /v1/ch/qr-bill/check`](/de/docs/swiss-qr-iban) für eine ganze QR-Rechnung.
 

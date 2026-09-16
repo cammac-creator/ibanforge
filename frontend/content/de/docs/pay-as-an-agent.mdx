@@ -8,7 +8,7 @@ order: 5
 
 Diese Seite richtet sich an autonome Agenten und die Menschen, die sie betreiben. Sie ist der praktische Begleiter zur [x402-Protokollreferenz](/docs/x402): nicht wie die Zahlung funktioniert, sondern wie man mit möglichst wenig Reibung von null zu einem zahlenden Agenten kommt.
 
-Eine Empfehlung vorweg: **Bei Volumen kaufen Sie Pakete.** Die größeren Pakete sind pro Aufruf günstiger als der Einzelpreis: 0,004 $ bei 5.000 Credits und 0,0032 $ bei 25.000, gegenüber 0,005 $ für eine einzelne Validierung. Und jede Pay-per-Call-Abrechnung ist eine eigene On-Chain-Transaktion: Der CDP-Facilitator, über den diese Zahlungen laufen, ist bis 1.000 On-Chain-Transaktionen pro Monat kostenlos und berechnet darüber hinaus 0,001 $ pro Transaktion (CDP-x402-Preise, gelesen am 2026-09-09), also 20 % einer Validierung zu 0,005 $ und 0,02 % eines 5-$-Pakets. Eine einzige Zahlung an `POST /v1/credits/buy/1k` liefert einen API-Schlüssel mit 1.000 vorgeladenen Credits, kein Verfall, kein Abo. Pay-per-Call funktioniert und braucht gar keinen Schlüssel; es ist bei echtem Volumen einfach die teure Form.
+Eine Empfehlung vorweg: **Bei Volumen kaufen Sie Pakete.** Jedes Paket ist pro Aufruf günstiger als der Einzelpreis: 0,004 $ ab dem ersten Paket, 0,0032 $ bei 25.000, gegenüber 0,005 $ für eine einzelne Validierung. Und jede Pay-per-Call-Abrechnung ist eine eigene On-Chain-Transaktion: Der CDP-Facilitator, über den diese Zahlungen laufen, ist bis 1.000 On-Chain-Transaktionen pro Monat kostenlos und berechnet darüber hinaus 0,001 $ pro Transaktion (CDP-x402-Preise, gelesen am 2026-09-09), also 20 % einer Validierung zu 0,005 $ und 0,025 % eines 4-$-Pakets. Eine einzige Zahlung an `POST /v1/credits/buy/1k` liefert einen API-Schlüssel mit 1.000 vorgeladenen Credits, kein Verfall, kein Abo. Pay-per-Call funktioniert und braucht gar keinen Schlüssel; es ist bei echtem Volumen einfach die teure Form.
 
 ## Schritt 1 — Geben Sie Ihrem Agenten ein Wallet mit Budget
 
@@ -31,13 +31,13 @@ Zum Üben ohne echtes Geld füllt der CDP-Faucet ein **base-sepolia**-Testwallet
 **Bestes Preis-Leistungs-Verhältnis — eine Zahlung, dann ein Schlüssel:**
 
 ```bash
-# über Ihren x402-fähigen Client (dieser Endpoint kostet 5,00 $, inline bezahlt):
+# über Ihren x402-fähigen Client (dieser Endpoint kostet 4,00 $, inline bezahlt):
 POST https://api.ibanforge.com/v1/credits/buy/1k
 # → { "api_key": "ifk_…", "credits": 1000, … }
 # danach jeden Endpoint aufrufen mit: Authorization: Bearer ifk_…
 ```
 
-Pakete: `1k` = 5 $ · `5k` = 20 $ · `25k` = 80 $. Credits verfallen nie; Batch-Validierung kostet 1 Credit pro IBAN.
+Pakete: `1k` = 4 $ · `5k` = 20 $ · `25k` = 80 $. Credits verfallen nie; Batch-Validierung kostet 1 Credit pro IBAN.
 
 **Pay-per-Call — ohne Schlüssel, ohne Zustand** (TypeScript, Pakete aus Schritt 1):
 

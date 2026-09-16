@@ -10,7 +10,7 @@ faq:
   - q: "Swift postponed its date on 27 August 2026: can I wait?"
     a: "The Swiss timetable must be checked separately. SIX still publishes 14 November 2026. Swift deferred its payments changes on 27 August; the EPC also postponed its 15 November deadline on 9 September and plans to set a new date in October. Neither announcement changes the SIX timetable by itself."
   - q: "What does the file audit cost?"
-    a: "The preview is free: the counters and twenty lines, IBANs masked. The annotated workbook costs 149 CHF up to 5,000 lines and 349 CHF up to 20,000, paid by card, downloadable for 24 hours."
+    a: "The preview is free: the counters and twenty lines, IBANs masked. The annotated workbook costs $149 up to 5,000 lines and $349 up to 20,000, paid by card, downloadable for 24 hours."
 ---
 
 The Swiss Payment Standards still publish 14 November 2026 for structured or hybrid addresses in payment orders when an address is used. The EPC postponed its separate 15 November deadline on 9 September; Swift had already deferred its payments changes on 27 August. These announcements do not themselves amend the Swiss timetable. See [the dated decisions, rail by rail](/blog/2026-09-02-which-date-structured-addresses).
@@ -51,7 +51,7 @@ Since 9 October 2025, euro-area banks compare the name you give with the account
 
 Export the file as CSV or XLSX with at least an IBAN column; name, BIC and address columns are used when they exist. Drop it on the [file audit](/audit). The preview is free and immediate: the counters per finding type, twenty lines with masked IBANs, and the sentence that matters, how many payments of this file would be rejected. Every line goes through the same registers as the IBANforge API: IBAN structure and check digits, bank code against the national register, the file's BIC against the register, duplicates, address country against IBAN country, and the address against the Swiss rules when the file has address columns.
 
-The annotated workbook, 149 CHF up to 5,000 lines, shows every line in full with the register's bank and BIC, the detail of each finding, and a summary sheet to pass on. It stays downloadable for 24 hours.
+The annotated workbook, $149 up to 5,000 lines, shows every line in full with the register's bank and BIC, the detail of each finding, and a summary sheet to pass on. It stays downloadable for 24 hours.
 
 If you would rather integrate it, the three routes doing this work are public: [`POST /v1/iban/validate`](/docs/iban-validate) for the IBAN and its bank code, [`POST /v1/address/check`](/docs/structured-addresses) to say, for free, whether an address passes the Swiss rules while naming the document, and [`POST /v1/ch/qr-bill/check`](/docs/swiss-qr-iban) for a whole QR-bill.
 

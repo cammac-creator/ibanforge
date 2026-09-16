@@ -9,7 +9,8 @@ describe('buildAuditReadyEmail', () => {
         lang,
         link: 'https://ibanforge.com/fr/audit/done?job=abc&session_id=cs_1',
         rows: 1240,
-        price_chf: 149,
+        price: 149,
+        currency: 'USD',
       });
       expect(m.subject).toContain('1240');
       expect(m.text).toContain('https://ibanforge.com/fr/audit/done?job=abc&session_id=cs_1');
@@ -17,10 +18,17 @@ describe('buildAuditReadyEmail', () => {
         'href="https://ibanforge.com/fr/audit/done?job=abc&session_id=cs_1"',
       );
       expect(m.text).not.toContain('\u2014');
-      expect(m.html).toContain('149 CHF');
+      expect(m.html).toContain('149 USD');
     }
     expect(
-      buildAuditReadyEmail({ to: 'a@b.c', lang: 'fr', link: 'x', rows: 3, price_chf: 149 }).subject,
+      buildAuditReadyEmail({
+        to: 'a@b.c',
+        lang: 'fr',
+        link: 'x',
+        rows: 3,
+        price: 149,
+        currency: 'USD',
+      }).subject,
     ).toBe('Votre audit de fichier de créanciers est prêt (3 lignes)');
   });
 });

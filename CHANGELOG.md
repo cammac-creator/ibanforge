@@ -5,6 +5,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **The entry credit pack costs $4 (was $5).** `1k` = 1,000 credits for $4.00, by card or in USDC: buying a pack is now always cheaper per call than paying per call. `GET /v1/credits/bundles`, the 402 bodies, the x402 discovery and the pricing page all say so. The 5k and 25k packs and the Pro plan are unchanged.
+- **The creditor file audit is priced in US dollars, like everything else.** 149 USD up to 5,000 rows, 349 USD up to 20,000 rows (the same figures were charged in CHF until now). Contract change on `/v1/audit/upload`, `/v1/audit/status/:job` and `/v1/audit/checkout/:job`: the field `price_chf` is renamed `price` and `currency` carries the ISO code of that price (`USD` for every new job; a job created before the switch keeps `CHF` and is charged in CHF). `tiers[].price_chf` is `tiers[].price`. The admin audit statistics gain `revenue_usd` and `payment_amounts.usd`; `revenue_chf` keeps the francs of before.
+- **Finland is a prudent register until its list is re-read.** The Finance Finland list behind `bank_code_check` is a hand transcription dated 15.10.2025 that nothing refreshes. A hit still names the banking group and its BIC, dated from the list; a code the list does not carry no longer answers `not_in_register` / `not_allocated` with `authoritative: true`, it falls through to the composite answer with `authoritative: false`, and `next_steps` never says `bank_code_not_allocated` for Finland.
+- **Pro subscription: a customer portal and a paragraph in the Terms.** Pro subscribers manage their card, their invoices and their cancellation in the Stripe customer portal (linked from the pricing page, the key e-mail and §3 of the Terms of Service, version 1.5 of 16 September 2026).
+
 ## [1.7.0] — 2026-09-15
 
 ### Added

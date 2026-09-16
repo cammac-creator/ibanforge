@@ -157,7 +157,7 @@
       },
       "heading": "Endpoints und Preise",
       "subtitle": "Starten Sie gratis mit 25 Anfragen pro Monat, ohne E-Mail. Beanspruchen Sie denselben Schlüssel für 200 pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC.",
-      "plans": "Gratis: 25 Anfragen pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung · Pro: 29 $ pro Monat für 10 000 Anfragen · Guthabenpakete ab 5 $ · Herstellerlizenz ab 149 $ pro Monat · Dateiprüfung 149 CHF.",
+      "plans": "Gratis: 25 Anfragen pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung · Pro: 29 $ pro Monat für 10 000 Anfragen · Guthabenpakete ab 4 $ · Herstellerlizenz ab 149 $ pro Monat · Dateiprüfung 149 $.",
       "plansLink": "Preise ansehen"
     },
     "cta": {
@@ -279,7 +279,7 @@
     },
     "audit": {
       "heading": "Prüfen Sie Ihre Lieferantendatei vor dem nächsten Zahlungslauf",
-      "text": "Laden Sie eine CSV- oder Excel-Datei hoch und sehen Sie die Ergebnisse kostenlos. Die kommentierte Arbeitsmappe kostet 149 CHF bis 5.000 Zeilen oder 349 CHF bis 20.000 Zeilen.",
+      "text": "Laden Sie eine CSV- oder Excel-Datei hoch und sehen Sie die Ergebnisse kostenlos. Die kommentierte Arbeitsmappe kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
       "cta": "Lieferantendatei prüfen"
     },
     "badgeFallback": "API online · Live-Status",
@@ -290,7 +290,7 @@
   "pricing": {
     "metadata": {
       "title": "Preise der IBAN-API: gratis, Pro 29 $, OEM",
-      "description": "25 kostenlose Anfragen pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung, Pro für 29 $ pro Monat mit 10 000 Anfragen, Guthabenpakete ab 5 $ ohne Ablauf, Herstellerlizenz ab 149 $ pro Monat, Dateiprüfung 149 CHF."
+      "description": "25 kostenlose Anfragen pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung, Pro für 29 $ pro Monat mit 10 000 Anfragen, Guthabenpakete ab 4 $ ohne Ablauf, Herstellerlizenz ab 149 $ pro Monat, Dateiprüfung 149 $."
     },
     "badge": "Transparente Preise",
     "hero": {
@@ -441,7 +441,7 @@
       "packs": {
         "tag": "Credit-Packs",
         "title": "Prepaid-Credits",
-        "body": "Im Paket kaufen, ohne Ablauf: 1k = 5 $, 5k = 20 $, 25k = 80 $ (bis 0,0032 $/Credit). Ein Credit = eine Validierung oder ein Lookup — ein Batch mit N IBANs verbraucht N Credits.",
+        "body": "Im Paket kaufen, ohne Ablauf: 1k = 4 $, 5k = 20 $, 25k = 80 $ (bis 0,0032 $/Credit). Ein Credit = eine Validierung oder ein Lookup — ein Batch mit N IBANs verbraucht N Credits.",
         "note": "Stripe-Checkout — API-Schlüssel per E-Mail. Agenten können in USDC kaufen: POST /v1/credits/buy/1k|5k|25k.",
         "cardLabel": "Mit Karte zahlen"
       }
@@ -453,24 +453,25 @@
     },
     "audit": {
       "label": "Prüfung der Kreditorendatei",
-      "text": "Kein Entwickler? Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen, und jede Zeile wird gegen dieselben Register geprüft: 149 CHF bis 5'000 Zeilen, 349 CHF bis 20'000, zuerst kostenlose Vorschau, kommentierte Arbeitsmappe direkt nach der Zahlung.",
+      "text": "Kein Entwickler? Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen, und jede Zeile wird gegen dieselben Register geprüft: 149 $ bis 5'000 Zeilen, 349 $ bis 20'000, zuerst kostenlose Vorschau, kommentierte Arbeitsmappe direkt nach der Zahlung.",
       "cta": "Datei prüfen"
     },
     "pro": {
       "label": "Pro-Abonnement",
       "title": "Lieber eine feste Monatsrechnung?",
-      "text": "Pro: 10'000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
+      "text": "Pro: 10'000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit im Kundenportal kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
       "note": "Die Integration in Ihr Produkt ist innerhalb der Grenzen und Bedingungen Ihres Tarifs erlaubt. Für ein schriftliches SLA, Supportzusagen oder höhere Volumen nutzen Sie das Editor/OEM-Angebot.",
       "price": "29 $",
       "per": "/ Monat",
-      "cta": "Pro abonnieren"
+      "cta": "Pro abonnieren",
+      "portal": "Abonnement, Rechnungen und Kündigung verwalten Sie im Kundenportal"
     },
     "uses": {
       "heading": "Wie möchten Sie IBANforge nutzen?",
       "estimate": "Tarife mit meinem Volumen vergleichen",
       "occasional": {
         "title": "Gelegentliche Prüfungen",
-        "body": "Prepaid-Guthaben ab 5 $, ohne Abo. Nutzen Sie das Guthaben bei Bedarf.",
+        "body": "Prepaid-Guthaben ab 4 $, ohne Abo. Nutzen Sie das Guthaben bei Bedarf.",
         "cta": "Pakete ansehen"
       },
       "regular": {
@@ -1918,7 +1919,7 @@
       "rows": {
         "pricing": {
           "label": "Preismodell",
-          "ibanforge": "Prepaid-Packs: 5 $ / 1.000 Credits, verfallen nie. Oder 0,002–0,02 $ pro Aufruf (x402). Gratis: 25 pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung.",
+          "ibanforge": "Prepaid-Packs: 4 $ / 1.000 Credits, verfallen nie. Oder 0,002–0,02 $ pro Aufruf (x402). Gratis: 25 pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung.",
           "ibancom": "Jahresabo: 530 €/Jahr (2.000 Lookups) bis 4.150 €/Jahr (unbegrenzt), Mindestlaufzeit 1 Jahr, zzgl. MwSt.",
           "ibanapi": "Vorausbezahlte Credits, die mit dem Plan verfallen: 15 $ für 60 Tage (2'000 Basis + 400 Bankabfragen) bis 115 $ für ein Jahr (30'000 + 5'000).",
           "libs": "Kostenlos (MIT/LGPL). Die Kosten sind Ihre Zeit.",
@@ -2228,8 +2229,8 @@
     }
   },
   "audit": {
-    "metaTitle": "Prüfung der Kreditorendatei: 149 CHF, Ergebnis sofort",
-    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 CHF bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist vom 14. November 2026.",
+    "metaTitle": "Prüfung der Kreditorendatei: 149 $, Ergebnis sofort",
+    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist vom 14. November 2026.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
     "intro": "Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN, Bankleitzahl, Bankname und BIC, SEPA-Erreichbarkeit, Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
@@ -2309,10 +2310,10 @@
       "address_not_structured": "Adresse nicht strukturiert (ISO 20022)"
     },
     "pay": {
-      "title": "Kommentierte Arbeitsmappe erhalten: {price} CHF für {rows} Zeilen",
+      "title": "Kommentierte Arbeitsmappe erhalten: {price} $ für {rows} Zeilen",
       "text": "Kartenzahlung über Stripe. Der Download öffnet sich direkt danach, mit jeder Zeile, Bank und BIC aus dem Register, dem Detail jedes Befunds und einem Zusammenfassungsblatt.",
       "email": "E-Mail für die Quittung (optional)",
-      "button": "{price} CHF zahlen und herunterladen",
+      "button": "{price} $ zahlen und herunterladen",
       "redirecting": "Zahlungsseite wird geöffnet",
       "retention": "Der Bericht wird 24 Stunden nach der Zahlung aufbewahrt und dann gelöscht. Ein unbezahlter Upload wird nach 2 Stunden gelöscht."
     },
@@ -2335,7 +2336,7 @@
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
     },
-    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor dem 14. November 2026.",
+    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor dem 14. November 2026.",
     "steps": {
       "title": "Drei Schritte, eine Datei",
       "s1t": "Datei ablegen",
@@ -2343,7 +2344,7 @@
       "s2t": "Kostenlos sehen, was zu korrigieren ist",
       "s2": "Zähler, Befunde nach Typ, zwanzig maskierte Zeilen.",
       "s3t": "Zahlen, herunterladen",
-      "s3": "149 CHF per Karte, die kommentierte Arbeitsmappe sofort, dazu der Link per E-Mail."
+      "s3": "149 $ per Karte, die kommentierte Arbeitsmappe sofort, dazu der Link per E-Mail."
     },
     "workbook": {
       "title": "Was Sie herunterladen",

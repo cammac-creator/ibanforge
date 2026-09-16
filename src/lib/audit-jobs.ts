@@ -26,7 +26,9 @@ export interface AuditJob {
   filename: string | null;
   rows: number;
   tier: AuditTierCode;
-  price_chf: number;
+  price: number;
+  /** ISO 4217 code of `price`: CHF for jobs created before 16/09/2026, USD since. */
+  currency: string;
   lang: AuditLang;
   summary: AuditSummary;
   preview: PreviewRow[];
@@ -43,7 +45,8 @@ interface Row {
   filename: string | null;
   rows: number;
   tier: string;
-  price_chf: number;
+  price: number;
+  currency: string;
   lang: string;
   summary_json: string;
   preview_json: string;
@@ -65,7 +68,8 @@ function toJob(r: Row): AuditJob {
     filename: r.filename,
     rows: r.rows,
     tier: r.tier as AuditTierCode,
-    price_chf: r.price_chf,
+    price: r.price,
+    currency: r.currency,
     lang: r.lang as AuditLang,
     summary: JSON.parse(r.summary_json) as AuditSummary,
     preview: JSON.parse(r.preview_json) as PreviewRow[],
@@ -80,7 +84,8 @@ export function createAuditJob(input: {
   filename: string | null;
   rows: number;
   tier: AuditTierCode;
-  price_chf: number;
+  price: number;
+  currency: string;
   lang: AuditLang;
   summary: AuditSummary;
   preview: PreviewRow[];
@@ -89,15 +94,16 @@ export function createAuditJob(input: {
   const id = randomBytes(18).toString('hex');
   const db = getStatsDB();
   db.prepare(
-    `INSERT INTO audit_jobs (id, expires_at, filename, rows, tier, price_chf, lang, summary_json, preview_json, report)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO audit_jobs (id, expires_at, filename, rows, tier, price, currency, lang, summary_json, preview_json, report)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     isoIn(UNPAID_TTL_HOURS),
     input.filename,
     input.rows,
     input.tier,
-    input.price_chf,
+    input.price,
+    input.currency,
     input.lang,
     JSON.stringify(input.summary),
     JSON.stringify(input.preview),
@@ -107,7 +113,7 @@ export function createAuditJob(input: {
 }
 
 const COLUMNS =
-  'id, created_at, expires_at, filename, rows, tier, price_chf, lang, summary_json, preview_json, stripe_session_id, paid_at, payer_email, downloads';
+  'id, created_at, expires_at, filename, rows, tier, price, currency, lang, summary_json, preview_json, stripe_session_id, paid_at, payer_email, downloads';
 
 export function getAuditJob(id: string): AuditJob | null {
   const r = getStatsDB()
@@ -216,13 +222,14 @@ export function markAuditPaid(
         id,
       );
       db.prepare(
-        `INSERT INTO audit_sales (job_id, rows, tier, price_chf, amount_paid_minor, amount_paid_currency, stripe_session_id, lang)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO audit_sales (job_id, rows, tier, price, currency, amount_paid_minor, amount_paid_currency, stripe_session_id, lang)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
         before.rows,
         before.tier,
-        before.price_chf,
+        before.price,
+        before.currency,
         payment.amount_minor,
         payment.currency,
         payment.session_id,
@@ -253,7 +260,7 @@ export function listPaidAuditJobs(limit = 50): Array<
 > {
   const rows = getStatsDB()
     .prepare(
-      `SELECT id, created_at, expires_at, filename, rows, tier, price_chf, lang, stripe_session_id, paid_at, payer_email, downloads,
+      `SELECT id, created_at, expires_at, filename, rows, tier, price, currency, lang, stripe_session_id, paid_at, payer_email, downloads,
               amount_paid_minor, amount_paid_currency
          FROM audit_jobs WHERE paid_at IS NOT NULL ORDER BY paid_at DESC LIMIT ?`,
     )
@@ -267,7 +274,8 @@ export function listPaidAuditJobs(limit = 50): Array<
     filename: r.filename,
     rows: r.rows,
     tier: r.tier as AuditTierCode,
-    price_chf: r.price_chf,
+    price: r.price,
+    currency: r.currency,
     lang: r.lang as AuditLang,
     stripe_session_id: r.stripe_session_id,
     paid_at: r.paid_at,
@@ -285,8 +293,10 @@ export interface AuditStats {
   sales: number;
   /** Total CHF connu à la commande, avant remboursements et frais ; jamais le catalogue. */
   revenue_chf: number | null;
+  /** Même chose en dollars : la devise de vente depuis le 16/09/2026. Jamais additionnés. */
+  revenue_usd: number | null;
   revenue_basis: 'stripe_checkout';
-  payment_amounts: { chf: number; other_currency: number; unknown: number };
+  payment_amounts: { chf: number; usd: number; other_currency: number; unknown: number };
   last_sale_at: string | null;
   conversion: number | null;
   /**
@@ -307,7 +317,8 @@ export interface AuditStats {
     paid_at: string;
     rows: number;
     tier: string;
-    price_chf: number;
+    price: number;
+    currency: string;
     amount_paid_minor: number | null;
     amount_paid_currency: string | null;
   }>;
@@ -336,7 +347,9 @@ export function auditStats(days: number): AuditStats {
        SELECT COUNT(*) n, MAX(paid_at) last,
               COALESCE(SUM(CASE WHEN valid_amount AND currency = 'chf' THEN amount_paid_minor ELSE 0 END), 0) chf_minor,
               COUNT(CASE WHEN valid_amount AND currency = 'chf' THEN 1 END) chf_payments,
-              COUNT(CASE WHEN valid_amount AND currency != 'chf' THEN 1 END) other_currency_payments
+              COALESCE(SUM(CASE WHEN valid_amount AND currency = 'usd' THEN amount_paid_minor ELSE 0 END), 0) usd_minor,
+              COUNT(CASE WHEN valid_amount AND currency = 'usd' THEN 1 END) usd_payments,
+              COUNT(CASE WHEN valid_amount AND currency NOT IN ('chf', 'usd') THEN 1 END) other_currency_payments
        FROM measured`,
     )
     .get(`-${days} days`) as {
@@ -344,6 +357,8 @@ export function auditStats(days: number): AuditStats {
     last: string | null;
     chf_minor: number;
     chf_payments: number;
+    usd_minor: number;
+    usd_payments: number;
     other_currency_payments: number;
   };
   const uploadRows = db
@@ -387,7 +402,7 @@ export function auditStats(days: number): AuditStats {
   });
   const recentSales = db
     .prepare(
-      `SELECT paid_at, rows, tier, price_chf, amount_paid_minor, amount_paid_currency
+      `SELECT paid_at, rows, tier, price, currency, amount_paid_minor, amount_paid_currency
        FROM audit_sales WHERE paid_at >= datetime('now', ?)
        ORDER BY paid_at DESC LIMIT 20`,
     )
@@ -398,11 +413,14 @@ export function auditStats(days: number): AuditStats {
     uploads,
     sales: sales.n,
     revenue_chf: sales.chf_payments > 0 || sales.n === 0 ? sales.chf_minor / 100 : null,
+    // Sold in dollars since 16/09/2026; the francs of before stay in their own total.
+    revenue_usd: sales.usd_payments > 0 || sales.n === 0 ? sales.usd_minor / 100 : null,
     revenue_basis: 'stripe_checkout',
     payment_amounts: {
       chf: sales.chf_payments,
+      usd: sales.usd_payments,
       other_currency: sales.other_currency_payments,
-      unknown: sales.n - sales.chf_payments - sales.other_currency_payments,
+      unknown: sales.n - sales.chf_payments - sales.usd_payments - sales.other_currency_payments,
     },
     last_sale_at: sales.last,
     conversion: uploads > 0 ? Math.round((sales.n / uploads) * 1000) / 1000 : null,

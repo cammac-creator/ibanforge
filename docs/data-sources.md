@@ -20,7 +20,11 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
 | SIX BankMaster (clearing suisse) | 1 164 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
 | SIX Group (BIC) | 20 | même publication que le BankMaster | ⚠️ à confirmer séparément |
-| EBA Clearing STEP2 SCT | 189 | « All rights reserved by EBA CLEARING », aucune licence publiée | ❌ **non établie — lu à la source le 24/08/2026**, voir ci-dessous |
+| EBA Clearing STEP2 SCT | 189 | « All rights reserved by EBA CLEARING », aucune licence publiée | ⏳ **demande de permission envoyée le 16/09/2026** (lettre et précision d'usage à clearing@ebaclearing.eu) ; servi avec crédit en attendant la réponse, retrait sur leur mot — voir la section du 16/09 |
+| Oesterreichische Nationalbank — SEPA-Zahlungsverkehrs-Verzeichnis (`national_bank_codes`, pays AT) | 869 au 29/07/2026 | aucune condition sur la page du répertoire (pied « Copyright © Oesterreichische Nationalbank ») ; le jeu est listé sur data.gv.at, où l'usage est en règle générale CC BY 4.0 | ⏳ **lettre envoyée le 16/09/2026** à oenb.info@oenb.at (permission, licence data.gv.at, formule d'attribution) ; servi avec crédit « Source: Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis, read in <mois> » |
+| Banque nationale de Belgique — bank identification codes, Protocol Secretariat (`national_bank_codes`, pays BE) | 790 au 29/07/2026 | aucune condition sur la page (lue le 16/09/2026 : formulaire pour ajouter/modifier un code, renvoi « to the financial institution concerned or the SWIFT-website » pour un usage précis) | ⏳ **lettre envoyée le 16/09/2026** à info@nbb.be ; servi avec crédit et mois de lecture |
+| Finance Finland (Finanssiala ry) — Finnish monetary institution codes and BICs (table `src/lib/fi-register.ts`, pays FI) | 20 lignes, édition du 15.10.2025 | aucune condition sur le site (lu le 16/09/2026) ; document PDF transcrit à la main | ⏳ **lettre envoyée le 16/09/2026** à ffi@financefinland.fi (permission, attribution, notification des éditions). **Régime prudent depuis le 16/09/2026** : un résultat confirme, une absence ne refuse rien (`authoritative: false`) |
+| Bulgarian National Bank — registre BAE et BIC (`bg_bae`, pays BG) | par édition du registre | réponse écrite du service de presse le 27/08/2026 : réutilisation permise « respecting the Rights for using the BNB site » = citer la source, ne pas altérer ni déformer | ✅ **accordée sous conditions le 27/08/2026** ; `source` et `as_of` stockés et servis, noms en cyrillique tels que publiés |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
 | OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
 | ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
@@ -380,6 +384,26 @@ L'association indique que son flux RSS constitue le seul historique des changeme
 à au moins treize mois au moment de sa réponse. Ne pas en déduire une profondeur historique garantie
 ou une archive complète disponible depuis une autre source. La présente entrée consigne les conditions ;
 elle ne déclare aucun nouvel import ni modification de l'API.
+
+### ✉️ 16/09/2026 — quatre lettres parties (OeNB, BNB, Finance Finland, EBA CLEARING), et la position en attendant
+
+Décision de Claude-Alain du 16/09/2026 sur l'audit du jour (« on assume et on écrit, on avisera ensuite selon
+les réponses ») : les quatre registres servis sans condition d'usage lue reçoivent le même modèle de lettre que
+la Bank of England, la Slovaquie et la Grèce (qui a marché trois fois sur trois). Envoyées le 16/09 au soir depuis
+`claude-alain@ibanforge.com` par le relais du CRM, consignées dans l'espace Correspondances (quatre correspondants
+créés) :
+
+| Destinataire | Adresse | Objet de la demande |
+|---|---|---|
+| Oesterreichische Nationalbank | oenb.info@oenb.at | permission de réutiliser le SEPA-Zahlungsverkehrs-Verzeichnis (CSV), la licence data.gv.at s'applique-t-elle, formule d'attribution |
+| Banque nationale de Belgique (Protocol Secretariat) | info@nbb.be | permission de réutiliser la liste des bank identification codes, formule d'attribution |
+| Finance Finland | ffi@financefinland.fi | permission de réutiliser la liste des codes d'établissements monétaires, attribution, notification des nouvelles éditions ou forme lisible par machine |
+| EBA CLEARING | clearing@ebaclearing.eu | permission d'utiliser la liste des STEP2 SCT reachable PSPs comme source de l'annuaire BIC ; une **précision** envoyée quelques minutes après la première lettre, qui décrivait l'usage de façon trop large (« réponse SEPA ») : la liste sert de source de noms pour des BIC qu'aucun autre annuaire ne nomme, moins de deux cents |
+
+Position tant qu'aucune réponse n'est arrivée : les quatre sources restent servies **avec crédit et date**, rien
+n'est redistribué ni altéré ; une réponse négative entraîne le retrait des lignes concernées, comme pour
+AusPayNet. Bulgarie : rien à demander, la BNB a déjà répondu (27/08, ci-dessus dans le tableau). Réponses à
+surveiller dans l'entrant (le CRM les rattache aux correspondants).
 
 ### ⛔ 03/09/2026 — AusPayNet refuse la réutilisation du répertoire BSB
 

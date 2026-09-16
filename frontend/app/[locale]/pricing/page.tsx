@@ -30,7 +30,7 @@ const ENDPOINT_COUNT = 5
 
 // Live Stripe Payment Links for the prepaid credit packs (card checkout).
 const CREDIT_PACKS = [
-  { bundle: "1k", price: "$5", credits: "1 000", url: "https://buy.stripe.com/3cI00c18lauh1i8bqO8so00" },
+  { bundle: "1k", price: "$4", credits: "1 000", url: "https://buy.stripe.com/bJe3coeZb31P6CsamK8so05" },
   { bundle: "5k", price: "$20", credits: "5 000", url: "https://buy.stripe.com/aFafZa6sF45TaSI9iG8so01" },
   { bundle: "25k", price: "$80", credits: "25 000", url: "https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02" },
 ] as const
@@ -39,6 +39,10 @@ const CREDIT_PACKS = [
 // whose metadata.plan = 'pro' is what the API webhook keys on. Price and
 // allowance are restated in src/lib/payment-links.ts and src/lib/api-keys.ts.
 const PRO_PAYMENT_LINK = "https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04"
+
+// Stripe customer portal (16/09/2026): the Pro subscriber manages their card,
+// invoices and cancellation there; the key stays valid until the paid period ends.
+const PRO_PORTAL_LINK = "https://billing.stripe.com/p/login/3cI00c18lauh1i8bqO8so00"
 
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -229,6 +233,13 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             >
               {t('pro.cta')}
             </Button>
+            <a
+              href={PRO_PORTAL_LINK}
+              rel="noopener"
+              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              {t('pro.portal')}
+            </a>
           </div>
         </div>
       </section>

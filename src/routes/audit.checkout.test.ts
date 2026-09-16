@@ -17,7 +17,8 @@ function makeJob() {
     filename: 'fournisseurs-fictifs.csv',
     rows: 3,
     tier: 'standard',
-    price_chf: 149,
+    price: 149,
+    currency: 'USD',
     lang: 'fr',
     summary: {
       rows: 3,
@@ -29,7 +30,8 @@ function makeJob() {
       columns_detected: ['iban'],
       address_checked: false,
       tier: 'standard',
-      price_chf: 149,
+      price: 149,
+      currency: 'USD',
     },
     preview: [],
     report: Buffer.from('rapport fictif'),
@@ -64,7 +66,7 @@ function fakeStripe(job: ReturnType<typeof makeJob>) {
     payment_status: 'unpaid',
     metadata: { audit_job: job.id },
     amount_total: 14900,
-    currency: 'chf',
+    currency: 'usd',
     customer_email: 'acme@example.com',
     expires_at: Math.floor(Date.parse(`${job.expires_at.replace(' ', 'T')}Z`) / 1000) - 300,
     url: 'https://checkout.stripe.com/c/pay/cs_test_fictif',
@@ -82,7 +84,7 @@ function fakeStripe(job: ReturnType<typeof makeJob>) {
 }
 
 function payment(sessionId: string) {
-  return { session_id: sessionId, email: 'acme@example.com', amount_minor: 14900, currency: 'chf' };
+  return { session_id: sessionId, email: 'acme@example.com', amount_minor: 14900, currency: 'usd' };
 }
 
 beforeEach(() => {

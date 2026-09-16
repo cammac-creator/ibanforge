@@ -29,7 +29,7 @@ interface UploadBody {
   job: string;
   rows: number;
   paid: boolean;
-  price_chf: number;
+  price: number;
   currency: string;
   download: string | null;
   checkout: string | null;
@@ -61,8 +61,8 @@ describe('POST /v1/audit/upload', () => {
     expect(body.job).toMatch(/^[0-9a-f]{36}$/);
     expect(body.rows).toBe(3);
     expect(body.paid).toBe(false);
-    expect(body.price_chf).toBe(149);
-    expect(body.currency).toBe('CHF');
+    expect(body.price).toBe(149);
+    expect(body.currency).toBe('USD');
     expect(body.summary.error).toBe(1);
     expect(body.preview[0].line).toBe(3);
     expect(body.preview[0].iban_masked).toBe('CH10 **** 2346');
@@ -169,17 +169,18 @@ describe('sample report and statistics', () => {
       session_id: 'cs_stats_1',
       email: null,
       amount_minor: 14900,
-      currency: 'chf',
+      currency: 'usd',
     });
     markAuditPaid(job, {
       session_id: 'cs_stats_1',
       email: null,
       amount_minor: 14900,
-      currency: 'chf',
+      currency: 'usd',
     });
     const after = auditStats(30);
     expect(after.sales).toBe(before.sales + 1);
-    expect(after.revenue_chf).toBe((before.revenue_chf ?? 0) + 149);
+    expect(after.revenue_usd).toBe((before.revenue_usd ?? 0) + 149);
+    expect(after.revenue_chf).toBe(before.revenue_chf);
     expect(after.uploads).toBeGreaterThan(before.uploads);
     expect(after.last_sale_at).toBeTruthy();
   });

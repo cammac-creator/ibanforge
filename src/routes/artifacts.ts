@@ -341,8 +341,8 @@ plans:
     signup: One payment, card or USDC. Returns an API key.
     bundles:
       - credits: 1000
-        price: 5
-        per_credit: 0.005
+        price: 4
+        per_credit: 0.004
       - credits: 5000
         price: 20
         per_credit: 0.004

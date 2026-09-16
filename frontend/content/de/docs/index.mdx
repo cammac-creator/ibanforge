@@ -29,7 +29,7 @@ Alle Endpunkte werden über HTTPS bereitgestellt. HTTP-Anfragen werden automatis
 Danach drei Wege hinein — wählen Sie, was passt; Ihre App oder Ihr Agent landet nie in einer Sackgasse:
 
 1. **Kostenloser API-Schlüssel** — 25 Anfragen/Monat ohne E-Mail. [Generieren Sie einen](/docs/api-keys) per POST ohne Body und senden Sie `Authorization: Bearer ifk_...`. Mit einem Code per E-Mail beanspruchen Sie denselben Schlüssel für 200/Monat, ohne Kreditkarte.
-2. **Prepaid-Guthabenpakete** — 1k = 5 $, 5k = 20 $, 25k = 80 $. Sie verfallen nie und sind **per Karte** oder in USDC kaufbar (`POST /v1/credits/buy/1k|5k|25k`). Siehe [Preise](/pricing).
+2. **Prepaid-Guthabenpakete** — 1k = 4 $, 5k = 20 $, 25k = 80 $. Sie verfallen nie und sind **per Karte** oder in USDC kaufbar (`POST /v1/credits/buy/1k|5k|25k`). Siehe [Preise](/pricing).
 3. **x402-Mikrozahlungen** — vollständig autonome Bezahlung pro Aufruf in USDC für Agenten, ganz ohne Konto. Siehe [x402-Leitfaden](/docs/x402).
 
 Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort mit maschinenlesbaren Anweisungen für alle drei Wege — autonome Agenten können sich selbst onboarden.
@@ -47,7 +47,7 @@ Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort m
 | `/v1/reference/validate` | GET/POST | Kostenlos | Prufziffer von Zahlungsreferenzen (RF/ISO 11649, Schweizer QRR, belgische OGM, finnische viitenumero) |
 | `/v1/address/check` | POST | Kostenlos | ISO-20022-Adresskonformität (SPS, HVPS+/T2, Fedwire), jeder Befund mit Quelle |
 | `/v1/ch/qr-bill/check` | POST | Kostenlos | Swiss-QR-Rechnung: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, strukturierte (S) oder kombinierte (K) Adresse vor dem 14.11.2026, mit vorgeschlagener strukturierter Form |
-| `/v1/audit/upload` | POST | Vorschau kostenlos, dann 149 CHF | Eine ganze Kreditorendatei (CSV oder XLSX): jede Zeile gegen dieselben Register, Duplikate, BIC- und Adressprüfung; maskierte Vorschau kostenlos, kommentierte Arbeitsmappe nach Zahlung. Die Seite für Nicht-Entwickler ist [/audit](/audit) |
+| `/v1/audit/upload` | POST | Vorschau kostenlos, dann 149 $ | Eine ganze Kreditorendatei (CSV oder XLSX): jede Zeile gegen dieselben Register, Duplikate, BIC- und Adressprüfung; maskierte Vorschau kostenlos, kommentierte Arbeitsmappe nach Zahlung. Die Seite für Nicht-Entwickler ist [/audit](/audit) |
 | `/v1/demo` | GET | Kostenlos | Beispielvalidierungen (keine Zahlung erforderlich) |
 | `/health` | GET | Kostenlos | Service-Gesundheitsprüfung |
 

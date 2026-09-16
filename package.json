@@ -54,7 +54,8 @@
     "prepublishOnly": "npm run build",
     "deps:check": "tsx scripts/check-runtime-deps.ts",
     "pages:export": "tsx scripts/export-register-pages.ts",
-    "pages:export-countries": "tsx scripts/export-country-pages.ts"
+    "pages:export-countries": "tsx scripts/export-country-pages.ts",
+    "backup:restore-test": "tsx scripts/restore-test.ts"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

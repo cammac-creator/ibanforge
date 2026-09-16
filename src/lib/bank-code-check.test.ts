@@ -157,12 +157,13 @@ describe('bank_code_check.reason — why an answer is not verified', () => {
     expect(r.bank_code_check!.reason).toBe('absent_from_reference_data');
   });
 
-  it('says register_names_no_holder where the register is silent rather than negative', () => {
+  it('never turns the silence of a prudent register into a denial', () => {
     // The Finnish 72-78 band: the document defines the code length and lists no
-    // holder. Silence is not a denial, and the reason has to say which it is.
+    // holder. Since 16/09/2026 Finland is a prudent register: silence falls
+    // through to the composite answer, and never becomes `not_allocated`.
     const r = check('FI2972000110000000');
-    expect(r.bank_code_check!.status).toBe('unavailable');
-    expect(r.bank_code_check!.reason).toBe('register_names_no_holder');
+    expect(r.bank_code_check!.reason).not.toBe('not_allocated');
+    expect(r.bank_code_check!.authoritative).toBe(false);
   });
 
   it('explains nothing on a verified answer, because there is nothing to explain', () => {

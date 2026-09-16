@@ -738,8 +738,8 @@ const TOOLS: Tool[] = [
       'USE WHEN: the user has a spreadsheet or export of creditor/supplier bank accounts (accounts-payable file, vendor master, payment batch) and wants it checked before sending payments, or asks to "audit my creditor file" / "check this supplier list" / "validate this payment batch". ' +
       'HOW: base64-encode the file bytes and pass them as `file_base64`, with the original `filename` (its extension decides CSV vs XLSX parsing). ' +
       `LIMITS: rejects files decoding to more than ${AUDIT_MAX_BYTES / 1024 / 1024} MB — checked locally, before any network call — and sheets over 20,000 rows, which the route itself rejects (400 too_many_rows). ` +
-      'RETURNS a FREE PREVIEW ONLY, never the full report: `job` (the id to reuse with audit_status), `rows`, `paid` (always false from this call), `price_chf` / `currency` naming what the full report costs, `summary` (counts by status and finding code, countries seen, columns detected), and `preview` (the first flagged rows then the first OK ones, up to 20, IBANs masked like "CH10 **** 2346"). ' +
-      'The annotated .xlsx report is a PAID deliverable — 149 CHF up to 5,000 rows, 349 CHF up to 20,000 — settled through a one-off Stripe Checkout Session. This tool NEVER pays automatically: pass `checkout: true` to also receive a Checkout URL for a HUMAN to open, then poll audit_status with the same `job` id to learn when it is paid and get the download link. ' +
+      'RETURNS a FREE PREVIEW ONLY, never the full report: `job` (the id to reuse with audit_status), `rows`, `paid` (always false from this call), `price` / `currency` naming what the full report costs, `summary` (counts by status and finding code, countries seen, columns detected), and `preview` (the first flagged rows then the first OK ones, up to 20, IBANs masked like "CH10 **** 2346"). ' +
+      'The annotated .xlsx report is a PAID deliverable — $149 up to 5,000 rows, $349 up to 20,000 — settled through a one-off Stripe Checkout Session. This tool NEVER pays automatically: pass `checkout: true` to also receive a Checkout URL for a HUMAN to open, then poll audit_status with the same `job` id to learn when it is paid and get the download link. ' +
       'COST: free. Only the full report is paid, and only once a human completes the Stripe checkout.',
     inputSchema: {
       type: 'object',
@@ -771,7 +771,7 @@ const TOOLS: Tool[] = [
         job: { type: 'string', description: 'Job id — pass to audit_status to poll payment and get the download link.' },
         rows: { type: 'number' },
         tier: { type: 'string', enum: ['standard', 'large'] },
-        price_chf: { type: 'number', description: 'Price of the full report in CHF, decided by row count alone.' },
+        price: { type: 'number', description: 'Price of the full report, in the currency given by `currency` (USD), decided by row count alone.' },
         currency: { type: 'string' },
         lang: { type: 'string', enum: ['en', 'fr', 'de'] },
         paid: { type: 'boolean', description: 'Always false from this tool — nothing has been paid yet.' },
@@ -833,7 +833,7 @@ const TOOLS: Tool[] = [
         job: { type: 'string' },
         rows: { type: 'number' },
         tier: { type: 'string', enum: ['standard', 'large'] },
-        price_chf: { type: 'number' },
+        price: { type: 'number' },
         currency: { type: 'string' },
         lang: { type: 'string', enum: ['en', 'fr', 'de'] },
         paid: { type: 'boolean' },
@@ -1131,7 +1131,7 @@ const INSTRUCTIONS =
   // src/mcp/instructions.ts. Ce paquet est publié séparément et ne peut pas
   // importer depuis src/ ; `src/mcp/instructions.test.ts` compare les deux.
   'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the daily limit. ' +
-  'Prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+  'Prepaid credit packs from $4 per 1,000 calls, no expiry. ' +
   'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
   'Paying as an agent (wallet, USDC on Base, prepaid packs): https://ibanforge.com/docs/pay-as-an-agent — ' +
   'Docs and code samples: https://ibanforge.com/docs/recipes';
@@ -1350,7 +1350,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         let note =
           'This is the FREE preview only (masked IBANs, summary counts) — never the full report. ' +
-          `The annotated .xlsx report costs ${String(result.price_chf ?? '')} ${String(result.currency ?? 'CHF')} ` +
+          `The annotated .xlsx report costs ${String(result.price ?? '')} ${String(result.currency ?? 'USD')} ` +
           'and is settled through a one-off Stripe Checkout Session. Call audit_status with this job id after a ' +
           'human pays, or pass `checkout: true` to this tool to get the Checkout URL right away.';
         const preview: JsonRecord = { ...result };

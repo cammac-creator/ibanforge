@@ -6,7 +6,7 @@ export interface AuditStatus {
   job: string;
   rows: number;
   tier: string;
-  price_chf: number;
+  price: number;
   currency: string;
   lang: string;
   paid: boolean;

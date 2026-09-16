@@ -18,7 +18,6 @@ In diesen Ländern **ist** der konsultierte Referenzbestand das nationale Regist
 | **DE** | Deutsche Bundesbank, Bankleitzahlendatei | monatlich | Name, PLZ + Ort (das Register führt keine Straße), Löschung + Nachfolge-BLZ |
 | **AT** | Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis | monatlich (Quelle erscheint täglich neu) | vollständige Sitzadresse, BIC, LEI |
 | **BE** | Banque nationale de Belgique, Bankidentifikationscodes | monatlich | Name in bis zu vier Sprachen — die Datei enthält keine Adressen; reservierte Slots (*VRIJ*, *Onbeschikbaar*) gelten als nicht vergeben |
-| **FI** | Finance Finland, Codes der monetären Institute | bei Neuveröffentlichung | Codes sind **Bankengruppen** zugeteilt, nicht Instituten — ein Treffer bestätigt die Gruppe; die positive Aussage ist schwächer, und die Antwort sagt das |
 | **BG** | Bulgarian National Bank, BAE-Code-Register | monatlich neu gelesen (das Register selbst erscheint **auf Anfrage** neu, nicht nach Kalender — `as_of` trägt sein eigenes Gültigkeitsdatum, nicht unseres) | nur der Name, kyrillisch wie veröffentlicht, dazu der BIC der Zentrale. Das Urteil gilt dem **vierstelligen Bankcode** (IBAN-Positionen 5-8): ein BAE-Code umfasst auch die Filialziffern in 9-12, doch das Register führt nicht die Filialen aller Banken nach demselben Maßstab auf — diese Ziffern führen deshalb nie zu einer Ablehnung |
 | **SK** | Národná banka Slovenska, Verzeichnis der Identifikationscodes für den inländischen Zahlungsverkehr (der *prevodník*) | monatlich neu gelesen (das Register erscheint als **nummerierte Ausgabe** mit eigenem Gültigkeitsdatum — `as_of` trägt dieses Datum, nicht unseres) | nur Name und BIC, wortgetreu mit slowakischen Diakritika; überhaupt keine Adresse. Acht tschechische Institute halten einen slowakischen Zahlungscode und veröffentlichen einen tschechischen BIC — das Register führt sie, also liefern wir sie aus |
 
@@ -37,6 +36,7 @@ Wir haben die NBS am 26.08.2026 gefragt, ob das Herauslösen einzelner Felder al
 | Land | Register | Aktualisierung | Was es über den Code hinaus veröffentlicht |
 |---|---|---|---|
 | **SM** | Zentralbank der Republik San Marino, Liste der operativen Banken | monatlich neu gelesen (die Seite nennt **weder Ausgabe noch Revisionsdatum**, `as_of` ist daher unser Lesetag, und die Quellenangabe sagt „read on") | Name, BIC und der vollständige Sitz — tiefer als BE, BG oder SK veröffentlichen |
+| **FI** | Finance Finland, Codes der monetären Institute (abgeschriebene Liste vom 15.10.2025) | bei Neuveröffentlichung | Codes sind **Bankengruppen** zugeteilt, nicht Instituten: ein Treffer bestätigt die Gruppe und ihren BIC, datiert nach der Liste selbst. Seit dem 16. September 2026 ist ein Fehlen in der Liste **keine** Ablehnung: die Liste ist eine manuelle Abschrift, die nichts auffrischt, Finnland antwortet daher wie vor der Liste, `authoritative: false` |
 
 San Marino steht für sich, weil es die Regel bricht, auf der die Tabelle oben beruht. Die Zentralbank veröffentlicht die vier Banken, die sie **beaufsichtigt**; sie veröffentlicht nicht die Vergabe des ABI-Coderaums. San Marino lizenziert außerdem Zahlungs- und E-Geld-Institute, die keine Banken sind (eines hält einen san-marinesischen BIC und wickelt über EBA STEP2 ab), und die offizielle san-marinesische Beispiel-IBAN trägt einen ABI-Code, der nicht auf der Seite steht. Also:
 
@@ -46,6 +46,8 @@ San Marino steht für sich, weil es die Regel bricht, auf der die Tabelle oben b
 Ein Flag geht in die andere Richtung: `bic.basis` ist `national_register` und `bic.authoritative` ist `true`, denn der BIC neben einem gelisteten Code ist die Zuordnung der Zentralbank selbst. San Marino ist die Stelle, an der die beiden Autoritäts-Flags auseinandergehen — umgekehrt zur Schweiz.
 
 **Die Lizenz ist unbekannt und wird als unbekannt geführt.** bcsm.sm veröffentlicht keine Nutzungsbedingungen — nur eine Datenschutzerklärung und einen Copyright-Hinweis im Fuß (geprüft am 06.09.2026). Unsere Position: vier Zeilen Routing-Daten, von der Aufsicht zur Nutzung veröffentlicht, pro Anfrage als ein Datensatz ausgeliefert, mit *Source: Central Bank of the Republic of San Marino, operating banks (read on …)* aus eigenem Entschluss und nicht aus Pflicht angegeben. Ein Brief an die Zentralbank liegt bereit; bei Widerspruch wird das Register zurückgezogen. Bis dahin wird keine Klausel erfunden.
+
+Finnland ist am 16. September 2026 aus der autoritativen Tabelle oben hierher gewandert: eine Ablehnung auf Basis einer elf Monate alten Abschrift ist kein Grund, eine Zahlung zu stoppen. Es kehrt zurück, sobald die Liste gegen eine aktuelle Veröffentlichung neu gelesen wurde.
 
 ## Die zusammengesetzte BIC-Karte — wo `authoritative: false`
 

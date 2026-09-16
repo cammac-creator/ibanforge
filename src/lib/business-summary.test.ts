@@ -79,7 +79,8 @@ describe('credits', () => {
       }),
     ]);
     expect(s.credits.sold_credits).toBe(5000);
-    expect(s.credits.sold_usd).toBe(21);
+    // 4,000 credits pro rata of the nearest pack (5k at $20) = $16, plus the entry pack at $4 (16/09/2026).
+    expect(s.credits.sold_usd).toBe(20);
     expect(s.credits.consumed_credits).toBe(2807);
     expect(s.credits.paying_accounts).toBe(2);
     // The second account bought a thousand credits and used seven: the pack
@@ -109,7 +110,7 @@ describe('credits', () => {
       }),
     ]);
     expect(s.credits.paying_accounts).toBe(1);
-    expect(s.credits.sold_usd).toBe(5);
+    expect(s.credits.sold_usd).toBe(4);
     expect(s.credits.accounts[0].domain).toBe('anonyme (x402)');
   });
 

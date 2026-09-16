@@ -29,7 +29,7 @@ Tous les endpoints sont servis en HTTPS. Les requetes HTTP sont automatiquement 
 Ensuite, trois portes d'entrée — choisissez ce qui vous convient, votre app ou votre agent ne tombe jamais sur un cul-de-sac :
 
 1. **Clé API gratuite** — 25 requêtes/mois sans e-mail. [Générez-la](/docs/api-keys) avec un POST sans corps, puis envoyez `Authorization: Bearer ifk_...`. Réclamer cette même clé avec un code reçu par e-mail porte le quota à 200/mois, sans carte.
-2. **Packs de crédits prépayés** — 1k = 5 $, 5k = 20 $, 25k = 80 $. Ils n'expirent jamais, achetables **par carte** ou en USDC (`POST /v1/credits/buy/1k|5k|25k`). Voir les [tarifs](/pricing).
+2. **Packs de crédits prépayés** — 1k = 4 $, 5k = 20 $, 25k = 80 $. Ils n'expirent jamais, achetables **par carte** ou en USDC (`POST /v1/credits/buy/1k|5k|25k`). Voir les [tarifs](/pricing).
 3. **Micropaiements x402** — paiement à l'appel entièrement autonome en USDC pour les agents, sans aucun compte. Voir le [guide x402](/docs/x402).
 
 Une requête sans clé valide ni paiement reçoit une réponse `402` avec des instructions lisibles par machine pour les trois voies — les agents autonomes s'auto-embarquent.
@@ -47,7 +47,7 @@ Une requête sans clé valide ni paiement reçoit une réponse `402` avec des in
 | `/v1/reference/validate` | GET/POST | Gratuit | Checksum de reference de paiement (RF/ISO 11649, QRR suisse, OGM belge, viitenumero finlandais) |
 | `/v1/address/check` | POST | Gratuit | Conformité d'adresse postale ISO 20022 (SPS, HVPS+/T2, Fedwire), chaque constat sourcé |
 | `/v1/ch/qr-bill/check` | POST | Gratuit | Charge utile de QR-facture suisse : en-tête, appariement QR-IBAN et référence, sommes de contrôle, adresse structurée (S) ou combinée (K) avant le 14.11.2026, avec une forme structurée proposée |
-| `/v1/audit/upload` | POST | Aperçu gratuit, puis 149 CHF | Un fichier de créanciers entier (CSV ou XLSX) : chaque ligne contre les mêmes registres, doublons, contrôles BIC et adresse ; aperçu masqué gratuit, classeur annoté après paiement. La page pour non-développeurs est [/audit](/audit) |
+| `/v1/audit/upload` | POST | Aperçu gratuit, puis 149 $ | Un fichier de créanciers entier (CSV ou XLSX) : chaque ligne contre les mêmes registres, doublons, contrôles BIC et adresse ; aperçu masqué gratuit, classeur annoté après paiement. La page pour non-développeurs est [/audit](/audit) |
 | `/v1/demo` | GET | Gratuit | Exemples de validation (sans paiement) |
 | `/health` | GET | Gratuit | Verification de l'etat du service |
 

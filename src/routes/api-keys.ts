@@ -130,7 +130,7 @@ import {
 // this one. A pack price that drifts here without drifting there would make
 // the weekly revenue line quietly wrong.
 export const BUNDLES: Record<string, { credits: number; price_usdc: number }> = {
-  '1k': { credits: 1000, price_usdc: 5 },
+  '1k': { credits: 1000, price_usdc: 4 },
   '5k': { credits: 5000, price_usdc: 20 },
   '25k': { credits: 25000, price_usdc: 80 },
 };

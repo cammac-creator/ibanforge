@@ -134,12 +134,6 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   CH: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
   LI: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
   DE: 'Deutsche Bundesbank Bankleitzahlendatei',
-  // Finland says what it is worth in the string itself. CH, LI and DE allocate
-  // to institutions; Finland allocates prefixes to banking groups, so a hit
-  // confirms the group rather than a specific bank. Same field name, weaker
-  // positive, and leaving that undeclared would be the collapse this whole
-  // verdict exists to undo.
-  FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)',
   AT: 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis',
   BE: 'Banque nationale de Belgique, bank identification codes (Protocol Secretariat)',
   // Slovakia. The NBS allocates the "kód platobného styku" to the providers of
@@ -184,6 +178,15 @@ const NATIONAL_REGISTERS: Record<string, string> = {
  * banks only, in a country that also licenses non-bank payment institutions.
  */
 const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
+  // Finland moved here from NATIONAL_REGISTERS on 16/09/2026 (decision of
+  // Claude-Alain on the audit of that day). The Finance Finland list is a hand
+  // transcription dated 15.10.2025 that nothing refreshes: a miss on an
+  // eleven-month-old list is not a denial a caller should stop a payment on.
+  // A hit still names the banking group and its BIC and carries the list's
+  // own date. Back to NATIONAL_REGISTERS once the list is re-read against a
+  // current publication. Finland allocates prefixes to banking GROUPS, not
+  // institutions, so even a hit confirms the group rather than a bank.
+  FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)',
   SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
 };
 
@@ -212,7 +215,6 @@ const PSD_TYPE_TO_ISSUER: Partial<Record<PsdEntityType, 'emi' | 'payment_institu
 function askNationalRegister(
   cc: string,
   bankCode: string,
-  bban?: string,
 ): {
   allocated: boolean;
   retired?: true;
@@ -249,22 +251,6 @@ function askNationalRegister(
         country: hit.address.country || cc,
       },
     };
-  }
-  if (cc === 'FI') {
-    // Finland needs the whole BBAN, not the 3-digit slice: institution codes
-    // run 1 to 4 characters and only the longest allocated prefix is the real
-    // one. Asking about the slice would read Nordea's '1' as '123' and deny
-    // the country's largest bank.
-    if (!bban) return null;
-    const hit = lookupFiInstitution(bban);
-    if (!hit) return null;
-    // Dated from the transcribed Finance Finland list itself: a denial a caller
-    // will act on has to say how old the list behind it is, and the reference
-    // month of the BIC refresh is not that date (audit of 16/09/2026, I1).
-    const fiDate = FI_REGISTER_AS_OF.slice(0, 7);
-    if (hit.status === 'unknown') return { allocated: false, inconclusive: true, as_of: fiDate };
-    if (hit.status === 'not_allocated') return { allocated: false, as_of: fiDate };
-    return { allocated: true, value: hit.code, as_of: fiDate };
   }
   if (cc === 'AT' || cc === 'BE' || cc === 'SK') {
     // Same safe failure as Germany: no table means no ground truth, so decline
@@ -450,7 +436,7 @@ function decideBankCode(
   const as_of = getReferenceAsOf();
   const national = NATIONAL_REGISTERS[cc];
 
-  const verdict = national ? askNationalRegister(cc, bankCode, bban) : null;
+  const verdict = national ? askNationalRegister(cc, bankCode) : null;
   if (national && verdict?.inconclusive) {
     // The register defines this code space but publishes no holder for it.
     // Silence is not a denial, so this reports unavailable and drops the
@@ -500,6 +486,39 @@ function decideBankCode(
       institution: { name: lu.name, street: null, post_code: null, town: null, country: 'LU' },
     };
   }
+  // Finland (16/09/2026): the transcribed Finance Finland list confirms what it
+  // knows and says nothing about the rest. It needs the whole BBAN, not the
+  // 3-digit slice: institution codes run 1 to 4 characters and only the longest
+  // allocated prefix is the real one — asking about the slice would read
+  // Nordea's '1' as '123'. A hit is served with the list's own date (a reader
+  // acting on it must know how old the list is); a code the list does not
+  // carry, or its unpopulated 72-78 band, falls through to the composite
+  // answer this country got before the list existed — never `not_allocated`.
+  if (cc === 'FI' && bban) {
+    const fi = lookupFiInstitution(bban);
+    if (fi?.status === 'allocated' && fi.code) {
+      return {
+        value: fi.code,
+        status: 'verified',
+        match: 'register',
+        register: NON_EXHAUSTIVE_REGISTERS.FI,
+        authoritative: false,
+        as_of: FI_REGISTER_AS_OF.slice(0, 7),
+        ...(fi.institution
+          ? {
+              institution: {
+                name: fi.institution,
+                street: null,
+                post_code: null,
+                town: null,
+                country: 'FI',
+              },
+            }
+          : {}),
+      };
+    }
+  }
+
   const partial = NON_EXHAUSTIVE_REGISTERS[cc];
   if (partial && nationalRegisterAvailable(cc)) {
     // Unguarded, like the authoritative registers: a read failure escapes to

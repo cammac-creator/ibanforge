@@ -81,8 +81,8 @@ describe('Montants des audits confirmés par Stripe', () => {
   function sale(amount: number | null, currency: string | null, paidAt?: string) {
     getStatsDB()
       .prepare(
-        `INSERT INTO audit_sales (job_id, rows, tier, price_chf, amount_paid_minor, amount_paid_currency, paid_at)
-         VALUES ('audit-fictif', 4, 'small', 149, ?, ?, COALESCE(?, datetime('now')))`,
+        `INSERT INTO audit_sales (job_id, rows, tier, price, currency, amount_paid_minor, amount_paid_currency, paid_at)
+         VALUES ('audit-fictif', 4, 'small', 149, 'USD', ?, ?, COALESCE(?, datetime('now')))`,
       )
       .run(amount, currency, paidAt ?? null);
   }
@@ -99,7 +99,8 @@ describe('Montants des audits confirmés par Stripe', () => {
     expect(stats.sales).toBe(5);
     expect(stats.revenue_basis).toBe('stripe_checkout');
     expect(stats.revenue_chf).toBe(223.5);
-    expect(stats.payment_amounts).toEqual({ chf: 3, other_currency: 1, unknown: 1 });
+    expect(stats.revenue_usd).toBe(149);
+    expect(stats.payment_amounts).toEqual({ chf: 3, usd: 1, other_currency: 0, unknown: 1 });
     expect(stats.recent_sales).toHaveLength(5);
     expect(stats.recent_sales).toContainEqual(
       expect.objectContaining({ amount_paid_minor: 7450, amount_paid_currency: 'CHF' }),
@@ -120,11 +121,17 @@ describe('Montants des audits confirmés par Stripe', () => {
     });
   });
 
-  it('ne transforme pas une devise étrangère en francs', () => {
+  it('ne transforme pas une devise en une autre : le dollar a son total, le franc le sien', () => {
     sale(9900, 'usd');
     expect(auditStats(30)).toMatchObject({
       revenue_chf: null,
-      payment_amounts: { chf: 0, other_currency: 1, unknown: 0 },
+      revenue_usd: 99,
+      payment_amounts: { chf: 0, usd: 1, other_currency: 0, unknown: 0 },
+    });
+    sale(500, 'eur');
+    expect(auditStats(30)).toMatchObject({
+      revenue_usd: 99,
+      payment_amounts: { chf: 0, usd: 1, other_currency: 1, unknown: 0 },
     });
   });
 

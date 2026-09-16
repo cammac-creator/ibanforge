@@ -25,7 +25,7 @@ import { applyRedactionRules, parseRedactionRules } from '@/lib/crm/redaction-ru
  * the institutional road has no usage to speak of and reaches it directly.
  */
 const PRODUCT_FACTS =
-  'Product facts you may cite, nothing else: free tier 200 requests/month; batch endpoint up to 100 IBANs per call; prepaid credit packs from $5 per 1,000 calls, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes';
+  'Product facts you may cite, nothing else: free tier 200 requests/month; batch endpoint up to 100 IBANs per call; prepaid credit packs from $4 per 1,000 calls, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes';
 
 /**
  * The writer guessed a first name off a domain on the first live control of

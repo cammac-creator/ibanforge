@@ -79,7 +79,7 @@ export interface ClientCall {
  * identical, so a price change cannot silently make this report lie.
  */
 export const CREDIT_PACK_USD: Record<number, number> = {
-  1000: 5,
+  1000: 4,
   5000: 20,
   25000: 80,
 };
@@ -90,7 +90,21 @@ export const CREDIT_PACK_USD: Record<number, number> = {
  * customer missing from the revenue line is a worse error than an approximate
  * one, and the caller is told how many were estimated.
  */
-export function creditPackUsd(credits: number): { usd: number; exact: boolean } {
+/**
+ * The entry pack cost $5 until 15/09/2026 inclusive (16/09/2026: $4, decision
+ * of Claude-Alain). A row without a stored amount from before that date is
+ * deduced at the price then in force, not at today's: the table answers
+ * "what does this pack cost today", and the history is not today.
+ */
+const ENTRY_PACK_USD_BEFORE_2026_09_16 = 5;
+
+export function creditPackUsd(
+  credits: number,
+  createdAt?: string | null,
+): { usd: number; exact: boolean } {
+  if (credits === 1000 && createdAt && createdAt < '2026-09-16') {
+    return { usd: ENTRY_PACK_USD_BEFORE_2026_09_16, exact: true };
+  }
   const known = CREDIT_PACK_USD[credits];
   if (known != null) return { usd: known, exact: true };
   const tiers = Object.keys(CREDIT_PACK_USD)
@@ -123,11 +137,12 @@ export function accountUsd(k: {
   credits_total: number | null;
   amount_paid_minor: number | null;
   amount_paid_currency: string | null;
+  created_at?: string | null;
 }): { usd: number; source: AmountSource; exact: boolean } {
   if (k.amount_paid_minor != null && (k.amount_paid_currency ?? '').toLowerCase() === 'usd') {
     return { usd: Math.round(k.amount_paid_minor) / 100, source: 'measured', exact: true };
   }
-  const deduced = creditPackUsd(k.credits_total ?? 0);
+  const deduced = creditPackUsd(k.credits_total ?? 0, k.created_at);
   return { usd: deduced.usd, source: 'deduced', exact: deduced.exact };
 }
 

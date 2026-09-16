@@ -129,7 +129,8 @@ describe('outgoing message bodies carry no em or en dash', () => {
       lang: 'fr',
       link: 'https://ibanforge.com/fr/audit/done?job=abc&session_id=cs_1',
       rows: 1240,
-      price_chf: 149,
+      price: 149,
+      currency: 'USD',
     }),
   };
 

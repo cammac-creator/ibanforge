@@ -675,6 +675,21 @@ address (guarded by a discovery test, like the admin routes now are), `next buil
 registry drift run in CI, and `main` refuses force-pushes and deletion. What still waits for a
 decision is listed in the report.
 
+**The decisions of that same evening, and their mechanics.** The entry credit pack costs $4
+(a new Stripe Payment Link with the same `bundle: 1k` metadata; the $5 link is deactivated), and
+the creditor file audit is sold in US dollars: the API fields `price_chf` became `price` plus
+`currency`, the two audit tables gained a `currency` column by migration (`CHF` for the rows of
+before, `USD` since), and the admin statistics count dollars and francs separately, never
+added. Pro subscribers have a Stripe customer portal (login page, cancellation at period end),
+cited in §3 of the Terms (version 1.5). Finland moved from `NATIONAL_REGISTERS` to
+`NON_EXHAUSTIVE_REGISTERS`: its list is a hand transcription that nothing refreshes, so a miss
+falls through to the composite answer instead of a denial; it goes back up once the list is
+re-read. Four permission letters left for the Austrian, Belgian and Finnish registers and for
+EBA CLEARING (`docs/data-sources.md`, section of 16/09). And the backup is finally tested:
+`npm run backup:restore-test <paid-state.json>` replays a dump on a throwaway database and
+compares what came back to what the file announces; a launchd job on the operator's Mac runs
+it on the first of each month and reports on Telegram.
+
 ---
 
 ## 10. Known debts, by weight

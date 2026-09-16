@@ -307,7 +307,8 @@ export function processStripeEvent(event: Stripe.Event): {
         lang: paidJob.lang,
         link: `https://ibanforge.com/${paidJob.lang}/audit/done?job=${paidJob.id}&session_id=${encodeURIComponent(paidJob.stripe_session_id!)}`,
         rows: paidJob.rows,
-        price_chf: paidJob.price_chf,
+        price: paidJob.price,
+        currency: paidJob.currency,
       });
     }
     if (notify && paidJob && result.status === 'paid' && !process.env.VITEST) {
@@ -315,7 +316,7 @@ export function processStripeEvent(event: Stripe.Event): {
         ? `<mail>@${paidJob.payer_email.split('@')[1]}`
         : 'e-mail inconnu';
       void notifyOps(
-        `Audit de fichier vendu : ${paidJob.price_chf} CHF, ${paidJob.rows} lignes, ${who}. Rapport telechargeable 24 h.`,
+        `Audit de fichier vendu : ${paidJob.price} ${paidJob.currency}, ${paidJob.rows} lignes, ${who}. Rapport telechargeable 24 h.`,
       ).catch(() => undefined);
     }
     return {

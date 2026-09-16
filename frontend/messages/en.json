@@ -157,7 +157,7 @@
       },
       "heading": "Endpoints & pricing",
       "subtitle": "Start free with 25 requests a month and no e-mail. Claim the same key for 200 a month. Pay as you grow — by card or in USDC.",
-      "plans": "Free: 25 requests a month with no e-mail, 200 a month once claimed · Pro: $29 a month for 10,000 requests · credit packs from $5 · vendor licence from $149 a month · file audit CHF 149.",
+      "plans": "Free: 25 requests a month with no e-mail, 200 a month once claimed · Pro: $29 a month for 10,000 requests · credit packs from $4 · vendor licence from $149 a month · file audit $149.",
       "plansLink": "See pricing"
     },
     "cta": {
@@ -279,7 +279,7 @@
     },
     "audit": {
       "heading": "Check your supplier file before the next payment run",
-      "text": "Upload a CSV or Excel file and preview the findings for free. The annotated workbook costs 149 CHF for up to 5,000 rows, or 349 CHF for up to 20,000 rows.",
+      "text": "Upload a CSV or Excel file and preview the findings for free. The annotated workbook costs $149 for up to 5,000 rows, or $349 for up to 20,000 rows.",
       "cta": "Check a supplier file"
     },
     "badgeFallback": "API online · live status",
@@ -290,7 +290,7 @@
   "pricing": {
     "metadata": {
       "title": "IBAN API pricing: free, Pro $29, packs, OEM",
-      "description": "25 free requests a month with no e-mail, 200 a month once claimed, Pro at $29 a month for 10,000 requests, credit packs from $5 that never expire, vendor licence from $149 a month, file audit CHF 149."
+      "description": "25 free requests a month with no e-mail, 200 a month once claimed, Pro at $29 a month for 10,000 requests, credit packs from $4 that never expire, vendor licence from $149 a month, file audit $149."
     },
     "badge": "Transparent pricing",
     "hero": {
@@ -441,7 +441,7 @@
       "packs": {
         "tag": "Credit packs",
         "title": "Prepaid credits",
-        "body": "Buy in bulk, never expires: 1k = $5, 5k = $20, 25k = $80 (down to $0.0032/credit). One credit = one validation or lookup — a batch of N IBANs uses N credits.",
+        "body": "Buy in bulk, never expires: 1k = $4, 5k = $20, 25k = $80 (down to $0.0032/credit). One credit = one validation or lookup — a batch of N IBANs uses N credits.",
         "note": "Stripe checkout — API key delivered by email. Agents can buy in USDC: POST /v1/credits/buy/1k|5k|25k.",
         "cardLabel": "Pay by card"
       }
@@ -453,24 +453,25 @@
     },
     "audit": {
       "label": "Creditor file audit",
-      "text": "Not a developer? Upload the CSV or XLSX you pay from and get every row checked against the same registers: 149 CHF up to 5,000 rows, 349 CHF up to 20,000, free preview first, annotated workbook right after payment.",
+      "text": "Not a developer? Upload the CSV or XLSX you pay from and get every row checked against the same registers: $149 up to 5,000 rows, $349 up to 20,000, free preview first, annotated workbook right after payment.",
       "cta": "Audit a file"
     },
     "pro": {
       "label": "Pro subscription",
       "title": "Prefer a flat monthly bill?",
-      "text": "Pro: 10,000 requests a month, every endpoint, resets on the 1st, cancel anytime. Card checkout through Stripe, your key arrives by e-mail right after payment and works within seconds.",
+      "text": "Pro: 10,000 requests a month, every endpoint, resets on the 1st, cancel anytime from the customer portal. Card checkout through Stripe, your key arrives by e-mail right after payment and works within seconds.",
       "note": "Integration into your product is permitted within your plan’s limits and terms. For a written SLA, support commitments or higher volumes, see the Editor/OEM plan.",
       "price": "$29",
       "per": "/ month",
-      "cta": "Subscribe to Pro"
+      "cta": "Subscribe to Pro",
+      "portal": "Manage your subscription, invoices and cancellation in the customer portal"
     },
     "uses": {
       "heading": "How will you use IBANforge?",
       "estimate": "Compare plans with my volume",
       "occasional": {
         "title": "Occasional checks",
-        "body": "Prepaid credits from $5, without a subscription. Use your balance when you need it.",
+        "body": "Prepaid credits from $4, without a subscription. Use your balance when you need it.",
         "cta": "See credit packs"
       },
       "regular": {
@@ -1918,7 +1919,7 @@
       "rows": {
         "pricing": {
           "label": "Pricing model",
-          "ibanforge": "Prepaid packs: $5 / 1,000 credits, never expire. Or $0.002–0.02 per call (x402). Free: 25 a month with no e-mail, 200 a month once claimed.",
+          "ibanforge": "Prepaid packs: $4 / 1,000 credits, never expire. Or $0.002–0.02 per call (x402). Free: 25 a month with no e-mail, 200 a month once claimed.",
           "ibancom": "Annual subscription: €530/year (2,000 lookups) to €4,150/year (unlimited), 1-year minimum, VAT excl.",
           "ibanapi": "Prepaid credits that expire with the plan: $15 for 60 days (2,000 basic + 400 bank lookups) to $115 for a year (30,000 + 5,000).",
           "libs": "Free (MIT/LGPL). Your time is the cost.",
@@ -2228,8 +2229,8 @@
     }
   },
   "audit": {
-    "metaTitle": "Creditor file audit: 149 CHF, result at once",
-    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then 149 CHF up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline of 14 November 2026.",
+    "metaTitle": "Creditor file audit: $149, result at once",
+    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then $149 up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline of 14 November 2026.",
     "eyebrow": "Creditor file audit",
     "title": "Audit your creditor file before the next payment run",
     "intro": "Every row goes through the same registers the IBANforge API serves: IBAN, bank code, bank name and BIC, SEPA reach, ISO 20022 address rules. You see what to fix for free; the annotated workbook has a displayed price, paid by card, downloadable at once.",
@@ -2309,10 +2310,10 @@
       "address_not_structured": "Address not structured (ISO 20022)"
     },
     "pay": {
-      "title": "Get the annotated workbook: {price} CHF for {rows} rows",
+      "title": "Get the annotated workbook: ${price} for {rows} rows",
       "text": "Payment by card on Stripe. The download opens right after, with every row, the bank and BIC from the register, the detail of each finding, and a summary sheet.",
       "email": "E-mail for the receipt (optional)",
-      "button": "Pay {price} CHF and download",
+      "button": "Pay ${price} and download",
       "redirecting": "Opening the payment page",
       "retention": "The report is kept 24 hours after payment, then deleted. An unpaid upload is deleted after 2 hours."
     },
@@ -2335,7 +2336,7 @@
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
     },
-    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before 14 November 2026.",
+    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then $149 for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before 14 November 2026.",
     "steps": {
       "title": "Three steps, one file",
       "s1t": "Drop your file",
@@ -2343,7 +2344,7 @@
       "s2t": "See what to fix, free",
       "s2": "Counts, findings by type, twenty masked rows.",
       "s3t": "Pay, download",
-      "s3": "149 CHF by card, the annotated workbook right away, plus the link by e-mail."
+      "s3": "$149 by card, the annotated workbook right away, plus the link by e-mail."
     },
     "workbook": {
       "title": "What you download",

@@ -255,7 +255,7 @@ const CREDIT_BUNDLES: Array<{
   price_usdc: number;
   discount?: string;
 }> = [
-  { slug: '1k', credits: 1000, price_usdc: 5 },
+  { slug: '1k', credits: 1000, price_usdc: 4 },
   { slug: '5k', credits: 5000, price_usdc: 20, discount: '-20% vs retail' },
   { slug: '25k', credits: 25000, price_usdc: 80, discount: '-36% vs retail' },
 ];
@@ -558,7 +558,7 @@ function buildAccessRamp(): Record<string, unknown> {
       // quotes are in `pricing` just below.
       pay_by_card_all_packs: PRICING_PAGE,
       pay_by_usdc: 'POST /v1/credits/buy/1k|5k|25k — list: GET /v1/credits/bundles',
-      pricing: '1k = $5 · 5k = $20 (-20%) · 25k = $80 (-36%)',
+      pricing: '1k = $4 · 5k = $20 · 25k = $80 (-20%)',
       // ECB/Banco de España licence condition: a buyer must be told, before
       // paying, that the underlying data is free at its official source. The
       // 402 IS the machine buyer's pre-payment screen, so the notice lives

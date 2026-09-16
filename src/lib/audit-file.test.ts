@@ -124,7 +124,8 @@ describe('auditTable', () => {
     expect(res.summary.error).toBe(3);
     expect(res.summary.by_code.duplicate).toBe(2);
     expect(res.summary.tier).toBe('standard');
-    expect(res.summary.price_chf).toBe(149);
+    expect(res.summary.price).toBe(149);
+    expect(res.summary.currency).toBe('USD');
   });
 
   it('checks the postal address against the Swiss structured rules when address columns exist', () => {
@@ -176,8 +177,8 @@ describe('rendering', () => {
   });
 
   it('tiers by row count', () => {
-    expect(tierFor(5000).price_chf).toBe(149);
-    expect(tierFor(5001).price_chf).toBe(349);
+    expect(tierFor(5000).price).toBe(149);
+    expect(tierFor(5001).price).toBe(349);
   });
 });
 

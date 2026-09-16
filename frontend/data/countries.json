@@ -1682,7 +1682,7 @@
     ],
     "vop_required": true
    },
-   "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)",
+   "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
    "api": {
     "valid": true,
     "country": {
@@ -1703,9 +1703,16 @@
      "value": "1",
      "status": "verified",
      "match": "register",
-     "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)",
-     "authoritative": true,
-     "as_of": "2025-10"
+     "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
+     "authoritative": false,
+     "as_of": "2025-10",
+     "institution": {
+      "name": "Nordea Bank",
+      "street": null,
+      "post_code": null,
+      "town": null,
+      "country": "FI"
+     }
     },
     "sepa": {
      "member": true,
