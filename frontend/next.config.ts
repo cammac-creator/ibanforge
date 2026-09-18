@@ -46,6 +46,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Sortie autonome pour le conteneur du VPS Infomaniak (rapatriement de
+  // septembre 2026) : server.js + les fichiers tracés, sans node_modules complet.
+  output: "standalone",
   turbopack: {
     root: path.resolve(__dirname),
   },
