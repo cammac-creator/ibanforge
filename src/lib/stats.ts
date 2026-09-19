@@ -1588,6 +1588,7 @@ export interface ClientProfile {
    */
   last_success_at: string | null;
   last_refusal_at: string | null;
+  first_refusal_at: string | null;
   endpoints: Array<{ path: string; count: number }>;
   /** ISO country codes they actually checked, busiest first. */
   countries: Array<{ code: string; count: number }>;
@@ -1632,6 +1633,7 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
       p95_ms: 0,
       last_success_at: null,
       last_refusal_at: null,
+      first_refusal_at: null,
       endpoints: [],
       countries: [],
       user_agents: [],
@@ -1655,8 +1657,9 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
               MAX(created_at) last_seen,
               COUNT(DISTINCT ip_hash) distinct_ips,
               AVG(response_ms) avg_ms,
-              MAX(CASE WHEN status >= 200 AND status < 300 THEN created_at END) last_success_at,
-              MAX(CASE WHEN status IN (401, 402, 429) THEN created_at END) last_refusal_at
+              MAX(CASE WHEN status >= 200 AND status < 300 THEN strftime('%Y-%m-%dT%H:%M:%fZ', created_at) END) last_success_at,
+              MAX(CASE WHEN status IN (401, 402, 429) THEN strftime('%Y-%m-%dT%H:%M:%fZ', created_at) END) last_refusal_at,
+              MIN(CASE WHEN status IN (401, 402, 429) THEN strftime('%Y-%m-%dT%H:%M:%fZ', created_at) END) first_refusal_at
        FROM request_log WHERE key_prefix IS NOT NULL GROUP BY key_prefix`,
     )
     .all() as Array<Record<string, number | string | null>>;
@@ -1674,6 +1677,7 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
     p.avg_ms = Math.round(Number(r.avg_ms ?? 0));
     p.last_success_at = (r.last_success_at as string) ?? null;
     p.last_refusal_at = (r.last_refusal_at as string) ?? null;
+    p.first_refusal_at = (r.first_refusal_at as string) ?? null;
   }
 
   // p95 per key. SQLite has no percentile function, so it is an offset into the

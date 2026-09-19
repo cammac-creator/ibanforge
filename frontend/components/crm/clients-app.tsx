@@ -20,6 +20,7 @@ import {
 import type { BusinessStatus } from '@/lib/crm/types';
 import { searchDossiers, type ClientFilter } from '@/lib/crm/client-search';
 import { flameOf } from '@/lib/crm/heat';
+import { quotaRefusals } from '@/lib/crm/quota-refusals';
 import { contactsHref } from '@/lib/crm/deep-link';
 import { ClientDossierModal } from './client-dossier-modal';
 import { ConquestChip } from './conquest-chip';
@@ -389,6 +390,7 @@ export function ClientsApp({
         ) : (
           view.map((d) => {
             const st = stateOfDossier(d);
+            const quota = quotaRefusals(d);
             const word = STATE_BY_KEY[st.status];
             const nuance = st.nuance ? NUANCE_BY_KEY[st.nuance] : null;
             const todayCalls = callsToday(d.days, new Date());
@@ -446,17 +448,17 @@ export function ClientsApp({
                   <span className="flex w-auto min-w-0 flex-col md:w-[8%]">
                     <span
                       className="truncate text-[13px]"
-                      style={{ color: word.colour }}
+                      style={{ color: quota.anonymous ? 'var(--fg-3)' : word.colour }}
                       title={
-                        st.derived
+                        quota.anonymous ? quota.heading : st.derived
                           ? `${word.why} (déduit de la fenêtre : aucune ligne d’activation)`
                           : word.why
                       }
                     >
-                      {word.one}
-                      {st.derived ? '°' : ''}
+                      {quota.anonymous ? `${quota.atQuota.length}/${d.keys.length} au plafond` : word.one}
+                      {!quota.anonymous && st.derived ? '°' : ''}
                     </span>
-                    {nuance && (
+                    {nuance && !quota.anonymous && (
                       <span className="truncate text-[11px] text-[var(--fg-4)]" title={nuance.why}>
                         {nuance.one}
                       </span>
@@ -523,14 +525,14 @@ export function ClientsApp({
                     >
                       {d.mails.sent + d.mails.received > 0 ? d.mails.sent + d.mails.received : '—'}
                     </span>
-                    <a
+                    {quota.canWrite && <a
                       href={contactsHref(locale, d.id)}
                       onClick={(e) => e.stopPropagation()}
                       title="Écrire dans Contacts : ouvre son fil, le composeur en bas"
                       className="text-amber-400 hover:underline"
                     >
                       écrire
-                    </a>
+                    </a>}
                     {d.mails.hasDraft && (
                       <span
                         className="ml-1 text-[var(--warn)]"

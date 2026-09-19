@@ -269,10 +269,15 @@ describe('apiKeyMiddleware — paywall cause surfaced in the 402 body', () => {
     });
     expect(res.status).toBe(402);
     expect(res.headers.get('X-Quota-Exhausted')).toBe('true');
-    const body = (await res.json()) as {
+    const raw = await res.text();
+    expect(Object.keys(JSON.parse(raw))[0]).toBe('message');
+    expect(raw.indexOf('"message"')).toBeLessThan(200);
+    const body = JSON.parse(raw) as {
       cause?: { reason?: string; quota?: { used: number; limit: number } };
       message?: string;
     };
+    expect(res.headers.get('X-Quota-Way-Out')).toContain('https://ibanforge.com/pricing');
+    expect(res.headers.get('X-Quota-Way-Out')).not.toContain('/claim');
     expect(body.cause?.reason).toBe('monthly_quota_exhausted');
     expect(body.cause?.quota?.limit).toBeGreaterThan(0);
     expect(body.message).toContain('resets on the 1st');
@@ -652,7 +657,10 @@ describe('apiKeyMiddleware — épuisement : trois populations, trois vérités'
     const app = await paywalledApp();
     const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
     expect(res.status).toBe(402);
-    const body = (await res.json()) as Wall;
+    const raw = await res.text();
+    expect(raw.indexOf('"message"')).toBeLessThan(200);
+    const body = JSON.parse(raw) as Wall;
+    expect(Object.keys(body)[0]).toBe('message');
     expect(body.cause?.tier).toBe('anonymous');
     expect(body.cause?.detail).toContain('/v1/keys/claim');
     // La réclamation AVANT tout achat : la position dans la phrase est le fond.
@@ -667,6 +675,7 @@ describe('apiKeyMiddleware — épuisement : trois populations, trois vérités'
     // RÉCLAMATION reste (il relève la clé en main).
     expect(body.free_tier).toBeUndefined();
     expect(body.claim_to_200).toBeDefined();
+    expect(res.headers.get('X-Quota-Way-Out')).toContain('POST /v1/keys/claim');
   });
 
   it('clé née SOUS ALERTE : pas de reprise le 1er, elle remonte seule, et la réclamation la relève tout de suite', async () => {
@@ -681,7 +690,10 @@ describe('apiKeyMiddleware — épuisement : trois populations, trois vérités'
     const app = await paywalledApp();
     const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
     expect(res.status).toBe(402);
-    const body = (await res.json()) as Wall;
+    const raw = await res.text();
+    expect(raw.indexOf('"message"')).toBeLessThan(200);
+    const body = JSON.parse(raw) as Wall;
+    expect(Object.keys(body)[0]).toBe('message');
     const detail = body.cause?.detail ?? '';
     expect(detail).not.toContain('resets on the 1st');
     expect(detail).toContain('does not start over on the 1st');
@@ -694,6 +706,7 @@ describe('apiKeyMiddleware — épuisement : trois populations, trois vérités'
     // bouclier porte 5 et non 25, et c'est la seule population à qui la sortie
     // a été promise.
     expect(body.claim_to_200).toBeDefined();
+    expect(res.headers.get('X-Quota-Way-Out')).toContain('POST /v1/keys/claim');
   });
 
   it('clé promue par PAIEMENT : une fois, pas chaque mois, et aucune promesse de code gratuit', async () => {
@@ -709,7 +722,10 @@ describe('apiKeyMiddleware — épuisement : trois populations, trois vérités'
     const app = await paywalledApp();
     const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
     expect(res.status).toBe(402);
-    const body = (await res.json()) as Wall;
+    const raw = await res.text();
+    expect(raw.indexOf('"message"')).toBeLessThan(200);
+    const body = JSON.parse(raw) as Wall;
+    expect(Object.keys(body)[0]).toBe('message');
     const detail = body.cause?.detail ?? '';
     expect(detail).not.toContain('resets on the 1st');
     expect(detail).toContain('once, not every month');
@@ -718,6 +734,8 @@ describe('apiKeyMiddleware — épuisement : trois populations, trois vérités'
     // lui proposer la réclamation serait promettre ce que la route refuse.
     expect(detail).not.toContain('/v1/keys/claim');
     expect(body.claim_to_200).toBeUndefined();
+    expect(res.headers.get('X-Quota-Way-Out')).toContain('https://ibanforge.com/pricing');
+    expect(res.headers.get('X-Quota-Way-Out')).not.toContain('/claim');
     expect(body.free_tier).toBeUndefined();
     expect(res.headers.get('X-Quota-Basis')).toBe('lifetime');
   });

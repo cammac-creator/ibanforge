@@ -966,7 +966,7 @@
           "cohortLegend": "Cohortes (repère hors total)",
           "markers": "Repères",
           "cohortNote": "Repère ambré : validations liées aux inscriptions automatiques regroupées. Elles sont exclues des totaux et des pourcentages. La hauteur du repère est réduite ; le volume réel apparaît dans l’infobulle.",
-          "partialDay": "La dernière barre représente la journée en cours depuis minuit UTC. Le comptage est incomplet et sa couleur est atténuée.",
+          "partialDay": "La barre hachurée représente la journée en cours depuis minuit UTC. Son comptage est incomplet.",
           "reading": "Les réponses réussies peuvent venir de l’essai gratuit ou d’une clé. Leur part parmi les statuts affichés ne mesure pas des ventes.",
           "scope": "Requêtes sur les routes IBAN, BIC et clearing suisse sélectionnées, avec la méthode HTTP attendue. Les clés internes et les chemins contenant des paramètres non remplacés sont exclus. Des requêtes anonymes ou automatiques peuvent rester comptées.",
           "help": {
@@ -1584,7 +1584,15 @@
         "cta_journey_audit": "Contrôler un fichier · Parcours",
         "cta_vendor_try": "Tester l’API · Éditeurs",
         "cta_vendor_docs": "Guides d’intégration · Éditeurs"
-      }
+      },
+      "callersToday": "Clients qui ont appelé aujourd'hui",
+      "callersTitle": "Les clients, jour par jour",
+      "callersDefinition": "Un compte par adresse, toutes ses clés réunies, quel que soit le statut HTTP. Comptes internes, clés anonymes et clés d’amorçage exclus. Jour UTC ; le CRM compte en jour suisse, un écart d’une unité le soir est normal.",
+      "callersAverage": "Jour UTC · moyenne {count} par jour sur {days} jours complets",
+      "callersUnit": "Comptes clients",
+      "callersAverage7": "Moyenne sur 7 jours complets",
+      "todayTick": "auj.",
+      "includingToday": "Dont la journée en cours"
     }
   },
   "docs": {

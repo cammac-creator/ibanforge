@@ -1,5 +1,8 @@
 'use client';
 
+import { useLocale } from 'next-intl';
+import { formatGrouped } from '@/lib/format-grouped';
+import { partialDayBackground, partialDayWords } from '@/components/dashboard/partial-day';
 import { useEffect, useMemo, useState } from 'react';
 
 /** The chart is a guest in two homes (Clients dossier, Contacts thread), so
@@ -124,6 +127,9 @@ function hoursBars(fetched: Array<{ hour: string; count: number; bad: number }>)
 }
 
 export function ActivityChart({ a }: { a: ActivityInput }) {
+  const locale = useLocale(), words = partialDayWords(locale);
+  const fmt = (n: number) => formatGrouped(n, locale);
+  const [today] = useState(() => dayKeyUTC(Date.now()));
   const d = a;
   const [scale, setScale] = useState<Scale>('d30');
   const [hours, setHours] = useState<Array<{ hour: string; count: number; bad: number }> | null>(null);
@@ -183,8 +189,8 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
     <div className="min-w-0">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-[12.5px] tabular-nums text-[var(--fg-3)]">
-          {total.toLocaleString('fr-CH')} appel{total > 1 ? 's' : ''}
-          {totalBad > 0 && <span className="text-red-400"> · {totalBad.toLocaleString('fr-CH')} refus</span>}
+          {fmt(total)} appel{total > 1 ? 's' : ''}
+          {totalBad > 0 && <span className="text-red-400"> · {fmt(totalBad)} refus</span>}
         </span>
         <span className="ml-auto flex items-center gap-0.5 rounded-md border border-[var(--ink-4)] p-0.5">
           {SCALES.map((s) => (
@@ -213,22 +219,23 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
         <>
           <div className="flex h-24 items-end gap-px" aria-hidden>
             {bars.map((b) => {
+              const partial = (scale === 'd7' || scale === 'd30') && b.key === today;
               const h = (b.count / max) * 100;
               const badH = b.count > 0 ? (b.bad / b.count) * h : 0;
               return (
                 <span
                   key={b.key}
-                  title={`${b.label} : ${b.count.toLocaleString('fr-CH')} appel${b.count > 1 ? 's' : ''}${
-                    b.bad > 0 ? ` (dont ${b.bad.toLocaleString('fr-CH')} refus)` : ''
-                  }`}
-                  className="flex min-w-[3px] flex-1 flex-col justify-end"
+                  title={`${b.label} : ${fmt(b.count)} appel${b.count > 1 ? 's' : ''}${
+                    b.bad > 0 ? ` (dont ${fmt(b.bad)} refus)` : ''
+                  }${partial ? ` · ${words.note}` : ''}`}
+                  className={`flex min-w-[3px] flex-1 flex-col justify-end${partial ? ' partial-day' : ''}`}
                   style={{ height: '100%' }}
                 >
-                  {b.bad > 0 && <span className="w-full rounded-t-sm bg-red-500/70" style={{ height: `${Math.max(badH, 2)}%` }} />}
+                  {b.bad > 0 && <span className="w-full rounded-t-sm bg-red-500/70" style={{ height: `${Math.max(badH, 2)}%`, backgroundImage: partial ? partialDayBackground : undefined }} />}
                   {b.count > 0 && (
                     <span
                       className={`w-full bg-[var(--amber-500)]/60 ${b.bad > 0 ? '' : 'rounded-t-sm'}`}
-                      style={{ height: `${Math.max(h - badH, b.bad > 0 ? 0 : 2)}%` }}
+                      style={{ height: `${Math.max(h - badH, b.bad > 0 ? 0 : 2)}%`, backgroundImage: partial ? partialDayBackground : undefined }}
                     />
                   )}
                 </span>
@@ -237,8 +244,8 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
           </div>
           <div className="mt-1 flex justify-between font-mono text-[10.5px] text-[var(--fg-5)]">
             <span>{bars[0]?.label}</span>
-            <span>max {max.toLocaleString('fr-CH')}</span>
-            <span>{bars[bars.length - 1]?.label}</span>
+            <span>max {fmt(max)}</span>
+            <span>{(scale === 'd7' || scale === 'd30') && bars.at(-1)?.key === today ? words.tick : bars.at(-1)?.label}</span>
           </div>
         </>
       )}

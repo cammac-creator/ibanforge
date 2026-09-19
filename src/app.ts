@@ -638,6 +638,7 @@ export function buildApp(): Hono<HonoEnv> {
         'X-Quota-Exhausted',
         'X-Quota-Insufficient',
         'X-Quota-Reset-Hint',
+        'X-Quota-Way-Out',
         'X-Quota-Notice',
         'X-Credits-Remaining',
         'X-Credits-Total',

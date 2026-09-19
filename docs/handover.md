@@ -798,3 +798,12 @@ Deux choses relevées à l'intégration, à savoir avant de chercher une panne a
 - Les deux mesures du film (`film:start`, `film:end`) du tableau de bord affichent
   désormais zéro en permanence : le film qui les émettait a été retiré de l'accueil avec
   ce chantier. Ce n'est pas une panne de collecte.
+
+
+## Quota lisible et statistiques quotidiennes — 19.09.2026
+
+Les réponses 402 sérialisent `message`, puis l’éventuel `claim_to_200`, avant les rails techniques. Les champs et les en-têtes x402 gardent leurs valeurs. `X-Quota-Way-Out` oriente les clés anonymes vers la réclamation de la même clé ; une clé déjà promue reçoit les sorties payantes. Aucun quota ni tarif ne change.
+
+`GET /v1/admin/activation` ajoute `daily_callers` : comptes externes distincts par jour UTC, tous statuts et chemins, clés inactives incluses, préfixes ambigus exclus avant filtrage. Le contrat contient 30 ou 90 jours denses, sans dates futures. Il complète `service_usage` sans changer sa version. L’Audience refuse un contrat absent ou incomplet au lieu d’afficher zéro, découpe la fenêtre reçue et distingue comptes et requêtes.
+
+Le motif `partial-day` signale seulement aujourd’hui dans les graphiques quotidiens. La moyenne glissante s’arrête hier. Les tuiles de trafic conservent leurs totaux, avec une variation fondée sur la médiane des jours complets, jours à zéro inclus. Dans le CRM, les refus restent des observations ; les actions sur le groupe anonymous concernent uniquement ses clés à leur plafond, sans courrier sans adresse. Les premières et dernières dates de refus et de succès normalisent les écritures SQL et ISO.

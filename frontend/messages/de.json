@@ -966,7 +966,7 @@
           "cohortLegend": "Kohorten (Markierung ausserhalb der Summe)",
           "markers": "Markierungen",
           "cohortNote": "Bernsteinfarbene Markierung: Prüfungen aus gruppierten automatischen Registrierungen. Sie sind aus Summen und Prozentwerten ausgeschlossen. Die Höhe der Markierung ist reduziert; das tatsächliche Volumen erscheint im Tooltip.",
-          "partialDay": "Der letzte Balken zeigt den laufenden Tag seit Mitternacht UTC. Die Zählung ist unvollständig und die Farbe abgeschwächt.",
+          "partialDay": "Der schraffierte Balken zeigt den laufenden Tag seit Mitternacht UTC. Seine Zählung ist unvollständig.",
           "reading": "Erfolgreiche Antworten können aus dem kostenlosen Test oder von einem API-Schlüssel stammen. Ihr Anteil an den angezeigten Statuscodes misst keine Verkäufe.",
           "scope": "Anfragen auf den ausgewählten Routen für IBAN, BIC und Schweizer Clearing mit der erwarteten HTTP-Methode. Interne Schlüssel und Pfade mit nicht ersetzten Parametern sind ausgeschlossen. Anonyme oder automatische Anfragen können weiterhin gezählt werden.",
           "help": {
@@ -1584,7 +1584,15 @@
         "cta_journey_audit": "Lieferantendatei prüfen · Seitenanfang",
         "cta_vendor_try": "API testen · Softwareanbieter",
         "cta_vendor_docs": "Integrationsanleitungen · Softwareanbieter"
-      }
+      },
+      "callersToday": "Kunden mit Aufrufen heute",
+      "callersTitle": "Kunden, Tag für Tag",
+      "callersDefinition": "Ein Konto pro E-Mail-Adresse, alle Schlüssel zusammen, unabhängig vom HTTP-Status. Interne Konten, anonyme und von uns ausgestellte Startschlüssel ausgeschlossen. UTC-Tag; das CRM verwendet Schweizer Tage, daher ist eine Abweichung von eins am Abend normal.",
+      "callersAverage": "UTC-Tag · durchschnittlich {count} pro Tag über {days} vollständige Tage",
+      "callersUnit": "Kundenkonten",
+      "callersAverage7": "Durchschnitt über 7 vollständige Tage",
+      "todayTick": "heute",
+      "includingToday": "Einschliesslich des laufenden Tages"
     }
   },
   "docs": {

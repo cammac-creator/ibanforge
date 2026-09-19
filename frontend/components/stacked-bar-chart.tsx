@@ -1,5 +1,8 @@
 'use client';
 
+import { useId } from 'react';
+import { useLocale } from 'next-intl';
+import { PartialDayDefs, partialDayProps, partialDayWords } from './dashboard/partial-day';
 import { formatStamp } from '@/lib/crm/format';
 import {
   ComposedChart,
@@ -42,8 +45,10 @@ function isCurrentUtcDay(date: unknown): boolean {
 }
 
 export function StackedBarChart({ data, bars, band, markers }: StackedBarChartProps) {
-  const lastIdx = data.length - 1;
-  const lastIsPartial = lastIdx >= 0 && isCurrentUtcDay(data[lastIdx]?.date);
+  const partialId = useId().replace(/:/g, '');
+  const today = new Date().toISOString().slice(0, 10);
+  const words = partialDayWords(useLocale());
+  const lastIsPartial = data.some((day) => isCurrentUtcDay(day.date));
 
   // One marker per day on the axis: several events a day would stack
   // unreadable labels on the same x, so their labels are joined.
@@ -62,12 +67,13 @@ export function StackedBarChart({ data, bars, band, markers }: StackedBarChartPr
     <div>
       <ResponsiveContainer width="100%" height={280}>
       <ComposedChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        {bars.map((bar) => <PartialDayDefs key={bar.key} id={`${partialId}-${bar.key}`} color={bar.color} />)}
         <XAxis
           dataKey="date"
           tick={{ fill: '#71717a', fontSize: 11 }}
           axisLine={{ stroke: '#27272a' }}
           tickLine={false}
-          tickFormatter={(v: string) => formatStamp(v) ?? v}
+          tickFormatter={(v: string) => v === today ? words.tick : formatStamp(v) ?? v}
         />
         <YAxis
           tick={{ fill: '#71717a', fontSize: 11 }}
@@ -77,6 +83,7 @@ export function StackedBarChart({ data, bars, band, markers }: StackedBarChartPr
           allowDecimals={false}
         />
         <Tooltip
+          labelFormatter={(day) => `${formatStamp(String(day))}${day === today ? ` · ${words.note}` : ''}`}
           contentStyle={{
             backgroundColor: '#18181b',
             border: '1px solid #3f3f46',
@@ -116,12 +123,13 @@ export function StackedBarChart({ data, bars, band, markers }: StackedBarChartPr
             name={bar.label}
             fill={bar.color}
             stackId="status"
+            isAnimationActive={false}
             radius={[0, 0, 0, 0]}
           >
             {data.map((entry, i) => (
               <Cell
                 key={i}
-                fillOpacity={lastIsPartial && i === lastIdx ? 0.3 : 1}
+                {...partialDayProps(String(entry.date), today, `${partialId}-${bar.key}`)}
               />
             ))}
           </Bar>
@@ -141,7 +149,7 @@ export function StackedBarChart({ data, bars, band, markers }: StackedBarChartPr
       )}
       {lastIsPartial && (
         <p className="mt-2 text-[11px] leading-snug text-[var(--fg-4)]">
-          La dernière barre = <strong className="text-[var(--fg-3)]">aujourd&apos;hui</strong>, jour en
+          La barre hachurée = <strong className="text-[var(--fg-3)]">aujourd&apos;hui</strong>, jour en
           cours (comptage depuis minuit UTC). Elle se remplit au fil de la journée — ce n&apos;est
           pas une chute de trafic.
         </p>

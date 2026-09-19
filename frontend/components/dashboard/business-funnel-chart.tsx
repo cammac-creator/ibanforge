@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+import { PartialDayDefs, partialDayProps, partialDayWords } from './partial-day';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   BarChart as RechartsBarChart,
@@ -35,7 +37,7 @@ const BARS = [
 // Une couleur distincte des cinq statuts pour le repère de cohortes.
 const COHORT_COLOR = '#d0a548';
 
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ payload: BusinessFunnelRow }>; label?: string }) {
+function CustomTooltip({ active, payload, label, todayUtc }: { todayUtc: string; active?: boolean; payload?: Array<{ payload: BusinessFunnelRow }>; label?: string }) {
   const t = useTranslations('dashboard.overview.details.businessFunnelChart');
   const locale = useLocale();
   if (!active || !payload || payload.length === 0) return null;
@@ -45,7 +47,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   return (
     <div className="rounded-md border border-[var(--ink-5)]/60 bg-[var(--ink-0)]/95 px-3 py-2 text-xs text-[var(--fg-1)] shadow-lg shadow-black/40 backdrop-blur">
       <div className="mb-1.5 font-semibold text-[var(--fg-1)]">
-        {label} · {t('total', { count: formatGrouped(total, locale) })}
+        {label}{row.date === todayUtc ? ` · ${partialDayWords(locale).note}` : ''} · {t('total', { count: formatGrouped(total, locale) })}
       </div>
       {total > 0 ? (
         <>
@@ -99,6 +101,8 @@ export function BusinessFunnelChart({
 }) {
   const t = useTranslations('dashboard.overview.details.businessFunnelChart');
   const locale = useLocale();
+  const partialId = useId().replace(/:/g, '');
+  const words = partialDayWords(locale);
   const rows = businessFunnelRows(data, cohortByDate);
   const hasCohort = rows.some((r) => r.cohort_units > 0);
 
@@ -110,8 +114,7 @@ export function BusinessFunnelChart({
     );
   }
 
-  const lastIdx = rows.length - 1;
-  const lastIsPartial = isCurrentUtcDay(rows[lastIdx]?.date, todayUtc);
+  const lastIsPartial = rows.some((row) => isCurrentUtcDay(row.date, todayUtc));
 
   // Un repère par jour ; les libellés du même jour restent réunis.
   const dates = new Set(rows.map((r) => r.date));
@@ -127,12 +130,13 @@ export function BusinessFunnelChart({
       <p className="mb-3 text-[12px] leading-relaxed text-[var(--fg-4)]">{t('reading')}</p>
       <ResponsiveContainer width="100%" height={280}>
         <RechartsBarChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+          {BARS.map((bar) => <PartialDayDefs key={bar.key} id={`${partialId}-${bar.key}`} color={bar.color} />)}
           <XAxis
             dataKey="date"
             tick={{ fill: '#71717a', fontSize: 11 }}
             axisLine={{ stroke: '#27272a' }}
             tickLine={false}
-            tickFormatter={(v: string) => formatRequestDay(v, locale)}
+            tickFormatter={(v: string) => v === todayUtc ? words.tick : formatRequestDay(v, locale)}
           />
           <YAxis
             tick={{ fill: '#71717a', fontSize: 11 }}
@@ -141,12 +145,12 @@ export function BusinessFunnelChart({
             width={40}
             allowDecimals={false}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: '#27272a40' }} />
+          <Tooltip content={<CustomTooltip todayUtc={todayUtc} />} cursor={{ fill: '#27272a40' }} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#a1a1aa', paddingTop: 8 }} />
           {BARS.map((b) => (
-            <Bar key={b.key} dataKey={b.key} name={t(`series.${b.key}`)} fill={b.color} stackId="funnel" radius={[0, 0, 0, 0]}>
-              {rows.map((row, i) => (
-                <Cell key={row.date} fillOpacity={lastIsPartial && i === lastIdx ? 0.3 : 1} />
+            <Bar key={b.key} dataKey={b.key} name={t(`series.${b.key}`)} fill={b.color} stackId="funnel" radius={[0, 0, 0, 0]} isAnimationActive={false}>
+              {rows.map((row) => (
+                <Cell key={row.date} {...partialDayProps(row.date, todayUtc, `${partialId}-${b.key}`)} />
               ))}
             </Bar>
           ))}

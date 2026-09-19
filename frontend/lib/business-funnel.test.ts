@@ -18,7 +18,7 @@ vi.mock('recharts', async () => {
       React.createElement(Rows.Provider, { value: data }, children),
     Bar: ({ name, children }: { name?: string; children?: ReactNode }) =>
       React.createElement('div', null, name, children),
-    Cell: ({ fillOpacity }: { fillOpacity: number }) => React.createElement('i', { 'data-opacity': fillOpacity }),
+    Cell: ({ className, fill }: { className?: string; fill?: string }) => React.createElement('i', { className, 'data-fill': fill }),
     XAxis: ({ tickFormatter }: { tickFormatter: (value: string) => string }) => {
       const row = React.useContext(Rows)[0];
       return React.createElement('span', null, tickFormatter(row.date));
@@ -90,7 +90,8 @@ describe.each(['en', 'fr', 'de'] as const)('Graphique et infobulle en %s', (loca
     expect(html).toContain(copy.cohortLegend);
     expect(html).toContain(copy.cohortNote);
     expect(html).toContain(copy.partialDay);
-    expect(html).toContain('data-opacity="0.3"');
+    expect(html).toContain('rotate(45)');
+    expect(html).toContain('class="partial-day"');
     expect(html).not.toContain('Paid success');
     expect(html).not.toContain('Taux de conversion');
     expect(html).toContain('Repère fictif A · Repère fictif B');

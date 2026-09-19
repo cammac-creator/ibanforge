@@ -430,6 +430,12 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       // client qui ne lit que les en-têtes programmerait une reprise le 1er.
       c.header('X-Quota-Basis', lifetime ? 'lifetime' : 'month');
       c.header(
+        'X-Quota-Way-Out',
+        tier === 'anonymous'
+          ? `Claim this key with an e-mail for ${FREE_TIER_MONTHLY_LIMIT}/month: POST /v1/keys/claim`
+          : 'Buy credits by card: https://ibanforge.com/pricing; or pay per call via x402',
+      );
+      c.header(
         'X-Quota-Reset-Hint',
         shield
           ? 'no monthly reset; lifted when the alert clears, or at once by a claim'

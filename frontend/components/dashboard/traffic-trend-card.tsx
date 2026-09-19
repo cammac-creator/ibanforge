@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Bar,
   CartesianGrid,
@@ -19,6 +19,8 @@ import {
   TREND_PERIODS,
   comparePeriods,
   deltaPct,
+  typicalDay,
+  typicalDelta,
   fmtInt,
   isWeekend,
   movingAverage,
@@ -30,6 +32,8 @@ import {
   type TrafficTrendResult,
   type TrendPeriod,
 } from '@/lib/traffic-trend';
+import { useLocale } from 'next-intl';
+import { PartialDayDefs, partialDayProps, partialDayWords } from './partial-day';
 import { InfoDot } from './info-dot';
 
 /**
@@ -220,6 +224,7 @@ function DeltaChip({ delta, invert = false }: { delta: number | null; invert?: b
 function Tile({
   label,
   value,
+  typical,
   delta,
   hint,
   series,
@@ -230,6 +235,7 @@ function Tile({
 }: {
   label: string;
   value: number;
+  typical: number | null;
   delta: number | null;
   hint: string;
   series: number[];
@@ -249,6 +255,7 @@ function Tile({
         {fmtInt(shown)}
       </div>
       <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+        <span className="text-[11px] text-[var(--fg-4)]">jour typique {typical == null ? '—' : String(typical).replace('.', ',')}</span>
         <DeltaChip delta={delta} invert={invert} />
       </div>
       <div className="mt-1 text-[11px] leading-snug text-[var(--fg-4)]">{hint}</div>
@@ -395,6 +402,8 @@ export function TrafficTrendCard({
   result: TrafficTrendResult;
   nowIso: string;
 }) {
+  const partialId = useId().replace(/:/g, '');
+  const words = partialDayWords(useLocale());
   const [period, setPeriod] = useState<TrendPeriod>(30);
   const [hovered, setHovered] = useState<NatureKey | null>(null);
   const [hidden, setHidden] = useState<Set<NatureKey>>(() => new Set());
@@ -410,8 +419,7 @@ export function TrafficTrendCard({
     [result, period, now],
   );
   const s = useMemo(() => summariseTrend(days), [days]);
-  const sp = useMemo(() => (previous ? summariseTrend(previous) : null), [previous]);
-  const avg = useMemo(() => movingAverage(days, 7), [days]);
+  const avg = useMemo(() => movingAverage(days, 7, todayKey), [days, todayKey]);
   const chartData = useMemo(() => days.map((d, i) => ({ ...d, avg7: avg[i] })), [days, avg]);
   const before = useMemo(() => {
     const m = new Map<string, TrafficTrendDay>();
@@ -433,8 +441,7 @@ export function TrafficTrendCard({
     return out;
   }, [days, before]);
 
-  const lastIdx = days.length - 1;
-  const lastIsToday = lastIdx >= 0 && days[lastIdx]?.date === todayKey;
+  const hasToday = days.some((day) => day.date === todayKey);
   const notFoundShare = s.total > 0 ? Math.round((s.notFound / s.total) * 100) : 0;
   const paywallShare = s.total > 0 ? Math.round((s.paywall / s.total) * 100) : 0;
 
@@ -442,7 +449,8 @@ export function TrafficTrendCard({
     ...n,
     count: s.byNature[n.key],
     share: s.total > 0 ? s.byNature[n.key] / s.total : 0,
-    delta: deltaPct(s.byNature[n.key], sp?.byNature[n.key]),
+    delta: typicalDelta(days, previous, n.key, todayKey),
+    typical: typicalDay(days, n.key, todayKey),
   }));
 
   const periodIdx = TREND_PERIODS.indexOf(period);
@@ -475,7 +483,7 @@ export function TrafficTrendCard({
         <InfoDot>
           Toutes les requêtes reçues, réparties en six natures qui ne se recouvrent pas : la hauteur
           d’une barre est le trafic du jour. La ligne pointillée claire est la moyenne des sept
-          derniers jours ; les bandes plus claires sont les week-ends.
+          derniers jours complets ; les bandes plus claires sont les week-ends.
           <br />
           <br />
           <strong className="text-[var(--fg-2)]">La ligne rouge, ce sont les 404</strong>,
@@ -484,7 +492,7 @@ export function TrafficTrendCard({
           carte nomme plus bas.
           <br />
           <br />
-          Chaque chiffre est comparé à la période de même longueur juste avant. 404, 402 et 5xx{' '}
+          Les variations comparent les médianes des jours complets à celles de la période précédente. Les totaux incluent la journée en cours. 404, 402 et 5xx{' '}
           <strong>traversent</strong> les natures : à ne jamais additionner avec elles.
         </InfoDot>
         <div className="relative ml-auto flex rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)]/60 p-0.5">
@@ -522,11 +530,13 @@ export function TrafficTrendCard({
         </div>
       ) : (
         <>
+          <p className="mb-2 text-[11px] text-[var(--fg-4)]">Totaux dont la journée en cours ; variations sur la médiane des jours complets.</p>
           <div className="relative mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
             <Tile
               label="Requêtes"
               value={s.total}
-              delta={deltaPct(s.total, sp?.total)}
+              typical={typicalDay(days, 'total', todayKey)}
+              delta={typicalDelta(days, previous, 'total', todayKey)}
               hint={`sur ${period} jours · ${s.peak ? `pic le ${shortDay(s.peak.date)} (${fmtInt(s.peak.total)})` : '—'}`}
               series={days.map((d) => d.total)}
               color="#e4e4e7"
@@ -534,9 +544,10 @@ export function TrafficTrendCard({
               animate={animate}
             />
             <Tile
-              label="Clients (avec clé)"
+              label="Requêtes avec clé"
               value={s.byNature.with_key}
-              delta={deltaPct(s.byNature.with_key, sp?.byNature.with_key)}
+              typical={typicalDay(days, 'with_key', todayKey)}
+              delta={typicalDelta(days, previous, 'with_key', todayKey)}
               hint={
                 s.total > 0
                   ? `${Math.round((s.byNature.with_key / s.total) * 100)} % du trafic — la bande qui paie`
@@ -550,7 +561,8 @@ export function TrafficTrendCard({
             <Tile
               label="Sans clé"
               value={s.keyless}
-              delta={deltaPct(s.keyless, sp?.keyless)}
+              typical={typicalDay(days, 'keyless', todayKey)}
+              delta={typicalDelta(days, previous, 'keyless', todayKey)}
               hint={
                 s.total > 0
                   ? `${Math.round((s.keyless / s.total) * 100)} % — hors clients et hors nos tests`
@@ -564,7 +576,8 @@ export function TrafficTrendCard({
             <Tile
               label="404 introuvable"
               value={s.notFound}
-              delta={deltaPct(s.notFound, sp?.notFound)}
+              typical={typicalDay(days, 'not_found', todayKey)}
+              delta={typicalDelta(days, previous, 'not_found', todayKey)}
               hint={
                 s.notFound > 0
                   ? `${notFoundShare} % des requêtes${s.notFoundPeak ? ` · pic le ${shortDay(s.notFoundPeak.date)}` : ''}`
@@ -579,7 +592,8 @@ export function TrafficTrendCard({
             <Tile
               label="402 paywall"
               value={s.paywall}
-              delta={deltaPct(s.paywall, sp?.paywall)}
+              typical={typicalDay(days, 'paywall', todayKey)}
+              delta={typicalDelta(days, previous, 'paywall', todayKey)}
               hint={s.paywall > 0 ? `${paywallShare} % — la demande qui bute sur le mur` : 'aucune'}
               series={days.map((d) => d.paywall)}
               color="#fbbf24"
@@ -598,6 +612,7 @@ export function TrafficTrendCard({
                 margin={{ top: 12, right: 6, left: 0, bottom: 0 }}
                 onMouseLeave={() => setHovered(null)}
               >
+                {NATURES.map((n) => <PartialDayDefs key={n.key} id={`${partialId}-${n.key}`} color={n.color} />)}
                 <defs>
                   {NATURES.map((n) => (
                     <linearGradient key={n.key} id={`traffic-${n.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -623,7 +638,7 @@ export function TrafficTrendCard({
                   axisLine={{ stroke: '#27272a' }}
                   tickLine={false}
                   minTickGap={28}
-                  tickFormatter={shortDay}
+                  tickFormatter={(day: string) => day === todayKey ? words.tick : shortDay(day)}
                 />
                 <YAxis
                   tick={{ fill: '#71717a', fontSize: 10 }}
@@ -654,10 +669,10 @@ export function TrafficTrendCard({
                     animationEasing="ease-out"
                     onMouseEnter={() => setHovered(n.key)}
                   >
-                    {chartData.map((d, j) => (
+                    {chartData.map((d) => (
                       <Cell
                         key={d.date}
-                        fillOpacity={lastIsToday && j === lastIdx ? 0.32 * dim(n.key) : undefined}
+                        {...partialDayProps(d.date, todayKey, `${partialId}-${n.key}`)}
                       />
                     ))}
                   </Bar>
@@ -763,6 +778,7 @@ export function TrafficTrendCard({
                       <span className="ml-1.5 font-mono text-[11.5px] tabular-nums text-[var(--fg-3)]">
                         {fmtInt(n.count)} · {Math.round(n.share * 100)} %
                       </span>
+                      <span className="ml-1.5 text-[11px] text-[var(--fg-4)]">jour typique {n.typical == null ? '—' : String(n.typical).replace('.', ',')}</span>
                       {n.delta !== null && (
                         <span
                           className={`ml-1.5 text-[11px] tabular-nums ${
@@ -774,7 +790,7 @@ export function TrafficTrendCard({
                           }`}
                         >
                           {n.delta > 0 ? '▲ +' : n.delta < 0 ? '▼ ' : '■ '}
-                          {n.delta} %
+                          {n.delta} % vs période précédente
                         </span>
                       )}
                       <span className="block text-[var(--fg-4)]">{n.gloss}</span>
@@ -848,9 +864,9 @@ export function TrafficTrendCard({
               />
               moyenne glissante 7 jours
             </span>
-            {lastIsToday && (
+            {hasToday && (
               <span>
-                dernière barre = <strong className="text-[var(--fg-3)]">aujourd’hui</strong>, en
+                barre hachurée = <strong className="text-[var(--fg-3)]">aujourd’hui</strong>, en
                 cours (comptage depuis minuit UTC)
               </span>
             )}

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { quotaRefusals } from '@/lib/crm/quota-refusals';
+import { toZurich } from '@/lib/crm/zurich';
 import Link from 'next/link';
 import {
   chipOfDossier,
@@ -43,12 +45,8 @@ function initialsOf(d: ClientDossier): string {
 function shortDate(raw: string | null): string | null {
   const t = parseUtc(raw);
   if (!t) return null;
-  return t.toLocaleDateString('fr-CH', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-    timeZone: 'Europe/Zurich',
-  });
+  const day = toZurich(t.toISOString());
+  return `${day.slice(8, 10)}.${day.slice(5, 7)}.${day.slice(2, 4)}`;
 }
 
 /** The relationship's milestones on one line: signup → first call → today. */
@@ -113,6 +111,7 @@ export function ClientDossierModal({
   onClose: () => void;
 }) {
   const now = new Date();
+  const quota = quotaRefusals(d);
   const errRate =
     d.requests > 0 ? Math.round(((d.badInput + d.serverError) / d.requests) * 100) : 0;
   const topCountry = d.countries[0];
@@ -248,10 +247,10 @@ export function ClientDossierModal({
                 className="h-1.5 w-1.5 rounded-full"
                 style={{ backgroundColor: verdict.colour }}
               />
-              {verdict.one}
+              {quota.anonymous ? quota.heading : verdict.one}
               {state.derived ? '°' : ''}
             </span>
-            {nuance && (
+            {!quota.anonymous && nuance && (
               <span
                 className="inline-flex shrink-0 items-center rounded-full border border-[var(--ink-4)] px-2 py-0.5 text-[12px] text-[var(--fg-3)]"
                 title={nuance.why}
@@ -260,14 +259,14 @@ export function ClientDossierModal({
               </span>
             )}
             <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg-4)]">
-              {nuance ? nuance.why : verdict.why}
+              {quota.anonymous ? 'Clés sans adresse, évaluées séparément' : nuance ? nuance.why : verdict.why}
             </span>
-            <Link
+            {quota.canWrite && <Link
               href={contactsHref(locale, d.id)}
               className="shrink-0 rounded-md border border-[var(--amber-500)]/40 px-2.5 py-1 text-[12.5px] font-medium text-[var(--amber-400)] hover:bg-[var(--amber-500)]/10"
             >
               ✉ Écrire
-            </Link>
+            </Link>}
           </div>
         </div>
 
@@ -275,27 +274,24 @@ export function ClientDossierModal({
         <div className="space-y-6 px-4 py-5 sm:px-6">
           <Journey d={d} now={now} />
 
-          {d.verdict === 'blocked' && (
-            <div className="rounded-lg border border-red-500/35 bg-red-500/[0.07] px-3 py-2.5">
-              <p className="text-[13px] leading-snug text-red-200">
-                ⛔ <b>Arrêté sur un refus</b>
-                {d.lastRefusalAt ? ` le ${d.lastRefusalAt.slice(0, 10)}` : ''} :{' '}
-                {d.authOrQuota > 0 ? `${d.authOrQuota} quota/auth (401/429)` : ''}
-                {d.authOrQuota > 0 && d.paywall > 0 ? ' · ' : ''}
-                {d.paywall > 0 ? `${d.paywall} paywall (402)` : ''}
-                {d.rejectReasons[0] ? ` · motif : ${d.rejectReasons[0].reason}` : ''}. Dernier appel
-                servi le {d.lastSuccessAt?.slice(0, 10) ?? '—'}. Tant qu&apos;ils n&apos;ont pas
-                réussi un appel, ils croient leur compte fermé.
+          {quota.visible && (
+            <div className="rounded-lg border border-red-500/35 bg-red-500/[0.07] px-3 py-2.5" data-quota-summary>
+              <p className="text-[13px] leading-snug text-red-200"><b>{quota.heading}</b></p>
+              <p className="mt-1 text-[13px] leading-snug text-[var(--fg-3)]">
+                {quota.refusals > 0 ? `${quota.refusals} refus observés (401, 402 ou 429)` : 'Aucun refus observé'}
+                {quota.refusals > 1 && quota.minutes != null ? ` sur ${quota.minutes} minutes entre le premier et le dernier refus conservés` : ''}.
+                {d.lastRefusalAt ? ` Dernier refus : ${toZurich(d.lastRefusalAt).replace('T', ' ')} (heure suisse).` : ''}
+                {d.lastSuccessAt ? ` Dernier appel servi : ${toZurich(d.lastSuccessAt).replace('T', ' ')} (heure suisse).` : ' Aucun succès conservé.'}
               </p>
-              {d.keys
-                .filter((k) => k.plan === 'free' && k.active)
-                .map((k) => (
-                  <RaiseLimitControl
-                    key={k.prefix}
-                    prefix={k.prefix}
-                    currentLimit={k.monthlyLimit ?? 200}
-                  />
-                ))}
+              {quota.wayOut && <p className="mt-2 text-[13px] text-[var(--fg-2)]">{quota.wayOut}</p>}
+              {quota.refusals > 1 && <p className="mt-1 text-[12px] text-[var(--fg-4)]">Les refus se répètent ; cela ne permet pas de savoir si le message a été lu.</p>}
+              {quota.atQuota.map((k) => (
+                <div key={k.prefix} className="mt-2" data-quota-key={k.prefix}>
+                  <span className="font-mono text-[12px] text-[var(--fg-3)]">{k.prefix}</span>
+                  {k.lastRefusalAt && <span className="ml-2 text-[12px] text-[var(--fg-4)]">dernier refus {shortDate(k.lastRefusalAt)}</span>}
+                  <RaiseLimitControl prefix={k.prefix} currentLimit={k.monthlyLimit ?? 200} lifetime={k.lifetime} />
+                </div>
+              ))}
             </div>
           )}
           {d.verdict === 'struggling' && (
@@ -462,7 +458,7 @@ export function ClientDossierModal({
                 const used =
                   k.creditsTotal != null
                     ? k.creditsTotal - (k.creditsRemaining ?? 0)
-                    : k.usedThisMonth;
+                    : k.lifetime ? (k.usedAllTime ?? 0) : k.usedThisMonth;
                 const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
                 return (
                   <div
@@ -498,7 +494,7 @@ export function ClientDossierModal({
                     </div>
                     <div className="mt-1 flex justify-between font-mono text-[12px] text-[var(--fg-4)]">
                       <span>
-                        {used} / {limit} {k.creditsTotal != null ? 'crédits' : 'ce mois'}
+                        {used} / {limit} {k.creditsTotal != null ? 'crédits' : k.lifetime ? 'depuis la création' : 'ce mois'}
                       </span>
                       <span>créée le {k.createdAt.slice(0, 10)}</span>
                     </div>

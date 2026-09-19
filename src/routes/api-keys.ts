@@ -1556,7 +1556,7 @@ apiKeys.get('/v1/admin/keys', (c) => {
       // anonymes), le CRM du site (qui n'en fait aucun contact) et la lecture
       // « cette clé a-t-elle prouvé une boîte ».
       `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
-            k.tier, k.claimed_at, k.claim_method,
+            k.tier, k.claimed_at, k.claim_method, k.no_recredit,
             k.credits_total, k.credits_remaining, k.amount_paid_minor, k.amount_paid_currency, k.issued_by_us, k.source,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
