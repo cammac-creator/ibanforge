@@ -286,15 +286,33 @@ export function isWeekend(date: string): boolean {
 }
 
 /** Trailing moving average of the daily totals over `window` days, aligned on the input. */
-export function movingAverage(days: TrafficTrendDay[], window = 7): number[] {
-  const out: number[] = [];
+export function movingAverage(days: TrafficTrendDay[], window = 7, todayKey = '9999-12-31'): Array<number | null> {
+  const out: Array<number | null> = [];
   let sum = 0;
   for (let i = 0; i < days.length; i++) {
+    if (days[i].date >= todayKey) { out.push(null); continue; }
     sum += days[i].total;
     if (i >= window) sum -= days[i - window].total;
     out.push(Math.round(sum / Math.min(i + 1, window)));
   }
   return out;
+}
+
+export type TypicalKey = Exclude<keyof TrafficTrendDay, 'date'> | 'keyless';
+
+/** Médiane des jours complets, zéros compris ; aucune mesure si la fenêtre est vide. */
+export function typicalDay(days: TrafficTrendDay[], key: TypicalKey, todayKey: string): number | null {
+  const values = days.filter((day) => day.date < todayKey)
+    .map((day) => key === 'keyless' ? KEYLESS_KEYS.reduce((sum, k) => sum + day[k], 0) : day[key])
+    .sort((a, b) => a - b);
+  if (!values.length) return null;
+  const middle = Math.floor(values.length / 2);
+  return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+}
+
+export function typicalDelta(current: TrafficTrendDay[], previous: TrafficTrendDay[] | null, key: TypicalKey, todayKey: string): number | null {
+  const value = typicalDay(current, key, todayKey);
+  return value === null || previous === null ? null : deltaPct(value, typicalDay(previous, key, todayKey));
 }
 
 /** Percentage change from `previous` to `current`; null when there is nothing to compare to. */

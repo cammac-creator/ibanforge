@@ -775,6 +775,21 @@ describe('the last thing that happened to a customer', () => {
     expect(p.last_refusal_at! >= p.last_success_at!).toBe(true);
   });
 
+  it('ordonne les refus et les succès malgré le mélange des dates SQL et ISO', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const insert = getStatsDB().prepare(`INSERT INTO request_log
+      (method, path, status, response_ms, client_kind, key_prefix, created_at)
+      VALUES ('POST', '/v1/iban/validate', ?, 5, 'api', 'ifk_profile1', ?)`);
+    insert.run(402, `${today}T09:00:00.000Z`);
+    insert.run(429, `${today} 11:00:00`);
+    insert.run(200, `${today}T08:00:00.000Z`);
+    insert.run(200, `${today} 10:00:00`);
+    const p = getClientProfiles()['ifk_profile1'];
+    expect(p.first_refusal_at).toBe(`${today}T09:00:00.000Z`);
+    expect(p.last_refusal_at).toBe(`${today}T11:00:00.000Z`);
+    expect(p.last_success_at).toBe(`${today}T10:00:00.000Z`);
+  });
+
   it('leaves the refusal instant null for a customer who was never turned away', () => {
     recordRequest('POST', '/v1/iban/validate', 200, 5, 'api', 'ip', 'ua', 'ifk_profile1');
     const p = getClientProfiles()['ifk_profile1'];

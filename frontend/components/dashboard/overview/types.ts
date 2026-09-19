@@ -54,6 +54,7 @@ export interface HourlyResponse {
 }
 
 export interface ActivationData {
+  daily_callers?: unknown;
   /** Bloc additif validé à la lecture, absent avec une API antérieure. */
   service_usage?: unknown;
   clients: ActivationClientRow[];

@@ -6,6 +6,7 @@ import {
   type ClientProfileRow,
   type DossierInput,
 } from './client-dossiers';
+import { quotaRefusals } from './quota-refusals';
 import type { KeyRow, MessageRow, ProspectRow } from './build-contacts';
 
 // example.net rather than example.com: INTERNAL_RE swallows the latter, and a
@@ -542,5 +543,42 @@ describe('offBooks — real traffic that is not a customer (TABS-02, TABS-08)', 
     const customers = dossiers.filter((d) => !d.offBooks);
     expect(customers.reduce((s, d) => s + d.requests, 0)).toBe(40);
     expect(dossiers.filter((d) => d.offBooks).reduce((s, d) => s + d.requests, 0)).toBe(600);
+  });
+});
+
+
+describe('Refus et actions : chaque clé garde son propre plafond', () => {
+  it('ne bloque pas tout le regroupement anonymous et ne propose pas de courrier sans adresse', () => {
+    const keys = [
+      keyRow('anonymous', { key_prefix: 'ifk_epuisee', tier: 'anonymous', monthly_limit: 25, used: 25 }),
+      keyRow('anonymous', { key_prefix: 'ifk_valide', tier: 'anonymous', monthly_limit: 25, used: 7 }),
+      keyRow('anonymous', { key_prefix: 'ifk_inactive', tier: 'anonymous', monthly_limit: 25, used: 25, active: 0 }),
+    ];
+    const dossier = buildDossiers({ ...base, keys })[0];
+    const result = quotaRefusals(dossier);
+    expect(result.heading).toBe('1 clé sur 3 à son plafond');
+    expect(result.atQuota.map(k => k.prefix)).toEqual(['ifk_epuisee']);
+    expect(result.canWrite).toBe(false);
+    expect(result.refusals).toBe(0);
+    expect(result.minutes).toBeNull();
+    expect(result.wayOut).toContain('réclamer cette même clé');
+  });
+  it('reconnaît un quota à vie sans promettre une nouvelle réclamation après paiement', () => {
+    const keys = [keyRow('contact@alpha.example.net', { tier: 'paid', no_recredit: 1, used: 2, used_all_time: 200 })];
+    const result = quotaRefusals(buildDossiers({ ...base, keys })[0]);
+    expect(result.atQuota).toHaveLength(1);
+    expect(result.canWrite).toBe(true);
+    expect(result.wayOut).toContain('carte');
+    expect(result.wayOut).not.toContain('réclamer');
+  });
+  it('calcule une durée factuelle et ne l’invente pas avec une ancienne réponse API', () => {
+    const keys = [keyRow('contact@alpha.example.net', { key_prefix: 'ifk_refus', used: 200 })];
+    const p = profile({ key_prefix: 'ifk_refus', total: 4, paywall: 3, ok: 1,
+      first_refusal_at: '2026-07-29 10:00:00', last_refusal_at: '2026-07-29T11:30:00.000Z', last_success_at: '2026-07-29 09:00:00' });
+    const dossier = () => buildDossiers({ ...base, keys, profiles: { ifk_refus: p } })[0];
+    expect(quotaRefusals(dossier()).minutes).toBe(90);
+    expect(quotaRefusals(dossier()).refusals).toBe(3);
+    delete p.first_refusal_at;
+    expect(quotaRefusals(dossier()).minutes).toBeNull();
   });
 });

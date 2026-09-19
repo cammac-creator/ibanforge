@@ -295,3 +295,37 @@ export function googleSummary(google: SearchConsole) {
 export function audienceDate(value: string | null): string {
   return value ? `${value.slice(8, 10)}.${value.slice(5, 7)}.${value.slice(0, 4)}` : '—';
 }
+
+export interface DailyCallers {
+  unit: 'account';
+  period_days: 30 | 90;
+  window: { from: string; to: string };
+  today_partial: true;
+  days: Array<{ day: string; accounts: number }>;
+}
+
+/** Refuse une série incomplète, dupliquée ou incohérente au lieu d'inventer des zéros. */
+export function readDailyCallers(raw: unknown): DailyCallers | null {
+  const dayKey = (value: unknown): value is string => typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString().slice(0, 10) === value;
+  if (!object(raw) || raw.unit !== 'account' || ![30, 90].includes(Number(raw.period_days)) ||
+      typeof raw.period_days !== 'number' || raw.today_partial !== true || !object(raw.window) ||
+      !dayKey(raw.window.from) || !dayKey(raw.window.to) || !Array.isArray(raw.days) ||
+      raw.days.length !== raw.period_days) return null;
+  const from = Date.parse(raw.window.from);
+  if (Date.parse(raw.window.to) !== from + (raw.period_days - 1) * 86_400_000) return null;
+  if (!raw.days.every((day, index) => object(day) && dayKey(day.day) && count(day.accounts) &&
+    day.day === new Date(from + index * 86_400_000).toISOString().slice(0, 10))) return null;
+  return raw as unknown as DailyCallers;
+}
+
+export function dailyCallerSeries(reading: DailyCallers | null, period: number, today: string) {
+  if (!reading || reading.window.to !== today) return null;
+  const floor = Date.parse(today) - (period - 1) * 86_400_000;
+  return reading.days.filter((day) => Date.parse(day.day) >= floor).map((day, index, days) => {
+    const completed = days.slice(Math.max(0, index - 6), index + 1).filter((d) => d.day < today);
+    return { ...day, average: day.day === today || !completed.length ? null
+      : completed.reduce((sum, d) => sum + d.accounts, 0) / completed.length };
+  });
+}

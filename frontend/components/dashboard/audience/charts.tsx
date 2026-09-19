@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   Area,
   Bar,
+  Cell,
   CartesianGrid,
   ComposedChart,
   Line,
   ResponsiveContainer,
+  ReferenceArea,
+  ReferenceLine,
   Tooltip,
   XAxis,
   YAxis,
@@ -20,7 +23,8 @@ import {
   type TrafficTrendDay,
 } from '@/lib/traffic-trend';
 import { formatGrouped } from '@/lib/format-grouped';
-import { audienceDate } from '@/lib/dashboard/audience-model';
+import { audienceDate, type dailyCallerSeries } from '@/lib/dashboard/audience-model';
+import { PartialDayDefs, partialDayProps } from '../partial-day';
 import { Panel } from './primitives';
 import styles from './audience.module.css';
 
@@ -42,6 +46,7 @@ const tooltipStyle = {
 const axis = (v: number) => (v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : String(v));
 
 export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: string }) {
+  const partialId = useId().replace(/:/g, '');
   const t = useTranslations('dashboard.audience'),
     locale = useLocale();
   const [hidden, setHidden] = useState<NatureKey[]>([]),
@@ -52,7 +57,7 @@ export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: 
       <div className={styles.chartHeadline}>
         <strong>{formatGrouped(summary.total, locale)}</strong>
         <span>
-          {t('requests')} · {audienceDate(days[0]?.date ?? null)} → {audienceDate(today)}
+          {t('requests')} · {audienceDate(days[0]?.date ?? null)} → {audienceDate(today)} · {t('includingToday')}
         </span>
       </div>
       {summary.mismatchDays > 0 && (
@@ -66,10 +71,11 @@ export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: 
             margin={{ top: 12, right: 8, bottom: 0, left: -14 }}
             accessibilityLayer
           >
+            <PartialDayDefs id={partialId} color="#e2e8f0" />
             <CartesianGrid stroke="#334155" vertical={false} strokeDasharray="3 5" />
             <XAxis
               dataKey="date"
-              tickFormatter={(d) => `${String(d).slice(8, 10)}.${String(d).slice(5, 7)}`}
+              tickFormatter={(d) => d === today ? t('todayTick') : `${String(d).slice(8, 10)}.${String(d).slice(5, 7)}`}
               minTickGap={32}
               tick={{ fill: '#94a3b8', fontSize: 11 }}
               axisLine={false}
@@ -84,7 +90,7 @@ export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: 
             />
             <Tooltip
               contentStyle={tooltipStyle}
-              labelFormatter={(d) => audienceDate(String(d))}
+              labelFormatter={(d) => `${audienceDate(String(d))}${d === today ? ` · ${t('todayPartial')}` : ''}`}
               formatter={(v, name) => [formatGrouped(Number(v), locale), name]}
             />
             {NATURE_KEYS.filter((k) => !hidden.includes(k)).map((k) => (
@@ -111,6 +117,10 @@ export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: 
                 isAnimationActive={false}
               />
             )}
+            {days.some((d) => d.date === today) && <ReferenceArea
+              x1={days.filter((d) => d.date < today).at(-1)?.date ?? today} x2={today}
+              fill={`url(#${partialId})`} fillOpacity={1} stroke="none" className="partial-day" />}
+            {days.some((d) => d.date === today) && <ReferenceLine x={today} stroke="#e2e8f0" strokeDasharray="3 3" />}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -186,6 +196,43 @@ export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: 
       </details>
     </Panel>
   );
+}
+
+export function DailyCallersChart({ days, today }: { days: ReturnType<typeof dailyCallerSeries>; today: string }) {
+  const t = useTranslations('dashboard.audience'), locale = useLocale();
+  const partialId = useId().replace(/:/g, '');
+  return <Panel title={t('callersTitle')} note={t('callersDefinition')}>
+    {!days ? <p className={styles.notice}>{t('unavailableShort')}</p> : <>
+      <div className={styles.chart} role="img" aria-label={t('callersTitle')}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <ComposedChart data={days} margin={{ top: 12, right: 8, bottom: 0, left: -14 }} accessibilityLayer>
+            <PartialDayDefs id={partialId} />
+            <CartesianGrid stroke="#334155" vertical={false} strokeDasharray="3 5" />
+            <XAxis dataKey="day" minTickGap={32} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false}
+              tickFormatter={(day) => day === today ? t('todayTick') : `${String(day).slice(8, 10)}.${String(day).slice(5, 7)}`} />
+            <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle}
+              labelFormatter={(day) => `${audienceDate(String(day))}${day === today ? ` · ${t('todayPartial')}` : ''}`}
+              formatter={(value, name) => [formatGrouped(Number(value), locale, Number.isInteger(Number(value)) ? 0 : 1), name]} />
+            <Bar dataKey="accounts" name={t('callersUnit')} fill="#fbbf24" maxBarSize={22} isAnimationActive={false}>
+              {days.map((day) => <Cell key={day.day} {...partialDayProps(day.day, today, partialId)} />)}
+            </Bar>
+            <Line dataKey="average" name={t('callersAverage7')} stroke="#e2e8f0" strokeDasharray="4 3" dot={false} connectNulls={false} isAnimationActive={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <p className={styles.caption}>{t('todayPartial')}</p>
+      <details className={styles.disclosure}><summary>{t('dailyData')}</summary>
+        <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={t('dailyData')}>
+          <table><thead><tr><th>{t('date')}</th><th>{t('callersUnit')}</th></tr></thead>
+            <tbody>{[...days].reverse().map((day) => <tr key={day.day}>
+              <th>{audienceDate(day.day)}{day.day === today ? ` · ${t('todayTick')}` : ''}</th><td>{formatGrouped(day.accounts, locale)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </details>
+    </>}
+  </Panel>;
 }
 
 export function GoogleChart({

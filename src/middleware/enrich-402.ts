@@ -783,7 +783,7 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
     // caller learns how to obtain a key or buy credits. A bare `{}` is the
     // dead end this middleware exists to prevent.
     const paywallCause = c.get('paywallCause');
-    const body = stripFreeTierWhenExhausted(
+    const enriched = stripFreeTierWhenExhausted(
       {
         ...(announcement ?? {}),
         error: 'payment_required',
@@ -793,6 +793,21 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
       },
       paywallCause,
     );
+
+    // Les aperçus d'erreur sont courts : le mode d'emploi précède le contrat
+    // de paiement. Aucun champ ni aucune valeur x402 ne disparaît.
+    const { message, claim_to_200, x402Version, error, resource, accepts, extensions, ...rails } =
+      enriched;
+    const body = {
+      message,
+      ...(claim_to_200 !== undefined ? { claim_to_200 } : {}),
+      ...rails,
+      ...(x402Version !== undefined ? { x402Version } : {}),
+      error,
+      ...(resource !== undefined ? { resource } : {}),
+      ...(accepts !== undefined ? { accepts } : {}),
+      ...(extensions !== undefined ? { extensions } : {}),
+    };
 
     c.res = new Response(JSON.stringify(body, null, 2), {
       status: 402,

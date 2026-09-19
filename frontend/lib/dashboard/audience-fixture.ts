@@ -1,4 +1,4 @@
-import type { AudienceFunnel, AudienceIndicator } from './audience-model';
+import type { AudienceFunnel, AudienceIndicator, DailyCallers } from './audience-model';
 
 /** Données entièrement inventées, réservées aux tests et à la recette visuelle. */
 export function audienceFixture(): AudienceFunnel {
@@ -87,5 +87,19 @@ export function audienceFixture(): AudienceFunnel {
       },
       mcp_remote: { sessions: 48, tool_calls: 136, key_requests: 9 },
     },
+  };
+}
+
+
+export function dailyCallersFixture(period: 30 | 90 = 30): DailyCallers {
+  const to = '2026-06-16';
+  const start = Date.parse(to) - (period - 1) * 86_400_000;
+  return {
+    unit: 'account', period_days: period,
+    window: { from: new Date(start).toISOString().slice(0, 10), to }, today_partial: true,
+    days: Array.from({ length: period }, (_, index) => ({
+      day: new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+      accounts: index === period - 1 ? 2 : index % 5,
+    })),
   };
 }

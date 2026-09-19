@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
+import { partialDayBackground, partialDayWords } from './partial-day';
 import { formatGrouped } from '@/lib/format-grouped';
 
 const VIOLET = '#a855f7';
@@ -45,6 +46,7 @@ export function UsageChart({
   months: string[];
 }) {
   const locale = useLocale();
+  const today = new Date().toISOString().slice(0, 10), words = partialDayWords(locale);
   const dailyTotal = days.reduce((a, d) => a + d.count, 0);
   const monthlyTotal = series.reduce((a, b) => a + b, 0);
   const [mode, setMode] = useState<Mode>(dailyTotal > 0 ? 'day' : 'month');
@@ -59,7 +61,7 @@ export function UsageChart({
   }
 
   const isDay = mode === 'day';
-  let bars: Array<{ label: string; tip: string; value: number }>;
+  let bars: Array<{ label: string; tip: string; value: number; partial?: boolean }>;
   let total: number;
 
   if (isDay) {
@@ -67,7 +69,7 @@ export function UsageChart({
     const axis = lastNDays(30);
     bars = axis.map((day) => {
       const v = byDay.get(day) ?? 0;
-      return { label: day.slice(8), tip: `${day} · ${v} appel${v > 1 ? 's' : ''}`, value: v };
+      return { label: day === today ? words.tick : day.slice(8), tip: `${day} · ${v} appel${v > 1 ? 's' : ''}${day === today ? ` · ${words.note}` : ''}`, value: v, partial: day === today };
     });
     total = dailyTotal;
   } else {
@@ -119,10 +121,11 @@ export function UsageChart({
                 <span className="mb-0.5 text-center font-mono text-[9px] text-[var(--fg-3)]">{b.value}</span>
               )}
               <div
-                className="w-full rounded-[2px]"
+                className={`w-full rounded-[2px]${b.partial ? ' partial-day' : ''}`}
                 style={{
                   height: `${Math.max(b.value > 0 ? 4 : 2, (b.value / max) * 40)}px`,
                   backgroundColor: last ? VIOLET : VIOLET_DIM,
+                  backgroundImage: b.partial ? partialDayBackground : undefined,
                   opacity: b.value === 0 ? 0.18 : 0.95,
                 }}
               />

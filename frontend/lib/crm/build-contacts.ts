@@ -121,6 +121,7 @@ export interface KeyRow {
    * se lit « palier inconnu » et le CRM est exactement le CRM d'avant.
    */
   tier?: string | null;
+  no_recredit?: number | null;
   /**
    * What Stripe actually charged, in minor units, and in which currency.
    *

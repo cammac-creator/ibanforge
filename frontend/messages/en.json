@@ -966,7 +966,7 @@
           "cohortLegend": "Cohorts (marker outside total)",
           "markers": "Markers",
           "cohortNote": "Amber marker: validations associated with grouped automated signups. They are excluded from totals and percentages. The marker height is reduced; the actual volume appears in the tooltip.",
-          "partialDay": "The last bar represents the current day since midnight UTC. The count is incomplete and its colour is faded.",
+          "partialDay": "The hatched bar shows the current day since midnight UTC. Its count is incomplete.",
           "reading": "Successful responses may come from the free trial or an API key. Their share of the displayed statuses does not measure sales.",
           "scope": "Requests on the selected IBAN, BIC and Swiss clearing routes, using the expected HTTP method. Internal keys and paths with unsubstituted parameters are excluded. Anonymous or automated requests may still be counted.",
           "help": {
@@ -1584,7 +1584,15 @@
         "cta_journey_audit": "Check a supplier file · Journey",
         "cta_vendor_try": "Try the API · Software vendors",
         "cta_vendor_docs": "Integration guides · Software vendors"
-      }
+      },
+      "callersToday": "Customers who called today",
+      "callersTitle": "Customers, day by day",
+      "callersDefinition": "One account per email address, all its keys combined, regardless of HTTP status. Internal accounts, anonymous keys and seeded keys excluded. UTC day; the CRM uses Swiss days, so a difference of one in the evening is normal.",
+      "callersAverage": "UTC day · average {count} per day over {days} complete days",
+      "callersUnit": "Customer accounts",
+      "callersAverage7": "Average over 7 complete days",
+      "todayTick": "today",
+      "includingToday": "Includes the day in progress"
     }
   },
   "docs": {

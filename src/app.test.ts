@@ -298,6 +298,20 @@ describe('the keyless trial sits between the key and the paywall', () => {
 // ─── 3. The public 402, which indexers read ──────────────────────────────────
 
 describe('the 402 an indexer reads', () => {
+  it('rend le message visible en tête et expose l’en-tête de sortie aux navigateurs', async () => {
+    process.env.CORS_ORIGIN = 'https://ibanforge.com';
+    const res = await req('/v1/iban/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://ibanforge.com' },
+      body: JSON.stringify({ ibans: [VALID_IBAN] }),
+    });
+    expect(res.status).toBe(402);
+    const raw = await res.text();
+    expect(Object.keys(JSON.parse(raw))[0]).toBe('message');
+    expect(raw.indexOf('"message"')).toBeLessThan(200);
+    expect(res.headers.get('access-control-expose-headers')).toContain('X-Quota-Way-Out');
+  });
+
   it('quotes the credit pack in x402 v2, in the body and in the header alike', async () => {
     const res = await req('/v1/credits/buy/1k', {
       method: 'POST',

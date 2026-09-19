@@ -16,6 +16,8 @@ import type { SearchConsole, SignupSources, WebEventsSummary } from '@/lib/dashb
 import { sliceToPeriod, summariseTrend, type TrafficTrendResult } from '@/lib/traffic-trend';
 import {
   audienceDate,
+  dailyCallerSeries,
+  type DailyCallers,
   audienceTab,
   AUDIENCE_TABS,
   googleSummary,
@@ -24,7 +26,7 @@ import {
   type AudienceTab,
 } from '@/lib/dashboard/audience-model';
 import { formatGrouped } from '@/lib/format-grouped';
-import { TrafficChart } from './charts';
+import { TrafficChart, DailyCallersChart } from './charts';
 import { IndicatorCard, JourneyPanel } from './journey-panel';
 import { GooglePanel } from './google-panel';
 import { SitePanel } from './site-panel';
@@ -41,6 +43,7 @@ const ICONS = {
 
 export function AudienceExplorer({
   trend,
+  dailyCallers = null,
   web,
   sources,
   google,
@@ -50,6 +53,7 @@ export function AudienceExplorer({
   children,
 }: {
   trend: TrafficTrendResult;
+  dailyCallers?: DailyCallers | null;
   web: WebEventsSummary | null;
   sources: SignupSources | null;
   google: SearchConsole | null;
@@ -78,8 +82,11 @@ export function AudienceExplorer({
     if (focus) nav.current?.querySelector<HTMLButtonElement>(`[data-tab="${next}"]`)?.focus();
   };
   const first = funnel?.indicators.first_result_24h;
+  const callers = dailyCallerSeries(dailyCallers, period, nowIso.slice(0, 10));
+  const completeCallers = callers?.filter((day) => day.day < nowIso.slice(0, 10)) ?? [];
+  const averageCallers = completeCallers.length ? completeCallers.reduce((sum, day) => sum + day.accounts, 0) / completeCallers.length : null;
   return (
-    <div className={styles.audience} data-audience-version="20260916">
+    <div className={styles.audience} data-audience-version="20260919">
       <div className={styles.hero}>
         <div>
           <span className={styles.eyebrow}>
@@ -141,6 +148,10 @@ export function AudienceExplorer({
         {tab === 'summary' && (
           <div className={styles.stack}>
             <div className={styles.metrics}>
+              <div title={t('callersDefinition')}>
+                <Metric label={t('callersToday')} value={callers ? fmt(callers.at(-1)!.accounts) : t('unavailableShort')}
+                  note={averageCallers == null ? t('unavailableShort') : t('callersAverage', { count: formatGrouped(averageCallers, locale, 1), days: completeCallers.length })} accent />
+              </div>
               <Metric
                 label={t('requests')}
                 value={traffic ? fmt(traffic.total) : '—'}
@@ -222,6 +233,7 @@ export function AudienceExplorer({
                 <Unavailable />
               </Panel>
             )}
+            <DailyCallersChart days={callers} today={nowIso.slice(0, 10)} />
             <Panel
               title={t('trialPreview')}
               note={t('maturityNote')}

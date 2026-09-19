@@ -8,6 +8,8 @@ import {
   fmtInt,
   isWeekend,
   movingAverage,
+  typicalDay,
+  typicalDelta,
   naturesTotal,
   parseTrafficTrend,
   shortDay,
@@ -348,5 +350,28 @@ describe('the readings the premium card adds', () => {
     ];
     const ev = trendEvents(days, '2026-09-06');
     expect(ev.map((e) => `${e.date}:${e.kind}`)).toEqual(['2026-09-05:sweep', '2026-09-04:peak']);
+  });
+});
+
+
+describe('Journée habituelle, sans la journée incomplète', () => {
+  const today = '2026-09-19';
+  it('résiste à un pic et conserve les jours à zéro', () => {
+    const rows = [0, 10, 10, 10, 9000, 1].map((browser, i) => day(`2026-09-${14+i}`, { browser }));
+    expect(typicalDay(rows, 'total', today)).toBe(10);
+    expect(typicalDay(rows.slice(0, 2), 'total', today)).toBe(5);
+    expect(typicalDay([day(today, { browser: 999 })], 'total', today)).toBeNull();
+  });
+  it('compare les médianes et non les volumes cumulés', () => {
+    const current = [10, 10, 9000].map((browser, i) => day(`2026-09-${15+i}`, { browser }));
+    const previous = [5, 5].map((browser, i) => day(`2026-09-${10+i}`, { browser }));
+    expect(typicalDelta(current, previous, 'total', today)).toBe(100);
+    expect(typicalDelta(current, null, 'total', today)).toBeNull();
+    expect(typicalDelta(current, [day('2026-09-10')], 'total', today)).toBeNull();
+    expect(typicalDay([day('2026-09-18', { with_key: 200, browser: 4, agent: 6, internal: 8 })], 'keyless', today)).toBe(10);
+  });
+  it('arrête la moyenne avant aujourd’hui, même si une date future suit', () => {
+    const rows = [10, 20, 999, 888].map((browser, i) => day(`2026-09-${17+i}`, { browser }));
+    expect(movingAverage(rows, 7, today)).toEqual([10, 15, null, null]);
   });
 });

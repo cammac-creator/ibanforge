@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocale } from 'next-intl';
+import { formatGrouped } from '@/lib/format-grouped';
 
-/**
- * The missing gesture behind the blocked banner: raise a free key's monthly
- * limit right here. Bounded steps only (the backend enforces [100, 20000]),
- * a native confirm, and the effect is immediate: validateApiKey re-reads
- * monthly_limit on the customer's next call.
- */
-export function RaiseLimitControl({ prefix, currentLimit }: { prefix: string; currentLimit: number }) {
+/** Relève le plafond de la clé, selon son assiette mensuelle ou à vie.
+ * L’API applique la nouvelle limite au prochain appel. Le geste reste confirmé par l’opérateur. */
+export function RaiseLimitControl({ prefix, currentLimit, lifetime = false }: { prefix: string; currentLimit: number; lifetime?: boolean }) {
+  const locale = useLocale();
+  const basis = lifetime ? ' au total' : '/mois';
   const [target, setTarget] = useState(Math.min(20_000, Math.max(1000, currentLimit * 5)));
   const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -16,16 +16,17 @@ export function RaiseLimitControl({ prefix, currentLimit }: { prefix: string; cu
   if (state === 'done') {
     return (
       <p className="mt-1 text-[12px] text-emerald-400">
-        ✓ {prefix} relevé à {target.toLocaleString('fr-CH')}/mois — effet à leur prochain appel. {message}
+        ✓ {prefix} relevé à {formatGrouped(target, locale)}{basis} — effet à leur prochain appel. {message}
       </p>
     );
   }
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-2">
       <span className="font-mono text-[12px] text-red-200/90">
-        {prefix} · {currentLimit.toLocaleString('fr-CH')}/mois
+        {prefix} · {formatGrouped(currentLimit, locale)}{basis}
       </span>
       <select
+        aria-label={`Nouveau plafond pour ${prefix}`}
         value={target}
         onChange={(e) => setTarget(Number(e.target.value))}
         className="rounded border border-red-400/40 bg-[var(--ink-1)] px-1.5 py-1 text-base text-[var(--fg-1)] sm:text-[12px]"
@@ -34,7 +35,7 @@ export function RaiseLimitControl({ prefix, currentLimit }: { prefix: string; cu
           .filter((n) => n > currentLimit)
           .map((n) => (
             <option key={n} value={n}>
-              {n.toLocaleString('fr-CH')}/mois
+              {formatGrouped(n, locale)}{basis}
             </option>
           ))}
       </select>
@@ -42,7 +43,7 @@ export function RaiseLimitControl({ prefix, currentLimit }: { prefix: string; cu
         type="button"
         disabled={state === 'busy'}
         onClick={async () => {
-          if (!window.confirm(`Relever ${prefix} de ${currentLimit} à ${target}/mois ?`)) return;
+          if (!window.confirm(`Relever ${prefix} de ${currentLimit} à ${target}${basis} ?`)) return;
           setState('busy');
           try {
             const r = await fetch('/api/crm/raise-limit', {

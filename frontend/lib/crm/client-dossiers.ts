@@ -19,6 +19,7 @@ export interface ClientProfileRow {
   p95_ms: number;
   last_success_at: string | null;
   last_refusal_at: string | null;
+  first_refusal_at?: string | null;
   endpoints: Array<{ path: string; count: number }>;
   countries: Array<{ code: string; count: number }>;
   user_agents: Array<{ ua: string; count: number }>;
@@ -71,6 +72,12 @@ export interface DossierInput {
 export type Verdict = 'blocked' | 'struggling' | 'dormant' | 'rising' | 'active' | 'former' | 'silent';
 
 export interface DossierKey {
+  lifetime?: boolean;
+  usedAllTime?: number;
+  tier?: string | null;
+  lastRefusalAt?: string | null;
+  firstRefusalAt?: string | null;
+  refusals?: number;
   prefix: string;
   createdAt: string;
   active: boolean;
@@ -458,6 +465,12 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       whatTheyDo: pick(prospect?.what_they_do, enriched?.what_they_do),
       signedUpAt,
       keys: keys.map((k) => ({
+        tier: k.tier ?? null,
+        lifetime: k.no_recredit === 1,
+        usedAllTime: k.used_all_time,
+        lastRefusalAt: input.profiles[k.key_prefix]?.last_refusal_at ?? null,
+        firstRefusalAt: input.profiles[k.key_prefix]?.first_refusal_at ?? null,
+        refusals: (input.profiles[k.key_prefix]?.paywall ?? 0) + (input.profiles[k.key_prefix]?.auth_or_quota ?? 0),
         prefix: k.key_prefix,
         createdAt: k.created_at,
         active: k.active === 1,

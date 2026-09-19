@@ -2,6 +2,7 @@ import { getStatsDB } from './db.js';
 import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { isInternalEmail } from './internal-accounts.js';
 import { getServiceUsage, type ServiceUsage } from './service-usage.js';
+import { getDailyCallers, type DailyCallers } from './daily-callers.js';
 
 /**
  * Per-EMAIL activation picture. The unit is deliberately the email, never the
@@ -84,6 +85,7 @@ export interface ActivationResponse {
   sources: ActivationSourceRow[];
   cohorts: ActivationCohort[];
   service_usage: ServiceUsage;
+  daily_callers: DailyCallers;
 }
 
 interface KeyRow {
@@ -373,5 +375,6 @@ export function getActivation(days = 30): ActivationResponse {
     sources,
     cohorts,
     service_usage: getServiceUsage(days, new Date(nowMs)),
+    daily_callers: getDailyCallers(days, new Date(nowMs)),
   };
 }

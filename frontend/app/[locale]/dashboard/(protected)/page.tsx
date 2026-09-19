@@ -278,6 +278,7 @@ export default async function DashboardPage({
       {growth && trendP && (
         <Suspense fallback={<SectionSkeleton tall />}>
           <AudienceSection
+            activationPromise={activationP}
             trendPromise={trendP}
             webPromise={audienceWebP}
             sourcesPromise={audienceSourcesP}

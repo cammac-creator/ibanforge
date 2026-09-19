@@ -654,3 +654,36 @@ describe('a paid route reached with a trailing slash is not a dead end', () => {
     expect(res.status).not.toBe(308);
   });
 });
+
+describe('mode d’emploi avant la mécanique x402', () => {
+  it('conserve le contrat entier derrière le message et les sorties disponibles', async () => {
+    const announcement = {
+      x402Version: 2,
+      error: 'Payment required',
+      resource: { url: 'https://api.example.net/paid' },
+      accepts: [{ scheme: 'exact', amount: '4000', extra: { padding: 'x'.repeat(24000) } }],
+      extensions: { custom: { info: { value: 'conservée' } } },
+    };
+    const app = new Hono<HonoEnv>();
+    app.use('*', enrich402Middleware());
+    app.get(
+      '/paid',
+      () =>
+        new Response('', {
+          status: 402,
+          headers: {
+            'payment-required': Buffer.from(JSON.stringify(announcement)).toString('base64'),
+          },
+        }),
+    );
+    const response = await app.request('/paid');
+    const raw = await response.text();
+    const body = JSON.parse(raw);
+    expect(Object.keys(body)[0]).toBe('message');
+    expect(raw.indexOf('"message"')).toBeLessThan(200);
+    expect(raw.indexOf('"claim_to_200"')).toBeLessThan(raw.indexOf('"accepts"'));
+    expect(body).toMatchObject({ ...announcement, error: 'payment_required' });
+    expect(body.credit_packs).toBeDefined();
+    expect(body.monthly_plan).toBeDefined();
+  });
+});

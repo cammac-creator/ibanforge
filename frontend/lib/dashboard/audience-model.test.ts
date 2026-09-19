@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { audienceFixture } from './audience-fixture';
+import { audienceFixture, dailyCallersFixture } from './audience-fixture';
 import {
   audienceDate,
+  readDailyCallers,
+  dailyCallerSeries,
   audienceSince,
   audienceTab,
   googleSummary,
@@ -173,5 +175,40 @@ describe('Essais : dénominateurs, recul et limites de rapprochement', () => {
     const raw = audienceFixture();
     raw.device.chain.lineages_of_delivered = { numerator: 2, denominator: 1, value: 2 };
     expect(readAudienceFunnel(raw)?.device.chain.lineages_of_delivered.value).toBe(2);
+  });
+});
+
+
+describe('Comptes distincts ayant appelé, contrat strict', () => {
+  it.each([30, 90] as const)('lit la fenêtre complète de %s jours et découpe sans inventer de données', (span) => {
+    const raw = dailyCallersFixture(span);
+    const parsed = readDailyCallers(raw);
+    expect(parsed).toEqual(raw);
+    expect(dailyCallerSeries(parsed, 7, raw.window.to)).toHaveLength(7);
+    expect(dailyCallerSeries(parsed, 90, raw.window.to)).toHaveLength(span);
+    expect(dailyCallerSeries(parsed, 30, '2026-06-17')).toBeNull();
+    const series = dailyCallerSeries(parsed, span, raw.window.to)!;
+    expect(series.at(-1)?.average).toBeNull();
+    expect(series.at(-2)?.average).toBe(raw.days.slice(-8, -1).reduce((sum, d) => sum + d.accounts, 0) / 7);
+  });
+  it.each([null, {}, { unit: 'key' }, { days: [] }])('ne transforme pas une lecture absente ou partielle en zéro : %j', (raw) => {
+    expect(readDailyCallers(raw)).toBeNull();
+  });
+  it('refuse dates invalides, trous, doublons, comptes négatifs et incohérences de fenêtre', () => {
+    for (const mutate of [
+      (r: ReturnType<typeof dailyCallersFixture>) => { r.days[0].day = '2026-02-30'; },
+      (r: ReturnType<typeof dailyCallersFixture>) => { r.days.pop(); },
+      (r: ReturnType<typeof dailyCallersFixture>) => { r.days[1].day = r.days[0].day; },
+      (r: ReturnType<typeof dailyCallersFixture>) => { r.days[0].accounts = -1; },
+      (r: ReturnType<typeof dailyCallersFixture>) => { r.days[0].accounts = 0.5; },
+      (r: ReturnType<typeof dailyCallersFixture>) => { r.window.from = '2026-05-17'; },
+    ]) { const raw = dailyCallersFixture(); mutate(raw); expect(readDailyCallers(raw)).toBeNull(); }
+    expect(readDailyCallers({ ...dailyCallersFixture(), today_partial: false })).toBeNull();
+  });
+  it('conserve un vrai zéro observé', () => {
+    const raw = dailyCallersFixture(); raw.days.forEach(d => { d.accounts = 0; });
+    const result = dailyCallerSeries(readDailyCallers(raw), 7, raw.window.to)!;
+    expect(result.at(-1)?.accounts).toBe(0);
+    expect(result.at(-2)?.average).toBe(0);
   });
 });
