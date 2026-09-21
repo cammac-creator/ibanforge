@@ -40,12 +40,12 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/mdx": "^2.0.14",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.185.4",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.11"
