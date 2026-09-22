@@ -394,7 +394,7 @@ export interface IBANValidationResult {
      *
      * - `national_register` — the country's own register publishes this BIC for
      *   this bank code. Today: Switzerland, Liechtenstein, Germany, Austria,
-     *   Belgium, Luxembourg, Bulgaria, Slovakia and San Marino — the SIX
+     *   Belgium, Bulgaria, Slovakia and San Marino — the SIX
      *   BankMaster carries the exact 11-character BIC per IID, the Bundesbank
      *   Bankleitzahlendatei the exact 11-character BIC per BLZ, and the OeNB,
      *   NBB, BNB BAE, NBS and BCSM registers publish the institution's BIC per
