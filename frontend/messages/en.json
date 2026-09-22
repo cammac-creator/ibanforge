@@ -1953,7 +1953,7 @@
         },
         {
           "title": "A trust pack you can send to procurement",
-          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. IBANs are never stored: validation runs in memory and only country + bank-prefix metadata is logged. And when a customer leaves, their telemetry deletes itself: erased by default 30 days after termination, contractually (DPA clause 4.7).",
+          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. Validation stores no IBAN: it runs in memory and only country + bank-prefix metadata is logged. The file audit is a separate deliverable: it keeps its report — which reproduces the columns you upload — for 2 hours unpaid, 24 hours after payment, then deletes it (see the Audit page). And when a customer leaves, their telemetry deletes itself: erased by default 30 days after termination, contractually (DPA clause 4.7).",
           "link": "Legal & DPA"
         }
       ]

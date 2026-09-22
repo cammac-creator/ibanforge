@@ -1953,7 +1953,7 @@
         },
         {
           "title": "Ein Vertrauenspaket für Ihren Einkauf",
-          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. IBANs werden nie gespeichert: Die Validierung läuft im Speicher, protokolliert werden nur Land und Bankpräfix. Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich (DPA Klausel 4.7).",
+          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. Die Validierung speichert keine IBAN: Sie läuft im Arbeitsspeicher, protokolliert werden nur Land und Bankpräfix. Die Dateiprüfung ist eine eigene Leistung: Sie bewahrt ihren Bericht — der die hochgeladenen Spalten übernimmt — 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf und löscht ihn dann (siehe die Seite Prüfung). Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich (DPA Klausel 4.7).",
           "link": "Rechtliches und DPA"
         }
       ]

@@ -22,6 +22,15 @@ import { dirname, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+/**
+ * Mirrors AUDIT_MAX_BYTES in src/index.ts — deliberately LOWER than the
+ * route's, because `file_base64` crosses stdio and a bigger payload kills the
+ * transport (see the note beside the constant there). Written once here so
+ * moving the cap does not leave a test asserting the old one, which is what
+ * happened on 22/09/2026.
+ */
+const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), '../dist/index.js');
 
@@ -151,7 +160,7 @@ beforeAll(async () => {
             JSON.stringify({
               error: 'no_iban_column',
               message: 'No column looks like an IBAN.',
-              limits: { max_rows: 20000, max_bytes: 5 * 1024 * 1024 },
+              limits: { max_rows: 20000, max_bytes: AUDIT_MAX_BYTES },
             }),
           );
           return;
@@ -191,6 +200,7 @@ afterAll(async () => {
   await client?.close();
   await new Promise<void>((ok) => api?.close(() => ok()));
 });
+
 
 describe('every tool declaring an outputSchema honours it', () => {
   it('exposes thirteen tools, all of them declaring an output schema', async () => {
@@ -341,7 +351,7 @@ describe('audit_creditor_file / audit_status: the paid creditor-file audit', () 
 
   it('refuses an oversized file locally — the route is never called', async () => {
     const before = auditUploadBodies.length;
-    const big = Buffer.alloc(5 * 1024 * 1024 + 1, 0x41).toString('base64');
+    const big = Buffer.alloc(AUDIT_MAX_BYTES + 1, 0x41).toString('base64');
     const res = await client.callTool({
       name: 'audit_creditor_file',
       arguments: { file_base64: big, filename: 'big.csv' },

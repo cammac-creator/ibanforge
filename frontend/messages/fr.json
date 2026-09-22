@@ -1953,7 +1953,7 @@
         },
         {
           "title": "Un dossier de confiance à transmettre aux achats",
-          "body": "DPA signable, conditions et politique de confidentialité publiées, page de statut en direct, changelog versionné. Les IBAN ne sont jamais stockés : la validation tourne en mémoire et seules les métadonnées pays + préfixe bancaire sont journalisées. Et quand un client part, sa télémétrie s'efface d'elle-même : supprimée par défaut 30 jours après la résiliation, contractuellement (clause 4.7 du DPA).",
+          "body": "DPA signable, conditions et politique de confidentialité publiées, page de statut en direct, changelog versionné. La validation ne stocke aucun IBAN : elle tourne en mémoire et seules les métadonnées pays + préfixe bancaire sont journalisées. L'audit de fichier, lui, est une prestation à part : il conserve son rapport — qui reprend les colonnes déposées — 2 heures sans paiement, 24 heures après, puis l'efface (voir la page Audit). Et quand un client part, sa télémétrie s'efface d'elle-même : supprimée par défaut 30 jours après la résiliation, contractuellement (clause 4.7 du DPA).",
           "link": "Juridique et DPA"
         }
       ]

@@ -2129,7 +2129,12 @@ const buildRawSpec = () => ({
                   'Where the consulted register places THIS bank code. May differ from address.city, which is the legal seat — both true, different questions.',
               },
               source: { type: ['string', 'null'], description: 'Which dataset named this institution.' },
-              as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed.' },
+              as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed. This dates the IMPORT, which for one source is not the date of the data — see source_as_of.' },
+              source_as_of: {
+                type: 'string',
+                description:
+                  "Year-month the source DATA is from, present ONLY when it differs from as_of. The redistributed SWIFT directory behind part of this reference set is a public repository whose publisher stopped updating it, so as_of alone would present an old bank name as last month's. Absent means no gap has been established between import and content, never 'this is current'.",
+              },
               basis: {
                 type: 'string',
                 enum: ['national_register', 'curated_map', 'directory_prefix'],

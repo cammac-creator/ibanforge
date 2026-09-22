@@ -57,12 +57,20 @@ const pkg = require('../package.json') as { version: string };
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const API_KEY = process.env.IBANFORGE_API_KEY;
 
-// Mirrors src/lib/audit-file.ts AUDIT_MAX_BYTES (10 MB since 22/09/2026, so a
-// file of 20,000 rows — the volume the large tier is sold at — actually fits).
-// This package cannot import from src/ (it is published separately), so the
-// limit is copied; scripts/mcp-parity.test.ts checks the two stay equal, same
-// pattern as FEEDBACK_ERROR_TYPES below.
-const AUDIT_MAX_BYTES = 10 * 1024 * 1024;
+// 🚨 DELIBERATELY LOWER than the route's AUDIT_MAX_BYTES (10 MB since
+// 22/09/2026), and this is the one place in the package where a copied number
+// is allowed to differ. `file_base64` travels as a JSON-RPC message over
+// stdio, so a 10 MB file is ~13.4 MB on the wire. Measured 22/09/2026 against
+// the built server: 5 MB goes through, 8 MB and above kill the transport
+// ("MCP error -32000: Connection closed") — the agent loses its connection
+// instead of getting an answer. Refusing at a threshold the channel can
+// actually carry is the whole reason this guard exists: a clean
+// `file_too_large` beats a dead pipe.
+//
+// Bigger files go through the HTTP route, which has no such ceiling.
+// scripts/mcp-parity.test.ts enforces `mcp <= route`, so this can never drift
+// ABOVE the route (which would refuse nothing) — only stay at or below it.
+const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
 
 // Same hints as the remote server (src/routes/mcp-http.ts): the five DATA tools
 // are pure reads against our own API. Without readOnlyHint, MCP clients ask the
@@ -738,7 +746,7 @@ const TOOLS: Tool[] = [
       'Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN structure and checksum, bank code against the national register, bank name and BIC, SEPA reachability and issuer type — plus checks a single IBAN call cannot make because they need the whole file: duplicate IBANs, the BIC the file carries against the BIC the register derives, address country against IBAN country, and Swiss structured-address conformity ahead of the 14 November 2026 deadline. ' +
       'USE WHEN: the user has a spreadsheet or export of creditor/supplier bank accounts (accounts-payable file, vendor master, payment batch) and wants it checked before sending payments, or asks to "audit my creditor file" / "check this supplier list" / "validate this payment batch". ' +
       'HOW: base64-encode the file bytes and pass them as `file_base64`, with the original `filename` (its extension decides CSV vs XLSX parsing). ' +
-      `LIMITS: rejects files decoding to more than ${AUDIT_MAX_BYTES / 1024 / 1024} MB — checked locally, before any network call — and sheets over 20,000 rows, which the route itself rejects (400 too_many_rows). ` +
+      `LIMITS: rejects files decoding to more than ${AUDIT_MAX_BYTES / 1024 / 1024} MB — checked locally, before any network call, because a larger base64 payload breaks the stdio channel; the HTTP route itself accepts up to 10 MB — and sheets over 20,000 rows, which the route rejects (400 too_many_rows). ` +
       'RETURNS a FREE PREVIEW ONLY, never the full report: `job` (the id to reuse with audit_status), `rows`, `paid` (always false from this call), `price` / `currency` naming what the full report costs, `summary` (counts by status and finding code, countries seen, columns detected), and `preview` (the first flagged rows then the first OK ones, up to 20, IBANs masked like "CH10 **** 2346"). ' +
       'The annotated .xlsx report is a PAID deliverable — $149 up to 5,000 rows, $349 up to 20,000 — settled through a one-off Stripe Checkout Session. This tool NEVER pays automatically: pass `checkout: true` to also receive a Checkout URL for a HUMAN to open, then poll audit_status with the same `job` id to learn when it is paid and get the download link. ' +
       'COST: free. Only the full report is paid, and only once a human completes the Stripe checkout.',
