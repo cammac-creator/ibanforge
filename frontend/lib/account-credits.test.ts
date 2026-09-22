@@ -100,7 +100,9 @@ describe('une clé à quota mensuel', () => {
   });
 
   it('reste mensuelle sans basis servi du tout', () => {
-    const { basis: _basis, ...older } = MONTHLY_KEY;
+    // Le champ est arrivé après la page : une réponse plus ancienne n'en a pas.
+    const older: AccountUsage = { ...MONTHLY_KEY };
+    delete older.basis;
     expect(readBalance(older).kind).toBe('quota');
   });
 

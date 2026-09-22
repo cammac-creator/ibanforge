@@ -508,8 +508,8 @@ export function AccountApp({ locale }: { locale: string }) {
             <h2 className="mb-3 font-heading text-lg font-semibold">{t("windowTitle")}</h2>
             <Days days={d.report.days} span={d.report.window_days} />
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Stat label={t("served")} value={d.report.ok.toLocaleString()} />
-              <Stat label={t("failed")} value={d.report.failed.toLocaleString()} />
+              <Stat label={t("served")} value={formatGrouped(d.report.ok, locale)} />
+              <Stat label={t("failed")} value={formatGrouped(d.report.failed, locale)} />
             </div>
           </section>
 
@@ -520,7 +520,7 @@ export function AccountApp({ locale }: { locale: string }) {
                 {d.report.endpoints.map((e) => (
                   <li key={e.path} className="flex items-baseline justify-between gap-4 text-sm">
                     <span className="min-w-0 truncate font-mono text-muted-foreground">{e.path}</span>
-                    <span className="font-mono tabular-nums">{e.count.toLocaleString()}</span>
+                    <span className="font-mono tabular-nums">{formatGrouped(e.count, locale)}</span>
                   </li>
                 ))}
               </ul>
@@ -538,7 +538,7 @@ export function AccountApp({ locale }: { locale: string }) {
                     <div className="flex flex-wrap items-baseline gap-x-3 text-sm">
                       <span className="font-mono font-semibold">{e.status}</span>
                       <span className="min-w-0 truncate font-mono text-muted-foreground">{e.path}</span>
-                      <span className="ml-auto font-mono tabular-nums">{e.count.toLocaleString()}</span>
+                      <span className="ml-auto font-mono tabular-nums">{formatGrouped(e.count, locale)}</span>
                     </div>
                     <p className="mt-1 text-sm">{e.meaning}</p>
                     {e.fix && <p className="mt-0.5 text-sm text-muted-foreground">{e.fix}</p>}
