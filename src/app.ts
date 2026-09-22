@@ -408,7 +408,7 @@ Response (real API output, trimmed to the fields agents typically need):
   "iban": "CH1000230000000012345",
   "valid": true,
   "country": { "code": "CH", "name": "Switzerland" },
-  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zürich" },
+  "bic": { "code": "UBSWCHZH80A", "bic8": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zürich", "basis": "national_register", "authoritative": true },
   "issuer": { "type": "bank", "name": "UBS Switzerland AG", "classification": "default" },
   "sepa": { "member": true, "schemes": ["SCT","SDD"], "vop_required": false },
   "clearing": { "iid": "00230", "name": "UBS Switzerland AG", "type": "bank", "town": "Zürich", "sic": true, "instant_payments_chf": true, "eurosic": true, "qr_iid": null },

@@ -116,7 +116,7 @@ export const BIC_BASIS_SCHEMA = z
   .optional()
   .describe(
     'Where the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-      'national_register (the country register publishes this BIC for this bank code — today DE, AT, BE, BG, SK and SM; settlement-grade) | ' +
+      'national_register (the country register publishes this BIC for this bank code — today CH, LI, DE, AT, BE, LU, BG, SK and SM; settlement-grade) | ' +
       'curated_map (our maintained bank-code map, exact key, usually right and not an allocation record) | ' +
       'directory_prefix (the bic8 LIKE fallback, which can match several institutions — read bank_code_check.candidates). ' +
       'Outside a national_register basis the BIC is ADVISORY: confirm it with the beneficiary or the bank before storing it as a routing instruction.',
@@ -127,7 +127,7 @@ export const BIC_AUTHORITATIVE_SCHEMA = z
   .optional()
   .describe(
     'Whether this BIC may be stored and settled against. Derived from basis, so the two cannot disagree. ' +
-      'NOT bank_code_check.authoritative, which answers a different question — whether a national register was consulted about the BANK CODE. In Switzerland the register confirms the code while the BIC still comes from our curated map.',
+      'NOT bank_code_check.authoritative, which answers a different question — whether a national register was consulted about the BANK CODE. San Marino is where the two part: the pairing is the supervisor’s, the code space is not its to settle.',
   );
 
 // Ces blocs nomment les champs réellement renvoyés par enrichResult. Le client
@@ -170,6 +170,20 @@ const REGISTERED_ADDRESS_SCHEMA = z.object({
 const ENRICHED_BIC_SCHEMA = z
   .object({
     code: z.string(),
+    bic8: z
+      .string()
+      .optional()
+      .describe(
+        'The eight characters of the institution — the field to compare a supplied BIC against. ' +
+          'code is served as the consulted source publishes it, so it is 8 or 11 characters; this one never moves. ' +
+          'The branch code (last three characters) is informational: in a cooperative network it names the LOCAL bank and the first eight its clearing institution.',
+      ),
+    redirected_from: z
+      .string()
+      .optional()
+      .describe(
+        'The bank code asked about, when the register answered for the one that took over its clearing (CH/LI only today: SIX marks an IID concatenated and publishes its successor). The IBAN stays valid — a redirect is not a retirement.',
+      ),
     bank_name: z.string().nullable(),
     city: z.string().nullable(),
     basis: BIC_BASIS_SCHEMA,

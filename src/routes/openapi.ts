@@ -2121,7 +2121,24 @@ const buildRawSpec = () => ({
           bic: {
             type: ['object', 'null'],
             properties: {
-              code: { type: 'string', example: 'NWBKGB2L' },
+              code: {
+                type: 'string',
+                example: 'UBSWCHZH56B',
+                description:
+                  'The BIC as the consulted source publishes it: 8 or 11 characters. Do NOT compare a supplied BIC against this field — compare on bic8 and read the branch code separately.',
+              },
+              bic8: {
+                type: 'string',
+                example: 'UBSWCHZH',
+                description:
+                  'The eight characters of the institution, and the field to compare a supplied BIC against. The branch code (the last three characters of `code`) is informational: in a cooperative network it names the LOCAL bank while the first eight name its clearing institution, so an equality test on the full code turns a correct BIC into a mismatch.',
+              },
+              redirected_from: {
+                type: 'string',
+                example: '04835',
+                description:
+                  'The bank code you asked about, when the register answered for the one that took over its clearing. CH and LI only today: SIX marks an IID concatenated and publishes its successor. The IBAN stays valid and the account payable — a redirect is not a retirement.',
+              },
               bank_name: { type: ['string', 'null'] },
               city: {
                 type: ['string', 'null'],
@@ -2135,7 +2152,7 @@ const buildRawSpec = () => ({
                 enum: ['national_register', 'curated_map', 'directory_prefix'],
                 description:
                   'WHERE the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-                  'national_register: the country\'s own register publishes this BIC for this bank code — today Germany, Austria, Belgium and Bulgaria; the German Bankleitzahlendatei carries the exact 11-character BIC per BLZ. ' +
+                  'national_register: the country\'s own register publishes this BIC for this bank code — today Switzerland, Liechtenstein, Germany, Austria, Belgium, Luxembourg, Bulgaria, Slovakia and San Marino; the SIX BankMaster carries the exact 11-character BIC per IID and the German Bankleitzahlendatei per BLZ. ' +
                   'curated_map: our maintained bank-code map made the pairing on an exact key. Usually right, and not an allocation record. ' +
                   'directory_prefix: the bic8 LIKE fallback, which can match several institutions at once — read bank_code_check.candidates. ' +
                   'Answers the settlement question directly: only national_register is settlement-grade, so outside those registers a derived BIC is advisory and should be confirmed with the beneficiary or your bank before it becomes a stored routing instruction.',
@@ -2144,7 +2161,7 @@ const buildRawSpec = () => ({
                 type: 'boolean',
                 description:
                   'Whether this BIC may be stored and settled against. Derived from `basis` by a single table, so the two cannot disagree. ' +
-                  'NOT the same claim as bank_code_check.authoritative, which is about the BANK CODE — whether a national register was consulted about its existence. Switzerland is where they visibly differ: the SIX BankMaster answers authoritatively that an IID is allocated, while the BIC beside it still comes from our curated map.',
+                  'NOT the same claim as bank_code_check.authoritative, which is about the BANK CODE — whether a national register was consulted about its existence. San Marino is where they part: the pairing is the supervisor\'s, while the code space is not its to settle.',
               },
               lei: {
                 type: ['string', 'null'],
@@ -2176,6 +2193,11 @@ const buildRawSpec = () => ({
                   as_of: { type: ['string', 'null'], example: '2026-02-24' },
                 },
               },
+              // Served by this endpoint since the ISO 20022 work of 2026-08 and
+              // declared only on /v1/bic/{code} until now: the same block, from
+              // the same builder, was invisible here to anyone coding against
+              // the contract.
+              postal_address: POSTAL_ADDRESS_SCHEMA,
             },
             required: ['code', 'bank_name', 'city'],
           },
