@@ -56,6 +56,10 @@ function apiBlock(answer: Json): Json {
     country: answer.country ?? null,
     bic: pick(answer.bic as Json, [
       'code',
+      // `code` is 8 or 11 characters, as the consulted source publishes it, so
+      // the page has to show the field a reader is told to compare against.
+      'bic8',
+      'redirected_from',
       'bank_name',
       'city',
       'source',

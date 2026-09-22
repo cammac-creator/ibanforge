@@ -117,6 +117,10 @@ function apiBlock(answer: Json): Json {
     valid: answer.valid,
     bic: pick(answer.bic as Json, [
       'code',
+      // Same reason as the country pages: `code` is 8 or 11 characters, and
+      // `bic8` is the field a reader compares a supplied BIC against.
+      'bic8',
+      'redirected_from',
       'bank_name',
       'city',
       'source',
