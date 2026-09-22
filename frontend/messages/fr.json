@@ -1964,8 +1964,8 @@
       "eyebrow": "Éditeur / OEM",
       "title": "Besoin d’engagements particuliers ?",
       "price": "À partir de 149 $ par mois",
-      "priceDetail": "Une clé à 50 000 requêtes par mois, droits de redistribution, SLA écrit (99,5 %), facturation UE, un contact de support nommé. Au-delà de 50 000 requêtes par mois, une conversation fixe le prix de volume.",
-      "body": "Une intégration ordinaire de l’API peut démarrer avec Pro. Échangeons sur l’OEM si vous avez besoin de droits de redistribution, d’un SLA écrit, de support adapté ou de volumes au-delà des offres publiées.",
+      "priceDetail": "Une clé à 50 000 requêtes par mois, le droit d’intégrer l’API dans votre produit pour vos clients finaux, SLA écrit (99,5 %), facturation UE, un contact de support nommé. Au-delà de 50 000 requêtes par mois, une conversation fixe le prix de volume. La revente d’extraits bruts des bases reste exclue (conditions d’utilisation, article 6).",
+      "body": "Une intégration ordinaire de l’API peut démarrer avec Pro. Échangeons sur l’OEM si vous avez besoin d’intégrer l’API dans votre produit pour vos clients finaux, d’un SLA écrit, de support adapté ou de volumes au-delà des offres publiées.",
       "cta": "support@ibanforge.com",
       "hint": "Décrivez votre produit et les engagements attendus. Pro, à 29 $ par mois pour 10 000 requêtes, se prend directement sur la page des tarifs.",
       "slaLink": "Lire le SLA"

@@ -1964,8 +1964,8 @@
       "eyebrow": "Editor / OEM",
       "title": "Need specific service commitments?",
       "price": "From $149 per month",
-      "priceDetail": "One key at 50,000 requests per month, redistribution rights, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price.",
-      "body": "Ordinary API integration can start on Pro. Discuss OEM if you need redistribution rights, a written SLA, tailored support or volumes beyond the published plans.",
+      "priceDetail": "One key at 50,000 requests per month, the right to embed the API in your own product for your end customers, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price. Reselling raw bulk extracts of the databases stays out of scope (Terms, article 6).",
+      "body": "Ordinary API integration can start on Pro. Discuss OEM if you need to embed the API in your product for your end customers, a written SLA, tailored support or volumes beyond the published plans.",
       "cta": "support@ibanforge.com",
       "hint": "Describe your product and the commitments you need. Pro, at $29 per month for 10,000 requests, is available directly from the pricing page.",
       "slaLink": "Read the SLA"

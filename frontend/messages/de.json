@@ -1964,8 +1964,8 @@
       "eyebrow": "Editor / OEM",
       "title": "Brauchen Sie besondere Leistungszusagen?",
       "price": "Ab 149 $ pro Monat",
-      "priceDetail": "Ein Schlüssel mit 50'000 Anfragen pro Monat, Weitervertriebsrechte, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50'000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest.",
-      "body": "Eine gewöhnliche API-Integration kann mit Pro starten. Besprechen Sie OEM mit uns, wenn Sie Weiterverteilungsrechte, ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
+      "priceDetail": "Ein Schlüssel mit 50'000 Anfragen pro Monat, das Recht, die API für Ihre Endkunden in Ihr eigenes Produkt einzubetten, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50'000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest. Der Weiterverkauf von Rohdatenauszügen der Datenbanken bleibt ausgeschlossen (AGB, Artikel 6).",
+      "body": "Eine gewöhnliche API-Integration kann mit Pro starten. Besprechen Sie OEM mit uns, wenn Sie die API für Ihre Endkunden in Ihr Produkt einbetten möchten, ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
       "cta": "support@ibanforge.com",
       "hint": "Beschreiben Sie Ihr Produkt und die benötigten Zusagen. Pro für 29 $ pro Monat mit 10.000 Anfragen ist direkt auf der Preisseite erhältlich.",
       "slaLink": "SLA lesen"
