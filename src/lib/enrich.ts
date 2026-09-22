@@ -857,6 +857,55 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
     }
   }
 
+  // Switzerland and Liechtenstein: the SIX BankMaster carries the exact
+  // 11-character BIC per IID, so serve it over the curated map for the same
+  // reason Germany serves the Bundesbank's. The reason is sharper here.
+  //
+  // In the Swiss cooperative networks the three branch characters name a
+  // DIFFERENT legal entity from the eight before them, and the eight name that
+  // entity's clearing institution. IID 30020 is Crédit Mutuel de la Vallée SA,
+  // BIC RBABCH22180, while RBABCH22 alone is Entris Banking AG — two banks, two
+  // LEIs, and truncating to eight served the central institution under the local
+  // bank's name. That is the failure a German integrator already measured one
+  // country over on Sparkassen BIC8s, and it is why this block exists.
+  //
+  // It also settles the IIDs SIX redirects (`concatenation = 1`): 04835, the
+  // former Credit Suisse, points at UBS's 00230, and `bank_code_check` already
+  // answered "UBS Switzerland AG" while the `bic` beside it still read CRESCHZZ
+  // — one response naming two banks for one account. `redirected_from` keeps the
+  // IID the caller asked about visible rather than swapping the answer in
+  // silence.
+  //
+  // NOT marked retired, deliberately: SIX redirects the CLEARING, it does not
+  // withdraw the IBANs. The accounts are live and payable, so the settlement
+  // licence stands — unlike a Bundesbank BLZ the register is withdrawing.
+  //
+  // The curated map stays as the fallback for the IIDs BankMaster publishes
+  // without a BIC, exactly as it does for the German BLZ without one.
+  if (cc === 'CH' || cc === 'LI') {
+    try {
+      const reg = lookupClearingByBankCode(bankCode);
+      if (reg?.bic) {
+        bic = {
+          code: reg.bic,
+          bank_name: reg.name,
+          city: reg.address.town,
+          source: NATIONAL_REGISTERS[cc],
+          as_of: getReferenceAsOf() || null,
+          // The one basis that licenses settling against the BIC: BankMaster
+          // publishes it per IID, so this pairing is the register's, not ours.
+          ...bicProvenance('national_register'),
+          ...(reg.redirected_from ? { redirected_from: reg.redirected_from } : {}),
+        };
+      }
+    } catch {
+      // Same failure discipline as the register blocks around this one: a
+      // Switzerland that cannot read BankMaster has no opinion and must not
+      // manufacture one out of the composite map.
+      lookupFailed = true;
+    }
+  }
+
   // Austria, Belgium and Slovakia: the same rule as Germany, one register over.
   // All three tables carry a BIC per bank code. For AT and BE it was read only
   // for the bank-code verdict until 29/08/2026, while the served BIC still came
@@ -1017,6 +1066,17 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       }
     }
   }
+
+  // The institution's eight characters, beside whatever `code` ended up being.
+  //
+  // One assignment for every country, deliberately: `code` is now 8 or 11
+  // depending on what the consulted source publishes, and a caller comparing a
+  // BIC it was given by a beneficiary needs ONE field whose length never moves.
+  // The three branch characters are informative and must not be compared blind —
+  // in a cooperative network they name the local bank while the first eight name
+  // its clearing institution, so an equality test on the full code turns a
+  // correct BIC into a mismatch and a mismatch into a false match.
+  if (bic?.code) bic.bic8 = bic.code.slice(0, 8);
 
   return { hit, lookupFailed, bic };
 }
