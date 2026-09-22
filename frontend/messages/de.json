@@ -258,7 +258,7 @@
       "line2": "Der EPC hat seine Frist vom 15. November am 9. September 2026 verschoben; ein neues Datum soll im Oktober festgelegt werden.",
       "line3": "Auch Swift hat seine Frist am 27. August 2026 verschoben. SIX veröffentlicht den Schweizer Zeitplan weiterhin separat.",
       "window": "Ende November 2026",
-      "windowLabel": "Schweizer Stichtag für strukturierte Adressen"
+      "windowLabel": "strukturierte Adressen · Schweizer Zeitplan"
     },
     "integrations": {
       "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",

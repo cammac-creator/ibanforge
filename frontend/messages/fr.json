@@ -258,7 +258,7 @@
       "line2": "L’EPC a reporté son échéance du 15 novembre le 9 septembre 2026 ; une nouvelle date doit être fixée en octobre.",
       "line3": "Swift a aussi reporté son échéance le 27 août 2026. Le calendrier suisse reste publié séparément par SIX.",
       "window": "fin novembre 2026",
-      "windowLabel": "échéance suisse des adresses structurées"
+      "windowLabel": "adresses structurées · calendrier suisse"
     },
     "integrations": {
       "heading": "Dans votre langage, votre ERP, votre tableur",
