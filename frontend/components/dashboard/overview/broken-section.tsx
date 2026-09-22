@@ -54,12 +54,20 @@ export async function BrokenSection({
   const refusals = refusalPaths(rows);
   const sources = healthRes.data?.bic_sources ?? [];
   const stale = sources.filter((s) => s.stale);
+  // Ce qui compte pour la bande « qu'est-ce qui est cassé » : ce qu'un geste
+  // peut réparer. Un amont figé (le répertoire SWIFT redistribué, dont
+  // l'éditeur ne publie plus) est vieux pour toujours — le compter ici mettrait
+  // le tableau de bord en alerte permanente, et une alerte permanente ne se lit
+  // plus. Il reste affiché avec ses deux dates dans la boucle « fraîcheur »,
+  // juste en dessous. Un `stale_reason` absent (API antérieure au 22/09/2026)
+  // garde l'ancien comportement.
+  const broken = stale.filter((s) => s.stale_reason !== 'source_frozen');
 
   // Each failed reader makes the verdict unknowable rather than green.
   const unreadable = [statusRes, errorsRes, healthRes].filter((r) => !r.ok).length;
   const level = brokenLevel({
     serverErrors: fiveXX.length,
-    staleSources: stale.length,
+    staleSources: broken.length,
     unreadable,
   });
 

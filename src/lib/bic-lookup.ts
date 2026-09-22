@@ -9,6 +9,7 @@ import { hasNonLatinScript } from './gleif-address.js';
 import { allocatedCodes, nationalRegisterAvailable, normaliseCode } from './national-registers.js';
 import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
+import { sourceVintage } from './source-vintage.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -277,6 +278,13 @@ export interface BankLookupHit {
   source: string | null;
   /** Year-month that dataset was last refreshed. */
   as_of: string | null;
+  /**
+   * Year-month the dataset's CONTENT is from, when that differs from `as_of`.
+   * Present only for a source whose refresh re-imports a frozen file — today
+   * the redistributed SWIFT directory, whose upstream stopped publishing in
+   * 2019. Absent means nobody has established a gap, never "it is current".
+   */
+  source_as_of?: string;
 }
 
 /**
@@ -492,9 +500,22 @@ export function getLastUpdated(): string | null {
 export interface SourceFreshness {
   source: string;
   entries: number;
+  /** When the row was IMPORTED. Not the same question as `source_as_of`. */
   last_updated: string | null;
-  /** True once this source's newest row is older than the refresh cadence allows. */
+  /**
+   * When the upstream DATA is from, where that differs from the import date.
+   * Null means nobody has established a gap — an absence of evidence, not a
+   * certificate of freshness. See ./source-vintage.ts.
+   */
+  source_as_of: string | null;
+  /**
+   * True when what this source SERVES is out of date — whether because the
+   * refresh stopped running, or because the refresh keeps re-importing a file
+   * the publisher froze years ago. Both leave a customer holding 2018 data;
+   * `stale_reason` is what tells the two apart.
+   */
   stale: boolean;
+  stale_reason: 'import_overdue' | 'source_frozen' | null;
 }
 
 /**
@@ -537,21 +558,51 @@ export function getSourceFreshness(): SourceFreshness[] {
       .all()
       .map((r) => {
         const row = r as { source: string; entries: number; last_updated: string | null };
+        const vintage = sourceVintage(row.source);
         return {
           source: row.source,
           entries: row.entries,
           last_updated: row.last_updated,
+          source_as_of: vintage?.as_of ?? null,
+          // 🚨 `vintage.note` — the paragraph saying what was read at the
+          // publisher and when — deliberately does NOT travel here. /health is
+          // polled by Railway every 30 s and by the public site; adding prose
+          // to it pushed the payload past `compress()`'s 1 024-byte threshold
+          // and started gzipping a healthcheck (caught by
+          // middleware/compress-threshold.test.ts on 22/09/2026). The reason
+          // fits in `stale_reason`; the evidence lives in lib/source-vintage.ts
+          // and docs/data-sources.md, where someone can act on it.
           stale: false,
+          stale_reason: null,
         };
       });
   }
   const cutoff = Date.now() - SOURCE_STALE_DAYS * 86_400_000;
-  return sourceFreshnessCache.map((s) => ({
-    ...s,
+  const vintageCutoff = new Date(Date.now() - SOURCE_STALE_DAYS * 86_400_000)
+    .toISOString()
+    .slice(0, 7);
+  return sourceFreshnessCache.map((s) => {
     // A source with no readable date cannot prove freshness: stale, not benefit
     // of the doubt — the flag exists to be seen, and "unknown" ages too.
-    stale: s.last_updated === null || new Date(s.last_updated + 'Z').getTime() < cutoff,
-  }));
+    const importOverdue =
+      s.last_updated === null || new Date(s.last_updated + 'Z').getTime() < cutoff;
+    // 🚨 And a refresh that RAN does not make the data current. `swiftcodes`
+    // re-clones a repository frozen in 2019 every month, so its import date
+    // marched forward while two thirds of the directory stayed in 2018 —
+    // /health answered stale:false about data eight years old. A flag that
+    // reports the machinery instead of the goods is worse than none: it is the
+    // one an alert trusts.
+    const sourceFrozen = s.source_as_of !== null && s.source_as_of < vintageCutoff;
+    return {
+      ...s,
+      stale: importOverdue || sourceFrozen,
+      // The import failing is the one a human has to fix; a frozen upstream is
+      // a property of the source and no amount of re-running changes it. Named
+      // separately so an alert can act on the first and a reader can weigh the
+      // second.
+      stale_reason: importOverdue ? 'import_overdue' : sourceFrozen ? 'source_frozen' : null,
+    };
+  });
 }
 
 /**
@@ -677,6 +728,10 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
     // out of it, with no curated pairing involved.
     source: sourceName(row.source),
     as_of: (row.updated_at ?? '').slice(0, 7) || null,
+    // And here the import date can lie. A `swiftcodes` row is stamped with the
+    // month it was cloned, not the month its content describes; a caller
+    // weighing this BIC deserves the second date beside the first.
+    ...(sourceVintage(row.source) ? { source_as_of: sourceVintage(row.source)!.as_of } : {}),
   };
 }
 

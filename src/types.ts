@@ -419,6 +419,19 @@ export interface IBANValidationResult {
     /** Year-month that dataset was last refreshed. Null rather than invented. */
     as_of?: string | null;
     /**
+     * Year-month the dataset's CONTENT is from, present only when it differs
+     * from `as_of`.
+     *
+     * `as_of` dates the IMPORT, and for most sources that is also the data: the
+     * monthly workflow downloads the publisher's current file. The
+     * redistributed SWIFT directory is the exception, and the large one — the
+     * refresh re-clones a repository whose last publication is dated 2019 and
+     * whose data directory was last updated in January 2018, so `as_of` alone
+     * presents an eight-year-old bank name as last month's. Absent means no gap
+     * has been established, never "this is current". See lib/source-vintage.ts.
+     */
+    source_as_of?: string;
+    /**
      * Legal Entity Identifier of the resolved institution, and whether GLEIF
      * still considers it active.
      *

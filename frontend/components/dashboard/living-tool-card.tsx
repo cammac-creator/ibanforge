@@ -77,8 +77,16 @@ export interface FeedbackReport {
 export interface SourceFreshnessEntry {
   source: string;
   entries: number;
+  /** Quand la ligne a été IMPORTÉE. */
   last_updated: string | null;
+  /** D'où DATE la donnée en amont, quand ce n'est pas la date d'import. */
+  source_as_of?: string | null;
   stale: boolean;
+  /**
+   * Pourquoi. Optionnel : une API antérieure au 22/09/2026 ne sert pas ce
+   * champ, et la carte ne doit pas inventer une cause qu'elle n'a pas lue.
+   */
+  stale_reason?: 'import_overdue' | 'source_frozen' | null;
 }
 
 export type LivingLoop = 'demand' | 'feedback' | 'freshness';
@@ -253,12 +261,28 @@ export function LivingToolCard({
             </p>
           ) : (
             <ul className="mt-1.5 flex flex-col gap-0.5 text-[12px]">
-              {staleSources.map((s) => (
-                <li key={s.source} className="text-red-400">
-                  ⚠ <b>{s.source}</b> n’a pas été rafraîchie depuis{' '}
-                  {(s.last_updated ?? 'jamais').slice(0, 10)}
-                </li>
-              ))}
+              {/*
+                🚨 Deux pannes différentes, deux phrases différentes. « Pas
+                rafraîchie » est faux pour une source dont le rafraîchissement
+                tourne très bien et re-télécharge chaque mois un fichier que
+                l’éditeur a figé : là, c’est la SOURCE qui est morte, et
+                relancer le cron n’y changera rien. Les dire pareil enverrait
+                chercher la panne au mauvais endroit.
+              */}
+              {staleSources.map((s) =>
+                s.stale_reason === 'source_frozen' ? (
+                  <li key={s.source} className="text-amber-400">
+                    ⏳ <b>{s.source}</b> : importée le{' '}
+                    {(s.last_updated ?? '—').slice(0, 10)}, mais la donnée date de{' '}
+                    {s.source_as_of ?? '?'} — l’amont ne publie plus
+                  </li>
+                ) : (
+                  <li key={s.source} className="text-red-400">
+                    ⚠ <b>{s.source}</b> n’a pas été rafraîchie depuis{' '}
+                    {(s.last_updated ?? 'jamais').slice(0, 10)}
+                  </li>
+                ),
+              )}
               <li className="text-[11px] text-[var(--fg-4)]">
                 {sources.length - staleSources.length} autres sources fraîches
               </li>

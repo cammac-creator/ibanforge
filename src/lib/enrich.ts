@@ -849,6 +849,9 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
         city: hit.city,
         source: hit.source,
         as_of: hit.as_of,
+        // The second date, when the first one lies: a directory row whose
+        // upstream froze years ago is stamped with the month it was cloned.
+        ...(hit.source_as_of ? { source_as_of: hit.source_as_of } : {}),
         // `source` names the dataset; `basis` says what KIND of source it is,
         // which is the half a payment engine can branch on. The prefix fallback
         // and an exact curated key are both advisory, and they are advisory for
