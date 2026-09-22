@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { localePath } from "@/lib/locale-path";
+import { formatGrouped } from "@/lib/format-grouped";
+import { readBalance, type AccountUsage } from "@/lib/account-credits";
 
 /**
  * The customer's own view of their key.
@@ -42,7 +44,9 @@ interface Report {
 
 interface Payload {
   key_prefix: string;
-  usage: { used: number; limit: number; remaining: number; month: string };
+  // Le bloc complet servi par /v1/keys/report, `basis` et solde de crédits
+  // compris. Ce qu'il faut en lire est décidé dans lib/account-credits.
+  usage: AccountUsage;
   report: Report;
 }
 
@@ -417,6 +421,9 @@ export function AccountApp({ locale }: { locale: string }) {
   }
 
   const d = state.kind === "ready" ? state.data : null;
+  // Ce que la clé peut encore dépenser, et contre quoi. Le calcul est hors du
+  // composant pour être testable sans DOM (lib/account-credits.test.ts).
+  const balance = d ? readBalance(d.usage) : null;
 
   return (
     <div className="space-y-8">
@@ -454,7 +461,7 @@ export function AccountApp({ locale }: { locale: string }) {
         <p className="rounded-md border px-4 py-3 text-sm text-muted-foreground">{t("unreachable")}</p>
       )}
 
-      {d && (
+      {d && balance && (
         <div className="space-y-8">
           {/* Nothing was ever called with this key: the report below has no past
               to show, so the first call comes first (BIZ-09). Both counters are
@@ -462,21 +469,47 @@ export function AccountApp({ locale }: { locale: string }) {
               not this one has a history worth reading and is not a new buyer. */}
           {d.usage.used === 0 && d.report.total === 0 && <FirstCall apiKey={key.trim()} />}
 
+          {/* 🚨 La deuxième tuile annonçait à TOUT LE MONDE un reste mensuel.
+              Pour une clé adossée à un lot de crédits, ce reste est calculé
+              contre le plafond du palier gratuit — que cette clé ne porte pas,
+              son `monthly_limit` étant vide — et rien ne lui est opposé : un
+              acheteur de 25 000 crédits y lisait un nombre à trois chiffres au
+              lieu de son solde. C'est la seule page où revient quelqu'un qui a
+              déjà payé ; elle montre maintenant le chiffre qui le concerne. */}
           <section>
             <h2 className="mb-3 font-heading text-lg font-semibold">{t("quotaTitle")}</h2>
             <div className="grid gap-3 sm:grid-cols-3">
-              <Stat label={t("used")} value={d.usage.used.toLocaleString()} hint={d.usage.month} />
-              <Stat label={t("remaining")} value={Math.max(0, d.usage.remaining).toLocaleString()} />
+              <Stat label={t("used")} value={formatGrouped(balance.used, locale)} hint={d.usage.month} />
+              {balance.kind === "credits" ? (
+                <Stat
+                  label={t("credits")}
+                  value={
+                    balance.creditsRemaining === null ? "—" : formatGrouped(balance.creditsRemaining, locale)
+                  }
+                  hint={
+                    balance.creditsTotal === null
+                      ? undefined
+                      : t("creditsOf", { total: formatGrouped(balance.creditsTotal, locale) })
+                  }
+                />
+              ) : (
+                <Stat label={t("remaining")} value={formatGrouped(balance.remaining, locale)} />
+              )}
               <Stat label={t("avgMs")} value={d.report.avg_ms == null ? "—" : `${d.report.avg_ms} ms`} />
             </div>
+            {balance.kind === "credits" && (
+              // La note que l'API sert avec le solde, dans la langue du lecteur :
+              // la sienne est en anglais, et cette page est trilingue.
+              <p className="mt-3 text-sm text-muted-foreground">{t("creditsNote")}</p>
+            )}
           </section>
 
           <section>
             <h2 className="mb-3 font-heading text-lg font-semibold">{t("windowTitle")}</h2>
             <Days days={d.report.days} span={d.report.window_days} />
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Stat label={t("served")} value={d.report.ok.toLocaleString()} />
-              <Stat label={t("failed")} value={d.report.failed.toLocaleString()} />
+              <Stat label={t("served")} value={formatGrouped(d.report.ok, locale)} />
+              <Stat label={t("failed")} value={formatGrouped(d.report.failed, locale)} />
             </div>
           </section>
 
@@ -487,7 +520,7 @@ export function AccountApp({ locale }: { locale: string }) {
                 {d.report.endpoints.map((e) => (
                   <li key={e.path} className="flex items-baseline justify-between gap-4 text-sm">
                     <span className="min-w-0 truncate font-mono text-muted-foreground">{e.path}</span>
-                    <span className="font-mono tabular-nums">{e.count.toLocaleString()}</span>
+                    <span className="font-mono tabular-nums">{formatGrouped(e.count, locale)}</span>
                   </li>
                 ))}
               </ul>
@@ -505,7 +538,7 @@ export function AccountApp({ locale }: { locale: string }) {
                     <div className="flex flex-wrap items-baseline gap-x-3 text-sm">
                       <span className="font-mono font-semibold">{e.status}</span>
                       <span className="min-w-0 truncate font-mono text-muted-foreground">{e.path}</span>
-                      <span className="ml-auto font-mono tabular-nums">{e.count.toLocaleString()}</span>
+                      <span className="ml-auto font-mono tabular-nums">{formatGrouped(e.count, locale)}</span>
                     </div>
                     <p className="mt-1 text-sm">{e.meaning}</p>
                     {e.fix && <p className="mt-0.5 text-sm text-muted-foreground">{e.fix}</p>}

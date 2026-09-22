@@ -2207,6 +2207,8 @@
     "used": "Verbrauchte Aufrufe",
     "remaining": "Verbleibend",
     "credits": "Verbleibende Credits",
+    "creditsOf": "von {total} gekauften",
+    "creditsNote": "Dieser Schlüssel nutzt ein im Voraus bezahltes Credit-Paket: Ein monatliches Kontingent gilt für ihn nicht. Die Aufrufe dieses Monats werden nur zur Information angezeigt; ablehnen kann einen Aufruf allein das Guthaben oben.",
     "windowTitle": "Letzte 30 Tage",
     "served": "Bedient",
     "failed": "Fehlgeschlagen",
