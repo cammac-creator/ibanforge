@@ -98,7 +98,11 @@ describe('POST /v1/iban/compliance', () => {
     // SCTs daily).
     const { body } = await check('LT353250012345678901');
     expect(body.valid).toBe(true);
-    expect((body.bic as { code: string }).code).toBe('REVOLT21');
+    // The curated key is written REVOLT21XXX and is now served as written; the
+    // EPC reachability lookup reads the institution's eight characters, which
+    // is why widening `code` changes nothing below.
+    expect((body.bic as { code: string; bic8: string }).code).toBe('REVOLT21XXX');
+    expect((body.bic as { code: string; bic8: string }).bic8).toBe('REVOLT21');
     const c = body.compliance as {
       reachability: { sct: boolean; sepa_instant: boolean; sdd: boolean };
       vop: { participant: boolean };

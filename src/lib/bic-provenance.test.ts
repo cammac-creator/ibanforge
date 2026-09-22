@@ -117,7 +117,8 @@ describe('Iceland names the code its verdict is really about', () => {
     const r = validateIBAN('IS280133260076543589621599');
     expect(r.valid).toBe(true);
     enrichResult(r);
-    expect(r.bic?.code).toBe('NBIIISRE');
+    expect(r.bic?.code).toBe('NBIIISREXXX');
+    expect(r.bic?.bic8).toBe('NBIIISRE');
     expect(r.bank_code_check?.value).toBe('01');
     expect(r.bank_code_check?.authoritative).toBe(false);
   });

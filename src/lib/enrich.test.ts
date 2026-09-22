@@ -8,6 +8,20 @@ describe('enrichResult', () => {
     const result = validateIBAN('CH5604835012345678009');
     enrichResult(result);
 
+    // The BIC is the SIX BankMaster's own, for the IID the register redirects
+    // this one to — and the response no longer names two banks for one account:
+    // bank_code_check already said "UBS Switzerland AG" while the BIC beside it
+    // still read CRESCHZZ.
+    expect(result.bic!.code).toBe('UBSWCHZH80A');
+    expect(result.bic!.bic8).toBe('UBSWCHZH');
+    expect(result.bic!.bank_name).toBe('UBS Switzerland AG');
+    expect(result.bic!.basis).toBe('national_register');
+    expect(result.bic!.authoritative).toBe(true);
+    // The IID that was asked about stays visible; a redirect is not a
+    // retirement, so nothing here withdraws the settlement licence.
+    expect(result.bic!.redirected_from).toBe('04835');
+    expect(result.bank_code_check!.retired).toBeUndefined();
+
     expect(result.sepa).toBeDefined();
     expect(result.sepa!.member).toBe(true);
     expect(result.sepa!.vop_required).toBe(false); // CH not EU
@@ -57,7 +71,8 @@ describe('enrichResult', () => {
       const result = validateIBAN('FR5211668000010000000010147');
       enrichResult(result);
 
-      expect(result.bic!.code).toBe('BERLMCMC');
+      expect(result.bic!.code).toBe('BERLMCMCXXX');
+      expect(result.bic!.bic8).toBe('BERLMCMC');
       expect(result.bic!.address!.country).toBe('MC');
     });
 
@@ -114,6 +129,149 @@ describe('enrichResult', () => {
         expect(result.bic?.lei ?? null).toBeNull();
         expect(result.bic?.address ?? null).toBeNull();
       }
+    });
+  });
+
+  /**
+   * The branch code is not decoration, and cutting it off named the wrong bank.
+   *
+   * Until 22/09/2026 every Swiss answer came from the curated map truncated to
+   * eight characters, and the three characters thrown away are the ones that
+   * identify the institution inside a cooperative network: IID 30020 is Crédit
+   * Mutuel de la Vallée SA (RBABCH22180) while RBABCH22 alone is Entris Banking
+   * AG, its clearing institution — a different legal entity with a different
+   * LEI. The SIX BankMaster publishes the exact 11-character BIC per IID, so it
+   * is read here the way the Bundesbank register is read for Germany.
+   *
+   * Every IBAN below is fabricated on a real, public bank code with a correct
+   * mod-97 check digit. None of them is an account.
+   */
+  describe('CH/LI — the BIC comes from the SIX register, branch code included', () => {
+    function enriched(iban: string) {
+      const r = validateIBAN(iban);
+      expect(r.valid, `${iban} must be mod-97 valid`).toBe(true);
+      enrichResult(r);
+      return r;
+    }
+
+    it('serves the register BIC11 for a branch IID, not its clearing institution', () => {
+      // IID 00258 is a UBS branch; the register writes UBSWCHZH56B.
+      const r = enriched('CH3600258000000000001');
+      expect(r.bic!.code).toBe('UBSWCHZH56B');
+      expect(r.bic!.bic8).toBe('UBSWCHZH');
+      expect(r.bic!.basis).toBe('national_register');
+      expect(r.bic!.authoritative).toBe(true);
+      expect(r.bic!.source).toContain('SIX');
+    });
+
+    it('serves the head-office IID under its own 11-character BIC', () => {
+      const r = enriched('CH0600230000000000001');
+      expect(r.bic!.code).toBe('UBSWCHZH80A');
+      expect(r.bic!.bic8).toBe('UBSWCHZH');
+      expect(r.bic!.basis).toBe('national_register');
+    });
+
+    it('names the local bank of a cooperative network, not its central institution', () => {
+      // This is the whole point: the first eight characters name Entris Banking
+      // AG, and the account is held by the bank the register names here.
+      const r = enriched('CH9430020000000000001');
+      expect(r.bic!.code).toBe('RBABCH22180');
+      expect(r.bic!.bic8).toBe('RBABCH22');
+      expect(r.bic!.bank_name).toBe('Crédit Mutuel de la Vallée SA');
+      expect(r.bic!.basis).toBe('national_register');
+    });
+
+    it('reaches an IID the curated map never carried', () => {
+      // 30010 is in BankMaster and absent from bic_data.json, so before the
+      // register was read for the BIC this IBAN answered bic: null.
+      const r = enriched('CH1430010000000000001');
+      expect(r.bic!.code).toBeTruthy();
+      expect(r.bic!.code!.length).toBe(11);
+      expect(r.bic!.basis).toBe('national_register');
+    });
+
+    it('declines rather than manufactures when the register publishes no BIC', () => {
+      // IID 08351 is allocated and carries no BIC in BankMaster, and the
+      // curated map holds no key for it. The honest pair is a verified bank
+      // code beside bic: null — never a BIC invented from the bank code.
+      const r = enriched('CH8108351000000000001');
+      expect(r.bic).toBeNull();
+      expect(r.bank_code_check!.status).toBe('verified');
+      expect(r.bank_code_check!.authoritative).toBe(true);
+    });
+
+    it('takes the postal address from the SIX seat of the branch, not of the head office', () => {
+      // The register publishes street and building number apart, per IID. The
+      // head office sits in Zürich; this row does not, and the ISO 20022 block
+      // must locate the institution the BIC names.
+      const r = enriched('CH3600258000000000001');
+      const postal = (r.bic as unknown as { postal_address?: { twn_nm: string; source: string } })
+        .postal_address;
+      expect(postal).toBeDefined();
+      expect(postal!.twn_nm).toBe('Wohlen AG 1');
+      expect(postal!.source).toContain('SIX');
+    });
+
+    it('covers Liechtenstein on the same register', () => {
+      const r = enriched('LI8008810000000000001');
+      expect(r.bic!.basis).toBe('national_register');
+      expect(r.bic!.bic8).toBe(r.bic!.code!.slice(0, 8));
+      expect(r.bic!.source).toContain('SIX');
+    });
+  });
+
+  /**
+   * `bic8` is served for every country and every basis, because it is the field
+   * a caller is told to compare a supplied BIC against. `code` is now 8 or 11
+   * characters depending on what the consulted source publishes, so a contract
+   * that only carried `code` forced the caller to slice it themselves — and the
+   * ones who did not sliced a mismatch out of a correct BIC.
+   */
+  describe('bic.bic8 — the one field whose length never moves', () => {
+    function bicOf(iban: string) {
+      const r = validateIBAN(iban);
+      expect(r.valid, `${iban} must be mod-97 valid`).toBe(true);
+      enrichResult(r);
+      return r.bic;
+    }
+
+    it('rides on a curated-map pairing that carries a real branch code (ES)', () => {
+      // ES 2045 is written CECAESMM045, Caja de Ahorros de Ontinyent. CECAESMM
+      // alone is Cecabank, the clearing institution — a different bank.
+      const bic = bicOf('ES7620450000000000000000');
+      expect(bic!.code).toBe('CECAESMM045');
+      expect(bic!.bic8).toBe('CECAESMM');
+      expect(bic!.basis).toBe('curated_map');
+      expect(bic!.authoritative).toBe(false);
+    });
+
+    it('does the same one country over (IT)', () => {
+      // ABI 08095 is CCRTIT2TBCE, Banca Centro Emilia; CCRTIT2T alone is Cassa
+      // Centrale Banca.
+      const bic = bicOf('IT12X0809500000000000000001');
+      expect(bic!.code).toBe('CCRTIT2TBCE');
+      expect(bic!.bic8).toBe('CCRTIT2T');
+      expect(bic!.basis).toBe('curated_map');
+    });
+
+    it('leaves the German register answer untouched', () => {
+      // The Bundesbank path already served the exact 11-character BIC; nothing
+      // about it changes except that bic8 is now stated rather than implied.
+      const bic = bicOf('DE18553500100000000001');
+      expect(bic!.code).toBe('MALADE51WOR');
+      expect(bic!.bic8).toBe('MALADE51');
+      expect(bic!.basis).toBe('national_register');
+      expect(bic!.authoritative).toBe(true);
+    });
+
+    it('is present on a code the prefix fallback resolved', () => {
+      // The weakest basis of the three still has to carry the field, or a
+      // caller branching on bic8 would silently skip the case where comparing
+      // matters most.
+      const bic = bicOf('GB55AUGT00000000000001');
+      expect(bic!.basis).toBe('directory_prefix');
+      expect(bic!.bic8).toBe(bic!.code!.slice(0, 8));
+      expect(bic!.bic8!.length).toBe(8);
     });
   });
 
