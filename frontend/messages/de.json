@@ -2413,7 +2413,7 @@
     },
     "privacy": {
       "title": "Was mit Ihrer Datei geschieht",
-      "text": "Die Datei wird im Arbeitsspeicher unserer Server in den Niederlanden (Railway, europe-west4) gelesen und nicht gespeichert. Nur der kommentierte Bericht wird aufbewahrt: 2 Stunden ohne Zahlung, 24 Stunden nach der Zahlung, dann automatisch gelöscht. Nichts wird für etwas anderes verwendet.",
+      "text": "Die hochgeladene Datei wird nicht als solche aufbewahrt: Sie wird im Arbeitsspeicher unserer Server in den Niederlanden (Railway, europe-west4) gelesen. Aufbewahrt wird der kommentierte Bericht — und er übernimmt jede Spalte Ihrer Datei, Kreditorennamen und IBAN eingeschlossen, mit den Befunden daneben. Er wird 2 Stunden nach dem Upload gelöscht, wenn Sie nicht bezahlen, sonst 24 Stunden nach der Zahlung; ein Durchlauf räumt alle zehn Minuten auf. Nichts wird für etwas anderes verwendet.",
       "support": "Fragen, eine Datei, die sich nicht lesen lässt, eine Rechnung: support@ibanforge.com."
     },
     "done": {
@@ -2508,7 +2508,7 @@
       "q1": "Welche Dateien funktionieren?",
       "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 10 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
       "q2": "Was geschieht mit meinen Daten?",
-      "a2": "Die Datei wird im Arbeitsspeicher unserer Server in den Niederlanden gelesen und nicht gespeichert. Nur der kommentierte Bericht wird aufbewahrt: 2 Stunden ohne Zahlung, 24 Stunden nach der Zahlung, dann gelöscht. Nichts wird für etwas anderes verwendet.",
+      "a2": "Die hochgeladene Datei wird nicht als solche aufbewahrt: Sie wird im Arbeitsspeicher unserer Server in den Niederlanden gelesen. Aufbewahrt wird der kommentierte Bericht, und er übernimmt jede Spalte Ihrer Datei — Kreditorennamen und IBAN eingeschlossen — mit den Befunden daneben. Er wird 2 Stunden nach dem Upload gelöscht, wenn Sie nicht bezahlen, sonst 24 Stunden nach der Zahlung, durch einen Durchlauf alle zehn Minuten. Nichts wird für etwas anderes verwendet.",
       "q3": "Was prüft die Prüfung, und was nicht?",
       "a3": "Struktur und Prüfziffer, Bankleitzahl gegen das nationale Register, Bankname und BIC, SEPA-Erreichbarkeit, Duplikate, den BIC Ihrer Datei gegen das Register, Adressland gegen IBAN-Land und die Regeln für strukturierte Adressen, wenn Adressspalten vorhanden sind. Sie bestätigt nicht, dass das Konto dem genannten Kreditor gehört: das ist die Verification of Payee der Banken.",
       "q4": "Mehr als 20'000 Zeilen oder mehrere Dateien?",

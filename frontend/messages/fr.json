@@ -2413,7 +2413,7 @@
     },
     "privacy": {
       "title": "Ce qui arrive à votre fichier",
-      "text": "Le fichier est lu en mémoire sur nos serveurs aux Pays-Bas (Railway, europe-west4) et n'est pas enregistré. Seul le rapport annoté est conservé : 2 heures si vous ne payez pas, 24 heures après paiement, puis effacé automatiquement. Rien ne sert à autre chose.",
+      "text": "Le fichier que vous déposez n'est pas gardé tel quel : il est lu en mémoire sur nos serveurs aux Pays-Bas (Railway, europe-west4). Ce qui est conservé, c'est le rapport annoté — et il reprend toutes les colonnes de votre fichier, noms de créanciers et IBAN compris, avec les constats en face. Il est effacé 2 heures après le dépôt si vous ne payez pas, 24 heures après le paiement sinon ; un balayage passe toutes les dix minutes. Rien ne sert à autre chose.",
       "support": "Une question, un fichier qui ne se lit pas, une facture : support@ibanforge.com."
     },
     "done": {
@@ -2508,7 +2508,7 @@
       "q1": "Quels fichiers passent ?",
       "a1": "CSV (virgule, point-virgule ou tabulation) et Excel XLSX ou XLS, jusqu'à 10 Mo et 20 000 lignes. Une colonne nommée IBAN suffit ; nom, BIC, rue, NPA, localité et pays sont utilisés s'ils existent.",
       "q2": "Que deviennent mes données ?",
-      "a2": "Le fichier est lu en mémoire sur nos serveurs aux Pays-Bas et n'est pas enregistré. Seul le rapport annoté est conservé : 2 heures si vous ne payez pas, 24 heures après paiement, puis effacé. Rien ne sert à autre chose.",
+      "a2": "Le fichier que vous déposez n'est pas gardé tel quel : il est lu en mémoire sur nos serveurs aux Pays-Bas. Ce qui est conservé, c'est le rapport annoté, et il reprend toutes les colonnes de votre fichier — noms de créanciers et IBAN compris — avec les constats en face. Il est effacé 2 heures après le dépôt si vous ne payez pas, 24 heures après le paiement sinon, par un balayage qui passe toutes les dix minutes. Rien ne sert à autre chose.",
       "q3": "Que contrôle l'audit, et que ne contrôle-t-il pas ?",
       "a3": "Structure et clé, code banque contre le registre national, nom de banque et BIC, joignabilité SEPA, doublons, BIC de votre fichier contre le registre, pays de l'adresse contre pays de l'IBAN, et les règles d'adresse structurée quand des colonnes d'adresse existent. Il ne confirme pas que le compte appartient au créancier nommé : c'est la Verification of Payee, faite par les banques.",
       "q4": "Plus de 20 000 lignes, ou plusieurs fichiers ?",

@@ -2413,7 +2413,7 @@
     },
     "privacy": {
       "title": "What happens to your file",
-      "text": "The file is read in memory on our servers in the Netherlands (Railway, europe-west4) and is not stored. Only the annotated report is kept: 2 hours if you do not pay, 24 hours after payment, then deleted automatically. Nothing is used for anything else.",
+      "text": "The file you upload is not kept as such: it is read in memory on our servers in the Netherlands (Railway, europe-west4). What is kept is the annotated report — and it reproduces every column of your file, creditor names and IBANs included, with the findings beside them. It is deleted 2 hours after upload if you do not pay, 24 hours after payment otherwise; a sweep runs every ten minutes. Nothing is used for anything else.",
       "support": "Questions, a file that will not read, an invoice: support@ibanforge.com."
     },
     "done": {
@@ -2508,7 +2508,7 @@
       "q1": "Which files work?",
       "a1": "CSV (comma, semicolon or tab) and Excel XLSX or XLS, up to 10 MB and 20,000 rows. One column named IBAN is enough; name, BIC, street, postal code, town and country are used when present.",
       "q2": "What happens to my data?",
-      "a2": "The file is read in memory on our servers in the Netherlands and is not stored. Only the annotated report is kept: 2 hours if you do not pay, 24 hours after payment, then deleted. Nothing is used for anything else.",
+      "a2": "The file you upload is not kept as such: it is read in memory on our servers in the Netherlands. What is kept is the annotated report, and it reproduces every column of your file — creditor names and IBANs included — with the findings beside them. It is deleted 2 hours after upload if you do not pay, 24 hours after payment otherwise, by a sweep that runs every ten minutes. Nothing is used for anything else.",
       "q3": "What does the audit check, and what does it not?",
       "a3": "Structure and check digits, bank code against the national register, bank name and BIC, SEPA reach, duplicates, the BIC in your file against the register, address country against IBAN country, and the structured-address rules when address columns exist. It does not confirm that the account belongs to the named creditor: that is Verification of Payee, done by banks.",
       "q4": "More than 20,000 rows, or several files?",

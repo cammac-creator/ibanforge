@@ -1,4 +1,5 @@
 import { describe, it, expect, afterAll, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import * as XLSX from 'xlsx';
 import { audit, resetAuditUploadLimiter, AUDIT_UPLOADS_PER_WINDOW } from './audit.js';
@@ -174,6 +175,30 @@ describe('checkout, status and report', () => {
     expect(purgeExpiredAuditJobs()).toBeGreaterThanOrEqual(1);
     const s = await app().request(`/v1/audit/status/${job}`);
     expect(s.status).toBe(404);
+  });
+
+  /**
+   * The purge above works; what was missing was anything to CALL it.
+   *
+   * Until 22/09/2026 `purgeExpiredAuditJobs` ran only from the upload route and
+   * the status route, so on a quiet week an expired report — every column of a
+   * customer's creditor file, IBANs included — stayed on the volume until the
+   * next visitor happened to arrive, while /audit promised it was gone after
+   * two hours. The clock now lives in `src/index.ts`, which no test can import
+   * (it calls `serve()` at import time), so it is read as text — the same
+   * remedy `scripts/mcp-parity.test.ts` uses for a constant it cannot import.
+   */
+  it('the entry point arms a clock for the purge, not just the request paths', () => {
+    const entry = readFileSync(new URL('../index.ts', import.meta.url), 'utf8');
+    expect(entry).toContain('purgeExpiredAuditJobs');
+    const interval = entry.match(/setInterval\(auditReportPurgeTick,\s*([A-Z_]+)\)/)?.[1];
+    expect(interval, 'aucun setInterval sur la purge des rapports d’audit').toBeDefined();
+    const ms = entry.match(new RegExp(`const ${interval} = ([^;]+);`))?.[1];
+    expect(ms).toBeTruthy();
+    const value = ms!.split('*').reduce((acc, part) => acc * Number(part.trim()), 1);
+    expect(Number.isFinite(value)).toBe(true);
+    // Shorter than the shortest promise on the page (2 h unpaid), by a margin.
+    expect(value).toBeLessThanOrEqual(30 * 60 * 1000);
   });
 });
 
