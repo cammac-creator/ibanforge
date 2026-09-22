@@ -158,7 +158,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 |---|---|---|
 | `code` | `string` | BIC/SWIFT-Code, wie ihn die Quelle veröffentlicht, 8 oder 11 Zeichen; auf `bic8` vergleichen |
 | `bic8` | `string` | Die acht Zeichen des Instituts — das Feld, gegen das ein gelieferter BIC zu vergleichen ist. Der Filialcode (die letzten drei Zeichen von `code`) ist informativ: in Genossenschaftsverbünden benennt er die lokale Bank und die ersten acht ihr Clearing-Institut |
-| `redirected_from` | `string?` | Der angefragte Bankcode, wenn das Register für denjenigen geantwortet hat, der sein Clearing übernommen hat (CH und LI: SIX leitet eine konkatenierte IID um). Die IBAN bleibt gültig \| eine Umleitung ist keine Stilllegung |
+| `redirected_from` | `string?` | Der angefragte Bankcode, wenn das Register für denjenigen geantwortet hat, der sein Clearing übernommen hat (CH und LI: SIX leitet eine konkatenierte IID um). Die IBAN bleibt gültig: eine Umleitung ist keine Stilllegung |
 | `bank_name` | `string \| null` | Name des Finanzinstituts |
 | `city` | `string \| null` | Stadt des Instituts |
 | `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, AT, BE und BG); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |

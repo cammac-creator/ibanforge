@@ -158,7 +158,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 |---|---|---|
 | `code` | `string` | Code BIC/SWIFT tel que la source le publie, 8 ou 11 caracteres ; comparer sur `bic8` |
 | `bic8` | `string` | Les huit caracteres de l'etablissement, et le champ sur lequel comparer un BIC fourni. Le code de branche (les trois derniers caracteres de `code`) est informatif : dans les reseaux cooperatifs il nomme la banque locale et les huit premiers sa centrale de compensation |
-| `redirected_from` | `string?` | Le code de banque demande, quand le registre a repondu pour celui qui a repris sa compensation (CH et LI : SIX redirige un IID concatene). L'IBAN reste valide \| une redirection n'est pas un retrait |
+| `redirected_from` | `string?` | Le code de banque demande, quand le registre a repondu pour celui qui a repris sa compensation (CH et LI : SIX redirige un IID concatene). L'IBAN reste valide : une redirection n'est pas un retrait |
 | `bank_name` | `string \| null` | Nom de l'etablissement financier |
 | `city` | `string \| null` | Ville de l'etablissement |
 | `basis` | `string` | D'où vient l'appariement code banque → BIC. `national_register` — le registre national du pays publie ce BIC pour ce code banque (aujourd'hui DE, AT, BE et BG) ; `curated_map` — notre carte de codes banque maintenue, une clé exacte et non un acte d'attribution ; `directory_prefix` — le repli par préfixe de BIC, qui peut correspondre à plusieurs établissements (voir `bank_code_check.candidates`) |

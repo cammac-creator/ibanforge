@@ -29,6 +29,29 @@ describe('POST /v1/iban/compliance', () => {
     expect(Array.isArray(c.flags)).toBe(true);
   });
 
+  it('still screens the bank when the served BIC is 11 characters', async () => {
+    // Every screening layer here — sanctions, EPC reachability, VoP — is keyed
+    // on the institution's eight characters. Since 22/09/2026 `bic.code` can be
+    // eleven (the SIX register for CH/LI, a curated key with a real branch code
+    // elsewhere), and a layer that compared the FULL code would silently answer
+    // "not screened" for a bank it holds — information we have, reported as
+    // information we lack, on the highest-stakes field of the API.
+    const { body } = await check('CH3600258000000000001');
+    expect(body.valid).toBe(true);
+    const bic = body.bic as { code: string; bic8: string };
+    expect(bic.code.length).toBe(11);
+    expect(bic.bic8).toBe('UBSWCHZH');
+
+    const c = body.compliance as {
+      sanctions: { bank_screened: boolean };
+      reachability: { screened: boolean };
+      vop: { screened: boolean };
+    };
+    expect(c.sanctions.bank_screened).toBe(true);
+    expect(c.reachability.screened).toBe(true);
+    expect(c.vop.screened).toBe(true);
+  });
+
   it('always carries a meta block disclosing scope + freshness + disclaimer', async () => {
     const { body } = await check('DE89370400440532013000');
     const meta = body.meta as Record<string, unknown>;

@@ -293,7 +293,20 @@ export function buildRouteTable(
         type: 'object',
         description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists). Null when unresolved.',
         properties: {
-          code: { type: 'string' },
+          code: {
+            type: 'string',
+            description: 'As the consulted source publishes it: 8 or 11 characters.',
+          },
+          bic8: {
+            type: 'string',
+            description:
+              'The institution’s eight characters — the field to compare a supplied BIC against. The branch code is informational.',
+          },
+          redirected_from: {
+            type: 'string',
+            description:
+              'The bank code asked about, when the register answered for the one that took over its clearing (CH/LI).',
+          },
           bank_name: { type: 'string' },
           city: { type: 'string' },
         },
@@ -540,7 +553,16 @@ export function buildRouteTable(
               bic: {
                 type: 'object',
                 properties: {
-                  code: { type: 'string' },
+                  code: {
+                    type: 'string',
+                    description: 'As the consulted source publishes it: 8 or 11 characters.',
+                  },
+                  bic8: {
+                    type: 'string',
+                    description:
+                      'The institution’s eight characters — compare a supplied BIC on this, not on code.',
+                  },
+                  redirected_from: { type: 'string' },
                   bank_name: { type: 'string' },
                   city: { type: 'string' },
                 },
