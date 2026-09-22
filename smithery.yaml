@@ -1,15 +1,77 @@
-# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+# Smithery listing for IBANforge.
+#
+# ## What this file was saying, and why none of it was true
+#
+# Written on 2026-04-10, never touched since. It declared a single stdio start
+# command, `node dist/mcp/server.js`, and said nothing about the remote server.
+# Both halves were wrong by 2026-09-22:
+#
+#   - the HTTP entry point at https://api.ibanforge.com/mcp did not exist when
+#     this file was written and is now the way almost every client connects;
+#   - `dist/mcp/server.js` is not the published package's entry point either.
+#     `ibanforge-mcp` on npm is built from `mcp/` and starts at `dist/index.js`,
+#     so the command named here started nothing at all.
+#
+# A listing that describes a shape the product no longer has is worse than no
+# listing: it is read by machines that cannot tell it is stale.
+#
+# ## What Smithery actually reads today (checked 2026-09-22)
+#
+# `smithery.yaml` appears NOWHERE in https://smithery.ai/docs/llms.txt. The two
+# documented ways to publish (https://smithery.ai/docs/build/publish) are:
+#
+#   1. URL — "bring your own hosting", the Gateway proxies to an upstream
+#      Streamable HTTP server. Metadata comes from a scan of that server, or,
+#      when a scan cannot complete, from a static server card served at
+#      /.well-known/mcp/server-card.json. We already serve that card
+#      (src/routes/mcp-card.ts), and it is the file to keep accurate.
+#   2. Local — a pre-built MCPB bundle for a stdio server.
+#
+# So this file no longer drives anything on Smithery's side, and the listing
+# itself is (re)published by a human through smithery.ai/new or the CLI:
+#
+#   smithery mcp publish "https://api.ibanforge.com/mcp" -n @cammac-creator/ibanforge
+#
+# It is kept, corrected rather than deleted, because a legacy reader that still
+# looks for it must find something true. Every value below is checked by
+# smithery-manifest.test.ts.
 
+# The server, as it really runs: remote first.
+remote:
+  type: streamable-http
+  url: https://api.ibanforge.com/mcp
+  # No key and no wallet needed to try it: the remote transport answers
+  # tools/call on a daily per-address allowance. See /llms.txt for the figures,
+  # which are served live and never written down here.
+  authentication:
+    required: false
+    schemes:
+      - bearer
+  # Metadata for a scanner that cannot complete its own scan.
+  serverCard: https://api.ibanforge.com/.well-known/mcp/server-card.json
+
+# The local alternative, for a client that wants a subprocess. This is the
+# command the README, glama.json and server.json all publish, and the only one
+# that works without building this repository.
 startCommand:
   type: stdio
   configSchema:
     type: object
     required: []
-    properties: {}
-  commandFunction:
-    # A JS function that produces the CLI command to start the MCP on stdio.
-    |-
+    properties:
+      apiKey:
+        type: string
+        title: IBANforge API key
+        description: >-
+          Optional. An ifk_ key raises the monthly allowance. Get one with no
+          e-mail at all: POST https://api.ibanforge.com/v1/keys/generate with
+          no body.
+  commandFunction: |-
     (config) => ({
-      command: 'node',
-      args: ['dist/mcp/server.js']
+      command: 'npx',
+      args: ['-y', 'ibanforge-mcp'],
+      env: config.apiKey ? { IBANFORGE_API_KEY: config.apiKey } : {}
     })
+
+homepage: https://ibanforge.com?src=smithery
+documentation: https://ibanforge.com/docs/mcp?src=smithery
