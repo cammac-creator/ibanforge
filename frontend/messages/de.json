@@ -2379,10 +2379,23 @@
         "iban": "IBAN",
         "status": "Status",
         "findings": "Befunde",
-        "bank": "Bank"
+        "bank": "Bank",
+        "register": "Nationales Register"
       },
       "more": "Kostenlose Vorschau: {shown} von {rows} Zeilen, IBAN maskiert. Die bezahlte Arbeitsmappe zeigt jede Zeile vollständig.",
-      "meaning": "{errors, plural, =0 {Diese Prüfungen haben keine blockierenden Fehler erkannt} one {# Zeile enthält einen blockierenden Fehler} other {# Zeilen enthalten blockierende Fehler}}; {warnings, plural, =0 {keine weiteren Warnungen} one {# Zeile sollte überprüft werden} other {# Zeilen sollten überprüft werden}}. Das bestätigt weder den Kontoinhaber noch den Erfolg einer Zahlung."
+      "meaning": "{errors, plural, =0 {Diese Prüfungen haben keine blockierenden Fehler erkannt} one {# Zeile enthält einen blockierenden Fehler} other {# Zeilen enthalten blockierende Fehler}}; {warnings, plural, =0 {keine weiteren Warnungen} one {# Zeile sollte überprüft werden} other {# Zeilen sollten überprüft werden}}. Das bestätigt weder den Kontoinhaber noch den Erfolg einer Zahlung.",
+      "registers": {
+        "title": "Nationale Register, Land für Land",
+        "lead": "Was ein Fehlen bedeutet, ist von Land zu Land verschieden. Wo das Register entscheidet, ist ein nicht gefundener Bankcode ein nicht vergebener Code; anderswo beweist unser Schweigen nichts.",
+        "note": "{missing, plural, =0 {Jede Zeile mit einem Land in dieser Datei wurde gegen ein Register geprüft, das ein Fehlen entscheidet.} one {# Zeile liegt in einem Land ohne Register, das ein Fehlen entscheidet: Dort ist ein unbekannter Bankcode kein widerlegter Bankcode.} other {# Zeilen liegen in einem Land ohne Register, das ein Fehlen entscheidet: Dort ist ein unbekannter Bankcode kein widerlegter Bankcode.}}",
+        "rows": "{n, plural, one {# Zeile} other {# Zeilen}}",
+        "authoritative": "Register entscheidet",
+        "partial": "Teilregister",
+        "none": "kein Register",
+        "authoritativeLong": "Nationales Register abgefragt: Ein Fehlen bedeutet, der Code ist nicht vergeben.",
+        "partialLong": "Teilregister: Ein Treffer nennt den Inhaber, ein Fehlen beweist nichts.",
+        "noneLong": "Für dieses Land wird kein nationales Register abgefragt: Ein Fehlen beweist nichts."
+      }
     },
     "status": {
       "ok": "OK",

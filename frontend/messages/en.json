@@ -2379,10 +2379,23 @@
         "iban": "IBAN",
         "status": "Status",
         "findings": "Findings",
-        "bank": "Bank"
+        "bank": "Bank",
+        "register": "National register"
       },
       "more": "Free preview: {shown} of {rows} rows, IBANs masked. The paid workbook shows every row in full.",
-      "meaning": "{errors, plural, =0 {No blocking errors detected by these checks} one {# row has a blocking error} other {# rows have blocking errors}}; {warnings, plural, =0 {no further warnings} one {# row needs review} other {# rows need review}}. This does not confirm account ownership or guarantee that a payment will succeed."
+      "meaning": "{errors, plural, =0 {No blocking errors detected by these checks} one {# row has a blocking error} other {# rows have blocking errors}}; {warnings, plural, =0 {no further warnings} one {# row needs review} other {# rows need review}}. This does not confirm account ownership or guarantee that a payment will succeed.",
+      "registers": {
+        "title": "National registers, country by country",
+        "lead": "What an absence is worth changes from country to country. Where the register settles it, a bank code that is not there is a code that is not allocated; elsewhere, our silence proves nothing.",
+        "note": "{missing, plural, =0 {Every row with a country in this file was checked against a register that settles an absence.} one {# row is in a country with no register that settles an absence: there, an unknown bank code is not a disproved one.} other {# rows are in a country with no register that settles an absence: there, an unknown bank code is not a disproved one.}}",
+        "rows": "{n, plural, one {# row} other {# rows}}",
+        "authoritative": "register settles it",
+        "partial": "partial register",
+        "none": "no register",
+        "authoritativeLong": "National register consulted: an absence means the code is not allocated.",
+        "partialLong": "Partial register: a hit names the holder, a miss proves nothing.",
+        "noneLong": "No national register consulted for this country: an absence proves nothing."
+      }
     },
     "status": {
       "ok": "OK",

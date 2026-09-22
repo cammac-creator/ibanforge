@@ -191,6 +191,43 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
 };
 
 /**
+ * What a country's register is worth, for a surface that has to say so per
+ * country rather than per answer.
+ *
+ * Three states, never a boolean. "No register at all" and "a register that
+ * cannot settle a negative" are different pieces of news for someone about to
+ * pay: the first means our silence says nothing, the second means a hit names
+ * the holder while a miss still says nothing. Collapsing them is the same
+ * mistake `bank_code_check.reason` exists to avoid.
+ *
+ * An ACCESSOR, and the two maps stay private. Handing them out is how a caller
+ * ends up merging them, and `decideBankCode` reads `const registerDown =
+ * !!national` — a country in the wrong map reports "we could not consult the
+ * register" about a register that answered. That trap is documented above and
+ * has been fallen into once already.
+ *
+ * Static by design: this answers "does a register that settles a negative
+ * exist for this country", not "did it answer just now". The per-answer state
+ * is `bank_code_check`, which carries `reason` for a register that was down.
+ */
+export type RegisterBasis = 'authoritative' | 'partial' | 'none';
+
+export interface RegisterCoverage {
+  basis: RegisterBasis;
+  /** The register's name, exactly as `bank_code_check.register` prints it. */
+  register: string | null;
+}
+
+export function registerCoverage(countryCode: string): RegisterCoverage {
+  const cc = countryCode.toUpperCase();
+  const national = NATIONAL_REGISTERS[cc];
+  if (national) return { basis: 'authoritative', register: national };
+  const partial = NON_EXHAUSTIVE_REGISTERS[cc];
+  if (partial) return { basis: 'partial', register: partial };
+  return { basis: 'none', register: null };
+}
+
+/**
  * EBA PSD2 register types that map onto an issuer type, and the ones that
  * deliberately do not.
  *

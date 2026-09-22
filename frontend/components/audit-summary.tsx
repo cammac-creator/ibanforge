@@ -18,7 +18,13 @@ export interface AuditStatus {
     warning: number;
     error: number;
     by_code: Record<string, number>;
-    countries: Array<{ code: string; rows: number }>;
+    // `register_basis` et `rows_without_authoritative_register` sont OPTIONNELS
+    // par nécessité, pas par confort : le site (Vercel) et l'API (Railway) se
+    // déploient séparément, donc la page tourne quelques minutes contre une API
+    // qui ne les sert pas encore. Absents, le bloc ne s'affiche pas ; il ne
+    // s'affiche jamais faux.
+    countries: Array<{ code: string; rows: number; register_basis?: RegisterBasis }>;
+    rows_without_authoritative_register?: number;
     columns_detected: string[];
     address_checked: boolean;
   };
@@ -28,9 +34,12 @@ export interface AuditStatus {
     status: "ok" | "warning" | "error";
     findings: string[];
     bank_name: string | null;
+    register_basis?: RegisterBasis;
   }>;
   download: string | null;
 }
+
+export type RegisterBasis = "authoritative" | "partial" | "none";
 
 const STATUS_CLASS: Record<string, string> = {
   ok: "text-emerald-700 dark:text-emerald-400",
@@ -42,6 +51,11 @@ export function AuditSummaryView({ status, masked, demonstration = false }: { st
   const t = useTranslations("audit");
   const s = status.summary;
   const codes = Object.entries(s.by_code).sort((a, b) => b[1] - a[1]);
+  // Une API antérieure au 22/09/2026 ne sert pas ces champs. Rien ne s'invente :
+  // on montre le bloc seulement quand la réponse le porte.
+  const missingRegister = s.rows_without_authoritative_register;
+  const showRegisters =
+    missingRegister !== undefined && s.countries.some((c) => c.register_basis !== undefined);
   return (
     <div className="flex flex-col gap-6 print:gap-4">
       <p className="rounded-lg border border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm leading-relaxed">
@@ -73,6 +87,33 @@ export function AuditSummaryView({ status, masked, demonstration = false }: { st
         <p className="text-sm text-muted-foreground">{t("preview.clean")}</p>
       )}
 
+      {showRegisters ? (
+        <div className="rounded-lg border p-5 flex flex-col gap-2">
+          <h3 className="font-semibold">{t("preview.registers.title")}</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {t("preview.registers.lead")}
+          </p>
+          <ul className="text-sm flex flex-col gap-1 mt-1">
+            {s.countries.map((c) => (
+              <li key={c.code} className="flex justify-between gap-4">
+                <span>
+                  <span className="font-mono">{c.code}</span>{" "}
+                  <span className="text-muted-foreground">
+                    · {t(`preview.registers.${c.register_basis ?? "none"}`)}
+                  </span>
+                </span>
+                <span className="font-mono tabular-nums">
+                  {t("preview.registers.rows", { n: c.rows })}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+            {t("preview.registers.note", { missing: missingRegister })}
+          </p>
+        </div>
+      ) : null}
+
       {status.preview.length > 0 ? (
         <div className="rounded-lg border overflow-x-auto print:hidden">
           <table className="w-full text-sm">
@@ -83,6 +124,9 @@ export function AuditSummaryView({ status, masked, demonstration = false }: { st
                 <th className="px-3 py-2 font-medium">{t("preview.table.status")}</th>
                 <th className="px-3 py-2 font-medium">{t("preview.table.findings")}</th>
                 <th className="px-3 py-2 font-medium">{t("preview.table.bank")}</th>
+                {showRegisters ? (
+                  <th className="px-3 py-2 font-medium">{t("preview.table.register")}</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -93,6 +137,17 @@ export function AuditSummaryView({ status, masked, demonstration = false }: { st
                   <td className={`px-3 py-2 font-medium ${STATUS_CLASS[row.status] ?? ""}`}>{t(`status.${row.status}`)}</td>
                   <td className="px-3 py-2">{row.findings.map((c) => findingLabel(t, c)).join(" ; ")}</td>
                   <td className="px-3 py-2 text-muted-foreground">{row.bank_name ?? ""}</td>
+                  {showRegisters ? (
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {row.register_basis ? (
+                        <span title={t(`preview.registers.${row.register_basis}Long`)}>
+                          {t(`preview.registers.${row.register_basis}`)}
+                        </span>
+                      ) : (
+                        ""
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

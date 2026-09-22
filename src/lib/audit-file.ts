@@ -16,7 +16,7 @@
  */
 import * as XLSX from 'xlsx';
 import { validateIBAN } from './iban.js';
-import { createEnrichCache, enrichResult } from './enrich.js';
+import { createEnrichCache, enrichResult, registerCoverage, type RegisterBasis } from './enrich.js';
 import { checkPostalAddress, type AddressScheme } from './address-conformity.js';
 import type { IBANValidationResult } from '../types.js';
 
@@ -112,6 +112,16 @@ export interface AuditRow {
   bic_file: string | null;
   sepa_reachable: boolean | null;
   address_verdict: 'pass' | 'fail' | 'not_applicable' | null;
+  /**
+   * Whether the IBAN's country has a register that settles a NEGATIVE, and its
+   * name. Carried per row because a creditor file mixes countries and the
+   * answer changes country by country: in Germany "not in the register" means
+   * the code is not allocated, in Italy it means nothing at all. Without it
+   * every clean line read the same, and a reader was free to take our silence
+   * about an Italian bank code for a clearance.
+   */
+  register_basis: RegisterBasis;
+  register: string | null;
   next_steps: string[];
 }
 
@@ -121,7 +131,15 @@ export interface AuditSummary {
   warning: number;
   error: number;
   by_code: Partial<Record<FindingCode, number>>;
-  countries: Array<{ code: string; rows: number }>;
+  /** One line per IBAN country met, with what its register is worth. */
+  countries: Array<{
+    code: string;
+    rows: number;
+    register_basis: RegisterBasis;
+    register: string | null;
+  }>;
+  /** Rows whose country has no register that settles a negative. */
+  rows_without_authoritative_register: number;
   columns_detected: Array<keyof AuditColumnMap>;
   address_checked: boolean;
   tier: AuditTierCode;
@@ -395,6 +413,8 @@ export function auditTable(
       bic_file: cols.bic !== undefined ? (r[cols.bic] ?? '').trim().toUpperCase() || null : null,
       sepa_reachable: null,
       address_verdict: null,
+      register_basis: 'none',
+      register: null,
       next_steps: [],
     };
     if (rawIban === '') {
@@ -411,6 +431,13 @@ export function auditTable(
         const compact = rawIban.replace(/\s+/g, '').toUpperCase();
         row.iban = compact;
         row.country = result.country?.code ?? compact.slice(0, 2);
+        // Read from the country, not from this answer: the question the column
+        // answers is "could a register have contradicted this line at all",
+        // which is true of the country whether or not this particular code was
+        // found. `bank_code_check` beside it says what happened to THIS code.
+        const coverage = registerCoverage(row.country);
+        row.register_basis = coverage.basis;
+        row.register = coverage.register;
         row.bank_name = result.bic?.bank_name ?? result.issuer?.name ?? null;
         row.bic_registry = result.bic?.code ?? null;
         row.sepa_reachable = result.risk_indicators?.sepa_reachable ?? result.sepa?.member ?? null;
@@ -527,6 +554,12 @@ export function auditTable(
     for (const f of row.findings) byCode[f.code] = (byCode[f.code] ?? 0) + 1;
     if (row.country) countries.set(row.country, (countries.get(row.country) ?? 0) + 1);
   }
+  // The one line a reader needs before trusting a page of green: how much of
+  // this file no register could have contradicted. A row whose IBAN did not
+  // validate has no country and is counted nowhere here.
+  const withoutAuthoritative = out.filter(
+    (r) => r.country !== null && r.register_basis !== 'authoritative',
+  ).length;
   const tier = tierFor(out.length);
   const summary: AuditSummary = {
     rows: out.length,
@@ -535,8 +568,15 @@ export function auditTable(
     error: out.filter((r) => r.status === 'error').length,
     by_code: byCode,
     countries: [...countries.entries()]
-      .map(([code, n]) => ({ code, rows: n }))
+      .map(([code, n]) => ({ code, rows: n, ...registerCoverage(code) }))
+      .map(({ code, rows, basis, register }) => ({
+        code,
+        rows,
+        register_basis: basis,
+        register,
+      }))
       .sort((a, b) => b.rows - a.rows),
+    rows_without_authoritative_register: withoutAuthoritative,
     columns_detected: (Object.keys(cols) as Array<keyof AuditColumnMap>).filter(
       (k) => cols[k] !== undefined,
     ),
@@ -625,6 +665,7 @@ const COLS: Record<AuditLang, string[]> = {
     'IBAN country',
     'SEPA',
     'Address ISO 20022',
+    'National register',
     'Detail',
   ],
   fr: [
@@ -635,6 +676,7 @@ const COLS: Record<AuditLang, string[]> = {
     'Pays IBAN',
     'SEPA',
     'Adresse ISO 20022',
+    'Registre national',
     'Détail',
   ],
   de: [
@@ -645,9 +687,41 @@ const COLS: Record<AuditLang, string[]> = {
     'IBAN-Land',
     'SEPA',
     'Adresse ISO 20022',
+    'Nationales Register',
     'Detail',
   ],
 };
+
+/**
+ * What the "National register" column says, per country and per language.
+ *
+ * Three states because a boolean would merge the two that matter: a country
+ * with no register at all (our silence says nothing) and a country whose
+ * register names a holder but never denies one (a hit is worth something, a
+ * miss is still nothing). Only `authoritative` licenses reading an absence as
+ * "this bank code does not exist".
+ */
+const REGISTER_LABELS: Record<AuditLang, Record<RegisterBasis, string>> = {
+  en: {
+    authoritative: 'yes — a miss means the code is not allocated',
+    partial: 'partial — a hit names the holder, a miss proves nothing',
+    none: 'none — no register consulted for this country',
+  },
+  fr: {
+    authoritative: 'oui — une absence vaut code non attribué',
+    partial: 'partiel — une présence nomme le titulaire, une absence ne prouve rien',
+    none: 'aucun — pas de registre consulté pour ce pays',
+  },
+  de: {
+    authoritative: 'ja — ein Fehlen bedeutet: Code nicht vergeben',
+    partial: 'teilweise — ein Treffer nennt den Inhaber, ein Fehlen beweist nichts',
+    none: 'keines — für dieses Land wird kein Register abgefragt',
+  },
+};
+
+export function registerLabel(basis: RegisterBasis, lang: AuditLang): string {
+  return REGISTER_LABELS[lang][basis];
+}
 
 export function findingLabel(code: FindingCode, lang: AuditLang): string {
   return LABELS[lang][code];
@@ -670,6 +744,13 @@ export interface PreviewRow {
   status: RowStatus;
   findings: FindingCode[];
   bank_name: string | null;
+  /**
+   * Present in the FREE preview on purpose. It is the one thing that changes
+   * how a clean line should be read, and hiding it behind the paywall would
+   * sell reassurance: without it, an Italian row with no finding looks exactly
+   * like a German one that a register actually confirmed.
+   */
+  register_basis: RegisterBasis;
 }
 
 /** The free look: the first rows that need attention, masked, then the first OK ones. */
@@ -682,6 +763,7 @@ export function previewRows(result: AuditResult, limit = 20): PreviewRow[] {
     status: r.status,
     findings: r.findings.map((f) => f.code),
     bank_name: r.bank_name,
+    register_basis: r.register_basis,
   }));
 }
 
@@ -710,6 +792,9 @@ export function buildWorkbook(
           : row.address_verdict === 'fail'
             ? 'KO'
             : 'n/a',
+      // Blank for a row with no country: an unreadable IBAN has no register
+      // question, and writing "none" there would read as a verdict.
+      row.country === null ? '' : REGISTER_LABELS[lang][row.register_basis],
       row.findings.map((f) => f.detail).join(' | '),
     ];
   });
@@ -739,7 +824,15 @@ export function buildWorkbook(
       .map(([code, n]) => [l[code], n] as [string, number]),
     ['', ''],
     [t.by_country, ''],
-    ...s.countries.map((c) => [c.code, c.rows] as [string, number]),
+    // Country, row count, and what that country's register is worth — the
+    // three belong on one line, because "42 rows in IT" reads as coverage
+    // until you know no Italian register was consulted.
+    ...s.countries.map(
+      (c) => [`${c.code} — ${REGISTER_LABELS[lang][c.register_basis]}`, c.rows] as [string, number],
+    ),
+    ['', ''],
+    [t.registers, ''],
+    [t.registers_note, s.rows_without_authoritative_register],
     ['', ''],
     [t.method, ''],
     [t.method_1, ''],
@@ -762,6 +855,9 @@ const SUMMARY_LABELS: Record<AuditLang, Record<string, string>> = {
     error: 'Do not pay',
     by_finding: 'Findings by type',
     by_country: 'Rows by IBAN country',
+    registers: 'National registers',
+    registers_note:
+      'Rows in a country with no register that settles a negative (an unknown bank code there is not a proven one)',
     method: 'Method',
     method_1:
       'Structure and check digits (ISO 13616), bank code against the national register, BIC and bank name from the register (SIX, Bundesbank, EBA and others, see ibanforge.com/sources).',
@@ -779,6 +875,9 @@ const SUMMARY_LABELS: Record<AuditLang, Record<string, string>> = {
     error: 'Ne pas payer',
     by_finding: 'Constats par type',
     by_country: "Lignes par pays de l'IBAN",
+    registers: 'Registres nationaux',
+    registers_note:
+      "Lignes dans un pays sans registre qui tranche une absence (un code banque inconnu n'y est pas un code prouvé faux)",
     method: 'Méthode',
     method_1:
       'Structure et clé de contrôle (ISO 13616), code banque contre le registre national, BIC et nom de banque tirés du registre (SIX, Bundesbank, EBA et autres, voir ibanforge.com/sources).',
@@ -796,6 +895,9 @@ const SUMMARY_LABELS: Record<AuditLang, Record<string, string>> = {
     error: 'Nicht zahlen',
     by_finding: 'Befunde nach Typ',
     by_country: 'Zeilen nach IBAN-Land',
+    registers: 'Nationale Register',
+    registers_note:
+      'Zeilen in einem Land ohne Register, das ein Fehlen entscheidet (ein dort unbekannter Bankcode ist kein widerlegter Bankcode)',
     method: 'Methode',
     method_1:
       'Struktur und Prüfziffer (ISO 13616), Bankleitzahl gegen das nationale Register, BIC und Bankname aus dem Register (SIX, Bundesbank, EBA und weitere, siehe ibanforge.com/sources).',

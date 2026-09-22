@@ -2379,10 +2379,23 @@
         "iban": "IBAN",
         "status": "Statut",
         "findings": "Constats",
-        "bank": "Banque"
+        "bank": "Banque",
+        "register": "Registre national"
       },
       "more": "Aperçu gratuit : {shown} lignes sur {rows}, IBAN masqués. Le classeur payant montre chaque ligne en entier.",
-      "meaning": "{errors, plural, =0 {Aucune erreur bloquante détectée par ces contrôles} one {# ligne présente une erreur bloquante} other {# lignes présentent des erreurs bloquantes}} ; {warnings, plural, =0 {aucun autre avertissement} one {# ligne mérite une vérification} other {# lignes méritent une vérification}}. Cela ne confirme ni le titulaire du compte ni la réussite d’un paiement."
+      "meaning": "{errors, plural, =0 {Aucune erreur bloquante détectée par ces contrôles} one {# ligne présente une erreur bloquante} other {# lignes présentent des erreurs bloquantes}} ; {warnings, plural, =0 {aucun autre avertissement} one {# ligne mérite une vérification} other {# lignes méritent une vérification}}. Cela ne confirme ni le titulaire du compte ni la réussite d’un paiement.",
+      "registers": {
+        "title": "Registres nationaux, pays par pays",
+        "lead": "Ce qu'une absence vaut change d'un pays à l'autre. Là où le registre fait foi, un code banque introuvable est un code non attribué ; ailleurs, notre silence ne prouve rien.",
+        "note": "{missing, plural, =0 {Chaque ligne datée d'un pays de ce fichier a été confrontée à un registre qui tranche une absence.} one {# ligne est dans un pays sans registre qui tranche une absence : là-bas, un code banque inconnu n'est pas un code prouvé faux.} other {# lignes sont dans un pays sans registre qui tranche une absence : là-bas, un code banque inconnu n'est pas un code prouvé faux.}}",
+        "rows": "{n, plural, one {# ligne} other {# lignes}}",
+        "authoritative": "registre qui fait foi",
+        "partial": "registre partiel",
+        "none": "aucun registre",
+        "authoritativeLong": "Registre national consulté : une absence vaut code non attribué.",
+        "partialLong": "Registre partiel : une présence nomme le titulaire, une absence ne prouve rien.",
+        "noneLong": "Aucun registre national consulté pour ce pays : une absence ne prouve rien."
+      }
     },
     "status": {
       "ok": "OK",
