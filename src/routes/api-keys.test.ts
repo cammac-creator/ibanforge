@@ -230,7 +230,11 @@ describe('/v1/keys/generate — acquisition source (best-effort)', () => {
     expect(row.source).toBe('npm-readme');
 
     // Malformed source (spaces, too long, injection-ish) must not block the
-    // key and must land as NULL — attribution is best-effort by contract.
+    // key. It used to land as NULL; since 22/09/2026 it falls back to the DOOR,
+    // because an empty origin is unrecoverable afterwards and left nearly every
+    // external key unattributable. Best-effort still means "never refuse",
+    // not "never record". No `attribution` object here, so the door is the
+    // one a caller without a browser comes through.
     const badEmail = `src-bad-${Date.now()}@example.com`;
     const bad = await app.request('/v1/keys/generate', {
       method: 'POST',
@@ -241,7 +245,42 @@ describe('/v1/keys/generate — acquisition source (best-effort)', () => {
     const rowBad = getStatsDB()
       .prepare('SELECT source FROM api_keys WHERE email = ?')
       .get(badEmail) as { source: string | null };
-    expect(rowBad.source).toBeNull();
+    expect(rowBad.source).toBe('api-direct');
+  });
+
+  it('écrit la porte quand rien de plus fin n’est connu, des deux côtés', async () => {
+    process.env.IBANFORGE_ADMIN_TEST_KEYS = 'true';
+    const app = makeApp();
+    const { getStatsDB } = await import('../lib/db.js');
+    const sourceOf = (email: string) =>
+      (
+        getStatsDB().prepare('SELECT source FROM api_keys WHERE email = ?').get(email) as {
+          source: string | null;
+        }
+      ).source;
+
+    // Sans navigateur : ni `source`, ni `attribution`. C'était le cas le plus
+    // fréquent et le seul qui n'écrivait rien du tout.
+    const curlEmail = `porte-api-${Date.now()}@example.com`;
+    const curl = await app.request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: curlEmail }),
+    });
+    expect(curl.status).toBe(201);
+    expect(sourceOf(curlEmail)).toBe('api-direct');
+
+    // Avec navigateur : le dialogue envoie TOUJOURS un objet `attribution`,
+    // même vide. C'est ce qui distingue un navigateur d'un curl, et la porte
+    // qui en découle.
+    const webEmail = `porte-web-${Date.now()}@example.com`;
+    const web = await app.request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: webEmail, attribution: {} }),
+    });
+    expect(web.status).toBe(201);
+    expect(sourceOf(webEmail)).toBe('site-signup');
   });
 });
 
@@ -787,7 +826,10 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     });
     expect(s.landings.find((l) => l.path === '/en/docs/quickstart')?.n).toBeGreaterThanOrEqual(1);
     expect(s.referrers.find((r) => r.host === 'google.com')?.n).toBeGreaterThanOrEqual(1);
-    expect(s.channels.find((c) => c.channel === 'api')?.n).toBeGreaterThanOrEqual(1);
+    // 🚨 Le canal d'une inscription SANS navigateur n'est plus `api` mais la
+    // porte `src:api-direct` : depuis le 22/09/2026 chaque chemin de frappe
+    // écrit une origine, et `api` ne restait que pour les lignes d'avant.
+    expect(s.channels.find((c) => c.channel === 'src:api-direct')?.n).toBeGreaterThanOrEqual(1);
   });
 
   it('serves the origins to the admin only', async () => {

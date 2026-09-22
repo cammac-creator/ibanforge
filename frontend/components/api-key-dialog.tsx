@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { routeKeyFailure } from '@/lib/api-key-failure';
 import { attributionOf, readArrival, rememberArrival } from '@/lib/arrival';
+import { originForSignup } from '@/lib/key-origin';
 import { FirstCallPanel } from '@/components/first-call-panel';
 import { localePath } from '@/lib/locale-path';
 
@@ -216,8 +217,18 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
         // Best-effort acquisition attribution, as captured on ARRIVAL by
         // lib/arrival.ts rather than read here: the ?src= our outbound links
         // carry, plus the landing page, the referrer and the utm labels.
+        //
+        // 🚨 Depuis le 22/09/2026 le champ part TOUJOURS. Sans étiquette de
+        // campagne, il porte la PORTE — la page d'où le dialogue a été ouvert.
+        // Avant, une visite sans `?src=` n'envoyait rien et la clé naissait
+        // sans origine : l'origine ne se rattrape jamais après coup, et c'est
+        // ainsi que presque toutes les clés existantes sont devenues muettes
+        // sur leur canal. Voir lib/key-origin.ts.
         const arrival = readArrival();
-        const src = arrival?.src ?? null;
+        const src = originForSignup(
+          arrival?.src,
+          typeof window === 'undefined' ? '/' : window.location.pathname,
+        );
         const address = email.trim().toLowerCase();
         const r = await fetch(`${API_BASE}/v1/keys/generate`, {
           method: 'POST',
