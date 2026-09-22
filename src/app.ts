@@ -790,9 +790,12 @@ export function buildApp(): Hono<HonoEnv> {
       // one number nobody could read was how many agents the free tier turns
       // away (MCP-04, audit 2026-09-01). The route publishes the outcome on a
       // response header rather than a context variable, because a new context
-      // variable means a change in src/types.ts, which belongs to another
-      // workstream today. Worth revisiting: `mcpOutcome` in HonoEnv['Variables']
-      // is the cleaner home, and would also carry the tool name into the log.
+      // variable meant a change in src/types.ts, which belonged to another
+      // workstream that day. The tool NAME took the cleaner route on
+      // 22/09/2026: `mcpToolName` in HonoEnv['Variables'], written beside the
+      // `mcpToolCall` marker and stored in its own column — the path stays
+      // `/mcp:tools-call` so the counters that compare that exact string keep
+      // counting.
       const mcpOutcome = path === '/mcp' ? c.res.headers.get('X-MCP-Outcome') : null;
       const recordedPath =
         path !== '/mcp'
@@ -814,6 +817,9 @@ export function buildApp(): Hono<HonoEnv> {
         userAgent,
         keyPrefix,
         agentSignature,
+        // Le nom voyage à côté du chemin, jamais dedans. Il vaut null sur tout
+        // le trafic REST : la colonne ne parle que de `/mcp`.
+        c.get('mcpToolName') ?? null,
       );
       // Les faits de mesure de la lignée, juste après la télémétrie brute et
       // seulement si une clé a été présentée (lot M). Le chemin RÉEL et non

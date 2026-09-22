@@ -1393,6 +1393,18 @@ mcpHttp.post('/mcp', async (c) => {
       'x-real-ip': c.req.header('x-real-ip') ?? null,
     }) ?? 'unknown';
 
+  // 🚨 Le NOM de l'outil, posé AVANT la porte du plafond — et c'est justement
+  // l'inverse de l'ordre du drapeau `mcpToolCall` vingt lignes plus bas.
+  //
+  // Le drapeau décide du CHEMIN : posé trop tôt, un refus se lisait comme un
+  // appel servi (MCP-04, audit du 01/09/2026), et c'est pour cela qu'il attend
+  // la sortie de cette porte. Le nom ne décide de rien — le chemin a déjà
+  // séparé `/mcp:tools-call` de `/mcp:tools-call:refused`. Posé après la
+  // porte, un appel REFUSÉ perdrait son nom, et « sur quel outil le palier
+  // gratuit renvoie-t-il les agents » redeviendrait la question sans réponse
+  // que cette colonne existe pour fermer.
+  if (toolName) c.set('mcpToolName', toolName);
+
   if (toolUnits > 0) {
     const limit = checkMcpRateLimit(mcpBucket(ip, ''), toolUnits);
     if (limit.degraded) {

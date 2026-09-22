@@ -107,6 +107,17 @@ type HonoEnv = {
     paywallCause?: PaywallCause;
     /** Set by the MCP route when the request carries tools/call invocations, so the stats middleware can split real usage from discovery handshakes. */
     mcpToolCall?: boolean;
+    /**
+     * Le nom de l'outil MCP appelé, posé par la route au même endroit que
+     * `mcpToolCall` et lu par la télémétrie, qui l'écrit dans
+     * `request_log.tool_name`.
+     *
+     * 🚨 Il ne remplace pas `mcpToolCall` : un lot JSON-RPC peut porter
+     * plusieurs appels, le drapeau dit « il y en a eu », ce champ nomme le
+     * PREMIER. Deux faits différents, et le drapeau est celui dont dépend le
+     * chemin `/mcp:tools-call` que les compteurs existants comparent.
+     */
+    mcpToolName?: string | null;
     /** Set by the API-key middleware when the request is served on the free tier: the response then carries the attribution block. */
     freeTier?: boolean;
     /** Set by the anonymous-trial middleware when a keyless validation is served on the daily allowance. */
