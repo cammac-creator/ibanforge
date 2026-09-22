@@ -2207,6 +2207,8 @@
     "used": "Appels consommés",
     "remaining": "Restant",
     "credits": "Crédits restants",
+    "creditsOf": "sur {total} achetés",
+    "creditsNote": "Cette clé puise dans un lot de crédits prépayés : aucun quota mensuel ne lui est opposé. Les appels du mois sont affichés pour information ; ce qui peut arrêter un appel, c’est le solde ci-dessus.",
     "windowTitle": "30 derniers jours",
     "served": "Servis",
     "failed": "En échec",

@@ -2207,6 +2207,8 @@
     "used": "Calls used",
     "remaining": "Remaining",
     "credits": "Credits left",
+    "creditsOf": "of {total} purchased",
+    "creditsNote": "This key draws on a prepaid credit bundle: no monthly quota is enforced against it. The calls made this month are shown for information only; what can turn a call away is the balance above.",
     "windowTitle": "Last 30 days",
     "served": "Served",
     "failed": "Failed",
