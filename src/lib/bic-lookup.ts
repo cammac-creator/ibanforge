@@ -601,22 +601,42 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
   }
 
   if (entry) {
-    // Normalize BIC to 8 chars (strip branch suffix if present)
-    const bic8 = entry.bic.length > 8 ? entry.bic.substring(0, 8) : entry.bic;
+    // The key is served as it is written, branch code and all.
+    //
+    // It used to be truncated to eight characters ("normalize BIC to 8 chars"),
+    // and the three characters that were thrown away are the ones that name the
+    // bank. In a cooperative network they identify a DIFFERENT legal entity from
+    // the eight before them, which identify its clearing institution: ES 2045 is
+    // written CECAESMM045, Caja de Ahorros de Ontinyent, and CECAESMM alone is
+    // Cecabank; IT 08095 is CCRTIT2TBCE, Banca Centro Emilia, and CCRTIT2T alone
+    // is Cassa Centrale Banca. Truncating answered the central institution under
+    // the local bank's name — the failure a German integrator measured on
+    // Sparkassen BIC8s before the Bundesbank register was read for the BIC.
+    //
+    // 22,681 of the 24,083 curated keys carry an 11-character BIC (18,273 of
+    // them the head-office form ending XXX), so this restores the branch code on
+    // every country the map serves, not only the two named above. Callers
+    // comparing a supplied BIC must compare on `bic.bic8`; the served `code` is
+    // now 8 or 11 characters depending on what the key holds.
+    const bic = entry.bic;
     let bankName = entry.bank_name ?? null;
     let cityName = entry.city ?? null;
 
     // The row is now read unconditionally rather than only to fill a missing
     // name or city, because it is also where the provenance comes from. The
     // lookup is LRU-cached, so the extra reads collapse onto the hot BIC8s.
-    const dbRow = lookup(bic8);
+    //
+    // The BIC11 row first, so a branch key is described by the branch's own row
+    // rather than by its clearing institution's; the BIC8 row stays as the
+    // fallback for the keys the directory carries only at institution grain.
+    const dbRow = (bic.length === 11 ? lookup(bic) : null) ?? lookup(bic.substring(0, 8));
     if (dbRow) {
       bankName = bankName || dbRow.institution;
       cityName = cityName || dbRow.city;
     }
 
     return {
-      code: bic8,
+      code: bic,
       bank_name: bankName,
       city: cityName,
       ...(checkedCode ? { checked: checkedCode } : {}),
