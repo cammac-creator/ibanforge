@@ -210,6 +210,31 @@ describe('readTable — the cap is enforced before the parse', () => {
     expect(readTable(csv(atCap), 'cap.csv').rows.length).toBe(AUDIT_MAX_ROWS);
   });
 
+  /**
+   * The row guard throws INSIDE the try block that wraps the parser, so until
+   * 22/09/2026 the catch below it relabelled a perfectly formed file as
+   * `unreadable` — blaming the customer's export for a limit that is ours.
+   * The code is what the site turns into "split the file", so the code is what
+   * this pins; a message check would have passed throughout the bug.
+   */
+  it('keeps the too_many_rows CODE, in text and in a workbook', () => {
+    const lines = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => VALID_CH)];
+    expect(() => readTable(csv(lines), 'big.csv')).toThrow(
+      expect.objectContaining({ code: 'too_many_rows' }),
+    );
+    const aoa: unknown[][] = [
+      ['IBAN'],
+      ...Array.from({ length: AUDIT_MAX_ROWS + 5 }, () => [VALID_CH]),
+    ];
+    expect(() => readTable(xlsx(aoa), 'big.xlsx')).toThrow(
+      expect.objectContaining({ code: 'too_many_rows' }),
+    );
+    // A genuinely broken file still gets the honest verdict.
+    expect(() =>
+      readTable(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]), 'broken.xlsx'),
+    ).toThrow(expect.objectContaining({ code: 'unreadable' }));
+  });
+
   it('counts lines on bytes, with and without a trailing newline', () => {
     expect(countLines(Buffer.from(''))).toBe(0);
     expect(countLines(Buffer.from('a'))).toBe(1);

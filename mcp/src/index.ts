@@ -57,11 +57,12 @@ const pkg = require('../package.json') as { version: string };
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const API_KEY = process.env.IBANFORGE_API_KEY;
 
-// Mirrors src/lib/audit-file.ts AUDIT_MAX_BYTES (5 MB). This package cannot
-// import from src/ (it is published separately), so the limit is copied;
-// scripts/mcp-parity.test.ts checks the two stay equal, same pattern as
-// FEEDBACK_ERROR_TYPES below.
-const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+// Mirrors src/lib/audit-file.ts AUDIT_MAX_BYTES (10 MB since 22/09/2026, so a
+// file of 20,000 rows — the volume the large tier is sold at — actually fits).
+// This package cannot import from src/ (it is published separately), so the
+// limit is copied; scripts/mcp-parity.test.ts checks the two stay equal, same
+// pattern as FEEDBACK_ERROR_TYPES below.
+const AUDIT_MAX_BYTES = 10 * 1024 * 1024;
 
 // Same hints as the remote server (src/routes/mcp-http.ts): the five DATA tools
 // are pure reads against our own API. Without readOnlyHint, MCP clients ask the

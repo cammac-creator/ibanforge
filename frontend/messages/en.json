@@ -2348,7 +2348,7 @@
     },
     "upload": {
       "label": "Drop your creditor file here",
-      "hint": "CSV or XLSX, up to 5 MB and 20,000 rows. A column named IBAN is enough; name, BIC and address columns are used when present.",
+      "hint": "CSV or XLSX, up to 10 MB and 20,000 rows. A column named IBAN is enough; name, BIC and address columns are used when present.",
       "button": "Analyse for free",
       "analyzing": "Analysing",
       "error": {
@@ -2356,7 +2356,7 @@
         "noIban": "No column holds IBANs. Name one IBAN, or make sure the account column contains IBANs.",
         "empty": "The file has no data rows.",
         "tooManyRows": "The file has more than 20,000 rows. Split it and upload the parts.",
-        "tooLarge": "The file is larger than 5 MB.",
+        "tooLarge": "The file is larger than 10 MB.",
         "unreadable": "The file could not be read as CSV or XLSX.",
         "expired": "This audit has expired. Upload the file again.",
         "payments": "Payment is temporarily unavailable. Try again in a few seconds. If the problem persists, contact support@ibanforge.com.",
@@ -2506,7 +2506,7 @@
     "faq": {
       "title": "Questions before you upload",
       "q1": "Which files work?",
-      "a1": "CSV (comma, semicolon or tab) and Excel XLSX or XLS, up to 5 MB and 20,000 rows. One column named IBAN is enough; name, BIC, street, postal code, town and country are used when present.",
+      "a1": "CSV (comma, semicolon or tab) and Excel XLSX or XLS, up to 10 MB and 20,000 rows. One column named IBAN is enough; name, BIC, street, postal code, town and country are used when present.",
       "q2": "What happens to my data?",
       "a2": "The file is read in memory on our servers in the Netherlands and is not stored. Only the annotated report is kept: 2 hours if you do not pay, 24 hours after payment, then deleted. Nothing is used for anything else.",
       "q3": "What does the audit check, and what does it not?",

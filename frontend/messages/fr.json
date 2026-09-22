@@ -2348,7 +2348,7 @@
     },
     "upload": {
       "label": "Déposez votre fichier de créanciers ici",
-      "hint": "CSV ou XLSX, jusqu'à 5 Mo et 20 000 lignes. Une colonne nommée IBAN suffit ; les colonnes nom, BIC et adresse sont utilisées si elles existent.",
+      "hint": "CSV ou XLSX, jusqu'à 10 Mo et 20 000 lignes. Une colonne nommée IBAN suffit ; les colonnes nom, BIC et adresse sont utilisées si elles existent.",
       "button": "Analyser gratuitement",
       "analyzing": "Analyse en cours",
       "error": {
@@ -2356,7 +2356,7 @@
         "noIban": "Aucune colonne ne contient d'IBAN. Nommez-en une IBAN, ou vérifiez que la colonne des comptes contient des IBAN.",
         "empty": "Le fichier n'a aucune ligne de données.",
         "tooManyRows": "Le fichier dépasse 20 000 lignes. Coupez-le et déposez les parties.",
-        "tooLarge": "Le fichier dépasse 5 Mo.",
+        "tooLarge": "Le fichier dépasse 10 Mo.",
         "unreadable": "Le fichier n'a pas pu être lu comme CSV ou XLSX.",
         "expired": "Cet audit a expiré. Déposez le fichier à nouveau.",
         "payments": "Le paiement est momentanément indisponible. Réessayez dans quelques secondes. Si le problème persiste, contactez support@ibanforge.com.",
@@ -2506,7 +2506,7 @@
     "faq": {
       "title": "Questions avant de déposer",
       "q1": "Quels fichiers passent ?",
-      "a1": "CSV (virgule, point-virgule ou tabulation) et Excel XLSX ou XLS, jusqu'à 5 Mo et 20 000 lignes. Une colonne nommée IBAN suffit ; nom, BIC, rue, NPA, localité et pays sont utilisés s'ils existent.",
+      "a1": "CSV (virgule, point-virgule ou tabulation) et Excel XLSX ou XLS, jusqu'à 10 Mo et 20 000 lignes. Une colonne nommée IBAN suffit ; nom, BIC, rue, NPA, localité et pays sont utilisés s'ils existent.",
       "q2": "Que deviennent mes données ?",
       "a2": "Le fichier est lu en mémoire sur nos serveurs aux Pays-Bas et n'est pas enregistré. Seul le rapport annoté est conservé : 2 heures si vous ne payez pas, 24 heures après paiement, puis effacé. Rien ne sert à autre chose.",
       "q3": "Que contrôle l'audit, et que ne contrôle-t-il pas ?",

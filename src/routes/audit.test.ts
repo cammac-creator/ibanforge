@@ -9,7 +9,7 @@ import {
   purgeExpiredAuditJobs,
   auditStats,
 } from '../lib/audit-jobs.js';
-import { AUDIT_MAX_BYTES } from '../lib/audit-file.js';
+import { AUDIT_MAX_BYTES, AUDIT_MAX_ROWS } from '../lib/audit-file.js';
 
 const VALID_CH = 'CH1000230000000012345';
 const VALID_DE = 'DE89370400440532013000';
@@ -85,6 +85,32 @@ describe('POST /v1/audit/upload', () => {
 
     const big = await upload(Buffer.alloc(AUDIT_MAX_BYTES + 1, 0x41), 'big.csv');
     expect(big.status).toBe(413);
+  });
+
+  /**
+   * A file one row past the cap must be told SO, and nothing else.
+   *
+   * Until 22/09/2026 it was answered `unreadable` — "we could not read your
+   * file as CSV or XLSX" — because `readTable` threw its own `too_many_rows`
+   * inside the try block that catches parser failures. The customer read that
+   * their export was malformed, when it was perfectly formed and simply longer
+   * than the product accepts; `no_iban_column` and `empty` travelled fine, so
+   * the one refusal with an obvious remedy was the one that lost it.
+   *
+   * The assertion is on the CODE, not the wording: the code is what the site
+   * maps to "split the file and upload the parts".
+   */
+  it('answers too_many_rows — not unreadable — on a file one row past the cap', async () => {
+    const lines = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => VALID_CH)];
+    const csv = Buffer.from(lines.join('\n') + '\n', 'utf8');
+    // The proof only means something if the file reaches the parser at all:
+    // the byte ceiling must leave room for the row count the tiers promise.
+    expect(csv.length).toBeLessThan(AUDIT_MAX_BYTES);
+    const r = await upload(csv, 'trop-long.csv');
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as UploadBody & { limits?: { max_rows: number } };
+    expect(body.error).toBe('too_many_rows');
+    expect(body.limits?.max_rows).toBe(AUDIT_MAX_ROWS);
   });
 });
 

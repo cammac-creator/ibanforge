@@ -2348,7 +2348,7 @@
     },
     "upload": {
       "label": "Legen Sie Ihre Kreditorendatei hier ab",
-      "hint": "CSV oder XLSX, bis 5 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Spalten für Name, BIC und Adresse werden genutzt, wenn vorhanden.",
+      "hint": "CSV oder XLSX, bis 10 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Spalten für Name, BIC und Adresse werden genutzt, wenn vorhanden.",
       "button": "Kostenlos analysieren",
       "analyzing": "Analyse läuft",
       "error": {
@@ -2356,7 +2356,7 @@
         "noIban": "Keine Spalte enthält IBAN. Nennen Sie eine Spalte IBAN oder prüfen Sie, ob die Kontospalte IBAN enthält.",
         "empty": "Die Datei enthält keine Datenzeilen.",
         "tooManyRows": "Die Datei hat mehr als 20'000 Zeilen. Teilen Sie sie und laden Sie die Teile hoch.",
-        "tooLarge": "Die Datei ist grösser als 5 MB.",
+        "tooLarge": "Die Datei ist grösser als 10 MB.",
         "unreadable": "Die Datei konnte nicht als CSV oder XLSX gelesen werden.",
         "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
         "payments": "Die Zahlung ist vorübergehend nicht verfügbar. Versuchen Sie es in wenigen Sekunden erneut. Falls das Problem weiterhin besteht, wenden Sie sich an support@ibanforge.com.",
@@ -2506,7 +2506,7 @@
     "faq": {
       "title": "Fragen vor dem Hochladen",
       "q1": "Welche Dateien funktionieren?",
-      "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 5 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
+      "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 10 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
       "q2": "Was geschieht mit meinen Daten?",
       "a2": "Die Datei wird im Arbeitsspeicher unserer Server in den Niederlanden gelesen und nicht gespeichert. Nur der kommentierte Bericht wird aufbewahrt: 2 Stunden ohne Zahlung, 24 Stunden nach der Zahlung, dann gelöscht. Nichts wird für etwas anderes verwendet.",
       "q3": "Was prüft die Prüfung, und was nicht?",

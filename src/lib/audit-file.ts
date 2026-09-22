@@ -21,7 +21,22 @@ import { checkPostalAddress, type AddressScheme } from './address-conformity.js'
 import type { IBANValidationResult } from '../types.js';
 
 export const AUDIT_MAX_ROWS = 20_000;
-export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+/**
+ * Byte ceiling on an upload, raised from 5 MB on 22/09/2026 so the volume the
+ * page SELLS can actually be delivered.
+ *
+ * The $349 tier is sold as "up to 20,000 rows". A real creditor master runs
+ * around 335 bytes per row over eight columns, so 20,000 rows weigh about
+ * 6.7 MB — measured that day, a 5 MB cap cut the file at roughly 14,700 rows
+ * and the customer met `file_too_large` on a file the price list promised to
+ * accept. The ceiling now leaves room for the row cap instead of contradicting
+ * it, with margin for a wider sheet (10 MB ≈ 500 bytes per row at the cap).
+ *
+ * The row cap, not this one, is what bounds the CPU: `readTable` counts lines
+ * before decoding a CSV and hands SheetJS `sheetRows`, so a bigger buffer buys
+ * an attacker bytes, never parsing work.
+ */
+export const AUDIT_MAX_BYTES = 10 * 1024 * 1024;
 /**
  * How many sheet rows the parser is allowed to materialise: the cap, the
  * header, and one row past the cap so `too_many_rows` still fires on exactly
@@ -163,6 +178,13 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
           sheetRows: SHEET_ROWS_CAP,
         });
   } catch (e) {
+    // 🚨 Our own verdicts leave by the front door. The `too_many_rows` guard a
+    // few lines up throws INSIDE this try, so until 22/09/2026 this catch
+    // reclassified it as `unreadable` — a file of 20,001 valid rows was told
+    // its format was broken, which blames the customer for a limit that is
+    // ours and hides the one instruction that fixes it ("split the file").
+    // Only a parser failure is an unreadable file.
+    if (e instanceof AuditFileError) throw e;
     throw new AuditFileError(
       'unreadable',
       `The file could not be read as CSV or XLSX (${(e as Error).message}).`,
