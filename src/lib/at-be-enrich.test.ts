@@ -144,7 +144,9 @@ describe('the register BIC wins the served pairing', () => {
     // AT 19510: the register says Liechtensteinische Landesbank (Österreich);
     // the composite map still said Zürcher Kantonalbank Österreich.
     const r = check('AT711951000001234567');
-    expect(r.bic?.code).toBe('COPRATWW');
+    // Was 'COPRATWW' while the seeder truncated. A head office is where the
+    // truncation looked harmless — the three characters it dropped were XXX.
+    expect(r.bic?.code).toBe('COPRATWWXXX');
     expect(r.bic?.basis).toBe('national_register');
     expect(r.bic?.authoritative).toBe(true);
   });
