@@ -14,6 +14,8 @@ interface StatCardV2Props {
   sparkline?: number[];
   accentColor?: string;
   hint?: ReactNode;
+  /** Lignes de détail sous la valeur (la tuile « Encaissé »). */
+  detail?: ReactNode;
 }
 
 function SparklineSVG({
@@ -96,6 +98,7 @@ export function StatCardV2({
   sparkline,
   accentColor = '#f59e0b',
   hint,
+  detail,
 }: StatCardV2Props) {
   return (
     <div className={styles.statCard}>
@@ -111,6 +114,9 @@ export function StatCardV2({
             {value}
           </p>
           {trend && <TrendBadge trend={trend} />}
+          {detail && (
+            <div className="mt-3 space-y-1 text-[11px] leading-snug text-[var(--fg-4)]">{detail}</div>
+          )}
         </div>
 
         {sparkline && sparkline.length >= 2 && (

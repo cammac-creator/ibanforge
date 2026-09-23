@@ -9,6 +9,8 @@ import type { BuildInput } from '@/lib/crm/build-contacts';
 import { moneySummary } from '@/lib/dashboard-overview';
 import { packUsdLabel, retainedPackSales, type PackSalesSnapshot } from '@/lib/dashboard/pack-sales';
 import { PackSalesCard } from './pack-sales-card';
+import { CollectedCard } from './collected-card';
+import { readStripeRevenuePayload } from '@/lib/dashboard/stripe-revenue';
 import { FailedPaymentsCard } from './failed-payments-card';
 import { ClientLinks } from './client-links';
 import { FetchFailed, type Fetched } from './fetching';
@@ -29,6 +31,7 @@ export async function MoneySection({
   digestPromise,
   packSalesPromise,
   failedPaymentsPromise,
+  stripeRevenuePromise,
 }: {
   compact?: boolean;
   locale: string;
@@ -42,10 +45,12 @@ export async function MoneySection({
   digestPromise: Promise<Fetched<{ digests: DigestEntry[] }>>;
   packSalesPromise: Promise<Fetched<PackSalesSnapshot>>;
   failedPaymentsPromise: Promise<Fetched<unknown>>;
+  /** GET /v1/admin/stripe-revenue : l'argent encaissé lu chez Stripe, ou son repli. */
+  stripeRevenuePromise: Promise<Fetched<unknown>>;
 }) {
   const t = await getTranslations('dashboard.overview');
   const w = await getTranslations('dashboard.workspace');
-  const [statsRes, historyRes, clientsRes, crm, digestRes, packsRes, refusRes] = await Promise.all([
+  const [statsRes, historyRes, clientsRes, crm, digestRes, packsRes, refusRes, collectedRes] = await Promise.all([
     statsPromise,
     historyPromise,
     clientsPromise,
@@ -53,6 +58,7 @@ export async function MoneySection({
     digestPromise,
     packSalesPromise,
     failedPaymentsPromise,
+    stripeRevenuePromise,
   ]);
 
   const now = new Date(nowIso);
@@ -61,6 +67,7 @@ export async function MoneySection({
   const snap = crm ? snapshotOnce(crm, nowIso) : null;
   const writable = snap ? writableIds(snap) : null;
   const packs = packsRes.ok ? retainedPackSales(packsRes.data) : null;
+  const collected = collectedRes.ok ? readStripeRevenuePayload(collectedRes.data) : null;
 
   // Real day-over-day delta, from the daily series. The one badge on this page
   // that was NOT a delta (ENS-02) has been removed rather than faked.
@@ -85,12 +92,19 @@ export async function MoneySection({
       {/* Une colonne sur téléphone : à deux colonnes, « 0.2780 USDC » se coupait en trois lignes
           dans une carte de 155 px (vu en production le 15.09.2026, WebKit 390 px). */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCardV2
-          title={t('money.packs')}
-          value={packUsdLabel(packs, locale)}
-          accentColor="#22c55e"
-          hint={t('money.packsHint')}
-        />
+        {/* L'argent encaissé lu chez Stripe (packs, abonnements, audits). Si la
+            route manque (une API pas encore redéployée), l'ancienne tuile des
+            packs reste : jamais un tiret là où un montant connu existe. */}
+        {collected ? (
+          <CollectedCard data={collected} locale={locale} />
+        ) : (
+          <StatCardV2
+            title={t('money.packs')}
+            value={packUsdLabel(packs, locale)}
+            accentColor="#22c55e"
+            hint={t('money.packsHint')}
+          />
+        )}
         <StatCardV2
           title={t('money.x402')}
           value={
