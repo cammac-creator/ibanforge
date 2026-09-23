@@ -17,6 +17,11 @@
  *
  * Idempotency is enforced via the `processed_webhooks` table: Stripe retries
  * webhooks aggressively, and we must not mint the same key twice.
+ *
+ * Renouvellements (23/09/2026) : `invoice.paid` consigne les factures
+ * `subscription_cycle` dans `subscription_payments`, sans rien frapper. Le
+ * premier paiement d'un abonnement reste sur sa clé (voir
+ * src/lib/subscription-payments.ts).
  */
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
@@ -32,6 +37,7 @@ import {
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
+import { recordSubscriptionInvoice } from '../lib/subscription-payments.js';
 import { notifyOps, opsFail } from '../lib/ops-alert.js';
 import {
   sendApiKeyEmail,
@@ -212,6 +218,33 @@ export function processStripeEvent(event: Stripe.Event): {
         subscription: sub.id,
         key_deactivated: deactivatedPrefix ?? false,
       },
+    };
+  }
+
+  // Renouvellement d'abonnement : aucune clé à frapper, un paiement à consigner.
+  // Seules les factures `subscription_cycle` entrent dans le registre ; la
+  // première facture (`subscription_create`) est déjà portée par la clé que
+  // checkout.session.completed a frappée, et toute autre facture est reçue et
+  // ignorée en le disant. Détail : src/lib/subscription-payments.ts.
+  //
+  // UNE transaction avec processed_webhooks, comme la branche audit : un arrêt
+  // entre les deux écritures laisserait soit un paiement sans évènement traité
+  // (Stripe rejoue, l'unicité de la facture tient), soit l'inverse (le
+  // renouvellement perdu pour toujours).
+  if (event.type === 'invoice.paid') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const outcome = db
+      .transaction(() => {
+        const result = recordSubscriptionInvoice(event.id, invoice, event.created ?? null, db);
+        db.prepare(
+          'INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
+        ).run(event.id, event.type);
+        return result;
+      })
+      .immediate();
+    return {
+      status: 200,
+      body: { received: true, event_id: event.id, invoice: invoice.id ?? null, ...outcome },
     };
   }
 

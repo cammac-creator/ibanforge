@@ -76,6 +76,8 @@ describe('ouverture du schéma', () => {
     ).map((t) => t.name);
     expect(tables).toContain('key_claims');
     expect(tables).toContain('key_settlements');
+    expect(tables).toContain('subscription_payments');
+    expect(indexes(db, 'subscription_payments')).toContain('idx_subscription_payments_sub');
     expect(columns(db, 'pending_verifications')).toContain('key_prefix');
     expect(indexes(db, 'api_keys')).toContain('idx_api_keys_prefix_unique');
     expect(indexes(db, 'key_creations')).toContain('idx_key_creations_created');
@@ -129,6 +131,8 @@ describe('ouverture du schéma', () => {
     });
     expect(rows[1].email_norm).toBeNull();
     expect(indexes(db, 'api_keys')).toContain('idx_api_keys_prefix_unique');
+    // Le registre des renouvellements se pose aussi sur une base ancienne.
+    expect(columns(db, 'subscription_payments')).toContain('invoice_id');
     mod.closeAll();
   });
 
