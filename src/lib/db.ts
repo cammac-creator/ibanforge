@@ -544,6 +544,36 @@ function openStatsDB(): DatabaseType.Database {
         subscription_id TEXT PRIMARY KEY,
         recorded_at TEXT DEFAULT (datetime('now'))
       );
+
+      -- Les renouvellements d'abonnement (invoice.paid, billing_reason
+      -- subscription_cycle) : le seul paiement d'abonnement qu'aucune clé ne
+      -- porte. Le premier paiement vit sur la clé frappée au Checkout
+      -- (api_keys.amount_paid_minor) et n'entre JAMAIS ici, sinon il serait
+      -- compté deux fois. Voir src/lib/subscription-payments.ts.
+      --
+      -- Deux unicités : l'évènement (Stripe rejoue) et la facture (la même
+      -- facture annoncée sous un autre évènement ne compte qu'une fois).
+      -- Un montant absent reste NULL, jamais 0 : « on ne nous l'a pas dit »
+      -- n'est pas « l'abonné n'a rien payé ».
+      --
+      -- Hors sauvegarde (src/lib/backup.ts), comme audit_sales et
+      -- processed_webhooks : ce registre se reconstitue depuis Stripe, qui garde
+      -- chaque facture payée, alors que la sauvegarde ne porte que ce qui ne se
+      -- reconstitue pas.
+      CREATE TABLE IF NOT EXISTS subscription_payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        stripe_event_id TEXT NOT NULL UNIQUE,
+        invoice_id TEXT NOT NULL UNIQUE,
+        subscription_id TEXT NOT NULL,
+        key_hash TEXT,
+        amount_paid_minor INTEGER,
+        amount_paid_currency TEXT,
+        billing_reason TEXT,
+        paid_at TEXT,
+        recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_subscription_payments_sub ON subscription_payments(subscription_id);
+      CREATE INDEX IF NOT EXISTS idx_subscription_payments_paid ON subscription_payments(paid_at);
     `);
     // One row per (key, month) once the holder has been warned they are near
     // the monthly ceiling. The PRIMARY KEY is the idempotency guarantee: a

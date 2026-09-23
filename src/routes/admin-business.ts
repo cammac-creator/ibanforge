@@ -25,6 +25,7 @@ import {
   type PathCount,
   type TrafficTotals,
 } from '../lib/business-summary.js';
+import { readSubscriptionRows, subscriptionsSold } from '../lib/subscription-payments.js';
 
 export const adminBusiness = new Hono();
 
@@ -220,10 +221,13 @@ adminBusiness.get('/admin/business-summary', (c) => {
       paths,
       clients,
       windowDays,
+      // Même règle interne que les crédits ci-dessus : deux totaux, une population.
+      subscriptions: subscriptionsSold(readSubscriptionRows(db), isInternal),
     }),
     docs:
       'Pass Bearer STATS_TOKEN. Aggregated conversion figures for the weekly report: ' +
-      'credit packs sold vs consumed, free-tier wall, steady unpaid users, client ' +
+      'credit packs sold vs consumed, subscriptions (first payment on the key, renewals ' +
+      'from invoice.paid) and total_sold_usd, free-tier wall, steady unpaid users, client ' +
       'concentration, and traffic split (402 and catalog reads separated out). ' +
       'Accounts are identified by key prefix and email domain only — never an address. ' +
       'Window via ?days=N (1-90, default 7).',

@@ -39,7 +39,12 @@ function ambiguous(row: PackKeyRow): boolean {
   return !!reference(row.stripe_session_id) && !!reference(row.x402_payment_ref);
 }
 
-function internal(email: string): boolean {
+/**
+ * La règle « compte interne » des montants conservés. Exportée pour que les
+ * autres lectures de la même tuile (abonnements, derived-revenue.ts) écartent
+ * exactement la même population que les packs.
+ */
+export function isInternalBuyer(email: string): boolean {
   // Les acheteurs sans adresse sont cachés du CRM, mais leurs paiements restent réels.
   const normalized = email.trim().toLowerCase();
   if (normalized === 'stripe-buyer' || normalized === 'credits-buyer') return false;
@@ -60,7 +65,7 @@ function groupBy(rows: PackKeyRow[], field: 'stripe_session_id' | 'x402_payment_
 
 function excluded(group: PackKeyRow[]): boolean {
   // Une copie non marquée ne transforme pas un cadeau ou un test en vente.
-  return group.some((row) => internal(row.email) || !!row.issued_by_us);
+  return group.some((row) => isInternalBuyer(row.email) || !!row.issued_by_us);
 }
 
 function firstCreatedAt(group: PackKeyRow[]): string | null {
@@ -111,7 +116,7 @@ export function summarizePackSales(rows: PackKeyRow[], now = new Date()): PackSa
     ambiguous_rail_keys: 0,
   };
   for (const row of credits) {
-    if (internal(row.email)) out.excluded_internal_credit_keys++;
+    if (isInternalBuyer(row.email)) out.excluded_internal_credit_keys++;
     else if (row.issued_by_us) out.granted_credit_keys++;
     else if (ambiguous(row)) out.ambiguous_rail_keys++;
     else if (!reference(row.stripe_session_id) && !reference(row.x402_payment_ref)) {

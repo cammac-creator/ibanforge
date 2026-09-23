@@ -2,6 +2,12 @@ import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from '../lib/db.js';
 import { packsSold, type PackKeyRow, type PacksSold } from '../lib/business-summary.js';
+import { isInternal } from '../lib/lifecycle-radar.js';
+import {
+  readSubscriptionRows,
+  subscriptionsSold,
+  type SubscriptionsSold,
+} from '../lib/subscription-payments.js';
 
 const adminRevenue = new Hono();
 
@@ -187,6 +193,19 @@ function packsSoldNow(): PacksSold {
   return packsSold(rows);
 }
 
+/**
+ * Les abonnements, à côté des packs et avec la même règle interne que
+ * packsSold (isInternal) : premier paiement lu sur la clé, renouvellements
+ * lus dans `subscription_payments`. Comme les packs par carte, cet argent
+ * n'atteint jamais le portefeuille USDC ci-dessus.
+ */
+function subscriptionsSoldNow(): SubscriptionsSold {
+  return subscriptionsSold(readSubscriptionRows(), isInternal);
+}
+
+const SUBSCRIPTIONS_NOTE =
+  'Subscriptions (Pro, Editor/OEM): the first payment is the amount Stripe reported on the key minted at checkout, renewals are the subscription_cycle invoices recorded from invoice.paid. The first invoice (subscription_create) is never recorded twice. USD only in usd/usd_minor; other currencies are counted, never converted. Paid by card, so never visible in the wallet figures.';
+
 function addressToTopic(addr: string): string {
   return '0x' + addr.slice(2).padStart(64, '0').toLowerCase();
 }
@@ -215,6 +234,8 @@ adminRevenue.get('/admin/revenue', async (c) => {
       contract: USDC_BASE_CONTRACT,
       balance_usdc: await fetchBalanceUsdc(wallet),
       packs_sold: packsSoldNow(),
+      subscriptions_sold: subscriptionsSoldNow(),
+      subscriptions_note: SUBSCRIPTIONS_NOTE,
       balance_only: true,
     });
   }
@@ -340,6 +361,8 @@ adminRevenue.get('/admin/revenue', async (c) => {
     received_internal_usdc: internalPayers.size ? round6(internalUsdc) : null,
     received_external_usdc: internalPayers.size ? round6(totalUsdc - internalUsdc) : null,
     packs_sold: packsSoldNow(),
+    subscriptions_sold: subscriptionsSoldNow(),
+    subscriptions_note: SUBSCRIPTIONS_NOTE,
     packs_note:
       'Prepaid credit packs actually SOLD, split by the rail that carried the money (stripe_session_id = card, x402_payment_ref = USDC). Card money never reaches the wallet above, so balance_usdc and total_received_usdc are structurally blind to it. `deduced_count` counts packs priced from the pack table because the processor amount was never stored: those dollars are a deduction, not a receipt, and any UI showing the total must say so.',
     transaction_count: cached.length,

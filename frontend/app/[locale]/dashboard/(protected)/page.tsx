@@ -138,6 +138,9 @@ export default async function DashboardPage({
   const signupSourcesWeekP = adminFor<SignupSources>(growth, '/v1/admin/signup-sources?days=7');
   const auditStatsP = adminFor<AuditStats>(growth, '/v1/admin/audit-stats?days=30');
   const packSalesP = adminFor<PackSalesSnapshot>(money, '/v1/admin/pack-sales');
+  // L'argent encaissé lu chez Stripe : la route répond 200 même quand Stripe
+  // tombe, avec le total selon les clés (fetchJSON jette le corps d'un non-2xx).
+  const stripeRevenueP = adminFor<unknown>(money, '/v1/admin/stripe-revenue');
   // 90 jours fixes : un refus de la semaine passée reste actionnable, la période
   // du reste de l'écran n'a pas de sens ici.
   const failedPaymentsP = adminFor<FailedPaymentsSnapshot>(
@@ -259,6 +262,7 @@ export default async function DashboardPage({
             digestPromise={digestP}
             packSalesPromise={packSalesP}
             failedPaymentsPromise={failedPaymentsP}
+            stripeRevenuePromise={stripeRevenueP}
           />
         </Suspense>
       )}
