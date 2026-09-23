@@ -1420,7 +1420,7 @@ html[data-js] .forge .scene {
   margin: 0.4rem 0 0.9rem;
 }
 /* Le slot portait « J-45 » : quatre caractères, taillés pour un compteur.
-   Depuis le 22/09/2026 il porte « fin novembre 2026 » (le compte à rebours a
+   Depuis le 22/09/2026 il porte « mi-novembre 2026 » (le compte à rebours a
    été retiré, plusieurs dates circulent) — dix-huit caractères, qui à 6,6rem
    débordent d'un téléphone. La taille descend et le texte a le droit de
    passer à la ligne ; tabular-nums part avec les chiffres qu'il alignait. */

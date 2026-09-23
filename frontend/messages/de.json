@@ -251,13 +251,13 @@
     },
     "deadline": {
       "eyebrow": "Stichtag",
-      "heading": "Ende November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
+      "heading": "Mitte November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
       "text": "POST /v1/address/check sagt gratis, ob eine Adresse die Schweizer, HVPS+- oder Fedwire-Regeln besteht, und nennt das Dokument; die Dateiprüfung nimmt eine ganze Arbeitsmappe.",
       "cta": "Die Regeln lesen, Schiene für Schiene",
-      "line1": "Ab Ende November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die geltenden Adressanforderungen erfüllen, wenn eine Adresse verwendet wird. Wir nennen den Tag nicht: Es kursieren mehrere Daten, und der Zeitplan hat sich bereits verschoben.",
+      "line1": "Ab Mitte November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die geltenden Adressanforderungen erfüllen, wenn eine Adresse verwendet wird. SIX nennt den 14. November; einen Countdown zeigen wir nicht mehr, weil sich die Zeitpläne der anderen Systeme bereits verschoben haben.",
       "line2": "Der EPC hat seine Frist vom 15. November am 9. September 2026 verschoben; ein neues Datum soll im Oktober festgelegt werden.",
       "line3": "Auch Swift hat seine Frist am 27. August 2026 verschoben. SIX veröffentlicht den Schweizer Zeitplan weiterhin separat.",
-      "window": "Ende November 2026",
+      "window": "Mitte November 2026",
       "windowLabel": "strukturierte Adressen · Schweizer Zeitplan"
     },
     "integrations": {
@@ -1909,7 +1909,7 @@
     "deadline": {
       "badge": "Stichtag",
       "title": "Strukturierte Adressen: getrennte Zeitpläne für die Schweiz, EPC und Swift",
-      "body": "Geprüft am 10. September 2026: SIX nennt für die Adressanforderungen der Swiss Payment Standards einen Stichtag Ende November 2026. Wir nennen den Tag nicht, es kursieren mehrere Daten. Am 9. September hat der EPC das Ende unstrukturierter Adressen in allen fünf Zahlungsschemen über den 15. November hinaus verschoben; ein neues Datum soll im Oktober festgelegt werden. Swift hat seine Zahlungsverkehrsänderungen am 27. August ebenfalls verschoben, mit einem Update spätestens im Dezember. Diese Ankündigungen ändern für sich allein den Schweizer Zeitplan nicht. Bereiten Sie Ihre Lieferantendaten weiterhin nach den Regeln des verwendeten Zahlungswegs vor.",
+      "body": "Geprüft am 10. September 2026: SIX nennt den 14. November 2026 als Stichtag für die Adressanforderungen der Swiss Payment Standards, für Zahlungsaufträge vom Kunden an seine Bank. Einen Countdown zeigen wir nicht mehr: Die anderen Zeitpläne haben sich verschoben. Am 9. September hat der EPC das Ende unstrukturierter Adressen in allen fünf Zahlungsschemen über den 15. November hinaus verschoben; ein neues Datum soll im Oktober festgelegt werden. Swift hat seine Zahlungsverkehrsänderungen am 27. August ebenfalls verschoben, mit einem Update spätestens im Dezember. Diese Ankündigungen ändern für sich allein den Schweizer Zeitplan nicht. Bereiten Sie Ihre Lieferantendaten weiterhin nach den Regeln des verwendeten Zahlungswegs vor.",
       "what": "Zwei Dinge, die diese API dafür tut, beide bereits produktiv. Eine kostenlose Konformitätsprüfung sagt Ihnen Regel für Regel, mit dem Dokument, aus dem jede Regel stammt, ob eine von Ihnen strukturierte Adresse auf einer bestimmten Schiene besteht. Und das Auflösen eines Clearing-Codes oder einer IBAN in einen BIC hebt die Adresspflicht des Agenten oft ganz auf: Wer den BIC hat, für den gilt dieser Zweig der Regel nicht.",
       "refused": "Abgelehnt: Land in Kleinbuchstaben und kein Ortselement",
       "accepted": "Akzeptiert: Ort, Land und Strasse in eigenen Elementen",
@@ -2323,7 +2323,7 @@
   },
   "audit": {
     "metaTitle": "Prüfung der Kreditorendatei: 149 $, Ergebnis sofort",
-    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist Ende November 2026.",
+    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist Mitte November 2026.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
     "intro": "Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN, Bankleitzahl, Bankname und BIC, SEPA-Erreichbarkeit, Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
@@ -2342,7 +2342,7 @@
       "note": "Eine Datei, eine Kartenzahlung über Stripe. Die kommentierte Arbeitsmappe (.xlsx) und die Zusammenfassung sind sofort nach der Zahlung bereit und bleiben 24 Stunden herunterladbar."
     },
     "deadline": {
-      "title": "Ende November 2026: SIX verarbeitet keine QR-Rechnungs-Zahlungen mit unstrukturierter Adresse mehr",
+      "title": "Mitte November 2026: SIX verarbeitet keine QR-Rechnungs-Zahlungen mit unstrukturierter Adresse mehr",
       "text": "Ab diesem Datum werden Daueraufträge und Zahlungsvorlagen auf Basis von QR-Rechnungen mit unstrukturierter Adresse nicht mehr verarbeitet. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
     },
     "upload": {
@@ -2442,7 +2442,7 @@
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
     },
-    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor Ende November 2026.",
+    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor Mitte November 2026.",
     "steps": {
       "title": "Drei Schritte, eine Datei",
       "s1t": "Datei ablegen",
@@ -2539,11 +2539,11 @@
   },
   "qrBill": {
     "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",
-    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, vor der SIX-Frist Ende November 2026.",
+    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, vor der SIX-Frist Mitte November 2026.",
     "eyebrow": "Kostenloses Tool",
-    "title": "Ist diese QR-Rechnung bereit für Ende November 2026?",
+    "title": "Ist diese QR-Rechnung bereit für Mitte November 2026?",
     "intro": "Fügen Sie den Text im Swiss-QR-Code ein (er beginnt mit SPC). Sie erhalten alle Urteile auf einmal: Kopfzeilen, Kreditoren-IBAN und QR-IBAN-Bereich, Referenz QRR, SCOR oder NON mit Prüfziffer, Betrag, Währung, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind. Eine kombinierte Adresse kommt mit den stattdessen zu verwendenden strukturierten Feldern zurück.",
-    "deadline": "Adressen vom Typ K wurden am 21. November 2025 aus dem Standard entfernt; ab Ende November 2026 verarbeiten die Banken darauf beruhende Daueraufträge und Zahlungsvorlagen nicht mehr.",
+    "deadline": "Adressen vom Typ K wurden am 21. November 2025 aus dem Standard entfernt; ab Mitte November 2026 verarbeiten die Banken darauf beruhende Daueraufträge und Zahlungsvorlagen nicht mehr.",
     "docsLink": "Dokumentation lesen",
     "input": {
       "label": "Text der QR-Rechnung (Swiss Payments Code)",
@@ -2554,7 +2554,7 @@
     },
     "result": {
       "valid": "Wohlgeformt",
-      "ready": "Bereit für Ende November 2026",
+      "ready": "Bereit für Mitte November 2026",
       "yes": "Ja",
       "no": "Nein",
       "iban": "Kreditoren-IBAN",

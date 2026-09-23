@@ -251,13 +251,13 @@
     },
     "deadline": {
       "eyebrow": "Échéance",
-      "heading": "Fin novembre 2026 : la Suisse cesse de traiter les adresses non structurées",
+      "heading": "Mi-novembre 2026 : la Suisse cesse de traiter les adresses non structurées",
       "text": "POST /v1/address/check dit gratuitement si une adresse passe les règles suisses, HVPS+ ou Fedwire, en nommant le document ; l’audit de fichier passe un classeur entier.",
       "cta": "Lire les règles, rail par rail",
-      "line1": "À partir de fin novembre 2026, les ordres de paiement relevant des Swiss Payment Standards doivent respecter les exigences d’adresse applicables lorsqu’une adresse est utilisée. Nous n’affichons pas le jour : plusieurs dates circulent et le calendrier a déjà bougé.",
+      "line1": "À partir de la mi-novembre 2026, les ordres de paiement relevant des Swiss Payment Standards doivent respecter les exigences d’adresse applicables lorsqu’une adresse est utilisée. SIX publie le 14 novembre ; nous n’affichons plus de compte à rebours, le calendrier des autres rails a déjà bougé.",
       "line2": "L’EPC a reporté son échéance du 15 novembre le 9 septembre 2026 ; une nouvelle date doit être fixée en octobre.",
       "line3": "Swift a aussi reporté son échéance le 27 août 2026. Le calendrier suisse reste publié séparément par SIX.",
-      "window": "fin novembre 2026",
+      "window": "mi-novembre 2026",
       "windowLabel": "adresses structurées · calendrier suisse"
     },
     "integrations": {
@@ -1909,7 +1909,7 @@
     "deadline": {
       "badge": "Échéance",
       "title": "Adresses structurées : calendriers distincts pour la Suisse, l’EPC et Swift",
-      "body": "Vérifié le 10 septembre 2026 : SIX publie une échéance de fin novembre 2026 pour les exigences d’adresse des Swiss Payment Standards. Nous n’en affichons pas le jour, plusieurs dates circulent. Le 9 septembre, l’EPC a reporté la fin des adresses non structurées de ses cinq schémas au-delà du 15 novembre ; il prévoit de fixer la nouvelle date en octobre. Swift a aussi reporté ses changements de paiement le 27 août, avec une mise à jour pour décembre au plus tard. Les annonces de l’EPC et de Swift ne changent pas à elles seules le calendrier suisse. Continuez à préparer vos données fournisseurs selon les règles du rail utilisé.",
+      "body": "Vérifié le 10 septembre 2026 : SIX publie le 14 novembre 2026 comme échéance des exigences d’adresse des Swiss Payment Standards, pour les ordres de paiement du client vers sa banque. Nous n’affichons plus de compte à rebours : les autres calendriers ont bougé. Le 9 septembre, l’EPC a reporté la fin des adresses non structurées de ses cinq schémas au-delà du 15 novembre ; il prévoit de fixer la nouvelle date en octobre. Swift a aussi reporté ses changements de paiement le 27 août, avec une mise à jour pour décembre au plus tard. Les annonces de l’EPC et de Swift ne changent pas à elles seules le calendrier suisse. Continuez à préparer vos données fournisseurs selon les règles du rail utilisé.",
       "what": "Deux choses que cette API fait pour vous, déjà en production. Un contrôle de conformité gratuit vous dit, règle par règle et avec le document dont chaque règle provient, si une adresse que vous avez structurée passe sur un rail donné. Et résoudre un code de clearing ou un IBAN en BIC supprime souvent l'obligation d'adresse de l'agent : détenez le BIC, et cette branche de la règle ne s'applique plus à vous.",
       "refused": "Refusée : un pays en minuscules et pas d'élément localité",
       "accepted": "Acceptée : localité, pays et rue dans leurs propres éléments",
@@ -2323,7 +2323,7 @@
   },
   "audit": {
     "metaTitle": "Audit de fichier de créanciers : 149 $, résultat immédiat",
-    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 $ jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX de fin novembre 2026.",
+    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 $ jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX de mi-novembre 2026.",
     "eyebrow": "Audit de fichier de créanciers",
     "title": "Contrôlez votre fichier de créanciers avant le prochain lot de paiements",
     "intro": "Chaque ligne passe par les mêmes registres que l'API IBANforge : IBAN, code banque, nom de banque et BIC, joignabilité SEPA, règles d'adresse ISO 20022. Vous voyez gratuitement quoi corriger ; le classeur annoté a un prix affiché, payé par carte, téléchargeable sur-le-champ.",
@@ -2342,7 +2342,7 @@
       "note": "Un fichier, un paiement par carte sur Stripe. Le classeur annoté (.xlsx) et la synthèse sont prêts dès le paiement et restent téléchargeables 24 heures."
     },
     "deadline": {
-      "title": "Fin novembre 2026 : SIX cesse de traiter les paiements QR-facture à adresse non structurée",
+      "title": "Mi-novembre 2026 : SIX cesse de traiter les paiements QR-facture à adresse non structurée",
       "text": "Dès cette date, les ordres permanents et modèles de paiement fondés sur des QR-factures à adresse non structurée ne sont plus traités. Si votre fichier de créanciers a des colonnes rue, NPA et localité, l'audit vous dit quelles lignes ne sont pas prêtes."
     },
     "upload": {
@@ -2442,7 +2442,7 @@
       "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
       "back": "Retour à la page d'audit"
     },
-    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 $ pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant fin novembre 2026.",
+    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 $ pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant mi-novembre 2026.",
     "steps": {
       "title": "Trois étapes, un fichier",
       "s1t": "Déposez votre fichier",
@@ -2539,11 +2539,11 @@
   },
   "qrBill": {
     "metaTitle": "Contrôle de QR-facture suisse : adresse structurée ou combinée, QR-IBAN et référence, gratuit",
-    "metaDescription": "Collez le texte d'un code QR-facture suisse et voyez chaque verdict : en-tête, appariement QR-IBAN et référence, sommes de contrôle, montant, et si les adresses sont structurées (type S) ou encore combinées (type K) avant l'échéance SIX de fin novembre 2026.",
+    "metaDescription": "Collez le texte d'un code QR-facture suisse et voyez chaque verdict : en-tête, appariement QR-IBAN et référence, sommes de contrôle, montant, et si les adresses sont structurées (type S) ou encore combinées (type K) avant l'échéance SIX de mi-novembre 2026.",
     "eyebrow": "Outil gratuit",
-    "title": "Cette QR-facture est-elle prête pour fin novembre 2026 ?",
+    "title": "Cette QR-facture est-elle prête pour la mi-novembre 2026 ?",
     "intro": "Collez le texte contenu dans un code QR-facture suisse (il commence par SPC). Vous obtenez tous les verdicts d'un coup : en-tête, IBAN du créancier et plage QR-IBAN, référence QRR, SCOR ou NON et sa somme de contrôle, montant, monnaie, et si les adresses sont structurées (type S) ou encore combinées (type K). Une adresse combinée revient avec les champs structurés à utiliser à la place.",
-    "deadline": "Les adresses de type K ont été retirées de la norme le 21 novembre 2025 ; à partir de fin novembre 2026, les banques ne traitent plus les ordres permanents et modèles de paiement qui s'appuient dessus.",
+    "deadline": "Les adresses de type K ont été retirées de la norme le 21 novembre 2025 ; à partir de la mi-novembre 2026, les banques ne traitent plus les ordres permanents et modèles de paiement qui s'appuient dessus.",
     "docsLink": "Lire la documentation",
     "input": {
       "label": "Texte de la QR-facture (Swiss Payments Code)",
@@ -2554,7 +2554,7 @@
     },
     "result": {
       "valid": "Bien formée",
-      "ready": "Prête pour fin novembre 2026",
+      "ready": "Prête pour la mi-novembre 2026",
       "yes": "Oui",
       "no": "Non",
       "iban": "IBAN du créancier",

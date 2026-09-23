@@ -89,13 +89,14 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   // "refreshed monthly" becomes a dated fact, never typed by hand (S4).
   //
   // 🚨 The day counter that used to stand here was REMOVED on 22/09/2026, on
-  // Claude-Alain's decision. It counted down to 14.11.2026 to the day, and
-  // three different November dates are in circulation for the same change
-  // (14, 20 and 21); Swift deferred its own November changes on 27.08.2026 and
-  // the EPC postponed on 09.09.2026. A countdown is a precision claim, and
-  // this one asserted a day nobody can settle — the surest way to be caught
-  // wrong on the page that has to be trusted. The band now says "end of
-  // November 2026" and keeps the three dated facts below it.
+  // Claude-Alain's decision. It counted down to 14.11.2026, the day SIX
+  // publishes for customer-to-bank payment orders (the 21 November date that
+  // circulates is the 2025 removal of type K addresses, not a 2026 deadline).
+  // Swift deferred its own November changes on 27.08.2026 and the EPC
+  // postponed on 09.09.2026. A countdown is a precision claim about what
+  // happens to a payment on that day, and that claim is not ours to make. The
+  // band now says "mid-November 2026", cites SIX's day in its body, and keeps
+  // the dated facts below it.
   const refreshedOn = liveStats.bicDataLastUpdated
     ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
         .format(new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`))
@@ -183,11 +184,12 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── The dated trigger: end of November 2026 (audit 2026-09-04, M3) ────
+      {/* ── The dated trigger: mid-November 2026 (audit 2026-09-04, M3) ─────
           It was the seventh line of the endpoint list, at 80 % of the page.
           The dates below are the ones our own doc and the 2026-09-02 post cite,
           source by source; Swift's suspension of 27 August 2026 is named. The
-          band names a MONTH, not a day — see the note beside `refreshedOn`. */}
+          heading names the month and the body cites SIX's day (14 November),
+          without a countdown — see the note beside `refreshedOn`. */}
       <section className="deadline" aria-labelledby="h-deadline">
         <div className="wrap deadline-grid">
           <div>
