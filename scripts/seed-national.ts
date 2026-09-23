@@ -16,7 +16,10 @@
  * AUSTRIA — Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis.
  * Republished DAILY, which is finer than the Bundesbank's monthly cycle. The
  * file is Latin-1 and semicolon-separated: decoding it as UTF-8 mangles every
- * umlaut in a bank name, the same trap the German seeder documents.
+ * umlaut in a bank name, the same trap the German seeder documents. Its
+ * `SWIFT-Code` column is 11 characters on EVERY row, and on most of them the
+ * branch code is not XXX — see bicAsPublished below for why that is data and
+ * not noise to be trimmed.
  *
  * BELGIUM — Banque nationale de Belgique, Secrétariat du Protocole. The file
  * publishes ALL 1000 three-digit slots and writes 'VRIJ' (Dutch for vacant) in
@@ -178,10 +181,29 @@ function pad(code: string, width: number): string | null {
   return d.padStart(width, '0');
 }
 
-/** A BIC column may carry an 11-character BIC; we store the 8-character stem. */
-function bic8(raw: string): string | null {
+/**
+ * A register's BIC column, stored exactly as that register publishes it — 11
+ * characters where it publishes 11, 8 where it publishes 8.
+ *
+ * 🚨 This used to cut every value to the 8-character stem, and in a cooperative
+ * network that is not a normalisation, it is a change of subject. The OeNB file
+ * publishes all of its BIC at 11 characters and most of them carry a branch code
+ * other than XXX; in the Austrian Raiffeisen network those last three characters
+ * name the LOCAL bank — a separate legal entity with its own LEI — while the
+ * first eight name the Raiffeisenlandesbank it clears through. Truncating served
+ * the Landesbank's BIC beside the local bank's name, with basis
+ * `national_register` and `authoritative: true`, which is the strongest claim
+ * this API makes. It is the same defect the German block in enrich.ts documents
+ * for Sparkassen (a German integrator dropped the API over it), and the same
+ * answer: the register publishes a pairing, so we serve that pairing whole.
+ *
+ * The form check is anchored now, so a 9, 10 or 12-character value is REFUSED
+ * rather than salvaged. Truncation is what made salvaging look harmless: without
+ * it, a half-read field would be stored and served as a BIC.
+ */
+function bicAsPublished(raw: string): string | null {
   const b = (raw ?? '').replace(/\s/g, '').toUpperCase();
-  return /^[A-Z]{6}[A-Z0-9]{2}/.test(b) ? b.slice(0, 8) : null;
+  return /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(b) ? b : null;
 }
 
 async function fetchBytes(url: string): Promise<Buffer> {
@@ -230,7 +252,7 @@ async function parseAustria(): Promise<Entry[]> {
     seen.set(code, {
       code,
       name,
-      bic: iBic >= 0 ? bic8(f[iBic] ?? '') : null,
+      bic: iBic >= 0 ? bicAsPublished(f[iBic] ?? '') : null,
       street: opt(f, iStreet),
       post_code: opt(f, iPlz),
       town: opt(f, iOrt),
@@ -277,7 +299,7 @@ async function parseBelgium(): Promise<Entry[]> {
     seen.set(code, {
       code,
       name,
-      bic: bic8(rawBic),
+      bic: bicAsPublished(rawBic),
       street: null,
       post_code: null,
       town: null,
@@ -461,7 +483,7 @@ export function parseSlovakia(text: string, edition: SlovakEdition): Entry[] {
     seen.set(code, {
       code,
       name,
-      bic: bic8(f[iBic] ?? ''),
+      bic: bicAsPublished(f[iBic] ?? ''),
       // The prevodník publishes a name and a BIC, no address at all — the same
       // honest shape as Belgium. Nulls here are what the NBS publishes, not
       // data missing on our side, and inventing an address would be the
@@ -572,7 +594,7 @@ export function parseSanMarino(html: string, readOn: string): Entry[] {
     entries.push({
       code,
       name,
-      bic: bic8(bic),
+      bic: bicAsPublished(bic),
       street: addr ? addr[1].trim() : null,
       post_code: addr ? addr[2] : null,
       town: addr ? addr[3].trim() : null,

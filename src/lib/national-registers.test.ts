@@ -59,13 +59,17 @@ describe('lookupNationalCode', () => {
 
   it.skipIf(skipIf('AT'))('resolves an Austrian institution', () => {
     const hit = lookupNationalCode('AT', '12000');
-    expect(hit?.bic).toBe('BKAUATWW');
+    // The OeNB publishes 11 characters on every row, head offices included, and
+    // the seeder stores what it publishes. This used to read 'BKAUATWW': the
+    // truncation was invisible here because for a head office the trimmed three
+    // characters are XXX, while one code group over they name a different bank.
+    expect(hit?.bic).toBe('BKAUATWWXXX');
     expect(hit?.name).toMatch(/Bank Austria/i);
   });
 
   it.skipIf(skipIf('AT'))('resolves the code the register writes unpadded', () => {
     // Published as '100', carried in an IBAN as '00100'.
-    expect(lookupNationalCode('AT', '00100')?.bic).toBe('NABAATWW');
+    expect(lookupNationalCode('AT', '00100')?.bic).toBe('NABAATWWXXX');
   });
 
   it.skipIf(skipIf('AT'))('denies an Austrian code the register does not carry', () => {

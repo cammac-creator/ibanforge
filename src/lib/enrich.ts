@@ -904,7 +904,13 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           // for the BIC the register named, the same division of labour the
           // Bulgarian block below documents: one source decides WHICH
           // institution holds the code, the directory only supplies details.
-          city: reg.town ?? lookup(`${reg.bic}XXX`)?.city ?? null,
+          //
+          // The BIC is appended with XXX only when the register published 8
+          // characters. Austria publishes 11 (branch code included, and often
+          // not XXX), so concatenating unconditionally built a 14-character
+          // string that matches nothing — a lookup guaranteed to miss rather
+          // than one that resolves the branch's own directory row.
+          city: reg.town ?? lookup(reg.bic.length === 8 ? `${reg.bic}XXX` : reg.bic)?.city ?? null,
           // The register's own credit where it stores one — Slovakia, whose
           // terms make naming the source a condition of reuse, and San Marino,
           // whose licence is unknown and which is therefore credited by choice

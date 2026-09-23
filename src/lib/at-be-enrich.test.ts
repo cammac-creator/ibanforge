@@ -144,7 +144,9 @@ describe('the register BIC wins the served pairing', () => {
     // AT 19510: the register says Liechtensteinische Landesbank (Österreich);
     // the composite map still said Zürcher Kantonalbank Österreich.
     const r = check('AT711951000001234567');
-    expect(r.bic?.code).toBe('COPRATWW');
+    // Was 'COPRATWW' while the seeder truncated. A head office is where the
+    // truncation looked harmless — the three characters it dropped were XXX.
+    expect(r.bic?.code).toBe('COPRATWWXXX');
     expect(r.bic?.basis).toBe('national_register');
     expect(r.bic?.authoritative).toBe(true);
   });
@@ -157,5 +159,67 @@ describe('the register BIC wins the served pairing', () => {
     const r = check('BE02102123456740');
     expect(r.bank_code_check?.status).toBe('verified');
     expect(r.bic).toBeNull();
+  });
+});
+
+/**
+ * The Austrian branch code is part of the answer, not noise to be trimmed.
+ *
+ * The OeNB publishes every BIC at 11 characters and most of them carry a branch
+ * code other than XXX. The seeder used to cut all of them to the 8-character
+ * stem, and in the Austrian Raiffeisen network that stem is the
+ * Raiffeisenlandesbank the local bank clears through — a different legal entity,
+ * with a different LEI. So the API served the Landesbank's BIC beside the local
+ * bank's name, under `basis: national_register` and `authoritative: true`.
+ *
+ * It is the same defect the German block of resolveBank documents for Sparkassen
+ * (MALADE51WOR against MALADE51), one register over, and it is pinned here the
+ * same way: against the register, on a synthetic IBAN whose check digits are
+ * verified before anything is asserted.
+ *
+ * These assertions name a real allocation, so a merger in the Raiffeisen network
+ * can retire one. That is the intended failure: the register moved and the
+ * expectation has to be re-read from it, which is cheaper than a silent return
+ * to serving the wrong institution.
+ */
+describe('Austria serves the branch code the OeNB publishes', () => {
+  it.skipIf(noAT)('serves the local bank BIC, not the Landesbank stem', () => {
+    // BLZ 32025, a Raiffeisenbank whose BIC ends AMS while RLNWATWW alone names
+    // the Raiffeisenlandesbank Niederösterreich-Wien.
+    const r = check('AT033202500000000001');
+    expect(r.bic?.code).toBe('RLNWATWWAMS');
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(true);
+    // The name beside it is the local bank's, which is exactly what made the
+    // truncated answer self-contradicting.
+    expect(r.bic?.bank_name).toMatch(/Amstetten/);
+  });
+
+  it.skipIf(noAT)('keeps the eleventh character out of the institution stem', () => {
+    // Stated separately from the equality above so a future change that
+    // reintroduces truncation fails on the reason rather than on a literal.
+    const code = check('AT033202500000000001').bic?.code;
+    expect(code).toHaveLength(11);
+    expect(code?.slice(8)).not.toBe('XXX');
+    expect(code?.slice(0, 8)).toBe('RLNWATWW');
+  });
+
+  it.skipIf(noAT)('serves a head office at eleven characters too, ending XXX', () => {
+    // BLZ 12000 has no branch code of its own: the register writes XXX. Storing
+    // what the register publishes means the suffix is served rather than
+    // rebuilt, so this is where the old truncation looked harmless.
+    const r = check('AT851200000000000001');
+    expect(r.bic?.code).toBe('BKAUATWWXXX');
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(true);
+  });
+
+  it.skipIf(noBE)('leaves Belgium on the eight characters the NBB publishes', () => {
+    // The change is "store what the source publishes", not "store eleven". The
+    // NBB file carries 8-character BIC and Belgium must not grow an invented
+    // XXX suffix.
+    const r = check('BE23001123456789');
+    expect(r.bic?.code).toBe('GEBABEBB');
+    expect(r.bic?.basis).toBe('national_register');
   });
 });
