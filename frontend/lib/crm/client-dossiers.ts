@@ -592,6 +592,8 @@ export async function fetchCompanyProfiles(): Promise<Record<string, CompanyProf
 
 export function chipOfDossier(d: ClientDossier): BusinessChip | null {
   const a = d.activation;
+  // Same rule, same place as chipOf: a subscriber outranks every status.
+  if (a?.subscriber) return chipForStatus('subscriber');
   if (a?.status === 'paying') return chipForStatus('paying');
   if (a?.status === 'dormant') return chipForStatus('dormant');
   if (a?.status === 'at-limit') return chipForStatus('at-limit');
@@ -614,6 +616,7 @@ export function heatOfDossier(d: ClientDossier, now: Date): Heat {
   };
   return heatFromFacts({
     packs: d.keys.filter((k) => k.plan === 'credits').length,
+    subscriber: d.activation?.subscriber === true,
     dormant: d.activation?.status === 'dormant',
     atLimit: d.activation?.status === 'at-limit',
     last7: inWindow(7, 0),

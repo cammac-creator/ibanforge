@@ -10,7 +10,7 @@ import { InfoDot } from './info-dot';
  */
 export interface ActivationClientRow {
   email: string;
-  keys: Array<{ key_prefix: string; role: 'free' | 'paid'; active: number }>;
+  keys: Array<{ key_prefix: string; role: 'free' | 'paid' | 'subscription'; active: number }>;
   signup_at: string;
   source: string;
   first_call_at: string | null;
@@ -22,6 +22,8 @@ export interface ActivationClientRow {
   credits_total: number;
   credits_remaining: number;
   packs: number;
+  /** A live subscription (Pro, Editor/OEM). Optional: Vercel and Railway ship apart. */
+  subscriber?: boolean;
   status: 'new' | 'active' | 'at-limit' | 'paying' | 'dormant' | 'silent';
 }
 
@@ -178,10 +180,18 @@ export function ClientsTable({ clients, locale }: { clients: ActivationClientRow
                   <tr key={c.email} className="border-b border-[var(--ink-4)]/50 last:border-0">
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-1.5">
-                        {c.packs > 0 && (
-                          <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-400">
-                            payant
+                        {c.subscriber ? (
+                          // The CRM's subscriber chip, same solid gold: the one
+                          // client to recognise first on every surface.
+                          <span className="rounded bg-[#facc15] px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#1c1400]">
+                            ★ abonné
                           </span>
+                        ) : (
+                          c.packs > 0 && (
+                            <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-400">
+                              payant
+                            </span>
+                          )
                         )}
                         <span className="max-w-[240px] truncate text-[var(--fg-1)]" title={c.email}>
                           {c.email}

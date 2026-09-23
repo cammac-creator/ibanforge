@@ -1,4 +1,4 @@
-import type { Contact } from './types';
+import type { BusinessInfo, Contact } from './types';
 
 /**
  * The one word the list is allowed to say about a contact's business state,
@@ -18,6 +18,11 @@ export interface BusinessChip {
 }
 
 const CHIP: Record<string, BusinessChip> = {
+  // The one chip allowed to shout. A subscriber is the client to serve first
+  // (asked on 23/09/2026: recognise them at a glance, as a priority), so this
+  // is the only SOLID chip: every other one is a tint, and a subscriber must
+  // not read as one more status among them.
+  subscriber: { label: '★ abonné', color: '#1c1400', bg: '#facc15' },
   paying: { label: 'payant', color: '#22c55e', bg: 'rgba(34,197,94,.12)' },
   dormant: { label: 'endormi', color: '#f59e0b', bg: 'rgba(245,158,11,.12)' },
   'at-limit': { label: 'à la limite', color: '#ef4444', bg: 'rgba(239,68,68,.12)' },
@@ -89,6 +94,15 @@ export function chipForStatus(status: keyof typeof CHIP): BusinessChip {
   return CHIP[status];
 }
 
+/**
+ * Paying either way: a credit pack or a live subscription. The one test the
+ * CRM uses for "is this a paying customer", so a queue, a chip and a sort order
+ * cannot disagree about it.
+ */
+export function isPayer(b: Pick<BusinessInfo, 'packs' | 'subscriber'> | null | undefined): boolean {
+  return (b?.packs ?? 0) > 0 || b?.subscriber === true;
+}
+
 export function chipOf(c: Contact): BusinessChip | null {
   // First, ahead of every business word. What an authority IS outranks any
   // activation verdict that could somehow be attached to it, and build-contacts
@@ -96,6 +110,9 @@ export function chipOf(c: Contact): BusinessChip | null {
   // stray join can never dress a supervisor as a paying customer.
   if (c.kind === 'institution') return institutionChip(c.institution.category);
   const b = c.business;
+  // Ahead of every other business word: the subscriber is the client to spot
+  // first. The kind guard keeps the rule on customers only.
+  if (c.kind === 'client' && b?.subscriber) return CHIP.subscriber;
   if (b) {
     if (b.status === 'paying') return CHIP.paying;
     if (b.status === 'dormant') return CHIP.dormant;

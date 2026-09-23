@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDossiers,
+  chipOfDossier,
   denseDays,
   sortDossiers,
   type ClientProfileRow,
@@ -542,5 +543,37 @@ describe('offBooks — real traffic that is not a customer (TABS-02, TABS-08)', 
     const customers = dossiers.filter((d) => !d.offBooks);
     expect(customers.reduce((s, d) => s + d.requests, 0)).toBe(40);
     expect(dossiers.filter((d) => d.offBooks).reduce((s, d) => s + d.requests, 0)).toBe(600);
+  });
+});
+
+describe('a subscriber on the Clients page', () => {
+  const activation = (over: Record<string, unknown> = {}) => ({
+    email: 'sub@alpha.example.net',
+    status: 'paying' as const,
+    source: 'direct',
+    credits_total: 0,
+    credits_remaining: 0,
+    packs: 0,
+    first_call_at: '2026-07-20 08:00:00',
+    calls_90d: 30,
+    ...over,
+  });
+
+  it('wears the subscriber chip, read from the activation verdict', () => {
+    const d = buildDossiers({
+      ...base,
+      keys: [keyRow('sub@alpha.example.net', { key_prefix: 'ifk_s' })],
+      activation: [activation({ subscriber: true })],
+    })[0];
+    expect(chipOfDossier(d)?.label).toBe('★ abonné');
+  });
+
+  it('an activation row from an API without the field is no subscriber', () => {
+    const d = buildDossiers({
+      ...base,
+      keys: [keyRow('sub@alpha.example.net', { key_prefix: 'ifk_s' })],
+      activation: [activation({ packs: 1, credits_total: 1000, credits_remaining: 900 })],
+    })[0];
+    expect(chipOfDossier(d)?.label).toBe('payant');
   });
 });
