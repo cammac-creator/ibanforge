@@ -39,6 +39,19 @@ import { getStatsDB } from './db.js';
 
 type Db = ReturnType<typeof getStatsDB>;
 
+/**
+ * LA règle qui reconnaît une clé d'abonnement, écrite une seule fois pour tout
+ * le dépôt : src/lib/activation.ts s'en sert pour le drapeau `subscriber` (le
+ * CRM et l'entonnoir), et readSubscriptionRows ci-dessous pour l'argent. Un
+ * identifiant d'abonnement Stripe, ou à défaut la forme que toute clé
+ * d'abonnement a et qu'aucune clé à crédits ne peut avoir : payée par Checkout,
+ * sans crédits. Deux règles auraient pu désigner deux populations d'abonnés.
+ *
+ * Fragment SQL sur `api_keys`, à mettre entre parenthèses dans un WHERE.
+ */
+export const SUBSCRIPTION_KEY_SQL =
+  'stripe_subscription_id IS NOT NULL OR (stripe_session_id IS NOT NULL AND credits_total IS NULL)';
+
 /** L'identifiant d'un objet Stripe, qu'il arrive en chaîne ou développé. */
 export function stripeId(value: unknown): string | null {
   if (typeof value === 'string') return value || null;
@@ -208,6 +221,11 @@ export function recordSubscriptionInvoice(
 /** Une clé d'abonnement : frappée au Checkout, ou recopiée par une rotation. */
 export interface SubscriptionKeyRow {
   email: string;
+  /**
+   * Une clé à crédits n'apporte jamais de premier paiement d'abonnement : son
+   * montant est celui d'un pack, déjà compté par la lecture des packs.
+   */
+  credits_total?: number | null;
   stripe_session_id: string | null;
   stripe_subscription_id: string | null;
   amount_paid_minor: number | null;
@@ -330,6 +348,9 @@ export function subscriptionsSold(
     }
     const session = k.stripe_session_id?.trim();
     if (!session || excludedSessions.has(session)) continue;
+    // Jamais deux fois le même argent : un montant porté par une clé à crédits
+    // appartient aux packs, même si la clé portait aussi un abonnement.
+    if ((k.credits_total ?? 0) > 0) continue;
     const group = sessions.get(session) ?? [];
     group.push(k);
     sessions.set(session, group);
@@ -393,15 +414,14 @@ export function readSubscriptionRows(db: Db = getStatsDB()): {
   keys: SubscriptionKeyRow[];
   payments: SubscriptionPaymentRow[];
 } {
-  // Une clé d'abonnement n'a pas de crédits ; les clés inactives restent (une
+  // La règle partagée avec activation.ts ; les clés inactives restent (une
   // rotation ou une résiliation n'efface pas le paiement d'origine).
   const keys = db
     .prepare(
-      `SELECT email, stripe_session_id, stripe_subscription_id, amount_paid_minor,
+      `SELECT email, credits_total, stripe_session_id, stripe_subscription_id, amount_paid_minor,
               amount_paid_currency, issued_by_us, active, created_at
          FROM api_keys
-        WHERE (stripe_subscription_id IS NOT NULL OR stripe_session_id IS NOT NULL)
-          AND credits_total IS NULL`,
+        WHERE (${SUBSCRIPTION_KEY_SQL})`,
     )
     .all() as SubscriptionKeyRow[];
   const payments = db

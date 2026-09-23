@@ -2,6 +2,7 @@ import { getStatsDB } from './db.js';
 import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { isInternalEmail } from './internal-accounts.js';
 import { getServiceUsage, type ServiceUsage } from './service-usage.js';
+import { SUBSCRIPTION_KEY_SQL } from './subscription-payments.js';
 
 /**
  * Per-EMAIL activation picture. The unit is deliberately the email, never the
@@ -168,11 +169,10 @@ export function getActivation(days = 30): ActivationResponse {
       // can have: paid through Stripe Checkout, yet no credits. The second term
       // is the same rule the CRM already applies to /v1/admin/keys (`paid` and
       // no credits_total), so the two surfaces cannot disagree about who is a
-      // subscriber.
+      // subscriber. The rule is written once, in subscription-payments.ts, and
+      // the revenue readings use the same text: one population of subscribers.
       `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier,
-              CASE WHEN stripe_subscription_id IS NOT NULL
-                     OR (stripe_session_id IS NOT NULL AND credits_total IS NULL)
-                   THEN 1 ELSE 0 END AS subscription
+              CASE WHEN ${SUBSCRIPTION_KEY_SQL} THEN 1 ELSE 0 END AS subscription
        FROM api_keys ORDER BY email, created_at`,
     )
     .all() as KeyRow[];

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { getStatsDB } from './db.js';
 import {
   invoiceSubscriptionId,
+  readSubscriptionRows,
   sqliteUtc,
   stripeId,
+  SUBSCRIPTION_KEY_SQL,
   subscriptionsSold,
   type SubscriptionKeyRow,
   type SubscriptionPaymentRow,
@@ -187,5 +190,40 @@ describe('ce qui a été vendu en abonnements', () => {
     );
     expect(sold.first_payments).toBe(0);
     expect(sold.usd_minor).toBe(0);
+  });
+});
+
+describe('une seule règle pour reconnaître un abonné, et jamais deux fois le même argent', () => {
+  it('la règle partagée avec activation.ts ne prend que les clés d’abonnement', () => {
+    const db = getStatsDB();
+    db.exec('DELETE FROM api_keys');
+    const insert = db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, credits_total, stripe_session_id,
+         stripe_subscription_id) VALUES (?, ?, 'abonne@alpha.example.net', ?, ?, ?)`,
+    );
+    insert.run('h_sub_id', 'ifk_rule0001', null, null, 'sub_rule');
+    insert.run('h_sub_shape', 'ifk_rule0002', null, 'cs_rule_sub', null);
+    insert.run('h_pack', 'ifk_rule0003', 1000, 'cs_rule_pack', null);
+    insert.run('h_free', 'ifk_rule0004', null, null, null);
+    const picked = (
+      db
+        .prepare(
+          `SELECT key_prefix FROM api_keys WHERE (${SUBSCRIPTION_KEY_SQL}) ORDER BY key_prefix`,
+        )
+        .all() as Array<{ key_prefix: string }>
+    ).map((r) => r.key_prefix);
+    expect(picked).toEqual(['ifk_rule0001', 'ifk_rule0002']);
+    expect(readSubscriptionRows(db).keys).toHaveLength(2);
+  });
+
+  it("une clé à crédits n'apporte jamais de premier paiement d'abonnement : c'est un pack", () => {
+    const sold = subscriptionsSold(
+      { keys: [keyRow({ credits_total: 1000, amount_paid_minor: 400 })], payments: [] },
+      nobodyInternal,
+    );
+    expect(sold.first_payments).toBe(0);
+    expect(sold.usd_minor).toBe(0);
+    // L'abonnement reste compté dans la population, pas son argent.
+    expect(sold.subscriptions).toBe(1);
   });
 });
