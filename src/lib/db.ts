@@ -1250,6 +1250,27 @@ function openStatsDB(): DatabaseType.Database {
         'CREATE INDEX IF NOT EXISTS idx_request_log_agent_signature ON request_log(agent_signature) WHERE agent_signature IS NOT NULL',
       );
     }
+    // Le NOM de l'outil MCP appelé (22/09/2026).
+    //
+    // Tout `/mcp` se rangeait sous un seul chemin : `validate_iban`,
+    // `check_compliance` et `request_api_key` étaient indiscernables dans le
+    // journal, donc on ne pouvait pas dire ce que les agents viennent chercher
+    // — alors que la route parse déjà ce nom pour compter les unités et le
+    // jetait ensuite.
+    //
+    // 🚨 Une COLONNE et non un suffixe de `path` : les compteurs existants
+    // testent l'égalité `path = '/mcp:tools-call'` (télémétrie, usage par
+    // service, classification du client). Un chemin par outil les mettrait
+    // tous à zéro sans qu'aucun test ne rougisse ailleurs.
+    //
+    // Index partiel : la colonne est NULL sur tout le trafic REST, c'est-à-dire
+    // la quasi-totalité des lignes, et un index plein paierait pour elles.
+    if (!reqCols.includes('tool_name')) {
+      statsDB.exec('ALTER TABLE request_log ADD COLUMN tool_name TEXT');
+      statsDB.exec(
+        'CREATE INDEX IF NOT EXISTS idx_request_log_tool_name ON request_log(tool_name) WHERE tool_name IS NOT NULL',
+      );
+    }
     // CRM timeline: French translation + detected language of foreign messages.
     const msgCols = (
       statsDB.prepare('PRAGMA table_info(email_messages)').all() as Array<{ name: string }>

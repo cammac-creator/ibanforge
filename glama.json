@@ -5,9 +5,9 @@
   ],
   "name": "IBANforge",
   "description": "Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, sanctions screening (OFAC) + SEPA/VoP reachability and risk scoring. 121k+ BIC entries (39k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,100+ Swiss clearing entries from SIX BankMaster (refreshed monthly), 89 countries. MCP-native + x402 micropayments on Base L2, free tier.",
-  "homepage": "https://ibanforge.com",
+  "homepage": "https://ibanforge.com?src=glama",
   "repository": "https://github.com/cammac-creator/ibanforge",
-  "documentation": "https://ibanforge.com/docs/mcp",
+  "documentation": "https://ibanforge.com/docs/mcp?src=glama",
   "categories": [
     "finance",
     "compliance",

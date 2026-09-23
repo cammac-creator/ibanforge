@@ -1,5 +1,6 @@
 import { getStatsDB } from './db.js';
 import { fillLineageEntry } from './lineage-facts.js';
+import { isDoorOrigin } from './key-origins.js';
 
 /**
  * Where a signup came from.
@@ -103,11 +104,21 @@ interface Row {
  * a referrer names the site that sent them, and what is left is either a
  * browser with no trace (typed, bookmarked, or a referrer stripped by the
  * sender) or no browser at all.
+ *
+ * 🚨 A DOOR is not a tag, and the order between the two is the whole point.
+ * Since every mint path writes an origin (src/lib/key-origins.ts), `src` is
+ * never empty: left above the referrer, the door would swallow every `ref:`
+ * reading the day it shipped — a working measurement traded for a new one.
+ * A door therefore ranks BELOW the referring site: it is always true and never
+ * specific, so it only answers when nothing better did. A tag we put on our
+ * own outbound link keeps its rank, `api-trial` included — the trial funnel on
+ * the dashboard reads the channel `src:api-trial`.
  */
 export function channelOf(r: Row): string {
   if (r.utm_source) return `utm:${r.utm_source}`;
-  if (r.src) return `src:${r.src}`;
+  if (r.src && !isDoorOrigin(r.src)) return `src:${r.src}`;
   if (r.referrer) return `ref:${r.referrer}`;
+  if (r.src) return `src:${r.src}`;
   return r.client === 'web' ? 'direct' : 'api';
 }
 

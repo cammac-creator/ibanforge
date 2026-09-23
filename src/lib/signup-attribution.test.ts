@@ -59,4 +59,24 @@ describe('channelOf', () => {
     expect(channelOf(base)).toBe('direct');
     expect(channelOf({ ...base, client: 'api' })).toBe('api');
   });
+
+  it('une PORTE passe après le site référent, une étiquette avant', () => {
+    // 🚨 C'est la décision qui porte tout le lot « origine » du 22/09/2026, et
+    // rien d'autre ne casse si on la « simplifie ». Depuis que chaque chemin de
+    // frappe écrit une origine, `src` n'est jamais vide : une porte laissée
+    // au-dessus du référent avalerait toutes les lectures `ref:` le jour même
+    // de sa mise en ligne — une mesure qui marche échangée contre une neuve.
+    expect(channelOf({ ...base, src: 'site-signup', referrer: 'google.com' })).toBe(
+      'ref:google.com',
+    );
+    // Sans référent, la porte répond quand même : c'est mieux que « direct ».
+    expect(channelOf({ ...base, src: 'site-pricing' })).toBe('src:site-pricing');
+    // Une étiquette de lien sortant garde son rang, `api-trial` compris :
+    // l'entonnoir de l'essai sans clé lit exactement ce canal.
+    expect(channelOf({ ...base, src: 'api-trial', referrer: 'google.com' })).toBe('src:api-trial');
+    // Et une campagne passe toujours avant tout le reste.
+    expect(
+      channelOf({ ...base, utm_source: 'newsletter', src: 'site-docs', referrer: 'google.com' }),
+    ).toBe('utm:newsletter');
+  });
 });

@@ -172,6 +172,7 @@ export function generateCreditKey(
   email: string | null,
   credits: number,
   paymentRef?: string | null,
+  source: string = 'x402-pack',
 ): { api_key: string; key_prefix: string; credits: number } {
   const db = getStatsDB();
   const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
@@ -183,7 +184,7 @@ export function generateCreditKey(
   const storedEmail = email && email.includes('@') ? email : 'credits-buyer';
   const emailNorm = normalizeEmail(storedEmail);
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view, tier, lineage_hash) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view, tier, lineage_hash, source) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
@@ -195,8 +196,9 @@ export function generateCreditKey(
     paymentRef ? rawKey : null,
     'paid',
     keyHash,
+    source,
   );
-  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', keyPrefix });
+  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', source, keyPrefix });
   linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
   return { api_key: rawKey, key_prefix: keyPrefix, credits };
 }
@@ -233,6 +235,7 @@ export function generateStripeKey(
   email: string | null,
   credits: number,
   stripeSessionId: string,
+  source: string = 'stripe-pack',
 ): { api_key: string | null; key_prefix: string; credits: number; idempotent: boolean } {
   const db = getStatsDB();
   const existing = db
@@ -249,7 +252,7 @@ export function generateStripeKey(
   const emailNorm = normalizeEmail(storedEmail);
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view, tier, lineage_hash) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view, tier, lineage_hash, source) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
@@ -261,8 +264,9 @@ export function generateStripeKey(
     rawKey,
     'paid',
     keyHash,
+    source,
   );
-  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', keyPrefix });
+  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', source, keyPrefix });
   linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
 
   return { api_key: rawKey, key_prefix: keyPrefix, credits, idempotent: false };
@@ -296,6 +300,7 @@ export function generateOemKey(
   monthlyLimit: number,
   stripeSessionId: string,
   stripeSubscriptionId: string | null,
+  source: string = 'stripe-subscription',
 ): { api_key: string | null; key_prefix: string; monthly_limit: number; idempotent: boolean } {
   const db = getStatsDB();
   const existing = db
@@ -317,7 +322,7 @@ export function generateOemKey(
   const emailNorm = normalizeEmail(storedEmail);
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view, tier, lineage_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view, tier, lineage_hash, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
@@ -329,8 +334,9 @@ export function generateOemKey(
     rawKey,
     'paid',
     keyHash,
+    source,
   );
-  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', keyPrefix });
+  recordLineageBirth({ lineageHash: keyHash, tier: 'paid', source, keyPrefix });
   linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
 
   return { api_key: rawKey, key_prefix: keyPrefix, monthly_limit: monthlyLimit, idempotent: false };

@@ -30,6 +30,15 @@ function recentMcpPaths(limit = 12): string[] {
   ).map((r) => r.path);
 }
 
+/** Chemin ET nom d'outil de la dernière ligne /mcp, dans cet ordre. */
+function lastMcpRow(): { path: string; tool_name: string | null } {
+  return getStatsDB()
+    .prepare(
+      "SELECT path, tool_name FROM request_log WHERE path LIKE '/mcp%' ORDER BY id DESC LIMIT 1",
+    )
+    .get() as { path: string; tool_name: string | null };
+}
+
 async function openSession(app: ReturnType<typeof buildApp>, ip: string): Promise<string> {
   const res = await app.request('/mcp', {
     method: 'POST',
@@ -107,6 +116,44 @@ describe('MCP telemetry — a refusal has its own path', () => {
     const body = (await refused.json()) as { error?: { message: string } };
     expect(body.error?.message).toContain('Daily MCP session limit reached');
     expect(recentMcpPaths(1)).toEqual(['/mcp:session:refused']);
+  });
+
+  it('écrit le NOM de l’outil à côté du chemin, sans changer le chemin', async () => {
+    const app = buildApp();
+    const ip = '203.0.113.173';
+    const sessionId = await openSession(app, ip);
+    expect(sessionId).toBeTruthy();
+
+    await callTool(app, sessionId, ip);
+    // 🚨 Les deux assertions vont ensemble. Le chemin DOIT rester
+    // `/mcp:tools-call` : les compteurs existants comparent cette chaîne à
+    // l'égalité, et un chemin par outil les mettrait tous à zéro. Le nom vit
+    // donc dans sa propre colonne.
+    const served = lastMcpRow();
+    expect(served.path).toBe('/mcp:tools-call');
+    expect(served.tool_name).toBe('lookup_ch_clearing');
+
+    // Une poignée de main n'appelle aucun outil : la colonne reste vide.
+    await openSession(app, ip);
+    const handshake = lastMcpRow();
+    expect(handshake.path).toBe('/mcp');
+    expect(handshake.tool_name).toBeNull();
+  });
+
+  it('le compte par outil se lit sur la colonne, refus compris', async () => {
+    const { getMcpToolStats } = await import('../lib/stats.js');
+    const app = buildApp();
+    const ip = '203.0.113.174';
+    const sessionId = await openSession(app, ip);
+    for (let i = 0; i < 10; i++) await callTool(app, sessionId, ip);
+    // La onzième dépasse l'allocation du jour : elle est refusée, et son nom
+    // doit rester lisible — c'est justement ce qu'on veut pouvoir compter.
+    await callTool(app, sessionId, ip);
+
+    const entry = getMcpToolStats(1).tools.find((t) => t.tool === 'lookup_ch_clearing');
+    expect(entry).toBeDefined();
+    expect(entry!.served).toBeGreaterThanOrEqual(10);
+    expect(entry!.refused).toBeGreaterThanOrEqual(1);
   });
 
   it('leaves a discovery handshake under the plain path', async () => {

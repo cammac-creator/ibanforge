@@ -106,6 +106,7 @@ import {
   type ProfileSource,
 } from '../lib/company-profiles.js';
 import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribution.js';
+import { normalizeOrigin } from '../lib/key-origins.js';
 import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
 import {
   sendApiKeyEmail,
@@ -483,12 +484,21 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   }
 
   // Acquisition channel, carried by our own outbound links (?src=npm, the n8n
-  // node, directory listings…). Best-effort by design: an absent or malformed
-  // value silently becomes NULL — attribution must never block a key.
-  const source =
-    typeof body.source === 'string' && /^[a-z0-9_-]{1,40}$/i.test(body.source.trim())
-      ? body.source.trim().toLowerCase()
-      : undefined;
+  // node, directory listings…).
+  //
+  // 🚨 An absent or malformed value used to become NULL, and that is how nearly
+  // every external key ended up with no origin at all: a caller who did not
+  // arrive on a `?src=` URL wrote nothing, and nothing is unrecoverable
+  // afterwards. It now falls back to the DOOR, which is always true: a body
+  // carrying an `attribution` object came from a browser (the dialog always
+  // sends one, even empty), anything else is a curl, an SDK or an agent.
+  // Attribution still never blocks a key — a bad value is replaced, not refused.
+  //
+  // `parseAttribution` is the ONE reader of that object, here and in the
+  // telemetry line further down: a second rule for "is this a browser" would
+  // drift from it the first time either changes.
+  const attribution = parseAttribution(body.attribution);
+  const source = normalizeOrigin(body.source, attribution ? 'site-signup' : 'api-direct');
 
   // Disjoncteur global, TOUTES IP CONFONDUES (lot 5). Il ne refuse JAMAIS : il
   // dégrade. Évalué AVANT la frappe, donc le compteur porte sur les créations
@@ -553,7 +563,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   // Where this signup came from: the landing page, the referring site and the
   // campaign labels the dialog captured on arrival. Telemetry, never a gate.
   try {
-    recordSignupAttribution(result.key_prefix, source, parseAttribution(body.attribution));
+    recordSignupAttribution(result.key_prefix, source, attribution);
   } catch {
     // The stats database refusing a write must not cost anyone their key.
   }
@@ -1354,7 +1364,10 @@ apiKeys.post('/v1/admin/keys', async (c) => {
   // behalf during a support exchange. Only the operator knows which, so it is
   // declared rather than inferred from the route.
   const issuedByUs = body.issued_by_us === true;
-  const result = generateApiKey(email.trim().toLowerCase(), monthlyLimit, undefined, issuedByUs);
+  // 'admin' plutôt que `undefined` : une clé frappée à la main est une porte
+  // comme une autre, et une origine vide la rendrait indiscernable des clés
+  // muettes que ce chantier existe pour ne plus produire.
+  const result = generateApiKey(email.trim().toLowerCase(), monthlyLimit, 'admin', issuedByUs);
   if (!result) {
     return c.json({ error: 'rate_limited' }, 429);
   }
@@ -1404,13 +1417,14 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
   }
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, source) VALUES (?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
     email.trim().toLowerCase(),
     normalizeEmail(email.trim().toLowerCase()),
     monthlyLimit,
+    'admin',
   );
 
   return c.json(

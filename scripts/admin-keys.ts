@@ -157,9 +157,12 @@ function localGenerate(email: string, monthlyLimit?: number) {
   const keyHash = createHash('sha256').update(rawKey).digest('hex');
   const keyPrefix = rawKey.slice(0, 12);
 
+  // `source` posé ici aussi : une clé locale sans origine ressemble en base à
+  // une clé externe sans origine, et c'est précisément la confusion que le
+  // vocabulaire de src/lib/key-origins.ts existe pour retirer.
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit) VALUES (?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, email, monthlyLimit ?? null);
+    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, source) VALUES (?, ?, ?, ?, ?)',
+  ).run(keyHash, keyPrefix, email, monthlyLimit ?? null, 'admin');
 
   console.log(`  Key generated LOCALLY for ${email}`);
   console.log(`  API Key:       ${rawKey}`);

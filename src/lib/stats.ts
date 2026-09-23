@@ -60,7 +60,7 @@ function upsertHourly() {
 function insertRequest() {
   if (!_insertRequest) {
     _insertRequest = getStatsDB().prepare(
-      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind, ip_hash, user_agent, key_prefix, agent_signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind, ip_hash, user_agent, key_prefix, agent_signature, tool_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
   }
   return _insertRequest;
@@ -341,6 +341,12 @@ export function normalizeRequestPath(path: string): string {
  * (see src/app.ts): an https origin, 'malformed', 'unnamed', or null. It is not
  * normalised here on purpose — the raw header must not travel this far, or the
  * next caller of recordRequest will pass one.
+ *
+ * `toolName` is the MCP tool this request invoked, null on everything else.
+ * It rides BESIDE `path` and never inside it: `path` stays `/mcp:tools-call`
+ * for every tool call, because the existing counters match that string exactly
+ * and a path per tool would silently zero them. Truncated like the user agent,
+ * for the same reason — the caller chooses the string.
  */
 export function recordRequest(
   method: string,
@@ -352,6 +358,7 @@ export function recordRequest(
   userAgent: string | null = null,
   keyPrefix: string | null = null,
   agentSignature: string | null = null,
+  toolName: string | null = null,
 ) {
   try {
     const now = new Date();
@@ -373,6 +380,7 @@ export function recordRequest(
       truncatedUa,
       keyPrefix,
       agentSignature,
+      toolName ? toolName.slice(0, 64) : null,
     );
   } catch (err) {
     // Request tracking is non-critical and must never break the API, but a
@@ -2627,5 +2635,50 @@ export function getCohortFootprint(): CohortFootprint {
       keys: allPrefixes.length,
       units: cohorts.reduce((s, c) => s + c.units, 0),
     },
+  };
+}
+
+/**
+ * What the agents actually ask for: MCP calls by tool name.
+ *
+ * Until 22/09/2026 the answer did not exist. `request_log` filed every remote
+ * MCP call under `/mcp:tools-call`, so a validation, a compliance screening and
+ * a key request were one undifferentiated number — the free tier's whole point
+ * being to show what agents come for, that was the one thing it could not show.
+ * The route parsed the tool name to price the call and threw it away; it now
+ * lands in `request_log.tool_name`.
+ *
+ * 🚨 Reads the COLUMN, never the path. `path` stays `/mcp:tools-call` for every
+ * tool call precisely so the existing counters keep matching it, and a reader
+ * that rebuilt the split from a path would be reading a string nothing writes.
+ *
+ * `refused` counts the calls the daily allowance turned away, which carry their
+ * own path — the same name can therefore appear with served calls at zero and
+ * refusals above it, and that is the interesting case.
+ */
+export interface McpToolUsage {
+  tool: string;
+  served: number;
+  refused: number;
+}
+
+export function getMcpToolStats(days: number): { period_days: number; tools: McpToolUsage[] } {
+  const db = getStatsDB();
+  const since = `-${Math.max(0, days - 1)} days`;
+  const rows = db
+    .prepare(
+      `SELECT tool_name AS tool,
+              SUM(CASE WHEN path = '/mcp:tools-call' THEN 1 ELSE 0 END) AS served,
+              SUM(CASE WHEN path = '/mcp:tools-call:refused' THEN 1 ELSE 0 END) AS refused
+         FROM request_log
+        WHERE tool_name IS NOT NULL
+          AND created_at >= date('now', ?)
+        GROUP BY tool_name
+        ORDER BY served DESC, refused DESC, tool ASC`,
+    )
+    .all(since) as Array<{ tool: string; served: number; refused: number }>;
+  return {
+    period_days: days,
+    tools: rows.map((r) => ({ tool: r.tool, served: r.served, refused: r.refused })),
   };
 }
