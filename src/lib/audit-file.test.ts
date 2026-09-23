@@ -12,6 +12,7 @@ import {
   tierFor,
   AuditFileError,
   AUDIT_MAX_ROWS,
+  SHEET_ROWS_CAP,
 } from './audit-file.js';
 
 const VALID_CH = 'CH1000230000000012345';
@@ -254,11 +255,15 @@ describe('readTable — the cap is enforced before the parse', () => {
       ...Array.from({ length: AUDIT_MAX_ROWS + 20_000 }, () => [VALID_CH]),
     ];
     const buffer = xlsx(aoa);
-    const started = performance.now();
-    expect(() => readTable(buffer, 'big.xlsx')).toThrow(/at most/);
-    // 40 000 rows parsed in full cost ~400 ms on the reviewer's machine; with
-    // sheetRows the parser stops at the cap and the read stays well under.
-    expect(performance.now() - started).toBeLessThan(1_500);
+    // Le refus compte les lignes que l'analyseur a réellement matérialisées :
+    // `SHEET_ROWS_CAP` moins l'en-tête, une de plus que le plafond, jamais les
+    // quarante mille du fichier. Une lecture sans `sheetRows` les compterait
+    // toutes. Vérifié par ce nombre et non plus par un chronomètre : une borne
+    // de 1,5 s tombait dès que la machine était occupée, sans rien dire du code.
+    expect(() => readTable(buffer, 'big.xlsx')).toThrow(
+      `The sheet has ${SHEET_ROWS_CAP - 1} rows; the audit takes at most ${AUDIT_MAX_ROWS}.`,
+    );
+    expect(aoa.length - 1).toBeGreaterThan(SHEET_ROWS_CAP);
   });
 
   it('refuses a text file by its line count, before decoding it', () => {

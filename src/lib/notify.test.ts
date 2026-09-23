@@ -56,11 +56,14 @@ describe('the purchase alert cannot hold the Stripe webhook open', () => {
    * does not spend three seconds proving a platform guarantee.
    */
   it('hands over a signal that aborts by itself', async () => {
-    const started = Date.now();
     const signal = AbortSignal.timeout(20);
     await new Promise((resolve) => signal.addEventListener('abort', resolve));
     expect(signal.aborted).toBe(true);
-    expect(Date.now() - started).toBeLessThan(2_000);
+    // Déclenché par sa propre horloge : la raison est une TimeoutError, celle
+    // qu'undici relaie (test suivant). Plus de borne de durée, qui tombait sur
+    // une machine occupée : un signal qui ne partirait jamais ferait tomber le
+    // test sur son propre délai, quelle que soit la vitesse de la machine.
+    expect(signal.reason).toMatchObject({ name: 'TimeoutError' });
   });
 
   it('reports failure rather than throwing when the call is aborted', async () => {
