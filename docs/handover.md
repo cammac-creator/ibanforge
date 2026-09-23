@@ -134,6 +134,7 @@ them are named beside each.
 | Every example e-mail published anywhere is driven through the real signup route | `src/routes/example-emails.test.ts` |
 | Every private frontend route answers 401 without a session — routes are discovered by glob, so a new one is enrolled the day it lands | `frontend/app/api/private-routes-auth.test.ts` |
 | The three message catalogues have identical keys and identical interpolations | `frontend/lib/messages-parity.test.ts` |
+| The Stripe account also carries another project's payments: the dashboard headline "Collected" counts packs + subscriptions + audits only, never `autre`; net, payouts and balance are account-wide because Stripe does not split them by product. A subscription renewal is recorded once, from `invoice.paid` with `billing_reason = subscription_cycle` — never the first invoice, whose amount already sits on the key | `src/lib/stripe-revenue.test.ts`, `src/routes/stripe-webhook.invoice.test.ts`, `frontend/lib/dashboard/stripe-revenue.test.ts` |
 
 **Three runtime ledgers live in memory, per instance**: the keyless trial, MCP sessions,
 and the rate limiter. The API therefore cannot run multiple instances without
