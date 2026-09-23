@@ -1,7 +1,7 @@
 import { isArchived } from './archived';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { isClosed } from './closed';
-import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
+import { chipOf, isPayer, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
 import { lastInboundMessage, noReplyHolds } from './no-reply';
 import { nextActionLabel } from './situation';
@@ -163,7 +163,8 @@ const FILTERS: Array<{
     key: 'paying',
     label: 'Payants',
     urgent: false,
-    test: (c) => c.kind === 'client' && (c.business?.packs ?? 0) > 0,
+    // A subscriber pays too: packs OR a live subscription, one shared test.
+    test: (c) => c.kind === 'client' && isPayer(c.business),
   },
   /**
    * The most urgent commercial state on the page, and until 2026-09-01 the only
@@ -352,6 +353,7 @@ function institutionSearch(c: Contact): string {
  * order nobody can read is an order nobody trusts.
  */
 function followupReason(c: Contact, s: Situation | undefined): string {
+  if (c.kind === 'client' && c.business?.subscriber) return 'abonné';
   if (c.kind === 'client' && (c.business?.packs ?? 0) > 0) return 'a acheté un pack';
   const calls = c.kind === 'client' ? (c.business?.calls90d ?? 0) : 0;
   if (calls > 0) return `clé active, ${calls} appel${calls > 1 ? 's' : ''} sur 90 j`;
@@ -601,9 +603,10 @@ function order(input: RowsInput, contacts: Contact[], active: MailFilterKey): Co
      * recency order below breaks the remaining ties.
      */
     if (active === 'followup') {
-      const packs = (c: Contact) => (c.kind === 'client' ? (c.business?.packs ?? 0) : 0);
-      const packGap = Math.min(packs(b), 1) - Math.min(packs(a), 1);
-      if (packGap !== 0) return packGap;
+      // Paying first, whichever way they pay (a pack or a subscription).
+      const payer = (c: Contact) => (c.kind === 'client' && isPayer(c.business) ? 1 : 0);
+      const payGap = payer(b) - payer(a);
+      if (payGap !== 0) return payGap;
       const calls = (c: Contact) => (c.kind === 'client' ? (c.business?.calls90d ?? 0) : 0);
       const callGap = calls(b) - calls(a);
       if (callGap !== 0) return callGap;

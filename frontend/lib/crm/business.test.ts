@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chipOf, replyGroupOf } from './business';
+import { chipOf, isPayer, replyGroupOf } from './business';
 import type { BusinessInfo, Contact } from './types';
 
 function base(kind: 'client' | 'prospect', business?: BusinessInfo): Contact {
@@ -113,5 +113,31 @@ describe('replyGroupOf — the three shelves of the reply queue', () => {
   it('fresh threads can wait', () => {
     expect(replyGroupOf(false, 0)).toBe('later');
     expect(replyGroupOf(false, null)).toBe('later');
+  });
+});
+
+describe('chipOf — a subscriber is the client to spot first', () => {
+  const sub = (status: BusinessInfo['status'] = 'paying'): BusinessInfo => ({ ...biz(status), subscriber: true });
+
+  it('wears the subscriber chip, ahead of paying', () => {
+    const chip = chipOf(base('client', sub()))!;
+    expect(chip.label).toBe('★ abonné');
+    // The only solid chip: every other business chip is a tint.
+    expect(chip.bg.startsWith('rgba')).toBe(false);
+  });
+
+  it('keeps it when the activation verdict is dormant', () => {
+    expect(chipOf(base('client', sub('dormant')))!.label).toBe('★ abonné');
+  });
+
+  it('never dresses a prospect as a subscriber', () => {
+    expect(chipOf(base('prospect', sub('active')))!.label).toBe('prospect');
+  });
+
+  it('isPayer: a pack or a live subscription, nothing else', () => {
+    expect(isPayer(biz('paying', 1))).toBe(true);
+    expect(isPayer(sub())).toBe(true);
+    expect(isPayer(biz('active', 0))).toBe(false);
+    expect(isPayer(undefined)).toBe(false);
   });
 });

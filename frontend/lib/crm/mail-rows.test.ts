@@ -776,6 +776,17 @@ describe('business filters and shelves', () => {
     expect(dormant).toEqual(['b@alpha.example.net']);
   });
 
+  it('Payants counts a subscriber too, and its row wears the subscriber chip', () => {
+    const plain = withBiz(client('s@alpha.example.net', 'Sigma', []), 'paying', 0);
+    const subscriber: Contact = { ...plain, business: { ...plain.business!, subscriber: true } };
+    const free = withBiz(client('c@alpha.example.net', 'Gamma', []), 'active', 0);
+    const input: RowsInput = { contacts: [subscriber, free], situations: {}, snoozed: {} };
+    expect(mailFilters(input).find((f) => f.key === 'paying')?.count).toBe(1);
+    const rows = mailRows(input, 'paying');
+    expect(rows.map((r) => r.id)).toEqual(['s@alpha.example.net']);
+    expect(rows[0].chip?.label).toBe('★ abonné');
+  });
+
   it('reply rows carry shelves in the sort order; other filters carry none', () => {
     const unreadNow = {
       ...client('u@alpha.example.net', 'U', [message('in', 'Hi', 'x', '2026-08-12 08:00')]),

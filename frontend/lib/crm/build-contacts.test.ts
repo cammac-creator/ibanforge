@@ -996,6 +996,27 @@ describe('buildContacts, institutional correspondents', () => {
     expect(out[0].kind).toBe('institution');
   });
 
+  it('carries the subscriber flag from the activation verdict onto the client', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('sub@alpha.example.net')],
+      activation: [
+        {
+          email: 'sub@alpha.example.net',
+          status: 'paying',
+          source: 'direct',
+          credits_total: 0,
+          credits_remaining: 0,
+          packs: 0,
+          subscriber: true,
+          first_call_at: null,
+          calls_90d: 3,
+        },
+      ],
+    });
+    expect(out[0].business?.subscriber).toBe(true);
+  });
+
   it('never attaches a business block, whatever the activation payload says', () => {
     const out = buildContacts({
       ...base,

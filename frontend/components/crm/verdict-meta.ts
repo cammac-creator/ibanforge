@@ -13,7 +13,7 @@ import type { BusinessStatus } from '@/lib/crm/types';
  */
 export const STATES: Array<{ key: BusinessStatus; label: string; one: string; colour: string; why: string }> = [
   { key: 'at-limit', label: 'À la limite', one: 'À la limite', colour: 'var(--err)', why: 'ils tapent leur plafond' },
-  { key: 'paying', label: 'Payants', one: 'Payant', colour: 'var(--ok)', why: 'ils ont acheté des crédits et appellent' },
+  { key: 'paying', label: 'Payants', one: 'Payant', colour: 'var(--ok)', why: 'ils ont acheté des crédits ou souscrit un abonnement, et appellent' },
   { key: 'dormant', label: 'Endormis', one: 'Endormi', colour: 'var(--warn)', why: 'acheteurs sans appel depuis plus de 14 jours' },
   { key: 'active', label: 'Actifs', one: 'Actif', colour: 'var(--info)', why: 'ils appellent, sans avoir acheté' },
   { key: 'new', label: 'Nouveaux', one: 'Nouveau', colour: 'var(--violet, #a78bfa)', why: 'inscrits tout récemment' },

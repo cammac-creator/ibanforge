@@ -33,6 +33,8 @@ function callsIn(c: Contact, fromDaysAgo: number, toDaysAgo: number): number {
 
 export interface HeatFacts {
   packs: number;
+  /** A live subscription: paying every month, the warmest fact there is. */
+  subscriber?: boolean;
   dormant: boolean;
   atLimit: boolean;
   last7: number;
@@ -52,10 +54,11 @@ export function heatFromFacts(f: HeatFacts): Heat {
     if (points !== 0) parts.push({ label, points });
   };
 
+  if (f.subscriber) add('Abonné (abonnement mensuel)', 50);
   if (f.packs > 0) {
     add(f.packs > 1 ? `${f.packs} packs de crédits achetés` : 'A acheté un pack de crédits', 40);
-    if (f.dormant) add('Payant sans appel depuis 14 j', -15);
   }
+  if ((f.subscriber || f.packs > 0) && f.dormant) add('Payant sans appel depuis 14 j', -15);
   if (f.last7 >= 500) add(`${f.last7} appels sur 7 j`, 30);
   else if (f.last7 >= 100) add(`${f.last7} appels sur 7 j`, 22);
   else if (f.last7 >= 10) add(`${f.last7} appels sur 7 j`, 14);
@@ -78,6 +81,7 @@ export function heatOf(c: Contact, s: Situation | undefined): Heat {
   const b = c.business;
   return heatFromFacts({
     packs: b?.packs ?? 0,
+    subscriber: b?.subscriber === true,
     dormant: b?.status === 'dormant',
     atLimit: b?.status === 'at-limit',
     last7: callsIn(c, 7, 0),

@@ -190,6 +190,8 @@ export interface ActivationClientRow {
   credits_total: number;
   credits_remaining: number;
   packs: number;
+  /** Optional on the wire: see BusinessInfo.subscriber. */
+  subscriber?: boolean;
   first_call_at: string | null;
   calls_90d: number;
 }
@@ -425,6 +427,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
       creditsTotal: a.credits_total,
       creditsRemaining: a.credits_remaining,
       packs: a.packs,
+      subscriber: a.subscriber === true,
       firstCallAt: a.first_call_at,
       calls90d: a.calls_90d,
     });

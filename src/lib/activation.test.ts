@@ -161,3 +161,105 @@ describe('getActivation — funnel, sources, cohorts', () => {
     expect(total).toBeGreaterThanOrEqual(3);
   });
 });
+
+/**
+ * A subscription is a way of paying. Until 23/09/2026 this module only knew
+ * credit packs: a Pro subscriber read as `active`, their subscription key was
+ * filed as a free key, and its monthly allowance swelled their free quota (the
+ * overview then counted them as a pilot). Fixtures on alpha.example.net, keys
+ * under the shared prefix so the file-level afterAll removes them.
+ */
+describe('getActivation — a subscription is a way of paying', () => {
+  const SUBSCRIBER = 'subscriber@alpha.example.net';
+  const LEGACY = 'legacy-subscriber@alpha.example.net';
+  const CANCELED = 'canceled@alpha.example.net';
+
+  beforeAll(() => {
+    const db = getStatsDB();
+    const ins = db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, active, monthly_limit, credits_total, credits_remaining, source, stripe_session_id, stripe_subscription_id)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)`,
+    );
+    // SUBSCRIBER: a free key first, then a subscription on the same address.
+    ins.run(`${PFX}_u_free`, `${PFX}_u_free`, SUBSCRIBER, daysAgo(3), 1, 200, null, null);
+    ins.run(
+      `${PFX}_u_sub`,
+      `${PFX}_u_sub`,
+      SUBSCRIBER,
+      daysAgo(1),
+      1,
+      10000,
+      'cs_test_alpha',
+      'sub_test_alpha',
+    );
+    // LEGACY: paid through Checkout, no credits, subscription id never stored.
+    ins.run(`${PFX}_l_sub`, `${PFX}_l_sub`, LEGACY, daysAgo(4), 1, 10000, 'cs_test_gamma', null);
+    // CANCELED: the webhook deactivated the key when the subscription ended.
+    ins.run(
+      `${PFX}_c_sub`,
+      `${PFX}_c_sub`,
+      CANCELED,
+      daysAgo(40),
+      0,
+      10000,
+      'cs_test_beta',
+      'sub_test_beta',
+    );
+    const log = db.prepare(
+      `INSERT INTO request_log (method, path, status, response_ms, created_at, key_prefix)
+       VALUES ('POST', '/v1/iban/validate', ?, 12, ?, ?)`,
+    );
+    log.run(HTTP_OK, daysAgo(1), `${PFX}_u_sub`);
+    log.run(HTTP_OK, daysAgo(2), `${PFX}_l_sub`);
+    log.run(HTTP_OK, daysAgo(2), `${PFX}_c_sub`);
+  });
+
+  it('reads a live subscriber as paying, the subscription key apart from the free quota', () => {
+    const c = getActivation(30).clients.find((x) => x.email === SUBSCRIBER);
+    expect(c).toBeDefined();
+    expect(c!.subscriber).toBe(true);
+    expect(c!.status).toBe('paying');
+    // A subscription is not a credit pack, and its allowance is not free.
+    expect(c!.packs).toBe(0);
+    expect(c!.free_quota).toBe(200);
+    expect(c!.keys.find((k) => k.key_prefix === `${PFX}_u_sub`)?.role).toBe('subscription');
+    expect(c!.keys.find((k) => k.key_prefix === `${PFX}_u_free`)?.role).toBe('free');
+  });
+
+  it('recognises a subscription key by its shape when the subscription id is missing', () => {
+    const c = getActivation(30).clients.find((x) => x.email === LEGACY);
+    expect(c!.subscriber).toBe(true);
+    expect(c!.status).toBe('paying');
+    expect(c!.free_quota).toBe(0);
+  });
+
+  it('does not keep a canceled subscription as a subscriber', () => {
+    const c = getActivation(30).clients.find((x) => x.email === CANCELED);
+    expect(c!.subscriber).toBe(false);
+    expect(c!.status).not.toBe('paying');
+    expect(c!.free_quota).toBe(0);
+  });
+
+  it('ranks a subscriber with the paying clients, ahead of a free one', () => {
+    const list = getActivation(30).clients;
+    const sub = list.findIndex((x) => x.email === SUBSCRIBER);
+    const fresh = list.findIndex((x) => x.email === FRESH);
+    expect(sub).toBeGreaterThanOrEqual(0);
+    expect(fresh).toBeGreaterThanOrEqual(0);
+    expect(sub).toBeLessThan(fresh);
+  });
+
+  it('counts a subscriber as a purchase in the funnel and in their source row', () => {
+    const { funnel, sources, clients } = getActivation(30);
+    // The same period rule as the module: signed up inside the window.
+    const since = Date.now() - 30 * 86_400_000;
+    const inPeriod = (x: { signup_at: string }) =>
+      Date.parse(x.signup_at.includes('T') ? x.signup_at : `${x.signup_at.replace(' ', 'T')}Z`) >=
+      since;
+    const payers = clients.filter((x) => inPeriod(x) && (x.packs > 0 || x.subscriber));
+    expect(payers.some((x) => x.email === SUBSCRIBER)).toBe(true);
+    expect(funnel.purchased).toBe(payers.length);
+    const direct = sources.find((r) => r.source === 'direct');
+    expect(direct!.paying).toBe(payers.filter((x) => x.source === 'direct').length);
+  });
+});

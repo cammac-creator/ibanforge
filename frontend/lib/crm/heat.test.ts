@@ -129,3 +129,16 @@ describe('heatOf — a score that always shows its arithmetic', () => {
     expect(heatOf(c, talking).score).toBeLessThanOrEqual(100);
   });
 });
+
+describe('heat — a subscriber', () => {
+  it('a live subscription is the warmest money fact', () => {
+    const h = heatOf(client([], { ...biz('paying', 0), subscriber: true }), undefined);
+    expect(h.parts.some((p) => p.label.startsWith('Abonné'))).toBe(true);
+    expect(h.score).toBeGreaterThanOrEqual(50);
+  });
+
+  it('a dormant subscriber loses the points a dormant buyer loses, once', () => {
+    const h = heatOf(client([], { ...biz('dormant', 0), subscriber: true }), undefined);
+    expect(h.parts.filter((p) => p.label === 'Payant sans appel depuis 14 j')).toHaveLength(1);
+  });
+});

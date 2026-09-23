@@ -155,6 +155,12 @@ export interface BusinessInfo {
   creditsRemaining: number;
   /** Paid credit keys owned by this address. */
   packs: number;
+  /**
+   * Holds a live subscription (Pro, Editor/OEM): the API's own verdict, never
+   * recomputed here. Optional on the wire, because Vercel and Railway ship
+   * independently: until the API carries it, nobody is a subscriber.
+   */
+  subscriber?: boolean;
   firstCallAt: string | null;
   calls90d: number;
 }
