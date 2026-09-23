@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { refreshDiff } from './refresh-diff.js';
 
 /**
  * The guard that stops a truncated source from being committed.
@@ -18,6 +19,13 @@ import Database from 'better-sqlite3';
  *
  * Each case asserts the EXIT CODE, because that is the whole contract the
  * workflow consumes: 0 = commit, non-zero = refuse.
+ *
+ * Depuis le 23.09.2026, les cas appellent `refreshDiff()` dans le processus du
+ * test : c'est le code de sortie que la commande pose, rendu par la fonction.
+ * Chaque cas relançait auparavant `npx tsx` sur le script, et le démarrage à
+ * froid de npx et de tsx dépassait seul le délai de vitest dès que la machine
+ * était occupée : le test tombait sans que la décision soit en cause. La vraie
+ * commande reste lancée UNE fois, par le dernier test du fichier.
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -95,13 +103,16 @@ function build(
   db.close();
 }
 
+/** Ce que la commande imprimerait (stdout et stderr ensemble) et le code qu'elle poserait. */
 function run(before: string, after: string): { status: number; out: string } {
-  const r = spawnSync('npx', ['tsx', SCRIPT], {
-    cwd: REPO,
-    env: { ...process.env, BIC_DIFF_BEFORE: before, BIC_DIFF_AFTER: after },
-    encoding: 'utf-8',
+  const lines: string[] = [];
+  const status = refreshDiff({
+    before,
+    after,
+    log: (line) => lines.push(line),
+    error: (line) => lines.push(line),
   });
-  return { status: r.status ?? -1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+  return { status, out: lines.join('\n') };
 }
 
 describe('refresh-diff refuses a damaged refresh and passes a normal one', () => {
@@ -212,4 +223,36 @@ describe('refresh-diff refuses a damaged refresh and passes a normal one', () =>
     expect(out).toContain('could not run');
     expect(status).toBe(1);
   });
+
+  /**
+   * La vraie commande, lancée UNE fois pour tout le fichier, par le chemin même
+   * du workflow (`npx tsx scripts/refresh-diff.ts`). Elle prouve ce que l'appel
+   * direct ne peut pas prouver : que le fichier lancé juge bien (une garde de
+   * module principal cassée le ferait sortir en 0 sans rien lire, c'est-à-dire
+   * autoriser le commit) et que le refus devient un code de sortie non nul.
+   *
+   * Le délai est explicite et large : le démarrage à froid de npx et de tsx
+   * prend plusieurs secondes sur une machine occupée, et cette durée n'est pas
+   * ce que le test affirme.
+   */
+  const CLI_TIMEOUT_MS = 120_000;
+  it(
+    'runs the real command once: a refused refresh exits non-zero',
+    () => {
+      build(p('cli-before'), { gleif: 4000 });
+      build(p('cli-after'), { gleif: 400 });
+      const r = spawnSync('npx', ['tsx', SCRIPT], {
+        cwd: REPO,
+        env: { ...process.env, BIC_DIFF_BEFORE: p('cli-before'), BIC_DIFF_AFTER: p('cli-after') },
+        encoding: 'utf-8',
+        timeout: CLI_TIMEOUT_MS - 10_000,
+      });
+      const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+      expect(r.status, r.error?.message ?? out).toBe(1);
+      expect(out).toContain('bic_entries: ');
+      expect(out).toContain('Refusing to commit');
+      expect(out).toContain('source gleif');
+    },
+    CLI_TIMEOUT_MS,
+  );
 });
