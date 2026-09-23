@@ -6,6 +6,7 @@ import { useLocale } from 'next-intl';
 import { ArrowUpRight, Search, X } from 'lucide-react';
 import styles from './workspace.module.css';
 import { contactsOpenHref } from '@/lib/crm/deep-link';
+import { chipForStatus } from '@/lib/crm/business';
 import { formatStamp } from '@/lib/crm/format';
 import {
   DEFAULT_JOURNAL_FILTER,
@@ -115,6 +116,22 @@ function Badge({
   );
 }
 
+/**
+ * The subscriber chip, drawn from the one definition in business.ts so the
+ * journal, the Clients page and the contact header cannot drift apart.
+ */
+function SubscriberChip() {
+  const chip = chipForStatus('subscriber');
+  return (
+    <span
+      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+      style={{ color: chip.color, backgroundColor: chip.bg }}
+    >
+      {chip.label}
+    </span>
+  );
+}
+
 function JournalLine({ row, locale }: { row: JournalRow; locale: string }) {
   const badge = row.scheduled ? SCHEDULED_BADGE : DIRECTION_BADGE[row.direction];
   const origin = row.origin ? ORIGIN_BADGE[row.origin] : null;
@@ -139,6 +156,7 @@ function JournalLine({ row, locale }: { row: JournalRow; locale: string }) {
             <span className="truncate text-sm font-semibold text-[var(--fg-1)]">
               {row.contact.label}
             </span>
+            {row.contact.subscriber && <SubscriberChip />}
             <Badge className={badge.className} title={badge.title}>
               {badge.label}
             </Badge>

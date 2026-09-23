@@ -56,6 +56,12 @@ export interface JournalContact {
   /** The company, or the address when there is no company. */
   label: string;
   kind: Contact['kind'];
+  /**
+   * A live subscriber (the API's activation verdict, carried by the contact).
+   * The journal is where a mail from the priority client has to stand out, so
+   * it wears the same solid chip as the Clients page and the contact header.
+   */
+  subscriber?: boolean;
 }
 
 export interface JournalRow {
@@ -163,6 +169,7 @@ export function journalRows(contacts: Contact[]): JournalRow[] {
       email: c.email,
       label: c.company || c.email || c.id,
       kind: c.kind,
+      subscriber: c.kind === 'client' && c.business?.subscriber === true,
     };
     // The draft is carried beside the thread rather than inside it (see
     // ContactBase), so both have to be walked or the unsent mail — the one

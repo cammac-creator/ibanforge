@@ -433,3 +433,26 @@ describe('journalRows — Swiss time and scheduled drafts (08/09/2026)', () => {
     expect(byId.sent.origin).toBe('claude');
   });
 });
+
+describe('journalRows — a subscriber stands out in the journal', () => {
+  it('carries the subscriber flag of a client onto every row of their thread', () => {
+    const base = contact({ id: 'abonne@alpha.example.net', kind: 'client', messages: [msg({})] });
+    const subscriber = {
+      ...base,
+      business: {
+        status: 'paying' as const,
+        source: 'direct',
+        creditsTotal: 0,
+        creditsRemaining: 0,
+        packs: 0,
+        subscriber: true,
+        firstCallAt: null,
+        calls90d: 3,
+      },
+    } as Contact;
+    const plain = contact({ id: 'libre@alpha.example.net', kind: 'client', messages: [msg({})] });
+    const rows = journalRows([subscriber, plain]);
+    expect(rows.find((r) => r.contact.id === 'abonne@alpha.example.net')?.contact.subscriber).toBe(true);
+    expect(rows.find((r) => r.contact.id === 'libre@alpha.example.net')?.contact.subscriber).toBe(false);
+  });
+});
