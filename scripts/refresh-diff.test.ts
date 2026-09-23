@@ -27,22 +27,31 @@ const REPO = resolve(__dirname, '..');
 let tmp: string;
 
 /** A plausible database: one big source, one small one, and the side tables. */
-function build(path: string, opts: {
-  gleif?: number;
-  swiftcodes?: number;
-  ebaStep2?: number;
-  chClearing?: number;
-  tinyCountryRows?: number;
-  praBanks?: number;
-  ecbMfi?: number;
-  bdeMfi?: number;
-} = {}): void {
+function build(
+  path: string,
+  opts: {
+    gleif?: number;
+    swiftcodes?: number;
+    ebaStep2?: number;
+    chClearing?: number;
+    tinyCountryRows?: number;
+    praBanks?: number;
+    ecbMfi?: number;
+    bdeMfi?: number;
+  } = {},
+): void {
   const {
-    gleif = 4000, swiftcodes = 8000, ebaStep2 = 180, chClearing = 1165, tinyCountryRows = 3,
+    gleif = 4000,
+    swiftcodes = 8000,
+    ebaStep2 = 180,
+    chClearing = 1165,
+    tinyCountryRows = 3,
     // Orders of magnitude taken from the real database, so the fixture lands in
     // the same band as production: pra_banks and bde_mfi sit just above SMALL
     // (200) and are therefore judged by the percentage band, ecb_mfi far above.
-    praBanks = 281, ecbMfi = 5373, bdeMfi = 238,
+    praBanks = 281,
+    ecbMfi = 5373,
+    bdeMfi = 238,
   } = opts;
   rmSync(path, { force: true });
   const db = new Database(path);
@@ -57,7 +66,8 @@ function build(path: string, opts: {
   `);
   const ins = db.prepare('INSERT INTO bic_entries VALUES (?, ?, ?, ?, ?)');
   const add = db.transaction((n: number, source: string, cc: string) => {
-    for (let i = 0; i < n; i++) ins.run(`AAAA${cc}${i}`, `AAAA${cc}${i}XXX`, cc, source, '2026-08-01');
+    for (let i = 0; i < n; i++)
+      ins.run(`AAAA${cc}${i}`, `AAAA${cc}${i}XXX`, cc, source, '2026-08-01');
   });
   add(gleif, 'gleif', 'GB');
   add(swiftcodes, 'swiftcodes', 'IT');
@@ -66,14 +76,18 @@ function build(path: string, opts: {
   // the guard cries wolf on ordinary churn in the long tail.
   add(tinyCountryRows, 'gleif', 'VA');
   const insCh = db.prepare('INSERT INTO ch_clearing VALUES (?)');
-  db.transaction((n: number) => { for (let i = 0; i < n; i++) insCh.run(String(i).padStart(5, '0')); })(chClearing);
+  db.transaction((n: number) => {
+    for (let i = 0; i < n; i++) insCh.run(String(i).padStart(5, '0'));
+  })(chClearing);
   // The tables must EXIST in both snapshots even when empty: read() swallows a
   // missing table as 0, and compare() reads 0 -> 0 as "nothing to say". A
   // fixture that skipped the CREATE would make the OPS-02 case below pass
   // whether or not the guard actually looks at these three registers.
   const fill = (table: string, n: number): void => {
     const ins = db.prepare(`INSERT INTO ${table} VALUES (?)`);
-    db.transaction((rows: number) => { for (let i = 0; i < rows; i++) ins.run(`ID${i}`); })(n);
+    db.transaction((rows: number) => {
+      for (let i = 0; i < rows; i++) ins.run(`ID${i}`);
+    })(n);
   };
   fill('pra_banks', praBanks);
   fill('ecb_mfi', ecbMfi);
@@ -91,13 +105,18 @@ function run(before: string, after: string): { status: number; out: string } {
 }
 
 describe('refresh-diff refuses a damaged refresh and passes a normal one', () => {
-  beforeAll(() => { tmp = mkdtempSync(resolve(tmpdir(), 'refreshdiff-test-')); });
-  afterAll(() => { rmSync(tmp, { recursive: true, force: true }); });
+  beforeAll(() => {
+    tmp = mkdtempSync(resolve(tmpdir(), 'refreshdiff-test-'));
+  });
+  afterAll(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
 
   const p = (n: string) => resolve(tmp, `${n}.sqlite`);
 
   it('passes when nothing changed', () => {
-    build(p('a')); build(p('b'));
+    build(p('a'));
+    build(p('b'));
     const { status, out } = run(p('a'), p('b'));
     expect(out).toContain('Quality diff OK.');
     expect(status).toBe(0);

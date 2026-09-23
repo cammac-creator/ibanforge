@@ -128,7 +128,9 @@ function read(path: string): Counts {
   const counts: Counts = {
     total: scalar('SELECT COUNT(*) AS n FROM bic_entries'),
     bySource: group('SELECT source AS k, COUNT(*) AS n FROM bic_entries GROUP BY source'),
-    byCountry: group('SELECT country_code AS k, COUNT(*) AS n FROM bic_entries GROUP BY country_code'),
+    byCountry: group(
+      'SELECT country_code AS k, COUNT(*) AS n FROM bic_entries GROUP BY country_code',
+    ),
     chClearing: scalar('SELECT COUNT(*) AS n FROM ch_clearing'),
     deBlz: scalar('SELECT COUNT(*) AS n FROM de_blz'),
     national: group('SELECT country AS k, COUNT(*) AS n FROM national_bank_codes GROUP BY country'),
@@ -169,7 +171,8 @@ function read(path: string): Counts {
 
 /** Worst first, and the aggregate lines before the per-country detail. */
 function severity(entry: { pct: number; label: string }): number {
-  const rank = entry.label.startsWith('bic_entries') || entry.label.startsWith('source') ? -1000 : 0;
+  const rank =
+    entry.label.startsWith('bic_entries') || entry.label.startsWith('source') ? -1000 : 0;
   return rank + entry.pct;
 }
 
@@ -177,13 +180,19 @@ const rows: Array<{ pct: number; label: string; text: string; blocking: boolean 
 
 function compare(label: string, before: number, after: number): void {
   if (before === 0) {
-    if (after > 0) rows.push({ pct: 999, label, text: `${label}: new, ${after} rows`, blocking: false });
+    if (after > 0)
+      rows.push({ pct: 999, label, text: `${label}: new, ${after} rows`, blocking: false });
     return;
   }
   if (after === 0) {
     const isCountry = label.startsWith('country ');
     const blocking = !isCountry || before >= MIN_POPULATION_TO_BLOCK_DISAPPEARANCE;
-    rows.push({ pct: -100, label, text: `${label}: ${before} -> 0 — disappeared entirely`, blocking });
+    rows.push({
+      pct: -100,
+      label,
+      text: `${label}: ${before} -> 0 — disappeared entirely`,
+      blocking,
+    });
     return;
   }
   const delta = after - before;
