@@ -7,6 +7,8 @@ import {
   isDiscoveryPath,
   type BusinessKeyRow,
 } from './business-summary.js';
+import { isInternal } from './lifecycle-radar.js';
+import { subscriptionsSold } from './subscription-payments.js';
 
 /** Invented fixture; this repo is public and carries no real account. */
 function key(over: Partial<BusinessKeyRow> = {}): BusinessKeyRow {
@@ -365,5 +367,73 @@ describe('credit revenue prefers what was charged over what the table says', () 
     expect(s.credits.sold_usd).toBe(12);
     expect(s.credits.sold_usd_is_estimate).toBe(false);
     expect(s.credits.sold_usd_deduced_accounts).toBe(0);
+  });
+});
+
+describe('subscriptions sit beside the credits, never inside them', () => {
+  // Invented figures: a first payment read on the key, one renewal from the
+  // subscription_payments ledger.
+  const subscriptions = subscriptionsSold(
+    {
+      keys: [
+        {
+          email: 'abonne@alpha.example.net',
+          stripe_session_id: 'cs_test_alpha',
+          stripe_subscription_id: 'sub_test_alpha',
+          amount_paid_minor: 1700,
+          amount_paid_currency: 'usd',
+          issued_by_us: 0,
+          active: 1,
+          created_at: '2030-01-01 10:00:00',
+        },
+      ],
+      payments: [
+        {
+          subscription_id: 'sub_test_alpha',
+          amount_paid_minor: 1700,
+          amount_paid_currency: 'usd',
+          billing_reason: 'subscription_cycle',
+          paid_at: '2030-02-01 10:00:00',
+          email: 'abonne@alpha.example.net',
+        },
+      ],
+    },
+    isInternal,
+  );
+
+  it('exposes first payment and renewals, and adds them to a separate total', () => {
+    const s = summary(
+      [
+        key({
+          email: 'pack@beta.example.net',
+          credits_total: 1000,
+          credits_remaining: 900,
+          amount_paid_minor: 400,
+          amount_paid_currency: 'usd',
+        }),
+      ],
+      { subscriptions },
+    );
+    expect(s.subscriptions?.first_payments).toBe(1);
+    expect(s.subscriptions?.renewals).toBe(1);
+    expect(s.subscriptions?.usd).toBe(34);
+    expect(s.subscriptions?.last_payment_at).toBe('2030-02-01 10:00:00');
+    expect(s.total_sold_usd).toBe(38);
+    // The existing fields keep their meaning: packs, and pack buyers only.
+    expect(s.credits.sold_usd).toBe(4);
+    expect(s.credits.paying_accounts).toBe(1);
+  });
+
+  it('says "not read" rather than "no subscription" when none were passed', () => {
+    const s = summary([
+      key({ email: 'pack@beta.example.net', credits_total: 1000, credits_remaining: 0 }),
+    ]);
+    expect(s.subscriptions).toBeNull();
+    expect(s.total_sold_usd).toBe(s.credits.sold_usd);
+  });
+
+  it('never emits the subscriber address', () => {
+    const s = summary([], { subscriptions });
+    expect(JSON.stringify(s)).not.toContain('abonne@');
   });
 });

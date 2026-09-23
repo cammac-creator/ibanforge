@@ -24,6 +24,7 @@
  * Do not loosen this to "just add the email, it's easier to read".
  */
 import { DEFAULT_MONTHLY_LIMIT, emailDomain, isInternal } from './lifecycle-radar.js';
+import type { SubscriptionsSold } from './subscription-payments.js';
 
 // ---------------------------------------------------------------------------
 // Inputs (plain rows, so tests need no database)
@@ -248,6 +249,19 @@ export interface BusinessSummary {
     /** Paying accounts beyond MAX_LISTED_ACCOUNTS. Never truncate in silence. */
     accounts_omitted: number;
   };
+  /**
+   * Les abonnements (Pro, Éditeur/OEM) : premier paiement lu sur la clé,
+   * renouvellements lus dans `subscription_payments`. À part des crédits, parce
+   * que `credits.sold_usd` et `credits.paying_accounts` gardent leur sens de
+   * toujours (des packs). NULL quand l'appelant ne l'a pas fourni : « non lu »
+   * n'est pas « aucun abonnement ».
+   */
+  subscriptions: SubscriptionsSold | null;
+  /**
+   * `credits.sold_usd` plus les abonnements en USD. Les packs peuvent y être
+   * déduits du tarif (voir sold_usd_deduced_accounts) ; les abonnements, jamais.
+   */
+  total_sold_usd: number;
   keys: {
     total: number;
     external: number;
@@ -289,8 +303,11 @@ export function buildBusinessSummary(input: {
   paths: PathCount[];
   clients: ClientCall[];
   windowDays: number;
+  /** Calculés par l'appelant avec subscriptionsSold() et la même règle isInternal. */
+  subscriptions?: SubscriptionsSold;
 }): BusinessSummary {
   const { traffic, paths, clients, windowDays } = input;
+  const subscriptions = input.subscriptions ?? null;
   const external = input.keys.filter((k) => !isInternal(k.email));
 
   // --- credits ------------------------------------------------------------
@@ -392,6 +409,9 @@ export function buildBusinessSummary(input: {
       accounts: listedAccounts,
       accounts_omitted: accounts.length - listedAccounts.length,
     },
+    subscriptions,
+    // En cents d'abord : additionner des dollars flottants arrondirait deux fois.
+    total_sold_usd: (Math.round(soldUsd * 100) + (subscriptions?.usd_minor ?? 0)) / 100,
     keys: {
       total: input.keys.length,
       external: external.length,
