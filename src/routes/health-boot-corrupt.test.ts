@@ -103,7 +103,12 @@ describe('PERF-03 — a corrupt stats database must not kill the boot', () => {
   // est load-bearing ailleurs — les tests de long-polling de `mcp-http.test.ts`
   // et de `device-grant.test.ts` règlent leurs propres attentes pour rester en
   // dessous, et un défaut plus large y masquerait une attente qui ne rend plus.
-  const BOOT_TIMEOUT_MS = 30_000;
+  //
+  // Porté de 30 à 120 s le 23/09/2026 : 30 s ont été dépassées quand la
+  // machine était saturée, alors que ce délai n'est qu'un filet contre un
+  // appel qui ne reviendrait jamais. Un délai passé à vitest en ligne de
+  // commande ne peut pas le relever : le délai d'un test l'emporte toujours.
+  const BOOT_TIMEOUT_MS = 120_000;
 
   it(
     'builds the application instead of throwing at import',

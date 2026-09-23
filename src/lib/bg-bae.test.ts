@@ -140,7 +140,12 @@ describe('the test register really is the invented one', () => {
   // une marge d'une seconde et demie que le parallélisme de la suite complète
   // consomme. Le délai explicite n'affaiblit aucune des trois assertions ;
   // un « timed out », lui, n'en vérifiait aucune.
-  const BUILD_APP_TIMEOUT_MS = 30_000;
+  //
+  // Porté de 30 à 120 s le 23/09/2026 : 30 s ont été dépassées quand la
+  // machine était saturée, alors que ce délai n'est qu'un filet contre un
+  // appel qui ne reviendrait jamais. Un délai passé à vitest en ligne de
+  // commande ne peut pas le relever : le délai d'un test l'emporte toujours.
+  const BUILD_APP_TIMEOUT_MS = 120_000;
 
   it(
     'serves that credit on /llms.txt, dated from the data',
