@@ -67,7 +67,14 @@ const PRICING: EndpointPricing[] = [
       bban: { bank_code: '00230', account_number: '000000012345' },
       sepa: { member: true, schemes: ['SCT', 'SDD'], vop_required: false },
       formatted: 'CH10 0023 0000 0000 1234 5',
-      bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
+      bic: {
+        code: 'UBSWCHZH80A',
+        bic8: 'UBSWCHZH',
+        bank_name: 'UBS Switzerland AG',
+        city: 'Zürich',
+        basis: 'national_register',
+        authoritative: true,
+      },
       issuer: { type: 'bank', name: 'UBS Switzerland AG', classification: 'default' },
       risk_indicators: {
         issuer_type: 'bank',

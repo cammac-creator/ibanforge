@@ -351,6 +351,32 @@ export interface IBANValidationResult {
   /** @see RegisteredAddressBlock */
   bic?: {
     code: string;
+    /**
+     * The eight characters of the institution — the field to compare a supplied
+     * BIC against.
+     *
+     * `code` is served as the consulted source publishes it, so it is 8 or 11
+     * characters depending on the country and the bank code. This one never
+     * moves. The branch code (the last three characters) is informative: in the
+     * cooperative networks it names the LOCAL bank and the first eight name its
+     * clearing institution, so comparing full codes turns a correct BIC into a
+     * mismatch, and comparing only the first eight of two different banks turns
+     * a mismatch into a match. Compare on `bic8`, then read the branch code.
+     */
+    bic8?: string;
+    /**
+     * The bank code the caller asked about, when the register answered for
+     * another one.
+     *
+     * Only Switzerland and Liechtenstein today: SIX marks an IID
+     * `concatenation` and publishes the IID that took over its clearing (the
+     * former Credit Suisse IIDs now point at UBS). The answer is the successor's
+     * — its name, its BIC — and this field keeps the IID that was asked about
+     * visible, so a caller reconciling against its own records can see the
+     * substitution instead of guessing at it. The IBAN stays valid and the
+     * account stays payable: a redirect is not a retirement.
+     */
+    redirected_from?: string;
     bank_name: string | null;
     city: string | null;
     /**
@@ -367,14 +393,16 @@ export interface IBANValidationResult {
      * by the first integration that reads the JSON.
      *
      * - `national_register` — the country's own register publishes this BIC for
-     *   this bank code. Today: Germany, Austria, Belgium, Bulgaria and
-     *   Slovakia and San Marino — the Bundesbank Bankleitzahlendatei carries
-     *   the exact 11-character BIC per BLZ, and the OeNB, NBB, BNB BAE, NBS and
-     *   BCSM registers publish the institution's BIC per bank code. San Marino
-     *   is the case where this flag and `bank_code_check.authoritative` part
-     *   company in the opposite direction from Switzerland: the pairing is the
-     *   supervisor's, the code space is not its to settle. Settlement-grade, except where the register itself
-     *   marks the code retired (see `authoritative` below).
+     *   this bank code. Today: Switzerland, Liechtenstein, Germany, Austria,
+     *   Belgium, Bulgaria, Slovakia and San Marino — the SIX
+     *   BankMaster carries the exact 11-character BIC per IID, the Bundesbank
+     *   Bankleitzahlendatei the exact 11-character BIC per BLZ, and the OeNB,
+     *   NBB, BNB BAE, NBS and BCSM registers publish the institution's BIC per
+     *   bank code. San Marino is the case where this flag and
+     *   `bank_code_check.authoritative` part company: the pairing is the
+     *   supervisor's, the code space is not its to settle. Settlement-grade,
+     *   except where the register itself marks the code retired (see
+     *   `authoritative` below).
      * - `curated_map` — our own maintained bank-code map made the pairing. It is
      *   an exact key and it is usually right; it is not an allocation record,
      *   and no authority stands behind it.
@@ -403,9 +431,12 @@ export interface IBANValidationResult {
      * ⚠️ Not the same claim as `bank_code_check.authoritative`, which is about
      * the BANK CODE: whether a national register was consulted about its
      * existence. This one is about the BIC: whether the pairing that produced it
-     * comes from that register too. Switzerland is where they visibly differ —
-     * the SIX BankMaster answers authoritatively that an IID is allocated, while
-     * the BIC beside it still comes from our curated map.
+     * comes from that register too. Switzerland used to be where they visibly
+     * differed — the SIX BankMaster settled the IID while the BIC beside it came
+     * from our curated map — and it is no longer: CH and LI are served from
+     * BankMaster's own BIC column, so both flags now answer true there. San
+     * Marino is where they still part, in the other direction: the pairing is
+     * the supervisor's, the code space is not its to settle.
      */
     authoritative?: boolean;
     /**

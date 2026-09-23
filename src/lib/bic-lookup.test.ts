@@ -129,7 +129,11 @@ describe('lookupByCountryBank — Monaco stays Monegasque', () => {
     // and for years the fourteen Monegasque institutions were keyed under FR:
     // only — reachable from a French IBAN, invisible from a Monegasque one.
     const hit = lookupByCountryBank('MC', '12739');
-    expect(hit?.code).toBe('CFMOMCMX');
+    // Eleven characters, as the curated key writes them: the branch code is no
+    // longer cut off, so `XXX` (the head office) is served explicitly rather
+    // than implied. Compare institutions on the first eight.
+    expect(hit?.code).toBe('CFMOMCMXXXX');
+    expect(hit?.code.slice(0, 8)).toBe('CFMOMCMX');
     expect(hit?.match).toBe('register');
   });
 
@@ -147,7 +151,7 @@ describe('lookupByCountryBank — Iceland answers at the bank grain', () => {
     // digits; the IBAN carries four. Before the truncation, no Icelandic key
     // was reachable at all.
     const hit = lookupByCountryBank('IS', '0133');
-    expect(hit?.code).toBe('NBIIISRE');
+    expect(hit?.code).toBe('NBIIISREXXX');
     // And the hit says which code it really consulted, so the verdict can
     // serve it as `value` instead of implying the branch digits were checked.
     expect(hit?.checked).toBe('01');

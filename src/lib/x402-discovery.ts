@@ -81,7 +81,14 @@ const ENTRIES: DiscoveryEntry[] = [
         bban: { bank_code: '00230', account_number: '000000012345' },
         sepa: { member: true, schemes: ['SCT', 'SDD'], vop_required: false },
         formatted: 'CH10 0023 0000 0000 1234 5',
-        bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
+        bic: {
+          code: 'UBSWCHZH80A',
+          bic8: 'UBSWCHZH',
+          bank_name: 'UBS Switzerland AG',
+          city: 'Zürich',
+          basis: 'national_register',
+          authoritative: true,
+        },
         issuer: { type: 'bank', name: 'UBS Switzerland AG', classification: 'default' },
         risk_indicators: {
           issuer_type: 'bank',
@@ -140,13 +147,23 @@ const ENTRIES: DiscoveryEntry[] = [
             iban: 'CH1000230000000012345',
             valid: true,
             country: { code: 'CH', name: 'Switzerland' },
-            bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
+            bic: {
+              code: 'UBSWCHZH80A',
+              bic8: 'UBSWCHZH',
+              bank_name: 'UBS Switzerland AG',
+              city: 'Zürich',
+            },
           },
           {
             iban: 'DE89370400440532013000',
             valid: true,
             country: { code: 'DE', name: 'Germany' },
-            bic: { code: 'COBADEFFXXX', bank_name: 'Commerzbank', city: 'Köln' },
+            bic: {
+              code: 'COBADEFFXXX',
+              bic8: 'COBADEFF',
+              bank_name: 'Commerzbank',
+              city: 'Köln',
+            },
           },
         ],
         count: 2,
@@ -271,7 +288,12 @@ const ENTRIES: DiscoveryEntry[] = [
         iban: 'CH1000230000000012345',
         valid: true,
         country: { code: 'CH', name: 'Switzerland' },
-        bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
+        bic: {
+          code: 'UBSWCHZH80A',
+          bic8: 'UBSWCHZH',
+          bank_name: 'UBS Switzerland AG',
+          city: 'Zürich',
+        },
         compliance: {
           sanctions: {
             country_sanctioned: false,

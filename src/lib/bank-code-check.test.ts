@@ -220,14 +220,21 @@ describe('bic.basis — where the pairing came from, and what it licenses', () =
   });
 
   it('keeps the two authoritative flags apart, because they answer different questions', () => {
-    // Switzerland is where they visibly differ, and where collapsing them would
-    // mislead: SIX confirms the IID is allocated, so bank_code_check is
-    // authoritative — while the BIC beside it still comes from our curated map
-    // and must not be settled against on the strength of that verdict.
-    const r = check('CH5604835012345678009');
-    expect(r.bank_code_check!.authoritative).toBe(true);
-    expect(r.bic!.basis).toBe('curated_map');
-    expect(r.bic!.authoritative).toBe(false);
+    // Switzerland used to be the example here, and it stopped being one: the
+    // BIC now comes from the SIX BankMaster's own column, so both flags answer
+    // true. France is where they still visibly differ — the curated map made
+    // the pairing, so the BIC must not be settled against however confident the
+    // verdict beside it sounds. One flag is about the BANK CODE, the other
+    // about the BIC, and collapsing them would license exactly what the second
+    // one refuses.
+    const fr = check('FR7630006000011234567890189');
+    expect(fr.bic!.basis).toBe('curated_map');
+    expect(fr.bic!.authoritative).toBe(false);
+
+    const ch = check('CH5604835012345678009');
+    expect(ch.bank_code_check!.authoritative).toBe(true);
+    expect(ch.bic!.basis).toBe('national_register');
+    expect(ch.bic!.authoritative).toBe(true);
   });
 
   it('derives the flag from the basis rather than carrying two independent claims', () => {

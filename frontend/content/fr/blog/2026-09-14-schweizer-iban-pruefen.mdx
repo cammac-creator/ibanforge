@@ -84,18 +84,19 @@ L'IID 00230, avec un numéro de compte inventé (les douze caractères ne compte
     "qr_iids": ["30005", "30308"]
   },
   "bic": {
-    "code": "UBSWCHZH",
+    "code": "UBSWCHZH80A",
+    "bic8": "UBSWCHZH",
     "bank_name": "UBS Switzerland AG",
-    "basis": "curated_map",
-    "authoritative": false,
-    "source": "IBANforge curated bank-code map"
+    "basis": "national_register",
+    "authoritative": true,
+    "source": "SIX BankMaster (Swiss IID / BC-Nummer register)"
   }
 }
 ```
 
 Trois blocs, trois prétentions. `bank_code_check` est le verdict du registre : `verified`, `authoritative: true`, et dessous l'adresse du siège telle que SIX la publie, rue et numéro compris, ce que très peu de registres européens font. `clearing` est ce que le registre dit des rails de paiement : participation à SIC (le clearing en francs), aux paiements instantanés en francs, à euroSIC pour l'euro, et les QR-IID que l'établissement détient, ici 30005 et 30308. Qui génère ou contrôle une QR-facture trouve ici quel QR-IID appartient à quelle banque.
 
-Le troisième bloc est l'honnête : `bic` porte `basis: curated_map` et `authoritative: false`. Le registre de SIX ne publie aucun BIC à côté de l'IID ; le BIC vient donc de notre propre carte entretenue, et l'API le dit au lieu de faire comme si SIX l'avait confirmé. L'IID est certifié, le BIC est une indication : deux poids, deux champs, et un programme qui lit la réponse branche sur `authoritative`, pas sur la présence d'une valeur.
+Le troisième bloc a changé le 22 septembre 2026, et la correction mérite d'être dite franchement : BankMaster publie bien un BIC à côté de l'IID, et cette API ne le lisait pas. Elle servait à la place les huit premiers caractères de sa propre carte — c'est-à-dire la centrale de compensation, pas toujours la banque qui tient le compte. Dans un réseau coopératif, les trois derniers caractères nomment une autre entité juridique : l'IID 30020 est Crédit Mutuel de la Vallée SA, `RBABCH22180`, alors que `RBABCH22` seul est Entris Banking AG. Le BIC suisse vient désormais du registre : `basis` vaut `national_register` et `authoritative` vaut `true`. Comparez un BIC fourni sur `bic8`, les huit caractères de l'établissement ; le code de branche à côté est une information, pas un écart.
 
 ## Troisième réponse : un QR-IBAN, et ce qu'il exige
 

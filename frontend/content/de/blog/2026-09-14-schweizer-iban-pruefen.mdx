@@ -84,18 +84,19 @@ Die IID 00230, mit einer erfundenen Kontonummer (die zwölf Stellen spielen für
     "qr_iids": ["30005", "30308"]
   },
   "bic": {
-    "code": "UBSWCHZH",
+    "code": "UBSWCHZH80A",
+    "bic8": "UBSWCHZH",
     "bank_name": "UBS Switzerland AG",
-    "basis": "curated_map",
-    "authoritative": false,
-    "source": "IBANforge curated bank-code map"
+    "basis": "national_register",
+    "authoritative": true,
+    "source": "SIX BankMaster (Swiss IID / BC-Nummer register)"
   }
 }
 ```
 
 Drei Blöcke, drei Ansprüche. `bank_code_check` ist das Urteil des Registers: `verified`, `authoritative: true`, und darunter die Sitzadresse, wie SIX sie veröffentlicht, mit Strasse und Hausnummer, was in Europa nur die wenigsten Register tun. `clearing` ist das, was das Register über die Zahlungsschienen sagt: Teilnahme an SIC (dem Schweizer Franken-Clearing), an Instant Payments in Franken, an euroSIC für den Euro, und die QR-IIDs, die das Institut hält, hier 30005 und 30308. Wer eine QR-Rechnung erzeugen oder prüfen will, findet hier, welche QR-IID zu welcher Bank gehört.
 
-Der dritte Block ist der ehrliche: `bic` trägt `basis: curated_map` und `authoritative: false`. Das Register von SIX veröffentlicht keinen BIC neben der IID, also kommt der BIC aus unserer eigenen, gepflegten Karte, und die API sagt es, statt so zu tun, als hätte SIX ihn bestätigt. Die IID ist beglaubigt, der BIC ist eine Angabe: Zwei verschiedene Gewichte, zwei Felder, und wer die Antwort automatisiert liest, verzweigt auf `authoritative` und nicht auf die Anwesenheit eines Werts.
+Der dritte Block hat sich am 22. September 2026 geändert, und die Korrektur gehört klar gesagt: BankMaster veröffentlicht sehr wohl einen BIC neben der IID, und diese API hat ihn lange nicht gelesen. Sie lieferte stattdessen die ersten acht Zeichen aus der eigenen Karte — also das Clearing-Institut, nicht immer die kontoführende Bank. In einem Genossenschaftsverbund benennen die letzten drei Zeichen eine andere juristische Person: Die IID 30020 ist Crédit Mutuel de la Vallée SA, `RBABCH22180`, während `RBABCH22` allein Entris Banking AG ist. Der Schweizer BIC stammt jetzt aus dem Register: `basis` lautet `national_register` und `authoritative` ist `true`. Vergleichen Sie einen gelieferten BIC auf `bic8`, den acht Zeichen des Instituts; der Filialcode daneben ist eine Information, keine Abweichung.
 
 ## Dritte Antwort: eine QR-IBAN, und was sie verlangt
 

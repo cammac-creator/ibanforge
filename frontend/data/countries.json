@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-16",
+ "generated_at": "2026-09-22",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -45,7 +45,8 @@
      "name": "Andorra"
     },
     "bic": {
-     "code": "BACAADAD",
+     "code": "BACAADADXXX",
+     "bic8": "BACAADAD",
      "bank_name": "ANDORRA BANC AGRÍCOL REIG, SA",
      "city": "LES ESCALDES",
      "source": "IBANforge curated bank-code map",
@@ -118,7 +119,8 @@
      "name": "United Arab Emirates"
     },
     "bic": {
-     "code": "BOMLAEAD",
+     "code": "BOMLAEADXXX",
+     "bic8": "BOMLAEAD",
      "bank_name": "MASHREQBANK PSC",
      "city": "DUBAI",
      "source": "IBANforge curated bank-code map",
@@ -317,7 +319,8 @@
      "name": "Azerbaijan"
     },
     "bic": {
-     "code": "NABZAZ2X",
+     "code": "NABZAZ2XXXX",
+     "bic8": "NABZAZ2X",
      "bank_name": "THE CENTRAL BANK OF THE REPUBLIC OF AZERBAIJAN",
      "city": "BAKU",
      "source": "IBANforge curated bank-code map",
@@ -525,6 +528,7 @@
     },
     "bic": {
      "code": "BNBGBGSF",
+     "bic8": "BNBGBGSF",
      "bank_name": "Българска народна банка",
      "city": "Sofia",
      "source": "Bulgarian National Bank, BAE register",
@@ -602,7 +606,8 @@
      "name": "Bahrain"
     },
     "bic": {
-     "code": "BMAGBHBM",
+     "code": "BMAGBHBMXXX",
+     "bic8": "BMAGBHBM",
      "bank_name": "CENTRAL BANK OF BAHRAIN",
      "city": "MANÂMA",
      "source": "IBANforge curated bank-code map",
@@ -803,7 +808,8 @@
      "name": "Belarus"
     },
     "bic": {
-     "code": "NBRBBY2X",
+     "code": "NBRBBY2XXXX",
+     "bic8": "NBRBBY2X",
      "bank_name": "National Bank of the Republic of Belarus",
      "city": "Минск",
      "source": "IBANforge curated bank-code map",
@@ -935,7 +941,8 @@
      "name": "Costa Rica"
     },
     "bic": {
-     "code": "BCRICRSJ",
+     "code": "BCRICRSJXXX",
+     "bic8": "BCRICRSJ",
      "bank_name": "BANCO DE COSTA RICA",
      "city": "SAN JOSE",
      "source": "IBANforge curated bank-code map",
@@ -1014,7 +1021,8 @@
      "name": "Cyprus"
     },
     "bic": {
-     "code": "BCYPCY2N",
+     "code": "BCYPCY2NXXX",
+     "bic8": "BCYPCY2N",
      "bank_name": "BANK OF CYPRUS PUBLIC COMPANY LIMITED",
      "city": "NICOSIA",
      "source": "IBANforge curated bank-code map",
@@ -1090,7 +1098,8 @@
      "name": "Czech Republic"
     },
     "bic": {
-     "code": "GIBACZPX",
+     "code": "GIBACZPXXXX",
+     "bic8": "GIBACZPX",
      "bank_name": "Česká spořitelna, a.s.",
      "city": "Praha 4",
      "source": "IBANforge curated bank-code map",
@@ -1166,6 +1175,7 @@
     },
     "bic": {
      "code": "COBADEFFXXX",
+     "bic8": "COBADEFF",
      "bank_name": "Commerzbank",
      "city": "Köln",
      "source": "Deutsche Bundesbank Bankleitzahlendatei",
@@ -1311,7 +1321,8 @@
      "name": "Denmark"
     },
     "bic": {
-     "code": "NDEADKKK",
+     "code": "NDEADKKKXXX",
+     "bic8": "NDEADKKK",
      "bank_name": "Nordea Bank Abp",
      "city": "COPENHAGEN",
      "source": "IBANforge curated bank-code map",
@@ -1383,7 +1394,8 @@
      "name": "Dominican Republic"
     },
     "bic": {
-     "code": "BAGRDOS1",
+     "code": "BAGRDOS1XXX",
+     "bic8": "BAGRDOS1",
      "bank_name": "BANCO AGRICOLA DE LA REPUBLICA DOMINICANA",
      "city": "SANTO DOMINGO",
      "source": "IBANforge curated bank-code map",
@@ -1456,7 +1468,8 @@
      "name": "Estonia"
     },
     "bic": {
-     "code": "HABAEE2X",
+     "code": "HABAEE2XXXX",
+     "bic8": "HABAEE2X",
      "bank_name": "SWEDBANK AS",
      "city": "TALLINN",
      "source": "IBANforge curated bank-code map",
@@ -1534,7 +1547,8 @@
      "name": "Egypt"
     },
     "bic": {
-     "code": "NBEGEGCX",
+     "code": "NBEGEGCXXXX",
+     "bic8": "NBEGEGCX",
      "bank_name": "NATIONAL BANK OF EGYPT",
      "city": "CAIRO",
      "source": "IBANforge curated bank-code map",
@@ -1614,6 +1628,7 @@
     },
     "bic": {
      "code": "CAIXESBB",
+     "bic8": "CAIXESBB",
      "bank_name": "CAIXABANK SA",
      "city": "Valencia",
      "source": "IBANforge curated bank-code map",
@@ -1690,7 +1705,8 @@
      "name": "Finland"
     },
     "bic": {
-     "code": "NDEAFIHH",
+     "code": "NDEAFIHHXXX",
+     "bic8": "NDEAFIHH",
      "bank_name": "Nordea Bank Abp",
      "city": "Helsinki",
      "source": "IBANforge curated bank-code map",
@@ -1771,6 +1787,7 @@
     },
     "bic": {
      "code": "SCBLFKFK",
+     "bic8": "SCBLFKFK",
      "bank_name": "STANDARD CHARTERED BANK",
      "city": "STANLEY",
      "source": "GLEIF LEI-to-BIC mapping",
@@ -1907,7 +1924,8 @@
      "name": "France"
     },
     "bic": {
-     "code": "PSSTFRPP",
+     "code": "PSSTFRPPXXX",
+     "bic8": "PSSTFRPP",
      "bank_name": "LA BANQUE POSTALE",
      "city": "PARIS",
      "source": "IBANforge curated bank-code map",
@@ -1990,6 +2008,7 @@
     },
     "bic": {
      "code": "NWBKGB2L",
+     "bic8": "NWBKGB2L",
      "bank_name": "NatWest",
      "city": "London",
      "source": "IBANforge curated bank-code map",
@@ -2061,7 +2080,8 @@
      "name": "Georgia"
     },
     "bic": {
-     "code": "BNLNGE22",
+     "code": "BNLNGE22XXX",
+     "bic8": "BNLNGE22",
      "bank_name": "საქართველოს ეროვნული ბანკი",
      "city": "თბილისი",
      "source": "IBANforge curated bank-code map",
@@ -2260,7 +2280,8 @@
      "name": "Greece"
     },
     "bic": {
-     "code": "ETHNGRAA",
+     "code": "ETHNGRAAXXX",
+     "bic8": "ETHNGRAA",
      "bank_name": "ΕΘΝΙΚΗ ΤΡΑΠΕΖΑ ΤΗΣ ΕΛΛΑΔΟΣ Α.Ε.",
      "city": "ATHENS",
      "source": "IBANforge curated bank-code map",
@@ -2333,7 +2354,8 @@
      "name": "Guatemala"
     },
     "bic": {
-     "code": "TRAJGTGC",
+     "code": "TRAJGTGCXXX",
+     "bic8": "TRAJGTGC",
      "bank_name": "BANCO DE LOS TRABAJADORES",
      "city": "GUATEMALA",
      "source": "IBANforge curated bank-code map",
@@ -2403,6 +2425,7 @@
     },
     "bic": {
      "code": "PISAHNTE",
+     "bic8": "PISAHNTE",
      "bank_name": "BANCO DEL PAIS, SOCIEDAD ANONIMA",
      "city": "San Pedro Sula",
      "source": "GLEIF LEI-to-BIC mapping",
@@ -2476,7 +2499,8 @@
      "name": "Croatia"
     },
     "bic": {
-     "code": "NBHRHR2X",
+     "code": "NBHRHR2XXXX",
+     "bic8": "NBHRHR2X",
      "bank_name": "Hrvatska narodna banka",
      "city": "Zagreb",
      "source": "IBANforge curated bank-code map",
@@ -2558,7 +2582,8 @@
      "name": "Hungary"
     },
     "bic": {
-     "code": "OTPVHUHB",
+     "code": "OTPVHUHBXXX",
+     "bic8": "OTPVHUHB",
      "bank_name": "OTP Bank Nyrt.",
      "city": "Budapest",
      "source": "IBANforge curated bank-code map",
@@ -2639,7 +2664,8 @@
      "name": "Ireland"
     },
     "bic": {
-     "code": "AIBKIE2D",
+     "code": "AIBKIE2DXXX",
+     "bic8": "AIBKIE2D",
      "bank_name": "ALLIED IRISH BANKS PUBLIC LIMITED COMPANY",
      "city": "Dublin",
      "source": "IBANforge curated bank-code map",
@@ -2781,7 +2807,8 @@
      "name": "Iraq"
     },
     "bic": {
-     "code": "NBIQIQBA",
+     "code": "NBIQIQBAXXX",
+     "bic8": "NBIQIQBA",
      "bank_name": "National Bank of Iraq",
      "city": "Baghdad",
      "source": "IBANforge curated bank-code map",
@@ -2859,7 +2886,8 @@
      "name": "Iceland"
     },
     "bic": {
-     "code": "NBIIISRE",
+     "code": "NBIIISREXXX",
+     "bic8": "NBIIISRE",
      "bank_name": "Landsbankinn hf.",
      "city": "Reykjavík",
      "source": "IBANforge curated bank-code map",
@@ -2940,7 +2968,8 @@
      "name": "Italy"
     },
     "bic": {
-     "code": "BLOPIT22",
+     "code": "BLOPIT22XXX",
+     "bic8": "BLOPIT22",
      "bank_name": "UBI BANCA SCPA",
      "city": "",
      "source": "IBANforge curated bank-code map",
@@ -3019,7 +3048,8 @@
      "name": "Jordan"
     },
     "bic": {
-     "code": "CBJOJOAX",
+     "code": "CBJOJOAXXXX",
+     "bic8": "CBJOJOAX",
      "bank_name": "CENTRAL BANK OF JORDAN",
      "city": "AMMAN",
      "source": "IBANforge curated bank-code map",
@@ -3088,7 +3118,8 @@
      "name": "Kuwait"
     },
     "bic": {
-     "code": "CBKUKWKW",
+     "code": "CBKUKWKWXXX",
+     "bic8": "CBKUKWKW",
      "bank_name": "Central Bank of Kuwait",
      "city": "Safat",
      "source": "IBANforge curated bank-code map",
@@ -3157,7 +3188,8 @@
      "name": "Kazakhstan"
     },
     "bic": {
-     "code": "NBRKKZKX",
+     "code": "NBRKKZKXXXX",
+     "bic8": "NBRKKZKX",
      "bank_name": "Республиканское государственное учреждение \"Национальный Банк Республики Казахстан\"",
      "city": "город Нур-Султан",
      "source": "IBANforge curated bank-code map",
@@ -3226,7 +3258,8 @@
      "name": "Lebanon"
     },
     "bic": {
-     "code": "BDLCLBBX",
+     "code": "BDLCLBBXXXX",
+     "bic8": "BDLCLBBX",
      "bank_name": "BANQUE DU LIBAN",
      "city": "BEIRUT",
      "source": "IBANforge curated bank-code map",
@@ -3295,7 +3328,8 @@
      "name": "Saint Lucia"
     },
     "bic": {
-     "code": "HEMMLCL2",
+     "code": "HEMMLCL2XXX",
+     "bic8": "HEMMLCL2",
      "bank_name": "HERMES BANK LIMITED",
      "city": "GROS-ISLET",
      "source": "IBANforge curated bank-code map",
@@ -3367,13 +3401,14 @@
      "name": "Liechtenstein"
     },
     "bic": {
-     "code": "BLFLLI2X",
+     "code": "BLFLLI2XXXX",
+     "bic8": "BLFLLI2X",
      "bank_name": "LGT Bank AG",
      "city": "Vaduz",
-     "source": "IBANforge curated bank-code map",
+     "source": "SIX BankMaster (Swiss IID / BC-Nummer register)",
      "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
+     "basis": "national_register",
+     "authoritative": true,
      "lei": "7KDSOB6Z0X4S67TMX170"
     },
     "bank_code_check": {
@@ -3516,6 +3551,7 @@
     },
     "bic": {
      "code": "BCEELULL",
+     "bic8": "BCEELULL",
      "bank_name": "Banque et Caisse d'Epargne de l'Etat, Luxembourg",
      "city": "Luxembourg",
      "source": "IBANforge curated bank-code map",
@@ -3790,6 +3826,7 @@
     },
     "bic": {
      "code": "AGRNMD2X",
+     "bic8": "AGRNMD2X",
      "bank_name": "Banca Comerciala\"MOLDOVA-AGROINDBANK\"S.A.",
      "city": "Chisinau",
      "source": "GLEIF LEI-to-BIC mapping",
@@ -3925,7 +3962,8 @@
      "name": "North Macedonia"
     },
     "bic": {
-     "code": "INSBMK22",
+     "code": "INSBMK22XXX",
+     "bic8": "INSBMK22",
      "bank_name": "Шпаркасе Банка Македонија АД Скопје",
      "city": "Skopje",
      "source": "IBANforge curated bank-code map",
@@ -4126,7 +4164,8 @@
      "name": "Malta"
     },
     "bic": {
-     "code": "MALTMTMT",
+     "code": "MALTMTMTXXX",
+     "bic8": "MALTMTMT",
      "bank_name": "Central Bank of Malta",
      "city": "Valletta",
      "source": "IBANforge curated bank-code map",
@@ -4263,6 +4302,7 @@
     },
     "bic": {
      "code": "BAMCNIMA",
+     "bic8": "BAMCNIMA",
      "bank_name": "BANCO DE AMERICA CENTRAL",
      "city": "MANAGUA",
      "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
@@ -4337,6 +4377,7 @@
     },
     "bic": {
      "code": "ABNANL2A",
+     "bic8": "ABNANL2A",
      "bank_name": "ABN AMRO Bank N.V.",
      "city": "Amsterdam",
      "source": "IBANforge curated bank-code map",
@@ -4412,7 +4453,8 @@
      "name": "Norway"
     },
     "bic": {
-     "code": "DABANO22",
+     "code": "DABANO22XXX",
+     "bic8": "DABANO22",
      "bank_name": "DANSKE BANK A/S",
      "city": "TRONDHEIM",
      "source": "IBANforge curated bank-code map",
@@ -4541,7 +4583,8 @@
      "name": "Pakistan"
     },
     "bic": {
-     "code": "SCBLPKKX",
+     "code": "SCBLPKKXXXX",
+     "bic8": "SCBLPKKX",
      "bank_name": "STANDARD CHARTERED BANK (PAKISTAN) LIMITED",
      "city": "KARACHI",
      "source": "IBANforge curated bank-code map",
@@ -4613,7 +4656,8 @@
      "name": "Poland"
     },
     "bic": {
-     "code": "WBKPPLPP",
+     "code": "WBKPPLPPXXX",
+     "bic8": "WBKPPLPP",
      "bank_name": "ERSTE BANK POLSKA SPÓŁKA AKCYJNA",
      "city": "WARSZAWA",
      "source": "IBANforge curated bank-code map",
@@ -4689,7 +4733,8 @@
      "name": "Palestine"
     },
     "bic": {
-     "code": "PALSPS22",
+     "code": "PALSPS22XXX",
+     "bic8": "PALSPS22",
      "bank_name": "Bank of Palestine P.L.C",
      "city": "Ramallah",
      "source": "IBANforge curated bank-code map",
@@ -4829,7 +4874,8 @@
      "name": "Qatar"
     },
     "bic": {
-     "code": "DOHBQAQA",
+     "code": "DOHBQAQAXXX",
+     "bic8": "DOHBQAQA",
      "bank_name": "DOHA BANK Q.P.S.C",
      "city": "DOHA",
      "source": "IBANforge curated bank-code map",
@@ -5085,7 +5131,8 @@
      "name": "Saudi Arabia"
     },
     "bic": {
-     "code": "RJHISARI",
+     "code": "RJHISARIXXX",
+     "bic8": "RJHISARI",
      "bank_name": "Al Rajhi Bank",
      "city": "Riyadh",
      "source": "IBANforge curated bank-code map",
@@ -5277,7 +5324,8 @@
      "name": "Sweden"
     },
     "bic": {
-     "code": "ESSESESS",
+     "code": "ESSESESSXXX",
+     "bic8": "ESSESESS",
      "bank_name": "Skandinaviska Enskilda Banken AB",
      "city": "Stockholm",
      "source": "IBANforge curated bank-code map",
@@ -5354,7 +5402,8 @@
      "name": "Slovenia"
     },
     "bic": {
-     "code": "SZKBSI2X",
+     "code": "SZKBSI2XXXX",
+     "bic8": "SZKBSI2X",
      "bank_name": "DEŽELNA BANKA SLOVENIJE d.d.",
      "city": "Ljubljana",
      "source": "IBANforge curated bank-code map",
@@ -5639,6 +5688,7 @@
     },
     "bic": {
      "code": "INOISTST",
+     "bic8": "INOISTST",
      "bank_name": "Banco Internacional de Sao Tome e Principe (BISTP)",
      "city": "Sao Tome",
      "source": "IBANforge curated bank-code map",
@@ -5707,7 +5757,8 @@
      "name": "El Salvador"
     },
     "bic": {
-     "code": "CENRSVSS",
+     "code": "CENRSVSSXXX",
+     "bic8": "CENRSVSS",
      "bank_name": "Banco Central de Reserva de El Salvador",
      "city": "San Salvador",
      "source": "IBANforge curated bank-code map",
@@ -5839,7 +5890,8 @@
      "name": "Tunisia"
     },
     "bic": {
-     "code": "STBKTNTT",
+     "code": "STBKTNTTXXX",
+     "bic8": "STBKTNTT",
      "bank_name": "SOCIETE TUNISIENNE DE BANQUE",
      "city": "Tunis",
      "source": "IBANforge curated bank-code map",
@@ -6027,6 +6079,7 @@
     },
     "bic": {
      "code": "IOPRVAVX",
+     "bic8": "IOPRVAVX",
      "bank_name": "Istituto per le Opere di Religione (IOR)",
      "city": "Vatican City",
      "source": "IBANforge curated bank-code map",
@@ -6224,6 +6277,7 @@
     },
     "bic": {
      "code": "CBYEYESA",
+     "bic8": "CBYEYESA",
      "bank_name": "CENTRAL BANK OF YEMEN",
      "city": "ADEN",
      "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",

@@ -84,18 +84,19 @@ IID 00230, with an invented account number (the twelve characters play no part i
     "qr_iids": ["30005", "30308"]
   },
   "bic": {
-    "code": "UBSWCHZH",
+    "code": "UBSWCHZH80A",
+    "bic8": "UBSWCHZH",
     "bank_name": "UBS Switzerland AG",
-    "basis": "curated_map",
-    "authoritative": false,
-    "source": "IBANforge curated bank-code map"
+    "basis": "national_register",
+    "authoritative": true,
+    "source": "SIX BankMaster (Swiss IID / BC-Nummer register)"
   }
 }
 ```
 
 Three blocks, three claims. `bank_code_check` is the register's verdict: `verified`, `authoritative: true`, and beneath it the registered address as SIX publishes it, street and number included, which very few European registers do. `clearing` is what the register says about the payment rails: participation in SIC (the Swiss franc clearing), in Instant Payments in francs, in euroSIC for the euro, and the QR-IIDs the institution holds, here 30005 and 30308. Anyone generating or checking a QR-bill finds here which QR-IID belongs to which bank.
 
-The third block is the honest one: `bic` carries `basis: curated_map` and `authoritative: false`. The SIX register publishes no BIC beside the IID, so the BIC comes from our own maintained map, and the API says so instead of pretending SIX confirmed it. The IID is vouched for, the BIC is an indication: two different weights, two fields, and a program reading the answer branches on `authoritative`, not on the presence of a value.
+The third block changed on 22 September 2026, and the correction is worth stating plainly: BankMaster does publish a BIC beside the IID, and for a long time this API did not read it. It served the first eight characters of its own map instead — which is the clearing institution, not always the bank holding the account. In a cooperative network the last three characters name a different legal entity: IID 30020 is Crédit Mutuel de la Vallée SA, `RBABCH22180`, while `RBABCH22` alone is Entris Banking AG. The Swiss BIC now comes from the register, so `basis` reads `national_register` and `authoritative` is `true`. Compare a supplied BIC on `bic8`, the eight characters of the institution; the branch code beside it is information, not a mismatch.
 
 ## Third answer: a QR-IBAN, and what it demands
 

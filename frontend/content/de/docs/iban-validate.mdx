@@ -56,11 +56,12 @@ POST https://api.ibanforge.com/v1/iban/validate
     "account_number": "000000012345"
   },
   "bic": {
-    "code": "UBSWCHZH",
+    "code": "UBSWCHZH80A",
+    "bic8": "UBSWCHZH",
     "bank_name": "UBS Switzerland AG",
     "city": "Zürich",
-    "basis": "curated_map",
-    "authoritative": false
+    "basis": "national_register",
+    "authoritative": true
   },
   "sepa": {
     "member": true,
@@ -155,7 +156,9 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 | Feld | Typ | Beschreibung |
 |---|---|---|
-| `code` | `string` | BIC/SWIFT-Code (8 Zeichen) |
+| `code` | `string` | BIC/SWIFT-Code, wie ihn die Quelle veröffentlicht, 8 oder 11 Zeichen; auf `bic8` vergleichen |
+| `bic8` | `string` | Die acht Zeichen des Instituts — das Feld, gegen das ein gelieferter BIC zu vergleichen ist. Der Filialcode (die letzten drei Zeichen von `code`) ist informativ: in Genossenschaftsverbünden benennt er die lokale Bank und die ersten acht ihr Clearing-Institut |
+| `redirected_from` | `string?` | Der angefragte Bankcode, wenn das Register für denjenigen geantwortet hat, der sein Clearing übernommen hat (CH und LI: SIX leitet eine konkatenierte IID um). Die IBAN bleibt gültig: eine Umleitung ist keine Stilllegung |
 | `bank_name` | `string \| null` | Name des Finanzinstituts |
 | `city` | `string \| null` | Stadt des Instituts |
 | `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, AT, BE und BG); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |
@@ -221,13 +224,13 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 Der BIC in der Antwort ist aus dem Bankcode der IBAN **abgeleitet**, und was diese Ableitung wert ist, hängt vollständig davon ab, was sie erzeugt hat. `bic.basis` sagt, welche Quelle es war, und `bic.authoritative` macht daraus den einen booleschen Wert, auf den eine Zahlungsverarbeitung verzweigen kann:
 
-- **`basis: "national_register"`, `authoritative: true`** — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode. Heute sind das **Deutschland, Österreich, Belgien, Bulgarien, die Slowakei und San Marino**: Die Bankleitzahlendatei der Bundesbank führt den exakten 11-stelligen BIC je BLZ, und die Register der OeNB, der Belgischen Nationalbank, das BAE-Register der Bulgarischen Nationalbank, der prevodník der Národná banka Slovenska sowie die Liste der Zentralbank von San Marino veröffentlichen den BIC des Instituts je Bankcode. San Marino ist die einzige Stelle, an der dieses Flag `true` ist, während `bank_code_check.authoritative` `false` ist: Die Liste der Zentralbank ordnet einem geführten Code einen BIC zu, veröffentlicht aber nicht die Vergabe des Coderaums. Das deutsche Register ist der Grund, weshalb eine Sparkasse zu ihrem eigenen BIC auflöst und nicht zum BIC8 der gemeinsamen Landesbank — das Feld benennt diese Zuordnung, es erzeugt sie nicht. Speicherbar und zur Abwicklung geeignet — mit einer Ausnahme: Ein Code, den das Register selbst als **zurückgezogen** führt, behält die Basis `national_register`, aber `authoritative` fällt auf `false`; lesen Sie `bank_code_check.retired` und `superseded_by`.
+- **`basis: "national_register"`, `authoritative: true`** — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode. Heute sind das **die Schweiz, Liechtenstein, Deutschland, Österreich, Belgien, Bulgarien, die Slowakei und San Marino**: Der SIX BankMaster führt für CH und LI den exakten 11-stelligen BIC je IID (BC-Nummer), die Bankleitzahlendatei der Bundesbank führt den exakten 11-stelligen BIC je BLZ, und die Register der OeNB, der Belgischen Nationalbank, das BAE-Register der Bulgarischen Nationalbank, der prevodník der Národná banka Slovenska sowie die Liste der Zentralbank von San Marino veröffentlichen den BIC des Instituts je Bankcode. San Marino ist die einzige Stelle, an der dieses Flag `true` ist, während `bank_code_check.authoritative` `false` ist: Die Liste der Zentralbank ordnet einem geführten Code einen BIC zu, veröffentlicht aber nicht die Vergabe des Coderaums. Das deutsche Register ist der Grund, weshalb eine Sparkasse zu ihrem eigenen BIC auflöst und nicht zum BIC8 der gemeinsamen Landesbank, und das Schweizer Register der Grund, weshalb die IID 30020 zu Crédit Mutuel de la Vallée SA (`RBABCH22180`) auflöst und nicht zu Entris Banking AG (`RBABCH22`) — das Feld benennt diese Zuordnung, es erzeugt sie nicht. **Vergleichen Sie einen gelieferten BIC auf `bic8`**: Der Filialcode ist informativ, und in einem Genossenschaftsverbund benennt er die lokale Bank, während die ersten acht Zeichen ihr Clearing-Institut benennen. Speicherbar und zur Abwicklung geeignet — mit einer Ausnahme: Ein Code, den das Register selbst als **zurückgezogen** führt, behält die Basis `national_register`, aber `authoritative` fällt auf `false`; lesen Sie `bank_code_check.retired` und `superseded_by`.
 - **`basis: "curated_map"`, `authoritative: false`** — unsere eigene gepflegte Bankcode-Karte hat die Zuordnung über einen exakten Schlüssel hergestellt. Meistens richtig und kein Vergabeakt: Keine Behörde steht dahinter.
 - **`basis: "directory_prefix"`, `authoritative: false`** — der BIC-Präfix-Rückfall. Er kann mehrere Institute gleichzeitig treffen; `bank_code_check.candidates` sagt wie viele, und `next_steps` meldet `bic_is_advisory`, sobald es mehr als eines ist.
 
 **Außerhalb einer `national_register`-Basis behandeln Sie den BIC als Hinweis**: gut für Anzeige, Anreicherung und Routing-Hinweise, und vor der Speicherung als Abwicklungsanweisung mit dem Empfänger oder Ihrer Bank zu bestätigen.
 
-> `bic.authoritative` und `bank_code_check.authoritative` beantworten **zwei verschiedene Fragen**, und in der Schweiz wird der Unterschied sichtbar. Der SIX BankMaster bestätigt autoritativ, dass der Bankcode vergeben ist — `bank_code_check.authoritative: true` — während der BIC daneben weiterhin aus unserer kuratierten Karte stammt, `bic.authoritative` also `false` ist. Das eine betrifft die Existenz des Codes, das andere die Zuordnung, die den BIC erzeugt hat.
+> `bic.authoritative` und `bank_code_check.authoritative` beantworten **zwei verschiedene Fragen**. In der Schweiz wurde der Unterschied früher sichtbar, heute nicht mehr: Der BIC stammt jetzt aus der Spalte des SIX BankMaster selbst, beide sind dort also `true`. In San Marino gehen sie weiterhin auseinander, in die andere Richtung — die Zuordnung ist die der Aufsicht (`bic.authoritative: true`), während der Coderaum nicht von ihr vergeben wird (`bank_code_check.authoritative: false`). Das eine betrifft die Existenz des Codes, das andere die Zuordnung, die den BIC erzeugt hat.
 
 ### Ungültige IBAN (200)
 
