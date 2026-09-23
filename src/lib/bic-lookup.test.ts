@@ -14,6 +14,26 @@ afterAll(() => {
   closeAll();
 });
 
+/**
+ * Lance `fn` et compte les instructions SQLite qu'il a exécutées (`run`, `get`,
+ * `all`, `iterate`), sur n'importe quelle base : elles partagent un prototype.
+ */
+function countStatementsRun(fn: () => void): number {
+  const statement = Object.getPrototypeOf(getBicDB().prepare('SELECT 1')) as Record<
+    'run' | 'get' | 'all' | 'iterate',
+    (...args: unknown[]) => unknown
+  >;
+  const executions = (['run', 'get', 'all', 'iterate'] as const).map((method) =>
+    vi.spyOn(statement, method),
+  );
+  try {
+    fn();
+    return executions.reduce((n, spy) => n + spy.mock.calls.length, 0);
+  } finally {
+    for (const spy of executions) spy.mockRestore();
+  }
+}
+
 describe('getEntryCount', () => {
   it('returns a positive number of BIC entries', () => {
     const count = getEntryCount();
@@ -114,20 +134,9 @@ describe('getLastUpdated — cached, and still the right answer', () => {
     // serait préparée ou gardée. Un seuil de 0,5 ms par appel tombait sur une
     // machine occupée sans rien dire du code.
     getLastUpdated();
-    const statement = Object.getPrototypeOf(getBicDB().prepare('SELECT 1')) as Record<
-      'run' | 'get' | 'all' | 'iterate',
-      (...args: unknown[]) => unknown
-    >;
-    const executions = (['run', 'get', 'all', 'iterate'] as const).map((method) =>
-      vi.spyOn(statement, method),
-    );
-    let executed = -1;
-    try {
+    const executed = countStatementsRun(() => {
       for (let i = 0; i < 500; i++) getLastUpdated();
-      executed = executions.reduce((n, spy) => n + spy.mock.calls.length, 0);
-    } finally {
-      for (const spy of executions) spy.mockRestore();
-    }
+    });
     expect(executed, 'statements run by 500 warm calls — the table scan is back').toBe(0);
   });
 });

@@ -40,6 +40,32 @@ function writes(): number {
   return (getStatsDB().prepare('SELECT total_changes() AS n').get() as { n: number }).n;
 }
 
+/**
+ * Lance `fn` et compte les instructions SQLite qu'il a exécutées (`run`, `get`,
+ * `all`, `iterate`) et compilées (`prepare`) sur la base des statistiques.
+ */
+function countStatements(fn: () => void): { executed: number; compiled: number } {
+  const db = getStatsDB();
+  const statement = Object.getPrototypeOf(db.prepare('SELECT 1')) as Record<
+    'run' | 'get' | 'all' | 'iterate',
+    (...args: unknown[]) => unknown
+  >;
+  const executions = (['run', 'get', 'all', 'iterate'] as const).map((method) =>
+    vi.spyOn(statement, method),
+  );
+  const compilations = vi.spyOn(db, 'prepare');
+  try {
+    fn();
+    return {
+      executed: executions.reduce((n, spy) => n + spy.mock.calls.length, 0),
+      compiled: compilations.mock.calls.length,
+    };
+  } finally {
+    for (const spy of executions) spy.mockRestore();
+    compilations.mockRestore();
+  }
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -494,26 +520,10 @@ describe('the cost of the hot path', () => {
     );
     // La requête préparée se compile au premier appel : celui-ci, hors du compte.
     countDailyUnits(ledgerBucket('198.51.100.1', 'rest:'), 1, 10_000);
-    const db = getStatsDB();
-    const statement = Object.getPrototypeOf(db.prepare('SELECT 1')) as Record<
-      'run' | 'get' | 'all' | 'iterate',
-      (...args: unknown[]) => unknown
-    >;
     const writesBefore = writes();
-    const executions = (['run', 'get', 'all', 'iterate'] as const).map((method) =>
-      vi.spyOn(statement, method),
-    );
-    const compilations = vi.spyOn(db, 'prepare');
-    let executed = -1;
-    let compiled = -1;
-    try {
+    const { executed, compiled } = countStatements(() => {
       for (const key of keys) countDailyUnits(key, 1, 10_000);
-      executed = executions.reduce((n, spy) => n + spy.mock.calls.length, 0);
-      compiled = compilations.mock.calls.length;
-    } finally {
-      for (const spy of executions) spy.mockRestore();
-      compilations.mockRestore();
-    }
+    });
     // UNE instruction par appel, l'UPSERT, et aucune compilée : la requête est
     // mémoïsée et rien d'autre ne tourne sur le chemin chaud.
     expect(executed).toBe(keys.length);
@@ -523,7 +533,7 @@ describe('the cost of the hot path', () => {
     expect(rows()).toBe(new Set(keys).size + 1);
     // Et la ligne visée se trouve par la clé primaire : une recherche, jamais
     // un balayage de la table.
-    const plan = db
+    const plan = getStatsDB()
       .prepare('EXPLAIN QUERY PLAN SELECT units FROM trial_ledger WHERE day = ? AND bucket = ?')
       .all(today(), keys[0]) as Array<{ detail: string }>;
     expect(plan.map((step) => step.detail).join(' | ')).toMatch(
