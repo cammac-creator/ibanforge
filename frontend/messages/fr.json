@@ -748,14 +748,15 @@
         "collected": {
           "title": "Encaissé · Stripe",
           "titleDerived": "Encaissé · selon les clés",
-          "hint": "Lu directement chez Stripe : chaque paiement par carte réussi, brut, rangé par nature (packs, abonnements Pro et Éditeur, audits de fichier). Net : ce que Stripe a crédité après ses frais, dans la devise du compte, avant remboursements. Viré : arrivé sur le compte bancaire. En attente : virements en route et solde Stripe. Relu au plus toutes les 15 minutes. Les paiements x402 en USDC sont comptés à part.",
+          "hint": "Lu directement chez Stripe : le total additionne les paiements par carte réussis des packs, des abonnements Pro et Éditeur et des audits de fichier, bruts. Un paiement du compte que rien ne relie à IBANforge est montré à part, hors total. Net, viré et en attente : compte Stripe entier, autres paiements compris, dans la devise du compte ; Stripe ne les sépare pas par produit. Net : ce que Stripe a crédité après ses frais, avant remboursements. Viré : arrivé sur le compte bancaire. En attente : virements en route et solde Stripe. Relu au plus toutes les 15 minutes. Les paiements x402 en USDC sont comptés à part.",
           "hintDerived": "Stripe n'a pas répondu : ce total vient de nos propres traces (montants enregistrés sur les clés, renouvellements d'abonnement reçus, audits payés), en dollars seulement. Un paiement dans une autre devise ou sans montant enregistré n'y est pas. Le net et les virements ne se lisent que chez Stripe.",
           "kinds": {
             "pack": "Packs",
             "abonnement": "Abonnements",
-            "audit": "Audits",
-            "autre": "Autres"
+            "audit": "Audits"
           },
+          "other": "Hors total : {amount} d'autres paiements du compte Stripe, que rien ne relie à IBANforge.",
+          "accountWide": "Compte Stripe entier, autres compris :",
           "net": "Net {amount}",
           "netUnread": "net non lu",
           "paidOut": "viré {amount}",
@@ -763,7 +764,7 @@
           "awaiting": "en attente {amount}",
           "derivedNote": "selon les clés, Stripe indisponible",
           "refunded": "Remboursé : {amount}, non déduit du total.",
-          "partial": "Classement incomplet : une partie des paiements est comptée dans « Autres ».",
+          "partial": "Classement incomplet : des paiements IBANforge peuvent être restés hors total.",
           "netUnknown": "Net inconnu pour {count, plural, =1 {# paiement} other {# paiements}}.",
           "testMode": "Clé Stripe de test : ces montants ne sont pas réels.",
           "derivedExcluded": "{count, plural, =1 {# paiement hors total} other {# paiements hors total}} : autre devise ou montant absent.",
@@ -782,7 +783,7 @@
         "idle": "vu il y a {days} j",
         "neverCalled": "jamais appelé",
         "digest": "Le point de la semaine (déplié le lundi)",
-        "windows": "Périmètres : encaissé lu chez Stripe, tous les paiements par carte depuis l'ouverture du compte, relu au plus toutes les 15 minutes ; crédits et comptes sur les clés recensées ; x402 cumulé depuis le 18 avril, variation contre la veille et courbe sur 7 jours. Le choix {days} j ne filtre pas ces quatre tuiles.",
+        "windows": "Périmètres : encaissé lu chez Stripe, les paiements par carte d'IBANforge depuis l'ouverture du compte (net, viré et en attente : compte Stripe entier), relu au plus toutes les 15 minutes ; crédits et comptes sur les clés recensées ; x402 cumulé depuis le 18 avril, variation contre la veille et courbe sur 7 jours. Le choix {days} j ne filtre pas ces quatre tuiles.",
         "retainedKeysNote": "Crédits et comptes : les anciennes clés remplacées restent dans ces compteurs. Un quota supérieur à 200 peut être un abonnement ; ces catégories mélangent l’usage payant et l’usage non payant. Les crédits recensés ne sont pas un solde utilisable.",
         "packSales": {
           "title": "Packs · détail des montants Stripe connus",

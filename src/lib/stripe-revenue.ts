@@ -26,8 +26,23 @@
  * listées UNE fois et rangées par paiement, plutôt qu'une requête par charge
  * (`checkout.sessions.list({ payment_intent })`) : le résultat est le même, et
  * le nombre d'appels suit le nombre de pages et non le nombre de paiements.
- * Tout le reste est « autre », montré à part, jamais fondu dans un total : le
- * compte Stripe porte encore des traces d'un autre projet.
+ * Tout le reste est « autre » : montré à part, JAMAIS dans le total IBANforge,
+ * parce que le compte Stripe porte encore des paiements d'un autre projet.
+ *
+ * Limite connue, assumée : une facture d'abonnement est tenue pour un
+ * abonnement IBANforge, et toute métadonnée `bundle` pour un pack. C'est vrai
+ * tant que ce compte ne facture ni abonnement ni lien à `bundle` pour un autre
+ * projet ; le jour où il le fait, lier l'abonnement à une session IBANforge
+ * (métadonnée `plan`) et `bundle` aux packs connus.
+ *
+ * DEUX PÉRIMÈTRES
+ *
+ *  - `ibanforge` = packs + abonnements + audits, jamais « autre ». Son brut,
+ *    ses remboursements et son nombre de paiements font le TITRE de la tuile.
+ *  - `account` = le compte Stripe entier, « autre » compris. Il porte le net et
+ *    les frais que la tuile montre à côté des virements et du solde, lesquels
+ *    ne se lisent qu'au niveau du compte (Stripe ne vire pas par produit) :
+ *    net = viré + en attente ne tient que sur ce périmètre-là.
  *
  * CE QUI FAIT FOI
  *
@@ -45,8 +60,10 @@
  *
  * Sans les charges, il n'y a rien à dire : la lecture échoue entière. Les
  * lectures de classement, de virements et de solde peuvent échouer seules :
- * le total brut reste juste, et la lecture le dit (`classification`,
- * `payouts: null`, `balance: null`).
+ * le brut du compte reste juste ; un classement manqué fait tomber des
+ * paiements IBANforge dans « autre », donc hors du titre, qui baisse au lieu de
+ * gonfler ; et la lecture le dit (`classification`, `payouts: null`,
+ * `balance: null`).
  *
  * UN SEUL APPEL À LA FOIS
  *
@@ -58,6 +75,8 @@ import type Stripe from 'stripe';
 
 export type RevenueKind = 'pack' | 'abonnement' | 'audit' | 'autre';
 export const REVENUE_KINDS: readonly RevenueKind[] = ['pack', 'abonnement', 'audit', 'autre'];
+/** Les natures qui font l'argent d'IBANforge, donc le titre de la tuile. « autre » n'en est pas. */
+export const IBANFORGE_KINDS: readonly RevenueKind[] = ['pack', 'abonnement', 'audit'];
 
 /** Montants en unités mineures, par devise ISO en minuscules. */
 export type MinorByCurrency = Record<string, number>;
@@ -84,11 +103,20 @@ export interface StripeRevenueSnapshot {
   /** false : une clé de test, des montants fictifs. null : aucun paiement lu. */
   livemode: boolean | null;
   by_kind: Record<RevenueKind, KindTotals>;
-  total: KindTotals;
+  /**
+   * L'argent d'IBANforge : packs + abonnements + audits, JAMAIS « autre ». Son
+   * brut, ses remboursements et son nombre de paiements font le titre de la tuile.
+   */
+  ibanforge: KindTotals;
+  /**
+   * Le compte Stripe entier, « autre » compris : le seul périmètre où le net et
+   * les frais se comparent aux virements et au solde (net = viré + en attente).
+   */
+  account: KindTotals;
   classification: {
-    /** false : la lecture des factures a échoué, des abonnements peuvent être dans « autre ». */
+    /** false : la lecture des factures a échoué, des abonnements peuvent être dans « autre », hors du titre. */
     invoices: boolean;
-    /** false : la lecture des sessions a échoué, des packs et audits peuvent être dans « autre ». */
+    /** false : la lecture des sessions a échoué, des packs et audits peuvent être dans « autre », hors du titre. */
     sessions: boolean;
   };
   payouts: {
@@ -276,7 +304,8 @@ export function summarizeStripeRevenue(
     RevenueKind,
     KindTotals
   >;
-  const total = emptyTotals();
+  const ibanforge = emptyTotals();
+  const account = emptyTotals();
   let livemode: boolean | null = null;
 
   for (const ch of input.charges) {
@@ -293,7 +322,11 @@ export function summarizeStripeRevenue(
       ch.balance_transaction && typeof ch.balance_transaction === 'object'
         ? ch.balance_transaction
         : null;
-    for (const t of [byKind[kindOf(ch)], total]) {
+    // « autre » va au compte, jamais au total IBANforge : c'est tout l'objet des
+    // deux périmètres (voir l'en-tête).
+    const kind = kindOf(ch);
+    const targets = kind === 'autre' ? [byKind.autre, account] : [byKind[kind], ibanforge, account];
+    for (const t of targets) {
       t.count++;
       add(t.gross, ch.currency, gross);
       if (ch.amount_refunded > 0) add(t.refunded, ch.currency, ch.amount_refunded);
@@ -347,7 +380,8 @@ export function summarizeStripeRevenue(
     read_at: readAt.toISOString(),
     livemode,
     by_kind: byKind,
-    total,
+    ibanforge,
+    account,
     classification: {
       invoices: input.invoicePayments !== null,
       sessions: input.sessions !== null,

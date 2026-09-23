@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type Stripe from 'stripe';
 import {
+  IBANFORGE_KINDS,
   readStripeRevenue,
   StripeRevenueCache,
   summarizeStripeRevenue,
+  type MinorByCurrency,
   type StripeRevenueClient,
 } from './stripe-revenue.js';
 
@@ -238,13 +240,68 @@ describe('classer chaque paiement, sans jamais mélanger les devises', () => {
     });
     expect(s.by_kind.audit).toMatchObject({ count: 1, gross: { usd: 14900 }, net: { chf: 12991 } });
     expect(s.by_kind.autre).toMatchObject({ count: 1, gross: { usd: 500 }, net: { chf: 407 } });
-    expect(s.total.count).toBe(7);
-    expect(s.total.gross).toEqual({ usd: 21600 });
-    expect(s.total.net).toEqual({ chf: 18666 });
-    expect(s.total.fees).toEqual({ chf: 774 });
-    expect(s.total.refunded).toEqual({});
-    expect(s.total.last_payment_at).not.toBeNull();
+    // Le titre : packs + abonnements + audits, sans le paiement « autre ».
+    expect(s.ibanforge.count).toBe(6);
+    expect(s.ibanforge.gross).toEqual({ usd: 21100 });
+    expect(s.ibanforge.net).toEqual({ chf: 18259 });
+    expect(s.ibanforge.fees).toEqual({ chf: 731 });
+    expect(s.ibanforge.refunded).toEqual({});
+    expect(s.ibanforge.last_payment_at).not.toBeNull();
+    // Le compte entier, « autre » compris.
+    expect(s.account.count).toBe(7);
+    expect(s.account.gross).toEqual({ usd: 21600 });
+    expect(s.account.net).toEqual({ chf: 18666 });
+    expect(s.account.fees).toEqual({ chf: 774 });
     expect(s.classification).toEqual({ invoices: true, sessions: true });
+  });
+
+  it('ne met jamais « autre » dans le titre : titre = packs + abonnements + audits', () => {
+    const f = reference();
+    const s = summarizeStripeRevenue(
+      {
+        charges: f.charges,
+        invoicePayments: f.invoicePayments as Stripe.InvoicePayment[],
+        sessions: f.sessions as Stripe.Checkout.Session[],
+        payouts: null,
+        balance: null,
+      },
+      READ_AT,
+    );
+    const sum = (field: 'gross' | 'refunded' | 'net' | 'fees'): MinorByCurrency => {
+      const out: MinorByCurrency = {};
+      for (const k of IBANFORGE_KINDS) {
+        for (const [c, v] of Object.entries(s.by_kind[k][field])) out[c] = (out[c] ?? 0) + v;
+      }
+      return out;
+    };
+    for (const field of ['gross', 'refunded', 'net', 'fees'] as const) {
+      expect(s.ibanforge[field], field).toEqual(sum(field));
+    }
+    expect(s.ibanforge.count).toBe(IBANFORGE_KINDS.reduce((n, k) => n + s.by_kind[k].count, 0));
+    // Le compte dépasse le titre exactement du paiement « autre ».
+    expect(s.account.gross.usd - s.ibanforge.gross.usd).toBe(s.by_kind.autre.gross.usd);
+    expect(s.account.count - s.ibanforge.count).toBe(s.by_kind.autre.count);
+  });
+
+  it('garde hors du titre un paiement « autre », même remboursé ou sans session', () => {
+    const s = summarizeStripeRevenue(
+      {
+        charges: [
+          charge({ pi: 'pi_pack_only', amount: 2800, net: 2400, fee: 100 }),
+          charge({ pi: 'pi_elsewhere', amount: 500, net: 407, fee: 43, refunded: 500 }),
+        ],
+        invoicePayments: [],
+        sessions: [session('pi_pack_only', { bundle: '5k' })],
+        payouts: null,
+        balance: null,
+      },
+      READ_AT,
+    );
+    expect(s.ibanforge.gross).toEqual({ usd: 2800 });
+    expect(s.ibanforge.refunded).toEqual({});
+    expect(s.by_kind.autre.refunded).toEqual({ usd: 500 });
+    expect(s.account.gross).toEqual({ usd: 3300 });
+    expect(s.account.refunded).toEqual({ usd: 500 });
   });
 
   it('dit ce qui est viré et ce qui attend : tout le net est l’un ou l’autre', () => {
@@ -267,7 +324,10 @@ describe('classer chaque paiement, sans jamais mélanger les devises', () => {
     expect(s.payouts?.in_transit).toEqual({ count: 1, amount: { chf: 1666 } });
     expect(s.balance).toEqual({ available: { chf: 1500 }, pending: { chf: 500 } });
     expect(s.awaiting_payout).toEqual({ chf: 3666 });
-    expect((s.payouts?.paid.amount.chf ?? 0) + (s.awaiting_payout?.chf ?? 0)).toBe(s.total.net.chf);
+    // Virements et solde n'existent qu'au niveau du compte : l'égalité se lit sur `account`.
+    expect((s.payouts?.paid.amount.chf ?? 0) + (s.awaiting_payout?.chf ?? 0)).toBe(
+      s.account.net.chf,
+    );
   });
 
   it('montre un remboursement à part, sans le retirer du brut', () => {
@@ -283,6 +343,7 @@ describe('classer chaque paiement, sans jamais mélanger les devises', () => {
     );
     expect(s.by_kind.pack.gross).toEqual({ usd: 2000 });
     expect(s.by_kind.pack.refunded).toEqual({ usd: 2000 });
+    expect(s.ibanforge.refunded).toEqual({ usd: 2000 });
     // Sans le solde, « en attente » n'est pas calculable : null, jamais zéro.
     expect(s.awaiting_payout).toBeNull();
   });
@@ -317,8 +378,10 @@ describe('classer chaque paiement, sans jamais mélanger les devises', () => {
       READ_AT,
     );
     expect(s.livemode).toBe(false);
-    expect(s.total.net_unknown).toBe(1);
-    expect(s.total.net).toEqual({});
+    expect(s.account.net_unknown).toBe(1);
+    expect(s.account.net).toEqual({});
+    // Sans session ni facture, ce paiement est « autre » : hors du titre.
+    expect(s.ibanforge.count).toBe(0);
   });
 });
 
@@ -336,23 +399,25 @@ describe('lire Stripe : pagination complète, lectures secondaires qui peuvent m
     expect(chargePages[0].params).not.toHaveProperty('starting_after');
     expect(chargePages[1].params).toMatchObject({ starting_after: f.charges[1].id });
     expect(chargePages[4].params).toMatchObject({ starting_after: f.charges[7].id });
-    expect(s.total.count).toBe(7);
-    expect(s.total.gross).toEqual({ usd: 21600 });
+    expect(s.account.count).toBe(7);
+    expect(s.ibanforge.gross).toEqual({ usd: 21100 });
     const invoiceCall = fake.calls.find((c) => c.method === 'invoicePayments');
     expect(invoiceCall?.params).toMatchObject({ status: 'paid', expand: ['data.invoice'] });
     const sessionCall = fake.calls.find((c) => c.method === 'sessions');
     expect(sessionCall?.params).toMatchObject({ status: 'complete' });
   });
 
-  it('garde le total brut quand le classement échoue, et le dit', async () => {
+  it('quand le classement échoue, le titre baisse au lieu de gonfler, et la lecture le dit', async () => {
     const f = reference();
     f.invoicePayments = new Error('factures injoignables');
     const s = await readStripeRevenue(fakeClient(f).client, { now: () => READ_AT.getTime() });
     expect(s.classification.invoices).toBe(false);
-    expect(s.total.gross).toEqual({ usd: 21600 });
-    // Les deux paiements d'abonnement n'ont pas de session : ils tombent dans « autre », visibles.
+    // Les deux paiements d'abonnement n'ont pas de session : ils tombent dans
+    // « autre », visibles mais hors du titre.
     expect(s.by_kind.abonnement.count).toBe(0);
     expect(s.by_kind.autre.count).toBe(3);
+    expect(s.ibanforge.gross).toEqual({ usd: 17700 });
+    expect(s.account.gross).toEqual({ usd: 21600 });
   });
 
   it('rend null les virements et le solde quand leur lecture échoue', async () => {
@@ -361,7 +426,7 @@ describe('lire Stripe : pagination complète, lectures secondaires qui peuvent m
     const s = await readStripeRevenue(fakeClient(f).client, { now: () => READ_AT.getTime() });
     expect(s.payouts).toBeNull();
     expect(s.awaiting_payout).toBeNull();
-    expect(s.total.count).toBe(7);
+    expect(s.account.count).toBe(7);
   });
 
   it('échoue entière sans les charges', async () => {

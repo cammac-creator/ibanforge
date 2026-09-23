@@ -25,7 +25,10 @@ function page<T>(data: T[]) {
   return Promise.resolve({ data, has_more: false });
 }
 
-/** Deux paiements inventés : un pack et un abonnement. */
+/**
+ * Trois paiements inventés : un pack, un abonnement, et un paiement « autre »
+ * (sans session ni facture reconnues) qui doit rester hors du titre.
+ */
 function fakeStripe(opts: { down?: boolean } = {}): StripeRevenueClient {
   const charges = [
     {
@@ -55,6 +58,19 @@ function fakeStripe(opts: { down?: boolean } = {}): StripeRevenueClient {
       receipt_email: 'abonne@alpha.example.net',
       billing_details: { email: 'abonne@alpha.example.net' },
       balance_transaction: { id: 'txn_b', currency: 'chf', amount: 1530, fee: 74, net: 1456 },
+    },
+    {
+      id: 'ch_route_other',
+      status: 'succeeded',
+      captured: true,
+      amount: 500,
+      amount_captured: 500,
+      amount_refunded: 0,
+      currency: 'usd',
+      livemode: true,
+      created: 1893463200,
+      payment_intent: 'pi_route_other',
+      balance_transaction: { id: 'txn_c', currency: 'chf', amount: 450, fee: 43, net: 407 },
     },
   ] as unknown as Stripe.Charge[];
   return {
@@ -109,7 +125,7 @@ function fakeStripe(opts: { down?: boolean } = {}): StripeRevenueClient {
     balance: {
       retrieve: () =>
         Promise.resolve({
-          available: [{ amount: 1000, currency: 'chf' }],
+          available: [{ amount: 1407, currency: 'chf' }],
           pending: [{ amount: 174, currency: 'chf' }],
         } as unknown as Stripe.Balance),
     },
@@ -221,7 +237,8 @@ describe('GET /v1/admin/stripe-revenue', () => {
       cache_ttl_seconds: number;
       stripe: {
         by_kind: Record<string, { count: number; gross: Record<string, number> }>;
-        total: { gross: Record<string, number>; net: Record<string, number> };
+        ibanforge: { count: number; gross: Record<string, number> };
+        account: { count: number; gross: Record<string, number>; net: Record<string, number> };
         payouts: { paid: { amount: Record<string, number> } };
         awaiting_payout: Record<string, number>;
         read_at: string;
@@ -235,10 +252,14 @@ describe('GET /v1/admin/stripe-revenue', () => {
     expect(body.stripe.by_kind.pack).toMatchObject({ count: 1, gross: { usd: 2000 } });
     expect(body.stripe.by_kind.abonnement).toMatchObject({ count: 1, gross: { usd: 1700 } });
     expect(body.stripe.by_kind.audit.count).toBe(0);
-    expect(body.stripe.total.gross).toEqual({ usd: 3700 });
-    expect(body.stripe.total.net).toEqual({ chf: 3174 });
+    expect(body.stripe.by_kind.autre).toMatchObject({ count: 1, gross: { usd: 500 } });
+    // Le titre : pack + abonnement, jamais le paiement « autre ».
+    expect(body.stripe.ibanforge).toMatchObject({ count: 2, gross: { usd: 3700 } });
+    // Le compte entier : net, virements et attente se lisent ensemble.
+    expect(body.stripe.account).toMatchObject({ count: 3, gross: { usd: 4200 } });
+    expect(body.stripe.account.net).toEqual({ chf: 3581 });
     expect(body.stripe.payouts.paid.amount).toEqual({ chf: 2000 });
-    expect(body.stripe.awaiting_payout).toEqual({ chf: 1174 });
+    expect(body.stripe.awaiting_payout).toEqual({ chf: 1581 });
     expect(Date.parse(body.stripe.read_at)).not.toBeNaN();
     expect(body.derived.total_minor).toBeGreaterThan(0);
 

@@ -45,7 +45,8 @@ function stripePayload(over: Partial<NonNullable<StripeRevenuePayload['stripe']>
         audit: kind({ count: 1, gross: { usd: 14900 }, net: { chf: 12991 }, fees: { chf: 419 } }),
         autre: kind(),
       },
-      total: kind({ count: 6, gross: { usd: 21100 }, net: { chf: 18259 }, fees: { chf: 731 } }),
+      ibanforge: kind({ count: 6, gross: { usd: 21100 }, net: { chf: 18259 }, fees: { chf: 731 } }),
+      account: kind({ count: 6, gross: { usd: 21100 }, net: { chf: 18259 }, fees: { chf: 731 } }),
       classification: { invoices: true, sessions: true },
       payouts: {
         paid: { count: 2, amount: { chf: 15000 }, last_arrival_at: '2030-01-01T00:00:00.000Z' },
@@ -91,6 +92,11 @@ async function render(value: unknown, locale = 'fr') {
 }
 
 const money = (n: number, locale: string) => formatGrouped(n, locale, 2);
+const accountWide = {
+  fr: 'Compte Stripe entier, autres compris :',
+  en: 'Whole Stripe account, other payments included:',
+  de: 'Gesamtes Stripe-Konto, andere Zahlungen inbegriffen:',
+} as const;
 
 describe('la tuile lit Stripe : total, détail par nature, net, virements, heure', () => {
   it.each([
@@ -110,6 +116,9 @@ describe('la tuile lit Stripe : total, détail par nature, net, virements, heure
     expect(html).toContain(`${awaiting}${money(32.59, locale)} CHF`);
     expect(html).toContain(readAt);
     expect(html).not.toContain('$');
+    // Aucun « autre » : ni ligne hors total, ni mention « compte entier ».
+    expect(html).not.toContain('data-collected-other');
+    expect(html).not.toContain(accountWide[locale as 'fr' | 'en' | 'de']);
   });
 
   it("donne l'heure suisse d'été", () => {
@@ -117,24 +126,32 @@ describe('la tuile lit Stripe : total, détail par nature, net, virements, heure
     expect(view.readAt).toBe('2030-07-01 11:30');
   });
 
-  it("n'affiche « Autres » que s'il y en a, et le signale", async () => {
-    const quiet = await render(stripePayload());
-    expect(quiet).not.toContain('Autres');
-    const html = await render(
-      stripePayload({
-        by_kind: {
-          pack: kind({ count: 1, gross: { usd: 2800 } }),
-          abonnement: kind(),
-          audit: kind(),
-          autre: kind({ count: 1, gross: { usd: 500 } }),
-        },
-        total: kind({ count: 2, gross: { usd: 3300 }, net: { chf: 2900 } }),
-      }),
-    );
-    expect(html).toContain('<span class="text-amber-300">');
-    expect(html).toContain('Autres');
-    expect(html).toContain(`>${money(5, 'fr')}</span>`);
-  });
+  it.each(['fr', 'en', 'de'] as const)(
+    "garde « autre » hors du titre, sur sa propre ligne, et dit que le net couvre le compte entier (%s)",
+    async (locale) => {
+      const html = await render(
+        stripePayload({
+          by_kind: {
+            pack: kind({ count: 1, gross: { usd: 2800 } }),
+            abonnement: kind(),
+            audit: kind(),
+            autre: kind({ count: 1, gross: { usd: 500 } }),
+          },
+          ibanforge: kind({ count: 1, gross: { usd: 2800 } }),
+          account: kind({ count: 2, gross: { usd: 3300 }, net: { chf: 2800 } }),
+        }),
+        locale,
+      );
+      // Le titre : 28, jamais 28 + 5.
+      expect(html).toContain(`>${money(28, locale)} USD</p>`);
+      expect(html).not.toContain(money(33, locale));
+      // « autre » à part, en ambre, avec sa devise écrite.
+      expect(html).toContain('data-collected-other="true" class="text-amber-300"');
+      expect(html).toContain(`${money(5, locale)} USD`);
+      // La ligne du net dit qu'elle couvre le compte entier.
+      expect(html).toContain(accountWide[locale]);
+    },
+  );
 
   it("n'additionne jamais deux devises", () => {
     const view = collectedView(
@@ -145,7 +162,8 @@ describe('la tuile lit Stripe : total, détail par nature, net, virements, heure
           audit: kind(),
           autre: kind(),
         },
-        total: kind({ count: 2, gross: { usd: 2800, eur: 1200 }, net: { chf: 3600 } }),
+        ibanforge: kind({ count: 2, gross: { usd: 2800, eur: 1200 } }),
+        account: kind({ count: 2, gross: { usd: 2800, eur: 1200 }, net: { chf: 3600 } }),
       }),
       'en',
     );
@@ -159,12 +177,19 @@ describe('la tuile lit Stripe : total, détail par nature, net, virements, heure
       stripePayload({
         livemode: false,
         classification: { invoices: false, sessions: true },
-        total: kind({ count: 6, gross: { usd: 21100 }, refunded: { usd: 400 }, net: { chf: 18259 }, net_unknown: 1 }),
+        by_kind: {
+          pack: kind({ count: 3, gross: { usd: 2800 }, refunded: { usd: 400 } }),
+          abonnement: kind({ count: 2, gross: { usd: 3400 } }),
+          audit: kind({ count: 1, gross: { usd: 14900 } }),
+          autre: kind(),
+        },
+        ibanforge: kind({ count: 6, gross: { usd: 21100 }, refunded: { usd: 400 } }),
+        account: kind({ count: 6, gross: { usd: 21100 }, refunded: { usd: 400 }, net: { chf: 18259 }, net_unknown: 1 }),
         payouts: null,
         awaiting_payout: null,
       }),
     );
-    expect(html).toContain('Classement incomplet');
+    expect(html).toContain('Classement incomplet : des paiements IBANforge peuvent être restés hors total.');
     expect(html).toContain(`Remboursé : ${money(4, 'fr')} USD, non déduit du total.`);
     expect(html).toContain('Clé Stripe de test');
     expect(html).toContain('virements non lus');
@@ -214,9 +239,43 @@ describe('un contrat incohérent ne devient jamais un montant', () => {
     ['indisponible avec une lecture', { ...valid, source: 'indisponible' }],
     ['repli qui ne s’additionne pas', { ...valid, derived: derived({ total_minor: 1 }) }],
     ['repli dans une autre devise', { ...valid, derived: { ...derived(), currency: 'chf' } }],
-    ['brut négatif', stripePayload({ total: kind({ count: 6, gross: { usd: -1 } }) })],
-    ['devise illisible', stripePayload({ total: kind({ count: 6, gross: { dollars: 100 } }) })],
-    ['natures qui ne font pas le total', stripePayload({ total: kind({ count: 5, gross: { usd: 21100 } }) })],
+    ['brut négatif', stripePayload({ ibanforge: kind({ count: 6, gross: { usd: -1 } }) })],
+    ['devise illisible', stripePayload({ ibanforge: kind({ count: 6, gross: { dollars: 100 } }) })],
+    ['natures qui ne font pas le titre', stripePayload({ ibanforge: kind({ count: 5, gross: { usd: 21100 } }) })],
+    ['ancien champ total, sans les deux périmètres', (() => {
+      const { ibanforge, account, ...rest } = stripePayload().stripe!;
+      return { ...stripePayload(), stripe: { ...rest, total: ibanforge ?? account } };
+    })()],
+    ['titre qui inclut « autre »', stripePayload({
+      by_kind: {
+        pack: kind({ count: 1, gross: { usd: 2800 } }),
+        abonnement: kind(),
+        audit: kind(),
+        autre: kind({ count: 1, gross: { usd: 500 } }),
+      },
+      ibanforge: kind({ count: 1, gross: { usd: 3300 } }),
+      account: kind({ count: 2, gross: { usd: 3300 } }),
+    })],
+    ['remboursement « autre » compté dans le titre', stripePayload({
+      by_kind: {
+        pack: kind({ count: 1, gross: { usd: 2800 } }),
+        abonnement: kind(),
+        audit: kind(),
+        autre: kind({ count: 1, gross: { usd: 500 }, refunded: { usd: 500 } }),
+      },
+      ibanforge: kind({ count: 1, gross: { usd: 2800 }, refunded: { usd: 500 } }),
+      account: kind({ count: 2, gross: { usd: 3300 }, refunded: { usd: 500 } }),
+    })],
+    ['compte qui oublie « autre »', stripePayload({
+      by_kind: {
+        pack: kind({ count: 1, gross: { usd: 2800 } }),
+        abonnement: kind(),
+        audit: kind(),
+        autre: kind({ count: 1, gross: { usd: 500 } }),
+      },
+      ibanforge: kind({ count: 1, gross: { usd: 2800 } }),
+      account: kind({ count: 1, gross: { usd: 2800 } }),
+    })],
     ['heure illisible', stripePayload({ read_at: 'hier' })],
     ['montant fractionnaire', stripePayload({ awaiting_payout: { chf: 1.5 } })],
   ])('%s', (_, value) => {

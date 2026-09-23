@@ -6,8 +6,10 @@ import { toZurich } from '@/lib/crm/zurich';
  * validation, et ce que la tuile affiche.
  *
  * Deux lectures possibles, jamais mélangées :
- *  - `stripe` : la source. Brut par nature et par devise, net et virements dans
- *    la devise du compte, heure de lecture ;
+ *  - `stripe` : la source. Le titre est `ibanforge` (packs + abonnements +
+ *    audits, JAMAIS « autre », que le compte Stripe partage avec un autre
+ *    projet) ; le net, les virements et l'attente sont ceux du compte entier
+ *    (`account`), les seuls que Stripe sache rapprocher des virements ;
  *  - `derived` : quand Stripe ne répond pas, le total selon nos propres traces,
  *    en dollars seulement, annoncé « selon les clés, Stripe indisponible ».
  *
@@ -17,6 +19,9 @@ import { toZurich } from '@/lib/crm/zurich';
 
 export const REVENUE_KINDS = ['pack', 'abonnement', 'audit', 'autre'] as const;
 export type RevenueKind = (typeof REVENUE_KINDS)[number];
+/** Ce qui fait le titre de la tuile. « autre » n'en est jamais. */
+export const IBANFORGE_KINDS = ['pack', 'abonnement', 'audit'] as const;
+export type IbanforgeKind = (typeof IBANFORGE_KINDS)[number];
 export type MinorByCurrency = Record<string, number>;
 
 export interface KindTotals {
@@ -34,7 +39,10 @@ export interface StripeRevenueSnapshot {
   read_at: string;
   livemode: boolean | null;
   by_kind: Record<RevenueKind, KindTotals>;
-  total: KindTotals;
+  /** Packs + abonnements + audits : le titre. Jamais « autre ». */
+  ibanforge: KindTotals;
+  /** Le compte Stripe entier, « autre » compris : le net, face aux virements et au solde. */
+  account: KindTotals;
   classification: { invoices: boolean; sessions: boolean };
   payouts: {
     paid: { count: number; amount: MinorByCurrency; last_arrival_at: string | null };
@@ -86,13 +94,30 @@ function isKindTotals(v: unknown): v is KindTotals {
     && isDateOrNull(v.last_payment_at);
 }
 
+/** `target` vaut, devise par devise, la somme exacte de `parts`. */
+function sumsTo(target: MinorByCurrency, parts: MinorByCurrency[]): boolean {
+  const keys = new Set([...Object.keys(target), ...parts.flatMap((p) => Object.keys(p))]);
+  for (const c of keys) {
+    if ((target[c] ?? 0) !== parts.reduce((sum, p) => sum + (p[c] ?? 0), 0)) return false;
+  }
+  return true;
+}
+
 function isSnapshot(v: unknown): v is StripeRevenueSnapshot {
   if (!isObject(v) || v.version !== 1 || !isDate(v.read_at)) return false;
   if (!(v.livemode === null || typeof v.livemode === 'boolean')) return false;
   if (!isObject(v.by_kind) || !REVENUE_KINDS.every((k) => isKindTotals((v.by_kind as Record<string, unknown>)[k]))) return false;
-  if (!isKindTotals(v.total)) return false;
+  if (!isKindTotals(v.ibanforge) || !isKindTotals(v.account)) return false;
   const byKind = v.by_kind as Record<RevenueKind, KindTotals>;
-  if (REVENUE_KINDS.reduce((sum, k) => sum + byKind[k].count, 0) !== v.total.count) return false;
+  // Le titre est EXACTEMENT packs + abonnements + audits : une API qui y
+  // glisserait « autre » est refusée, et la tuile retombe sur l'ancienne.
+  const own = IBANFORGE_KINDS.map((k) => byKind[k]);
+  if (own.reduce((n, t) => n + t.count, 0) !== v.ibanforge.count) return false;
+  if (!sumsTo(v.ibanforge.gross, own.map((t) => t.gross))) return false;
+  if (!sumsTo(v.ibanforge.refunded, own.map((t) => t.refunded))) return false;
+  const all = REVENUE_KINDS.map((k) => byKind[k]);
+  if (all.reduce((n, t) => n + t.count, 0) !== v.account.count) return false;
+  if (!sumsTo(v.account.gross, all.map((t) => t.gross))) return false;
   if (!isObject(v.classification) || typeof v.classification.invoices !== 'boolean'
     || typeof v.classification.sessions !== 'boolean') return false;
   if (v.payouts !== null) {
@@ -171,17 +196,21 @@ function hasAmount(map: MinorByCurrency | null | undefined): boolean {
 
 export interface CollectedView {
   mode: 'stripe' | 'derived';
-  /** Le total brut : « 216,00 USD », ou par devise quand il y en a plusieurs. */
+  /** Le total brut IBANforge : « 216,00 USD », ou par devise quand il y en a plusieurs. */
   headline: string;
-  /** Packs, abonnements et audits toujours ; « autre » seulement s'il existe, signalé. */
-  kinds: Array<{ kind: RevenueKind; amount: string; alert: boolean }>;
+  /** Packs, abonnements et audits : exactement ce que le titre additionne. */
+  kinds: Array<{ kind: IbanforgeKind; amount: string }>;
+  /** Les paiements « autre » du compte, montrés à part et jamais dans le titre. */
+  other: string | null;
+  /** Il y a des « autres » : la ligne net / viré / en attente le dit, car elle couvre tout le compte. */
+  accountWide: boolean;
   net: string | null;
   paidOut: string | null;
   awaiting: string | null;
   /** Heure suisse de la lecture Stripe, « AAAA-MM-JJ HH:MM ». */
   readAt: string | null;
   refunded: string | null;
-  /** Le classement a manqué une lecture : une partie des paiements est dans « autre ». */
+  /** Le classement a manqué une lecture : des paiements IBANforge peuvent être restés hors du titre. */
   partial: boolean;
   netUnknown: number;
   testMode: boolean;
@@ -198,11 +227,9 @@ export function collectedView(payload: StripeRevenuePayload, locale: string): Co
     return {
       mode: 'derived',
       headline: formatMinorMap({ usd: d.total_minor }, locale),
-      kinds: [
-        { kind: 'pack', amount: usd(d.by_kind.pack), alert: false },
-        { kind: 'abonnement', amount: usd(d.by_kind.abonnement), alert: false },
-        { kind: 'audit', amount: usd(d.by_kind.audit), alert: false },
-      ],
+      kinds: IBANFORGE_KINDS.map((k) => ({ kind: k, amount: usd(d.by_kind[k]) })),
+      other: null,
+      accountWide: false,
       net: null,
       paidOut: null,
       awaiting: null,
@@ -215,15 +242,21 @@ export function collectedView(payload: StripeRevenuePayload, locale: string): Co
     };
   }
 
-  const gross = stripe.total.gross;
+  // Le titre : l'argent d'IBANforge seulement, jamais « autre ».
+  const gross = stripe.ibanforge.gross;
   const grossCurrencies = currencies(gross).filter((c) => gross[c] !== 0);
   // Une seule devise dans le total : les lignes de détail la sous-entendent.
   const bare = grossCurrencies.length <= 1 ? (grossCurrencies[0] ?? 'usd') : undefined;
-  const kinds = REVENUE_KINDS
-    .filter((k) => k !== 'autre' || stripe.by_kind.autre.count > 0)
-    .map((k) => ({ kind: k, amount: formatMinorMap(stripe.by_kind[k].gross, locale, { bare }), alert: k === 'autre' }));
+  const kinds = IBANFORGE_KINDS.map((k) => ({
+    kind: k,
+    amount: formatMinorMap(stripe.by_kind[k].gross, locale, { bare }),
+  }));
+  // « autre » garde sa devise écrite en entier : il n'appartient pas au titre.
+  const other = stripe.by_kind.autre.count > 0
+    ? formatMinorMap(stripe.by_kind.autre.gross, locale, { fallback: 'usd' })
+    : null;
   // La devise de règlement du compte, lue et jamais supposée.
-  const settlement = currencies(stripe.total.net)[0]
+  const settlement = currencies(stripe.account.net)[0]
     ?? currencies(stripe.balance?.available ?? {})[0]
     ?? currencies(stripe.balance?.pending ?? {})[0]
     ?? null;
@@ -233,13 +266,16 @@ export function collectedView(payload: StripeRevenuePayload, locale: string): Co
     mode: 'stripe',
     headline: formatMinorMap(gross, locale, { fallback: 'usd' }),
     kinds,
-    net: hasAmount(stripe.total.net) ? formatMinorMap(stripe.total.net, locale) : null,
+    other,
+    accountWide: other !== null,
+    // Net, virements et attente : le compte entier, seul périmètre où ils se comparent.
+    net: hasAmount(stripe.account.net) ? formatMinorMap(stripe.account.net, locale) : null,
     paidOut: paid ? formatMinorMap(paid, locale, { fallback: settlement }) : null,
     awaiting: stripe.awaiting_payout ? formatMinorMap(stripe.awaiting_payout, locale, { fallback: settlement }) : null,
     readAt: zurich === stripe.read_at ? null : zurich.slice(0, 16).replace('T', ' '),
-    refunded: hasAmount(stripe.total.refunded) ? formatMinorMap(stripe.total.refunded, locale) : null,
+    refunded: hasAmount(stripe.ibanforge.refunded) ? formatMinorMap(stripe.ibanforge.refunded, locale) : null,
     partial: !stripe.classification.invoices || !stripe.classification.sessions,
-    netUnknown: stripe.total.net_unknown,
+    netUnknown: stripe.account.net_unknown,
     testMode: stripe.livemode === false,
     excluded: 0,
   };
