@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { refreshDiff } from './refresh-diff.js';
 
 /**
  * The guard that stops a truncated source from being committed.
@@ -18,6 +19,13 @@ import Database from 'better-sqlite3';
  *
  * Each case asserts the EXIT CODE, because that is the whole contract the
  * workflow consumes: 0 = commit, non-zero = refuse.
+ *
+ * Depuis le 23.09.2026, les cas appellent `refreshDiff()` dans le processus du
+ * test : c'est le code de sortie que la commande pose, rendu par la fonction.
+ * Chaque cas relançait auparavant `npx tsx` sur le script, et le démarrage à
+ * froid de npx et de tsx dépassait seul le délai de vitest dès que la machine
+ * était occupée : le test tombait sans que la décision soit en cause. La vraie
+ * commande reste lancée UNE fois, par le dernier test du fichier.
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,22 +35,31 @@ const REPO = resolve(__dirname, '..');
 let tmp: string;
 
 /** A plausible database: one big source, one small one, and the side tables. */
-function build(path: string, opts: {
-  gleif?: number;
-  swiftcodes?: number;
-  ebaStep2?: number;
-  chClearing?: number;
-  tinyCountryRows?: number;
-  praBanks?: number;
-  ecbMfi?: number;
-  bdeMfi?: number;
-} = {}): void {
+function build(
+  path: string,
+  opts: {
+    gleif?: number;
+    swiftcodes?: number;
+    ebaStep2?: number;
+    chClearing?: number;
+    tinyCountryRows?: number;
+    praBanks?: number;
+    ecbMfi?: number;
+    bdeMfi?: number;
+  } = {},
+): void {
   const {
-    gleif = 4000, swiftcodes = 8000, ebaStep2 = 180, chClearing = 1165, tinyCountryRows = 3,
+    gleif = 4000,
+    swiftcodes = 8000,
+    ebaStep2 = 180,
+    chClearing = 1165,
+    tinyCountryRows = 3,
     // Orders of magnitude taken from the real database, so the fixture lands in
     // the same band as production: pra_banks and bde_mfi sit just above SMALL
     // (200) and are therefore judged by the percentage band, ecb_mfi far above.
-    praBanks = 281, ecbMfi = 5373, bdeMfi = 238,
+    praBanks = 281,
+    ecbMfi = 5373,
+    bdeMfi = 238,
   } = opts;
   rmSync(path, { force: true });
   const db = new Database(path);
@@ -57,7 +74,8 @@ function build(path: string, opts: {
   `);
   const ins = db.prepare('INSERT INTO bic_entries VALUES (?, ?, ?, ?, ?)');
   const add = db.transaction((n: number, source: string, cc: string) => {
-    for (let i = 0; i < n; i++) ins.run(`AAAA${cc}${i}`, `AAAA${cc}${i}XXX`, cc, source, '2026-08-01');
+    for (let i = 0; i < n; i++)
+      ins.run(`AAAA${cc}${i}`, `AAAA${cc}${i}XXX`, cc, source, '2026-08-01');
   });
   add(gleif, 'gleif', 'GB');
   add(swiftcodes, 'swiftcodes', 'IT');
@@ -66,14 +84,18 @@ function build(path: string, opts: {
   // the guard cries wolf on ordinary churn in the long tail.
   add(tinyCountryRows, 'gleif', 'VA');
   const insCh = db.prepare('INSERT INTO ch_clearing VALUES (?)');
-  db.transaction((n: number) => { for (let i = 0; i < n; i++) insCh.run(String(i).padStart(5, '0')); })(chClearing);
+  db.transaction((n: number) => {
+    for (let i = 0; i < n; i++) insCh.run(String(i).padStart(5, '0'));
+  })(chClearing);
   // The tables must EXIST in both snapshots even when empty: read() swallows a
   // missing table as 0, and compare() reads 0 -> 0 as "nothing to say". A
   // fixture that skipped the CREATE would make the OPS-02 case below pass
   // whether or not the guard actually looks at these three registers.
   const fill = (table: string, n: number): void => {
     const ins = db.prepare(`INSERT INTO ${table} VALUES (?)`);
-    db.transaction((rows: number) => { for (let i = 0; i < rows; i++) ins.run(`ID${i}`); })(n);
+    db.transaction((rows: number) => {
+      for (let i = 0; i < rows; i++) ins.run(`ID${i}`);
+    })(n);
   };
   fill('pra_banks', praBanks);
   fill('ecb_mfi', ecbMfi);
@@ -81,23 +103,31 @@ function build(path: string, opts: {
   db.close();
 }
 
+/** Ce que la commande imprimerait (stdout et stderr ensemble) et le code qu'elle poserait. */
 function run(before: string, after: string): { status: number; out: string } {
-  const r = spawnSync('npx', ['tsx', SCRIPT], {
-    cwd: REPO,
-    env: { ...process.env, BIC_DIFF_BEFORE: before, BIC_DIFF_AFTER: after },
-    encoding: 'utf-8',
+  const lines: string[] = [];
+  const status = refreshDiff({
+    before,
+    after,
+    log: (line) => lines.push(line),
+    error: (line) => lines.push(line),
   });
-  return { status: r.status ?? -1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+  return { status, out: lines.join('\n') };
 }
 
 describe('refresh-diff refuses a damaged refresh and passes a normal one', () => {
-  beforeAll(() => { tmp = mkdtempSync(resolve(tmpdir(), 'refreshdiff-test-')); });
-  afterAll(() => { rmSync(tmp, { recursive: true, force: true }); });
+  beforeAll(() => {
+    tmp = mkdtempSync(resolve(tmpdir(), 'refreshdiff-test-'));
+  });
+  afterAll(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
 
   const p = (n: string) => resolve(tmp, `${n}.sqlite`);
 
   it('passes when nothing changed', () => {
-    build(p('a')); build(p('b'));
+    build(p('a'));
+    build(p('b'));
     const { status, out } = run(p('a'), p('b'));
     expect(out).toContain('Quality diff OK.');
     expect(status).toBe(0);
@@ -193,4 +223,36 @@ describe('refresh-diff refuses a damaged refresh and passes a normal one', () =>
     expect(out).toContain('could not run');
     expect(status).toBe(1);
   });
+
+  /**
+   * La vraie commande, lancée UNE fois pour tout le fichier, par le chemin même
+   * du workflow (`npx tsx scripts/refresh-diff.ts`). Elle prouve ce que l'appel
+   * direct ne peut pas prouver : que le fichier lancé juge bien (une garde de
+   * module principal cassée le ferait sortir en 0 sans rien lire, c'est-à-dire
+   * autoriser le commit) et que le refus devient un code de sortie non nul.
+   *
+   * Le délai est explicite et large : le démarrage à froid de npx et de tsx
+   * prend plusieurs secondes sur une machine occupée, et cette durée n'est pas
+   * ce que le test affirme.
+   */
+  const CLI_TIMEOUT_MS = 120_000;
+  it(
+    'runs the real command once: a refused refresh exits non-zero',
+    () => {
+      build(p('cli-before'), { gleif: 4000 });
+      build(p('cli-after'), { gleif: 400 });
+      const r = spawnSync('npx', ['tsx', SCRIPT], {
+        cwd: REPO,
+        env: { ...process.env, BIC_DIFF_BEFORE: p('cli-before'), BIC_DIFF_AFTER: p('cli-after') },
+        encoding: 'utf-8',
+        timeout: CLI_TIMEOUT_MS - 10_000,
+      });
+      const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+      expect(r.status, r.error?.message ?? out).toBe(1);
+      expect(out).toContain('bic_entries: ');
+      expect(out).toContain('Refusing to commit');
+      expect(out).toContain('source gleif');
+    },
+    CLI_TIMEOUT_MS,
+  );
 });

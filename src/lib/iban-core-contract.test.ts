@@ -18,7 +18,7 @@
  * Scope: only the behaviours the product depends on, asserted on concrete
  * values. It is not a re-implementation of the library's own test suite.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 // Imported through the product's own facades, not straight from the package:
 // this exercises the full path a route takes — facade → library — so a broken
 // re-export fails here too.
@@ -26,6 +26,31 @@ import { getSepaInfo, getCountryRisk, IBAN_LENGTHS, getCountryName } from './cou
 import { validateBIC } from './bic-validator.js';
 import { classifyIssuer } from './issuers.js';
 import { validateIBAN } from './iban.js';
+
+/**
+ * Lance `fn` et rend son résultat, avec la longueur de la plus longue chaîne
+ * que `replace`, `toUpperCase` ou une expression régulière ont traitée pendant
+ * ce temps : ce sont elles qui brûlent le processeur sur une entrée démesurée.
+ * Compté et non plus chronométré : une borne de 250 ms dépendait de la vitesse
+ * de la machine.
+ */
+function withLongestStringProcessed<T>(fn: () => T): [T, number] {
+  const replaced = vi.spyOn(String.prototype, 'replace');
+  const upper = vi.spyOn(String.prototype, 'toUpperCase');
+  const tested = vi.spyOn(RegExp.prototype, 'test');
+  const executed = vi.spyOn(RegExp.prototype, 'exec');
+  try {
+    const result = fn();
+    const longest = Math.max(
+      0,
+      ...[...replaced.mock.contexts, ...upper.mock.contexts].map((s) => String(s).length),
+      ...[...tested.mock.calls, ...executed.mock.calls].map(([s]) => String(s).length),
+    );
+    return [result, longest];
+  } finally {
+    for (const spy of [replaced, upper, tested, executed]) spy.mockRestore();
+  }
+}
 
 describe('iban-core contract — IBAN validation', () => {
   // One representative country per BBAN shape the product serves:
@@ -110,9 +135,7 @@ describe('iban-core contract — IBAN validation', () => {
 
   it('caps absurdly long input instead of burning CPU on it (anti-DoS)', () => {
     const huge = 'C'.repeat(1_000_000);
-    const started = performance.now();
-    const r = validateIBAN(huge);
-    const elapsed = performance.now() - started;
+    const [r, longest] = withLongestStringProcessed(() => validateIBAN(huge));
 
     expect(r.valid).toBe(false);
     expect(r.error).toBe('invalid_format');
@@ -120,8 +143,8 @@ describe('iban-core contract — IBAN validation', () => {
     expect(r.iban).toBe('C'.repeat(64));
     expect(r.iban.length).toBe(64);
     // Without the guard, the mod-97 BigInt on a million characters takes
-    // seconds. Measured with the guard: ~0.2 ms.
-    expect(elapsed).toBeLessThan(250);
+    // seconds. With it, nothing ever works on more than the 64 characters kept.
+    expect(longest).toBeLessThanOrEqual(64);
   });
 
   it.each([[null], [undefined], [{}], [42], [[]]])(

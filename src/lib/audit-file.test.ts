@@ -12,6 +12,7 @@ import {
   tierFor,
   AuditFileError,
   AUDIT_MAX_ROWS,
+  SHEET_ROWS_CAP,
 } from './audit-file.js';
 
 const VALID_CH = 'CH1000230000000012345';
@@ -248,18 +249,32 @@ describe('the audit says, per country, whether a register settles an absence', (
  * of reading its size, not its content.
  */
 describe('readTable — the cap is enforced before the parse', () => {
-  it('refuses an XLSX far above the cap without materialising it', () => {
-    const aoa: unknown[][] = [
-      ['IBAN'],
-      ...Array.from({ length: AUDIT_MAX_ROWS + 20_000 }, () => [VALID_CH]),
-    ];
-    const buffer = xlsx(aoa);
-    const started = performance.now();
-    expect(() => readTable(buffer, 'big.xlsx')).toThrow(/at most/);
-    // 40 000 rows parsed in full cost ~400 ms on the reviewer's machine; with
-    // sheetRows the parser stops at the cap and the read stays well under.
-    expect(performance.now() - started).toBeLessThan(1_500);
-  });
+  // Fabriquer puis relire un classeur de quarante mille lignes prend plusieurs
+  // secondes sur une machine occupée : 5,3 s mesurées le 23/09/2026 sous
+  // charge, au-delà du délai par défaut de vitest. Ce délai explicite n'est
+  // qu'un filet, la durée n'étant plus ce que le test affirme.
+  const BIG_WORKBOOK_TIMEOUT_MS = 60_000;
+
+  it(
+    'refuses an XLSX far above the cap without materialising it',
+    () => {
+      const aoa: unknown[][] = [
+        ['IBAN'],
+        ...Array.from({ length: AUDIT_MAX_ROWS + 20_000 }, () => [VALID_CH]),
+      ];
+      const buffer = xlsx(aoa);
+      // Le refus compte les lignes que l'analyseur a réellement matérialisées :
+      // `SHEET_ROWS_CAP` moins l'en-tête, une de plus que le plafond, jamais les
+      // quarante mille du fichier. Une lecture sans `sheetRows` les compterait
+      // toutes. Vérifié par ce nombre et non plus par un chronomètre : une borne
+      // de 1,5 s tombait dès que la machine était occupée, sans rien dire du code.
+      expect(() => readTable(buffer, 'big.xlsx')).toThrow(
+        `The sheet has ${SHEET_ROWS_CAP - 1} rows; the audit takes at most ${AUDIT_MAX_ROWS}.`,
+      );
+      expect(aoa.length - 1).toBeGreaterThan(SHEET_ROWS_CAP);
+    },
+    BIG_WORKBOOK_TIMEOUT_MS,
+  );
 
   it('refuses a text file by its line count, before decoding it', () => {
     const lines = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => VALID_CH)];

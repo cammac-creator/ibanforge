@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi } from 'vitest';
 import {
   lookup,
   lookupByBic8,
@@ -13,6 +13,26 @@ import { getBicDB, closeAll } from './db.js';
 afterAll(() => {
   closeAll();
 });
+
+/**
+ * Lance `fn` et compte les instructions SQLite qu'il a exécutées (`run`, `get`,
+ * `all`, `iterate`), sur n'importe quelle base : elles partagent un prototype.
+ */
+function countStatementsRun(fn: () => void): number {
+  const statement = Object.getPrototypeOf(getBicDB().prepare('SELECT 1')) as Record<
+    'run' | 'get' | 'all' | 'iterate',
+    (...args: unknown[]) => unknown
+  >;
+  const executions = (['run', 'get', 'all', 'iterate'] as const).map((method) =>
+    vi.spyOn(statement, method),
+  );
+  try {
+    fn();
+    return executions.reduce((n, spy) => n + spy.mock.calls.length, 0);
+  } finally {
+    for (const spy of executions) spy.mockRestore();
+  }
+}
 
 describe('getEntryCount', () => {
   it('returns a positive number of BIC entries', () => {
@@ -106,16 +126,18 @@ describe('getLastUpdated — cached, and still the right answer', () => {
     expect(getReferenceAsOf()).toMatch(/^\d{4}-\d{2}$/);
   });
 
-  it('answers in well under a millisecond once warm', () => {
+  it('answers from memory once warm, without running a single statement', () => {
     // The regression this guards is a caller reintroducing the scan — for
-    // instance by clearing the cache in the hot path. The threshold is loose
-    // on purpose: it must fail on a full scan (12 ms) and pass on anything
-    // sane, on any machine.
+    // instance by clearing the cache in the hot path. Compté et non plus
+    // chronométré : aucune instruction SQL ne doit s'exécuter une fois la
+    // valeur en mémoire, quelle que soit la manière dont une instruction
+    // serait préparée ou gardée. Un seuil de 0,5 ms par appel tombait sur une
+    // machine occupée sans rien dire du code.
     getLastUpdated();
-    const t0 = process.hrtime.bigint();
-    for (let i = 0; i < 500; i++) getLastUpdated();
-    const perCall = Number(process.hrtime.bigint() - t0) / 1e6 / 500;
-    expect(perCall, `${perCall.toFixed(3)} ms per call — the table scan is back`).toBeLessThan(0.5);
+    const executed = countStatementsRun(() => {
+      for (let i = 0; i < 500; i++) getLastUpdated();
+    });
+    expect(executed, 'statements run by 500 warm calls — the table scan is back').toBe(0);
   });
 });
 

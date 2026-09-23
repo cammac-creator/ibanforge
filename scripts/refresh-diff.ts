@@ -69,13 +69,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import Database from 'better-sqlite3';
-
-// The two paths are overridable so the guard can be rehearsed against a
-// deliberately damaged copy without touching the tracked database.
-const DB = process.env.BIC_DIFF_AFTER ?? 'data/bic.sqlite';
-const BEFORE = process.env.BIC_DIFF_BEFORE ?? null;
 
 /** Relative drop that fails the run, for a population big enough to have a rate. */
 const MAX_DROP_PCT = 10;
@@ -128,7 +124,9 @@ function read(path: string): Counts {
   const counts: Counts = {
     total: scalar('SELECT COUNT(*) AS n FROM bic_entries'),
     bySource: group('SELECT source AS k, COUNT(*) AS n FROM bic_entries GROUP BY source'),
-    byCountry: group('SELECT country_code AS k, COUNT(*) AS n FROM bic_entries GROUP BY country_code'),
+    byCountry: group(
+      'SELECT country_code AS k, COUNT(*) AS n FROM bic_entries GROUP BY country_code',
+    ),
     chClearing: scalar('SELECT COUNT(*) AS n FROM ch_clearing'),
     deBlz: scalar('SELECT COUNT(*) AS n FROM de_blz'),
     national: group('SELECT country AS k, COUNT(*) AS n FROM national_bank_codes GROUP BY country'),
@@ -169,21 +167,36 @@ function read(path: string): Counts {
 
 /** Worst first, and the aggregate lines before the per-country detail. */
 function severity(entry: { pct: number; label: string }): number {
-  const rank = entry.label.startsWith('bic_entries') || entry.label.startsWith('source') ? -1000 : 0;
+  const rank =
+    entry.label.startsWith('bic_entries') || entry.label.startsWith('source') ? -1000 : 0;
   return rank + entry.pct;
 }
 
-const rows: Array<{ pct: number; label: string; text: string; blocking: boolean }> = [];
+interface Row {
+  pct: number;
+  label: string;
+  text: string;
+  blocking: boolean;
+}
 
-function compare(label: string, before: number, after: number): void {
+// `rows` est passé en paramètre, jamais gardé au niveau du module : la fonction
+// exportée plus bas est appelée plusieurs fois dans un même processus par les
+// tests, et une liste partagée y accumulerait les anomalies d'un appel à l'autre.
+function compare(rows: Row[], label: string, before: number, after: number): void {
   if (before === 0) {
-    if (after > 0) rows.push({ pct: 999, label, text: `${label}: new, ${after} rows`, blocking: false });
+    if (after > 0)
+      rows.push({ pct: 999, label, text: `${label}: new, ${after} rows`, blocking: false });
     return;
   }
   if (after === 0) {
     const isCountry = label.startsWith('country ');
     const blocking = !isCountry || before >= MIN_POPULATION_TO_BLOCK_DISAPPEARANCE;
-    rows.push({ pct: -100, label, text: `${label}: ${before} -> 0 — disappeared entirely`, blocking });
+    rows.push({
+      pct: -100,
+      label,
+      text: `${label}: ${before} -> 0 — disappeared entirely`,
+      blocking,
+    });
     return;
   }
   const delta = after - before;
@@ -193,75 +206,128 @@ function compare(label: string, before: number, after: number): void {
   if (blocking || Math.abs(pct) > 5) rows.push({ pct, label, text, blocking });
 }
 
-function compareMaps(kind: string, before: Map<string, number>, after: Map<string, number>): void {
+function compareMaps(
+  rows: Row[],
+  kind: string,
+  before: Map<string, number>,
+  after: Map<string, number>,
+): void {
   for (const key of new Set([...before.keys(), ...after.keys()])) {
-    compare(`${kind} ${key}`, before.get(key) ?? 0, after.get(key) ?? 0);
+    compare(rows, `${kind} ${key}`, before.get(key) ?? 0, after.get(key) ?? 0);
   }
 }
 
-const tmp = mkdtempSync(resolve(tmpdir(), 'bicdiff-'));
-const previousPath = resolve(tmp, 'previous.sqlite');
-try {
-  if (BEFORE) {
-    copyFileSync(BEFORE, previousPath);
-  } else {
-    writeFileSync(
-      previousPath,
-      execFileSync('git', ['show', 'HEAD:data/bic.sqlite'], { maxBuffer: 512 * 1024 * 1024 }),
-    );
-  }
-  const before = read(previousPath);
-  const after = read(DB);
+/** Ce que la ligne de commande lit dans l'environnement, passé en paramètres. */
+export interface RefreshDiffOptions {
+  /** La base à juger : BIC_DIFF_AFTER en ligne de commande. */
+  after: string;
+  /** La base de comparaison : BIC_DIFF_BEFORE, ou `null` pour `git show HEAD:data/bic.sqlite`. */
+  before: string | null;
+  /** Le résumé : stdout en ligne de commande. */
+  log?: (line: string) => void;
+  /** Les anomalies bloquantes : stderr en ligne de commande. */
+  error?: (line: string) => void;
+}
 
-  compare('bic_entries total', before.total, after.total);
-  compareMaps('source', before.bySource, after.bySource);
-  compareMaps('country', before.byCountry, after.byCountry);
-  compare('ch_clearing', before.chClearing, after.chClearing);
-  compare('de_blz', before.deBlz, after.deBlz);
-  compareMaps('national_bank_codes', before.national, after.national);
-  compare('bg_bae', before.bgBae, after.bgBae);
-  compare('psd_entities', before.psd, after.psd);
-  compareMaps('psd_entities country', before.psdByCountry, after.psdByCountry);
-  compare('pra_banks', before.praBanks, after.praBanks);
-  compare('ecb_mfi', before.ecbMfi, after.ecbMfi);
-  compare('bde_mfi', before.bdeMfi, after.bdeMfi);
+/**
+ * Le jugement entier, sans lancer de processus. Rend le code de sortie que la
+ * ligne de commande pose : 0 = commit, 1 = refus.
+ *
+ * Exporté le 23.09.2026 pour que les tests l'appellent directement. Chacun
+ * d'eux relançait `npx tsx` sur ce fichier, et le démarrage à froid de npx et
+ * de tsx dépassait à lui seul le délai par test de vitest dès que la machine
+ * était occupée : le test tombait sans que la décision soit en cause. Le
+ * contrat de la ligne de commande, en tête de fichier, ne change pas (voir le
+ * bas du fichier).
+ */
+export function refreshDiff(options: RefreshDiffOptions): 0 | 1 {
+  const { after: db, log = console.log, error = console.error } = options;
+  const rows: Row[] = [];
+  const tmp = mkdtempSync(resolve(tmpdir(), 'bicdiff-'));
+  const previousPath = resolve(tmp, 'previous.sqlite');
+  try {
+    if (options.before) {
+      copyFileSync(options.before, previousPath);
+    } else {
+      writeFileSync(
+        previousPath,
+        execFileSync('git', ['show', 'HEAD:data/bic.sqlite'], { maxBuffer: 512 * 1024 * 1024 }),
+      );
+    }
+    const before = read(previousPath);
+    const after = read(db);
 
-  console.log(`bic_entries: ${before.total} -> ${after.total}`);
-  console.log(`sources: ${[...after.bySource].map(([k, n]) => `${k}=${n}`).join(' ')}`);
-  console.log(`countries: ${before.byCountry.size} -> ${after.byCountry.size}`);
-  // Only the head of each list is printed: a broken source moves every country
-  // at once, and 200 lines of the same story hide the one line that names it.
-  rows.sort((a, b) => severity(a) - severity(b));
-  const failures = rows.filter((r) => r.blocking).map((r) => r.text);
-  const notes = rows.filter((r) => !r.blocking).map((r) => r.text);
+    compare(rows, 'bic_entries total', before.total, after.total);
+    compareMaps(rows, 'source', before.bySource, after.bySource);
+    compareMaps(rows, 'country', before.byCountry, after.byCountry);
+    compare(rows, 'ch_clearing', before.chClearing, after.chClearing);
+    compare(rows, 'de_blz', before.deBlz, after.deBlz);
+    compareMaps(rows, 'national_bank_codes', before.national, after.national);
+    compare(rows, 'bg_bae', before.bgBae, after.bgBae);
+    compare(rows, 'psd_entities', before.psd, after.psd);
+    compareMaps(rows, 'psd_entities country', before.psdByCountry, after.psdByCountry);
+    compare(rows, 'pra_banks', before.praBanks, after.praBanks);
+    compare(rows, 'ecb_mfi', before.ecbMfi, after.ecbMfi);
+    compare(rows, 'bde_mfi', before.bdeMfi, after.bdeMfi);
 
-  if (notes.length) {
-    console.log(`\nMoves worth a look, not blocking (${notes.length}):`);
-    for (const n of notes.slice(0, 10)) console.log(`  - ${n}`);
-    if (notes.length > 10) console.log(`  ... and ${notes.length - 10} more`);
+    log(`bic_entries: ${before.total} -> ${after.total}`);
+    log(`sources: ${[...after.bySource].map(([k, n]) => `${k}=${n}`).join(' ')}`);
+    log(`countries: ${before.byCountry.size} -> ${after.byCountry.size}`);
+    // Only the head of each list is printed: a broken source moves every country
+    // at once, and 200 lines of the same story hide the one line that names it.
+    rows.sort((a, b) => severity(a) - severity(b));
+    const failures = rows.filter((r) => r.blocking).map((r) => r.text);
+    const notes = rows.filter((r) => !r.blocking).map((r) => r.text);
+
+    if (notes.length) {
+      log(`\nMoves worth a look, not blocking (${notes.length}):`);
+      for (const n of notes.slice(0, 10)) log(`  - ${n}`);
+      if (notes.length > 10) log(`  ... and ${notes.length - 10} more`);
+    }
+    if (failures.length) {
+      error(`\nRefusing to commit ${db}: ${failures.length} anomaly/anomalies`);
+      for (const f of failures.slice(0, 12)) error(`  ! ${f}`);
+      if (failures.length > 12) error(`  ... and ${failures.length - 12} more`);
+      error(
+        '\nA source answering with a truncated file looks exactly like this. ' +
+          'Re-run once the sources are reachable; the previous database still stands.',
+      );
+      // A return, never process.exit(): exit() does not unwind, so the
+      // `finally` below would never run and every blocked run would leave its
+      // temp copy of a 33 MB database behind on the runner.
+      return 1;
+    }
+    log('\nQuality diff OK.');
+    return 0;
+  } catch (err) {
+    // A guard that cannot read one of the two databases has not cleared the
+    // refresh, so it must not exit 0. Reported distinctly from a data anomaly:
+    // this is the branch that fires if `git show` cannot produce the blob.
+    error(`\nRefusing to commit ${db}: the quality diff could not run.`);
+    error(`  ! ${(err as Error).message}`);
+    return 1;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
   }
-  if (failures.length) {
-    console.error(`\nRefusing to commit ${DB}: ${failures.length} anomaly/anomalies`);
-    for (const f of failures.slice(0, 12)) console.error(`  ! ${f}`);
-    if (failures.length > 12) console.error(`  ... and ${failures.length - 12} more`);
-    console.error(
-      '\nA source answering with a truncated file looks exactly like this. ' +
-        'Re-run once the sources are reachable; the previous database still stands.',
-    );
-    // exitCode rather than exit(): process.exit() does not unwind, so the
-    // `finally` below would never run and every blocked run would leave its
-    // temp copy of a 33 MB database behind on the runner.
-    process.exitCode = 1;
-  } else {
-    console.log('\nQuality diff OK.');
-  }
-} catch (err) {
-  // A guard that cannot read one of the two databases has not cleared the
-  // refresh, so it must not exit 0. Reported distinctly from a data anomaly:
-  // this is the branch that fires if `git show` cannot produce the blob.
-  console.error(`\nRefusing to commit ${DB}: the quality diff could not run.`);
-  console.error(`  ! ${(err as Error).message}`);
-  process.exitCode = 1;
-} finally {
-  rmSync(tmp, { recursive: true, force: true });
+}
+
+// La ligne de commande, seulement quand ce fichier est lancé lui-même
+// (`npx tsx scripts/refresh-diff.ts`, le pas du workflow refresh-bic.yml), et
+// jamais quand un test l'importe. Même garde que weekly-veille.ts et
+// seed-ecb-mfi.ts. Le test « runs the real command » de refresh-diff.test.ts
+// lance la vraie commande une fois : une garde cassée ferait sortir le script
+// en 0 sans rien juger, c'est-à-dire autoriser le commit.
+const invokedDirectly =
+  !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  // The two paths are overridable so the guard can be rehearsed against a
+  // deliberately damaged copy without touching the tracked database.
+  const code = refreshDiff({
+    after: process.env.BIC_DIFF_AFTER ?? 'data/bic.sqlite',
+    before: process.env.BIC_DIFF_BEFORE ?? null,
+  });
+  // exitCode plutôt que exit() : le processus se termine de lui-même une fois
+  // stdout et stderr vidés, exactement comme avant l'export de la fonction.
+  if (code !== 0) process.exitCode = code;
 }

@@ -40,6 +40,8 @@ import {
   DEVICE_GRANT_MAX_LIFETIME_SECONDS,
   DEVICE_POLL_INTERVAL_SECONDS,
   approveGrant,
+  deviceMissDelayFloorMs,
+  deviceMissDelayMaxMs,
   hashGrantSecret,
   issueApprovalToken,
   pollsInFlight,
@@ -166,6 +168,115 @@ function rewindGrant(deviceCode: string, clause: string): void {
     .prepare(`UPDATE device_codes SET expires_at = datetime('now', ?) WHERE device_code_hash = ?`)
     .run(clause, hashGrantSecret(deviceCode));
 }
+
+/**
+ * 🚨 AUCUN CHRONOMÈTRE POUR DIRE « ATTEND » OU « REND LA MAIN » (23/09/2026).
+ *
+ * Ces tests mesuraient une durée en temps réel (moins de 100 ms, moins de
+ * 200 ms, plus de 300 ms) et pariaient sur 40 ou 60 ms pour qu'une attente ait
+ * commencé : dès que la machine était occupée, ils tombaient sans que le code
+ * soit en cause. Ce qui distingue une attente d'une réponse immédiate se lit
+ * sans horloge : une attente longue RETIENT une place dans `pollsInFlight()`,
+ * le compteur que le serveur lit lui-même pour ses trois plafonds. On relit
+ * donc ce compteur, et l'on rend la main à un retrait qui attend en
+ * l'abandonnant, comme un client qui raccroche (`c.req.raw.signal`).
+ *
+ * Une échéance que rien n'atteint : un retrait qui attend ne rend jamais la
+ * main de lui-même pendant un test, donc une place vue une fois reste visible
+ * jusqu'à l'abandon.
+ */
+const LONG_WAIT_MS = String(10 * 60_000);
+
+/** Relit `condition` à chaque tour de la boucle d'événements, sans supposer de durée. */
+async function until(condition: () => boolean): Promise<void> {
+  while (!condition()) await new Promise((resolve) => setTimeout(resolve, 1));
+}
+
+interface StartedPoll {
+  response: Promise<Response>;
+  settled: () => boolean;
+  abort: () => void;
+}
+
+/** Les retraits lancés par un test : abandonnés et attendus après lui, même s'il a échoué. */
+const startedPolls: Array<{ controller: AbortController; response: Promise<Response> }> = [];
+
+/** Lance un retrait sans l'attendre. */
+function startPoll(
+  app: Hono,
+  deviceCode: string,
+  headers: Record<string, string> = {},
+): StartedPoll {
+  const controller = new AbortController();
+  let done = false;
+  const response = Promise.resolve(
+    app.request('/v1/keys/device/token', {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, ...headers },
+      body: JSON.stringify({ device_code: deviceCode }),
+      signal: controller.signal,
+    }),
+  ).finally(() => {
+    done = true;
+  });
+  startedPolls.push({ controller, response });
+  return { response, settled: () => done, abort: () => controller.abort() };
+}
+
+/**
+ * Un retrait, et s'il a retenu une place d'attente longue (`waited`).
+ *
+ * Tant que la réponse n'est pas rendue, le compteur est relu : une attente qui
+ * commence y ajoute une place et la garde jusqu'à l'abandon, donc une relecture
+ * la voit forcément. Vue, elle est abandonnée aussitôt et la réponse suit.
+ */
+async function pollAndWatch(
+  app: Hono,
+  deviceCode: string,
+  headers: Record<string, string> = {},
+): Promise<{ res: Response; waited: boolean }> {
+  const baseline = pollsInFlight();
+  const poll = startPoll(app, deviceCode, headers);
+  let waited = false;
+  await until(() => {
+    waited = waited || pollsInFlight() > baseline;
+    return waited || poll.settled();
+  });
+  if (waited) poll.abort();
+  return { res: await poll.response, waited };
+}
+
+/**
+ * Un 404 d'approbation, les délais que le serveur a ARMÉS pour y répondre (lus
+ * sur `setTimeout` : la durée demandée, pas la durée subie) et sa durée mesurée.
+ */
+async function approveMiss(
+  app: Hono,
+  userCode: string,
+  ip: string,
+): Promise<{ res: Response; armed: number[]; ms: number }> {
+  const spy = vi.spyOn(globalThis, 'setTimeout');
+  const started = performance.now();
+  try {
+    const res = await post(
+      app,
+      '/v1/keys/device/approve',
+      { user_code: userCode, approval_token: 'ifa_x' },
+      { 'x-real-ip': ip },
+    );
+    const ms = performance.now() - started;
+    const armed = spy.mock.calls.map((call) => Number(call[1] ?? 0)).filter((delay) => delay > 0);
+    return { res, armed, ms };
+  } finally {
+    spy.mockRestore();
+  }
+}
+
+afterEach(async () => {
+  for (const poll of startedPolls) poll.controller.abort();
+  await Promise.allSettled(startedPolls.map((poll) => poll.response));
+  startedPolls.length = 0;
+});
 
 const originalEnv = { ...process.env };
 beforeEach(() => {
@@ -384,16 +495,17 @@ describe('le retrait', () => {
 
   it('répond slow_down, immédiatement, à deux appels trop rapprochés', async () => {
     const app = makeApp();
+    process.env.DEVICE_POLL_WAIT_MS = LONG_WAIT_MS;
     const opened = await open(app);
-    await post(app, '/v1/keys/device/token', { device_code: opened.device_code });
-    const started = performance.now();
-    const res = await post(app, '/v1/keys/device/token', { device_code: opened.device_code });
-    const elapsed = performance.now() - started;
+    // Le premier appel attend, comme tout retrait d'un grant encore en attente.
+    expect((await pollAndWatch(app, opened.device_code)).waited).toBe(true);
+    const { res, waited } = await pollAndWatch(app, opened.device_code);
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe('slow_down');
     // Sans attente : la contre-pression du grant se met DEVANT le limiteur
-    // global de requêtes par minute.
-    expect(elapsed).toBeLessThan(100);
+    // global de requêtes par minute. Un slow_down rendu après l'attente y
+    // aurait retenu une place.
+    expect(waited).toBe(false);
   });
 
   it('répond access_denied après un refus, et aucune clé n’a été frappée', async () => {
@@ -456,20 +568,25 @@ describe('le retrait', () => {
 describe('le long-polling', () => {
   it('rend la main dès l’approbation, nettement avant la fin de l’attente', async () => {
     const app = makeApp();
-    process.env.DEVICE_POLL_WAIT_MS = '2000';
+    // L'échéance est hors d'atteinte : si ce retrait rend la clé, c'est que
+    // l'approbation l'a réveillé. Un retrait qui ne se réveillerait pas
+    // attendrait son échéance et le test tomberait sur son propre délai, la
+    // règle des tests d'attente de ce dépôt (voir health-boot-corrupt.test.ts).
+    process.env.DEVICE_POLL_WAIT_MS = LONG_WAIT_MS;
     const opened = await open(app);
     const token = await tokenFor(app, opened.user_code);
-    const started = performance.now();
-    const polling = post(app, '/v1/keys/device/token', { device_code: opened.device_code });
-    await new Promise((r) => setTimeout(r, 60));
+    const baseline = pollsInFlight();
+    const polling = startPoll(app, opened.device_code);
+    // L'approbation doit arriver PENDANT l'attente : on attend que le retrait
+    // tienne sa place, au lieu de parier sur soixante millisecondes.
+    await until(() => pollsInFlight() > baseline || polling.settled());
+    expect(polling.settled()).toBe(false);
     await post(app, '/v1/keys/device/approve', {
       user_code: opened.user_code,
       approval_token: token,
     });
-    const res = await polling;
-    const elapsed = performance.now() - started;
+    const res = await polling.response;
     expect(res.status).toBe(200);
-    expect(elapsed).toBeLessThan(1_500);
   });
 
   it('un navigateur n’attend JAMAIS', async () => {
@@ -478,111 +595,75 @@ describe('le long-polling', () => {
     // résidentielles qu'elle a de lecteurs — et la route acceptant le
     // form-encodé, c'est une requête simple, sans preflight.
     const app = makeApp();
-    process.env.DEVICE_POLL_WAIT_MS = '600';
+    process.env.DEVICE_POLL_WAIT_MS = LONG_WAIT_MS;
     const browserHeaders: Array<Record<string, string>> = [
       { Origin: 'https://ailleurs.example' },
       { 'Sec-Fetch-Mode': 'cors' },
     ];
     for (const header of browserHeaders) {
       const opened = await open(app);
-      const started = performance.now();
-      const res = await post(
-        app,
-        '/v1/keys/device/token',
-        { device_code: opened.device_code },
-        header,
-      );
-      const elapsed = performance.now() - started;
+      const { res, waited } = await pollAndWatch(app, opened.device_code, header);
       expect(res.status).toBe(400);
       expect(((await res.json()) as { error: string }).error).toBe('authorization_pending');
-      expect(elapsed, `en-tête ${JSON.stringify(header)}`).toBeLessThan(200);
+      expect(waited, `en-tête ${JSON.stringify(header)}`).toBe(false);
     }
     // Et sans en-tête, la même requête attend bien : sans cette moitié, une
     // règle qui ne ferait jamais attendre personne passerait le test.
     const opened = await open(app);
-    const started = performance.now();
-    await post(app, '/v1/keys/device/token', { device_code: opened.device_code });
-    expect(performance.now() - started).toBeGreaterThan(300);
+    expect((await pollAndWatch(app, opened.device_code)).waited).toBe(true);
   });
 
   it('le sous-plafond par empreinte mord avant le global', async () => {
     const app = makeApp();
-    process.env.DEVICE_POLL_WAIT_MS = '600';
+    process.env.DEVICE_POLL_WAIT_MS = LONG_WAIT_MS;
     process.env.DEVICE_POLLS_IN_FLIGHT_PER_IP = '1';
     const ip = '203.0.113.90';
     const held = await open(app, { 'x-real-ip': '203.0.113.91' });
     const second = await open(app, { 'x-real-ip': '203.0.113.92' });
     const elsewhere = await open(app, { 'x-real-ip': '203.0.113.93' });
 
-    // Une attente RETENUE depuis cette empreinte.
-    const first = post(
-      app,
-      '/v1/keys/device/token',
-      { device_code: held.device_code },
-      {
-        'x-real-ip': ip,
-      },
-    );
-    await new Promise((r) => setTimeout(r, 40));
-    const startedSame = performance.now();
-    const refused = await post(
-      app,
-      '/v1/keys/device/token',
-      { device_code: second.device_code },
-      {
-        'x-real-ip': ip,
-      },
-    );
-    const sameElapsed = performance.now() - startedSame;
-    expect(refused.status).toBe(400);
-    expect(((await refused.json()) as { error: string }).error).toBe('authorization_pending');
-    expect(sameElapsed).toBeLessThan(200);
+    // Une attente RETENUE depuis cette empreinte, vue dans le compteur avant
+    // d'aller plus loin : sans elle, le second retrait ne trouverait pas le
+    // sous-plafond atteint.
+    const baseline = pollsInFlight();
+    const first = startPoll(app, held.device_code, { 'x-real-ip': ip });
+    await until(() => pollsInFlight() > baseline || first.settled());
+    expect(first.settled()).toBe(false);
+
+    const refused = await pollAndWatch(app, second.device_code, { 'x-real-ip': ip });
+    expect(refused.res.status).toBe(400);
+    expect(((await refused.res.json()) as { error: string }).error).toBe('authorization_pending');
+    expect(refused.waited).toBe(false);
 
     // 🚨 Et une attente ouverte depuis une AUTRE adresse attend bien, elle :
     // sans cette moitié, un sous-plafond posé trop bas passerait pour correct.
-    const startedOther = performance.now();
-    await post(
-      app,
-      '/v1/keys/device/token',
-      { device_code: elsewhere.device_code },
-      {
-        'x-real-ip': '203.0.113.99',
-      },
-    );
-    expect(performance.now() - startedOther).toBeGreaterThan(300);
-    await first;
+    const other = await pollAndWatch(app, elsewhere.device_code, { 'x-real-ip': '203.0.113.99' });
+    expect(other.waited).toBe(true);
+    first.abort();
+    await first.response;
   });
 
   it('le plafond global rend la main tout de suite', async () => {
     const app = makeApp();
-    process.env.DEVICE_POLL_WAIT_MS = '600';
+    process.env.DEVICE_POLL_WAIT_MS = LONG_WAIT_MS;
     process.env.DEVICE_POLLS_IN_FLIGHT_MAX = '1';
     const held = await open(app, { 'x-real-ip': '203.0.113.81' });
     const other = await open(app, { 'x-real-ip': '203.0.113.82' });
-    const first = post(
-      app,
-      '/v1/keys/device/token',
-      { device_code: held.device_code },
-      {
-        'x-real-ip': '203.0.113.85',
-      },
-    );
-    await new Promise((r) => setTimeout(r, 40));
-    const started = performance.now();
-    const res = await post(
-      app,
-      '/v1/keys/device/token',
-      { device_code: other.device_code },
-      {
-        'x-real-ip': '203.0.113.86',
-      },
-    );
+    const baseline = pollsInFlight();
+    const first = startPoll(app, held.device_code, { 'x-real-ip': '203.0.113.85' });
+    await until(() => pollsInFlight() > baseline || first.settled());
+    expect(first.settled()).toBe(false);
+
+    const { res, waited } = await pollAndWatch(app, other.device_code, {
+      'x-real-ip': '203.0.113.86',
+    });
     const body = (await res.json()) as Record<string, unknown>;
-    expect(performance.now() - started).toBeLessThan(200);
+    expect(waited).toBe(false);
     expect(body.error).toBe('authorization_pending');
     // Le corps porte l'intervalle : le client conforme repasse à sa cadence.
     expect(body.interval).toBe(DEVICE_POLL_INTERVAL_SECONDS);
-    await first;
+    first.abort();
+    await first.response;
   });
 });
 
@@ -729,34 +810,42 @@ describe('le 404 uniforme, en corps ET en temps', () => {
     const opened = await open(app);
     rewindGrant(opened.device_code, '-1 second');
 
-    // Un code EXPIRÉ : la ligne existe, donc `hit = 1`.
-    const startedHit = performance.now();
-    const hit = await post(
-      app,
-      '/v1/keys/device/approve',
-      { user_code: opened.user_code, approval_token: 'ifa_x' },
-      { 'x-real-ip': guesser },
-    );
-    const hitMs = performance.now() - startedHit;
+    // Trois paires alternées : un code EXPIRÉ (la ligne existe, donc
+    // `hit = 1`) puis un code INEXISTANT (`hit = 0`).
+    const hits: Array<Awaited<ReturnType<typeof approveMiss>>> = [];
+    const misses: Array<Awaited<ReturnType<typeof approveMiss>>> = [];
+    for (let i = 0; i < 3; i++) {
+      hits.push(await approveMiss(app, opened.user_code, guesser));
+      misses.push(await approveMiss(app, 'XXXX-XXXX', guesser));
+    }
 
-    // Un code INEXISTANT : `hit = 0`.
-    const startedMiss = performance.now();
-    const miss = await post(
-      app,
-      '/v1/keys/device/approve',
-      { user_code: 'XXXX-XXXX', approval_token: 'ifa_x' },
-      { 'x-real-ip': guesser },
-    );
-    const missMs = performance.now() - startedMiss;
-
-    expect(hit.status).toBe(404);
-    expect(miss.status).toBe(404);
+    for (const answer of [...hits, ...misses]) expect(answer.res.status).toBe(404);
     // Corps strictement identiques : aucun oracle de contenu.
-    expect(await hit.text()).toBe(await miss.text());
-    // Et durées du même ordre : aucun oracle temporel. Un code expiré est un
-    // parcours qui n'aboutit pas ; rien ne justifie de le servir plus vite.
-    const ratio = Math.max(hitMs, missMs) / Math.max(1, Math.min(hitMs, missMs));
-    expect(ratio, `hit ${hitMs.toFixed(0)} ms vs miss ${missMs.toFixed(0)} ms`).toBeLessThan(1.6);
+    expect(await hits[0]!.res.text()).toBe(await misses[0]!.res.text());
+
+    // Et même délai : aucun oracle temporel. Un code expiré est un parcours qui
+    // n'aboutit pas ; rien ne justifie de le servir plus vite. Vérifié sur le
+    // délai que le serveur ARME, pas sur une durée mesurée : c'est l'escalade,
+    // au-dessus du plancher, que le budget brûlé plus haut doit déclencher.
+    expect(deviceMissDelayMaxMs()).toBeGreaterThan(deviceMissDelayFloorMs());
+    for (const hit of hits) expect(hit.armed).toEqual(misses[0]!.armed);
+    for (const miss of misses) expect(miss.armed).toContain(deviceMissDelayMaxMs());
+
+    // La durée subie reste mesurée, en comparaison relative et avec une marge
+    // large, pour qu'une machine occupée ne puisse pas faire tomber le test :
+    // le MINIMUM de trois essais par parcours (le bruit d'une machine chargée
+    // ne fait qu'allonger une mesure) et un rapport sous 3, quand le défaut
+    // gardé ici (un code expiré servi au plancher pendant que l'inexistant
+    // paie l'escalade) donne le rapport des deux délais de ce fichier, de
+    // l'ordre de quinze.
+    const fastestHit = Math.min(...hits.map((hit) => hit.ms));
+    const fastestMiss = Math.min(...misses.map((miss) => miss.ms));
+    const ratio =
+      Math.max(fastestHit, fastestMiss) / Math.max(1, Math.min(fastestHit, fastestMiss));
+    expect(
+      ratio,
+      `hit ${fastestHit.toFixed(0)} ms vs miss ${fastestMiss.toFixed(0)} ms`,
+    ).toBeLessThan(3);
   });
 
   it('retarde, mais ne refuse JAMAIS : le 404 reste un 404', async () => {
@@ -1041,9 +1130,19 @@ describe('les deux horloges', () => {
     const app = makeApp();
     process.env.DEVICE_MISS_DELAY_FLOOR_MS = '120';
     expect(pollsInFlight('device')).toBe(0);
-    const pending = post(app, '/v1/keys/device/lookup', { user_code: 'AAAA-AAAA' });
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    expect(pollsInFlight('device')).toBeGreaterThanOrEqual(1);
+    let settled = false;
+    const pending = post(app, '/v1/keys/device/lookup', { user_code: 'AAAA-AAAA' }).finally(() => {
+      settled = true;
+    });
+    // La place se lit PENDANT l'attente du 404 : le compteur est relu jusqu'à
+    // l'y voir, ou jusqu'à la réponse, qui, rendue sans place, fait échouer le
+    // test. Plus de pari sur quarante millisecondes.
+    let seen = false;
+    await until(() => {
+      seen = seen || pollsInFlight('device') >= 1;
+      return seen || settled;
+    });
+    expect(seen).toBe(true);
     expect((await pending).status).toBe(404);
     expect(pollsInFlight('device')).toBe(0);
   });

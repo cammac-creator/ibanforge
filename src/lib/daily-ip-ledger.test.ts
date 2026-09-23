@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import {
   bumpTrialDayShieldMinutes,
   countDailyUnits,
@@ -38,6 +38,32 @@ function rows(): number {
 
 function writes(): number {
   return (getStatsDB().prepare('SELECT total_changes() AS n').get() as { n: number }).n;
+}
+
+/**
+ * Lance `fn` et compte les instructions SQLite qu'il a exécutées (`run`, `get`,
+ * `all`, `iterate`) et compilées (`prepare`) sur la base des statistiques.
+ */
+function countStatements(fn: () => void): { executed: number; compiled: number } {
+  const db = getStatsDB();
+  const statement = Object.getPrototypeOf(db.prepare('SELECT 1')) as Record<
+    'run' | 'get' | 'all' | 'iterate',
+    (...args: unknown[]) => unknown
+  >;
+  const executions = (['run', 'get', 'all', 'iterate'] as const).map((method) =>
+    vi.spyOn(statement, method),
+  );
+  const compilations = vi.spyOn(db, 'prepare');
+  try {
+    fn();
+    return {
+      executed: executions.reduce((n, spy) => n + spy.mock.calls.length, 0),
+      compiled: compilations.mock.calls.length,
+    };
+  } finally {
+    for (const spy of executions) spy.mockRestore();
+    compilations.mockRestore();
+  }
 }
 
 function today(): string {
@@ -485,14 +511,34 @@ describe('the cost of the hot path', () => {
   beforeEach(() => resetDailyLedger());
 
   it('absorbs a thousand distinct sources', () => {
-    // ⚠️ Budget global, pas une assertion de p99 : ce qui est mesuré ici est
-    // qu'un UPSERT sur une table WITHOUT ROWID reste de l'ordre du coût d'une
-    // écriture, pas d'un balayage.
-    const start = performance.now();
-    for (let i = 0; i < 1000; i += 1) {
-      countDailyUnits(ledgerBucket(`203.0.113.${i % 250}`, i % 2 ? 'rest:' : 'init:'), 1, 10_000);
-    }
-    expect(performance.now() - start).toBeLessThan(2000);
+    // ⚠️ Ce qui est vérifié ici : qu'un UPSERT sur une table WITHOUT ROWID
+    // reste de l'ordre du coût d'une écriture, pas d'un balayage. Compté et
+    // non plus chronométré : un budget de deux secondes tombait dès que la
+    // machine était occupée, sans rien dire du code.
+    const keys = Array.from({ length: 1000 }, (_, i) =>
+      ledgerBucket(`203.0.113.${i % 250}`, i % 2 ? 'rest:' : 'init:'),
+    );
+    // La requête préparée se compile au premier appel : celui-ci, hors du compte.
+    countDailyUnits(ledgerBucket('198.51.100.1', 'rest:'), 1, 10_000);
+    const writesBefore = writes();
+    const { executed, compiled } = countStatements(() => {
+      for (const key of keys) countDailyUnits(key, 1, 10_000);
+    });
+    // UNE instruction par appel, l'UPSERT, et aucune compilée : la requête est
+    // mémoïsée et rien d'autre ne tourne sur le chemin chaud.
+    expect(executed).toBe(keys.length);
+    expect(compiled).toBe(0);
+    // UNE ligne écrite par appel, et une ligne par source.
+    expect(writes() - writesBefore).toBe(keys.length);
+    expect(rows()).toBe(new Set(keys).size + 1);
+    // Et la ligne visée se trouve par la clé primaire : une recherche, jamais
+    // un balayage de la table.
+    const plan = getStatsDB()
+      .prepare('EXPLAIN QUERY PLAN SELECT units FROM trial_ledger WHERE day = ? AND bucket = ?')
+      .all(today(), keys[0]) as Array<{ detail: string }>;
+    expect(plan.map((step) => step.detail).join(' | ')).toMatch(
+      /^SEARCH trial_ledger USING PRIMARY KEY \(day=\? AND bucket=\?\)$/,
+    );
   });
 });
 
