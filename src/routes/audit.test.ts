@@ -1,4 +1,5 @@
 import { describe, it, expect, afterAll, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import * as XLSX from 'xlsx';
 import { audit, resetAuditUploadLimiter, AUDIT_UPLOADS_PER_WINDOW } from './audit.js';
@@ -9,7 +10,7 @@ import {
   purgeExpiredAuditJobs,
   auditStats,
 } from '../lib/audit-jobs.js';
-import { AUDIT_MAX_BYTES } from '../lib/audit-file.js';
+import { AUDIT_MAX_BYTES, AUDIT_MAX_ROWS } from '../lib/audit-file.js';
 
 const VALID_CH = 'CH1000230000000012345';
 const VALID_DE = 'DE89370400440532013000';
@@ -86,6 +87,32 @@ describe('POST /v1/audit/upload', () => {
     const big = await upload(Buffer.alloc(AUDIT_MAX_BYTES + 1, 0x41), 'big.csv');
     expect(big.status).toBe(413);
   });
+
+  /**
+   * A file one row past the cap must be told SO, and nothing else.
+   *
+   * Until 22/09/2026 it was answered `unreadable` — "we could not read your
+   * file as CSV or XLSX" — because `readTable` threw its own `too_many_rows`
+   * inside the try block that catches parser failures. The customer read that
+   * their export was malformed, when it was perfectly formed and simply longer
+   * than the product accepts; `no_iban_column` and `empty` travelled fine, so
+   * the one refusal with an obvious remedy was the one that lost it.
+   *
+   * The assertion is on the CODE, not the wording: the code is what the site
+   * maps to "split the file and upload the parts".
+   */
+  it('answers too_many_rows — not unreadable — on a file one row past the cap', async () => {
+    const lines = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => VALID_CH)];
+    const csv = Buffer.from(lines.join('\n') + '\n', 'utf8');
+    // The proof only means something if the file reaches the parser at all:
+    // the byte ceiling must leave room for the row count the tiers promise.
+    expect(csv.length).toBeLessThan(AUDIT_MAX_BYTES);
+    const r = await upload(csv, 'trop-long.csv');
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as UploadBody & { limits?: { max_rows: number } };
+    expect(body.error).toBe('too_many_rows');
+    expect(body.limits?.max_rows).toBe(AUDIT_MAX_ROWS);
+  });
 });
 
 describe('checkout, status and report', () => {
@@ -148,6 +175,30 @@ describe('checkout, status and report', () => {
     expect(purgeExpiredAuditJobs()).toBeGreaterThanOrEqual(1);
     const s = await app().request(`/v1/audit/status/${job}`);
     expect(s.status).toBe(404);
+  });
+
+  /**
+   * The purge above works; what was missing was anything to CALL it.
+   *
+   * Until 22/09/2026 `purgeExpiredAuditJobs` ran only from the upload route and
+   * the status route, so on a quiet week an expired report — every column of a
+   * customer's creditor file, IBANs included — stayed on the volume until the
+   * next visitor happened to arrive, while /audit promised it was gone after
+   * two hours. The clock now lives in `src/index.ts`, which no test can import
+   * (it calls `serve()` at import time), so it is read as text — the same
+   * remedy `scripts/mcp-parity.test.ts` uses for a constant it cannot import.
+   */
+  it('the entry point arms a clock for the purge, not just the request paths', () => {
+    const entry = readFileSync(new URL('../index.ts', import.meta.url), 'utf8');
+    expect(entry).toContain('purgeExpiredAuditJobs');
+    const interval = entry.match(/setInterval\(auditReportPurgeTick,\s*([A-Z_]+)\)/)?.[1];
+    expect(interval, 'aucun setInterval sur la purge des rapports d’audit').toBeDefined();
+    const ms = entry.match(new RegExp(`const ${interval} = ([^;]+);`))?.[1];
+    expect(ms).toBeTruthy();
+    const value = ms!.split('*').reduce((acc, part) => acc * Number(part.trim()), 1);
+    expect(Number.isFinite(value)).toBe(true);
+    // Shorter than the shortest promise on the page (2 h unpaid), by a margin.
+    expect(value).toBeLessThanOrEqual(30 * 60 * 1000);
   });
 });
 

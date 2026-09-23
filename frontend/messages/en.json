@@ -251,16 +251,14 @@
     },
     "deadline": {
       "eyebrow": "Deadline",
-      "heading": "14 November 2026: Switzerland stops processing unstructured addresses",
+      "heading": "Mid-November 2026: Switzerland stops processing unstructured addresses",
       "text": "POST /v1/address/check says for free whether an address passes the Swiss, HVPS+ or Fedwire rules, naming the document; the file audit takes a whole workbook.",
       "cta": "Read the rules, rail by rail",
-      "dayPrefix": "D-",
-      "daysLabel": "days before 14 November 2026",
-      "daysAria": "{days} days before 14 November 2026",
-      "since": "in force since 14 November 2026",
-      "line1": "From 14 November 2026, payment orders covered by the Swiss Payment Standards must meet the applicable address requirements when an address is used.",
+      "line1": "From mid-November 2026, payment orders covered by the Swiss Payment Standards must meet the applicable address requirements when an address is used. SIX publishes 14 November; we no longer print a countdown, as the other rails have already moved their dates.",
       "line2": "The EPC postponed its 15 November deadline on 9 September 2026; a new date is due to be set in October.",
-      "line3": "Swift also postponed its deadline on 27 August 2026. The Swiss timetable remains separately published by SIX."
+      "line3": "Swift also postponed its deadline on 27 August 2026. The Swiss timetable remains separately published by SIX.",
+      "window": "mid-November 2026",
+      "windowLabel": "structured addresses · Swiss timetable"
     },
     "integrations": {
       "heading": "In your language, your ERP, your spreadsheet",
@@ -1909,9 +1907,9 @@
       "trialNote": "Start without an account or sales call. No API key is needed to try IBAN validation in the playground."
     },
     "deadline": {
-      "badge": "Dated deadline",
+      "badge": "Deadline",
       "title": "Structured addresses: Switzerland, EPC and Swift have separate timetables",
-      "body": "Checked on 10 September 2026: SIX still publishes 14 November 2026 for the Swiss Payment Standards address requirements. On 9 September, the EPC postponed the end of unstructured addresses under all five payment schemes beyond 15 November; it plans to set the new date in October. Swift also deferred its payments changes on 27 August, with an update by December at the latest. The EPC and Swift announcements do not themselves change the Swiss timetable. Continue preparing your supplier data against the rules of the rail you use.",
+      "body": "Checked on 10 September 2026: SIX publishes 14 November 2026 as the deadline for the Swiss Payment Standards address requirements, for payment orders from the customer to its bank. We no longer print a countdown: the other timetables have moved. On 9 September, the EPC postponed the end of unstructured addresses under all five payment schemes beyond 15 November; it plans to set the new date in October. Swift also deferred its payments changes on 27 August, with an update by December at the latest. The EPC and Swift announcements do not themselves change the Swiss timetable. Continue preparing your supplier data against the rules of the rail you use.",
       "what": "Two things this API does about it, both already live. A free conformity check tells you, rule by rule and with the document each rule comes from, whether an address you have structured passes a given rail. And resolving a clearing code or an IBAN into a BIC often removes the agent-address obligation altogether: hold the BIC, and that branch of the rule does not apply to you.",
       "refused": "Refused: a country in lowercase and no town element",
       "accepted": "Accepted: town, country and the street in their own elements",
@@ -1955,7 +1953,7 @@
         },
         {
           "title": "A trust pack you can send to procurement",
-          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. IBANs are never stored: validation runs in memory and only country + bank-prefix metadata is logged. And when a customer leaves, their telemetry deletes itself: erased by default 30 days after termination, contractually (DPA clause 4.7).",
+          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. Validation stores no IBAN: it runs in memory and only country + bank-prefix metadata is logged. The file audit is a separate deliverable: it keeps its report — which reproduces the columns you upload — for 2 hours unpaid, 24 hours after payment, then deletes it (see the Audit page). And when a customer leaves, their telemetry deletes itself: erased by default 30 days after termination, contractually (DPA clause 4.7).",
           "link": "Legal & DPA"
         }
       ]
@@ -1964,8 +1962,8 @@
       "eyebrow": "Editor / OEM",
       "title": "Need specific service commitments?",
       "price": "From $149 per month",
-      "priceDetail": "One key at 50,000 requests per month, redistribution rights, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price.",
-      "body": "Ordinary API integration can start on Pro. Discuss OEM if you need redistribution rights, a written SLA, tailored support or volumes beyond the published plans.",
+      "priceDetail": "One key at 50,000 requests per month, the right to embed the API in your own product for your end customers, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price. Reselling raw bulk extracts of the databases stays out of scope (Terms, article 6).",
+      "body": "Ordinary API integration can start on Pro. Discuss OEM if you need to embed the API in your product for your end customers, a written SLA, tailored support or volumes beyond the published plans.",
       "cta": "support@ibanforge.com",
       "hint": "Describe your product and the commitments you need. Pro, at $29 per month for 10,000 requests, is available directly from the pricing page.",
       "slaLink": "Read the SLA"
@@ -2316,7 +2314,8 @@
         "0": "No account-holder verification: validation proves structure, checksum and the institution behind the code — never that an account exists or who holds it.",
         "1": "Sanctions screening is at bank level (BIC8), not name level, and the compliance response repeats this itself. It is not a regulated AML/CFT product.",
         "2": "No “CBPR+ conformity” boolean: that guideline is unreachable to automated readers, and a verdict quoting an unread document would be a guess. The address check says so on every answer.",
-        "3": "This page lists only what is settled. It grows as publishers answer — never ahead of them."
+        "3": "This page lists only what is settled. It grows as publishers answer — never ahead of them.",
+        "4": "Sources do not all age at the same rate, and one of them no longer ages at all: the redistributed SWIFT directory behind roughly two thirds of our BIC rows is a public repository its publisher stopped updating in 2019, holding data from January 2018. We re-import it every month, which does not make it younger. /health therefore serves two dates per source — when it was imported and when the data is from — and marks that one as out of date."
       }
     },
     "cta": {
@@ -2326,7 +2325,7 @@
   },
   "audit": {
     "metaTitle": "Creditor file audit: $149, result at once",
-    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then $149 up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline of 14 November 2026.",
+    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then $149 up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline at mid-November 2026.",
     "eyebrow": "Creditor file audit",
     "title": "Audit your creditor file before the next payment run",
     "intro": "Every row goes through the same registers the IBANforge API serves: IBAN, bank code, bank name and BIC, SEPA reach, ISO 20022 address rules. You see what to fix for free; the annotated workbook has a displayed price, paid by card, downloadable at once.",
@@ -2345,12 +2344,12 @@
       "note": "One file, one payment by card on Stripe. The annotated workbook (.xlsx) and the summary are ready right after payment and stay downloadable for 24 hours."
     },
     "deadline": {
-      "title": "14 November 2026: SIX stops processing QR-bill payments with unstructured addresses",
+      "title": "Mid-November 2026: SIX stops processing QR-bill payments with unstructured addresses",
       "text": "From that date, standing orders and payment templates built on QR-bills with a non-structured address are no longer processed. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
     },
     "upload": {
       "label": "Drop your creditor file here",
-      "hint": "CSV or XLSX, up to 5 MB and 20,000 rows. A column named IBAN is enough; name, BIC and address columns are used when present.",
+      "hint": "CSV or XLSX, up to 10 MB and 20,000 rows. A column named IBAN is enough; name, BIC and address columns are used when present.",
       "button": "Analyse for free",
       "analyzing": "Analysing",
       "error": {
@@ -2358,7 +2357,7 @@
         "noIban": "No column holds IBANs. Name one IBAN, or make sure the account column contains IBANs.",
         "empty": "The file has no data rows.",
         "tooManyRows": "The file has more than 20,000 rows. Split it and upload the parts.",
-        "tooLarge": "The file is larger than 5 MB.",
+        "tooLarge": "The file is larger than 10 MB.",
         "unreadable": "The file could not be read as CSV or XLSX.",
         "expired": "This audit has expired. Upload the file again.",
         "payments": "Payment is temporarily unavailable. Try again in a few seconds. If the problem persists, contact support@ibanforge.com.",
@@ -2381,10 +2380,23 @@
         "iban": "IBAN",
         "status": "Status",
         "findings": "Findings",
-        "bank": "Bank"
+        "bank": "Bank",
+        "register": "National register"
       },
       "more": "Free preview: {shown} of {rows} rows, IBANs masked. The paid workbook shows every row in full.",
-      "meaning": "{errors, plural, =0 {No blocking errors detected by these checks} one {# row has a blocking error} other {# rows have blocking errors}}; {warnings, plural, =0 {no further warnings} one {# row needs review} other {# rows need review}}. This does not confirm account ownership or guarantee that a payment will succeed."
+      "meaning": "{errors, plural, =0 {No blocking errors detected by these checks} one {# row has a blocking error} other {# rows have blocking errors}}; {warnings, plural, =0 {no further warnings} one {# row needs review} other {# rows need review}}. This does not confirm account ownership or guarantee that a payment will succeed.",
+      "registers": {
+        "title": "National registers, country by country",
+        "lead": "What an absence is worth changes from country to country. Where the register settles it, a bank code that is not there is a code that is not allocated; elsewhere, our silence proves nothing.",
+        "note": "{missing, plural, =0 {Every row with a country in this file was checked against a register that settles an absence.} one {# row is in a country with no register that settles an absence: there, an unknown bank code is not a disproved one.} other {# rows are in a country with no register that settles an absence: there, an unknown bank code is not a disproved one.}}",
+        "rows": "{n, plural, one {# row} other {# rows}}",
+        "authoritative": "register settles it",
+        "partial": "partial register",
+        "none": "no register",
+        "authoritativeLong": "National register consulted: an absence means the code is not allocated.",
+        "partialLong": "Partial register: a hit names the holder, a miss proves nothing.",
+        "noneLong": "No national register consulted for this country: an absence proves nothing."
+      }
     },
     "status": {
       "ok": "OK",
@@ -2415,7 +2427,7 @@
     },
     "privacy": {
       "title": "What happens to your file",
-      "text": "The file is read in memory on our servers in the Netherlands (Railway, europe-west4) and is not stored. Only the annotated report is kept: 2 hours if you do not pay, 24 hours after payment, then deleted automatically. Nothing is used for anything else.",
+      "text": "The file you upload is not kept as such: it is read in memory on our servers in the Netherlands (Railway, europe-west4). What is kept is the annotated report — and it reproduces every column of your file, creditor names and IBANs included, with the findings beside them. It is deleted 2 hours after upload if you do not pay, 24 hours after payment otherwise; a sweep runs every ten minutes. Nothing is used for anything else.",
       "support": "Questions, a file that will not read, an invoice: support@ibanforge.com."
     },
     "done": {
@@ -2432,7 +2444,7 @@
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
     },
-    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then $149 for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before 14 November 2026.",
+    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then $149 for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before mid-November 2026.",
     "steps": {
       "title": "Three steps, one file",
       "s1t": "Drop your file",
@@ -2508,9 +2520,9 @@
     "faq": {
       "title": "Questions before you upload",
       "q1": "Which files work?",
-      "a1": "CSV (comma, semicolon or tab) and Excel XLSX or XLS, up to 5 MB and 20,000 rows. One column named IBAN is enough; name, BIC, street, postal code, town and country are used when present.",
+      "a1": "CSV (comma, semicolon or tab) and Excel XLSX or XLS, up to 10 MB and 20,000 rows. One column named IBAN is enough; name, BIC, street, postal code, town and country are used when present.",
       "q2": "What happens to my data?",
-      "a2": "The file is read in memory on our servers in the Netherlands and is not stored. Only the annotated report is kept: 2 hours if you do not pay, 24 hours after payment, then deleted. Nothing is used for anything else.",
+      "a2": "The file you upload is not kept as such: it is read in memory on our servers in the Netherlands. What is kept is the annotated report, and it reproduces every column of your file — creditor names and IBANs included — with the findings beside them. It is deleted 2 hours after upload if you do not pay, 24 hours after payment otherwise, by a sweep that runs every ten minutes. Nothing is used for anything else.",
       "q3": "What does the audit check, and what does it not?",
       "a3": "Structure and check digits, bank code against the national register, bank name and BIC, SEPA reach, duplicates, the BIC in your file against the register, address country against IBAN country, and the structured-address rules when address columns exist. It does not confirm that the account belongs to the named creditor: that is Verification of Payee, done by banks.",
       "q4": "More than 20,000 rows, or several files?",
@@ -2529,11 +2541,11 @@
   },
   "qrBill": {
     "metaTitle": "Swiss QR-bill check: structured or combined address, QR-IBAN and reference, free",
-    "metaDescription": "Paste the text of a Swiss QR-bill code and see every rule verdict: header, QR-IBAN and reference pairing, checksums, amount, and whether the addresses are structured (type S) or still combined (type K) before the SIX deadline of 14 November 2026.",
+    "metaDescription": "Paste the text of a Swiss QR-bill code and see every rule verdict: header, QR-IBAN and reference pairing, checksums, amount, and whether the addresses are structured (type S) or still combined (type K) before the SIX deadline at mid-November 2026.",
     "eyebrow": "Free tool",
-    "title": "Is this QR-bill ready for 14 November 2026?",
+    "title": "Is this QR-bill ready for mid-November 2026?",
     "intro": "Paste the text inside a Swiss QR-bill code (it starts with SPC). You get every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR, SCOR or NON reference and its checksum, amount, currency, and whether the addresses are structured (type S) or still combined (type K). A combined address comes back with the structured fields to use instead.",
-    "deadline": "Type K addresses were removed from the standard on 21 November 2025; from 14 November 2026 banks no longer process standing orders and payment templates built on them.",
+    "deadline": "Type K addresses were removed from the standard on 21 November 2025; from mid-November 2026 banks no longer process standing orders and payment templates built on them.",
     "docsLink": "Read the documentation",
     "input": {
       "label": "QR-bill text (Swiss Payments Code)",
@@ -2544,7 +2556,7 @@
     },
     "result": {
       "valid": "Well-formed",
-      "ready": "Ready for 14.11.2026",
+      "ready": "Ready for mid-November 2026",
       "yes": "Yes",
       "no": "No",
       "iban": "Creditor IBAN",

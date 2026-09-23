@@ -52,6 +52,20 @@ describe('compression threshold', () => {
     // `c.res = new Response(...)` rebuilds the response, and Hono's own setter
     // merges the previous headers over the new one after deleting its
     // content-type. A silent loss there would change what every client parses.
+    //
+    // ⚠️ The body is decoded rather than parsed straight, and that is the
+    // point of this comment. Until 22/09/2026 this test read `res.json()`
+    // directly, which only worked because /health happened to sit just under
+    // the 1 024-byte threshold — so it doubled, silently, as a size ceiling on
+    // a payload nobody knew it was guarding. Adding two honest fields per
+    // source (`source_as_of`, `stale_reason`) crossed it and turned a
+    // provenance change into a compression failure. Crossing the threshold is
+    // the DESIGNED behaviour, proved one test up on /openapi.json, and it
+    // costs nothing here: Railway reads the status code, the Dockerfile probe
+    // uses `fetch` (which negotiates and decodes), and gzip only ever happens
+    // for a client that asked. What this test is really about is the headers
+    // and the bytes surviving the rebuild, so it now checks exactly that,
+    // whichever side of the threshold the payload lands on.
     const app = buildApp();
     const res = await app.request('/health', { headers: GZIP });
     expect(res.headers.get('content-type')).toContain('application/json');
@@ -59,7 +73,12 @@ describe('compression threshold', () => {
       res.headers.get('x-content-type-options'),
       'a security header was dropped in the rebuild',
     ).toBe('nosniff');
-    const body = (await res.json()) as Record<string, unknown>;
+    const raw = Buffer.from(await res.arrayBuffer());
+    const text =
+      res.headers.get('content-encoding') === 'gzip'
+        ? gunzipSync(raw).toString('utf8')
+        : raw.toString('utf8');
+    const body = JSON.parse(text) as Record<string, unknown>;
     expect(body.status).toBeTruthy();
   });
 

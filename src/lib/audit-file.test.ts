@@ -183,6 +183,65 @@ describe('rendering', () => {
 });
 
 /**
+ * Audit of 22/09/2026: a clean line read the same whatever the country, so a
+ * file of Italian creditors came back as green as a file of German ones —
+ * although no Italian register was consulted at all. What a SILENCE is worth
+ * is the whole question when the deliverable is "what would the bank refuse",
+ * and it belongs in the free preview as much as in the paid workbook: hiding
+ * it behind the paywall would sell the reassurance rather than the check.
+ */
+describe('the audit says, per country, whether a register settles an absence', () => {
+  // Germany is authoritative (Bundesbank), San Marino partial (the BCSM lists
+  // banks, not the allocation of the code space), Italy has no register here.
+  const VALID_IT = 'IT60X0542811101000000123456';
+  const VALID_SM = 'SM86U0322509800000000270100';
+
+  it('carries the three states per row and counts them once in the summary', () => {
+    const res = auditTable(['IBAN'], [[VALID_DE], [VALID_SM], [VALID_IT], [BAD_CHECK]]);
+    const byLine = new Map(res.rows.map((r) => [r.line, r]));
+    expect(byLine.get(1)!.register_basis).toBe('authoritative');
+    expect(byLine.get(1)!.register).toContain('Bundesbank');
+    expect(byLine.get(2)!.register_basis).toBe('partial');
+    expect(byLine.get(3)!.register_basis).toBe('none');
+    expect(byLine.get(3)!.register).toBeNull();
+    // An IBAN that does not validate has no country, so no register question.
+    expect(byLine.get(4)!.register_basis).toBe('none');
+
+    const countries = new Map(res.summary.countries.map((c) => [c.code, c]));
+    expect(countries.get('DE')!.register_basis).toBe('authoritative');
+    expect(countries.get('SM')!.register_basis).toBe('partial');
+    expect(countries.get('IT')!.register_basis).toBe('none');
+    // San Marino and Italy: two rows no register could have contradicted. The
+    // unreadable row is excluded — it has no country to judge.
+    expect(res.summary.rows_without_authoritative_register).toBe(2);
+  });
+
+  it('puts it in the free preview, not only in the paid workbook', () => {
+    const res = auditTable(['IBAN'], [[VALID_IT], [VALID_DE]]);
+    const basis = previewRows(res, 20).map((p) => p.register_basis);
+    expect(basis).toContain('none');
+    expect(basis).toContain('authoritative');
+  });
+
+  it('gives the workbook a column and the summary sheet a line, in the page language', () => {
+    const res = auditFile(csv(['IBAN', VALID_DE, VALID_IT]), 'x.csv');
+    const wb = XLSX.read(buildWorkbook(res, 'fr'), { type: 'buffer' });
+    const aoa = XLSX.utils.sheet_to_json<string[]>(wb.Sheets['Audit']!, { header: 1 });
+    const col = aoa[0]!.indexOf('Registre national');
+    expect(col).toBeGreaterThan(0);
+    expect(aoa[1]![col]).toContain('non attribué');
+    expect(aoa[2]![col]).toContain('aucun');
+
+    const flat = XLSX.utils
+      .sheet_to_json<string[]>(wb.Sheets['Synthèse']!, { header: 1 })
+      .map((r) => r.join(' | '))
+      .join('\n');
+    expect(flat).toContain('Registres nationaux');
+    expect(flat).toMatch(/IT — aucun/);
+  });
+});
+
+/**
  * Adversarial review of 07/09/2026, A1: the row cap used to run after the
  * whole sheet had been parsed. Now the parser stops at the cap and text is
  * counted before it is decoded — an oversized file is refused for the price
@@ -208,6 +267,31 @@ describe('readTable — the cap is enforced before the parse', () => {
     // Exactly at the cap: allowed, and parsed normally.
     const atCap = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS }, () => VALID_CH)];
     expect(readTable(csv(atCap), 'cap.csv').rows.length).toBe(AUDIT_MAX_ROWS);
+  });
+
+  /**
+   * The row guard throws INSIDE the try block that wraps the parser, so until
+   * 22/09/2026 the catch below it relabelled a perfectly formed file as
+   * `unreadable` — blaming the customer's export for a limit that is ours.
+   * The code is what the site turns into "split the file", so the code is what
+   * this pins; a message check would have passed throughout the bug.
+   */
+  it('keeps the too_many_rows CODE, in text and in a workbook', () => {
+    const lines = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => VALID_CH)];
+    expect(() => readTable(csv(lines), 'big.csv')).toThrow(
+      expect.objectContaining({ code: 'too_many_rows' }),
+    );
+    const aoa: unknown[][] = [
+      ['IBAN'],
+      ...Array.from({ length: AUDIT_MAX_ROWS + 5 }, () => [VALID_CH]),
+    ];
+    expect(() => readTable(xlsx(aoa), 'big.xlsx')).toThrow(
+      expect.objectContaining({ code: 'too_many_rows' }),
+    );
+    // A genuinely broken file still gets the honest verdict.
+    expect(() =>
+      readTable(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]), 'broken.xlsx'),
+    ).toThrow(expect.objectContaining({ code: 'unreadable' }));
   });
 
   it('counts lines on bytes, with and without a trailing newline', () => {

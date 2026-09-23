@@ -15,7 +15,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 
 | Source | Lignes | Licence | Établie ? |
 |---|---:|---|---|
-| PeterNotenboom/SwiftCodes | 82 102 | MIT | ✅ licence dans le dépôt |
+| PeterNotenboom/SwiftCodes | 82 102 | MIT | ✅ licence dans le dépôt — ⚠️ **données figées à janvier 2018**, voir ci-dessous |
 | GLEIF (BIC↔LEI) | 39 297 | **CC0** | ✅ **vérifié à la source le 23/08/2026** |
 | Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
 | SIX BankMaster (clearing suisse) | 1 164 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
@@ -142,6 +142,29 @@ La seule mention trouvée sur tout le site :
 « Tous droits réservés » sans grant publié = pas de permission établie. Même
 classe de décision que l'ONU, en moins restrictif (rien n'interdit, rien
 n'autorise) : écrire à EBA CLEARING, ou retirer, ou documenter l'incertitude.
+
+
+### ⚠️ SwiftCodes : la source la plus grosse ne bouge plus depuis 2018
+
+**Relevé le 22/09/2026, à la source.** Le dépôt `PeterNotenboom/SwiftCodes`
+n'a plus reçu de publication depuis le **09.08.2019**, et le dernier commit
+qui a touché le dossier de données est « Update for 2018 », daté du
+**27.01.2018**. Ses 82 102 lignes — environ deux tiers de `bic_entries` —
+décrivent donc le paysage bancaire de janvier 2018.
+
+Le rafraîchissement mensuel re-clone ce même fichier figé, donc `updated_at`
+avance tous les mois sans que le contenu bouge : la date d'import ne dit rien
+de la donnée. C'est pour cela que `src/lib/source-vintage.ts` porte la date
+réelle, que `/health` sert `source_as_of` à côté de `last_updated`, et qu'un
+BIC résolu par la recherche par préfixe sur une ligne SwiftCodes porte les
+deux dates.
+
+**Conséquence pratique** : une banque créée, absorbée ou renommée depuis 2018
+peut manquer, ou porter un nom périmé, dans la partie SwiftCodes du
+répertoire. Les registres nationaux (SIX, Bundesbank, OeNB, BNB, NBS, BNB
+bulgare) et GLEIF, eux, sont bien rafraîchis chaque mois — c'est pourquoi
+`bank_code_check` et `bic.basis` existent : ils disent quelle partie du
+répertoire a répondu.
 
 ## Ce qui alimente `compliance.sqlite`
 

@@ -1419,14 +1419,19 @@ html[data-js] .forge .scene {
   flex-direction: column;
   margin: 0.4rem 0 0.9rem;
 }
+/* Le slot portait « J-45 » : quatre caractères, taillés pour un compteur.
+   Depuis le 22/09/2026 il porte « mi-novembre 2026 » (le compte à rebours a
+   été retiré, plusieurs dates circulent) — dix-huit caractères, qui à 6,6rem
+   débordent d'un téléphone. La taille descend et le texte a le droit de
+   passer à la ligne ; tabular-nums part avec les chiffres qu'il alignait. */
 .forge .deadline-days b {
   font-family: var(--font-bebas);
   font-weight: 400;
-  font-size: clamp(4.2rem, 9vw, 6.6rem);
-  line-height: 0.92;
+  font-size: clamp(2.2rem, 6vw, 3.6rem);
+  line-height: 1;
   letter-spacing: 0.01em;
   color: var(--amber-500);
-  font-variant-numeric: tabular-nums;
+  text-wrap: balance;
 }
 .forge .deadline-days span {
   font-family: var(--font-mono);

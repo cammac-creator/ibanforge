@@ -194,6 +194,12 @@ const ENRICHED_BIC_SCHEMA = z
       .optional()
       .describe('Source of the bank-code/BIC pairing; keep its provenance.'),
     as_of: z.string().nullable().optional(),
+    source_as_of: z
+      .string()
+      .optional()
+      .describe(
+        'Year-month the SOURCE DATA is from, present only when it differs from as_of. as_of dates the import; for the redistributed SWIFT directory the upstream stopped publishing years ago, so as_of alone presents an old bank name as last month\'s. Absent means no gap has been established, never "this is current".',
+      ),
     lei: z
       .string()
       .nullable()

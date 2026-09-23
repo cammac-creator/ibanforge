@@ -21,7 +21,7 @@ export async function generateMetadata({
 
 const PRINCIPLES = ["0", "1", "2"] as const;
 const LICENCES = ["0", "1", "2", "3"] as const;
-const HONEST = ["0", "1", "2", "3"] as const;
+const HONEST = ["0", "1", "2", "3", "4"] as const;
 
 /**
  * The permissions page shows only what is settled: a written permission, a

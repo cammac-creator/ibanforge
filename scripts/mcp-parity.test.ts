@@ -187,25 +187,40 @@ describe("parité MCP — aucun écart entre les trois listes d'outils", () => {
   }
 });
 
-describe('parité MCP — la limite de taille du fichier audit ne diverge pas de la route', () => {
+describe('parité MCP — la limite de taille du fichier audit ne dépasse jamais celle de la route', () => {
   /**
    * `mcp/src/index.ts` copie AUDIT_MAX_BYTES pour refuser un fichier trop
    * gros AVANT tout appel réseau (ce paquet ne peut pas importer src/lib/
-   * audit-file.ts, publié séparément). Même risque, même remède que
-   * FEEDBACK_ERROR_TYPES juste en dessous : un nombre recopié à la main à
-   * côté d'un nombre qui bouge finit par diverger en silence.
+   * audit-file.ts, publié séparément). Même risque que FEEDBACK_ERROR_TYPES
+   * plus bas : un nombre recopié à la main à côté d'un nombre qui bouge finit
+   * par diverger en silence.
+   *
+   * 🚨 La règle était l'ÉGALITÉ jusqu'au 22/09/2026, et elle était fausse dans
+   * un sens. `file_base64` traverse stdio : un fichier de 10 Mo pèse ~13,4 Mo
+   * sur le fil, et mesuré ce jour-là contre le serveur construit, 8 Mo et
+   * au-delà tuent le transport (« Connection closed ») au lieu de rendre une
+   * erreur. Le paquet doit donc pouvoir refuser PLUS TÔT que la route, et la
+   * seule divergence dangereuse est l'autre : un plafond MCP plus HAUT que
+   * celui de la route ne refuse plus rien et laisse la route décider après
+   * avoir déjà tout transporté. C'est cette inégalité-là qui est gardée.
    */
-  it('mcp/src/index.ts AUDIT_MAX_BYTES == src/lib/audit-file.ts AUDIT_MAX_BYTES', () => {
-    const routeValue = read('src/lib/audit-file.ts')
-      .match(/export const AUDIT_MAX_BYTES\s*=\s*([^;]+);/)?.[1]
-      ?.trim();
-    const mcpValue = SRC.A.match(/const AUDIT_MAX_BYTES\s*=\s*([^;]+);/)?.[1]?.trim();
+  const parse = (expr: string | undefined): number | undefined =>
+    expr?.split('*').reduce<number>((acc, part) => acc * Number(part.trim()), 1);
+
+  it('mcp/src/index.ts AUDIT_MAX_BYTES <= src/lib/audit-file.ts AUDIT_MAX_BYTES', () => {
+    const routeValue = parse(
+      read('src/lib/audit-file.ts')
+        .match(/export const AUDIT_MAX_BYTES\s*=\s*([^;]+);/)?.[1]
+        ?.trim(),
+    );
+    const mcpValue = parse(SRC.A.match(/const AUDIT_MAX_BYTES\s*=\s*([^;]+);/)?.[1]?.trim());
     expect(routeValue, 'AUDIT_MAX_BYTES introuvable dans src/lib/audit-file.ts').toBeDefined();
+    expect(mcpValue, 'AUDIT_MAX_BYTES introuvable dans mcp/src/index.ts').toBeDefined();
+    expect(Number.isFinite(routeValue!) && Number.isFinite(mcpValue!)).toBe(true);
     expect(
-      mcpValue,
-      'mcp/src/index.ts a divergé de src/lib/audit-file.ts AUDIT_MAX_BYTES — le paquet npm ' +
-        'refuserait au mauvais seuil, ou plus du tout.',
-    ).toBe(routeValue);
+      mcpValue!,
+      'mcp/src/index.ts refuse PLUS HAUT que la route : le garde-fou local ne garde plus rien.',
+    ).toBeLessThanOrEqual(routeValue!);
   });
 });
 

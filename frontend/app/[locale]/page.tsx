@@ -87,17 +87,16 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   }))
   // The refresh date /health already reports and the page used to throw away:
   // "refreshed monthly" becomes a dated fact, never typed by hand (S4).
-  // Days left before SIX stops processing unstructured addresses, computed at
-  // render (the page is revalidated every hour) and never by the browser.
   //
-  // react-hooks/purity refuses an impure call during render and it is right
-  // about the call: this IS the clock. It is also the point. This is a server
-  // component, rendered once per revalidation window and never re-rendered in
-  // a browser, so there is no memoised render for the clock to make a liar of;
-  // frozen at build time the countdown would simply be wrong. The one impure
-  // read on the page, named.
-  // eslint-disable-next-line react-hooks/purity
-  const daysLeft = Math.ceil((Date.UTC(2026, 10, 14) - Date.now()) / 86_400_000)
+  // 🚨 The day counter that used to stand here was REMOVED on 22/09/2026, on
+  // Claude-Alain's decision. It counted down to 14.11.2026, the day SIX
+  // publishes for customer-to-bank payment orders (the 21 November date that
+  // circulates is the 2025 removal of type K addresses, not a 2026 deadline).
+  // Swift deferred its own November changes on 27.08.2026 and the EPC
+  // postponed on 09.09.2026. A countdown is a precision claim about what
+  // happens to a payment on that day, and that claim is not ours to make. The
+  // band now says "mid-November 2026", cites SIX's day in its body, and keeps
+  // the dated facts below it.
   const refreshedOn = liveStats.bicDataLastUpdated
     ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
         .format(new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`))
@@ -185,22 +184,22 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── The dated trigger: 14 November 2026 (audit 2026-09-04, M3) ────────
+      {/* ── The dated trigger: mid-November 2026 (audit 2026-09-04, M3) ─────
           It was the seventh line of the endpoint list, at 80 % of the page.
-          The dates are the ones our own doc and the 2026-09-02 post cite,
-          source by source; Swift's suspension of 27 August 2026 is named. */}
+          The dates below are the ones our own doc and the 2026-09-02 post cite,
+          source by source; Swift's suspension of 27 August 2026 is named. The
+          heading names the month and the body cites SIX's day (14 November),
+          without a countdown — see the note beside `refreshedOn`. */}
       <section className="deadline" aria-labelledby="h-deadline">
         <div className="wrap deadline-grid">
           <div>
             <span className="eyebrow">{t('deadline.eyebrow')}</span>
-            {/* Audit 2026-09-05 (n° 17): the "why now" had no anchor for the
-                eye. The count is computed on the server at each revalidation. */}
-            <p className="deadline-days" aria-label={daysLeft > 0 ? t('deadline.daysAria', { days: daysLeft }) : t('deadline.since')}>
-              {daysLeft > 0 ? (
-                <><b>{t('deadline.dayPrefix')}{daysLeft}</b><span>{t('deadline.daysLabel')}</span></>
-              ) : (
-                <><b>14.11.2026</b><span>{t('deadline.since')}</span></>
-              )}
+            {/* Audit 2026-09-05 (n° 17): the "why now" needed an anchor for
+                the eye. It is a month, not a running day count — the anchor
+                stays, the false precision does not. */}
+            <p className="deadline-days">
+              <b>{t('deadline.window')}</b>
+              <span>{t('deadline.windowLabel')}</span>
             </p>
             <h2 className="sect-h sect-h-left" id="h-deadline">{t('deadline.heading')}</h2>
           </div>

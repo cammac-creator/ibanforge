@@ -27,6 +27,7 @@ function makeJob() {
       error: 0,
       by_code: {},
       countries: [],
+      rows_without_authoritative_register: 0,
       columns_detected: ['iban'],
       address_checked: false,
       tier: 'standard',

@@ -14,6 +14,7 @@ import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
 import { purgeExpiredDeviceCodes } from './lib/device-grant.js';
+import { purgeExpiredAuditJobs } from './lib/audit-jobs.js';
 import { purgeLineageFacts } from './lib/lineage-facts.js';
 import { reviewLedgerVolume, snapshotTrialDay, sweepDailyLedger } from './lib/daily-ip-ledger.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
@@ -127,6 +128,37 @@ setInterval(
   },
   24 * 60 * 60 * 1000,
 ).unref();
+
+// ─── Creditor-audit reports: the clock that makes the promise true ──────────
+//
+// An audit report carries the bank details of the customer's creditors, and
+// /audit promises they disappear — two hours after an unpaid upload, twenty-four
+// hours after payment. Until 22/09/2026 `purgeExpiredAuditJobs()` was called
+// from two places only: the upload route and the status route. A promise of
+// erasure whose only clock is the next customer is not a promise: on a quiet
+// week an expired report simply stayed on the volume until someone happened to
+// upload a file.
+//
+// Ten minutes rather than the 24 h retention interval above: the shorter of the
+// two deadlines is two hours, and a daily sweep would overshoot it twelvefold.
+// The call is one indexed DELETE, so its cost is the wake-up.
+const AUDIT_PURGE_MS = 10 * 60 * 1000;
+
+function auditReportPurgeTick(): void {
+  try {
+    const purged = purgeExpiredAuditJobs();
+    if (purged > 0) console.log(`Retention: purged ${purged} expired audit report(s)`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Audit report purge failed:', msg);
+    // Seuil 3 : le tick passe six fois par heure, donc trois échecs de suite ne
+    // sont plus un hoquet — c'est une demi-heure sans horloge sur les
+    // coordonnées bancaires de tiers, et la page continue de promettre.
+    void opsFail('retention:audit', `Purge des rapports d'audit de fichier en échec : ${msg}`, 3);
+  }
+}
+auditReportPurgeTick();
+setInterval(auditReportPurgeTick, AUDIT_PURGE_MS).unref();
 
 // Daily commercial lifecycle radar, in-process — the customer ledger must not
 // transit an external CI runner (see lifecycle-radar-server.ts).

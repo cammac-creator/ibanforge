@@ -251,16 +251,14 @@
     },
     "deadline": {
       "eyebrow": "Stichtag",
-      "heading": "14. November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
+      "heading": "Mitte November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
       "text": "POST /v1/address/check sagt gratis, ob eine Adresse die Schweizer, HVPS+- oder Fedwire-Regeln besteht, und nennt das Dokument; die Dateiprüfung nimmt eine ganze Arbeitsmappe.",
       "cta": "Die Regeln lesen, Schiene für Schiene",
-      "dayPrefix": "T-",
-      "daysLabel": "Tage bis zum 14. November 2026",
-      "daysAria": "{days} Tage bis zum 14. November 2026",
-      "since": "in Kraft seit dem 14. November 2026",
-      "line1": "Ab dem 14. November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die geltenden Adressanforderungen erfüllen, wenn eine Adresse verwendet wird.",
+      "line1": "Ab Mitte November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die geltenden Adressanforderungen erfüllen, wenn eine Adresse verwendet wird. SIX nennt den 14. November; einen Countdown zeigen wir nicht mehr, weil sich die Zeitpläne der anderen Systeme bereits verschoben haben.",
       "line2": "Der EPC hat seine Frist vom 15. November am 9. September 2026 verschoben; ein neues Datum soll im Oktober festgelegt werden.",
-      "line3": "Auch Swift hat seine Frist am 27. August 2026 verschoben. SIX veröffentlicht den Schweizer Zeitplan weiterhin separat."
+      "line3": "Auch Swift hat seine Frist am 27. August 2026 verschoben. SIX veröffentlicht den Schweizer Zeitplan weiterhin separat.",
+      "window": "Mitte November 2026",
+      "windowLabel": "strukturierte Adressen · Schweizer Zeitplan"
     },
     "integrations": {
       "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
@@ -1909,9 +1907,9 @@
       "trialNote": "Starten Sie ohne Konto oder Beratungstermin. Für einen IBAN-Test im Playground brauchen Sie keinen API-Key."
     },
     "deadline": {
-      "badge": "Datierter Stichtag",
+      "badge": "Stichtag",
       "title": "Strukturierte Adressen: getrennte Zeitpläne für die Schweiz, EPC und Swift",
-      "body": "Geprüft am 10. September 2026: SIX nennt weiterhin den 14. November 2026 für die Adressanforderungen der Swiss Payment Standards. Am 9. September hat der EPC das Ende unstrukturierter Adressen in allen fünf Zahlungsschemen über den 15. November hinaus verschoben; ein neues Datum soll im Oktober festgelegt werden. Swift hat seine Zahlungsverkehrsänderungen am 27. August ebenfalls verschoben, mit einem Update spätestens im Dezember. Diese Ankündigungen ändern für sich allein den Schweizer Zeitplan nicht. Bereiten Sie Ihre Lieferantendaten weiterhin nach den Regeln des verwendeten Zahlungswegs vor.",
+      "body": "Geprüft am 10. September 2026: SIX nennt den 14. November 2026 als Stichtag für die Adressanforderungen der Swiss Payment Standards, für Zahlungsaufträge vom Kunden an seine Bank. Einen Countdown zeigen wir nicht mehr: Die anderen Zeitpläne haben sich verschoben. Am 9. September hat der EPC das Ende unstrukturierter Adressen in allen fünf Zahlungsschemen über den 15. November hinaus verschoben; ein neues Datum soll im Oktober festgelegt werden. Swift hat seine Zahlungsverkehrsänderungen am 27. August ebenfalls verschoben, mit einem Update spätestens im Dezember. Diese Ankündigungen ändern für sich allein den Schweizer Zeitplan nicht. Bereiten Sie Ihre Lieferantendaten weiterhin nach den Regeln des verwendeten Zahlungswegs vor.",
       "what": "Zwei Dinge, die diese API dafür tut, beide bereits produktiv. Eine kostenlose Konformitätsprüfung sagt Ihnen Regel für Regel, mit dem Dokument, aus dem jede Regel stammt, ob eine von Ihnen strukturierte Adresse auf einer bestimmten Schiene besteht. Und das Auflösen eines Clearing-Codes oder einer IBAN in einen BIC hebt die Adresspflicht des Agenten oft ganz auf: Wer den BIC hat, für den gilt dieser Zweig der Regel nicht.",
       "refused": "Abgelehnt: Land in Kleinbuchstaben und kein Ortselement",
       "accepted": "Akzeptiert: Ort, Land und Strasse in eigenen Elementen",
@@ -1955,7 +1953,7 @@
         },
         {
           "title": "Ein Vertrauenspaket für Ihren Einkauf",
-          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. IBANs werden nie gespeichert: Die Validierung läuft im Speicher, protokolliert werden nur Land und Bankpräfix. Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich (DPA Klausel 4.7).",
+          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. Die Validierung speichert keine IBAN: Sie läuft im Arbeitsspeicher, protokolliert werden nur Land und Bankpräfix. Die Dateiprüfung ist eine eigene Leistung: Sie bewahrt ihren Bericht — der die hochgeladenen Spalten übernimmt — 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf und löscht ihn dann (siehe die Seite Prüfung). Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich (DPA Klausel 4.7).",
           "link": "Rechtliches und DPA"
         }
       ]
@@ -1964,8 +1962,8 @@
       "eyebrow": "Editor / OEM",
       "title": "Brauchen Sie besondere Leistungszusagen?",
       "price": "Ab 149 $ pro Monat",
-      "priceDetail": "Ein Schlüssel mit 50'000 Anfragen pro Monat, Weitervertriebsrechte, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50'000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest.",
-      "body": "Eine gewöhnliche API-Integration kann mit Pro starten. Besprechen Sie OEM mit uns, wenn Sie Weiterverteilungsrechte, ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
+      "priceDetail": "Ein Schlüssel mit 50'000 Anfragen pro Monat, das Recht, die API für Ihre Endkunden in Ihr eigenes Produkt einzubetten, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50'000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest. Der Weiterverkauf von Rohdatenauszügen der Datenbanken bleibt ausgeschlossen (AGB, Artikel 6).",
+      "body": "Eine gewöhnliche API-Integration kann mit Pro starten. Besprechen Sie OEM mit uns, wenn Sie die API für Ihre Endkunden in Ihr Produkt einbetten möchten, ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
       "cta": "support@ibanforge.com",
       "hint": "Beschreiben Sie Ihr Produkt und die benötigten Zusagen. Pro für 29 $ pro Monat mit 10.000 Anfragen ist direkt auf der Preisseite erhältlich.",
       "slaLink": "SLA lesen"
@@ -2316,7 +2314,8 @@
         "0": "Keine Kontoinhaber-Prüfung: die Validierung beweist Struktur, Prüfsumme und die Institution hinter dem Code — nie, dass ein Konto existiert oder wem es gehört.",
         "1": "Das Sanktions-Screening arbeitet auf Bankebene (BIC8), nicht auf Namensebene, und die Compliance-Antwort wiederholt das selbst. Es ist kein reguliertes AML/CFT-Produkt.",
         "2": "Kein „CBPR+-Konformität“-Boolean: diese Richtlinie ist für automatisierte Leser unerreichbar, und ein Verdikt, das ein ungelesenes Dokument zitiert, wäre geraten. Die Adressprüfung sagt das bei jeder Antwort.",
-        "3": "Diese Seite listet nur, was gesichert ist. Sie wächst, wenn Herausgeber antworten — nie vor ihnen."
+        "3": "Diese Seite listet nur, was gesichert ist. Sie wächst, wenn Herausgeber antworten — nie vor ihnen.",
+        "4": "Nicht alle Quellen altern gleich schnell, und eine altert gar nicht mehr: Das weiterverteilte SWIFT-Verzeichnis, aus dem rund zwei Drittel unserer BIC-Zeilen stammen, ist ein öffentliches Repository, das sein Herausgeber seit 2019 nicht mehr aktualisiert und dessen Daten von Januar 2018 stammen. Wir importieren es jeden Monat neu, was es nicht jünger macht. /health liefert deshalb zwei Daten je Quelle — wann importiert und von wann die Daten sind — und markiert diese als nicht aktuell."
       }
     },
     "cta": {
@@ -2326,7 +2325,7 @@
   },
   "audit": {
     "metaTitle": "Prüfung der Kreditorendatei: 149 $, Ergebnis sofort",
-    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist vom 14. November 2026.",
+    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist Mitte November 2026.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
     "intro": "Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN, Bankleitzahl, Bankname und BIC, SEPA-Erreichbarkeit, Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
@@ -2345,12 +2344,12 @@
       "note": "Eine Datei, eine Kartenzahlung über Stripe. Die kommentierte Arbeitsmappe (.xlsx) und die Zusammenfassung sind sofort nach der Zahlung bereit und bleiben 24 Stunden herunterladbar."
     },
     "deadline": {
-      "title": "14. November 2026: SIX verarbeitet keine QR-Rechnungs-Zahlungen mit unstrukturierter Adresse mehr",
+      "title": "Mitte November 2026: SIX verarbeitet keine QR-Rechnungs-Zahlungen mit unstrukturierter Adresse mehr",
       "text": "Ab diesem Datum werden Daueraufträge und Zahlungsvorlagen auf Basis von QR-Rechnungen mit unstrukturierter Adresse nicht mehr verarbeitet. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
     },
     "upload": {
       "label": "Legen Sie Ihre Kreditorendatei hier ab",
-      "hint": "CSV oder XLSX, bis 5 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Spalten für Name, BIC und Adresse werden genutzt, wenn vorhanden.",
+      "hint": "CSV oder XLSX, bis 10 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Spalten für Name, BIC und Adresse werden genutzt, wenn vorhanden.",
       "button": "Kostenlos analysieren",
       "analyzing": "Analyse läuft",
       "error": {
@@ -2358,7 +2357,7 @@
         "noIban": "Keine Spalte enthält IBAN. Nennen Sie eine Spalte IBAN oder prüfen Sie, ob die Kontospalte IBAN enthält.",
         "empty": "Die Datei enthält keine Datenzeilen.",
         "tooManyRows": "Die Datei hat mehr als 20'000 Zeilen. Teilen Sie sie und laden Sie die Teile hoch.",
-        "tooLarge": "Die Datei ist grösser als 5 MB.",
+        "tooLarge": "Die Datei ist grösser als 10 MB.",
         "unreadable": "Die Datei konnte nicht als CSV oder XLSX gelesen werden.",
         "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
         "payments": "Die Zahlung ist vorübergehend nicht verfügbar. Versuchen Sie es in wenigen Sekunden erneut. Falls das Problem weiterhin besteht, wenden Sie sich an support@ibanforge.com.",
@@ -2381,10 +2380,23 @@
         "iban": "IBAN",
         "status": "Status",
         "findings": "Befunde",
-        "bank": "Bank"
+        "bank": "Bank",
+        "register": "Nationales Register"
       },
       "more": "Kostenlose Vorschau: {shown} von {rows} Zeilen, IBAN maskiert. Die bezahlte Arbeitsmappe zeigt jede Zeile vollständig.",
-      "meaning": "{errors, plural, =0 {Diese Prüfungen haben keine blockierenden Fehler erkannt} one {# Zeile enthält einen blockierenden Fehler} other {# Zeilen enthalten blockierende Fehler}}; {warnings, plural, =0 {keine weiteren Warnungen} one {# Zeile sollte überprüft werden} other {# Zeilen sollten überprüft werden}}. Das bestätigt weder den Kontoinhaber noch den Erfolg einer Zahlung."
+      "meaning": "{errors, plural, =0 {Diese Prüfungen haben keine blockierenden Fehler erkannt} one {# Zeile enthält einen blockierenden Fehler} other {# Zeilen enthalten blockierende Fehler}}; {warnings, plural, =0 {keine weiteren Warnungen} one {# Zeile sollte überprüft werden} other {# Zeilen sollten überprüft werden}}. Das bestätigt weder den Kontoinhaber noch den Erfolg einer Zahlung.",
+      "registers": {
+        "title": "Nationale Register, Land für Land",
+        "lead": "Was ein Fehlen bedeutet, ist von Land zu Land verschieden. Wo das Register entscheidet, ist ein nicht gefundener Bankcode ein nicht vergebener Code; anderswo beweist unser Schweigen nichts.",
+        "note": "{missing, plural, =0 {Jede Zeile mit einem Land in dieser Datei wurde gegen ein Register geprüft, das ein Fehlen entscheidet.} one {# Zeile liegt in einem Land ohne Register, das ein Fehlen entscheidet: Dort ist ein unbekannter Bankcode kein widerlegter Bankcode.} other {# Zeilen liegen in einem Land ohne Register, das ein Fehlen entscheidet: Dort ist ein unbekannter Bankcode kein widerlegter Bankcode.}}",
+        "rows": "{n, plural, one {# Zeile} other {# Zeilen}}",
+        "authoritative": "Register entscheidet",
+        "partial": "Teilregister",
+        "none": "kein Register",
+        "authoritativeLong": "Nationales Register abgefragt: Ein Fehlen bedeutet, der Code ist nicht vergeben.",
+        "partialLong": "Teilregister: Ein Treffer nennt den Inhaber, ein Fehlen beweist nichts.",
+        "noneLong": "Für dieses Land wird kein nationales Register abgefragt: Ein Fehlen beweist nichts."
+      }
     },
     "status": {
       "ok": "OK",
@@ -2415,7 +2427,7 @@
     },
     "privacy": {
       "title": "Was mit Ihrer Datei geschieht",
-      "text": "Die Datei wird im Arbeitsspeicher unserer Server in den Niederlanden (Railway, europe-west4) gelesen und nicht gespeichert. Nur der kommentierte Bericht wird aufbewahrt: 2 Stunden ohne Zahlung, 24 Stunden nach der Zahlung, dann automatisch gelöscht. Nichts wird für etwas anderes verwendet.",
+      "text": "Die hochgeladene Datei wird nicht als solche aufbewahrt: Sie wird im Arbeitsspeicher unserer Server in den Niederlanden (Railway, europe-west4) gelesen. Aufbewahrt wird der kommentierte Bericht — und er übernimmt jede Spalte Ihrer Datei, Kreditorennamen und IBAN eingeschlossen, mit den Befunden daneben. Er wird 2 Stunden nach dem Upload gelöscht, wenn Sie nicht bezahlen, sonst 24 Stunden nach der Zahlung; ein Durchlauf räumt alle zehn Minuten auf. Nichts wird für etwas anderes verwendet.",
       "support": "Fragen, eine Datei, die sich nicht lesen lässt, eine Rechnung: support@ibanforge.com."
     },
     "done": {
@@ -2432,7 +2444,7 @@
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
     },
-    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor dem 14. November 2026.",
+    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor Mitte November 2026.",
     "steps": {
       "title": "Drei Schritte, eine Datei",
       "s1t": "Datei ablegen",
@@ -2508,9 +2520,9 @@
     "faq": {
       "title": "Fragen vor dem Hochladen",
       "q1": "Welche Dateien funktionieren?",
-      "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 5 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
+      "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 10 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
       "q2": "Was geschieht mit meinen Daten?",
-      "a2": "Die Datei wird im Arbeitsspeicher unserer Server in den Niederlanden gelesen und nicht gespeichert. Nur der kommentierte Bericht wird aufbewahrt: 2 Stunden ohne Zahlung, 24 Stunden nach der Zahlung, dann gelöscht. Nichts wird für etwas anderes verwendet.",
+      "a2": "Die hochgeladene Datei wird nicht als solche aufbewahrt: Sie wird im Arbeitsspeicher unserer Server in den Niederlanden gelesen. Aufbewahrt wird der kommentierte Bericht, und er übernimmt jede Spalte Ihrer Datei — Kreditorennamen und IBAN eingeschlossen — mit den Befunden daneben. Er wird 2 Stunden nach dem Upload gelöscht, wenn Sie nicht bezahlen, sonst 24 Stunden nach der Zahlung, durch einen Durchlauf alle zehn Minuten. Nichts wird für etwas anderes verwendet.",
       "q3": "Was prüft die Prüfung, und was nicht?",
       "a3": "Struktur und Prüfziffer, Bankleitzahl gegen das nationale Register, Bankname und BIC, SEPA-Erreichbarkeit, Duplikate, den BIC Ihrer Datei gegen das Register, Adressland gegen IBAN-Land und die Regeln für strukturierte Adressen, wenn Adressspalten vorhanden sind. Sie bestätigt nicht, dass das Konto dem genannten Kreditor gehört: das ist die Verification of Payee der Banken.",
       "q4": "Mehr als 20'000 Zeilen oder mehrere Dateien?",
@@ -2529,11 +2541,11 @@
   },
   "qrBill": {
     "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",
-    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, vor der SIX-Frist vom 14. November 2026.",
+    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, vor der SIX-Frist Mitte November 2026.",
     "eyebrow": "Kostenloses Tool",
-    "title": "Ist diese QR-Rechnung bereit für den 14. November 2026?",
+    "title": "Ist diese QR-Rechnung bereit für Mitte November 2026?",
     "intro": "Fügen Sie den Text im Swiss-QR-Code ein (er beginnt mit SPC). Sie erhalten alle Urteile auf einmal: Kopfzeilen, Kreditoren-IBAN und QR-IBAN-Bereich, Referenz QRR, SCOR oder NON mit Prüfziffer, Betrag, Währung, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind. Eine kombinierte Adresse kommt mit den stattdessen zu verwendenden strukturierten Feldern zurück.",
-    "deadline": "Adressen vom Typ K wurden am 21. November 2025 aus dem Standard entfernt; ab dem 14. November 2026 verarbeiten die Banken darauf beruhende Daueraufträge und Zahlungsvorlagen nicht mehr.",
+    "deadline": "Adressen vom Typ K wurden am 21. November 2025 aus dem Standard entfernt; ab Mitte November 2026 verarbeiten die Banken darauf beruhende Daueraufträge und Zahlungsvorlagen nicht mehr.",
     "docsLink": "Dokumentation lesen",
     "input": {
       "label": "Text der QR-Rechnung (Swiss Payments Code)",
@@ -2544,7 +2556,7 @@
     },
     "result": {
       "valid": "Wohlgeformt",
-      "ready": "Bereit für den 14.11.2026",
+      "ready": "Bereit für Mitte November 2026",
       "yes": "Ja",
       "no": "Nein",
       "iban": "Kreditoren-IBAN",
