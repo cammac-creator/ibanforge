@@ -14,7 +14,12 @@ import { getServiceUsage, type ServiceUsage } from './service-usage.js';
 
 export interface ActivationClient {
   email: string;
-  keys: Array<{ key_prefix: string; role: 'free' | 'paid'; active: number }>;
+  /**
+   * `paid` is a prepaid credit key (a pack), `subscription` a Stripe
+   * subscription key (Pro, Editor/OEM): paid too, but on a monthly allowance
+   * rather than on credits, so it is neither a pack nor a free key.
+   */
+  keys: Array<{ key_prefix: string; role: 'free' | 'paid' | 'subscription'; active: number }>;
   signup_at: string;
   source: string;
   first_call_at: string | null;
@@ -34,6 +39,15 @@ export interface ActivationClient {
   credits_total: number;
   credits_remaining: number;
   packs: number;
+  /**
+   * Holds an ACTIVE subscription key. Until 23/09/2026 this module only knew
+   * packs: a Pro subscriber read as `active`, their subscription key filed as
+   * a free key, so the CRM showed no paid mark at all and the overview counted
+   * them as a pilot (the plan's monthly allowance landed in free_quota). A
+   * subscriber is a paying customer; `packs` still counts credit packs only,
+   * and this flag says the other way of paying.
+   */
+  subscriber: boolean;
   status: 'new' | 'active' | 'at-limit' | 'paying' | 'dormant' | 'silent';
 }
 
@@ -97,6 +111,8 @@ interface KeyRow {
   credits_remaining: number | null;
   source: string | null;
   tier: string;
+  /** 1 for a Stripe subscription key — see the SELECT. */
+  subscription: number;
 }
 
 interface LogAgg {
@@ -147,7 +163,16 @@ export function getActivation(days = 30): ActivationResponse {
 
   const keyRows = db
     .prepare(
-      `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier
+      // A subscription key is recognised by its Stripe subscription id, and
+      // failing that by the shape every subscription key has and no pack key
+      // can have: paid through Stripe Checkout, yet no credits. The second term
+      // is the same rule the CRM already applies to /v1/admin/keys (`paid` and
+      // no credits_total), so the two surfaces cannot disagree about who is a
+      // subscriber.
+      `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier,
+              CASE WHEN stripe_subscription_id IS NOT NULL
+                     OR (stripe_session_id IS NOT NULL AND credits_total IS NULL)
+                   THEN 1 ELSE 0 END AS subscription
        FROM api_keys ORDER BY email, created_at`,
     )
     .all() as KeyRow[];
@@ -204,8 +229,14 @@ export function getActivation(days = 30): ActivationResponse {
 
   const clients: ActivationClient[] = [];
   for (const [email, list] of byEmail) {
-    const freeKeys = list.filter((k) => k.credits_total == null);
+    // A subscription key is not a free key: its monthly allowance is bought,
+    // and counting it here once turned a subscriber into a "pilot" (free quota
+    // above 200) on the overview.
+    const freeKeys = list.filter((k) => k.credits_total == null && k.subscription !== 1);
     const paidKeys = list.filter((k) => k.credits_total != null);
+    // Only a LIVE subscription makes a subscriber: a canceled one has its key
+    // deactivated by the customer.subscription.deleted webhook.
+    const subscriber = list.some((k) => k.subscription === 1 && k.active === 1);
 
     let firstCall: string | null = null;
     let lastSeen: string | null = null;
@@ -237,9 +268,10 @@ export function getActivation(days = 30): ActivationResponse {
     const creditsRemaining = paidKeys.reduce((a, k) => a + (k.credits_remaining ?? 0), 0);
 
     // Paid state is decided FIRST: a buyer can never fall through to the
-    // free-tier labels, whatever their counters look like.
+    // free-tier labels, whatever their counters look like. A subscriber pays
+    // too, and is judged the same way (recent call: paying, else dormant).
     let status: ActivationClient['status'];
-    if (paidKeys.length > 0) {
+    if (paidKeys.length > 0 || subscriber) {
       status = lastSeen !== null && ageDays(lastSeen) <= 14 ? 'paying' : 'dormant';
     } else if (firstCall === null) {
       status = ageDays(signupAt) < 3 ? 'new' : 'silent';
@@ -255,7 +287,7 @@ export function getActivation(days = 30): ActivationResponse {
       email,
       keys: list.map((k) => ({
         key_prefix: k.key_prefix,
-        role: k.credits_total != null ? 'paid' : 'free',
+        role: k.credits_total != null ? 'paid' : k.subscription === 1 ? 'subscription' : 'free',
         active: k.active,
       })),
       signup_at: signupAt,
@@ -270,12 +302,16 @@ export function getActivation(days = 30): ActivationResponse {
       credits_total: creditsTotal,
       credits_remaining: creditsRemaining,
       packs: paidKeys.length,
+      subscriber,
       status,
     });
   }
 
+  // Paying either way: a credit pack or a live subscription.
+  const pays = (c: ActivationClient) => c.packs > 0 || c.subscriber;
+
   clients.sort((a, z) => {
-    if (a.packs > 0 !== z.packs > 0) return a.packs > 0 ? -1 : 1;
+    if (pays(a) !== pays(z)) return pays(a) ? -1 : 1;
     return (z.last_seen_at ?? '').localeCompare(a.last_seen_at ?? '');
   });
 
@@ -293,12 +329,12 @@ export function getActivation(days = 30): ActivationResponse {
   // the whole funnel, which is the only reading that can be compared week over
   // week.
   const limited = inPeriod.filter((c) => c.limit_hits_window > 0);
-  const buyers = inPeriod.filter((c) => c.packs > 0);
+  const buyers = inPeriod.filter(pays);
 
   const purchaseAt = (c: ActivationClient): string | null => {
     const paid = byEmail
       .get(c.email)!
-      .filter((k) => k.credits_total != null)
+      .filter((k) => k.credits_total != null || k.subscription === 1)
       .map((k) => k.created_at)
       .sort()[0];
     return paid ?? null;
@@ -331,7 +367,7 @@ export function getActivation(days = 30): ActivationResponse {
     const row = bySource.get(c.source) ?? { source: c.source, signups: 0, called: 0, paying: 0 };
     row.signups += 1;
     if (c.first_call_at !== null) row.called += 1;
-    if (c.packs > 0) row.paying += 1;
+    if (pays(c)) row.paying += 1;
     bySource.set(c.source, row);
   }
   const sources = [...bySource.values()].sort((a, z) => z.signups - a.signups);
@@ -353,7 +389,7 @@ export function getActivation(days = 30): ActivationResponse {
     if (!bucket) continue;
     bucket.signups += 1;
     if (c.first_call_at !== null) bucket.called += 1;
-    if (c.packs > 0) bucket.paid += 1;
+    if (pays(c)) bucket.paid += 1;
   }
   const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
   const cohorts: ActivationCohort[] = weekStarts.map((w) => {
