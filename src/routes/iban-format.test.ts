@@ -207,6 +207,8 @@ describe('/v1/iban/format says what valid means', () => {
     expect(body.upgrade_to_full_validation).toMatch(/well[- ]formed|written/i);
     expect(body.upgrade_to_full_validation).toMatch(/allocated/);
     expect(body.upgrade_to_full_validation).toContain('/v1/iban/validate');
+    // A reader that cannot POST is sent to real answers it can open with GET.
+    expect(body.upgrade_to_full_validation).toContain('https://api.ibanforge.com/v1/demo');
   });
 });
 

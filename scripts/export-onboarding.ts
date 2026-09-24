@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { MCP_DAILY_LIMIT } from '../src/lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../src/lib/mcp-limits.js';
 import { MCP_TOOLS } from '../src/mcp/inventory.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../src/lib/tiers.js';
 import {
@@ -17,7 +17,10 @@ const installedSource = readFileSync(new URL('mcp/src/index.ts', root), 'utf8');
 const installed = [...installedSource.matchAll(/^ {4}name: '([a-z_]+)',/gm)].map((m) => m[1]);
 const remote = MCP_TOOLS.map((tool) => tool.name);
 const catalogue = {
-  remoteDaily: MCP_DAILY_LIMIT,
+  // L'accès MCP sans clé, compté à la semaine ISO (UTC) depuis le soir du
+  // 24/09/2026. Renommé avec l'unité : `remoteDaily` aurait porté un chiffre de
+  // la semaine sous un nom du jour.
+  remoteWeekly: MCP_WEEKLY_LIMIT,
   remote,
   installed,
   tools: MCP_TOOLS.map(({ name, price }) => ({ name, price })),

@@ -5,6 +5,7 @@ import {
   countTrialActivitySince,
   countTrialBucketsSince,
   countTrialBucketsToday,
+  countMcpWeek,
   countTrialWeek,
   countWeeklyTrialUnits,
   getTrialDaily,
@@ -19,6 +20,7 @@ import {
 import { ledgerBucket } from './ledger-bucket.js';
 import { closeAll, getStatsDB } from './db.js';
 import { REST_TRIAL_WEEKLY_LIMIT, trialResetsAt, trialWeekStart } from './trial.js';
+import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 
 /**
  * Le compteur que trois franchises gratuites partagent (appels d'outils MCP,
@@ -860,15 +862,99 @@ describe('the week of the keyless REST trial', () => {
     );
   });
 
-  it('leaves the MCP daily ceilings exactly where they were', () => {
-    // La franchise MCP reste au jour : un nouveau jour la rouvre, alors que
-    // celle de l'essai REST reste fermée jusqu'au lundi.
-    const mcp = ledgerBucket('203.0.113.7', '');
+  // ── L'accès MCP sans clé, à la semaine depuis le soir du 24/09/2026 ──────
+  //
+  // Décision de Claude-Alain : 25 unités par semaine et par source, comme
+  // l'essai REST, et les deux ne se partagent pas. Même table, seaux distincts
+  // (`<h>` pour le MCP, `rest:<h>` pour l'essai REST) ; les sessions (`init:`)
+  // restent au jour.
+
+  const MCP = ledgerBucket('203.0.113.7', '');
+  const INIT = ledgerBucket('203.0.113.7', 'init:');
+
+  it('keeps the MCP week and the REST week of one source apart, both ways', () => {
     at('2026-09-29T08:00:00Z');
-    countDailyUnits(mcp, 10, 10);
-    countWeeklyTrialUnits(BUCKET, REST_TRIAL_WEEKLY_LIMIT, REST_TRIAL_WEEKLY_LIMIT);
+    countWeeklyTrialUnits(MCP, MCP_WEEKLY_LIMIT, MCP_WEEKLY_LIMIT);
+    expect(countWeeklyTrialUnits(MCP, 1, MCP_WEEKLY_LIMIT).allowed).toBe(false);
+    // Même source, l'autre porte : entière.
+    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT)).toEqual({
+      allowed: true,
+      used: 1,
+      remaining: REST_TRIAL_WEEKLY_LIMIT - 1,
+    });
+    // Et dans l'autre sens, sur une source neuve.
+    const otherMcp = ledgerBucket('203.0.113.8', '');
+    countWeeklyTrialUnits(OTHER, REST_TRIAL_WEEKLY_LIMIT + 1, REST_TRIAL_WEEKLY_LIMIT);
+    expect(countWeeklyTrialUnits(otherMcp, 1, MCP_WEEKLY_LIMIT).allowed).toBe(true);
+  });
+
+  it('keeps the MCP allowance closed for the rest of the week, then reopens it on Monday', () => {
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits(MCP, MCP_WEEKLY_LIMIT, MCP_WEEKLY_LIMIT);
+    at('2026-10-01T08:00:00Z');
+    sweepDailyLedger();
+    expect(countWeeklyTrialUnits(MCP, 1, MCP_WEEKLY_LIMIT).allowed).toBe(false);
+    at('2026-10-05T00:00:00Z');
+    sweepDailyLedger();
+    expect(countWeeklyTrialUnits(MCP, 1, MCP_WEEKLY_LIMIT).allowed).toBe(true);
+  });
+
+  // What the ROUTE does with sessions is held in mcp-http.test.ts (D13); this
+  // one only says what countDailyUnits does with an `init:` key.
+  it('countDailyUnits keeps an init: key by the day, and never writes the weekly table', () => {
+    at('2026-09-29T08:00:00Z');
+    countDailyUnits(INIT, 30, 30);
+    expect(countDailyUnits(INIT, 1, 30).allowed).toBe(false);
     at('2026-09-30T08:00:00Z');
-    expect(countDailyUnits(mcp, 1, 10).allowed).toBe(true);
-    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(false);
+    sweepDailyLedger();
+    expect(countDailyUnits(INIT, 1, 30).allowed).toBe(true);
+    const initRows = getStatsDB()
+      .prepare("SELECT COUNT(*) AS n FROM trial_weekly WHERE bucket LIKE 'init:%'")
+      .get() as { n: number };
+    expect(initRows.n).toBe(0);
+  });
+
+  it('gives the administration the REST week and the MCP week, each its own', () => {
+    countWeeklyTrialUnits(BUCKET, 2, REST_TRIAL_WEEKLY_LIMIT);
+    countWeeklyTrialUnits(MCP, MCP_WEEKLY_LIMIT + 1, MCP_WEEKLY_LIMIT);
+    expect(countTrialWeek()).toEqual({
+      week: trialWeekStart(),
+      buckets: 1,
+      units: 2,
+      over_limit: 0,
+    });
+    expect(countMcpWeek()).toEqual({
+      week: trialWeekStart(),
+      buckets: 1,
+      units: MCP_WEEKLY_LIMIT + 1,
+      over_limit: 1,
+    });
+  });
+
+  it('keeps refused MCP session openings out of rest_attempts_uncounted too', () => {
+    // Relecture du 24/09/2026, D2 : le court-circuit du jour comptait encore les
+    // refus d'ouverture de session dans la colonne de l'essai REST.
+    at('2026-09-29T08:00:00Z');
+    countDailyUnits(INIT, 31, 30);
+    for (let i = 0; i < 3; i += 1) expect(countDailyUnits(INIT, 1, 30).allowed).toBe(false);
+    snapshotTrialDay('2026-09-29');
+    const row = getTrialDaily(90).find((r) => r.day === '2026-09-29');
+    expect(row?.rest_attempts_uncounted).toBe(0);
+    expect(row?.init_buckets).toBe(1);
+  });
+
+  it('keeps MCP refusals out of rest_attempts_uncounted, and MCP calls in the daily trace', () => {
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits(MCP, MCP_WEEKLY_LIMIT + 1, MCP_WEEKLY_LIMIT);
+    // Refusés par la marque de la semaine : aucune écriture, et rien dans la
+    // colonne de l'essai REST.
+    for (let i = 0; i < 5; i += 1) countWeeklyTrialUnits(MCP, 1, MCP_WEEKLY_LIMIT);
+    countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+    snapshotTrialDay('2026-09-29');
+    const row = getTrialDaily(90).find((r) => r.day === '2026-09-29');
+    expect(row?.rest_attempts_uncounted).toBe(0);
+    expect(row?.rest_buckets).toBe(1);
+    expect(row?.mcp_buckets).toBe(1);
+    expect(row?.mcp_units).toBe(MCP_WEEKLY_LIMIT + 1);
   });
 });

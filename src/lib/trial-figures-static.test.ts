@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_FREE_KEY_HINT } from './trial.js';
-import { MCP_DAILY_LIMIT } from './mcp-limits.js';
+import { MCP_SESSIONS_PER_IP_DAY, MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 import { DAILY_KEY_CREATION_LIMIT } from './key-creation-guard.js';
 
 /**
@@ -111,9 +111,10 @@ const ORDINALS = [
  * « Sans autre chiffre entre les deux » est ce qui empêche une phrase juste de
  * rougir : « 25 par mois sur toutes les routes. Sans clé : 25 validations par
  * jour » ne relie au jour que le second 25. Deux autres quotas du jour vivent
- * dans les mêmes pages et gardent leur propre chiffre : le MCP hébergé (10 unités
- * par jour), reconnu à ce que sa ligne parle d'outils MCP, et la création de
- * clés (3 par réseau et par jour), reconnue à « per network ».
+ * dans les mêmes pages et gardent leur propre chiffre : l'ouverture de sessions
+ * MCP, reconnue à « session », et la création de clés (3 par réseau et par
+ * jour), reconnue à « per network ». Depuis le soir du 24/09/2026, l'accès MCP
+ * sans clé n'en fait plus partie : il se compte à la semaine (voir plus bas).
  */
 const DAILY_FIGURE =
   /(?<![.,\d$/])(\d+)(?![.,]?\d)(?![kK])[^\d\n]{0,40}?(?:\ba day\b|\bper day\b|\/day\b|par jour|pro Tag|am Tag)/gi;
@@ -124,8 +125,9 @@ const ABOUT_MCP = /\bMCP\b|tool calls?|appels? d'outil|Tool-Aufrufe?/i;
  */
 const WEEKLY_FIGURE =
   /(?<![.,\d$/])(\d+)(?![.,]?\d)(?![kK])[^\d\n]{0,40}?(?:\ba week\b|\bper week\b|\/week\b|\bin the week\b|\bof the week\b|par semaine|de la semaine|dans la semaine|pro Woche|der Woche|in der Woche)/gi;
+const ABOUT_SESSIONS = /\bsessions?\b|Sitzung/i;
 const OTHER_DAILY_QUOTAS: Array<{ about: RegExp; value: number }> = [
-  { about: ABOUT_MCP, value: MCP_DAILY_LIMIT },
+  { about: ABOUT_SESSIONS, value: MCP_SESSIONS_PER_IP_DAY },
   {
     about: /keys? per network|clés? par réseau|Schlüssel pro Netz/i,
     value: DAILY_KEY_CREATION_LIMIT,
@@ -148,6 +150,23 @@ const OTHER_DAILY_QUOTAS: Array<{ about: RegExp; value: number }> = [
 const DAILY_WORDS =
   /\bdaily (allowance|trial|quota)\b|\bdaily\b[^.\n]{0,20}\b(allowance|trial)\b|counters are daily|reads `day`|vaut `day`|trägt `day`|journalier|quotidien|t[aä]glich|Zähler pro Tag|\btoday\b|midnight UTC|aujourd.hui|minuit|\bheute\b|Mitternacht/i;
 const PER_NETWORK = /per network|par réseau|pro Netz/i;
+
+/**
+ * Le plafond MCP dit au jour sans chiffre : « the daily limit », « la limite du
+ * jour », « Tageslimit ». Lu seulement sur une ligne qui parle du MCP.
+ */
+const MCP_DAILY_WORDS =
+  /\bdaily\b|\bper day\b|\ba day\b|par jour|quotidien|journali[eè]r|pro Tag|am Tag|und Tag\b|t[aä]glich|Tages(limit|kontingent)/i;
+
+/** Une ligne sur le MCP qui le compte encore au jour (sessions et clés à part). */
+function saysMcpDaily(line: string): boolean {
+  if (!ABOUT_MCP.test(line) || ABOUT_SESSIONS.test(line) || PER_NETWORK.test(line)) return false;
+  return (
+    [...line.matchAll(DAILY_FIGURE)].length > 0 ||
+    DAILY_WORDS.test(line) ||
+    MCP_DAILY_WORDS.test(line)
+  );
+}
 
 /**
  * Exempté nommément : le README du paquet npm `ibanforge-mcp` (`mcp/`, hors du
@@ -186,7 +205,14 @@ interface Tally {
   /** Every daily figure written by hand on a line about the trial. */
   daily: Array<{ ref: string; value: number; other: boolean }>;
   /** Every weekly figure written by hand on a line about the trial. */
-  weekly: Array<{ ref: string; value: number }>;
+  weekly: Array<{ ref: string; value: number; mcp: boolean }>;
+  /**
+   * Since the evening of 24/09/2026 the keyless MCP allowance is weekly: on ANY
+   * line about MCP, trial words or not, a daily figure or a daily word is wrong,
+   * sessions aside. « 10 free tool calls per day » (pay-as-an-agent) said no
+   * « no key » and escaped the trial scan.
+   */
+  mcpDaily: string[];
   /** A daily trial said in words, with no figure. */
   dailyWords: string[];
   memory: string[];
@@ -201,6 +227,7 @@ function tally(): Tally {
     daily: [],
     weekly: [],
     dailyWords: [],
+    mcpDaily: [],
     memory: [],
     sharing: [],
     secondPerson: [],
@@ -215,6 +242,10 @@ function tally(): Tally {
       // dem 11. Aufruf am Tag » a survécu dix jours sur une ligne qui ne disait
       // ni « Kostprobe » ni « ohne Schlüssel ».
       if (ORDINALS.some((p) => p.test(line))) out.ordinal.push(ref);
+      // Même exemption nommée que les mots du jour : le README du paquet npm
+      // se corrige avec sa prochaine publication.
+      if (!DAILY_WORDS_EXEMPT.has(file) && saysMcpDaily(line))
+        out.mcpDaily.push(`${ref}: ${line.trim().slice(0, 120)}`);
       // L'exemple de démarrage est désormais exporté depuis le contrat. Seule
       // la ligne EXACTE est exemptée ; onboarding-parity.test.ts contrôle le
       // bloc complet dans les trois langues. Le plafond de prose ne remonte pas.
@@ -232,7 +263,8 @@ function tally(): Tally {
         const other = OTHER_DAILY_QUOTAS.some((q) => q.value === value && q.about.test(line));
         out.daily.push({ ref, value, other });
       }
-      for (const m of line.matchAll(WEEKLY_FIGURE)) out.weekly.push({ ref, value: Number(m[1]) });
+      for (const m of line.matchAll(WEEKLY_FIGURE))
+        out.weekly.push({ ref, value: Number(m[1]), mcp: ABOUT_MCP.test(line) });
       if (
         !DAILY_WORDS_EXEMPT.has(file) &&
         DAILY_WORDS.test(line) &&
@@ -282,6 +314,11 @@ describe('la prose statique de l’essai', () => {
     expect(wrong, wrong.join('\n')).toEqual([]);
   });
 
+  it('ne compte jamais plus l’accès MCP au jour, en chiffres ni en mots (sessions à part)', () => {
+    const { mcpDaily } = tally();
+    expect(mcpDaily, mcpDaily.join('\n')).toEqual([]);
+  });
+
   it('ne dit pas non plus l’essai quotidien en toutes lettres (daily, today, `day`)', () => {
     const { dailyWords } = tally();
     expect(dailyWords, dailyWords.join('\n')).toEqual([]);
@@ -289,8 +326,14 @@ describe('la prose statique de l’essai', () => {
 
   it('écrit le plafond de la semaine que le code applique, sur chaque ligne qui le cite', () => {
     const { weekly } = tally();
+    // Une ligne sur le MCP peut porter le chiffre de l'accès MCP sans clé ;
+    // toute autre ligne, celui de l'essai REST. Égaux aujourd'hui, séparés dans
+    // le code, et ce test rougira le jour où l'un bouge sans l'autre.
     const wrong = weekly
-      .filter(({ value }) => value !== REST_TRIAL_WEEKLY_LIMIT)
+      .filter(
+        ({ value, mcp }) =>
+          value !== REST_TRIAL_WEEKLY_LIMIT && !(mcp && value === MCP_WEEKLY_LIMIT),
+      )
       .map(({ ref, value }) => `${ref}: ${value}`);
     expect(wrong, wrong.join('\n')).toEqual([]);
     // Un balayage qui ne voit rien ne prouve rien : l'essai est cité, en
@@ -428,9 +471,27 @@ describe('les motifs eux-mêmes', () => {
     expect(caught).toBe(false);
   });
 
-  it('reconnaît une ligne du MCP, dont le plafond du jour est un autre quota', () => {
+  it('reconnaît une ligne du MCP', () => {
     expect(ABOUT_MCP.test('The MCP server gives 10 free tool calls per day')).toBe(true);
     expect(ABOUT_MCP.test('the keyless trial serves up to 25 calls a day')).toBe(false);
+  });
+
+  it.each([
+    // Les trois lignes réelles d'avant le 24/09/2026 au soir.
+    '- The [MCP server](/docs/mcp) gives 10 free tool calls per day — enough to check the data quality on your own IBANs.',
+    "Transport HTTP streamable, **10 appels d'outils gratuits par IP et par jour**, sans aucune clé",
+    'Streamable-HTTP-Transport, **10 kostenlose Tool-Aufrufe pro IP und Tag**, ganz ohne Schlüssel',
+    'The HTTP MCP transport has its own allowance, counted by the day: 10 tool calls/day per source address',
+  ])('attrape l’accès MCP compté au jour : %s', (line) => {
+    expect(saysMcpDaily(line)).toBe(true);
+  });
+
+  it.each([
+    'Streamable HTTP transport, **25 free tool calls a week per source address**, no key at all',
+    'Daily MCP session limit reached (30 new sessions/day).',
+    'At most 3 free keys per network per day, whatever MCP client asks.',
+  ])('laisse passer l’accès MCP à la semaine, et les sessions : %s', (line) => {
+    expect(saysMcpDaily(line)).toBe(false);
   });
 
   it.each([

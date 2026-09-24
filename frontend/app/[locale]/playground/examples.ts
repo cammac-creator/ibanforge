@@ -61,6 +61,19 @@ export const CHIPS: Record<PlaygroundMode, Chip[]> = {
   ],
 };
 
+/**
+ * The day each saved answer was captured, shown on its card (24/09/2026).
+ *
+ * An assistant quoted this page's saved answer as a live one: the card said
+ * "saved", never when. Only the IBAN tab has a capture date the code can read,
+ * from captured-iban.json, which the monthly BIC refresh rewrites with the
+ * answer. The three other tabs are payloads typed in July and retouched by hand
+ * since: no date is claimed for them, and their card keeps the undated label.
+ */
+export const SAVED_ON: Partial<Record<PlaygroundMode, string>> = {
+  iban: capturedIban.captured_at,
+};
+
 /** Default payloads — REAL captured responses (see file header). */
 export const DEFAULT_RESULT: Record<PlaygroundMode, Record<string, unknown>> = {
   // The fold's answer lives in captured-iban.json, rewritten every month by

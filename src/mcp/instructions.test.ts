@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { MCP_TOOLS } from './inventory.js';
-import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -52,6 +52,38 @@ function literalAfter(source: string, name: string): string {
   const withoutComments = block.replace(/^\s*\/\/.*$/gm, '');
   const chunks = withoutComments.match(/'(?:[^'\\]|\\.)*'/g) ?? [];
   return chunks.map((c) => c.slice(1, -1).replace(/\\'/g, "'")).join('');
+}
+
+/**
+ * Les écarts permis à la copie du paquet npm jusqu'à sa prochaine publication.
+ *
+ * 24/09/2026 : l'accès MCP sans clé passe de 10 appels par jour à 25 par
+ * SEMAINE (décision de Claude-Alain). La constante partagée le dit ; la copie de
+ * `mcp/src/index.ts`, publiée à part, garde l'ancienne phrase jusqu'à la PR qui
+ * prépare sa publication (`mcp/` n'est pas touché ici). Chaque paire [texte du
+ * paquet, texte de la constante] est remplacée dans la copie AVANT la
+ * comparaison au caractère près, et un test vérifie qu'elle y est encore : le
+ * jour où la copie est alignée, ce test rougit et l'écart doit partir d'ici.
+ *
+ * ⚠️ La même PR devra adapter `stdioInstructions` (mcp/src/stdio-instructions.ts),
+ * dont l'expression reconnaît l'ancienne phrase de quota et lève sinon.
+ */
+const PENDING_NPM_RELEASE: ReadonlyArray<readonly [string, string]> = [
+  [
+    'Free tier: 10 tool calls/IP/day here, no signup.',
+    'Free tier: 25 tool calls a week per source address here (ISO week in UTC, reset on Monday 00:00 UTC), no signup.',
+  ],
+  [
+    'both tools keep answering after the daily limit.',
+    'both tools keep answering after the free allowance is spent.',
+  ],
+];
+
+function withPendingRelease(text: string): string {
+  return PENDING_NPM_RELEASE.reduce(
+    (t, [published, current]) => t.split(published).join(current),
+    text,
+  );
 }
 
 const SURFACES: Array<{ label: string; path: string; anchor: string }> = [
@@ -99,9 +131,18 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
 
   for (const surface of SURFACES) {
     it(`${surface.label} sert le texte au caractère près`, () => {
-      expect(literalAfter(read(surface.path), surface.anchor)).toBe(MCP_INSTRUCTIONS);
+      expect(withPendingRelease(literalAfter(read(surface.path), surface.anchor))).toBe(
+        MCP_INSTRUCTIONS,
+      );
     });
   }
+
+  it.each(PENDING_NPM_RELEASE.map(([published]) => [published]))(
+    'la copie du paquet dit encore « %s » (sinon retirer l’écart)',
+    (published) => {
+      expect(literalAfter(read('mcp/src/index.ts'), 'const INSTRUCTIONS =')).toContain(published);
+    },
+  );
 
   it('nomme la porte gratuite avec son URL complète, pas seulement son existence', () => {
     // Un agent qui lit « clé gratuite disponible » sans l'adresse ne peut rien
@@ -121,7 +162,15 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
    * réglage de palier fait rougir ce fichier au lieu de laisser le texte mentir.
    */
   it('les chiffres écrits sont ceux que le code applique', () => {
-    expect(MCP_INSTRUCTIONS).toContain(`Free tier: ${MCP_DAILY_LIMIT} tool calls/IP/day`);
+    expect(MCP_INSTRUCTIONS).toContain(
+      `Free tier: ${MCP_WEEKLY_LIMIT} tool calls a week per source address here`,
+    );
+    // Le quota de ce transport et celui de la clé sans e-mail ne partagent pas
+    // une phrase : depuis le 24/09/2026 ils portent le même chiffre.
+    const sentences = MCP_INSTRUCTIONS.split(/(?<=[.!?])\s+/);
+    const quota = sentences.find((x) => x.startsWith('Free tier:'));
+    expect(quota).toBeDefined();
+    expect(quota).not.toMatch(/month/);
     expect(MCP_INSTRUCTIONS).toContain(`${ANONYMOUS_MONTHLY_LIMIT} REST calls/month`);
     expect(MCP_INSTRUCTIONS).toContain(`${FREE_TIER_MONTHLY_LIMIT} REST calls/month`);
   });

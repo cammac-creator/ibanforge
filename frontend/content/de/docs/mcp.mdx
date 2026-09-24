@@ -48,7 +48,33 @@ Nach dem Speichern den Client neu starten. Das npm-Paket bietet **13 Tools**, de
 https://api.ibanforge.com/mcp
 ```
 
-Streamable-HTTP-Transport, **10 kostenlose Tool-Aufrufe pro IP und Tag**, ganz ohne Schlüssel: der schnellste Weg für einen Agenten, die Daten zu prüfen, bevor Sie sich festlegen. Für dauerhafte Nutzung das npm-Paket mit dem kostenlosen Schlüssel betreiben.
+Streamable-HTTP-Transport, **25 kostenlose Tool-Aufrufe pro Woche und Quelladresse**, ganz ohne Schlüssel (ISO-Woche in UTC, Neustart montags um 00:00 UTC; ein Batch zählt einen Aufruf pro IBAN; getrennt vom REST-Test ohne Schlüssel): der schnellste Weg für einen Agenten, die Daten zu prüfen, bevor Sie sich festlegen. Für dauerhafte Nutzung das npm-Paket mit dem kostenlosen Schlüssel betreiben.
+
+### Als Connector in einem Chat-Assistenten hinzufügen
+
+In einem Chat-Assistenten wird die Adresse oben zu einem *benutzerdefinierten Connector*: Der Assistent ruft die MCP-Tools dann selbst auf, statt eine Antwort zu erraten, die er nicht abrufen kann.
+
+**Ein Connector ohne Schlüssel greift auf dasselbe schlüssellose Kontingent zu wie jeder andere Aufrufer**, gezählt pro Quelladresse. In Claude gehen die Aufrufe eines Connectors von der Cloud von Anthropic aus, nicht von Ihrem Gerät (offizielle Seite unten, Abschnitt „Network requirements“): Dieses Kontingent wird also mit anderen Nutzern geteilt und kann schon aufgebraucht sein, wenn Sie beginnen. Andere Assistenten: von uns nicht geprüft. Der gehostete Endpoint liest keinen Schlüssel. Um mit Ihrem eigenen Schlüssel zu arbeiten, betreiben Sie das npm-Paket in einem Desktop-Client mit gesetztem `IBANFORGE_API_KEY` (Option 1 oben), oder rufen Sie die REST-API mit dem Schlüssel auf: Ein POST auf `https://api.ibanforge.com/v1/keys/generate` ohne Body liefert einen, ohne E-Mail.
+
+Wo Sie klicken, nach der offiziellen Seite jedes Anbieters, gelesen am 24. September 2026; Menüs ändern sich, maßgeblich ist die verlinkte Seite.
+
+**Claude** ([offizielle Seite](https://support.claude.com/en/articles/11175166), aktualisiert am 11. August 2026). Benutzerdefinierte Connectors gibt es in den Plänen Free, Pro, Max, Team und Enterprise; im Free-Plan ist es ein einziger benutzerdefinierter Connector. *Von uns nicht ausprobiert.*
+
+- Einzelplan (die Seite führt diese Schritte unter Pro und Max): **Customize > Connectors** öffnen, auf **+** und dann **Add custom connector** klicken, `https://api.ibanforge.com/mcp` eingeben und auf **Add** klicken. Die OAuth-Felder unter **Advanced settings** sind optional; dieser Server verlangt keine Authentifizierung.
+- Team oder Enterprise: Ein Owner öffnet **Organization settings > Connectors**, klickt auf **Add**, fährt über **Custom** und wählt **Web**, gibt die Adresse ein und klickt auf **Add**; Mitglieder finden ihn danach unter **Customize > Connectors** und klicken auf **Connect**.
+- In einer Unterhaltung: die Schaltfläche **+** unten links, dann **Connectors**, um ihn einzuschalten.
+
+**ChatGPT** ([offizielle Seite](https://developers.openai.com/api/docs/guides/developer-mode)). Der Entwicklermodus, im Web, für Pro-, Plus-, Business-, Enterprise- und Education-Konten: nicht im kostenlosen Plan. *Von uns nicht ausprobiert.*
+
+- Einschalten: **Settings → Security and login**, dann **Developer mode**.
+- Server hinzufügen: [ChatGPT Plugins](https://chatgpt.com/plugins) öffnen, die Plus-Schaltfläche wählen und eine Entwicklermodus-App für den entfernten MCP-Server `https://api.ibanforge.com/mcp` anlegen. Die Seite nennt Streaming-HTTP unter den Protokollen und *No Authentication* unter den Optionen.
+- In einer Unterhaltung: **Developer mode** im Plus-Menü wählen und die App auswählen.
+
+**Gemini** ([offizielle Seite](https://support.google.com/gemini/answer/17209137)). Benutzerdefinierte Apps setzen voraus: 18 Jahre oder älter und in den USA, ein privates Google-Konto (kein Arbeits- oder Schulkonto), eingeschaltete Aktivitätsspeicherung (Keep Activity) und Englisch; sie werden nur in der Gemini-Web-App hinzugefügt und funktionieren danach im Web und in der mobilen App. *Von uns nicht ausprobiert.*
+
+- Auf gemini.google.com unten auf **Settings** und dann **Connected Apps** klicken; unter „Custom apps“ eine benutzerdefinierte App hinzufügen, `https://api.ibanforge.com/mcp` eingeben, auf **Next** klicken und den Anweisungen folgen.
+- Die Seite verlangt Zugangsdaten unter „Advanced features“, wenn ein Server keine Dynamic Client Registration unterstützt. Dieser Server verlangt keine Authentifizierung; ob Gemini das akzeptiert, haben wir nicht geprüft.
+- In einer Anfrage: **@** eingeben und die App auswählen.
 
 Im offiziellen MCP-Registry ist der Server als `io.github.cammac-creator/ibanforge` gelistet.
 
@@ -140,7 +166,7 @@ Prüft den Status eines von audit_creditor_file erstellten Audit-Jobs: ob bezahl
 
 ### send_feedback
 
-Ein falsches Ergebnis, veraltete oder fehlende Daten oder alles, was Sie an der Nutzung oder an der BEZAHLUNG des Dienstes hindert, direkt an die Betreiber melden. Kostenlos, und das Tool antwortet auch dann noch, wenn das kostenlose Tageskontingent aufgebraucht ist: den Beschwerdekasten mit genau der Grenze zu deckeln, die die Beschwerde auslöst, würde die Meldungen zum Schweigen bringen, für die er da ist. Ein Mensch liest jede Meldung; ein nachgewiesener Datenfehler bei einem bezahlten x402-Aufruf wird on-chain erstattet. `error_type` und `notes` sind Pflicht, der Rest ist optional.
+Ein falsches Ergebnis, veraltete oder fehlende Daten oder alles, was Sie an der Nutzung oder an der BEZAHLUNG des Dienstes hindert, direkt an die Betreiber melden. Kostenlos, und das Tool antwortet auch dann noch, wenn das kostenlose Kontingent aufgebraucht ist: den Beschwerdekasten mit genau der Grenze zu deckeln, die die Beschwerde auslöst, würde die Meldungen zum Schweigen bringen, für die er da ist. Ein Mensch liest jede Meldung; ein nachgewiesener Datenfehler bei einem bezahlten x402-Aufruf wird on-chain erstattet. `error_type` und `notes` sind Pflicht, der Rest ist optional.
 
 ```json
 { "error_type": "wrong_bic", "notes": "BIC verweist auf eine 2024 fusionierte Bank", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }

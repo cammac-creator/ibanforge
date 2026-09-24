@@ -714,6 +714,7 @@
       "no": "Non",
       "retry": "Relancez le contrôle pour obtenir un verdict exploitable.",
       "savedExample": "Exemple préenregistré · relancez pour un contrôle actuel",
+      "savedExampleOn": "Exemple préenregistré, capturé auprès de l’API le {date} · pas une réponse en direct : lancez un contrôle pour une réponse actuelle",
       "apiResponse": "Réponse reçue de l’API",
       "localCheckInvalid": "Un contrôle national supplémentaire échoue. La structure IBAN valide ne suffit pas : faites confirmer ces coordonnées avant le paiement."
     }
@@ -1849,7 +1850,7 @@
         "Demandez : « Contrôle l’IBAN de documentation DE89370400440532013000 et indique le résultat du registre, sa source et sa date. »",
         "Lisez bank_code_check et ses sources. Un résultat unknown ne confirme rien ; le contrôle ne prouve ni l’existence du compte ni son titulaire."
       ],
-      "limits": "{daily} unités d’outils par adresse réseau et par jour, sans clé ; chaque IBAN d’un lot compte pour une unité. Une clé API n’augmente pas ce quota distant. {remote} outils distants, {installed} dans le paquet local : les deux outils d’audit de fichiers nécessitent le paquet installé.",
+      "limits": "{weekly} unités d’outils par adresse réseau et par semaine (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC), sans clé ; chaque IBAN d’un lot compte pour une unité. Une clé API n’augmente pas ce quota distant. {remote} outils distants, {installed} dans le paquet local : les deux outils d’audit de fichiers nécessitent le paquet installé.",
       "guide": "Guide MCP et quotas",
       "local": "Votre client nécessite un processus local ? Utilisez cette configuration.",
       "sdkHeading": "Intégrer avec un SDK",
@@ -2920,7 +2921,7 @@
       "index": "Tous les pays"
     },
     "sourceNote": "Source : registre ISO 13616 pour la longueur, le découpage et l'exemple ; réponse de l'API relevée le {date}.",
-    "exampleNotAllocated": "Le code banque de cet exemple officiel n'est pas attribué dans {register} : l'API le dit tel quel, c'est le comportement attendu sur un IBAN de démonstration.",
+    "exampleNotAllocated": "La clé de contrôle de cet exemple officiel est juste, et pourtant {register} dit que personne ne détient son code banque : c'est exactement ce que notre contrôle du code banque attrape, et ce qu'une clé seule ne voit pas.",
     "examplePartialRegister": "Une partie des codes banque de ce pays est en outre nommée par une liste du superviseur, dont nous servons une page par code — mais cette liste ne publie pas l'attribution de l'espace des codes : un code qui n'y figure pas n'est donc pas un code jamais attribué."
   },
   "tools": {

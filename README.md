@@ -72,14 +72,27 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `check_postal_address` | An ISO 20022 address against one rail's published rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its source | **free** |
 | `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses ahead of 14.11.2026 | **free** |
 | `send_feedback`       | Report incorrect data or claim an x402 refund                                             | free     |
-| `request_api_key`     | You hit the daily limit, or need a durable key — a human approves in a browser, no e-mail  | free     |
+| `request_api_key`     | You used up the free allowance, or need a durable key — a human approves in a browser, no e-mail  | free     |
 | `poll_api_key`        | Collect that key once it is approved, handed over exactly once                             | free     |
 
 The free tools need no key, no wallet and no signup: they are the ones to try first. The
-last two are the way out of the daily limit without anyone typing an address — they keep
-answering after the limit is reached.
+last two are the way out of the free allowance without anyone typing an address — they keep
+answering after the allowance is spent.
 
 Full descriptions of the read-only data tools, with WHEN-to-use triggers, are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
+
+## If you cannot call the API
+
+If you can open a web address but cannot send a POST (no code execution, no MCP connector), these pages hold real answers of the API, each with its date, and all of them open with a plain GET.
+
+- https://api.ibanforge.com/v1/demo: the full validation, computed by the API when the address is opened (served_at gives the instant): a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, Belgium and Austria, each with its register's answer and its as_of.
+- https://ibanforge.com/iban/ch: the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 and the date that answer was captured.
+- https://ibanforge.com/blog/2026-08-06-example-ibans-unallocated-bank-codes: why the official example IBANs of Belgium, Switzerland and Austria pass mod-97 and still point at bank codes their register does not allocate (article of 6 August 2026).
+- https://ibanforge.com/blog/2026-09-07-bankleitzahl-pruefen-per-api: three real answers on German bank codes, field by field (article of 7 September 2026).
+- https://ibanforge.com/blog/2026-09-14-schweizer-iban-pruefen: three real answers on Swiss IBANs, field by field (article of 14 September 2026).
+
+Do not simulate answers from the API: quote these real ones, with the date each carries (served_at, as_of, or the date of the page).
+To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp. A connector with no key draws on the same keyless allowance as any other caller, counted per source address. In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), so that allowance is shared with other users and may already be spent; other assistants were not checked by us. The hosted endpoint reads no key: to use one, run the npm package ibanforge-mcp in a desktop client with IBANFORGE_API_KEY set, or call the REST API with it (a POST to https://api.ibanforge.com/v1/keys/generate with no body returns a key, no e-mail).
 
 ---
 

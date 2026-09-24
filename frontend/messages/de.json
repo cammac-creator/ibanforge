@@ -714,6 +714,7 @@
       "no": "Nein",
       "retry": "Prüfung erneut starten, um ein verwertbares Ergebnis zu erhalten.",
       "savedExample": "Gespeichertes Beispiel · für eine aktuelle Prüfung erneut starten",
+      "savedExampleOn": "Gespeichertes Beispiel, am {date} von der API abgerufen · keine Live-Antwort: Starten Sie eine Prüfung für eine aktuelle Antwort",
       "apiResponse": "Antwort von der API empfangen",
       "localCheckInvalid": "Eine zusätzliche nationale Prüfung ist fehlgeschlagen. Eine gültige IBAN-Struktur reicht nicht aus: bestätigen Sie diese Angaben vor der Zahlung."
     }
@@ -1849,7 +1850,7 @@
         "Fragen Sie: „Prüfe die Dokumentations-IBAN DE89370400440532013000 und nenne Registerergebnis, Quelle und Datum.“",
         "Lesen Sie bank_code_check und die Quellen. unknown bestätigt nichts; die Prüfung belegt weder die Existenz des Kontos noch dessen Inhaber."
       ],
-      "limits": "{daily} Tool-Einheiten pro Netzwerkadresse und Tag ohne Schlüssel; jede IBAN eines Batches zählt als Einheit. Ein API-Schlüssel erhöht dieses entfernte Kontingent nicht. {remote} entfernte Tools, {installed} im lokalen Paket: Die beiden Dateiaudit-Tools benötigen das installierte Paket.",
+      "limits": "{weekly} Tool-Einheiten pro Netzwerkadresse und Woche (ISO-Woche in UTC, Neustart montags um 00:00 UTC) ohne Schlüssel; jede IBAN eines Batches zählt als Einheit. Ein API-Schlüssel erhöht dieses entfernte Kontingent nicht. {remote} entfernte Tools, {installed} im lokalen Paket: Die beiden Dateiaudit-Tools benötigen das installierte Paket.",
       "guide": "MCP-Anleitung und Kontingente",
       "local": "Benötigt Ihr Client einen lokalen Prozess? Nutzen Sie diese Konfiguration.",
       "sdkHeading": "Mit einem SDK integrieren",
@@ -2920,7 +2921,7 @@
       "index": "Alle Länder"
     },
     "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}.",
-    "exampleNotAllocated": "Die Bankleitzahl dieses offiziellen Beispiels ist in {register} nicht vergeben: Die API sagt es so, wie es ist, das erwartete Verhalten bei einer Demo-IBAN.",
+    "exampleNotAllocated": "Die Prüfziffern dieses offiziellen Beispiels stimmen, und doch meldet {register}, dass niemand diesen Bankcode hält: Genau das fängt unsere Bankcode-Prüfung ab, und genau das sieht eine Prüfsumme allein nicht.",
     "examplePartialRegister": "Ein Teil der Bankleitzahlen dieses Landes wird zusätzlich von einer Aufsichtsliste benannt, zu der wir je eine Seite ausliefern — doch diese Liste veröffentlicht nicht die Vergabe des Coderaums: Ein dort fehlender Code ist deshalb kein nie vergebener Code."
   },
   "tools": {

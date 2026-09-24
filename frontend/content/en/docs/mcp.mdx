@@ -48,7 +48,33 @@ After saving, restart the client. The npm package exposes **13 tools**, the remo
 https://api.ibanforge.com/mcp
 ```
 
-Streamable HTTP transport, **10 free tool calls per IP per day**, no key at all: the fastest way for an agent to evaluate the data before committing to anything. For sustained use, run the npm package with your free key.
+Streamable HTTP transport, **25 free tool calls a week per source address**, no key at all (ISO week in UTC, reset on Monday 00:00 UTC; a batch counts one call per IBAN; separate from the keyless REST trial): the fastest way for an agent to evaluate the data before committing to anything. For sustained use, run the npm package with your free key.
+
+### Add it as a connector in a chat assistant
+
+In a chat assistant, the address above becomes a *custom connector*: the assistant then calls the MCP tools itself instead of guessing an answer it cannot fetch.
+
+**A connector with no key draws on the same keyless allowance as any other caller**, counted per source address. In Claude, a connector's calls leave from Anthropic's cloud, not from your device (official page below, section "Network requirements"): that allowance is therefore shared with other users and may already be spent when you start. Other assistants: not checked by us. The hosted endpoint reads no key. To work with your own key, run the npm package in a desktop client with `IBANFORGE_API_KEY` set (Option 1 above), or call the REST API with the key: a POST to `https://api.ibanforge.com/v1/keys/generate` with no body returns one, no e-mail.
+
+Where to click, from each vendor's official page as read on 24 September 2026; menus move, and the linked page is the reference.
+
+**Claude** ([official page](https://support.claude.com/en/articles/11175166), updated 11 August 2026). Custom connectors are available on the Free, Pro, Max, Team and Enterprise plans; Free users are limited to one custom connector. *Not tried by us.*
+
+- Individual plan (the page lists these steps under Pro and Max): open **Customize > Connectors**, click **+** then **Add custom connector**, enter `https://api.ibanforge.com/mcp`, and click **Add**. The OAuth fields under **Advanced settings** are optional; this server asks for no authentication.
+- Team or Enterprise: an Owner opens **Organization settings > Connectors**, clicks **Add**, hovers over **Custom** and selects **Web**, enters the address and clicks **Add**; members then find it in **Customize > Connectors** and click **Connect**.
+- In a conversation: the **+** button at the lower left of the chat, then **Connectors**, to switch it on.
+
+**ChatGPT** ([official page](https://developers.openai.com/api/docs/guides/developer-mode)). Developer mode, on the web, for Pro, Plus, Business, Enterprise and Education accounts: not on the free plan. *Not tried by us.*
+
+- Turn it on: **Settings → Security and login**, then **Developer mode**.
+- Add the server: go to [ChatGPT Plugins](https://chatgpt.com/plugins), select the plus button and create a developer-mode app for the remote MCP server `https://api.ibanforge.com/mcp`. The page lists streaming HTTP among the protocols and *No Authentication* among the options.
+- In a conversation: choose **Developer mode** from the Plus menu and select the app.
+
+**Gemini** ([official page](https://support.google.com/gemini/answer/17209137)). Custom apps require being 18 or over and in the US, a personal Google Account (not a work or school one), Keep Activity turned on, and English; they are added in the Gemini web app only, then work on the web and in the mobile app. *Not tried by us.*
+
+- At gemini.google.com, click **Settings** at the bottom, then **Connected Apps**; under "Custom apps", add a custom app, enter `https://api.ibanforge.com/mcp`, click **Next** and follow the on-screen instructions.
+- The page asks for credentials under "Advanced features" when a server does not support Dynamic Client Registration. This server asks for no authentication; whether Gemini accepts that is not checked by us.
+- In a prompt: type **@** and select the app.
 
 On the official MCP registry the server is listed as `io.github.cammac-creator/ibanforge`.
 
@@ -140,7 +166,7 @@ Check the status of a creditor-file audit job created by audit_creditor_file: wh
 
 ### send_feedback
 
-Report a wrong result, stale or missing data, or anything blocking you from using or PAYING for the service, straight to the operators. Free, and it keeps working after the daily free-tier allowance is spent: capping the complaint box with the limit that produced the complaint would silence the reports it exists for. A human reads every one; a verified data error on a paid x402 call is refunded on-chain. `error_type` and `notes` are required, the rest is optional.
+Report a wrong result, stale or missing data, or anything blocking you from using or PAYING for the service, straight to the operators. Free, and it keeps working after the free allowance is spent: capping the complaint box with the limit that produced the complaint would silence the reports it exists for. A human reads every one; a verified data error on a paid x402 call is refunded on-chain. `error_type` and `notes` are required, the rest is optional.
 
 ```json
 { "error_type": "wrong_bic", "notes": "BIC resolved to a bank that merged in 2024", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }

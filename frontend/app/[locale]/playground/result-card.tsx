@@ -9,6 +9,7 @@ import { JsonViewer } from "@/components/json-viewer"
 import { useCountUp } from "@/components/use-count-up"
 import type { PlaygroundMode } from "./examples"
 import { VerificationSummary } from "./verification-summary"
+import { resultOrigin } from "@/lib/playground-origin"
 
 /* ── safe readers over the unknown API payload ─────────────────────────────── */
 type Rec = Record<string, unknown>
@@ -101,11 +102,14 @@ export function ResultCard({
   data,
   animateKey,
   received = false,
+  savedOn,
 }: {
   mode: PlaygroundMode
   data: Rec
   animateKey: number
   received?: boolean
+  /** YYYY-MM-DD: the day the saved example was captured, when it is known. */
+  savedOn?: string
 }) {
   const t = useTranslations("playground")
   const tc = useTranslations("common")
@@ -144,9 +148,15 @@ export function ResultCard({
     </span>
   )
 
+  // Where the answer on screen comes from: the API just now, or a saved
+  // example with the day it was captured. The date is printed as captured
+  // (YYYY-MM-DD), never through Intl: a client component formats differently
+  // in WebKit and in Node (rule 8).
+  const origin = resultOrigin(received, savedOn)
+
   return (
     <div key={animateKey} className="card-surface pg-result-in rounded-xl border overflow-hidden">
-      <p className="border-b border-[var(--hairline)] px-4 py-3 text-xs text-[var(--fg-3)]">{t(received ? "verdict.apiResponse" : "verdict.savedExample")}</p>
+      <p className="border-b border-[var(--hairline)] px-4 py-3 text-xs text-[var(--fg-3)]">{t(origin.key, origin.values)}</p>
       {/* ── glanceable banner ─────────────────────────────────────────────── */}
       <div className="border-b border-[var(--hairline)] p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

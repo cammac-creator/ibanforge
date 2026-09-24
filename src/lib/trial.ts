@@ -11,9 +11,10 @@
  * is src/middleware/anonymous-trial.ts, the counter is `trial_weekly`
  * (src/lib/daily-ip-ledger.ts).
  *
- * 🚨 Only this door changed. The key that needs no e-mail stays at its monthly
- * allowance (src/lib/tiers.ts) and the MCP taster at its daily one
- * (src/lib/mcp-limits.ts).
+ * 🚨 The key that needs no e-mail stays at its monthly allowance
+ * (src/lib/tiers.ts). The same evening, the MCP taster was counted by the week
+ * too, at twenty-five per source (src/lib/mcp-limits.ts): the same figure and
+ * the same week, two separate allowances that never share a bucket.
  *
  * 🚨 The figure is no longer the MCP taster's. It used to be, and that parity
  * was the whole justification — the ten had been copied from `MCP_DAILY_LIMIT`
@@ -23,9 +24,10 @@
  * $0.02 compliance screening; and the friction is on this side, where a
  * developer pasting the curl examples from the documentation burns several
  * calls before reading a single answer. So REST was 25 and MCP stayed 10 a day.
- * Since 24/09/2026 the REST figure is counted by the week while MCP stays
- * daily: the two doors are not compared by their number any more, and no text
- * should call either one "the smaller".
+ * Since the evening of 24/09/2026 both are 25 a week, by Claude-Alain's
+ * decision: equal figures, separate allowances. No text should call either one
+ * "the smaller", and no sentence should carry two 25s without naming each door
+ * (src/routes/free-doors-claims.test.ts keeps them apart altogether).
  *
  * "Per source", not "per address": the ledger bucket is the IPv6 /64 collapsed
  * and then salted-hashed, because an IPv6 subscriber is handed a whole prefix

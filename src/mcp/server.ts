@@ -739,7 +739,7 @@ server.registerTool(
       'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
       'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
       'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
       'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
     inputSchema: {
       error_type: z
@@ -812,12 +812,12 @@ server.registerTool(
     title: 'Request an IBANforge API key',
     description:
       'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
-      'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+      'USE WHEN: you used up the free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
       'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
       'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
       'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
       'Then call poll_api_key. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent.',
     inputSchema: {
       client_name: z
         .string()
@@ -907,7 +907,7 @@ server.registerTool(
       '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
       '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
       '`invalid_grant` means this code can no longer be used at all — stop. ' +
-      'This tool is free and does NOT count against the daily free-tier limit.',
+      'This tool is free and does NOT count against the free allowance.',
     inputSchema: {
       device_code: z
         .string()

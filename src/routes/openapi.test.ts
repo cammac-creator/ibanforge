@@ -277,6 +277,42 @@ describe('the contract covers the routes and fields the server actually serves',
     expect(spec.paths[path][method], `${path} has no ${method} operation`).toBeDefined();
   });
 
+  it('declares every block and field the free demo serves (D7, 24/09/2026)', () => {
+    const demo = spec.paths['/v1/demo'].get as {
+      responses: {
+        '200': {
+          content: {
+            'application/json': {
+              schema: {
+                properties: Record<
+                  string,
+                  {
+                    items?: {
+                      allOf?: Array<{ required?: string[] }>;
+                      properties?: Record<string, unknown>;
+                    };
+                  }
+                >;
+              };
+            };
+          };
+        };
+      };
+    };
+    const props = demo.responses['200'].content['application/json'].schema.properties;
+    expect(Object.keys(props)).toEqual(
+      expect.arrayContaining([
+        'served_at',
+        'how_to_read',
+        'iban_examples',
+        'bic_examples',
+        'compliance_example',
+      ]),
+    );
+    expect(props.iban_examples.items?.allOf?.[1]?.required).toContain('label');
+    expect(Object.keys(props.bic_examples.items?.properties ?? {})).not.toContain('endpoint');
+  });
+
   it('declares the sanctions screen served on every BIC lookup', () => {
     expect(Object.keys(spec.components.schemas.BICLookupResult.properties ?? {})).toContain(
       'sanctions',

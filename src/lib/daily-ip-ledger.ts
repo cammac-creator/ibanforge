@@ -7,19 +7,22 @@ import {
   TRIAL_WEEKLY_MAX_ROWS,
   trialWeekStart,
 } from './trial.js';
+import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 
 /**
- * Le compteur derrière chaque franchise gratuite mesurée par source et par
- * jour : les appels d'outils MCP, les ouvertures de session MCP, et la trace
- * quotidienne de l'essai REST sans clé sur POST /v1/iban/validate.
+ * Le compteur derrière chaque franchise gratuite mesurée par source : les
+ * appels d'outils MCP, les ouvertures de session MCP, et l'essai REST sans clé
+ * sur POST /v1/iban/validate.
  *
  * 🚨 Depuis le 24/09/2026, l'essai REST se DÉCIDE à la semaine (25 appels par
  * semaine ISO en UTC, table `trial_weekly`, section « La semaine de l'essai »
- * en bas de ce fichier). Ses lignes quotidiennes `rest:<h>` restent écrites
- * ici, pour la trace `trial_daily`, les deux fenêtres glissantes et la surface
- * d'administration : elles mesurent, elles ne décident plus rien. Les plafonds
- * MCP (appels d'outils, ouvertures de session) restent quotidiens et passent
- * toujours par `countDailyUnits`, inchangée.
+ * en bas de ce fichier), et les appels d'outils MCP aussi (décision du même
+ * jour, 22 h 05 : 25 unités par semaine et par source, seau `<h>` nu, distinct
+ * du seau `rest:<h>` de l'essai REST). Leurs lignes quotidiennes restent
+ * écrites ici, pour la trace `trial_daily`, les deux fenêtres glissantes et la
+ * surface d'administration : elles mesurent, elles ne décident plus rien. Seul
+ * le plafond des OUVERTURES de session MCP (`init:<h>`) reste quotidien et
+ * passe toujours par `countDailyUnits`, inchangée.
  *
  * Porté d'une Map de niveau module vers la table `trial_ledger` de
  * stats.sqlite le 15/09/2026. Ce que cela achète, précisément : le décompte
@@ -457,7 +460,10 @@ export function countDailyUnits(key: string, units: number, limit: number): Dail
   const seen = overLimit.get(key);
   if (seen && seen.day === day && seen.limit === limit) {
     seen.used += units;
-    bumpUncounted(day, units);
+    // Même garde que le chemin de la semaine (relecture du 24/09/2026, D2) :
+    // `rest_attempts_uncounted` est une colonne de l'essai REST, et ce chemin ne
+    // reçoit plus que des ouvertures de session MCP (`init:`).
+    if (key.startsWith('rest:')) bumpUncounted(day, units);
     return { allowed: false, used: seen.used, remaining: 0 };
   }
 
@@ -829,8 +835,16 @@ export function getTrialDaily(days: number): TrialDailyRow[] {
 // Donc : la DÉCISION lit `trial_weekly`, clé (week, bucket), une lecture sur la
 // clé primaire ; la ligne quotidienne `rest:<h>` continue d'être écrite dans la
 // même transaction, pour la trace, les fenêtres glissantes et l'administration,
-// qui mesurent exactement comme avant. Les plafonds MCP ne touchent jamais
-// cette section.
+// qui mesurent exactement comme avant.
+//
+// Les appels d'outils MCP passent par cette section depuis la décision du même
+// soir (accès MCP sans clé : 25 unités par semaine et par source). Leur seau est
+// le haché nu `<h>`, celui de l'essai REST `rest:<h>` : deux allocations dans la
+// même table, qui ne se partagent jamais. Ce qui reste propre à l'essai REST est
+// filtré sur le préfixe `rest:` : la trace des tentatives court-circuitées
+// (`rest_attempts_uncounted`) et le total de la semaine de l'administration
+// (`countTrialWeek`). Les ouvertures de session MCP (`init:<h>`) ne touchent
+// jamais cette section : leur plafond reste quotidien.
 //
 // Mêmes propriétés que le registre du jour, section par section : jamais
 // d'exception, `degraded` sur panne de base, marque de dépassement en mémoire
@@ -926,11 +940,18 @@ function weekPurgeStmt(): Statement {
 }
 
 function weekTotalsStmt(): Statement {
+  // Une requête pour les deux familles de la table, comme le rollup du jour :
+  // le préfixe dit la porte. Sans ce partage, le total de l'essai REST aurait
+  // additionné les appels MCP dès qu'ils sont passés à la semaine.
   if (!_weekTotals) {
     _weekTotals = getStatsDB().prepare(
-      `SELECT COUNT(*) AS buckets,
-              COALESCE(SUM(units), 0) AS units,
-              COALESCE(SUM(CASE WHEN units > ? THEN 1 ELSE 0 END), 0) AS over_limit
+      `SELECT
+         COALESCE(SUM(CASE WHEN bucket LIKE 'rest:%' THEN 1 ELSE 0 END), 0) AS rest_buckets,
+         COALESCE(SUM(CASE WHEN bucket LIKE 'rest:%' THEN units ELSE 0 END), 0) AS rest_units,
+         COALESCE(SUM(CASE WHEN bucket LIKE 'rest:%' AND units > ? THEN 1 ELSE 0 END), 0) AS rest_over,
+         COALESCE(SUM(CASE WHEN bucket NOT LIKE 'rest:%' THEN 1 ELSE 0 END), 0) AS mcp_buckets,
+         COALESCE(SUM(CASE WHEN bucket NOT LIKE 'rest:%' THEN units ELSE 0 END), 0) AS mcp_units,
+         COALESCE(SUM(CASE WHEN bucket NOT LIKE 'rest:%' AND units > ? THEN 1 ELSE 0 END), 0) AS mcp_over
          FROM trial_weekly WHERE week = ?`,
     );
   }
@@ -985,7 +1006,8 @@ function refundWeekInMemory(key: string, units: number, week: string): void {
 
 /**
  * Dépenser `units` sur la franchise de la SEMAINE de `key` (essai REST sans
- * clé), et dire si ça passe. Même contrat que `countDailyUnits` : la dépense a
+ * clé, seau `rest:<h>` ; appels d'outils MCP sans clé, seau `<h>`), et dire si
+ * ça passe. Même contrat que `countDailyUnits` : la dépense a
  * lieu même refusée, `used` inclut cet appel et continue de croître, et la
  * fonction ne lève jamais (`degraded: true` sur panne de base).
  *
@@ -1013,7 +1035,9 @@ export function countWeeklyTrialUnits(
   const seen = weeklyOverLimit.get(key);
   if (seen && seen.week === week && seen.limit === limit) {
     seen.used += units;
-    bumpUncounted(day, units);
+    // `rest_attempts_uncounted` est une colonne de l'essai REST : un refus MCP
+    // de la semaine n'a rien à y faire, et il durerait jusqu'au lundi.
+    if (key.startsWith('rest:')) bumpUncounted(day, units);
     return { allowed: false, used: seen.used, remaining: 0 };
   }
 
@@ -1109,23 +1133,42 @@ function reviewWeeklyVolume(maxRows: number): void {
   }
 }
 
-/** La semaine en cours, pour la surface d'administration. Ne lève jamais. */
-export function countTrialWeek(): {
+/** Les totaux d'une porte sur la semaine en cours. */
+export interface WeekTotals {
   week: string;
   buckets: number;
   units: number;
   over_limit: number;
-} {
+}
+
+function weekTotals(): { rest: WeekTotals; mcp: WeekTotals } {
   const week = trialWeekStart();
   try {
-    const row = weekTotalsStmt().get(REST_TRIAL_WEEKLY_LIMIT, week) as {
-      buckets: number;
-      units: number;
-      over_limit: number;
+    const row = weekTotalsStmt().get(REST_TRIAL_WEEKLY_LIMIT, MCP_WEEKLY_LIMIT, week) as {
+      rest_buckets: number;
+      rest_units: number;
+      rest_over: number;
+      mcp_buckets: number;
+      mcp_units: number;
+      mcp_over: number;
     };
-    return { week, buckets: row.buckets, units: row.units, over_limit: row.over_limit };
+    return {
+      rest: { week, buckets: row.rest_buckets, units: row.rest_units, over_limit: row.rest_over },
+      mcp: { week, buckets: row.mcp_buckets, units: row.mcp_units, over_limit: row.mcp_over },
+    };
   } catch (err) {
     reportLedgerFailure(err);
-    return { week, buckets: 0, units: 0, over_limit: 0 };
+    const empty = { week, buckets: 0, units: 0, over_limit: 0 };
+    return { rest: empty, mcp: { ...empty } };
   }
+}
+
+/** La semaine en cours de l'essai REST, pour l'administration. Ne lève jamais. */
+export function countTrialWeek(): WeekTotals {
+  return weekTotals().rest;
+}
+
+/** La semaine en cours de l'accès MCP sans clé, pour l'administration. Ne lève jamais. */
+export function countMcpWeek(): WeekTotals {
+  return weekTotals().mcp;
 }

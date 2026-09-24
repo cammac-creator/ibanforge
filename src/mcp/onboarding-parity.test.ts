@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { mcpCard } from '../routes/mcp-card.js';
-import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { MCP_TOOLS } from './inventory.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 import {
@@ -27,7 +27,9 @@ describe('Prise en main : parité avec les contrats servis', () => {
     expect([...catalogue.remote].sort()).toEqual(remote.sort());
     expect([...catalogue.installed].sort()).toEqual(installed.sort());
     expect(catalogue.tools).toEqual(MCP_TOOLS.map(({ name, price }) => ({ name, price })));
-    expect(catalogue.remoteDaily).toBe(MCP_DAILY_LIMIT);
+    expect(catalogue.remoteWeekly).toBe(MCP_WEEKLY_LIMIT);
+    // Renommé avec l'unité le 24/09/2026 : l'ancien nom ne doit plus traîner.
+    expect(catalogue).not.toHaveProperty('remoteDaily');
     expect(catalogue.anonymousMonthly).toBe(ANONYMOUS_MONTHLY_LIMIT);
     expect(catalogue.claimedMonthly).toBe(FREE_TIER_MONTHLY_LIMIT);
     expect(catalogue.restTrialWeekly).toBe(REST_TRIAL_WEEKLY_LIMIT);

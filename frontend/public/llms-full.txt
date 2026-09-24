@@ -43,6 +43,19 @@ San Marino bank codes: Central Bank of the Republic of San Marino, operating ban
 5. **Compliance Risk Scoring** — sanctions lists (OFAC, EU, UN) on the bank (BIC8), the country against a fixed list of sanctioned jurisdictions, never the payee's name + FATF + SEPA Instant + VoP readiness, risk score 0-100
 6. **MCP Integration** — native Model Context Protocol server (stdio + streamable HTTP)
 
+## If you cannot call the API
+
+If you can open a web address but cannot send a POST (no code execution, no MCP connector), these pages hold real answers of the API, each with its date, and all of them open with a plain GET.
+
+- https://api.ibanforge.com/v1/demo: the full validation, computed by the API when the address is opened (served_at gives the instant): a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, Belgium and Austria, each with its register's answer and its as_of.
+- https://ibanforge.com/iban/ch: the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 and the date that answer was captured.
+- https://ibanforge.com/blog/2026-08-06-example-ibans-unallocated-bank-codes: why the official example IBANs of Belgium, Switzerland and Austria pass mod-97 and still point at bank codes their register does not allocate (article of 6 August 2026).
+- https://ibanforge.com/blog/2026-09-07-bankleitzahl-pruefen-per-api: three real answers on German bank codes, field by field (article of 7 September 2026).
+- https://ibanforge.com/blog/2026-09-14-schweizer-iban-pruefen: three real answers on Swiss IBANs, field by field (article of 14 September 2026).
+
+Do not simulate answers from the API: quote these real ones, with the date each carries (served_at, as_of, or the date of the page).
+To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp. A connector with no key draws on the same keyless allowance as any other caller, counted per source address. In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), so that allowance is shared with other users and may already be spent; other assistants were not checked by us. The hosted endpoint reads no key: to use one, run the npm package ibanforge-mcp in a desktop client with IBANFORGE_API_KEY set, or call the REST API with it (a POST to https://api.ibanforge.com/v1/keys/generate with no body returns a key, no e-mail).
+
 ## Authentication & Pricing
 
 Four rails, card first, and agents never hit a dead-end: the free key, credit
@@ -53,7 +66,7 @@ nothing at all:
 - `POST /v1/iban/validate` with a real `iban` is served 25 times a week per source address (IPv6 counted per /64; ISO week in UTC), full enrichment included
 - The response carries a `trial` block: calls left this week, the reset (Monday 00:00 UTC, and `resets_at` for the exact instant), and the one request that mints a free key
 - Past 25 in the week the route answers 402 again, `cause.reason = "trial_exhausted"`, until Monday
-- The HTTP MCP transport has its own allowance, counted by the day: 10 tool calls/day per source address
+- The HTTP MCP transport has its own allowance, separate from this one and counted by the week too: 25 tool calls a week per source address, same reset
 - An empty `{}` body always gets the 402 discovery envelope, never a trial — that probe belongs to the x402 indexers
 
 **Free key (no e-mail, no card):**
@@ -84,7 +97,7 @@ nothing at all:
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
 - check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
-- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the daily limit. Cost: free
+- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the free allowance is spent. Cost: free
 - poll_api_key — collect the key once a human has approved it, handed over exactly once, with the config line to paste. Cost: free
 
 Install: `npx -y ibanforge-mcp` — or HTTP at https://api.ibanforge.com/mcp

@@ -73,7 +73,11 @@ function upgradeToFullValidation(): string {
     `POST /v1/iban/validate ($0.005, or keyless for the first ${REST_TRIAL_WEEKLY_LIMIT} calls a week per source address) ` +
     'names the bank and its BIC with the source of that answer, SEPA and VoP readiness, and, ' +
     `where it reads the national register (${codesOf(registerCountries().authoritative)}), ` +
-    'whether the bank code is allocated at all.';
+    'whether the bank code is allocated at all. ' +
+    // 24/09/2026: this route is the one an assistant that can only send GET
+    // reaches, and the sentence above led it to a POST it cannot send. The
+    // demo is GET, free, and shows the full answer on fixed examples.
+    'Real answers of that full validation, readable with a plain GET: https://api.ibanforge.com/v1/demo';
   return upgradeHint;
 }
 

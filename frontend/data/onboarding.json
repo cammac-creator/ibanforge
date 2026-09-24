@@ -1,5 +1,5 @@
 {
-  "remoteDaily": 10,
+  "remoteWeekly": 25,
   "remote": [
     "validate_iban",
     "batch_validate_iban",

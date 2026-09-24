@@ -714,6 +714,7 @@
       "no": "No",
       "retry": "Run the check again to obtain a usable verdict.",
       "savedExample": "Saved example · run again for a current check",
+      "savedExampleOn": "Saved example, captured from the API on {date} · not a live answer: run a check for a current one",
       "apiResponse": "Response received from the API",
       "localCheckInvalid": "An additional national check failed. A valid IBAN structure is not enough: confirm these details before payment."
     }
@@ -1849,7 +1850,7 @@
         "Ask: “Check the documentation IBAN DE89370400440532013000 and report the register result, source and date.”",
         "Read bank_code_check and its sources. An unknown result confirms nothing; the check does not prove that the account exists or identify its holder."
       ],
-      "limits": "{daily} tool units per network address per day, without a key; each IBAN in a batch counts as one unit. An API key does not raise this remote allowance. {remote} remote tools, {installed} in the local package: the two file-audit tools need the installed package.",
+      "limits": "{weekly} tool units per network address per week (ISO week in UTC, reset on Monday 00:00 UTC), without a key; each IBAN in a batch counts as one unit. An API key does not raise this remote allowance. {remote} remote tools, {installed} in the local package: the two file-audit tools need the installed package.",
       "guide": "MCP guide and quotas",
       "local": "Does your client require a local process? Use this configuration.",
       "sdkHeading": "Integrate with an SDK",
@@ -2920,7 +2921,7 @@
       "index": "All countries"
     },
     "sourceNote": "Source: ISO 13616 registry for the length, layout and example; API answer captured on {date}.",
-    "exampleNotAllocated": "The bank code of this official example is not allocated in {register}: the API says so as it is, which is the expected behaviour on a demonstration IBAN.",
+    "exampleNotAllocated": "The check digits of this official example pass, yet {register} says nobody holds its bank code: that is exactly what our bank-code check catches, and what a checksum alone cannot see.",
     "examplePartialRegister": "Some of this country's bank codes are additionally named by a supervisor's list, which we serve one page each — but that list does not publish the allocation of the code space, so a code missing from it is not a code that was never issued."
   },
   "tools": {

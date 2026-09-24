@@ -2800,7 +2800,9 @@ export function getCohortFootprint(): CohortFootprint {
  * tool call precisely so the existing counters keep matching it, and a reader
  * that rebuilt the split from a path would be reading a string nothing writes.
  *
- * `refused` counts the calls the daily allowance turned away, which carry their
+ * `refused` counts the calls the free allowance turned away (counted by the
+ * week since 24/09/2026, so a source refused on Monday is refused all week),
+ * which carry their
  * own path — the same name can therefore appear with served calls at zero and
  * refusals above it, and that is the interesting case.
  */

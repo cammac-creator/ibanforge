@@ -51,7 +51,7 @@ const MCP_CLAUDE_DESKTOP_JSON = `{
   }
 }`;
 
-const counts = { daily: catalogue.remoteDaily, remote: catalogue.remote.length, installed: catalogue.installed.length };
+const counts = { weekly: catalogue.remoteWeekly, remote: catalogue.remote.length, installed: catalogue.installed.length };
 const FREE_KEY_CURL = `curl -X POST https://api.ibanforge.com/v1/keys/generate
 
 # → { "api_key": "ifk_...", "monthly_limit": ${catalogue.anonymousMonthly} }`;

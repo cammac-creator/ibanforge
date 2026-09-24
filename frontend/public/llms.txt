@@ -26,7 +26,7 @@ BIC directory, 121k+ entries (entries, not institutions): GLEIF and national reg
 ## Data sources and attribution
 
 GLEIF · SIX BankMaster · SwiftCodes (MIT, a public copy of the SWIFT directory frozen in January 2018) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Bulgarian National Bank · Central Bank of the Republic of San Marino · Finance Finland · ABBL · European Central Bank · Banco de España · EBA · Betaalvereniging Nederland · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
-This service uses the BIC to LEI relationship file. The mapping table has been developed by SWIFT. SWIFT and BIC are registered trademarks of S.W.I.F.T. SC.
+BIC-to-LEI relationship file (Mapping Table), developed by SWIFT and published by GLEIF: the notice its licence asks for, with the Mapping Table version loaded at the last monthly refresh, is served live at https://api.ibanforge.com/llms.txt
 Dutch issuer list: Betaalvereniging Nederland, reused with attribution — a BIC or a bank code may be modified, withdrawn or added at any time, and the association does not guarantee the permanent accuracy of the list.
 UK deposit-taking authorisation: Bank of England (List of Banks, 2026-08), used with the Bank of England's written permission. The month of the list in force is served live at https://api.ibanforge.com/llms.txt
 Slovak bank codes: Národná banka Slovenska, Directory of identification codes for the domestic payment system (version 225, effective 2026-05-18), reproduced under the NBS site terms — the source is named and the file is not altered. The edition in force is served live at https://api.ibanforge.com/llms.txt
@@ -34,6 +34,19 @@ San Marino bank codes: Central Bank of the Republic of San Marino, operating ban
 
 ## API Base URL
 https://api.ibanforge.com
+
+## If you cannot call the API
+
+If you can open a web address but cannot send a POST (no code execution, no MCP connector), these pages hold real answers of the API, each with its date, and all of them open with a plain GET.
+
+- https://api.ibanforge.com/v1/demo: the full validation, computed by the API when the address is opened (served_at gives the instant): a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, Belgium and Austria, each with its register's answer and its as_of.
+- https://ibanforge.com/iban/ch: the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 and the date that answer was captured.
+- https://ibanforge.com/blog/2026-08-06-example-ibans-unallocated-bank-codes: why the official example IBANs of Belgium, Switzerland and Austria pass mod-97 and still point at bank codes their register does not allocate (article of 6 August 2026).
+- https://ibanforge.com/blog/2026-09-07-bankleitzahl-pruefen-per-api: three real answers on German bank codes, field by field (article of 7 September 2026).
+- https://ibanforge.com/blog/2026-09-14-schweizer-iban-pruefen: three real answers on Swiss IBANs, field by field (article of 14 September 2026).
+
+Do not simulate answers from the API: quote these real ones, with the date each carries (served_at, as_of, or the date of the page).
+To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp. A connector with no key draws on the same keyless allowance as any other caller, counted per source address. In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), so that allowance is shared with other users and may already be spent; other assistants were not checked by us. The hosted endpoint reads no key: to use one, run the npm package ibanforge-mcp in a desktop client with IBANFORGE_API_KEY set, or call the REST API with it (a POST to https://api.ibanforge.com/v1/keys/generate with no body returns a key, no e-mail).
 
 ## How AI agents connect (pick one)
 
@@ -69,7 +82,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
 - check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
-- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the daily limit. Cost: free
+- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the free allowance is spent. Cost: free
 - poll_api_key — collect the key once a human has approved it, handed over exactly once, with the config line to paste. Cost: free
 
 ## REST endpoints
@@ -90,7 +103,8 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - POST /v1/keys/claim (key in the Authorization header, never the body) — raises that same key to 200 a month with a mailed 6-digit code, or to 200 once with an x402 payment on the key
 
 ## How to pay (4 rails, no dead-ends)
-- Try before anything: 25 keyless validations a week per source address (IPv6 counted per /64, reset on Monday 00:00 UTC) on POST /v1/iban/validate, and 10 MCP tool calls/day per source address. Tasters, not tiers.
+- Try before anything: 25 keyless validations a week per source address (IPv6 counted per /64, reset on Monday 00:00 UTC) on POST /v1/iban/validate. A taster, not a tier.
+- The hosted MCP transport has its own taster, not shared with that one: 25 tool calls a week per source address, same reset.
 - Free key, nothing asked: POST /v1/keys/generate with no body at all → an ifk_ key, 25 requests a month, on every endpoint. Nothing is mailed and no record is opened.
 - Same key, full free allowance: POST /v1/keys/claim with `Authorization: Bearer ifk_...` (never in the body), once the key has served one call. A 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose — gives 200 every month; an x402 payment made on the key gives 200 once.
 - Credit packs (card or USDC, never expire): 1k = $4, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k

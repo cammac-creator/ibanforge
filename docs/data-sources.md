@@ -62,14 +62,18 @@ whole or in part, includes the following notice » :
 > refer to www.swift.com/bic . »
 > — <https://www.gleif.org/lei-data/lei-mapping/download-bic-to-lei-relationship-files/2017-12-21_annex-2_bic-to-lei-mapping-table-license-agreement_final.pdf>
 
-La formule servie jusqu'ici (« This service uses the BIC to LEI relationship
-file… ») n'a aucune source : elle ne figure pas dans cette licence. `NOTICE`
-porte désormais la formule exacte. Le mois de version n'est stocké nulle part :
+La formule servie jusqu'au 24/09/2026 (« This service uses the BIC to LEI
+relationship file… ») n'avait aucune source : elle ne figure pas dans cette
+licence. `NOTICE` porte la formule exacte, et `/llms.txt` de l'API la sert mot
+pour mot depuis la PR 240 (`src/lib/bic-lei-notice.ts`) ; le `llms.txt` du
+site renvoie à ce texte servi. Le mois de version n'est stocké nulle part :
 `src/db/seed.ts` prend la dernière table publiée (`mapping.gleif.org/api/v2/bic-lei/latest`)
 à chaque rafraîchissement mensuel ; les lignes `gleif` du 01/09/2026 viennent
-de la version d'août 2026 (`LEI-BIC-20260828.zip`). À faire : stocker ce mois
-et corriger les surfaces qui servent l'ancienne formule (`src/app.ts`,
-`frontend/public/llms.txt`).
+de la version d'août 2026 (`LEI-BIC-20260828.zip`). Le mois servi est donc
+déduit de la date de chargement des lignes `gleif` (le mois qui précède le
+rafraîchissement du 1er). Reste à faire : stocker ce mois au chargement, ce qui
+lèverait la seule limite de cette déduction (un rafraîchissement manuel lancé
+entre la publication de fin de mois et la fin de ce mois).
 
 **SIX BankMaster — usage libre.** ✅
 > « All the details published in the Bank Master Data are based on information
