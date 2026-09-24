@@ -195,6 +195,21 @@ function readEmail(raw: unknown): string | null {
   return email;
 }
 
+/**
+ * Combien de fois le cookie du compte figure dans l'en-tête `Cookie`. Découpé
+ * comme Hono le découpe (`;`, blancs retirés autour du nom), sans rien
+ * décoder : le nom EXACT seulement, jamais un nom qui le contient.
+ */
+function accountCookieCount(header: string | undefined): number {
+  if (!header) return 0;
+  let n = 0;
+  for (const pair of header.split(';')) {
+    const eq = pair.indexOf('=');
+    if (eq !== -1 && pair.slice(0, eq).trim() === ACCOUNT_COOKIE) n++;
+  }
+  return n;
+}
+
 function signedOut(c: Context): Response {
   // Un cookie présenté qui ne mène à aucune session vivante est effacé : le
   // navigateur cesse de l'envoyer.
@@ -214,6 +229,21 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
   account.use('/v1/account/*', async (c, next) => {
     await next();
     c.header('Cache-Control', 'no-store');
+  });
+
+  // Deux cookies du même nom : Hono lit le premier et tait l'autre, et un
+  // navigateur envoie d'abord celui dont le chemin est le plus long. Un cookie
+  // posé par un autre hôte du même site passerait donc devant celui de la
+  // personne. Toute requête qui porte deux fois le nom est refusée comme sans
+  // session, AVANT toute lecture, et le cookie de l'API est effacé. Seul ce
+  // cookie-là peut l'être d'ici (hôte seul, `Path=/v1/account`) : une copie
+  // posée avec un autre `Domain` ou un autre `Path` reste chez le navigateur.
+  account.use('/v1/account/*', async (c, next) => {
+    if (accountCookieCount(c.req.header('cookie')) > 1) {
+      deleteCookie(c, ACCOUNT_COOKIE, COOKIE_OPTIONS);
+      return c.json({ error: 'signed_out', message: TEXTS.signed_out }, 401);
+    }
+    await next();
   });
 
   // ── 1. POST /v1/account/code ─────────────────────────────────────────────

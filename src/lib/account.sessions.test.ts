@@ -241,6 +241,56 @@ describe('les sessions du compte', () => {
     ).toEqual({ n: 0 });
   });
 
+  it('deux cookies du même nom : 401 et cookie effacé, sur toutes les routes du compte', async () => {
+    const app = makeApp();
+    const mine = await signIn(app, 'double@alpha.example.net');
+    // Un second cookie du même nom, venu d'ailleurs, passé en premier.
+    const planted = await signIn(app, 'intrus@alpha.example.net');
+    const both = `${ACCOUNT_COOKIE}=${planted}; ${ACCOUNT_COOKIE}=${mine}`;
+    const sentBefore = relay.sent.length;
+
+    const view = await app.request('/v1/account/overview', { headers: { Cookie: both } });
+    expect(view.status).toBe(401);
+    expect(((await view.json()) as { error: string }).error).toBe('signed_out');
+    expect(view.headers.get('set-cookie')).toMatch(new RegExp(`${ACCOUNT_COOKIE}=;.*Max-Age=0`));
+    expect(view.headers.get('cache-control')).toBe('no-store');
+
+    // Toutes les routes du compte, lecture et écriture, refusent de choisir.
+    const report = await app.request('/v1/account/keys/report?prefix=ifk_00000000', {
+      headers: { Cookie: both },
+    });
+    expect(report.status).toBe(401);
+    for (const path of ['/v1/account/logout', '/v1/account/code', '/v1/account/session']) {
+      const res = await post(
+        app,
+        path,
+        { email: 'double@alpha.example.net', code: '123456', all: true },
+        { Cookie: both },
+      );
+      expect(res.status, path).toBe(401);
+      expect(res.headers.get('set-cookie'), path).toMatch(
+        new RegExp(`${ACCOUNT_COOKIE}=;.*Max-Age=0`),
+      );
+    }
+    expect(relay.sent).toHaveLength(sentBefore);
+    // Rien n'a été révoqué ni ouvert : chaque session, présentée seule, lit toujours.
+    expect((await overview(app, mine)).status).toBe(200);
+    expect((await overview(app, planted)).status).toBe(200);
+
+    // Le nom EXACT seulement : un cookie dont le nom le contient ne compte pas,
+    // des blancs autour du nom si.
+    for (const other of [`x${ACCOUNT_COOKIE}=abc`, `${ACCOUNT_COOKIE}_old=abc`]) {
+      const res = await app.request('/v1/account/overview', {
+        headers: { Cookie: `${other}; ${ACCOUNT_COOKIE}=${mine}` },
+      });
+      expect(res.status, other).toBe(200);
+    }
+    const spaced = await app.request('/v1/account/overview', {
+      headers: { Cookie: ` ${ACCOUNT_COOKIE} =${planted};${ACCOUNT_COOKIE}=${mine}` },
+    });
+    expect(spaced.status).toBe(401);
+  });
+
   it('revokeSession et revokeAllSessions ne comptent que ce qui vivait', () => {
     const norm = 'compte@alpha.example.net';
     const live = createSession(norm, norm).token;
