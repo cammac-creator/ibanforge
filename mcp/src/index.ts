@@ -49,7 +49,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { createRequire } from 'node:module';
 import { createApiClient, requestTimeout, type JsonRecord } from './api-client.js';
-import { stdioInstructions, stdioTools } from './stdio-instructions.js';
+import { stdioInstructions } from './stdio-instructions.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -955,12 +955,12 @@ const TOOLS: Tool[] = [
     annotations: { title: 'Request an IBANforge API key' },
     description:
       'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
-      'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+      'USE WHEN: you used up the free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
       'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
       'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
       'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
       'Then call poll_api_key. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1027,7 +1027,7 @@ const TOOLS: Tool[] = [
       '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
       '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
       '`invalid_grant` means this code can no longer be used at all — stop. ' +
-      'This tool is free and does NOT count against the daily free-tier limit.',
+      'This tool is free and does NOT count against the free allowance.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1170,12 +1170,16 @@ const INSTRUCTIONS =
   // le contexte du modèle AVANT `tools/list`, donc citer un outil absent
   // apprendrait à l'agent que la documentation mente. Un test vérifie que tout
   // nom d'outil cité est bien enregistré.
-  'Free tier: 10 tool calls/IP/day here, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
+  // 24/09/2026 : ce paragraphe d'accès (de « Free tier: » au prix des packs)
+  // n'est PAS servi par ce paquet : `stdioInstructions` le remplace par un texte
+  // sans chiffre ni période, qui renvoie à rate-limits.yml et à GET /v1. Un
+  // paquet publié reste figé jusqu'à la version suivante ; les quotas, non.
+  'Free tier: 25 tool calls a week per source address here (ISO week in UTC, reset on Monday 00:00 UTC), no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
   'POST https://api.ibanforge.com/v1/keys/claim lifts that same key to 200 REST calls/month — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. The mailed code gives 200 every month; a payment gives 200 once. ' +
   // 2026-09-15 : copie CARACTÈRE POUR CARACTÈRE de la phrase device grant de
   // src/mcp/instructions.ts. Ce paquet est publié séparément et ne peut pas
   // importer depuis src/ ; `src/mcp/instructions.test.ts` compare les deux.
-  'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the daily limit. ' +
+  'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the free allowance is spent. ' +
   'Prepaid credit packs from $4 per 1,000 calls, no expiry. ' +
   'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
   'Paying as an agent (wallet, USDC on Base, prepaid packs): https://ibanforge.com/docs/pay-as-an-agent — ' +
@@ -1186,14 +1190,7 @@ const server = new Server(
   { capabilities: { tools: {} }, instructions: stdioInstructions(INSTRUCTIONS) },
 );
 
-// Le texte servi, pas la source : deux descriptions partagées avec les autres
-// surfaces disent encore « daily » et ne peuvent changer ici qu'avec elles
-// (voir PENDING_SHARED_WORDING dans stdio-instructions.ts). Calculé une fois,
-// au démarrage : une phrase introuvable arrête le serveur au lieu de servir
-// l'ancien texte en silence.
-const SERVED_TOOLS = stdioTools(TOOLS);
-
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: SERVED_TOOLS }));
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;

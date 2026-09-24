@@ -71,10 +71,14 @@ data/
 - **Formatting** : prettier (voir .prettierrc)
 - **Linting** : eslint (voir eslint.config.js)
 - **Prenom** : Claude-Alain, jamais « Alain »
-- **Les deux « 25 » ne partagent jamais une phrase.** L'essai sans clé, c'est 25 validations
-  par semaine (semaine ISO, UTC), sur la seule `POST /v1/iban/validate`. La clé sans e-mail,
-  c'est 25 requêtes par mois, sur tous les endpoints. Nommer la porte, annoncer la clé par ses
-  200 une fois réclamée ; `src/routes/free-doors-claims.test.ts` y veille.
+- **Les « 25 » ne partagent jamais une phrase.** L'essai sans clé, c'est 25 validations
+  par semaine (semaine ISO, UTC), sur la seule `POST /v1/iban/validate`. L'accès sans clé du
+  transport `/mcp` est une allocation séparée (`MCP_WEEKLY_LIMIT`, `src/lib/mcp-limits.ts`) :
+  25 unités d'outil par semaine et par source, un lot comptant une unité par IBAN. La clé sans
+  e-mail, c'est 25 requêtes par mois, sur tous les endpoints. Nommer la porte, annoncer la clé
+  par ses 200 une fois réclamée ; `src/routes/free-doors-claims.test.ts` y veille. Le paquet npm
+  `ibanforge-mcp` n'écrit aucun de ces chiffres : figé jusqu'à sa prochaine version, il renvoie
+  à `rate-limits.yml` et à `GET /v1` (`mcp/src/published-text.test.ts`).
 
 ## 🚨 Ce dépôt est PUBLIC
 

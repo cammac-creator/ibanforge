@@ -10,8 +10,9 @@
  * publication suivante, et les quotas du service bougent : la règle est donc
  * de n'écrire AUCUN chiffre de quota ici et de renvoyer à `rate-limits.yml` et
  * à `GET /v1`. Ce test la tient sur le paquet construit, pas sur sa source :
- * deux descriptions partagées ne sont corrigées qu'au moment d'être servies
- * (`PENDING_SHARED_WORDING`).
+ * le paragraphe d'accès des instructions partagées (copie de
+ * `src/mcp/instructions.ts`, chiffres compris) n'est remplacé qu'au moment
+ * d'être servi, par `stdioInstructions`.
  */
 import { readFileSync } from 'node:fs';
 import { createServer, type RequestListener } from 'node:http';
@@ -148,7 +149,7 @@ describe('le paquet publié ne fige aucun quota', () => {
     expect(batch).toContain('one request or one credit');
   });
 
-  it('les descriptions du device grant servent déjà la formulation des autres surfaces', async () => {
+  it('les descriptions du device grant disent l’allocation gratuite sans jour', async () => {
     const { tools } = await client.listTools();
     const descriptionOf = (name: string) => tools.find((t) => t.name === name)?.description ?? '';
     expect(descriptionOf('request_api_key')).toContain(

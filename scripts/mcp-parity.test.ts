@@ -60,49 +60,6 @@ const SRC: Record<SurfaceId, string> = {
 };
 
 /**
- * Les écarts permis au paquet publié (A) jusqu'à sa prochaine publication.
- *
- * 24/09/2026 : l'accès MCP sans clé passe de 10 appels par jour à 25 par
- * SEMAINE (décision de Claude-Alain). B et C ne disent plus « daily » ; A,
- * publié à part, le dit encore, et sa mise à jour part dans une PR séparée avant
- * la publication (`mcp/` n'est pas touché ici). Chaque paire [texte de A,
- * texte de B et C] est remplacée dans A AVANT la comparaison, et un test
- * vérifie qu'elle y est encore : le jour où `mcp/` est aligné, ce test rougit
- * et l'écart doit partir d'ici.
- */
-const PENDING_NPM_RELEASE: ReadonlyArray<readonly [string, string]> = [
-  [
-    'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
-    'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent.',
-  ],
-  [
-    'USE WHEN: you hit the daily free allowance, a call answers 402,',
-    'USE WHEN: you used up the free allowance, a call answers 402,',
-  ],
-  [
-    'This tool is free and does NOT count against the daily free-tier limit.',
-    'This tool is free and does NOT count against the free allowance.',
-  ],
-];
-
-function withPendingRelease(id: SurfaceId, text: string): string {
-  if (id !== 'A') return text;
-  return PENDING_NPM_RELEASE.reduce(
-    (t, [published, current]) => t.split(published).join(current),
-    text,
-  );
-}
-
-describe('parité MCP — les écarts en attente de publication du paquet', () => {
-  it.each(PENDING_NPM_RELEASE.map(([published]) => [published]))(
-    'le paquet publié dit encore « %s » (sinon retirer l’écart)',
-    (published) => {
-      expect(SRC.A).toContain(published);
-    },
-  );
-});
-
-/**
  * Les noms d'outils d'une surface.
  *
  * A déclare un tableau `TOOLS: Tool[]` (`name: 'x',`), B et C appellent
@@ -392,7 +349,7 @@ describe('parité MCP — les descriptions du device grant sont identiques au ca
     const chunk = rest.slice(0, end.index + end[0].length);
     const withoutComments = chunk.replace(/^\s*\/\/.*$/gm, '');
     const pieces = withoutComments.match(/'(?:[^'\\]|\\.)*'/g) ?? [];
-    return withPendingRelease(id, pieces.map((p) => p.slice(1, -1).replace(/\\'/g, "'")).join(''));
+    return pieces.map((p) => p.slice(1, -1).replace(/\\'/g, "'")).join('');
   }
 
   for (const tool of DEVICE_TOOLS) {
