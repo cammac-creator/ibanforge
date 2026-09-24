@@ -9,6 +9,7 @@ import {
 import { evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
 import { grantReservationCount } from '../lib/device-grant.js';
 import { normalizeEmail } from '../lib/email-norm.js';
+import { isPlainEmail } from '../lib/email-shape.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
@@ -275,8 +276,9 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
     }
 
-    // Stricter shape check: local-part@domain.tld (avoids "test@" or "foo@bar")
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    // Une seule adresse simple (src/lib/email-shape.ts) : ni « test@ », ni
+    // « foo@bar », ni rien qu'un en-tête de mail lirait comme deux adresses.
+    if (!isPlainEmail(email)) {
       return c.json(
         { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
         400,
@@ -1055,7 +1057,7 @@ apiKeys.post('/v1/keys/claim', async (c) => {
     return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
   }
   const email = rawEmail.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+  if (!isPlainEmail(email)) {
     return c.json(
       { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
       400,

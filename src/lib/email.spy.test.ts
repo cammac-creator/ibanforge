@@ -195,3 +195,48 @@ describe('la réclamation en deux temps, avec un relais qui répond', () => {
     expect(row.shield_episode).toBeNull();
   });
 });
+
+describe('une adresse qui en nomme plusieurs', () => {
+  // Une seule adresse simple (src/lib/email-shape.ts) : une liste, un nom
+  // affiché ou des guillemets sont refusés AVANT tout envoi, sur les deux
+  // routes qui postent un mail à l'adresse saisie.
+  const LISTS = [
+    'liste+x,autre@alpha-corp.example.net',
+    'liste@alpha-corp.example.net;autre@alpha-corp.example.net',
+    'Acme <liste@alpha-corp.example.net>',
+  ];
+
+  it.each(LISTS)('la génération la refuse sans rien envoyer : %j', async (email) => {
+    const res = await asProduction(() =>
+      makeApp().request('/v1/keys/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_email');
+    expect(sendFreeKeyEmail).not.toHaveBeenCalled();
+  });
+
+  it.each(LISTS)('la réclamation la refuse sans poster de code : %j', async (email) => {
+    const k = generateApiKey(null, undefined, undefined, false, {
+      ipHash: `spy-liste-${RUN}-${LISTS.indexOf(email)}`,
+    });
+    if (!k) throw new Error('mint anonyme impossible');
+    getStatsDB()
+      .prepare('INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 1)')
+      .run(k.key_hash, new Date().toISOString().slice(0, 7));
+    const res = await asProduction(() =>
+      makeApp().request('/v1/keys/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+        body: JSON.stringify({ email }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_email');
+    expect(deliverKeyVerificationEmail).not.toHaveBeenCalled();
+    expect(getKeyTier(k.key_hash)!.tier).toBe('anonymous');
+  });
+});
