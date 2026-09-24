@@ -48,6 +48,7 @@ import {
   buildOverview,
   checkLoginCode,
   createSession,
+  drawLoginCode,
   findOwnedKey,
   forgetLoginCode,
   issueLoginCode,
@@ -276,13 +277,14 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     // `normalizeEmail` ne rend null que sans arobase, ce que la forme exclut.
     const emailNorm = normalizeEmail(email) ?? email;
 
-    // 🚨 L'ordre des gestes est celui de `/v1/keys/claim`, et il est un
-    // contrat : plafonds d'envoi, enregistrement de l'envoi, émission du code,
-    // envoi réel. Émettre le code avant de mesurer l'envoi offrirait des remises
-    // à zéro gratuites du compteur d'essais, seul rempart contre la force brute
-    // des six chiffres. Le registre est `verification_sends`, PARTAGÉ avec la
-    // création et la réclamation : les plafonds ne se doublent pas en passant
-    // par la connexion.
+    // 🚨 L'ordre des gestes est un contrat : plafonds d'envoi, enregistrement de
+    // l'envoi, tirage du code, envoi réel, et SEULEMENT APRÈS un envoi réussi,
+    // écriture du code. Écrire un code avant de mesurer l'envoi offrirait des
+    // remises à zéro gratuites du compteur d'essais, seul rempart contre la force
+    // brute des six chiffres ; l'écrire avant l'envoi ferait qu'un envoi raté
+    // remplace le code que la personne vient de recevoir. Le registre est
+    // `verification_sends`, PARTAGÉ avec la création et la réclamation : les
+    // plafonds ne se doublent pas en passant par la connexion.
     const source = clientSource(c);
     const sendCheck = challengeSendAllowed(source, email);
     if (!sendCheck.ok) {
@@ -308,7 +310,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
       return c.json({ error: 'code_unavailable', message: TEXTS.code_unavailable }, 503);
     }
     const sendId = recordVerificationSend(source, email);
-    const code = issueLoginCode(emailNorm);
+    const code = drawLoginCode();
     const outcome = await deliverAccountCodeEmail({
       to: email,
       code,
@@ -330,6 +332,9 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
       );
       return c.json({ error: 'code_unavailable', message: TEXTS.code_unavailable }, 503);
     }
+    // Le code n'existe en base qu'une fois parti : il remplace alors l'ancien et
+    // remet les essais à zéro, pour un envoi déjà compté au registre.
+    issueLoginCode(emailNorm, code);
     noteAccountCodeSent();
     return c.json({ status: 'code_sent', expires_in: VERIFICATION_TTL_MINUTES * 60 }, 202);
   });

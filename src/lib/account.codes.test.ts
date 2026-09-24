@@ -357,6 +357,40 @@ describe('les codes de connexion', () => {
     expect(after.refused - before.refused).toBe(2);
   });
 
+  it('un envoi raté laisse le code précédent valide, essais compris', async () => {
+    const app = makeApp();
+    const email = 'renvoi-rate@alpha.example.net';
+    expect((await post(app, '/v1/account/code', { email }, '203.0.113.44')).status).toBe(202);
+    // Relevé MAINTENANT : la doublure du relais retient aussi les messages
+    // qu'elle dit refuser, et le « dernier code reçu » serait alors faux.
+    const first = lastCodeFor(email);
+    const wrong = first === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 3; i++) {
+      expect(
+        (await post(app, '/v1/account/session', { email, code: wrong }, '203.0.113.44')).status,
+      ).toBe(400);
+    }
+    const attempts = () =>
+      (
+        getStatsDB()
+          .prepare('SELECT attempts FROM account_login_codes WHERE email_norm = ?')
+          .get(email) as { attempts: number }
+      ).attempts;
+    expect(attempts()).toBe(3);
+
+    // Le relais tombe, puis refuse l'adresse : aucun code neuf n'existe.
+    relay.outcome = 'refused';
+    expect((await post(app, '/v1/account/code', { email }, '203.0.113.44')).status).toBe(503);
+    relay.outcome = 'undeliverable';
+    expect((await post(app, '/v1/account/code', { email }, '203.0.113.44')).status).toBe(400);
+
+    // Le code reçu tient toujours, et les essais déjà brûlés le restent :
+    // un envoi raté n'est pas une remise à zéro gratuite.
+    expect(attempts()).toBe(3);
+    const session = await post(app, '/v1/account/session', { email, code: first }, '203.0.113.44');
+    expect(session.status).toBe(200);
+  });
+
   it('au-delà de trente codes dans l’heure, la connexion cède : 503, une alerte par heure', async () => {
     const app = makeApp();
     const db = getStatsDB();

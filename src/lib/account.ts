@@ -122,19 +122,24 @@ function toIso(sqliteUtc: string | null): string | null {
 
 // ─── Les codes de connexion ──────────────────────────────────────────────────
 
+/** Tire un code à six chiffres, sans rien écrire (voir `issueLoginCode`). */
+export function drawLoginCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0');
+}
+
 /**
- * Émet (ou remplace) le code de connexion d'une adresse normalisée et rend le
- * code en clair : c'est l'APPELANT qui le poste ; seule son empreinte est
- * gardée.
+ * Enregistre (ou remplace) le code de connexion d'une adresse normalisée et le
+ * rend en clair ; sans code fourni, en tire un. Seule son empreinte est gardée.
  *
  * Le remplacement remet `attempts` à zéro et invalide l'ancien code. C'est la
  * seule remise à zéro qui existe, et elle ne s'obtient qu'en passant les
- * plafonds d'envoi : la route mesure l'envoi AVANT d'appeler cette fonction.
- * Le tirage et la durée sont ceux du code de vérification
- * (`src/lib/key-creation-guard.ts`), constantes importées.
+ * plafonds d'envoi : la route inscrit l'envoi au registre AVANT de poster le
+ * code, et n'appelle cette fonction qu'APRÈS un envoi réussi. Un envoi raté ne
+ * remplace donc pas le code que la personne vient peut-être de recevoir, et ne
+ * remet pas le compteur à zéro. Le tirage et la durée sont ceux du code de
+ * vérification (`src/lib/key-creation-guard.ts`), constantes importées.
  */
-export function issueLoginCode(emailNorm: string): string {
-  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+export function issueLoginCode(emailNorm: string, code: string = drawLoginCode()): string {
   getStatsDB()
     .prepare(
       `INSERT INTO account_login_codes (email_norm, code_hash, attempts, created_at, expires_at)
