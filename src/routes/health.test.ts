@@ -88,6 +88,19 @@ describe('/health', () => {
   });
 
   /**
+   * On 24/09/2026 an assistant quoted a July copy of this answer as current.
+   * `served_at` dates the answer itself, so a copy dates itself too.
+   */
+  it('dates the answer with served_at, ISO 8601 in UTC, taken on the request', async () => {
+    const before = Date.now();
+    const body = (await (await app.request('/health')).json()) as Record<string, unknown>;
+    expect(body.served_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    const stamp = Date.parse(body.served_at as string);
+    expect(stamp).toBeGreaterThanOrEqual(Math.floor(before / 1000) * 1000);
+    expect(stamp).toBeLessThanOrEqual(Date.now());
+  });
+
+  /**
    * The whole point. Before this change, only the first of these three was
    * red — the two most expensive failures answered 200.
    */

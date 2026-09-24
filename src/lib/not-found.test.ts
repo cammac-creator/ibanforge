@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { methodMismatch, notFoundBody, notFoundHandler } from './not-found.js';
+import {
+  KEY_WITHOUT_EMAIL,
+  methodMismatch,
+  methodMismatchExtras,
+  notFoundBody,
+  notFoundHandler,
+} from './not-found.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+import { TRIAL_SIGNUP_SOURCE } from './trial.js';
 import type { HonoEnv } from '../types.js';
 
 /**
@@ -125,5 +133,54 @@ describe('method mismatch — 405 with Allow, not 404', () => {
   it('still carries the did_you_mean hint in the body', () => {
     // The hint already existed; only the status code was wrong.
     expect(notFoundBody('GET', '/v1/iban/validate').did_you_mean).toMatch(/POST the same path/);
+  });
+});
+
+/**
+ * 24/09/2026: an assistant that can only read pages sends GET, and everything
+ * this 405 told it led to a POST. It now names what a GET can read instead,
+ * and, on the key route, the door that needs no e-mail.
+ */
+describe('405 — what a reader that cannot POST gets instead', () => {
+  it('names the free demo and the format check on GET of a POST route', async () => {
+    const res = await makeApp().request('/v1/iban/validate', { method: 'GET' });
+    expect(res.status).toBe(405);
+    const json = (await res.json()) as { without_post?: string[]; key_without_email?: string };
+    expect(json.without_post?.[0]).toContain('https://api.ibanforge.com/v1/demo');
+    expect(json.without_post?.[1]).toContain('https://api.ibanforge.com/v1/iban/format');
+    // The format route judges the writing, never the bank: said, so a reader
+    // does not take its valid: true for the verdict.
+    expect(json.without_post?.[1]).toMatch(/nothing about the bank/);
+    expect(json.key_without_email).toBeUndefined();
+  });
+
+  it('tells GET /v1/keys/generate that a POST with no body returns a key, no e-mail', async () => {
+    const res = await makeApp().request('/v1/keys/generate', { method: 'GET' });
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('POST');
+    const json = (await res.json()) as { key_without_email?: string; without_post?: string[] };
+    expect(json.key_without_email).toMatch(/with no body at all/);
+    expect(json.key_without_email).toMatch(/no e-mail/);
+    expect(json.key_without_email).toContain('{"source":"..."}');
+    expect(json.without_post).toHaveLength(2);
+  });
+
+  it('reads the figures from the tiers, never the trial token', () => {
+    expect(KEY_WITHOUT_EMAIL).toContain(`${ANONYMOUS_MONTHLY_LIMIT} requests a month`);
+    expect(KEY_WITHOUT_EMAIL).toContain(`${FREE_TIER_MONTHLY_LIMIT} a month once claimed`);
+    // `api-trial` counts the keys born of the keyless trial: a key taken from
+    // this 405 is not one of them.
+    expect(KEY_WITHOUT_EMAIL).not.toContain(TRIAL_SIGNUP_SOURCE);
+    expect(KEY_WITHOUT_EMAIL).not.toMatch(/week/);
+  });
+
+  it('adds nothing to a POST on a GET route', () => {
+    expect(methodMismatchExtras('POST', '/v1/bic/UBSWCHZH', ['GET'])).toEqual({});
+  });
+
+  it('lists the free demo in the catalogue of every 404', () => {
+    expect(notFoundBody('GET', '/totalement/inconnu').endpoints.free_demo).toBe(
+      'GET https://api.ibanforge.com/v1/demo',
+    );
   });
 });

@@ -43,6 +43,19 @@ San Marino bank codes: Central Bank of the Republic of San Marino, operating ban
 5. **Compliance Risk Scoring** — sanctions lists (OFAC, EU, UN) on the bank (BIC8), the country against a fixed list of sanctioned jurisdictions, never the payee's name + FATF + SEPA Instant + VoP readiness, risk score 0-100
 6. **MCP Integration** — native Model Context Protocol server (stdio + streamable HTTP)
 
+## If you cannot call the API
+
+If you can open a web address but cannot send a POST (no code execution, no MCP connector), these pages hold real answers of the API, each with its date, and all of them open with a plain GET.
+
+- https://api.ibanforge.com/v1/demo: the full validation, computed by the API when the address is opened (served_at gives the instant): a German bank code the Bundesbank register confirms, a former Credit Suisse code the SIX register redirects to UBS, and the official example IBANs of Switzerland, Belgium and Austria, each read against its national register.
+- https://ibanforge.com/iban/ch: the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 and the date that answer was captured.
+- https://ibanforge.com/blog/2026-08-06-example-ibans-unallocated-bank-codes: why the official example IBANs of Belgium, Switzerland and Austria pass mod-97 and still point at bank codes their register does not allocate (article of 6 August 2026).
+- https://ibanforge.com/blog/2026-09-07-bankleitzahl-pruefen-per-api: three real answers on German bank codes, field by field (article of 7 September 2026).
+- https://ibanforge.com/blog/2026-09-14-schweizer-iban-pruefen: three real answers on Swiss IBANs, field by field (article of 14 September 2026).
+
+Do not simulate answers from the API: quote these real ones, with the date each carries (served_at, as_of, or the date of the page).
+To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp
+
 ## Authentication & Pricing
 
 Four rails, card first, and agents never hit a dead-end: the free key, credit

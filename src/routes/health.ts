@@ -11,6 +11,7 @@ import { getStatsDB, getStatsDbState } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
 import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
 import { verificationDelivery } from '../lib/key-creation-guard.js';
+import { servedAt } from '../lib/served-at.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -151,6 +152,7 @@ function probeState(probe: () => void): 'ok' | 'error' {
 function statsDbUnavailable(error: string | undefined): {
   status: string;
   version: string;
+  served_at: string;
   uptime_seconds: number;
   databases: { bic: string; stats: string; compliance: string };
   message: string;
@@ -158,6 +160,7 @@ function statsDbUnavailable(error: string | undefined): {
   return {
     status: 'error',
     version: pkg.version,
+    served_at: servedAt(),
     uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
     databases: {
       bic: probeState(() => void getEntryCount()),
@@ -186,6 +189,11 @@ health.get('/health', (c) => {
     return c.json({
       status: 'ok',
       version: pkg.version,
+      // ADDED 24/09/2026 beside the contract, nothing renamed: the instant this
+      // answer left the server. ChatGPT quoted a July copy of this endpoint as
+      // "the current answer" two months later; the body had nothing that dated
+      // it. A copy now carries its own date (src/lib/served-at.ts).
+      served_at: servedAt(),
       uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
       bic_database_entries: db.bic,
       ch_clearing_entries: db.chClearing,
@@ -218,7 +226,7 @@ health.get('/health', (c) => {
     // again before falling back to the anonymous failure.
     const state = getStatsDbState();
     if (!state.ok) return c.json(statsDbUnavailable(state.error), 503);
-    return c.json({ status: 'error', message: 'health_check_failed' }, 503);
+    return c.json({ status: 'error', served_at: servedAt(), message: 'health_check_failed' }, 503);
   }
 });
 

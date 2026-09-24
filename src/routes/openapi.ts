@@ -1928,7 +1928,8 @@ const buildRawSpec = () => ({
       get: {
         operationId: 'getDemo',
         summary: 'Free demo results',
-        description: 'Returns example IBAN and BIC validation results. No payment required.',
+        description:
+          'Returns example IBAN and BIC validation results, computed on the request by the same validation as the paid routes. No payment required, and readable with a plain GET: the official example IBANs of Switzerland, Belgium and Austria show the verdict of their national register on a bank code a checksum cannot judge. `served_at` dates the answer.',
         tags: ['Free'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -1943,8 +1944,21 @@ const buildRawSpec = () => ({
                   type: 'object',
                   properties: {
                     message: { type: 'string' },
+                    served_at: {
+                      type: 'string',
+                      format: 'date-time',
+                      description:
+                        'When this answer was computed, ISO 8601 in UTC, to the second. Added on 24/09/2026, so that a copy of this page quoted later dates itself.',
+                    },
+                    how_to_read: {
+                      type: 'string',
+                      description:
+                        'How to read the verdict on the bank code, for a reader that cannot call the API itself.',
+                    },
                     iban_examples: {
                       type: 'array',
+                      description:
+                        'One validation result per example, computed on the request, each with a `label` that names the example (its bank, or its provenance for an official example IBAN).',
                       items: { $ref: '#/components/schemas/IBANValidationResult' },
                     },
                     bic_examples: {
@@ -2996,6 +3010,12 @@ const buildRawSpec = () => ({
         properties: {
           status: { type: 'string', enum: ['ok'] },
           version: { type: 'string', example: PKG_VERSION },
+          served_at: {
+            type: 'string',
+            format: 'date-time',
+            description:
+              'When this answer left the server, ISO 8601 in UTC, to the second. Added on 24/09/2026: a copy of this endpoint quoted from an index or a cache now carries its own date.',
+          },
           uptime_seconds: { type: 'number' },
           bic_database_entries: {
             type: 'integer',

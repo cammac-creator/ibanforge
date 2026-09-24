@@ -4,6 +4,7 @@ import { datasetFacts } from '../lib/dataset-facts.js';
 import {
   BANK_LEVEL_SANCTIONS,
   bicDirectorySentence,
+  cannotCallJson,
   codesOf,
   freeAccessSentences,
   registerCountries,
@@ -60,6 +61,10 @@ const MCP_SERVER_CARD = {
   // 24/09/2026 said nothing about free access. One sentence per door, every
   // figure read from the constant the code applies.
   free_access: freeAccessSentences().join(' '),
+  // The same day, the lesson of the reader that cannot POST: this card is
+  // opened with a GET, so it names the real answers a GET can open, and asks
+  // not to simulate. Written once in src/lib/positioning.ts.
+  if_you_cannot_call: cannotCallJson(),
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,

@@ -81,6 +81,19 @@ answering after the limit is reached.
 
 Full descriptions of the read-only data tools, with WHEN-to-use triggers, are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
 
+## If you cannot call the API
+
+If you can open a web address but cannot send a POST (no code execution, no MCP connector), these pages hold real answers of the API, each with its date, and all of them open with a plain GET.
+
+- https://api.ibanforge.com/v1/demo: the full validation, computed by the API when the address is opened (served_at gives the instant): a German bank code the Bundesbank register confirms, a former Credit Suisse code the SIX register redirects to UBS, and the official example IBANs of Switzerland, Belgium and Austria, each read against its national register.
+- https://ibanforge.com/iban/ch: the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 and the date that answer was captured.
+- https://ibanforge.com/blog/2026-08-06-example-ibans-unallocated-bank-codes: why the official example IBANs of Belgium, Switzerland and Austria pass mod-97 and still point at bank codes their register does not allocate (article of 6 August 2026).
+- https://ibanforge.com/blog/2026-09-07-bankleitzahl-pruefen-per-api: three real answers on German bank codes, field by field (article of 7 September 2026).
+- https://ibanforge.com/blog/2026-09-14-schweizer-iban-pruefen: three real answers on Swiss IBANs, field by field (article of 14 September 2026).
+
+Do not simulate answers from the API: quote these real ones, with the date each carries (served_at, as_of, or the date of the page).
+To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp
+
 ---
 
 ## For AI agents — pay per call without an API key (x402)
