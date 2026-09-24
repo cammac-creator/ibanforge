@@ -16,12 +16,15 @@ import { Hono } from 'hono';
 
 const relay = vi.hoisted(() => ({
   sent: [] as Array<{ to: string; subject: string; text: string; html?: string }>,
+  /** Latence simulée du relais, posée par le seul test chronométré. */
+  delayMs: 0,
 }));
 vi.mock('../lib/mail-transport.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/mail-transport.js')>();
   return {
     ...actual,
     deliverViaRelay: async (m: { to: string; subject: string; text: string; html?: string }) => {
+      if (relay.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, relay.delayMs));
       relay.sent.push(m);
       return { outcome: 'sent' as const };
     },
@@ -78,6 +81,7 @@ const NOBODY = 'nobody@alpha.example.net';
 
 beforeEach(() => {
   relay.sent.length = 0;
+  relay.delayMs = 0;
   mailDomain.accepts = true;
   delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
   const db = getStatsDB();
@@ -256,6 +260,12 @@ describe('anti-énumération : POST /v1/account/code et /v1/account/session', ()
     // les deux séries, et médianes pour qu'un ramasse-miettes isolé ne décide
     // rien. Le registre d'envois est vidé entre deux appels, hors chronomètre :
     // sans cela, les plafonds répondraient 429 dès le quatrième.
+    //
+    // Le relais simulé prend quelques millisecondes, comme un vrai relais en
+    // prend des centaines : c'est ce qui rend visible l'implémentation écartée
+    // par le plan (ne rien envoyer aux adresses sans clé). Avec un relais
+    // instantané, ce test ne pourrait rien voir.
+    relay.delayMs = 8;
     const app = makeApp();
     const db = getStatsDB();
     const timeOne = async (email: string): Promise<number> => {
