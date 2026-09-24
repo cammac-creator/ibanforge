@@ -44,12 +44,15 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import {
   ACCOUNT_COOKIE,
   ACCOUNT_SESSION_SECONDS,
+  accountCodeBudgetLeft,
   buildOverview,
   checkLoginCode,
   createSession,
   findOwnedKey,
   forgetLoginCode,
   issueLoginCode,
+  noteAccountCodeRefused,
+  noteAccountCodeSent,
   readSession,
   revokeAllSessions,
   revokeSession,
@@ -107,7 +110,11 @@ const TEXTS = {
     'Too many sign-in codes were sent to addresses at this domain today. Try again tomorrow.',
   rate_limited_source:
     'Too many sign-in codes were requested from this network today. Try again tomorrow.',
-  code_unavailable: 'Sign-in codes cannot be sent right now. Try again in a few minutes.',
+  // Le même texte pour les deux causes (relais en panne, plafond global de
+  // l'heure) : le repli qu'il propose vaut pour toute adresse, donc il ne dit
+  // rien de celle-ci.
+  code_unavailable:
+    'Sign-in codes cannot be sent right now. Try again later, or paste an API key on the account page instead.',
   invalid_code:
     'This code is not valid, or it has expired. Check the most recent mail, or ask for a new code.',
   too_many_attempts: 'Too many attempts with this code. Ask for a new one.',
@@ -237,8 +244,8 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     // `normalizeEmail` ne rend null que sans arobase, ce que la forme exclut.
     const emailNorm = normalizeEmail(email) ?? email;
 
-    // 🚨 L'ordre des quatre gestes est celui de `/v1/keys/claim`, et il est un
-    // contrat : plafond d'envoi, enregistrement de l'envoi, émission du code,
+    // 🚨 L'ordre des gestes est celui de `/v1/keys/claim`, et il est un
+    // contrat : plafonds d'envoi, enregistrement de l'envoi, émission du code,
     // envoi réel. Émettre le code avant de mesurer l'envoi offrirait des remises
     // à zéro gratuites du compteur d'essais, seul rempart contre la force brute
     // des six chiffres. Le registre est `verification_sends`, PARTAGÉ avec la
@@ -259,6 +266,14 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
         },
         429,
       );
+    }
+    // Le plafond GLOBAL de l'heure, dernier contrôle avant l'envoi : la boîte
+    // d'envoi est celle des clés payées, et c'est la connexion qui cède. Un
+    // refus ici n'entre pas au registre (aucun mail n'est parti) et n'alerte
+    // qu'une fois par heure (`noteAccountCodeRefused`).
+    if (!accountCodeBudgetLeft()) {
+      noteAccountCodeRefused();
+      return c.json({ error: 'code_unavailable', message: TEXTS.code_unavailable }, 503);
     }
     const sendId = recordVerificationSend(source, email);
     const code = issueLoginCode(emailNorm);
@@ -283,6 +298,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
       );
       return c.json({ error: 'code_unavailable', message: TEXTS.code_unavailable }, 503);
     }
+    noteAccountCodeSent();
     return c.json({ status: 'code_sent', expires_in: VERIFICATION_TTL_MINUTES * 60 }, 202);
   });
 

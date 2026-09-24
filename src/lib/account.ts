@@ -48,6 +48,7 @@ import {
   type ApiKeyValidationRow,
 } from './api-keys.js';
 import { VERIFICATION_MAX_ATTEMPTS, VERIFICATION_TTL_MINUTES } from './key-creation-guard.js';
+import { opsFail, opsOk } from './ops-alert.js';
 import { PRO_PORTAL_URL } from './payment-links.js';
 import { CREDITS_NOTICE_LOCK_PREFIX } from './quota-notice.js';
 import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
@@ -163,6 +164,88 @@ export function checkLoginCode(emailNorm: string, code: string): LoginCodeCheck 
 /** Oublie le code en cours d'une adresse (révocation par l'administration). */
 export function forgetLoginCode(emailNorm: string): void {
   getStatsDB().prepare('DELETE FROM account_login_codes WHERE email_norm = ?').run(emailNorm);
+}
+
+// ─── Le plafond global des codes de connexion ────────────────────────────────
+
+/**
+ * Codes de vérification au plus sur l'heure glissante, toutes portes
+ * confondues, au-delà desquels la connexion au compte n'envoie plus de code.
+ *
+ * Pourquoi : `POST /v1/account/code` n'exige aucune clé, et tous les mails
+ * transactionnels partent de la MÊME boîte d'envoi, celle qui livre aussi les
+ * clés payées. Les plafonds par adresse, par domaine et par réseau ne bornent
+ * pas un envoi réparti sur beaucoup d'adresses et de réseaux. Le quota du
+ * fournisseur est déjà un plafond global, partagé avec l'argent : mieux vaut
+ * choisir que ce soit la connexion qui cède. Au-delà, la route répond 503, et
+ * le repli « coller une clé » reste.
+ *
+ * 🚨 Compté sur le registre d'envois PARTAGÉ (`verification_sends`), qui ne
+ * dit pas quelle porte a posté le code : les codes de création, de réclamation
+ * et d'approbation par appareil entrent donc dans ce compte. C'est voulu (la
+ * boîte est une), et seule la connexion est refusée ici : les autres portes
+ * gardent leurs propres plafonds.
+ */
+export const ACCOUNT_CODES_GLOBAL_PER_HOUR = 30;
+
+/** La clé de l'alerte d'exploitation du plafond, distincte de celle du relais. */
+export const ACCOUNT_CODE_CEILING_ALERT = 'mail:account-code-ceiling';
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Vrai si le registre d'envois a encore de la place dans l'heure glissante.
+ * Le registre est purgé au-delà de deux jours à chaque envoi : le parcours
+ * reste court.
+ */
+export function accountCodeBudgetLeft(): boolean {
+  const row = getStatsDB()
+    .prepare(
+      "SELECT COUNT(*) AS n FROM verification_sends WHERE created_at >= datetime('now', '-1 hour')",
+    )
+    .get() as { n: number };
+  return row.n < ACCOUNT_CODES_GLOBAL_PER_HOUR;
+}
+
+/**
+ * L'état de l'alerte du plafond, tenu en mémoire : un `opsFail` au PREMIER refus
+ * d'une heure, jamais un par requête ; un `opsOk` au premier code parti après
+ * une heure sans refus.
+ *
+ * `open` vaut vrai au démarrage : l'état persisté par `ops-alert` survit à un
+ * redéploiement, pas cette mémoire, et une alerte laissée ouverte sans `opsOk`
+ * resterait muette au dépassement suivant (le piège que décrit
+ * `reportKeyDelivered`, `src/lib/email.ts`). Le premier code parti après le
+ * démarrage la referme donc, ce qui ne coûte qu'une lecture quand rien n'est
+ * ouvert.
+ */
+const ceilingAlert = { failedAt: 0, lastRefusalAt: 0, open: true };
+
+/** Un code refusé au plafond global. */
+export function noteAccountCodeRefused(now = Date.now()): void {
+  ceilingAlert.lastRefusalAt = now;
+  if (now - ceilingAlert.failedAt < HOUR_MS) return;
+  ceilingAlert.failedAt = now;
+  ceilingAlert.open = true;
+  void opsFail(
+    ACCOUNT_CODE_CEILING_ALERT,
+    `Account sign-in codes are paused: the shared verification mailbox reached ${ACCOUNT_CODES_GLOBAL_PER_HOUR} codes within the last hour, so the account sign-in answers 503 until the hour clears. Key deliveries are not held by this ceiling.`,
+    1,
+  );
+}
+
+/** Un code de connexion parti : l'alerte se ferme après une heure sans refus. */
+export function noteAccountCodeSent(now = Date.now()): void {
+  if (!ceilingAlert.open || now - ceilingAlert.lastRefusalAt < HOUR_MS) return;
+  ceilingAlert.open = false;
+  void opsOk(ACCOUNT_CODE_CEILING_ALERT, 'Account sign-in codes are leaving again.');
+}
+
+/** Pour les tests : l'état d'un processus qui vient de démarrer. */
+export function resetAccountCodeCeilingAlert(): void {
+  ceilingAlert.failedAt = 0;
+  ceilingAlert.lastRefusalAt = 0;
+  ceilingAlert.open = true;
 }
 
 // ─── Les sessions ────────────────────────────────────────────────────────────

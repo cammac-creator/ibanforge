@@ -26,8 +26,12 @@ vi.mock('./mail-transport.js', async (importOriginal) => {
     },
   };
 });
-// L'alerte d'exploitation, retenue plutôt qu'envoyée : on vérifie qu'elle part.
-const ops = vi.hoisted(() => ({ fails: [] as Array<{ key: string; threshold?: number }> }));
+// L'alerte d'exploitation, retenue plutôt qu'envoyée : on vérifie qu'elle part
+// (et le shell de la machine peut porter un vrai jeton Telegram).
+const ops = vi.hoisted(() => ({
+  fails: [] as Array<{ key: string; threshold?: number }>,
+  oks: [] as string[],
+}));
 vi.mock('./ops-alert.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./ops-alert.js')>();
   return {
@@ -35,12 +39,21 @@ vi.mock('./ops-alert.js', async (importOriginal) => {
     opsFail: async (key: string, _detail: string, threshold?: number) => {
       ops.fails.push({ key, threshold });
     },
+    opsOk: async (key: string) => {
+      ops.oks.push(key);
+    },
   };
 });
 
 import { apiKeys } from '../routes/api-keys.js';
 import { getStatsDB } from './db.js';
-import { checkLoginCode, issueLoginCode } from './account.js';
+import {
+  ACCOUNT_CODES_GLOBAL_PER_HOUR,
+  ACCOUNT_CODE_CEILING_ALERT,
+  checkLoginCode,
+  issueLoginCode,
+  resetAccountCodeCeilingAlert,
+} from './account.js';
 import {
   VERIFICATION_MAX_ATTEMPTS,
   VERIFICATION_SENDS_PER_EMAIL_DAY,
@@ -99,6 +112,7 @@ beforeEach(() => {
   relay.sent.length = 0;
   relay.outcome = 'sent';
   ops.fails.length = 0;
+  ops.oks.length = 0;
   // La garde des domaines fictifs reste ARMÉE : les adresses de ce fichier
   // sont en alpha.example.net, qu'elle laisse passer, comme en production.
   delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
@@ -336,5 +350,74 @@ describe('les codes de connexion', () => {
     const after = verificationDelivery(24);
     expect(after.attempted - before.attempted).toBe(2);
     expect(after.refused - before.refused).toBe(2);
+  });
+
+  it('au-delà de trente codes dans l’heure, la connexion cède : 503, une alerte par heure', async () => {
+    const app = makeApp();
+    const db = getStatsDB();
+    resetAccountCodeCeilingAlert();
+    // L'horloge du processus est pilotée (l'alerte se compte par heure) ; celle
+    // de SQLite reste réelle, donc le registre garde ses lignes.
+    let clock = Date.now();
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      // Le registre ne dit pas quelle porte a posté un code : des lignes
+      // quelconques de l'heure le remplissent, une ligne plus vieille ne compte plus.
+      const insert = db.prepare(
+        `INSERT INTO verification_sends (ip_hash, email_hash, domain_hash, created_at)
+           VALUES (?, ?, NULL, datetime('now', ?))`,
+      );
+      insert.run('autre-porte-ancienne', 'autre-adresse-ancienne', '-61 minutes');
+      for (let i = 0; i < ACCOUNT_CODES_GLOBAL_PER_HOUR - 1; i++) {
+        insert.run(`autre-porte-${i}`, `autre-adresse-${i}`, '-5 minutes');
+      }
+      const registry = () =>
+        (db.prepare('SELECT COUNT(*) AS n FROM verification_sends').get() as { n: number }).n;
+      const ask = (email: string, ip: string) => post(app, '/v1/account/code', { email }, ip);
+      expect(ACCOUNT_CODES_GLOBAL_PER_HOUR).toBe(30);
+
+      // Vingt-neuf codes dans l'heure : le trentième part. Le premier code parti
+      // après un démarrage referme une alerte que l'état persisté aurait gardée.
+      expect((await ask('plafond-a@alpha.example.net', '203.0.113.46')).status).toBe(202);
+      expect(relay.sent).toHaveLength(1);
+      expect(ops.oks).toEqual([ACCOUNT_CODE_CEILING_ALERT]);
+      const full = registry();
+
+      // Trente : la connexion cède, sans rien envoyer ni rien inscrire.
+      const refused = await ask('plafond-b@alpha.example.net', '203.0.113.47');
+      expect(refused.status).toBe(503);
+      const body = (await refused.json()) as { error: string; message: string };
+      expect(body.error).toBe('code_unavailable');
+      expect(body.message).toMatch(/paste an API key/);
+      expect(relay.sent).toHaveLength(1);
+      expect(registry()).toBe(full);
+      expect(ops.fails).toEqual([{ key: ACCOUNT_CODE_CEILING_ALERT, threshold: 1 }]);
+
+      // Un autre refus dans la même heure : aucune seconde alerte.
+      clock += 30 * 60_000;
+      expect((await ask('plafond-c@alpha.example.net', '203.0.113.48')).status).toBe(503);
+      expect(ops.fails).toHaveLength(1);
+
+      // L'heure suivante, le premier refus alerte de nouveau.
+      clock += 31 * 60_000;
+      expect((await ask('plafond-d@alpha.example.net', '203.0.113.49')).status).toBe(503);
+      expect(ops.fails).toHaveLength(2);
+      expect(ops.oks).toHaveLength(1);
+
+      // Deux places se libèrent : les codes repartent, mais l'alerte ne se
+      // referme qu'après une heure sans refus.
+      db.prepare(
+        "UPDATE verification_sends SET created_at = datetime('now', '-2 hours') WHERE ip_hash IN ('autre-porte-0', 'autre-porte-1')",
+      ).run();
+      clock += 10 * 60_000;
+      expect((await ask('plafond-e@alpha.example.net', '203.0.113.50')).status).toBe(202);
+      expect(ops.oks).toHaveLength(1);
+      clock += 61 * 60_000;
+      expect((await ask('plafond-f@alpha.example.net', '203.0.113.51')).status).toBe(202);
+      expect(ops.oks).toEqual([ACCOUNT_CODE_CEILING_ALERT, ACCOUNT_CODE_CEILING_ALERT]);
+      expect(ops.fails).toHaveLength(2);
+    } finally {
+      now.mockRestore();
+    }
   });
 });
