@@ -357,6 +357,64 @@ describe('les codes de connexion', () => {
     expect(after.refused - before.refused).toBe(2);
   });
 
+  it('une adresse qui en nomme plusieurs, ou qui n’est pas simple, est refusée sans rien envoyer', async () => {
+    const app = makeApp();
+    const db = getStatsDB();
+    const count = (table: string) =>
+      (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+    for (const email of [
+      // Une liste, quelle que soit la façon de la coller.
+      'liste+x,autre@alpha.example.net',
+      'liste@alpha.example.net,autre@alpha.example.net',
+      'liste@alpha.example.net;autre@alpha.example.net',
+      // Un nom affiché ou des guillemets, qu'un en-tête lirait autrement.
+      'Acme <liste@alpha.example.net>',
+      '"liste,autre"@alpha.example.net',
+      // Simple une fois saisie, mais pas sa forme normalisée, qui recevrait le code.
+      'premier.+tag@alpha.example.net',
+    ]) {
+      const code = await post(app, '/v1/account/code', { email }, '203.0.113.42');
+      expect(code.status, email).toBe(400);
+      expect(((await code.json()) as { error: string }).error, email).toBe('invalid_email');
+      const session = await post(
+        app,
+        '/v1/account/session',
+        { email, code: '123456' },
+        '203.0.113.42',
+      );
+      expect(session.status, email).toBe(400);
+      expect(((await session.json()) as { error: string }).error, email).toBe('invalid_email');
+    }
+    // Refusées AVANT tout : aucun mail, rien au registre, aucun code.
+    expect(relay.sent).toHaveLength(0);
+    expect(count('verification_sends')).toBe(0);
+    expect(count('account_login_codes')).toBe(0);
+  });
+
+  it('le code part à l’adresse normalisée, jamais à l’adresse saisie', async () => {
+    const app = makeApp();
+    for (const [typed, normalized] of [
+      ['acme+facturation@alpha.example.net', 'acme@alpha.example.net'],
+      ['Ac.Me.Ops+ci@GoogleMail.com', 'acmeops@gmail.com'],
+    ]) {
+      relay.sent.length = 0;
+      expect((await post(app, '/v1/account/code', { email: typed }, '203.0.113.43')).status).toBe(
+        202,
+      );
+      // L'espion du relais : un seul message, à la boîte de l'identité normalisée.
+      expect(relay.sent.map((m) => m.to)).toEqual([normalized]);
+      const code = lastCodeFor(normalized);
+      // La session s'ouvre en tapant la même adresse, pour l'identité normalisée.
+      const session = await post(
+        app,
+        '/v1/account/session',
+        { email: typed, code },
+        '203.0.113.43',
+      );
+      expect(session.status, typed).toBe(200);
+    }
+  });
+
   it('un envoi raté laisse le code précédent valide, essais compris', async () => {
     const app = makeApp();
     const email = 'renvoi-rate@alpha.example.net';

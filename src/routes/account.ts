@@ -66,6 +66,7 @@ import { isAllowedOrigin } from '../lib/cors-origins.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
 import { deliverAccountCodeEmail } from '../lib/email.js';
 import { normalizeEmail } from '../lib/email-norm.js';
+import { isPlainEmail } from '../lib/email-shape.js';
 import { getKeyReport } from '../lib/key-report.js';
 import {
   VERIFICATION_TTL_MINUTES,
@@ -136,9 +137,6 @@ const COOKIE_OPTIONS = {
   path: '/v1/account',
 } as const;
 
-/** Même forme d'adresse que `/v1/keys/generate` et `/v1/keys/claim`. */
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
 function clientSource(c: Context): string | null {
   return keyCreationSource(
     extractClientIp({
@@ -190,12 +188,25 @@ async function readBody(c: Context): Promise<Record<string, unknown> | 'invalid'
   return parsed as Record<string, unknown>;
 }
 
-/** L'adresse, en minuscules et sans blancs, ou null si ce n'en est pas une. */
-function readEmail(raw: unknown): string | null {
+/**
+ * L'adresse saisie (en minuscules, sans blancs autour) et sa forme normalisée,
+ * ou null si l'une des deux n'est pas UNE adresse simple (`isPlainEmail`, la
+ * forme que le relais d'envoi accepte, comme `/v1/keys/generate` et
+ * `/v1/keys/claim`).
+ *
+ * 🚨 C'est la forme NORMALISÉE qui reçoit le code, jamais l'adresse saisie :
+ * la session ouvre l'identité normalisée (`email_norm`), c'est donc cette
+ * boîte-là qui doit prouver qu'on la lit. Elle doit être simple elle aussi :
+ * une étiquette retirée peut laisser une partie locale qui finit par un point,
+ * que le relais refuserait.
+ */
+function readEmail(raw: unknown): { email: string; emailNorm: string } | null {
   if (typeof raw !== 'string') return null;
   const email = raw.trim().toLowerCase();
-  if (email === '' || email.length > 255 || !EMAIL_SHAPE.test(email)) return null;
-  return email;
+  if (!isPlainEmail(email)) return null;
+  const emailNorm = normalizeEmail(email);
+  if (!emailNorm || !isPlainEmail(emailNorm)) return null;
+  return { email, emailNorm };
 }
 
 /**
@@ -262,22 +273,24 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (body === 'invalid') {
       return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
     }
-    const email = readEmail(body.email);
-    if (!email) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    const address = readEmail(body.email);
+    if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    // Tout ce qui suit porte sur l'adresse qui RECEVRA le code : la forme
+    // normalisée (voir `readEmail`). Les gardes de domaine la lisent elle aussi,
+    // puisque la normalisation peut changer le domaine (googlemail devient gmail).
+    const { emailNorm } = address;
     if (
       process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' &&
-      (deps.isBlockedEmail(email) || isDisposableDomain(email))
+      (deps.isBlockedEmail(emailNorm) || isDisposableDomain(emailNorm))
     ) {
       return c.json({ error: 'disposable_email', message: TEXTS.disposable_email }, 400);
     }
     // Un domaine sans serveur de courrier ne recevra jamais le code, et chaque
     // envoi vers un tel domaine coûte la réputation de la boîte d'envoi. Sauté
     // sous vitest, comme sur `/claim` : un test ne dépend pas d'un résolveur.
-    if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(email)))) {
+    if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(emailNorm)))) {
       return c.json({ error: 'undeliverable_email', message: TEXTS.undeliverable_domain }, 400);
     }
-    // `normalizeEmail` ne rend null que sans arobase, ce que la forme exclut.
-    const emailNorm = normalizeEmail(email) ?? email;
 
     // 🚨 L'ordre des gestes est un contrat : plafonds d'envoi, enregistrement de
     // l'envoi, tirage du code, envoi réel, et SEULEMENT APRÈS un envoi réussi,
@@ -288,7 +301,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     // `verification_sends`, PARTAGÉ avec la création et la réclamation : les
     // plafonds ne se doublent pas en passant par la connexion.
     const source = clientSource(c);
-    const sendCheck = challengeSendAllowed(source, email);
+    const sendCheck = challengeSendAllowed(source, emailNorm);
     if (!sendCheck.ok) {
       return c.json(
         {
@@ -311,10 +324,10 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
       noteAccountCodeRefused();
       return c.json({ error: 'code_unavailable', message: TEXTS.code_unavailable }, 503);
     }
-    const sendId = recordVerificationSend(source, email);
+    const sendId = recordVerificationSend(source, emailNorm);
     const code = drawLoginCode();
     const outcome = await deliverAccountCodeEmail({
-      to: email,
+      to: emailNorm,
       code,
       ttlMinutes: VERIFICATION_TTL_MINUTES,
     });
@@ -353,8 +366,9 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (body === 'invalid') {
       return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
     }
-    const email = readEmail(body.email);
-    if (!email) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    const address = readEmail(body.email);
+    if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    const { email, emailNorm } = address;
     const code = typeof body.code === 'string' ? body.code.trim() : '';
     // Une saisie qui n'a pas la forme d'un code (cinq chiffres, une lettre)
     // n'est pas comptée comme un essai : elle ne peut pas être juste, et une
@@ -362,7 +376,6 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (!/^\d{6}$/.test(code)) {
       return c.json({ error: 'invalid_code', message: TEXTS.invalid_code }, 400);
     }
-    const emailNorm = normalizeEmail(email) ?? email;
     // 🚨 Une seule réponse pour tout échec, quelle qu'en soit la raison
     // (`checkLoginCode` la garde pour ses propres tests) : la réponse d'une
     // adresse dont le code est épuisé ne se distingue pas de celle d'une adresse
@@ -460,11 +473,10 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (body === 'invalid') {
       return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
     }
-    const email = readEmail(body.email);
-    const emailNorm = email ? normalizeEmail(email) : null;
-    if (!emailNorm) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
-    const revoked = revokeAllSessions(emailNorm);
-    forgetLoginCode(emailNorm);
+    const address = readEmail(body.email);
+    if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    const revoked = revokeAllSessions(address.emailNorm);
+    forgetLoginCode(address.emailNorm);
     return c.json({ revoked });
   });
 

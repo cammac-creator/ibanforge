@@ -26,6 +26,7 @@ vi.mock('./mail-transport.js', async (importOriginal) => {
 
 import { apiKeys } from '../routes/api-keys.js';
 import { getStatsDB } from './db.js';
+import { normalizeEmail } from './email-norm.js';
 import {
   ACCOUNT_COOKIE,
   ACCOUNT_SESSION_DAYS,
@@ -72,11 +73,14 @@ function tokenFrom(res: Response): string {
   return m[1];
 }
 
-/** Le vrai parcours : un code par mail, puis la session. Rend le jeton du cookie. */
+/**
+ * Le vrai parcours : un code par mail, puis la session. Rend le jeton du cookie.
+ * Le code part à l'adresse NORMALISÉE : c'est là qu'on le lit.
+ */
 async function signIn(app: Hono, email: string): Promise<string> {
   const sent = await post(app, '/v1/account/code', { email });
   if (sent.status !== 202) throw new Error(`code refusé : ${sent.status}`);
-  const mail = [...relay.sent].reverse().find((m) => m.to === email);
+  const mail = [...relay.sent].reverse().find((m) => m.to === normalizeEmail(email));
   const code = mail ? /^(\d{6}) /.exec(mail.subject)?.[1] : undefined;
   const res = await post(app, '/v1/account/session', { email, code });
   if (res.status !== 200) throw new Error(`session refusée : ${res.status}`);
