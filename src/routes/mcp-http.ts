@@ -1479,6 +1479,63 @@ mcpHttp.post('/mcp', async (c) => {
   // que cette colonne existe pour fermer.
   if (toolName) c.set('mcpToolName', toolName);
 
+  // 🚨 LA SESSION D'ABORD, LE DÉBIT ENSUITE (relecture du 25/09/2026, D1).
+  //
+  // L'allocation se débitait avant de savoir si la session existait : un
+  // `tools/call` sur une session inconnue (après chaque redéploiement, après
+  // 30 min d'inactivité, après une éviction) payait ses unités, un lot de 20
+  // IBAN en payait 20, puis recevait un 404 sans qu'aucun outil ait tourné. Au
+  // jour, l'unité perdue revenait le lendemain ; à la semaine, elle ne revient
+  // que le lundi. Aucun outil ne peut servir une requête sans session : on ne
+  // débite donc qu'une fois la session trouvée.
+  const sessionId = c.req.header('mcp-session-id');
+  let transport = sessionId ? mcpSessions.get(sessionId) : undefined;
+
+  if (sessionId && !transport) {
+    // The SDK answers this case `400 Bad Request: Server not initialized`, which
+    // describes the server rather than the session — and an LLM reading it
+    // concludes the service is broken instead of re-opening a session. It
+    // happens after every redeploy (the store is in memory) and now after an
+    // idle sweep too, so the message has to name the remedy. 404 is what the
+    // streamable-HTTP spec reserves for an unknown session id, and a compliant
+    // client re-sends `initialize` on it. MCP-09, audit 2026-09-01.
+    return c.json(
+      {
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: {
+          code: -32001,
+          message:
+            'Session expired or server redeployed. Send initialize again to open a new session.',
+          data: { session_id: sessionId, idle_timeout_minutes: MCP_SESSION_IDLE_MS / 60000 },
+        },
+      },
+      404,
+    );
+  }
+
+  if (!sessionId && toolCalls > 0) {
+    // Un `tools/call` sans session, seul ou dans un lot avec `initialize`. Le
+    // SDK le refuse en 400 (« Server not initialized », « Only one
+    // initialization request is allowed ») ; le laisser aller jusqu'à lui
+    // consommait une ouverture de session, construisait un McpServer pour rien
+    // et, avant la correction ci-dessus, débitait l'allocation. On répond tôt,
+    // sans rien débiter, avec le geste qui marche.
+    return c.json(
+      {
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: {
+          code: -32000,
+          message:
+            'Bad Request: no session. Send initialize alone first, then send tools/call with the ' +
+            'mcp-session-id header that initialize returned.',
+        },
+      },
+      400,
+    );
+  }
+
   if (toolUnits > 0) {
     const now = new Date();
     const limit = checkMcpToolAllowance(mcpBucket(ip, ''), toolUnits, now);
@@ -1542,13 +1599,14 @@ mcpHttp.post('/mcp', async (c) => {
   // par requête dans le fichier qui porte `api_keys`, les crédits et les traces
   // de paiement. `tool_calls` compte donc les appels SERVIS ; les refus se
   // lisent déjà à part, sous `/mcp:tools-call:refused` dans `request_log`.
+  // Depuis le 25/09/2026 (D1), ce point n'est atteint qu'avec une session
+  // vivante : un appel sur une session inconnue (404) ou sans session (400)
+  // repart plus haut et n'est plus compté ici.
   //
   // Une seule écriture par requête `/mcp`, sur une table d'une ligne par jour.
   if (toolCalls > 0) bumpMcpRemoteDaily({ toolCalls, keyRequests });
 
-  const sessionId = c.req.header('mcp-session-id');
-
-  // 🚨 LE PORTEUR EST PRÉPARÉ ICI, AVANT DE SAVOIR S'IL Y A UNE SESSION, et
+  // 🚨 LE PORTEUR EST PRÉPARÉ ICI, AVANT QU'UNE SESSION NEUVE SOIT CRÉÉE, et
   // l'ordre des gestes est la moitié de la correction.
   //
   // Sur une requête `initialize`, `sessionId` N'EXISTE PAS ENCORE : il vient de
@@ -1565,31 +1623,6 @@ mcpHttp.post('/mcp', async (c) => {
   const callCtx: McpCallContext = known ?? { ip: null, userAgent: null };
   callCtx.ip = ip === 'unknown' ? null : ip;
   callCtx.userAgent = c.req.header('user-agent') ?? null;
-
-  let transport = sessionId ? mcpSessions.get(sessionId) : undefined;
-
-  if (sessionId && !transport) {
-    // The SDK answers this case `400 Bad Request: Server not initialized`, which
-    // describes the server rather than the session — and an LLM reading it
-    // concludes the service is broken instead of re-opening a session. It
-    // happens after every redeploy (the store is in memory) and now after an
-    // idle sweep too, so the message has to name the remedy. 404 is what the
-    // streamable-HTTP spec reserves for an unknown session id, and a compliant
-    // client re-sends `initialize` on it. MCP-09, audit 2026-09-01.
-    return c.json(
-      {
-        jsonrpc: '2.0',
-        id: rpcId,
-        error: {
-          code: -32001,
-          message:
-            'Session expired or server redeployed. Send initialize again to open a new session.',
-          data: { session_id: sessionId, idle_timeout_minutes: MCP_SESSION_IDLE_MS / 60000 },
-        },
-      },
-      404,
-    );
-  }
 
   if (!transport) {
     // Opening a session costs a full McpServer, so it is metered like the tool

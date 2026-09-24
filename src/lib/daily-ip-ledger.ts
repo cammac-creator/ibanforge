@@ -460,7 +460,10 @@ export function countDailyUnits(key: string, units: number, limit: number): Dail
   const seen = overLimit.get(key);
   if (seen && seen.day === day && seen.limit === limit) {
     seen.used += units;
-    bumpUncounted(day, units);
+    // Même garde que le chemin de la semaine (relecture du 25/09/2026, D2) :
+    // `rest_attempts_uncounted` est une colonne de l'essai REST, et ce chemin ne
+    // reçoit plus que des ouvertures de session MCP (`init:`).
+    if (key.startsWith('rest:')) bumpUncounted(day, units);
     return { allowed: false, used: seen.used, remaining: 0 };
   }
 

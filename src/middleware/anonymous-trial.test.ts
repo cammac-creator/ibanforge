@@ -13,7 +13,13 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from './x402.js';
-import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
+import {
+  REST_TRIAL_WEEKLY_LIMIT,
+  TRIAL_RESET,
+  trialResetsAt,
+  trialWeekStart,
+} from '../lib/trial.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import {
   forgetLedgerMemory,
   resetDailyLedger,
@@ -618,5 +624,103 @@ describe('what the trial measures', () => {
     const before = orphan();
     await validate({ iban: VALID_IBAN }, freshHeaders());
     expect(orphan()).toBe(before);
+  });
+});
+
+/**
+ * Two separate allowances of the same size (Claude-Alain's decision of
+ * 24/09/2026, evening, point 2): the keyless REST trial and the keyless MCP
+ * access never share a bucket. Held here, through the real app and the real
+ * routes (review of 25/09/2026, D12): the ledger tests fix both buckets by
+ * hand and cannot fail, whatever bucket a route picks.
+ */
+describe('the keyless MCP allowance and the REST trial are separate', () => {
+  const MCP_HEADERS = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+  };
+
+  async function mcp(ip: string, body: unknown, sessionId?: string): Promise<Response> {
+    return buildApp().request('https://api.ibanforge.com/mcp', {
+      method: 'POST',
+      headers: {
+        ...MCP_HEADERS,
+        'x-real-ip': ip,
+        ...(sessionId ? { 'mcp-session-id': sessionId } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function rpcBody(res: Response): Promise<{ error?: { code: number }; result?: unknown }> {
+    const text = await res.text();
+    const frame = text.match(/^data:\s*(\{.*\})$/m);
+    return JSON.parse(frame ? frame[1] : text) as { error?: { code: number }; result?: unknown };
+  }
+
+  async function openSession(ip: string): Promise<string> {
+    const res = await mcp(ip, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'separation', version: '1.0.0' },
+      },
+    });
+    const sessionId = res.headers.get('mcp-session-id');
+    expect(sessionId).toBeTruthy();
+    await res.text();
+    await mcp(ip, { jsonrpc: '2.0', method: 'notifications/initialized' }, sessionId!);
+    return sessionId!;
+  }
+
+  function toolCall(id: number) {
+    return {
+      jsonrpc: '2.0',
+      id,
+      method: 'tools/call',
+      params: { name: 'validate_iban', arguments: { iban: VALID_IBAN } },
+    };
+  }
+
+  // 198.51.100.x on purpose: freshHeaders() cycles through 203.0.113.0/24.
+  it('a source that spent the MCP week keeps its REST trial', async () => {
+    const ip = '198.51.100.61';
+    const sessionId = await openSession(ip);
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i += 1) {
+      expect(
+        (await rpcBody(await mcp(ip, toolCall(10 + i), sessionId))).error,
+        `call ${i + 1}`,
+      ).toBeUndefined();
+    }
+    expect((await rpcBody(await mcp(ip, toolCall(99), sessionId))).error?.code).toBe(-32000);
+
+    const rest = await validate({ iban: VALID_IBAN }, { 'x-real-ip': ip });
+    expect(rest.status).toBe(200);
+    const body = (await rest.json()) as TrialBody;
+    expect(body.trial?.calls_left_this_week).toBe(REST_TRIAL_WEEKLY_LIMIT - 1);
+  });
+
+  it('a source that spent the REST trial is still served on MCP', async () => {
+    const ip = '198.51.100.62';
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
+      expect(
+        (await validate({ iban: VALID_IBAN }, { 'x-real-ip': ip })).status,
+        `call ${i + 1}`,
+      ).toBe(200);
+    }
+    expect((await validate({ iban: VALID_IBAN }, { 'x-real-ip': ip })).status).toBe(402);
+
+    const sessionId = await openSession(ip);
+    expect((await rpcBody(await mcp(ip, toolCall(10), sessionId))).error).toBeUndefined();
+
+    // One `rest:` bucket and one bare bucket for the source, never merged.
+    const buckets = getStatsDB()
+      .prepare('SELECT bucket FROM trial_weekly WHERE week = ?')
+      .all(trialWeekStart()) as Array<{ bucket: string }>;
+    expect(buckets.filter((b) => b.bucket.startsWith('rest:'))).toHaveLength(1);
+    expect(buckets.filter((b) => !b.bucket.includes(':'))).toHaveLength(1);
   });
 });

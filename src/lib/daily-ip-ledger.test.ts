@@ -899,7 +899,9 @@ describe('the week of the keyless REST trial', () => {
     expect(countWeeklyTrialUnits(MCP, 1, MCP_WEEKLY_LIMIT).allowed).toBe(true);
   });
 
-  it('leaves the MCP session ceiling counted by the day, out of the weekly table', () => {
+  // What the ROUTE does with sessions is held in mcp-http.test.ts (D13); this
+  // one only says what countDailyUnits does with an `init:` key.
+  it('countDailyUnits keeps an init: key by the day, and never writes the weekly table', () => {
     at('2026-09-29T08:00:00Z');
     countDailyUnits(INIT, 30, 30);
     expect(countDailyUnits(INIT, 1, 30).allowed).toBe(false);
@@ -927,6 +929,18 @@ describe('the week of the keyless REST trial', () => {
       units: MCP_WEEKLY_LIMIT + 1,
       over_limit: 1,
     });
+  });
+
+  it('keeps refused MCP session openings out of rest_attempts_uncounted too', () => {
+    // Relecture du 25/09/2026, D2 : le court-circuit du jour comptait encore les
+    // refus d'ouverture de session dans la colonne de l'essai REST.
+    at('2026-09-29T08:00:00Z');
+    countDailyUnits(INIT, 31, 30);
+    for (let i = 0; i < 3; i += 1) expect(countDailyUnits(INIT, 1, 30).allowed).toBe(false);
+    snapshotTrialDay('2026-09-29');
+    const row = getTrialDaily(90).find((r) => r.day === '2026-09-29');
+    expect(row?.rest_attempts_uncounted).toBe(0);
+    expect(row?.init_buckets).toBe(1);
   });
 
   it('keeps MCP refusals out of rest_attempts_uncounted, and MCP calls in the daily trace', () => {
