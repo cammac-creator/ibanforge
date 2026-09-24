@@ -73,6 +73,7 @@ Files concerned:
   src/lib/fi-register.ts
   scripts/data/eu-emi-register-2026-05-22.json
   scripts/data/iban-registry-2026-05-22.json
+  test fixtures and sample API responses elsewhere (see group C)
 
 Earlier commits of this repository, and forks of it, keep copies of these
 files. The data in those copies remains subject to its publishers' terms.
@@ -93,33 +94,44 @@ GLEIF (Global Legal Entity Identifier Foundation), LEI reference data
   Terms: CC0 1.0 Universal Public Domain Dedication.
          https://www.gleif.org/en/about/open-data
 
-  The BIC-to-LEI mapping used to key this data to BIC codes is published by
-  GLEIF in collaboration with SWIFT and is provided under SWIFT's
-  royalty-free, commercial-use terms, which require the following
-  attribution:
-    "This service uses the BIC to LEI relationship file. The mapping table has
-     been developed by SWIFT. SWIFT and BIC are registered trademarks of S.W.I.F.T. SC."
-    https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files
-
-PeterNotenboom/SwiftCodes
-  Where: data/bic.sqlite, table bic_entries, source 'swiftcodes'
-         (82,102 rows).
-  Terms: MIT License, granted by the author of that repository (copyright
-         notice at the end of this file). Its data was last updated in
-         January 2018. The licence is that author's, not SWIFT's: IBANforge
-         holds no licence to the SWIFT BIC directory.
-         https://github.com/PeterNotenboom/SwiftCodes
+  The BIC-to-LEI relationship file ("Mapping Table") used to key this data to
+  BIC codes has been developed by SWIFT and is published by GLEIF. Its licence,
+  the BIC/LEI Mapping Table License Agreement (Annex II, 21 December 2017),
+  grants a royalty-free licence for any purpose, including commercial,
+  "provided always that any copy of the Mapping Table, in whole or in part,
+  includes the following notice":
+    "SWIFT © and database rights [insert date (i.e. month and year) of the Mapping Table version].
+    All rights reserved.
+    This Mapping Table has been developed by SWIFT. Any use of the Mapping Table, in whole or
+    in part, is subject to the BIC/LEI Mapping Table License Agreement as published with the
+    Mapping Table available on GLEIF’s website.
+    The Mapping Table is updated monthly. For the latest BIC information and updates, always
+    refer to www.swift.com/bic ."
+    https://www.gleif.org/lei-data/lei-mapping/download-bic-to-lei-relationship-files/2017-12-21_annex-2_bic-to-lei-mapping-table-license-agreement_final.pdf
+  Applied to the copy in this repository, the first line reads
+    SWIFT © and database rights <month year>.
+  where <month year> is the version of the Mapping Table loaded at the last
+  monthly refresh. IBANforge does not yet store that version: the 'gleif'
+  rows of bic_entries carry the refresh date (column updated_at), and the
+  version is the latest file GLEIF had published by then, as listed on
+  https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files
+  In this revision the rows were loaded on 1 September 2026, from the
+  August 2026 version (LEI-BIC-20260828.zip).
 
 Deutsche Bundesbank, Bankleitzahlendatei
   Where: data/bic.sqlite, table bic_entries, source 'bundesbank' (143 rows),
          and table de_blz (3,506 rows); frontend/data/registers/de-blz.json.
   Attribution required by the Bundesbank:
          Quelle: Deutsche Bundesbank
-  Terms: the Bundesbank's terms of use allow storing, forwarding and
-         reproducing its information for personal or business use, and
-         state: "The information must not be changed or falsified." The
-         records here are reformatted for storage and lookup; whether that
-         counts as a change has not been confirmed with the Bundesbank.
+  Terms: section 4.1 of the Bundesbank's terms of use: "Es steht Ihnen
+         frei, für Ihren persönlichen oder geschäftlichen Gebrauch von der
+         Deutschen Bundesbank erstellte Informationen in körperlicher oder
+         elektronischer Form zu speichern, weiterzugeben oder zu
+         vervielfältigen. Die Informationen dürfen nicht verändert oder
+         verfälscht werden." (storing, forwarding and reproducing for
+         personal or business use; no change or falsification). The records
+         here are reformatted for storage and lookup; whether that counts as
+         a change has not been confirmed with the Bundesbank.
          https://www.bundesbank.de/de/startseite/benutzerhinweise/nutzungsbedingungen-fuer-den-allgemeinen-gebrauch-der-website-763554
 
 SIX Group AG, Bank Master
@@ -172,7 +184,7 @@ European Banking Authority, payment institutions register (PSD2)
   Where: data/bic.sqlite, table psd_entities (4,422 rows, 30 countries,
          register of 1 September 2026); the entries of
          scripts/data/eu-emi-register-2026-05-22.json taken from the same
-         register (the GB entries of that file are listed in group B).
+         register (the GB entries of that file are listed in group C).
   Terms: "Reproduction of all EBA material on this site is authorised,
          provided the source is acknowledged."
          https://www.eba.europa.eu/legal-notice
@@ -184,12 +196,11 @@ U.S. Department of the Treasury, Office of Foreign Assets Control (OFAC),
 Specially Designated Nationals and Blocked Persons (SDN) list
   Where: data/compliance.sqlite, table sanctioned_entities, source_list
          'OFAC' (285 rows).
-  Terms: a work of the United States Government ("Copyright protection under
-         this title is not available for any work of the United States
-         Government", 17 U.S.C. §105), declared CC0 1.0 for this dataset in
-         the Treasury's data inventory. No endorsement by the U.S.
+  Terms: a work of the United States Government: "Copyright protection
+         under this title is not available for any work of the United
+         States Government" (17 U.S.C. §105). No endorsement by the U.S.
          Government is implied.
-         https://www.treasury.gov/jsonfiles/data.json
+         https://www.govinfo.gov/content/pkg/USCODE-2023-title17/html/USCODE-2023-title17-chap1-sec105.htm
 
 European Union, consolidated list of persons, groups and entities subject
 to EU financial sanctions
@@ -252,6 +263,17 @@ IBANforge's own tables
 B. Sources whose terms have not yet been confirmed
 --------------------------------------------------------------------------------
 
+PeterNotenboom/SwiftCodes
+  Where: data/bic.sqlite, table bic_entries, source 'swiftcodes'
+         (82,102 rows).
+  Terms: the repository is distributed under the MIT License by its author
+         (copyright notice at the end of this file) and states: "All the
+         info is grabbed from public websites." Its data was last updated in
+         January 2018. The licence is that author's, not SWIFT's: SWIFT's
+         rights in these records have not been established, and IBANforge
+         holds no licence to the SWIFT BIC directory.
+         https://github.com/PeterNotenboom/SwiftCodes
+
 SIX Group AG, BIC entries
   Where: data/bic.sqlite, table bic_entries, source 'six_group' (20 rows).
   Terms: taken from the same SIX publication as the Bank Master above;
@@ -260,7 +282,8 @@ SIX Group AG, BIC entries
 
 Composite bank-code map, apart from the Austrian, Belgian, Finnish,
 Luxembourg and Polish keys listed in group C
-  Where: src/db/bic_data.json (24,083 keys, 75 countries).
+  Where: src/db/bic_data.json (18,629 of its 24,083 keys, in 70 of its
+         75 countries).
   Built from: the datasets of sigalor/iban-to-bic, which that project
          generates from files published by national central banks and
          banking associations; the bank registries of mdomke/schwifty,
@@ -274,13 +297,6 @@ Luxembourg and Polish keys listed in group C
          reviewed.
          https://github.com/sigalor/iban-to-bic
          https://github.com/mdomke/schwifty
-
-UK Financial Conduct Authority (FCA), exports of e-money and payment firms
-  Where: the GB entries of scripts/data/eu-emi-register-2026-05-22.json
-         (1,195 of its 2,755 entries: name, country, type).
-  Terms: not confirmed for this use. The FCA's written acceptance of
-         7 September 2026 covers its Register API, queried one firm per
-         request; it does not cover these exports.
 
 SWIFT, IBAN Registry
   Where: scripts/data/iban-registry-2026-05-22.json (per country: IBAN
@@ -296,8 +312,12 @@ rights, restrict use to non-commercial purposes, publish no terms, or have
 permitted use in the IBANforge API without permitting redistribution of the
 data. They remain subject to their publishers' terms. They are not covered by
 the MIT License in LICENSE, and this repository grants no right to reuse
-them. They are being moved out of the public repository, in every file
-listed for them below.
+them. They are being moved out of the public repository: from every file
+listed for them below, and from test fixtures and sample API responses
+elsewhere in the repository, for example scripts/seed-national.test.ts (a
+copy of the San Marino page, with addresses and telephone numbers),
+mcp/fixtures/api-answers.json (EPC "sepa" blocks) and the FI, LU and PL
+examples of frontend/data/countries.json (resolved by keys listed below).
 
 EBA CLEARING, STEP2 SCT reachable PSPs list
   Where: data/bic.sqlite, table bic_entries, source 'eba_step2' (189 rows).
@@ -396,6 +416,25 @@ Bank of England, List of PRA-regulated Banks
          downloading "for personal use or internal use within an individual
          organisation for non-commercial purposes".
          https://www.bankofengland.co.uk/legal
+
+UK Financial Conduct Authority (FCA), Financial Services Register lists
+"E-Money Firms (CSV)" and "Firms with PSD Permissions (CSV)"
+  Where: the GB entries of scripts/data/eu-emi-register-2026-05-22.json
+         (1,195 of its 2,755 entries: name, country, type).
+  Terms: the FCA's website terms state: "3.3 You must not reproduce or
+         store any part of this site in any other website or include it in
+         any public or private electronic retrieval system or service
+         without our prior written permission. 3.4 You must not use data
+         from this site to provide a data feed to any comparison table or
+         any other website without our written permission." Their clause
+         2.2 applies the UK Open Government Licence to "charts, figures,
+         graphs, diagrams, tables and numerical datasets published within
+         the Data section of this site"; these lists are downloaded from the
+         Register (register.fca.org.uk), not from that section.
+         The FCA's written acceptance of 7 September 2026 covers its
+         Register API, queried one firm per request; it does not cover
+         these lists.
+         https://www.fca.org.uk/legal
 
 --------------------------------------------------------------------------------
 MIT License notices for the data compilations named above

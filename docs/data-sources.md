@@ -47,6 +47,30 @@ prochain lecteur puisse contredire plutôt que refaire.
 Aucune obligation d'attribution n'est énoncée. CC0 est une renonciation au droit
 d'auteur, pas une licence à conditions.
 
+**Table BIC↔LEI de SWIFT — licence lue le 24/09/2026.** ⚠️ La table qui relie
+les BIC aux LEI n'est pas couverte par le CC0 de GLEIF : elle est développée par
+SWIFT et publiée sous le *BIC/LEI Mapping Table License Agreement* (annexe II,
+21/12/2017), lié en pied de la page GLEIF. Licence gratuite pour tout usage, y
+compris commercial, « provided always that any copy of the Mapping Table, in
+whole or in part, includes the following notice » :
+> « SWIFT © and database rights [insert date (i.e. month and year) of the Mapping Table version].
+> All rights reserved.
+> This Mapping Table has been developed by SWIFT. Any use of the Mapping Table, in whole or
+> in part, is subject to the BIC/LEI Mapping Table License Agreement as published with the
+> Mapping Table available on GLEIF’s website.
+> The Mapping Table is updated monthly. For the latest BIC information and updates, always
+> refer to www.swift.com/bic . »
+> — <https://www.gleif.org/lei-data/lei-mapping/download-bic-to-lei-relationship-files/2017-12-21_annex-2_bic-to-lei-mapping-table-license-agreement_final.pdf>
+
+La formule servie jusqu'ici (« This service uses the BIC to LEI relationship
+file… ») n'a aucune source : elle ne figure pas dans cette licence. `NOTICE`
+porte désormais la formule exacte. Le mois de version n'est stocké nulle part :
+`src/db/seed.ts` prend la dernière table publiée (`mapping.gleif.org/api/v2/bic-lei/latest`)
+à chaque rafraîchissement mensuel ; les lignes `gleif` du 01/09/2026 viennent
+de la version d'août 2026 (`LEI-BIC-20260828.zip`). À faire : stocker ce mois
+et corriger les surfaces qui servent l'ancienne formule (`src/app.ts`,
+`frontend/public/llms.txt`).
+
 **SIX BankMaster — usage libre.** ✅
 > « All the details published in the Bank Master Data are based on information
 > provided by the respective banks/institutions. **Information in the Download
@@ -104,6 +128,10 @@ Treasury (obligatoire sous l'OPEN Government Data Act) porte pour la liste SDN
 <https://catalog.data.gov/dataset/specially-designated-nationals-sdn-and-blocked-persons-list>.
 Seules réserves (usa.gov) : ne pas suggérer d'endossement, ne pas utiliser les
 logos fédéraux. Nous ne faisons ni l'un ni l'autre.
+
+⚠️ **Relu le 24/09/2026 : `data.json` ne porte plus aucune entrée OFAC ou SDN**
+(231 jeux, aucun ne nomme la liste). La déclaration CC0 lue le 24/08 n'est donc
+plus vérifiable ; `NOTICE` ne cite plus que le §105, qui suffit.
 
 **ONU — établie, et c'est la réponse qui dérange.** ⚠️ (24/08/2026)
 > « None of the materials provided on this web site may be used, reproduced or
@@ -668,8 +696,8 @@ toute sous-licence ; jamais le logo ; jamais d'implication d'endossement.
 Le contenu écrit (hors data) est en CC BY 4.0. Attribution posée le 26/08
 sur les pages data-sources publiques (3 langues).
 
-**Formule remplie le 24/09/2026** (l'ancienne, « accessed at each plenary
-sync », n'avait ni l'année ni une date de consultation) :
+**Formule remplie le 24/09/2026** (l'ancienne formule publiée n'avait ni
+l'année ni une date de consultation) :
 
 > FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
 
@@ -678,8 +706,9 @@ plénière) et de `FATF_ACCESSED_ON` (jour de lecture des déclarations du GAFI 
 le 10/07/2026, commit `766d711d`, qui a synchronisé les listes sur la plénière
 des 17-19 juin), dans `src/lib/compliance-static.ts`. Les trois pages
 data-sources et `NOTICE` ne peuvent pas appeler la fonction :
-`src/routes/fatf-attribution.test.ts` les épingle sur elle, et échoue si
-`FATF_AS_OF` avance sans une nouvelle date de consultation.
+`src/routes/fatf-attribution.test.ts` les épingle sur elle (ce fichier
+compris), et échoue si la date de consultation précède l'ouverture de la
+plénière (`FATF_PLENARY_OPENED_ON`, le 17/06/2026 pour la plénière de juin).
 
 **EPC — ❌ NON COMMERCIAL par défaut → permission d'abord.**
 > « In principle, the information contained in this website can be

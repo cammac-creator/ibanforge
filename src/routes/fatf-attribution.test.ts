@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { FATF_ACCESSED_ON, FATF_AS_OF, fatfCitation } from '../lib/compliance-static.js';
+import {
+  FATF_ACCESSED_ON,
+  FATF_AS_OF,
+  FATF_PLENARY_OPENED_ON,
+  fatfCitation,
+} from '../lib/compliance-static.js';
 
 /**
  * The FATF permits commercial use of its data on one condition: credit in its
@@ -21,21 +26,24 @@ const ROOT = join(import.meta.dirname, '..', '..');
 /** Every static surface that carries the FATF credit. */
 const SURFACES = [
   'NOTICE',
+  'docs/data-sources.md',
   'frontend/content/en/docs/data-sources.mdx',
   'frontend/content/fr/docs/data-sources.mdx',
   'frontend/content/de/docs/data-sources.mdx',
 ];
 
 describe('FATF attribution', () => {
-  it('the access date is a real day, not before the plenary it reflects, not in the future', () => {
-    expect(FATF_ACCESSED_ON).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    const accessed = new Date(`${FATF_ACCESSED_ON}T00:00:00Z`);
-    expect(Number.isNaN(accessed.getTime())).toBe(false);
-    expect(accessed.toISOString().slice(0, 10)).toBe(FATF_ACCESSED_ON);
+  it('the access date is a real day, not before the plenary opened, not in the future', () => {
+    for (const day of [FATF_ACCESSED_ON, FATF_PLENARY_OPENED_ON]) {
+      expect(day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10)).toBe(day);
+    }
+    // The plenary day belongs to the plenary month the lists are dated by.
+    expect(FATF_PLENARY_OPENED_ON.startsWith(`${FATF_AS_OF}-`)).toBe(true);
     // A plenary bump that forgets the access date lands here: the lists of an
     // October plenary cannot have been read in July.
-    expect(FATF_ACCESSED_ON >= `${FATF_AS_OF}-01`).toBe(true);
-    expect(accessed.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(FATF_ACCESSED_ON >= FATF_PLENARY_OPENED_ON).toBe(true);
+    expect(new Date(`${FATF_ACCESSED_ON}T00:00:00Z`).getTime()).toBeLessThanOrEqual(Date.now());
   });
 
   it('the citation follows the FATF format, with the year and a dated access', () => {
