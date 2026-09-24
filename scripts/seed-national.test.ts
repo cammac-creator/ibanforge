@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import {
   CzechSourceNotLoaded,
@@ -8,6 +8,7 @@ import {
   parseCzech,
   parseCzechEditions,
   planCzechEditions,
+  seedCzechLive,
   writeCzech,
   type CzechEdition,
   parseSanMarino,
@@ -585,7 +586,7 @@ describe('writeCzech', () => {
 
   it('writes the edition in force and the announced one side by side', () => {
     const db = fresh();
-    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01', 39));
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01', 39), '2026-08-24');
     expect(count(db, 'national_bank_codes')).toBe(40);
     expect(count(db, 'national_bank_codes_pending')).toBe(39);
     expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
@@ -594,16 +595,16 @@ describe('writeCzech', () => {
 
   it('clears the announcement once a newer edition is in force', () => {
     const db = fresh();
-    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01'));
-    writeCzech(db, edition('254', '2026-09-01'), null);
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01'), '2026-08-24');
+    writeCzech(db, edition('254', '2026-09-01'), null, '2026-09-02');
     expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 254$/);
     expect(count(db, 'national_bank_codes_pending')).toBe(0);
   });
 
   it('refuses to go back an edition, and leaves both tables as they were', () => {
     const db = fresh();
-    writeCzech(db, edition('254', '2026-09-01'), edition('255', '2026-10-01'));
-    const back = () => writeCzech(db, edition('253', '2026-07-01'), null);
+    writeCzech(db, edition('254', '2026-09-01'), edition('255', '2026-10-01'), '2026-09-25');
+    const back = () => writeCzech(db, edition('253', '2026-07-01'), null, '2026-09-25');
     // Kept apart from a format change: the tables stay, the refresh goes on.
     expect(back).toThrow(CzechSourceNotLoaded);
     expect(back).toThrow(/go back/);
@@ -613,8 +614,8 @@ describe('writeCzech', () => {
 
   it('refuses a short edition before touching anything, and fails the run', () => {
     const db = fresh();
-    writeCzech(db, edition('253', '2026-07-01'), null);
-    const short = () => writeCzech(db, edition('254', '2026-09-01', 10), null);
+    writeCzech(db, edition('253', '2026-07-01'), null, '2026-07-02');
+    const short = () => writeCzech(db, edition('254', '2026-09-01', 10), null, '2026-09-02');
     expect(short).toThrow(/at least/);
     // A truncated file or a changed format is for a human to read, not the
     // keep-the-tables-and-carry-on kind.
@@ -622,12 +623,31 @@ describe('writeCzech', () => {
     expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
   });
 
+  it('refuses to go back behind an announced edition already in force', () => {
+    // 254 still sits in the pending table, but from 1 September activeTable()
+    // serves it: a stale page putting 253 in force must not bring 253 back.
+    const db = fresh();
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01'), '2026-08-24');
+    const stale = () => writeCzech(db, edition('253', '2026-07-01'), null, '2026-09-02');
+    expect(stale).toThrow(CzechSourceNotLoaded);
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
+    expect(versionIn(db, 'national_bank_codes_pending')).toMatch(/verze 254$/);
+  });
+
+  it('lets an announcement not yet in force be withdrawn', () => {
+    const db = fresh();
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01'), '2026-08-24');
+    writeCzech(db, edition('253', '2026-07-01'), null, '2026-08-30');
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
+    expect(count(db, 'national_bank_codes_pending')).toBe(0);
+  });
+
   it('leaves the other countries of the table alone', () => {
     const db = fresh();
     db.prepare(
       `INSERT INTO national_bank_codes (country, code, name) VALUES ('SK', '0200', 'Všeobecná úverová banka, a.s.')`,
     ).run();
-    writeCzech(db, edition('254', '2026-09-01'), null);
+    writeCzech(db, edition('254', '2026-09-01'), null, '2026-09-02');
     expect(
       (
         db.prepare(`SELECT COUNT(*) AS n FROM national_bank_codes WHERE country = 'SK'`).get() as {
@@ -635,5 +655,242 @@ describe('writeCzech', () => {
         }
       ).n,
     ).toBe(1);
+  });
+});
+
+/**
+ * The whole Czech loading path, on a stubbed network: the page, the history,
+ * the numbered and unnumbered files, and every way the ČNB can fail to serve
+ * them. No request leaves the machine.
+ */
+describe('seedCzechLive', () => {
+  const PAGE = 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/';
+  const HISTORY = 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/historicke-ciselniky/';
+  const UNNUMBERED =
+    'https://www.cnb.cz/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR.csv';
+  const HEADER =
+    'Kód platebního styku;Poskytovatel platebních služeb;BIC kód (SWIFT);Systém CERTIS';
+
+  /** An edition of 40 invented codes; `extra` rows are appended, `certis` fills the last column. */
+  const csv = (extra: string[] = [], certis = 'A') =>
+    [
+      HEADER,
+      ...Array.from(
+        { length: 40 },
+        (_, i) => `${String(1000 + i)};Příkladová banka ${i}, a.s.;;${certis}`,
+      ),
+      ...extra,
+    ].join('\r\n');
+
+  const item = (version: string, date: string, href: string) =>
+    `<li>Číselník ${version} <a href="/x.pdf">platný od ${date} (pdf)</a>, <a href="${href}">(utf-8, csv)</a></li>`;
+  const page = (...items: string[]) =>
+    `<html><head><title>Číselníky, seznamy, registry - Česká národní banka</title></head><body><ul>${items.join('')}</ul></body></html>`;
+  const history = page(
+    '<li><a href="/254.pdf">Číselník 254 platný od 1. 9. 2026 (pdf)</a></li>',
+    '<li><a href="/253.pdf">Číselník 253 platný od 1. 7. 2026 (pdf)</a></li>',
+  );
+  const REFUSAL =
+    '<html><head><title>Request Rejected</title></head><body>The requested URL was rejected. Your support ID is: 0000000000.</body></html>';
+
+  type Route = () => Response | Promise<Response>;
+  const text =
+    (body: string, status = 200): Route =>
+    () =>
+      new Response(body, { status });
+  /** Headers arrive, then the connection is cut while the body streams. */
+  const cutMidBody: Route = () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(HEADER));
+          controller.error(new TypeError('terminated'));
+        },
+      }),
+      { status: 200 },
+    );
+
+  function network(routes: Record<string, Route>) {
+    const calls: string[] = [];
+    const fetchImpl = async (url: string) => {
+      calls.push(url);
+      const route = routes[url];
+      return route ? route() : new Response('Not Found', { status: 404 });
+    };
+    return { calls, fetchImpl };
+  }
+
+  const fresh = () => {
+    const db = new Database(':memory:');
+    ensureNationalTables(db);
+    return db;
+  };
+  const rows = (db: Database.Database, table: string) =>
+    db
+      .prepare(
+        `SELECT source, as_of, COUNT(*) AS n FROM ${table} WHERE country = 'CZ' GROUP BY source`,
+      )
+      .all() as Array<{ source: string; as_of: string; n: number }>;
+  const quiet = () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    return vi.spyOn(console, 'warn').mockImplementation(() => {});
+  };
+
+  it('loads the edition in force, and does not read the history when nothing is announced', async () => {
+    quiet();
+    const db = fresh();
+    const { calls, fetchImpl } = network({
+      [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv()),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes')).toEqual([
+      { source: czechSource({ version: '254' }), as_of: '2026-09-01', n: 40 },
+    ]);
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([]);
+    expect(calls).not.toContain(HISTORY);
+    vi.restoreAllMocks();
+  });
+
+  it('writes an announcement read from its numbered file even when only CERTIS changed', async () => {
+    // 248→249 changed nothing but the CERTIS column, which is not stored: the
+    // numbered file is edition 249 by construction, so 249 must be credited
+    // from its date rather than dropped as "identical".
+    quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(
+        page(
+          item('254', '1. 9. 2026', UNNUMBERED),
+          item('255', '1. 10. 2026', czechNumberedCsvUrl('255')),
+        ),
+      ),
+      [HISTORY]: text(history),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [czechNumberedCsvUrl('255')]: text(csv([], '-')),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([
+      { source: czechSource({ version: '255' }), as_of: '2026-10-01', n: 40 },
+    ]);
+    vi.restoreAllMocks();
+  });
+
+  it('does not write an announcement whose only file is the unnumbered one, unchanged', async () => {
+    const warn = quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(
+        page(item('254', '1. 9. 2026', UNNUMBERED), item('255', '1. 10. 2026', UNNUMBERED)),
+      ),
+      [HISTORY]: text(history),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv()),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes')[0].source).toBe(czechSource({ version: '254' }));
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([]);
+    expect(warn.mock.calls.flat().join(' ')).toMatch(/announcement not written/);
+    vi.restoreAllMocks();
+  });
+
+  it('writes the announcement once the unnumbered file has moved', async () => {
+    quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(
+        page(item('254', '1. 9. 2026', UNNUMBERED), item('255', '1. 10. 2026', UNNUMBERED)),
+      ),
+      [HISTORY]: text(history),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv(['2999;Nová banka, a.s.;NOVACZPP;A'])),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([
+      { source: czechSource({ version: '255' }), as_of: '2026-10-01', n: 41 },
+    ]);
+    vi.restoreAllMocks();
+  });
+
+  /** Every failure below leaves a database that already holds 254 exactly as it was. */
+  const seeded = async () => {
+    quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv()),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    return db;
+  };
+
+  it.each([
+    [
+      'the network is down',
+      {
+        fetchImpl: async () => {
+          throw new TypeError('fetch failed');
+        },
+      },
+    ],
+    ['the page answers 403', network({ [PAGE]: text('Forbidden', 403) })],
+    [
+      'a refusal page is served with 200 instead of the register page',
+      network({ [PAGE]: text(REFUSAL) }),
+    ],
+    [
+      'a refusal page is served with 200 instead of the numbered file',
+      network({
+        [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+        [czechNumberedCsvUrl('254')]: text(REFUSAL),
+        [UNNUMBERED]: text(csv()),
+      }),
+    ],
+    [
+      'the connection is cut while the file arrives',
+      network({
+        [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+        [czechNumberedCsvUrl('254')]: cutMidBody,
+      }),
+    ],
+  ])('keeps the tables and does not fail the month when %s', async (_label, net) => {
+    const db = await seeded();
+    const before = rows(db, 'national_bank_codes');
+    await expect(
+      seedCzechLive(db, { fetchImpl: net.fetchImpl, today: '2026-09-26' }),
+    ).rejects.toBeInstanceOf(CzechSourceNotLoaded);
+    expect(rows(db, 'national_bank_codes')).toEqual(before);
+    vi.restoreAllMocks();
+  });
+
+  it('loads the numbered file when only the linked one is a refusal page', async () => {
+    const db = await seeded();
+    const warn = quiet();
+    const { fetchImpl } = network({
+      [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+      [czechNumberedCsvUrl('254')]: text(csv(['2999;Nová banka, a.s.;NOVACZPP;A'])),
+      [UNNUMBERED]: text(REFUSAL),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-26' });
+    expect(rows(db, 'national_bank_codes')[0].n).toBe(41);
+    expect(warn.mock.calls.flat().join(' ')).toMatch(/without the comparison/);
+    vi.restoreAllMocks();
+  });
+
+  it('fails the run on a ČNB page that no longer states its edition', async () => {
+    // The bank's name is there, the phrase is not: that is the layout
+    // changing, for a human to read, not the ČNB refusing us.
+    const db = await seeded();
+    const { fetchImpl } = network({
+      [PAGE]: text(page('<li>Aktuální číselník: viz níže</li>')),
+    });
+    const run = seedCzechLive(db, { fetchImpl, today: '2026-09-26' });
+    await expect(run).rejects.toThrow(/layout changed/);
+    await expect(seedCzechLive(db, { fetchImpl, today: '2026-09-26' })).rejects.not.toBeInstanceOf(
+      CzechSourceNotLoaded,
+    );
+    vi.restoreAllMocks();
   });
 });

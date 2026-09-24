@@ -239,7 +239,19 @@ const SKIP_TRACKING = new Set([
 // /llms.txt — emerging standard (llmstxt.org) for AI agents to understand the API.
 // Counts are read live from the database on first request and memoized —
 // hardcoded numbers rot at every monthly data refresh, and agents DO verify.
+//
+// Memoized per EDITION of the dated registers, not per process: the Czech
+// register switches editions at midnight in Prague without a deploy (see
+// PENDING_TABLE in national-registers.ts), and a text built once would keep
+// crediting the old edition while every validation already credits the new
+// one. The key is the credits themselves, read per request (a map read and a
+// small query each); the text is rebuilt only when one of them changes.
 let llmsTxtCache: string | null = null;
+let llmsTxtKey: string | null = null;
+
+function llmsTxtEditionKey(): string {
+  return ['SK', 'CZ', 'SM'].map((cc) => nationalRegisterCredit(cc) ?? '').join('|');
+}
 
 function buildLlmsTxt(): string {
   const bicCount = getEntryCount().toLocaleString('en-US');
@@ -1007,7 +1019,11 @@ export function buildApp(): Hono<HonoEnv> {
   });
 
   app.get('/llms.txt', (c) => {
-    if (!llmsTxtCache) llmsTxtCache = buildLlmsTxt();
+    const key = llmsTxtEditionKey();
+    if (!llmsTxtCache || llmsTxtKey !== key) {
+      llmsTxtCache = buildLlmsTxt();
+      llmsTxtKey = key;
+    }
     return c.text(llmsTxtCache, 200, { 'Content-Type': 'text/plain; charset=utf-8' });
   });
 
