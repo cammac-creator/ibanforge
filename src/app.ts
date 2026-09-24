@@ -725,6 +725,7 @@ export function buildApp(): Hono<HonoEnv> {
         return configuredOrigins.includes(origin) ? origin : configuredOrigins[0];
       },
       allowMethods: ['GET', 'POST', 'OPTIONS'],
+      credentials: true, // cookie du compte client (lot C1), lu par src/routes/account.ts seul
       // X-API-Key is a documented auth header (api-key middleware accepts it), so it
       // must be allowed through CORS preflight or browser callers can't use it.
       // PAYMENT-SIGNATURE is the x402 v2 payment header and X-Payment the v1 one.

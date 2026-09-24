@@ -525,6 +525,61 @@ export async function sendKeyVerificationEmail(p: { to: string; code: string }):
 }
 
 /**
+ * Le code de connexion à la page du compte (lot C1, 24.09.2026).
+ *
+ * Un gabarit à part de `buildKeyVerificationEmail`, qui parle d'une « second
+ * API key requested from your network » : faux pour une connexion. Trois
+ * règles, chacune verrouillée par `src/lib/email.account-code.test.ts` :
+ *  - AUCUN LIEN. Pas de lien magique, jamais un secret dans une URL : le code
+ *    se recopie là où il a été demandé. Un lien vers le site serait aussi le
+ *    geste qu'un hameçonnage imite le mieux ;
+ *  - RIEN SUR LES CLÉS. Le même mail part que l'adresse porte des clés ou non :
+ *    c'est ce qui rend la connexion muette sur l'existence d'un compte. Un mot
+ *    sur « vos clés » dans ce texte trahirait ce que la route tait ;
+ *  - la durée vient de la constante (`ttlMinutes`), jamais d'un littéral.
+ *
+ * Le code est seul sur sa ligne, comme dans le mail de vérification : un lecteur
+ * automatique le trouve sans heuristique, et iOS le propose dans le champ
+ * `one-time-code` de la page.
+ */
+export function buildAccountCodeEmail(p: { code: string; ttlMinutes: number }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const subject = `${p.code} is your IBANforge sign-in code`;
+  const text =
+    `Your IBANforge sign-in code:\n\n${p.code}\n\n` +
+    `Enter it where you asked for it, within ${p.ttlMinutes} minutes. ` +
+    `If you did not ask for it, ignore this mail: nobody can sign in without this code.\n\nIBANforge`;
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your sign-in code</h1>
+    <p style="font-size:32px;letter-spacing:.3em;font-family:monospace;color:#fafafa;margin:18px 0">${p.code}</p>
+    <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">Enter it where you asked for it, within ${p.ttlMinutes} minutes.</p>
+    <p style="color:#71717a;font-size:12px;margin:14px 0 0">If you did not ask for it, ignore this mail: nobody can sign in without this code.</p>
+  </div></body></html>`;
+  return { subject, text, html };
+}
+
+/**
+ * L'envoi du code de connexion, avec la même issue à trois voies que le code de
+ * vérification : adresse refusée par le serveur de courrier (400, rien à
+ * alerter), relais en panne (503 et alerte, côté route), parti.
+ */
+export async function deliverAccountCodeEmail(p: {
+  to: string;
+  code: string;
+  ttlMinutes: number;
+}): Promise<RelayOutcome> {
+  const { subject, text, html } = buildAccountCodeEmail(p);
+  const { outcome } = await deliverViaRelay({ to: p.to, subject, text, html });
+  if (outcome !== 'sent') reportUndelivered('sign-in code', p.to, false);
+  return outcome;
+}
+
+/**
  * Subscription welcome (Editor/OEM, and Pro since 2026-09-02): same delivery
  * mechanics as buildApiKeyEmail, worded for a monthly allowance that renews
  * rather than a prepaid credit pool.

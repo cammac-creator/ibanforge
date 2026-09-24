@@ -13,6 +13,7 @@ import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
+import { purgeAccountTables } from './lib/account.js';
 import { purgeExpiredDeviceCodes } from './lib/device-grant.js';
 import { purgeExpiredAuditJobs } from './lib/audit-jobs.js';
 import { purgeLineageFacts } from './lib/lineage-facts.js';
@@ -85,6 +86,10 @@ try {
       `Retention: purged ${purgedTerminated} request_log rows of terminated keys (DPA 4.7)`,
     );
   purgeExpiredVerifications();
+  // Les codes de connexion expirés et les sessions du compte client expirées
+  // ou révoquées depuis plus d'un jour (lot C1) : aux deux mêmes endroits que
+  // la purge des vérifications, pour la même raison qu'elle.
+  purgeAccountTables();
   // Les grants d'appareil et le journal de leurs tentatives, aux DEUX mêmes
   // endroits que la purge des vérifications. 🚨 L'étape qui révoque une clé
   // approuvée que personne n'est venu chercher est le point le plus facile à
@@ -113,6 +118,7 @@ setInterval(
       purgeOldRequestLog(12);
       purgeTerminatedKeyTelemetry(30);
       purgeExpiredVerifications();
+      purgeAccountTables();
       purgeExpiredDeviceCodes();
       purgeLineageFacts(12);
       checkpointStatsWal();

@@ -131,6 +131,8 @@ describe('outgoing message bodies carry no em or en dash', () => {
     }),
     buildProKeyEmail: emailModule.buildProKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 10_000 }),
     buildKeyVerificationEmail: emailModule.buildKeyVerificationEmail({ code: '123456' }),
+    // Le code de connexion à la page du compte (lot C1, 24.09.2026).
+    buildAccountCodeEmail: emailModule.buildAccountCodeEmail({ code: '123456', ttlMinutes: 15 }),
     buildAuditReadyEmail: emailModule.buildAuditReadyEmail({
       to: 'buyer@example.com',
       lang: 'fr',
