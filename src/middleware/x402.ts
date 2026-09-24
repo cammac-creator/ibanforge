@@ -254,7 +254,7 @@ export function buildRouteTable(
   const FB = frozenBicShare();
   const TRUST_TAG_BIC =
     FB.month && FB.rows > 0
-      ? `Production · ${PERF} · ${F.claim.bic} BIC entries, ${FB.words} from a public SWIFT directory copy frozen in ${FB.month} · ${V}`
+      ? `Production · ${PERF} · ${F.claim.bic} BIC entries, ${FB.words} from a public copy of the SWIFT directory frozen in ${FB.month} · ${V}`
       : `Production · ${PERF} · ${F.claim.bic} BIC entries from GLEIF and national registers, refreshed monthly · ${V}`;
   const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, refreshed monthly · ${V}`;
   const TRUST_TAG_COMPLIANCE = `Production · ${PERF} · OFAC, EU, UN + FATF + SEPA + VoP · weekly refresh · ${V}`;

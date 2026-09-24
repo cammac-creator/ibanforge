@@ -373,7 +373,7 @@ interface A2ASkillDetail {
  */
 const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
   validate_iban: {
-    description: `Structure (mod-97 + country BBAN) in ${F.claim.countries} countries, the issuing bank and BIC with their source, a bank-code verdict from the national register in ${REGISTER_CODES} (a miss there means not allocated), EMI/vIBAN classification, SEPA, SEPA Instant and VoP readiness of the bank.`,
+    description: `Structure (mod-97 + country BBAN) in ${F.claim.countries} countries, the issuing bank and BIC with their source, a bank-code verdict from the national register in ${REGISTER_CODES} (a miss there means not allocated), EMI/vIBAN classification, the SEPA schemes that reach the bank (from the EPC scheme registers when they list it, from its country otherwise) and whether the EPC VoP register lists it as ready.`,
     tags: ['iban', 'validation', 'bank-code', 'national-register', 'sepa', 'vop', 'bank'],
     examples: ['Validate DE89370400440532013000 and tell me the issuing bank.'],
   },

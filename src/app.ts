@@ -609,7 +609,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 ## When NOT to use IBANforge
 
 - Full account ownership verification, or checking the account holder's name (use SEPA VoP itself, the payee's bank, or AIS providers)
-- Screening a person or a company against sanctions lists: IBANforge screens the bank (BIC8) and its country, never the payee
+- Screening a person or a company against sanctions lists: IBANforge matches the OFAC, EU and UN lists on the bank's BIC8 and checks the country against a fixed list of sanctioned jurisdictions, never the payee
 - KYC / identity proofing (use a regulated open-banking aggregator)
 - Standalone UK sort-code lookup or bank-name resolution from a sort code (we run the modulus checksum on a GB IBAN and we can say whether the resolved institution is PRA-authorised to take deposits, but we do not serve the UK sort-code directory)
 - US ABA, BSB, PIX (non-IBAN systems out of scope)
