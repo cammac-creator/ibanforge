@@ -15,8 +15,8 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 
 | Source | Lignes | Licence | Établie ? |
 |---|---:|---|---|
-| PeterNotenboom/SwiftCodes | 82 102 | MIT | ✅ licence dans le dépôt — ⚠️ **données figées à janvier 2018**, voir ci-dessous |
-| GLEIF (BIC↔LEI) | 39 297 | **CC0** | ✅ **vérifié à la source le 23/08/2026** |
+| PeterNotenboom/SwiftCodes | 82 102 | MIT accordée par l'auteur du dépôt, **pas par SWIFT** | ⚠️ **droits de SWIFT non établis** (groupe B de `NOTICE` depuis le 24/09/2026 ; le dépôt dit seulement « All the info is grabbed from public websites ») — ⚠️ **données figées à janvier 2018**, voir ci-dessous |
+| GLEIF (LEI) et table BIC↔LEI de SWIFT | 39 297 | **CC0** pour les données LEI ; la **table BIC↔LEI** relève de la licence de SWIFT, avec sa mention obligatoire (voir plus bas) | ✅ CC0 **vérifié à la source le 23/08/2026** ; licence SWIFT **lue le 24/09/2026** |
 | Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
 | SIX BankMaster (clearing suisse) | 1 164 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
 | SIX Group (BIC) | 20 | même publication que le BankMaster | ⚠️ à confirmer séparément |
@@ -26,7 +26,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Finance Finland (Finanssiala ry) — Finnish monetary institution codes and BICs (table `src/lib/fi-register.ts`, pays FI) | 20 lignes, édition du 15.10.2025 | aucune condition sur le site (lu le 16/09/2026) ; document PDF transcrit à la main | ⏳ **lettre envoyée le 16/09/2026** à ffi@financefinland.fi (permission, attribution, notification des éditions). **Régime prudent depuis le 16/09/2026** : un résultat confirme, une absence ne refuse rien (`authoritative: false`) |
 | Bulgarian National Bank — registre BAE et BIC (`bg_bae`, pays BG) | par édition du registre | réponse écrite du service de presse le 27/08/2026 : réutilisation permise « respecting the Rights for using the BNB site » = citer la source, ne pas altérer ni déformer | ✅ **accordée sous conditions le 27/08/2026** ; `source` et `as_of` stockés et servis, noms en cyrillique tels que publiés |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
-| OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
+| OFAC (sanctions) | — | domaine public, **17 U.S.C. §105** (le CC0 lu le 24/08/2026 dans l'inventaire du Treasury n'y figure plus le 24/09/2026) | ✅ §105 **vérifié le 24/08/2026** ; CC0 plus vérifiable depuis le 24/09/2026 |
 | ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
 | UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
 | Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
@@ -116,7 +116,7 @@ nicht zulässig » figure dans la section **images et vidéos**. La confondre av
 la règle sur les données ferait retirer une source utilisable — symétrique du
 piège SIX ci-dessus.
 
-**OFAC — CC0 1.0, déclaré par le Treasury pour CE dataset.** ✅ (24/08/2026)
+**OFAC — domaine public (17 U.S.C. §105) ; CC0 lu le 24/08/2026, plus vérifiable depuis le 24/09/2026.** ✅
 > « Copyright protection under this title is not available for any work of the
 > United States Government » — 17 U.S.C. §105
 > — <https://www.govinfo.gov/content/pkg/USCODE-2023-title17/html/USCODE-2023-title17-chap1-sec105.htm>
@@ -286,9 +286,12 @@ britannique, jamais le déploiement.
 
 ## Ce qui reste à faire, par ordre de risque
 
-1. **Établir les licences encore marquées ❌.** Sept sur treize sont établies
-   au 24/08 : SwiftCodes, GLEIF, Bundesbank, SIX BankMaster (23/08), puis
-   **UE (CC BY 4.0)**, **OFAC (CC0)** et **ONU** (24/08). Restent **EBA
+1. **Établir les licences encore marquées ❌.** Six sur treize sont établies :
+   GLEIF (CC0 pour les LEI, 23/08 ; licence SWIFT de la table BIC↔LEI, 24/09),
+   Bundesbank, SIX BankMaster (23/08), puis **UE (CC BY 4.0)**, **OFAC
+   (§105)** et **ONU** (24/08). **SwiftCodes n'en fait plus partie depuis le
+   24/09/2026** : la MIT vient de l'auteur du dépôt, les droits de SWIFT ne
+   sont pas établis (groupe B de `NOTICE`). Au 24/08, restaient **EBA
    Clearing** (« all rights reserved », aucun grant), **NBP**, **EPC** et le
    **GAFI** — les trois derniers derrière des murs anti-robot, voir la mesure
    ci-dessous. La position sur l'ONU est arrêtée depuis le 24/08 (voir la

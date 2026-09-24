@@ -108,15 +108,21 @@ GLEIF (Global Legal Entity Identifier Foundation), LEI reference data
     The Mapping Table is updated monthly. For the latest BIC information and updates, always
     refer to www.swift.com/bic ."
     https://www.gleif.org/lei-data/lei-mapping/download-bic-to-lei-relationship-files/2017-12-21_annex-2_bic-to-lei-mapping-table-license-agreement_final.pdf
-  Applied to the copy in this repository, the first line reads
-    SWIFT © and database rights <month year>.
-  where <month year> is the version of the Mapping Table loaded at the last
-  monthly refresh. IBANforge does not yet store that version: the 'gleif'
-  rows of bic_entries carry the refresh date (column updated_at), and the
-  version is the latest file GLEIF had published by then, as listed on
+  For the copy in this repository, the date to insert is the version of the
+  Mapping Table loaded at the last monthly refresh. IBANforge does not yet
+  store that version: the 'gleif' rows of bic_entries carry the refresh date
+  (column updated_at), and the version is the latest file GLEIF had
+  published by then, as listed on
   https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files
-  In this revision the rows were loaded on 1 September 2026, from the
-  August 2026 version (LEI-BIC-20260828.zip).
+  At commit 5094d72a, the rows were loaded on 1 September 2026 from the
+  August 2026 version (LEI-BIC-20260828.zip), and the notice reads:
+    SWIFT © and database rights August 2026.
+    All rights reserved.
+    This Mapping Table has been developed by SWIFT. Any use of the Mapping Table, in whole or
+    in part, is subject to the BIC/LEI Mapping Table License Agreement as published with the
+    Mapping Table available on GLEIF’s website.
+    The Mapping Table is updated monthly. For the latest BIC information and updates, always
+    refer to www.swift.com/bic .
 
 Deutsche Bundesbank, Bankleitzahlendatei
   Where: data/bic.sqlite, table bic_entries, source 'bundesbank' (143 rows),
@@ -316,8 +322,11 @@ them. They are being moved out of the public repository: from every file
 listed for them below, and from test fixtures and sample API responses
 elsewhere in the repository, for example scripts/seed-national.test.ts (a
 copy of the San Marino page, with addresses and telephone numbers),
-mcp/fixtures/api-answers.json (EPC "sepa" blocks) and the FI, LU and PL
-examples of frontend/data/countries.json (resolved by keys listed below).
+mcp/fixtures/api-answers.json and sdks/fixtures/quickstart-api.json (EPC
+"sepa" data), the sample response for DE89370400440532013000 in
+frontend/content/{en,fr,de}/docs/onboarding.mdx (an EPC "sepa" block), and
+the FI, LU and PL examples of frontend/data/countries.json (resolved by
+keys listed below).
 
 EBA CLEARING, STEP2 SCT reachable PSPs list
   Where: data/bic.sqlite, table bic_entries, source 'eba_step2' (189 rows).
@@ -433,7 +442,10 @@ UK Financial Conduct Authority (FCA), Financial Services Register lists
          Register (register.fca.org.uk), not from that section.
          The FCA's written acceptance of 7 September 2026 covers its
          Register API, queried one firm per request; it does not cover
-         these lists.
+         these lists. That reply also refers to the Register's own terms
+         of use (https://register.fca.org.uk/s/legal-information), which
+         could not be read without a browser and may apply to these lists
+         as well.
          https://www.fca.org.uk/legal
 
 --------------------------------------------------------------------------------
