@@ -145,15 +145,24 @@ const TOOLS: Tool[] = [
             account_number: { type: 'string' },
           },
         },
+        // 🚨 Every `null` below is a value the API really serves, and each one
+        // used to be declared as a plain string or object. The official MCP
+        // client validates structuredContent against this schema and THROWS on
+        // a mismatch, so the call failed on exactly the answers that matter
+        // most: an unallocated bank code (`bic: null`), a bank the EBA register
+        // names (`classification: "register"`). Measured 24/09/2026 against the
+        // real routes: more than half of the answers were refused. The API's
+        // own types (src/types.ts) are the reference; mcp/src/output-schema.test.ts
+        // replays real answers through the official client.
         bic: {
-          type: 'object',
+          type: ['object', 'null'],
           description:
             'Resolved BIC/SWIFT (when BBAN→BIC mapping exists). null if unresolved. ' +
             'Read basis before storing it as a routing instruction: only a national_register pairing is settlement-grade.',
           properties: {
             code: { type: 'string' },
-            bank_name: { type: 'string' },
-            city: { type: 'string' },
+            bank_name: { type: ['string', 'null'] },
+            city: { type: ['string', 'null'] },
             basis: {
               type: 'string',
               enum: ['national_register', 'curated_map', 'directory_prefix'],
@@ -176,7 +185,12 @@ const TOOLS: Tool[] = [
             // exactly the answers that matter most.
             type: { type: ['string', 'null'], enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null] },
             name: { type: 'string' },
-            classification: { type: 'string', enum: ['curated', 'default'] },
+            classification: {
+              type: 'string',
+              enum: ['curated', 'register', 'default'],
+              description:
+                'curated = the BIC8 is in the issuer set; register = an official register (today the EBA PSD2 register) names the holder of this bank code, provenance in psd_registration; default = nothing on file, "bank" is a fallback. Count curated and register, never default, when sizing virtual-IBAN exposure.',
+            },
             iban_issuer: { type: 'string', enum: ['confirmed', 'not_listed'] },
           },
         },
@@ -253,17 +267,18 @@ const TOOLS: Tool[] = [
           },
         },
         clearing: {
-          type: 'object',
-          description: 'Swiss clearing data when country is CH or LI (null otherwise).',
+          type: ['object', 'null'],
+          description:
+            'Swiss clearing data when country is CH or LI. null when the SIX register holds no such IID (an unallocated Swiss bank code).',
           properties: {
             iid: { type: 'string' },
             name: { type: 'string' },
             type: { type: 'string' },
-            town: { type: 'string' },
+            town: { type: ['string', 'null'] },
             sic: { type: 'boolean' },
             instant_payments_chf: { type: 'boolean' },
             eurosic: { type: 'boolean' },
-            qr_iid: { type: 'string' },
+            qr_iid: { type: ['string', 'null'] },
           },
         },
       },
@@ -307,7 +322,7 @@ const TOOLS: Tool[] = [
               iban: { type: 'string' },
               valid: { type: 'boolean' },
               country: { type: 'object' },
-              bic: { type: 'object' },
+              bic: { type: ['object', 'null'], description: 'null when the bank code resolves no BIC.' },
               issuer: { type: 'object' },
               sepa: { type: 'object' },
               error: { type: 'string', description: 'Set when valid=false.' },
@@ -352,7 +367,9 @@ const TOOLS: Tool[] = [
         bic11: { type: 'string', description: '11-char form including branch.' },
         found: { type: 'boolean' },
         valid_format: { type: 'boolean' },
-        institution: { type: 'string', description: 'Bank legal name.' },
+        // null on `found: false`, and on a found BIC that carries no LEI: the
+        // two most common answers of this tool (see the note above validate_iban's bic).
+        institution: { type: ['string', 'null'], description: 'Bank legal name. null when the BIC is not found.' },
         country: {
           type: 'object',
           properties: {
@@ -360,20 +377,20 @@ const TOOLS: Tool[] = [
             name: { type: 'string' },
           },
         },
-        city: { type: 'string' },
-        lei: { type: 'string', description: 'Legal Entity Identifier (ISO 17442) if available.' },
+        city: { type: ['string', 'null'] },
+        lei: { type: ['string', 'null'], description: 'Legal Entity Identifier (ISO 17442); null when none is on file.' },
         address: {
-          type: 'object',
-          description: 'Registered head-office address object (present when available).',
+          type: ['object', 'null'],
+          description: 'Registered head-office address (GLEIF). null when the BIC carries no LEI or address.',
           properties: {
             type: { type: 'string' },
-            street: { type: 'string' },
-            post_code: { type: 'string' },
-            region: { type: 'string' },
-            city: { type: 'string' },
+            street: { type: ['string', 'null'] },
+            post_code: { type: ['string', 'null'] },
+            region: { type: ['string', 'null'] },
+            city: { type: ['string', 'null'] },
             country: { type: 'string' },
             source: { type: 'string' },
-            as_of: { type: 'string' },
+            as_of: { type: ['string', 'null'] },
           },
         },
         address_available: { type: 'boolean' },
@@ -425,14 +442,14 @@ const TOOLS: Tool[] = [
         address: {
           type: 'object',
           properties: {
-            street: { type: 'string' },
-            building_number: { type: 'string' },
-            post_code: { type: 'string' },
-            town: { type: 'string' },
+            street: { type: ['string', 'null'] },
+            building_number: { type: ['string', 'null'] },
+            post_code: { type: ['string', 'null'] },
+            town: { type: ['string', 'null'] },
             country: { type: 'string' },
           },
         },
-        bic: { type: 'string', description: 'BIC if mapped.' },
+        bic: { type: ['string', 'null'], description: 'BIC if mapped, null otherwise.' },
         payment_services: {
           type: 'object',
           properties: {
@@ -444,8 +461,8 @@ const TOOLS: Tool[] = [
             lsv_bdd_eur: { type: 'boolean' },
           },
         },
-        sic_iid: { type: 'string' },
-        qr_iid: { type: 'string', description: 'QR-IID allocation, null when none.' },
+        sic_iid: { type: ['string', 'null'] },
+        qr_iid: { type: ['string', 'null'], description: 'QR-IID allocation, null when none.' },
         valid_on: { type: 'string' },
       },
       required: ['iid', 'found'],
@@ -493,13 +510,15 @@ const TOOLS: Tool[] = [
         'Reference verdict. Without an iban this is the free checksum answer; with one it is the reference_check block of a full IBAN validation.',
       properties: {
         reference: { type: 'string', description: 'Normalized: uppercase, separators removed.' },
+        // The three nulls the descriptions already promised were typed as
+        // non-null, so the client refused the very answers they describe.
         scheme: {
-          type: 'string',
-          enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr'],
+          type: ['string', 'null'],
+          enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr', null],
           description: 'Null when no supported scheme matches.',
         },
         valid: {
-          type: 'boolean',
+          type: ['boolean', 'null'],
           description:
             'null means recognised but uncheckable without the creditor bank configuration (KID, OCR). Never report null as false.',
         },
@@ -509,7 +528,10 @@ const TOOLS: Tool[] = [
           description: 'A STRING, so a two-digit value beginning with zero survives ("03", "97").',
         },
         also_valid_as: { type: 'object', description: 'The second reading of an ambiguous string, with its own verdict.' },
-        source: { type: 'string', description: 'The document publishing the rule. Relay it.' },
+        source: {
+          type: ['string', 'null'],
+          description: 'The document publishing the rule. Null only when no scheme matched. Relay it.',
+        },
         as_of: { type: 'string', description: 'YYYY-MM of that document.' },
         note: { type: 'string' },
         pairing: {
@@ -677,7 +699,11 @@ const TOOLS: Tool[] = [
         iban: { type: 'string' },
         valid: { type: 'boolean' },
         country: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' } } },
-        bic: { type: 'object', properties: { code: { type: 'string' }, bank_name: { type: 'string' }, city: { type: 'string' } } },
+        bic: {
+          type: ['object', 'null'],
+          description: 'null when the bank code resolves no BIC; the bank-level sanctions check then has no bank to screen (compliance.sanctions.bank_screened: false).',
+          properties: { code: { type: 'string' }, bank_name: { type: ['string', 'null'] }, city: { type: ['string', 'null'] } },
+        },
         issuer: { type: 'object', properties: { type: { type: ['string', 'null'] }, name: { type: 'string' } } },
         sepa: {
           type: 'object',
@@ -698,7 +724,7 @@ const TOOLS: Tool[] = [
                 country_sanctioned: { type: 'boolean' },
                 bank_sanctioned: { type: 'boolean', description: 'Bank-BIC level only — NOT the beneficiary.' },
                 matched_lists: { type: 'array', items: { type: 'string' }, description: 'e.g. ["OFAC","EU"].' },
-                fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
+                fatf_status: { type: 'string', enum: ['member', 'suspended', 'grey_list', 'black_list', 'non_member'] },
               },
             },
             reachability: {
@@ -709,7 +735,12 @@ const TOOLS: Tool[] = [
               type: 'object',
               properties: { participant: { type: 'boolean' }, status: { type: 'string' } },
             },
-            risk_score: { type: 'number', minimum: 0, maximum: 100, description: '0 = safest, 100 = highest.' },
+            risk_score: {
+              type: ['number', 'null'],
+              minimum: 0,
+              maximum: 100,
+              description: '0 = safest, 100 = highest. null when the IBAN failed validation: there was nothing to score (risk_level: unassessable).',
+            },
             risk_level: {
               type: 'string',
               enum: ['low', 'medium', 'elevated', 'high', 'critical', 'unassessable'],
