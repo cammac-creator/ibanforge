@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LANG_LABEL, langName, previewReading, usableLang } from './reading';
+import { LANG_LABEL, langName, previewReading, subjectReading, usableLang } from './reading';
 
 describe('usableLang', () => {
   it('garde un code de deux ou trois lettres', () => {
@@ -77,5 +77,25 @@ describe('previewReading', () => {
       untranslated: false,
       text: 'x',
     });
+  });
+});
+
+describe('subjectReading', () => {
+  it("lit l'objet traduit d'un message étranger", () => {
+    expect(
+      subjectReading({ lang: 'de', subject: 'Frage zum nächsten Import', subject_fr: 'Question sur le prochain import' }),
+    ).toBe('Question sur le prochain import');
+  });
+
+  it("garde l'objet d'origine sans traduction, en français ou pour une langue inconnue", () => {
+    expect(subjectReading({ lang: 'de', subject: 'Frage', subject_fr: null })).toBe('Frage');
+    expect(subjectReading({ lang: 'de', subject: 'Frage', subject_fr: '   ' })).toBe('Frage');
+    expect(subjectReading({ lang: 'fr', subject: 'Question', subject_fr: 'Autre' })).toBe('Question');
+    expect(subjectReading({ lang: 'und', subject: 'Frage', subject_fr: 'Question' })).toBe('Frage');
+    expect(subjectReading({ lang: null, subject: 'Frage', subject_fr: 'Question' })).toBe('Frage');
+  });
+
+  it('rend une chaîne vide pour un message sans objet', () => {
+    expect(subjectReading({ lang: 'en', subject: null, subject_fr: null })).toBe('');
   });
 });

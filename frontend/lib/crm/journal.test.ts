@@ -480,6 +480,26 @@ describe('journalRows, la langue de chaque ligne', () => {
     });
   });
 
+  it('lit l’objet en français et le retrouve par l’objet d’origine', () => {
+    const german = contact({
+      id: 'objet@alpha.example.net',
+      kind: 'client',
+      messages: [
+        msg({
+          id: 'de2',
+          lang: 'de',
+          subject: 'Frage zum nächsten Import',
+          subject_fr: 'Question sur le prochain import',
+          snippet: 'Guten Tag',
+          snippet_fr: 'Bonjour',
+        }),
+      ],
+    });
+    const rows = journalRows([german]);
+    expect(rows[0]?.subject).toBe('Question sur le prochain import');
+    expect(filterJournal(rows, filter({ query: 'nächsten' }), TODAY).map((r) => r.id)).toEqual(['de2']);
+  });
+
   it('se retrouve aussi par un mot de la langue d’origine', () => {
     const rows = journalRows([english]);
     expect(filterJournal(rows, filter({ query: 'works' }), TODAY).map((r) => r.id)).toEqual([

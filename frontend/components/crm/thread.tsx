@@ -6,7 +6,7 @@ import { dayLabel, formatStamp } from '@/lib/crm/format';
 import { toZurich } from '@/lib/crm/zurich';
 import { splitQuoted } from '@/lib/crm/quoted';
 import type { Message } from '@/lib/crm/types';
-import { usableLang } from '@/lib/crm/reading';
+import { subjectReading, usableLang } from '@/lib/crm/reading';
 import { LangBadge } from './lang-badge';
 
 function Bubble({
@@ -47,6 +47,9 @@ function Bubble({
   const original = m.body || m.snippet || '';
   const { fresh, quoted } = splitQuoted(hasFr ? (m.snippet_fr ?? '') : original);
   const { fresh: originalFresh } = splitQuoted(original);
+  // L'objet suit la même règle : le français quand on le tient, l'original à côté.
+  const subject = subjectReading(m);
+  const subjectTranslated = !!m.subject && subject !== m.subject.trim();
 
   // splitQuoted cuts at the first quote marker, so a '>' inside genuinely new
   // text folds real content away. The toggle therefore states how many lines
@@ -114,7 +117,7 @@ function Bubble({
               contacts, le journal et les brouillons. */}
           <LangBadge lang={m.lang} translated={hasFr} />
         </div>
-        {m.subject && <p className="mb-0.5 font-medium text-[var(--fg-1)]">{m.subject}</p>}
+        {subject && <p className="mb-0.5 font-medium text-[var(--fg-1)]">{subject}</p>}
         {fresh && <p className="whitespace-pre-wrap">{fresh}</p>}
         {quoted && (
           <>
@@ -170,6 +173,7 @@ function Bubble({
               // composited tint, not picked by name), and the violet rule ties
               // it to the badge that says the message was translated.
               <p className="mt-1 whitespace-pre-wrap border-l-2 border-violet-400/40 pl-2 text-[14px] text-[var(--fg-2)]">
+                {subjectTranslated && <span className="mb-0.5 block font-medium">{m.subject}</span>}
                 {originalFresh}
               </p>
             )}

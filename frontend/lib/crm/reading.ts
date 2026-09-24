@@ -102,3 +102,14 @@ export function previewReading(m: Pick<Message, 'lang' | 'snippet_fr' | 'snippet
     text: translated ? fr : (m.snippet ?? ''),
   };
 }
+
+/**
+ * L'objet à lire : sa traduction française pour un message étranger qui en a
+ * une, sinon l'objet d'origine. Pour l'affichage seulement : une réponse garde
+ * l'objet d'origine, dans la langue du correspondant.
+ */
+export function subjectReading(m: Pick<Message, 'lang' | 'subject' | 'subject_fr'>): string {
+  const lang = usableLang(m.lang);
+  const fr = (m.subject_fr ?? '').trim();
+  return lang !== null && lang !== 'fr' && fr ? fr : (m.subject ?? '').trim();
+}

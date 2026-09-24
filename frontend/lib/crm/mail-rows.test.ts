@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAIL_FILTER_KEYS,
+  fold,
   mailFilters,
   mailRows,
   searchRows,
@@ -1265,6 +1266,18 @@ describe('mailRows, la langue de l’aperçu', () => {
     expect(row?.preview).toBe('Comment voir mon solde ?');
     expect(row?.previewLang).toBe('en');
     expect(row?.previewTranslated).toBe(true);
+  });
+
+  it('montre l’objet traduit, et se retrouve par l’objet d’origine', () => {
+    const row = rowFor({
+      ...message('in', 'Frage zum Guthaben', 'Wie sehe ich mein Guthaben?', '2026-07-28'),
+      lang: 'de',
+      snippet_fr: 'Comment voir mon solde ?',
+      subject_fr: 'Question sur le solde',
+    });
+    expect(row?.subject).toBe('Question sur le solde');
+    expect(row?.search).toContain(fold('Frage zum Guthaben'));
+    expect(row?.search).toContain(fold('Question sur le solde'));
   });
 
   it('garde l’original, signalé comme non traduit, tant que la traduction manque', () => {

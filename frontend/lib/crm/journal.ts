@@ -3,7 +3,7 @@ import { dayLabel, isoDay, shiftDay } from './format';
 import { toZurich } from './zurich';
 import { fold } from './mail-rows';
 import type { Contact, Message } from './types';
-import { previewReading, type Reading } from './reading';
+import { previewReading, subjectReading, type Reading } from './reading';
 
 /**
  * The mail journal: every message of every contact on one antichronological
@@ -189,7 +189,7 @@ export function journalRows(contacts: Contact[]): JournalRow[] {
       const day = isoDay(local);
       if (!day || !m.msg_date) continue;
       const direction = directionOf(m);
-      const subject = (m.subject ?? '').trim();
+      const subject = subjectReading(m);
       const reading = previewOf(m);
       const snippet = reading.text;
       rows.push({
@@ -206,7 +206,7 @@ export function journalRows(contacts: Contact[]): JournalRow[] {
         translated: reading.translated,
         // L'original aussi : un mot cherché dans la langue du correspondant doit
         // trouver sa ligne même quand la ligne se lit en français.
-        search: fold(`${contact.label} ${contact.email} ${subject} ${snippet} ${m.snippet ?? ''}`),
+        search: fold(`${contact.label} ${contact.email} ${subject} ${m.subject ?? ''} ${snippet} ${m.snippet ?? ''}`),
       });
     }
   }

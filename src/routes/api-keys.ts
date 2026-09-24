@@ -1756,6 +1756,8 @@ interface EmailMessageInput {
   subject?: unknown;
   snippet?: unknown;
   snippet_fr?: unknown;
+  /** L'objet traduit en français, pour la lecture seulement (voir db.ts). */
+  subject_fr?: unknown;
   lang?: unknown;
   body?: unknown;
   counterparty?: unknown;
@@ -1883,8 +1885,8 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   const clip = (v: unknown, n: number): string | null =>
     typeof v === 'string' && v.length ? v.slice(0, n) : null;
   const upsert = db.prepare(
-    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed, origin)
-     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @body, @counterparty, @no_reply_needed, @origin)
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, subject_fr, lang, body, counterparty, no_reply_needed, origin)
+     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @subject_fr, @lang, @body, @counterparty, @no_reply_needed, @origin)
      -- 🚨 no_reply_needed is deliberately ABSENT from the update list below, so
      -- an omitted column keeps its stored value. Ids are stable md5s and the
      -- whole mailbox is re-ingested every night: assigning it here would erase
@@ -1899,6 +1901,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
        -- re-sync of the same message carries none (translations are set out-of-band
        -- by translate-messages.py; a raw re-sync must not wipe them).
        snippet_fr = COALESCE(excluded.snippet_fr, snippet_fr),
+       subject_fr = COALESCE(excluded.subject_fr, subject_fr),
        lang = COALESCE(excluded.lang, lang),
        -- Same shape as the two above, for a different pair of writers. The
        -- nightly re-ingestion reads the mailbox and cannot know that a mail was
@@ -1981,6 +1984,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
         subject: normaliseSubject(r.subject) || null,
         snippet: clip(r.snippet, 300),
         snippet_fr: clip(r.snippet_fr, 8000),
+        subject_fr: normaliseSubject(r.subject_fr) || null,
         lang: clip(r.lang, 8),
         // 50 000, aligned with the send route and the draft store (dashboard
         // audit 2026-09-01, TABS-10): the 8 000 clip here silently amputated the
@@ -2031,8 +2035,8 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
   // dropping it from the light cut would make the caller with the least reason
   // to download bodies the only one unable to say who sent a mail.
   const columns = summaryOnly
-    ? `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, counterparty, no_reply_needed, origin`
-    : `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed, origin`;
+    ? `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, subject_fr, lang, counterparty, no_reply_needed, origin`
+    : `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, subject_fr, lang, body, counterparty, no_reply_needed, origin`;
   const rows = since
     ? db
         .prepare(`SELECT ${columns} FROM email_messages WHERE msg_date >= ? ORDER BY msg_date ASC`)
