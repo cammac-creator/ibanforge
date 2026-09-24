@@ -26,6 +26,7 @@ import {
 } from '../lib/api-keys.js';
 import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
 import { paidSoFarUsd } from '../lib/key-settlements.js';
+import { CREDITS_NOTICE_LOCK_PREFIX } from '../lib/quota-notice.js';
 import { restoreBurstRevocation } from '../lib/key-revocations.js';
 import { PRO_PAYMENT_LINK, PRO_PRICE_USD } from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
@@ -2325,12 +2326,16 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
   for (const r of usage)
     (monthsByKey[r.key_prefix] ??= []).push({ month: r.month, count: r.count });
   // Which keys we have already warned about their quota, so the panel does not
-  // suggest sending a notice twice.
+  // suggest sending a notice twice. Des mois seulement : l'avertissement des
+  // packs partage cette table sous une clé `credits-` (voir
+  // maybeSendCreditsWarning), et le CRM affiche chaque valeur d'ici comme
+  // « avertie à 80 % en <mois> ».
   const warned = db
     .prepare(
-      `SELECT k.key_prefix, q.month FROM quota_notices q JOIN api_keys k ON k.key_hash = q.key_hash`,
+      `SELECT k.key_prefix, q.month FROM quota_notices q JOIN api_keys k ON k.key_hash = q.key_hash
+       WHERE q.month NOT LIKE ?`,
     )
-    .all() as Array<{ key_prefix: string; month: string }>;
+    .all(`${CREDITS_NOTICE_LOCK_PREFIX}%`) as Array<{ key_prefix: string; month: string }>;
   const warnedByKey: Record<string, string[]> = {};
   for (const r of warned) (warnedByKey[r.key_prefix] ??= []).push(r.month);
 

@@ -111,6 +111,13 @@ describe('outgoing message bodies carry no em or en dash', () => {
       month: '2026-08',
       keyPrefix: FAKE_PREFIX,
     }),
+    // L'avertissement des 10 % d'un pack (24.09.2026).
+    buildCreditsWarningEmail: emailModule.buildCreditsWarningEmail({
+      keyPrefix: FAKE_PREFIX,
+      remaining: 100,
+      total: 1000,
+      proMonthlyLimit: 10_000,
+    }),
     // Added 2026-09-01 (BIZ-14). These two messages were live and unswept: both
     // were assembled inside their async sender, so the lock test above could not
     // see them and the OEM subject shipped an em dash. Making them pure is what

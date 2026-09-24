@@ -1,4 +1,11 @@
-import { PAYMENT_LINKS, PRICING_PAGE, PRO_PORTAL_URL } from './payment-links.js';
+import {
+  PAYMENT_LINKS,
+  PRICING_PAGE,
+  PRO_PAYMENT_LINK,
+  PRO_PORTAL_URL,
+  PRO_PRICE_USD,
+} from './payment-links.js';
+import { CREDITS_NOTICE_RATIO } from './tiers.js';
 import {
   sendViaRelay,
   deliverViaRelay,
@@ -129,14 +136,22 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): {
   html: string;
 } {
   const credits = p.credits.toLocaleString('en-US');
+  const noticePct = Math.round(CREDITS_NOTICE_RATIO * 100);
 
+  // Le solde, dit en toutes lettres. Le lien vers le compte du bloc « premier
+  // appel » s'intitule « everything this key does », et un acheteur qui
+  // cherchait ses « crédits restants » ne l'y a pas reconnu : la partie HTML ne
+  // disait jamais « solde ».
   const text =
     `Thanks for your purchase. Your IBANforge API key is ready.\n\n` +
     `API key: ${p.rawKey}\n` +
     `Credits: ${credits} (pack ${p.bundle})\n\n` +
     buildFirstCallText({ bearer: p.rawKey }) +
-    `\nCheck your balance any time:\n` +
-    `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n\n` +
+    `\nYour balance any time:\n` +
+    `  - your account page: ${ACCOUNT_PAGE} (paste this key)\n` +
+    `  - the X-Credits-Remaining header on every paid response\n` +
+    `  - curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n` +
+    `We e-mail you once when ${noticePct}% of the pack is left.\n\n` +
     `Docs: https://ibanforge.com/docs\n` +
     `Terms: https://ibanforge.com/legal/terms (unused card-paid packs: 14-day refund)\n` +
     `Keep this key safe. It will not be shown again.\n\nIBANforge`;
@@ -152,6 +167,10 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): {
     </div>
     <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe. It will not be shown again.</p>
     ${buildFirstCallHtml({ bearer: p.rawKey })}
+    <div style="font-size:13px;color:#a1a1aa;margin:0 0 6px">Your balance any time</div>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">Paste this key there.</span></p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 22px">We e-mail you once when ${noticePct}% of the pack is left.</p>
     <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <!-- BIZ-05 (2026-09-01), third surface: the machine-facing copy still said
@@ -368,6 +387,88 @@ export async function sendQuotaWarningEmail(
   const { subject, text, html } = buildQuotaWarningEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject: subject, text, html });
   if (!ok) reportUndelivered('quota warning', p.to, false);
+  return ok;
+}
+
+export interface CreditsWarningInput {
+  keyPrefix: string;
+  /** Crédits restants une fois facturé l'appel qui a franchi le seuil. */
+  remaining: number;
+  /** Ce que contenait le pack. */
+  total: number;
+  /** L'allocation Pro, passée en paramètre pour que ce module reste à l'écart du magasin des clés. */
+  proMonthlyLimit: number;
+}
+
+/**
+ * Compose l'e-mail « il ne reste que 10 % de votre pack », le pendant de
+ * buildQuotaWarningEmail pour le porteur d'un pack. Pur, pour que les tests en
+ * vérifient la formulation.
+ *
+ * Il dit ce qui se passe à zéro (un 402 sur cette clé), parce que c'est ce
+ * qu'un porteur qui fait tourner un circuit de production doit savoir avant que
+ * cela arrive. Et il dit clairement qu'un achat par carte arrive aujourd'hui
+ * sous une NOUVELLE clé : sinon, un porteur qui rachète un pack et continue
+ * d'appeler avec celle-ci lirait le 402 suivant comme une panne de notre côté.
+ */
+export function buildCreditsWarningEmail(p: CreditsWarningInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const remaining = p.remaining.toLocaleString('en-US');
+  const total = p.total.toLocaleString('en-US');
+  const pro = p.proMonthlyLimit.toLocaleString('en-US');
+  const pct = Math.round(CREDITS_NOTICE_RATIO * 100);
+  const subject = `${remaining} IBANforge credits left on key ${p.keyPrefix} (${pct}% alert)`;
+
+  const text =
+    `Heads up: key ${p.keyPrefix} has ${remaining} of its ${total} prepaid credits left.\n` +
+    `When they run out, calls with this key answer HTTP 402 (payment required) until you top up.\n\n` +
+    `Keep it running, pay by card in one click:\n` +
+    `  1,000 credits  $4   ${PAYMENT_LINKS['1k']}\n` +
+    `  5,000 credits  $20  ${PAYMENT_LINKS['5k']}\n` +
+    ` 25,000 credits  $80  ${PAYMENT_LINKS['25k']}\n` +
+    `Or a flat $${PRO_PRICE_USD}/month for ${pro} requests: ${PRO_PAYMENT_LINK}\n\n` +
+    `For now, a purchase by card arrives as a new key: put it in place of this one in your integration.\n\n` +
+    `Your balance any time:\n` +
+    `  - your account page: ${ACCOUNT_PAGE} (paste the key)\n` +
+    `  - the X-Credits-Remaining header on every paid response\n` +
+    `  - GET https://api.ibanforge.com/v1/credits/balance\n\n` +
+    `Credits never expire. Paying in USDC instead? POST /v1/credits/buy/1k|5k|25k.\n` +
+    `A larger volume, or a question? Reply to this email.\n\nIBANforge`;
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${remaining} credits left on your key</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has <b style="color:#fafafa">${remaining} of its ${total}</b> prepaid credits left. When they run out, calls with this key answer <b style="color:#fafafa">HTTP 402</b> (payment required) until you top up.</p>
+    <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 12px">
+      <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Keep it running, pay by card</div>
+      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
+      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
+      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
+      <p style="margin:0"><a href="${PRO_PAYMENT_LINK}" style="color:#fbbf24;text-decoration:none">Pro · ${pro} requests a month · $${PRO_PRICE_USD} →</a></p>
+    </div>
+    <p style="color:#71717a;font-size:13px;margin:0 0 18px">For now, a purchase by card arrives as a new key: put it in place of this one in your integration.</p>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">Paste the key there.</span></p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
+    <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">A larger volume, or a question? Just reply.</p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · <a href="${PRICING_PAGE}" style="color:#71717a">all packs</a></p>
+  </div></body></html>`;
+
+  return { subject, text, html };
+}
+
+/** Envoie l'avertissement du pack. Même contrat sans échec bloquant que sendQuotaWarningEmail. */
+export async function sendCreditsWarningEmail(
+  p: CreditsWarningInput & { to: string },
+): Promise<boolean> {
+  const { subject, text, html } = buildCreditsWarningEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) reportUndelivered('credits warning', p.to, false);
   return ok;
 }
 
