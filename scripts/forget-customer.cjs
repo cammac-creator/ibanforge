@@ -30,6 +30,28 @@ if (!email || !email.includes('@')) {
   process.exit(1);
 }
 
+/**
+ * La forme normalisée d'une adresse, recopiée de src/lib/email-norm.ts : ce
+ * script CommonJS ne peut pas importer de TypeScript. C'est l'identité du compte
+ * client (sessions et codes de connexion). scripts/forget-customer.account.test.ts
+ * vérifie que les deux copies s'accordent (étiquette, points de Gmail,
+ * googlemail, casse).
+ */
+function normalizeEmail(raw) {
+  const e = String(raw).trim().toLowerCase();
+  if (!e.includes('@')) return null;
+  const at = e.lastIndexOf('@');
+  let local = e.slice(0, at);
+  const domain = e.slice(at + 1);
+  const plus = local.indexOf('+');
+  if (plus > 0) local = local.slice(0, plus);
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    return `${local.split('.').join('')}@gmail.com`;
+  }
+  return `${local}@${domain}`;
+}
+const emailNorm = normalizeEmail(email);
+
 const dbPath =
   process.env.STATS_DB_PATH ||
   (require('node:fs').existsSync('/app/data/stats.sqlite')
@@ -39,6 +61,7 @@ const dbPath =
 const db = new Database(dbPath);
 console.log(`Database: ${dbPath}`);
 console.log(`Customer: ${email}`);
+console.log(`Account identity: ${emailNorm}`);
 console.log(execute ? 'MODE: EXECUTE (rows will be deleted)\n' : 'MODE: dry run (pass --execute to delete)\n');
 
 const keys = db
@@ -96,6 +119,16 @@ if (hasTable('key_claims')) {
 }
 if (hasTable('cohort_relabels')) {
   targets.push(['cohort_relabels', 'FROM cohort_relabels WHERE lower(old_email) = ? OR lower(address) = ?', [email, email]]);
+}
+// Compte client par e-mail (lot C1, 25.09.2026) : les sessions de lecture et le
+// code de connexion en cours, par l'adresse NORMALISÉE, qui est l'identité du
+// compte. Une demande d'oubli coupe ainsi les sessions tout de suite, au lieu de
+// les laisser lire jusqu'à leur expiration.
+if (hasTable('account_sessions')) {
+  targets.push(['account_sessions', 'FROM account_sessions WHERE email_norm = ?', [emailNorm]]);
+}
+if (hasTable('account_login_codes')) {
+  targets.push(['account_login_codes', 'FROM account_login_codes WHERE email_norm = ?', [emailNorm]]);
 }
 if (hasTable('orphan_mail')) {
   // sender is either the bare address or "Name <address>".
