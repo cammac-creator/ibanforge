@@ -135,10 +135,6 @@ describe('les écrans de la page du compte', () => {
       ...screen,
       notice: 'code_invalid',
     });
-    expect(afterSignIn({ status: 400, body: { error: 'too_many_attempts' } }, screen)).toEqual({
-      ...screen,
-      notice: 'code_attempts',
-    });
     expect(afterSignIn(NETWORK_FAILURE, screen)).toEqual({ ...screen, notice: 'service' });
     expect(afterSignIn({ status: 400, body: { error: 'invalid_email' } }, screen)).toEqual({
       kind: 'signed_out',
@@ -347,6 +343,11 @@ describe('les autres réponses', () => {
     const signedIn = afterOverview(overview([PACK_KEY]), CHECKING);
     expect(afterLogout({ status: 204, body: null }, signedIn)).toEqual({ kind: 'signed_out', notice: null });
     expect(afterLogout(NETWORK_FAILURE, signedIn)).toEqual({ ...signedIn, notice: 'service' });
+    // Cookie en double ou session déjà révoquée : l'API rend 401, on est déconnecté.
+    expect(afterLogout({ status: 401, body: { error: 'signed_out' } }, signedIn)).toEqual({
+      kind: 'signed_out',
+      notice: null,
+    });
   });
 
   it('le rapport d’une clé : prêt, ou échec lisible', () => {
@@ -358,7 +359,10 @@ describe('les autres réponses', () => {
   });
 
   it('le message d’erreur suit le champ error, puis retombe sur « service »', () => {
-    expect(noticeFor({ status: 400, body: { error: 'too_many_attempts' } })).toBe('code_attempts');
+    expect(noticeFor({ status: 400, body: { error: 'invalid_code' } })).toBe('code_invalid');
+    // L'ancien code d'erreur n'existe plus côté API : il retombe sur « service ».
+    expect(noticeFor({ status: 400, body: { error: 'too_many_attempts' } })).toBe('service');
+    expect(noticeFor({ status: 503, body: { error: 'code_unavailable' } })).toBe('service');
     expect(noticeFor({ status: 415, body: { error: 'unsupported_media_type' } })).toBe('service');
     expect(noticeFor({ status: 400, body: 'texte' })).toBe('service');
   });

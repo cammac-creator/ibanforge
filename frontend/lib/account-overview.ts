@@ -79,7 +79,6 @@ export interface KeyReportPayload {
  */
 export type Notice =
   | 'code_invalid'
-  | 'code_attempts'
   | 'rate_limited'
   | 'address'
   | 'service'
@@ -93,8 +92,9 @@ export type Notice =
  * relais (503) et panne réseau comprises, est « connexion indisponible ».
  */
 const ERROR_NOTICES: Readonly<Record<string, Notice>> = {
+  // Un seul code pour « faux, expiré ou trop d'essais » depuis la relecture de
+  // sécurité (M1) : l'API ne dit plus lequel, pour ne rien révéler de l'adresse.
   invalid_code: 'code_invalid',
-  too_many_attempts: 'code_attempts',
   code_rate_limited: 'rate_limited',
   invalid_email: 'address',
   disposable_email: 'address',
@@ -420,6 +420,9 @@ export function afterOverview(reply: ApiReply, previous: AccountScreen): Account
  */
 export function afterLogout(reply: ApiReply, previous: AccountScreen): AccountScreen {
   if (reply.status >= 200 && reply.status < 300) return { kind: 'signed_out', notice: null };
+  // 401 : la session n'existe déjà plus (cookie en double effacé par l'API,
+  // session révoquée ailleurs). Le but de la déconnexion est atteint.
+  if (reply.status === 401) return { kind: 'signed_out', notice: null };
   if (isConnected(previous)) return { ...previous, notice: 'service' };
   return previous;
 }

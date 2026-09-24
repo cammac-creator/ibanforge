@@ -81,7 +81,6 @@ function postAccount(path: string, body: Record<string, unknown>): Promise<ApiRe
 /** Le texte de chaque message, dans l'espace `account`. */
 const NOTICE_TEXT: Record<Notice, string> = {
   code_invalid: "errorCode",
-  code_attempts: "errorAttempts",
   rate_limited: "errorRateLimited",
   address: "errorAddress",
   service: "errorService",
