@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { getComplianceDB } from './compliance-db.js';
+import { complianceTableLoaded, getComplianceDB } from './compliance-db.js';
 import type {
   SanctionsCheck,
   ReachabilityCheck,
@@ -14,7 +14,28 @@ let _checkFatf: Database.Statement | null = null;
 let _checkReachability: Database.Statement | null = null;
 let _checkVop: Database.Statement | null = null;
 
+/**
+ * Levée quand une banque doit être contrôlée et qu'aucune liste de sanctions
+ * n'est chargée.
+ *
+ * Pas une erreur de recherche mais un état : les listes ne sont pas chargées,
+ * et une absence de résultat se lirait « aucune correspondance » sur des listes
+ * que personne n'a consultées. Elle est levée plutôt que renvoyée, pour que les
+ * chemins payants tombent dans la garde qui répond déjà « nous avons un IBAN
+ * valide et n'avons pas pu le contrôler » (`compliance_data_unavailable`,
+ * niveau elevated, src/lib/compliance-response.ts) au lieu d'un score rassurant.
+ */
+export class SanctionsListsNotLoadedError extends Error {
+  constructor() {
+    super('No sanctions list is loaded: the bank cannot be screened.');
+    this.name = 'SanctionsListsNotLoadedError';
+  }
+}
+
 export function checkSanctions(countryCode: string, bic8: string | null): SanctionsCheck {
+  if (bic8 !== null && !complianceTableLoaded('sanctioned_entities')) {
+    throw new SanctionsListsNotLoadedError();
+  }
   const db = getComplianceDB();
   if (!_checkSanctionedCountry)
     _checkSanctionedCountry = db.prepare(
@@ -63,6 +84,11 @@ export interface BicSanctionsScreen {
 }
 
 export function screenBicSanctions(bic8: string): BicSanctionsScreen {
+  // Aucune liste chargée, c'est la même nouvelle qu'une base illisible : rien
+  // n'a été consulté, donc rien ci-dessous ne peut se lire « propre ».
+  if (!complianceTableLoaded('sanctioned_entities')) {
+    return { screened: false, listed: null, matched_lists: [] };
+  }
   try {
     const db = getComplianceDB();
     if (!_checkSanctionedBank)
@@ -82,6 +108,12 @@ export function screenBicSanctions(bic8: string): BicSanctionsScreen {
 
 export function checkReachability(bic8: string | null): ReachabilityCheck {
   if (!bic8) return { sepa_instant: false, sct: false, sdd: false, screened: false };
+  // Un registre EPC qui n'est pas chargé n'a pas été consulté. Répondre
+  // `screened: true` ici disait « non joignable » de toutes les banques, et
+  // ajoutait 5 à leur score de risque, sur une table simplement absente.
+  if (!complianceTableLoaded('sepa_participants')) {
+    return { sepa_instant: false, sct: false, sdd: false, screened: false };
+  }
   const db = getComplianceDB();
   if (!_checkReachability)
     _checkReachability = db.prepare('SELECT scheme FROM sepa_participants WHERE bic8 = ?');
@@ -97,6 +129,10 @@ export function checkReachability(bic8: string | null): ReachabilityCheck {
 
 export function checkVop(bic8: string | null): VopCheck {
   if (!bic8) return { participant: false, status: 'not_found', screened: false };
+  // Même règle que checkReachability : pas de registre VoP chargé, pas de réponse VoP.
+  if (!complianceTableLoaded('vop_participants')) {
+    return { participant: false, status: 'not_found', screened: false };
+  }
   const db = getComplianceDB();
   if (!_checkVop) _checkVop = db.prepare('SELECT status FROM vop_participants WHERE bic8 = ?');
   const row = _checkVop.get(bic8) as { status: string } | undefined;
@@ -218,14 +254,30 @@ export function calculateRiskScore(
   // `bank_code_not_allocated` (+40); a second weight for the same fact would be
   // double-counting, and inventing one merely to keep scores from moving would
   // reintroduce a number that means "we did not check".
-  if (!reachability.screened || !vop.screened) {
+  //
+  // (25/09/2026) Qu'une banque ait été résolue se lit désormais dans
+  // `bank_screened` (un BIC8 était en main), plus dans les deux champs
+  // `screened` : ceux-ci disent aussi « le registre n'est pas chargé », et une
+  // banque résolue ne doit pas être décrite comme non résolue parce qu'une
+  // table manque.
+  //
+  // Un registre non chargé se note de la même façon, axe par axe et pour la
+  // même raison : `sepa_register_unavailable` et `vop_register_unavailable` ne
+  // pèsent rien, parce qu'ils décrivent ce que nous n'avons pas pu consulter,
+  // pas la banque. Les noter, c'est ce qui faisait passer une banque ordinaire
+  // de 0 à 10 sur une base sans les tables EPC.
+  if (!sanctions.bank_screened) {
     flags.push('no_bank_resolved');
   } else {
-    if (!reachability.sepa_instant) {
+    if (!reachability.screened) {
+      flags.push('sepa_register_unavailable');
+    } else if (!reachability.sepa_instant) {
       score += 5;
       flags.push('no_sepa_instant');
     }
-    if (!vop.participant) {
+    if (!vop.screened) {
+      flags.push('vop_register_unavailable');
+    } else if (!vop.participant) {
       score += 5;
       flags.push('no_vop');
     }

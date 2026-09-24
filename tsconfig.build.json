@@ -5,6 +5,8 @@
   // and the Dockerfile shipped them into the production image, fixtures and
   // billing assertions included (audit QUA-01 / OPS-11). mcp/tsconfig.json had
   // fixed the same defect for the npm package; this applies it to the API.
+  // src/test-support/ porte les jeux inventés qu'installent les tests
+  // (restricted-fixtures.ts, 25/09/2026) : du code de test, jamais d'exécution.
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/test-support/**"]
 }

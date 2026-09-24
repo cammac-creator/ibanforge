@@ -292,7 +292,7 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
         .nullable()
         .optional()
         .describe(
-          'true = resolved bank is listed as ready in the EPC VoP scheme register; null = no institution resolved.',
+          'true = resolved bank is listed as ready in the EPC VoP scheme register; null = no institution resolved, or the VoP register is not loaded (not consulted).',
         ),
       // Declared because `enrichResult` now serves it: the SDK validates
       // this payload against the schema and drops `structuredContent`

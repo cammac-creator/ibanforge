@@ -1271,10 +1271,11 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
   // 2025-10-09, payer-side real-time checks since 2026-04). Null when no
   // institution was resolved — same rule as issuer.type: no substantiated
   // subject, no claim about it.
+  // Nul aussi quand le registre VoP n'est pas chargé (25/09/2026) : `false`
+  // dirait alors « absente du registre » d'un registre que personne n'a consulté.
   if (result.sepa) {
-    result.sepa.vop_participant = result.bic?.code
-      ? checkVop(result.bic.code.slice(0, 8)).participant
-      : null;
+    const vop = result.bic?.code ? checkVop(result.bic.code.slice(0, 8)) : null;
+    result.sepa.vop_participant = vop?.screened ? vop.participant : null;
 
     // `schemes` at the grain the published contract promises it at (DATA-02,
     // 01/09/2026). The OpenAPI description says "SEPA schemes the INSTITUTION
