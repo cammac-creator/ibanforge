@@ -12,7 +12,7 @@ import {
 } from '../lib/positioning.js';
 import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 import { dataTools, FREE_ENDPOINTS } from '../mcp/inventory.js';
-import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 import { CONSENT_BOUNDARY } from '../lib/consent.js';
 
@@ -540,7 +540,10 @@ const APIS_JSON = {
       name: 'IBANforge API',
       description:
         `REST + MCP + x402. Free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests/month on a key that needs no e-mail at all, ` +
-        `${FREE_TIER_MONTHLY_LIMIT} a month once claimed; the HTTP MCP transport answers ${MCP_DAILY_LIMIT} free tool calls per IP per day with no key at all.`,
+        `${FREE_TIER_MONTHLY_LIMIT} a month once claimed. ` +
+        // Its own sentence since 24/09/2026: the MCP allowance became weekly
+        // and took the key's monthly figure, and the two must not share one.
+        `Separately, the HTTP MCP transport answers ${MCP_WEEKLY_LIMIT} free tool calls a week per source address with no key at all.`,
       humanURL: 'https://ibanforge.com',
       baseURL: 'https://api.ibanforge.com',
       tags: [

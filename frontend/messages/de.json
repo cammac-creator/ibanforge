@@ -1850,7 +1850,7 @@
         "Fragen Sie: „Prüfe die Dokumentations-IBAN DE89370400440532013000 und nenne Registerergebnis, Quelle und Datum.“",
         "Lesen Sie bank_code_check und die Quellen. unknown bestätigt nichts; die Prüfung belegt weder die Existenz des Kontos noch dessen Inhaber."
       ],
-      "limits": "{daily} Tool-Einheiten pro Netzwerkadresse und Tag ohne Schlüssel; jede IBAN eines Batches zählt als Einheit. Ein API-Schlüssel erhöht dieses entfernte Kontingent nicht. {remote} entfernte Tools, {installed} im lokalen Paket: Die beiden Dateiaudit-Tools benötigen das installierte Paket.",
+      "limits": "{weekly} Tool-Einheiten pro Netzwerkadresse und Woche (ISO-Woche in UTC, Neustart montags um 00:00 UTC) ohne Schlüssel; jede IBAN eines Batches zählt als Einheit. Ein API-Schlüssel erhöht dieses entfernte Kontingent nicht. {remote} entfernte Tools, {installed} im lokalen Paket: Die beiden Dateiaudit-Tools benötigen das installierte Paket.",
       "guide": "MCP-Anleitung und Kontingente",
       "local": "Benötigt Ihr Client einen lokalen Prozess? Nutzen Sie diese Konfiguration.",
       "sdkHeading": "Mit einem SDK integrieren",

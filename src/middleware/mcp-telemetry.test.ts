@@ -15,6 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildApp } from '../app.js';
 import { getStatsDB } from '../lib/db.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 
 const MCP_HEADERS = {
   'Content-Type': 'application/json',
@@ -86,8 +87,8 @@ describe('MCP telemetry — a refusal has its own path', () => {
     await callTool(app, sessionId, ip);
     expect(recentMcpPaths(1)).toEqual(['/mcp:tools-call']);
 
-    // Spend the rest of the daily allowance, then one more.
-    for (let i = 0; i < 9; i++) await callTool(app, sessionId, ip);
+    // Spend the rest of the allowance (weekly since 24/09/2026), then one more.
+    for (let i = 0; i < MCP_WEEKLY_LIMIT - 1; i++) await callTool(app, sessionId, ip);
     const refused = await callTool(app, sessionId, ip);
     // The refusal is a JSON-RPC error carried in a 200, which is exactly why
     // the status could not tell the two apart.
@@ -145,14 +146,14 @@ describe('MCP telemetry — a refusal has its own path', () => {
     const app = buildApp();
     const ip = '203.0.113.174';
     const sessionId = await openSession(app, ip);
-    for (let i = 0; i < 10; i++) await callTool(app, sessionId, ip);
-    // La onzième dépasse l'allocation du jour : elle est refusée, et son nom
-    // doit rester lisible — c'est justement ce qu'on veut pouvoir compter.
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) await callTool(app, sessionId, ip);
+    // La suivante dépasse l'allocation de la semaine : elle est refusée, et son
+    // nom doit rester lisible — c'est justement ce qu'on veut pouvoir compter.
     await callTool(app, sessionId, ip);
 
     const entry = getMcpToolStats(1).tools.find((t) => t.tool === 'lookup_ch_clearing');
     expect(entry).toBeDefined();
-    expect(entry!.served).toBeGreaterThanOrEqual(10);
+    expect(entry!.served).toBeGreaterThanOrEqual(MCP_WEEKLY_LIMIT);
     expect(entry!.refused).toBeGreaterThanOrEqual(1);
   });
 

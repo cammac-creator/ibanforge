@@ -35,7 +35,7 @@ import {
   MCP_SESSIONS_PER_IP_DAY,
 } from './mcp-http.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
-import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { deviceGrant } from './device-grant.js';
 import { getStatsDB } from '../lib/db.js';
 import { DAILY_KEY_CREATION_LIMIT, keyCreationSource } from '../lib/key-creation-guard.js';
@@ -123,8 +123,8 @@ async function initialize(
 }
 
 /**
- * `clientIp` exists because the free tier is 10 tool calls per IP per day and
- * this file is at the cap. Unset, every test shares the 'unknown' bucket, so
+ * `clientIp` exists because the free tier is a handful of tool calls per source
+ * per week (ten a day until 24/09/2026) and this file is at the cap. Unset, every test shares the 'unknown' bucket, so
  * adding an eleventh `tools/call` anywhere makes a DIFFERENT test fail with a
  * rate-limit error — a confusing failure that says nothing about the code under
  * test. A documentation address (RFC 5737 TEST-NET-3) gives one test its own
@@ -585,13 +585,13 @@ describe('POST /mcp — JSON-RPC batch billing', () => {
     const app = makeApp();
     const sessionId = await initialize(app);
 
-    // One batch carrying more calls than a whole day's allowance.
+    // One batch carrying more calls than a whole week's allowance.
     const res = await postBatch(app, sessionId, '203.0.113.201', 40);
     const body = await parseStreamableHttp(res);
 
-    expect(body.error, 'a 40-call batch must not slip past the daily allowance').toBeDefined();
+    expect(body.error, 'a 40-call batch must not slip past the weekly allowance').toBeDefined();
     expect(body.error?.code).toBe(-32000);
-    expect(body.error?.message).toContain('Daily MCP free tier limit reached');
+    expect(body.error?.message).toContain('Weekly MCP free tier limit reached');
   });
 
   it('leaves a single tool call unaffected', async () => {
@@ -810,7 +810,7 @@ describe('POST /mcp — opening a session is metered per address', () => {
  * signed-up one. Every other surface already bills this tool per IBAN.
  */
 describe('POST /mcp — batch_validate_iban bills per IBAN', () => {
-  it('spends a whole day of allowance on one 100-IBAN batch', async () => {
+  it('spends a whole week of allowance on one 100-IBAN batch', async () => {
     const app = makeApp();
     const ip = '198.51.100.241';
     const sessionId = await initialize(app, ip);
@@ -1079,7 +1079,7 @@ describe('device grant — les deux outils sur le transport HTTP', () => {
     const sessionId = await initialize(app, ip);
 
     // Le plafond d'unités épuisé sur la même adresse, par le chemin normal.
-    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) {
       await rpc(
         app,
         sessionId,
@@ -1107,7 +1107,7 @@ describe('device grant — les deux outils sur le transport HTTP', () => {
     const app = makeApp();
     const ip = '198.51.100.202';
     const sessionId = await initialize(app, ip);
-    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) {
       await rpc(
         app,
         sessionId,
@@ -1348,7 +1348,7 @@ describe('le haut de l’entonnoir MCP distant, par jour', () => {
     const app = makeApp();
     const ip = freshIp();
     const sessionId = await initialize(app, ip);
-    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) {
       await rpc(
         app,
         sessionId,
@@ -1367,7 +1367,7 @@ describe('le haut de l’entonnoir MCP distant, par jour', () => {
       999,
       ip,
     );
-    expect(refused.error?.message).toContain('Daily MCP free tier limit reached');
+    expect(refused.error?.message).toContain('Weekly MCP free tier limit reached');
     expect(today()).toEqual(before);
   });
 });

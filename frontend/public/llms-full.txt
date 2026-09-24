@@ -66,7 +66,7 @@ nothing at all:
 - `POST /v1/iban/validate` with a real `iban` is served 25 times a week per source address (IPv6 counted per /64; ISO week in UTC), full enrichment included
 - The response carries a `trial` block: calls left this week, the reset (Monday 00:00 UTC, and `resets_at` for the exact instant), and the one request that mints a free key
 - Past 25 in the week the route answers 402 again, `cause.reason = "trial_exhausted"`, until Monday
-- The HTTP MCP transport has its own allowance, counted by the day: 10 tool calls/day per source address
+- The HTTP MCP transport has its own allowance, separate from this one and counted by the week too: 25 tool calls a week per source address, same reset
 - An empty `{}` body always gets the 402 discovery envelope, never a trial — that probe belongs to the x402 indexers
 
 **Free key (no e-mail, no card):**
@@ -97,7 +97,7 @@ nothing at all:
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
 - check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
-- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the daily limit. Cost: free
+- request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the free allowance is spent. Cost: free
 - poll_api_key — collect the key once a human has approved it, handed over exactly once, with the config line to paste. Cost: free
 
 Install: `npx -y ibanforge-mcp` — or HTTP at https://api.ibanforge.com/mcp

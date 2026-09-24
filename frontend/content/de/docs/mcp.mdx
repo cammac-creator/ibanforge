@@ -48,7 +48,7 @@ Nach dem Speichern den Client neu starten. Das npm-Paket bietet **13 Tools**, de
 https://api.ibanforge.com/mcp
 ```
 
-Streamable-HTTP-Transport, **10 kostenlose Tool-Aufrufe pro IP und Tag**, ganz ohne Schlüssel: der schnellste Weg für einen Agenten, die Daten zu prüfen, bevor Sie sich festlegen. Für dauerhafte Nutzung das npm-Paket mit dem kostenlosen Schlüssel betreiben.
+Streamable-HTTP-Transport, **25 kostenlose Tool-Aufrufe pro Woche und Quelladresse**, ganz ohne Schlüssel (ISO-Woche in UTC, Neustart montags um 00:00 UTC; ein Batch zählt einen Aufruf pro IBAN; getrennt vom REST-Test ohne Schlüssel): der schnellste Weg für einen Agenten, die Daten zu prüfen, bevor Sie sich festlegen. Für dauerhafte Nutzung das npm-Paket mit dem kostenlosen Schlüssel betreiben.
 
 ### Als Connector in einem Chat-Assistenten hinzufügen
 
@@ -162,7 +162,7 @@ Prüft den Status eines von audit_creditor_file erstellten Audit-Jobs: ob bezahl
 
 ### send_feedback
 
-Ein falsches Ergebnis, veraltete oder fehlende Daten oder alles, was Sie an der Nutzung oder an der BEZAHLUNG des Dienstes hindert, direkt an die Betreiber melden. Kostenlos, und das Tool antwortet auch dann noch, wenn das kostenlose Tageskontingent aufgebraucht ist: den Beschwerdekasten mit genau der Grenze zu deckeln, die die Beschwerde auslöst, würde die Meldungen zum Schweigen bringen, für die er da ist. Ein Mensch liest jede Meldung; ein nachgewiesener Datenfehler bei einem bezahlten x402-Aufruf wird on-chain erstattet. `error_type` und `notes` sind Pflicht, der Rest ist optional.
+Ein falsches Ergebnis, veraltete oder fehlende Daten oder alles, was Sie an der Nutzung oder an der BEZAHLUNG des Dienstes hindert, direkt an die Betreiber melden. Kostenlos, und das Tool antwortet auch dann noch, wenn das kostenlose Kontingent aufgebraucht ist: den Beschwerdekasten mit genau der Grenze zu deckeln, die die Beschwerde auslöst, würde die Meldungen zum Schweigen bringen, für die er da ist. Ein Mensch liest jede Meldung; ein nachgewiesener Datenfehler bei einem bezahlten x402-Aufruf wird on-chain erstattet. `error_type` und `notes` sind Pflicht, der Rest ist optional.
 
 ```json
 { "error_type": "wrong_bic", "notes": "BIC verweist auf eine 2024 fusionierte Bank", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }

@@ -4,7 +4,9 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { closeAll } from '../lib/db.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_FREE_KEY_HINT } from '../lib/trial.js';
-import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
+import { FREE_TIER_NOTE, mcpAllowanceRefusal } from './mcp-http.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 /**
@@ -34,6 +36,14 @@ const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
 
 const TRIAL = String(REST_TRIAL_WEEKLY_LIMIT);
 const MONTH = String(ANONYMOUS_MONTHLY_LIMIT);
+/**
+ * The keyless MCP allowance, counted by the week since the evening of
+ * 24/09/2026 (Claude-Alain's decision). Today it is the same number as the
+ * REST trial and the key: three doors, one figure, and the strict rule below
+ * (never two of them in one sentence) is what keeps them apart.
+ */
+const MCP = String(MCP_WEEKLY_LIMIT);
+const FIGURES = [TRIAL, MCP, MONTH];
 
 /**
  * The trial's unit, in the three languages. The WEEK since 24/09/2026; the day
@@ -64,10 +74,28 @@ function collides(sentence: string): boolean {
     refersToTrial.test(sentence)
   )
     return true;
-  const d = (sentence.match(bare(TRIAL)) ?? []).length;
-  if (TRIAL === MONTH) return d >= 2;
+  // Two doors that share a figure: that figure never appears twice in one
+  // sentence, whatever the units and whatever names are around it. Stricter
+  // than "name each door", and that is the point: it cannot be argued with.
+  for (const n of new Set(FIGURES)) {
+    const doors = FIGURES.filter((f) => f === n).length;
+    if (doors >= 2 && (sentence.match(bare(n)) ?? []).length >= 2) return true;
+  }
+  // Different figures: a period figure beside the key's monthly one still reads
+  // as a comparison of the two doors.
   const m = (sentence.match(bare(MONTH)) ?? []).length;
-  return d >= 1 && m >= 1 && TRIAL_UNIT.test(sentence) && /month|mois|Monat/i.test(sentence);
+  if (m === 0 || !/month|mois|Monat/i.test(sentence) || !TRIAL_UNIT.test(sentence)) return false;
+  return [TRIAL, MCP]
+    .filter((n) => n !== MONTH)
+    .some((n) => (sentence.match(bare(n)) ?? []).length >= 1);
+}
+
+/** Every string value of a JSON document, depth first. */
+function jsonStrings(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(jsonStrings);
+  if (value && typeof value === 'object') return Object.values(value).flatMap(jsonStrings);
+  return [];
 }
 
 function offenders(name: string, text: string): string[] {
@@ -157,6 +185,49 @@ describe('the weekly trial and the monthly key never share a sentence', () => {
     expect(found, found.join('\n')).toEqual([]);
   });
 
+  // The MCP texts, since the keyless MCP allowance took the same figure
+  // (24/09/2026): the note every priced tool carries, the instructions sent at
+  // connection, the refusal past the allowance, the GET /mcp discovery body,
+  // the agents catalogue and the rate-limit artifacts.
+  it('the free-tier note of every priced MCP tool', () => {
+    const found = offenders('FREE_TIER_NOTE', FREE_TIER_NOTE);
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
+  it('the MCP instructions sent at initialize', () => {
+    const found = offenders('MCP_INSTRUCTIONS', MCP_INSTRUCTIONS);
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
+  it('the JSON-RPC refusal past the keyless MCP allowance', () => {
+    const found = offenders(
+      'mcpAllowanceRefusal',
+      mcpAllowanceRefusal(MCP_WEEKLY_LIMIT + 1).message,
+    );
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
+  // JSON bodies are read string by string: a bare `"weekly_limit":25` beside
+  // `"mcp_weekly_limit":25` is two fields, not a sentence anyone reads.
+  it.each(['/v1', '/apis.json', '/.well-known/agents.json'])('%s', async (path) => {
+    const found = offenders(path, jsonStrings(JSON.parse(await get(path))).join('\n'));
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
+  it('GET /mcp, whose discovery body rides on a 405', async () => {
+    // 405 on purpose (SSE clients stop retrying); the JSON body is still what a
+    // developer reads in a browser.
+    const res = await app.request('https://api.ibanforge.com/mcp');
+    expect(res.status).toBe(405);
+    const found = offenders('/mcp', jsonStrings(await res.json()).join('\n'));
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
+  it.each(['/.well-known/rate-limits.yml', '/.well-known/auth.md'])('%s', async (path) => {
+    const found = offenders(path, await get(path));
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
   it('the OpenAPI overview and the validation route', async () => {
     const spec = JSON.parse(await get('/openapi.json')) as {
       info: { description: string };
@@ -178,6 +249,16 @@ describe('the weekly trial and the monthly key never share a sentence', () => {
     'Ohne Schlüssel 25 Prüfungen pro Woche, mit dem Schlüssel 25 Anfragen im Monat.',
   ])('catches the collision it exists for: %s', (sentence) => {
     expect(collides(sentence)).toBe(TRIAL === MONTH);
+  });
+
+  it.each([
+    // The keyless MCP allowance and the REST trial, both 25 a week since the
+    // evening of 24/09/2026: never in one sentence, however well named.
+    'No key: 25 validations a week on POST /v1/iban/validate, and 25 tool calls a week on the MCP transport.',
+    // The MCP allowance and the key's month.
+    'free: 25 units a week per source on this transport, or an ifk_ key for 25 REST calls/month.',
+  ])('catches the collision of the MCP allowance: %s', (sentence) => {
+    expect(collides(sentence)).toBe(MCP === TRIAL || MCP === MONTH);
   });
 
   it('catches the collision made by reference to the weekly figure', () => {
@@ -212,7 +293,7 @@ describe('the MCP server card says how to start for free', () => {
     };
     const text = card.free_access ?? '';
     expect(text).toContain(`${REST_TRIAL_WEEKLY_LIMIT} IBAN validations a week`);
-    expect(text).toContain(`${MCP_DAILY_LIMIT} full tool calls a day per IP`);
+    expect(text).toContain(`${MCP_WEEKLY_LIMIT} full tool calls a week per source address`);
     expect(text).toContain(`${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed`);
     expect(text).toContain(`starts at ${ANONYMOUS_MONTHLY_LIMIT} requests a month`);
     expect(text).toContain('POST /v1/keys/generate with an empty body');

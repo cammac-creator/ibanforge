@@ -11,6 +11,7 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // middleware applique, jamais une copie retapée. 🚨 Y compris `example`, qui
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { RATE_LIMIT } from '../middleware/rate-limit.js';
 import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
@@ -2094,10 +2095,14 @@ const buildRawSpec = () => ({
         operationId: 'mcpStreamableHttp',
         summary: 'MCP endpoint for AI agents (Streamable HTTP)',
         description:
-          'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes the same capabilities as this REST API as 7 MCP tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference and check_postal_address (both free), plus send_feedback. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec.',
+          'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes the same capabilities as this REST API as 7 MCP tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference and check_postal_address (both free), plus send_feedback. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec. With no credential it answers up to ' +
+          MCP_WEEKLY_LIMIT +
+          ' tool units a week per source address (one per tool call, one per IBAN in batch_validate_iban; the week is the ISO week in UTC and resets on ' +
+          TRIAL_RESET +
+          '), an allowance separate from the keyless REST trial.',
         tags: ['MCP'],
         // Anonymous is a supported alternative here, not an oversight: the HTTP
-        // MCP transport answers a daily free allowance with no credential.
+        // MCP transport answers a weekly free allowance with no credential.
         security: [{}, { apiKey: [] }],
         externalDocs: {
           description: 'MCP setup guide (Claude Desktop, Cursor, HTTP transport)',

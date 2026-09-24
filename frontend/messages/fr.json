@@ -1850,7 +1850,7 @@
         "Demandez : « Contrôle l’IBAN de documentation DE89370400440532013000 et indique le résultat du registre, sa source et sa date. »",
         "Lisez bank_code_check et ses sources. Un résultat unknown ne confirme rien ; le contrôle ne prouve ni l’existence du compte ni son titulaire."
       ],
-      "limits": "{daily} unités d’outils par adresse réseau et par jour, sans clé ; chaque IBAN d’un lot compte pour une unité. Une clé API n’augmente pas ce quota distant. {remote} outils distants, {installed} dans le paquet local : les deux outils d’audit de fichiers nécessitent le paquet installé.",
+      "limits": "{weekly} unités d’outils par adresse réseau et par semaine (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC), sans clé ; chaque IBAN d’un lot compte pour une unité. Une clé API n’augmente pas ce quota distant. {remote} outils distants, {installed} dans le paquet local : les deux outils d’audit de fichiers nécessitent le paquet installé.",
       "guide": "Guide MCP et quotas",
       "local": "Votre client nécessite un processus local ? Utilisez cette configuration.",
       "sdkHeading": "Intégrer avec un SDK",

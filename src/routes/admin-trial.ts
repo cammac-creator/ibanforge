@@ -1,12 +1,14 @@
 import { Hono } from 'hono';
 import { isAdminAuthorized } from './api-keys.js';
 import {
+  countMcpWeek,
   countTrialActivitySince,
   countTrialBucketsSince,
   countTrialBucketsToday,
   countTrialWeek,
   getTrialDaily,
 } from '../lib/daily-ip-ledger.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 
 /**
@@ -42,6 +44,11 @@ adminTrial.get('/v1/admin/trial', (c) => {
     resets: TRIAL_RESET,
     resets_at: trialResetsAt(),
     this_week: countTrialWeek(),
+    // L'accès MCP sans clé, compté à la semaine depuis le soir du 24/09/2026
+    // dans la même table, sous un seau distinct : ses totaux à part, pour que
+    // ceux de l'essai REST restent les siens.
+    mcp_weekly_limit: MCP_WEEKLY_LIMIT,
+    mcp_this_week: countMcpWeek(),
     // La journée courante, lue dans le registre vivant : elle n'est pas encore
     // dans `trial_daily`, que `snapshotTrialDay` n'écrira qu'au tick suivant.
     today: {

@@ -48,7 +48,7 @@ Après enregistrement, redémarrez le client. Le module npm expose **13 outils**
 https://api.ibanforge.com/mcp
 ```
 
-Transport HTTP streamable, **10 appels d'outils gratuits par IP et par jour**, sans aucune clé : le chemin le plus rapide pour qu'un agent évalue la donnée avant tout engagement. Pour un usage suivi, lancez le paquet npm avec votre clé gratuite.
+Transport HTTP streamable, **25 appels d'outils gratuits par semaine et par adresse source**, sans aucune clé (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC ; un lot compte un appel par IBAN ; distinct de l'essai REST sans clé) : le chemin le plus rapide pour qu'un agent évalue la donnée avant tout engagement. Pour un usage suivi, lancez le paquet npm avec votre clé gratuite.
 
 ### L'ajouter comme connecteur dans un assistant de conversation
 
@@ -162,7 +162,7 @@ Vérifie le statut d'un job d'audit de fichier créanciers créé par audit_cred
 
 ### send_feedback
 
-Signaler un résultat faux, une donnée périmée ou absente, ou tout ce qui vous empêche d'utiliser ou de PAYER le service, directement aux opérateurs. Gratuit, et l'outil continue de répondre une fois l'allocation gratuite quotidienne épuisée : plafonner la boîte à réclamations avec la limite qui produit la réclamation ferait taire précisément les rapports qu'elle sert à recevoir. Un humain lit chaque rapport ; une erreur de donnée avérée sur un appel x402 payé est remboursée on-chain. `error_type` et `notes` sont requis, le reste est optionnel.
+Signaler un résultat faux, une donnée périmée ou absente, ou tout ce qui vous empêche d'utiliser ou de PAYER le service, directement aux opérateurs. Gratuit, et l'outil continue de répondre une fois l'allocation gratuite épuisée : plafonner la boîte à réclamations avec la limite qui produit la réclamation ferait taire précisément les rapports qu'elle sert à recevoir. Un humain lit chaque rapport ; une erreur de donnée avérée sur un appel x402 payé est remboursée on-chain. `error_type` et `notes` sont requis, le reste est optionnel.
 
 ```json
 { "error_type": "wrong_bic", "notes": "BIC résolu vers une banque fusionnée en 2024", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }

@@ -47,10 +47,11 @@ import { openapi } from './routes/openapi.js';
 import { discovery } from './routes/discovery.js';
 import { artifacts } from './routes/artifacts.js';
 import { ogImage } from './routes/og-image.js';
-// MCP_DAILY_LIMIT travels with the route that enforces it: the /v1 text below
-// announces both tasters, and a retyped "10" is a number that stops being true
-// the day one of them moves.
-import { mcpHttp, MCP_DAILY_LIMIT } from './routes/mcp-http.js';
+// MCP_WEEKLY_LIMIT travels with the route that enforces it: the /v1 text below
+// announces both tasters, and a retyped figure is a number that stops being
+// true the day one of them moves (it did on 24/09/2026: ten a day became
+// twenty-five a week).
+import { mcpHttp, MCP_WEEKLY_LIMIT } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 // The tool inventory, so /llms.txt counts the tools instead of asserting a
 // number. It claimed "7 tools" while the servers exposed 8 (audit 2026-09-01,
@@ -455,9 +456,9 @@ ${cannotCallLines().join('\n')}
 - **Paying as an agent, zero to first payment in 3 steps** (wallet with budget → USDC on Base → one $${packPrice} payment for 1,000 credits, or pay-per-call): https://ibanforge.com/docs/pay-as-an-agent
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\`: the tools of the HTTP transport plus the creditor-file audit (${STDIO_ONLY_TOOLS.join(', ')}), no signup
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp (${MCP_TOOLS.length} tools, no signup)
-- **Try it with zero setup, as an agent (${MCP_DAILY_LIMIT} free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_DAILY_LIMIT} calls/day you get JSON-RPC error -32000, so move to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
+- **Try it with zero setup, as an agent (${MCP_WEEKLY_LIMIT} free tool calls a week per source address):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_WEEKLY_LIMIT} calls in the week you get JSON-RPC error -32000 until ${TRIAL_RESET}. For anything real, move to x402 or to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed). This allowance is separate from the keyless REST trial below: a source has both. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
 - **Try it with zero setup, from a terminal (${REST_TRIAL_WEEKLY_LIMIT} free validations a week per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"DE89370400440532013000"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left this week, when the count resets (\`resets_at\`), and how to take a key that needs no e-mail at all. The trial is counted by the ISO week in UTC and covers this route only. Past ${REST_TRIAL_WEEKLY_LIMIT} in the week the route goes back to 402, with \`cause.reason = "trial_exhausted"\`, until ${TRIAL_RESET}. The allowance is counted per source address (IPv6 counted per /64) and lives in the service database, so it survives a redeploy.
-- **The key that needs no e-mail is another door:** every endpoint, and ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed with a 6-digit code mailed to an address you read (POST /v1/keys/claim); an x402 payment made on the key raises it to ${FREE_TIER_MONTHLY_LIMIT} once, not every month. The HTTP MCP transport has its own allowance, counted by the day (${MCP_DAILY_LIMIT} tool calls/day).
+- **The key that needs no e-mail is another door:** every endpoint, and ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed with a 6-digit code mailed to an address you read (POST /v1/keys/claim); an x402 payment made on the key raises it to ${FREE_TIER_MONTHLY_LIMIT} once, not every month. The HTTP MCP transport has its own allowance, counted by the week (${MCP_WEEKLY_LIMIT} tool calls a week per source address).
 
 ## Discovery endpoints
 
@@ -590,7 +591,7 @@ curl -s -X POST https://api.ibanforge.com/v1/keys/device \\
   -d '{"client_name":"my agent","reason":"validate supplier IBANs before payout"}'
 \`\`\`
 
-Two MCP tools, and the only door that asks the agent for **nothing at all** — not an address, not a card, not even a REST call. \`request_api_key\` answers a short spoken-friendly code, a link, and a \`display_to_human\` block to show your human **verbatim**; they open the page, check the code matches, and click. Then \`poll_api_key\` (no argument needed) returns the key **once**, with the exact \`config_line\` to paste into an MCP client. The key is ${ANONYMOUS_MONTHLY_LIMIT} requests a month with no address of any kind, or ${FREE_TIER_MONTHLY_LIMIT} if your human chooses to add one on that page. Both tools are free and keep answering **after** the daily limit — that is what they are for. Over REST the same pair is \`POST /v1/keys/device\` then \`POST /v1/keys/device/token\` (long-polling; \`authorization_pending\` is normal, never loop tighter than the \`interval\`).
+Two MCP tools, and the only door that asks the agent for **nothing at all** — not an address, not a card, not even a REST call. \`request_api_key\` answers a short spoken-friendly code, a link, and a \`display_to_human\` block to show your human **verbatim**; they open the page, check the code matches, and click. Then \`poll_api_key\` (no argument needed) returns the key **once**, with the exact \`config_line\` to paste into an MCP client. The key is ${ANONYMOUS_MONTHLY_LIMIT} requests a month with no address of any kind, or ${FREE_TIER_MONTHLY_LIMIT} if your human chooses to add one on that page. Both tools are free and keep answering **after** the free allowance is spent — that is what they are for. Over REST the same pair is \`POST /v1/keys/device\` then \`POST /v1/keys/device/token\` (long-polling; \`authorization_pending\` is normal, never loop tighter than the \`interval\`).
 
 ### 9. /v1/iban/format — free pre-flight (no auth, no payment)
 
@@ -998,7 +999,7 @@ export function buildApp(): Hono<HonoEnv> {
       //
       // 24/09/2026 : l'essai se compte à la semaine ISO (UTC). `daily_limit`
       // est retiré plutôt que gardé, il aurait porté un chiffre de la semaine
-      // sous un nom du jour ; `mcp_daily_limit`, lui, reste vrai.
+      // sous un nom du jour.
       trial: {
         endpoint: 'POST /v1/iban/validate',
         weekly_limit: REST_TRIAL_WEEKLY_LIMIT,
@@ -1008,7 +1009,10 @@ export function buildApp(): Hono<HonoEnv> {
         resets_at: trialResetsAt(),
         exhausted: 'HTTP 402, cause.reason = "trial_exhausted"',
         note: 'No key, no wallet, no e-mail: a real iban in the body is served in full. Counted in the service database, so it survives a redeploy.',
-        mcp_daily_limit: MCP_DAILY_LIMIT,
+        // 24/09/2026 (soir) : l'accès MCP sans clé se compte aussi à la semaine.
+        // `mcp_daily_limit` est retiré pour la même raison que `daily_limit`.
+        mcp_weekly_limit: MCP_WEEKLY_LIMIT,
+        mcp_period: 'week',
       },
       discovery: {
         x402: 'https://api.ibanforge.com/.well-known/x402',

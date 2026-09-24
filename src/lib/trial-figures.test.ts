@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { buildApp } from '../app.js';
 import { closeAll } from '../lib/db.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from './trial.js';
-import { MCP_DAILY_LIMIT } from './mcp-limits.js';
+import { MCP_SESSIONS_PER_IP_DAY, MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 
 /**
  * Le chiffre de l'essai, tel qu'il est SERVI.
@@ -17,8 +17,10 @@ import { MCP_DAILY_LIMIT } from './mcp-limits.js';
  * 🚨 Les deux chiffres sont DIFFÉRENTS depuis le 15/09/2026 (REST 25, MCP 10),
  * donc chaque motif dit lequel il attend : un garde qui accepterait « l'un ou
  * l'autre » laisserait passer la confusion même qu'il existe pour empêcher.
- * Et depuis le 24/09/2026 ils n'ont plus la même UNITÉ (REST par semaine, MCP
- * par jour) : chaque motif porte aussi la sienne.
+ * Le 24/09/2026 l'essai REST est passé à la semaine, puis le même soir l'accès
+ * MCP sans clé aussi (25 par semaine, décision de Claude-Alain) : les deux
+ * chiffres sont de nouveau ÉGAUX, et ce sont deux allocations séparées. Chaque
+ * motif dit donc toujours laquelle il attend, et son unité.
  *
  * Les corps sont comparés espaces NORMALISÉS : une phrase servie peut être
  * coupée par prettier ou par un retour à la ligne YAML sans que sa promesse
@@ -48,10 +50,15 @@ const SERVED = [
   },
   {
     path: '/llms.txt',
-    pattern: /own allowance, counted by the day \((?<n>\d+) tool calls\/day\)/,
+    pattern:
+      /own allowance, counted by the week \((?<n>\d+) tool calls a week per source address\)/,
     expect: 'MCP',
   },
-  { path: '/llms.txt', pattern: /\((?<n>\d+) free tool calls\/day per IP\)/, expect: 'MCP' },
+  {
+    path: '/llms.txt',
+    pattern: /\((?<n>\d+) free tool calls a week per source address\)/,
+    expect: 'MCP',
+  },
   {
     path: '/.well-known/rate-limits.yml',
     pattern: /rest_anonymous_trial: requests: (?<n>\d+) window: 1 week/,
@@ -59,7 +66,7 @@ const SERVED = [
   },
   {
     path: '/.well-known/rate-limits.yml',
-    pattern: /mcp_anonymous: requests: (?<n>\d+)/,
+    pattern: /mcp_anonymous: requests: (?<n>\d+) window: 1 week/,
     expect: 'MCP',
   },
   {
@@ -69,7 +76,7 @@ const SERVED = [
   },
   {
     path: '/.well-known/auth.md',
-    pattern: /answers (?<n>\d+) full tool calls per IP per day/,
+    pattern: /answers (?<n>\d+) full tool calls per source address per week/,
     expect: 'MCP',
   },
   {
@@ -99,7 +106,7 @@ describe('les chiffres servis par du code', () => {
     // garde de pourrir en silence : sans elle, reformuler la phrase ferait
     // passer le test au vert en ne vérifiant plus rien.
     expect(found, `motif introuvable sur ${path} — la phrase a été reformulée`).not.toBeNull();
-    const wanted = which === 'REST' ? REST_TRIAL_WEEKLY_LIMIT : MCP_DAILY_LIMIT;
+    const wanted = which === 'REST' ? REST_TRIAL_WEEKLY_LIMIT : MCP_WEEKLY_LIMIT;
     expect(Number(found?.groups?.n)).toBe(wanted);
   });
 
@@ -109,14 +116,18 @@ describe('les chiffres servis par du code', () => {
       trial?: Record<string, unknown> & {
         weekly_limit?: number;
         period?: string;
-        mcp_daily_limit?: number;
+        mcp_weekly_limit?: number;
+        mcp_period?: string;
         resets?: string;
         resets_at?: string;
       };
     };
     expect(json.trial?.weekly_limit).toBe(REST_TRIAL_WEEKLY_LIMIT);
     expect(json.trial?.period).toBe('week');
-    expect(json.trial?.mcp_daily_limit).toBe(MCP_DAILY_LIMIT);
+    expect(json.trial?.mcp_weekly_limit).toBe(MCP_WEEKLY_LIMIT);
+    expect(json.trial?.mcp_period).toBe('week');
+    // 🚨 Même raison, le même soir : l'accès MCP sans clé se compte à la semaine.
+    expect(json.trial).not.toHaveProperty('mcp_daily_limit');
     expect(json.trial?.resets).toBe(TRIAL_RESET);
     expect(json.trial?.resets_at).toBe(trialResetsAt());
     // 🚨 `daily_limit` aurait porté un chiffre de la semaine sous un nom du jour.
@@ -149,9 +160,9 @@ describe('les chiffres servis par du code', () => {
     });
     expect(res.status).toBe(200);
     const text = (await res.text()).replace(/\s+/g, ' ');
-    const found = text.match(/Free tier: (?<n>\d+) tool calls\/IP\/day/);
+    const found = text.match(/Free tier: (?<n>\d+) tool calls a week per source address here/);
     expect(found, 'la phrase des instructions MCP a été reformulée').not.toBeNull();
-    expect(Number(found?.groups?.n)).toBe(MCP_DAILY_LIMIT);
+    expect(Number(found?.groups?.n)).toBe(MCP_WEEKLY_LIMIT);
   });
 });
 
@@ -161,16 +172,19 @@ describe('les chiffres servis par du code', () => {
  * chiffre au jour. Les motifs exacts ci-dessus ne voient qu'une phrase chacun ;
  * celui-ci voit toutes les autres, y compris celle qu'on écrira demain.
  *
- * Deux quotas du jour vivent dans les mêmes textes et gardent leur chiffre : le
- * MCP hébergé, reconnu à sa phrase et à sa valeur, et la création de clés
- * (« per network »). L'unité est lue par phrase, pas par ligne : l'OpenAPI et
- * la carte MCP sont du JSON sur une seule ligne.
+ * Depuis le soir du 24/09/2026, l'accès MCP sans clé se compte lui aussi à la
+ * semaine : une phrase sur le MCP est lue comme une phrase sur l'essai, et un
+ * chiffre du jour y est une erreur. Deux quotas du jour restent vrais et gardent
+ * leur chiffre : l'ouverture de sessions MCP (reconnue à « session » et à sa
+ * valeur) et la création de clés (« per network »). L'unité est lue par phrase,
+ * pas par ligne : l'OpenAPI et la carte MCP sont du JSON sur une seule ligne.
  */
 describe('les surfaces servies ne comptent plus l’essai au jour', () => {
   const DAILY =
     /(?<![.,\d$/])(\d+)(?![.,]?\d)(?![kK])[^\d\n]{0,40}?(?:\ba day\b|\bper day\b|\/day\b|\/IP\/day\b)/gi;
-  const ABOUT_TRIAL = /keyless|trial|no key|without a key/i;
-  const OTHER = /\bMCP\b|tool calls?|tool units?|per network|keys? per/i;
+  const ABOUT_TRIAL = /keyless|trial|no key|without a key|\bMCP\b|tool calls?|tool units?/i;
+  const SESSIONS = /session/i;
+  const PER_NETWORK = /per network|keys? per/i;
 
   it.each([
     '/llms.txt',
@@ -188,11 +202,9 @@ describe('les surfaces servies ne comptent plus l’essai au jour', () => {
       seen += 1;
       for (const m of sentence.matchAll(DAILY)) {
         const value = Number(m[1]);
-        if (value === MCP_DAILY_LIMIT && OTHER.test(sentence)) continue;
-        if (/per network|keys? per/i.test(sentence)) continue;
-        if (value === REST_TRIAL_WEEKLY_LIMIT || !OTHER.test(sentence)) {
-          offenders.push(`${value} par jour : ${sentence.slice(0, 180)}`);
-        }
+        if (PER_NETWORK.test(sentence)) continue;
+        if (value === MCP_SESSIONS_PER_IP_DAY && SESSIONS.test(sentence)) continue;
+        offenders.push(`${value} par jour : ${sentence.slice(0, 180)}`);
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
@@ -202,10 +214,12 @@ describe('les surfaces servies ne comptent plus l’essai au jour', () => {
 
   // Relecture du 24/09/2026 (D18) : l'essai quotidien dit sans chiffre. Pas de
   // « daily », « today » ni « midnight » tout courts ici : la note historique
-  // de l'OpenAPI (« the trial was daily ») et la phrase MCP de /v1 (« after
-  // the daily limit ») sont justes et rougiraient.
+  // de l'OpenAPI (« the trial was daily ») est juste et rougirait. Depuis le
+  // soir du même jour, « the daily limit » du MCP est faux lui aussi : le motif
+  // le lit, et seules les phrases sur les sessions et la création de clés, qui
+  // restent au jour, en sont exemptées.
   const DAILY_WORDS =
-    /\bdaily (allowance|trial|quota)\b|\bdaily\b[^.\n]{0,20}\b(allowance|trial)\b|counters are daily|reads `day`|"month":"day"/i;
+    /\bdaily (free[- ]tier )?(allowance|trial|quota|limit)\b|\bdaily\b[^.\n]{0,20}\b(allowance|trial)\b|counters are daily|reads `day`|"month":"day"/i;
 
   it.each([
     '/llms.txt',
@@ -219,7 +233,10 @@ describe('les surfaces servies ne comptent plus l’essai au jour', () => {
     const text = await body(path);
     const found = text
       .split(/(?<=[.!?])\s+/)
-      .filter((sentence) => DAILY_WORDS.test(sentence) && !OTHER.test(sentence));
+      .filter(
+        (sentence) =>
+          DAILY_WORDS.test(sentence) && !SESSIONS.test(sentence) && !PER_NETWORK.test(sentence),
+      );
     expect(found, found.join('\n')).toEqual([]);
   });
 

@@ -1850,7 +1850,7 @@
         "Ask: “Check the documentation IBAN DE89370400440532013000 and report the register result, source and date.”",
         "Read bank_code_check and its sources. An unknown result confirms nothing; the check does not prove that the account exists or identify its holder."
       ],
-      "limits": "{daily} tool units per network address per day, without a key; each IBAN in a batch counts as one unit. An API key does not raise this remote allowance. {remote} remote tools, {installed} in the local package: the two file-audit tools need the installed package.",
+      "limits": "{weekly} tool units per network address per week (ISO week in UTC, reset on Monday 00:00 UTC), without a key; each IBAN in a batch counts as one unit. An API key does not raise this remote allowance. {remote} remote tools, {installed} in the local package: the two file-audit tools need the installed package.",
       "guide": "MCP guide and quotas",
       "local": "Does your client require a local process? Use this configuration.",
       "sdkHeading": "Integrate with an SDK",

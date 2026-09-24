@@ -31,11 +31,11 @@ import {
  * with IBANforge is a terminal, they paste the curl from the docs, and they met
  * a 402 before ever seeing a response body.
  *
- * 🚨 The two allowances are no longer the same number, and that is deliberate.
- * Parity is in the INVITATION, not in the figure: this door opens one route at
- * $0.005, the MCP taster opens every data tool up to a $0.02 compliance
- * screening, so the smaller allowance is the MCP one. The ten here had been
- * copied from `MCP_DAILY_LIMIT` because a number was needed.
+ * 🚨 Parity is in the INVITATION, not in the figure: this door opens one route
+ * at $0.005, the MCP taster opens every data tool up to a $0.02 compliance
+ * screening. The ten here had once been copied from the MCP allowance because a
+ * number was needed. Since the evening of 24/09/2026 both doors are 25 a week
+ * per source, by decision, and they remain two separate allowances.
  *
  * It is a taster, not a tier. Twenty-five calls a week is enough to decide
  * whether the enrichment is worth a key and far too few to run anything on, and

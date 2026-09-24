@@ -5,7 +5,7 @@ import {
   ANONYMOUS_MONTHLY_LIMIT as ANON_MONTHLY,
   FREE_TIER_MONTHLY_LIMIT as FREE_MONTHLY,
 } from '../lib/tiers.js';
-import { MCP_DAILY_LIMIT as MCP_FREE_DAILY } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT as MCP_FREE_WEEKLY, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
 
 /**
  * Machine-readable operating artifacts: what an agent is allowed to do without
@@ -174,10 +174,17 @@ quotas:
     scope: per API key
     signup: POST /v1/keys/claim on an anonymous key — a mailed 6-digit code
   mcp_anonymous:
-    requests: ${MCP_FREE_DAILY}
+    requests: ${MCP_FREE_WEEKLY}
+    window: 1 week (ISO week, UTC)
+    scope: per client source address (IPv6 counted per /64)
+    resets: ${TRIAL_RESET}
+    unit: one per tool call, one per IBAN in batch_validate_iban
+    note: Full paid responses over the HTTP MCP transport with no key and no wallet. Separate from the REST trial below.
+  mcp_sessions:
+    requests: ${MCP_SESSIONS_PER_IP_DAY}
     window: 1 day
-    scope: per client IP
-    note: Full paid responses over the HTTP MCP transport with no key and no wallet.
+    scope: per client source address
+    note: New MCP sessions (initialize); reuse the mcp-session-id instead of opening one per call.
   rest_anonymous_trial:
     requests: ${REST_TRIAL_WEEKLY_LIMIT}
     window: 1 week (ISO week, UTC)
@@ -527,8 +534,10 @@ or a browser history, so use it only where no header can be set.
 ## 3. MCP, anonymous
 
 The HTTP MCP transport at \`https://api.ibanforge.com/mcp\` answers
-${MCP_FREE_DAILY} full tool calls per IP per day with no key and no wallet, so
-an agent can evaluate the API before anyone signs anything.
+${MCP_FREE_WEEKLY} full tool calls per source address per week (ISO week in UTC,
+reset on ${TRIAL_RESET}) with no key and no wallet, so an agent can evaluate the
+API before anyone signs anything. This allowance is separate from the REST trial
+below.
 
 ## 4. REST, anonymous
 

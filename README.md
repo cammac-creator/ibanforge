@@ -72,12 +72,12 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `check_postal_address` | An ISO 20022 address against one rail's published rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its source | **free** |
 | `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses ahead of 14.11.2026 | **free** |
 | `send_feedback`       | Report incorrect data or claim an x402 refund                                             | free     |
-| `request_api_key`     | You hit the daily limit, or need a durable key — a human approves in a browser, no e-mail  | free     |
+| `request_api_key`     | You used up the free allowance, or need a durable key — a human approves in a browser, no e-mail  | free     |
 | `poll_api_key`        | Collect that key once it is approved, handed over exactly once                             | free     |
 
 The free tools need no key, no wallet and no signup: they are the ones to try first. The
-last two are the way out of the daily limit without anyone typing an address — they keep
-answering after the limit is reached.
+last two are the way out of the free allowance without anyone typing an address — they keep
+answering after the allowance is spent.
 
 Full descriptions of the read-only data tools, with WHEN-to-use triggers, are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
 

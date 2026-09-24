@@ -4,7 +4,7 @@ import { IBAN_LENGTHS, getCountryName } from './countries.js';
 import { getSourceFreshness } from './bic-lookup.js';
 import { LU_SOURCE, luRegisterConfigured } from './lu-register.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET } from './trial.js';
-import { MCP_DAILY_LIMIT } from './mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 
 /**
@@ -271,7 +271,7 @@ export const NOT_WHAT_IT_IS =
 export function freeAccessSentences(): string[] {
   return [
     `No key at all: POST /v1/iban/validate answers up to ${REST_TRIAL_WEEKLY_LIMIT} IBAN validations a week per source address, in full, to try it out; the week resets on ${TRIAL_RESET}.`,
-    `The hosted MCP transport (https://api.ibanforge.com/mcp) answers up to ${MCP_DAILY_LIMIT} full tool calls a day per IP, a batch counting one per IBAN, with no key and no wallet.`,
+    `The hosted MCP transport (https://api.ibanforge.com/mcp) has its own allowance, separate from that trial: up to ${MCP_WEEKLY_LIMIT} full tool calls a week per source address, a batch counting one per IBAN, with no key and no wallet, reset on the same Monday.`,
     `A key that needs no e-mail and no card (POST /v1/keys/generate with an empty body) works on every endpoint and reaches ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed at POST /v1/keys/claim.`,
     `Before the claim, that key starts at ${ANONYMOUS_MONTHLY_LIMIT} requests a month.`,
   ];
