@@ -1240,3 +1240,62 @@ describe('the preview says whose words it shows', () => {
     expect(byId['theirs@example.com']).toBe(false);
   });
 });
+
+/**
+ * L'aperçu de la liste était la seule lecture du CRM qui montrait toujours
+ * l'original : il suit maintenant la règle commune (reading.ts), comme le fil.
+ */
+describe('mailRows, la langue de l’aperçu', () => {
+  const rowFor = (last: Message) =>
+    mailRows(
+      {
+        ...input,
+        contacts: [client('alpha@example.com', 'Société Alpha', [last])],
+        situations: { 'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }) },
+      },
+      'reply',
+    )[0];
+
+  it('montre la traduction française, et la langue d’origine', () => {
+    const row = rowFor({
+      ...message('in', 'Question', 'How can I see my balance?', '2026-07-28'),
+      lang: 'en',
+      snippet_fr: 'Comment voir mon solde ?',
+    });
+    expect(row?.preview).toBe('Comment voir mon solde ?');
+    expect(row?.previewLang).toBe('en');
+    expect(row?.previewTranslated).toBe(true);
+  });
+
+  it('garde l’original, signalé comme non traduit, tant que la traduction manque', () => {
+    const row = rowFor({
+      ...message('in', 'Question', 'How can I see my balance?', '2026-07-28'),
+      lang: 'en',
+    });
+    expect(row?.preview).toBe('How can I see my balance?');
+    expect(row?.previewLang).toBe('en');
+    expect(row?.previewTranslated).toBe(false);
+  });
+
+  it('ramène une traduction de plusieurs paragraphes à une ligne d’aperçu', () => {
+    const long = 'Bonjour,\n\n' + 'Une phrase assez longue pour déborder. '.repeat(20);
+    const row = rowFor({
+      ...message('in', 'Question', 'Hello', '2026-07-28'),
+      lang: 'en',
+      snippet_fr: long,
+    });
+    expect(row?.preview).not.toContain('\n');
+    expect(row?.preview.length).toBeLessThanOrEqual(280);
+    expect(row?.preview.startsWith('Bonjour, Une phrase')).toBe(true);
+  });
+
+  it('un aperçu en français porte sa langue sans traduction', () => {
+    const row = rowFor({
+      ...message('in', 'Question', 'Comment voir mon solde ?', '2026-07-28'),
+      lang: 'fr',
+    });
+    expect(row?.preview).toBe('Comment voir mon solde ?');
+    expect(row?.previewLang).toBe('fr');
+    expect(row?.previewTranslated).toBe(false);
+  });
+});
