@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
-    "@scalar/api-reference-react": "^0.9.67",
+    "@scalar/api-reference-react": "^0.9.68",
     "@tailwindcss/typography": "^0.5.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
