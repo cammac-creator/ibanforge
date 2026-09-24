@@ -152,7 +152,7 @@ describe('anti-énumération : POST /v1/account/code et /v1/account/session', ()
   it('les routes code et session ne lisent pas api_keys', async () => {
     const db = getStatsDB();
     const spy = vi.spyOn(db, 'prepare');
-    let statements: string[] = [];
+    const statements: string[] = [];
     // 🚨 La table des clés est RETIRÉE le temps des appels. Une lecture, même par
     // une requête préparée plus tôt et gardée en cache, échouerait alors en 500.
     db.exec('ALTER TABLE api_keys RENAME TO api_keys_hidden_for_test');
@@ -178,7 +178,7 @@ describe('anti-énumération : POST /v1/account/code et /v1/account/session', ()
       }
     } finally {
       // Relevé AVANT la restauration, qui efface l'historique du témoin.
-      statements = spy.mock.calls.map((call) => String(call[0]));
+      statements.push(...spy.mock.calls.map((call) => String(call[0])));
       spy.mockRestore();
       db.exec('ALTER TABLE api_keys_hidden_for_test RENAME TO api_keys');
     }

@@ -4,7 +4,7 @@
  *   POST /v1/account/code          une adresse → un code à six chiffres par mail
  *   POST /v1/account/session       adresse + code → cookie de session, sans jeton dans le corps
  *   GET  /v1/account/overview      les clés actives de l'adresse (cookie)
- *   GET  /v1/account/keys/report   le rapport de 30 jours d'UNE de ces clés (cookie)
+ *   GET  /v1/account/keys/report   ?prefix=ifk_… : le rapport de 30 jours d'UNE de ces clés (cookie)
  *   POST /v1/account/logout        se déconnecter, ici ou partout (cookie)
  *   POST /v1/admin/account/revoke  couper toutes les sessions d'une adresse (support)
  *
