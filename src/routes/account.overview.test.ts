@@ -151,6 +151,58 @@ describe('GET /v1/account/overview', () => {
     expect(body.inactive_keys).toBe(0);
   });
 
+  it('une clé réétiquetée vers une autre adresse quitte la vue de l’adresse d’origine', async () => {
+    process.env.ADMIN_SECRET = 'secret-de-test-reetiquetage';
+    const app = makeApp();
+    const before = 'avant@alpha.example.net';
+    const after = 'apres@alpha.example.net';
+    const kept = generateCreditKey(before, 1000);
+    const moved = generateCreditKey(before, 1000);
+    const movedDead = generateCreditKey(before, 1000);
+    revokeApiKey(movedDead.api_key);
+
+    // Le réétiquetage manuel réécrit `email` et laisse `email_norm` : le cas traité.
+    const relabel = await app.request('/v1/admin/keys/relabel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': process.env.ADMIN_SECRET },
+      body: JSON.stringify({
+        key_prefixes: [moved.key_prefix, movedDead.key_prefix],
+        email: after,
+      }),
+    });
+    expect(relabel.status).toBe(200);
+    expect(
+      getStatsDB()
+        .prepare('SELECT email, email_norm FROM api_keys WHERE key_prefix = ?')
+        .get(moved.key_prefix),
+    ).toEqual({ email: after, email_norm: before });
+
+    const { body } = await overviewOf(before);
+    expect(body.keys.map((k) => k.key_prefix)).toEqual([kept.key_prefix]);
+    // Les comptes suivent le même filtre : ni page fantôme, ni clé désactivée comptée.
+    expect(body.inactive_keys).toBe(0);
+    expect(body.pages).toBe(1);
+
+    // Son rapport rend le même 404 qu'un préfixe inconnu.
+    const cookie = cookieFor(before);
+    const ask = (prefix: string) =>
+      app.request(`/v1/account/keys/report?prefix=${prefix}`, { headers: { Cookie: cookie } });
+    const unknown = await (await ask('ifk_00000000')).text();
+    const report = await ask(moved.key_prefix);
+    expect(report.status).toBe(404);
+    expect(await report.text()).toBe(unknown);
+    expect((await ask(kept.key_prefix)).status).toBe(200);
+
+    // La nouvelle adresse ne la voit pas non plus : `email_norm` ne l'a jamais nommée.
+    expect((await overviewOf(after)).body.keys).toEqual([]);
+
+    // Une variante de la même boîte reste à elle : casse, points, étiquette,
+    // googlemail. C'est la branche où la fonction de normalisation travaille.
+    const variant = generateCreditKey('Ac.Me.Ops+ci@GoogleMail.com', 1000);
+    const { body: sameBox } = await overviewOf('acmeops@gmail.com');
+    expect(sameBox.keys.map((k) => k.key_prefix)).toEqual([variant.key_prefix]);
+  });
+
   it('jamais la clé brute, son empreinte ni sa lignée', async () => {
     const email = 'minimal@alpha.example.net';
     const k = generateApiKey(email);

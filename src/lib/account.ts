@@ -47,6 +47,7 @@ import {
   type ApiKeyValidation,
   type ApiKeyValidationRow,
 } from './api-keys.js';
+import { normalizeEmail } from './email-norm.js';
 import { VERIFICATION_MAX_ATTEMPTS, VERIFICATION_TTL_MINUTES } from './key-creation-guard.js';
 import { opsFail, opsOk } from './ops-alert.js';
 import { PRO_PORTAL_URL } from './payment-links.js';
@@ -73,6 +74,40 @@ export const OVERVIEW_PAGE_SIZE = 50;
  * filtre, l'adresse inventée par la ferme verrait les clés regroupées.
  */
 const NOT_A_COHORT = "email NOT LIKE '%@cohorte.invalid'";
+
+/**
+ * Une clé n'appartient à l'adresse de la session que si son `email` COURANT se
+ * normalise encore en `email_norm`. Deux chemins réécrivent `email` sans toucher
+ * `email_norm` : le regroupement de cohortes, et le réétiquetage manuel
+ * (`/v1/admin/keys/relabel`), qui accepte n'importe quelle adresse. Sans ce
+ * filtre, une clé réétiquetée vers une autre adresse resterait visible pour
+ * l'adresse d'origine. Il couvre aussi les cohortes ; `NOT_A_COHORT` reste, en
+ * garde explicite et gratuite.
+ *
+ * La normalisation (points de Gmail) ne s'écrit pas en SQLite : c'est la MÊME
+ * fonction JS que celle du rattrapage de `email_norm` et de tous les chemins de
+ * frappe, exposée à SQL par connexion (idiome de `registerInternalEmailFn`).
+ *
+ * `email = email_norm OR …` : la plupart des clés portent déjà leur adresse
+ * sous forme normalisée, et la fonction n'est alors pas appelée. L'équivalence
+ * est exacte : chaque requête exige aussi `email_norm = ?`, une adresse déjà
+ * normalisée, et `normalizeEmail` est idempotente.
+ */
+const STILL_THIS_ADDRESS = '(email = email_norm OR account_email_norm(email) = email_norm)';
+
+const SQL_FNS_REGISTERED = new WeakSet<object>();
+
+/** La base des statistiques, avec la fonction `account_email_norm` enregistrée. */
+function accountDB(): ReturnType<typeof getStatsDB> {
+  const db = getStatsDB();
+  if (!SQL_FNS_REGISTERED.has(db)) {
+    db.function('account_email_norm', { deterministic: true }, (email: unknown) =>
+      typeof email === 'string' ? normalizeEmail(email) : null,
+    );
+    SQL_FNS_REGISTERED.add(db);
+  }
+  return db;
+}
 
 function sha256(s: string): string {
   return createHash('sha256').update(s).digest('hex');
@@ -428,8 +463,10 @@ function planOf(row: KeyRow): AccountPlan {
 
 /**
  * Tout ce que la page du compte montre pour une session : les clés ACTIVES de
- * l'adresse normalisée, hors clés regroupées en cohorte, cinquante par page,
- * le dernier appel d'abord.
+ * l'adresse normalisée, hors clés regroupées en cohorte ou réétiquetées vers
+ * une autre adresse (`STILL_THIS_ADDRESS`), cinquante par page, le dernier
+ * appel d'abord. Les deux comptes (pages, clés désactivées) suivent le même
+ * filtre.
  *
  * `usageOf` est le constructeur du bloc d'usage de `/v1/keys/usage`, passé par
  * la route plutôt qu'importé : il vit dans `src/routes/api-keys.ts`, et un
@@ -462,12 +499,12 @@ export function buildOverview(
   page: number,
   usageOf: UsageBuilder,
 ): AccountOverview {
-  const db = getStatsDB();
+  const db = accountDB();
   const counts = db
     .prepare(
       `SELECT COALESCE(SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END), 0) AS live,
               COALESCE(SUM(CASE WHEN active = 0 THEN 1 ELSE 0 END), 0) AS dead
-         FROM api_keys WHERE email_norm = ? AND ${NOT_A_COHORT}`,
+         FROM api_keys WHERE email_norm = ? AND ${NOT_A_COHORT} AND ${STILL_THIS_ADDRESS}`,
     )
     .get(session.emailNorm) as { live: number; dead: number };
   const pages = Math.max(1, Math.ceil(counts.live / OVERVIEW_PAGE_SIZE));
@@ -480,7 +517,7 @@ export function buildOverview(
                 WHERE r.key_prefix = api_keys.key_prefix
                 ORDER BY r.id DESC LIMIT 1) AS last_call_at
          FROM api_keys
-        WHERE email_norm = ? AND +active = 1 AND ${NOT_A_COHORT}
+        WHERE email_norm = ? AND +active = 1 AND ${NOT_A_COHORT} AND ${STILL_THIS_ADDRESS}
         ORDER BY last_call_at IS NULL, last_call_at DESC, created_at DESC, id DESC
         LIMIT ? OFFSET ?`,
     )
@@ -571,8 +608,9 @@ export function buildOverview(
 
 /**
  * La clé ACTIVE de ce préfixe, si elle appartient à l'adresse de la session ;
- * null sinon, que le préfixe soit inconnu, désactivé, regroupé en cohorte ou à
- * une autre adresse. Une seule requête dans tous les cas : la route rend le
+ * null sinon, que le préfixe soit inconnu, désactivé, regroupé en cohorte,
+ * réétiqueté ou à une autre adresse. Une seule requête dans tous les cas : la
+ * route rend le
  * même 404, dans le même temps, pour un préfixe inconnu et pour celui d'un
  * autre.
  */
@@ -580,11 +618,12 @@ export function findOwnedKey(
   emailNorm: string,
   keyPrefix: string,
 ): { keyPrefix: string; validation: ApiKeyValidation } | null {
-  const row = getStatsDB()
+  const row = accountDB()
     .prepare(
       `SELECT key_hash, key_prefix, ${API_KEY_VALIDATION_COLUMNS}
          FROM api_keys
         WHERE key_prefix = ? AND email_norm = ? AND active = 1 AND ${NOT_A_COHORT}
+          AND ${STILL_THIS_ADDRESS}
         LIMIT 1`,
     )
     .get(keyPrefix, emailNorm) as
