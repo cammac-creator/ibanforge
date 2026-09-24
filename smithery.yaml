@@ -41,7 +41,7 @@ remote:
   type: streamable-http
   url: https://api.ibanforge.com/mcp
   # No key and no wallet needed to try it: the remote transport answers
-  # tools/call on a daily per-address allowance. See /llms.txt for the figures,
+  # tools/call on a per-source allowance (IPv6 per /64). See /llms.txt for the figures,
   # which are served live and never written down here.
   authentication:
     required: false

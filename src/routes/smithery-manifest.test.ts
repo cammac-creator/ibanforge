@@ -59,4 +59,14 @@ describe('smithery.yaml — ce qu’il annonce existe', () => {
     // site et la fiche n'est jamais créditée de rien.
     expect(DECLARED).toContain('?src=smithery');
   });
+
+  it('ne donne pas d’unité à l’allocation sans clé, commentaires compris', () => {
+    // Relecture du 25/09/2026 (D4) : le commentaire disait encore « a daily
+    // per-address allowance » le jour où l'accès MCP sans clé est passé à la
+    // semaine. Le fichier renvoie à /llms.txt pour les chiffres ; il ne dit
+    // donc ni le jour ni la semaine, et ce test lit le fichier ENTIER.
+    expect(MANIFEST).not.toMatch(
+      /(daily|weekly|per day|a day|per week|a week)[^\n]{0,40}allowance/i,
+    );
+  });
 });

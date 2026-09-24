@@ -68,9 +68,10 @@ describe('GET /v1/demo', () => {
   it.each(OFFICIAL_EXAMPLE_IBANS.map((e) => [e.iban, e.label]))(
     'shows %s as the national register answers it: allocated to nobody',
     async (iban) => {
-      // If a register leaves the repository, or starts allocating one of these
-      // codes, this turns red: the example then leaves the demo rather than
-      // show something else under its label.
+      // If a register leaves the repository, this turns red: give the tests a
+      // synthetic register (fictitious codes) rather than dropping the example,
+      // since production still reads the register. Only if the register starts
+      // allocating one of these codes does the example leave the demo.
       const body = await getDemo();
       const example = body.iban_examples.find((e) => e.iban === iban)!;
       expect(example.valid).toBe(true);

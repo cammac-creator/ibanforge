@@ -40,9 +40,11 @@ export const DEMO_IBANS = [
  *
  * The labels name the PROVENANCE, never the verdict: the answer below each
  * label is computed on the request, from the register as it stands that month.
- * demo.test.ts asserts the verdict on the committed data; if a register leaves
- * the repository or starts allocating one of these codes, that test turns red,
- * and the example has to leave this list rather than show something else.
+ * demo.test.ts asserts the verdict on the committed data. If a register leaves
+ * the repository, give the tests a synthetic register (fictitious codes, see the
+ * data-removal plan) rather than dropping the example: production still reads
+ * the register. Only if the register starts allocating one of these codes does
+ * the example leave this list.
  */
 export const OFFICIAL_EXAMPLE_IBANS = [
   {
