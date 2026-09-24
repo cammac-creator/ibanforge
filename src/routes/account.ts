@@ -91,9 +91,11 @@ export interface AccountRouteDeps {
 
 /**
  * Les textes servis. En anglais, comme toute l'API. 🚨 Ceux des routes `code`
- * et `session` ne disent JAMAIS rien des clés : ils répondent de la même façon
- * à une adresse qui en porte et à une adresse qui n'en porte pas, et un mot sur
- * « vos clés » ici serait l'oracle que la construction évite.
+ * et `session` ne dépendent JAMAIS de l'adresse : ils répondent de la même
+ * façon à une adresse qui porte des clés et à une adresse qui n'en porte pas,
+ * et ne disent jamais rien des clés de CETTE adresse (« vos clés ») : ce serait
+ * l'oracle que la construction évite. Le repli « coller une clé » du 503, le
+ * même pour toute adresse, n'en dit rien.
  */
 const TEXTS = {
   unsupported_media_type: 'Send this request as application/json.',
