@@ -309,8 +309,8 @@ export function freeAccessSentences(): string[] {
  *
  * Served by /llms.txt, GET /v1 and the MCP server card, which import it.
  * README.md, frontend/public/llms.txt and frontend/public/llms-full.txt cannot:
- * positioning.test.ts holds them to these lines, and checks that every address
- * of the site names a page that exists in the repository.
+ * src/routes/cannot-call.test.ts holds them to these lines, and checks that every
+ * address of the site names a page that exists in the repository.
  */
 export const CANNOT_CALL_TITLE = 'If you cannot call the API';
 
@@ -327,10 +327,11 @@ export const READ_ONLY_ANSWERS: readonly ReadOnlyAnswer[] = [
   {
     url: 'https://api.ibanforge.com/v1/demo',
     shows:
+      // Provenance only, like the labels of demo.ts (review of 25/09/2026,
+      // D15): the verdicts live in the answer, dated by as_of.
       'the full validation, computed by the API when the address is opened (served_at gives the instant): ' +
-      'a German bank code the Bundesbank register confirms, a former Credit Suisse code the SIX register ' +
-      'redirects to UBS, and the official example IBANs of Switzerland, Belgium and Austria, each read ' +
-      'against its national register',
+      'a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, ' +
+      "Belgium and Austria, each with its register's answer and its as_of",
   },
   {
     url: 'https://ibanforge.com/iban/ch',
@@ -358,9 +359,23 @@ export const NO_SIMULATION_RULE =
   'Do not simulate answers from the API: quote these real ones, with the date each carries ' +
   '(served_at, as_of, or the date of the page).';
 
+/**
+ * The connector route, said with its limit (review of 25/09/2026, D8). A
+ * connector with no key draws on the keyless MCP allowance like any caller,
+ * counted per source address, and in Claude its calls leave from Anthropic's
+ * cloud (Anthropic's page, "Network requirements"): the allowance is shared
+ * with other users behind that address. /mcp reads no key (the key middleware
+ * is mounted on /v1/* only), so the way to a key is the npm package or REST.
+ */
 export const CONNECTOR_HINT =
   'To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom ' +
-  'connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp';
+  'connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp. ' +
+  'A connector with no key draws on the same keyless allowance as any other caller, counted per source address. ' +
+  "In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), " +
+  'so that allowance is shared with other users and may already be spent; other assistants were not checked by us. ' +
+  'The hosted endpoint reads no key: to use one, run the npm package ibanforge-mcp in a desktop client with ' +
+  'IBANFORGE_API_KEY set, or call the REST API with it (a POST to https://api.ibanforge.com/v1/keys/generate ' +
+  'with no body returns a key, no e-mail).';
 
 /** The block as lines of text: llms.txt of the API, README and the site's llms files. */
 export function cannotCallLines(): string[] {

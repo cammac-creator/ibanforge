@@ -118,7 +118,20 @@ describe('what the block may not say', () => {
   });
 
   it('writes no verdict down: the address says it, dated', () => {
-    expect(text).not.toMatch(/not_allocated|allocated to nobody|nobody holds/);
+    // `confirm|redirect` since the review of 25/09/2026 (D15): the demo line
+    // said "the Bundesbank register confirms" and "redirects to UBS". The
+    // article of 6 August keeps its dated "does not allocate".
+    expect(text).not.toMatch(/not_allocated|allocated to nobody|nobody holds|confirm|redirect/i);
+  });
+
+  it('says the connector route shares the keyless allowance, and where a key goes', () => {
+    // Review of 25/09/2026 (D8): the connector was offered as a way into the
+    // allowance, while its calls leave from the assistant's servers and /mcp
+    // reads no key.
+    expect(CONNECTOR_HINT).toMatch(/same keyless allowance/);
+    expect(CONNECTOR_HINT).toMatch(/reads no key/);
+    expect(CONNECTOR_HINT).toContain('IBANFORGE_API_KEY');
+    expect(CONNECTOR_HINT).not.toMatch(/x402/);
   });
 
   it('is plain text, the same bytes in JSON, a text file and a README', () => {

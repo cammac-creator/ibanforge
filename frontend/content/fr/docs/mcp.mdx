@@ -52,9 +52,13 @@ Transport HTTP streamable, **25 appels d'outils gratuits par semaine et par adre
 
 ### L'ajouter comme connecteur dans un assistant de conversation
 
-Dans un assistant de conversation, l'adresse ci-dessus devient un *connecteur personnalisé* : l'assistant appelle alors lui-même les outils MCP, dans l'allocation gratuite de l'endpoint hébergé, au lieu de deviner une réponse qu'il ne peut pas obtenir. Où cliquer, d'après la page officielle de chaque éditeur lue le 24 septembre 2026 ; les menus changent, et la page citée fait foi.
+Dans un assistant de conversation, l'adresse ci-dessus devient un *connecteur personnalisé* : l'assistant appelle alors lui-même les outils MCP, au lieu de deviner une réponse qu'il ne peut pas obtenir.
 
-**Claude** ([page officielle](https://support.claude.com/en/articles/11175166), mise à jour le 11 août 2026). Les connecteurs personnalisés sont ouverts aux plans Free, Pro, Max, Team et Enterprise ; en Free, un seul connecteur personnalisé.
+**Un connecteur sans clé puise dans la même allocation sans clé que tout autre appelant**, comptée par adresse source. Dans Claude, les appels d'un connecteur partent du cloud d'Anthropic, pas de votre appareil (page officielle ci-dessous, section « Network requirements ») : cette allocation est donc partagée avec d'autres utilisateurs et peut être déjà épuisée quand vous commencez. Autres assistants : non vérifié par nous. L'endpoint hébergé ne lit aucune clé. Pour travailler avec votre propre clé, lancez le paquet npm dans un client de bureau avec `IBANFORGE_API_KEY` renseignée (Option 1 ci-dessus), ou appelez l'API REST avec la clé : un POST sur `https://api.ibanforge.com/v1/keys/generate` sans corps en renvoie une, sans e-mail.
+
+Où cliquer, d'après la page officielle de chaque éditeur lue le 24 septembre 2026 ; les menus changent, et la page citée fait foi.
+
+**Claude** ([page officielle](https://support.claude.com/en/articles/11175166), mise à jour le 11 août 2026). Les connecteurs personnalisés sont ouverts aux plans Free, Pro, Max, Team et Enterprise ; en Free, un seul connecteur personnalisé. *Non essayé par nous.*
 
 - Plan individuel (la page donne ces étapes sous Pro et Max) : ouvrez **Customize > Connectors**, cliquez sur **+** puis **Add custom connector**, saisissez `https://api.ibanforge.com/mcp` et cliquez sur **Add**. Les champs OAuth de **Advanced settings** sont facultatifs ; ce serveur ne demande aucune authentification.
 - Team ou Enterprise : un Owner ouvre **Organization settings > Connectors**, clique sur **Add**, survole **Custom** et choisit **Web**, saisit l'adresse et clique sur **Add** ; les membres le trouvent ensuite dans **Customize > Connectors** et cliquent sur **Connect**.

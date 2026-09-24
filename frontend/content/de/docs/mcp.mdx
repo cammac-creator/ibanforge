@@ -52,9 +52,13 @@ Streamable-HTTP-Transport, **25 kostenlose Tool-Aufrufe pro Woche und Quelladres
 
 ### Als Connector in einem Chat-Assistenten hinzufügen
 
-In einem Chat-Assistenten wird die Adresse oben zu einem *benutzerdefinierten Connector*: Der Assistent ruft die MCP-Tools dann selbst auf, im kostenlosen Kontingent des gehosteten Endpoints, statt eine Antwort zu erraten, die er nicht abrufen kann. Wo Sie klicken, nach der offiziellen Seite jedes Anbieters, gelesen am 24. September 2026; Menüs ändern sich, maßgeblich ist die verlinkte Seite.
+In einem Chat-Assistenten wird die Adresse oben zu einem *benutzerdefinierten Connector*: Der Assistent ruft die MCP-Tools dann selbst auf, statt eine Antwort zu erraten, die er nicht abrufen kann.
 
-**Claude** ([offizielle Seite](https://support.claude.com/en/articles/11175166), aktualisiert am 11. August 2026). Benutzerdefinierte Connectors gibt es in den Plänen Free, Pro, Max, Team und Enterprise; im Free-Plan ist es ein einziger benutzerdefinierter Connector.
+**Ein Connector ohne Schlüssel greift auf dasselbe schlüssellose Kontingent zu wie jeder andere Aufrufer**, gezählt pro Quelladresse. In Claude gehen die Aufrufe eines Connectors von der Cloud von Anthropic aus, nicht von Ihrem Gerät (offizielle Seite unten, Abschnitt „Network requirements“): Dieses Kontingent wird also mit anderen Nutzern geteilt und kann schon aufgebraucht sein, wenn Sie beginnen. Andere Assistenten: von uns nicht geprüft. Der gehostete Endpoint liest keinen Schlüssel. Um mit Ihrem eigenen Schlüssel zu arbeiten, betreiben Sie das npm-Paket in einem Desktop-Client mit gesetztem `IBANFORGE_API_KEY` (Option 1 oben), oder rufen Sie die REST-API mit dem Schlüssel auf: Ein POST auf `https://api.ibanforge.com/v1/keys/generate` ohne Body liefert einen, ohne E-Mail.
+
+Wo Sie klicken, nach der offiziellen Seite jedes Anbieters, gelesen am 24. September 2026; Menüs ändern sich, maßgeblich ist die verlinkte Seite.
+
+**Claude** ([offizielle Seite](https://support.claude.com/en/articles/11175166), aktualisiert am 11. August 2026). Benutzerdefinierte Connectors gibt es in den Plänen Free, Pro, Max, Team und Enterprise; im Free-Plan ist es ein einziger benutzerdefinierter Connector. *Von uns nicht ausprobiert.*
 
 - Einzelplan (die Seite führt diese Schritte unter Pro und Max): **Customize > Connectors** öffnen, auf **+** und dann **Add custom connector** klicken, `https://api.ibanforge.com/mcp` eingeben und auf **Add** klicken. Die OAuth-Felder unter **Advanced settings** sind optional; dieser Server verlangt keine Authentifizierung.
 - Team oder Enterprise: Ein Owner öffnet **Organization settings > Connectors**, klickt auf **Add**, fährt über **Custom** und wählt **Web**, gibt die Adresse ein und klickt auf **Add**; Mitglieder finden ihn danach unter **Customize > Connectors** und klicken auf **Connect**.

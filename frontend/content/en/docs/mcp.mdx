@@ -52,9 +52,13 @@ Streamable HTTP transport, **25 free tool calls a week per source address**, no 
 
 ### Add it as a connector in a chat assistant
 
-In a chat assistant, the address above becomes a *custom connector*: the assistant then calls the MCP tools itself, within the free allowance of the hosted endpoint, instead of guessing an answer it cannot fetch. Where to click, from each vendor's official page as read on 24 September 2026; menus move, and the linked page is the reference.
+In a chat assistant, the address above becomes a *custom connector*: the assistant then calls the MCP tools itself instead of guessing an answer it cannot fetch.
 
-**Claude** ([official page](https://support.claude.com/en/articles/11175166), updated 11 August 2026). Custom connectors are available on the Free, Pro, Max, Team and Enterprise plans; Free users are limited to one custom connector.
+**A connector with no key draws on the same keyless allowance as any other caller**, counted per source address. In Claude, a connector's calls leave from Anthropic's cloud, not from your device (official page below, section "Network requirements"): that allowance is therefore shared with other users and may already be spent when you start. Other assistants: not checked by us. The hosted endpoint reads no key. To work with your own key, run the npm package in a desktop client with `IBANFORGE_API_KEY` set (Option 1 above), or call the REST API with the key: a POST to `https://api.ibanforge.com/v1/keys/generate` with no body returns one, no e-mail.
+
+Where to click, from each vendor's official page as read on 24 September 2026; menus move, and the linked page is the reference.
+
+**Claude** ([official page](https://support.claude.com/en/articles/11175166), updated 11 August 2026). Custom connectors are available on the Free, Pro, Max, Team and Enterprise plans; Free users are limited to one custom connector. *Not tried by us.*
 
 - Individual plan (the page lists these steps under Pro and Max): open **Customize > Connectors**, click **+** then **Add custom connector**, enter `https://api.ibanforge.com/mcp`, and click **Add**. The OAuth fields under **Advanced settings** are optional; this server asks for no authentication.
 - Team or Enterprise: an Owner opens **Organization settings > Connectors**, clicks **Add**, hovers over **Custom** and selects **Web**, enters the address and clicks **Add**; members then find it in **Customize > Connectors** and click **Connect**.

@@ -12,6 +12,7 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_TOOLS } from '../mcp/inventory.js';
 import { RATE_LIMIT } from '../middleware/rate-limit.js';
 import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
@@ -1960,16 +1961,79 @@ const buildRawSpec = () => ({
                       type: 'array',
                       description:
                         'One validation result per example, computed on the request, each with a `label` that names the example (its bank, or its provenance for an official example IBAN).',
-                      items: { $ref: '#/components/schemas/IBANValidationResult' },
+                      // Review of 25/09/2026 (D7): `label` and
+                      // `compliance_example` were served and declared nowhere,
+                      // and `endpoint` was declared and never served.
+                      items: {
+                        allOf: [
+                          { $ref: '#/components/schemas/IBANValidationResult' },
+                          {
+                            type: 'object',
+                            required: ['label'],
+                            properties: {
+                              label: {
+                                type: 'string',
+                                description: 'Names the example: its bank, or its provenance for an official example IBAN.',
+                              },
+                            },
+                          },
+                        ],
+                      },
                     },
                     bic_examples: {
                       type: 'array',
+                      description: 'A summary of the directory row of two BICs, not the full answer of GET /v1/bic/{code}.',
                       items: {
                         type: 'object',
                         properties: {
                           label: { type: 'string' },
                           bic: { type: 'string' },
-                          endpoint: { type: 'string' },
+                          bic8: { type: 'string' },
+                          bic11: { type: 'string' },
+                          found: { type: 'boolean' },
+                          institution: { type: ['string', 'null'] },
+                          country: {
+                            type: 'object',
+                            properties: { code: { type: 'string' }, name: { type: ['string', 'null'] } },
+                          },
+                          city: { type: ['string', 'null'] },
+                          lei: { type: ['string', 'null'] },
+                          cost_usdc: { type: 'number', description: 'The list price of a BIC lookup; the demo itself is free.' },
+                        },
+                      },
+                    },
+                    compliance_example: {
+                      type: 'object',
+                      description: 'One compliance check, assembled like the answer of POST /v1/iban/compliance.',
+                      required: ['description', 'endpoint', 'cost', 'result'],
+                      properties: {
+                        description: { type: 'string' },
+                        endpoint: { type: 'string', example: 'POST /v1/iban/compliance' },
+                        cost: { type: 'string' },
+                        result: {
+                          oneOf: [
+                            {
+                              allOf: [
+                                { $ref: '#/components/schemas/IBANValidationResult' },
+                                {
+                                  type: 'object',
+                                  required: ['compliance', 'meta'],
+                                  properties: {
+                                    compliance: { $ref: '#/components/schemas/ComplianceResult' },
+                                    meta: {
+                                      type: 'object',
+                                      description: 'Provenance and scope of the verdict, as in POST /v1/iban/compliance.',
+                                    },
+                                  },
+                                },
+                              ],
+                            },
+                            {
+                              type: 'object',
+                              required: ['error'],
+                              properties: { error: { type: 'string', example: 'Compliance data unavailable' } },
+                            },
+                          ],
                         },
                       },
                     },
@@ -2095,15 +2159,28 @@ const buildRawSpec = () => ({
         operationId: 'mcpStreamableHttp',
         summary: 'MCP endpoint for AI agents (Streamable HTTP)',
         description:
-          'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes the same capabilities as this REST API as 7 MCP tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference and check_postal_address (both free), plus send_feedback. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec. With no credential it answers up to ' +
+          // The tool list is read from the inventory (review of 25/09/2026,
+          // D6/D10/D17): "7 MCP tools" was typed here while the transport
+          // served eleven, three of them absent from the sentence.
+          'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes ' +
+          MCP_TOOLS.length +
+          ' MCP tools: ' +
+          MCP_TOOLS.map((t) => t.name).join(', ') +
+          ' (free: ' +
+          MCP_TOOLS.filter((t) => t.price === 'free')
+            .map((t) => t.name)
+            .join(', ') +
+          '; request_api_key and poll_api_key are the way to a key once the keyless allowance is spent). Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec. With no credential it answers up to ' +
           MCP_WEEKLY_LIMIT +
           ' tool units a week per source address (one per tool call, one per IBAN in batch_validate_iban; the week is the ISO week in UTC and resets on ' +
           TRIAL_RESET +
           '), an allowance separate from the keyless REST trial.',
         tags: ['MCP'],
-        // Anonymous is a supported alternative here, not an oversight: the HTTP
-        // MCP transport answers a weekly free allowance with no credential.
-        security: [{}, { apiKey: [] }],
+        // Anonymous only, and said so (review of 25/09/2026, D8): the HTTP MCP
+        // transport answers a weekly free allowance with no credential, and it
+        // reads no key at all (the key middleware is mounted on /v1/* only).
+        // Declaring `apiKey` here told a client a key would lift that allowance.
+        security: [{}],
         externalDocs: {
           description: 'MCP setup guide (Claude Desktop, Cursor, HTTP transport)',
           url: 'https://ibanforge.com/docs/mcp',

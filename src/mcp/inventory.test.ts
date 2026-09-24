@@ -141,6 +141,19 @@ describe('the surfaces that describe the server itself carry all tools', () => {
     expect(llms).not.toContain('(7 tools');
   });
 
+  it('the OpenAPI description of POST /mcp names every tool and the real count', async () => {
+    // Review of 25/09/2026 (D6/D10/D17): it said "7 MCP tools" while the
+    // transport served eleven.
+    const spec = JSON.parse(await fetchText('/openapi.json')) as {
+      paths: Record<string, { post?: { description?: string } }>;
+    };
+    const description = spec.paths['/mcp']?.post?.description ?? '';
+    expect(description).toContain(`Exposes ${MCP_TOOLS.length} MCP tools`);
+    for (const tool of MCP_TOOLS) {
+      expect(description, `/mcp description never mentions ${tool.name}`).toContain(tool.name);
+    }
+  });
+
   it('the static frontend mcp.json lists every tool and the released version', () => {
     const doc = JSON.parse(
       readFileSync(resolve(ROOT, 'frontend/public/.well-known/mcp.json'), 'utf8'),
