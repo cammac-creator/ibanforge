@@ -258,8 +258,8 @@ SIX Group AG, BIC entries
          whether its terms cover these rows has not been confirmed
          separately.
 
-Composite bank-code map, apart from the Austrian, Belgian and Luxembourg
-keys listed in group C
+Composite bank-code map, apart from the Austrian, Belgian, Finnish,
+Luxembourg and Polish keys listed in group C
   Where: src/db/bic_data.json (24,083 keys, 75 countries).
   Built from: the datasets of sigalor/iban-to-bic, which that project
          generates from files published by national central banks and
@@ -333,7 +333,9 @@ Verification of Payee schemes
          Source: European Payments Council.
 
 Narodowy Bank Polski (NBP)
-  Where: data/bic.sqlite, table bic_entries, source 'nbp' (21 rows).
+  Where: data/bic.sqlite, table bic_entries, source 'nbp' (21 rows); the
+         3,004 PL keys of src/db/bic_data.json, taken by mdomke/schwifty
+         from the NBP's EWIB file.
   Terms: "Narodowy Bank Polski makes no objections to saving files, copying
          pages in full or in part or making printouts for personal use,
          provided that they do not serve commercial purposes."
@@ -343,8 +345,8 @@ Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis
   Where: data/bic.sqlite, table national_bank_codes, country AT
          (873 rows), and table bic_entries, source 'oenb' (1 row);
          frontend/data/registers/at-blz.json; the 870 AT keys of
-         src/db/bic_data.json, taken by sigalor/iban-to-bic from the same
-         OeNB file.
+         src/db/bic_data.json, taken by sigalor/iban-to-bic and
+         mdomke/schwifty from the same OeNB file.
   Terms: none stated on the directory page, which carries "Copyright ©
          Oesterreichische Nationalbank". Not established.
 
@@ -366,12 +368,15 @@ Central Bank of the Republic of San Marino, operating banks
 
 Finance Finland (Finanssiala ry), Finnish monetary institution codes and
 BICs (list published 15 October 2025)
-  Where: src/lib/fi-register.ts (codes transcribed by hand).
+  Where: src/lib/fi-register.ts (codes transcribed by hand); the 656 FI
+         keys of src/db/bic_data.json, taken by mdomke/schwifty from
+         Finance Finland's publications.
   Terms: none stated on the site. Not established.
 
 ABBL, Luxembourg Register of IBAN-BIC Codes
-  Where: the 143 LU keys of src/db/bic_data.json, taken by
-         sigalor/iban-to-bic from the ABBL register.
+  Where: the 143 LU keys of src/db/bic_data.json; 135 of them come from
+         the sigalor/iban-to-bic dataset taken from the ABBL register, the
+         other 8 from mdomke/schwifty.
   Terms: the ABBL's written confirmation of 15 September 2026 covers one
          normalised entry per API response, credited
            Source: ABBL, Luxembourg register of IBAN/BIC codes
