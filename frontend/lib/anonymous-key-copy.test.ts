@@ -14,8 +14,9 @@ import de from '@/messages/de.json';
  *     `src/routes/static-claims.test.ts`, qui tient le budget de tout le dépôt ;
  *     ici les motifs sont recopiés pour que le périmètre humain soit une
  *     ÉGALITÉ À ZÉRO et non un budget. Un budget se relâche, une égalité non.
- *  2. **Les deux 25 portent leur unité et leur portée.** `REST_TRIAL_DAILY_LIMIT`
- *     vaut 25 par jour sur la seule route de validation ; `ANONYMOUS_MONTHLY_LIMIT`
+ *  2. **Les deux 25 portent leur unité et leur portée.** `REST_TRIAL_WEEKLY_LIMIT`
+ *     vaut 25 par semaine (par jour jusqu'au 24/09/2026) sur la seule route de
+ *     validation ; `ANONYMOUS_MONTHLY_LIMIT`
  *     vaut 25 par mois sur tous les endpoints. Deux quotas sans rapport qui
  *     portent le même chiffre : un lecteur qui lit les deux sans les unités
  *     conclut, à raison sur les validations, que la clé est pire que pas de clé.
@@ -107,23 +108,26 @@ describe('les textes de la clé sans e-mail', () => {
     // clé, la clé) au lieu d'opposer « les deux 25 » dans une phrase : chaque
     // chiffre garde son unité et sa portée, jamais deux 25 dans une même phrase.
     const attendu: Array<[string, string[]]> = [
-      ['content/en/docs/api-keys.mdx', ['**25 times a day', '**25 requests a month**', 'on this route only', 'on every endpoint', 'two different doors']],
-      ['content/fr/docs/api-keys.mdx', ['**25 fois par jour', '**25 requêtes par mois**', 'sur cette route seulement', 'sur tous les endpoints', 'deux portes différentes']],
-      ['content/de/docs/api-keys.mdx', ['**25-mal pro Tag', '**25 Anfragen pro Monat**', 'nur auf dieser Route', 'auf allen Endpunkten', 'zwei verschiedene Türen']],
+      ['content/en/docs/api-keys.mdx', ['**25 times a week', '**25 requests a month**', 'on this route only', 'on every endpoint', 'two different doors']],
+      ['content/fr/docs/api-keys.mdx', ['**25 fois par semaine', '**25 requêtes par mois**', 'sur cette route seulement', 'sur tous les endpoints', 'deux portes différentes']],
+      ['content/de/docs/api-keys.mdx', ['**25-mal pro Woche', '**25 Anfragen pro Monat**', 'nur auf dieser Route', 'auf allen Endpunkten', 'zwei verschiedene Türen']],
     ];
     for (const [rel, phrases] of attendu) {
       const texte = applati(lire(rel));
       for (const phrase of phrases) expect(texte, `${rel} : ${phrase}`).toContain(phrase);
       // Par paragraphe, puis par phrase : un titre et le paragraphe qui le suit
-      // ne forment pas une phrase. Une phrase fautive met le 25 du jour et le 25
-      // du mois face à face.
+      // ne forment pas une phrase. Une phrase fautive met le 25 de l'essai (la
+      // semaine, et le jour tant qu'un ancien texte peut traîner) et le 25 du
+      // mois face à face.
       const decoupees = lire(rel)
         .split(/\n\s*\n/)
         .flatMap((paragraphe) => applati(paragraphe).split(/(?<=[.!?])\s+/));
       for (const phrase of decoupees) {
         const vingtCinq = (phrase.match(/(?<![.,\d])25(?![.,]?\d)(?![kK])/g) ?? []).length;
         const collision =
-          vingtCinq >= 2 && /\bday\b|jour|\bTag\b/i.test(phrase) && /month|mois|Monat/i.test(phrase);
+          vingtCinq >= 2 &&
+          /\bday\b|jour|\bTag\b|\bweek\b|semaine|Woche/i.test(phrase) &&
+          /month|mois|Monat/i.test(phrase);
         expect(collision, `${rel} : ${phrase}`).toBe(false);
       }
     }
@@ -133,9 +137,9 @@ describe('les textes de la clé sans e-mail', () => {
     // « la clé vaut moins que pas de clé » (seconde analyse des réponses d'IA).
     // Chaque porte est nommée, la clé est annoncée par ses 200 une fois réclamée.
     const faq: Array<[string, string, string[]]> = [
-      ['en', en.pricing.faq[2].answer, ['up to 25 times a day', 'on that route only', 'for every endpoint', '200 requests a month', 'starts at 25 requests a month']],
-      ['fr', fr.pricing.faq[2].answer, ['jusqu’à 25 fois par jour', 'sur cette seule route', 'sur tous les endpoints', '200 requêtes par mois', 'démarre à 25 requêtes par mois']],
-      ['de', de.pricing.faq[2].answer, ['bis zu 25-mal pro Tag', 'nur auf dieser Route', 'für alle Endpunkte', '200 Anfragen pro Monat', 'mit 25 Anfragen pro Monat']],
+      ['en', en.pricing.faq[2].answer, ['up to 25 times a week', 'on that route only', 'Monday at 00:00 UTC', 'for every endpoint', '200 requests a month', 'starts at 25 requests a month']],
+      ['fr', fr.pricing.faq[2].answer, ['jusqu’à 25 fois par semaine', 'sur cette seule route', 'lundi à 00:00 UTC', 'sur tous les endpoints', '200 requêtes par mois', 'démarre à 25 requêtes par mois']],
+      ['de', de.pricing.faq[2].answer, ['bis zu 25-mal pro Woche', 'nur auf dieser Route', 'Montag um 00:00 UTC', 'für alle Endpunkte', '200 Anfragen pro Monat', 'mit 25 Anfragen pro Monat']],
     ];
     for (const [langue, reponse, phrases] of faq) {
       const texte = applati(reponse);

@@ -13,9 +13,9 @@ définitivement. Au-delà, les [micropaiements x402](/docs/x402) ou les packs pr
 
 Cette page est la référence sur les clés seules. Si vous n'avez pas encore fait d'appel, la [prise en main](/docs/onboarding) est le chemin le plus court : l'appel sans clé, cette clé, la réponse lue bloc par bloc et un lot de 100, en dix minutes.
 
-## Avant la clé : 25 appels par jour, sans clé
+## Avant la clé : 25 appels par semaine, sans clé
 
-`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **25 fois par jour pour l'adresse d'où il vient**, remis à zéro à minuit UTC :
+`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **25 fois par semaine pour l'adresse d'où il vient**. La semaine est la semaine ISO en UTC : le décompte repart à zéro le lundi à 00:00 UTC.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -23,14 +23,15 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-La réponse porte un bloc `trial` avec le nombre d'appels restants aujourd'hui et la requête qui crée
-la clé. C'est une dégustation, pas un palier : au-delà de 25 appels par jour, l'endpoint répond de
-nouveau `402` avec `cause.reason: "trial_exhausted"`.
+La réponse porte un bloc `trial` avec le nombre d'appels restants cette semaine, l'instant de la
+remise à zéro (`resets_at`) et la requête qui crée la clé. C'est une dégustation, pas un palier :
+au-delà de 25 appels dans la semaine, l'endpoint répond de nouveau `402` avec
+`cause.reason: "trial_exhausted"`, jusqu'au lundi.
 
 **L'essai sans clé et la clé sont deux portes différentes.** L'essai sans clé vaut sur cette route
-seulement, et il revient à minuit UTC. La clé vaut sur tous les endpoints : lot, BIC, clearing
+seulement, et il revient chaque lundi. La clé vaut sur tous les endpoints : lot, BIC, clearing
 suisse, conformité. Elle se compte par mois, et c'est la réclamation qui la porte à 200 requêtes par
-mois. Si vous ne faites que valider un IBAN à la fois, l'essai sans clé peut vous suffire.
+mois. Si vous validez quelques IBAN par semaine, un à la fois, l'essai sans clé peut vous suffire.
 
 ## Une clé sans e-mail
 

@@ -24,7 +24,7 @@ Alle Endpunkte werden über HTTPS bereitgestellt. HTTP-Anfragen werden automatis
 
 ## Authentifizierung
 
-**Vor allen dreien: Die ersten 25 Aufrufe pro Tag brauchen gar nichts.** `POST /v1/iban/validate` mit einer echten `iban` und ohne Schlüssel wird vollständig beantwortet, 25-mal pro Tag für die Adresse, von der er kommt. Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der einen Anfrage, die einen kostenlosen Schlüssel liefert. Eine Kostprobe, keine Stufe: über 25/Tag antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
+**Vor allen dreien: Die ersten Aufrufe der Woche brauchen gar nichts.** `POST /v1/iban/validate` mit einer echten `iban` und ohne Schlüssel wird vollständig beantwortet, 25-mal pro Woche für die Adresse, von der er kommt (ISO-Woche in UTC, Rücksetzung am Montag um 00:00 UTC). Die Antwort enthält einen `trial`-Block mit der Zahl der in dieser Woche verbleibenden Aufrufe, dem Zeitpunkt der Rücksetzung und der einen Anfrage, die einen kostenlosen Schlüssel liefert. Eine Kostprobe, keine Stufe: über 25 in der Woche antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
 
 Danach drei Wege hinein — wählen Sie, was passt; Ihre App oder Ihr Agent landet nie in einer Sackgasse:
 
@@ -53,7 +53,7 @@ Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort m
 
 ## Schnellbeispiel
 
-Ohne Schlüssel, ohne Anmeldung — dieser Aufruf funktioniert so, wie er ist, 25-mal pro Tag für die Adresse, von der er kommt:
+Ohne Schlüssel, ohne Anmeldung — dieser Aufruf funktioniert so, wie er ist, 25-mal pro Woche für die Adresse, von der er kommt:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -65,16 +65,17 @@ Die Antwort enthält dann einen zusätzlichen `trial`-Block:
 
 ```json
 "trial": {
-  "calls_used_today": 1,
-  "calls_left_today": 24,
-  "daily_limit": 25,
-  "resets": "midnight UTC",
+  "calls_used_this_week": 1,
+  "calls_left_this_week": 24,
+  "weekly_limit": 25,
+  "resets": "Monday 00:00 UTC",
+  "resets_at": "2026-09-28T00:00:00Z",
   "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: it returns an ifk_ key that works on every endpoint, good for 200 requests a month once claimed (POST /v1/keys/claim, key in the Authorization header, with a code mailed to an address you read). Unclaimed, the key starts at 25 requests a month",
   "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
 }
 ```
 
-Ab dem 11. Aufruf am Tag holen Sie sich den [kostenlosen Schlüssel](/docs/api-keys) — ein einziger POST, keine Karte — und ergänzen dieselbe Anfrage um `Authorization: Bearer ifk_...`.
+Nach den 25 Aufrufen der Woche holen Sie sich den [kostenlosen Schlüssel](/docs/api-keys) — ein einziger POST, keine Karte — und ergänzen dieselbe Anfrage um `Authorization: Bearer ifk_...`.
 
 Antwort:
 

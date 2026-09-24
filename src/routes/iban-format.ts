@@ -4,7 +4,7 @@ import type { HonoEnv } from '../types.js';
 import { recordOperation } from '../lib/stats.js';
 import { recordSafely } from '../lib/record-safely.js';
 import { codesOf, registerCountries } from '../lib/positioning.js';
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT } from '../lib/trial.js';
 
 /**
  * GET /v1/iban/format — FREE pure-format IBAN check.
@@ -66,7 +66,7 @@ let upgradeHint: string | undefined;
 function upgradeToFullValidation(): string {
   upgradeHint ??=
     'valid: true here means the IBAN is well formed (length, structure, mod-97), nothing more. ' +
-    `POST /v1/iban/validate ($0.005, or keyless for the first ${REST_TRIAL_DAILY_LIMIT} calls a day per source address) ` +
+    `POST /v1/iban/validate ($0.005, or keyless for the first ${REST_TRIAL_WEEKLY_LIMIT} calls a week per source address) ` +
     'names the bank and its BIC with the source of that answer, SEPA and VoP readiness, and, ' +
     `where it reads the national register (${codesOf(registerCountries().authoritative)}), ` +
     'whether the bank code is allocated at all.';

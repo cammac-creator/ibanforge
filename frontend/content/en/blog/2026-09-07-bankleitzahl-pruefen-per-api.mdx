@@ -1,6 +1,6 @@
 ---
 title: "Checking a German bank code (Bankleitzahl) by API: what the Bundesbank register answers, field by field"
-description: "Checking a Bankleitzahl is not a checksum. The Deutsche Bundesbank publishes every month which codes are allocated, who holds them and which are being retired. Three real API answers, field by field; the keyless trial covers up to 25 checks a day."
+description: "Checking a Bankleitzahl is not a checksum. The Deutsche Bundesbank publishes every month which codes are allocated, who holds them and which are being retired. Three real API answers, field by field; the keyless trial covers up to 25 checks a week."
 date: "2026-09-07"
 faq:
   - q: "What is a Bankleitzahl, and who allocates it?"
@@ -10,7 +10,7 @@ faq:
   - q: "What does a retired code mean?"
     a: "The Bundesbank announces the deletion of a Bankleitzahl and, in most cases, names the successor code. The answer then carries retired: true and superseded_by with the new code. The code was allocated, so the answer stays verified; a payment to the old code will eventually come back, and the beneficiary record has to be re-papered against the successor."
   - q: "What does the check cost?"
-    a: "Nothing to start. No key at all: up to 25 IBAN validations a day per address, on POST /v1/iban/validate only, to try it out. A key that needs no e-mail: 200 requests a month once claimed; taken with no address at all, it starts at 25 a month, on every endpoint. And a single Bankleitzahl can be looked up on its own page under /blz with no call at all."
+    a: "Nothing to start. No key at all: up to 25 IBAN validations a week per address, on POST /v1/iban/validate only, to try it out. A key that needs no e-mail: 200 requests a month once claimed; taken with no address at all, it starts at 25 a month, on every endpoint. And a single Bankleitzahl can be looked up on its own page under /blz with no call at all."
 ---
 
 Someone who searches for "Bankleitzahl prüfen" (check a German bank code) rarely wants to compute a check digit. The question underneath is different: does this code still exist, who holds it, and may I pay into this account? No algorithm answers that; a register does. In Germany it is the [Bankleitzahlendatei of the Deutsche Bundesbank](/blz), renewed every month, listing every code the Bundesbank has allocated, with the institution behind it, its BIC and, alone among Europe's national registers, the announcement of which codes are about to disappear. The September 2026 file holds 3,506 bank codes, 75 of them marked for deletion.
@@ -135,7 +135,7 @@ The contrast matters. In a country without a published register, say for most ac
 
 ## How to call it
 
-Without a key, straight from the terminal: the keyless trial serves up to 25 calls a day per address, on this route only.
+Without a key, straight from the terminal: the keyless trial serves up to 25 calls a week per address, on this route only.
 
 ```bash
 curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -143,7 +143,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban":"DE82370400440123456789"}'
 ```
 
-The answer is complete, and it carries a `trial` block saying how many calls are left today. For production, take a [key that needs no e-mail](/docs/api-keys): 200 requests a month once claimed, no card; to check a whole file, use [`POST /v1/iban/batch`](/docs/iban-validate) with up to a hundred IBANs per call. And if you would rather write no code at all, [every Bankleitzahl has its own page](/blz), with exactly this answer on it.
+The answer is complete, and it carries a `trial` block saying how many calls are left this week. For production, take a [key that needs no e-mail](/docs/api-keys): 200 requests a month once claimed, no card; to check a whole file, use [`POST /v1/iban/batch`](/docs/iban-validate) with up to a hundred IBANs per call. And if you would rather write no code at all, [every Bankleitzahl has its own page](/blz), with exactly this answer on it.
 
 ## What the register does not say
 

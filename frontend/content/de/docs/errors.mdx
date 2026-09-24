@@ -89,7 +89,7 @@ Wird zurückgegeben, wenn eine kostenpflichtige Route ohne Schlüssel, ohne Zahl
 
 | `cause.reason` | Wann |
 |---|---|
-| `trial_exhausted` | Die Kostprobe ohne Schlüssel auf `POST /v1/iban/validate` ist für diese Adresse heute verbraucht; sie kommt um Mitternacht UTC zurück |
+| `trial_exhausted` | Die Kostprobe ohne Schlüssel auf `POST /v1/iban/validate` ist für diese Adresse in dieser Woche verbraucht; sie kommt am Montag um 00:00 UTC zurück (`quota.resets` nennt den Zeitpunkt) |
 | `trial_unavailable` | Das Kontingent ohne Schlüssel kann gerade nicht gezählt werden, der Aufruf fällt auf die Zahlung zurück |
 | `monthly_quota_exhausted` | Das Monatskontingent des Schlüssels ist verbraucht |
 | `monthly_quota_insufficient` | Ein Stapel braucht mehr Anfragen, als dem Schlüssel bleiben; nichts wurde verbraucht |
@@ -146,7 +146,7 @@ Wenn Sie einen 500-Fehler erhalten, ist auf unserer Seite etwas Unerwartetes pas
 
 ### „Payment Required" bei jeder Anfrage
 
-- Ohne Schlüssel hat nur `POST /v1/iban/validate` eine Kostprobe ohne Schlüssel (25 Aufrufe pro Tag und Quelladresse). Jede andere kostenpflichtige Route braucht einen Schlüssel oder eine Zahlung
+- Ohne Schlüssel hat nur `POST /v1/iban/validate` eine Kostprobe ohne Schlüssel (25 Aufrufe pro Woche und Quelladresse, Rücksetzung am Montag um 00:00 UTC). Jede andere kostenpflichtige Route braucht einen Schlüssel oder eine Zahlung
 - Lesen Sie `cause.reason` im Body des `402`, wenn es dort steht: Es nennt das verbrauchte Kontingent
 - Für x402: Stellen Sie sicher, dass Sie USDC im **Base**-Netzwerk haben (nicht im Ethereum-Mainnet), dass der private Wallet-Schlüssel, den Ihr Client liest (zum Beispiel `WALLET_PRIVATE_KEY`), gesetzt ist und dass Sie ein kompatibles x402-Client-SDK verwenden
 

@@ -63,7 +63,7 @@ import { createPlaygroundRelay } from './routes/playground.js';
 import { BATCH_PRICE_PER_IBAN, createX402Middleware } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
 import { anonymousTrialMiddleware } from './middleware/anonymous-trial.js';
-import { REST_TRIAL_DAILY_LIMIT, TRIAL_RESET } from './lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_PERIOD, TRIAL_RESET, trialResetsAt } from './lib/trial.js';
 // Les deux plafonds de palier et les phrases de consentement viennent de leurs
 // modules feuilles : `llms.txt` est la surface que les agents lisent avant de
 // décider s'ils doivent inscrire quelqu'un, et une phrase recopiée ici
@@ -109,7 +109,7 @@ import { adminCohorts } from './routes/admin-cohorts.js';
 import { adminBreaker } from './routes/admin-breaker.js';
 import { adminFailedPayments } from './routes/admin-failed-payments.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
-import { rateLimitMiddleware } from './middleware/rate-limit.js';
+import { RATE_LIMIT, rateLimitMiddleware } from './middleware/rate-limit.js';
 import {
   recordRequest,
   classifyClient,
@@ -440,7 +440,7 @@ These three calls show what a checksum cannot: the bank-code verdict of a nation
 - **Privacy by default:** submitted IBANs are never stored (validation runs in memory); IPs only as salted hashes; telemetry auto-purged after 12 months, and erased 30 days after a customer terminates (default, DPA clause 4.7: https://ibanforge.com/en/legal/dpa). Pre-signed DPA + published SLA + live status page.
 - **Free key, no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month):** POST https://api.ibanforge.com/v1/keys/generate with no body at all returns an \`ifk_\` key on the spot — no address, no card, nothing to confirm. Nothing is mailed and no record is opened. Then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`). Batch validation counts 1 request per IBAN — on API keys and credit packs alike.
 - **Claim the same key to ${FREE_TIER_MONTHLY_LIMIT} req/month:** POST https://api.ibanforge.com/v1/keys/claim with header \`Authorization: Bearer ifk_...\` (never in the body), once the key has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "${CONSENT_ASK}" — or an x402 payment made on the key. ${CONSENT_BOUNDARY} The mailed code gives ${FREE_TIER_MONTHLY_LIMIT} every month; a payment gives ${FREE_TIER_MONTHLY_LIMIT} once.
-- **Optional at creation:** POST /v1/keys/generate with \`{"email":"you@company.com"}\` issues the same key already at the full allowance (\`tier: "email"\`, no \`claim_url\`): there is nothing left to claim, and POST /v1/keys/claim on it answers 409 already_claimed. The address is never required, and the ${REST_TRIAL_DAILY_LIMIT} keyless validations a day above need no key at all.
+- **Optional at creation:** POST /v1/keys/generate with \`{"email":"you@company.com"}\` issues the same key already at the full allowance (\`tier: "email"\`, no \`claim_url\`): there is nothing left to claim, and POST /v1/keys/claim on it answers 409 already_claimed. The address is never required, and the keyless trial below needs no key at all.
 - **See what a key did:** GET https://api.ibanforge.com/v1/keys/report with the key itself. Returns its traffic, the endpoints it called, what failed WITH the cause and a fix, and how many distinct networks used it. Human-readable at https://ibanforge.com/en/account. No account, no password: the key is the credential.
 - **Credit packs (card or USDC):** prepaid credits, never expire: ${packSummary(BUNDLES)}. Card: https://ibanforge.com/pricing — USDC: POST /v1/credits/buy/1k|5k|25k (list: GET /v1/credits/bundles)
 - **Pro subscription (card):** $${PRO_PRICE_USD}/month for ${PRO_MONTHLY_LIMIT.toLocaleString('en-US')} requests, resets on the 1st, cancel anytime: https://ibanforge.com/pricing (checkout link in GET /v1/credits/bundles → subscription)
@@ -449,7 +449,8 @@ These three calls show what a checksum cannot: the bank-code verdict of a nation
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\`: the tools of the HTTP transport plus the creditor-file audit (${STDIO_ONLY_TOOLS.join(', ')}), no signup
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp (${MCP_TOOLS.length} tools, no signup)
 - **Try it with zero setup, as an agent (${MCP_DAILY_LIMIT} free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_DAILY_LIMIT} calls/day you get JSON-RPC error -32000, so move to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
-- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"DE89370400440532013000"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take a key that needs no e-mail at all. The trial is counted per day and covers this route only. The key that needs no e-mail is another door: every endpoint, and ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed with one call at POST /v1/keys/claim. Past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC, is counted per source address (IPv6 counted per /64), and lives in the service database, so it survives a redeploy. The HTTP MCP transport has its own, smaller allowance (${MCP_DAILY_LIMIT} tool calls/day): one MCP call can be a $0.02 compliance screening, a REST validation is $0.005.
+- **Try it with zero setup, from a terminal (${REST_TRIAL_WEEKLY_LIMIT} free validations a week per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"DE89370400440532013000"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left this week, when the count resets (\`resets_at\`), and how to take a key that needs no e-mail at all. The trial is counted by the ISO week in UTC and covers this route only. Past ${REST_TRIAL_WEEKLY_LIMIT} in the week the route goes back to 402, with \`cause.reason = "trial_exhausted"\`, until ${TRIAL_RESET}. The allowance is counted per source address (IPv6 counted per /64) and lives in the service database, so it survives a redeploy.
+- **The key that needs no e-mail is another door:** every endpoint, and ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed (POST /v1/keys/claim with a 6-digit code mailed to an address you read, or an x402 payment). The HTTP MCP transport has its own allowance, counted by the day (${MCP_DAILY_LIMIT} tool calls/day).
 
 ## Discovery endpoints
 
@@ -544,7 +545,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/compliance \\
 
 Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (\`matched_lists\`: the OFAC, EU or UN lists that name the bank's BIC8; \`country_sanctioned\`: the country against a fixed list of sanctioned jurisdictions; never the payee's name; plus FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` (whether the EPC VoP register lists the bank as ready), and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
 
-**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. One precision since 06/09/2026: POST /v1/iban/validate with a REAL \`iban\` in the body and no key is served ${REST_TRIAL_DAILY_LIMIT} times a day per source address, IPv6 counted per /64 (see the keyless trial above) — the empty-body probe is unaffected and still gets its 402. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
+**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. One precision since 06/09/2026: POST /v1/iban/validate with a REAL \`iban\` in the body and no key is served ${REST_TRIAL_WEEKLY_LIMIT} times a week per source address, IPv6 counted per /64 (see the keyless trial above) — the empty-body probe is unaffected and still gets its 402. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
 
 ### 6. validate_payment_reference — structured payment reference (${toolPriceLabel('validate_payment_reference')})
 
@@ -630,10 +631,19 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 - US ABA, BSB, PIX (non-IBAN systems out of scope)
 - Regulated AML/CFT obligations (use Refinitiv, ComplyAdvantage, etc.)
 
+## Errors, limits and support
+
+- An invalid IBAN is not an HTTP error: POST /v1/iban/validate answers 200 with \`valid: false\`, an \`error\` code (invalid_format, unsupported_country, wrong_length, invalid_check_digits, checksum_failed, invalid_bban_structure) and \`error_detail\`.
+- A refused request answers \`{"error": "<token>", "message": "<sentence>"}\`: 400 malformed request, 402 payment needed or allowance used up (\`cause.reason\` says which), 413 body over 256 KB, 429 over ${RATE_LIMIT} requests a minute per IP address (\`Retry-After\` header). Every code: https://ibanforge.com/docs/errors
+- Support: support@ibanforge.com (quote your key_prefix, never the key) or https://github.com/cammac-creator/ibanforge/issues
+- Live availability: https://ibanforge.com/status · Written SLA, for Editor/OEM subscriptions only (99.5% monthly availability, service credits): https://ibanforge.com/legal/sla
+
 ## Documentation
 
 - Human docs: https://ibanforge.com/docs
 - Pricing: https://ibanforge.com/pricing
+- Status: https://ibanforge.com/status
+- SLA (Editor/OEM subscriptions only): https://ibanforge.com/legal/sla
 - GitHub: https://github.com/cammac-creator/ibanforge
 - npm package: https://www.npmjs.com/package/ibanforge-mcp
 - MCP registry: https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge
@@ -978,11 +988,17 @@ export function buildApp(): Hono<HonoEnv> {
       // sondait /v1 en JSON n'apprenait rien de l'essai sans clé — la prose de
       // /llms.txt le disait, ce point de découverte non. Les chiffres viennent
       // des constantes, jamais retapés.
+      //
+      // 24/09/2026 : l'essai se compte à la semaine ISO (UTC). `daily_limit`
+      // est retiré plutôt que gardé, il aurait porté un chiffre de la semaine
+      // sous un nom du jour ; `mcp_daily_limit`, lui, reste vrai.
       trial: {
         endpoint: 'POST /v1/iban/validate',
-        daily_limit: REST_TRIAL_DAILY_LIMIT,
+        weekly_limit: REST_TRIAL_WEEKLY_LIMIT,
+        period: TRIAL_PERIOD,
         scope: 'per client source address (IPv6 counted per /64)',
         resets: TRIAL_RESET,
+        resets_at: trialResetsAt(),
         exhausted: 'HTTP 402, cause.reason = "trial_exhausted"',
         note: 'No key, no wallet, no e-mail: a real iban in the body is served in full. Counted in the service database, so it survives a redeploy.',
         mcp_daily_limit: MCP_DAILY_LIMIT,
@@ -992,6 +1008,16 @@ export function buildApp(): Hono<HonoEnv> {
         mcp: 'https://api.ibanforge.com/mcp',
         agents: 'https://api.ibanforge.com/.well-known/agents.json',
         llms: 'https://api.ibanforge.com/llms.txt',
+      },
+      // 24/09/2026 : un assistant qui lisait ce document ne trouvait ni une
+      // personne à qui écrire, ni la page de statut, ni le SLA.
+      support: {
+        email: 'support@ibanforge.com',
+        issues: 'https://github.com/cammac-creator/ibanforge/issues',
+        errors: 'https://ibanforge.com/docs/errors',
+        status: 'https://ibanforge.com/status',
+        sla: 'https://ibanforge.com/legal/sla',
+        sla_scope: 'Editor/OEM subscriptions only',
       },
       endpoints: {
         paid: [

@@ -500,7 +500,7 @@
       },
       "2": {
         "question": "Is there a free tier?",
-        "answer": "Yes, and it starts before any key. No key at all: POST /v1/iban/validate with a real IBAN is served up to 25 times a day for the address it comes from, in full, on that route only, to try it out. Free key: POST /v1/keys/generate with no body at all returns an ifk_ key for every endpoint, with no e-mail, no card and no captcha; POST /v1/keys/claim raises it to 200 requests a month with a 6-digit code on an address you choose to give. Taken with no address at all, the key starts at 25 requests a month. Batch validation counts 1 request per IBAN. For higher volumes, buy a prepaid credit pack by card, or pay per call in USDC via x402."
+        "answer": "Yes, and it starts before any key. No key at all: POST /v1/iban/validate with a real IBAN is served up to 25 times a week for the address it comes from, in full, on that route only, to try it out; the week resets on Monday at 00:00 UTC. Free key: POST /v1/keys/generate with no body at all returns an ifk_ key for every endpoint, with no e-mail, no card and no captcha; POST /v1/keys/claim raises it to 200 requests a month with a 6-digit code on an address you choose to give. Taken with no address at all, the key starts at 25 requests a month. Batch validation counts 1 request per IBAN. For higher volumes, buy a prepaid credit pack by card, or pay per call in USDC via x402."
       },
       "3": {
         "question": "What about high volume?",

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT } from './trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_FREE_KEY_HINT } from './trial.js';
 import { MCP_DAILY_LIMIT } from './mcp-limits.js';
 import { DAILY_KEY_CREATION_LIMIT } from './key-creation-guard.js';
 
@@ -20,9 +20,14 @@ import { DAILY_KEY_CREATION_LIMIT } from './key-creation-guard.js';
  * Le 24/09/2026 ce lot est passé : plus aucune ligne ne dit dix, en chiffres,
  * en lettres ou en ordinal. Les plafonds sont donc descendus à ZÉRO et sont
  * devenus des égalités, et le compte des lignes chiffrées, qui mesurait des
- * copies à tenir, est remplacé par ce qu'il protégeait : chaque plafond du jour
- * écrit à la main est celui que le code applique. Le jour où la constante
- * change, chaque copie rougit ici et nomme sa ligne.
+ * copies à tenir, est remplacé par ce qu'il protégeait.
+ *
+ * Le même jour, Claude-Alain a passé l'essai de 25 par JOUR à 25 par SEMAINE.
+ * Deux gardes en découlent : aucune ligne sur l'essai ne relie plus un chiffre
+ * au jour (« a day », « par jour », « pro Tag »), hors les deux autres quotas
+ * du jour qui vivent dans les mêmes pages ; et chaque plafond de la semaine
+ * écrit à la main est celui que le code applique. Le jour où la constante ou
+ * l'unité change, chaque copie rougit ici et nomme sa ligne.
  *
  * ⚠️ Ce qui est interdit TOUT DE SUITE et sans plafond : « partagé par toutes
  * les instances », dans les trois langues. Cette phrase n'est ni prouvable
@@ -56,9 +61,15 @@ const FILES = [
   // Ajoutés le 24/09/2026 : les pages qui citent l'essai et qu'aucun garde ne
   // lisait. L'article suisse du 14.09 disait « dix par jour » depuis dix jours.
   ...['en', 'fr', 'de'].flatMap((lang) =>
-    ['errors', 'iban-validate', 'pay-as-an-agent', 'ch-clearing', 'compliance'].map(
-      (name) => `frontend/content/${lang}/docs/${name}.mdx`,
-    ),
+    [
+      'errors',
+      'iban-validate',
+      'iban-batch',
+      'pay-as-an-agent',
+      'ch-clearing',
+      'compliance',
+      'recipes',
+    ].map((name) => `frontend/content/${lang}/docs/${name}.mdx`),
   ),
   ...['en', 'fr', 'de'].flatMap((lang) =>
     ['2026-09-07-bankleitzahl-pruefen-per-api', '2026-09-14-schweizer-iban-pruefen'].map(
@@ -107,6 +118,12 @@ const ORDINALS = [
 const DAILY_FIGURE =
   /(?<![.,\d$/])(\d+)(?![.,]?\d)(?![kK])[^\d\n]{0,40}?(?:\ba day\b|\bper day\b|\/day\b|par jour|pro Tag|am Tag)/gi;
 const ABOUT_MCP = /\bMCP\b|tool calls?|appels? d'outil|Tool-Aufrufe?/i;
+/**
+ * Un plafond DE LA SEMAINE écrit en chiffres, même construction : le nombre,
+ * puis l'unité de la semaine, sans autre chiffre entre les deux.
+ */
+const WEEKLY_FIGURE =
+  /(?<![.,\d$/])(\d+)(?![.,]?\d)(?![kK])[^\d\n]{0,40}?(?:\ba week\b|\bper week\b|\/week\b|\bin the week\b|\bof the week\b|par semaine|de la semaine|dans la semaine|pro Woche|der Woche|in der Woche)/gi;
 const OTHER_DAILY_QUOTAS: Array<{ about: RegExp; value: number }> = [
   { about: ABOUT_MCP, value: MCP_DAILY_LIMIT },
   {
@@ -143,6 +160,8 @@ interface Tally {
   ordinal: string[];
   /** Every daily figure written by hand on a line about the trial. */
   daily: Array<{ ref: string; value: number; other: boolean }>;
+  /** Every weekly figure written by hand on a line about the trial. */
+  weekly: Array<{ ref: string; value: number }>;
   memory: string[];
   sharing: string[];
   secondPerson: string[];
@@ -153,6 +172,7 @@ function tally(): Tally {
     spelled: [],
     ordinal: [],
     daily: [],
+    weekly: [],
     memory: [],
     sharing: [],
     secondPerson: [],
@@ -163,6 +183,10 @@ function tally(): Tally {
       const ref = `${file}:${i + 1}`;
       if (SHARING_CLAIM.test(line)) out.sharing.push(ref);
       if (SECOND_PERSON.test(line)) out.secondPerson.push(ref);
+      // Les ordinaux sont propres à l'essai : lus sur toutes les lignes. « Ab
+      // dem 11. Aufruf am Tag » a survécu dix jours sur une ligne qui ne disait
+      // ni « Kostprobe » ni « ohne Schlüssel ».
+      if (ORDINALS.some((p) => p.test(line))) out.ordinal.push(ref);
       // L'exemple de démarrage est désormais exporté depuis le contrat. Seule
       // la ligne EXACTE est exemptée ; onboarding-parity.test.ts contrôle le
       // bloc complet dans les trois langues. Le plafond de prose ne remonte pas.
@@ -175,12 +199,12 @@ function tally(): Tally {
         return;
       if (!ABOUT_THE_TRIAL.test(line)) return;
       if (SPELLED_OUT.some((p) => p.test(line))) out.spelled.push(ref);
-      if (ORDINALS.some((p) => p.test(line))) out.ordinal.push(ref);
       for (const m of line.matchAll(DAILY_FIGURE)) {
         const value = Number(m[1]);
         const other = OTHER_DAILY_QUOTAS.some((q) => q.value === value && q.about.test(line));
         out.daily.push({ ref, value, other });
       }
+      for (const m of line.matchAll(WEEKLY_FIGURE)) out.weekly.push({ ref, value: Number(m[1]) });
       if (MEMORY_CLAIM.test(line)) out.memory.push(ref);
     });
   }
@@ -210,15 +234,27 @@ describe('la prose statique de l’essai', () => {
     }
   });
 
-  it('écrit le plafond du jour que le code applique, sur chaque ligne qui le cite', () => {
+  it('ne relie plus jamais le chiffre de l’essai au jour (a day, par jour, pro Tag)', () => {
+    // 🚨 Le garde du 24/09/2026 : l'essai se compte à la semaine. Sur une
+    // ligne qui parle de l'essai, le seul chiffre du jour permis est celui
+    // d'un AUTRE quota du jour (MCP hébergé, création de clés), reconnu à sa
+    // ligne et à sa valeur.
     const { daily } = tally();
     const wrong = daily
-      .filter(({ value, other }) => value !== REST_TRIAL_DAILY_LIMIT && !other)
+      .filter(({ other }) => !other)
+      .map(({ ref, value }) => `${ref}: ${value} par jour`);
+    expect(wrong, wrong.join('\n')).toEqual([]);
+  });
+
+  it('écrit le plafond de la semaine que le code applique, sur chaque ligne qui le cite', () => {
+    const { weekly } = tally();
+    const wrong = weekly
+      .filter(({ value }) => value !== REST_TRIAL_WEEKLY_LIMIT)
       .map(({ ref, value }) => `${ref}: ${value}`);
     expect(wrong, wrong.join('\n')).toEqual([]);
     // Un balayage qui ne voit rien ne prouve rien : l'essai est cité, en
     // chiffres, dans les trois langues de plusieurs pages.
-    expect(daily.filter(({ other }) => !other).length).toBeGreaterThan(10);
+    expect(weekly.length).toBeGreaterThan(10);
   });
 });
 
@@ -306,6 +342,28 @@ describe('les motifs eux-mêmes', () => {
     expect(
       dailyValues('Unclaimed, it starts at 25 a month. No key at all: up to 25 validations a day.'),
     ).toEqual([25]);
+  });
+
+  const weeklyValues = (line: string): number[] =>
+    [...line.matchAll(WEEKLY_FIGURE)].map((m) => Number(m[1]));
+
+  it.each([
+    ['No key at all: up to 25 IBAN validations a week per address', [25]],
+    ['Past 25 calls in the week the endpoint answers 402', [25]],
+    ["l'essai sans clé sert jusqu'à 25 appels par semaine et par adresse", [25]],
+    ['Au-delà des 25 appels de la semaine, prenez la clé', [25]],
+    ['bis zu 25-mal pro Woche für die Adresse', [25]],
+    ['Nach den 25 Aufrufen der Woche holen Sie sich den Schlüssel', [25]],
+  ] as const)('lit le plafond de la semaine écrit à la main : %s', (line, values) => {
+    expect(weeklyValues(line)).toEqual(values);
+  });
+
+  it.each([
+    'it starts at 25 a month, on every endpoint.',
+    'reset on Monday 00:00 UTC',
+    '10 MCP tool calls/day per source address',
+  ])('ne prend pas un autre nombre pour le plafond de la semaine : %s', (line) => {
+    expect(weeklyValues(line)).toEqual([]);
   });
 
   it('reconnaît une ligne du MCP, dont le plafond du jour est un autre quota', () => {

@@ -500,7 +500,7 @@
       },
       "2": {
         "question": "Existe-t-il une offre gratuite ?",
-        "answer": "Oui, et elle commence avant toute clé. Sans clé du tout : POST /v1/iban/validate avec un vrai IBAN est servi jusqu’à 25 fois par jour pour l’adresse d’où il vient, en entier, sur cette seule route, pour essayer. Clé gratuite : POST /v1/keys/generate sans aucun corps renvoie une clé ifk_ valable sur tous les endpoints, sans e-mail, sans carte ni captcha ; POST /v1/keys/claim la porte à 200 requêtes par mois avec un code à 6 chiffres sur une adresse que vous choisissez de donner. Prise sans aucune adresse, la clé démarre à 25 requêtes par mois. La validation par lot compte 1 requête par IBAN. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte, ou payez à l’appel en USDC via x402."
+        "answer": "Oui, et elle commence avant toute clé. Sans clé du tout : POST /v1/iban/validate avec un vrai IBAN est servi jusqu’à 25 fois par semaine pour l’adresse d’où il vient, en entier, sur cette seule route, pour essayer ; la semaine repart le lundi à 00:00 UTC. Clé gratuite : POST /v1/keys/generate sans aucun corps renvoie une clé ifk_ valable sur tous les endpoints, sans e-mail, sans carte ni captcha ; POST /v1/keys/claim la porte à 200 requêtes par mois avec un code à 6 chiffres sur une adresse que vous choisissez de donner. Prise sans aucune adresse, la clé démarre à 25 requêtes par mois. La validation par lot compte 1 requête par IBAN. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte, ou payez à l’appel en USDC via x402."
       },
       "3": {
         "question": "Et pour les gros volumes ?",

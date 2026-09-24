@@ -1,5 +1,5 @@
 /**
- * The keyless daily trial, tested against the REAL application object.
+ * The keyless weekly trial, tested against the REAL application object.
  *
  * Everything here runs through `buildApp()` for the reason `src/app.test.ts`
  * gives: the trial IS a mount-order decision (after the api-key middleware,
@@ -8,12 +8,12 @@
  * empty-body probe, and a typo'd key keeping its own 402 — are invisible to any
  * composition that does not include x402.
  */
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from './x402.js';
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 import { resetDailyLedger, resetDailyLedgerStatements } from '../lib/daily-ip-ledger.js';
 import { generateApiKey } from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
@@ -98,10 +98,11 @@ interface TrialBody {
   cost_usdc?: number;
   attribution?: { required: boolean };
   trial?: {
-    calls_used_today: number;
-    calls_left_today: number;
-    daily_limit: number;
+    calls_used_this_week: number;
+    calls_left_this_week: number;
+    weekly_limit: number;
     resets: string;
+    resets_at: string;
     free_key: string;
     docs: string;
   };
@@ -116,11 +117,15 @@ describe('the trial is granted', () => {
     const body = (await res.json()) as TrialBody;
     expect(body.valid).toBe(true);
     expect(body.trial).toMatchObject({
-      calls_used_today: 1,
-      calls_left_today: REST_TRIAL_DAILY_LIMIT - 1,
-      daily_limit: REST_TRIAL_DAILY_LIMIT,
-      resets: 'midnight UTC',
+      calls_used_this_week: 1,
+      calls_left_this_week: REST_TRIAL_WEEKLY_LIMIT - 1,
+      weekly_limit: REST_TRIAL_WEEKLY_LIMIT,
+      resets: TRIAL_RESET,
+      resets_at: trialResetsAt(),
     });
+    // Aucun champ ne dit le jour : l'essai se compte à la semaine depuis le
+    // 24/09/2026, et un nom du jour porterait un compte de la semaine.
+    expect(Object.keys(body.trial ?? {}).join(' ')).not.toMatch(/today|daily/);
     // The invitation is the point of the whole feature: it must be actionable
     // without reading a doc page first.
     expect(body.trial?.free_key).toContain('/v1/keys/generate');
@@ -141,9 +146,12 @@ describe('the trial is granted', () => {
   it('publishes the count in headers as well as in the body', async () => {
     const res = await validate({ iban: VALID_IBAN }, freshHeaders());
     expect(res.headers.get('x-trial-used')).toBe('1');
-    expect(res.headers.get('x-trial-limit')).toBe(String(REST_TRIAL_DAILY_LIMIT));
-    expect(res.headers.get('x-trial-remaining')).toBe(String(REST_TRIAL_DAILY_LIMIT - 1));
-    expect(res.headers.get('x-trial-reset')).toBe('midnight UTC');
+    expect(res.headers.get('x-trial-limit')).toBe(String(REST_TRIAL_WEEKLY_LIMIT));
+    expect(res.headers.get('x-trial-remaining')).toBe(String(REST_TRIAL_WEEKLY_LIMIT - 1));
+    expect(res.headers.get('x-trial-period')).toBe('week');
+    // The instant, not a phrase: next Monday 00:00:00 UTC.
+    expect(res.headers.get('x-trial-reset')).toBe(trialResetsAt());
+    expect(res.headers.get('x-trial-reset')).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00Z$/);
   });
 
   it('accepts the field in any case, like the handler does', async () => {
@@ -161,13 +169,14 @@ describe('the trial is counted', () => {
     for (const expected of [1, 2, 3]) {
       const res = await validate({ iban: VALID_IBAN }, h);
       const body = (await res.json()) as TrialBody;
-      expect(body.trial?.calls_used_today).toBe(expected);
+      expect(body.trial?.calls_used_this_week).toBe(expected);
     }
   });
 
   it('gives a different address its own allowance', async () => {
     const first = freshHeaders();
-    for (let i = 0; i < REST_TRIAL_DAILY_LIMIT; i += 1) await validate({ iban: VALID_IBAN }, first);
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1)
+      await validate({ iban: VALID_IBAN }, first);
     const res = await validate({ iban: VALID_IBAN }, freshHeaders());
     expect(res.status).toBe(200);
   });
@@ -200,14 +209,14 @@ describe('the trial is refunded on a 4xx', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as TrialBody;
     expect(body.valid).toBe(false);
-    expect(body.trial?.calls_used_today).toBe(1);
+    expect(body.trial?.calls_used_this_week).toBe(1);
   });
 });
 
 describe('the trial is exhausted', () => {
-  it(`answers 402 with trial_exhausted on call ${REST_TRIAL_DAILY_LIMIT + 1}`, async () => {
+  it(`answers 402 with trial_exhausted on call ${REST_TRIAL_WEEKLY_LIMIT + 1}`, async () => {
     const h = freshHeaders();
-    for (let i = 0; i < REST_TRIAL_DAILY_LIMIT; i += 1) {
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
       const ok = await validate({ iban: VALID_IBAN }, h);
       expect(ok.status).toBe(200);
     }
@@ -224,11 +233,12 @@ describe('the trial is exhausted', () => {
     };
     expect(body.error).toBe('payment_required');
     expect(body.cause?.reason).toBe('trial_exhausted');
-    expect(body.cause?.quota?.used).toBe(REST_TRIAL_DAILY_LIMIT + 1);
-    expect(body.cause?.quota?.resets).toBe('midnight UTC');
+    expect(body.cause?.quota?.used).toBe(REST_TRIAL_WEEKLY_LIMIT + 1);
+    expect(body.cause?.quota?.resets).toBe(`${TRIAL_RESET} (${trialResetsAt()})`);
     // The detail has to say all three things: how many were served, when it
     // resets, how to get a key.
-    expect(body.cause?.detail).toContain('resets at midnight UTC');
+    expect(body.cause?.detail).toContain(`comes back on ${TRIAL_RESET} (${trialResetsAt()})`);
+    expect(body.cause?.detail).not.toMatch(/midnight|today/i);
     expect(body.cause?.detail).toContain('/v1/keys/generate');
     // Still a real x402 envelope: an agent must be able to pay its way past.
     expect(Array.isArray(body.accepts)).toBe(true);
@@ -246,16 +256,74 @@ describe('the trial is exhausted', () => {
   it('never assumes the caller is the one who spent', async () => {
     // ⚠️ Depuis le portage, un redéploiement ne remet plus le compteur à zéro,
     // et le seau est un PRÉFIXE : plusieurs abonnés d'un même /64 partagent une
-    // franchise. Le message dit « this address gets today », jamais « you have
-    // used » — et pas « your network », qui inviterait à débattre du périmètre.
+    // franchise. Le message dit « this address … gets this week », jamais « you
+    // have used » — et pas « your network », qui inviterait à débattre du
+    // périmètre.
     const h = freshHeaders();
-    for (let i = 0; i < REST_TRIAL_DAILY_LIMIT + 1; i += 1) await validate({ iban: VALID_IBAN }, h);
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT + 1; i += 1)
+      await validate({ iban: VALID_IBAN }, h);
     const res = await validate({ iban: VALID_IBAN }, h);
     const body = (await res.json()) as { cause?: { detail: string } };
-    expect(body.cause?.detail).toContain('this address gets today');
+    expect(body.cause?.detail).toContain('This address has used');
+    expect(body.cause?.detail).toContain('it gets this week');
     expect(body.cause?.detail).not.toMatch(/you have used|your network/i);
     // Et le chiffre cité est bien le plafond appliqué, jamais un chiffre retapé.
-    expect(body.cause?.detail).toContain(`${REST_TRIAL_DAILY_LIMIT} keyless validations`);
+    expect(body.cause?.detail).toContain(`${REST_TRIAL_WEEKLY_LIMIT} keyless validations`);
+  });
+});
+
+/**
+ * The week, not the day (24/09/2026). Only `Date` is faked: timers and I/O stay
+ * real, so the application runs exactly as it does in the other cases.
+ */
+describe('the trial is counted by the ISO week, in UTC', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function servedAt(iso: string, h: Record<string, string>): Promise<Response> {
+    vi.setSystemTime(new Date(iso));
+    return validate({ iban: VALID_IBAN }, h);
+  }
+
+  it(`spreads ${REST_TRIAL_WEEKLY_LIMIT} calls from Monday to Thursday and refuses the next one`, async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const h = freshHeaders();
+    // Monday 28/09/2026 to Thursday 01/10/2026: a new day never gives a new
+    // allowance any more.
+    const days = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01'];
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
+      const res = await servedAt(`${days[i % days.length]}T10:00:00Z`, h);
+      expect(res.status, `call ${i + 1}`).toBe(200);
+    }
+    const refused = await servedAt('2026-10-01T18:00:00Z', h);
+    expect(refused.status).toBe(402);
+    const body = (await refused.json()) as { cause?: { reason: string; detail: string } };
+    expect(body.cause?.reason).toBe('trial_exhausted');
+    expect(body.cause?.detail).toContain('2026-10-05T00:00:00Z');
+  });
+
+  it('stays shut on Sunday 23:59:59 UTC and reopens on Monday 00:00:00 UTC', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const h = freshHeaders();
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
+      await servedAt('2026-10-02T09:00:00Z', h);
+    }
+    const sunday = await servedAt('2026-10-04T23:59:59Z', h);
+    expect(sunday.status).toBe(402);
+    const monday = await servedAt('2026-10-05T00:00:00Z', h);
+    expect(monday.status).toBe(200);
+    const body = (await monday.json()) as TrialBody;
+    expect(body.trial?.calls_used_this_week).toBe(1);
+    expect(body.trial?.resets_at).toBe('2026-10-12T00:00:00Z');
+    expect(monday.headers.get('x-trial-reset')).toBe('2026-10-12T00:00:00Z');
+  });
+
+  it('announces the reset of the week that counted the call, Sunday night included', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const res = await servedAt('2026-10-04T23:59:59Z', freshHeaders());
+    const body = (await res.json()) as TrialBody;
+    expect(body.trial?.resets_at).toBe('2026-10-05T00:00:00Z');
   });
 });
 
@@ -290,6 +358,18 @@ describe('the ledger can be down without a single message lying', () => {
     expect(body.free_tier).toEqual(CONSENT_FIELDS.free_tier);
     expect(body.cause?.detail).toContain('Nothing is wrong with your request');
   });
+
+  it('says the same when the table of the week is the one that is gone', async () => {
+    // La décision lit `trial_weekly` depuis le 24/09/2026 : sa panne doit
+    // produire la même cause honnête, jamais un « plafond atteint » inventé.
+    getStatsDB().exec('DROP TABLE IF EXISTS trial_weekly');
+    resetDailyLedgerStatements();
+    const res = await validate({ iban: VALID_IBAN }, freshHeaders());
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as { cause?: { reason: string } };
+    expect(body.cause?.reason).toBe('trial_unavailable');
+    expect(res.headers.get('x-trial-used')).toBeNull();
+  });
 });
 
 describe('one IPv6 /64, one allowance', () => {
@@ -303,13 +383,13 @@ describe('one IPv6 /64, one allowance', () => {
     const second = (await (
       await validate({ iban: VALID_IBAN }, { 'x-real-ip': '2001:db8:aa:1::2' })
     ).json()) as TrialBody;
-    expect(first.trial?.calls_used_today).toBe(1);
-    expect(second.trial?.calls_used_today).toBe(2);
+    expect(first.trial?.calls_used_this_week).toBe(1);
+    expect(second.trial?.calls_used_this_week).toBe(2);
     // Un autre /64 garde sa propre franchise.
     const other = (await (
       await validate({ iban: VALID_IBAN }, { 'x-real-ip': '2001:db8:aa:2::1' })
     ).json()) as TrialBody;
-    expect(other.trial?.calls_used_today).toBe(1);
+    expect(other.trial?.calls_used_this_week).toBe(1);
   });
 });
 
@@ -442,7 +522,8 @@ describe('what the trial measures', () => {
   it('writes one api:trial-exhausted on the first refusal of the day', async () => {
     const before = names().filter((n) => n === 'api:trial-exhausted').length;
     const h = freshHeaders();
-    for (let i = 0; i < REST_TRIAL_DAILY_LIMIT + 2; i += 1) await validate({ iban: VALID_IBAN }, h);
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT + 2; i += 1)
+      await validate({ iban: VALID_IBAN }, h);
     expect(names().filter((n) => n === 'api:trial-exhausted').length - before).toBe(1);
   });
 

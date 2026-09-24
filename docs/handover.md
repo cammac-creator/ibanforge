@@ -368,6 +368,20 @@ limit under alert; it is deliberately not wired until the daily peak has been me
 (`GET /v1/admin/trial?days=14`, `peak_hour_buckets`). Proof of the port: a keyless call that answers
 402 keeps answering 402 across a redeploy.
 
+**Since 24 September the REST trial is counted by the WEEK** (Claude-Alain's decision: 25 a
+day was too much). `REST_TRIAL_WEEKLY_LIMIT` (25) per source and per ISO week in UTC, reset on
+Monday 00:00 UTC for everyone at once. The decision reads a table of its own, `trial_weekly`
+(`week` = the Monday as `YYYY-MM-DD`, `bucket`, `units`), through `countWeeklyTrialUnits`,
+which writes the `rest:<h>` row of the day in the same transaction. Why not sum the daily rows
+since Monday: `snapshotTrialDay(yesterday)` runs every hour and only abstains on an EMPTY day,
+so REST rows kept for a week would have made the tick after the first one overwrite
+`mcp_buckets`, `init_buckets` and `rest_attempts_uncounted` with zeros every day; and a sum per
+source on a `(day, bucket)` key scans the whole week. So `trial_ledger`, `trial_daily` and the
+MCP daily ceilings behave exactly as before; `rest_over_limit` now reads "sources that spent
+the whole week in one day". The `trial` block says `calls_used_this_week`,
+`calls_left_this_week`, `weekly_limit`, `resets` and `resets_at`; the daily names were removed
+(no published package read them). `X-Trial-Reset` is the ISO instant, `X-Trial-Period: week`.
+
 **The cohort radar sees anonymous keys since 15 September (lot 6), in report mode.** A second pass
 in `src/lib/cohort-radar-server.ts` loads anonymous and claimed keys with its OWN query (the e-mail
 loader's `no_recredit = 0` and `monthly_limit IS NULL` clauses are false by construction for an
@@ -606,8 +620,8 @@ the candidate server before touching DNS**, and do not delete the SEO redirects 
 locale detection means an unprefixed URL legitimately serves a different language depending
 on the browser, so a naive fix breaks something that works.
 
-**The keyless trial is twenty-five calls a day, with no e-mail and no key — in the code
-since 15 September (lot 4 of the "key without e-mail" chantier).** The constant is used
+**The keyless trial is twenty-five calls a week since 24 September, with no e-mail and no
+key** (twenty-five a day from 15 September, lot 4 of the "key without e-mail" chantier). The constant is used
 properly inside `src/`; the surfaces that still write the number by hand are counted by
 `src/lib/trial-figures-static.test.ts`, whose cap only goes down. The README and the
 onboarding page were the last two to say ten (fixed 16 September).

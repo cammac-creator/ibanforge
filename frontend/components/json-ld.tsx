@@ -37,7 +37,7 @@
 
 import catalogue from "@/data/onboarding.json";
 
-const FREE_KEY = `a free API key with no e-mail (${catalogue.anonymousMonthly} requests/month, ${catalogue.claimedMonthly} once claimed)`;
+const FREE_KEY = `a free API key with no e-mail (${catalogue.claimedMonthly} requests a month once claimed, ${catalogue.anonymousMonthly} a month before that)`;
 
 const SOFTWARE_APPLICATION = {
   '@context': 'https://schema.org',
@@ -97,7 +97,7 @@ const SOFTWARE_APPLICATION = {
     {
       '@type': 'Offer',
       name: 'Free API key',
-      description: `No e-mail required: ${catalogue.anonymousMonthly} requests/month, ${catalogue.claimedMonthly} once the key is claimed`,
+      description: `No e-mail required: ${catalogue.claimedMonthly} requests a month once the key is claimed, ${catalogue.anonymousMonthly} a month before that`,
       price: '0',
       priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: catalogue.anonymousMonthly, unitText: 'requests/month' },

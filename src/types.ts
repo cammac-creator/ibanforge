@@ -75,17 +75,19 @@ export interface PaywallCause {
 }
 
 /**
- * A keyless REST call served on the daily trial (src/middleware/anonymous-trial.ts).
+ * A keyless REST call served on the weekly trial (src/middleware/anonymous-trial.ts).
  *
  * Present ONLY when the trial was actually granted, so `c.get('anonymousTrial')`
  * doubles as the predicate everything downstream branches on: the x402 skip, the
  * `trial` block in the body, the zero revenue, the response headers.
  */
 export interface AnonymousTrial {
-  /** Calls served to this address today, this one included. */
+  /** Calls served to this source this week (ISO week, UTC), this one included. */
   used: number;
   limit: number;
   remaining: number;
+  /** Next Monday 00:00:00 UTC, ISO 8601: when `remaining` goes back to `limit`. */
+  resetsAt: string;
 }
 
 type HonoEnv = {
@@ -120,7 +122,7 @@ type HonoEnv = {
     mcpToolName?: string | null;
     /** Set by the API-key middleware when the request is served on the free tier: the response then carries the attribution block. */
     freeTier?: boolean;
-    /** Set by the anonymous-trial middleware when a keyless validation is served on the daily allowance. */
+    /** Set by the anonymous-trial middleware when a keyless validation is served on the weekly allowance. */
     anonymousTrial?: AnonymousTrial;
   };
 };
@@ -663,7 +665,7 @@ export interface IBANValidationResult {
   processing_ms?: number;
   /** Present on free-tier responses only. */
   attribution?: Attribution;
-  /** Present only on a call served by the keyless daily trial. @see TrialBlock */
+  /** Present only on a call served by the keyless weekly trial. @see TrialBlock */
   trial?: TrialBlock;
 }
 
@@ -677,15 +679,24 @@ export interface IBANValidationResult {
  * on the last one, when it is already too late to be a choice.
  */
 export interface TrialBlock {
-  calls_used_today: number;
-  calls_left_today: number;
-  daily_limit: number;
+  /**
+   * Since 24/09/2026 the trial is counted by the ISO WEEK (UTC), and every
+   * field says so in its name. The former `calls_used_today`,
+   * `calls_left_today` and `daily_limit` were removed rather than kept: they
+   * would have carried weekly counts under daily names, and no published
+   * package read them (sdks/, mcp/, integrations/ checked that day).
+   */
+  calls_used_this_week: number;
+  calls_left_this_week: number;
+  weekly_limit: number;
+  /** In words: "Monday 00:00 UTC". */
   resets: string;
+  /** The exact instant, ISO 8601: next Monday 00:00:00 UTC. */
+  resets_at: string;
   /**
    * Copy-pasteable: the request that mints a key with no address at all.
-   * Its figure is the ANONYMOUS monthly allowance, and the one thing this
-   * field must keep saying is which of the two 25s it means (a month, on
-   * every endpoint — not a day, on this route). See src/lib/trial.ts.
+   * It announces the key by its claimed monthly allowance and never puts the
+   * trial's figure beside the key's (see src/lib/trial.ts).
    */
   free_key: string;
   docs: string;

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CONSENT_ASK } from '../lib/consent.js';
-import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT, TRIAL_SIGNUP_SOURCE } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_FREE_KEY_HINT, TRIAL_SIGNUP_SOURCE } from '../lib/trial.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 /**
@@ -339,8 +339,8 @@ describe('la phrase de consentement et son interdit', () => {
     // Sans le `source`, la carte des portes d'entrée du tableau de bord tombe à
     // zéro pour toujours, et aucun autre test ne le verrait.
     expect(TRIAL_FREE_KEY_HINT).toContain(`"source":"${TRIAL_SIGNUP_SOURCE}"`);
-    // Depuis le 24/09/2026, le plafond du JOUR n'est plus dans cette phrase :
-    // elle est servie dans le bloc `trial`, juste à côté de `daily_limit`, et
+    // Depuis le 24/09/2026, le plafond de l'essai n'est plus dans cette phrase :
+    // elle est servie dans le bloc `trial`, juste à côté de `weekly_limit`, et
     // les deux 25 face à face se lisaient « la clé vaut moins que pas de clé ».
     // La clé s'annonce par ses 200 une fois réclamée, le 25 du mois ensuite,
     // chiffres lus dans les constantes.
@@ -351,8 +351,8 @@ describe('la phrase de consentement et son interdit', () => {
     expect(TRIAL_FREE_KEY_HINT.indexOf(String(FREE_TIER_MONTHLY_LIMIT))).toBeLessThan(
       TRIAL_FREE_KEY_HINT.indexOf(`starts at ${ANONYMOUS_MONTHLY_LIMIT}`),
     );
-    expect(TRIAL_FREE_KEY_HINT).not.toMatch(/\bday\b/i);
-    expect(TRIAL_FREE_KEY_HINT).not.toContain(`${REST_TRIAL_DAILY_LIMIT} are`);
+    expect(TRIAL_FREE_KEY_HINT).not.toMatch(/\b(day|week)\b/i);
+    expect(TRIAL_FREE_KEY_HINT).not.toContain(`${REST_TRIAL_WEEKLY_LIMIT} are`);
     // Réclamer demande un code reçu à une adresse : « un appel » était faux.
     expect(TRIAL_FREE_KEY_HINT).toMatch(/code mailed/);
     expect(TRIAL_FREE_KEY_HINT).not.toContain('you@');
@@ -360,10 +360,10 @@ describe('la phrase de consentement et son interdit', () => {
 
   it('une ligne où les deux plafonds se croisent porte les deux unités', () => {
     // Les deux quotas valent le même nombre et n'ont AUCUN rapport : 25 par
-    // jour sur la seule route de validation, 25 par mois sur tous les
-    // endpoints. Une ligne qui cite le nombre deux fois les met face à face,
+    // semaine (par jour avant le 24/09/2026) sur la seule route de validation,
+    // 25 par mois sur tous les endpoints. Une ligne qui cite le nombre deux fois les met face à face,
     // et c'est là que l'unité devient obligatoire.
-    const figure = String(REST_TRIAL_DAILY_LIMIT);
+    const figure = String(REST_TRIAL_WEEKLY_LIMIT);
     expect(figure).toBe(String(ANONYMOUS_MONTHLY_LIMIT));
     // 🚨 Le chiffre NU, comme `N200` ci-dessus : sans ces bornes, « 1k = $5,
     // 5k = $20, 25k = $80 » compte deux 25 et la ligne des paquets de crédits
@@ -376,7 +376,9 @@ describe('la phrase de consentement et son interdit', () => {
         .split('\n')
         .forEach((line, i) => {
           if ((line.match(bare) ?? []).length < 2) return;
-          if (/\bday\b/i.test(line) && /\bmonth\b/i.test(line)) return;
+          // L'unité de l'essai : la semaine, et le jour tant qu'un ancien texte
+          // peut traîner. Chacune reste une unité, jamais une absence d'unité.
+          if (/\b(day|week)\b/i.test(line) && /\bmonth\b/i.test(line)) return;
           offenders.push(`${rel}:${i + 1} ${line.trim()}`);
         });
     }

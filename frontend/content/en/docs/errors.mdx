@@ -89,7 +89,7 @@ Returned when a paid route is called with no key, no payment and no free allowan
 
 | `cause.reason` | When |
 |---|---|
-| `trial_exhausted` | The keyless trial of `POST /v1/iban/validate` is used up for this address today; it comes back at midnight UTC |
+| `trial_exhausted` | The keyless trial of `POST /v1/iban/validate` is used up for this address this week; it comes back on Monday at 00:00 UTC (`quota.resets` gives the instant) |
 | `trial_unavailable` | The keyless allowance cannot be counted right now, so the call falls back to payment |
 | `monthly_quota_exhausted` | The key's allowance for the month is used up |
 | `monthly_quota_insufficient` | A batch needs more requests than the key has left; nothing was consumed |
@@ -146,7 +146,7 @@ If you receive a 500 error, something unexpected happened on our side. The body 
 
 ### "Payment Required" on every request
 
-- Without a key, only `POST /v1/iban/validate` has a keyless trial (25 calls a day per source address). Every other paid route needs a key or a payment
+- Without a key, only `POST /v1/iban/validate` has a keyless trial (25 calls a week per source address, reset on Monday at 00:00 UTC). Every other paid route needs a key or a payment
 - Read `cause.reason` in the `402` body when it is there: it names the allowance that ran out
 - For x402: make sure you have USDC on the **Base** network (not Ethereum mainnet), that the wallet private key your client reads (for example `WALLET_PRIVATE_KEY`) is set, and that you use a compatible x402 client SDK
 

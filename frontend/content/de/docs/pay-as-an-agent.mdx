@@ -61,7 +61,7 @@ Python: `pip install cdp-sdk "x402[evm,httpx]"` mit `x402HttpxClient` auf diesel
 ## Erst prüfen, dann ausgeben
 
 - `GET /ping` und `GET /.well-known/x402` sind kostenlos — das Manifest listet jede bezahlbare Route mit ihrem exakten Preis.
-- Ganz ohne Schlüssel: bis zu 25 IBAN-Prüfungen pro Tag und Quelladresse, nur auf `POST /v1/iban/validate`, zum Ausprobieren.
+- Ganz ohne Schlüssel: bis zu 25 IBAN-Prüfungen pro Woche und Quelladresse, nur auf `POST /v1/iban/validate`, zum Ausprobieren (Rücksetzung am Montag um 00:00 UTC).
 - Der [MCP-Server](/docs/mcp) bietet 10 kostenlose Tool-Aufrufe pro Tag — genug, um die Datenqualität an eigenen IBANs zu prüfen.
 - Ein [API-Schlüssel](/docs/api-keys) braucht weder E-Mail noch Karte und erreicht 200 Anfragen im Monat, sobald er beansprucht ist: genug, um die anderen Endpunkte vor dem Bezahlen zu prüfen.
 

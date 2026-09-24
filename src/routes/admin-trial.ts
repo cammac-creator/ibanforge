@@ -4,9 +4,10 @@ import {
   countTrialActivitySince,
   countTrialBucketsSince,
   countTrialBucketsToday,
+  countTrialWeek,
   getTrialDaily,
 } from '../lib/daily-ip-ledger.js';
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 
 /**
  * Ce que l'essai sans clé a servi, aujourd'hui et les jours d'avant.
@@ -35,7 +36,12 @@ adminTrial.get('/v1/admin/trial', (c) => {
   // intermédiaire qui garderait la réponse montrerait une rafale éteinte.
   c.header('Cache-Control', 'private, no-store');
   return c.json({
-    daily_limit: REST_TRIAL_DAILY_LIMIT,
+    // Depuis le 24/09/2026, l'essai se décide à la semaine ISO (UTC). Les
+    // lignes du jour ci-dessous mesurent toujours au jour, comme avant.
+    weekly_limit: REST_TRIAL_WEEKLY_LIMIT,
+    resets: TRIAL_RESET,
+    resets_at: trialResetsAt(),
+    this_week: countTrialWeek(),
     // La journée courante, lue dans le registre vivant : elle n'est pas encore
     // dans `trial_daily`, que `snapshotTrialDay` n'écrira qu'au tick suivant.
     today: {

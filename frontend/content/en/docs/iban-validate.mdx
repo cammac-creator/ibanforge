@@ -16,7 +16,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 **Cost:** $0.005 USDC per request with x402, or one request from your key's allowance or credits.
 
-**No key at all:** up to 25 validations a day per source address (IPv6 counted per /64), on this route only, to try it out. Send a real `iban` with no credential: the answer is complete and carries a `trial` block with the count left today. Past that, the route answers `402` with `cause.reason: "trial_exhausted"` until midnight UTC. For every other endpoint, take a [key that needs no e-mail](/docs/api-keys).
+**No key at all:** up to 25 validations a week per source address (IPv6 counted per /64), on this route only, to try it out. The week is the ISO week in UTC and resets on Monday at 00:00 UTC. Send a real `iban` with no credential: the answer is complete and carries a `trial` block with the count left this week and the reset instant. Past that, the route answers `402` with `cause.reason: "trial_exhausted"` until Monday. For every other endpoint, take a [key that needs no e-mail](/docs/api-keys).
 
 ## Request
 

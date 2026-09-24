@@ -500,7 +500,7 @@
       },
       "2": {
         "question": "Gibt es ein kostenloses Angebot?",
-        "answer": "Ja, und es beginnt schon vor jedem Schlüssel. Ganz ohne Schlüssel: POST /v1/iban/validate mit einer echten IBAN wird bis zu 25-mal pro Tag für die Adresse beantwortet, von der der Aufruf kommt, vollständig und nur auf dieser Route, zum Ausprobieren. Kostenloser Schlüssel: POST /v1/keys/generate ganz ohne Body liefert einen ifk_-Schlüssel für alle Endpunkte, ohne E-Mail, ohne Karte, ohne Captcha; POST /v1/keys/claim hebt ihn mit einem 6-stelligen Code an eine Adresse, die Sie freiwillig angeben, auf 200 Anfragen pro Monat. Ganz ohne Adresse genommen, startet der Schlüssel mit 25 Anfragen pro Monat. Batch-Validierung zählt 1 Anfrage pro IBAN. Für höhere Volumen kaufen Sie ein Prepaid-Credit-Pack per Karte oder zahlen pro Aufruf in USDC via x402."
+        "answer": "Ja, und es beginnt schon vor jedem Schlüssel. Ganz ohne Schlüssel: POST /v1/iban/validate mit einer echten IBAN wird bis zu 25-mal pro Woche für die Adresse beantwortet, von der der Aufruf kommt, vollständig und nur auf dieser Route, zum Ausprobieren; die Woche beginnt am Montag um 00:00 UTC neu. Kostenloser Schlüssel: POST /v1/keys/generate ganz ohne Body liefert einen ifk_-Schlüssel für alle Endpunkte, ohne E-Mail, ohne Karte, ohne Captcha; POST /v1/keys/claim hebt ihn mit einem 6-stelligen Code an eine Adresse, die Sie freiwillig angeben, auf 200 Anfragen pro Monat. Ganz ohne Adresse genommen, startet der Schlüssel mit 25 Anfragen pro Monat. Batch-Validierung zählt 1 Anfrage pro IBAN. Für höhere Volumen kaufen Sie ein Prepaid-Credit-Pack per Karte oder zahlen pro Aufruf in USDC via x402."
       },
       "3": {
         "question": "Was ist mit hohen Volumen?",

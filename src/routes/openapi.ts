@@ -10,7 +10,7 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // Même motif que la ligne ci-dessus : le contrat cite le plafond que le
 // middleware applique, jamais une copie retapée. 🚨 Y compris `example`, qui
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 import { RATE_LIMIT } from '../middleware/rate-limit.js';
 import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
@@ -206,14 +206,16 @@ const buildRawSpec = () => ({
         summary: 'Validate a single IBAN',
         description:
           'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64): send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. The trial is counted per day and covers this route only. The key that needs no email is another door: every endpoint, and ' +
+          REST_TRIAL_WEEKLY_LIMIT +
+          ' calls a week from one source address are served with no key and no payment** (IPv6 counted per /64; the week is the ISO week in UTC and resets on ' +
+          TRIAL_RESET +
+          '): send a real `iban` and the response carries a `trial` block with the count left this week, the reset instant, and how to take a key that needs no email at all. The trial covers this route only. The key that needs no email is another door: every endpoint, and ' +
           FREE_TIER_MONTHLY_LIMIT +
           ' requests a month once claimed (POST /v1/keys/claim with a 6-digit code mailed to an address you read); taken with an empty body it starts at ' +
           ANONYMOUS_MONTHLY_LIMIT +
           ' a month. Past ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ', the route answers 402 again with `cause.reason = "trial_exhausted"`. **An invalid IBAN is not an HTTP error: the answer is HTTP 200 with `valid: false`, an `error` code and an `error_detail` sentence** (codes: `invalid_format`, `unsupported_country`, `wrong_length`, `invalid_check_digits`, `checksum_failed`, `invalid_bban_structure`). Only the request itself changes the status: 400 for malformed JSON or a missing `iban`, 402 for payment or an exhausted allowance, 413 for a body over 256 KB, 429 past the rate limit. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
+          REST_TRIAL_WEEKLY_LIMIT +
+          ' in the week, the route answers 402 again with `cause.reason = "trial_exhausted"` until the reset. **An invalid IBAN is not an HTTP error: the answer is HTTP 200 with `valid: false`, an `error` code and an `error_detail` sentence** (codes: `invalid_format`, `unsupported_country`, `wrong_length`, `invalid_check_digits`, `checksum_failed`, `invalid_bban_structure`). Only the request itself changes the status: 400 for malformed JSON or a missing `iban`, 402 for payment or an exhausted allowance, 413 for a body over 256 KB, 429 past the rate limit. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -249,7 +251,7 @@ const buildRawSpec = () => ({
         responses: {
           '200': {
             description:
-              'Validation result, for a valid AND for an invalid IBAN: an invalid IBAN is HTTP 200 with `valid: false`, `error` and `error_detail`, never a 4xx. Carries an optional `trial` block when the call was served by the keyless daily allowance (no key, no payment), and `cost_usdc: 0` with it — nobody was charged.',
+              'Validation result, for a valid AND for an invalid IBAN: an invalid IBAN is HTTP 200 with `valid: false`, `error` and `error_detail`, never a 4xx. Carries an optional `trial` block when the call was served by the keyless weekly trial (no key, no payment), and `cost_usdc: 0` with it — nobody was charged.',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/IBANValidationResult' },
@@ -259,7 +261,7 @@ const buildRawSpec = () => ({
           },
           '402': {
             description:
-              'Payment required (x402). Also returned when the keyless daily trial is used up for this IP — `cause.reason = "trial_exhausted"`, with the count served today, the reset (midnight UTC) and the free-key route — and when a key has used its allowance (`monthly_quota_exhausted`, `credits_exhausted`). Without a key, an empty `{}` body gets this 402 and spends nothing of the trial: that is the discovery probe x402 indexers send. With a key, the same empty body is a 400.',
+              'Payment required (x402). Also returned when the keyless weekly trial is used up for this source address — `cause.reason = "trial_exhausted"`, with the count served this week, the reset (' + TRIAL_RESET + ') and the free-key route — and when a key has used its allowance (`monthly_quota_exhausted`, `credits_exhausted`). Without a key, an empty `{}` body gets this 402 and spends nothing of the trial: that is the discovery probe x402 indexers send. With a key, the same empty body is a 400.',
           },
           '400': {
             description:
@@ -2186,22 +2188,31 @@ const buildRawSpec = () => ({
           trial: {
             type: 'object',
             description:
-              'Present ONLY on a call served by the keyless daily trial: POST /v1/iban/validate with a real `iban` and no API key is served ' +
-              REST_TRIAL_DAILY_LIMIT +
-              ' times a day per source address (IPv6 counted per /64), with no payment. Says how many calls are left today and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint.',
+              'Present ONLY on a call served by the keyless weekly trial: POST /v1/iban/validate with a real `iban` and no API key is served ' +
+              REST_TRIAL_WEEKLY_LIMIT +
+              ' times a week per source address (IPv6 counted per /64; ISO week in UTC, reset on ' +
+              TRIAL_RESET +
+              '), with no payment. Says how many calls are left this week, when the count resets, and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint. Until 24 September 2026 the trial was daily and this block carried `calls_used_today`, `calls_left_today` and `daily_limit`; they were replaced, not kept, because they would have carried weekly counts under daily names.',
             required: [
-              'calls_used_today',
-              'calls_left_today',
-              'daily_limit',
+              'calls_used_this_week',
+              'calls_left_this_week',
+              'weekly_limit',
               'resets',
+              'resets_at',
               'free_key',
               'docs',
             ],
             properties: {
-              calls_used_today: { type: 'integer', example: 1 },
-              calls_left_today: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT - 1 },
-              daily_limit: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT },
-              resets: { type: 'string', example: 'midnight UTC' },
+              calls_used_this_week: { type: 'integer', example: 1 },
+              calls_left_this_week: { type: 'integer', example: REST_TRIAL_WEEKLY_LIMIT - 1 },
+              weekly_limit: { type: 'integer', example: REST_TRIAL_WEEKLY_LIMIT },
+              resets: { type: 'string', example: TRIAL_RESET },
+              resets_at: {
+                type: 'string',
+                format: 'date-time',
+                description: 'Next Monday 00:00:00 UTC: the instant the weekly count goes back to zero.',
+                example: trialResetsAt(new Date('2026-09-24T12:00:00Z')),
+              },
               free_key: {
                 type: 'string',
                 description:

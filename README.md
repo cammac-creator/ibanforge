@@ -130,8 +130,9 @@ out = IBANforge().format_iban("DE89370400440532013000")
 ## For developers — REST API
 
 ```bash
-# Validate IBAN — no key needed for the first 25 calls a day per source address.
-# The answer carries a `trial` block with the count left and how to get a key.
+# Validate IBAN — no key needed for the first 25 calls a week per source address
+# (ISO week in UTC, reset on Monday 00:00 UTC). The answer carries a `trial` block
+# with the count left this week, the reset instant and how to get a key.
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -d '{"iban":"DE89 3704 0044 0532 0130 00"}'
@@ -161,7 +162,7 @@ curl https://api.ibanforge.com/v1/demo
 
 | Method | Path                       | Cost          | Description                                                    |
 | ------ | -------------------------- | ------------- | -------------------------------------------------------------- |
-| `POST` | `/v1/iban/validate`        | $0.005        | Single IBAN: bank-code verdict + BIC with its source + SEPA + issuer + risk + Swiss bc_nummer. A daily keyless trial per source address (see above) |
+| `POST` | `/v1/iban/validate`        | $0.005        | Single IBAN: bank-code verdict + BIC with its source + SEPA + issuer + risk + Swiss bc_nummer. A weekly keyless trial per source address (see above) |
 | `POST` | `/v1/iban/batch`           | $0.002/IBAN (USDC, x402) | Up to 100 IBANs in one call; on a key or a credit pack, one credit per IBAN |
 | `GET`  | `/v1/bic/{code}`           | $0.003        | BIC/SWIFT lookup with LEI                                      |
 | `GET`  | `/v1/ch/clearing/{iid}`    | $0.003        | Swiss BC-Nummer / IID — SIC, euroSIC, QR-IID                  |

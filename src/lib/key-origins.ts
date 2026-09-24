@@ -97,7 +97,7 @@ export const KEY_ORIGIN_TAGS = {
   'mcp-registry': 'The official MCP registry listing (server.json).',
   smithery: 'The Smithery listing (smithery.yaml).',
   glama: 'The Glama listing (glama.json).',
-  'api-trial': 'The keyless REST trial, once its daily allowance is spent.',
+  'api-trial': 'The keyless REST trial, once its weekly allowance is spent.',
 } as const;
 
 export type KeyOriginTag = keyof typeof KEY_ORIGIN_TAGS;

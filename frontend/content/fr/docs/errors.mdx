@@ -89,7 +89,7 @@ Renvoyé quand une route payante est appelée sans clé, sans paiement et sans f
 
 | `cause.reason` | Quand |
 |---|---|
-| `trial_exhausted` | L'essai sans clé de `POST /v1/iban/validate` est épuisé pour cette adresse aujourd'hui ; il revient à minuit UTC |
+| `trial_exhausted` | L'essai sans clé de `POST /v1/iban/validate` est épuisé pour cette adresse cette semaine ; il revient le lundi à 00:00 UTC (`quota.resets` donne l'instant) |
 | `trial_unavailable` | La franchise sans clé ne peut pas être décomptée en ce moment : l'appel retombe sur le paiement |
 | `monthly_quota_exhausted` | Le quota du mois de la clé est épuisé |
 | `monthly_quota_insufficient` | Un lot demande plus de requêtes qu'il n'en reste à la clé ; rien n'a été consommé |
@@ -146,7 +146,7 @@ Si vous recevez une erreur 500, quelque chose d'inattendu s'est produit de notre
 
 ### « Payment Required » à chaque requête
 
-- Sans clé, seule `POST /v1/iban/validate` a un essai sans clé (25 appels par jour et par adresse source). Toute autre route payante demande une clé ou un paiement
+- Sans clé, seule `POST /v1/iban/validate` a un essai sans clé (25 appels par semaine et par adresse source, remis à zéro le lundi à 00:00 UTC). Toute autre route payante demande une clé ou un paiement
 - Lisez `cause.reason` dans le corps du `402` quand il y figure : il nomme la franchise épuisée
 - Pour x402 : assurez-vous d'avoir des USDC sur le réseau **Base** (et non sur le mainnet Ethereum), que la clé privée du portefeuille que lit votre client (par exemple `WALLET_PRIVATE_KEY`) est définie, et que vous utilisez un SDK client x402 compatible
 

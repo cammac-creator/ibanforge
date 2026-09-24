@@ -97,9 +97,10 @@ npm run build             # next build
   conditions that must appear on every response built from them.
 - `src/lib/trial.ts` — the keyless trial, in figures and in words. Every surface quotes
   these constants; none of them hardcodes the number. **The two 25s never share a
-  sentence.** The keyless trial is 25 validations a day, on `POST /v1/iban/validate` only.
-  The key that needs no e-mail is 25 requests a month, on every endpoint. Name the door, and
-  announce the key by its 200 once claimed; `src/routes/free-doors-claims.test.ts` holds it.
+  sentence.** The keyless trial is 25 validations a week (ISO week, UTC), on
+  `POST /v1/iban/validate` only. The key that needs no e-mail is 25 requests a month, on every
+  endpoint. Name the door, and announce the key by its 200 once claimed;
+  `src/routes/free-doors-claims.test.ts` holds it.
 - `src/middleware/x402.ts` — prices. `frontend/data/` — what the site pre-renders,
   exported from the API by `npm run pages:export` and `pages:export-countries`.
 - `docs/data-sources.md` — every data source, its licence, and the permission we hold in
@@ -126,13 +127,15 @@ GitHub and ships to the VPS over a restricted SSH key, and the legal texts updat
 records, a decision on a CDN in front, and the cutover. The reasoning is in the internal
 report named below.
 
-**The keyless trial is twenty-five calls a day, in the code since 15 September.**
-`REST_TRIAL_DAILY_LIMIT` in `src/lib/trial.ts` reads 25, counted per source address (IPv6
-per /64) and stored in the service database. No e-mail and no key are required for those
-calls, and a key that needs no e-mail exists beside it (25 requests a month, 200 once
-claimed). Every surface that quotes a figure is meant to read the constants;
-`src/lib/trial-figures-static.test.ts` caps the prose that still writes numbers by hand, so
-that cap can only go down.
+**The keyless trial is twenty-five calls a WEEK since 24 September** (Claude-Alain's
+decision; it was twenty-five a day from 15 September). `REST_TRIAL_WEEKLY_LIMIT` in
+`src/lib/trial.ts` reads 25, counted per source address (IPv6 per /64) and per ISO week in
+UTC, reset on Monday 00:00 UTC, in the table `trial_weekly` of the service database. The
+daily rows of `trial_ledger` are still written and still feed `trial_daily`; the MCP
+allowances stay daily. No e-mail and no key are required for those calls. The key that needs
+no e-mail is another door, announced by its 200 requests a month once claimed. Every surface
+that quotes a figure is meant to read the constants; `src/lib/trial-figures-static.test.ts`
+refuses the trial's figure beside a day and checks every weekly figure written by hand.
 
 ---
 

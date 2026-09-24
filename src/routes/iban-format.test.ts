@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { EXAMPLE_IBANS, IBAN_LENGTHS } from 'iban-core';
@@ -202,4 +204,39 @@ describe('/v1/iban/format says what valid means', () => {
     expect(body.upgrade_to_full_validation).toMatch(/allocated/);
     expect(body.upgrade_to_full_validation).toContain('/v1/iban/validate');
   });
+});
+
+/**
+ * The QR-IBAN page shows a real answer of this route. Until 24/09/2026 its
+ * `upgrade_to_full_validation` line was the old hint, sanctions included, days
+ * after the route stopped saying it: held equal to what the route serves.
+ */
+describe('/v1/iban/format, as the documentation shows it', () => {
+  it.each(['en', 'fr', 'de'])(
+    'swiss-qr-iban (%s) quotes the hint the route serves',
+    async (lang) => {
+      const app = buildApp();
+      const r = await app.request('/v1/iban/format?iban=CH5530024123000889012');
+      const { upgrade_to_full_validation: served } = (await r.json()) as {
+        upgrade_to_full_validation: string;
+      };
+      const page = readFileSync(
+        join(
+          import.meta.dirname,
+          '..',
+          '..',
+          'frontend',
+          'content',
+          lang,
+          'docs',
+          'swiss-qr-iban.mdx',
+        ),
+        'utf8',
+      );
+      const lines = page
+        .split('\n')
+        .filter((l) => l.trim().startsWith('"upgrade_to_full_validation":'));
+      expect(lines).toEqual([`  "upgrade_to_full_validation": ${JSON.stringify(served)}`]);
+    },
+  );
 });

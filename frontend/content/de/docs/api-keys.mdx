@@ -13,9 +13,9 @@ bestätigen. Ein weiterer Schritt — ein zugesandter Code — hebt denselben Sc
 
 Diese Seite ist die Referenz allein zu Schlüsseln. Wenn Sie noch keinen Aufruf gemacht haben, sind die [Ersten Schritte](/docs/onboarding) der kürzere Weg: der Aufruf ohne Schlüssel, dieser Schlüssel, die Antwort Block für Block gelesen und ein Stapel von 100 — in zehn Minuten.
 
-## Vor dem Schlüssel: 25 Aufrufe pro Tag, ohne Schlüssel
+## Vor dem Schlüssel: 25 Aufrufe pro Woche, ohne Schlüssel
 
-`POST /v1/iban/validate` mit einer echten `iban` und ganz ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **25-mal pro Tag für die Adresse, von der der Aufruf kommt**, Rücksetzung um Mitternacht UTC:
+`POST /v1/iban/validate` mit einer echten `iban` und ganz ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **25-mal pro Woche für die Adresse, von der der Aufruf kommt**. Die Woche ist die ISO-Woche in UTC: Der Zähler beginnt am Montag um 00:00 UTC wieder bei null.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -23,15 +23,16 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der
-Anfrage, die den Schlüssel erzeugt. Eine Kostprobe, keine Stufe: über 25 Aufrufe pro Tag antwortet
-der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
+Die Antwort enthält einen `trial`-Block mit der Zahl der in dieser Woche verbleibenden Aufrufe, dem
+Zeitpunkt der Rücksetzung (`resets_at`) und der Anfrage, die den Schlüssel erzeugt. Eine Kostprobe,
+keine Stufe: über 25 Aufrufe in der Woche antwortet der Endpunkt bis Montag wieder mit `402` und
+`cause.reason: "trial_exhausted"`.
 
 **Die Kostprobe ohne Schlüssel und der Schlüssel sind zwei verschiedene Türen.** Die Kostprobe gilt
-nur auf dieser Route und kommt um Mitternacht UTC zurück. Der Schlüssel gilt auf allen Endpunkten:
+nur auf dieser Route und kommt jeden Montag zurück. Der Schlüssel gilt auf allen Endpunkten:
 Batch, BIC, Schweizer Clearing, Compliance. Er wird pro Monat gezählt, und erst die Beanspruchung
-hebt ihn auf 200 Anfragen pro Monat. Wer ohnehin nur einzelne IBANs prüft, kommt mit der Kostprobe
-ohne Schlüssel womöglich aus.
+hebt ihn auf 200 Anfragen pro Monat. Wer nur ein paar IBANs pro Woche einzeln prüft, kommt mit der
+Kostprobe ohne Schlüssel womöglich aus.
 
 ## Ein Schlüssel ohne E-Mail
 

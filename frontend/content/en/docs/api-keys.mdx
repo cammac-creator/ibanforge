@@ -13,9 +13,9 @@ code — lifts that same key to **200 requests a month**, for good. Beyond that,
 
 This page is the reference on keys alone. If you have not made a call yet, [Onboarding](/docs/onboarding) is the shorter road: the keyless call, this key, the answer read block by block and a batch of 100, in ten minutes.
 
-## Before the key: 25 calls a day, keyless
+## Before the key: 25 calls a week, keyless
 
-`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **25 times a day for the address it comes from**, resetting at midnight UTC:
+`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **25 times a week for the address it comes from**. The week is the ISO week in UTC: the count resets on Monday at 00:00 UTC.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -23,14 +23,14 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-The response carries a `trial` block with the count left today and the request that mints the key.
-It is a taster, not a tier: past 25 calls a day the endpoint answers `402` again with
-`cause.reason: "trial_exhausted"`.
+The response carries a `trial` block with the count left this week, the reset instant
+(`resets_at`) and the request that mints the key. It is a taster, not a tier: past 25 calls in
+the week the endpoint answers `402` again with `cause.reason: "trial_exhausted"`, until Monday.
 
 **The keyless trial and the key are two different doors.** The keyless trial works on this route
-only, and it comes back at midnight UTC. The key works on every endpoint: batch, BIC, Swiss clearing,
+only, and it comes back every Monday. The key works on every endpoint: batch, BIC, Swiss clearing,
 compliance. It is counted by the month, and claiming it is what takes it to 200 requests a month.
-If all you ever do is validate one IBAN at a time, the keyless trial may be all you need.
+If you validate a few IBANs a week, one at a time, the keyless trial may be all you need.
 
 ## A key with no e-mail
 

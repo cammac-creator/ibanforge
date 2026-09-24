@@ -16,7 +16,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 **Kosten:** 0,005 $ in USDC pro Anfrage mit x402, oder eine Anfrage aus dem Kontingent oder Guthaben Ihres Schlüssels.
 
-**Ganz ohne Schlüssel:** bis zu 25 Prüfungen pro Tag und Quelladresse (IPv6 pro /64 gezählt), nur auf dieser Route, zum Ausprobieren. Senden Sie eine echte `iban` ohne Zugangsdaten: Die Antwort ist vollständig und trägt einen Block `trial` mit der Zahl der heute verbleibenden Aufrufe. Danach antwortet die Route bis Mitternacht UTC mit `402` und `cause.reason: "trial_exhausted"`. Für alle anderen Endpunkte nehmen Sie einen [Schlüssel ohne E-Mail](/docs/api-keys).
+**Ganz ohne Schlüssel:** bis zu 25 Prüfungen pro Woche und Quelladresse (IPv6 pro /64 gezählt), nur auf dieser Route, zum Ausprobieren. Die Woche ist die ISO-Woche in UTC und beginnt am Montag um 00:00 UTC neu. Senden Sie eine echte `iban` ohne Zugangsdaten: Die Antwort ist vollständig und trägt einen Block `trial` mit der Zahl der in dieser Woche verbleibenden Aufrufe und dem Zeitpunkt der Rücksetzung. Danach antwortet die Route bis Montag mit `402` und `cause.reason: "trial_exhausted"`. Für alle anderen Endpunkte nehmen Sie einen [Schlüssel ohne E-Mail](/docs/api-keys).
 
 ## Anfrage
 

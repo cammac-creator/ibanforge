@@ -1,6 +1,6 @@
 ---
 title: "Eine Schweizer IBAN prüfen: Prüfziffer, IID-Register von SIX, QR-IBAN"
-description: "Eine Schweizer IBAN besteht drei Prüfungen, nicht eine: die Prüfziffer, die fünfstellige IID gegen das Register von SIX, und die Frage, ob es eine QR-IBAN ist, die eine QR-Referenz verlangt. Drei echte Antworten der API, Feld für Feld; die Kostprobe ohne Schlüssel deckt bis zu 25 Prüfungen pro Tag."
+description: "Eine Schweizer IBAN besteht drei Prüfungen, nicht eine: die Prüfziffer, die fünfstellige IID gegen das Register von SIX, und die Frage, ob es eine QR-IBAN ist, die eine QR-Referenz verlangt. Drei echte Antworten der API, Feld für Feld; die Kostprobe ohne Schlüssel deckt bis zu 25 Prüfungen pro Woche."
 date: "2026-09-14"
 faq:
   - q: "Was ist die IID in einer Schweizer IBAN?"
@@ -10,7 +10,7 @@ faq:
   - q: "Woran erkennt man eine QR-IBAN?"
     a: "An ihrer IID: Liegt sie zwischen 30000 und 31999, ist es eine QR-IID, und die IBAN ist eine QR-IBAN. Sie verlangt eine QR-Referenz (QRR) auf der QR-Rechnung; eine gewöhnliche IBAN verbietet sie. Die API meldet is_qr_iid und löst die QR-IID auf das Institut auf."
   - q: "Was kostet die Prüfung?"
-    a: "Nichts, um anzufangen. Ganz ohne Schlüssel: bis zu 25 IBAN-Prüfungen pro Tag und Adresse, nur auf der Validierungsroute, zum Ausprobieren. Ein Schlüssel ohne E-Mail: 200 Anfragen im Monat, sobald er beansprucht ist; ganz ohne Adresse genommen, beginnt er mit 25 im Monat, auf allen Endpunkten. Und jede IID hat ihre eigene Seite unter /de/iid, ohne Aufruf."
+    a: "Nichts, um anzufangen. Ganz ohne Schlüssel: bis zu 25 IBAN-Prüfungen pro Woche und Adresse, nur auf der Validierungsroute, zum Ausprobieren. Ein Schlüssel ohne E-Mail: 200 Anfragen im Monat, sobald er beansprucht ist; ganz ohne Adresse genommen, beginnt er mit 25 im Monat, auf allen Endpunkten. Und jede IID hat ihre eigene Seite unter /de/iid, ohne Aufruf."
 ---
 
 Wer «IBAN prüfen Schweiz» sucht, bekommt meist einen Prüfziffernrechner. Der beantwortet eine Frage von dreien. Eine Schweizer IBAN besteht aus CH, zwei Prüfziffern, einer fünfstelligen Bankclearing-Nummer (IID) und zwölf Stellen Konto. Die Prüfziffer sagt, ob die Zeichenkette in sich stimmig ist. Die IID sagt, welches Institut das Konto führt, und ob dieser Code überhaupt vergeben ist: Das steht im [BankMaster von SIX](/de/iid), dem Register, das die Codes zuteilt und jeden Monat neu veröffentlicht, mit Sitzadresse und Zahlungsschienen. Und die IID sagt noch etwas Drittes: Liegt sie zwischen 30000 und 31999, ist die IBAN eine [QR-IBAN](/de/docs/swiss-qr-iban), und die Zahlung muss eine QR-Referenz tragen, sonst wird sie abgewiesen.
@@ -142,7 +142,7 @@ Ein Detail für die Sorgfältigen: Die QR-IBAN aus der SIX-Dokumentation, CH44 3
 
 ## So rufen Sie es auf
 
-Ohne Schlüssel, aus dem Terminal: Die Kostprobe ohne Schlüssel beantwortet bis zu 25 Aufrufe pro Tag und Adresse, nur auf dieser Route.
+Ohne Schlüssel, aus dem Terminal: Die Kostprobe ohne Schlüssel beantwortet bis zu 25 Aufrufe pro Woche und Adresse, nur auf dieser Route.
 
 ```bash
 curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -150,7 +150,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban":"CH4900230000012345678"}'
 ```
 
-Die Antwort ist vollständig und trägt einen Block `trial`, der sagt, wie viele Aufrufe heute noch frei sind. Für den Betrieb nehmen Sie einen [Schlüssel ohne E-Mail](/de/docs/api-keys): 200 Anfragen im Monat, sobald er beansprucht ist, ohne Karte. Wer keine Zeile Code schreiben will: [jede IID hat ihre eigene Seite](/de/iid) mit genau dieser Antwort, [das Schweizer IBAN-Format mit dem offiziellen Beispiel](/de/iban/ch) steht daneben, und der [Generator für Test-IBANs](/de/tools/test-iban) liefert Schweizer IBANs mit echten, vergebenen IIDs für Fixtures und Demos.
+Die Antwort ist vollständig und trägt einen Block `trial`, der sagt, wie viele Aufrufe in dieser Woche noch frei sind. Für den Betrieb nehmen Sie einen [Schlüssel ohne E-Mail](/de/docs/api-keys): 200 Anfragen im Monat, sobald er beansprucht ist, ohne Karte. Wer keine Zeile Code schreiben will: [jede IID hat ihre eigene Seite](/de/iid) mit genau dieser Antwort, [das Schweizer IBAN-Format mit dem offiziellen Beispiel](/de/iban/ch) steht daneben, und der [Generator für Test-IBANs](/de/tools/test-iban) liefert Schweizer IBANs mit echten, vergebenen IIDs für Fixtures und Demos.
 
 ## Was das Register nicht sagt
 
