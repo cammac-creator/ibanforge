@@ -32,11 +32,33 @@ const PATTERNS: RegExp[] = [
   /1,000 (?:calls|credits) = \$(\d+(?:\.\d+)?)/g,
   /1,000 credits for \$(\d+(?:\.\d+)?)/g,
   /\$(\d+(?:\.\d+)?) covers 1,000/g,
-  /\$(\d+(?:\.\d+)?) per 1,000\b/g,
+  // The 429 message quoted in the docs: the price of the 1k pack, named by its route.
+  /\$(\d+(?:\.\d+)?) per 1,000, POST \/v1\/credits\/buy\/1k/g,
   /\$(\d+(?:\.\d+)?) \/ 1,000 credits/g,
+  /(\d+(?:,\d+)?) \$ \/ 1[ .]000 (?:crédits|Credits)/g,
   /(\d+(?:,\d+)?) \$ couvrent 1 000/g,
   /(\d+(?:,\d+)?) \$ decken 1\.000/g,
+  /\$(\d+(?:\.\d+)?) for 1,000 calls/g,
 ];
+
+/**
+ * A FLOOR per 1,000 calls ("from $X per 1,000", "down to $X per 1,000") is
+ * the cheapest pack's ratio, not the smallest pack's price: "from $4 per
+ * 1,000 calls" was served while the 25,000 pack costs $3.20 per 1,000 (review
+ * of 24/09/2026). A bare "$X per 1,000" is no longer read as the 1k price.
+ */
+const FLOOR = /(?:from|down to) \$(\d+(?:\.\d+)?) per 1,000\b/g;
+const CHEAPEST_PER_1K = Math.min(
+  ...Object.values(BUNDLES).map((b) => (b.price_usdc / b.credits) * 1000),
+);
+
+/**
+ * Known debt, named rather than hidden: MCP_INSTRUCTIONS still says "from $4
+ * per 1,000 calls", and it is compared character for character with its copy
+ * in the npm package (src/mcp/instructions.test.ts), which only a release may
+ * change. Remove the entry in the same change as that release.
+ */
+const FLOOR_DEBT = new Set(['src/mcp/instructions.ts']);
 
 const docs = (lang: string): string[] =>
   readdirSync(join(ROOT, 'frontend', 'content', lang, 'docs'))
@@ -79,6 +101,48 @@ describe('the 1,000-credit pack is quoted at the price the API sells it', () => 
     expect(seen).toBeGreaterThan(5);
   });
 
+  it('as a floor per 1,000 calls only at the cheapest pack ratio', async () => {
+    const wrong: string[] = [];
+    const served = [
+      ['/llms.txt', await (await buildApp().request('https://api.ibanforge.com/llms.txt')).text()],
+      [
+        '/openapi.json',
+        (
+          (await (await buildApp().request('https://api.ibanforge.com/openapi.json')).json()) as {
+            info: { description: string };
+          }
+        ).info.description,
+      ],
+    ] as const;
+    const texts: Array<readonly [string, string]> = [
+      ...served,
+      ...SURFACES.filter((rel) => !FLOOR_DEBT.has(rel)).map((rel) => [rel, read(rel)] as const),
+    ];
+    let seen = 0;
+    for (const [name, text] of texts) {
+      for (const m of text.matchAll(FLOOR)) {
+        seen += 1;
+        if (Math.abs(Number(m[1]) - CHEAPEST_PER_1K) > 0.005) wrong.push(`${name}: ${m[0]}`);
+      }
+    }
+    expect(wrong, wrong.join('\n')).toEqual([]);
+    // The served llms.txt and the OpenAPI overview both state the floor.
+    expect(seen).toBeGreaterThanOrEqual(2);
+  });
+
+  it('in the pricing cell of the comparison, in three languages', () => {
+    for (const lang of ['en', 'fr', 'de']) {
+      const cell = (
+        JSON.parse(read(`frontend/messages/${lang}.json`)) as {
+          compare: { table: { rows: { pricing: { ibanforge: string } } } };
+        }
+      ).compare.table.rows.pricing.ibanforge;
+      const found = quotes(cell);
+      expect(found, `${lang}: the pack price is no longer quoted in the cell`).toHaveLength(1);
+      expect(found[0], lang).toBe(PACK.price_usdc);
+    }
+  });
+
   it('in the comparison example, 2 × 1k packs, in three languages', () => {
     // "$10 one-time (2 × 1k packs)" was the $5 pack, doubled, and survived the
     // price change like the rest of this file's findings.
@@ -114,5 +178,41 @@ describe('the 1,000-credit pack is quoted at the price the API sells it', () => 
     expect(entry?.description).not.toMatch(/Same per-credit cost as retail/);
     // The price the paywall charges, read back rather than restated.
     expect(entry?.accepts?.price).toBe(`$${PACK.price_usdc.toFixed(2)}`);
+    // "cheaper than paying per call" was false for a BIC lookup and an x402
+    // batch (review of 24/09/2026): the description compares route by route,
+    // and each figure it quotes is the price that route's paywall charges.
+    const priceOf = (key: string): string => {
+      const route = buildRouteTable('0x0000000000000000000000000000000000000001', 'GET', '/')[
+        key
+      ] as { accepts?: { price?: unknown } } | undefined;
+      return String(route?.accepts?.price ?? '').replace(/^\$/, '');
+    };
+    const d = entry?.description ?? '';
+    expect(d).toContain(`validate (${priceOf('POST /v1/iban/validate')})`);
+    expect(d).toContain(`compliance (${priceOf('POST /v1/iban/compliance')})`);
+    expect(d).toContain(`BIC lookup (${priceOf('GET /v1/bic/:code')})`);
+    expect(d).not.toMatch(/cheaper than paying per call/);
+  });
+});
+
+/**
+ * The batch rate is an x402 price. On a key, a credit pack or Pro, one IBAN in
+ * a batch is one request or credit, so a static line quoting "$0.002" without
+ * saying USDC or x402 lets a reader believe a batch costs half on every rail
+ * (review of 24/09/2026).
+ */
+describe('the batch rate is said to be the x402 rate', () => {
+  const BATCH_SURFACES = [
+    'frontend/public/llms.txt',
+    'frontend/public/llms-full.txt',
+    'README.md',
+    'glama.json',
+    'frontend/public/.well-known/mcp.json',
+  ];
+  it.each(BATCH_SURFACES)('%s', (rel) => {
+    const wrong = read(rel)
+      .split('\n')
+      .filter((line) => /\$0\.002\b/.test(line) && !/x402|USDC/.test(line));
+    expect(wrong, wrong.join('\n')).toEqual([]);
   });
 });

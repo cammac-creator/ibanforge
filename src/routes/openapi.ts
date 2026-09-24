@@ -13,7 +13,7 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 // The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
-import { NOT_WHAT_IT_IS, positioningLong } from '../lib/positioning.js';
+import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
 import { BUNDLES } from './api-keys.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
@@ -48,7 +48,7 @@ import {
 const openapi = new Hono();
 
 // Version is read from package.json so the spec can never drift from the
-// deployed server again (the spec is fetched ~20k times/month by machines
+// deployed server again (the spec is fetched by machines
 // that code against it — it must tell the truth).
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require('../../package.json') as { version: string };
@@ -60,7 +60,7 @@ const buildRawSpec = () => ({
     title: 'IBANforge API',
     version: PKG_VERSION,
     // This string is the first thing every agent reads about the product, on
-    // the surface machines fetch ~20k times/month. Until 24/09/2026 it opened
+    // the surface machines fetch the most. Until 24/09/2026 it opened
     // on "Pre-payout screening for AI agents" and Swiss clearing, and the
     // assistants that read it filed IBANforge as a Swiss tool for agents with
     // a sanctions screening of the payee. The paragraph now comes from
@@ -71,9 +71,9 @@ const buildRawSpec = () => ({
       ' ' +
       NOT_WHAT_IT_IS +
       ' Also: Swiss clearing with payment-rail participation (SIX BankMaster), the UK modulus check, and the official identity of the bank from central-bank lists (France, Spain). ' +
-      'Ways to pay, none a dead-end: prepaid credit packs by card or USDC, from $' +
-      BUNDLES['1k'].price_usdc +
-      ' per 1,000 calls with no expiry; a Pro subscription by card ($' +
+      'Ways to pay, none a dead-end: prepaid credit packs by card or USDC, no expiry, ' +
+      packSummary(BUNDLES) +
+      '; a Pro subscription by card ($' +
       PRO_PRICE_USD +
       ' a month); or pay-per-call via x402 micropayments (USDC on Base L2, no signup). ' +
       'Before paying, a free API key needs no email address: ' +
@@ -319,7 +319,7 @@ const buildRawSpec = () => ({
           // The list of authorities is spelled out on this line rather than
           // read from BANK_LEVEL_SANCTIONS: this file is a coverage surface of
           // sanctions-claims.test.ts, which reads the source line by line.
-          "Validates an IBAN and returns everything from /v1/iban/validate PLUS a pre-payment triage layer: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8) and country, never on the payee's name; FATF status; SEPA Instant reachability; whether the bank answers Verification of Payee requests (VoP readiness); and a composite risk score (0-100). Costs $0.02 USDC via x402.",
+          "Validates an IBAN and returns everything from /v1/iban/validate PLUS a pre-payment triage layer: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country checked against a fixed list of sanctioned jurisdictions, never the payee's name; FATF status; SEPA Instant reachability; whether the EPC Verification of Payee register lists the bank as ready (VoP readiness); and a composite risk score (0-100). Costs $0.02 USDC via x402.",
         tags: ['Compliance'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -2870,7 +2870,7 @@ const buildRawSpec = () => ({
           uptime_seconds: { type: 'number' },
           bic_database_entries: {
             type: 'integer',
-            description: 'Number of BIC entries currently loaded (refreshed monthly from public sources)',
+            description: `Number of BIC entries currently loaded: GLEIF and national registers are refreshed monthly; the SwiftCodes rows are a public copy of the SWIFT directory frozen in ${frozenBicShare().month ?? 'an earlier year'}, re-imported unchanged. Each source's own data date is its source_as_of in bic_sources.`,
             example: getEntryCount(),
           },
           bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },

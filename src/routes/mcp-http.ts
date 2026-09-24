@@ -631,7 +631,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
         'or needs a numeric risk score for an internal payment-approval workflow. ' +
         'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
-        `CHECKS: IBAN validity + ${BANK_LEVEL_SANCTIONS} + country sanctions and FATF status + SEPA Instant reachability + whether the bank answers Verification of Payee (VoP) requests; the name check itself is done by the payee's bank, never here. ` +
+        `CHECKS: IBAN validity + ${BANK_LEVEL_SANCTIONS} + FATF status + SEPA Instant reachability + whether the EPC Verification of Payee (VoP) register lists the bank as ready; the name check itself is done by the payee's bank, never here. ` +
         'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop). ' +
         costLine('$0.02 per call'),
       inputSchema: {

@@ -392,7 +392,7 @@ const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
     tags: ['swiss', 'clearing', 'qr-iid', 'six'],
   },
   check_compliance: {
-    description: `Bank-level triage: ${BANK_LEVEL_SANCTIONS}; FATF lists; SEPA Instant reachability; whether the bank answers VoP requests; a 0-100 risk score.`,
+    description: `Bank-level triage: ${BANK_LEVEL_SANCTIONS}; FATF lists; SEPA Instant reachability; whether the EPC VoP register lists the bank as ready; a 0-100 risk score.`,
     tags: ['sanctions', 'fatf', 'risk', 'compliance'],
   },
   validate_payment_reference: {
@@ -676,7 +676,8 @@ const GLAMA_MANIFEST = {
     },
     {
       name: 'batch_validate_iban',
-      description: 'Validate up to 100 IBANs in one call ($0.002 each)',
+      description:
+        'Validate up to 100 IBANs in one call ($0.002 USDC each via x402; one credit per IBAN on a key)',
     },
     {
       name: 'lookup_bic',

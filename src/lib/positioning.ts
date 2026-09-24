@@ -218,8 +218,9 @@ export function positioningLong(): string {
     `It validates IBANs from all ${countries} IBAN countries and names the bank and its BIC, with the source of that answer. ` +
     `Where it reads the national register (${namesOf(authoritative)}), it also tells you whether the bank code is allocated at all; ` +
     'elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. ' +
-    'For each SEPA bank it resolves, it says whether the bank is reachable by SEPA Credit Transfer, SEPA Instant and SEPA Direct Debit, ' +
-    'and whether it answers Verification of Payee (VoP) requests. ' +
+    'For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), ' +
+    'from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), ' +
+    'and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. ' +
     "It does not check who holds the account: that name check belongs to the payee's bank, through VoP."
   );
 }
@@ -231,7 +232,7 @@ export function positioningOneLine(): string {
   return (
     `Check the bank behind an IBAN before you pay: validation in ${countries} countries, ` +
     `a bank-code verdict from the national register (${codesOf(authoritative)}), ` +
-    'the bank and BIC with their source, the SEPA, SEPA Instant and VoP readiness of the bank, ' +
+    'the bank and BIC with their source, SEPA and VoP readiness from the EPC registers where they list the bank, ' +
     'and bank-level sanctions (OFAC, EU, UN).'
   );
 }
@@ -276,9 +277,54 @@ export function freeAccessSentences(): string[] {
   ];
 }
 
-/** The scope of the sanctions check, in the words every compliance description uses. */
+/**
+ * The scope of the sanctions check, in the words every compliance description uses.
+ *
+ * Two checks, said as two (review of 24/09/2026): the OFAC, EU and UN lists are
+ * matched on the bank's BIC8 only, and only those hits reach `matched_lists`;
+ * the country is checked against a fixed list of sanctioned jurisdictions
+ * (`country_sanctioned`, src/lib/compliance-static.ts), which names no list.
+ */
 export const BANK_LEVEL_SANCTIONS =
-  "sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8) and country, never on the payee's name";
+  "sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country checked against a fixed list of sanctioned jurisdictions, never the payee's name";
+
+/**
+ * The SEPA and VoP line of the "country by country" block, word for word in the
+ * API llms.txt and the two site llms files (positioning.test.ts holds them).
+ *
+ * Said the way the code answers (review of 24/09/2026): `sepa.vop_participant`
+ * is true only when the EPC VoP register lists the bank's BIC8 as ready, so an
+ * absence is `false` and proves nothing about the bank; `sepa.schemes` comes
+ * from the EPC scheme registers only when they list the bank, and from the
+ * country otherwise.
+ */
+export const SEPA_VOP_LINE =
+  '- Every SEPA bank we resolve: whether the EPC Verification of Payee register lists it as ready (a bank absent from that register comes back `false`, which does not prove it ignores VoP requests); SCT, SCT Inst and SDD reachability from the EPC scheme registers where they list the bank (`sepa.basis: "epc_register"`), the country\'s schemes otherwise (`sepa.basis: "country_default"`).';
+
+/**
+ * The prepaid packs in one phrase, from the price list GET /v1/credits/bundles
+ * serves (passed in, so this module does not import a route).
+ *
+ * The cheapest pack is named by its own price, and the floor per 1,000 calls
+ * is the cheapest ratio, not the smallest pack: "from $4 per 1,000 calls" read
+ * as a floor while the 25,000 pack costs $3.20 per 1,000 (review of
+ * 24/09/2026).
+ */
+export function packSummary(
+  bundles: Record<string, { credits: number; price_usdc: number }>,
+): string {
+  const entries = Object.entries(bundles);
+  const smallest = entries.reduce((a, b) => (b[1].credits < a[1].credits ? b : a));
+  const cheapest = entries.reduce((a, b) =>
+    b[1].price_usdc / b[1].credits < a[1].price_usdc / a[1].credits ? b : a,
+  );
+  const floor = (cheapest[1].price_usdc / cheapest[1].credits) * 1000;
+  const list = entries.map(([slug, b]) => `${slug}=$${b.price_usdc}`).join(', ');
+  return (
+    `$${smallest[1].price_usdc} for ${smallest[1].credits.toLocaleString('en-US')} calls, ` +
+    `down to $${floor.toFixed(2)} per 1,000 with the ${cheapest[1].credits.toLocaleString('en-US')} pack (${list})`
+  );
+}
 
 /** The one line plus the two facts a directory entry must not omit. */
 export function serverDescription(): string {
@@ -289,8 +335,8 @@ export function serverDescription(): string {
 export function threeLayers(): string[] {
   return [
     '1. Is the number well written? Structure and mod-97: free, offline with the MIT library `ibanforge` on npm, or GET /v1/iban/format.',
-    '2. Which bank is it, does its code exist, and can it be reached? That is IBANforge: the bank-code verdict (the national register where we read it, which can say "not allocated"; a partial register or a composite map elsewhere, which cannot; every validation says which), the bank and BIC with their source, the SEPA, SEPA Instant and VoP readiness of that bank, e-money and virtual-IBAN detection, and bank-level sanctions.',
-    "3. Is the account open, and in this name? Only the payee's bank can answer, through Verification of Payee or an equivalent service. IBANforge tells you whether that bank answers VoP requests; it never runs the name check.",
+    '2. Which bank is it, does its code exist, and can it be reached? That is IBANforge: the bank-code verdict (the national register where we read it, which can say "not allocated"; a partial register or a composite map elsewhere, which cannot; every validation says which), the bank and BIC with their source, the SEPA reachability and VoP register listing of that bank (from the EPC registers where they list it), e-money and virtual-IBAN detection, and bank-level sanctions.',
+    "3. Is the account open, and in this name? Only the payee's bank can answer, through Verification of Payee or an equivalent service. IBANforge tells you whether the EPC VoP register lists that bank as ready; it never runs the name check.",
   ];
 }
 

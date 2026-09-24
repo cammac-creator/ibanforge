@@ -43,6 +43,17 @@ function sentences(text: string): string[] {
 
 /** Does this sentence put the day allowance and the month allowance side by side? */
 function collides(sentence: string): boolean {
+  // A sentence that puts the monthly figure against the daily one by reference
+  // ("not a day", "the two figures above ... share a number") collides just
+  // the same with a single bare number in it (review of 24/09/2026).
+  const refersToDay =
+    /not a day|figures above|share a number|pas un jour|pas par jour|nicht pro Tag|kein Tag/i;
+  if (
+    (sentence.match(bare(MONTH)) ?? []).length >= 1 &&
+    /month|mois|Monat/i.test(sentence) &&
+    refersToDay.test(sentence)
+  )
+    return true;
   const d = (sentence.match(bare(DAY)) ?? []).length;
   if (DAY === MONTH) return d >= 2;
   const m = (sentence.match(bare(MONTH)) ?? []).length;
@@ -55,15 +66,15 @@ function offenders(name: string, text: string): string[] {
     .map((s) => `${name}: ${s.trim().slice(0, 160)}`);
 }
 
-/** Every value of the comparison page, one per line. */
-function compareText(lang: 'en' | 'fr' | 'de'): string {
+/** Every value of a messages file, one per line: the whole site, not one page. */
+function messagesText(lang: 'en' | 'fr' | 'de'): string {
   const out: string[] = [];
   const walk = (v: unknown): void => {
     if (typeof v === 'string') out.push(v);
     else if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === 'object') Object.values(v).forEach(walk);
   };
-  walk((JSON.parse(read(`frontend/messages/${lang}.json`)) as { compare: unknown }).compare);
+  walk(JSON.parse(read(`frontend/messages/${lang}.json`)));
   return out.join('\n');
 }
 
@@ -90,8 +101,8 @@ describe('the daily trial and the monthly key never share a sentence', () => {
     expect(found, found.join('\n')).toEqual([]);
   });
 
-  it.each(['en', 'fr', 'de'] as const)('the comparison page (%s)', (lang) => {
-    const found = offenders(`compare ${lang}`, compareText(lang));
+  it.each(['en', 'fr', 'de'] as const)('every text of the site (%s)', (lang) => {
+    const found = offenders(`messages ${lang}`, messagesText(lang));
     expect(found, found.join('\n')).toEqual([]);
   });
 
@@ -133,6 +144,14 @@ describe('the daily trial and the monthly key never share a sentence', () => {
     'Past 25/day, add the free key (25 req/month with no e-mail, 200 once claimed).',
   ])('catches the collision it exists for: %s', (sentence) => {
     expect(collides(sentence)).toBe(DAY === MONTH);
+  });
+
+  it('catches the collision made by reference to the daily figure', () => {
+    expect(
+      collides(
+        '- 25 requests a MONTH, on every endpoint, not a day: the two figures above and this one happen to share a number',
+      ),
+    ).toBe(true);
   });
 
   it.each([

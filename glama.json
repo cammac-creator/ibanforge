@@ -4,7 +4,7 @@
     "cammac-creator"
   ],
   "name": "IBANforge",
-  "description": "Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, BG, CH, LI), the bank and BIC with their source, the SEPA, SEPA Instant and VoP readiness of the bank, and bank-level sanctions (OFAC, EU, UN). It does not check the payee's name. BIC directory, 121k+ entries (entries, not institutions): GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the rows. Also Swiss clearing (1,100+ SIX BankMaster entries). MCP-native, prepaid packs by card or x402 micropayments on Base L2, and a free API key that needs no e-mail.",
+  "description": "Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, BG, CH, LI), the bank and BIC with their source, SEPA and VoP readiness from the EPC registers where they list the bank, and bank-level sanctions (OFAC, EU, UN). It does not check the payee's name. BIC directory, 121k+ entries (entries, not institutions): GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the rows. Also Swiss clearing (1,100+ SIX BankMaster entries). MCP-native, prepaid packs by card or x402 micropayments on Base L2, and a free API key that needs no e-mail.",
   "homepage": "https://ibanforge.com?src=glama",
   "repository": "https://github.com/cammac-creator/ibanforge",
   "documentation": "https://ibanforge.com/docs/mcp?src=glama",
@@ -44,7 +44,7 @@
     },
     {
       "name": "batch_validate_iban",
-      "description": "Validate up to 100 IBANs in one call ($0.002 each)"
+      "description": "Validate up to 100 IBANs in one call ($0.002 USDC each via x402; one credit per IBAN on a key)"
     },
     {
       "name": "lookup_bic",
@@ -52,7 +52,7 @@
     },
     {
       "name": "check_compliance",
-      "description": "Bank-level triage: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8) and country, never on the payee's name + FATF + SEPA reachability + VoP readiness + risk score ($0.02)"
+      "description": "Bank-level triage: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country against a fixed list of sanctioned jurisdictions, never the payee's name + FATF + SEPA reachability + VoP readiness + risk score ($0.02)"
     },
     {
       "name": "lookup_ch_clearing",

@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
-import { BANK_LEVEL_SANCTIONS, codesOf, registerCountries } from '../lib/positioning.js';
+import { codesOf, frozenBicShare, registerCountries } from '../lib/positioning.js';
 // The price list GET /v1/credits/bundles serves, for the WORDS of the pack
 // descriptions only: the price the paywall charges is the `price` literal of
 // each route below, untouched (a price is Claude-Alain's decision).
@@ -245,7 +245,17 @@ export function buildRouteTable(
   const PERF =
     'server processing <5ms (network excluded — measure your own round trip on GET /ping)';
   const TRUST_TAG_VALIDATE = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI via GLEIF) + ${F.claim.chClearing} SIX · ${V}`;
-  const TRUST_TAG_BIC = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly) · ${V}`;
+  // The BIC directory said the way it is (review of 24/09/2026): this tag is
+  // what the 402 of GET /v1/bic serves and what facilitators index, and it
+  // still called the whole directory "refreshed monthly" while two thirds of
+  // it is a copy frozen years ago. Figures read from the data, like
+  // bicDirectorySentence, but short: the description must stay under
+  // MAX_RESOURCE_DESCRIPTION or the route cannot be paid.
+  const FB = frozenBicShare();
+  const TRUST_TAG_BIC =
+    FB.month && FB.rows > 0
+      ? `Production · ${PERF} · ${F.claim.bic} BIC entries, ${FB.words} from a public SWIFT directory copy frozen in ${FB.month} · ${V}`
+      : `Production · ${PERF} · ${F.claim.bic} BIC entries from GLEIF and national registers, refreshed monthly · ${V}`;
   const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, refreshed monthly · ${V}`;
   const TRUST_TAG_COMPLIANCE = `Production · ${PERF} · OFAC, EU, UN + FATF + SEPA + VoP · weekly refresh · ${V}`;
   // Read from the code that decides the verdict (src/lib/positioning.ts).
@@ -540,7 +550,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description: `Pre-payment triage of the bank behind an IBAN: ${BANK_LEVEL_SANCTIONS}; FATF status; SEPA Instant reachability; whether the bank answers VoP requests. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
+      description: `Pre-payment triage of the bank behind an IBAN: OFAC, EU and UN lists matched on the bank (BIC8), the country against a fixed sanctions list, never the payee's name; FATF status; SEPA Instant reachability; whether the EPC VoP register lists the bank. Returns risk_score 0-100. Not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -664,7 +674,7 @@ export function buildRouteTable(
       // "Same per-credit cost as retail (0.005 USDC)" survived here after the
       // pack moved to $4 on 16/09/2026, and the 402 served it to every agent
       // that probed the route. The per-credit figure is now computed.
-      description: `Prepaid bundle of 1,000 credits: 1 credit = 1 validation or lookup, and batch validation debits 1 credit per IBAN. ${PACK_1K.price_usdc / PACK_1K.credits} USDC per credit, cheaper than paying per call (0.005), with only ONE x402 settlement instead of 1,000: most agent stacks handle a single payment far better than micropayments. The same pack is sold by card at https://ibanforge.com/pricing. Returns an ifk_xxx key with 1,000 credits valid for any /v1/iban/* or /v1/bic/* endpoint. No expiry.`,
+      description: `Prepaid bundle of 1,000 credits: 1 credit = 1 validation or lookup, and batch validation debits 1 credit per IBAN. ${PACK_1K.price_usdc / PACK_1K.credits} USDC per credit: cheaper than validate (0.005) or compliance (0.02) paid per call, dearer than a BIC lookup (0.003) or an x402 batch (${BATCH_PRICE_PER_IBAN} per IBAN). ONE x402 settlement instead of 1,000. Also sold by card at https://ibanforge.com/pricing. Returns an ifk_xxx key with 1,000 credits valid for any /v1/iban/* or /v1/bic/* endpoint. No expiry.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {

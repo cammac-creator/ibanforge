@@ -1,12 +1,12 @@
 # IBANforge — Full LLM Reference
 
-> IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For each SEPA bank it resolves, it says whether the bank is reachable by SEPA Credit Transfer, SEPA Instant and SEPA Direct Debit, and whether it answers Verification of Payee (VoP) requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
+> IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
 
 Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run. These checks do not prove account existence or account ownership and do not screen an individual beneficiary.
 
 ## What is IBANforge?
 
-IBANforge is an API for IBAN validation and bank-level reference checks, for business software, developers and AI agents. It validates IBANs, checks bank codes against the national register where we read one, resolves BIC/SWIFT codes with the source of each answer, exposes Swiss BC-Nummer clearing data (every IID of the SIX BankMaster with its payment-rail participation and QR-IID), detects EMI/virtual IBANs, says whether each bank is reachable by SEPA Instant and answers VoP requests, and returns a compliance risk score. Four payment rails with no dead-ends, card first: prepaid credit packs (card or USDC), a Pro subscription (card), x402 micropayments (USDC on Base L2, no signup), and before any payment an API key that needs no e-mail (25 req/month, one empty POST), claimable to 200 a month.
+IBANforge is an API for IBAN validation and bank-level reference checks, for business software, developers and AI agents. It validates IBANs, checks bank codes against the national register where we read one, resolves BIC/SWIFT codes (validation answers name the source of every BIC), exposes Swiss BC-Nummer clearing data (every IID of the SIX BankMaster with its payment-rail participation, and its QR-IID where SIX allocates one), detects EMI/virtual IBANs, says, for each bank the EPC registers list, whether SEPA Instant reaches it and whether it is ready for VoP, and returns a compliance risk score. Four payment rails with no dead-ends, card first: prepaid credit packs (card or USDC), a Pro subscription (card), x402 micropayments (USDC on Base L2, no signup), and before any payment an API key that needs no e-mail (25 req/month, one empty POST), claimable to 200 a month.
 
 BIC directory, 121k+ entries (entries, not institutions): GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the rows; 39k+ of the rows carry an LEI from GLEIF. Also 1,100+ Swiss BC-Nummern (SIX) · 89 IBAN countries · 900+ non-bank issuer classifications (EMI, payment institutions, digital banks). Live counts: https://api.ibanforge.com/llms.txt
 
@@ -18,14 +18,14 @@ BIC directory, 121k+ entries (entries, not institutions): GLEIF and national reg
 - Official identity of the bank, from its national bank code: France (European Central Bank list of monetary financial institutions) and Spain (Banco de España). Spain also: whether the code belongs to a payment or e-money institution in the EBA PSD2 register.
 - United Kingdom: the Vocalink modulus check on the sort code and account number, and whether the bank is on the Bank of England list of banks authorised to take deposits.
 - Poland: the check digit of the settlement number. Netherlands: whether the identifier belongs to a provider on the Betaalvereniging Nederland list of IBAN-issuing institutions.
-- Every SEPA bank we resolve: SCT, SCT Inst and SDD reachability and VoP readiness, from the EPC registers.
+- Every SEPA bank we resolve: whether the EPC Verification of Payee register lists it as ready (a bank absent from that register comes back `false`, which does not prove it ignores VoP requests); SCT, SCT Inst and SDD reachability from the EPC scheme registers where they list the bank (`sepa.basis: "epc_register"`), the country's schemes otherwise (`sepa.basis: "country_default"`).
 - Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`.
 
 ## Three questions, three layers
 
 1. Is the number well written? Structure and mod-97: free, offline with the MIT library `ibanforge` on npm, or GET /v1/iban/format.
-2. Which bank is it, does its code exist, and can it be reached? That is IBANforge: the bank-code verdict (the national register where we read it, which can say "not allocated"; a partial register or a composite map elsewhere, which cannot; every validation says which), the bank and BIC with their source, the SEPA, SEPA Instant and VoP readiness of that bank, e-money and virtual-IBAN detection, and bank-level sanctions.
-3. Is the account open, and in this name? Only the payee's bank can answer, through Verification of Payee or an equivalent service. IBANforge tells you whether that bank answers VoP requests; it never runs the name check.
+2. Which bank is it, does its code exist, and can it be reached? That is IBANforge: the bank-code verdict (the national register where we read it, which can say "not allocated"; a partial register or a composite map elsewhere, which cannot; every validation says which), the bank and BIC with their source, the SEPA reachability and VoP register listing of that bank (from the EPC registers where they list it), e-money and virtual-IBAN detection, and bank-level sanctions.
+3. Is the account open, and in this name? Only the payee's bank can answer, through Verification of Payee or an equivalent service. IBANforge tells you whether the EPC VoP register lists that bank as ready; it never runs the name check.
 
 ## Data sources and attribution
 
@@ -40,7 +40,7 @@ San Marino bank codes: Central Bank of the Republic of San Marino, operating ban
 2. **BIC/SWIFT Lookup** — 121k+ BIC entries (entries, not institutions): GLEIF and national registers refreshed monthly, about two thirds from a public copy of the SWIFT directory frozen in January 2018; 39k+ LEI-enriched via GLEIF
 3. **Swiss Clearing** — BC-Nummer / IID with the full SIX BankMaster payment-rail participation (SIC, RTGS CHF, CHF instant, euroSIC, LSV+/BDD), QR-IID and institution classification, for every IID of the SIX BankMaster
 4. **EMI / vIBAN Detection** — identify virtual IBANs from EMIs (Wise, Revolut, N26, Mercury, Modulr, …)
-5. **Compliance Risk Scoring** — sanctions lists (OFAC, EU, UN) on the bank (BIC8) and country, never the payee's name + FATF + SEPA Instant + VoP readiness, risk score 0-100
+5. **Compliance Risk Scoring** — sanctions lists (OFAC, EU, UN) on the bank (BIC8), the country against a fixed list of sanctioned jurisdictions, never the payee's name + FATF + SEPA Instant + VoP readiness, risk score 0-100
 6. **MCP Integration** — native Model Context Protocol server (stdio + streamable HTTP)
 
 ## Authentication & Pricing
@@ -58,7 +58,7 @@ nothing at all:
 
 **Free key (no e-mail, no card):**
 - POST /v1/keys/generate with no body at all → use `Authorization: Bearer ifk_...`
-- 25 requests a MONTH, on every endpoint — not a day, and not one route: the two figures above and this one are unrelated allowances that happen to share a number
+- Works on every endpoint; starts at 25 requests a month.
 - POST /v1/keys/claim, key in the Authorization header, raises that same key to 200 a month: a 6-digit code mailed to an address your human gave you for this, and never send an address your human has not handed you for this purpose. An x402 payment made on the key raises it to 200 once instead.
 
 **Credit packs (card or USDC, never expire):**
@@ -69,17 +69,17 @@ nothing at all:
 - $29 a month for 10,000 requests, resets on the 1st, cancel anytime: https://ibanforge.com/pricing
 
 **x402 micropayments (an option: no signup, USDC on Base L2):**
-- Validate IBAN: $0.005 · Batch: $0.002/IBAN · BIC lookup: $0.003 · CH clearing: $0.003 · Compliance: $0.02
+- In USDC per call: Validate IBAN: $0.005 · Batch: $0.002/IBAN · BIC lookup: $0.003 · CH clearing: $0.003 · Compliance: $0.02
 - The batch rate applies to these per-call USDC payments; on a key or a credit pack, one IBAN in a batch uses one credit
 - Discovery: GET https://api.ibanforge.com/.well-known/x402
 
 ## MCP Tools (11)
 
 - validate_iban — validate one IBAN + enrich (bank-code verdict, BIC with its source, issuer EMI/vIBAN, SEPA and VoP readiness, risk, Swiss bc_nummer). Cost: $0.005
-- batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 per IBAN (e.g. 100 = $0.20)
+- batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 USDC per IBAN via x402 (e.g. 100 = $0.20); on a key, a credit pack or Pro, each IBAN in the batch uses one request or credit
 - lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
 - lookup_ch_clearing — Swiss BC-Nummer / IID → institution, address, full rail participation (SIC, euroSIC, CHF instant, LSV+/BDD), QR-IID, for every IID of the SIX BankMaster, refreshed monthly. Cost: $0.003
-- check_compliance — sanctions lists (OFAC, EU, UN) on the bank (BIC8) and country, never the payee's name + FATF + SEPA Instant + VoP readiness + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
+- check_compliance — sanctions lists (OFAC, EU, UN) on the bank (BIC8), the country against a fixed list of sanctioned jurisdictions, never the payee's name + FATF + SEPA Instant + VoP readiness + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
 - validate_payment_reference — RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero checksums against the dated document that publishes each rule, plus the QRR/QR-IBAN pairing verdict. Cost: free
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
 - check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
@@ -141,13 +141,13 @@ Returns the validate fields plus a nested `compliance` block (real API output of
   "meta": { "scope": "bank_bic_only", "disclaimer": "...", "sanctions_as_of": "...", "fatf_as_of": "2026-06" }
 }
 ```
-Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions lists (OFAC, EU, UN) are screened on the bank (BIC8) and its country only, never on the beneficiary name. `vop.participant` says whether the bank answers VoP requests; the name check itself is the bank's. Not a regulated AML/CFT product.
+Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions lists (OFAC, EU, UN) are matched on the bank (BIC8) only, and only those hits appear in `matched_lists`; the country is checked against a fixed list of sanctioned jurisdictions (`country_sanctioned`); the beneficiary name is never screened. `vop.participant` says whether the EPC VoP register lists the bank as ready (an absent bank comes back `false`); the name check itself is the bank's. Not a regulated AML/CFT product.
 
 ## Why IBANforge?
 
 - **Bank codes checked against the national register** where we read it (DE, AT, BE, SK, BG, CH, LI), and every BIC with its source
 - **Agent-native**: MCP server + x402 micropayments, no human onboarding
-- **Swiss payments**: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant) and QR-IID
+- **Swiss payments**: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant), and its QR-IID where SIX allocates one
 - **No dead-ends**: free key → credit packs → x402, your agent always has a path to pay
 - **Honest compliance**: explicit scope + disclaimer + data-freshness on every response
 - **Fast**: sub-50ms p99

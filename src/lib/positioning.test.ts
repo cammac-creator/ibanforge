@@ -11,8 +11,10 @@ import {
   positioningLong,
   positioningOneLine,
   registerCountries,
+  SEPA_VOP_LINE,
   shareInWords,
 } from './positioning.js';
+import { buildRouteTable } from '../middleware/x402.js';
 
 /**
  * The first lines machines read, held to the code that decides the verdict.
@@ -153,15 +155,58 @@ describe('the static surfaces say what the code says', () => {
     expect(compareText('en')).toContain(f.words);
   });
 
-  it('the site llms files name every partial register, Luxembourg included', () => {
+  // Aimed at the LINE, not the file: "Finland" and "San Marino" also appear in
+  // the sources list, so a whole-file check stayed green when the partial
+  // register line lost them (review of 24/09/2026). And the other way round: a
+  // country whose register settles a negative must not sit in that line.
+  it.each([
+    ['frontend/public/llms.txt', '- A partial register:'],
+    ['frontend/public/llms-full.txt', '- A partial register:'],
+    ['README.md', '- **Bank-code verdict**:'],
+  ])('%s names every partial register in its own line, and no authoritative one', (rel, start) => {
+    const line = read(rel)
+      .split('\n')
+      .find((l) => l.startsWith(start));
+    expect(line, `${rel}: no line starting with ${start}`).toBeDefined();
     const partialNames = Object.keys(IBAN_LENGTHS)
       .filter((cc) => registerCoverage(cc).basis === 'partial')
       .map((cc) => namesOf([cc]));
-    for (const rel of ['frontend/public/llms.txt', 'frontend/public/llms-full.txt']) {
-      const text = read(rel);
-      for (const name of [...partialNames, 'Luxembourg'])
-        expect(text, `${rel}: ${name}`).toContain(name);
+    // For the README the line carries both lists: only the part after the
+    // partial clause is held to the partial names.
+    const partialPart = rel === 'README.md' ? line!.slice(line!.indexOf('partial lists')) : line!;
+    for (const name of [...partialNames, 'Luxembourg'])
+      expect(partialPart, `${rel}: ${name}`).toContain(name);
+    for (const cc of registerCountries().authoritative) {
+      expect(partialPart, `${rel}: ${cc} is authoritative`).not.toContain(namesOf([cc]));
     }
+  });
+
+  it.each(['frontend/public/llms.txt', 'frontend/public/llms-full.txt'])(
+    '%s carries the SEPA and VoP line the API serves',
+    (rel) => {
+      expect(read(rel)).toContain(SEPA_VOP_LINE);
+    },
+  );
+});
+
+/**
+ * The 402 of GET /v1/bic is what facilitators index. It called the whole
+ * directory "refreshed monthly" while two thirds of it is a copy frozen in
+ * 2018 (review of 24/09/2026): the served description must name the frozen
+ * copy and its month, from the data.
+ */
+describe('the BIC paywall description dates the frozen copy', () => {
+  it('names the month and the share, read from the data', () => {
+    const f = frozenBicShare();
+    const d =
+      (
+        buildRouteTable('0x0000000000000000000000000000000000000001', 'GET', '/v1/bic/DEUTDEFF')[
+          'GET /v1/bic/:code'
+        ] as { description?: string }
+      ).description ?? '';
+    expect(d).toContain(`frozen in ${f.month}`);
+    expect(d).toContain(f.words);
+    expect(d).not.toMatch(/BICs? \([^)]*refreshed monthly/);
   });
 });
 
@@ -183,6 +228,27 @@ const RETIRED: Array<[RegExp, string]> = [
     'every IID of the SIX BankMaster with its rails and QR-IID',
   ],
   [/\$5 payment for 1,000/i, 'the pack price is read from BUNDLES'],
+  // Added after the review of 24/09/2026.
+  [
+    /BICs? \([^)]*refreshed monthly|BIC entries [^.;]*\(refreshed monthly/i,
+    'bicDirectorySentence or frozenBicShare',
+  ],
+  [
+    // Aimed at a claim about the bank; "Listing means the bank answers VoP
+    // requests" (OpenAPI, the meaning of the EPC listing) stays true.
+    /whether (?![^.;]{0,80}ready to answer)[^.;]{0,60}answers? (VoP|Verification of Payee)( \(VoP\))? requests/i,
+    'whether the EPC VoP register lists the bank as ready',
+  ],
+  [
+    /For each SEPA bank it resolves/i,
+    'the SEPA schemes come from the EPC registers only when they list the bank',
+  ],
+  [/each answer naming its source/i, 'validation answers name the source of every BIC'],
+  [
+    /cheaper than paying per call/i,
+    'compare route by route: a BIC lookup and an x402 batch cost less per call',
+  ],
+  [/from \$4 per 1,000/i, 'the floor per 1,000 is the cheapest pack ratio'],
 ];
 
 const OWNED = [
