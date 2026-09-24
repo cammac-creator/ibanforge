@@ -3,17 +3,29 @@ import type { HonoEnv } from '../types.js';
 import { extractKey } from './api-key.js';
 import { isSellingRoute } from './x402.js';
 import { getIban } from '../lib/request-helpers.js';
-import { countDailyUnits, refundDailyUnits } from '../lib/daily-ip-ledger.js';
+import {
+  countDailyUnits,
+  countWeeklyTrialUnits,
+  refundWeeklyTrialUnits,
+} from '../lib/daily-ip-ledger.js';
 import { extractClientIp } from '../lib/stats.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { recordServerEvent } from '../lib/web-events.js';
 import { recordSafely } from '../lib/record-safely.js';
-import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT, TRIAL_RESET } from '../lib/trial.js';
+import {
+  REST_TRIAL_WEEKLY_LIMIT,
+  TRIAL_FREE_KEY_HINT,
+  TRIAL_PERIOD,
+  TRIAL_RESET,
+  trialResetsAt,
+} from '../lib/trial.js';
 
 /**
- * Twenty-five keyless validations a day, per SOURCE, on POST /v1/iban/validate.
+ * Twenty-five keyless validations a WEEK, per SOURCE, on POST /v1/iban/validate.
  *
- * Decided 06/09/2026 at ten, raised to twenty-five on 15/09/2026. The HTTP MCP
+ * Decided 06/09/2026 at ten a day, raised to twenty-five a day on 15/09/2026,
+ * and counted by the ISO week in UTC since 24/09/2026 (Claude-Alain: twenty-five
+ * a day was too much). The week opens on Monday at 00:00 UTC. The HTTP MCP
  * transport has served a taster since July — no key, no wallet — and it
  * converts, while the REST door had no equivalent: a developer's first contact
  * with IBANforge is a terminal, they paste the curl from the docs, and they met
@@ -25,9 +37,9 @@ import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT, TRIAL_RESET } from '../lib
  * screening, so the smaller allowance is the MCP one. The ten here had been
  * copied from `MCP_DAILY_LIMIT` because a number was needed.
  *
- * It is a taster, not a tier. Twenty-five calls is enough to decide whether the
- * enrichment is worth a key and far too few to run anything on, and the
- * response says so on every single call.
+ * It is a taster, not a tier. Twenty-five calls a week is enough to decide
+ * whether the enrichment is worth a key and far too few to run anything on, and
+ * the response says so on every single call.
  *
  * The count is kept in the service database, so it survives a redeploy, and the
  * bucket is a normalised, hashed SOURCE — never an address.
@@ -123,7 +135,7 @@ function trialIp(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string {
  * cite la limite effective et non la documentée.
  */
 function effectiveTrialLimit(): number {
-  return REST_TRIAL_DAILY_LIMIT;
+  return REST_TRIAL_WEEKLY_LIMIT;
 }
 
 export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
@@ -170,7 +182,11 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
     const ip = trialIp(c);
     const key = ledgerKey(ip);
     const limit = effectiveTrialLimit();
-    const spent = countDailyUnits(key, 1, limit);
+    // One instant for the whole call: the week that counts it and the reset it
+    // announces must be the same week, even on Sunday at 23:59:59.
+    const now = new Date();
+    const resetsAt = trialResetsAt(now);
+    const spent = countWeeklyTrialUnits(key, 1, limit, now);
 
     if (spent.degraded) {
       // La base du service ne répond pas. Le plafond n'est pas atteint : il
@@ -200,7 +216,7 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
       // travelling inside it (enrich-402 reads `paywallCause`). Answering a
       // bespoke 429 would break every x402 client on the one route they use
       // most.
-      // ⚠️ « this address gets today », jamais « you have used » : depuis le
+      // ⚠️ « this address gets this week », jamais « you have used » : depuis le
       // portage, un redéploiement ne remet plus le compteur à zéro, un pool
       // résidentiel peut pré-brûler le seau d'un développeur honnête, et le
       // seau est désormais un PRÉFIXE, donc plusieurs abonnés d'un même /64
@@ -210,22 +226,43 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
       c.set('paywallCause', {
         reason: 'trial_exhausted',
         detail:
-          `You used the ${limit} keyless validations this address gets today ` +
-          `(${spent.used} calls served); the allowance resets at ${TRIAL_RESET}. ` +
+          `This address has used the ${limit} keyless validations it gets this week ` +
+          `(${spent.used} calls served); the allowance comes back on ${TRIAL_RESET} (${resetsAt}). ` +
           `To keep going now, take a free key: ${TRIAL_FREE_KEY_HINT}. ` +
           'Prefer to pay per call? Settle this 402 with x402 — no account needed.',
         quota: {
           used: spent.used,
           limit,
-          month: 'day',
-          resets: TRIAL_RESET,
+          month: TRIAL_PERIOD,
+          resets: `${TRIAL_RESET} (${resetsAt})`,
           required: 1,
           remaining: 0,
         },
       });
-      // "A developer hit the ceiling", once per address per day. The second
-      // refusal of the same day says nothing the first did not.
-      if (countDailyUnits(`evt:trial-exhausted:${ip}`, 1, 1).allowed) {
+      // "A source hit the ceiling", once per source and per WEEK: written on the
+      // call that crosses it, and on no other.
+      //
+      // 🚨 Until 24/09/2026 this was deduplicated per address and per DAY, which
+      // was right while the allowance was daily. Once the refusal lasts until
+      // Monday, a source that comes back every day would have written one
+      // "exhausted" a day with no "tried" beside it (a refused call is not
+      // served), and the doors card would show more sources that ran out than
+      // sources that tried. `spent.used` is the week's count, including this
+      // call: it equals limit + 1 exactly once per source and per week. It keeps
+      // growing in memory on the refusals that follow, and after a redeploy the
+      // next write in the database lands at limit + 2, so the event is not
+      // written again.
+      //
+      // ⚠️ Reserve for lot 5: if the effective limit is lowered during a week, a
+      // source already above the new limit will not cross it and writes no
+      // event. Decide it when the breaker is wired, not here.
+      //
+      // ⚠️ Reserve on the memory path: a source counted in memory rather than
+      // in `trial_weekly` (the shared `unknown` bucket, or a new source while
+      // the week's table is full) starts again from zero after a restart. It is
+      // served 25 more calls, and crosses the ceiling, and writes this event,
+      // once more. Only the database path is restart-proof.
+      if (spent.used === limit + 1) {
         recordSafely(() => recordServerEvent('api:trial-exhausted'), 'web_event');
       }
       await next();
@@ -236,6 +273,7 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
       used: spent.used,
       limit,
       remaining: spent.remaining,
+      resetsAt,
     });
     // The attribution block the free tier carries applies here for the same
     // reason it applies to a free key: the results are being shown to someone,
@@ -262,7 +300,7 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
     // it is the answer the caller asked for.
     let used = spent.used;
     if (c.res.status >= 400 && c.res.status < 500) {
-      refundDailyUnits(key, 1);
+      refundWeeklyTrialUnits(key, 1);
       used = Math.max(spent.used - 1, 0);
     }
 
@@ -271,9 +309,13 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
     // The `trial` block in the body is built by the handler and therefore
     // pre-refund; on a 4xx there is no such block to disagree with, because the
     // handler that would have written it is the one that refused.
+    // Counts of the WEEK, and the instant it resets (ISO 8601, next Monday
+    // 00:00 UTC): a header that said "midnight UTC" would send a script to
+    // retry the next day into the same refusal.
     c.header('X-Trial-Used', String(used));
     c.header('X-Trial-Limit', String(limit));
     c.header('X-Trial-Remaining', String(Math.max(limit - used, 0)));
-    c.header('X-Trial-Reset', TRIAL_RESET);
+    c.header('X-Trial-Period', TRIAL_PERIOD);
+    c.header('X-Trial-Reset', resetsAt);
   };
 }

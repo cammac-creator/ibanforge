@@ -23,7 +23,7 @@ request. A tag says a deliberate effort produced the visit.
 | `mcp-registry` | the official MCP registry listing (`server.json`) |
 | `smithery` | the Smithery listing (`smithery.yaml`) |
 | `glama` | the Glama listing (`glama.json`) |
-| `api-trial` | the keyless REST trial, once its daily allowance is spent |
+| `api-trial` | the keyless REST trial, once its weekly allowance is spent |
 
 **A door** is what the server writes when no tag says anything finer: the
 surface the key was actually minted on. It is always true and never specific.

@@ -1402,8 +1402,8 @@ function openStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_at TEXT');
     // ─── Registre des franchises d'essai (lot 4, 15/09/2026) ────────────────
     //
-    // Bloc autonome posé en DERNIER, exprès : deux `CREATE TABLE IF NOT EXISTS`
-    // et aucun `ALTER`, donc aucun index à créer après une colonne ajoutée et
+    // Bloc autonome posé en DERNIER, exprès : des `CREATE TABLE IF NOT EXISTS`
+    // (`trial_weekly` s'y ajoute le 24/09/2026) et aucun `ALTER`, donc aucun index à créer après une colonne ajoutée et
     // aucune garde `PRAGMA table_info` (le piège du 19/08, qui empêchait l'API
     // de démarrer, n'a pas de prise ici). Le placer à la fin garde la région
     // isolée des autres chantiers qui migrent `api_keys` en parallèle.
@@ -1486,6 +1486,24 @@ function openStatsDB(): DatabaseType.Database {
         init_buckets            INTEGER NOT NULL,
         shield_minutes          INTEGER NOT NULL DEFAULT 0,
         created_at              TEXT    DEFAULT (datetime('now'))
+      ) WITHOUT ROWID;
+      -- Le compteur de la SEMAINE de l'essai REST sans clé (24/09/2026 :
+      -- 25 appels par semaine et par source, semaine ISO en UTC). Une table à
+      -- part, et non des seaux quotidiens sommés depuis le lundi : garder les
+      -- lignes rest de trial_ledger sept jours ferait réécrire par des zéros,
+      -- une heure après minuit, la trace que snapshotTrialDay vient d'écrire
+      -- (elle ne s'abstient que sur une journée vide), et la somme par source
+      -- balaierait toute la semaine sur une clé (day, bucket). trial_ledger,
+      -- trial_daily et les plafonds MCP quotidiens restent donc intacts.
+      --
+      -- week = le lundi « YYYY-MM-DD » de la semaine ISO en UTC ; bucket = le
+      -- même seau haché que trial_ledger ('rest:<h>'), jamais une adresse.
+      -- Purgée par le tick horaire dès que la semaine est passée.
+      CREATE TABLE IF NOT EXISTS trial_weekly (
+        week   TEXT    NOT NULL,
+        bucket TEXT    NOT NULL,
+        units  INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (week, bucket)
       ) WITHOUT ROWID;
       -- ─── Les deux portes d'une identité d'AGENT, par jour ────────────────
       -- (chantier « mesure agents », 15/09/2026)

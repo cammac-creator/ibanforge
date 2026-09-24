@@ -1,33 +1,46 @@
 ---
 title: "Error Reference"
-description: "All error codes, HTTP statuses, and troubleshooting guide for the IBANforge API."
+description: "The HTTP statuses of the IBANforge API and the error codes its routes share: invalid IBANs, request errors, payment and quota (402), body size (413), rate limit (429), and where to get help."
 order: 6
 ---
 
 # Error Reference
 
-IBANforge uses standard HTTP status codes and returns structured error responses in JSON. This page covers every error you might encounter.
+IBANforge uses standard HTTP status codes and returns structured JSON errors, `{"error": "<token>", "message": "<sentence>"}`. Branch on `error`, which is stable; `message` may be reworded. This page covers the statuses of the API and the codes its routes share; a code that belongs to one route only (API keys, UK firms) is on that route's page.
+
+**An invalid IBAN is not an error status.** `POST /v1/iban/validate` answers HTTP `200` with `valid: false`, an `error` code and an `error_detail` sentence. Only the request itself (its JSON, a missing field, payment, quota, size, rate) changes the HTTP status.
 
 ## HTTP status codes
 
 | Status | Meaning | When it happens |
 |---|---|---|
-| `200` | OK | Request succeeded (note: invalid IBANs still return 200 with `valid: false`) |
-| `400` | Bad Request | Malformed request body, missing fields, or invalid parameters |
-| `402` | Payment Required | No payment header or insufficient/invalid payment |
-| `404` | Not Found | Unknown endpoint. An unknown BIC is not a 404: `/v1/bic/{code}` answers `200` with `found: false` |
-| `500` | Internal Server Error | Unexpected server error (please report these) |
+| `200` | OK | The request was answered. An invalid IBAN still returns `200` with `valid: false`; an unknown BIC returns `200` with `found: false` |
+| `400` | Bad Request | Malformed JSON, a missing field, or an invalid parameter |
+| `401` | Unauthorized | The key routes only. `missing_key` (no key sent) on `GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`, `POST /v1/keys/revoke` and `POST /v1/keys/rotate`; `invalid_key` (unknown or inactive key) on the first four. `POST /v1/keys/claim` still accepts a key cut off for a burst of automated signups: claiming is how it comes back. A paid route never answers `401` |
+| `403` | Forbidden | `verification_required`: `POST /v1/keys/generate` with an address, from a network that took a key recently; a code was mailed, repeat the request with it. `forbidden_origin`: approving or refusing a device key (`POST /v1/keys/device/approve`, `/deny`) from a page on another origin |
+| `402` | Payment Required | A paid route called without a usable way to pay: no key and no free allowance left, a key that is invalid or has spent its allowance or credits, or a payment that was refused. The x402 payment envelope, with a `cause` when one applies |
+| `404` | Not Found | Unknown endpoint. On `POST /v1/keys/revoke` and `POST /v1/keys/rotate`, `invalid_key`: the key is unknown or already revoked |
+| `405` | Method Not Allowed | Right path, wrong method (for example `GET /v1/keys/generate`); the `allow` field names the method to use |
+| `409` | Conflict | The key routes only. `already_claimed`: the key is already past the anonymous tier. `already_claimed_elsewhere`: that address already holds a claimed key, or claimed one in the last 24 hours. `verification_in_flight`: a code for that address was issued moments ago; use it, or try again in a few minutes |
+| `413` | Payload Too Large | Request body over 256 KB |
+| `429` | Too Many Requests | More than 100 requests in one minute from the same IP address; wait for `Retry-After` |
+| `500` | Internal Server Error | Unexpected server error (please report it, see [Support](#support)) |
+| `502`, `503` | Bad Gateway, Service Unavailable | The x402 payment rail could not be reached or answered with an error. Retry later. On the key routes, `503 verification_unavailable`: the verification mail could not be sent (a key created with an address, a claim, a device approval); try again in a few minutes. The UK firms route has its own `502` and `503` codes, on [its page](/docs/gb-firms) |
 
 ## Validation error codes
 
-These appear in the response body when an IBAN is invalid. The HTTP status is still `200` — the request itself succeeded, but the IBAN did not pass validation.
+These appear in the body of a `200` answer when `valid` is `false`: the request succeeded, the IBAN did not pass. `POST /v1/iban/validate`, each item of `POST /v1/iban/batch` and the free `GET /v1/iban/format` use the same six codes. One exception on `/v1/iban/format`: a length out of bounds (fewer than 15 or more than 34 characters once spaces and hyphens are removed, or more than 64 as sent) is a `400 invalid_iban_length`, not a `200`.
 
 | Code | Description | Example cause |
 |---|---|---|
-| `invalid_format` | IBAN contains invalid characters or is empty | Special characters, too short, empty string |
-| `unsupported_country` | Country code is not in our registry | `XX12345678` — "XX" is not a valid country |
-| `wrong_length` | IBAN length does not match expected length for the country | Swiss IBAN should be 21 chars, but 19 were provided |
-| `checksum_failed` | MOD-97 checksum verification failed | A digit was changed or transposed |
+| `invalid_format` | Characters other than letters, digits, spaces and hyphens; fewer than 5 characters; or more than 64 characters as sent | A dot or an en dash between the groups, curly quotes, a truncated paste |
+| `unsupported_country` | The first two letters are not one of the 89 IBAN countries | `XX00 0000 0000 0000`. Free text lands here too: its first two letters are read as a country code |
+| `wrong_length` | The length does not match the IBAN length of that country | `CH93 0076 2011 6238 5295` has 20 characters; a Swiss IBAN has 21 |
+| `invalid_check_digits` | Characters 3 and 4 are not two digits, or are `00`, `01` or `99` (ISO 13616 allows 02 to 98) | `DE00 3704 0044 0532 0130 00` |
+| `checksum_failed` | The MOD-97 check fails | A digit was changed, or two digits were swapped |
+| `invalid_bban_structure` | Length and MOD-97 pass, but the national part does not follow the layout the country defines | A letter inside a German bank code, with the check digits recomputed to match |
+
+Spaces (non-breaking spaces included) and ASCII hyphens are removed, and letters are read in either case, before any of these checks.
 
 ### Example: validation error
 
@@ -36,23 +49,34 @@ These appear in the response body when an IBAN is invalid. The HTTP status is st
   "iban": "CH100023000000001234",
   "valid": false,
   "error": "wrong_length",
-  "error_detail": "Expected 21 characters for CH, got 20."
+  "error_detail": "Expected 21 characters for CH, got 20.",
+  "cost_usdc": 0
 }
 ```
 
+`cost_usdc` is `0` when a key or the keyless trial served the call, and the route price when the call was paid with x402.
+
+### An empty or missing IBAN
+
+`{"iban": ""}`, or a body with no `iban` at all, is an incomplete request rather than an invalid IBAN. With a key it answers `400 invalid_request`. With no key it answers the `402` payment envelope and spends nothing of the keyless trial: an empty `{}` is how x402 indexers probe the route.
+
 ## Request error codes
 
-These return non-200 HTTP status codes.
+These return a status other than `200`.
 
 ### 400 Bad Request
 
-| Code | Description |
-|---|---|
-| `invalid_json` | Request body is not valid JSON |
-| `invalid_request` | The `iban` field is missing or not a string; for a batch, the body has no array of IBAN strings (`ibans`, `iban_list` or `list`) |
-| `empty_batch` | The `ibans` array is empty |
-| `batch_too_large` | More than 100 IBANs in a batch request |
-| `invalid_bic_format` | BIC code is not 8 or 11 alphanumeric characters |
+| Code | Route | Description |
+|---|---|---|
+| `invalid_json` | validate, batch, compliance | The request body is not valid JSON |
+| `invalid_request` | validate, batch, compliance | The `iban` field is missing, empty or not a string; for a batch, the body has no array of IBAN strings (`ibans`, `iban_list` or `list`) |
+| `empty_batch` | batch | The `ibans` array is empty |
+| `batch_too_large` | batch | More than 100 IBANs in a batch request |
+| `invalid_bic_format` | `GET /v1/bic/{code}` | The BIC is not 8 or 11 alphanumeric characters in the ISO 9362 shape |
+| `placeholder_literal` | `GET /v1/bic/{code}`, `GET /v1/ch/clearing/{iid}` | The literal placeholder of the OpenAPI document was sent instead of a value |
+| `invalid_iid_format` | `GET /v1/ch/clearing/{iid}` | The IID is not a number of 1 to 5 digits |
+| `missing_iban` | `GET` and `POST /v1/iban/format` | No `iban` query parameter or body field |
+| `invalid_iban_length` | `GET` and `POST /v1/iban/format` | Fewer than 15 or more than 34 characters once spaces and hyphens are removed, or more than 64 characters as sent |
 
 ### Example: bad request
 
@@ -65,7 +89,17 @@ These return non-200 HTTP status codes.
 
 ### 402 Payment Required
 
-Returned when the payment header is missing, expired, or invalid (`PAYMENT-SIGNATURE` for x402 v2, `X-PAYMENT` for v1). The response includes payment instructions:
+Returned when a paid route is called without a usable way to pay: no key and no free allowance left, a key that is invalid or has spent its allowance or credits, or a payment that was sent and refused. The body is the x402 payment envelope; the `PAYMENT-SIGNATURE` header (x402 v2) or `X-PAYMENT` (v1) settles it. When a precise reason applies, the body also carries `cause.reason` and a `message` that names the way out:
+
+| `cause.reason` | When |
+|---|---|
+| `trial_exhausted` | The keyless trial of `POST /v1/iban/validate` is used up for this address this week; it comes back on Monday at 00:00 UTC (`quota.resets` gives the instant) |
+| `trial_unavailable` | The keyless allowance cannot be counted right now, so the call falls back to payment |
+| `monthly_quota_exhausted` | The key's allowance for the month is used up |
+| `monthly_quota_insufficient` | A batch needs more requests than the key has left; nothing was consumed |
+| `credits_exhausted`, `credits_insufficient` | The same two cases for a prepaid credit key |
+| `invalid_api_key` | A key was sent, but it is unknown or revoked |
+| `key_revoked_burst` | An anonymous key revoked with a burst of automated signups; the `message` says how to claim it back |
 
 ```json
 {
@@ -84,54 +118,76 @@ Returned when the payment header is missing, expired, or invalid (`PAYMENT-SIGNA
 }
 ```
 
-See [x402 Payments](/docs/x402) for how to handle this.
+When a payment was sent and refused, the body also carries `payment_error` with the reason.
+
+See [x402 Payments](/docs/x402) for how to handle this, and [API keys](/docs/api-keys) for the free key.
 
 ### 404 Not Found
 
 | Code | Description |
 |---|---|
-| `bic_not_found` | No institution found matching the provided BIC code |
-| `not_found` | The requested endpoint does not exist |
+| `not_found` | The requested endpoint does not exist. The body lists the main routes with the shape of their request |
+
+An unknown code is not a 404: `GET /v1/bic/{code}` answers `200` with `found: false`, and `GET /v1/ch/clearing/{iid}` answers `200` with `found: false` and `error: "clearing_not_found"`.
+
+### 405 Method Not Allowed
+
+`method_not_allowed`: the path exists, the method does not. The `allow` field lists the methods the path accepts. The common case is `GET /v1/keys/generate`: a key is taken with a `POST`, and with no body at all it needs no e-mail.
+
+### 413 Payload Too Large
+
+`payload_too_large`: the request body is over 256 KB. It is checked before routing and before payment, so nothing is charged. A batch of 100 IBANs is about 5 KB.
+
+### 429 Too Many Requests
+
+`rate_limit_exceeded`: more than 100 requests in one minute from the same IP address. The answer carries a `Retry-After` header and a `retry_after` field, both in seconds. Every counted response carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` (seconds), plus the older `X-RateLimit-*` headers, whose reset is a Unix timestamp. `/health`, `/ping`, `/openapi.json` and `/v1/demo` are not counted. The same limit is published at [`/.well-known/rate-limits.yml`](https://api.ibanforge.com/.well-known/rate-limits.yml).
+
+Taking and claiming keys have their own daily limits, with their own `429` codes: see [API keys](/docs/api-keys). A key's monthly allowance is not a `429`: it ends in the `402` above. Every answer served on a monthly key (free or claimed) carries `X-Quota-Used`, `X-Quota-Limit` and `X-Quota-Remaining` (`GET /v1/keys/usage` returns the same count); a prepaid credit key carries `X-Credits-Remaining` and `X-Credits-Total` instead (`GET /v1/credits/balance`).
 
 ### 500 Internal Server Error
 
-If you receive a 500 error, something unexpected happened on our side. The response will contain:
-
-The body is the plain text `Internal Server Error` — there is no JSON envelope on a 500. Please report it with the endpoint and the time of the call (UTC).
+If you receive a 500 error, something unexpected happened on our side. The body is the plain text `Internal Server Error`: there is no JSON envelope on a 500. Please report it with the endpoint and the time of the call (UTC).
 
 ## Troubleshooting
 
 ### "Payment Required" on every request
 
-- Make sure you have USDC on the **Base** network (not Ethereum mainnet)
-- Check that your wallet private key is correctly set in the `WALLET_PRIVATE_KEY` environment variable
-- Verify you are using a compatible x402 client SDK
+- Without a key, only `POST /v1/iban/validate` has a keyless trial (25 calls a week per source address, reset on Monday at 00:00 UTC). Every other paid route needs a key or a payment
+- Read `cause.reason` in the `402` body when it is there: it names the allowance that ran out
+- For x402: make sure you have USDC on the **Base** network (not Ethereum mainnet), that the wallet private key your client reads (for example `WALLET_PRIVATE_KEY`) is set, and that you use a compatible x402 client SDK
 
 ### "Invalid IBAN format" but the IBAN looks correct
 
-- Remove any leading/trailing whitespace
-- Make sure there are no non-ASCII characters (curly quotes, em-dashes, etc.)
-- The IBAN should only contain letters A-Z and digits 0-9 (spaces are stripped automatically)
+- Only letters A-Z, digits 0-9, spaces and ASCII hyphens are accepted; dots, slashes and typographic dashes are refused
+- Make sure there are no other non-ASCII characters (curly quotes, zero-width spaces)
+- Case does not matter
 
 ### "Unsupported country" for a valid country
 
-- IBANforge supports 89 countries. Some territories and microstates may not be included yet
+- IBANforge supports the 89 IBAN countries. Some territories use the IBAN of another country: check which one issues it
 - Double-check the two-letter country code at the start of the IBAN
 
 ### "BIC not found" but the code is real
 
-- The BIC database contains 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT) but may not cover every branch
-- Try the 8-character version (without branch code) — e.g., `UBSWCHZH` instead of `UBSWCHZH80A`
+- The BIC directory holds 121k+ entries from public sources (GLEIF, national registers such as the Bundesbank, SIX and NBP, EBA STEP2 SCT, and a public copy of the SWIFT directory frozen in January 2018) but may not cover every branch
+- Try the 8-character version (without branch code), e.g. `UBSWCHZH` instead of `UBSWCHZH80A`
 - Some financial institutions use BIC codes that are not registered with SWIFT/GLEIF
 
-### Batch request returns fewer results than expected
+### A batch request is refused
 
-- Check that your `ibans` array does not exceed 10 items
-- Ensure each item is a string — numbers and objects are rejected
+- More than 100 items is refused as a whole with `400 batch_too_large`: split the list
+- Every item must be a string: a number or an object makes the whole request `400 invalid_request`
 - The results array always matches the order and count of the input array
 
 ### Timeout or no response
 
-- The API has a 30-second timeout. If you are sending complex batch requests, they should complete well within this limit
+- A batch of up to 100 IBANs is one request, answered in one piece
 - Check your network connection and firewall rules
-- Try the `/health` endpoint to verify the service is running
+- Try the free `/health` endpoint to verify the service is running, and the [status page](/status) for live availability
+
+## Support
+
+- E-mail [support@ibanforge.com](mailto:support@ibanforge.com) with the endpoint, the time of the call (UTC) and your `key_prefix`, never the key itself
+- Public questions and bug reports: [GitHub Issues](https://github.com/cammac-creator/ibanforge/issues)
+- From an agent: `POST /v1/feedback` or the MCP tool `send_feedback`, free and with no key
+- Live availability: the [status page](/status). A written SLA exists for Editor/OEM subscriptions only: [SLA](/legal/sla)

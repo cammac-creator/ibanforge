@@ -10,7 +10,7 @@ import {
   serverDescription,
 } from '../lib/positioning.js';
 import { MCP_TOOLS, dataTools, priceLabel } from '../mcp/inventory.js';
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT } from '../lib/trial.js';
 import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
@@ -30,9 +30,9 @@ const pkg = require('../../package.json') as { version: string };
  * which is the behaviour that makes a ninth tool publish itself.
  */
 const LONG_DESCRIPTIONS: Record<string, string> = {
-  validate_iban: `Verify an IBAN from any of the ${F.claim.countries} IBAN countries AND enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, asks who the bank is, asks whether the bank code exists, or asks whether the recipient bank is reachable on SEPA rails. Returns: valid, country, the bank-code verdict (national register in ${codesOf(registerCountries().authoritative)}, where a miss means not allocated), BIC and bank name with their source, EMI/vIBAN flag, SEPA and VoP readiness, risk indicators, Swiss bc_nummer for CH/LI. Does not confirm the account exists or belongs to anyone. Cost: $0.005; free to try, with no key, ${REST_TRIAL_DAILY_LIMIT} times a day per source address on POST /v1/iban/validate, and ${MCP_DAILY_LIMIT} tool calls a day per IP on the hosted MCP transport (see free_access).`,
+  validate_iban: `Verify an IBAN from any of the ${F.claim.countries} IBAN countries AND enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, asks who the bank is, asks whether the bank code exists, or asks whether the recipient bank is reachable on SEPA rails. Returns: valid, country, the bank-code verdict (national register in ${codesOf(registerCountries().authoritative)}, where a miss means not allocated), BIC and bank name with their source, EMI/vIBAN flag, SEPA and VoP readiness, risk indicators, Swiss bc_nummer for CH/LI. Does not confirm the account exists or belongs to anyone. Cost: $0.005; free to try, with no key, ${REST_TRIAL_WEEKLY_LIMIT} times a week per source address on POST /v1/iban/validate, and ${MCP_DAILY_LIMIT} tool calls a day per IP on the hosted MCP transport (see free_access).`,
   batch_validate_iban:
-    'Validate up to 100 IBANs in one call (cheaper than calling validate_iban repeatedly). Use for CSV/spreadsheet cleanup, customer DB dedup, or pre-flight payout list triage. Cost: $0.002 USDC per IBAN via x402, max $0.20 per batch; on a key or a credit pack, one credit per IBAN.',
+    'Validate up to 100 IBANs in one call. Paid per call in USDC via x402, an IBAN costs $0.002 in a batch instead of $0.005 in validate_iban; on a key or a credit pack each IBAN uses one request or credit, the same as one validate_iban call. Use for CSV/spreadsheet cleanup, customer DB dedup, or pre-flight payout list triage. Cost: $0.002 USDC per IBAN via x402, max $0.20 per batch; on a key or a credit pack, one credit per IBAN.',
   lookup_bic: `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. ${bicDirectorySentence({ withCount: true })} Cost: $0.003.`,
   check_compliance: `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: ${BANK_LEVEL_SANCTIONS}; FATF status of the country; SEPA Instant reachability; whether the EPC Verification of Payee (VoP) register lists the bank as ready. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. Cost: $0.02.`,
   lookup_ch_clearing: `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC and the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus the QR-IID where SIX allocates one, for every IID of the SIX BankMaster: ${F.claim.chClearing} entries, refreshed monthly. Cost: $0.003. Only relevant for CH/LI accounts.`,

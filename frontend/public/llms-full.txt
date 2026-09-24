@@ -50,10 +50,10 @@ packs, the Pro subscription, x402. And before any of them, a taster that needs
 nothing at all:
 
 **Keyless trial (no key, no wallet, no email):**
-- `POST /v1/iban/validate` with a real `iban` is served 25 times a day per source address (IPv6 counted per /64), full enrichment included
-- The response carries a `trial` block: calls left today, the reset (midnight UTC), and the one request that mints a free key
-- Past 25/day the route answers 402 again, `cause.reason = "trial_exhausted"`
-- The HTTP MCP transport has its own, smaller allowance: 10 tool calls/day per source address
+- `POST /v1/iban/validate` with a real `iban` is served 25 times a week per source address (IPv6 counted per /64; ISO week in UTC), full enrichment included
+- The response carries a `trial` block: calls left this week, the reset (Monday 00:00 UTC, and `resets_at` for the exact instant), and the one request that mints a free key
+- Past 25 in the week the route answers 402 again, `cause.reason = "trial_exhausted"`, until Monday
+- The HTTP MCP transport has its own allowance, counted by the day: 10 tool calls/day per source address
 - An empty `{}` body always gets the 402 discovery envelope, never a trial — that probe belongs to the x402 indexers
 
 **Free key (no e-mail, no card):**
@@ -100,7 +100,7 @@ Authorization: Bearer ifk_...
 ```
 
 Drop the `Authorization` line and the same call still works within the keyless
-daily allowance described above: the response then carries a `trial` block instead of being billed.
+weekly allowance described above: the response then carries a `trial` block instead of being billed.
 
 Response (real API output of 2026-09, trimmed to the fields agents use most):
 ```json
@@ -150,7 +150,14 @@ Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions l
 - **Swiss payments**: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant), and its QR-IID where SIX allocates one
 - **No dead-ends**: free key → credit packs → x402, your agent always has a path to pay
 - **Honest compliance**: explicit scope + disclaimer + data-freshness on every response
-- **Fast**: sub-50ms p99
+- **Fast**: server-side processing takes milliseconds; the rest of the latency is the network, measured with GET /ping
+
+## Errors, limits and support
+
+- An invalid IBAN is not an HTTP error: POST /v1/iban/validate answers 200 with valid: false, an error code (invalid_format, unsupported_country, wrong_length, invalid_check_digits, checksum_failed, invalid_bban_structure) and error_detail.
+- A refused request answers {"error": "<token>", "message": "<sentence>"}: 400 malformed request, 402 payment needed or allowance used up (cause.reason says which), 413 body over 256 KB, 429 over 100 requests a minute per IP address (Retry-After header). Statuses and shared codes: https://ibanforge.com/docs/errors?src=llms
+- Support: support@ibanforge.com (quote your key_prefix, never the key) or https://github.com/cammac-creator/ibanforge/issues
+- Live availability: https://ibanforge.com/status · Written SLA, for Editor/OEM subscriptions only (99.5% monthly availability, service credits): https://ibanforge.com/legal/sla
 
 ## Links
 
@@ -160,3 +167,5 @@ Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions l
 - OpenAPI 3.1: https://api.ibanforge.com/openapi.json
 - npm: https://www.npmjs.com/package/ibanforge-mcp · PyPI: https://pypi.org/project/ibanforge/
 - GitHub: https://github.com/cammac-creator/ibanforge
+- Status: https://ibanforge.com/status
+- SLA (Editor/OEM subscriptions only): https://ibanforge.com/legal/sla

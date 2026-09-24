@@ -14,7 +14,9 @@ Validate a single IBAN with full checksum verification, country-specific BBAN st
 POST https://api.ibanforge.com/v1/iban/validate
 ```
 
-**Cost:** $0.005 USDC per request
+**Cost:** $0.005 USDC per request with x402, or one request from your key's allowance or credits.
+
+**No key at all:** up to 25 validations a week per source address (IPv6 counted per /64), on this route only, to try it out. The week is the ISO week in UTC and resets on Monday at 00:00 UTC. Send a real `iban` with no credential: the answer is complete and carries a `trial` block with the count left this week and the reset instant. Past that, the route answers `402` with `cause.reason: "trial_exhausted"` until Monday. For every other endpoint, take a [key that needs no e-mail](/docs/api-keys).
 
 ## Request
 
@@ -23,8 +25,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | Header | Value | Required |
 |---|---|---|
 | `Content-Type` | `application/json` | Yes |
-| `Authorization` | `Bearer ifk_...` (free API key) | One of the two |
-| `X-PAYMENT` | x402 payment token | One of the two |
+| `Authorization` | `Bearer ifk_...` (API key, no e-mail needed) | No: without it, the keyless trial serves the call while it lasts |
+| `PAYMENT-SIGNATURE` (x402 v2) or `X-PAYMENT` (v1) | x402 payment signature | No: pays for this one call instead of a key |
 
 ### Body
 
@@ -213,7 +215,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 `bank_code_check.status: "verified"` means the bank code resolves to an institution we can name in the reference data consulted. How much that is worth is exactly what `authoritative` says:
 
-- **`authoritative: true`** — the reference set is the national register itself. Today: **CH and LI** (SIX BankMaster), **DE** (Bundesbank Bankleitzahlendatei), **FI** (Finance Finland codes — allocated to banking groups, so a hit confirms the group), **AT** (OeNB directory), **BE** (NBB code list), **BG** (Bulgarian National Bank BAE register — the verdict covers the four-letter bank code, IBAN positions 5-8; branch digits are not separately verified), **SK** (the Národná banka Slovenska *prevodník* of identification codes for the domestic payment system). In these countries, `not_in_register` means the code is **not allocated** — a strong reason to stop a payment. **San Marino is deliberately not on that list**: the Central Bank's list of operating banks names the holder of a code it carries, so a hit is `verified` with an `institution` block, but it does not publish the allocation of the ABI space, so a miss stays `absent_from_reference_data` and `authoritative` stays `false`. See [San Marino bank codes](/docs/sm-bank-codes).
+- **`authoritative: true`** — the reference set is the national register itself. Today: **CH and LI** (SIX BankMaster), **DE** (Bundesbank Bankleitzahlendatei), **AT** (OeNB directory), **BE** (NBB code list), **BG** (Bulgarian National Bank BAE register — the verdict covers the four-letter bank code, IBAN positions 5-8; branch digits are not separately verified), **SK** (the Národná banka Slovenska *prevodník* of identification codes for the domestic payment system). In these countries, `not_in_register` means the code is **not allocated** — a strong reason to stop a payment. **San Marino is deliberately not on that list**: the Central Bank's list of operating banks names the holder of a code it carries, so a hit is `verified` with an `institution` block, but it does not publish the allocation of the ABI space, so a miss stays `absent_from_reference_data` and `authoritative` stays `false`. See [San Marino bank codes](/docs/sm-bank-codes). **Finland is not on that list either** since 16 September 2026: the Finance Finland codes are a transcribed list dated 2025-10 that nothing refreshes, allocated to banking groups rather than to institutions, so a hit is `verified` and names the group, while a miss stays `absent_from_reference_data` with `authoritative: false`. See [Finnish bank codes](/docs/fi-bank-codes).
 - **`authoritative: false`** — the reference set is our composite bank-code map, assembled from BIC directories. A hit names who holds the matching BIC; it does **not** prove that this institution issues IBANs. Where bank codes are letter-based, `match: "prefix"` with `candidates > 1` means the answer is indicative only.
 
 **A failure on our side is reported as `unavailable`, never as a verdict.** When the reference data cannot be read — an unreadable database, a table missing after a bad deploy, a lookup that times out — the answer is `status: "unavailable"` with `reason: "lookup_failed"` and `register: null`. It is never `not_in_register`, because that verdict means "no institution holds this code" and an outage on our side is not evidence about your beneficiary. `reason` is what separates the two situations in one token: `lookup_failed` and `national_register_unavailable` are ours to fix, everything else is a statement about the code. All of them call for the same handling: carry on, and let a payee name check decide.
@@ -241,19 +243,25 @@ When the IBAN is invalid, the response still returns 200 but with `valid: false`
   "iban": "CH5604835012345678000",
   "valid": false,
   "error": "checksum_failed",
-  "error_detail": "Modulo 97 check returned 42, expected 1.",
+  "error_detail": "Modulo 97 check returned 49, expected 1.",
   "cost_usdc": 0.005
 }
 ```
+
+`cost_usdc` shows the x402 price of the call; it is `0` when a key or the keyless trial served it.
 
 ### Error codes
 
 | Code | Description |
 |---|---|
-| `invalid_format` | IBAN contains invalid characters or is too short |
+| `invalid_format` | IBAN contains characters other than letters, digits, spaces and hyphens, or is too short |
 | `unsupported_country` | Country code is not recognized |
 | `wrong_length` | IBAN length does not match expected length for this country |
+| `invalid_check_digits` | Characters 3 and 4 are not two digits, or are `00`, `01` or `99` |
 | `checksum_failed` | MOD-97 checksum verification failed |
+| `invalid_bban_structure` | Length and MOD-97 pass, but the national part does not follow the country's layout |
+
+Every code, and the HTTP statuses of a refused request (`400`, `402`, `413`, `429`), is in the [error reference](/docs/errors).
 
 ## Code examples
 

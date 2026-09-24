@@ -25,7 +25,7 @@ import { buildApp } from './app.js';
 import { resetX402Paywall } from './middleware/x402.js';
 import { generateCreditKey } from './lib/api-keys.js';
 import { getStatsDB, closeAll } from './lib/db.js';
-import { REST_TRIAL_DAILY_LIMIT } from './lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT } from './lib/trial.js';
 import { resetDailyLedger } from './lib/daily-ip-ledger.js';
 
 // Our own bucket in the in-memory rate limiter (100 req/min per IP, shared
@@ -268,7 +268,7 @@ describe('the keyless trial sits between the key and the paywall', () => {
       body: JSON.stringify({ iban: VALID_IBAN }),
     });
     expect(res.status).toBe(200);
-    expect(res.headers.get('x-trial-limit')).toBe(String(REST_TRIAL_DAILY_LIMIT));
+    expect(res.headers.get('x-trial-limit')).toBe(String(REST_TRIAL_WEEKLY_LIMIT));
   });
 
   it('still answers 402 to the empty-body probe every indexer sends', async () => {

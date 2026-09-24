@@ -1,12 +1,25 @@
 import type { Statement } from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { opsFail } from './ops-alert.js';
-import { REST_TRIAL_DAILY_LIMIT, TRIAL_LEDGER_MAX_ROWS_PER_DAY } from './trial.js';
+import {
+  REST_TRIAL_WEEKLY_LIMIT,
+  TRIAL_LEDGER_MAX_ROWS_PER_DAY,
+  TRIAL_WEEKLY_MAX_ROWS,
+  trialWeekStart,
+} from './trial.js';
 
 /**
  * Le compteur derrière chaque franchise gratuite mesurée par source et par
- * jour : les appels d'outils MCP, les ouvertures de session MCP, et l'essai
- * REST sans clé sur POST /v1/iban/validate.
+ * jour : les appels d'outils MCP, les ouvertures de session MCP, et la trace
+ * quotidienne de l'essai REST sans clé sur POST /v1/iban/validate.
+ *
+ * 🚨 Depuis le 24/09/2026, l'essai REST se DÉCIDE à la semaine (25 appels par
+ * semaine ISO en UTC, table `trial_weekly`, section « La semaine de l'essai »
+ * en bas de ce fichier). Ses lignes quotidiennes `rest:<h>` restent écrites
+ * ici, pour la trace `trial_daily`, les deux fenêtres glissantes et la surface
+ * d'administration : elles mesurent, elles ne décident plus rien. Les plafonds
+ * MCP (appels d'outils, ouvertures de session) restent quotidiens et passent
+ * toujours par `countDailyUnits`, inchangée.
  *
  * Porté d'une Map de niveau module vers la table `trial_ledger` de
  * stats.sqlite le 15/09/2026. Ce que cela achète, précisément : le décompte
@@ -181,6 +194,7 @@ let _peak: Statement | null = null;
 let _daily: Statement | null = null;
 
 export function resetDailyLedgerStatements(): void {
+  resetWeeklyStatements();
   _spend = null;
   _refund = null;
   _window = null;
@@ -530,10 +544,21 @@ export function sweepDailyLedger(): number {
   // Le scalaire anti-tempête fait partie des structures à balayer : une valeur
   // vieille d'une heure n'a plus rien à garder.
   if (Date.now() - lastLedgerAlertMs > LEDGER_ALERT_GAP_MS) lastLedgerAlertMs = 0;
+  swept += sweepWeeklyMemory();
   try {
     const stmt = purgeStmt();
     for (let pass = 0; pass < PURGE_MAX_PASSES; pass += 1) {
       const gone = stmt.run(day).changes;
+      swept += gone;
+      if (gone === 0) break;
+    }
+    // La semaine passée de l'essai REST, dans le même tick et avec la même
+    // borne : toutes ses lignes expirent d'un coup le lundi, et le plafond
+    // `TRIAL_WEEKLY_MAX_ROWS` est ce qu'un tick sait vider.
+    const weekStmt = weekPurgeStmt();
+    const week = trialWeekStart();
+    for (let pass = 0; pass < PURGE_MAX_PASSES; pass += 1) {
+      const gone = weekStmt.run(week).changes;
       swept += gone;
       if (gone === 0) break;
     }
@@ -555,7 +580,10 @@ export function sweepDailyLedger(): number {
  * coûterait plus cher que ce que le mécanisme vaut. La production appelle sans
  * argument et lit la constante.
  */
-export function reviewLedgerVolume(maxRows: number = TRIAL_LEDGER_MAX_ROWS_PER_DAY): void {
+export function reviewLedgerVolume(
+  maxRows: number = TRIAL_LEDGER_MAX_ROWS_PER_DAY,
+  maxWeekRows: number = TRIAL_WEEKLY_MAX_ROWS,
+): void {
   const day = today();
   try {
     const rows = (countDayStmt().get(day) as { n: number }).n;
@@ -572,6 +600,7 @@ export function reviewLedgerVolume(maxRows: number = TRIAL_LEDGER_MAX_ROWS_PER_D
   } catch (err) {
     reportLedgerFailure(err);
   }
+  reviewWeeklyVolume(maxWeekRows);
 }
 
 /**
@@ -588,11 +617,29 @@ export function resetDailyLedger(): void {
   ledgerFull = false;
   ledgerFullDay = '';
   lastLedgerAlertMs = 0;
+  resetWeeklyMemory();
   try {
-    getStatsDB().exec('DELETE FROM trial_ledger');
+    getStatsDB().exec('DELETE FROM trial_ledger; DELETE FROM trial_weekly');
   } catch {
     /* une base absente n'a rien à effacer */
   }
+}
+
+/**
+ * Seam de test : ce qu'un redémarrage du conteneur oublie, et rien d'autre.
+ *
+ * Vide les structures mémoire (marques de dépassement, compteurs de repli,
+ * tentatives court-circuitées, contre-pression) et garde les tables, pour
+ * prouver ce qu'un redéploiement fait réellement. `closeAll()` seul ne le
+ * prouve pas : il ferme la connexion mais laisse la mémoire du module.
+ */
+export function forgetLedgerMemory(): void {
+  memoryCounts.clear();
+  overLimit.clear();
+  uncountedAttemptsToday = { day: '', n: 0 };
+  ledgerFull = false;
+  ledgerFullDay = '';
+  resetWeeklyMemory();
 }
 
 /** Le jour UTC d'il y a `minutes` minutes, pour rester sur la plage de la clé. */
@@ -635,7 +682,7 @@ export function countTrialActivitySince(minutes: number): TrialWindow {
 /** Le même compte depuis minuit UTC, pour la surface d'administration. */
 export function countTrialBucketsToday(): TrialWindow {
   try {
-    const row = rollupStmt().get(REST_TRIAL_DAILY_LIMIT, today()) as {
+    const row = rollupStmt().get(REST_TRIAL_WEEKLY_LIMIT, today()) as {
       rest_buckets: number;
       rest_units: number;
     };
@@ -687,11 +734,18 @@ function peakHourBuckets(day: string): number {
  * ⚠️ `uncountedAttemptsToday` doit être lu ICI, avant `sweepDailyLedger()`.
  * Inverser les deux perd `rest_attempts_uncounted` tous les jours, en silence.
  *
+ * ⚠️ Depuis l'essai à la semaine (24/09/2026), `rest_over_limit` compte les
+ * sources dont la ligne DU JOUR dépasse le plafond de l'essai, c'est-à-dire
+ * celles qui ont épuisé la semaine entière en une journée. Une source refusée
+ * mercredi pour une semaine épuisée lundi ne fait plus de ligne mercredi : ses
+ * tentatives vont dans `rest_attempts_uncounted`. Le calcul n'a pas changé, sa
+ * lecture si.
+ *
  * Ne lève jamais : perdre une ligne d'agrégat ne doit pas empêcher la purge.
  */
 export function snapshotTrialDay(day: string): void {
   try {
-    const row = rollupStmt().get(REST_TRIAL_DAILY_LIMIT, day) as {
+    const row = rollupStmt().get(REST_TRIAL_WEEKLY_LIMIT, day) as {
       rest_buckets: number;
       rest_units: number;
       rest_over: number;
@@ -751,5 +805,327 @@ export function getTrialDaily(days: number): TrialDailyRow[] {
   } catch (err) {
     reportLedgerFailure(err);
     return [];
+  }
+}
+
+// ── La semaine de l'essai REST (24/09/2026) ──────────────────────────────────
+//
+// Claude-Alain a ramené l'essai sans clé de 25 appels par JOUR à 25 par SEMAINE
+// et par source. La semaine est la semaine ISO en UTC : elle s'ouvre le lundi à
+// 00:00 UTC, pour tout le monde à la fois (`trialWeekStart`, src/lib/trial.ts).
+//
+// Pourquoi une table à part (`trial_weekly`) plutôt que la somme des lignes
+// quotidiennes `rest:<h>` depuis le lundi :
+//
+//   1. `snapshotTrialDay(hier)` repasse toutes les heures et ne s'abstient que
+//      sur une journée VIDE. Des lignes REST gardées sept jours la rendraient
+//      non vide : le tick de 01 h réécrirait `mcp_buckets`, `init_buckets` et
+//      `rest_attempts_uncounted` à zéro (lignes MCP déjà purgées, compteur
+//      mémoire déjà vidé), chaque jour, sans un test rouge.
+//   2. La clé primaire de `trial_ledger` est (day, bucket) : une somme par
+//      source sur la semaine y serait un balayage de toute la semaine, sur le
+//      chemin le plus chaud du service.
+//
+// Donc : la DÉCISION lit `trial_weekly`, clé (week, bucket), une lecture sur la
+// clé primaire ; la ligne quotidienne `rest:<h>` continue d'être écrite dans la
+// même transaction, pour la trace, les fenêtres glissantes et l'administration,
+// qui mesurent exactement comme avant. Les plafonds MCP ne touchent jamais
+// cette section.
+//
+// Mêmes propriétés que le registre du jour, section par section : jamais
+// d'exception, `degraded` sur panne de base, marque de dépassement en mémoire
+// (un refusé ne coûte aucune écriture), seaux `unknown` en mémoire, plafond de
+// lignes, purge bornée, remise à zéro de test.
+
+/** Les seaux comptés en mémoire cette semaine : `unknown`, ou table pleine. */
+const weeklyMemory = new Map<string, { count: number; week: string }>();
+
+/** Seaux dont on SAIT qu'ils ont dépassé la semaine. Purement local. */
+const weeklyOverLimit = new Map<string, { week: string; used: number; limit: number }>();
+
+/** Contre-pression de volume de la table de la semaine. */
+let weeklyFull = false;
+let weeklyFullWeek = '';
+
+let _weekSpend: Statement | null = null;
+let _weekRefund: Statement | null = null;
+let _weekExists: Statement | null = null;
+let _weekCount: Statement | null = null;
+let _weekPurge: Statement | null = null;
+let _weekTotals: Statement | null = null;
+let _weekTx:
+  ((week: string, day: string, key: string, units: number, writeDay: boolean) => number) | null =
+  null;
+
+function resetWeeklyStatements(): void {
+  _weekSpend = null;
+  _weekRefund = null;
+  _weekExists = null;
+  _weekCount = null;
+  _weekPurge = null;
+  _weekTotals = null;
+  _weekTx = null;
+}
+
+function resetWeeklyMemory(): void {
+  weeklyMemory.clear();
+  weeklyOverLimit.clear();
+  weeklyFull = false;
+  weeklyFullWeek = '';
+}
+
+function weekSpendStmt(): Statement {
+  if (!_weekSpend) {
+    _weekSpend = getStatsDB().prepare(
+      `INSERT INTO trial_weekly (week, bucket, units) VALUES (?, ?, ?)
+       ON CONFLICT(week, bucket) DO UPDATE SET units = units + excluded.units
+       RETURNING units`,
+    );
+  }
+  return _weekSpend;
+}
+
+function weekRefundStmt(): Statement {
+  // Comme le remboursement du jour : plancher à zéro, jamais de création de
+  // ligne, jamais la semaine d'avant.
+  if (!_weekRefund) {
+    _weekRefund = getStatsDB().prepare(
+      'UPDATE trial_weekly SET units = MAX(units - ?, 0) WHERE week = ? AND bucket = ?',
+    );
+  }
+  return _weekRefund;
+}
+
+function weekExistsStmt(): Statement {
+  if (!_weekExists) {
+    _weekExists = getStatsDB().prepare(
+      'SELECT 1 AS hit FROM trial_weekly WHERE week = ? AND bucket = ?',
+    );
+  }
+  return _weekExists;
+}
+
+function weekCountStmt(): Statement {
+  if (!_weekCount) {
+    _weekCount = getStatsDB().prepare('SELECT COUNT(*) AS n FROM trial_weekly WHERE week = ?');
+  }
+  return _weekCount;
+}
+
+function weekPurgeStmt(): Statement {
+  // Même forme portable que la purge du jour : pas de `DELETE ... LIMIT`.
+  if (!_weekPurge) {
+    _weekPurge = getStatsDB().prepare(
+      `DELETE FROM trial_weekly
+        WHERE (week, bucket) IN (
+          SELECT week, bucket FROM trial_weekly WHERE week < ? LIMIT ${PURGE_BATCH}
+        )`,
+    );
+  }
+  return _weekPurge;
+}
+
+function weekTotalsStmt(): Statement {
+  if (!_weekTotals) {
+    _weekTotals = getStatsDB().prepare(
+      `SELECT COUNT(*) AS buckets,
+              COALESCE(SUM(units), 0) AS units,
+              COALESCE(SUM(CASE WHEN units > ? THEN 1 ELSE 0 END), 0) AS over_limit
+         FROM trial_weekly WHERE week = ?`,
+    );
+  }
+  return _weekTotals;
+}
+
+/**
+ * La dépense de la semaine ET la ligne du jour, en une transaction : un seul
+ * engagement pour les deux écritures, et jamais une trace qui compte un appel
+ * que la semaine n'a pas compté. `writeDay` vaut faux quand le registre du jour
+ * est plein et ne connaît pas encore ce seau : la trace perd la source, comme
+ * avant, la décision ne perd rien.
+ */
+function weekTx(): (
+  week: string,
+  day: string,
+  key: string,
+  units: number,
+  writeDay: boolean,
+) => number {
+  if (!_weekTx) {
+    _weekTx = getStatsDB().transaction(
+      (week: string, day: string, key: string, units: number, writeDay: boolean): number => {
+        const row = weekSpendStmt().get(week, key, units) as { units: number };
+        if (writeDay) spendStmt().get(day, key, units);
+        return row.units;
+      },
+    );
+  }
+  return _weekTx;
+}
+
+function countWeekInMemory(key: string, units: number, limit: number, week: string): DailyCount {
+  const entry = weeklyMemory.get(key);
+  if (!entry || entry.week !== week) {
+    weeklyMemory.set(key, { count: units, week });
+    return { allowed: units <= limit, used: units, remaining: Math.max(0, limit - units) };
+  }
+  entry.count += units;
+  return {
+    allowed: entry.count <= limit,
+    used: entry.count,
+    remaining: Math.max(0, limit - entry.count),
+  };
+}
+
+function refundWeekInMemory(key: string, units: number, week: string): void {
+  const entry = weeklyMemory.get(key);
+  if (!entry || entry.week !== week) return;
+  entry.count = Math.max(0, entry.count - units);
+}
+
+/**
+ * Dépenser `units` sur la franchise de la SEMAINE de `key` (essai REST sans
+ * clé), et dire si ça passe. Même contrat que `countDailyUnits` : la dépense a
+ * lieu même refusée, `used` inclut cet appel et continue de croître, et la
+ * fonction ne lève jamais (`degraded: true` sur panne de base).
+ *
+ * `used` et `remaining` sont ceux de la SEMAINE. La ligne du jour de la même
+ * source reçoit la même dépense, pour la trace, tant que la semaine n'est pas
+ * dépassée ; au-delà, les tentatives vont en mémoire et dans
+ * `rest_attempts_uncounted`, exactement comme un refusé du jour avant.
+ *
+ * `now` est passé par l'appelant qui annonce aussi la remise à zéro : la
+ * semaine qui compte l'appel et celle dont il cite la fin doivent être la
+ * même, y compris le dimanche à 23:59:59.
+ */
+export function countWeeklyTrialUnits(
+  key: string,
+  units: number,
+  limit: number,
+  now: Date = new Date(),
+): DailyCount {
+  const week = trialWeekStart(now);
+  const day = now.toISOString().slice(0, 10);
+  if (MEMORY_ONLY.test(key)) return countWeekInMemory(key, units, limit, week);
+
+  // Court-circuit du refusé : aucune écriture, ni dans la semaine ni dans le
+  // jour. ⚠️ `seen.limit === limit`, pour la même raison que le registre du jour.
+  const seen = weeklyOverLimit.get(key);
+  if (seen && seen.week === week && seen.limit === limit) {
+    seen.used += units;
+    bumpUncounted(day, units);
+    return { allowed: false, used: seen.used, remaining: 0 };
+  }
+
+  try {
+    if (weeklyFull && weeklyFullWeek !== week) weeklyFull = false;
+    if (ledgerFull && ledgerFullDay !== day) ledgerFull = false;
+    const writeDay = !ledgerFull || !!(existsStmt().get(day, key) as { hit: number } | undefined);
+    if (weeklyFull && !(weekExistsStmt().get(week, key) as { hit: number } | undefined)) {
+      // La table de la semaine est pleine et ne connaît pas ce seau : la
+      // décision se prend en mémoire, mais la TRACE du jour garde la source,
+      // sous la seule condition du registre du jour, exactement comme le chemin
+      // en base ci-dessous (relecture du 24/09/2026, D3). Sans cela, pendant
+      // une rotation de sources, c'est-à-dire précisément quand elle compte, la
+      // source disparaissait de la trace, des fenêtres et de l'administration.
+      // Même règle que le chemin en base : l'appel qui franchit le plafond est
+      // encore écrit, les suivants passent par la marque et vont dans
+      // `rest_attempts_uncounted`.
+      //
+      // ⚠️ Deux limites connues, tenues pour acceptables parce que ce seuil
+      // n'est atteint que sous une rotation massive, qui déclenche l'alerte
+      // `trial:volume-week` : une source comptée en mémoire retrouve une
+      // semaine neuve à chaque redémarrage, et `weeklyMemory` n'est vidée que
+      // le lundi (pas de taille maximale).
+      const counted = countWeekInMemory(key, units, limit, week);
+      if (writeDay) spendStmt().get(day, key, units);
+      if (!counted.allowed) weeklyOverLimit.set(key, { week, used: counted.used, limit });
+      return counted;
+    }
+    const used = weekTx()(week, day, key, units, writeDay);
+    if (used > limit) weeklyOverLimit.set(key, { week, used, limit });
+    return { allowed: used <= limit, used, remaining: Math.max(0, limit - used) };
+  } catch (err) {
+    reportLedgerFailure(err);
+    return { allowed: false, used: limit + units, remaining: 0, degraded: true };
+  }
+}
+
+/**
+ * Rendre un créneau de la semaine (et de la ligne du jour), sur un 4xx du
+ * handler. Avale son erreur en silence, comme `refundDailyUnits`, et pour la
+ * même raison : la réponse est déjà produite.
+ */
+export function refundWeeklyTrialUnits(key: string, units = 1): void {
+  const now = new Date();
+  const week = trialWeekStart(now);
+  if (MEMORY_ONLY.test(key)) return refundWeekInMemory(key, units, week);
+  weeklyOverLimit.delete(key);
+  refundWeekInMemory(key, units, week);
+  try {
+    weekRefundStmt().run(units, week, key);
+    refundStmt().run(units, now.toISOString().slice(0, 10), key);
+  } catch {
+    /* silence délibéré : voir refundDailyUnits */
+  }
+}
+
+/** Vider la mémoire des semaines passées. Appelée par `sweepDailyLedger`. */
+function sweepWeeklyMemory(): number {
+  const week = trialWeekStart();
+  let swept = 0;
+  for (const [key, val] of weeklyMemory) {
+    if (val.week !== week) {
+      weeklyMemory.delete(key);
+      swept += 1;
+    }
+  }
+  for (const [key, val] of weeklyOverLimit) {
+    if (val.week !== week) {
+      weeklyOverLimit.delete(key);
+      swept += 1;
+    }
+  }
+  return swept;
+}
+
+/** Armer ou désarmer la contre-pression de la table de la semaine. */
+function reviewWeeklyVolume(maxRows: number): void {
+  const week = trialWeekStart();
+  try {
+    const rows = (weekCountStmt().get(week) as { n: number }).n;
+    const full = rows >= maxRows;
+    if (full && !weeklyFull) {
+      void opsFail(
+        'trial:volume-week',
+        `Compteur de la semaine de l'essai au plafond de lignes pour la semaine du ${week} (${rows}). ` +
+          'Les seaux déjà connus restent servis depuis la base, les seaux neufs sont comptés en mémoire.',
+      );
+    }
+    weeklyFull = full;
+    weeklyFullWeek = week;
+  } catch (err) {
+    reportLedgerFailure(err);
+  }
+}
+
+/** La semaine en cours, pour la surface d'administration. Ne lève jamais. */
+export function countTrialWeek(): {
+  week: string;
+  buckets: number;
+  units: number;
+  over_limit: number;
+} {
+  const week = trialWeekStart();
+  try {
+    const row = weekTotalsStmt().get(REST_TRIAL_WEEKLY_LIMIT, week) as {
+      buckets: number;
+      units: number;
+      over_limit: number;
+    };
+    return { week, buckets: row.buckets, units: row.units, over_limit: row.over_limit };
+  } catch (err) {
+    reportLedgerFailure(err);
+    return { week, buckets: 0, units: 0, over_limit: 0 };
   }
 }

@@ -17,6 +17,9 @@ import {
 } from "@/lib/landing-stats"
 import { alternatesFor, urlFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
+// Quotas read from what the API exports (scripts/export-onboarding.ts), never
+// retyped: the layout's JSON-LD does the same (components/json-ld.tsx).
+import catalogue from "@/data/onboarding.json"
 
 // Title and description are generated per-locale by app/[locale]/layout.tsx —
 // do NOT define a static `metadata` here, it would override the locale-aware
@@ -378,7 +381,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               "@type": "Offer",
               price: "0",
               priceCurrency: "USD",
-              description: "Free tier — 200 requests per month",
+              // Until 24/09/2026: "Free tier — 200 requests per month", on every
+              // locale of the home page, as if 200 came with no step at all.
+              description: `Free API key, no e-mail: ${catalogue.claimedMonthly} requests a month once claimed, ${catalogue.anonymousMonthly} a month before that`,
             },
           }),
         }}

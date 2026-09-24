@@ -1,6 +1,6 @@
 ---
 title: "Checking a Swiss IBAN: check digits, the SIX IID register, QR-IBAN"
-description: "A Swiss IBAN passes three checks, not one: the check digits, the five-digit IID against the SIX register, and whether it is a QR-IBAN that demands a QR reference. Three real API answers, field by field, with ten calls a day and no key."
+description: "A Swiss IBAN passes three checks, not one: the check digits, the five-digit IID against the SIX register, and whether it is a QR-IBAN that demands a QR reference. Three real API answers, field by field; the keyless trial covers up to 25 checks a week."
 date: "2026-09-14"
 faq:
   - q: "What is the IID in a Swiss IBAN?"
@@ -10,7 +10,7 @@ faq:
   - q: "How do you recognise a QR-IBAN?"
     a: "By its IID: between 30000 and 31999 it is a QR-IID, and the IBAN is a QR-IBAN. It requires a QR reference (QRR) on the QR-bill; an ordinary IBAN forbids one. The API reports is_qr_iid and resolves the QR-IID to the institution."
   - q: "What does the check cost?"
-    a: "Nothing to start: ten checks a day per address with no key, 200 a month with the free key, and every IID has its own page under /iid, with no call at all."
+    a: "Nothing to start. No key at all: up to 25 IBAN validations a week per address, on POST /v1/iban/validate only, to try it out. A key that needs no e-mail: 200 requests a month once claimed; taken with no address at all, it starts at 25 a month, on every endpoint. And every IID has its own page under /iid, with no call at all."
 ---
 
 Search for "check Swiss IBAN" and you mostly get a check-digit calculator. It answers one question out of three. A Swiss IBAN is CH, two check digits, a five-digit bank clearing number (IID) and twelve characters of account. The check digits say whether the string is consistent with itself. The IID says which institution holds the account, and whether that code is allocated at all: that lives in the [SIX BankMaster](/iid), the register that allocates the codes and republishes every month, with the registered address and the payment rails. And the IID says a third thing: between 30000 and 31999 the IBAN is a [QR-IBAN](/docs/swiss-qr-iban), and the payment has to carry a QR reference or be rejected.
@@ -142,7 +142,7 @@ One detail for the careful: the QR-IBAN from the SIX documentation, CH44 3199 91
 
 ## How to call it
 
-Without a key, from the terminal, ten times a day per address:
+Without a key, from the terminal: the keyless trial serves up to 25 calls a week per address, on this route only.
 
 ```bash
 curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -150,7 +150,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban":"CH4900230000012345678"}'
 ```
 
-The answer is complete and carries a `trial` block saying how many calls are left today. For production the [free key](/docs/api-keys) is enough, 200 requests a month with no card. If you would rather write no code: [every IID has its own page](/iid) with exactly this answer, [the Swiss IBAN format with the official example](/iban/ch) sits beside it, and the [test IBAN generator](/tools/test-iban) produces Swiss IBANs with real, allocated IIDs for fixtures and demos.
+The answer is complete and carries a `trial` block saying how many calls are left this week. For production, take a [key that needs no e-mail](/docs/api-keys): 200 requests a month once claimed, no card. If you would rather write no code: [every IID has its own page](/iid) with exactly this answer, [the Swiss IBAN format with the official example](/iban/ch) sits beside it, and the [test IBAN generator](/tools/test-iban) produces Swiss IBANs with real, allocated IIDs for fixtures and demos.
 
 ## What the register does not say
 

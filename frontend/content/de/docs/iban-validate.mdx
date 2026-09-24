@@ -14,7 +14,9 @@ Validieren Sie eine einzelne IBAN mit vollständiger Prüfsummenverifizierung, l
 POST https://api.ibanforge.com/v1/iban/validate
 ```
 
-**Kosten:** $0.005 USDC pro Anfrage
+**Kosten:** 0,005 $ in USDC pro Anfrage mit x402, oder eine Anfrage aus dem Kontingent oder Guthaben Ihres Schlüssels.
+
+**Ganz ohne Schlüssel:** bis zu 25 Prüfungen pro Woche und Quelladresse (IPv6 pro /64 gezählt), nur auf dieser Route, zum Ausprobieren. Die Woche ist die ISO-Woche in UTC und beginnt am Montag um 00:00 UTC neu. Senden Sie eine echte `iban` ohne Zugangsdaten: Die Antwort ist vollständig und trägt einen Block `trial` mit der Zahl der in dieser Woche verbleibenden Aufrufe und dem Zeitpunkt der Rücksetzung. Danach antwortet die Route bis Montag mit `402` und `cause.reason: "trial_exhausted"`. Für alle anderen Endpunkte nehmen Sie einen [Schlüssel ohne E-Mail](/docs/api-keys).
 
 ## Anfrage
 
@@ -23,8 +25,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | Header | Wert | Erforderlich |
 |---|---|---|
 | `Content-Type` | `application/json` | Ja |
-| `Authorization` | `Bearer ifk_...` (kostenloser API-Schlüssel) | Einer von beiden |
-| `X-PAYMENT` | x402-Zahlungstoken | Einer von beiden |
+| `Authorization` | `Bearer ifk_...` (API-Schlüssel, ohne E-Mail) | Nein: Ohne ihn bedient die Kostprobe ohne Schlüssel den Aufruf, solange sie reicht |
+| `PAYMENT-SIGNATURE` (x402 v2) oder `X-PAYMENT` (v1) | x402-Zahlungssignatur | Nein: bezahlt diesen einen Aufruf statt eines Schlüssels |
 
 ### Body
 
@@ -213,7 +215,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 `bank_code_check.status: "verified"` bedeutet: Der Bankcode löst in den konsultierten Referenzdaten zu einem Institut auf, das wir benennen können. Wie viel das wert ist, sagt genau `authoritative`:
 
-- **`authoritative: true`** — der Referenzbestand ist das nationale Register selbst. Heute: **CH und LI** (SIX BankMaster), **DE** (Bankleitzahlendatei der Bundesbank), **FI** (Finance-Finland-Codes — an Bankengruppen vergeben, ein Treffer bestätigt die Gruppe), **AT** (OeNB-Verzeichnis), **BE** (Codeliste der Belgischen Nationalbank), **BG** (BAE-Register der Bulgarischen Nationalbank — das Urteil gilt dem Bankcode aus vier Buchstaben, IBAN-Positionen 5-8; Filialziffern werden nicht separat geprüft), **SK** (der *prevodník* der Identifikationscodes für den inländischen Zahlungsverkehr der Národná banka Slovenska). In diesen Ländern bedeutet `not_in_register`, dass der Code **nicht vergeben** ist — ein starker Grund, eine Zahlung zu stoppen. **San Marino steht dort bewusst nicht**: Die Liste der operativen Banken der Zentralbank nennt den Inhaber eines geführten Codes, ein Treffer ist also `verified` mit einem `institution`-Block, doch sie veröffentlicht nicht die Vergabe des ABI-Raums — ein Fehlen bleibt daher `absent_from_reference_data` und `authoritative` bleibt `false`. Siehe [san-marinesische Bankleitzahlen](/docs/sm-bank-codes).
+- **`authoritative: true`** — der Referenzbestand ist das nationale Register selbst. Heute: **CH und LI** (SIX BankMaster), **DE** (Bankleitzahlendatei der Bundesbank), **AT** (OeNB-Verzeichnis), **BE** (Codeliste der Belgischen Nationalbank), **BG** (BAE-Register der Bulgarischen Nationalbank — das Urteil gilt dem Bankcode aus vier Buchstaben, IBAN-Positionen 5-8; Filialziffern werden nicht separat geprüft), **SK** (der *prevodník* der Identifikationscodes für den inländischen Zahlungsverkehr der Národná banka Slovenska). In diesen Ländern bedeutet `not_in_register`, dass der Code **nicht vergeben** ist — ein starker Grund, eine Zahlung zu stoppen. **San Marino steht dort bewusst nicht**: Die Liste der operativen Banken der Zentralbank nennt den Inhaber eines geführten Codes, ein Treffer ist also `verified` mit einem `institution`-Block, doch sie veröffentlicht nicht die Vergabe des ABI-Raums — ein Fehlen bleibt daher `absent_from_reference_data` und `authoritative` bleibt `false`. Siehe [san-marinesische Bankleitzahlen](/docs/sm-bank-codes). **Auch Finnland steht dort nicht** seit dem 16. September 2026: Die Finance-Finland-Codes sind eine abgeschriebene Liste mit Stand 2025-10, die nichts auffrischt, und sie sind an Bankengruppen vergeben, nicht an Institute; ein Treffer ist daher `verified` und nennt die Gruppe, ein Fehlen bleibt `absent_from_reference_data` mit `authoritative: false`. Siehe [finnische Bankcodes](/docs/fi-bank-codes).
 - **`authoritative: false`** — der Referenzbestand ist unsere zusammengesetzte Bankcode-Karte aus BIC-Verzeichnissen. Ein Treffer benennt den Inhaber des passenden BIC; er beweist **nicht**, dass dieses Institut IBANs ausgibt. Wo Bankcodes aus Buchstaben bestehen, heißt `match: "prefix"` mit `candidates > 1`: nur ein Hinweis.
 
 **Ein Fehler auf unserer Seite wird als `unavailable` gemeldet, nie als Verdikt.** Wenn die Referenzdaten nicht gelesen werden können — unlesbare Datenbank, nach einem fehlgeschlagenen Deploy fehlende Tabelle, Zeitüberschreitung einer Abfrage — lautet die Antwort `status: "unavailable"` mit `reason: "lookup_failed"` und `register: null`. Nie `not_in_register`: Dieses Verdikt bedeutet „kein Institut hält diesen Code", und eine Störung bei uns ist kein Beleg über Ihren Empfänger. `reason` trennt beide Situationen in einem einzigen Token: `lookup_failed` und `national_register_unavailable` liegen bei uns, alles andere ist eine Aussage über den Code. Alle werden gleich behandelt: weitermachen und einen Namensabgleich des Empfängers entscheiden lassen.
@@ -241,19 +243,25 @@ Wenn die IBAN ungültig ist, gibt die Antwort dennoch den Statuscode 200 zurück
   "iban": "CH5604835012345678000",
   "valid": false,
   "error": "checksum_failed",
-  "error_detail": "Modulo 97 check returned 42, expected 1.",
+  "error_detail": "Modulo 97 check returned 49, expected 1.",
   "cost_usdc": 0.005
 }
 ```
+
+`cost_usdc` zeigt den x402-Preis des Aufrufs; er ist `0`, wenn ein Schlüssel oder die Kostprobe ohne Schlüssel ihn bedient hat.
 
 ### Fehlercodes
 
 | Code | Beschreibung |
 |---|---|
-| `invalid_format` | IBAN enthält ungültige Zeichen oder ist zu kurz |
+| `invalid_format` | IBAN enthält andere Zeichen als Buchstaben, Ziffern, Leerzeichen und Bindestriche, oder ist zu kurz |
 | `unsupported_country` | Ländercode wird nicht erkannt |
 | `wrong_length` | IBAN-Länge stimmt nicht mit der erwarteten Länge für dieses Land überein |
+| `invalid_check_digits` | Die Zeichen 3 und 4 sind keine zwei Ziffern, oder sie lauten `00`, `01` oder `99` |
 | `checksum_failed` | MOD-97-Prüfsummenverifizierung fehlgeschlagen |
+| `invalid_bban_structure` | Länge und MOD-97 stimmen, aber der nationale Teil folgt nicht dem Aufbau des Landes |
+
+Jeder Code und die HTTP-Status einer abgelehnten Anfrage (`400`, `402`, `413`, `429`) stehen in der [Fehlerreferenz](/docs/errors).
 
 ## Codebeispiele
 

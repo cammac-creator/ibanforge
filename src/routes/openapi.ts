@@ -10,7 +10,9 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // Même motif que la ligne ci-dessus : le contrat cite le plafond que le
 // middleware applique, jamais une copie retapée. 🚨 Y compris `example`, qui
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
+import { RATE_LIMIT } from '../middleware/rate-limit.js';
+import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 // The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
 import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
@@ -53,6 +55,100 @@ const openapi = new Hono();
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require('../../package.json') as { version: string };
 
+/**
+ * Every `error` code a validation can put next to `valid: false`.
+ *
+ * Until 24/09/2026 the contract listed four of the six the library emits, and
+ * a client switching on the published enum fell into its default branch on
+ * `invalid_check_digits` and `invalid_bban_structure`. The two type checks
+ * below refuse to compile if the list and `IBANValidationResult['error']`
+ * (the library's own union) ever disagree, in either direction.
+ */
+type IbanErrorCode = NonNullable<IBANValidationResult['error']>;
+const IBAN_ERROR_CODES = [
+  'invalid_format',
+  'unsupported_country',
+  'wrong_length',
+  'invalid_check_digits',
+  'checksum_failed',
+  'invalid_bban_structure',
+] as const satisfies readonly IbanErrorCode[];
+const IBAN_ERROR_CODES_COMPLETE: Exclude<IbanErrorCode, (typeof IBAN_ERROR_CODES)[number]> extends never
+  ? true
+  : never = true;
+void IBAN_ERROR_CODES_COMPLETE;
+
+/**
+ * A valid and an invalid answer of POST /v1/iban/validate, as the route serves
+ * them to an x402 payer (no `trial` block, no `attribution`). Copied from a
+ * local call on 24/09/2026; the bank data are public register entries.
+ *
+ * Why here at all: the second DeepSeek test of 24/09/2026 read this document,
+ * found no example and concluded that the error handling was undocumented. The
+ * invalid example is the point: a 200, not a 4xx.
+ */
+const VALIDATE_EXAMPLES = {
+  valid: {
+    summary: 'A valid German IBAN, its bank code checked in the Bundesbank register',
+    value: {
+      iban: 'DE89370400440532013000',
+      valid: true,
+      country: { code: 'DE', name: 'Germany' },
+      check_digits: '89',
+      bban: { bank_code: '37040044', account_number: '0532013000' },
+      sepa: {
+        member: true,
+        schemes: ['SCT', 'SDD', 'SCT_INST'],
+        vop_required: true,
+        vop_participant: true,
+        basis: 'epc_register',
+      },
+      formatted: 'DE89 3704 0044 0532 0130 00',
+      cost_usdc: 0.005,
+      bic: {
+        code: 'COBADEFFXXX',
+        bank_name: 'Commerzbank',
+        city: 'Köln',
+        source: 'Deutsche Bundesbank Bankleitzahlendatei',
+        as_of: '2026-09',
+        basis: 'national_register',
+        authoritative: true,
+        lei: '851WYGNLUQLFZBSYGB56',
+        lei_status: 'ACTIVE',
+        bic8: 'COBADEFF',
+      },
+      issuer: { type: 'bank', name: 'Commerzbank', classification: 'default' },
+      risk_indicators: {
+        issuer_type: 'bank',
+        country_risk: 'standard',
+        test_bic: false,
+        sepa_reachable: true,
+        sepa_reachable_scope: 'country',
+        vop_coverage: true,
+      },
+      bank_code_check: {
+        value: '37040044',
+        status: 'verified',
+        match: 'register',
+        register: 'Deutsche Bundesbank Bankleitzahlendatei',
+        authoritative: true,
+        institution: { name: 'Commerzbank', street: null, post_code: '50447', town: 'Köln', country: 'DE' },
+        as_of: '2026-09',
+      },
+    },
+  },
+  invalid: {
+    summary: 'An invalid IBAN: still HTTP 200, with valid false, error and error_detail',
+    value: {
+      iban: 'DE89370400440532013001',
+      valid: false,
+      error: 'checksum_failed',
+      error_detail: 'Modulo 97 check returned 28, expected 1.',
+      cost_usdc: 0.005,
+    },
+  },
+};
+
 // Built lazily on first request (needs a DB read for live counts), then memoized.
 const buildRawSpec = () => ({
   openapi: '3.1.0',
@@ -76,13 +172,23 @@ const buildRawSpec = () => ({
       '; a Pro subscription by card ($' +
       PRO_PRICE_USD +
       ' a month); or pay-per-call via x402 micropayments (USDC on Base L2, no signup). ' +
-      'Before paying, a free API key needs no email address: ' +
-      ANONYMOUS_MONTHLY_LIMIT +
-      ' req/month with an empty body, and the same key claimed reaches ' +
+      'Before paying, a free API key needs no email address: it reaches ' +
       FREE_TIER_MONTHLY_LIMIT +
-      ' a month.',
+      ' requests a month once claimed, and taken with an empty body it starts at ' +
+      ANONYMOUS_MONTHLY_LIMIT +
+      ' a month. ' +
+      'An invalid IBAN is not an HTTP error: validation answers 200 with `valid: false`. ' +
+      'A refused request (4xx) answers JSON with `error`, a stable token, and on the public routes a `message` sentence (`{"error": "<token>", "message": "<sentence>"}`); an unexpected 500 is the plain text `Internal Server Error`, with no JSON; ' +
+      'rate limit ' +
+      RATE_LIMIT +
+      ' requests a minute per address, with Retry-After on the 429 (https://api.ibanforge.com/rate-limits.yml). ' +
+      'Support: support@ibanforge.com, or GitHub Issues.',
+    // Audit of 24/09/2026: an assistant reading this document found no way to
+    // reach a person. The URL alone sent it to the home page.
     contact: {
-      url: 'https://ibanforge.com',
+      name: 'IBANforge support',
+      url: 'https://github.com/cammac-creator/ibanforge/issues',
+      email: 'support@ibanforge.com',
     },
   },
   externalDocs: {
@@ -100,14 +206,16 @@ const buildRawSpec = () => ({
         summary: 'Validate a single IBAN',
         description:
           'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64): send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. The trial is counted per day and covers this route only. The key that needs no email is another door: every endpoint, and ' +
+          REST_TRIAL_WEEKLY_LIMIT +
+          ' calls a week from one source address are served with no key and no payment** (IPv6 counted per /64; the week is the ISO week in UTC and resets on ' +
+          TRIAL_RESET +
+          '): send a real `iban` and the response carries a `trial` block with the count left this week, the reset instant, and how to take a key that needs no email at all. The trial covers this route only. The key that needs no email is another door: every endpoint, and ' +
           FREE_TIER_MONTHLY_LIMIT +
-          ' requests a month once claimed with one call at POST /v1/keys/claim; taken with an empty body it starts at ' +
+          ' requests a month once claimed (POST /v1/keys/claim with a 6-digit code mailed to an address you read); taken with an empty body it starts at ' +
           ANONYMOUS_MONTHLY_LIMIT +
           ' a month. Past ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ', the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
+          REST_TRIAL_WEEKLY_LIMIT +
+          ' in the week, the route answers 402 again with `cause.reason = "trial_exhausted"` until the reset. **An invalid IBAN is not an HTTP error: the answer is HTTP 200 with `valid: false`, an `error` code and an `error_detail` sentence** (codes: `invalid_format`, `unsupported_country`, `wrong_length`, `invalid_check_digits`, `checksum_failed`, `invalid_bban_structure`). Only the request itself changes the status: 400 for malformed JSON or a missing `iban`, 402 for payment or an exhausted allowance, 413 for a body over 256 KB, 429 past the rate limit. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -143,18 +251,22 @@ const buildRawSpec = () => ({
         responses: {
           '200': {
             description:
-              'Validation result. Carries an optional `trial` block when the call was served by the keyless daily allowance (no key, no payment), and `cost_usdc: 0` with it — nobody was charged.',
+              'Validation result, for a valid AND for an invalid IBAN: an invalid IBAN is HTTP 200 with `valid: false`, `error` and `error_detail`, never a 4xx. Carries an optional `trial` block when the call was served by the keyless weekly trial (no key, no payment), and `cost_usdc: 0` with it — nobody was charged.',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/IBANValidationResult' },
+                examples: VALIDATE_EXAMPLES,
               },
             },
           },
           '402': {
             description:
-              'Payment required (x402). Also returned when the keyless daily trial is used up for this IP — `cause.reason = "trial_exhausted"`, with the count served today, the reset (midnight UTC) and the free-key route. An empty `{}` body always gets this 402, never a 400: that is the discovery probe x402 indexers send.',
+              'Payment required (x402). Also returned when the keyless weekly trial is used up for this source address — `cause.reason = "trial_exhausted"`, with the count served this week, the reset (' + TRIAL_RESET + ') and the free-key route — and when a key has used its allowance (`monthly_quota_exhausted`, `credits_exhausted`). Without a key, an empty `{}` body gets this 402 and spends nothing of the trial: that is the discovery probe x402 indexers send. With a key, the same empty body is a 400.',
           },
-          '400': { description: 'Missing or malformed request body' },
+          '400': {
+            description:
+              '`invalid_json` (the body is not JSON) or `invalid_request` (no `iban` string). An invalid IBAN is never a 400: it is a 200 with `valid: false`.',
+          },
         },
       },
     },
@@ -435,7 +547,7 @@ const buildRawSpec = () => ({
         operationId: 'formatCheckIBAN',
         summary: 'Free IBAN format check (mod-97 + structure)',
         description:
-          'FREE pure-format IBAN check: ISO 13616 mod-97 checksum, country-specific length, and BBAN parsing. No payment, no API key, no quota (global rate limit only). Does NOT touch the BIC, SEPA, VoP, sanctions, or Swiss clearing databases — use POST /v1/iban/validate ($0.005) when you need the full enrichment. Ideal for pre-filtering malformed IBANs before paying for validation.',
+          'FREE pure-format IBAN check: ISO 13616 mod-97 checksum, country-specific length, and BBAN parsing. No payment, no API key, no quota (global rate limit only). `valid: true` here means well formed and nothing more: this route does NOT touch the BIC, SEPA, VoP or Swiss clearing data, and does not say whether the bank code is allocated. Use POST /v1/iban/validate ($0.005) for that. Spaces and hyphens are removed before the length is measured, so an IBAN written in groups of four is accepted as printed. Also answers POST with the JSON body `{"iban": "..."}`. Ideal for pre-filtering malformed IBANs before paying for validation.',
         tags: ['Free'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -446,11 +558,12 @@ const buildRawSpec = () => ({
             name: 'iban',
             in: 'query',
             required: true,
-            description: 'IBAN to check (spaces allowed, will be normalized)',
+            description:
+              'IBAN to check. Spaces and hyphens are allowed and removed before the length is measured (15 to 34 characters once removed; at most 64 as sent).',
             schema: {
               type: 'string',
               minLength: 15,
-              maxLength: 34,
+              maxLength: 64,
               example: 'CH1000230000000012345',
             },
           },
@@ -465,7 +578,10 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '400': { description: 'Missing ?iban= query parameter, or IBAN shorter than 15 / longer than 34 characters' },
+          '400': {
+            description:
+              '`missing_iban` (no ?iban= query parameter), or `invalid_iban_length` (fewer than 15 or more than 34 characters once spaces and hyphens are removed, or more than 64 as sent)',
+          },
         },
       },
     },
@@ -2055,13 +2171,13 @@ const buildRawSpec = () => ({
           error: {
             type: 'string',
             description:
-              'Stable machine-readable token in snake_case, e.g. "invalid_iban", "payment_required", "payload_too_large", "rate_limited". Branch on this, never on `message`.',
-            example: 'invalid_iban',
+              'Stable machine-readable token in snake_case, e.g. "invalid_json", "invalid_request", "batch_too_large", "payment_required", "payload_too_large", "rate_limit_exceeded". Branch on this, never on `message`. An invalid IBAN is not an ApiError: validation answers 200 with `valid: false`.',
+            example: 'batch_too_large',
           },
           message: {
             type: 'string',
             description: 'Human-readable sentence explaining the failure. Wording may change; the token above will not.',
-            example: 'IBAN failed the mod-97 checksum.',
+            example: 'Maximum 100 IBANs per batch request',
           },
         },
       },
@@ -2072,28 +2188,39 @@ const buildRawSpec = () => ({
           trial: {
             type: 'object',
             description:
-              'Present ONLY on a call served by the keyless daily trial: POST /v1/iban/validate with a real `iban` and no API key is served ' +
-              REST_TRIAL_DAILY_LIMIT +
-              ' times a day per source address (IPv6 counted per /64), with no payment. Says how many calls are left today and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint.',
+              'Present ONLY on a call served by the keyless weekly trial: POST /v1/iban/validate with a real `iban` and no API key is served ' +
+              REST_TRIAL_WEEKLY_LIMIT +
+              ' times a week per source address (IPv6 counted per /64; ISO week in UTC, reset on ' +
+              TRIAL_RESET +
+              '), with no payment. Says how many calls are left this week, when the count resets, and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint. Until 24 September 2026 the trial was daily and this block carried `calls_used_today`, `calls_left_today` and `daily_limit`; they were replaced, not kept, because they would have carried weekly counts under daily names.',
             required: [
-              'calls_used_today',
-              'calls_left_today',
-              'daily_limit',
+              'calls_used_this_week',
+              'calls_left_this_week',
+              'weekly_limit',
               'resets',
+              'resets_at',
               'free_key',
               'docs',
             ],
             properties: {
-              calls_used_today: { type: 'integer', example: 1 },
-              calls_left_today: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT - 1 },
-              daily_limit: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT },
-              resets: { type: 'string', example: 'midnight UTC' },
+              calls_used_this_week: { type: 'integer', example: 1 },
+              calls_left_this_week: { type: 'integer', example: REST_TRIAL_WEEKLY_LIMIT - 1 },
+              weekly_limit: { type: 'integer', example: REST_TRIAL_WEEKLY_LIMIT },
+              resets: { type: 'string', example: TRIAL_RESET },
+              resets_at: {
+                type: 'string',
+                format: 'date-time',
+                description: 'Next Monday 00:00:00 UTC: the instant the weekly count goes back to zero.',
+                example: trialResetsAt(new Date('2026-09-24T12:00:00Z')),
+              },
               free_key: {
                 type: 'string',
                 description:
-                  'The request that ends the trial in your favour: a key that needs no email address, ' +
+                  'The request that ends the trial in your favour: a key that needs no email address, on every endpoint, ' +
+                  FREE_TIER_MONTHLY_LIMIT +
+                  ' requests a month once claimed (' +
                   ANONYMOUS_MONTHLY_LIMIT +
-                  ' requests a month on every endpoint.',
+                  ' a month before that).',
               },
               docs: { type: 'string', format: 'uri' },
             },
@@ -2252,8 +2379,9 @@ const buildRawSpec = () => ({
           // the answers it gets. Each now states its own condition.
           error: {
             type: 'string',
-            enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],
-            description: 'Present ONLY when `valid` is false. Absent on every successful validation.',
+            enum: IBAN_ERROR_CODES,
+            description:
+              'Present ONLY when `valid` is false, on an HTTP 200: an invalid IBAN is not an HTTP error. Absent on every successful validation.',
           },
           error_detail: {
             type: 'string',
@@ -2563,12 +2691,13 @@ const buildRawSpec = () => ({
           error: {
             type: 'string',
             description: 'Only when valid=false',
-            enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],
+            enum: IBAN_ERROR_CODES,
           },
           error_detail: { type: 'string', description: 'Only when valid=false' },
           upgrade_to_full_validation: {
             type: 'string',
-            description: 'Pointer to POST /v1/iban/validate for BIC, SEPA, VoP, sanctions and Swiss clearing enrichment',
+            description:
+              'Says what `valid: true` means on this route (well formed, nothing more) and what POST /v1/iban/validate adds: the bank and its BIC with their source, SEPA and VoP readiness, and, where the national register is read, whether the bank code is allocated at all',
           },
         },
       },

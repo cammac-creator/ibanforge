@@ -4,10 +4,11 @@ import { MCP_DAILY_LIMIT } from '../src/lib/mcp-limits.js';
 import { MCP_TOOLS } from '../src/mcp/inventory.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../src/lib/tiers.js';
 import {
-  REST_TRIAL_DAILY_LIMIT,
+  REST_TRIAL_WEEKLY_LIMIT,
   TRIAL_RESET,
   TRIAL_FREE_KEY_HINT,
   TRIAL_DOCS_URL,
+  trialResetsAt,
 } from '../src/lib/trial.js';
 
 // Export autonome : le site ne charge ni serveur MCP, ni base de données.
@@ -22,6 +23,11 @@ const catalogue = {
   tools: MCP_TOOLS.map(({ name, price }) => ({ name, price })),
   anonymousMonthly: ANONYMOUS_MONTHLY_LIMIT,
   claimedMonthly: FREE_TIER_MONTHLY_LIMIT,
+  // L'essai sans clé, compté à la semaine ISO en UTC depuis le 24/09/2026.
+  // Exporté pour que le site puisse le lire au lieu de le retaper ; aucune page
+  // ne le lit encore, et onboarding-parity.test.ts le tient égal à la constante.
+  restTrialWeekly: REST_TRIAL_WEEKLY_LIMIT,
+  restTrialReset: TRIAL_RESET,
 };
 writeFileSync(
   new URL('frontend/data/onboarding.json', root),
@@ -29,11 +35,13 @@ writeFileSync(
 );
 
 // Les exemples gardent le jeton d'attribution de l'essai, sans adresse e-mail.
+// `resets_at` est celui d'une date fixe, pour que l'export soit reproductible.
 const trial = {
-  calls_used_today: 1,
-  calls_left_today: REST_TRIAL_DAILY_LIMIT - 1,
-  daily_limit: REST_TRIAL_DAILY_LIMIT,
+  calls_used_this_week: 1,
+  calls_left_this_week: REST_TRIAL_WEEKLY_LIMIT - 1,
+  weekly_limit: REST_TRIAL_WEEKLY_LIMIT,
   resets: TRIAL_RESET,
+  resets_at: trialResetsAt(new Date('2026-09-24T12:00:00Z')),
   free_key: TRIAL_FREE_KEY_HINT,
   docs: TRIAL_DOCS_URL,
 };

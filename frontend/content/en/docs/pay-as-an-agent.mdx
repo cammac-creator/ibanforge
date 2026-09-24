@@ -61,8 +61,9 @@ Python: `pip install cdp-sdk "x402[evm,httpx]"` and use `x402HttpxClient` the sa
 ## Try before you spend
 
 - `GET /ping` and `GET /.well-known/x402` are free — the manifest lists every payable route with its exact price.
+- No key at all: up to 25 IBAN validations a week per source address, on `POST /v1/iban/validate` only, to try it out (reset on Monday at 00:00 UTC).
 - The [MCP server](/docs/mcp) gives 10 free tool calls per day — enough to check the data quality on your own IBANs.
-- The free API key tier (200 requests/month, [one per developer](/docs/api-keys)) exists for humans evaluating the service.
+- An [API key](/docs/api-keys) needs no e-mail and no card, and reaches 200 requests a month once claimed: enough to evaluate the other endpoints before paying.
 
 ## If something blocks you from paying
 

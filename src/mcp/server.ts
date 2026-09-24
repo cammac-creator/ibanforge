@@ -157,7 +157,7 @@ server.registerTool(
     description: `Validate a single IBAN and retrieve the associated BIC/SWIFT code, bank details, SEPA membership, issuer classification, and risk indicators.
 
 When to use: verifying a payment recipient before a wire transfer, checking a bank account during onboarding, or confirming IBAN format and bank identity in a KYC workflow.
-When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheaper per IBAN). For compliance/sanctions screening, use check_compliance instead.
+When NOT to use: for multiple IBANs, use batch_validate_iban instead (one call for up to 100; paid per call in USDC via x402, an IBAN costs $0.002 there instead of $0.005 here, while on a key or a credit pack each IBAN uses one request or credit either way). For compliance/sanctions screening, use check_compliance instead.
 
 Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, checks the bank code against the national register where one is read, resolves the BIC from a local directory and names the source of that answer, and classifies the issuer type. ${bicDirectorySentence({ withCount: true })} Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
 

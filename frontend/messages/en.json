@@ -30,6 +30,7 @@
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "API Status",
+      "sla": "SLA",
       "agents": "Agents",
       "openapi": "OpenAPI",
       "openSource": "Open-source core (MIT)",
@@ -156,7 +157,7 @@
         "description": "ISO 20022 address rules (SPS, T2, Fedwire) ahead of the November 2026 changes"
       },
       "heading": "Endpoints & pricing",
-      "subtitle": "Start free with 25 requests a month and no e-mail. Claim the same key for 200 a month. Pay as you grow — by card or in USDC.",
+      "subtitle": "Start free with 25 requests a month and no e-mail. Claim the same key for 200 a month. Pay as you grow — by card or in USDC. The prices below are per call in USDC via x402; on a key or a credit pack, each call and each IBAN of a batch uses one request or credit.",
       "plans": "Free: 25 requests a month with no e-mail, 200 a month once claimed · Pro: $29 a month for 10,000 requests · credit packs from $4 · vendor licence from $149 a month · file audit $149.",
       "plansLink": "See pricing"
     },
@@ -398,7 +399,7 @@
     },
     "table": {
       "heading": "Endpoint pricing",
-      "subtitle": "Start free with 25 requests a month and no e-mail. Claim the same key for 200 a month. Pay as you grow — by card, or per request in USDC via x402 on Base L2."
+      "subtitle": "Start free with 25 requests a month and no e-mail. Claim the same key for 200 a month. Pay as you grow — by card, or per request in USDC via x402 on Base L2. The prices below are the x402 ones; on a key or a credit pack, each call and each IBAN of a batch uses one request or credit."
     },
     "endpoints": {
       "0": {
@@ -412,7 +413,7 @@
         "method": "POST",
         "path": "/v1/iban/batch",
         "cost": "$0.002",
-        "costLabel": "per IBAN (up to 100)",
+        "costLabel": "per IBAN in USDC via x402 (up to 100)",
         "description": "Batch validation with full enrichment per IBAN"
       },
       "2": {
@@ -499,7 +500,7 @@
       },
       "2": {
         "question": "Is there a free tier?",
-        "answer": "Yes, and it starts before any key. No key at all: POST /v1/iban/validate with a real IBAN is served up to 25 times a day for the address it comes from, in full, on that route only, to try it out. Free key: POST /v1/keys/generate with no body at all returns an ifk_ key for every endpoint, with no e-mail, no card and no captcha; POST /v1/keys/claim raises it to 200 requests a month with a 6-digit code on an address you choose to give. Taken with no address at all, the key starts at 25 requests a month. Batch validation counts 1 request per IBAN. For higher volumes, buy a prepaid credit pack by card, or pay per call in USDC via x402."
+        "answer": "Yes, and it starts before any key. No key at all: POST /v1/iban/validate with a real IBAN is served up to 25 times a week for the address it comes from, in full, on that route only, to try it out; the week resets on Monday at 00:00 UTC. Free key: POST /v1/keys/generate with no body at all returns an ifk_ key for every endpoint, with no e-mail, no card and no captcha; POST /v1/keys/claim raises it to 200 requests a month with a 6-digit code on an address you choose to give. Taken with no address at all, the key starts at 25 requests a month. Batch validation counts 1 request per IBAN. For higher volumes, buy a prepaid credit pack by card, or pay per call in USDC via x402."
       },
       "3": {
         "question": "What about high volume?",
@@ -914,9 +915,9 @@
             "title": "Keyless trial (REST API)",
             "step": "Step",
             "tried": "Tried without a key",
-            "exhausted": "Ran out of the 10/day",
+            "exhausted": "Used up the weekly trial",
             "keys": "Keys born of the trial",
-            "note": "One line per address and per day, not per call. A key counts here when it was created with source=api-trial."
+            "note": "Tried: one line per address and per day. Used up: one line per source and per week. Never per call. A key counts here when it was created with source=api-trial."
           },
           "names": {
             "nav_key": "Header → Your key",
@@ -1812,7 +1813,7 @@
     },
     "endpoints": {
       "heading": "5 paid endpoints, all available via MCP + x402 + API key",
-      "subtitle": "Same data, three integration paths."
+      "subtitle": "Same data, three integration paths. Prices are per call in USDC via x402; on an API key or a credit pack, each call and each IBAN of a batch uses one request or credit."
     },
     "discovery": {
       "eyebrow": "Auto-discovery",

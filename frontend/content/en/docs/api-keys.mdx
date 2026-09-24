@@ -7,15 +7,15 @@ order: 1
 # API Keys
 
 IBANforge has two free steps, and the first asks for nothing. One empty POST returns an `ifk_` key
-worth **25 requests a month**: no address, no card, nothing to confirm. One more call — a mailed
+worth **25 requests a month**: no address, no card, nothing to confirm. One more step — a mailed
 code — lifts that same key to **200 requests a month**, for good. Beyond that,
 [x402 micropayments](/docs/x402) or prepaid packs.
 
 This page is the reference on keys alone. If you have not made a call yet, [Onboarding](/docs/onboarding) is the shorter road: the keyless call, this key, the answer read block by block and a batch of 100, in ten minutes.
 
-## Before the key: 25 calls a day, keyless
+## Before the key: 25 calls a week, keyless
 
-`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **25 times a day for the address it comes from**, resetting at midnight UTC:
+`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **25 times a week for the address it comes from**. The week is the ISO week in UTC: the count resets on Monday at 00:00 UTC.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -23,15 +23,14 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-The response carries a `trial` block with the count left today and the request that mints the key.
-It is a taster, not a tier: past 25 calls a day the endpoint answers `402` again with
-`cause.reason: "trial_exhausted"`.
+The response carries a `trial` block with the count left this week, the reset instant
+(`resets_at`) and the request that mints the key. It is a taster, not a tier: past 25 calls in
+the week the endpoint answers `402` again with `cause.reason: "trial_exhausted"`, until Monday.
 
-**Careful with the two 25s — they are not the same allowance.** This one is 25 **a day**, on this
-route only, and it comes back at midnight UTC. The anonymous key below is 25 **a month**, on every
-endpoint: batch, BIC, Swiss clearing, compliance. If all you ever do is validate one IBAN at a time,
-the keyless route is the better deal and you can stay on it. The key is what opens the other
-endpoints; claiming it is what takes the month to 200.
+**The keyless trial and the key are two different doors.** The keyless trial works on this route
+only, and it comes back every Monday. The key works on every endpoint: batch, BIC, Swiss clearing,
+compliance. It is counted by the month, and claiming it is what takes it to 200 requests a month.
+If you validate a few IBANs a week, one at a time, the keyless trial may be all you need.
 
 ## A key with no e-mail
 
@@ -289,12 +288,13 @@ a key claimed by payment — its 200 are counted once, across all months, not re
 `credits` means a prepaid balance, with nothing enforced against `limit`. The `claim` block is
 served only on a key that can still be claimed.
 
-`month` is the calendar month the counters belong to (`YYYY-MM`); on the keyless trial the counters are daily and that field reads `day`. This endpoint is free and does not consume quota.
+`month` is the calendar month the counters belong to (`YYYY-MM`). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`. A served keyless answer carries `X-Trial-Period: week`; the 402 carries no `X-Trial-*` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same (the claim still accepts a key cut off for a burst of automated signups, since claiming is how it comes back). `POST /v1/keys/revoke` and `POST /v1/keys/rotate` answer `401 missing_key` without a key, and `404 invalid_key` for an unknown or already revoked one.
 
 ## Watching your quota
 
-Every authenticated response carries your counters, on success as well as on
-refusal, so you can act before you reach the wall rather than when you hit it:
+Every response served on a monthly key carries your counters, on success as well as on
+refusal, so you can act before you reach the wall rather than when you hit it (a prepaid
+credit key carries `X-Credits-Remaining` and `X-Credits-Total` instead):
 
 ```
 X-Quota-Used: 7

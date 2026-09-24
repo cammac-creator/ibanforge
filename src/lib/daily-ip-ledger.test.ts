@@ -5,7 +5,10 @@ import {
   countTrialActivitySince,
   countTrialBucketsSince,
   countTrialBucketsToday,
+  countTrialWeek,
+  countWeeklyTrialUnits,
   getTrialDaily,
+  refundWeeklyTrialUnits,
   refundDailyUnits,
   resetDailyLedger,
   resetDailyLedgerStatements,
@@ -15,7 +18,7 @@ import {
 } from './daily-ip-ledger.js';
 import { ledgerBucket } from './ledger-bucket.js';
 import { closeAll, getStatsDB } from './db.js';
-import { REST_TRIAL_DAILY_LIMIT } from './trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, trialResetsAt, trialWeekStart } from './trial.js';
 
 /**
  * Le compteur que trois franchises gratuites partagent (appels d'outils MCP,
@@ -146,9 +149,9 @@ describe('countDailyUnits', () => {
     // 🚨 Ce cas échoue si `resetDailyLedgerStatements()` n'est pas câblée dans
     // `closeAll()` : la requête préparée répondrait depuis une connexion morte.
     // C'est voulu, c'est ce test qui attrape l'oubli.
-    countDailyUnits(BUCKET, 1, REST_TRIAL_DAILY_LIMIT);
+    countDailyUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
     closeAll();
-    expect(countDailyUnits(BUCKET, 1, REST_TRIAL_DAILY_LIMIT).used).toBe(2);
+    expect(countDailyUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).used).toBe(2);
   });
 
   it('counts fifty calls of one tick as exactly fifty', () => {
@@ -214,7 +217,7 @@ describe('the buckets that never reach the table', () => {
     // un verrou durable jusqu'à minuit pour tous les appelants non plaçables.
     countDailyUnits('evt:trial:203.0.113.9', 1, 1);
     countDailyUnits('evt:trial-exhausted:203.0.113.9', 1, 1);
-    countDailyUnits('rest:unknown', 1, REST_TRIAL_DAILY_LIMIT);
+    countDailyUnits('rest:unknown', 1, REST_TRIAL_WEEKLY_LIMIT);
     countDailyUnits('unknown', 1, 10);
     countDailyUnits('init:unknown', 1, 30);
     expect(rows()).toBe(0);
@@ -233,9 +236,9 @@ describe('the buckets that never reach the table', () => {
     // une ligne qui n'existe pas : sans erreur, sans effet, et le seau partagé
     // des non plaçables ne serait jamais remboursé — alors que le middleware
     // rembourse sur tout 4xx du handler.
-    countDailyUnits('rest:unknown', 1, REST_TRIAL_DAILY_LIMIT);
+    countDailyUnits('rest:unknown', 1, REST_TRIAL_WEEKLY_LIMIT);
     refundDailyUnits('rest:unknown', 1);
-    expect(countDailyUnits('rest:unknown', 1, REST_TRIAL_DAILY_LIMIT).used).toBe(1);
+    expect(countDailyUnits('rest:unknown', 1, REST_TRIAL_WEEKLY_LIMIT).used).toBe(1);
     expect(rows()).toBe(0);
   });
 });
@@ -328,7 +331,7 @@ describe('the ledger never throws, whatever happens to the database', () => {
 
   it('answers degraded instead of a fabricated ceiling', () => {
     breakLedger();
-    const spent = countDailyUnits(BUCKET, 1, REST_TRIAL_DAILY_LIMIT);
+    const spent = countDailyUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
     expect(spent.allowed).toBe(false);
     expect(spent.degraded).toBe(true);
   });
@@ -419,8 +422,8 @@ describe('the daily trace', () => {
 
   it('aggregates a day without keeping any source', () => {
     const day = today();
-    seed(BUCKET, { units: REST_TRIAL_DAILY_LIMIT + 1 });
-    seed(OTHER, { units: REST_TRIAL_DAILY_LIMIT + 4 });
+    seed(BUCKET, { units: REST_TRIAL_WEEKLY_LIMIT + 1 });
+    seed(OTHER, { units: REST_TRIAL_WEEKLY_LIMIT + 4 });
     seed(ledgerBucket('203.0.113.21', 'rest:'), { units: 2 });
     seed(ledgerBucket('203.0.113.22', 'rest:'), { units: 1 });
     seed(ledgerBucket('203.0.113.23', ''), { units: 3 });
@@ -578,5 +581,294 @@ describe('one /64, one bucket', () => {
     // Même source, trois franchises : l'agent qui a dépensé ses appels MCP
     // garde son essai REST.
     expect(ledgerBucket(ip, 'rest:').slice(5)).toBe(ledgerBucket(ip, ''));
+  });
+});
+
+/**
+ * La semaine de l'essai REST (24/09/2026) : 25 appels par semaine ISO en UTC,
+ * décidés dans `trial_weekly`, pendant que la ligne du jour `rest:<h>` continue
+ * d'alimenter la trace, les fenêtres et l'administration comme avant.
+ *
+ * Seul `Date` est simulé : SQLite lit sa propre horloge, que ces tests ne
+ * consultent pas (ils ne portent que sur des colonnes `day` et `week` posées
+ * par le JS).
+ */
+describe('the week of the keyless REST trial', () => {
+  beforeEach(() => resetDailyLedger());
+  afterEach(() => vi.useRealTimers());
+
+  function at(iso: string): void {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(iso));
+  }
+
+  function weeklyRows(): Array<{ week: string; bucket: string; units: number }> {
+    return getStatsDB()
+      .prepare('SELECT week, bucket, units FROM trial_weekly ORDER BY week')
+      .all() as Array<{
+      week: string;
+      bucket: string;
+      units: number;
+    }>;
+  }
+
+  it('opens the week on Monday 00:00 UTC and announces the next one', () => {
+    expect(trialWeekStart(new Date('2026-09-24T12:00:00Z'))).toBe('2026-09-21');
+    expect(trialWeekStart(new Date('2026-09-27T23:59:59Z'))).toBe('2026-09-21');
+    expect(trialWeekStart(new Date('2026-09-28T00:00:00Z'))).toBe('2026-09-28');
+    expect(trialResetsAt(new Date('2026-09-24T12:00:00Z'))).toBe('2026-09-28T00:00:00Z');
+    // Une semaine à cheval sur deux années : la clé reste le lundi, en date.
+    expect(trialWeekStart(new Date('2027-01-01T08:00:00Z'))).toBe('2026-12-28');
+    expect(trialResetsAt(new Date('2026-12-31T23:00:00Z'))).toBe('2027-01-04T00:00:00Z');
+  });
+
+  it('keeps the week in UTC under any machine timezone', () => {
+    // Sous UTC+14, dimanche 23:30 UTC est déjà lundi à l'heure locale : une
+    // semaine LOCALE rouvrirait l'essai dix heures et demie trop tôt.
+    const saved = process.env.TZ;
+    try {
+      process.env.TZ = 'Pacific/Kiritimati';
+      expect(trialWeekStart(new Date('2026-10-04T23:30:00Z'))).toBe('2026-09-28');
+      expect(trialResetsAt(new Date('2026-10-04T23:30:00Z'))).toBe('2026-10-05T00:00:00Z');
+      process.env.TZ = 'America/Los_Angeles';
+      expect(trialWeekStart(new Date('2026-09-28T02:00:00Z'))).toBe('2026-09-28');
+    } finally {
+      if (saved === undefined) delete process.env.TZ;
+      else process.env.TZ = saved;
+    }
+  });
+
+  it(`counts ${REST_TRIAL_WEEKLY_LIMIT} calls spread over four days as one allowance`, () => {
+    const days = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01'];
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
+      at(`${days[i % days.length]}T10:00:00Z`);
+      expect(
+        countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed,
+        `call ${i + 1}`,
+      ).toBe(true);
+    }
+    at('2026-10-01T18:00:00Z');
+    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT)).toEqual({
+      allowed: false,
+      used: REST_TRIAL_WEEKLY_LIMIT + 1,
+      remaining: 0,
+    });
+    expect(weeklyRows()).toEqual([
+      { week: '2026-09-28', bucket: BUCKET, units: REST_TRIAL_WEEKLY_LIMIT + 1 },
+    ]);
+  });
+
+  it('refuses on Sunday 23:59:59 UTC and reopens on Monday 00:00:00 UTC', () => {
+    at('2026-10-02T09:00:00Z');
+    countWeeklyTrialUnits(BUCKET, REST_TRIAL_WEEKLY_LIMIT, REST_TRIAL_WEEKLY_LIMIT);
+    at('2026-10-04T23:59:59Z');
+    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(false);
+    at('2026-10-05T00:00:00Z');
+    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT)).toEqual({
+      allowed: true,
+      used: 1,
+      remaining: REST_TRIAL_WEEKLY_LIMIT - 1,
+    });
+  });
+
+  it('counts the call in the week of the instant it is given', () => {
+    // Le middleware passe le même instant au compteur et à l'annonce de la
+    // remise à zéro : une horloge qui passe lundi entre les deux ne doit pas
+    // compter l'appel dans une semaine et annoncer la fin de l'autre.
+    at('2026-10-05T00:00:01Z');
+    countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT, new Date('2026-10-04T23:59:59Z'));
+    expect(weeklyRows()).toEqual([{ week: '2026-09-28', bucket: BUCKET, units: 1 }]);
+  });
+
+  it('writes the day row as before, so the daily trace does not move', () => {
+    at('2026-09-29T08:00:00Z');
+    for (let i = 0; i < 3; i += 1) countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+    countWeeklyTrialUnits(OTHER, 1, REST_TRIAL_WEEKLY_LIMIT);
+    const day = getStatsDB()
+      .prepare('SELECT bucket, units FROM trial_ledger WHERE day = ? ORDER BY units DESC')
+      .all('2026-09-29') as Array<{ bucket: string; units: number }>;
+    expect(day).toEqual([
+      { bucket: BUCKET, units: 3 },
+      { bucket: OTHER, units: 1 },
+    ]);
+    snapshotTrialDay('2026-09-29');
+    const row = getTrialDaily(90).find((r) => r.day === '2026-09-29');
+    expect(row?.rest_buckets).toBe(2);
+    expect(row?.rest_units_counted).toBe(4);
+  });
+
+  it('does not let the next ticks overwrite the trace of a day with zeros', () => {
+    // 🚨 Le scénario qui a fait choisir une table à part : la trace d'hier est
+    // écrite au premier tick, puis la purge passe ; les ticks suivants de la
+    // journée ne doivent rien réécrire.
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+    countDailyUnits(ledgerBucket('203.0.113.40', ''), 2, 10);
+    at('2026-09-30T00:30:00Z');
+    snapshotTrialDay('2026-09-29');
+    const first = getTrialDaily(90).find((r) => r.day === '2026-09-29');
+    expect(first?.mcp_buckets).toBe(1);
+    sweepDailyLedger();
+    at('2026-09-30T01:30:00Z');
+    snapshotTrialDay('2026-09-29');
+    expect(getTrialDaily(90).find((r) => r.day === '2026-09-29')).toEqual(first);
+    // Et la semaine, elle, a survécu au changement de jour.
+    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).used).toBe(2);
+  });
+
+  it('costs nothing to a source refused for the week, day after day', () => {
+    at('2026-09-28T09:00:00Z');
+    countWeeklyTrialUnits(BUCKET, REST_TRIAL_WEEKLY_LIMIT + 1, REST_TRIAL_WEEKLY_LIMIT);
+    at('2026-09-30T09:00:00Z');
+    const before = writes();
+    for (let i = 0; i < 20; i += 1) {
+      expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(false);
+    }
+    expect(writes() - before).toBe(0);
+  });
+
+  it('hands a slot back on a refund, in the week and in the day', () => {
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits(BUCKET, 2, REST_TRIAL_WEEKLY_LIMIT);
+    refundWeeklyTrialUnits(BUCKET, 1);
+    expect(countWeeklyTrialUnits(BUCKET, 0, REST_TRIAL_WEEKLY_LIMIT).used).toBe(1);
+    const day = getStatsDB()
+      .prepare('SELECT units FROM trial_ledger WHERE day = ? AND bucket = ?')
+      .get('2026-09-29', BUCKET) as { units: number };
+    expect(day.units).toBe(1);
+  });
+
+  it('reopens a source whose refund brings it back under the ceiling', () => {
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits(BUCKET, REST_TRIAL_WEEKLY_LIMIT + 1, REST_TRIAL_WEEKLY_LIMIT);
+    refundWeeklyTrialUnits(BUCKET, 1);
+    expect(countWeeklyTrialUnits(BUCKET, 0, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(true);
+  });
+
+  it('keeps the unknown bucket in memory, by the week', () => {
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits('rest:unknown', REST_TRIAL_WEEKLY_LIMIT, REST_TRIAL_WEEKLY_LIMIT);
+    expect(weeklyRows()).toEqual([]);
+    at('2026-10-02T08:00:00Z');
+    expect(countWeeklyTrialUnits('rest:unknown', 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(false);
+    at('2026-10-05T08:00:00Z');
+    expect(countWeeklyTrialUnits('rest:unknown', 1, REST_TRIAL_WEEKLY_LIMIT).used).toBe(1);
+  });
+
+  it('survives a redeploy', () => {
+    countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+    closeAll();
+    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).used).toBe(2);
+  });
+
+  it('purges the weeks that are over, and only those, in bounded batches', () => {
+    const insert = getStatsDB().prepare(
+      "INSERT INTO trial_weekly (week, bucket, units) VALUES ('2000-01-03', ?, 1)",
+    );
+    getStatsDB().transaction(() => {
+      for (let i = 0; i < 12_000; i += 1) insert.run(`rest:${i.toString(16).padStart(16, '0')}`);
+    })();
+    countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+    expect(sweepDailyLedger()).toBeGreaterThanOrEqual(12_000);
+    expect(weeklyRows()).toEqual([{ week: trialWeekStart(), bucket: BUCKET, units: 1 }]);
+  });
+
+  it('stops inserting new sources when the week is full, keeps serving the known ones', () => {
+    for (let i = 0; i < 10; i += 1) {
+      countWeeklyTrialUnits(
+        ledgerBucket(`203.0.113.${100 + i}`, 'rest:'),
+        1,
+        REST_TRIAL_WEEKLY_LIMIT,
+      );
+    }
+    reviewLedgerVolume(Number.MAX_SAFE_INTEGER, 10);
+    const eleventh = ledgerBucket('203.0.113.200', 'rest:');
+    expect(countWeeklyTrialUnits(eleventh, 1, REST_TRIAL_WEEKLY_LIMIT)).toEqual({
+      allowed: true,
+      used: 1,
+      remaining: REST_TRIAL_WEEKLY_LIMIT - 1,
+    });
+    expect(weeklyRows()).toHaveLength(10);
+    expect(
+      countWeeklyTrialUnits(ledgerBucket('203.0.113.100', 'rest:'), 1, REST_TRIAL_WEEKLY_LIMIT)
+        .used,
+    ).toBe(2);
+    reviewLedgerVolume();
+  });
+
+  it('keeps a new source in the day trace when only the week is full', () => {
+    // Relecture du 24/09/2026 (D3) : la source comptée en mémoire sortait
+    // avant d'écrire la ligne du jour et disparaissait de toute la surface
+    // d'administration, précisément pendant une rotation de sources.
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits(OTHER, 1, REST_TRIAL_WEEKLY_LIMIT);
+    reviewLedgerVolume(Number.MAX_SAFE_INTEGER, 1);
+    try {
+      for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
+        expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(true);
+      }
+      // L'appel qui franchit le plafond est encore écrit, comme en base ; les
+      // suivants ne coûtent aucune écriture et vont dans les tentatives.
+      expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(false);
+      const before = writes();
+      for (let i = 0; i < 4; i += 1) countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+      expect(writes() - before).toBe(0);
+      expect(weeklyRows().map((r) => r.bucket)).toEqual([OTHER]);
+      expect(countTrialBucketsToday()).toEqual({
+        buckets: 2,
+        units: 1 + REST_TRIAL_WEEKLY_LIMIT + 1,
+      });
+      snapshotTrialDay('2026-09-29');
+      const row = getTrialDaily(90).find((r) => r.day === '2026-09-29');
+      expect(row?.rest_buckets).toBe(2);
+      expect(row?.rest_attempts_uncounted).toBe(4);
+    } finally {
+      reviewLedgerVolume();
+    }
+  });
+
+  it('answers degraded, never a fabricated ceiling, when its table is gone', () => {
+    getStatsDB().exec('DROP TABLE IF EXISTS trial_weekly');
+    resetDailyLedgerStatements();
+    try {
+      expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).degraded).toBe(true);
+      expect(() => refundWeeklyTrialUnits(BUCKET, 1)).not.toThrow();
+      expect(countTrialWeek().buckets).toBe(0);
+    } finally {
+      restoreLedger();
+    }
+  });
+
+  it('reads the week for the administration surface', () => {
+    countWeeklyTrialUnits(BUCKET, REST_TRIAL_WEEKLY_LIMIT + 1, REST_TRIAL_WEEKLY_LIMIT);
+    countWeeklyTrialUnits(OTHER, 2, REST_TRIAL_WEEKLY_LIMIT);
+    expect(countTrialWeek()).toEqual({
+      week: trialWeekStart(),
+      buckets: 2,
+      units: REST_TRIAL_WEEKLY_LIMIT + 3,
+      over_limit: 1,
+    });
+  });
+
+  it('finds its row by the primary key, one lookup and never a scan', () => {
+    countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+    const plan = getStatsDB()
+      .prepare('EXPLAIN QUERY PLAN SELECT units FROM trial_weekly WHERE week = ? AND bucket = ?')
+      .all(trialWeekStart(), BUCKET) as Array<{ detail: string }>;
+    expect(plan.map((step) => step.detail).join(' | ')).toMatch(
+      /^SEARCH trial_weekly USING PRIMARY KEY \(week=\? AND bucket=\?\)$/,
+    );
+  });
+
+  it('leaves the MCP daily ceilings exactly where they were', () => {
+    // La franchise MCP reste au jour : un nouveau jour la rouvre, alors que
+    // celle de l'essai REST reste fermée jusqu'au lundi.
+    const mcp = ledgerBucket('203.0.113.7', '');
+    at('2026-09-29T08:00:00Z');
+    countDailyUnits(mcp, 10, 10);
+    countWeeklyTrialUnits(BUCKET, REST_TRIAL_WEEKLY_LIMIT, REST_TRIAL_WEEKLY_LIMIT);
+    at('2026-09-30T08:00:00Z');
+    expect(countDailyUnits(mcp, 1, 10).allowed).toBe(true);
+    expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(false);
   });
 });

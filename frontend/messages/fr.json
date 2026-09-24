@@ -30,6 +30,7 @@
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "État de l'API",
+      "sla": "SLA",
       "agents": "Agents",
       "openapi": "OpenAPI",
       "openSource": "Cœur open-source (MIT)",
@@ -156,7 +157,7 @@
         "description": "Règles d'adresses ISO 20022 (SPS, T2, Fedwire) avant les échéances de novembre 2026"
       },
       "heading": "Endpoints et tarifs",
-      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
+      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte ou en USDC. Les prix ci-dessous sont ceux de l’appel payé en USDC via x402 ; avec une clé ou un pack de crédits, chaque appel et chaque IBAN d’un lot compte pour une requête ou un crédit.",
       "plans": "Gratuit : 25 requêtes par mois sans e-mail, 200 par mois une fois réclamée · Pro : 29 $ par mois pour 10 000 requêtes · packs de crédits dès 4 $ · licence éditeur dès 149 $ par mois · audit de fichier 149 $.",
       "plansLink": "Voir les tarifs"
     },
@@ -398,7 +399,7 @@
     },
     "table": {
       "heading": "Tarifs par endpoint",
-      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte, ou à la requête en USDC via x402 sur Base L2."
+      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte, ou à la requête en USDC via x402 sur Base L2. Les prix ci-dessous sont ceux de x402 ; avec une clé ou un pack de crédits, chaque appel et chaque IBAN d’un lot compte pour une requête ou un crédit."
     },
     "endpoints": {
       "0": {
@@ -412,7 +413,7 @@
         "method": "POST",
         "path": "/v1/iban/batch",
         "cost": "$0.002",
-        "costLabel": "par IBAN (jusqu'à 100)",
+        "costLabel": "par IBAN en USDC via x402 (jusqu'à 100)",
         "description": "Validation par lot avec enrichissement complet par IBAN"
       },
       "2": {
@@ -499,7 +500,7 @@
       },
       "2": {
         "question": "Existe-t-il une offre gratuite ?",
-        "answer": "Oui, et elle commence avant toute clé. Sans clé du tout : POST /v1/iban/validate avec un vrai IBAN est servi jusqu’à 25 fois par jour pour l’adresse d’où il vient, en entier, sur cette seule route, pour essayer. Clé gratuite : POST /v1/keys/generate sans aucun corps renvoie une clé ifk_ valable sur tous les endpoints, sans e-mail, sans carte ni captcha ; POST /v1/keys/claim la porte à 200 requêtes par mois avec un code à 6 chiffres sur une adresse que vous choisissez de donner. Prise sans aucune adresse, la clé démarre à 25 requêtes par mois. La validation par lot compte 1 requête par IBAN. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte, ou payez à l’appel en USDC via x402."
+        "answer": "Oui, et elle commence avant toute clé. Sans clé du tout : POST /v1/iban/validate avec un vrai IBAN est servi jusqu’à 25 fois par semaine pour l’adresse d’où il vient, en entier, sur cette seule route, pour essayer ; la semaine repart le lundi à 00:00 UTC. Clé gratuite : POST /v1/keys/generate sans aucun corps renvoie une clé ifk_ valable sur tous les endpoints, sans e-mail, sans carte ni captcha ; POST /v1/keys/claim la porte à 200 requêtes par mois avec un code à 6 chiffres sur une adresse que vous choisissez de donner. Prise sans aucune adresse, la clé démarre à 25 requêtes par mois. La validation par lot compte 1 requête par IBAN. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte, ou payez à l’appel en USDC via x402."
       },
       "3": {
         "question": "Et pour les gros volumes ?",
@@ -914,9 +915,9 @@
             "title": "Essai sans clé (API REST)",
             "step": "Étape",
             "tried": "Ont essayé sans clé",
-            "exhausted": "Ont épuisé les 10/jour",
+            "exhausted": "Ont épuisé l'essai de la semaine",
             "keys": "Clés nées de l'essai",
-            "note": "Une ligne par adresse et par jour, pas par appel. Une clé compte ici si elle a été créée avec source=api-trial."
+            "note": "Essais : une ligne par adresse et par jour. Épuisements : une ligne par source et par semaine. Jamais par appel. Une clé compte ici si elle a été créée avec source=api-trial."
           },
           "names": {
             "nav_key": "En-tête → Votre clé",
@@ -1812,7 +1813,7 @@
     },
     "endpoints": {
       "heading": "5 endpoints payants, tous accessibles via MCP + x402 + clé API",
-      "subtitle": "Mêmes données, trois voies d'intégration."
+      "subtitle": "Mêmes données, trois voies d'intégration. Les prix sont ceux de l’appel payé en USDC via x402 ; avec une clé API ou un pack de crédits, chaque appel et chaque IBAN d’un lot compte pour une requête ou un crédit."
     },
     "discovery": {
       "eyebrow": "Auto-découverte",

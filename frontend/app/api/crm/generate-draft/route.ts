@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
 import { CORRESPONDENT_LANG_NAME, normaliseLang } from '@/lib/crm/correspondent-lang';
 import { applyRedactionRules, parseRedactionRules } from '@/lib/crm/redaction-rules';
+// The two free quotas as the API exports them (scripts/export-onboarding.ts).
+import catalogue from '@/data/onboarding.json';
 
 /**
  * Ground the brief in what this contact actually did with the API.
@@ -24,8 +26,17 @@ import { applyRedactionRules, parseRedactionRules } from '@/lib/crm/redaction-ru
  * who is writing. The commercial road reaches it through the usage facts below;
  * the institutional road has no usage to speak of and reaches it directly.
  */
+/*
+ * 24/09/2026: this line said "free tier 200 requests/month" and "credit packs
+ * from $4 per 1,000 calls". The first skipped the step (a key with no e-mail
+ * starts lower and reaches 200 once claimed); the second was a false floor (the
+ * 25,000 pack costs $3.20 per 1,000). Both went out in customer mails. The quotas
+ * are now read from the API's export; the pack prices are the ones
+ * GET /v1/credits/bundles serves, written out because this module cannot import
+ * the API.
+ */
 const PRODUCT_FACTS =
-  'Product facts you may cite, nothing else: free tier 200 requests/month; batch endpoint up to 100 IBANs per call; prepaid credit packs from $4 per 1,000 calls, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes';
+  `Product facts you may cite, nothing else: a free API key needs no e-mail and gives ${catalogue.claimedMonthly} requests a month once claimed (${catalogue.anonymousMonthly} a month before that); batch endpoint up to 100 IBANs per call; prepaid credit packs: $4 for 1,000 calls, down to $3.20 per 1,000 with the 25,000 pack, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes`;
 
 /**
  * The writer guessed a first name off a domain on the first live control of

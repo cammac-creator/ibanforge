@@ -33,6 +33,9 @@ export function SiteFooter() {
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.github"), external: true },
         { href: localePath(locale, '/docs/mcp'), label: t("link.mcp") },
         { href: localePath(locale, '/status'), label: t("link.apiStatus") },
+        // Beside the status page (24/09/2026): an assistant asked whether a
+        // written SLA exists, and no page but the pricing FAQ led to it.
+        { href: localePath(locale, '/legal/sla'), label: t("link.sla") },
         // Next to API Status on purpose: both answer "is it working" — one for
         // the service, one for the caller's own key. Without a link here the
         // page was reachable only from an email, so a customer who deleted it

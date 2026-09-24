@@ -75,5 +75,7 @@
     }
   ],
   "anonymousMonthly": 25,
-  "claimedMonthly": 200
+  "claimedMonthly": 200,
+  "restTrialWeekly": 25,
+  "restTrialReset": "Monday 00:00 UTC"
 }

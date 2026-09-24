@@ -1,6 +1,6 @@
 ---
 title: "Vérifier un IBAN suisse : clé de contrôle, registre des IID de SIX, QR-IBAN"
-description: "Un IBAN suisse passe trois contrôles, pas un : la clé de contrôle, l'IID à cinq chiffres contre le registre de SIX, et la question de savoir si c'est un QR-IBAN qui exige une référence QR. Trois vraies réponses de l'API, champ par champ, avec dix appels par jour sans clé."
+description: "Un IBAN suisse passe trois contrôles, pas un : la clé de contrôle, l'IID à cinq chiffres contre le registre de SIX, et la question de savoir si c'est un QR-IBAN qui exige une référence QR. Trois vraies réponses de l'API, champ par champ ; l'essai sans clé couvre jusqu'à 25 vérifications par semaine."
 date: "2026-09-14"
 faq:
   - q: "Qu'est-ce que l'IID dans un IBAN suisse ?"
@@ -10,7 +10,7 @@ faq:
   - q: "Comment reconnaître un QR-IBAN ?"
     a: "À son IID : entre 30000 et 31999, c'est un QR-IID, et l'IBAN est un QR-IBAN. Il exige une référence QR (QRR) sur la QR-facture ; un IBAN ordinaire l'interdit. L'API signale is_qr_iid et résout le QR-IID vers l'établissement."
   - q: "Combien coûte la vérification ?"
-    a: "Rien pour commencer : dix vérifications par jour et par adresse sans clé, 200 par mois avec la clé gratuite, et chaque IID a sa propre page sous /fr/iid, sans aucun appel."
+    a: "Rien pour commencer. Sans clé du tout : jusqu'à 25 validations d'IBAN par semaine et par adresse, sur la seule route de validation, pour essayer. Une clé sans e-mail : 200 requêtes par mois une fois réclamée ; prise sans aucune adresse, elle démarre à 25 par mois, sur toutes les routes. Et chaque IID a sa propre page sous /fr/iid, sans aucun appel."
 ---
 
 Qui cherche « vérifier IBAN suisse » tombe le plus souvent sur un calculateur de clé de contrôle. Il répond à une question sur trois. Un IBAN suisse, c'est CH, deux chiffres de contrôle, un numéro de clearing bancaire à cinq chiffres (IID) et douze caractères de compte. La clé dit si la chaîne est cohérente avec elle-même. L'IID dit quel établissement tient le compte, et si ce code est seulement attribué : cela se lit dans le [BankMaster de SIX](/fr/iid), le registre qui attribue les codes et les republie chaque mois, avec le siège et les rails de paiement. Et l'IID dit une troisième chose : entre 30000 et 31999, l'IBAN est un [QR-IBAN](/fr/docs/swiss-qr-iban), et le paiement doit porter une référence QR sous peine de rejet.
@@ -142,7 +142,7 @@ Un détail pour les soigneux : le QR-IBAN de la documentation SIX, CH44 3199 912
 
 ## Comment l'appeler
 
-Sans clé, depuis le terminal, dix fois par jour et par adresse :
+Sans clé, depuis le terminal : l'essai sans clé sert jusqu'à 25 appels par semaine et par adresse, sur cette seule route.
 
 ```bash
 curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -150,7 +150,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban":"CH4900230000012345678"}'
 ```
 
-La réponse est complète et porte un bloc `trial` qui dit combien d'appels restent aujourd'hui. Pour la production, la [clé gratuite](/fr/docs/api-keys) suffit, 200 requêtes par mois sans carte. Qui ne veut écrire aucune ligne de code : [chaque IID a sa propre page](/fr/iid) avec exactement cette réponse, [le format de l'IBAN suisse avec l'exemple officiel](/fr/iban/ch) est à côté, et le [générateur d'IBAN de test](/fr/tools/test-iban) produit des IBAN suisses avec de vrais IID attribués, pour les fixtures et les démonstrations.
+La réponse est complète et porte un bloc `trial` qui dit combien d'appels restent cette semaine. Pour la production, prenez une [clé sans e-mail](/fr/docs/api-keys) : 200 requêtes par mois une fois réclamée, sans carte. Qui ne veut écrire aucune ligne de code : [chaque IID a sa propre page](/fr/iid) avec exactement cette réponse, [le format de l'IBAN suisse avec l'exemple officiel](/fr/iban/ch) est à côté, et le [générateur d'IBAN de test](/fr/tools/test-iban) produit des IBAN suisses avec de vrais IID attribués, pour les fixtures et les démonstrations.
 
 ## Ce que le registre ne dit pas
 
