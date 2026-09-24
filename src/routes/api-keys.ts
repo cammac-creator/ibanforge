@@ -110,6 +110,7 @@ import {
 import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribution.js';
 import { normalizeOrigin } from '../lib/key-origins.js';
 import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
+import { createAccountRoutes } from './account.js';
 import {
   sendApiKeyEmail,
   sendFreeKeyEmail,
@@ -736,6 +737,10 @@ apiKeys.get('/v1/credits/balance', (c) => {
  * One helper, and not a block copied into each route, precisely because there
  * are two: /v1/keys/usage and /v1/keys/report both answer the holder's own key,
  * and a holder must not read one figure on one and another on the other.
+ *
+ * Trois surfaces depuis le lot C1 (24.09.2026) : la page du compte le reçoit par
+ * `createAccountRoutes` (fin de fichier) et l'applique à une validation construite
+ * par `validationFromRow`, puisqu'une session ne détient pas la clé brute.
  */
 function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> {
   const isCreditKey = typeof v.creditsRemaining === 'number';
@@ -3465,5 +3470,20 @@ apiKeys.post('/v1/admin/thread-read', async (c) => {
   ).run(body.email.trim().toLowerCase());
   return c.json({ ok: true });
 });
+
+// Le compte client par e-mail (lot C1, 24.09.2026) : six routes, montées ICI
+// pour passer, comme `/v1/keys/generate`, avant le middleware des clés et le
+// rail x402. Une fabrique qui reçoit ce dont elle a besoin de ce fichier, et
+// non un import dans l'autre sens : voir l'en-tête de `./account.ts` pour la
+// boucle d'import que cela évite. `usageBlock` passé tel quel est ce qui garantit
+// les MÊMES chiffres sur la page du compte et sur `/v1/keys/usage`.
+apiKeys.route(
+  '/',
+  createAccountRoutes({
+    usageBlock,
+    isAdminAuthorized,
+    isBlockedEmail: (email) => BLOCKED_EMAIL_DOMAINS.test(email),
+  }),
+);
 
 export { apiKeys };

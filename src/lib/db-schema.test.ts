@@ -54,6 +54,29 @@ function indexes(db: Database.Database, table: string): string[] {
   );
 }
 
+/**
+ * Les deux tables du compte client (lot C1, 24.09.2026), posées en DERNIER dans
+ * `openStatsDB`. Les colonnes sont nommées une à une : une colonne qui manque
+ * ferait jeter la première connexion, pas l'ouverture de la base.
+ */
+function expectAccountTables(db: Database.Database): void {
+  expect(columns(db, 'account_login_codes').sort()).toEqual(
+    ['attempts', 'code_hash', 'created_at', 'email_norm', 'expires_at'].sort(),
+  );
+  expect(columns(db, 'account_sessions').sort()).toEqual(
+    [
+      'created_at',
+      'email_display',
+      'email_norm',
+      'expires_at',
+      'last_seen_at',
+      'revoked_at',
+      'token_hash',
+    ].sort(),
+  );
+  expect(indexes(db, 'account_sessions')).toContain('idx_account_sessions_email');
+}
+
 describe('ouverture du schéma', () => {
   it('sur une base NEUVE, openStatsDB() ne jette pas et pose le palier de clé', async () => {
     const mod = await openAt(freshPath());
@@ -81,6 +104,7 @@ describe('ouverture du schéma', () => {
     expect(columns(db, 'pending_verifications')).toContain('key_prefix');
     expect(indexes(db, 'api_keys')).toContain('idx_api_keys_prefix_unique');
     expect(indexes(db, 'key_creations')).toContain('idx_key_creations_created');
+    expectAccountTables(db);
     mod.closeAll();
   });
 
@@ -133,6 +157,8 @@ describe('ouverture du schéma', () => {
     expect(indexes(db, 'api_keys')).toContain('idx_api_keys_prefix_unique');
     // Le registre des renouvellements se pose aussi sur une base ancienne.
     expect(columns(db, 'subscription_payments')).toContain('invoice_id');
+    // Et les deux tables du compte client (lot C1).
+    expectAccountTables(db);
     mod.closeAll();
   });
 

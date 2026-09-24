@@ -1578,6 +1578,48 @@ function openStatsDB(): DatabaseType.Database {
       ) WITHOUT ROWID;
     `);
     migrateLineageFacts(statsDB);
+    // ─── Le compte client par e-mail (lot C1, 24/09/2026) ─────────────────
+    //
+    // Bloc autonome posé en DERNIER, après les faits de mesure, pour la même
+    // raison que les deux blocs précédents : des CREATE TABLE IF NOT EXISTS et
+    // aucun ALTER, donc aucune garde PRAGMA table_info et aucun index qui
+    // nommerait une colonne créée plus bas (le piège du 19/08). Hors de la
+    // sauvegarde (src/lib/backup.ts) : ce sont des données éphémères, sans
+    // valeur de restauration.
+    statsDB.exec(`
+      -- Les défis de connexion. Table à part de pending_verifications : un
+      -- code de connexion ne crée ni ne réclame une clé, et une demande de
+      -- connexion n'écrase jamais un défi de création ou de réclamation (dont
+      -- la clé primaire est l'adresse seule).
+      --
+      -- Pas de contre-apostrophe et pas de point d'interrogation dans ces
+      -- commentaires : ils vivent dans un littéral de gabarit JS.
+      --
+      -- email_norm est la forme normalisée, celle qui choisit les clés ;
+      -- code_hash est le sha256 du code, jamais le code lui-même.
+      CREATE TABLE IF NOT EXISTS account_login_codes (
+        email_norm TEXT PRIMARY KEY,
+        code_hash  TEXT NOT NULL,
+        attempts   INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at TEXT NOT NULL
+      );
+      -- Les sessions de lecture. Le jeton ne vit que dans le cookie du
+      -- navigateur ; seule son empreinte sha256 est ici. email_display est
+      -- l'adresse saisie, en minuscules : ce que l'écran affiche. Aucune
+      -- empreinte d'adresse IP ni d'agent : personne ne les lirait, et la
+      -- moindre collecte est la bonne.
+      CREATE TABLE IF NOT EXISTS account_sessions (
+        token_hash    TEXT PRIMARY KEY,
+        email_norm    TEXT NOT NULL,
+        email_display TEXT NOT NULL,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at    TEXT NOT NULL,
+        last_seen_at  TEXT,
+        revoked_at    TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_account_sessions_email ON account_sessions(email_norm);
+    `);
   }
   return statsDB;
 }
