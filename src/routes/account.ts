@@ -115,9 +115,11 @@ const TEXTS = {
   // rien de celle-ci.
   code_unavailable:
     'Sign-in codes cannot be sent right now. Try again later, or paste an API key on the account page instead.',
+  // UN seul texte pour un code faux, expiré, épuisé par les essais ou jamais
+  // demandé : distinguer « trop d'essais » disait qu'un code était en cours
+  // pour cette adresse. Il invite donc à redemander un code dans tous les cas.
   invalid_code:
-    'This code is not valid, or it has expired. Check the most recent mail, or ask for a new code.',
-  too_many_attempts: 'Too many attempts with this code. Ask for a new one.',
+    'This code cannot be used: it is wrong, it has expired, or it was tried too many times. Ask for a new code.',
   signed_out: 'You are not signed in, or your session has ended. Please sign in again.',
   not_found: 'No such key in this account.',
   unauthorized: 'unauthorized',
@@ -324,11 +326,12 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
       return c.json({ error: 'invalid_code', message: TEXTS.invalid_code }, 400);
     }
     const emailNorm = normalizeEmail(email) ?? email;
-    const check = checkLoginCode(emailNorm, code);
-    if (!check.ok) {
-      return check.reason === 'too_many_attempts'
-        ? c.json({ error: 'too_many_attempts', message: TEXTS.too_many_attempts }, 400)
-        : c.json({ error: 'invalid_code', message: TEXTS.invalid_code }, 400);
+    // 🚨 Une seule réponse pour tout échec, quelle qu'en soit la raison
+    // (`checkLoginCode` la garde pour ses propres tests) : la réponse d'une
+    // adresse dont le code est épuisé ne se distingue pas de celle d'une adresse
+    // qui n'a jamais demandé de code.
+    if (!checkLoginCode(emailNorm, code).ok) {
+      return c.json({ error: 'invalid_code', message: TEXTS.invalid_code }, 400);
     }
     // Une session déjà portée par ce navigateur est révoquée : le cookie va
     // être remplacé, et une session que plus personne ne détient n'a pas à

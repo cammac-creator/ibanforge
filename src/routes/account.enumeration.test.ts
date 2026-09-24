@@ -187,6 +187,46 @@ describe('anti-énumération : POST /v1/account/code et /v1/account/session', ()
     expect(statements.filter((s) => /\bapi_keys\b/.test(s))).toEqual([]);
   });
 
+  it('le sixième essai ne se distingue pas d’une adresse sans code', async () => {
+    // Une adresse dont un code est en cours, et une adresse qui n'en a jamais
+    // demandé : six codes faux sur chacune, puis le BON code sur la première,
+    // épuisé. Rien ne doit dire « un code a été demandé pour cette adresse »,
+    // ni le statut, ni le corps, ni les en-têtes, à aucun essai.
+    const app = makeApp();
+    const pending = 'en-cours@alpha.example.net';
+    const never = 'jamais@alpha.example.net';
+    expect((await post(app, '/v1/account/code', { email: pending }, '203.0.113.58')).status).toBe(
+      202,
+    );
+    const good = codeOf(lastMailTo(pending));
+    const wrong = good === '000000' ? '111111' : '000000';
+    const shape = async (res: Response) => ({
+      status: res.status,
+      body: await res.text(),
+      headers: ['content-type', 'cache-control', 'set-cookie'].map((h) => res.headers.get(h)),
+    });
+    const attempts: Array<[string, string]> = [
+      ...Array.from({ length: 6 }, () => [wrong, wrong] as [string, string]),
+      [good, wrong],
+    ];
+    for (const [i, [forPending, forNever]] of attempts.entries()) {
+      const a = await shape(
+        await post(
+          app,
+          '/v1/account/session',
+          { email: pending, code: forPending },
+          '203.0.113.58',
+        ),
+      );
+      const b = await shape(
+        await post(app, '/v1/account/session', { email: never, code: forNever }, '203.0.113.59'),
+      );
+      expect(a, `essai ${i + 1}`).toEqual(b);
+      expect(a.status).toBe(400);
+      expect(JSON.parse(a.body).error).toBe('invalid_code');
+    }
+  });
+
   it('429 identique avec ou sans clé', async () => {
     const app = makeApp();
     for (let i = 0; i < VERIFICATION_SENDS_PER_EMAIL_DAY; i++) {

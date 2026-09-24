@@ -161,20 +161,25 @@ describe('les codes de connexion', () => {
     // 🚨 Le sixième essai échoue même avec le BON code.
     expect(checkLoginCode(norm, code)).toEqual({ ok: false, reason: 'too_many_attempts' });
 
-    // La même chose par la route, qui ne distingue que « trop d'essais ».
+    // La même chose par la route, qui ne le dit PAS autrement : le code épuisé
+    // rend exactement la réponse d'un code faux (voir aussi
+    // `src/routes/account.enumeration.test.ts`).
     const app = makeApp();
     const email = 'essais-route@alpha.example.net';
     expect((await post(app, '/v1/account/code', { email }, '203.0.113.10')).status).toBe(202);
     const good = lastCodeFor(email);
     const bad = good === '000000' ? '111111' : '000000';
+    const wrongBodies: string[] = [];
     for (let i = 0; i < VERIFICATION_MAX_ATTEMPTS; i++) {
       const r = await post(app, '/v1/account/session', { email, code: bad }, '203.0.113.10');
       expect(r.status).toBe(400);
-      expect(((await r.json()) as { error: string }).error).toBe('invalid_code');
+      wrongBodies.push(await r.text());
     }
+    expect(new Set(wrongBodies).size).toBe(1);
+    expect(JSON.parse(wrongBodies[0]).error).toBe('invalid_code');
     const locked = await post(app, '/v1/account/session', { email, code: good }, '203.0.113.10');
     expect(locked.status).toBe(400);
-    expect(((await locked.json()) as { error: string }).error).toBe('too_many_attempts');
+    expect(await locked.text()).toBe(wrongBodies[0]);
     expect(locked.headers.get('set-cookie')).toBeNull();
 
     // Un nouveau code rouvre la porte.
