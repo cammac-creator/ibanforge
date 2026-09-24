@@ -128,7 +128,13 @@ import {
   iidGuardMiddleware,
 } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
-import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
+import {
+  getEntryCount,
+  getChClearingCount,
+  getLeiEnrichedCount,
+  getSourceFreshness,
+} from './lib/bic-lookup.js';
+import { bicLeiMappingNotice, mappingVersionFromLoad } from './lib/bic-lei-notice.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { bgAttribution, getBgBankCodeCount } from './lib/bg-bae.js';
 import { nationalRegisterCredit } from './lib/national-registers.js';
@@ -363,6 +369,13 @@ function buildLlmsTxt(): string {
   // code that decides the verdict; frontend/public/llms.txt carries the same
   // paragraph and positioning.test.ts holds it there.
   const bic = bicDirectoryBreakdown();
+  // The licence of the BIC-to-LEI Mapping Table asks for its notice with the
+  // version date on any copy (review of 25/09/2026). The version is read from
+  // the load date of the gleif rows, never typed: see src/lib/bic-lei-notice.ts.
+  const mappingVersion = mappingVersionFromLoad(
+    getSourceFreshness().find((s) => s.source === 'gleif')?.last_updated,
+  );
+  const mappingNotice = mappingVersion ? bicLeiMappingNotice(mappingVersion) : null;
   const bicTruth = bic.month
     ? `${bicCount} BIC entries (entries, not institutions): ${leiCount} LEI-enriched rows from GLEIF and ${bic.other.toLocaleString('en-US')} from national registers and EBA STEP2, refreshed monthly; ${bic.rows.toLocaleString('en-US')} (${bic.words}) from a public copy of the SWIFT directory (SwiftCodes, MIT) frozen in ${bic.month}, re-imported unchanged every month. Validation answers name the source of every BIC.`
     : `${bicCount} BIC entries (entries, not institutions) from GLEIF and national registers, refreshed monthly. Validation answers name the source of every BIC.`;
@@ -415,7 +428,7 @@ ${threeLayers().join('\n')}
 
 ## Data sources and attribution
 
-- BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT. This service uses the BIC to LEI relationship file. The mapping table has been developed by SWIFT. SWIFT and BIC are registered trademarks of S.W.I.F.T. SC. That credit covers the BIC-to-LEI mapping file GLEIF publishes; IBANforge holds no licence to the SWIFT BIC directory.
+- BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
 - National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${smSourceLine}${luSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
