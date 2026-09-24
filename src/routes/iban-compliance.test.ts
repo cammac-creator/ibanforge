@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { ibanCompliance } from './iban-compliance.js';
+import { complianceTableLoaded } from '../lib/compliance-db.js';
 
 const app = new Hono();
 app.route('/', ibanCompliance);
@@ -48,8 +49,10 @@ describe('POST /v1/iban/compliance', () => {
       vop: { screened: boolean };
     };
     expect(c.sanctions.bank_screened).toBe(true);
-    expect(c.reachability.screened).toBe(true);
-    expect(c.vop.screened).toBe(true);
+    // Les axes EPC, dès que leur registre est chargé : un registre non chargé
+    // n'a pas été consulté, et le dit (25/09/2026).
+    expect(c.reachability.screened).toBe(complianceTableLoaded('sepa_participants'));
+    expect(c.vop.screened).toBe(complianceTableLoaded('vop_participants'));
   });
 
   it('always carries a meta block disclosing scope + freshness + disclaimer', async () => {

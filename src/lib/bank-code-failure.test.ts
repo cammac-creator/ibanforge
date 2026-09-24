@@ -92,6 +92,15 @@ vi.mock('./national-registers.js', async (importOriginal) => {
     // with the authority dropped — never read every code as unallocated.
     nationalRegisterAvailable: (cc: string) => {
       if (failing.nationalRegisterMissing) return false;
+      // Une lecture CASSÉE, c'est une table qui répond à la sonde de présence
+      // puis lève une erreur sur la requête. Dit ici plutôt que laissé aux
+      // données : les lignes autrichiennes et belges quittent la base publique
+      // (décision du 24/09/2026), et sur une base sans elles la sonde répondait
+      // faux, la lecture cassée n'était jamais tentée, et la carte composite
+      // répondait `verified` à sa place (src/db/bic_data.json porte encore des
+      // clés autrichiennes ; voir restricted-data-absent.test.ts). L'échec dont
+      // parle ce fichier n'aurait alors plus été testé.
+      if (failing.nationalRegister && ['AT', 'BE', 'SK'].includes(cc)) return true;
       return actual.nationalRegisterAvailable(cc);
     },
   };

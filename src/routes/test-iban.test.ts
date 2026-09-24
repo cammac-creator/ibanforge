@@ -1,12 +1,20 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi } from 'vitest';
 import { Hono } from 'hono';
 import { testIban } from './test-iban.js';
 import { validateIBAN } from '../lib/iban.js';
-import { closeAll } from '../lib/db.js';
 
-afterAll(() => {
-  closeAll();
+/**
+ * Les IBAN de test autrichiens et belges sont tirés de ces registres, qui
+ * quittent le dépôt public (décision du 24/09/2026). Ils sont tirés ici de
+ * registres inventés de la même forme (src/test-support/restricted-fixtures.ts),
+ * installés avant l'évaluation des imports ci-dessus (vi.hoisted passe en
+ * premier). restore() ferme les connexions, ce que ce fichier faisait à la main.
+ */
+const { fixture } = await vi.hoisted(async () => {
+  const m = await import('../test-support/restricted-fixtures.js');
+  return { fixture: m.installRestrictedFixture() };
 });
+afterAll(() => fixture.restore());
 
 function makeApp() {
   const app = new Hono();
