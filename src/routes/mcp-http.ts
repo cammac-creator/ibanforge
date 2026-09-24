@@ -65,6 +65,10 @@ import {
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import { MCP_WEEKLY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
+import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+
+/** The tools a call may name and be served; parity with registerTool is tested. */
+const MCP_TOOL_NAMES: ReadonlySet<string> = new Set(MCP_TOOLS.map((t) => t.name));
 import {
   ANONYMOUS_MONTHLY_LIMIT,
   FREE_TIER_MONTHLY_LIMIT,
@@ -1295,6 +1299,18 @@ function checkMcpSessionLimit(key: string): {
  * is named, and the week's figure and the key's monthly figure never share a
  * sentence.
  */
+/**
+ * The refusal when the keyless allowance could not be counted at all.
+ *
+ * It used to say "use an API key or x402 to continue" on /mcp, which reads
+ * neither (review of 24/09/2026): the ways to continue are the REST API and the
+ * npm package.
+ */
+export const MCP_ACCOUNTING_UNAVAILABLE =
+  'Free-tier accounting is temporarily unavailable on this transport, which reads no key. ' +
+  'To continue, call the REST API (https://api.ibanforge.com/v1) with a key or an x402 payment, ' +
+  'or run the npm package ibanforge-mcp with IBANFORGE_API_KEY set.';
+
 export function mcpAllowanceRefusal(
   used: number,
   now: Date = new Date(),
@@ -1362,11 +1378,7 @@ function mcpBucket(ip: string, prefix: '' | 'init:'): string {
  * tool free in one and not the other is either billed silently or documented
  * wrong.
  */
-export const MCP_FREE_TOOLS: ReadonlySet<string> = new Set([
-  'send_feedback',
-  'request_api_key',
-  'poll_api_key',
-]);
+export const MCP_FREE_TOOLS: ReadonlySet<string> = ALLOWANCE_EXEMPT_TOOLS;
 function mcpToolUnits(params: { name?: unknown; arguments?: unknown } | undefined): number {
   const name = typeof params?.name === 'string' ? params.name : '';
   if (MCP_FREE_TOOLS.has(name)) return 0;
@@ -1431,6 +1443,9 @@ mcpHttp.post('/mcp', async (c) => {
   // registre journalier ne compte que des UNITÉS — or cet outil coûte zéro unité
   // (`MCP_FREE_TOOLS`), donc il y est parfaitement invisible.
   let keyRequests = 0;
+  // Any tools/call at all, known tool or not: what the no-session answer below
+  // reads, so that no session is opened for a call that cannot be served.
+  let anyToolCall = false;
   try {
     const body = await cloned.json();
     // JSON-RPC allows a BATCH: the body may be an array of messages. On an
@@ -1446,9 +1461,16 @@ mcpHttp.post('/mcp', async (c) => {
       params?: { name?: unknown; arguments?: unknown };
     }> = Array.isArray(body) ? body : [body];
     const calls = messages.filter((m) => m?.method === 'tools/call');
-    toolCalls = calls.length;
-    keyRequests = calls.filter((m) => m?.params?.name === 'request_api_key').length;
-    toolUnits = calls.reduce((sum, m) => sum + mcpToolUnits(m?.params), 0);
+    anyToolCall = calls.length > 0;
+    // Only a tool this server registers can be served (review of 24/09/2026):
+    // a call to an unknown name gets "tool not found" from the SDK, so it is
+    // neither charged nor counted as a served call.
+    const servable = calls.filter(
+      (m) => typeof m?.params?.name === 'string' && MCP_TOOL_NAMES.has(m.params.name),
+    );
+    toolCalls = servable.length;
+    keyRequests = servable.filter((m) => m?.params?.name === 'request_api_key').length;
+    toolUnits = servable.reduce((sum, m) => sum + mcpToolUnits(m?.params), 0);
     toolName =
       calls
         .map((m) => (typeof m?.params?.name === 'string' ? m.params.name : null))
@@ -1479,7 +1501,7 @@ mcpHttp.post('/mcp', async (c) => {
   // que cette colonne existe pour fermer.
   if (toolName) c.set('mcpToolName', toolName);
 
-  // 🚨 LA SESSION D'ABORD, LE DÉBIT ENSUITE (relecture du 25/09/2026, D1).
+  // 🚨 LA SESSION D'ABORD, LE DÉBIT ENSUITE (relecture du 24/09/2026, D1).
   //
   // L'allocation se débitait avant de savoir si la session existait : un
   // `tools/call` sur une session inconnue (après chaque redéploiement, après
@@ -1514,7 +1536,7 @@ mcpHttp.post('/mcp', async (c) => {
     );
   }
 
-  if (!sessionId && toolCalls > 0) {
+  if (!sessionId && anyToolCall) {
     // Un `tools/call` sans session, seul ou dans un lot avec `initialize`. Le
     // SDK le refuse en 400 (« Server not initialized », « Only one
     // initialization request is allowed ») ; le laisser aller jusqu'à lui
@@ -1536,6 +1558,19 @@ mcpHttp.post('/mcp', async (c) => {
     );
   }
 
+  // The transport refuses with 406 a POST whose Accept header does not list
+  // both application/json and text/event-stream: the same substring test as
+  // the SDK (@modelcontextprotocol/sdk 1.30.0, handlePostRequest). Such a call
+  // is never served, so it is neither charged nor counted (review of
+  // 24/09/2026). Mirrored rather than paraphrased: were the SDK to relax its
+  // test, the worst case is an unserved call left uncharged.
+  const accept = c.req.header('accept');
+  if (!accept?.includes('application/json') || !accept.includes('text/event-stream')) {
+    toolUnits = 0;
+    toolCalls = 0;
+    keyRequests = 0;
+  }
+
   if (toolUnits > 0) {
     const now = new Date();
     const limit = checkMcpToolAllowance(mcpBucket(ip, ''), toolUnits, now);
@@ -1550,9 +1585,7 @@ mcpHttp.post('/mcp', async (c) => {
         id: rpcId,
         error: {
           code: -32000,
-          message:
-            'Free-tier accounting is temporarily unavailable; use an API key or x402 to continue. ' +
-            'See https://api.ibanforge.com/.well-known/x402',
+          message: MCP_ACCOUNTING_UNAVAILABLE,
           data: { degraded: true },
         },
       });
@@ -1599,7 +1632,7 @@ mcpHttp.post('/mcp', async (c) => {
   // par requête dans le fichier qui porte `api_keys`, les crédits et les traces
   // de paiement. `tool_calls` compte donc les appels SERVIS ; les refus se
   // lisent déjà à part, sous `/mcp:tools-call:refused` dans `request_log`.
-  // Depuis le 25/09/2026 (D1), ce point n'est atteint qu'avec une session
+  // Depuis le 24/09/2026 (D1), ce point n'est atteint qu'avec une session
   // vivante : un appel sur une session inconnue (404) ou sans session (400)
   // repart plus haut et n'est plus compté ici.
   //

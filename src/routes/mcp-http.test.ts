@@ -28,6 +28,7 @@ import { Hono } from 'hono';
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import type { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
+  MCP_ACCOUNTING_UNAVAILABLE,
   mcpHttp,
   mcpSessions,
   createMcpSessionStore,
@@ -752,7 +753,7 @@ describe('POST /mcp — an expired session says what to do about it', () => {
 });
 
 /**
- * No session, no debit (review of 25/09/2026, D1).
+ * No session, no debit (review of 24/09/2026, D1).
  *
  * The weekly allowance used to be charged BEFORE the session was looked up: a
  * batch of IBANs sent on a session the last redeploy had wiped paid one unit
@@ -760,6 +761,15 @@ describe('POST /mcp — an expired session says what to do about it', () => {
  * tools/call with no session header paid a unit, spent a session opening and
  * built a McpServer, for a 400.
  */
+describe('POST /mcp — no text promises a key on a transport that reads none', () => {
+  it('sends a caller whose allowance cannot be counted to REST or the npm package', () => {
+    expect(MCP_ACCOUNTING_UNAVAILABLE).toMatch(/reads no key/);
+    expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('https://api.ibanforge.com/v1');
+    expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('IBANFORGE_API_KEY');
+    expect(MCP_ACCOUNTING_UNAVAILABLE).not.toMatch(/use an API key or x402 to continue/);
+  });
+});
+
 describe('POST /mcp — a call that no tool can serve costs nothing', () => {
   const IBANS = Array.from({ length: 20 }, () => 'DE89370400440532013000');
 
@@ -846,6 +856,57 @@ describe('POST /mcp — a call that no tool can serve costs nothing', () => {
     expect(toolCallsToday()).toBe(calls);
   });
 
+  it('an unknown tool on a live session is neither charged nor counted', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.205';
+    const sessionId = await initialize(app, ip);
+    const calls = toolCallsToday();
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'x-real-ip': ip,
+        'mcp-session-id': sessionId,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 79,
+        method: 'tools/call',
+        params: { name: 'validate_ibanz', arguments: { iban: 'DE89370400440532013000' } },
+      }),
+    });
+    await res.text();
+    expect(weekUnits(ip)).toBeNull();
+    expect(toolCallsToday()).toBe(calls);
+  });
+
+  it('a call the transport refuses with 406 is neither charged nor counted', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.206';
+    const sessionId = await initialize(app, ip);
+    const calls = toolCallsToday();
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // No text/event-stream: the SDK answers 406.
+        Accept: 'application/json',
+        'x-real-ip': ip,
+        'mcp-session-id': sessionId,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 80,
+        method: 'tools/call',
+        params: { name: 'batch_validate_iban', arguments: { ibans: IBANS } },
+      }),
+    });
+    expect(res.status).toBe(406);
+    expect(weekUnits(ip)).toBeNull();
+    expect(toolCallsToday()).toBe(calls);
+  });
+
   it('a live session is still billed, one unit per IBAN', async () => {
     const app = makeApp();
     const ip = '192.0.2.204';
@@ -925,7 +986,7 @@ describe('POST /mcp — opening a session is metered per address', () => {
 
   /**
    * The session ceiling stays counted by the DAY, out of the weekly table
-   * (review of 25/09/2026, D13): only the tool calls moved to the week. The
+   * (review of 24/09/2026, D13): only the tool calls moved to the week. The
    * test above stays green if the ceiling were weekly, since the next opening
    * is refused either way; this one reopens the next day.
    */

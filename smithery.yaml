@@ -43,10 +43,10 @@ remote:
   # No key and no wallet needed to try it: the remote transport answers
   # tools/call on a per-source allowance (IPv6 per /64). See /llms.txt for the figures,
   # which are served live and never written down here.
+  # It reads no credential at all (no key, no OAuth, no x402), so no scheme is
+  # declared: a key works on the REST API and in the npm package below.
   authentication:
     required: false
-    schemes:
-      - bearer
   # Metadata for a scanner that cannot complete its own scan.
   serverCard: https://api.ibanforge.com/.well-known/mcp/server-card.json
 

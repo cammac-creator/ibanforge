@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
-import { MCP_TOOLS, FREE_ENDPOINTS, dataTools } from './inventory.js';
+import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS, FREE_ENDPOINTS, dataTools } from './inventory.js';
 
 /**
  * Every surface that publishes the tool list publishes the SAME list.
@@ -58,6 +58,13 @@ async function fetchText(path: string): Promise<string> {
   expect(res.status, `${path} did not answer 200`).toBe(200);
   return res.text();
 }
+
+describe('the tools outside the keyless allowance', () => {
+  it('are all tools of the inventory', () => {
+    const names = new Set(MCP_TOOLS.map((t) => t.name));
+    for (const name of ALLOWANCE_EXEMPT_TOOLS) expect(names.has(name), name).toBe(true);
+  });
+});
 
 describe('the inventory is internally coherent', () => {
   it('names no tool twice', () => {
@@ -142,13 +149,18 @@ describe('the surfaces that describe the server itself carry all tools', () => {
   });
 
   it('the OpenAPI description of POST /mcp names every tool and the real count', async () => {
-    // Review of 25/09/2026 (D6/D10/D17): it said "7 MCP tools" while the
+    // Review of 24/09/2026 (D6/D10/D17): it said "7 MCP tools" while the
     // transport served eleven.
     const spec = JSON.parse(await fetchText('/openapi.json')) as {
       paths: Record<string, { post?: { description?: string } }>;
     };
     const description = spec.paths['/mcp']?.post?.description ?? '';
     expect(description).toContain(`Exposes ${MCP_TOOLS.length} MCP tools`);
+    // Two lists, never merged (review of 24/09/2026): "no USDC price" is not
+    // "outside the keyless allowance".
+    const outside = description.slice(description.indexOf('Outside the keyless allowance'));
+    for (const name of ALLOWANCE_EXEMPT_TOOLS) expect(outside).toContain(name);
+    expect(outside.slice(0, outside.indexOf(';'))).not.toContain('check_swiss_qr_bill');
     for (const tool of MCP_TOOLS) {
       expect(description, `/mcp description never mentions ${tool.name}`).toContain(tool.name);
     }

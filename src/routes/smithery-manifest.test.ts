@@ -60,8 +60,16 @@ describe('smithery.yaml — ce qu’il annonce existe', () => {
     expect(DECLARED).toContain('?src=smithery');
   });
 
+  it('ne déclare aucun schéma d’authentification pour le transport distant, qui n’en lit aucun', () => {
+    // Relecture du 24/09/2026 : `schemes: [bearer]` laissait croire qu'une clé
+    // marchait sur /mcp. La clé reste déclarée pour le paquet npm (configSchema).
+    const remote = DECLARED.slice(DECLARED.indexOf('remote:'), DECLARED.indexOf('startCommand:'));
+    expect(remote).not.toMatch(/schemes|bearer/);
+    expect(DECLARED).toContain('IBANFORGE_API_KEY');
+  });
+
   it('ne donne pas d’unité à l’allocation sans clé, commentaires compris', () => {
-    // Relecture du 25/09/2026 (D4) : le commentaire disait encore « a daily
+    // Relecture du 24/09/2026 (D4) : le commentaire disait encore « a daily
     // per-address allowance » le jour où l'accès MCP sans clé est passé à la
     // semaine. Le fichier renvoie à /llms.txt pour les chiffres ; il ne dit
     // donc ni le jour ni la semaine, et ce test lit le fichier ENTIER.

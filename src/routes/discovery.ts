@@ -262,18 +262,38 @@ const oauthResourceMetadata = {
 };
 
 discovery.get('/.well-known/oauth-protected-resource', (c) => c.json(oauthResourceMetadata));
-discovery.get('/.well-known/oauth-protected-resource/mcp', (c) =>
-  c.json({ ...oauthResourceMetadata, resource: 'https://api.ibanforge.com/mcp' }),
-);
+
+/**
+ * The same document for the hosted MCP transport, said the way /mcp works.
+ *
+ * Until the review of 24/09/2026 this copied the API's metadata and announced an
+ * API key and x402 for /mcp, which reads neither: the key middleware is mounted
+ * on /v1/* only, and /mcp answers a keyless weekly allowance per source. A
+ * client reading `api_key` here would send a key and expect it to lift that
+ * allowance. It still answers 200 rather than 404, for the reason given below
+ * (clients that cannot tell "no auth here" from "server broken"), and it says
+ * the truth in the fields RFC 9728 defines: no authorization server, and an
+ * empty `bearer_methods_supported`, the RFC's way of saying "no bearer token".
+ */
+const MCP_RESOURCE_METADATA = {
+  resource: 'https://api.ibanforge.com/mcp',
+  resource_documentation: 'https://ibanforge.com/docs/mcp',
+  bearer_methods_supported: [] as string[],
+  authentication_methods: [] as unknown[],
+  note:
+    'The hosted MCP transport reads no credential: no OAuth, no API key, no x402. It answers a keyless ' +
+    'weekly allowance per source address. A key works on the REST API (https://api.ibanforge.com/v1) ' +
+    'and in the npm package ibanforge-mcp through IBANFORGE_API_KEY.',
+};
+
+discovery.get('/.well-known/oauth-protected-resource/mcp', (c) => c.json(MCP_RESOURCE_METADATA));
 
 // RFC 9728 inserts the well-known segment before the resource path, which the
 // route above already serves. Plenty of MCP clients append it instead, and on
 // one single day that spelling was requested over and over by dozens of distinct IPs and
 // answered 404. A 404 there is worse than unhelpful: the client cannot tell
 // "this server needs no OAuth" from "this server is broken".
-discovery.get('/mcp/.well-known/oauth-protected-resource', (c) =>
-  c.json({ ...oauthResourceMetadata, resource: 'https://api.ibanforge.com/mcp' }),
-);
+discovery.get('/mcp/.well-known/oauth-protected-resource', (c) => c.json(MCP_RESOURCE_METADATA));
 
 // We deliberately do NOT serve /.well-known/oauth-authorization-server. There
 // is no authorization server; a 404 is the correct RFC 8414 signal and lets a

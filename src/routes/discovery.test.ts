@@ -143,6 +143,32 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     expect(Array.isArray(body.authentication_methods)).toBe(true);
   });
 
+  it('says on both /mcp spellings that the transport reads no credential (review of 24/09/2026)', async () => {
+    // It used to copy the API's metadata and announce api_key and x402 for /mcp,
+    // which reads neither.
+    const app = makeApp();
+    for (const path of [
+      '/.well-known/oauth-protected-resource/mcp',
+      '/mcp/.well-known/oauth-protected-resource',
+    ]) {
+      const body = (await (await app.request(path)).json()) as {
+        bearer_methods_supported: string[];
+        authentication_methods: unknown[];
+        authorization_servers?: unknown;
+        note: string;
+      };
+      expect(body.bearer_methods_supported, path).toEqual([]);
+      expect(body.authentication_methods, path).toEqual([]);
+      expect(body.authorization_servers, path).toBeUndefined();
+      expect(body.note, path).toMatch(/reads no credential/);
+    }
+    // The API's own document keeps its two methods.
+    const api = (await (await app.request('/.well-known/oauth-protected-resource')).json()) as {
+      authentication_methods: Array<{ type: string }>;
+    };
+    expect(api.authentication_methods.map((m) => m.type)).toEqual(['api_key', 'x402']);
+  });
+
   it('serves /.well-known/glama.json with LIVE counts, never hardcoded (45 distinct IPs)', async () => {
     const res = await makeApp().request('/.well-known/glama.json');
     expect(res.status).toBe(200);
