@@ -499,7 +499,7 @@
       },
       "2": {
         "question": "Is there a free tier?",
-        "answer": "Yes, and it starts before any key: POST /v1/iban/validate with a real IBAN and no credential at all is served 25 times a day for the address it comes from, in full. For every other endpoint, POST /v1/keys/generate with no body at all returns an ifk_ key worth 25 requests a month across all of them — no e-mail, no card, no captcha — and POST /v1/keys/claim raises that same key to 200 a month with a 6-digit code on an address you choose to give. The two 25s are different allowances: 25 a day on one route, 25 a month on all of them. Batch validation counts 1 request per IBAN. For higher volumes, buy a prepaid credit pack by card, or pay per call in USDC via x402."
+        "answer": "Yes, and it starts before any key. No key at all: POST /v1/iban/validate with a real IBAN is served up to 25 times a day for the address it comes from, in full, on that route only, to try it out. Free key: POST /v1/keys/generate with no body at all returns an ifk_ key for every endpoint, with no e-mail, no card and no captcha; POST /v1/keys/claim raises it to 200 requests a month with a 6-digit code on an address you choose to give. Taken with no address at all, the key starts at 25 requests a month. Batch validation counts 1 request per IBAN. For higher volumes, buy a prepaid credit pack by card, or pay per call in USDC via x402."
       },
       "3": {
         "question": "What about high volume?",
@@ -2054,7 +2054,7 @@
           "label": "Free tier",
           "ibanforge": "25 requests a month with no e-mail at all, 200 a month once claimed, no card",
           "ibancom": "100-query trial, expires after one month",
-          "ibanapi": "100 basic + 20 bank credits, 30 days",
+          "ibanapi": "100 basic + 20 bank credits per 30 days; the free plan renews automatically, per their pricing page",
           "libs": "Everything is free",
           "abstract": "100 requests, 1 request per second"
         },
@@ -2070,7 +2070,7 @@
           "label": "Bank code checked against the national register (a miss means not allocated)",
           "ibanforge": "DE, AT, BE, SK, BG, CH, LI: the national register itself. Partial lists in FI, SM and LU, where a miss is not a refusal. Elsewhere a composite map, answered with authoritative: false.",
           "ibancom": "Not checked by us",
-          "ibanapi": "Not checked by us",
+          "ibanapi": "Announced on their home page (24 September 2026): the bank code in the IBAN is resolved against their own bank registry (central banks, SEPA data and manual review). Whether a code missing from it means not allocated: not checked by us.",
           "libs": "Varies by library: schwifty rejects a bank code unknown to its bundled registry. Others not checked by us.",
           "abstract": "Not checked by us"
         },
@@ -2085,7 +2085,7 @@
         "compliance": {
           "label": "Compliance pre-check (sanctions, FATF, VoP requirement)",
           "ibanforge": "One endpoint, $0.02: bank screening (OFAC, EU, UN), FATF lists, SEPA reachability and VoP readiness of the bank, 0–100 risk score",
-          "ibancom": "Separate products (BAV/VoP from €2,000 per 2,500 verifications)",
+          "ibancom": "IBAN Suite announces SEPA reachability; payee-name check (BAV/VoP) sold separately, from €2,000 per 2,500 verifications; sanctions and FATF: not checked by us",
           "ibanapi": "Not checked by us",
           "libs": "Not checked by us",
           "abstract": "Not in the documented response (iban and is_valid only)"
@@ -2130,7 +2130,7 @@
       "items": [
         "Pay-once economics: prepaid credits that never expire instead of a subscription you must amortize.",
         "German, Austrian, Belgian, Slovak and Bulgarian bank codes checked against the national register: a well-formed IBAN whose bank code nobody holds is caught before the payment.",
-        "Swiss payments: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant) and QR-IID.",
+        "Swiss payments: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant), and its QR-IID where SIX allocates one.",
         "One compliance triage call before a payout: bank-level sanctions + FATF + SEPA reachability + VoP readiness + risk score in a single $0.02 request.",
         "AI agents and automation: native MCP tools, machine-readable 402s with exact top-up instructions, x402 autonomous payment."
       ]
@@ -2162,7 +2162,7 @@
           "vendor": "iban.de",
           "sells": "IBAN calculation and validation; compare the included annual query quotas",
           "price": "€420 to €3,800 per year, one-year term",
-          "free": "None found"
+          "free": "100-query trial, active one month, per its developer page"
         },
         {
           "vendor": "iban-test.eu",

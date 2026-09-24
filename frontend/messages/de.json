@@ -499,7 +499,7 @@
       },
       "2": {
         "question": "Gibt es ein kostenloses Angebot?",
-        "answer": "Ja, und sie beginnt schon vor jedem Schlüssel: POST /v1/iban/validate mit einer echten IBAN und ganz ohne Zugangsdaten wird 25-mal pro Tag für die Adresse beantwortet, von der der Aufruf kommt, und zwar vollständig. Für alle anderen Endpunkte liefert POST /v1/keys/generate ganz ohne Body einen ifk_-Schlüssel mit 25 Anfragen pro Monat über alle hinweg — ohne E-Mail, ohne Karte, ohne Captcha — und POST /v1/keys/claim hebt denselben Schlüssel auf 200 pro Monat, mit einem 6-stelligen Code an eine Adresse, die Sie freiwillig angeben. Die zwei 25 sind nicht dasselbe Kontingent: 25 pro Tag auf einer Route, 25 pro Monat auf allen. Batch-Validierung zählt 1 Anfrage pro IBAN. Für höhere Volumen kaufen Sie ein Prepaid-Credit-Pack per Karte oder zahlen pro Aufruf in USDC via x402."
+        "answer": "Ja, und es beginnt schon vor jedem Schlüssel. Ganz ohne Schlüssel: POST /v1/iban/validate mit einer echten IBAN wird bis zu 25-mal pro Tag für die Adresse beantwortet, von der der Aufruf kommt, vollständig und nur auf dieser Route, zum Ausprobieren. Kostenloser Schlüssel: POST /v1/keys/generate ganz ohne Body liefert einen ifk_-Schlüssel für alle Endpunkte, ohne E-Mail, ohne Karte, ohne Captcha; POST /v1/keys/claim hebt ihn mit einem 6-stelligen Code an eine Adresse, die Sie freiwillig angeben, auf 200 Anfragen pro Monat. Ganz ohne Adresse genommen, startet der Schlüssel mit 25 Anfragen pro Monat. Batch-Validierung zählt 1 Anfrage pro IBAN. Für höhere Volumen kaufen Sie ein Prepaid-Credit-Pack per Karte oder zahlen pro Aufruf in USDC via x402."
       },
       "3": {
         "question": "Was ist mit hohen Volumen?",
@@ -2054,7 +2054,7 @@
           "label": "Kostenloses Kontingent",
           "ibanforge": "25 Anfragen pro Monat ganz ohne E-Mail, 200 pro Monat nach Beanspruchung, keine Karte",
           "ibancom": "Test mit 100 Anfragen, läuft nach einem Monat ab",
-          "ibanapi": "100 Basic + 20 Bank-Credits, 30 Tage",
+          "ibanapi": "100 Basis- + 20 Bank-Credits pro 30 Tage; der kostenlose Plan verlängert sich automatisch, laut ihrer Preisseite",
           "libs": "Alles kostenlos",
           "abstract": "100 Anfragen, 1 Anfrage pro Sekunde"
         },
@@ -2070,7 +2070,7 @@
           "label": "Bankcode gegen das nationale Register geprüft (fehlt er dort, ist er nicht vergeben)",
           "ibanforge": "DE, AT, BE, SK, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM und LU, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false.",
           "ibancom": "Von uns nicht geprüft",
-          "ibanapi": "Von uns nicht geprüft",
+          "ibanapi": "Laut ihrer Startseite (24. September 2026): Der Bankcode der IBAN wird mit ihrem eigenen Bankregister abgeglichen (Zentralbanken, SEPA-Daten und manuelle Prüfung). Ob ein dort fehlender Code nicht vergeben ist: von uns nicht geprüft.",
           "libs": "Je nach Bibliothek: schwifty lehnt einen Bankcode ab, den sein mitgeliefertes Register nicht kennt. Andere von uns nicht geprüft.",
           "abstract": "Von uns nicht geprüft"
         },
@@ -2085,7 +2085,7 @@
         "compliance": {
           "label": "Compliance-Vorprüfung (Sanktionen, FATF, VoP-Pflicht)",
           "ibanforge": "Ein Endpunkt, 0,02 $: Bankprüfung (OFAC, EU, UN), FATF-Listen, SEPA-Erreichbarkeit und VoP-Bereitschaft der Bank, Score 0–100",
-          "ibancom": "Separate Produkte (BAV/VoP ab 2.000 € je 2.500 Prüfungen)",
+          "ibancom": "IBAN Suite nennt die SEPA-Erreichbarkeit; Namensprüfung (BAV/VoP) als separates Produkt ab 2.000 € je 2.500 Prüfungen; Sanktionen und FATF: von uns nicht geprüft",
           "ibanapi": "Von uns nicht geprüft",
           "libs": "Von uns nicht geprüft",
           "abstract": "Nicht in der dokumentierten Antwort (nur iban und is_valid)"
@@ -2130,7 +2130,7 @@
       "items": [
         "Pay-once-Ökonomie: Prepaid-Credits ohne Verfall statt eines Abos, das Sie amortisieren müssen.",
         "Deutsche, österreichische, belgische, slowakische und bulgarische Bankcodes gegen das nationale Register geprüft: Eine formal korrekte IBAN, deren Bankcode niemandem zugeteilt ist, fällt vor der Zahlung auf.",
-        "Schweizer Zahlungen: jede IID des SIX BankMaster mit ihrer Teilnahme an den Zahlungsrails (SIC, euroSIC, CHF-Instant) und ihrer QR-IID.",
+        "Schweizer Zahlungen: jede IID des SIX BankMaster mit ihrer Teilnahme an den Zahlungsrails (SIC, euroSIC, CHF-Instant) und, sofern vorhanden, ihrer QR-IID.",
         "Ein einziger Compliance-Triage-Aufruf vor einer Auszahlung: Sanktionsprüfung der Bank + FATF + SEPA-Erreichbarkeit + VoP-Bereitschaft + Risikoscore in einer 0,02-$-Anfrage.",
         "KI-Agenten und Automatisierung: native MCP-Tools, maschinenlesbare 402er mit exakten Anweisungen, autonome x402-Zahlung."
       ]
@@ -2162,7 +2162,7 @@
           "vendor": "iban.de",
           "sells": "IBAN-Berechnung und -Prüfung; enthaltene Jahreskontingente vergleichen",
           "price": "420 € bis 3'800 € pro Jahr, Laufzeit ein Jahr",
-          "free": "Keine gefunden"
+          "free": "Test mit 100 Abfragen, einen Monat aktiv, laut Entwicklerseite"
         },
         {
           "vendor": "iban-test.eu",

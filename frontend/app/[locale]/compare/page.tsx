@@ -219,6 +219,8 @@ export default async function ComparePage({
         <p className="text-xs text-muted-foreground/70 mt-4" style={{ lineHeight: 1.6 }}>
           {t("footnoteExtra")}{" "}
           <a href="https://www.iban.de/preise.html" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban.de</a>{" "}·{" "}
+          {/* The free trial of iban.de is announced on its developer page, not its price page (24/09/2026). */}
+          <a href="https://www.iban.de/entwickler.html" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban.de/entwickler</a>{" "}·{" "}
           <a href="https://www.iban-test.eu/" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban-test.eu</a>{" "}·{" "}
           <a href="https://www.bankdataapi.com/" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">bankdataapi.com</a>{" "}·{" "}
           <a href="https://api-ninjas.com/pricing" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">api-ninjas.com</a>{" "}·{" "}
