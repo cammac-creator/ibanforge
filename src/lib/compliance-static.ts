@@ -8,13 +8,58 @@
  * ⚠️  RECALIBRATE after every FATF plenary — 3×/year (February, June, October).
  *     Last plenary reflected here: 17–19 June 2026 (fatf-gafi.org,
  *     "Jurisdictions under Increased Monitoring — 19 June 2026").
- *     NEXT plenary: October 2026 — update FATF_GREY_LIST and bump FATF_AS_OF.
+ *     NEXT plenary: October 2026 — update FATF_GREY_LIST, bump FATF_AS_OF,
+ *     FATF_PLENARY_OPENED_ON AND FATF_ACCESSED_ON, then the citation on the
+ *     static surfaces listed in
+ *     src/routes/fatf-attribution.test.ts (the test fails until they match).
  *
  * Source: FATF "High-risk and other monitored jurisdictions" statements.
  */
 
 /** Year-month (YYYY-MM) of the FATF plenary these lists reflect. */
 export const FATF_AS_OF = '2026-06';
+
+/**
+ * First day (YYYY-MM-DD) of that plenary (17–19 June 2026). The FATF statements
+ * cannot have been read before it opened: the attribution test holds
+ * FATF_ACCESSED_ON to that.
+ */
+export const FATF_PLENARY_OPENED_ON = '2026-06-17';
+
+/**
+ * Day (YYYY-MM-DD) the FATF statements behind these lists were read on
+ * fatf-gafi.org. The FATF's terms make it part of the credit ("accessed on
+ * (date)"), so it is a licence term, not a freshness detail. 2026-07-10 is the
+ * day the June 2026 plenary lists were transcribed here (commit 766d711d).
+ */
+export const FATF_ACCESSED_ON = '2026-07-10';
+
+/**
+ * The credit the FATF's terms require for its data, in its own citation format:
+ * "FATF (year), (dataset name), (data source) DOI or URL (accessed on (date))."
+ * Built from the two dates above so it cannot drift from the lists it credits.
+ * Surfaces that cannot call it (docs pages, NOTICE) are pinned to it by
+ * src/routes/fatf-attribution.test.ts.
+ */
+export function fatfCitation(): string {
+  const [year, month] = FATF_AS_OF.split('-').map(Number);
+  const plenary = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const accessed = new Date(`${FATF_ACCESSED_ON}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return (
+    `FATF (${year}), High-Risk and Other Monitored Jurisdictions, ` +
+    `FATF public statements of the ${plenary} plenary, https://www.fatf-gafi.org ` +
+    `(accessed on ${accessed}).`
+  );
+}
 
 /** FATF "Call for Action" — high-risk jurisdictions (the black list). */
 export const FATF_BLACK_LIST: string[] = ['KP', 'IR', 'MM'];

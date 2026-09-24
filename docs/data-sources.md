@@ -15,8 +15,8 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 
 | Source | Lignes | Licence | Établie ? |
 |---|---:|---|---|
-| PeterNotenboom/SwiftCodes | 82 102 | MIT | ✅ licence dans le dépôt — ⚠️ **données figées à janvier 2018**, voir ci-dessous |
-| GLEIF (BIC↔LEI) | 39 297 | **CC0** | ✅ **vérifié à la source le 23/08/2026** |
+| PeterNotenboom/SwiftCodes | 82 102 | MIT accordée par l'auteur du dépôt, **pas par SWIFT** | ⚠️ **droits de SWIFT non établis** (groupe B de `NOTICE` depuis le 24/09/2026 ; le dépôt dit seulement « All the info is grabbed from public websites ») — ⚠️ **données figées à janvier 2018**, voir ci-dessous |
+| GLEIF (LEI) et table BIC↔LEI de SWIFT | 39 297 | **CC0** pour les données LEI ; la **table BIC↔LEI** relève de la licence de SWIFT, avec sa mention obligatoire (voir plus bas) | ✅ CC0 **vérifié à la source le 23/08/2026** ; licence SWIFT **lue le 24/09/2026** |
 | Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
 | SIX BankMaster (clearing suisse) | 1 164 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
 | SIX Group (BIC) | 20 | même publication que le BankMaster | ⚠️ à confirmer séparément |
@@ -26,7 +26,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Finance Finland (Finanssiala ry) — Finnish monetary institution codes and BICs (table `src/lib/fi-register.ts`, pays FI) | 20 lignes, édition du 15.10.2025 | aucune condition sur le site (lu le 16/09/2026) ; document PDF transcrit à la main | ⏳ **lettre envoyée le 16/09/2026** à ffi@financefinland.fi (permission, attribution, notification des éditions). **Régime prudent depuis le 16/09/2026** : un résultat confirme, une absence ne refuse rien (`authoritative: false`) |
 | Bulgarian National Bank — registre BAE et BIC (`bg_bae`, pays BG) | par édition du registre | réponse écrite du service de presse le 27/08/2026 : réutilisation permise « respecting the Rights for using the BNB site » = citer la source, ne pas altérer ni déformer | ✅ **accordée sous conditions le 27/08/2026** ; `source` et `as_of` stockés et servis, noms en cyrillique tels que publiés |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
-| OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
+| OFAC (sanctions) | — | domaine public, **17 U.S.C. §105** (le CC0 lu le 24/08/2026 dans l'inventaire du Treasury n'y figure plus le 24/09/2026) | ✅ §105 **vérifié le 24/08/2026** ; CC0 plus vérifiable depuis le 24/09/2026 |
 | ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
 | UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
 | Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
@@ -46,6 +46,30 @@ prochain lecteur puisse contredire plutôt que refaire.
 
 Aucune obligation d'attribution n'est énoncée. CC0 est une renonciation au droit
 d'auteur, pas une licence à conditions.
+
+**Table BIC↔LEI de SWIFT — licence lue le 24/09/2026.** ⚠️ La table qui relie
+les BIC aux LEI n'est pas couverte par le CC0 de GLEIF : elle est développée par
+SWIFT et publiée sous le *BIC/LEI Mapping Table License Agreement* (annexe II,
+21/12/2017), lié en pied de la page GLEIF. Licence gratuite pour tout usage, y
+compris commercial, « provided always that any copy of the Mapping Table, in
+whole or in part, includes the following notice » :
+> « SWIFT © and database rights [insert date (i.e. month and year) of the Mapping Table version].
+> All rights reserved.
+> This Mapping Table has been developed by SWIFT. Any use of the Mapping Table, in whole or
+> in part, is subject to the BIC/LEI Mapping Table License Agreement as published with the
+> Mapping Table available on GLEIF’s website.
+> The Mapping Table is updated monthly. For the latest BIC information and updates, always
+> refer to www.swift.com/bic . »
+> — <https://www.gleif.org/lei-data/lei-mapping/download-bic-to-lei-relationship-files/2017-12-21_annex-2_bic-to-lei-mapping-table-license-agreement_final.pdf>
+
+La formule servie jusqu'ici (« This service uses the BIC to LEI relationship
+file… ») n'a aucune source : elle ne figure pas dans cette licence. `NOTICE`
+porte désormais la formule exacte. Le mois de version n'est stocké nulle part :
+`src/db/seed.ts` prend la dernière table publiée (`mapping.gleif.org/api/v2/bic-lei/latest`)
+à chaque rafraîchissement mensuel ; les lignes `gleif` du 01/09/2026 viennent
+de la version d'août 2026 (`LEI-BIC-20260828.zip`). À faire : stocker ce mois
+et corriger les surfaces qui servent l'ancienne formule (`src/app.ts`,
+`frontend/public/llms.txt`).
 
 **SIX BankMaster — usage libre.** ✅
 > « All the details published in the Bank Master Data are based on information
@@ -92,7 +116,7 @@ nicht zulässig » figure dans la section **images et vidéos**. La confondre av
 la règle sur les données ferait retirer une source utilisable — symétrique du
 piège SIX ci-dessus.
 
-**OFAC — CC0 1.0, déclaré par le Treasury pour CE dataset.** ✅ (24/08/2026)
+**OFAC — domaine public (17 U.S.C. §105) ; CC0 lu le 24/08/2026, plus vérifiable depuis le 24/09/2026.** ✅
 > « Copyright protection under this title is not available for any work of the
 > United States Government » — 17 U.S.C. §105
 > — <https://www.govinfo.gov/content/pkg/USCODE-2023-title17/html/USCODE-2023-title17-chap1-sec105.htm>
@@ -104,6 +128,10 @@ Treasury (obligatoire sous l'OPEN Government Data Act) porte pour la liste SDN
 <https://catalog.data.gov/dataset/specially-designated-nationals-sdn-and-blocked-persons-list>.
 Seules réserves (usa.gov) : ne pas suggérer d'endossement, ne pas utiliser les
 logos fédéraux. Nous ne faisons ni l'un ni l'autre.
+
+⚠️ **Relu le 24/09/2026 : `data.json` ne porte plus aucune entrée OFAC ou SDN**
+(231 jeux, aucun ne nomme la liste). La déclaration CC0 lue le 24/08 n'est donc
+plus vérifiable ; `NOTICE` ne cite plus que le §105, qui suffit.
 
 **ONU — établie, et c'est la réponse qui dérange.** ⚠️ (24/08/2026)
 > « None of the materials provided on this web site may be used, reproduced or
@@ -195,6 +223,27 @@ base ait moins de 21 jours, et l'inscrit dans `metadata.carried_over` (liste et 
 des lignes) : les listes qui ont rafraîchi partent, la liste en panne est servie périmée et
 dite telle, et une panne de trois semaines fait de nouveau échouer le run.
 
+## Carte composite `src/db/bic_data.json` (code banque → BIC)
+
+Absente de cet inventaire jusqu'au 24/09/2026. Environ 24 000 clés `PAYS:code`,
+servies avec `authoritative: false` là où aucun registre national ne répond.
+Origines, relevées dans l'historique git et dans les scripts des projets amont :
+
+| Origine | Pays | Données d'origine |
+|---|---|---|
+| sigalor/iban-to-bic (MIT), `scripts/build-bic-data.ts` | DE, AT, FR, NL, BE, ES, LU | fichiers publiés par les banques nationales et associations : Bundesbank (DE), OeNB (AT), BNB (BE), Betaalvereniging (NL), BCE (FR, ES), **registre de l'ABBL (LU)** |
+| schwifty (MIT), import du 08/04/2026 (`9e8e34a8`) | 42 pays, dont NO, SI, **FI**, IT, LT, ES, **PL** | registres nationaux compilés par schwifty : **EWIB de la NBP (PL)**, **Finance Finland (FI)**, OeNB (AT), etc. |
+| SIX BankMaster | CH | voir plus haut |
+| clés dérivées de `bic_entries` (`51f86e96`) | GB, IE et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` |
+| ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
+
+Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
+droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
+PL et FI sortent du dépôt public** (conditions non établies, non commerciales,
+ou permission limitée à l'API : ABBL, voir la section ABBL plus bas). Les
+autres pays tirés de schwifty restent à vérifier un par un. Détail et
+attributions : `NOTICE`.
+
 ## Hors dépôt, délibérément
 
 **Vocalink — table de contrôle modulo britannique** (`valacdos.txt`,
@@ -237,9 +286,12 @@ britannique, jamais le déploiement.
 
 ## Ce qui reste à faire, par ordre de risque
 
-1. **Établir les licences encore marquées ❌.** Sept sur treize sont établies
-   au 24/08 : SwiftCodes, GLEIF, Bundesbank, SIX BankMaster (23/08), puis
-   **UE (CC BY 4.0)**, **OFAC (CC0)** et **ONU** (24/08). Restent **EBA
+1. **Établir les licences encore marquées ❌.** Six sur treize sont établies :
+   GLEIF (CC0 pour les LEI, 23/08 ; licence SWIFT de la table BIC↔LEI, 24/09),
+   Bundesbank, SIX BankMaster (23/08), puis **UE (CC BY 4.0)**, **OFAC
+   (§105)** et **ONU** (24/08). **SwiftCodes n'en fait plus partie depuis le
+   24/09/2026** : la MIT vient de l'auteur du dépôt, les droits de SWIFT ne
+   sont pas établis (groupe B de `NOTICE`). Au 24/08, restaient **EBA
    Clearing** (« all rights reserved », aucun grant), **NBP**, **EPC** et le
    **GAFI** — les trois derniers derrière des murs anti-robot, voir la mesure
    ci-dessous. La position sur l'ONU est arrêtée depuis le 24/08 (voir la
@@ -647,6 +699,20 @@ toute sous-licence ; jamais le logo ; jamais d'implication d'endossement.
 Le contenu écrit (hors data) est en CC BY 4.0. Attribution posée le 26/08
 sur les pages data-sources publiques (3 langues).
 
+**Formule remplie le 24/09/2026** (l'ancienne formule publiée n'avait ni
+l'année ni une date de consultation) :
+
+> FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
+
+Elle est construite par `fatfCitation()` à partir de `FATF_AS_OF` (mois de la
+plénière) et de `FATF_ACCESSED_ON` (jour de lecture des déclarations du GAFI :
+le 10/07/2026, commit `766d711d`, qui a synchronisé les listes sur la plénière
+des 17-19 juin), dans `src/lib/compliance-static.ts`. Les trois pages
+data-sources et `NOTICE` ne peuvent pas appeler la fonction :
+`src/routes/fatf-attribution.test.ts` les épingle sur elle (ce fichier
+compris), et échoue si la date de consultation précède l'ouverture de la
+plénière (`FATF_PLENARY_OPENED_ON`, le 17/06/2026 pour la plénière de juin).
+
 **EPC — ❌ NON COMMERCIAL par défaut → permission d'abord.**
 > « In principle, the information contained in this website can be
 > reproduced, redistributed and transmitted for **non-commercial purposes**,
@@ -894,9 +960,13 @@ répertoire de codes de paiement.
 
 ### La position et la réponse reçue
 
-Nous ne redistribuons pas le fichier : nous servons **un enregistrement par
-requête**, noms verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la
-version et la date d'effet lues sur la page.
+**Position retenue par Claude-Alain le 24/09/2026 : le registre slovaque est
+publiable, avec la citation.** L'API sert **un enregistrement par requête**, noms
+verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la version et la
+date d'effet lues sur la page. Les lignes extraites figurent aussi dans le dépôt
+public (`data/bic.sqlite`, `frontend/data/registers/sk-bank.json`), avec la même
+citation dans `NOTICE` (groupe A). Le fichier électronique de la NBS lui-même
+n'est ni republié ni modifié.
 
 **Réponse de la NBS du 09/09/2026, relue le 14/09/2026**, à la demande du
 26/08 sur l'extraction de champs dans une API commerciale : la NBS indique
