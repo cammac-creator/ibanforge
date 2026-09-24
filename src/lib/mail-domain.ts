@@ -17,6 +17,31 @@ import { promises as dns } from 'node:dns';
 const TTL_MS = 60 * 60 * 1000;
 const cache = new Map<string, { ok: boolean; until: number }>();
 
+/**
+ * Les bornes du cache : une entrée par domaine demandé, et `/v1/account/code`
+ * est une porte sans clé. Sans borne, la mémoire du service grandirait avec
+ * chaque domaine inventé qu'on lui soumet. Au-delà de `MAIL_DOMAIN_CACHE_PURGE_AT`
+ * entrées, chaque nouvelle entrée purge d'abord celles qui ont expiré ;
+ * `MAIL_DOMAIN_CACHE_MAX` ne se dépasse jamais, les plus anciennes sortant en
+ * premier.
+ */
+export const MAIL_DOMAIN_CACHE_PURGE_AT = 1_000;
+export const MAIL_DOMAIN_CACHE_MAX = 5_000;
+
+function remember(domain: string, ok: boolean): void {
+  const now = Date.now();
+  if (cache.size >= MAIL_DOMAIN_CACHE_PURGE_AT) {
+    for (const [key, entry] of cache) if (entry.until <= now) cache.delete(key);
+  }
+  // La Map garde l'ordre d'arrivée : la première clé est la plus ancienne.
+  while (cache.size >= MAIL_DOMAIN_CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+  cache.set(domain, { ok, until: now + TTL_MS });
+}
+
 const RESERVED_SUFFIXES = [
   '.invalid',
   '.internal',
@@ -51,7 +76,7 @@ export async function domainAcceptsMail(domain: string): Promise<boolean> {
       ok = true; // timeout or resolver failure: not the domain's fault
     }
   }
-  cache.set(d, { ok, until: Date.now() + TTL_MS });
+  remember(d, ok);
   return ok;
 }
 
@@ -94,4 +119,9 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 /** Test seam: forget what was learned. */
 export function resetMailDomainCache(): void {
   cache.clear();
+}
+
+/** Pour les tests : le nombre d'entrées en mémoire. */
+export function mailDomainCacheSize(): number {
+  return cache.size;
 }
