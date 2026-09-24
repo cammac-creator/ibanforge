@@ -163,7 +163,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `redirected_from` | `string?` | The bank code you asked about, when the register answered for the one that took over its clearing (CH and LI: SIX redirects a concatenated IID). The IBAN stays valid: a redirect is not a retirement |
 | `bank_name` | `string \| null` | Financial institution name |
 | `city` | `string \| null` | City of the institution |
-| `basis` | `string` | Where the bank code to BIC pairing came from. `national_register` — the country's own register publishes this BIC for this bank code (today DE, AT, BE and BG); `curated_map` — our maintained bank-code map, an exact key and not an allocation record; `directory_prefix` — the BIC-prefix fallback, which can match several institutions (see `bank_code_check.candidates`) |
+| `basis` | `string` | Where the bank code to BIC pairing came from. `national_register` — the country's own register publishes this BIC for this bank code (today DE, AT, BE, SK, CZ, BG, CH, LI and SM); `curated_map` — our maintained bank-code map, an exact key and not an allocation record; `directory_prefix` — the BIC-prefix fallback, which can match several institutions (see `bank_code_check.candidates`) |
 | `authoritative` | `boolean` | Whether this BIC may be stored and settled against. Derived from `basis`, `true` only for `national_register`. See "Settle against it, or treat it as advisory?" below |
 
 **`sepa` object:**
@@ -197,7 +197,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `register` | `string \| null` | Human name of the reference set consulted |
 | `authoritative` | `boolean` | `true` only where the reference set IS the national register — see below |
 | `candidates` | `number?` | On `match: "prefix"`: how many institutions matched. More than 1 means the answer is indicative |
-| `institution` | `object?` | What the national register publishes about the allocated institution — name, seat address, LEI where available. Only on authoritative answers. Depth varies: CH/LI and AT full street address, DE postal code + town (its register has no street), BE name only, BG name only — in Cyrillic, as the register publishes it — SK name only, with Slovak diacritics as published. Absent fields are `null`, never guessed. This is the institution holding the bank code, not a branch, and not proof of any account |
+| `institution` | `object?` | What the national register publishes about the allocated institution — name, seat address, LEI where available. Only on authoritative answers. Depth varies: CH/LI and AT full street address, DE postal code + town (its register has no street), BE name only, BG name only — in Cyrillic, as the register publishes it — SK name only, with Slovak diacritics as published, CZ name only, with Czech diacritics as published. Absent fields are `null`, never guessed. This is the institution holding the bank code, not a branch, and not proof of any account |
 | `as_of` | `string` | Month of the reference data |
 
 **`risk_indicators` object:**

@@ -163,7 +163,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `redirected_from` | `string?` | Der angefragte Bankcode, wenn das Register für denjenigen geantwortet hat, der sein Clearing übernommen hat (CH und LI: SIX leitet eine konkatenierte IID um). Die IBAN bleibt gültig: eine Umleitung ist keine Stilllegung |
 | `bank_name` | `string \| null` | Name des Finanzinstituts |
 | `city` | `string \| null` | Stadt des Instituts |
-| `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, AT, BE und BG); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |
+| `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, AT, BE, SK, CZ, BG, CH, LI und SM); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |
 | `authoritative` | `boolean` | Ob dieser BIC gespeichert und zur Abwicklung verwendet werden darf. Aus `basis` abgeleitet, `true` nur bei `national_register`. Siehe den Abschnitt „Abwickeln oder nur als Hinweis behandeln?" unten |
 
 **`sepa`-Objekt:**
@@ -197,7 +197,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `register` | `string \| null` | Name des konsultierten Referenzbestands |
 | `authoritative` | `boolean` | `true` nur dort, wo der Referenzbestand das nationale Register IST — siehe unten |
 | `candidates` | `number?` | Bei `match: "prefix"`: Anzahl passender Institute. Mehr als 1 heißt: nur ein Hinweis |
-| `institution` | `object?` | Was das nationale Register über das Institut veröffentlicht: Name, Sitzadresse, LEI wo vorhanden. Nur bei autoritativen Antworten. Tiefe variiert: CH/LI und AT volle Adresse, DE nur PLZ + Ort (das Register führt keine Straße), BE nur der Name, BG nur der Name — in Kyrillisch, wie das Register ihn veröffentlicht —, SK nur der Name, mit slowakischen Diakritika wie veröffentlicht. Fehlende Felder sind `null`, nie geraten. Es ist das Institut, das den Bankcode hält — keine Filiale und kein Beleg für ein Konto |
+| `institution` | `object?` | Was das nationale Register über das Institut veröffentlicht: Name, Sitzadresse, LEI wo vorhanden. Nur bei autoritativen Antworten. Tiefe variiert: CH/LI und AT volle Adresse, DE nur PLZ + Ort (das Register führt keine Straße), BE nur der Name, BG nur der Name — in Kyrillisch, wie das Register ihn veröffentlicht —, SK nur der Name, mit slowakischen Diakritika wie veröffentlicht, CZ nur der Name, mit tschechischen Diakritika wie veröffentlicht. Fehlende Felder sind `null`, nie geraten. Es ist das Institut, das den Bankcode hält — keine Filiale und kein Beleg für ein Konto |
 | `as_of` | `string` | Monat der Referenzdaten |
 
 **`risk_indicators`-Objekt:**

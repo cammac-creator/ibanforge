@@ -163,7 +163,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `redirected_from` | `string?` | Le code de banque demande, quand le registre a repondu pour celui qui a repris sa compensation (CH et LI : SIX redirige un IID concatene). L'IBAN reste valide : une redirection n'est pas un retrait |
 | `bank_name` | `string \| null` | Nom de l'etablissement financier |
 | `city` | `string \| null` | Ville de l'etablissement |
-| `basis` | `string` | D'où vient l'appariement code banque → BIC. `national_register` — le registre national du pays publie ce BIC pour ce code banque (aujourd'hui DE, AT, BE et BG) ; `curated_map` — notre carte de codes banque maintenue, une clé exacte et non un acte d'attribution ; `directory_prefix` — le repli par préfixe de BIC, qui peut correspondre à plusieurs établissements (voir `bank_code_check.candidates`) |
+| `basis` | `string` | D'où vient l'appariement code banque → BIC. `national_register` — le registre national du pays publie ce BIC pour ce code banque (aujourd'hui DE, AT, BE, SK, CZ, BG, CH, LI et SM) ; `curated_map` — notre carte de codes banque maintenue, une clé exacte et non un acte d'attribution ; `directory_prefix` — le repli par préfixe de BIC, qui peut correspondre à plusieurs établissements (voir `bank_code_check.candidates`) |
 | `authoritative` | `boolean` | Ce BIC peut-il être stocké et servir à régler. Dérivé de `basis`, `true` uniquement pour `national_register`. Voir la section « Régler contre ce BIC, ou le traiter comme indicatif ? » ci-dessous |
 
 **Objet `sepa` :**
@@ -197,7 +197,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `register` | `string \| null` | Nom du jeu de référence consulté |
 | `authoritative` | `boolean` | `true` uniquement là où le jeu de référence EST le registre national — voir ci-dessous |
 | `candidates` | `number?` | Sur `match: "prefix"` : nombre d'établissements correspondants. Au-delà de 1, la réponse n'est qu'indicative |
-| `institution` | `object?` | Ce que le registre national publie sur l'établissement titulaire : nom, adresse du siège, LEI quand il existe. Seulement sur les réponses autoritaires. La profondeur varie : CH/LI et AT adresse complète, DE code postal + ville (son registre n'a pas de rue), BE nom seul, BG nom seul — en cyrillique, tel que le registre le publie —, SK nom seul, avec les diacritiques slovaques tels que publiés. Les champs absents sont `null`, jamais devinés. C'est l'établissement titulaire du code banque, pas une agence, et pas la preuve d'un compte |
+| `institution` | `object?` | Ce que le registre national publie sur l'établissement titulaire : nom, adresse du siège, LEI quand il existe. Seulement sur les réponses autoritaires. La profondeur varie : CH/LI et AT adresse complète, DE code postal + ville (son registre n'a pas de rue), BE nom seul, BG nom seul — en cyrillique, tel que le registre le publie —, SK nom seul, avec les diacritiques slovaques tels que publiés, CZ nom seul, avec les diacritiques tchèques tels que publiés. Les champs absents sont `null`, jamais devinés. C'est l'établissement titulaire du code banque, pas une agence, et pas la preuve d'un compte |
 | `as_of` | `string` | Mois des données de référence |
 
 **Objet `risk_indicators` :**

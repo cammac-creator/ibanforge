@@ -51,7 +51,13 @@ jobs:
       - name: Seed German Bankleitzahlen (Bundesbank)
         run: npm run db:seed-blz
 
-      - name: Refresh Austrian, Belgian, Slovak and San Marino registers
+      # The Czech register rides the same step, last. It exits 0 and leaves both
+      # Czech tables as they were when cnb.cz cannot be read, contradicts
+      # itself or serves an older edition than the one already in force (a
+      # refusal page served with HTTP 200 included); only a change of FORMAT
+      # fails the step, because that is what a human has to read. Same rule as
+      # the Bulgarian step below.
+      - name: Refresh Austrian, Belgian, Slovak, San Marino and Czech registers
         run: npm run db:seed-national
 
       # The Bulgarian National Bank's BAE register. Same reason as the German

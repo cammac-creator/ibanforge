@@ -194,7 +194,7 @@ deux dates.
 
 **Conséquence pratique** : une banque créée, absorbée ou renommée depuis 2018
 peut manquer, ou porter un nom périmé, dans la partie SwiftCodes du
-répertoire. Les registres nationaux (SIX, Bundesbank, OeNB, BNB, NBS, BNB
+répertoire. Les registres nationaux (SIX, Bundesbank, OeNB, BNB, NBS, ČNB, BNB
 bulgare) et GLEIF, eux, sont bien rafraîchis chaque mois — c'est pourquoi
 `bank_code_check` et `bic.basis` existent : ils disent quelle partie du
 répertoire a répondu.
@@ -1043,19 +1043,26 @@ Conditions d'utilisation du site, « Podmínky užívání internetových strán
 
 Traduction de travail : on peut stocker, transmettre et reproduire les
 informations du site, sauf textes signés et images de tiers ; la ČNB doit
-toujours être citée (« Zdroj: ČNB ») ; le fichier ne doit pas être modifié ; en
-cas d'extrait, de découpage ou de réunion de textes, les faits et le sens ne
-doivent pas changer.
+toujours être citée (« Zdroj: ČNB ») ; le fichier ne doit être modifié ni dans
+son contenu ni autrement, et il doit toujours être ouvert dans une nouvelle
+fenêtre du navigateur ; en cas d'extrait, de découpage ou de réunion de textes,
+les faits et le sens ne doivent pas changer.
+
+La clause de la nouvelle fenêtre vise l'ouverture d'un fichier de la ČNB dans
+un navigateur. IBANforge ne sert ni n'ouvre ce fichier : l'API sert des champs
+extraits, un enregistrement par requête, ce que couvre la phrase sur les
+extraits (et l'avis du 27/08/2026 cité plus bas). Elle est donc sans objet ici.
 
 Base de l'exhaustivité, vyhláška č. 169/2011 Sb., publiée par la ČNB
 (<https://www.cnb.cz/export/sites/cnb/cs/platebni-styk/.galleries/pravni_predpisy/download/vyhl_169_2011.pdf>),
-lue le **24/09/2026** :
+lue le **24/09/2026** et relue le **25/09/2026** sur le PDF publié (texte extrait
+par `pdftotext`, coupures de fin de ligne recollées) :
 
 > § 4 : « Číslo účtu ve formátu IBAN je tvořeno 24 alfanumerickými znaky, kdy
-> […] c) pátý až osmý znak obsahují číslice kódu platebního styku (§ 6) »
+> […] c) pátý až osmý znak obsahují číslice kódu platebního styku (§ 6) […] »
 >
 > § 6 al. 2 : « Česká národní banka uveřejňuje kódy platebního styku, které
-> poskytovatelům platebních služeb přidělila, v Číselníku kódů platebního styku
+> poskytovateli platebních služeb přidělila, v Číselníku kódů platebního styku
 > v České republice, a to způsobem umožňujícím dálkový přístup. »
 
 Les positions 5 à 8 de tout IBAN tchèque sont le code de paiement, et la ČNB
@@ -1098,11 +1105,27 @@ dans `NATIONAL_REGISTERS` (`authoritative: true`), comme la Slovaquie.
   16/03/2026, 245 le 09/04/2025), alors que le rafraîchissement mensuel tourne
   le 1er.
 - L'édition en vigueur se lit dans son CSV **numéroté**
-  (`kody_bank_CR_<N>.csv`, servi sans être lié) ; quand rien n'est annoncé, il
-  doit être identique au CSV lié par la page, sinon le chargeur refuse.
-- Un échec de **téléchargement** laisse les deux tables telles quelles et ne
-  fait pas échouer le rafraîchissement mensuel (on ne sait pas si cnb.cz répond
-  aux machines de GitHub) ; un changement de **format** le fait échouer.
+  (`kody_bank_CR_<N>.csv`). La page lie ce fichier numéroté pour une édition
+  annoncée (copie archivée du 28/08/2026 : 254 lié par `kody_bank_CR_254.csv`,
+  253 par le fichier non numéroté). Quand rien n'est annoncé, le numéroté est
+  comparé au CSV lié par la page ; s'ils diffèrent, ou si le lié ne se lit pas,
+  le numéroté est chargé, aucune annonce n'est écrite et un avertissement est
+  journalisé ; le rafraîchissement suivant relit la page.
+- Une annonce lue dans son fichier **numéroté** est écrite même si ses codes,
+  noms et BIC sont ceux de l'édition en vigueur (des éditions ne changent que
+  la colonne CERTIS, non stockée : 235→236, 248→249, 250→251). Seule une
+  annonce lue dans le fichier non numéroté, identique à l'édition en vigueur,
+  est écartée : ce fichier ne porte pas de numéro et n'a peut-être pas encore
+  bougé.
+- Une source **injoignable** (réseau, erreur HTTP, connexion coupée pendant le
+  transfert, délai dépassé), une **page de refus servie en HTTP 200** (page sans
+  le nom « Česká národní banka », ou HTML à la place d'un CSV), des dates
+  **contradictoires** entre la page et l'historique, ou une édition **plus
+  ancienne** que celle déjà servie laissent les deux tables telles quelles et
+  ne font pas échouer le rafraîchissement mensuel (on ne sait pas si cnb.cz
+  répond aux machines de GitHub). Un changement de **format** (page de la ČNB
+  sans la phrase « Číselník N platný od … », CSV sans son en-tête, édition sous
+  le plancher) le fait échouer.
 
 ### Les pièges de la source
 
