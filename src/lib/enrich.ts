@@ -142,6 +142,17 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   // languages because the Slovak word is what the register is called at home
   // and the English one is what the page a reader will open says.
   SK: 'Národná banka Slovenska, prevodník of identification codes for the domestic payment system',
+  // Czechia. The one register here whose exhaustiveness is written in law:
+  // vyhláška č. 169/2011 Sb., § 4 c), makes IBAN positions 5-8 the payment code
+  // of § 6, and § 6 (2) has the ČNB publish every code it has allocated in this
+  // číselník. A code absent from the edition in force is allocated to nobody.
+  // "Zdroj: ČNB" sits in the name itself: the ČNB site terms make it a
+  // condition of every reuse ("ČNB musí být vždy uvedena jako zdroj
+  // informací"), and this string is what `bank_code_check.register` carries on
+  // EVERY answer the register decides — a refusal, and the codes the ČNB
+  // publishes without a BIC, have no `bic` block to carry the edition's own
+  // credit.
+  CZ: 'Česká národní banka, Číselník kódů platebního styku v České republice (directory of payment-system codes; Zdroj: ČNB)',
   // Bulgaria says what the claim covers, like Finland does. A BAE code is the
   // NOTE: the bare name lives in BG_REGISTER_NAME below — the caveat qualifies
   // the VERDICT, and repeating it beside a BIC would attach it to a field it
@@ -289,14 +300,15 @@ function askNationalRegister(
       },
     };
   }
-  if (cc === 'AT' || cc === 'BE' || cc === 'SK') {
+  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'CZ') {
     // Same safe failure as Germany: no table means no ground truth, so decline
     // authority rather than reading every code as unallocated.
     if (!nationalRegisterAvailable(cc)) return null;
     // Dated from the register where the register states a date, on the NEGATIVE
     // branch too: a denial a caller will act on has to say how current the list
-    // behind it is. Only Slovakia stores one — the NBS publishes a versioned
-    // edition with an effective date, while the OeNB and the NBB publish a
+    // behind it is. Slovakia and Czechia store one — the NBS and the ČNB publish
+    // versioned editions with an effective date (for Czechia, the edition IN
+    // FORCE today, not the one announced), while the OeNB and the NBB publish a
     // rolling file whose honest date is our own refresh month. `null` here
     // falls through to getReferenceAsOf() in the caller, which is exactly what
     // AT and BE were doing before this branch learned about editions.
@@ -307,10 +319,10 @@ function askNationalRegister(
       allocated: true,
       institution: {
         name: hit.name,
-        // OeNB: full seat address. BNB and NBS: names only — nulls are the
-        // honest shape of what Belgium and Slovakia publish, not missing data
-        // on our side, and inventing an address would be the distortion the
-        // NBS terms forbid.
+        // OeNB: full seat address. BNB, NBS and ČNB: names only — nulls are
+        // the honest shape of what Belgium, Slovakia and Czechia publish, not
+        // missing data on our side, and inventing an address would be the
+        // distortion the NBS and ČNB terms forbid.
         street: hit.street,
         post_code: hit.post_code,
         town: hit.town,
@@ -760,7 +772,7 @@ function safeReferenceAsOf(): string {
  * two halves of the same object contradicting each other on the exact point at
  * issue. A derived boolean cannot do that.
  *
- * Only the national register is true today — served for DE, AT, BE, BG and SK —
+ * Only the national register is true today — served for DE, AT, BE, BG, SK and CZ —
  * and the flat answer "advisory outside a register" is worth more than a field
  * that flatters the other two. Adding a country here means its register
  * publishes the BIC per bank code AND that we read it — not that our pairing
@@ -955,8 +967,10 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
     }
   }
 
-  // Austria, Belgium and Slovakia: the same rule as Germany, one register over.
-  // All three tables carry a BIC per bank code. For AT and BE it was read only
+  // Austria, Belgium, Slovakia and Czechia: the same rule as Germany, one
+  // register over. All four tables carry a BIC per bank code (Czechia's joined
+  // on 25/09/2026, with codes the ČNB publishes without one — those keep the
+  // composite map's BIC, if it has one). For AT and BE it was read only
   // for the bank-code verdict until 29/08/2026, while the served BIC still came
   // from the composite map; measured against the registers, that split kept
   // three retired pairings in circulation (two Belgian, one Austrian) and
@@ -987,15 +1001,16 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       lookupFailed = true;
     }
   }
-  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'SM') {
+  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'CZ' || cc === 'SM') {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
       if (reg?.bic) {
         bic = {
           code: reg.bic,
-          // Verbatim, diacritics and all. The NBS terms forbid altering the
-          // file, so a Slovak name is served exactly as published — the same
-          // rule that keeps Bulgarian names in Cyrillic below.
+          // Verbatim, diacritics and all. The NBS and ČNB terms forbid altering
+          // the file or the facts, so a Slovak or Czech name is served exactly
+          // as published — the same rule that keeps Bulgarian names in
+          // Cyrillic below.
           bank_name: reg.name,
           // The OeNB publishes the seat; the NBB and the NBS publish names
           // only — so Belgium and Slovakia take the city from the directory row
@@ -1009,17 +1024,18 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           // string that matches nothing — a lookup guaranteed to miss rather
           // than one that resolves the branch's own directory row.
           city: reg.town ?? lookup(reg.bic.length === 8 ? `${reg.bic}XXX` : reg.bic)?.city ?? null,
-          // The register's own credit where it stores one — Slovakia, whose
-          // terms make naming the source a condition of reuse, and San Marino,
+          // The register's own credit where it stores one — Slovakia and
+          // Czechia, whose terms make naming the source a condition of reuse
+          // (the Czech one reads "Zdroj: ČNB, …, verze N"), and San Marino,
           // whose licence is unknown and which is therefore credited by choice
-          // rather than by obligation. Both are read from the row and never
+          // rather than by obligation. All are read from the row and never
           // written here. Austria and Belgium store none and take the
           // register's name.
           source: reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc],
-          // Year-month, as this field is documented. Slovakia states an
-          // effective date of its own and San Marino carries the day we read
-          // its page; AT and BE are dated by the reference set, which for a
-          // file re-read on our cycle is the honest answer.
+          // Year-month, as this field is documented. Slovakia and Czechia
+          // state an effective date of their own and San Marino carries the
+          // day we read its page; AT and BE are dated by the reference set,
+          // which for a file re-read on our cycle is the honest answer.
           as_of: reg.as_of?.slice(0, 7) ?? (getReferenceAsOf() || null),
           // Same licence as the German block above: the register publishes
           // this BIC per bank code, so the pairing is the register's, not ours.
