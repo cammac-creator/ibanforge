@@ -164,6 +164,18 @@ describe('portée d’une session : lecture seule', () => {
     const key = generateApiKey(email);
     if (!key) throw new Error('frappe impossible');
     const db = getStatsDB();
+    // Des lignes existantes à ne pas toucher : sans elles, une écriture qui ne
+    // trouverait rien à modifier passerait pour une lecture.
+    db.prepare('INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 7)').run(
+      key.key_hash,
+      new Date().toISOString().slice(0, 7),
+    );
+    db.prepare("INSERT INTO quota_notices (key_hash, month) VALUES (?, '2026-08')").run(
+      key.key_hash,
+    );
+    db.prepare(
+      "INSERT INTO request_log (method, path, status, response_ms, key_prefix) VALUES ('POST', '/v1/iban/validate', 200, 2, ?)",
+    ).run(key.key_prefix);
     const snapshot = () => ({
       keys: db.prepare('SELECT * FROM api_keys WHERE email_norm = ? ORDER BY id').all(email),
       usage: db.prepare('SELECT * FROM api_usage WHERE key_hash = ?').all(key.key_hash),
