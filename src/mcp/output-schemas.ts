@@ -497,7 +497,7 @@ const CHECK_COMPLIANCE_OUTPUT_SCHEMA = {
       disclaimer: z.string(),
       sanctions_as_of: z.string().nullable().optional(),
       fatf_as_of: z.string().nullable().optional(),
-      sources: z.string().optional(),
+      sources: z.string().nullable().optional(),
     })
     .passthrough(),
   cost_usdc: z.number().describe('What THIS call was billed. Zero on the free MCP tier.'),

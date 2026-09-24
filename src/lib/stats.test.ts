@@ -15,6 +15,7 @@ import {
   getBotProfiles,
   classifyClient,
   extractClientIp,
+  isBillableCall,
   normalizeRequestPath,
   anonymousTierCounts,
 } from './stats.js';
@@ -590,6 +591,122 @@ describe('normalizeRequestPath', () => {
     expect(normalizeRequestPath('/CH9300762011623852957%7D')).toBe('/:redacted%7D');
   });
 
+  // The privacy policy promises submitted IBANs are not stored (privacy.mdx §1,
+  // DPA clause 2). Until 24/09/2026 a value in the PATH was only caught when it
+  // came in one block: any separator, or a percent-escaped one, and the whole
+  // IBAN went into `request_log` for twelve months. People and agents write
+  // IBANs the way they read them, in groups. Public example IBANs only.
+  describe('an IBAN written the way people write it', () => {
+    it.each([
+      ['one block', '/v1/iban/CH9300762011623852957', '/v1/iban/:redacted'],
+      ['lowercase', '/v1/iban/ch9300762011623852957', '/v1/iban/:redacted'],
+      ['raw spaces', '/v1/iban/CH93 0076 2011 6238 5295 7', '/v1/iban/:redacted'],
+      ['%20', '/v1/iban/CH93%200076%202011%206238%205295%207', '/v1/iban/:redacted'],
+      ['+', '/v1/iban/CH93+0076+2011+6238+5295+7', '/v1/iban/:redacted'],
+      ['dashes', '/v1/iban/CH93-0076-2011-6238-5295-7', '/v1/iban/:redacted'],
+      ['dots', '/check/CH93.0076.2011.6238.5295.7', '/check/:redacted'],
+      ['underscores', '/v1/iban/CH93_0076_2011_6238_5295_7', '/v1/iban/:redacted'],
+      ['lowercase with dashes', '/v1/iban/de89-3704-0044-0532-0130-00', '/v1/iban/:redacted'],
+      ['escaped dashes', '/v1/iban/CH93%2D0076%2D2011%2D6238%2D5295%2D7', '/v1/iban/:redacted'],
+      [
+        'no-break spaces',
+        '/v1/iban/CH93%C2%A00076%C2%A02011%C2%A06238%C2%A05295%C2%A07',
+        '/v1/iban/:redacted',
+      ],
+      [
+        'narrow no-break spaces',
+        '/v1/iban/FR14%E2%80%AF2004%E2%80%AF1010%E2%80%AF0505%E2%80%AF0001%E2%80%AF3M02%E2%80%AF606',
+        '/v1/iban/:redacted',
+      ],
+      [
+        'every character escaped',
+        '/v1/iban/%43%48%39%33%30%30%37%36%32%30%31%31%36%32%33%38%35%32%39%35%37',
+        '/v1/iban/:redacted',
+      ],
+      [
+        'encoded braces around groups',
+        '/v1/bic/%7BCH93%200076%202011%206238%205295%207%7D',
+        '/v1/bic/%7B:redacted%7D',
+      ],
+      [
+        'raw braces around groups',
+        '/v1/iban/{gb29-nwbk-6016-1331-9268-19}',
+        '/v1/iban/{:redacted}',
+      ],
+      [
+        'groups inside a longer segment',
+        '/v1/iban/iban=CH93-0076-2011-6238-5295-7',
+        '/v1/iban/iban=:redacted',
+      ],
+      // A mistyped IBAN (last digit wrong, mod 97 fails) is still one a person
+      // submitted: the policy keeps at most its first twelve characters.
+      ['mistyped, with dashes', '/v1/iban/CH93-0076-2011-6238-5295-8', '/v1/iban/:redacted'],
+      // A character missing: no group ends at the Swiss length (21), so the
+      // mask runs to the last group that could still belong to it.
+      [
+        'one character short, with spaces',
+        '/v1/iban/CH93%200076%202011%206238%205295',
+        '/v1/iban/:redacted',
+      ],
+      // At the registered length the IBAN ends: what follows it is kept.
+      [
+        'followed by a sub-path',
+        '/lookup/de89-3704-0044-0532-0130-00/details',
+        '/lookup/:redacted/details',
+      ],
+      // Spread over segments: TWO markers, whatever the grouping, so the path
+      // keeps saying it had more than one segment.
+      [
+        'one group per segment',
+        '/v1/iban/DE89/3704/0044/0532/0130/00',
+        '/v1/iban/:redacted/:redacted',
+      ],
+      // A country our table does not list: masked because mod 97 holds.
+      [
+        'unlisted country, valid check digits',
+        '/v1/iban/ZZ98-1234-5678-9012-3456-7',
+        '/v1/iban/:redacted',
+      ],
+    ])('%s', (_form, path, expected) => {
+      expect(normalizeRequestPath(path)).toBe(expected);
+    });
+
+    it('does not mask groups that only look like one: unlisted country, check digits wrong', () => {
+      // Two letters no IBAN opens with, and mod 97 fails: not an IBAN, so a
+      // slug of this shape keeps its own bucket.
+      expect(normalizeRequestPath('/v1/iban/ZZ97-1234-5678-9012-3456-7')).toBe(
+        '/v1/iban/ZZ97-1234-5678-9012-3456-7',
+      );
+    });
+
+    // `isBillableCall` and the lineage facts read the SAME normalisation, and
+    // the measurement contract of 15/09 says `GET /v1/bic/a/b/c` is not a BIC
+    // lookup. An IBAN spread over segments under /v1/bic/ must not collapse
+    // into the one-segment family `/v1/bic/:code`.
+    it('never turns a multi-segment path into a billable one-segment family', () => {
+      expect(normalizeRequestPath('/v1/bic/DE89/3704/0044/0532/0130/00')).toBe(
+        '/v1/bic/:code/:redacted',
+      );
+      expect(isBillableCall('GET', '/v1/bic/DE89/3704/0044/0532/0130/00')).toBe(false);
+      // One segment stays what it was before the fix: a (malformed) BIC lookup.
+      expect(normalizeRequestPath('/v1/bic/DE89-3704-0044-0532-0130-00')).toBe('/v1/bic/:code');
+      expect(isBillableCall('GET', '/v1/bic/DE89-3704-0044-0532-0130-00')).toBe(true);
+    });
+
+    it('is idempotent: a stored label normalises to itself', () => {
+      for (const p of [
+        '/v1/iban/CH93%200076%202011%206238%205295%207',
+        '/v1/iban/DE89/3704/0044/0532/0130/00',
+        '/v1/bic/DE89/3704/0044/0532/0130/00',
+        '/v1/bic/%7BCH93%200076%202011%206238%205295%207%7D',
+        '/v1/ch/clearing/CH230',
+      ]) {
+        const once = normalizeRequestPath(p);
+        expect(normalizeRequestPath(once)).toBe(once);
+      }
+    });
+  });
+
   it('leaves ordinary endpoints untouched', () => {
     for (const p of [
       '/',
@@ -599,6 +716,13 @@ describe('normalizeRequestPath', () => {
       '/mcp',
       '/v1/credits/buy/25k',
       '/v1/iban/structure/CH',
+      '/v1/iban/format',
+      '/v1/feedback/42',
+      '/v1/gb/firm/123456',
+      '/internal/heartbeat/crm-sync',
+      // An audit job id is 36 hex characters: longer than any IBAN.
+      '/v1/audit/status/de12a4b5c6d7e8f90a1b2c3d4e5f60718293',
+      '/.well-known/mcp/server-card.json',
     ]) {
       expect(normalizeRequestPath(p)).toBe(p);
     }
@@ -622,6 +746,31 @@ describe('request_log persists no submitted identifier (DPA)', () => {
     // this very sweep pass green over a table holding complete IBANs.
     recordRequest('GET', '/v1/bic/%7BCH9300762011623852957%7D', 400, 1);
     recordRequest('POST', '/%7BCH9300762011623852957%7D', 404, 1);
+    // Written in groups (24/09/2026): every one of these was stored whole.
+    recordRequest('GET', '/v1/iban/CH93%200076%202011%206238%205295%207', 404, 1);
+    recordRequest('GET', '/v1/iban/de89-3704-0044-0532-0130-00', 404, 1);
+    recordRequest('GET', '/v1/iban/GB29.NWBK.6016.1331.9268.19', 404, 1);
+    recordRequest('GET', '/v1/iban/FR14_2004_1010_0505_0001_3M02_606', 404, 1);
+    recordRequest('GET', '/v1/iban/CH93+0076+2011+6238+5295+7', 404, 1);
+    recordRequest('GET', '/v1/bic/DE89/3704/0044/0532/0130/00', 404, 1);
+    recordRequest('GET', '/v1/bic/%7Bch93%200076%202011%206238%205295%207%7D', 400, 1);
+
+    // C. Read the way a person would: escapes decoded, separators dropped,
+    // case ignored. None of the IBANs written above may be found again.
+    const WRITTEN = [
+      'CH9300762011623852957',
+      'DE89370400440532013000',
+      'GB29NWBK60161331926819',
+      'FR1420041010050500013M02606',
+    ];
+    const asRead = (stored: string): string =>
+      stored
+        .replace(/%([0-7][0-9A-Fa-f])/g, (_m, hex: string) =>
+          String.fromCharCode(Number.parseInt(hex, 16)),
+        )
+        .replace(/%C2%A0|%E2%80%AF|%E2%80%89/gi, '')
+        .replace(/[\s+\-._/]/g, '')
+        .toUpperCase();
 
     // Invariants restated independently of stats.ts: if the production regexes
     // were wrong, importing them here would make the test wrong the same way.
@@ -635,7 +784,7 @@ describe('request_log persists no submitted identifier (DPA)', () => {
     const rows = getStatsDB().prepare('SELECT path FROM request_log').all() as Array<{
       path: string;
     }>;
-    expect(rows.length).toBeGreaterThanOrEqual(5);
+    expect(rows.length).toBeGreaterThanOrEqual(12);
 
     for (const { path } of rows) {
       // A. No token anywhere is identifier-shaped — covers unmatched routes and
@@ -650,6 +799,8 @@ describe('request_log persists no submitted identifier (DPA)', () => {
 
       const iid = /^\/v1\/ch\/clearing\/([^/]+)/.exec(path);
       if (iid && !specTemplate.test(iid[1])) expect(iid[1]).toBe(':iid');
+
+      for (const iban of WRITTEN) expect(asRead(path)).not.toContain(iban);
     }
   });
 });

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
+import { IBAN_LENGTHS } from './countries.js';
 import { getStatsDB } from './db.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 import { ANONYMOUS_CONTACT } from './tiers.js';
@@ -223,7 +224,7 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 // A submitted identifier must never reach `request_log`, which has twelve-month
 // retention — that is the signed DPA clause, and the malformed-identifier
 // traffic this instrumentation exists to measure is exactly the population that
-// used to leak. Three shapes had to be closed:
+// used to leak. The shapes that had to be closed:
 //
 //   /v1/bic/UBSW%20CHZH      → the old `[A-Za-z0-9]+` stopped at `%`, storing
 //                              `/v1/bic/:code%20CHZH` (tail of the BIC kept).
@@ -236,30 +237,189 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 //                              segment-shaped (it starts with `%`), and excused
 //                              by the template rule below — a COMPLETE IBAN at
 //                              rest, worse than the first case. See
-//                              `redactSegment` for why the fix belongs there.
+//                              `PATH_UNIT` for why the fix belongs there.
+//   /v1/iban/CH93%200076%20… → an IBAN written the way people write it, in
+//   /v1/iban/de89-3704-…       groups (24/09/2026). Only a value in ONE block
+//   /v1/iban/DE89/3704/…       was caught, so any separator — space, `+`, `-`,
+//                              `.`, `_`, a slash, raw or percent-encoded — put
+//                              the whole IBAN at rest. See `spreadIbanEnd`.
 
 /**
  * The one shape a submitted value can take on ANY route, including one we never
- * registered: two letters, two check digits, then alphanumerics.
+ * registered: two letters, two check digits, then alphanumerics. Tested on a
+ * run of letters and digits with nothing between them, uppercased first, so the
+ * case a caller typed changes nothing.
  *
  * Deliberately narrow. Checked against every path this API registers — `v1`,
  * `validate`, `clearing`, the `1k`/`5k`/`25k` bundle slugs, `cs_…` Stripe
  * session ids, 2-letter country codes — none has this shape, so the catch-all
- * cannot swallow a real endpoint and fragment the dashboard.
+ * cannot swallow a real endpoint and fragment the dashboard (the route sweep in
+ * `src/app.log-redaction.test.ts` checks every registered pattern).
  */
-const IBAN_SHAPED_TOKEN = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+const IBAN_SHAPED_TOKEN = /^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/;
 
 /**
- * What delimits an identifier inside a path segment, beyond `/`: a percent
- * escape or a brace.
+ * How a path is read before any identifier is looked for: one unit per
+ * character, where a percent escape counts as the character it encodes. This
+ * replaces `IDENTIFIER_BOUNDARY`, which split a segment on escapes and braces.
  *
- * Testing whole segments is not enough. In `%7BCH9300762011623852957%7D` the
- * `B` of `%7B` glues onto the `CH`, so the segment matches nothing
- * identifier-shaped while still containing a complete IBAN. Splitting here (the
- * capture group keeps the delimiters, so the wrapper is rebuilt verbatim)
- * isolates the core and lets it be redacted in place.
+ * Splitting was enough for a value written in one block, not for a value
+ * written the way people write IBANs: `CH93%200076%202011…`, `ch93-0076-…`,
+ * `CH93.0076.…`, `DE89/3704/…`. Reading `%20`, `%2D` or `%41` as the space, dash
+ * or letter they stand for is what lets one rule see all of those as the same
+ * IBAN. The three multi-byte escapes are the no-break, narrow no-break and thin
+ * spaces that a copy from a PDF or a French document puts between the groups.
+ *
+ * An escape stays ONE unit, so in `%7BCH9300762011623852957%7D` the `B` of
+ * `%7B` can never glue onto the `CH` (the trap `IDENTIFIER_BOUNDARY` was written
+ * for): the brace is a boundary, and the wrapper is rebuilt verbatim around the
+ * redacted core.
  */
-const IDENTIFIER_BOUNDARY = /(%[0-9A-Fa-f]{2}|[{}])/;
+const PATH_UNIT = /%e2%80%(?:af|89)|%c2%a0|%[0-9a-f]{2}|[\s\S]/giu;
+
+/** What people put between the groups of an IBAN. The slash is handled apart. */
+const GROUP_SEPARATORS = new Set([' ', '\t', '+', '-', '.', '_', ' ', ' ', ' ']);
+
+/** Letters and digits in an IBAN once its separators are dropped (ISO 13616). */
+const IBAN_MIN_LENGTH = 15;
+const IBAN_MAX_LENGTH = 34;
+
+interface PathUnit {
+  /** The unit as it was written, rebuilt verbatim when it is not redacted. */
+  raw: string;
+  kind: 'alnum' | 'separator' | 'slash' | 'other';
+  /** The uppercased character, for `alnum` units only. */
+  char: string;
+}
+
+function readPathUnit(raw: string): PathUnit {
+  // The multi-byte escapes PATH_UNIT matches whole are all spaces.
+  if (raw.length > 3) return { raw, kind: 'separator', char: '' };
+  let decoded = raw;
+  if (raw.length === 3 && raw.startsWith('%')) {
+    const code = Number.parseInt(raw.slice(1), 16);
+    if (code >= 0x80) return { raw, kind: 'other', char: '' };
+    decoded = String.fromCharCode(code);
+    // `%2F` sits INSIDE one segment: the router never split on it.
+    if (decoded === '/') return { raw, kind: 'separator', char: '' };
+  } else if (raw === '/') {
+    return { raw, kind: 'slash', char: '' };
+  }
+  if (/^[A-Za-z0-9]$/.test(decoded)) return { raw, kind: 'alnum', char: decoded.toUpperCase() };
+  if (GROUP_SEPARATORS.has(decoded)) return { raw, kind: 'separator', char: '' };
+  return { raw, kind: 'other', char: '' };
+}
+
+/** ISO 13616 check: the first four characters moved to the end, A = 10 … Z = 35, remainder 1. */
+function passesMod97(compact: string): boolean {
+  const rearranged = compact.slice(4) + compact.slice(0, 4);
+  let remainder = 0;
+  for (const char of rearranged) {
+    const digits = char >= 'A' ? String(char.charCodeAt(0) - 55) : char;
+    for (const digit of digits) remainder = (remainder * 10 + Number(digit)) % 97;
+  }
+  return remainder === 1;
+}
+
+/**
+ * Where an IBAN written across separators ends, when one starts at `start`: the
+ * index of its last unit, or -1.
+ *
+ * The letters and digits are read through spaces, `+`, `-`, `.`, `_` and `/`,
+ * raw or percent-encoded, then judged once separators are dropped and case is
+ * ignored: two letters, two digits, 15 to 34 characters in all, ending where a
+ * group ends. Where it ends: at the country's registered length when a group
+ * ends there (`/DE89370400440532013000/details` keeps `/details`); otherwise —
+ * an IBAN typed a character short or long — at the LAST group end that
+ * qualifies, because one group too many only costs a 404 path its tail, while
+ * one too few would leave account digits in clear.
+ *
+ * Which two letters qualify:
+ *   - a country code of the IBAN registry (`IBAN_LENGTHS`): the shape suffices,
+ *     mod 97 is NOT required. A mistyped IBAN is still an IBAN a person
+ *     submitted, and the privacy policy lets us keep at most its first twelve
+ *     characters (privacy.mdx §1, DPA clause 2). Requiring the checksum would
+ *     leave exactly the mistyped ones — the reason people check an IBAN at all —
+ *     in clear for twelve months.
+ *   - any other two letters: only when mod 97 holds, for an IBAN from a country
+ *     the table does not list yet. Without the checksum, a slug of that shape is
+ *     not an IBAN and keeps its own bucket.
+ * No route this API registers opens with a registry country code and two digits
+ * (route sweep in `src/app.log-redaction.test.ts`), so the rule without the
+ * checksum costs the dashboard nothing.
+ */
+function spreadIbanEnd(units: readonly PathUnit[], start: number): number {
+  let compact = '';
+  let end = -1;
+  for (let k = start; k < units.length; k += 1) {
+    const unit = units[k];
+    if (unit.kind === 'other') break;
+    if (unit.kind !== 'alnum') continue;
+    compact += unit.char;
+    const n = compact.length;
+    if (n <= 2 && !/[A-Z]/.test(unit.char)) return -1;
+    if (n > 2 && n <= 4 && !/\d/.test(unit.char)) return -1;
+    const groupEnds = k + 1 >= units.length || units[k + 1].kind !== 'alnum';
+    if (groupEnds && n >= IBAN_MIN_LENGTH) {
+      const country = compact.slice(0, 2);
+      if (Object.hasOwn(IBAN_LENGTHS, country)) {
+        if (n === IBAN_LENGTHS[country]) return k;
+        end = k;
+      } else if (passesMod97(compact)) {
+        end = k;
+      }
+    }
+    if (n >= IBAN_MAX_LENGTH) break;
+  }
+  return end;
+}
+
+/**
+ * Replace every IBAN, however it is written, and every IBAN-shaped value in
+ * `text` — a request path, or a request target with its query string — by
+ * `marker`, leaving everything around it as it was.
+ *
+ * Shared by the two journals that keep a path: `request_log` (twelve months,
+ * marker `:redacted`, via `normalizeRequestPath`) and the console log that
+ * Railway keeps (marker `***`, `src/app.ts`). One rule for both, so they can no
+ * longer disagree on what an IBAN looks like: the console used to mask only a
+ * block written in capitals.
+ *
+ * An IBAN spread over several segments (`/DE89/3704/…`) becomes TWO markers,
+ * `:redacted/:redacted`. The path keeps saying it had more than one segment, so
+ * a one-segment route label never absorbs it (`GET /v1/bic/a/b/c` is not a BIC
+ * lookup: measurement contract of 15/09, see `BILLABLE_RULES`), and every such
+ * path lands in one bucket whatever the grouping.
+ */
+export function redactIbanShapedValues(text: string, marker: string): string {
+  const units = (text.match(PATH_UNIT) ?? []).map(readPathUnit);
+  let out = '';
+  let i = 0;
+  while (i < units.length) {
+    const startsWord = units[i].kind === 'alnum' && (i === 0 || units[i - 1].kind !== 'alnum');
+    if (!startsWord) {
+      out += units[i].raw;
+      i += 1;
+      continue;
+    }
+    const end = spreadIbanEnd(units, i);
+    if (end >= 0) {
+      const spansSegments = units.slice(i, end + 1).some((unit) => unit.kind === 'slash');
+      out += spansSegments ? `${marker}/${marker}` : marker;
+      i = end + 1;
+      continue;
+    }
+    // Not spread over groups: the one-block rule, on this run of letters and digits.
+    let j = i;
+    while (j + 1 < units.length && units[j + 1].kind === 'alnum') j += 1;
+    const run = units.slice(i, j + 1);
+    out += IBAN_SHAPED_TOKEN.test(run.map((unit) => unit.char).join(''))
+      ? marker
+      : run.map((unit) => unit.raw).join('');
+    i = j + 1;
+  }
+  return out;
+}
 
 /**
  * OpenAPI template literals (`{code}`, `%7Bcode%7D`) are NOT submitted values —
@@ -271,8 +431,8 @@ const IDENTIFIER_BOUNDARY = /(%[0-9A-Fa-f]{2}|[{}])/;
  * start counting them as `bad_input` — the exact regression that exclusion was
  * added to fix.
  *
- * This rule is only safe because `redactSegment` runs first and reaches INSIDE
- * the wrapper. On its own it is far too coarse: it would happily excuse
+ * This rule is only safe because `redactIbanShapedValues` runs first and reaches
+ * INSIDE the wrapper. On its own it is far too coarse: it would happily excuse
  * `%7BCH9300762011623852957%7D`, whose braces contain a real IBAN rather than a
  * placeholder name. Narrowing this predicate is the wrong repair — it would
  * only cover the two named route families, leave `/%7BCH93…%7D` on an unmatched
@@ -285,18 +445,6 @@ const SPEC_TEMPLATE_SEGMENT = /\{|%7[Bb]/;
  *  trips the funnel's spec-template exclusion, and a wrapper redacted to
  *  `%7B:redacted%7D` still does. */
 const REDACTED_SEGMENT = ':redacted';
-
-/**
- * Strip any identifier out of one path segment, preserving everything around
- * it. `%7BCH9300762011623852957%7D` → `%7B:redacted%7D`: the wrapper survives
- * so the funnel keeps excluding the row, the identifier does not survive at all.
- */
-function redactSegment(segment: string): string {
-  return segment
-    .split(IDENTIFIER_BOUNDARY)
-    .map((token) => (IBAN_SHAPED_TOKEN.test(token) ? REDACTED_SEGMENT : token))
-    .join('');
-}
 
 /**
  * Collapse a request path to a storable label: no submitted identifier, and a
@@ -314,7 +462,7 @@ function redactSegment(segment: string): string {
  * today.
  */
 export function normalizeRequestPath(path: string): string {
-  const redacted = path.split('/').map(redactSegment).join('/');
+  const redacted = redactIbanShapedValues(path, REDACTED_SEGMENT);
   return (
     redacted
       .replace(/\/v1\/bic\/[^/?]+/, (match) =>
