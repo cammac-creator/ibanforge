@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
 import { MCP_TOOLS } from './inventory.js';
+import { getComplianceMeta, type ComplianceMeta } from '../lib/compliance-db.js';
 
 /**
  * Both internal MCP transports must declare the SAME `outputSchema` per tool.
@@ -119,4 +120,29 @@ describe('output schema parity — stdio and HTTP declare the same shared schema
       );
     });
   }
+});
+
+// `ComplianceMeta` (src/lib/compliance-db.ts) types `sources` as `string | null`:
+// null whenever the compliance database carries no metadata row. The schema
+// declared `z.string().optional()`, which refuses null, so on that day every
+// `check_compliance` answer over /mcp would fail its own output validation — a
+// conformant client refuses a whole response whose structuredContent does not
+// match the advertised schema. The published package's copy of this schema was
+// fixed the same way (mcp/, PR 232).
+describe('check_compliance: meta accepts every value the API can put there', () => {
+  const metaSchema = TOOL_OUTPUT_SCHEMAS.check_compliance.meta;
+
+  it('accepts a meta whose dates and sources are unknown (null)', () => {
+    const meta: ComplianceMeta = {
+      ...getComplianceMeta(),
+      sanctions_as_of: null,
+      fatf_as_of: null,
+      sources: null,
+    };
+    expect(metaSchema.safeParse(meta).success).toBe(true);
+  });
+
+  it('still refuses a sources value of the wrong type', () => {
+    expect(metaSchema.safeParse({ ...getComplianceMeta(), sources: 42 }).success).toBe(false);
+  });
 });
