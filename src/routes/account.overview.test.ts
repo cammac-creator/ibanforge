@@ -388,4 +388,30 @@ describe('GET /v1/account/overview', () => {
     expect(new Set(all).size).toBe(OVERVIEW_PAGE_SIZE + 1);
     expect(new Set(all)).toEqual(new Set(keys.map((k) => k.key_prefix)));
   });
+
+  it('la requête des clés descend les index, sans parcourir api_keys ni request_log', async () => {
+    // Le plan de la requête RÉELLEMENT préparée par la route, relu sur une base
+    // sans statistiques ANALYZE, comme celle du service. Sans le `+` de
+    // `+active = 1`, SQLite y choisissait l'index des clés actives, donc toute
+    // la table à chaque ouverture de la page.
+    const email = 'plan@alpha.example.net';
+    generateCreditKey(email, 100);
+    const db = getStatsDB();
+    const spy = vi.spyOn(db, 'prepare');
+    const { res } = await overviewOf(email);
+    const sql = spy.mock.calls
+      .map((call) => String(call[0]))
+      .find((s) => s.includes('request_log'));
+    spy.mockRestore();
+    expect(res.status).toBe(200);
+    expect(sql).toBeDefined();
+    const plan = (
+      db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(email, OVERVIEW_PAGE_SIZE, 0) as Array<{
+        detail: string;
+      }>
+    ).map((row) => row.detail);
+    expect(plan.join('\n')).toMatch(/SEARCH api_keys USING INDEX idx_api_keys_email_norm/);
+    expect(plan.join('\n')).toMatch(/SEARCH r USING INDEX idx_request_log_key_prefix/);
+    expect(plan.filter((detail) => /\bSCAN\b/.test(detail))).toEqual([]);
+  });
 });

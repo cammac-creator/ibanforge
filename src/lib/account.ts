@@ -362,6 +362,13 @@ function planOf(row: KeyRow): AccountPlan {
  * parcours de ses millions de lignes. Le rapport détaillé d'une clé, lui, se
  * charge à la demande (`findOwnedKey` puis `getKeyReport`).
  *
+ * Le `+` de `+active = 1` est voulu : il interdit à SQLite de prendre l'index
+ * `idx_api_keys_active` pour ce terme. Mesuré sur une base sans statistiques
+ * ANALYZE (le service n'en lance jamais) : sans lui, le planificateur choisissait
+ * cet index, presque toutes les clés étant actives, et parcourait donc toute la
+ * table à chaque ouverture de la page ; avec lui, il descend
+ * `idx_api_keys_email_norm`, quelques lignes par adresse.
+ *
  * Jamais servis : la clé brute, `key_hash`, `lineage_hash`, les empreintes
  * d'adresse IP, `no_recredit`, `shield_episode`, `issued_by_us`, et aucune clé
  * d'une autre adresse normalisée. La requête ne sélectionne que ce qu'elle
@@ -390,7 +397,7 @@ export function buildOverview(
                 WHERE r.key_prefix = api_keys.key_prefix
                 ORDER BY r.id DESC LIMIT 1) AS last_call_at
          FROM api_keys
-        WHERE email_norm = ? AND active = 1 AND ${NOT_A_COHORT}
+        WHERE email_norm = ? AND +active = 1 AND ${NOT_A_COHORT}
         ORDER BY last_call_at IS NULL, last_call_at DESC, created_at DESC, id DESC
         LIMIT ? OFFSET ?`,
     )
