@@ -67,6 +67,6 @@ export function checkBelgianMod97(country: string, bban: string): NationalCheck 
     scheme: 'be_mod97',
     status: 'fail',
     detail:
-      'The last two digits of the Belgian account number are not the remainder of its first ten digits divided by 97: this account number cannot have been issued as written.',
+      'The last two digits of the Belgian account number do not match the check digits computed from its first ten digits (their remainder modulo 97, or 97 when that remainder is 0): this account number cannot have been issued as written.',
   };
 }

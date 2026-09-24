@@ -60,7 +60,12 @@ describe('Belgique : les bornes', () => {
     expect(isoValid(withKey97)).toBe(true);
     expect(isoValid(withKey00)).toBe(true);
     expect(checkBelgianMod97('BE', bbanOf(withKey97)).status).toBe('pass');
-    expect(checkBelgianMod97('BE', bbanOf(withKey00)).status).toBe('fail');
+    const result = checkBelgianMod97('BE', bbanOf(withKey00));
+    expect(result.status).toBe('fail');
+    // Ici 00 EST le reste des dix premiers chiffres : le détail ne doit pas
+    // prétendre le contraire, c'est la règle « 0 devient 97 » qui fait échouer.
+    expect(result.detail).toMatch(/or 97 when that remainder is 0/);
+    expect(result.detail).not.toMatch(/are not the remainder/);
   });
 
   it('une clé à un chiffre s’écrit avec son zéro', () => {
