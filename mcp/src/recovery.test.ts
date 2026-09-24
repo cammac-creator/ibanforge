@@ -51,7 +51,8 @@ describe('un agent peut comprendre et reprendre un appel refusé', () => {
       async (client) => {
         const instructions = client.getInstructions()!;
         expect(instructions).toContain('This installed MCP server calls the REST API');
-        expect(instructions).not.toContain('10 tool calls/IP/day here');
+        expect(instructions).not.toContain('Free tier:');
+        expect(instructions).toContain('https://api.ibanforge.com/.well-known/rate-limits.yml');
         expect(instructions).toContain('does not sign x402');
         expect(instructions).toContain('no body at all');
       },
@@ -120,7 +121,8 @@ describe('un agent peut comprendre et reprendre un appel refusé', () => {
           arguments: { ibans: Array(100).fill(IBAN) },
         });
         expect(result.isError).toBe(true);
-        expect(payload(result)._hint).toContain('25 REST calls/month');
+        expect(payload(result)._hint).toContain('POST https://api.ibanforge.com/v1/keys/generate');
+        expect(payload(result)._hint).toContain('.well-known/rate-limits.yml');
         expect(payload(result)._hint).toContain('does not sign x402');
       },
     );

@@ -96,11 +96,15 @@ npm run build             # next build
   loaders. Each carries its source string and its `as_of`, and some carry licence
   conditions that must appear on every response built from them.
 - `src/lib/trial.ts` — the keyless trial, in figures and in words. Every surface quotes
-  these constants; none of them hardcodes the number. **The two 25s never share a
+  these constants; none of them hardcodes the number. **The 25s never share a
   sentence.** The keyless trial is 25 validations a week (ISO week, UTC), on
-  `POST /v1/iban/validate` only. The key that needs no e-mail is 25 requests a month, on every
-  endpoint. Name the door, and announce the key by its 200 once claimed;
-  `src/routes/free-doors-claims.test.ts` holds it.
+  `POST /v1/iban/validate` only. The keyless access of the hosted `/mcp` transport is a
+  separate allowance, `MCP_WEEKLY_LIMIT` in `src/lib/mcp-limits.ts`: 25 tool units a week per
+  source address, a batch counting one per IBAN. The key that needs no e-mail is 25 requests a
+  month, on every endpoint. Name the door, and announce the key by its 200 once claimed;
+  `src/routes/free-doors-claims.test.ts` holds it. The npm package `ibanforge-mcp` quotes none
+  of these figures: it is frozen until its next release, so it points to `rate-limits.yml` and
+  `GET /v1` (`mcp/src/published-text.test.ts`).
 - `src/middleware/x402.ts` — prices. `frontend/data/` — what the site pre-renders,
   exported from the API by `npm run pages:export` and `pages:export-countries`.
 - `docs/data-sources.md` — every data source, its licence, and the permission we hold in
@@ -131,11 +135,15 @@ report named below.
 decision; it was twenty-five a day from 15 September). `REST_TRIAL_WEEKLY_LIMIT` in
 `src/lib/trial.ts` reads 25, counted per source address (IPv6 per /64) and per ISO week in
 UTC, reset on Monday 00:00 UTC, in the table `trial_weekly` of the service database. The
-daily rows of `trial_ledger` are still written and still feed `trial_daily`; the MCP
-allowances stay daily. No e-mail and no key are required for those calls. The key that needs
+daily rows of `trial_ledger` are still written and still feed `trial_daily`. Since the
+evening of the same day, the keyless MCP tool calls are counted by the week as well, in a
+bucket of their own in the same table (`MCP_WEEKLY_LIMIT` in `src/lib/mcp-limits.ts`); the
+two allowances never share. Only the ceiling on MCP session openings
+(`MCP_SESSIONS_PER_IP_DAY`) stays daily. No e-mail and no key are required for those calls. The key that needs
 no e-mail is another door, announced by its 200 requests a month once claimed. Every surface
 that quotes a figure is meant to read the constants; `src/lib/trial-figures-static.test.ts`
-refuses the trial's figure beside a day and checks every weekly figure written by hand.
+refuses the trial's figure beside a day, refuses any MCP line still counted by the day, and
+checks every weekly figure written by hand.
 
 ---
 

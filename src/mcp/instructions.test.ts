@@ -54,38 +54,6 @@ function literalAfter(source: string, name: string): string {
   return chunks.map((c) => c.slice(1, -1).replace(/\\'/g, "'")).join('');
 }
 
-/**
- * Les écarts permis à la copie du paquet npm jusqu'à sa prochaine publication.
- *
- * 24/09/2026 : l'accès MCP sans clé passe de 10 appels par jour à 25 par
- * SEMAINE (décision de Claude-Alain). La constante partagée le dit ; la copie de
- * `mcp/src/index.ts`, publiée à part, garde l'ancienne phrase jusqu'à la PR qui
- * prépare sa publication (`mcp/` n'est pas touché ici). Chaque paire [texte du
- * paquet, texte de la constante] est remplacée dans la copie AVANT la
- * comparaison au caractère près, et un test vérifie qu'elle y est encore : le
- * jour où la copie est alignée, ce test rougit et l'écart doit partir d'ici.
- *
- * ⚠️ La même PR devra adapter `stdioInstructions` (mcp/src/stdio-instructions.ts),
- * dont l'expression reconnaît l'ancienne phrase de quota et lève sinon.
- */
-const PENDING_NPM_RELEASE: ReadonlyArray<readonly [string, string]> = [
-  [
-    'Free tier: 10 tool calls/IP/day here, no signup.',
-    'Free tier: 25 tool calls a week per source address here (ISO week in UTC, reset on Monday 00:00 UTC), no signup.',
-  ],
-  [
-    'both tools keep answering after the daily limit.',
-    'both tools keep answering after the free allowance is spent.',
-  ],
-];
-
-function withPendingRelease(text: string): string {
-  return PENDING_NPM_RELEASE.reduce(
-    (t, [published, current]) => t.split(published).join(current),
-    text,
-  );
-}
-
 const SURFACES: Array<{ label: string; path: string; anchor: string }> = [
   {
     label: 'stdio publié (npm ibanforge-mcp)',
@@ -131,18 +99,9 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
 
   for (const surface of SURFACES) {
     it(`${surface.label} sert le texte au caractère près`, () => {
-      expect(withPendingRelease(literalAfter(read(surface.path), surface.anchor))).toBe(
-        MCP_INSTRUCTIONS,
-      );
+      expect(literalAfter(read(surface.path), surface.anchor)).toBe(MCP_INSTRUCTIONS);
     });
   }
-
-  it.each(PENDING_NPM_RELEASE.map(([published]) => [published]))(
-    'la copie du paquet dit encore « %s » (sinon retirer l’écart)',
-    (published) => {
-      expect(literalAfter(read('mcp/src/index.ts'), 'const INSTRUCTIONS =')).toContain(published);
-    },
-  );
 
   it('nomme la porte gratuite avec son URL complète, pas seulement son existence', () => {
     // Un agent qui lit « clé gratuite disponible » sans l'adresse ne peut rien

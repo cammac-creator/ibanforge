@@ -382,6 +382,21 @@ the whole week in one day". The `trial` block says `calls_used_this_week`,
 `calls_left_this_week`, `weekly_limit`, `resets` and `resets_at`; the daily names were removed
 (no published package read them). `X-Trial-Reset` is the ISO instant, `X-Trial-Period: week`.
 
+**The same evening, the keyless MCP access moved to the week as well** (Claude-Alain's
+decision). `MCP_WEEKLY_LIMIT` in `src/lib/mcp-limits.ts` (25; renamed from `MCP_DAILY_LIMIT` so
+that no forgotten use keeps compiling under a daily name) is spent per source and per ISO week
+in UTC through the same `trial_weekly` table, in a bucket of its own: the bare hash `<h>`,
+beside the trial's `rest:<h>`. The two allowances never share. What stays REST-only filters on
+the `rest:` prefix (`rest_attempts_uncounted`, the admin week total, which now shows
+`mcp_this_week` beside it). The daily rows are still written for `trial_daily`; only the
+ceiling on MCP session openings (`init:<h>`, `MCP_SESSIONS_PER_IP_DAY`) stays daily, because it
+bounds container memory rather than a free offer. `GET /v1` serves `mcp_weekly_limit` and
+`mcp_period`; `GET /mcp` adds `mcp_resets` and `mcp_resets_at`. The npm package
+`ibanforge-mcp` writes none of these figures, nor their period: a published package stays
+frozen until its next release, so its README and the instructions it serves point to
+`rate-limits.yml` and `GET /v1`, and `mcp/src/published-text.test.ts` refuses a quota figure or
+period in anything it serves.
+
 **The cohort radar sees anonymous keys since 15 September (lot 6), in report mode.** A second pass
 in `src/lib/cohort-radar-server.ts` loads anonymous and claimed keys with its OWN query (the e-mail
 loader's `no_recredit = 0` and `monthly_limit IS NULL` clauses are false by construction for an

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { positioningOneLine } from '../lib/positioning.js';
 
 /**
  * The repo carries TWO server.json files and only ONE of them is ever
@@ -67,11 +68,25 @@ describe('the README badge tracks the released version', () => {
 describe('the published manifest carries the positioning, not a generic blurb', () => {
   it('states what makes the product different, not just what it does', () => {
     // The registry rejected anything over 100 chars (commit 445d3aa), so this
-    // one line has to earn its place: screening intent + the two moats.
+    // one line has to earn its place.
     expect(published.description.length).toBeLessThanOrEqual(100);
-    expect(published.description).toMatch(/pre-payout/i);
-    expect(published.description).toMatch(/sanctions/i);
-    expect(published.description).toMatch(/swiss/i);
+  });
+
+  /**
+   * 24/09/2026 : the line said "Pre-payout IBAN screening for AI agents:
+   * validation, sanctions, Swiss clearing, risk scoring". That is, word for
+   * word, the reading positioning.ts was written to undo: "screening" and a
+   * bare "sanctions" credited us with a screening of the payee we do not run
+   * (bank and country only), "for AI agents" and Swiss clearing in the lead
+   * filed us as a Swiss tool for agents. This test used to REQUIRE "swiss"; it
+   * now holds the line to the positioning sentence instead.
+   */
+  it('opens with the positioning sentence and says whose sanctions', () => {
+    const lead = positioningOneLine().split(':')[0];
+    expect(lead).toBe('Check the bank behind an IBAN before you pay');
+    expect(published.description.startsWith(`${lead}:`)).toBe(true);
+    expect(published.description).toMatch(/bank-level sanctions/i);
+    expect(published.description).not.toMatch(/screening|for (AI )?agents|swiss/i);
   });
 
   it('points assistants at both transports', () => {

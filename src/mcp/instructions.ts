@@ -24,8 +24,9 @@ export const MCP_INSTRUCTIONS =
   //
   // 24/09/2026 : l'accès sans clé de ce transport passe de 10 appels par jour à
   // 25 par SEMAINE et par source (décision de Claude-Alain). La copie du paquet
-  // npm (`mcp/src/index.ts`) garde l'ancienne phrase jusqu'à sa prochaine
-  // publication : `instructions.test.ts` porte l'écart, nommé et daté.
+  // npm (`mcp/src/index.ts`) suit au caractère près, mais le paquet ne SERT pas
+  // ce paragraphe d'accès : `stdioInstructions` le remplace par un texte sans
+  // chiffre, puisqu'un paquet publié reste figé jusqu'à la version suivante.
   //
   // 🚨 Les chiffres sont écrits, pas interpolés, et ce n'est pas un oubli :
   // l'extracteur de `src/mcp/instructions.test.ts` ne reconnaît que des chaînes
