@@ -714,6 +714,7 @@
       "no": "Non",
       "retry": "Relancez le contrôle pour obtenir un verdict exploitable.",
       "savedExample": "Exemple préenregistré · relancez pour un contrôle actuel",
+      "savedExampleOn": "Exemple préenregistré, capturé auprès de l’API le {date} · pas une réponse en direct : lancez un contrôle pour une réponse actuelle",
       "apiResponse": "Réponse reçue de l’API",
       "localCheckInvalid": "Un contrôle national supplémentaire échoue. La structure IBAN valide ne suffit pas : faites confirmer ces coordonnées avant le paiement."
     }
@@ -2920,7 +2921,7 @@
       "index": "Tous les pays"
     },
     "sourceNote": "Source : registre ISO 13616 pour la longueur, le découpage et l'exemple ; réponse de l'API relevée le {date}.",
-    "exampleNotAllocated": "Le code banque de cet exemple officiel n'est pas attribué dans {register} : l'API le dit tel quel, c'est le comportement attendu sur un IBAN de démonstration.",
+    "exampleNotAllocated": "La clé de contrôle de cet exemple officiel est juste, et pourtant {register} dit que personne ne détient son code banque : c'est exactement ce que notre contrôle du code banque attrape, et ce qu'une clé seule ne voit pas.",
     "examplePartialRegister": "Une partie des codes banque de ce pays est en outre nommée par une liste du superviseur, dont nous servons une page par code — mais cette liste ne publie pas l'attribution de l'espace des codes : un code qui n'y figure pas n'est donc pas un code jamais attribué."
   },
   "tools": {

@@ -50,6 +50,28 @@ https://api.ibanforge.com/mcp
 
 Streamable HTTP transport, **10 free tool calls per IP per day**, no key at all: the fastest way for an agent to evaluate the data before committing to anything. For sustained use, run the npm package with your free key.
 
+### Add it as a connector in a chat assistant
+
+In a chat assistant, the address above becomes a *custom connector*: the assistant then calls the MCP tools itself, within the free allowance of the hosted endpoint, instead of guessing an answer it cannot fetch. Where to click, from each vendor's official page as read on 24 September 2026; menus move, and the linked page is the reference.
+
+**Claude** ([official page](https://support.claude.com/en/articles/11175166), updated 11 August 2026). Custom connectors are available on the Free, Pro, Max, Team and Enterprise plans; Free users are limited to one custom connector.
+
+- Individual plan (the page lists these steps under Pro and Max): open **Customize > Connectors**, click **+** then **Add custom connector**, enter `https://api.ibanforge.com/mcp`, and click **Add**. The OAuth fields under **Advanced settings** are optional; this server asks for no authentication.
+- Team or Enterprise: an Owner opens **Organization settings > Connectors**, clicks **Add**, hovers over **Custom** and selects **Web**, enters the address and clicks **Add**; members then find it in **Customize > Connectors** and click **Connect**.
+- In a conversation: the **+** button at the lower left of the chat, then **Connectors**, to switch it on.
+
+**ChatGPT** ([official page](https://developers.openai.com/api/docs/guides/developer-mode)). Developer mode, on the web, for Pro, Plus, Business, Enterprise and Education accounts: not on the free plan. *Not tried by us.*
+
+- Turn it on: **Settings → Security and login**, then **Developer mode**.
+- Add the server: go to [ChatGPT Plugins](https://chatgpt.com/plugins), select the plus button and create a developer-mode app for the remote MCP server `https://api.ibanforge.com/mcp`. The page lists streaming HTTP among the protocols and *No Authentication* among the options.
+- In a conversation: choose **Developer mode** from the Plus menu and select the app.
+
+**Gemini** ([official page](https://support.google.com/gemini/answer/17209137)). Custom apps require being 18 or over and in the US, a personal Google Account (not a work or school one), Keep Activity turned on, and English; they are added in the Gemini web app only, then work on the web and in the mobile app. *Not tried by us.*
+
+- At gemini.google.com, click **Settings** at the bottom, then **Connected Apps**; under "Custom apps", add a custom app, enter `https://api.ibanforge.com/mcp`, click **Next** and follow the on-screen instructions.
+- The page asks for credentials under "Advanced features" when a server does not support Dynamic Client Registration. This server asks for no authentication; whether Gemini accepts that is not checked by us.
+- In a prompt: type **@** and select the app.
+
 On the official MCP registry the server is listed as `io.github.cammac-creator/ibanforge`.
 
 ## Available tools
