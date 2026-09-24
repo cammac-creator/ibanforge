@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import {
+  CzechSourceNotLoaded,
   czechNumberedCsvUrl,
   czechSource,
   ensureNationalTables,
@@ -420,9 +421,18 @@ describe('parseCzechEditions', () => {
     ]);
   });
 
-  it('refuses a date that does not exist on the calendar', () => {
+  it('skips an item whose date does not exist on the calendar', () => {
+    // On the current page that leaves no edition, which the seeder refuses as
+    // a changed layout; on the history page one typo costs one item, not the run.
     const impossible = CZ_PAGE.replace('platný od 1. 9. 2026', 'platný od 31. 2. 2026');
-    expect(() => parseCzechEditions(impossible, CZ_PAGE_URL)).toThrow(/not a date/);
+    expect(parseCzechEditions(impossible, CZ_PAGE_URL)).toEqual([]);
+    const history = CZ_HISTORY.replace('platný od 1. 7. 2026', 'platný od 31. 6. 2026');
+    expect(parseCzechEditions(history, CZ_HISTORY_URL).map((e) => e.version)).toEqual([
+      '254',
+      '251',
+      '248',
+      '247',
+    ]);
   });
 
   it('finds nothing on a page that changed shape, rather than something wrong', () => {
@@ -474,14 +484,17 @@ describe('planCzechEditions', () => {
     expect(planCzechEditions(history, '2025-10-05').current.version).toBe('248');
   });
 
-  it('refuses an edition dated differently on the two pages', () => {
-    expect(() => planCzechEditions([page('254', '2026-09-02'), ...history], '2026-09-25')).toThrow(
-      /dated/,
-    );
+  it('loads nothing for an edition dated differently on the two pages', () => {
+    // CzechSourceNotLoaded: the tables stay, the monthly refresh goes on.
+    const plan = () => planCzechEditions([page('254', '2026-09-02'), ...history], '2026-09-25');
+    expect(plan).toThrow(CzechSourceNotLoaded);
+    expect(plan).toThrow(/dated/);
   });
 
-  it('refuses when no edition it can see is in force yet', () => {
-    expect(() => planCzechEditions([page('255', '2026-10-01')], '2026-09-25')).toThrow(/in force/);
+  it('loads nothing when no edition it can see is in force yet', () => {
+    const plan = () => planCzechEditions([page('255', '2026-10-01')], '2026-09-25');
+    expect(plan).toThrow(CzechSourceNotLoaded);
+    expect(plan).toThrow(/in force/);
   });
 });
 
@@ -590,15 +603,22 @@ describe('writeCzech', () => {
   it('refuses to go back an edition, and leaves both tables as they were', () => {
     const db = fresh();
     writeCzech(db, edition('254', '2026-09-01'), edition('255', '2026-10-01'));
-    expect(() => writeCzech(db, edition('253', '2026-07-01'), null)).toThrow(/go back/);
+    const back = () => writeCzech(db, edition('253', '2026-07-01'), null);
+    // Kept apart from a format change: the tables stay, the refresh goes on.
+    expect(back).toThrow(CzechSourceNotLoaded);
+    expect(back).toThrow(/go back/);
     expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 254$/);
     expect(versionIn(db, 'national_bank_codes_pending')).toMatch(/verze 255$/);
   });
 
-  it('refuses a short edition before touching anything', () => {
+  it('refuses a short edition before touching anything, and fails the run', () => {
     const db = fresh();
     writeCzech(db, edition('253', '2026-07-01'), null);
-    expect(() => writeCzech(db, edition('254', '2026-09-01', 10), null)).toThrow(/at least/);
+    const short = () => writeCzech(db, edition('254', '2026-09-01', 10), null);
+    expect(short).toThrow(/at least/);
+    // A truncated file or a changed format is for a human to read, not the
+    // keep-the-tables-and-carry-on kind.
+    expect(short).not.toThrow(CzechSourceNotLoaded);
     expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
   });
 

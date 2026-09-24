@@ -45,6 +45,14 @@ const REMOVED_4000 = 'CZ9040000000192000145399'; // removed on 9 April 2025 (ban
 const REMOVED_8280 = 'CZ8182800000192000145399'; // removed on 1 December 2024
 const NEVER_9999 = 'CZ7799990000192000145399'; // allocated to nobody, ever
 
+/** A valid Czech IBAN for any bank code, on the SWIFT registry example's account. */
+function czIban(code: string): string {
+  const bban = `${code}0000192000145399`;
+  const digits = `${bban}CZ00`.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+  const check = 98n - (BigInt(digits) % 97n);
+  return `CZ${check.toString().padStart(2, '0')}${bban}`;
+}
+
 /** The edition in force, read from the rows: the tests must survive the monthly refresh. */
 const edition = nationalRegisterEdition('CZ');
 
@@ -153,12 +161,28 @@ describe('the composite map agrees with the číselník', () => {
   ) as Record<string, { bic: string }>;
   const czKeys = Object.entries(curated).filter(([k]) => k.startsWith('CZ:'));
 
-  it('holds no key the ČNB has removed', () => {
+  it('holds neither of the two keys the ČNB had removed', () => {
     expect(curated['CZ:4000']).toBeUndefined();
     expect(curated['CZ:8280']).toBeUndefined();
+  });
+
+  it('serves no BIC for a code the edition in force does not allocate', () => {
+    // Held on the ANSWER, not on the file: the ČNB can remove a code between two
+    // rebuilds of the map (6800, a bank in liquidation, is still listed today),
+    // and the load-time prune plus the guard in lookupByCountryBank are what
+    // keep such a key from being served. 4000 and 8280 are always checked, so
+    // the loop is never empty.
     const allocated = allocatedCodes('CZ');
-    const stale = czKeys.map(([k]) => k.slice(3)).filter((code) => !allocated.has(code));
-    expect(stale).toEqual([]);
+    const unallocated = new Set([
+      '4000',
+      '8280',
+      ...czKeys.map(([k]) => k.slice(3)).filter((code) => !allocated.has(code)),
+    ]);
+    for (const code of unallocated) {
+      const r = check(czIban(code));
+      expect(r.bank_code_check?.reason, code).toBe('not_allocated');
+      expect(r.bic ?? null, code).toBeNull();
+    }
   });
 
   it('pairs every Czech key with the BIC the ČNB publishes for it', () => {

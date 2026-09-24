@@ -154,23 +154,36 @@ const REGISTER_TIME_ZONE: Record<string, string> = { CZ: 'Europe/Prague' };
  * property of the ICU data, not a promise.
  */
 export function registerToday(cc: string, now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: REGISTER_TIME_ZONE[cc] ?? 'UTC',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
+  const timeZone = REGISTER_TIME_ZONE[cc] ?? 'UTC';
+  let format = formatters.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    formatters.set(timeZone, format);
+  }
+  const parts = format.formatToParts(now);
   const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
+
+/** Building a formatter costs more than formatting: one per time zone, for the process. */
+const formatters = new Map<string, Intl.DateTimeFormat>();
 
 const stmts = new Map<EditionTable, import('better-sqlite3').Statement>();
 let tableChecked = false;
 let tablePresent = false;
 let pendingChecked = false;
 let pendingPresent = false;
-/** Which table is in force for a country, decided once per register day. */
-const activeMemo = new Map<string, { day: string; table: EditionTable }>();
+/**
+ * Per country, the effective date of the announced edition and of the one in
+ * force, read once per process: the database is read-only at run time and is
+ * only ever replaced by a deploy, which starts a new process.
+ */
+const editionDates = new Map<string, { pending: string | null; current: string | null }>();
 
 /**
  * Same lifecycle discipline as resetStatements() in bic-lookup.ts, and wired
@@ -187,7 +200,7 @@ export function resetNationalRegisterStatements(): void {
   tablePresent = false;
   pendingChecked = false;
   pendingPresent = false;
-  activeMemo.clear();
+  editionDates.clear();
 }
 
 function tableExists(name: string): boolean {
@@ -235,26 +248,32 @@ function pendingReady(): boolean {
  * its credit, the allocated set — so a version can never be printed beside a
  * date, or a verdict beside a credit, from another edition.
  *
+ * It sits on the hot path of every register country, so the common case costs
+ * a map read: nothing announced — every country, nearly every day — returns
+ * the current table without computing a date. Today's date is only computed
+ * for a country with an edition waiting, which is Czechia during the week or
+ * two the ČNB publishes ahead.
+ *
  * Unguarded when the query itself fails, like lookupNationalCode: a database
  * that cannot say which edition is in force cannot answer for either.
  */
 function activeTable(cc: string): EditionTable {
   if (!pendingReady()) return CURRENT_TABLE;
-  const day = registerToday(cc);
-  const memo = activeMemo.get(cc);
-  if (memo && memo.day === day) return memo.table;
-  const db = getBicDB();
-  const pending = db
-    .prepare(`SELECT MIN(as_of) AS as_of FROM ${PENDING_TABLE} WHERE country = ?`)
-    .get(cc) as { as_of: string | null } | undefined;
-  const current = db
-    .prepare(`SELECT MAX(as_of) AS as_of FROM ${CURRENT_TABLE} WHERE country = ?`)
-    .get(cc) as { as_of: string | null } | undefined;
-  const takesOver =
-    !!pending?.as_of && pending.as_of <= day && (!current?.as_of || current.as_of < pending.as_of);
-  const table: EditionTable = takesOver ? PENDING_TABLE : CURRENT_TABLE;
-  activeMemo.set(cc, { day, table });
-  return table;
+  let dates = editionDates.get(cc);
+  if (!dates) {
+    const db = getBicDB();
+    const pending = db
+      .prepare(`SELECT MIN(as_of) AS as_of FROM ${PENDING_TABLE} WHERE country = ?`)
+      .get(cc) as { as_of: string | null } | undefined;
+    const current = db
+      .prepare(`SELECT MAX(as_of) AS as_of FROM ${CURRENT_TABLE} WHERE country = ?`)
+      .get(cc) as { as_of: string | null } | undefined;
+    dates = { pending: pending?.as_of ?? null, current: current?.as_of ?? null };
+    editionDates.set(cc, dates);
+  }
+  if (!dates.pending) return CURRENT_TABLE;
+  if (dates.current && dates.current >= dates.pending) return CURRENT_TABLE;
+  return dates.pending <= registerToday(cc) ? PENDING_TABLE : CURRENT_TABLE;
 }
 
 export function nationalRegisterAvailable(cc: string): boolean {

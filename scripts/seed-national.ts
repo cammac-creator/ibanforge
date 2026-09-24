@@ -659,13 +659,21 @@ export interface CzechEdition {
   csv_url: string | null;
 }
 
-/** 'D', 'M', 'YYYY' to ISO, refusing a day the calendar does not have. */
-function isoDate(cc: string, day: string, month: string, year: string): string {
+/**
+ * The ČNB's pages or files are in a state this run will not load: unreachable,
+ * contradictory, or older than what is stored. Both Czech tables are left
+ * exactly as they were and the monthly refresh goes on for every other source
+ * (see main). Everything else — a page or a file whose SHAPE changed — throws a
+ * plain Error and fails the run, because that is the failure a human has to
+ * read. Same rule as the Bulgarian step of the workflow.
+ */
+export class CzechSourceNotLoaded extends Error {}
+
+/** 'D', 'M', 'YYYY' to ISO, or null for a day the calendar does not have. */
+function isoDate(day: string, month: string, year: string): string | null {
   const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   const probe = new Date(`${iso}T00:00:00Z`);
-  if (Number.isNaN(probe.getTime()) || probe.toISOString().slice(0, 10) !== iso) {
-    throw new Error(`${cc}: "${day}. ${month}. ${year}" is not a date, refusing the page`);
-  }
+  if (Number.isNaN(probe.getTime()) || probe.toISOString().slice(0, 10) !== iso) return null;
   return iso;
 }
 
@@ -693,6 +701,11 @@ function isoDate(cc: string, day: string, month: string, year: string): string {
  * The phrase is matched on the TEXT, tags stripped and entities decoded: on the
  * current page the date sits inside the PDF anchor ("Číselník 254 <a>platný od
  * 1. 9. 2026 (pdf…)</a>"), on the history page the whole phrase does.
+ *
+ * An item whose date the calendar does not have is SKIPPED, with a warning:
+ * one typo among the 129 items of the history page must not stop a run, and
+ * on the current page a skipped item leaves no edition at all, which the
+ * caller refuses as a changed layout.
  */
 export function parseCzechEditions(html: string, pageUrl: string): CzechEdition[] {
   const visible = html.replace(/<!--[\s\S]*?-->/g, '');
@@ -715,7 +728,12 @@ export function parseCzechEditions(html: string, pageUrl: string): CzechEdition[
         break;
       }
     }
-    editions.push({ version: m[1], as_of: isoDate('CZ', m[2], m[3], m[4]), csv_url });
+    const as_of = isoDate(m[2], m[3], m[4]);
+    if (!as_of) {
+      console.warn(`  CZ: "${m[0]}" states no real date; that item is skipped`);
+      continue;
+    }
+    editions.push({ version: m[1], as_of, csv_url });
   }
   return editions;
 }
@@ -732,7 +750,7 @@ export function parseCzechEditions(html: string, pageUrl: string): CzechEdition[
  * read by the refresh after the first takes effect.
  *
  * The same edition met on both pages must carry the same date there; if it does
- * not, nothing here can tell which page is right, so the run stops.
+ * not, nothing here can tell which page is right, so nothing is loaded.
  */
 export function planCzechEditions(
   editions: readonly CzechEdition[],
@@ -743,7 +761,7 @@ export function planCzechEditions(
     const n = Number(e.version);
     const seen = byVersion.get(n);
     if (seen && seen.as_of !== e.as_of) {
-      throw new Error(
+      throw new CzechSourceNotLoaded(
         `CZ: edition ${e.version} is dated ${seen.as_of} on one ČNB page and ${e.as_of} on another, refusing to pick one`,
       );
     }
@@ -753,7 +771,7 @@ export function planCzechEditions(
   const newestFirst = [...byVersion.entries()].sort((a, b) => b[0] - a[0]).map(([, e]) => e);
   const current = newestFirst.find((e) => e.as_of <= today);
   if (!current) {
-    throw new Error(
+    throw new CzechSourceNotLoaded(
       `CZ: none of the editions the ČNB states (${newestFirst.map((e) => `${e.version} from ${e.as_of}`).join(', ') || 'none'}) is in force on ${today}`,
     );
   }
@@ -911,10 +929,11 @@ function insertRows(db: Database.Database, table: string, cc: string, entries: E
  * newer edition in force supersedes the announcement, and an announcement the
  * ČNB withdrew must not take effect on its old date.
  *
- * Refused, with the tables untouched: an edition under the floor, and an
- * edition in force OLDER than the one already stored. The second is what a
- * stale copy of the page served by a cache would look like, and going back an
- * edition would re-allocate codes the ČNB has removed.
+ * Refused, with the tables untouched: an edition under the floor (a plain
+ * Error: a truncated file or a changed format, for a human to read), and an
+ * edition in force OLDER than the one already stored (CzechSourceNotLoaded: a
+ * stale copy of the page served by a cache would look like that, and going
+ * back an edition would re-allocate codes the ČNB has removed).
  */
 export function writeCzech(
   db: Database.Database,
@@ -933,7 +952,7 @@ export function writeCzech(
     .get() as { source: string | null } | undefined;
   const storedVersion = /verze (\d+)/.exec(stored?.source ?? '')?.[1];
   if (storedVersion && Number(storedVersion) > Number(current.edition.version)) {
-    throw new Error(
+    throw new CzechSourceNotLoaded(
       `CZ: the table holds edition ${storedVersion} while the ČNB pages put ${current.edition.version} in force. Refusing to go back an edition.`,
     );
   }
@@ -955,21 +974,15 @@ export function writeCzech(
   }
 }
 
-/**
- * The ČNB could not be reached, or answered with an HTTP error. Kept apart from
- * every other failure on purpose: see seedCzechLive.
- */
-class CzechDownloadError extends Error {}
-
 async function czechFetch(url: string, optional = false): Promise<Buffer | null> {
   let res: Response;
   try {
     res = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': UA } });
   } catch (e) {
-    throw new CzechDownloadError(`${url}: ${e instanceof Error ? e.message : String(e)}`);
+    throw new CzechSourceNotLoaded(`${url}: ${e instanceof Error ? e.message : String(e)}`);
   }
   if (optional && res.status === 404) return null;
-  if (!res.ok) throw new CzechDownloadError(`${url} -> HTTP ${res.status}`);
+  if (!res.ok) throw new CzechSourceNotLoaded(`${url} -> HTTP ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
@@ -979,9 +992,12 @@ const utf8 = (buf: Buffer): string => new TextDecoder('utf-8').decode(buf);
  * One edition's rows, from its numbered CSV when the ČNB serves it and from the
  * file the page links otherwise.
  *
- * `crossCheck`: when the page states NO announced edition, its linked file must
- * be the edition in force; both files are read and must agree, or the run stops
- * rather than loading an edition under another's number.
+ * `crossCheck`: when the page states NO announced edition, its linked file
+ * should be the edition in force, and both files are read and compared. If
+ * they differ, the numbered file is still the edition its number says, so it is
+ * the one loaded; the difference is reported and nothing is announced. That is
+ * what the ČNB depositing the next file before updating its page would look
+ * like, and refusing both would only cost the month's refresh.
  */
 async function readCzechEdition(
   edition: CzechEdition,
@@ -992,7 +1008,7 @@ async function readCzechEdition(
     edition.csv_url && (crossCheck || !numbered) ? await czechFetch(edition.csv_url) : null;
   const primary = numbered ?? linked;
   if (!primary) {
-    throw new CzechDownloadError(
+    throw new CzechSourceNotLoaded(
       `no CSV for edition ${edition.version} (numbered file 404, none linked from the page)`,
     );
   }
@@ -1003,8 +1019,8 @@ async function readCzechEdition(
     linked &&
     !sameAllocation(entries, parseCzech(utf8(linked), edition))
   ) {
-    throw new Error(
-      `CZ: the page puts edition ${edition.version} in force, but the CSV it links differs from kody_bank_CR_${edition.version}.csv. Refusing both.`,
+    console.warn(
+      `  CZ: the page puts edition ${edition.version} in force, but the CSV it links differs from kody_bank_CR_${edition.version}.csv; the numbered file is loaded, nothing is announced, and the next refresh will read the page again`,
     );
   }
   console.log(
@@ -1124,21 +1140,22 @@ async function main(): Promise<void> {
     write(db, cc, await parse());
   }
   // Czechia last, and on its own path: it writes two tables, and it is the one
-  // register here whose failure to DOWNLOAD must not fail the monthly refresh.
+  // register here whose failure to LOAD must not fail the monthly refresh.
   // Whether cnb.cz answers GitHub's runners has not been verified; a refusal
   // there would otherwise block every other source of the month from being
-  // committed. So an unreachable ČNB leaves both Czech tables exactly as they
-  // were and says so; a page or a file that changed shape still throws, because
-  // that is the failure a human has to read. The Bulgarian step of the same
-  // workflow follows the same rule. An announced edition already stored keeps
-  // taking effect on its date through a failed month.
+  // committed. So an unreachable, contradictory or stale ČNB
+  // (CzechSourceNotLoaded) leaves both Czech tables exactly as they were and
+  // says so; a page or a file that changed shape still throws, because that is
+  // the failure a human has to read. The Bulgarian step of the same workflow
+  // follows the same rule. An announced edition already stored keeps taking
+  // effect on its date through a failed month.
   if (!only || only === 'CZ') {
     console.log(`CZ: reading ${SOURCES.CZ}`);
     try {
       await seedCzechLive(db);
     } catch (e) {
-      if (!(e instanceof CzechDownloadError)) throw e;
-      console.warn(`CZ: download failed (${e.message}); the Czech tables stay as they were`);
+      if (!(e instanceof CzechSourceNotLoaded)) throw e;
+      console.warn(`CZ: not loaded (${e.message}); the Czech tables stay as they were`);
     }
   }
   db.close();

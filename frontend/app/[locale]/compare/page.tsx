@@ -25,7 +25,7 @@ const ROWS = [
   "freeTier",
   "bankData",
   // The bank-code verdict of the national register, before the Swiss row:
-  // it is the check a checksum cannot make, in seven countries (24/09/2026).
+  // it is the check a checksum cannot make, in eight countries (25/09/2026).
   "bankCode",
   "swiss",
   "compliance",
