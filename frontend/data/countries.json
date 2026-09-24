@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-23",
+ "generated_at": "2026-09-24",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -1090,7 +1090,7 @@
     ],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": "Česká národní banka, Číselník kódů platebního styku v České republice (directory of payment-system codes; Zdroj: ČNB)",
    "api": {
     "valid": true,
     "country": {
@@ -1098,22 +1098,29 @@
      "name": "Czech Republic"
     },
     "bic": {
-     "code": "GIBACZPXXXX",
+     "code": "GIBACZPX",
      "bic8": "GIBACZPX",
      "bank_name": "Česká spořitelna, a.s.",
      "city": "Praha 4",
-     "source": "IBANforge curated bank-code map",
+     "source": "Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze 254",
      "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
+     "basis": "national_register",
+     "authoritative": true,
      "lei": "9KOGW2C2FCIOJQ7FF485"
     },
     "bank_code_check": {
      "value": "0800",
      "status": "verified",
      "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
+     "register": "Česká národní banka, Číselník kódů platebního styku v České republice (directory of payment-system codes; Zdroj: ČNB)",
+     "authoritative": true,
+     "institution": {
+      "name": "Česká spořitelna, a.s.",
+      "street": null,
+      "post_code": null,
+      "town": null,
+      "country": "CZ"
+     },
      "as_of": "2026-09"
     },
     "sepa": {

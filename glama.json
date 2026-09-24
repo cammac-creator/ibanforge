@@ -4,7 +4,7 @@
     "cammac-creator"
   ],
   "name": "IBANforge",
-  "description": "Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, BG, CH, LI), the bank and BIC with their source, SEPA and VoP readiness from the EPC registers where they list the bank, and bank-level sanctions (OFAC, EU, UN). It does not check the payee's name. BIC directory, 121k+ entries (entries, not institutions): GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the rows. Also Swiss clearing (1,100+ SIX BankMaster entries). MCP-native, prepaid packs by card or x402 micropayments on Base L2, and a free API key that needs no e-mail.",
+  "description": "Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, CZ, BG, CH, LI), the bank and BIC with their source, SEPA and VoP readiness from the EPC registers where they list the bank, and bank-level sanctions (OFAC, EU, UN). It does not check the payee's name. BIC directory, 121k+ entries (entries, not institutions): GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the rows. Also Swiss clearing (1,100+ SIX BankMaster entries). MCP-native, prepaid packs by card or x402 micropayments on Base L2, and a free API key that needs no e-mail.",
   "homepage": "https://ibanforge.com?src=glama",
   "repository": "https://github.com/cammac-creator/ibanforge",
   "documentation": "https://ibanforge.com/docs/mcp?src=glama",

@@ -1,6 +1,6 @@
 # IBANforge — Full LLM Reference
 
-> IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
+> IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Czech Republic, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
 
 Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run. These checks do not prove account existence or account ownership and do not screen an individual beneficiary.
 
@@ -12,7 +12,7 @@ BIC directory, 121k+ entries (entries, not institutions): GLEIF and national reg
 
 ## What IBANforge checks, country by country
 
-- Checked against the national register, read in full: a code it does not hold comes back `not_allocated`, `authoritative: true`. Germany (Deutsche Bundesbank), Austria (Oesterreichische Nationalbank), Belgium (Banque nationale de Belgique), Slovakia (Národná banka Slovenska), Bulgaria (Bulgarian National Bank, bank code only), Switzerland and Liechtenstein (SIX BankMaster).
+- Checked against the national register, read in full: a code it does not hold comes back `not_allocated`, `authoritative: true`. Germany (Deutsche Bundesbank), Austria (Oesterreichische Nationalbank), Belgium (Banque nationale de Belgique), Slovakia (Národná banka Slovenska), Czech Republic (Česká národní banka, Zdroj: ČNB), Bulgaria (Bulgarian National Bank, bank code only), Switzerland and Liechtenstein (SIX BankMaster).
 - A partial register: a hit names the holder, a miss is not a refusal (`authoritative: false`). Finland (Finance Finland, codes of banking groups), San Marino (Central Bank of the Republic of San Marino, operating banks) and Luxembourg (ABBL register of IBAN/BIC codes).
 - A structural rule the authority publishes, not a register: Latvia and Gibraltar, where IBAN positions 5-8 are the first four characters of the BIC.
 - Official identity of the bank, from its national bank code: France (European Central Bank list of monetary financial institutions) and Spain (Banco de España). Spain also: whether the code belongs to a payment or e-money institution in the EBA PSD2 register.
@@ -29,14 +29,15 @@ BIC directory, 121k+ entries (entries, not institutions): GLEIF and national reg
 
 ## Data sources and attribution
 
-GLEIF · SIX BankMaster · SwiftCodes (MIT, a public copy of the SWIFT directory frozen in January 2018) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Bulgarian National Bank · Central Bank of the Republic of San Marino · Finance Finland · ABBL · European Central Bank · Banco de España · EBA · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
+GLEIF · SIX BankMaster · SwiftCodes (MIT, a public copy of the SWIFT directory frozen in January 2018) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Česká národní banka · Bulgarian National Bank · Central Bank of the Republic of San Marino · Finance Finland · ABBL · European Central Bank · Banco de España · EBA · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
 UK deposit-taking authorisation: Bank of England (List of Banks, 2026-08), used with the Bank of England's written permission. The month of the list in force is served live at https://api.ibanforge.com/llms.txt
 Slovak bank codes: Národná banka Slovenska, Directory of identification codes for the domestic payment system (version 225, effective 2026-05-18), reproduced under the NBS site terms — the source is named and the file is not altered. The edition in force is served live at https://api.ibanforge.com/llms.txt
+Czech bank codes: Zdroj: ČNB, Číselník kódů platebního styku v ČR, reproduced under the ČNB site terms — the ČNB is named as the source and the facts are not altered. The ČNB publishes each numbered edition ahead of its effective date and we apply it from that date; this static file does not follow the editions, so the edition in force and its date are served live at https://api.ibanforge.com/llms.txt
 San Marino bank codes: Central Bank of the Republic of San Marino, operating banks — four banks, read from the BCSM site. No terms of use are published there, so the licence is recorded as UNKNOWN and the source is credited by choice; the page states no edition, so the credit carries the date we read it. The list names the holder of a code it carries and does NOT publish the allocation of the ABI code space: an absence from it is not a non-allocation. Read date in force served live at https://api.ibanforge.com/llms.txt
 
 ## Core Capabilities
 
-1. **IBAN Validation** — ISO 13616 MOD-97 checksum, BBAN structure parsing, 89 countries, and the bank-code verdict of the national register (DE, AT, BE, SK, BG, CH, LI)
+1. **IBAN Validation** — ISO 13616 MOD-97 checksum, BBAN structure parsing, 89 countries, and the bank-code verdict of the national register (DE, AT, BE, SK, CZ, BG, CH, LI)
 2. **BIC/SWIFT Lookup** — 121k+ BIC entries (entries, not institutions): GLEIF and national registers refreshed monthly, about two thirds from a public copy of the SWIFT directory frozen in January 2018; 39k+ LEI-enriched via GLEIF
 3. **Swiss Clearing** — BC-Nummer / IID with the full SIX BankMaster payment-rail participation (SIC, RTGS CHF, CHF instant, euroSIC, LSV+/BDD), QR-IID and institution classification, for every IID of the SIX BankMaster
 4. **EMI / vIBAN Detection** — identify virtual IBANs from EMIs (Wise, Revolut, N26, Mercury, Modulr, …)
@@ -158,7 +159,7 @@ Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions l
 
 ## Why IBANforge?
 
-- **Bank codes checked against the national register** where we read it (DE, AT, BE, SK, BG, CH, LI), and every BIC with its source
+- **Bank codes checked against the national register** where we read it (DE, AT, BE, SK, CZ, BG, CH, LI), and every BIC with its source
 - **Agent-native**: MCP server + x402 micropayments, no human onboarding
 - **Swiss payments**: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant), and its QR-IID where SIX allocates one
 - **No dead-ends**: free key → credit packs → x402, your agent always has a path to pay
