@@ -226,5 +226,49 @@ describe('the retired sentences stay retired', () => {
     const text = compareText(lang);
     expect(text).not.toMatch(/deepest|plus profondes|tiefsten/i);
     expect(text).not.toMatch(/121k\+ BICs, 39k\+/);
+    // AbstractAPI's "$99 ... 3 requests/second" lives only in hidden HTML; no
+    // visitor sees it (re-read on 24/09/2026 in a real browser).
+    // Bounded on both sides: "39,99 $" is a price of another vendor, not this one.
+    expect(text).not.toMatch(/\$99(?![.,]?\d)|(?<![\d.,'])99 \$/);
+  });
+});
+
+/**
+ * A silent page proves nothing. The comparison said "No" for competitors on
+ * Swiss clearing, compliance and AI agents while at least four vendors announce
+ * an MCP server; re-read on 24/09/2026, every such cell is either a fact read
+ * on the vendor's page or "not checked by us".
+ */
+describe('the comparison claims no absence it has not read', () => {
+  // A bare verdict, possibly with a parenthesis ("No", "Non", "Nein (…)"),
+  // never a sentence that merely begins with the word: "Non vérifié par
+  // nous" is the honest form this guard asks for.
+  const NO = /^(No|Non|Nein)(\s*\(.*\))?$/;
+
+  it('the pattern catches a bare verdict and lets the honest form through', () => {
+    for (const v of ['No', 'Non', 'Nein', 'No (a library, not a service)'])
+      expect(NO.test(v), v).toBe(true);
+    for (const v of [
+      'Non vérifié par nous',
+      'Not checked by us',
+      'Nicht in der dokumentierten Antwort',
+    ])
+      expect(NO.test(v), v).toBe(false);
+  });
+  const COMPETITORS = ['ibancom', 'ibanapi', 'abstract'] as const;
+
+  it.each(['en', 'fr', 'de'] as const)('%s', (lang) => {
+    const rows = (
+      JSON.parse(read(`frontend/messages/${lang}.json`)) as {
+        compare: { table: { rows: Record<string, Record<string, string>> } };
+      }
+    ).compare.table.rows;
+    const offenders: string[] = [];
+    for (const row of ['swiss', 'compliance', 'agents', 'bankCode']) {
+      for (const col of COMPETITORS) {
+        if (NO.test(rows[row][col])) offenders.push(`${row}.${col}: ${rows[row][col]}`);
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 });

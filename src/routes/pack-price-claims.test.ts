@@ -79,6 +79,22 @@ describe('the 1,000-credit pack is quoted at the price the API sells it', () => 
     expect(seen).toBeGreaterThan(5);
   });
 
+  it('in the comparison example, 2 × 1k packs, in three languages', () => {
+    // "$10 one-time (2 × 1k packs)" was the $5 pack, doubled, and survived the
+    // price change like the rest of this file's findings.
+    const twice = 2 * PACK.price_usdc;
+    const spelled: Record<string, RegExp> = {
+      en: /\$(\d+(?:\.\d+)?) one-time \(2 × 1k packs\)/,
+      fr: /(\d+(?:,\d+)?) \$ une fois \(2 packs 1k\)/,
+      de: /(\d+(?:,\d+)?) \$ einmalig \(2 × 1k-Packs\)/,
+    };
+    for (const [lang, pattern] of Object.entries(spelled)) {
+      const m = read(`frontend/messages/${lang}.json`).match(pattern);
+      expect(m, `${lang}: the 2 × 1k example was reworded`).not.toBeNull();
+      expect(Number(m![1].replace(',', '.')), lang).toBe(twice);
+    }
+  });
+
   it('in the llms.txt the API serves', async () => {
     const res = await buildApp().request('https://api.ibanforge.com/llms.txt');
     const text = await res.text();

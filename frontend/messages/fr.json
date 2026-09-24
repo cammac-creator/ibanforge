@@ -2015,12 +2015,12 @@
   "compare": {
     "meta": {
       "title": "IBANforge contre AbstractAPI, iban.com, IBANAPI et les bibliothèques open source : une comparaison honnête",
-      "description": "Prix et capacités des API de validation IBAN vérifiés le 10 septembre 2026 : périodes de facturation, quotas avec données bancaires, SDK disponibles et limites de chaque option. IBANforge, AbstractAPI, iban.com, IBANAPI et bibliothèques open source."
+      "description": "Prix et capacités des API de validation IBAN, prix et quotas relus le 24 septembre 2026 : périodes de facturation, quotas avec données bancaires, SDK disponibles et limites de chaque option. IBANforge, AbstractAPI, iban.com, IBANAPI et bibliothèques open source."
     },
     "eyebrow": "Comparatif",
     "hero": {
       "title": "Choisir une API de validation d'IBAN",
-      "description": "Comparez API payantes et bibliothèques open source selon les données renvoyées, le nombre de recherches bancaires incluses et la période facturée. Sources publiques vérifiées le 10 septembre 2026 ; ces services ne sont pas interchangeables."
+      "description": "Comparez API payantes et bibliothèques open source selon les données renvoyées, le nombre de recherches bancaires incluses et la période facturée. Prix et quotas relus sur les pages publiques le 24 septembre 2026 ; ces services ne sont pas interchangeables."
     },
     "disclosure": "Nous vendons l'un des produits de ce tableau : lisez-le en le sachant. Chaque chiffre est daté et vient d'une page publique ; si un prix a changé ou qu'une erreur s'est glissée, écrivez à support@ibanforge.com et nous corrigerons.",
     "table": {
@@ -2039,16 +2039,16 @@
           "ibanforge": "Packs prépayés : 4 $ / 1 000 crédits, sans expiration. Ou 0,002–0,02 $ par appel (x402). Gratuit : 25 par mois sans e-mail, 200 par mois une fois réclamée.",
           "ibancom": "Abonnement annuel : 530 €/an (2 000 lookups) à 4 150 €/an (illimité), engagement 1 an, hors TVA.",
           "ibanapi": "Crédits prépayés qui expirent avec le plan : 15 $ pour 60 jours (2 000 basiques + 400 recherches banque) à 115 $ pour un an (30 000 + 5 000).",
-          "libs": "Gratuit (MIT/LGPL). Le coût, c'est votre temps.",
-          "abstract": "Standard mensuel : 99 $ pour 60 000 requêtes/mois, 3 requêtes/seconde. L’option annuelle est distincte. Gratuit : 100 requêtes, 1 requête/seconde."
+          "libs": "Gratuit, sous licences open source. Le coût, c'est votre temps.",
+          "abstract": "Standard, vue par défaut (facturation annuelle) : 63 $/mois pour 60 000 requêtes par an, 25 requêtes/seconde. En facturation mensuelle : 69 $/mois pour 5 000 requêtes par mois. Gratuit : 100 requêtes, 1 requête/seconde."
         },
         "example": {
           "label": "2 000 validations avec données bancaires",
-          "ibanforge": "10 $ une fois (2 packs 1k), sans expiration ni abonnement",
+          "ibanforge": "8 $ une fois (2 packs 1k), sans expiration ni abonnement",
           "ibancom": "530 €/an (plan Professional)",
           "ibanapi": "Un forfait publié couvrant à lui seul 2 000 recherches bancaires : 115 $ pour 365 jours, avec 5 000 recherches. Celui à 40 $/180 jours n’en comprend que 1 500. Les achats successifs ne sont pas comparés ici.",
           "libs": "Pas de frais d’API ; les données bancaires dépendent du paquet et de ses registres. Couverture et fraîcheur à vérifier.",
-          "abstract": "La réponse documentée fournit un booléen de validité, sans données bancaires. Le forfait Standard mensuel affiche 99 $ pour 60 000 requêtes."
+          "abstract": "La réponse documentée fournit un booléen de validité, sans données bancaires. En facturation mensuelle, le Standard coûte 69 $ pour 5 000 requêtes par mois ; en annuelle, 63 $ par mois pour 60 000 requêtes par an."
         },
         "freeTier": {
           "label": "Offre gratuite",
@@ -2061,8 +2061,8 @@
         "bankData": {
           "label": "Identification de la banque (BIC, nom)",
           "ibanforge": "121k+ entrées BIC (des lignes, pas des établissements) : GLEIF et registres nationaux rafraîchis chaque mois, environ deux tiers issus d'une copie publique de l'annuaire SWIFT figée en janvier 2018 ; 39k+ enrichies LEI via GLEIF. Chaque validation nomme la source de son BIC.",
-          "ibancom": "Oui, c'est leur cœur de produit",
-          "ibanapi": "« Si disponible » selon leur doc",
+          "ibancom": "Oui : IBAN Suite identifie le BIC et les données bancaires, avec des données BIC sous licence S.W.I.F.T.",
+          "ibanapi": "BIC renvoyé « là où il est disponible », selon leur page d'accueil (leur page de documentation répondait 403 lors de notre vérification)",
           "libs": "Selon la bibliothèque : schwifty peut retrouver le BIC d’un IBAN à partir de ses données de codes banque.",
           "abstract": "La réponse publiée contient iban et is_valid ; aucun BIC ni nom de banque n’est documenté."
         },
@@ -2071,37 +2071,37 @@
           "ibanforge": "DE, AT, BE, SK, BG, CH, LI : le registre national lui-même. Listes partielles en FI, SM et LU, où une absence ne vaut pas refus. Ailleurs, une carte composite, signalée authoritative: false.",
           "ibancom": "Non vérifié par nous",
           "ibanapi": "Non vérifié par nous",
-          "libs": "Non vérifié par nous",
+          "libs": "Selon la bibliothèque : schwifty refuse un code banque inconnu de son registre embarqué. Les autres, non vérifiées par nous.",
           "abstract": "Non vérifié par nous"
         },
         "swiss": {
           "label": "Profondeur clearing suisse (SIC / euroSIC / QR-IID)",
           "ibanforge": "1,100+ entrées SIX BankMaster, participation aux rails instantanés, sémantique QR-IID",
-          "ibancom": "Pas exposé comme produit",
-          "ibanapi": "Non",
-          "libs": "Non",
-          "abstract": "Non"
+          "ibancom": "Non vérifié par nous",
+          "ibanapi": "Non vérifié par nous",
+          "libs": "Non vérifié par nous",
+          "abstract": "Absent de la réponse documentée (iban et is_valid seulement)"
         },
         "compliance": {
           "label": "Pré-check compliance (sanctions, FATF, obligation VoP)",
           "ibanforge": "Un endpoint, 0,02 $ : filtrage banques (OFAC, EU, UN), listes FATF, joignabilité SEPA et VoP de la banque, score 0–100",
           "ibancom": "Produits séparés (BAV/VoP dès 2 000 € les 2 500 vérifications)",
-          "ibanapi": "Non",
-          "libs": "Non",
-          "abstract": "Non"
+          "ibanapi": "Non vérifié par nous",
+          "libs": "Non vérifié par nous",
+          "abstract": "Absent de la réponse documentée (iban et is_valid seulement)"
         },
         "agents": {
           "label": "Agents IA (MCP, paiement autonome)",
           "ibanforge": "Serveur MCP natif et paiement par appel x402 en USDC ; ce mode de paiement ne demande pas de compte.",
-          "ibancom": "Non",
-          "ibanapi": "Non",
+          "ibancom": "Non vérifié par nous",
+          "ibanapi": "Non vérifié par nous",
           "libs": "Non (une bibliothèque, pas un service)",
-          "abstract": "Non"
+          "abstract": "Non vérifié par nous"
         },
         "signup": {
           "label": "Délai jusqu'au premier appel",
           "ibanforge": "Un curl pour une clé gratuite, ou zéro inscription via x402",
-          "ibancom": "Bon de commande, contrat annuel",
+          "ibancom": "Inscription en ligne pour un essai de 100 requêtes actif un mois ; licences achetées en ligne à la caisse, ou sur facture via l'équipe commerciale",
           "ibanapi": "Création de compte",
           "libs": "npm/pip install",
           "abstract": "Création de compte"
@@ -2109,7 +2109,7 @@
         "trust": {
           "label": "Surface légale/ops publiée",
           "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après résiliation (DPA 4.7)",
-          "ibancom": "Conditions, politique de confidentialité et DPA publics ; modalités de redistribution à convenir avec le fournisseur.",
+          "ibancom": "Conditions, politique de confidentialité, DPA et SLA publics ; modalités de redistribution à convenir avec le fournisseur.",
           "ibanapi": "Conditions et politique de confidentialité publiques ; engagements de service à vérifier auprès du fournisseur.",
           "libs": "Fichier de licence",
           "abstract": "CGU et confidentialité publiées"
@@ -2141,11 +2141,11 @@
       "getKey": "Obtenir une clé gratuite",
       "playground": "Ouvrir le playground"
     },
-    "footnote": "Sources publiques vérifiées le 10 septembre 2026. Les périodes facturées et les quotas avec données bancaires sont distingués. TVA, licences et conditions au paiement restent celles de chaque fournisseur.",
+    "footnote": "Prix, quotas, offres gratuites et capacités citées dans le tableau relus sur les pages publiques le 24 septembre 2026. Les cellules d'inscription et de documents légaux d'IBANAPI et d'AbstractAPI datent de la première lecture, le 10 septembre 2026. Une page muette ne prouve rien : là où nous n'avons pas vérifié une capacité, le tableau le dit. Les périodes facturées et les quotas avec données bancaires sont distingués. TVA, licences et conditions au paiement restent celles de chaque fournisseur.",
     "honest": {
       "heading": "Là où nous perdons, dit simplement",
       "items": [
-        "Pour 60 000 contrôles de validité seule, le forfait Standard mensuel publié par AbstractAPI coûte 99 $. Chez IBANforge, 2 packs de 25 000 et 2 packs de 5 000 crédits coûtent 200 $ et incluent l’enrichissement bancaire. Si la structure et la somme de contrôle suffisent, une bibliothèque locale peut éviter ces deux factures.",
+        "Si la structure et la somme de contrôle suffisent, une bibliothèque locale (ibantools, schwifty, iban4j, IbanNet) ne coûte rien et évite tout appel réseau : toute API payante, la nôtre comprise, perd cette comparaison. Pour repère, le forfait IBAN d’AbstractAPI, qui ne renvoie qu’un booléen de validité, s’affiche à 63 $ par mois en facturation annuelle pour 60 000 requêtes par an, ou à 69 $ par mois en facturation mensuelle pour 5 000 requêtes par mois.",
         "Des SDK Java 17+ et .NET 8 existent désormais, en plus de Python et TypeScript. Java est publié sur Maven Central ; .NET est disponible sur NuGet. Ces SDK appellent l’API hébergée, tandis que des bibliothèques comme iban4j et IbanNet effectuent des contrôles locaux."
       ]
     },
@@ -2154,7 +2154,7 @@
       "cols": {
         "vendor": "Acteur",
         "sells": "Ce qu'il vend",
-        "price": "Prix vérifié le 10 septembre 2026",
+        "price": "Prix vérifié le 24 septembre 2026",
         "free": "Palier gratuit"
       },
       "rows": [
@@ -2167,8 +2167,8 @@
         {
           "vendor": "iban-test.eu",
           "sells": "Contrôles contre les registres bancaires pour 40 pays, intégrations REST et MCP",
-          "price": "Forfaits API payants ; consulter la page du fournisseur pour les quotas et tarifs actuels",
-          "free": "Contrôles gratuits dans le navigateur et essai API ; quota à confirmer à l’inscription"
+          "price": "9,90 €/mois pour 100 requêtes API par 24 h jusqu'à 49,90 €/mois pour 10 000 par 24 h (ou 90 € à 490 € par an) ; usage commercial uniquement, hors TVA",
+          "free": "10 requêtes API par 24 h"
         },
         {
           "vendor": "apilayer bankdataapi",
@@ -2178,19 +2178,19 @@
         },
         {
           "vendor": "API Ninjas",
-          "sells": "Décomposition d'IBAN ; nom de banque, adresse et BIC réservés aux plans payants",
-          "price": "Forfait Developer affiché à 39 $/mois pour 100 000 appels partagés entre les API ; offre à confirmer au paiement",
+          "sells": "Décomposition d'IBAN ; nom de banque, adresse et BIC réservés aux plans payants ; serveur MCP annoncé",
+          "price": "Forfait Developer : 39 $/mois en facturation annuelle (vue par défaut), 59 $/mois en mensuel, pour 100 000 appels par mois ; la page de prix ne mentionne pas l'IBAN",
           "free": "3 000 par mois, usage non commercial"
         },
         {
           "vendor": "openiban",
-          "sells": "Clé de contrôle plus enrichissement banque pour BE, DE, NL, LU, CH, AT, LI",
+          "sells": "Clé de contrôle plus enrichissement banque pour BE, DE, NL, LU, CH, AT, LI, signalés « not guaranteed » ; données BIC mises à jour pour la dernière fois le 24 janvier 2018, selon la page",
           "price": "Service public gratuit et code open source ; aucun SLA payant établi dans cette comparaison",
           "free": "Tout"
         }
       ]
     },
-    "footnoteExtra": "Sources publiques vérifiées le 10 septembre 2026 :"
+    "footnoteExtra": "Sources publiques vérifiées le 24 septembre 2026 :"
   },
   "testIban": {
     "metaTitle": "Générateur d'IBAN de test — codes banque réels, vérifiés aux registres nationaux",
