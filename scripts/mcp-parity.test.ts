@@ -41,6 +41,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { STDIO_ONLY_TOOLS } from '../src/mcp/inventory.js';
+import { BANK_LEVEL_SANCTIONS, frozenBicShare } from '../src/lib/positioning.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8');
@@ -630,5 +631,75 @@ describe('parité MCP — les compteurs annoncés suivent la réalité', () => {
     expect(SRC.A, `la bannière stderr de mcp/src/index.ts n'annonce pas ${n} outils`).toContain(
       `${n} tools exposed.`,
     );
+  });
+});
+
+/**
+ * Les phrases de positionnement des outils de donnée, entre A et C.
+ *
+ * 25/09/2026 : la PR 231 a réécrit ces descriptions sur le transport HTTP (C),
+ * et le paquet npm (A) disait encore « THE DEEPEST SWISS CLEARING DATA IN ANY
+ * PUBLIC API », « 121k+ … 38k+ LEI-enriched … refreshed monthly », des
+ * sanctions « bank sanctions (OFAC) » sans le pays ni les deux autres listes,
+ * et « a European IBAN » pour un service qui en valide dans tous les pays IBAN.
+ * Un paquet publié garde ses phrases jusqu'à la version suivante : ce bloc
+ * compare, au caractère près, les fragments que A doit servir comme C.
+ *
+ * Seuls des fragments, et pas des descriptions entières : C construit les
+ * siennes avec des chiffres lus en direct (`datasetFacts()`,
+ * `bicDirectorySentence()`), que A, figé à la publication, ne recopie pas.
+ */
+describe('parité MCP — les phrases de positionnement des outils de donnée', () => {
+  const SHARED: Array<{ tool: string; fragment: string }> = [
+    {
+      tool: 'lookup_bic',
+      fragment:
+        'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, and registered head-office address (where available). ',
+    },
+    {
+      tool: 'lookup_ch_clearing',
+      fragment:
+        'EVERY IID OF THE SIX BANKMASTER, with its full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ',
+    },
+    {
+      tool: 'check_compliance',
+      fragment:
+        'Run a pre-flight compliance triage on an IBAN before sending a SEPA / cross-border payment. ',
+    },
+    {
+      tool: 'check_compliance',
+      fragment:
+        "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, ",
+    },
+    {
+      tool: 'check_compliance',
+      fragment: "the name check itself is done by the payee's bank, never here. ",
+    },
+  ];
+
+  it.each(SHARED)('$tool : A et C servent « $fragment »', ({ fragment }) => {
+    expect(SRC.C, 'le transport HTTP a changé sa phrase : réaligner le paquet').toContain(fragment);
+    expect(SRC.A, 'le paquet npm ne suit plus le transport HTTP').toContain(fragment);
+  });
+
+  it('check_compliance : A recopie mot pour mot la portée des sanctions que C importe', () => {
+    expect(SRC.C).toContain('${BANK_LEVEL_SANCTIONS}');
+    expect(SRC.A).toContain(`CHECKS: IBAN validity + ${BANK_LEVEL_SANCTIONS} + FATF status`);
+  });
+
+  it('lookup_bic : A date la copie figée de l’annuaire SWIFT du même mois que la base', () => {
+    const { month } = frozenBicShare();
+    expect(month, 'la base ne date plus sa copie figée : relire la phrase de A').not.toBeNull();
+    expect(SRC.A).toContain(`a public copy of the SWIFT directory frozen in ${month}`);
+  });
+
+  it.each([
+    [/THE DEEPEST SWISS CLEARING DATA/i, 'every IID of the SIX BankMaster'],
+    [/\b38k\+ LEI/i, 'only the GLEIF rows carry an LEI, counts at llms.txt'],
+    [/bank sanctions \(OFAC\)/i, 'BANK_LEVEL_SANCTIONS'],
+    [/a European IBAN/i, 'an IBAN from any IBAN country'],
+    [/from the GLEIF database/i, 'the BIC directory has several sources'],
+  ] as const)('A ne sert plus %s (remplacé par : %s)', (retired, _instead) => {
+    expect(SRC.A).not.toMatch(retired);
   });
 });
