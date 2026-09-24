@@ -11,7 +11,7 @@ Typical uses: verify supplier IBANs at onboarding, triage a payout list before t
 | **Validate IBAN** | Structure + checksum + issuing bank (BIC), bank-code check against the national register (`not_in_register` means the register allocates the code to nobody), EMI/vIBAN classification, SEPA + VoP reachability |
 | **Look up BIC** | BIC/SWIFT → bank name, city, country, LEI |
 | **Look up Swiss clearing** | BC-Nummer / IID → institution, seat address, SIC/euroSIC/instant rails, QR-IID semantics |
-| **Compliance check** | Bank-level sanctions (OFAC + EU), FATF lists, SEPA/VoP, 0-100 risk score. Bank-level, not name screening |
+| **Compliance check** | Bank-level sanctions (OFAC, EU, UN), FATF lists, SEPA/VoP, 0-100 risk score. Bank-level, not name screening |
 
 ## Installation
 
@@ -25,7 +25,19 @@ npm install n8n-nodes-ibanforge
 
 ## Credentials
 
-One free API key: 200 requests/month, no card. Get it at [ibanforge.com](https://ibanforge.com?src=n8n) (key dialog) or straight from the API:
+The node needs an IBANforge API key. The quickest one needs no e-mail and no card:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate \
+  -H "Content-Type: application/json" \
+  -d '{"source": "n8n"}'
+```
+
+The answer carries an `ifk_…` key, shown once, worth 25 requests a month on every endpoint. Paste it into the node's IBANforge API credentials.
+
+To raise that same key to 200 requests a month, claim it once it has served a call: `POST https://api.ibanforge.com/v1/keys/claim` with the key in the `Authorization: Bearer ifk_…` header, then the six-digit code mailed to the address you give for this. The steps are in [the API keys guide](https://ibanforge.com/docs/api-keys?src=n8n).
+
+Prefer to give an address from the start? Send it in the same call and the key starts at 200 requests a month:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
@@ -33,7 +45,7 @@ curl -X POST https://api.ibanforge.com/v1/keys/generate \
   -d '{"email": "you@company.com", "source": "n8n"}'
 ```
 
-Paste the `ifk_…` key into the node's IBANforge API credentials.
+The [key dialog on ibanforge.com](https://ibanforge.com?src=n8n) does the same from a browser.
 
 ## Honest limits
 
