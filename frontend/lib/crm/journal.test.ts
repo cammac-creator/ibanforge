@@ -456,3 +456,45 @@ describe('journalRows — a subscriber stands out in the journal', () => {
     expect(rows.find((r) => r.contact.id === 'libre@alpha.example.net')?.contact.subscriber).toBe(false);
   });
 });
+
+describe('journalRows, la langue de chaque ligne', () => {
+  const english = contact({
+    id: 'langue@alpha.example.net',
+    kind: 'client',
+    messages: [
+      msg({
+        id: 'en1',
+        lang: 'en',
+        snippet: 'Thanks for the key, it works',
+        snippet_fr: 'Merci pour la clé, elle fonctionne',
+      }),
+    ],
+  });
+
+  it('se lit en français et nomme la langue d’origine', () => {
+    const [row] = journalRows([english]);
+    expect(row).toMatchObject({
+      snippet: 'Merci pour la clé, elle fonctionne',
+      lang: 'en',
+      translated: true,
+    });
+  });
+
+  it('se retrouve aussi par un mot de la langue d’origine', () => {
+    const rows = journalRows([english]);
+    expect(filterJournal(rows, filter({ query: 'works' }), TODAY).map((r) => r.id)).toEqual([
+      'en1',
+    ]);
+  });
+
+  it('signale une ligne étrangère encore sans traduction', () => {
+    const [row] = journalRows([
+      contact({
+        id: 'sans@alpha.example.net',
+        kind: 'client',
+        messages: [msg({ id: 'de1', lang: 'de', snippet: 'Danke schön', snippet_fr: null })],
+      }),
+    ]);
+    expect(row).toMatchObject({ snippet: 'Danke schön', lang: 'de', translated: false });
+  });
+});

@@ -9,6 +9,8 @@ import { formatStamp } from '@/lib/crm/format';
 import { toZurich } from '@/lib/crm/zurich';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
+import { langName, usableLang } from '@/lib/crm/reading';
+import { LangBadge } from './lang-badge';
 
 /**
  * A CRM-native draft sitting in the thread: read it, adjust it in place, then
@@ -67,6 +69,7 @@ export function DraftCard({
   // below, never instead of it (owner, 03/09/2026). `draftReading` keeps its
   // contract; what changed is that this card no longer asks it to swap.
   const reading = draftReading(draft, false);
+  const departure = usableLang(draft.lang);
   const original = draft.body ?? draft.snippet ?? '';
   const [busy, setBusy] = useState<false | 'send' | 'save' | 'del'>(false);
   // Latched on a confirmed send. router.refresh() is not awaitable and the
@@ -317,12 +320,22 @@ export function DraftCard({
           <p className="mt-0.5 whitespace-pre-wrap text-[14px] leading-[22px] text-[var(--fg-2)]">
             {reading.text}
           </p>
+          {/* Un brouillon en langue étrangère que le traducteur n'a pas encore
+              lu : la pastille commune le dit, en ambre, au lieu de se taire. */}
+          {!reading.canTranslate && departure && departure !== 'fr' && (
+            <div className="mt-1.5">
+              <LangBadge lang={departure} translated={false} />
+            </div>
+          )}
           {reading.canTranslate && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <span className="rounded bg-[var(--ink-4)] px-1.5 py-0.5 text-[12px] text-[var(--fg-3)]">
+              {/* La pastille commune (lang-badge.tsx), puis ce qui ne vaut
+                  qu'ici : la langue dans laquelle le mail partira, en toutes
+                  lettres et non plus en code. */}
+              <LangBadge lang={draft.lang} translated={reading.isTranslation} />
+              <span className="text-[12px] text-[var(--fg-3)]">
                 {reading.isTranslation
-                  ? '🌐 traduction française · le mail partira en ' +
-                    (draft.lang ?? 'langue d’origine')
+                  ? `lecture en français · le mail partira en ${departure ? langName(departure) : 'sa langue d’origine'}`
                   : '✉️ texte qui sera envoyé'}
               </span>
               <button

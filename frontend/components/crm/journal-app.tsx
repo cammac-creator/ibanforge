@@ -21,6 +21,7 @@ import {
   type SendOrigin,
 } from '@/lib/crm/journal';
 import { kindWord, railColorOf } from '@/lib/crm/table-view';
+import { LangBadge } from './lang-badge';
 
 /**
  * The Courrier page: every mail, in one list, newest first.
@@ -169,6 +170,13 @@ function JournalLine({ row, locale }: { row: JournalRow; locale: string }) {
           {row.subject && <p className="mt-2 truncate text-sm text-[var(--fg-2)]">{row.subject}</p>}
           {row.snippet && (
             <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[var(--fg-4)]">
+              <LangBadge
+                lang={row.lang}
+                translated={row.translated}
+                compact
+                hideFrench
+                className="mr-1.5"
+              />
               {row.snippet}
             </p>
           )}
