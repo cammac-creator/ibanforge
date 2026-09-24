@@ -169,14 +169,6 @@ function saysMcpDaily(line: string): boolean {
 }
 
 /**
- * Exempté nommément : le README du paquet npm `ibanforge-mcp` (`mcp/`, hors du
- * périmètre de la PR 235) dit encore l'essai quotidien. Il se corrige avec la
- * prochaine publication du paquet, qui est le geste de Claude-Alain : retirer
- * alors cette exemption, le garde doit rester vert sans elle.
- */
-const DAILY_WORDS_EXEMPT = new Set(['mcp/README.md']);
-
-/**
  * « Compté en mémoire, par instance ».
  *
  * 🚨 Le texte allemand réel est « im Arbeitsspeicher je Serverinstanz » : un
@@ -242,10 +234,7 @@ function tally(): Tally {
       // dem 11. Aufruf am Tag » a survécu dix jours sur une ligne qui ne disait
       // ni « Kostprobe » ni « ohne Schlüssel ».
       if (ORDINALS.some((p) => p.test(line))) out.ordinal.push(ref);
-      // Même exemption nommée que les mots du jour : le README du paquet npm
-      // se corrige avec sa prochaine publication.
-      if (!DAILY_WORDS_EXEMPT.has(file) && saysMcpDaily(line))
-        out.mcpDaily.push(`${ref}: ${line.trim().slice(0, 120)}`);
+      if (saysMcpDaily(line)) out.mcpDaily.push(`${ref}: ${line.trim().slice(0, 120)}`);
       // L'exemple de démarrage est désormais exporté depuis le contrat. Seule
       // la ligne EXACTE est exemptée ; onboarding-parity.test.ts contrôle le
       // bloc complet dans les trois langues. Le plafond de prose ne remonte pas.
@@ -265,12 +254,7 @@ function tally(): Tally {
       }
       for (const m of line.matchAll(WEEKLY_FIGURE))
         out.weekly.push({ ref, value: Number(m[1]), mcp: ABOUT_MCP.test(line) });
-      if (
-        !DAILY_WORDS_EXEMPT.has(file) &&
-        DAILY_WORDS.test(line) &&
-        !ABOUT_MCP.test(line) &&
-        !PER_NETWORK.test(line)
-      ) {
+      if (DAILY_WORDS.test(line) && !ABOUT_MCP.test(line) && !PER_NETWORK.test(line)) {
         out.dailyWords.push(ref);
       }
       if (MEMORY_CLAIM.test(line)) out.memory.push(ref);

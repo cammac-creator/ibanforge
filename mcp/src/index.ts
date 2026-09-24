@@ -49,7 +49,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { createRequire } from 'node:module';
 import { createApiClient, requestTimeout, type JsonRecord } from './api-client.js';
-import { stdioInstructions } from './stdio-instructions.js';
+import { stdioInstructions, stdioTools } from './stdio-instructions.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -111,7 +111,7 @@ const TOOLS: Tool[] = [
       'source and free_of_charge are licence conditions that must travel with the data — do not strip them when relaying the answer. ' +
       'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
       'is open, or belongs to any particular person. Verify the payee by name before sending funds. ' +
-      'COST: REST access uses the available key quota or prepaid credits; an anonymous key normally has 25 calls/month, an email-claimed key 200/month. The HTTP API also accepts x402 (0.005 USDC), but this package does not sign payments.',
+      'COST: REST access uses the available key quota or prepaid credits; the allowances in force are served at https://api.ibanforge.com/.well-known/rate-limits.yml. The HTTP API also accepts x402 (0.005 USDC per call), but this package does not sign payments.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -292,12 +292,12 @@ const TOOLS: Tool[] = [
     title: 'Batch Validate IBANs',
     annotations: { title: 'Batch Validate IBANs', ...READ_ONLY },
     description:
-      'Validate up to 100 IBANs in a single call at $0.002 per IBAN (60% cheaper than calling validate_iban repeatedly at $0.005). ' +
+      'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, an IBAN costs $0.002 here instead of $0.005 for validate_iban; on a key or prepaid credits, each IBAN uses one request or one credit either way. ' +
       'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
       'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
       'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
       'RETURNS: { results: [...same shape as validate_iban], count, valid_count, cost_usdc }. ' +
-      'COST: 0.002 USDC per IBAN (e.g. 10 IBANs = 0.02, 100 IBANs = 0.20).',
+      'COST: via x402, 0.002 USDC per IBAN (e.g. 10 IBANs = 0.02, 100 IBANs = 0.20); on a key or prepaid credits, one request or one credit per IBAN.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -905,7 +905,7 @@ const TOOLS: Tool[] = [
       'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
       'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
       'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
       'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
     inputSchema: {
       type: 'object',
@@ -1186,7 +1186,14 @@ const server = new Server(
   { capabilities: { tools: {} }, instructions: stdioInstructions(INSTRUCTIONS) },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+// Le texte servi, pas la source : deux descriptions partagées avec les autres
+// surfaces disent encore « daily » et ne peuvent changer ici qu'avec elles
+// (voir PENDING_SHARED_WORDING dans stdio-instructions.ts). Calculé une fois,
+// au démarrage : une phrase introuvable arrête le serveur au lieu de servir
+// l'ancien texte en silence.
+const SERVED_TOOLS = stdioTools(TOOLS);
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: SERVED_TOOLS }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
@@ -1229,10 +1236,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const ANON_NOTE =
     'Anonymous mode — basic format validation only. For BIC, SEPA reachability, ' +
     'issuer classification, sanctions, Swiss BC-Nummer and risk score: take a key ' +
-    'with no e-mail at all — POST /v1/keys/generate with no body, 25 REST calls a ' +
-    'month — then POST /v1/keys/claim with the key in the Authorization header to ' +
-    'lift it to 200 a month, or pay per call via x402 ' +
-    '(see https://api.ibanforge.com/.well-known/x402).';
+    'with no e-mail at all — POST /v1/keys/generate with no body — then POST ' +
+    '/v1/keys/claim with the key in the Authorization header to raise its monthly ' +
+    'allowance (figures in force: https://api.ibanforge.com/.well-known/rate-limits.yml), ' +
+    'or pay per call via x402 (see https://api.ibanforge.com/.well-known/x402).';
 
   // When the 402 carried a cause (exhausted quota/credits, invalid key), the
   // degraded fallback result must say so: the user HAS a key and would
