@@ -20,6 +20,10 @@ const PURGED_BY_TIME: Record<string, string> = {
   pending_verifications: 'supprimée à l’expiration du code (src/lib/verification.ts)',
   device_codes: 'TTL du device grant, purge datée (src/routes/device-grant.ts)',
   audit_jobs: 'expires_at, purge des travaux d’audit (src/lib/audit-jobs.ts)',
+  account_login_codes:
+    'code de connexion au compte, 15 minutes de vie, supprimé à l’expiration (purgeAccountTables, src/lib/account.ts)',
+  account_sessions:
+    'session de lecture du compte, 7 jours au plus, supprimée un jour après expiration ou révocation (purgeAccountTables, src/lib/account.ts)',
 };
 
 /** Colonnes qui portent un mot du lexique sans être une adresse. */
