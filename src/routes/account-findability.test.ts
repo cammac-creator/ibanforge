@@ -101,6 +101,6 @@ describe('the key documentation has its account section, in three languages', ()
     expect(section).toMatch(/\b15 (minutes|Minuten)\b/);
     expect(section).toContain('POST /v1/keys/rotate');
     expect(section).toContain('POST /v1/keys/revoke');
-    expect(section, 'no em or en dash').not.toMatch(/[—–]/);
+    expect(section, 'no em or en dash').not.toMatch(/[\u2014\u2013]/);
   });
 });
