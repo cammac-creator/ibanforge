@@ -110,7 +110,13 @@ import { adminBreaker } from './routes/admin-breaker.js';
 import { adminFailedPayments } from './routes/admin-failed-payments.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
-import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
+import {
+  recordRequest,
+  classifyClient,
+  hashIp,
+  extractClientIp,
+  redactIbanShapedValues,
+} from './lib/stats.js';
 import { CONTEXT_HEADER, recordLineageSuccess } from './lib/lineage-facts.js';
 import {
   bicGuardMiddleware,
@@ -161,12 +167,21 @@ const redactQueryValues = (line: string): string =>
 // submitted identifier too. `request_log` already redacts these through
 // `normalizeRequestPath`; stdout, which Railway keeps, did not. Security audit
 // 2026-09-01, finding SEC-02.
-const IBAN_SHAPED_PATH_TOKEN = /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g;
+//
+// The IBAN half used its own pattern until 24/09/2026, and a narrower one than
+// `request_log`: capitals only, one block only. `ch93…`, `CH93%200076%20…`,
+// `de89-3704-…` went into the log whole. It now reads the request target (path
+// AND query, so a bare `?CH93…` without `=` is covered too) with the very rule
+// `request_log` uses, `redactIbanShapedValues`: one definition of an IBAN for
+// both journals. Only the target is scanned, up to the first blank, so the
+// status and duration printed after it can never be read as an IBAN's last
+// group.
+const REQUEST_TARGET = /\/\S*/g;
 const redactPathSecrets = (line: string): string =>
   line
     .replace(/(\/v1\/stripe\/key\/)[^/?\s]+/g, '$1***')
     .replace(/(\/v1\/credits\/recover\/)[^/?\s]+/g, '$1***')
-    .replace(IBAN_SHAPED_PATH_TOKEN, '***');
+    .replace(REQUEST_TARGET, (target) => redactIbanShapedValues(target, '***'));
 
 // Track all HTTP requests for dashboard analytics
 // Exclude internal/monitoring endpoints to avoid feedback loop
