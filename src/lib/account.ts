@@ -625,9 +625,8 @@ export function buildOverview(
  * La clé ACTIVE de ce préfixe, si elle appartient à l'adresse de la session ;
  * null sinon, que le préfixe soit inconnu, désactivé, regroupé en cohorte,
  * réétiqueté ou à une autre adresse. Une seule requête dans tous les cas : la
- * route rend le
- * même 404, dans le même temps, pour un préfixe inconnu et pour celui d'un
- * autre.
+ * route rend le même 404, dans le même temps, pour un préfixe inconnu et pour
+ * celui d'un autre.
  */
 export function findOwnedKey(
   emailNorm: string,
