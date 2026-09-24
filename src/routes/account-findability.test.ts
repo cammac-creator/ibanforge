@@ -78,3 +78,29 @@ describe('no served code points at /en/account any more', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * La documentation des clés porte sa section « page du compte », en trois
+ * langues et avec le même contenu : ce qu'on y voit, comment se connecter, la
+ * durée de la session, le repli « coller une clé », et que renouveler ou
+ * révoquer demande la clé elle-même.
+ */
+describe('the key documentation has its account section, in three languages', () => {
+  it.each([
+    ['en', '## Your account page'],
+    ['fr', '## Votre page de compte'],
+    ['de', '## Ihre Kontoseite'],
+  ])('%s', (lang, heading) => {
+    const text = read(`frontend/content/${lang}/docs/api-keys.mdx`);
+    const start = text.indexOf(`${heading}\n`);
+    expect(start, `${lang}: ${heading}`).toBeGreaterThan(-1);
+    const section = text.slice(start, text.indexOf('\n## ', start + 3));
+    expect(section).toContain('[ibanforge.com/account](/account)');
+    for (const route of ROUTES) expect(section, `${lang}: ${route}`).toContain(route);
+    expect(section).toMatch(/\b7 (days|jours|Tage)\b/);
+    expect(section).toMatch(/\b15 (minutes|Minuten)\b/);
+    expect(section).toContain('POST /v1/keys/rotate');
+    expect(section).toContain('POST /v1/keys/revoke');
+    expect(section, 'no em or en dash').not.toMatch(/[—–]/);
+  });
+});
