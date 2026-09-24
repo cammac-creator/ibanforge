@@ -17,7 +17,7 @@ This README gives no figures on purpose: a published package stays as it is unti
 
 - **Remote MCP, nothing to install:** `https://api.ibanforge.com/mcp` answers full tool calls without a key or a wallet, within its own allowance per source address (`mcp_anonymous` in rate-limits.yml), a batch counting one per IBAN. It is separate from the REST trial below, and an API key does not raise it.
 - **This package, before you have a key:** `validate_iban` goes through the REST API's keyless trial (`rest_anonymous_trial`), counted per source address; the `trial` block of each answer says how many calls are left and when the count resets. The other paid tools need a key, prepaid credits or x402.
-- **A key that needs no e-mail and no card:** `POST https://api.ibanforge.com/v1/keys/generate` with an empty body returns an `ifk_` key with a monthly allowance on every endpoint (`anonymous_key`). Claimed at `POST /v1/keys/claim` with a code mailed to an address given for this, the same key gets a larger monthly allowance (`free_tier`; see [Keep using the same key](#keep-using-the-same-key)).
+- **A key that needs no e-mail and no card:** `POST https://api.ibanforge.com/v1/keys/generate` with an empty body returns an `ifk_` key with its own allowance on every endpoint (`anonymous_key`). Claimed at `POST /v1/keys/claim` with a code mailed to an address given for this, the same key gets a larger allowance (`free_tier`; see [Keep using the same key](#keep-using-the-same-key)).
 
 ## Tools
 
@@ -47,7 +47,7 @@ No e-mail, no account, no form. Four steps, about fifteen seconds of human time:
 2. Show your human the `display_to_human` block **verbatim**: it carries the short code
    and the link. Do not open the link yourself, and never invent an address.
 3. Your human opens the page, checks the code matches, and clicks. The page gives a key
-   with no address at all; they may add one there to raise the monthly allowance.
+   with no address at all; they may add one there to raise the allowance.
 4. Call **`poll_api_key`** (no argument needed). On `approved` it carries the key **once**,
    plus a ready-made `config_line` to paste. Save it as `IBANFORGE_API_KEY` and reconnect.
 
@@ -110,14 +110,14 @@ curl -X POST https://api.ibanforge.com/v1/keys/generate
 
 Store the returned `api_key` securely and add it as `IBANFORGE_API_KEY` in the MCP server's
 `env` object, then reconnect the client. Do not paste a placeholder key and do not mint a
-new key for every conversation. The key starts at the monthly allowance given in
+new key for every conversation. The key starts at the allowance given in
 [Free access](#free-access); read `monthly_limit`, since a temporary protection can reduce it.
 It provides a stable identity, a dedicated quota and `GET /v1/keys/usage`.
 
 Once used, that same key can be claimed at `POST /v1/keys/claim`, with
 `Authorization: Bearer ifk_…`, never a key in the body. A six-digit code sent to an address
-explicitly supplied for this purpose raises the key's monthly allowance, every month. An x402
-payment made on the key raises it once. The figures are those of `free_tier` in
+explicitly supplied for this purpose raises the key's allowance, renewed with each new period. An
+x402 payment made on the key raises it once, without renewal. The figures are those of `free_tier` in
 [rate-limits.yml](https://api.ibanforge.com/.well-known/rate-limits.yml). Do not infer an
 address or initiate payment without authorization. Prepaid credits also work with the
 configured key: one credit per call, and one per IBAN in a batch.

@@ -47,6 +47,23 @@ const QUOTA_FIGURES = [
 
 const PRICE_CLAIMS = /\d+\s*%\s*(?:cheaper|lower|off)|cheaper than/i;
 
+/**
+ * La période d'un quota, même sans chiffre : l'essai est passé du jour à la
+ * semaine, l'accès MCP sans clé le même soir, et « a monthly allowance » aurait
+ * figé la clé de la même façon. Lue seulement dans une phrase qui parle
+ * d'allocation : « refreshed monthly » (la fraîcheur d'une source) est juste.
+ * `monthly_limit`, nom d'un champ de l'API, ne forme pas un mot entier.
+ */
+const QUOTA_SENTENCE = /allowance|quota|\blimit\b|trial|free[ -]tier|\bcalls?\b|\brequests?\b|\bcredits?\b/i;
+const PERIOD =
+  /\b(?:daily|weekly|monthly|hourly)\b|\b(?:per|a|every|each|this) (?:day|week|month|hour)\b|\/(?:day|week|month|hour)\b/i;
+
+function periodSentences(text: string): string[] {
+  return withoutTrueDaily(text)
+    .split(/(?<=[.!?;])\s+|\n/)
+    .filter((sentence) => QUOTA_SENTENCE.test(sentence) && PERIOD.test(sentence));
+}
+
 function withoutTrueDaily(text: string): string {
   return TRUE_DAILY.reduce((t, phrase) => t.split(phrase).join(''), text);
 }
@@ -61,6 +78,8 @@ function offences(label: string, text: string): string[] {
   }
   const price = text.match(PRICE_CLAIMS);
   if (price) found.push(`${label} : « ${price[0]} »`);
+  for (const sentence of periodSentences(text))
+    found.push(`${label} : période de quota « ${sentence.slice(0, 140)} »`);
   return found;
 }
 
@@ -198,6 +217,24 @@ describe('les motifs eux-mêmes', () => {
     'you hit the daily free allowance',
   ])('attrape le jour : %s', (line) => {
     expect(DAILY.test(withoutTrueDaily(line))).toBe(true);
+  });
+
+  it.each([
+    'returns an ifk_ key with a monthly allowance on every endpoint.',
+    'Both tools are free and keep working after the daily limit is reached.',
+    'The remote service has its own allowance, counted by the week (per week and per address).',
+    'The mailed code raises the allowance every month; a payment raises it once.',
+  ])('attrape la période d’un quota : %s', (line) => {
+    expect(periodSentences(line)).not.toEqual([]);
+  });
+
+  it.each([
+    'GLEIF and the national registers are refreshed monthly.',
+    'the ECB or Banco de Espana daily list.',
+    'read `monthly_limit`, since a temporary protection can reduce it.',
+    'raises the allowance, renewed with each new period.',
+  ])('laisse passer une période qui n’est pas un quota : %s', (line) => {
+    expect(periodSentences(line)).toEqual([]);
   });
 
   it('attrape « 60% cheaper »', () => {

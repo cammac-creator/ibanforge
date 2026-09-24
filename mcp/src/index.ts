@@ -1237,7 +1237,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     'Anonymous mode — basic format validation only. For BIC, SEPA reachability, ' +
     'issuer classification, sanctions, Swiss BC-Nummer and risk score: take a key ' +
     'with no e-mail at all — POST /v1/keys/generate with no body — then POST ' +
-    '/v1/keys/claim with the key in the Authorization header to raise its monthly ' +
+    '/v1/keys/claim with the key in the Authorization header to raise its ' +
     'allowance (figures in force: https://api.ibanforge.com/.well-known/rate-limits.yml), ' +
     'or pay per call via x402 (see https://api.ibanforge.com/.well-known/x402).';
 
