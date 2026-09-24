@@ -11,7 +11,7 @@ import { apiKeys } from './api-keys.js';
 import { buildApp } from '../app.js';
 import { getStatsDB } from '../lib/db.js';
 import { generateApiKey, generateCreditKey, revokeApiKey } from '../lib/api-keys.js';
-import { ACCOUNT_COOKIE, createSession } from '../lib/account.js';
+import { ACCOUNT_COOKIE, ACCOUNT_REPORT_MAX_DAYS, createSession } from '../lib/account.js';
 
 const ENV = { ...process.env };
 
@@ -56,8 +56,15 @@ describe('GET /v1/account/keys/report', () => {
       .run(key.key_hash, new Date().toISOString().slice(0, 7));
 
     const cookie = cookieFor(email);
-    for (const query of ['', '&days=7', '&days=9999']) {
-      const pasted = await app.request(`/v1/keys/report?x=1${query}`, {
+    // Au-delà de 90 jours, le compte plafonne là où `/v1/keys/report` va jusqu'à
+    // 365 : il rend alors le rapport de la clé collée sur 90 jours.
+    for (const [query, pastedQuery] of [
+      ['', ''],
+      ['&days=7', '&days=7'],
+      ['&days=90', '&days=90'],
+      ['&days=9999', '&days=90'],
+    ]) {
+      const pasted = await app.request(`/v1/keys/report?x=1${pastedQuery}`, {
         headers: { Authorization: `Bearer ${key.api_key}` },
       });
       const signedIn = await app.request(
@@ -71,6 +78,38 @@ describe('GET /v1/account/keys/report', () => {
       expect(await signedIn.json()).toEqual(a);
       expect((a as { report: { total: number } }).report.total).toBeGreaterThan(0);
     }
+  });
+
+  it('depuis le compte, le rapport s’arrête à 90 jours', async () => {
+    const app = makeApp();
+    const email = 'fenetre@alpha.example.net';
+    const key = generateCreditKey(email, 1000);
+    const at = (daysAgo: number) =>
+      new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 19).replace('T', ' ');
+    logCall(key.key_prefix, at(200), 200);
+    logCall(key.key_prefix, at(120), 200);
+    logCall(key.key_prefix, at(20), 200);
+    const cookie = cookieFor(email);
+    const read = async (path: string, headers: Record<string, string>) =>
+      (await (await app.request(path, { headers })).json()) as {
+        report: { window_days: number; total: number };
+      };
+
+    expect(ACCOUNT_REPORT_MAX_DAYS).toBe(90);
+    for (const days of ['365', '91', '100000']) {
+      const signedIn = await read(`/v1/account/keys/report?prefix=${key.key_prefix}&days=${days}`, {
+        Cookie: cookie,
+      });
+      // Plafonné, pas refusé : la fenêtre servie est écrite dans la réponse.
+      expect(signedIn.report.window_days, days).toBe(ACCOUNT_REPORT_MAX_DAYS);
+      expect(signedIn.report.total, days).toBe(1);
+    }
+    // La clé collée garde sa propre borne : l'année entière.
+    const pasted = await read('/v1/keys/report?days=365', {
+      Authorization: `Bearer ${key.api_key}`,
+    });
+    expect(pasted.report.window_days).toBe(365);
+    expect(pasted.report.total).toBe(3);
   });
 
   it('le préfixe d’une autre adresse rend le même 404 qu’un préfixe inconnu', async () => {

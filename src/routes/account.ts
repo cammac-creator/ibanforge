@@ -4,7 +4,8 @@
  *   POST /v1/account/code          une adresse → un code à six chiffres par mail
  *   POST /v1/account/session       adresse + code → cookie de session, sans jeton dans le corps
  *   GET  /v1/account/overview      les clés actives de l'adresse (cookie)
- *   GET  /v1/account/keys/report   ?prefix=ifk_… : le rapport de 30 jours d'UNE de ces clés (cookie)
+ *   GET  /v1/account/keys/report   ?prefix=ifk_…&days=N : le rapport d'UNE de ces clés,
+ *                                  30 jours par défaut, 90 au plus (cookie)
  *   POST /v1/account/logout        se déconnecter, ici ou partout (cookie)
  *   POST /v1/admin/account/revoke  couper toutes les sessions d'une adresse (support)
  *
@@ -43,6 +44,7 @@ import type { Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import {
   ACCOUNT_COOKIE,
+  ACCOUNT_REPORT_MAX_DAYS,
   ACCOUNT_SESSION_SECONDS,
   accountCodeBudgetLeft,
   buildOverview,
@@ -406,11 +408,13 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     const prefix = (c.req.query('prefix') ?? '').trim();
     const owned = prefix === '' ? null : findOwnedKey(session.emailNorm, prefix.slice(0, 64));
     if (!owned) return c.json({ error: 'not_found', message: TEXTS.not_found }, 404);
-    // La même borne que `/v1/keys/report` : une fenêtre sans limite serait un
-    // parcours de table que n'importe quelle session pourrait répéter.
+    // Une borne plus courte que celle de `/v1/keys/report` (voir
+    // `ACCOUNT_REPORT_MAX_DAYS`) : une longue fenêtre est une lecture synchrone
+    // du journal que n'importe quelle session pourrait répéter. Plafonnée, pas
+    // refusée ; `report.window_days` dit la fenêtre servie.
     const requested = Number(c.req.query('days') ?? 30);
     const windowDays = Number.isFinite(requested)
-      ? Math.min(Math.max(Math.trunc(requested), 1), 365)
+      ? Math.min(Math.max(Math.trunc(requested), 1), ACCOUNT_REPORT_MAX_DAYS)
       : 30;
     // La même forme que `/v1/keys/report`, construite par les mêmes fonctions :
     // la page rend une seule fiche de clé, collée ou connectée.

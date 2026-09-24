@@ -67,6 +67,16 @@ export const ACCOUNT_SESSION_DAYS = 7;
 export const ACCOUNT_SESSION_SECONDS = ACCOUNT_SESSION_DAYS * 24 * 60 * 60;
 /** Clés par page de la vue d'ensemble. */
 export const OVERVIEW_PAGE_SIZE = 50;
+/**
+ * Jours au plus pour le rapport d'une clé demandé depuis le compte, contre 365
+ * sur `/v1/keys/report`. Le rapport lit `request_log` de façon synchrone : sur
+ * une clé très appelée, une fenêtre d'un an bloque le service le temps de la
+ * lecture, et le compte ouvre ce rapport à qui tient l'adresse. Une demande
+ * plus longue est PLAFONNÉE, pas refusée : c'est déjà ce que fait
+ * `/v1/keys/report` hors de ses bornes, et `report.window_days` dit la fenêtre
+ * réellement servie. La page du compte demande 30 jours.
+ */
+export const ACCOUNT_REPORT_MAX_DAYS = 90;
 
 /**
  * Les clés de ferme regroupées par le radar de cohortes ont leur `email` réécrit
