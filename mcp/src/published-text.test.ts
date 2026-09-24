@@ -142,6 +142,25 @@ describe('le paquet publié ne fige aucun quota', () => {
     expect(found, found.join('\n')).toEqual([]);
   });
 
+  it('aucune phrase de positionnement retirée (PR 231) dans tools/list', async () => {
+    // 25/09/2026 : les descriptions des outils de donnée suivent celles du
+    // transport HTTP ; scripts/mcp-parity.test.ts compare la source, ceci le
+    // texte réellement servi par le paquet construit.
+    const { tools } = await client.listTools();
+    const served = JSON.stringify(tools);
+    for (const retired of [
+      /DEEPEST SWISS CLEARING/i,
+      /\b38k\+/i,
+      /bank sanctions \(OFAC\)/i,
+      /a European IBAN/i,
+      /from the GLEIF database/i,
+    ]) {
+      expect(served).not.toMatch(retired);
+    }
+    expect(served).toContain('EVERY IID OF THE SIX BANKMASTER');
+    expect(served).toContain("matched on the payee's bank (BIC8)");
+  });
+
   it('le lot dit son prix vrai : le rabais est celui de x402, un crédit par IBAN sur une clé', async () => {
     const { tools } = await client.listTools();
     const batch = tools.find((t) => t.name === 'batch_validate_iban')?.description ?? '';

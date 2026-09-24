@@ -90,7 +90,7 @@ const TOOLS: Tool[] = [
     title: 'Validate IBAN',
     annotations: { title: 'Validate IBAN', ...READ_ONLY },
     description:
-      'Verify whether a European IBAN is valid AND enrich it with bank, compliance and routing data. ' +
+      'Verify whether an IBAN from any IBAN country is valid AND enrich it with bank, compliance and routing data. ' +
       'USE WHEN: the user mentions an IBAN, asks to validate an IBAN and identify the issuing bank, asks to detect a typo in an IBAN, ' +
       'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
       'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
@@ -117,7 +117,7 @@ const TOOLS: Tool[] = [
       properties: {
         iban: {
           type: 'string',
-          description: 'IBAN to validate. Spaces and lowercase are accepted. Example: "CH10 0023 0000 0000 1234 5" or "de89370400440532013000".',
+          description: 'IBAN to validate. Spaces and lowercase are accepted. Example: "de89370400440532013000" or "CH10 0023 0000 0000 1234 5".',
         },
       },
       required: ['iban'],
@@ -343,11 +343,16 @@ const TOOLS: Tool[] = [
     title: 'Lookup BIC/SWIFT',
     annotations: { title: 'Lookup BIC/SWIFT', ...READ_ONLY },
     description:
-      'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, address. ' +
+      'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, and registered head-office address (where available). ' +
       'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
       'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
       'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-      'BACKED BY: 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly. ' +
+      // 25/09/2026 : la phrase de `bicDirectorySentence()` (src/lib/positioning.ts),
+      // sans ses chiffres : le paquet publié reste figé jusqu'à sa version suivante,
+      // les comptes vivent à llms.txt. « most of the rows » plutôt que « about two
+      // thirds » : la part bouge à chaque rafraîchissement, « most » reste vrai tant
+      // que la copie figée dépasse la moitié. scripts/mcp-parity.test.ts relie le mois.
+      'BACKED BY: a BIC directory of GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up most of the rows; only the GLEIF rows carry an LEI. Live counts: https://api.ibanforge.com/llms.txt. ' +
       'RETURNS: bank_name, country, country_name, city, lei, address (if available). ' +
       'COST: 0.003 USDC.',
     inputSchema: {
@@ -362,7 +367,7 @@ const TOOLS: Tool[] = [
     },
     outputSchema: {
       type: 'object',
-      description: 'BIC/SWIFT lookup result from the GLEIF database.',
+      description: 'BIC/SWIFT lookup result from the BIC directory (GLEIF, national registers and a public copy of the SWIFT directory).',
       properties: {
         bic: { type: 'string', description: 'Echo of the input, normalized to uppercase.' },
         bic8: { type: 'string', description: '8-char form (institution-level).' },
@@ -409,8 +414,8 @@ const TOOLS: Tool[] = [
       'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
       'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
       'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
-      'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
-      'BACKED BY: 1,100+ SIX BankMaster entries (Swiss official source, refreshed monthly). ' +
+      'EVERY IID OF THE SIX BANKMASTER, with its full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
+      'BACKED BY: the SIX BankMaster (Swiss official source, refreshed monthly); live count at https://api.ibanforge.com/llms.txt. ' +
       'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
       'COST: 0.003 USDC. Only relevant for CH and LI accounts.',
     inputSchema: {
@@ -674,15 +679,15 @@ const TOOLS: Tool[] = [
     title: 'Compliance Check',
     annotations: { title: 'Compliance Check', ...READ_ONLY },
     description:
-      'Run a full pre-flight compliance check on an IBAN before sending a SEPA / cross-border payment. ' +
+      'Run a pre-flight compliance triage on an IBAN before sending a SEPA / cross-border payment. ' +
       'USE WHEN: the user is about to send a payment / payout / refund and wants to triage risk first, ' +
-      'asks "is this IBAN safe to pay?", asks for sanctions screening, asks whether the recipient bank is reachable for SEPA Instant, ' +
+      "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
       'or needs a numeric risk score for an internal payment-approval workflow. ' +
       'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
-      'SCOPE: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name. ' +
-      'CHECKS: IBAN validity + bank sanctions (OFAC) + FATF grey/black list + ' +
-      'SEPA Instant reachability + VoP (EU 2024/886) participant flag. ' +
-      'RETURNS: the validate_iban fields PLUS a nested compliance { sanctions, reachability, vop, risk_score (0-100), risk_level, flags[] }. ' +
+      // 25/09/2026 : copie de BANK_LEVEL_SANCTIONS (src/lib/positioning.ts), que ce
+      // paquet ne peut pas importer ; scripts/mcp-parity.test.ts compare les deux.
+      "CHECKS: IBAN validity + sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country checked against a fixed list of sanctioned jurisdictions, never the payee's name + FATF status + SEPA Instant reachability + whether the EPC Verification of Payee (VoP) register lists the bank as ready; the name check itself is done by the payee's bank, never here. " +
+      'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop). ' +
       'COST: 0.02 USDC.',
     inputSchema: {
       type: 'object',
