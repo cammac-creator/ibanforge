@@ -19,3 +19,21 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+Scope of the MIT License in this repository
+
+The MIT License above covers the source code of this repository and its
+documentation. It does not cover the following data files. The third-party
+records they contain remain subject to the terms of their publishers, as
+described in the NOTICE file:
+
+  data/*.sqlite
+  frontend/data/registers/*.json and frontend/data/countries.json
+  frontend/app/[locale]/playground/captured-iban.json
+  src/db/*.json
+  scripts/data/**
+  src/lib/fi-register.ts, for its list of bank codes
+  any other file that NOTICE lists as a data file, and any file of this
+  repository that reproduces records from those publishers, such as
+  exported API responses and test fixtures
