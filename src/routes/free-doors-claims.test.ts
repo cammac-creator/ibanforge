@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { closeAll } from '../lib/db.js';
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT } from '../lib/trial.js';
 import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
@@ -22,9 +22,11 @@ import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.j
  * and found nothing on free access. The card now carries it, read from the
  * constants.
  *
- * Deliberately out of scope: TRIAL_FREE_KEY_HINT (src/lib/trial.ts), the hint
- * served inside the `trial` block, which opposes the two figures on purpose
- * and is pinned elsewhere; it belongs to a change of the response itself.
+ * TRIAL_FREE_KEY_HINT (src/lib/trial.ts), the hint served inside the `trial`
+ * block, used to oppose the two figures on purpose; since 24/09/2026 it names
+ * the key by its 200 once claimed and leaves the daily figure to `daily_limit`,
+ * so it is held by the same rule. So are the articles and documentation pages
+ * that quoted "ten a day" or "200 with the free key" until that day.
  */
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -84,6 +86,14 @@ const STATIC = [
   'frontend/public/llms-full.txt',
   'frontend/components/json-ld.tsx',
   'glama.json',
+  ...['en', 'fr', 'de'].flatMap((lang) => [
+    ...['api-keys', 'onboarding', 'errors', 'iban-validate', 'pay-as-an-agent'].map(
+      (name) => `frontend/content/${lang}/docs/${name}.mdx`,
+    ),
+    ...['2026-09-07-bankleitzahl-pruefen-per-api', '2026-09-14-schweizer-iban-pruefen'].map(
+      (slug) => `frontend/content/${lang}/blog/${slug}.mdx`,
+    ),
+  ]),
 ];
 
 const app = buildApp();
@@ -103,6 +113,11 @@ describe('the daily trial and the monthly key never share a sentence', () => {
 
   it.each(['en', 'fr', 'de'] as const)('every text of the site (%s)', (lang) => {
     const found = offenders(`messages ${lang}`, messagesText(lang));
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
+  it('the hint served in the `trial` block of every keyless answer', () => {
+    const found = offenders('TRIAL_FREE_KEY_HINT', TRIAL_FREE_KEY_HINT);
     expect(found, found.join('\n')).toEqual([]);
   });
 

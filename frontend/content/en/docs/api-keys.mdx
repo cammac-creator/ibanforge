@@ -7,7 +7,7 @@ order: 1
 # API Keys
 
 IBANforge has two free steps, and the first asks for nothing. One empty POST returns an `ifk_` key
-worth **25 requests a month**: no address, no card, nothing to confirm. One more call — a mailed
+worth **25 requests a month**: no address, no card, nothing to confirm. One more step — a mailed
 code — lifts that same key to **200 requests a month**, for good. Beyond that,
 [x402 micropayments](/docs/x402) or prepaid packs.
 
@@ -27,11 +27,10 @@ The response carries a `trial` block with the count left today and the request t
 It is a taster, not a tier: past 25 calls a day the endpoint answers `402` again with
 `cause.reason: "trial_exhausted"`.
 
-**Careful with the two 25s — they are not the same allowance.** This one is 25 **a day**, on this
-route only, and it comes back at midnight UTC. The anonymous key below is 25 **a month**, on every
-endpoint: batch, BIC, Swiss clearing, compliance. If all you ever do is validate one IBAN at a time,
-the keyless route is the better deal and you can stay on it. The key is what opens the other
-endpoints; claiming it is what takes the month to 200.
+**The keyless trial and the key are two different doors.** The keyless trial works on this route
+only, and it comes back at midnight UTC. The key works on every endpoint: batch, BIC, Swiss clearing,
+compliance. It is counted by the month, and claiming it is what takes it to 200 requests a month.
+If all you ever do is validate one IBAN at a time, the keyless trial may be all you need.
 
 ## A key with no e-mail
 

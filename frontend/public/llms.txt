@@ -116,5 +116,11 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - Free tools, no key: test IBANs https://ibanforge.com/tools/test-iban?src=llms · Swiss QR-bill check https://ibanforge.com/tools/qr-bill?src=llms
 - Creditor-file audit before 14 November 2026 (CSV/XLSX, free preview): https://ibanforge.com/audit?src=llms
 
+## Errors, limits and support
+- An invalid IBAN is not an HTTP error: POST /v1/iban/validate answers 200 with valid: false, an error code (invalid_format, unsupported_country, wrong_length, invalid_check_digits, checksum_failed, invalid_bban_structure) and error_detail.
+- A refused request answers {"error": "<token>", "message": "<sentence>"}: 400 malformed request, 402 payment needed or allowance used up (cause.reason says which), 413 body over 256 KB, 429 over 100 requests a minute per IP address (Retry-After header). Every code: https://ibanforge.com/docs/errors?src=llms
+- Support: support@ibanforge.com (quote your key_prefix, never the key) or https://github.com/cammac-creator/ibanforge/issues
+- Live availability: https://ibanforge.com/status · Written SLA, for Editor/OEM subscriptions only (99.5% monthly availability, service credits): https://ibanforge.com/legal/sla
+
 ## Links
-Docs: https://ibanforge.com/docs?src=llms · Playground: https://ibanforge.com/playground?src=llms · Pricing: https://ibanforge.com/pricing?src=llms · GitHub: https://github.com/cammac-creator/ibanforge
+Docs: https://ibanforge.com/docs?src=llms · Playground: https://ibanforge.com/playground?src=llms · Pricing: https://ibanforge.com/pricing?src=llms · GitHub: https://github.com/cammac-creator/ibanforge · Status: https://ibanforge.com/status · SLA: https://ibanforge.com/legal/sla

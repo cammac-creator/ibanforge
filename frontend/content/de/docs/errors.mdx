@@ -1,33 +1,42 @@
 ---
 title: "Fehlerreferenz"
-description: "Alle Fehlercodes, HTTP-Statuscodes und Fehlerbehebungsanleitung für die IBANforge API."
+description: "Jeder HTTP-Status und jeder Fehlercode der IBANforge-API: ungültige IBANs, Anfragefehler, Zahlung und Kontingent (402), Grösse des Body (413), Ratenlimit (429), und wo es Hilfe gibt."
 order: 6
 ---
 
 # Fehlerreferenz
 
-IBANforge verwendet standardmäßige HTTP-Statuscodes und gibt strukturierte Fehlerantworten im JSON-Format zurück. Diese Seite behandelt jeden Fehler, der auftreten kann.
+IBANforge verwendet standardmässige HTTP-Statuscodes und gibt strukturierte Fehler im JSON-Format zurück, `{"error": "<token>", "message": "<text>"}`. Verzweigen Sie auf `error`, das stabil bleibt; `message` kann umformuliert werden. Diese Seite behandelt jeden Status und jeden Code, der auftreten kann.
+
+**Eine ungültige IBAN ist kein Fehlerstatus.** `POST /v1/iban/validate` antwortet mit HTTP `200`, `valid: false`, einem `error`-Code und einem Satz in `error_detail`. Nur die Anfrage selbst (ihr JSON, ein fehlendes Feld, Zahlung, Kontingent, Grösse, Rate) ändert den HTTP-Status.
 
 ## HTTP-Statuscodes
 
-| Status | Bedeutung | Wann er auftritt |
+| Status | Bedeutung | Wann es auftritt |
 |---|---|---|
-| `200` | OK | Anfrage erfolgreich (Hinweis: Ungültige IBANs geben dennoch 200 mit `valid: false` zurück) |
-| `400` | Bad Request | Fehlerhafter Anfrage-Body, fehlende Felder oder ungültige Parameter |
-| `402` | Payment Required | Fehlender Zahlungs-Header oder unzureichende/ungültige Zahlung |
-| `404` | Not Found | Unbekannter Endpunkt. Ein unbekannter BIC ist kein 404: `/v1/bic/{code}` antwortet mit `200` und `found: false` |
-| `500` | Internal Server Error | Unerwarteter Serverfehler (bitte melden Sie diese) |
+| `200` | OK | Die Anfrage wurde beantwortet. Eine ungültige IBAN liefert trotzdem `200` mit `valid: false`; ein unbekannter BIC liefert `200` mit `found: false` |
+| `400` | Bad Request | Fehlerhaftes JSON, ein fehlendes Feld oder ein ungültiger Parameter |
+| `402` | Payment Required | Kostenpflichtige Route ohne Schlüssel, ohne Zahlung und ohne verbleibendes Gratiskontingent: der x402-Zahlungsumschlag, mit einer `cause`, wenn eine zutrifft |
+| `404` | Not Found | Unbekannter Endpunkt |
+| `405` | Method Not Allowed | Richtiger Pfad, falsche Methode (zum Beispiel `GET /v1/keys/generate`); das Feld `allow` nennt die richtige Methode |
+| `413` | Payload Too Large | Body der Anfrage über 256 KB |
+| `429` | Too Many Requests | Mehr als 100 Anfragen in einer Minute von derselben IP-Adresse; warten Sie `Retry-After` ab |
+| `500` | Internal Server Error | Unerwarteter Serverfehler (bitte melden, siehe [Support](#support)) |
 
 ## Validierungsfehlercodes
 
-Diese erscheinen im Antwort-Body, wenn eine IBAN ungültig ist. Der HTTP-Status ist weiterhin `200` — die Anfrage selbst war erfolgreich, aber die IBAN hat die Validierung nicht bestanden.
+Sie stehen im Body einer `200`-Antwort, wenn `valid` den Wert `false` hat: Die Anfrage war erfolgreich, die IBAN hat die Prüfung nicht bestanden. `POST /v1/iban/validate`, jedes Element von `POST /v1/iban/batch` und die kostenlose Route `GET /v1/iban/format` verwenden dieselben sechs Codes.
 
 | Code | Beschreibung | Beispielursache |
 |---|---|---|
-| `invalid_format` | IBAN enthält ungültige Zeichen oder ist leer | Sonderzeichen, zu kurz, leerer String |
-| `unsupported_country` | Ländercode ist nicht in unserem Register | `XX12345678` — „XX" ist kein gültiger Ländercode |
-| `wrong_length` | IBAN-Länge stimmt nicht mit der erwarteten Länge für das Land überein | Schweizer IBAN sollte 21 Zeichen haben, aber es wurden 19 angegeben |
-| `checksum_failed` | MOD-97-Prüfsummenverifizierung fehlgeschlagen | Eine Ziffer wurde geändert oder vertauscht |
+| `invalid_format` | Andere Zeichen als Buchstaben, Ziffern, Leerzeichen und Bindestriche; weniger als 5 Zeichen; oder mehr als 64 Zeichen wie gesendet | Ein Punkt oder ein Halbgeviertstrich zwischen den Gruppen, typografische Anführungszeichen, ein abgeschnittenes Einfügen |
+| `unsupported_country` | Die ersten zwei Buchstaben sind keines der 89 IBAN-Länder | `XX00 0000 0000 0000`. Freier Text landet ebenfalls hier: Seine ersten zwei Buchstaben werden als Ländercode gelesen |
+| `wrong_length` | Die Länge entspricht nicht der IBAN-Länge dieses Landes | `CH93 0076 2011 6238 5295` hat 20 Zeichen; eine Schweizer IBAN hat 21 |
+| `invalid_check_digits` | Die Zeichen 3 und 4 sind keine zwei Ziffern, oder sie lauten `00`, `01` oder `99` (ISO 13616 erlaubt 02 bis 98) | `DE00 3704 0044 0532 0130 00` |
+| `checksum_failed` | Die MOD-97-Prüfung schlägt fehl | Eine Ziffer wurde geändert oder zwei Ziffern vertauscht |
+| `invalid_bban_structure` | Länge und MOD-97 stimmen, aber der nationale Teil folgt nicht dem Aufbau, den das Land festlegt | Ein Buchstabe in einer deutschen Bankleitzahl, mit passend neu berechneten Prüfziffern |
+
+Leerzeichen (geschützte eingeschlossen) und ASCII-Bindestriche werden entfernt und Buchstaben unabhängig von Gross- und Kleinschreibung gelesen, bevor eine dieser Prüfungen läuft.
 
 ### Beispiel: Validierungsfehler
 
@@ -36,23 +45,34 @@ Diese erscheinen im Antwort-Body, wenn eine IBAN ungültig ist. Der HTTP-Status 
   "iban": "CH100023000000001234",
   "valid": false,
   "error": "wrong_length",
-  "error_detail": "Expected 21 characters for CH, got 20."
+  "error_detail": "Expected 21 characters for CH, got 20.",
+  "cost_usdc": 0
 }
 ```
 
+`cost_usdc` ist `0`, wenn ein Schlüssel oder die Kostprobe ohne Schlüssel den Aufruf bedient hat, und der Preis der Route, wenn der Aufruf per x402 bezahlt wurde.
+
+### Eine leere oder fehlende IBAN
+
+`{"iban": ""}` oder ein Body ganz ohne `iban` ist eine unvollständige Anfrage, keine ungültige IBAN. Mit einem Schlüssel lautet die Antwort `400 invalid_request`. Ohne Schlüssel kommt der `402`-Zahlungsumschlag, und von der Kostprobe ohne Schlüssel wird nichts verbraucht: Ein leeres `{}` ist die Sonde, mit der x402-Indexer die Route entdecken.
+
 ## Anfragefehlercodes
 
-Diese geben HTTP-Statuscodes ungleich 200 zurück.
+Sie liefern einen anderen Status als `200`.
 
 ### 400 Bad Request
 
-| Code | Beschreibung |
-|---|---|
-| `invalid_json` | Anfrage-Body ist kein gültiges JSON |
-| `invalid_request` | Das Feld `iban` fehlt oder ist keine Zeichenkette; bei einem Stapel enthält der Body kein Array von IBAN-Strings (`ibans`, `iban_list` oder `list`) |
-| `empty_batch` | Das `ibans`-Array ist leer |
-| `batch_too_large` | Mehr als 100 IBANs in einer Stapelanfrage |
-| `invalid_bic_format` | BIC-Code hat nicht 8 oder 11 alphanumerische Zeichen |
+| Code | Route | Beschreibung |
+|---|---|---|
+| `invalid_json` | validate, batch, compliance | Der Body der Anfrage ist kein gültiges JSON |
+| `invalid_request` | validate, batch, compliance | Das Feld `iban` fehlt, ist leer oder kein String; bei einem Stapel enthält der Body kein Array aus IBAN-Strings (`ibans`, `iban_list` oder `list`) |
+| `empty_batch` | batch | Das Array `ibans` ist leer |
+| `batch_too_large` | batch | Mehr als 100 IBANs in einer Stapelanfrage |
+| `invalid_bic_format` | `GET /v1/bic/{code}` | Der BIC hat nicht 8 oder 11 alphanumerische Zeichen in der Form nach ISO 9362 |
+| `placeholder_literal` | `GET /v1/bic/{code}`, `GET /v1/ch/clearing/{iid}` | Der Platzhalter des OpenAPI-Dokuments wurde wörtlich gesendet statt eines Werts |
+| `invalid_iid_format` | `GET /v1/ch/clearing/{iid}` | Die IID ist keine Zahl mit 1 bis 5 Ziffern |
+| `missing_iban` | `GET` und `POST /v1/iban/format` | Weder Parameter `iban` in der Adresse noch Feld `iban` im Body |
+| `invalid_iban_length` | `GET` und `POST /v1/iban/format` | Weniger als 15 oder mehr als 34 Zeichen, sobald Leerzeichen und Bindestriche entfernt sind |
 
 ### Beispiel: Fehlerhafte Anfrage
 
@@ -65,7 +85,17 @@ Diese geben HTTP-Statuscodes ungleich 200 zurück.
 
 ### 402 Payment Required
 
-Wird zurückgegeben, wenn der Zahlungs-Header fehlt, abgelaufen oder ungültig ist (`PAYMENT-SIGNATURE` für x402 v2, `X-PAYMENT` für v1). Die Antwort enthält Zahlungsanweisungen:
+Wird zurückgegeben, wenn eine kostenpflichtige Route ohne Schlüssel, ohne Zahlung und ohne verbleibendes Gratiskontingent aufgerufen wird. Der Body ist der x402-Zahlungsumschlag; der Header `PAYMENT-SIGNATURE` (x402 v2) oder `X-PAYMENT` (v1) begleicht ihn. Wenn ein genauer Grund zutrifft, trägt der Body zusätzlich `cause.reason` und eine `message`, die den Ausweg nennt:
+
+| `cause.reason` | Wann |
+|---|---|
+| `trial_exhausted` | Die Kostprobe ohne Schlüssel auf `POST /v1/iban/validate` ist für diese Adresse heute verbraucht; sie kommt um Mitternacht UTC zurück |
+| `trial_unavailable` | Das Kontingent ohne Schlüssel kann gerade nicht gezählt werden, der Aufruf fällt auf die Zahlung zurück |
+| `monthly_quota_exhausted` | Das Monatskontingent des Schlüssels ist verbraucht |
+| `monthly_quota_insufficient` | Ein Stapel braucht mehr Anfragen, als dem Schlüssel bleiben; nichts wurde verbraucht |
+| `credits_exhausted`, `credits_insufficient` | Dieselben zwei Fälle für einen Schlüssel mit Prepaid-Guthaben |
+| `invalid_api_key` | Ein Schlüssel wurde gesendet, ist aber unbekannt oder widerrufen |
+| `key_revoked_burst` | Ein anonymer Schlüssel, der mit einer Welle automatischer Anmeldungen widerrufen wurde; die `message` sagt, wie man ihn zurückholt |
 
 ```json
 {
@@ -84,54 +114,74 @@ Wird zurückgegeben, wenn der Zahlungs-Header fehlt, abgelaufen oder ungültig i
 }
 ```
 
-Siehe [x402-Zahlungen](/docs/x402) für den Umgang damit.
+Wie Sie damit umgehen, steht unter [x402-Zahlungen](/docs/x402); den kostenlosen Schlüssel erklärt [API-Schlüssel](/docs/api-keys).
 
 ### 404 Not Found
 
 | Code | Beschreibung |
 |---|---|
-| `bic_not_found` | Kein Institut gefunden, das dem angegebenen BIC-Code entspricht |
-| `not_found` | Der angeforderte Endpunkt existiert nicht |
+| `not_found` | Der angefragte Endpunkt existiert nicht. Der Body listet die wichtigsten Routen mit der Form ihrer Anfrage |
+
+Ein unbekannter Code ist kein 404: `GET /v1/bic/{code}` antwortet mit `200` und `found: false`, und `GET /v1/ch/clearing/{iid}` antwortet mit `200`, `found: false` und `error: "clearing_not_found"`.
+
+### 405 Method Not Allowed
+
+`method_not_allowed`: Der Pfad existiert, die Methode nicht. Das Feld `allow` listet die Methoden, die der Pfad annimmt. Der häufige Fall ist `GET /v1/keys/generate`: Ein Schlüssel wird mit einem `POST` geholt, und ganz ohne Body verlangt er keine E-Mail.
+
+### 413 Payload Too Large
+
+`payload_too_large`: Der Body der Anfrage ist grösser als 256 KB. Die Prüfung läuft vor dem Routing und vor der Zahlung, es wird also nichts berechnet. Ein Stapel von 100 IBANs wiegt etwa 5 KB.
+
+### 429 Too Many Requests
+
+`rate_limit_exceeded`: mehr als 100 Anfragen in einer Minute von derselben IP-Adresse. Die Antwort trägt einen Header `Retry-After` und ein Feld `retry_after`, beide in Sekunden. Jede gezählte Antwort trägt `RateLimit-Limit`, `RateLimit-Remaining` und `RateLimit-Reset` (Sekunden), dazu die älteren Header `X-RateLimit-*`, deren Reset ein Unix-Zeitstempel ist. `/health`, `/ping`, `/openapi.json` und `/v1/demo` werden nicht gezählt. Dasselbe Limit ist unter [`/.well-known/rate-limits.yml`](https://api.ibanforge.com/.well-known/rate-limits.yml) veröffentlicht.
+
+Einen Schlüssel holen und beanspruchen haben eigene Tageslimits mit eigenen `429`-Codes: siehe [API-Schlüssel](/docs/api-keys). Das Monatskontingent eines Schlüssels ist kein `429`: Es endet mit dem `402` oben, und jede Antwort auf einen Schlüssel trägt `X-Quota-Used`, `X-Quota-Limit` und `X-Quota-Remaining` (`GET /v1/keys/usage` liefert denselben Stand).
 
 ### 500 Internal Server Error
 
-Wenn Sie einen 500-Fehler erhalten, ist auf unserer Seite etwas Unerwartetes passiert. Die Antwort enthält:
-
-Der Body ist der reine Text `Internal Server Error`; ein 500 hat keine JSON-Hülle. Bitte melden Sie ihn mit Endpunkt und Uhrzeit des Aufrufs (UTC).
+Wenn Sie einen 500-Fehler erhalten, ist auf unserer Seite etwas Unerwartetes passiert. Der Body ist der reine Text `Internal Server Error`: Ein 500 hat keinen JSON-Umschlag. Bitte melden Sie ihn mit dem Endpunkt und der Uhrzeit des Aufrufs (UTC).
 
 ## Fehlerbehebung
 
 ### „Payment Required" bei jeder Anfrage
 
-- Stellen Sie sicher, dass Sie USDC auf dem **Base**-Netzwerk haben (nicht Ethereum Mainnet)
-- Überprüfen Sie, ob Ihr privater Wallet-Schlüssel korrekt in der Umgebungsvariable `WALLET_PRIVATE_KEY` gesetzt ist
-- Vergewissern Sie sich, dass Sie ein kompatibles x402-Client-SDK verwenden
+- Ohne Schlüssel hat nur `POST /v1/iban/validate` eine Kostprobe ohne Schlüssel (25 Aufrufe pro Tag und Quelladresse). Jede andere kostenpflichtige Route braucht einen Schlüssel oder eine Zahlung
+- Lesen Sie `cause.reason` im Body des `402`, wenn es dort steht: Es nennt das verbrauchte Kontingent
+- Für x402: Stellen Sie sicher, dass Sie USDC im **Base**-Netzwerk haben (nicht im Ethereum-Mainnet), dass der private Wallet-Schlüssel, den Ihr Client liest (zum Beispiel `WALLET_PRIVATE_KEY`), gesetzt ist und dass Sie ein kompatibles x402-Client-SDK verwenden
 
 ### „Invalid IBAN format", obwohl die IBAN korrekt aussieht
 
-- Entfernen Sie führende/nachfolgende Leerzeichen
-- Stellen Sie sicher, dass keine Nicht-ASCII-Zeichen vorhanden sind (typografische Anführungszeichen, Geviertstriche usw.)
-- Die IBAN darf nur Buchstaben A-Z und Ziffern 0-9 enthalten (Leerzeichen werden automatisch entfernt)
+- Nur die Buchstaben A-Z, die Ziffern 0-9, Leerzeichen und ASCII-Bindestriche werden angenommen; Punkte, Schrägstriche und typografische Striche werden abgelehnt
+- Achten Sie auf weitere Nicht-ASCII-Zeichen (typografische Anführungszeichen, Leerzeichen ohne Breite)
+- Gross- und Kleinschreibung spielen keine Rolle
 
 ### „Unsupported country" für ein gültiges Land
 
-- IBANforge unterstützt über 80 Länder. Einige Gebiete und Mikrostaaten sind möglicherweise noch nicht enthalten
-- Überprüfen Sie den zweistelligen Ländercode am Anfang der IBAN
+- IBANforge unterstützt die 89 IBAN-Länder. Manche Gebiete verwenden die IBAN eines anderen Landes: Prüfen Sie, welches sie ausgibt
+- Prüfen Sie den zweistelligen Ländercode am Anfang der IBAN
 
 ### „BIC not found", obwohl der Code existiert
 
-- Die BIC-Datenbank enthält über 121.000 BIC-Einträge aus öffentlichen Quellen (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP), mit LEI-Anreicherung für ~38K Einträge aus GLEIF, deckt aber möglicherweise nicht jede Filiale ab
-- Versuchen Sie die 8-Zeichen-Version (ohne Branch-Code) — z. B. `UBSWCHZH` statt `UBSWCHZH80A`
-- Einige Finanzinstitute verwenden BIC-Codes, die nicht bei SWIFT/GLEIF registriert sind
+- Das BIC-Verzeichnis enthält über 121 000 Einträge aus öffentlichen Quellen (GLEIF, nationale Register wie die der Bundesbank, von SIX und der NBP, EBA STEP2 SCT sowie eine öffentliche Kopie des SWIFT-Verzeichnisses, eingefroren im Januar 2018), deckt aber nicht unbedingt jede Filiale ab
+- Versuchen Sie die 8-stellige Version (ohne Filialcode), z. B. `UBSWCHZH` statt `UBSWCHZH80A`
+- Einige Finanzinstitute verwenden BIC-Codes, die nicht bei SWIFT oder GLEIF registriert sind
 
-### Stapelanfrage gibt weniger Ergebnisse zurück als erwartet
+### Eine Stapelanfrage wird abgelehnt
 
-- Überprüfen Sie, ob Ihr `ibans`-Array nicht mehr als 10 Einträge enthält
-- Stellen Sie sicher, dass jedes Element ein String ist — Zahlen und Objekte werden abgelehnt
+- Über 100 Elemente wird der Stapel als Ganzes mit `400 batch_too_large` abgelehnt: Teilen Sie die Liste auf
+- Jedes Element muss ein String sein: Eine Zahl oder ein Objekt macht die ganze Anfrage zu `400 invalid_request`
 - Das Ergebnis-Array entspricht immer der Reihenfolge und Anzahl des Eingabe-Arrays
 
 ### Zeitüberschreitung oder keine Antwort
 
-- Die API hat ein Timeout von 30 Sekunden. Wenn Sie komplexe Stapelanfragen senden, sollten diese deutlich innerhalb dieses Limits abgeschlossen werden
+- Ein Stapel von bis zu 100 IBANs ist eine einzige Anfrage und wird in einem Stück beantwortet
 - Überprüfen Sie Ihre Netzwerkverbindung und Firewall-Regeln
-- Versuchen Sie den Endpunkt `/health`, um zu überprüfen, ob der Dienst läuft
+- Testen Sie den kostenlosen Endpunkt `/health`, um zu prüfen, ob der Dienst läuft, und die [Statusseite](/status) für die aktuelle Verfügbarkeit
+
+## Support
+
+- Schreiben Sie an [support@ibanforge.com](mailto:support@ibanforge.com) mit dem Endpunkt, der Uhrzeit des Aufrufs (UTC) und Ihrem `key_prefix`, nie mit dem Schlüssel selbst
+- Öffentliche Fragen und Fehlerberichte: [GitHub Issues](https://github.com/cammac-creator/ibanforge/issues)
+- Von einem Agenten aus: `POST /v1/feedback` oder das MCP-Tool `send_feedback`, kostenlos und ohne Schlüssel
+- Aktuelle Verfügbarkeit: die [Statusseite](/status). Ein schriftliches SLA gibt es nur für Editor/OEM-Abonnements: [SLA](/legal/sla)

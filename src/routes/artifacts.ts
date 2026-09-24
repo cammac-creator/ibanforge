@@ -580,7 +580,9 @@ Read these fields in this order. Stop at the first one that blocks.
 5. **\`issuer.classification\`** — \`curated\` is an identification; \`default\`
    means we fell back to "bank" without support for it. Count only \`curated\`
    when sizing exposure to virtual IBANs.
-6. **\`sepa.vop_participant\`** — whether the bank answers Verification of Payee.
+6. **\`sepa.vop_participant\`** — whether the EPC VoP register lists the bank as
+   ready to answer Verification of Payee requests. \`false\` proves nothing: a bank
+   absent from that register reads \`false\` too.
 
 ## The mistake to avoid
 

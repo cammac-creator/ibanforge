@@ -71,6 +71,10 @@ data/
 - **Formatting** : prettier (voir .prettierrc)
 - **Linting** : eslint (voir eslint.config.js)
 - **Prenom** : Claude-Alain, jamais « Alain »
+- **Les deux « 25 » ne partagent jamais une phrase.** L'essai sans clé, c'est 25 validations
+  par jour, sur la seule `POST /v1/iban/validate`. La clé sans e-mail, c'est 25 requêtes par
+  mois, sur tous les endpoints. Nommer la porte, annoncer la clé par ses 200 une fois
+  réclamée ; `src/routes/free-doors-claims.test.ts` y veille.
 
 ## 🚨 Ce dépôt est PUBLIC
 

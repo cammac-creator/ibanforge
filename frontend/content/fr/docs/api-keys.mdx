@@ -7,8 +7,8 @@ order: 1
 # Clés API
 
 IBANforge a deux marches gratuites, et la première ne demande rien. Un POST au corps vide renvoie
-une clé `ifk_` de **25 requêtes par mois** : aucune adresse, aucune carte, rien à confirmer. Un
-appel de plus — un code reçu par mail — porte cette même clé à **200 requêtes par mois**,
+une clé `ifk_` de **25 requêtes par mois** : aucune adresse, aucune carte, rien à confirmer. Une
+étape de plus — un code reçu par mail — porte cette même clé à **200 requêtes par mois**,
 définitivement. Au-delà, les [micropaiements x402](/docs/x402) ou les packs prépayés.
 
 Cette page est la référence sur les clés seules. Si vous n'avez pas encore fait d'appel, la [prise en main](/docs/onboarding) est le chemin le plus court : l'appel sans clé, cette clé, la réponse lue bloc par bloc et un lot de 100, en dix minutes.
@@ -27,11 +27,10 @@ La réponse porte un bloc `trial` avec le nombre d'appels restants aujourd'hui e
 la clé. C'est une dégustation, pas un palier : au-delà de 25 appels par jour, l'endpoint répond de
 nouveau `402` avec `cause.reason: "trial_exhausted"`.
 
-**Attention aux deux 25 : ce n'est pas le même quota.** Celui-ci vaut 25 **par jour**, sur cette
-route seulement, et il revient à minuit UTC. La clé anonyme ci-dessous vaut 25 **par mois**, sur tous
-les endpoints : lot, BIC, clearing suisse, conformité. Si vous ne faites que valider un IBAN à la
-fois, l'appel sans clé est le meilleur marché et vous pouvez y rester. La clé ouvre les autres
-endpoints ; c'est la réclamation qui porte le mois à 200.
+**L'essai sans clé et la clé sont deux portes différentes.** L'essai sans clé vaut sur cette route
+seulement, et il revient à minuit UTC. La clé vaut sur tous les endpoints : lot, BIC, clearing
+suisse, conformité. Elle se compte par mois, et c'est la réclamation qui la porte à 200 requêtes par
+mois. Si vous ne faites que valider un IBAN à la fois, l'essai sans clé peut vous suffire.
 
 ## Une clé sans e-mail
 

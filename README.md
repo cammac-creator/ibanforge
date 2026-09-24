@@ -17,7 +17,7 @@ Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, n
 For business software and AI agents alike: a REST API, a native **MCP** server, prepaid packs by card, and **x402 micropayments** with no signup.
 
 ```
-89 IBAN countries · bank codes checked against the national registers of DE, AT, BE, SK, BG, CH, LI · 121k+ BIC entries (39k+ LEI via GLEIF; about two thirds a public SWIFT directory copy frozen in January 2018) · 1,100+ Swiss BC-Nummern (SIX)
+89 IBAN countries · bank codes checked against the national registers of DE, AT, BE, SK, BG, CH, LI · 121k+ BIC entries (39k+ LEI via GLEIF; about two thirds a public copy of the SWIFT directory frozen in January 2018) · 1,100+ Swiss BC-Nummern (SIX)
 ```
 
 ---
@@ -174,8 +174,19 @@ curl https://api.ibanforge.com/v1/demo
 | `GET`  | `/v1/credits/bundles`      | free          | Prepaid credit bundles and their prices                        |
 | `GET`  | `/health`                  | free          | Health + DB status                                             |
 | `POST` | `/v1/keys/generate`        | free          | Generate an `ifk_*` API key: no body for a key that needs no e-mail (25 req/month, 200 once claimed at `/v1/keys/claim`), or `{email}` for 200 req/month from the start |
+| `GET`  | `/v1/keys/usage`           | free          | Your key's usage this month (key in the `Authorization` header)  |
 
 Full OpenAPI 3.1: [api.ibanforge.com/openapi.json](https://api.ibanforge.com/openapi.json).
+
+### Errors, limits and support
+
+- **An invalid IBAN is not an HTTP error.** `POST /v1/iban/validate` answers `200` with `valid: false`, an `error` code and an `error_detail` sentence. The codes: `invalid_format`, `unsupported_country`, `wrong_length`, `invalid_check_digits`, `checksum_failed`, `invalid_bban_structure`.
+- **A refused request** carries `{"error": "<token>", "message": "<sentence>"}`: `400` for malformed JSON, a missing `iban` or a batch over 100; `402` when a payment is needed or an allowance is used up (`cause.reason` says which); `413` for a body over 256 KB; `429` past the rate limit.
+- **Rate limit:** 100 requests a minute per IP address. A `429` carries `Retry-After`, and every counted response carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` ([rate-limits.yml](https://api.ibanforge.com/rate-limits.yml)).
+- **Your key's usage:** `GET /v1/keys/usage`, and `X-Quota-Used`, `X-Quota-Limit`, `X-Quota-Remaining` on every answer served on a key.
+- **Support:** [support@ibanforge.com](mailto:support@ibanforge.com) (quote your `key_prefix`, never the key) or [GitHub Issues](https://github.com/cammac-creator/ibanforge/issues).
+- **Availability:** live on the [status page](https://ibanforge.com/status). A written [SLA](https://ibanforge.com/legal/sla) (99.5% monthly availability, service credits) covers Editor/OEM subscriptions only.
+- Every status and code, in three languages: [ibanforge.com/docs/errors](https://ibanforge.com/docs/errors).
 
 ### Why prefer IBANforge over local mod-97 validation?
 

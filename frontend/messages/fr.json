@@ -30,6 +30,7 @@
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "État de l'API",
+      "sla": "SLA",
       "agents": "Agents",
       "openapi": "OpenAPI",
       "openSource": "Cœur open-source (MIT)",
@@ -156,7 +157,7 @@
         "description": "Règles d'adresses ISO 20022 (SPS, T2, Fedwire) avant les échéances de novembre 2026"
       },
       "heading": "Endpoints et tarifs",
-      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
+      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte ou en USDC. Les prix ci-dessous sont ceux de l’appel payé en USDC via x402 ; avec une clé ou un pack de crédits, chaque appel et chaque IBAN d’un lot compte pour une requête ou un crédit.",
       "plans": "Gratuit : 25 requêtes par mois sans e-mail, 200 par mois une fois réclamée · Pro : 29 $ par mois pour 10 000 requêtes · packs de crédits dès 4 $ · licence éditeur dès 149 $ par mois · audit de fichier 149 $.",
       "plansLink": "Voir les tarifs"
     },
@@ -398,7 +399,7 @@
     },
     "table": {
       "heading": "Tarifs par endpoint",
-      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte, ou à la requête en USDC via x402 sur Base L2."
+      "subtitle": "Commencez gratuitement avec 25 requêtes par mois, sans e-mail. Réclamez la même clé pour 200 par mois. Payez à mesure que vous grandissez — par carte, ou à la requête en USDC via x402 sur Base L2. Les prix ci-dessous sont ceux de x402 ; avec une clé ou un pack de crédits, chaque appel et chaque IBAN d’un lot compte pour une requête ou un crédit."
     },
     "endpoints": {
       "0": {
@@ -412,7 +413,7 @@
         "method": "POST",
         "path": "/v1/iban/batch",
         "cost": "$0.002",
-        "costLabel": "par IBAN (jusqu'à 100)",
+        "costLabel": "par IBAN en USDC via x402 (jusqu'à 100)",
         "description": "Validation par lot avec enrichissement complet par IBAN"
       },
       "2": {
@@ -1812,7 +1813,7 @@
     },
     "endpoints": {
       "heading": "5 endpoints payants, tous accessibles via MCP + x402 + clé API",
-      "subtitle": "Mêmes données, trois voies d'intégration."
+      "subtitle": "Mêmes données, trois voies d'intégration. Les prix sont ceux de l’appel payé en USDC via x402 ; avec une clé API ou un pack de crédits, chaque appel et chaque IBAN d’un lot compte pour une requête ou un crédit."
     },
     "discovery": {
       "eyebrow": "Auto-découverte",

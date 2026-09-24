@@ -33,7 +33,7 @@ La réponse est la réponse entière, plus un bloc que vous ne voyez jamais autr
     "calls_left_today": 24,
     "daily_limit": 25,
     "resets": "midnight UTC",
-    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: an ifk_ key worth 25 requests a MONTH, on every endpoint (these 25 are a DAY, on this route only). One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to 200 a month.",
+    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: it returns an ifk_ key that works on every endpoint, good for 200 requests a month once claimed (POST /v1/keys/claim, key in the Authorization header, with a code mailed to an address you read). Unclaimed, the key starts at 25 requests a month",
     "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
   }
 }
@@ -43,7 +43,7 @@ La réponse est la réponse entière, plus un bloc que vous ne voyez jamais autr
 
 ## 2. La clé gratuite — 25 requêtes par mois sans e-mail, 200 avec une adresse
 
-Un seul POST, sans carte, sans portefeuille. Sans corps du tout, la clé ne demande rien et vaut le quota mensuel de base sur tous les endpoints ; un appel à `POST /v1/keys/claim` la porte ensuite au plein quota. Avec une adresse, comme ci-dessous, elle naît directement au plein quota :
+Un seul POST, sans carte, sans portefeuille. Sans corps du tout, la clé ne demande rien et vaut le quota mensuel de base sur tous les endpoints ; la réclamer avec `POST /v1/keys/claim` (un code envoyé à une adresse que vous lisez, une fois que la clé a servi un appel) la porte ensuite au plein quota. Avec une adresse, comme ci-dessous, elle naît directement au plein quota :
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
@@ -221,7 +221,7 @@ Trois choses à savoir avant de dimensionner un traitement :
 
 - `results` conserve **l'ordre et le nombre de votre entrée** : vous pouvez le recoller à vos lignes par index.
 - Chaque élément a la même forme qu'une validation unique, `bank_code_check` et `clearing` compris. Ils se lisent exactement comme à l'étape 3.
-- **Un lot débite une requête par IBAN.** 100 IBAN, ce sont 100 de vos 200 requêtes mensuelles gratuites, ou 100 crédits prépayés. Si le lot dépasse ce qu'il vous reste, l'API le refuse en bloc avec un `402` qui nomme le manque (`X-Quota-Required` / `X-Credits-Required`), et rien n'est consommé.
+- **Un lot débite une requête par IBAN.** 100 IBAN consomment 100 requêtes du quota mensuel de votre clé (200 une fois réclamée), ou 100 crédits prépayés. Si le lot dépasse ce qu'il vous reste, l'API le refuse en bloc avec un `402` qui nomme le manque (`X-Quota-Required` / `X-Credits-Required`), et rien n'est consommé.
 
 Référence complète : [validation par lot](/docs/iban-batch).
 

@@ -518,12 +518,13 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
     {
       title: 'Batch Validate IBANs',
       description:
-        'Validate up to 100 IBANs in a single call at $0.002 per IBAN (60% cheaper than calling validate_iban repeatedly at $0.005). ' +
+        'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, it costs $0.002 per IBAN instead of $0.005 per validate_iban call; ' +
+        'on an API key or a credit pack each IBAN uses one request or credit, the same as one validate_iban call. ' +
         'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
         'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
         'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
         'RETURNS: { results: [...same shape as validate_iban], count, valid_count }. ' +
-        costLine('$0.002 per IBAN'),
+        costLine('$0.002 USDC per IBAN via x402'),
       inputSchema: {
         ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
       },

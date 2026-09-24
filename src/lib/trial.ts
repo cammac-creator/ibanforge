@@ -77,18 +77,25 @@ export const TRIAL_SIGNUP_SOURCE = 'api-trial';
  * bord à zéro pour toujours, sans faire rougir un test. Un garde l'épingle
  * (`src/routes/static-claims.test.ts`).
  *
- * 🚨 Et les deux 25 n'ont RIEN à voir : 25 par jour ici, sur cette seule
- * route ; 25 par mois pour la clé, sur tous les endpoints. Un développeur qui
- * lit les deux dans cet ordre conclut, avec raison sur les validations, que la
- * clé est trente fois pire que pas de clé. La clé n'achète pas du volume, elle
- * achète les endpoints que l'essai ne sert pas et la porte vers le palier
- * complet — donc l'unité et la portée sont écrites, toutes les deux.
+ * 🚨 Et les deux 25 n'ont RIEN à voir : 25 par jour pour l'essai, sur cette
+ * seule route ; 25 par mois pour la clé, sur tous les endpoints. Jusqu'au
+ * 24/09/2026 cette phrase les opposait (« these 25 are a DAY »), et une phrase
+ * qui met les deux face à face se lit « la clé vaut moins que pas de clé »
+ * (seconde analyse des réponses d'IA). Le plafond du jour n'y figure donc plus :
+ * il est servi juste à côté, dans `daily_limit`. La clé s'annonce par sa
+ * destination, les 200 une fois réclamée, et le 25 par mois vient ensuite comme
+ * point de départ. Réclamer, c'est un code reçu à une adresse lue (ou un
+ * paiement x402), pas un simple appel : la phrase le dit.
+ *
+ * Pas de point final : le middleware de l'essai enchâsse cette phrase dans la
+ * sienne et y ajoute le point (`anonymous-trial.ts`), qui sortait doublé.
  */
 export const TRIAL_FREE_KEY_HINT =
   `POST https://api.ibanforge.com/v1/keys/generate with {"source":"${TRIAL_SIGNUP_SOURCE}"}` +
-  ` — no e-mail, no card, nothing to confirm: an ifk_ key worth ${ANONYMOUS_MONTHLY_LIMIT} requests a MONTH, ` +
-  `on every endpoint (these ${REST_TRIAL_DAILY_LIMIT} are a DAY, on this route only). ` +
-  `One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to ${FREE_TIER_MONTHLY_LIMIT} a month.`;
+  ' — no e-mail, no card, nothing to confirm: it returns an ifk_ key that works on every endpoint, ' +
+  `good for ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed (POST /v1/keys/claim, key in the ` +
+  'Authorization header, with a code mailed to an address you read). ' +
+  `Unclaimed, the key starts at ${ANONYMOUS_MONTHLY_LIMIT} requests a month`;
 
 /** Where the free key is explained. The page is content/<lang>/docs/api-keys.mdx. */
 export const TRIAL_DOCS_URL = `https://ibanforge.com/docs/api-keys?src=${TRIAL_SIGNUP_SOURCE}`;

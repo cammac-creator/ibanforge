@@ -55,4 +55,17 @@ describe('Prise en main : parité avec les contrats servis', () => {
       docs: TRIAL_DOCS_URL,
     });
   });
+
+  // La page Prise en main recopie le même bloc à la main, au milieu d'une réponse
+  // plus longue que `scripts/export-onboarding.ts` ne réécrit pas. Le 24/09/2026 le
+  // conseil a changé et cette copie serait restée à l'ancienne phrase sans que rien
+  // ne rougisse : elle est tenue égale à la constante servie, ligne pour ligne.
+  it.each(['fr', 'en', 'de'])(
+    'recopie mot pour mot le conseil servi dans onboarding (%s)',
+    (locale) => {
+      const source = read(`frontend/content/${locale}/docs/onboarding.mdx`);
+      const lines = source.split('\n').filter((line) => line.trim().startsWith('"free_key":'));
+      expect(lines).toEqual([`    "free_key": ${JSON.stringify(TRIAL_FREE_KEY_HINT)},`]);
+    },
+  );
 });

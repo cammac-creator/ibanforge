@@ -103,14 +103,29 @@ describe('les textes de la clé sans e-mail', () => {
   });
 
   it('écrivent l’unité ET la portée partout où les deux 25 se croisent', () => {
+    // Depuis le 24/09/2026, la page des clés nomme les deux portes (l'essai sans
+    // clé, la clé) au lieu d'opposer « les deux 25 » dans une phrase : chaque
+    // chiffre garde son unité et sa portée, jamais deux 25 dans une même phrase.
     const attendu: Array<[string, string[]]> = [
-      ['content/en/docs/api-keys.mdx', ['25 **a day**', '25 **a month**', 'on this route only', 'on every endpoint']],
-      ['content/fr/docs/api-keys.mdx', ['25 **par jour**', '25 **par mois**', 'sur cette route seulement', 'sur tous les endpoints']],
-      ['content/de/docs/api-keys.mdx', ['25-mal **pro Tag**', 'nur auf dieser Route', 'auf allen Endpunkten']],
+      ['content/en/docs/api-keys.mdx', ['**25 times a day', '**25 requests a month**', 'on this route only', 'on every endpoint', 'two different doors']],
+      ['content/fr/docs/api-keys.mdx', ['**25 fois par jour', '**25 requêtes par mois**', 'sur cette route seulement', 'sur tous les endpoints', 'deux portes différentes']],
+      ['content/de/docs/api-keys.mdx', ['**25-mal pro Tag', '**25 Anfragen pro Monat**', 'nur auf dieser Route', 'auf allen Endpunkten', 'zwei verschiedene Türen']],
     ];
     for (const [rel, phrases] of attendu) {
       const texte = applati(lire(rel));
       for (const phrase of phrases) expect(texte, `${rel} : ${phrase}`).toContain(phrase);
+      // Par paragraphe, puis par phrase : un titre et le paragraphe qui le suit
+      // ne forment pas une phrase. Une phrase fautive met le 25 du jour et le 25
+      // du mois face à face.
+      const decoupees = lire(rel)
+        .split(/\n\s*\n/)
+        .flatMap((paragraphe) => applati(paragraphe).split(/(?<=[.!?])\s+/));
+      for (const phrase of decoupees) {
+        const vingtCinq = (phrase.match(/(?<![.,\d])25(?![.,]?\d)(?![kK])/g) ?? []).length;
+        const collision =
+          vingtCinq >= 2 && /\bday\b|jour|\bTag\b/i.test(phrase) && /month|mois|Monat/i.test(phrase);
+        expect(collision, `${rel} : ${phrase}`).toBe(false);
+      }
     }
     // La FAQ la plus lue du site dit les deux, dans les trois langues, chacun
     // avec son unité et sa portée. Depuis le 24/09/2026, jamais dans la même

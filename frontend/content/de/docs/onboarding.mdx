@@ -33,7 +33,7 @@ Die Antwort ist die vollständige Antwort, plus ein Block, den Sie nur ohne Schl
     "calls_left_today": 24,
     "daily_limit": 25,
     "resets": "midnight UTC",
-    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: an ifk_ key worth 25 requests a MONTH, on every endpoint (these 25 are a DAY, on this route only). One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to 200 a month.",
+    "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: it returns an ifk_ key that works on every endpoint, good for 200 requests a month once claimed (POST /v1/keys/claim, key in the Authorization header, with a code mailed to an address you read). Unclaimed, the key starts at 25 requests a month",
     "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
   }
 }
@@ -43,7 +43,7 @@ Die Antwort ist die vollständige Antwort, plus ein Block, den Sie nur ohne Schl
 
 ## 2. Der kostenlose Schlüssel — 25 Anfragen pro Monat ohne E-Mail, 200 mit Adresse
 
-Ein einziger POST, keine Karte, keine Wallet. Ganz ohne Body verlangt der Schlüssel nichts und ist das monatliche Grundkontingent auf allen Endpunkten wert; ein Aufruf von `POST /v1/keys/claim` hebt ihn danach auf das volle Kontingent. Mit einer Adresse, wie unten, wird er sofort mit dem vollen Kontingent ausgestellt:
+Ein einziger POST, keine Karte, keine Wallet. Ganz ohne Body verlangt der Schlüssel nichts und ist das monatliche Grundkontingent auf allen Endpunkten wert; wer ihn mit `POST /v1/keys/claim` beansprucht (ein Code an eine Adresse, die Sie lesen, sobald der Schlüssel einen Aufruf bedient hat), hebt ihn danach auf das volle Kontingent. Mit einer Adresse, wie unten, wird er sofort mit dem vollen Kontingent ausgestellt:
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
@@ -221,7 +221,7 @@ Drei Dinge, die man vor der Dimensionierung eines Laufs wissen sollte:
 
 - `results` behält **Reihenfolge und Anzahl Ihrer Eingabe**, sodass Sie es über den Index wieder auf Ihre Zeilen legen können.
 - Jeder Eintrag hat dieselbe Form wie eine Einzelvalidierung, `bank_code_check` und `clearing` eingeschlossen. Sie werden genau wie in Schritt 3 gelesen.
-- **Ein Stapel bucht eine Anfrage pro IBAN ab.** 100 IBANs sind 100 Ihrer 200 kostenlosen Monatsanfragen oder 100 Prepaid-Guthaben. Übersteigt der Stapel den Rest, lehnt die API ihn ganz oder gar nicht ab, mit einem `402`, der die Lücke benennt (`X-Quota-Required` / `X-Credits-Required`) — verbraucht wird nichts.
+- **Ein Stapel bucht eine Anfrage pro IBAN ab.** 100 IBANs verbrauchen 100 Anfragen aus dem Monatskontingent Ihres Schlüssels (200, sobald er beansprucht ist) oder 100 Prepaid-Guthaben. Übersteigt der Stapel den Rest, lehnt die API ihn ganz oder gar nicht ab, mit einem `402`, der die Lücke benennt (`X-Quota-Required` / `X-Credits-Required`) — verbraucht wird nichts.
 
 Vollständige Referenz: [Stapelvalidierung](/docs/iban-batch).
 

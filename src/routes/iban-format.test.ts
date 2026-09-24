@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
+import { EXAMPLE_IBANS, IBAN_LENGTHS } from 'iban-core';
 import { ibanFormat } from './iban-format.js';
 
 function buildApp() {
@@ -92,5 +93,113 @@ describe('GET /v1/iban/format (free, no payment)', () => {
       const body = (await r.json()) as Record<string, unknown>;
       expect(body.upgrade_to_full_validation).toContain('$0.005');
     }
+  });
+});
+
+/**
+ * The printed form of an IBAN is longer than the IBAN.
+ *
+ * Until 24/09/2026 the route measured the length BEFORE removing the spaces, so
+ * a valid IBAN written in groups of four, as on an invoice, was refused with
+ * 400 `invalid_iban_length` as soon as its printed form passed 34 characters:
+ * 13 countries of 89, Malta among them, a SEPA country. The paid route never had
+ * this defect (it measures nothing before the library normalises). The list is
+ * computed from the library's own lengths, so a country added tomorrow is
+ * covered without anyone remembering.
+ */
+describe('/v1/iban/format measures the IBAN, not its printed form', () => {
+  const grouped = (iban: string) => iban.replace(/(.{4})(?=.)/g, '$1 ');
+  const printedTooLong = Object.keys(IBAN_LENGTHS)
+    .filter((cc) => grouped('X'.repeat(IBAN_LENGTHS[cc]!)).length > 34)
+    .sort();
+
+  it('names the countries whose printed IBAN passes 34 characters', () => {
+    expect(printedTooLong).toEqual([
+      'BR',
+      'EG',
+      'JO',
+      'KW',
+      'LC',
+      'MT',
+      'MU',
+      'PS',
+      'QA',
+      'RU',
+      'SC',
+      'UA',
+      'YE',
+    ]);
+  });
+
+  it.each(printedTooLong)(
+    'accepts the official %s example written in groups of four (GET and POST)',
+    async (cc) => {
+      const app = buildApp();
+      const example = EXAMPLE_IBANS[cc]!;
+      const printed = grouped(example);
+      expect(printed.length).toBeGreaterThan(34);
+
+      const get = await app.request(`/v1/iban/format?iban=${encodeURIComponent(printed)}`);
+      expect(get.status).toBe(200);
+      const getBody = (await get.json()) as { valid: boolean; iban: string };
+      expect(getBody.valid).toBe(true);
+      expect(getBody.iban).toBe(example);
+
+      const post = await app.request('/v1/iban/format', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ iban: printed }),
+      });
+      expect(post.status).toBe(200);
+      expect(((await post.json()) as { valid: boolean }).valid).toBe(true);
+    },
+  );
+
+  it('accepts the Maltese example with hyphens between the groups', async () => {
+    const app = buildApp();
+    const r = await app.request('/v1/iban/format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'MT84-MALT-0110-0001-2345-MTLC-AST0-01S' }),
+    });
+    expect(r.status).toBe(200);
+    expect(((await r.json()) as { valid: boolean }).valid).toBe(true);
+  });
+
+  it('still refuses more than 34 characters once the separators are gone', async () => {
+    const app = buildApp();
+    const r = await app.request(`/v1/iban/format?iban=${'A'.repeat(35)}`);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toBe('invalid_iban_length');
+  });
+
+  it('still refuses fewer than 15 characters once the separators are gone', async () => {
+    const app = buildApp();
+    const r = await app.request(`/v1/iban/format?iban=${encodeURIComponent('CH93 0076 20')}`);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toBe('invalid_iban_length');
+  });
+
+  it('refuses a raw value longer than the library reads, separators or not', async () => {
+    const app = buildApp();
+    const padded = 'CH93' + ' '.repeat(70) + '00762011623852957';
+    const r = await app.request('/v1/iban/format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: padded }),
+    });
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toBe('invalid_iban_length');
+  });
+});
+
+describe('/v1/iban/format says what valid means', () => {
+  it('tells the caller that valid is the written form only, and where the bank code is judged', async () => {
+    const app = buildApp();
+    const r = await app.request('/v1/iban/format?iban=CH9300762011623852957');
+    const body = (await r.json()) as { upgrade_to_full_validation: string };
+    expect(body.upgrade_to_full_validation).toMatch(/well[- ]formed|written/i);
+    expect(body.upgrade_to_full_validation).toMatch(/allocated/);
+    expect(body.upgrade_to_full_validation).toContain('/v1/iban/validate');
   });
 });

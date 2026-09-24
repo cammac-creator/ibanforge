@@ -8,7 +8,7 @@ order: 1
 
 IBANforge hat zwei kostenlose Stufen, und die erste verlangt gar nichts. Ein POST mit leerem Body
 liefert einen `ifk_`-Schlüssel für **25 Anfragen pro Monat**: keine Adresse, keine Karte, nichts zu
-bestätigen. Ein weiterer Aufruf — ein zugesandter Code — hebt denselben Schlüssel dauerhaft auf
+bestätigen. Ein weiterer Schritt — ein zugesandter Code — hebt denselben Schlüssel dauerhaft auf
 **200 Anfragen pro Monat**. Darüber hinaus: [x402-Mikrozahlungen](/docs/x402) oder Prepaid-Pakete.
 
 Diese Seite ist die Referenz allein zu Schlüsseln. Wenn Sie noch keinen Aufruf gemacht haben, sind die [Ersten Schritte](/docs/onboarding) der kürzere Weg: der Aufruf ohne Schlüssel, dieser Schlüssel, die Antwort Block für Block gelesen und ein Stapel von 100 — in zehn Minuten.
@@ -27,11 +27,11 @@ Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Au
 Anfrage, die den Schlüssel erzeugt. Eine Kostprobe, keine Stufe: über 25 Aufrufe pro Tag antwortet
 der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
 
-**Vorsicht bei den zwei 25 — es ist nicht dasselbe Kontingent.** Dieses hier gilt 25-mal **pro Tag**,
-nur auf dieser Route, und kommt um Mitternacht UTC zurück. Der anonyme Schlüssel unten gilt 25-mal
-**pro Monat**, dafür auf allen Endpunkten: Batch, BIC, Schweizer Clearing, Compliance. Wer ohnehin
-nur einzelne IBANs prüft, fährt mit dem Aufruf ohne Schlüssel besser und kann dabei bleiben. Der
-Schlüssel öffnet die anderen Endpunkte; erst die Beanspruchung hebt den Monat auf 200.
+**Die Kostprobe ohne Schlüssel und der Schlüssel sind zwei verschiedene Türen.** Die Kostprobe gilt
+nur auf dieser Route und kommt um Mitternacht UTC zurück. Der Schlüssel gilt auf allen Endpunkten:
+Batch, BIC, Schweizer Clearing, Compliance. Er wird pro Monat gezählt, und erst die Beanspruchung
+hebt ihn auf 200 Anfragen pro Monat. Wer ohnehin nur einzelne IBANs prüft, kommt mit der Kostprobe
+ohne Schlüssel womöglich aus.
 
 ## Ein Schlüssel ohne E-Mail
 

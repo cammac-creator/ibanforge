@@ -30,6 +30,7 @@
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "API-Status",
+      "sla": "SLA",
       "agents": "Agenten",
       "openapi": "OpenAPI",
       "openSource": "Open-Source-Kern (MIT)",
@@ -156,7 +157,7 @@
         "description": "ISO-20022-Adressregeln (SPS, T2, Fedwire) vor den Umstellungen im November 2026"
       },
       "heading": "Endpoints und Preise",
-      "subtitle": "Starten Sie gratis mit 25 Anfragen pro Monat, ohne E-Mail. Beanspruchen Sie denselben Schlüssel für 200 pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC.",
+      "subtitle": "Starten Sie gratis mit 25 Anfragen pro Monat, ohne E-Mail. Beanspruchen Sie denselben Schlüssel für 200 pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC. Die Preise unten gelten pro Aufruf in USDC über x402; mit einem Schlüssel oder einem Guthabenpaket zählt jeder Aufruf und jede IBAN eines Stapels als eine Anfrage oder ein Guthaben.",
       "plans": "Gratis: 25 Anfragen pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung · Pro: 29 $ pro Monat für 10 000 Anfragen · Guthabenpakete ab 4 $ · Herstellerlizenz ab 149 $ pro Monat · Dateiprüfung 149 $.",
       "plansLink": "Preise ansehen"
     },
@@ -398,7 +399,7 @@
     },
     "table": {
       "heading": "Preise pro Endpoint",
-      "subtitle": "Starten Sie gratis mit 25 Anfragen pro Monat, ohne E-Mail. Beanspruchen Sie denselben Schlüssel für 200 pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder pro Anfrage in USDC über x402 auf Base L2."
+      "subtitle": "Starten Sie gratis mit 25 Anfragen pro Monat, ohne E-Mail. Beanspruchen Sie denselben Schlüssel für 200 pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder pro Anfrage in USDC über x402 auf Base L2. Die Preise unten sind die von x402; mit einem Schlüssel oder einem Guthabenpaket zählt jeder Aufruf und jede IBAN eines Stapels als eine Anfrage oder ein Guthaben."
     },
     "endpoints": {
       "0": {
@@ -412,7 +413,7 @@
         "method": "POST",
         "path": "/v1/iban/batch",
         "cost": "$0.002",
-        "costLabel": "pro IBAN (bis zu 100)",
+        "costLabel": "pro IBAN in USDC über x402 (bis zu 100)",
         "description": "Batch-Validierung mit vollständiger Anreicherung pro IBAN"
       },
       "2": {
@@ -1812,7 +1813,7 @@
     },
     "endpoints": {
       "heading": "5 kostenpflichtige Endpunkte, alle über MCP + x402 + API-Schlüssel verfügbar",
-      "subtitle": "Gleiche Daten, drei Integrationswege."
+      "subtitle": "Gleiche Daten, drei Integrationswege. Die Preise gelten pro Aufruf in USDC über x402; mit einem API-Schlüssel oder einem Guthabenpaket zählt jeder Aufruf und jede IBAN eines Stapels als eine Anfrage oder ein Guthaben."
     },
     "discovery": {
       "eyebrow": "Auto-Entdeckung",

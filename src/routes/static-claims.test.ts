@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CONSENT_ASK } from '../lib/consent.js';
 import { REST_TRIAL_DAILY_LIMIT, TRIAL_FREE_KEY_HINT, TRIAL_SIGNUP_SOURCE } from '../lib/trial.js';
-import { ANONYMOUS_MONTHLY_LIMIT } from '../lib/tiers.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 /**
  * One version of our own numbers, everywhere.
@@ -270,7 +270,12 @@ describe('migration des promesses sur l’essai', () => {
     // Mesuré sur cette branche ; le repère historique était 166 lignes, puis
     // 174 avant le lot des textes agents (15/09/2026), qui a vidé ses fichiers.
     // Réduire avec chaque lot de textes, jusqu'à une égalité à zéro au raccordement.
-    const BUDGET = 140;
+    // 24/09/2026 : 140 → 45. Mesuré à 39 sur une copie propre après le lot des
+    // textes secondaires (articles des 07.09 et 14.09, pages de doc qui
+    // annonçaient « 200 » comme LA clé) ; la marge couvre les fichiers non suivis
+    // d'un poste de travail, que ce balayage lit aussi (deux lignes chez
+    // l'intégrateur ce jour-là).
+    const BUDGET = 45;
     expect(offenders.length, offenders.join('\n')).toBeLessThanOrEqual(BUDGET);
   });
 
@@ -330,13 +335,26 @@ describe('la phrase de consentement et son interdit', () => {
     expect(seen, 'plus aucune surface ne publie la phrase de consentement').toBeGreaterThan(0);
   });
 
-  it("le conseil de l'essai garde le jeton de mesure ET l'unité des deux plafonds", () => {
+  it("le conseil de l'essai garde le jeton de mesure et annonce la clé par sa destination", () => {
     // Sans le `source`, la carte des portes d'entrée du tableau de bord tombe à
     // zéro pour toujours, et aucun autre test ne le verrait.
     expect(TRIAL_FREE_KEY_HINT).toContain(`"source":"${TRIAL_SIGNUP_SOURCE}"`);
-    // Les deux 25 se croisent dans cette phrase : chacun porte son unité.
-    expect(TRIAL_FREE_KEY_HINT).toMatch(/\bMONTH\b/);
-    expect(TRIAL_FREE_KEY_HINT).toMatch(/\bDAY\b/);
+    // Depuis le 24/09/2026, le plafond du JOUR n'est plus dans cette phrase :
+    // elle est servie dans le bloc `trial`, juste à côté de `daily_limit`, et
+    // les deux 25 face à face se lisaient « la clé vaut moins que pas de clé ».
+    // La clé s'annonce par ses 200 une fois réclamée, le 25 du mois ensuite,
+    // chiffres lus dans les constantes.
+    expect(TRIAL_FREE_KEY_HINT).toContain(
+      `${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed`,
+    );
+    expect(TRIAL_FREE_KEY_HINT).toContain(`starts at ${ANONYMOUS_MONTHLY_LIMIT} requests a month`);
+    expect(TRIAL_FREE_KEY_HINT.indexOf(String(FREE_TIER_MONTHLY_LIMIT))).toBeLessThan(
+      TRIAL_FREE_KEY_HINT.indexOf(`starts at ${ANONYMOUS_MONTHLY_LIMIT}`),
+    );
+    expect(TRIAL_FREE_KEY_HINT).not.toMatch(/\bday\b/i);
+    expect(TRIAL_FREE_KEY_HINT).not.toContain(`${REST_TRIAL_DAILY_LIMIT} are`);
+    // Réclamer demande un code reçu à une adresse : « un appel » était faux.
+    expect(TRIAL_FREE_KEY_HINT).toMatch(/code mailed/);
     expect(TRIAL_FREE_KEY_HINT).not.toContain('you@');
   });
 

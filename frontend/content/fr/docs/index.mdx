@@ -69,7 +69,7 @@ La réponse porte alors un bloc `trial` supplémentaire :
   "calls_left_today": 24,
   "daily_limit": 25,
   "resets": "midnight UTC",
-  "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: an ifk_ key worth 25 requests a MONTH, on every endpoint (these 25 are a DAY, on this route only). One call at POST /v1/keys/claim, key in the Authorization header, raises the same key to 200 a month.",
+  "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: it returns an ifk_ key that works on every endpoint, good for 200 requests a month once claimed (POST /v1/keys/claim, key in the Authorization header, with a code mailed to an address you read). Unclaimed, the key starts at 25 requests a month",
   "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
 }
 ```

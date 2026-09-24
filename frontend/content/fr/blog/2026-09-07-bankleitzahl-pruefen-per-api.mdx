@@ -1,6 +1,6 @@
 ---
 title: "Vérifier une Bankleitzahl par API : ce que répond le registre de la Bundesbank, champ par champ"
-description: "Vérifier un code banque allemand n'est pas un calcul de clé. La Deutsche Bundesbank publie chaque mois quels codes sont attribués, à qui, et lesquels vont disparaître. Trois vraies réponses de l'API, champ par champ, avec dix appels par jour sans clé."
+description: "Vérifier un code banque allemand n'est pas un calcul de clé. La Deutsche Bundesbank publie chaque mois quels codes sont attribués, à qui, et lesquels vont disparaître. Trois vraies réponses de l'API, champ par champ ; l'essai sans clé couvre jusqu'à 25 vérifications par jour."
 date: "2026-09-07"
 faq:
   - q: "Qu'est-ce qu'une Bankleitzahl, et qui l'attribue ?"
@@ -10,7 +10,7 @@ faq:
   - q: "Que signifie un code retiré ?"
     a: "La Bundesbank annonce la suppression d'une Bankleitzahl et nomme, dans la plupart des cas, le code qui lui succède. La réponse porte alors retired: true et superseded_by avec le nouveau code. Le code a été attribué, la réponse reste verified ; mais un paiement vers l'ancien code finira par revenir, et la fiche du bénéficiaire est à refaire contre le successeur."
   - q: "Combien coûte la vérification ?"
-    a: "Rien pour commencer : dix vérifications par jour et par adresse sans clé, 200 par mois avec la clé gratuite, et une Bankleitzahl seule se consulte sur sa propre page sous /fr/blz, sans aucun appel."
+    a: "Rien pour commencer. Sans clé du tout : jusqu'à 25 validations d'IBAN par jour et par adresse, sur la seule route de validation, pour essayer. Une clé sans e-mail : 200 requêtes par mois une fois réclamée ; prise sans aucune adresse, elle démarre à 25 par mois, sur toutes les routes. Et une Bankleitzahl seule se consulte sur sa propre page sous /fr/blz, sans aucun appel."
 ---
 
 Qui cherche « Bankleitzahl prüfen » (vérifier un code banque allemand) veut rarement calculer une clé de contrôle. La question du dessous est autre : ce code existe-t-il encore, à qui appartient-il, et puis-je payer sur ce compte ? Aucun algorithme n'y répond ; un registre, oui. En Allemagne, c'est la [Bankleitzahlendatei de la Deutsche Bundesbank](/fr/blz), renouvelée chaque mois, qui liste tous les codes que la Bundesbank a attribués, avec l'établissement derrière chacun, son BIC et, seul registre national d'Europe à le faire, l'annonce des codes qui vont disparaître. Le fichier de septembre 2026 compte 3 506 codes banque, dont 75 marqués pour suppression.
@@ -135,7 +135,7 @@ Le contraste compte. Dans un pays sans registre publié, disons pour la plupart 
 
 ## Comment l'appeler
 
-Sans clé, depuis le terminal, dix fois par jour et par adresse :
+Sans clé, depuis le terminal : l'essai sans clé sert jusqu'à 25 appels par jour et par adresse, sur cette seule route.
 
 ```bash
 curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -143,7 +143,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban":"DE82370400440123456789"}'
 ```
 
-La réponse est complète, et elle porte un bloc `trial` qui dit combien d'appels restent aujourd'hui. Pour la production, la [clé gratuite](/fr/docs/api-keys) suffit, 200 requêtes par mois sans carte ; pour vérifier un fichier entier, [`POST /v1/iban/batch`](/fr/docs/iban-validate) prend jusqu'à cent IBAN par appel. Et qui ne veut écrire aucune ligne de code trouve [chaque Bankleitzahl sur sa propre page](/fr/blz), avec exactement cette réponse dessus.
+La réponse est complète, et elle porte un bloc `trial` qui dit combien d'appels restent aujourd'hui. Pour la production, prenez une [clé sans e-mail](/fr/docs/api-keys) : 200 requêtes par mois une fois réclamée, sans carte ; pour vérifier un fichier entier, [`POST /v1/iban/batch`](/fr/docs/iban-validate) prend jusqu'à cent IBAN par appel. Et qui ne veut écrire aucune ligne de code trouve [chaque Bankleitzahl sur sa propre page](/fr/blz), avec exactement cette réponse dessus.
 
 ## Ce que le registre ne dit pas
 
