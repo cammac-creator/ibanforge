@@ -101,12 +101,10 @@ const buildRawSpec = () => ({
         description:
           'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first ' +
           REST_TRIAL_DAILY_LIMIT +
-          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64) — send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. Those ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ' are a day, on this route only; the key carries ' +
-          ANONYMOUS_MONTHLY_LIMIT +
-          ' a month, on every endpoint, and one call at POST /v1/keys/claim raises it to ' +
+          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64): send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. The trial is counted per day and covers this route only. The key that needs no email is another door: every endpoint, and ' +
           FREE_TIER_MONTHLY_LIMIT +
+          ' requests a month once claimed with one call at POST /v1/keys/claim; taken with an empty body it starts at ' +
+          ANONYMOUS_MONTHLY_LIMIT +
           ' a month. Past ' +
           REST_TRIAL_DAILY_LIMIT +
           ', the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',

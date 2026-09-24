@@ -2,7 +2,7 @@
 
 > IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For each SEPA bank it resolves, it says whether the bank is reachable by SEPA Credit Transfer, SEPA Instant and SEPA Direct Debit, and whether it answers Verification of Payee (VoP) requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
 
-Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory.
+Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run.
 
 BIC directory, 121k+ entries (entries, not institutions): GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the rows. Also 1,100+ Swiss BC-Nummern (SIX) · 89 IBAN countries · 900+ non-bank issuer classifications (EMI, payment institutions, digital banks). Live counts at https://api.ibanforge.com/llms.txt
 
@@ -40,7 +40,7 @@ https://api.ibanforge.com
 ### Try it right now, no key, no wallet (REST)
 curl -s -X POST https://api.ibanforge.com/v1/iban/validate -H 'Content-Type: application/json' -d '{"iban":"DE89370400440532013000"}'
 Then send CH9300762011623852957, the Swiss example of the SWIFT IBAN registry: mod-97 passes, and the answer says the SIX BankMaster allocates its bank code to nobody (`not_allocated`, `authoritative: true`).
-The first 25 calls a day per source address (IPv6 counted per /64) are served in full, free. The answer carries a `trial` block saying how many are left today and how to take a key that needs no e-mail at all (25 a month, claimable to 200 a month). These 25 are a day, on this route only; the key's 25 are a month, on every route — a different thing, not a bigger one. Past 25 the route answers 402 again, `cause.reason = "trial_exhausted"`. Send a REAL iban: an empty `{}` body is the x402 discovery probe and always gets the 402.
+The first 25 calls a day per source address (IPv6 counted per /64) are served in full, free, on this route only. The answer carries a `trial` block saying how many are left today and how to take the other door, a key that needs no e-mail and no card: it works on every route and reaches 200 requests a month once claimed. Past 25 calls in a day the route answers 402 again, `cause.reason = "trial_exhausted"`. Send a REAL iban: an empty `{}` body is the x402 discovery probe and always gets the 402.
 
 ### MCP server (stdio — easiest, no signup)
 npx -y ibanforge-mcp

@@ -3,6 +3,9 @@ import { registerCoverage, structuralRuleCountries } from './enrich.js';
 import { IBAN_LENGTHS, getCountryName } from './countries.js';
 import { getSourceFreshness } from './bic-lookup.js';
 import { LU_SOURCE, luRegisterConfigured } from './lu-register.js';
+import { REST_TRIAL_DAILY_LIMIT } from './trial.js';
+import { MCP_DAILY_LIMIT } from './mcp-limits.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 
 /**
  * What IBANforge is, said once for every first line a machine reads.
@@ -233,11 +236,45 @@ export function positioningOneLine(): string {
   );
 }
 
-/** What we are not, said right after what we are. */
+/**
+ * What we are not, said right after what we are.
+ *
+ * The second sentence was added on 24/09/2026 after a probe: a French IBAN
+ * whose RIB key was wrong, its mod-97 recomputed, came back `valid: true` and
+ * `verified`. Until the national check digits are coded, the list says so.
+ */
 export const NOT_WHAT_IT_IS =
   'Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, ' +
   'not a sanctions screening of the payee (bank and country only), ' +
-  'not a licensed copy of the SWIFT BIC directory.';
+  'not a licensed copy of the SWIFT BIC directory. ' +
+  'The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, ' +
+  'the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct ' +
+  'mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run.';
+
+/**
+ * The free ways in, one sentence per door, every figure read from the constant
+ * the code applies.
+ *
+ * Written for the MCP server card (24/09/2026): it is the one page of the API
+ * DeepSeek opened live, and it said nothing about free access, so the
+ * assistant answered from stale copies elsewhere.
+ *
+ * 🚨 Two rules, and both are the point. Each door is NAMED (the keyless trial,
+ * the hosted MCP transport, the free key): a bare number is what readers
+ * confuse. And the trial's daily figure and the key's monthly figure never sit
+ * in the same sentence: today they are the same number with nothing in common
+ * (one route a day, every route a month), and side by side they read as "the
+ * key is worse than no key". The key is announced by what it reaches once
+ * claimed.
+ */
+export function freeAccessSentences(): string[] {
+  return [
+    `No key at all: POST /v1/iban/validate answers up to ${REST_TRIAL_DAILY_LIMIT} IBAN validations a day per source address, in full, to try it out.`,
+    `The hosted MCP transport (https://api.ibanforge.com/mcp) answers up to ${MCP_DAILY_LIMIT} full tool calls a day per IP, a batch counting one per IBAN, with no key and no wallet.`,
+    `A key that needs no e-mail and no card (POST /v1/keys/generate with an empty body) works on every endpoint and reaches ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed at POST /v1/keys/claim.`,
+    `Before the claim, that key starts at ${ANONYMOUS_MONTHLY_LIMIT} requests a month.`,
+  ];
+}
 
 /** The scope of the sanctions check, in the words every compliance description uses. */
 export const BANK_LEVEL_SANCTIONS =

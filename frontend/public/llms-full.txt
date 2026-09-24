@@ -2,7 +2,7 @@
 
 > IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For each SEPA bank it resolves, it says whether the bank is reachable by SEPA Credit Transfer, SEPA Instant and SEPA Direct Debit, and whether it answers Verification of Payee (VoP) requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
 
-Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. These checks do not prove account existence or account ownership and do not screen an individual beneficiary.
+Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run. These checks do not prove account existence or account ownership and do not screen an individual beneficiary.
 
 ## What is IBANforge?
 

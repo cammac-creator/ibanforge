@@ -12,7 +12,7 @@
 
 > IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For each SEPA bank it resolves, it says whether the bank is reachable by SEPA Credit Transfer, SEPA Instant and SEPA Direct Debit, and whether it answers Verification of Payee (VoP) requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
 
-Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory.
+Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run.
 
 For business software and AI agents alike: a REST API, a native **MCP** server, prepaid packs by card, and **x402 micropayments** with no signup.
 
@@ -114,8 +114,8 @@ The Python SDK ships with sync + async clients, typed exception classes, and a f
 ```python
 from ibanforge import IBANforge
 
-# 1-line free key (200 req/month, no signup form)
-key = IBANforge.generate_api_key("you@company.com")
+# 1-line key, no e-mail: 25 requests a month, 200 once claimed
+key = IBANforge.generate_api_key()  # shown ONCE: store key["api_key"] now
 
 with IBANforge(api_key=key["api_key"]) as client:
     out = client.validate_iban("DE89370400440532013000")
@@ -142,7 +142,8 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -d '{"iban":"CH93 0076 2011 6238 5295 7"}'
 
-# Past 25/day, add the free key (25 req/month with no e-mail, 200 once claimed; one POST, no card)
+# Beyond the keyless trial, send a key: an empty POST to /v1/keys/generate returns one
+# (no e-mail, no card), for every endpoint, 200 requests a month once claimed.
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ifk_..." \
