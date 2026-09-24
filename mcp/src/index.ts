@@ -150,10 +150,12 @@ const TOOLS: Tool[] = [
         // client validates structuredContent against this schema and THROWS on
         // a mismatch, so the call failed on exactly the answers that matter
         // most: an unallocated bank code (`bic: null`), a bank the EBA register
-        // names (`classification: "register"`). Measured 24/09/2026 against the
-        // real routes: more than half of the answers were refused. The API's
-        // own types (src/types.ts) are the reference; mcp/src/output-schema.test.ts
-        // replays real answers through the official client.
+        // names (`classification: "register"`). Found 24/09/2026 by replaying
+        // real answers of the routes: many were refused, such as any bank code
+        // that resolves no BIC, any BIC without an LEI, any compliance check on
+        // an invalid IBAN. The API's own types (src/types.ts) are the reference;
+        // mcp/src/output-schema.test.ts replays real answers through the
+        // official client.
         bic: {
           type: ['object', 'null'],
           description:
@@ -755,9 +757,12 @@ const TOOLS: Tool[] = [
           properties: {
             scope: { type: 'string', enum: ['bank_bic_only'], description: 'Sanctions are screened at the bank BIC, NOT the beneficiary name.' },
             disclaimer: { type: 'string' },
-            sanctions_as_of: { type: 'string', description: 'ISO timestamp of the last data refresh.' },
-            fatf_as_of: { type: 'string', description: 'YYYY-MM of the FATF plenary reflected.' },
-            sources: { type: 'string' },
+            // null when the compliance database has no metadata to read
+            // (getComplianceMeta in src/lib/compliance-db.ts): the answer is
+            // still served, with its dates unknown rather than invented.
+            sanctions_as_of: { type: ['string', 'null'], description: 'ISO timestamp of the last data refresh; null when unknown.' },
+            fatf_as_of: { type: ['string', 'null'], description: 'YYYY-MM of the FATF plenary reflected; null when unknown.' },
+            sources: { type: ['string', 'null'], description: 'Comma-separated data sources; null when unknown.' },
           },
         },
         cost_usdc: { type: 'number' },

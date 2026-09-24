@@ -1,5 +1,5 @@
 {
-  "_provenance": "Real answers of the API code at revision 1115c180, produced by mounting each route alone in a Hono app (as its own tests do) against the tracked data/bic.sqlite: no network, no key. Public example IBANs and public bank codes only; the Spanish IBAN pairs the bank code of an e-money institution listed in the EBA PSD2 register with an invented account number. Regenerate them when the API changes the shape of an answer.",
+  "_provenance": "Real answers of the API code at revision 1115c180, produced by mounting each route alone in a Hono app (as its own tests do) against the tracked data/bic.sqlite: no network, no key. Public example IBANs and public bank codes only; the Spanish IBAN pairs the bank code of an e-money institution listed in the EBA PSD2 register with an invented account number. Regenerate them when the API changes the shape of an answer. compliance_meta_unknown is the same route answering with a copy of data/compliance.sqlite whose metadata table was emptied, the case where getComplianceMeta() serves sanctions_as_of, fatf_as_of and sources as null.",
   "es_emi_iban": "ES4067020001011234567890",
   "answers": {
     "validate_de89": {
@@ -899,6 +899,137 @@
       "source": null,
       "note": "No supported scheme matches this string. RF references start with \"RF\"; a Swiss QR reference is 27 digits; a Belgian OGM is 12 digits; a Finnish reference is 4 to 20 digits. Pass reference_type to force a scheme.",
       "pairing_verdict": "POST /v1/iban/validate ($0.005) with a `reference` field adds reference_check.pairing — whether a QRR or ISO 11649 reference may legally travel with that IBAN under the Swiss Payment Standards."
+    },
+    "compliance_meta_unknown": {
+      "iban": "DE89370400440532013000",
+      "valid": true,
+      "country": {
+        "code": "DE",
+        "name": "Germany"
+      },
+      "check_digits": "89",
+      "bban": {
+        "bank_code": "37040044",
+        "account_number": "0532013000"
+      },
+      "sepa": {
+        "member": true,
+        "schemes": [
+          "SCT",
+          "SDD",
+          "SCT_INST"
+        ],
+        "vop_required": true,
+        "vop_participant": true,
+        "basis": "epc_register"
+      },
+      "formatted": "DE89 3704 0044 0532 0130 00",
+      "cost_usdc": 0.02,
+      "bic": {
+        "code": "COBADEFFXXX",
+        "bank_name": "Commerzbank",
+        "city": "Köln",
+        "source": "Deutsche Bundesbank Bankleitzahlendatei",
+        "as_of": "2026-09",
+        "basis": "national_register",
+        "authoritative": true,
+        "lei": "851WYGNLUQLFZBSYGB56",
+        "lei_status": "ACTIVE",
+        "address": {
+          "type": "registered",
+          "street": "Kaiserstraße 16",
+          "post_code": "60311",
+          "region": "DE-HE",
+          "city": "Frankfurt am Main",
+          "country": "DE",
+          "romanized": "Kaiserstraße 16",
+          "romanization": "original_latin",
+          "source": "GLEIF",
+          "language": "de",
+          "as_of": "2026-02-24"
+        },
+        "postal_address": {
+          "pst_cd": "60311",
+          "twn_nm": "Frankfurt am Main",
+          "ctry": "DE",
+          "adr_line": [
+            "Kaiserstraße 16"
+          ],
+          "format": "hybrid",
+          "source": "GLEIF",
+          "as_of": "2026-02-24"
+        },
+        "bic8": "COBADEFF"
+      },
+      "issuer": {
+        "type": "bank",
+        "name": "Commerzbank",
+        "classification": "default"
+      },
+      "risk_indicators": {
+        "issuer_type": "bank",
+        "country_risk": "standard",
+        "test_bic": false,
+        "sepa_reachable": true,
+        "sepa_reachable_scope": "country",
+        "vop_coverage": true
+      },
+      "bank_code_check": {
+        "value": "37040044",
+        "status": "verified",
+        "match": "register",
+        "register": "Deutsche Bundesbank Bankleitzahlendatei",
+        "authoritative": true,
+        "institution": {
+          "name": "Commerzbank",
+          "street": null,
+          "post_code": "50447",
+          "town": "Köln",
+          "country": "DE"
+        },
+        "as_of": "2026-09"
+      },
+      "next_steps": [
+        {
+          "code": "screen_compliance",
+          "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+          "because": "bank_code_check.status is verified, so there is an institution to screen",
+          "action": "POST /v1/iban/compliance"
+        }
+      ],
+      "compliance": {
+        "sanctions": {
+          "country_sanctioned": false,
+          "bank_sanctioned": false,
+          "matched_lists": [],
+          "fatf_status": "member",
+          "bank_screened": true
+        },
+        "reachability": {
+          "sepa_instant": true,
+          "sct": true,
+          "sdd": true,
+          "screened": true
+        },
+        "vop": {
+          "participant": true,
+          "status": "active",
+          "screened": true
+        },
+        "risk_score": 0,
+        "risk_level": "low",
+        "flags": []
+      },
+      "meta": {
+        "scope": "bank_bic_only",
+        "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
+        "sanctions_as_of": null,
+        "fatf_as_of": null,
+        "sources": null,
+        "country_risk_as_of": "2026-07",
+        "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
+      },
+      "processing_ms": 77.19
     }
   }
 }

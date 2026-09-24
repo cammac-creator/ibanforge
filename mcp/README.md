@@ -13,7 +13,7 @@ For business software and AI agents alike: an API key that needs no e-mail, prep
 
 ## Free access
 
-- **Remote MCP, nothing to install:** `https://api.ibanforge.com/mcp` answers 10 tool calls a day per IP, a batch counting one per IBAN, without a key or a wallet. An API key does not raise this allowance.
+- **Remote MCP, nothing to install:** `https://api.ibanforge.com/mcp` answers a daily allowance of full tool calls per IP (`mcp_anonymous` in [rate-limits.yml](https://api.ibanforge.com/rate-limits.yml)), a batch counting one per IBAN, without a key or a wallet. An API key does not raise this allowance.
 - **This package, before you have a key:** `validate_iban` goes through the REST API's daily keyless trial, counted per source address; each answer's `trial` block says how many calls remain today. The other paid tools need a key, prepaid credits or x402.
 - **A key that needs no e-mail and no card:** `POST https://api.ibanforge.com/v1/keys/generate` with an empty body returns an `ifk_` key worth 25 requests a month on every endpoint. Claimed at `POST /v1/keys/claim` with a code mailed to an address given for this, the same key reaches 200 a month (see [Keep using the same key](#keep-using-the-same-key)).
 - The figures the API applies today are served live at [rate-limits.yml](https://api.ibanforge.com/rate-limits.yml).

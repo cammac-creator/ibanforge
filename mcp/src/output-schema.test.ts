@@ -9,9 +9,10 @@
  * déclarait non nullables des champs que l'API sert à `null` tous les jours :
  * `bic` d'un code banque non attribué, `lei` d'un BIC sans LEI, `risk_score`
  * d'un IBAN invalide… et une classification `register` que l'énumération
- * ignorait. Mesuré ce jour-là contre les vraies routes : plus de la moitié des
- * réponses refusées, précisément celles qui comptent le plus (« ce code banque
- * n'existe pas »).
+ * ignorait. Rejouées ce jour-là, beaucoup de vraies réponses étaient refusées :
+ * tout code banque qui ne résout aucun BIC, tout BIC sans LEI, toute
+ * conformité sur un IBAN invalide. Précisément celles qui comptent le plus
+ * (« ce code banque n'existe pas »).
  *
  * `index.test.ts` ne pouvait pas le voir : ses charges utiles sont écrites à la
  * main, et une charge utile écrite à la main a la forme que l'on croit, pas
@@ -61,6 +62,7 @@ function answerFor(method: string, url: string, body: string): Answer | undefine
   }
   if (method === 'POST' && url === '/v1/iban/batch') return A.batch_mix;
   if (method === 'POST' && url === '/v1/iban/compliance') {
+    if (iban === 'DE89370400440532013000') return A.compliance_meta_unknown;
     if (iban === 'CH9300762011623852957') return A.compliance_ch93;
     if (iban === 'not-an-iban') return A.compliance_invalid;
     if (iban === 'RU0204452560040702810412345678901') return A.compliance_ru;
@@ -172,6 +174,18 @@ describe('the official MCP client accepts what the API really serves', () => {
     const compliance = sc.compliance as Answer;
     expect(compliance.risk_score).toBeNull();
     expect(compliance.risk_level).toBe('unassessable');
+  });
+
+  it('a compliance check whose data dates are unknown: meta sanctions_as_of, fatf_as_of and sources null', async () => {
+    // getComplianceMeta() (src/lib/compliance-db.ts) serves the three at null
+    // when the compliance database has no metadata to read. The answer itself
+    // is real: the route run against a copy of that database with its
+    // metadata table emptied (see _provenance).
+    const sc = await structured('check_compliance', { iban: 'DE89370400440532013000' });
+    const meta = sc.meta as Answer;
+    expect(meta.sanctions_as_of).toBeNull();
+    expect(meta.fatf_as_of).toBeNull();
+    expect(meta.sources).toBeNull();
   });
 
   it('a compliance check on a country the FATF suspended: fatf_status suspended', async () => {
