@@ -2219,7 +2219,7 @@
   },
   "account": {
     "title": "Your account",
-    "subtitle": "Everything your API key did this month — what worked, what failed and why, and where it was used from.",
+    "subtitle": "Your API keys: their balance, this month's usage, what failed and why, and where they are called from.",
     "signInIntro": "Sign in with the e-mail address attached to your keys. We send you a 6-digit code: no password, no link.",
     "emailLabel": "E-mail address",
     "sendCode": "Send me a code",

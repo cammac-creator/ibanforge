@@ -2219,7 +2219,7 @@
   },
   "account": {
     "title": "Ihr Konto",
-    "subtitle": "Alles, was Ihr API-Schlüssel diesen Monat getan hat: was funktioniert hat, was fehlgeschlagen ist und warum, und von wo er aufgerufen wird.",
+    "subtitle": "Ihre API-Schlüssel: ihr Guthaben, ihr Verbrauch in diesem Monat, was fehlgeschlagen ist und warum, und von wo sie aufgerufen werden.",
     "signInIntro": "Melden Sie sich mit der E-Mail-Adresse an, die mit Ihren Schlüsseln verknüpft ist. Wir senden Ihnen einen 6-stelligen Code, ohne Passwort und ohne Link.",
     "emailLabel": "E-Mail-Adresse",
     "sendCode": "Code senden",

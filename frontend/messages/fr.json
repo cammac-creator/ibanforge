@@ -2219,7 +2219,7 @@
   },
   "account": {
     "title": "Votre compte",
-    "subtitle": "Tout ce que votre clé API a fait ce mois-ci : ce qui a fonctionné, ce qui a échoué et pourquoi, et depuis où elle est appelée.",
+    "subtitle": "Vos clés API : leur solde, leur consommation du mois, ce qui a échoué et pourquoi, et depuis où elles sont appelées.",
     "signInIntro": "Connectez-vous avec l'adresse e-mail liée à vos clés. Nous vous envoyons un code à 6 chiffres : ni mot de passe, ni lien.",
     "emailLabel": "Adresse e-mail",
     "sendCode": "Recevoir un code",
