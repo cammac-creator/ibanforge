@@ -40,6 +40,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { STDIO_ONLY_TOOLS } from '../src/mcp/inventory.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8');
@@ -126,6 +127,15 @@ const A_ONLY_TOOLS: ReadonlyArray<{ tool: string; since: string; why: string }> 
   },
 ];
 const A_ONLY_NAMES = A_ONLY_TOOLS.map((t) => t.tool);
+
+// La liste que /llms.txt cite pour `npx -y ibanforge-mcp` vient de
+// src/mcp/inventory.ts : elle doit être exactement celle-ci, sinon le texte
+// servi nommerait un outil que le paquet n'a pas (ou en oublierait un).
+describe('parité MCP : STDIO_ONLY_TOOLS suit A_ONLY_TOOLS', () => {
+  it('src/mcp/inventory.ts nomme les mêmes outils réservés au paquet npm', () => {
+    expect([...STDIO_ONLY_TOOLS].sort()).toEqual([...A_ONLY_NAMES].sort());
+  });
+});
 
 /**
  * Écarts connus et ASSUMÉS entre surfaces, hors outils. Toute ligne ici est une

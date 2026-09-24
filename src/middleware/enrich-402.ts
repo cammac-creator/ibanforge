@@ -2,6 +2,12 @@ import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv, PaywallCause } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import {
+  BANK_LEVEL_SANCTIONS,
+  bicDirectorySentence,
+  codesOf,
+  registerCountries,
+} from '../lib/positioning.js';
+import {
   buildBazaarInfo,
   findDiscovery,
   markExample,
@@ -45,7 +51,9 @@ const PRICING: EndpointPricing[] = [
       // The register check is the claim that separates this from a checksum
       // pass, and a registry operator told us it was invisible from the
       // discovery document — it lived only in settled responses. Surfaced.
-      'Validate a single IBAN (ISO 13616 mod-97) and resolve BIC, country, EMI/vIBAN classification, SEPA + VoP flags, and Swiss BC-Nummer for CH/LI accounts. Domestic bank codes are verified against the national registers we mirror (with as-of dates), not just checksummed.',
+      // The countries are named since 24/09/2026: "the national registers we
+      // mirror" read as every country, and assistants repeated it that way.
+      `Validate a single IBAN (ISO 13616 mod-97) and resolve BIC, country, EMI/vIBAN classification, SEPA and VoP readiness, and Swiss BC-Nummer for CH/LI accounts. Where we read the national register (${codesOf(registerCountries().authoritative)}), the bank code is checked against it, with its as-of date, not just checksummed; elsewhere a partial register or a composite map names the bank without ruling a code out.`,
     inputSchema: {
       type: 'object',
       required: ['iban'],
@@ -140,7 +148,7 @@ const PRICING: EndpointPricing[] = [
   {
     match: (m, p) => m === 'GET' && p.startsWith('/v1/bic/'),
     price_usdc: 0.003,
-    description: `Lookup a BIC/SWIFT code against ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly). Returns bank name, country, city, LEI, and registered head-office address (where available).`,
+    description: `Lookup a BIC/SWIFT code. Returns bank name, country, city, LEI, and registered head-office address (where available). ${bicDirectorySentence({ withCount: true })}`,
     inputSchema: {
       type: 'object',
       required: ['code'],
@@ -178,8 +186,7 @@ const PRICING: EndpointPricing[] = [
   {
     match: (m, p) => m === 'POST' && p === '/v1/iban/compliance',
     price_usdc: 0.02,
-    description:
-      'Pre-payout screening for agents — check the bank behind a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100). Pre-flight triage, not a regulated AML product.',
+    description: `Pre-payment triage of the bank behind an IBAN: validation + ${BANK_LEVEL_SANCTIONS} + FATF status + SEPA Instant reachability + VoP readiness of the bank + risk score (0-100). Pre-flight triage, not a regulated AML product.`,
     inputSchema: {
       type: 'object',
       required: ['iban'],

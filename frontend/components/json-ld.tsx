@@ -27,7 +27,17 @@
  * Embedded in app/[locale]/layout.tsx <head>. Inline JSON.stringify is safe
  * here because we control the source — none of these strings contain user
  * input or "</script>" sequences.
+ *
+ * 24/09/2026: the description is the one line the API serves from
+ * src/lib/positioning.ts (src/lib/positioning.test.ts holds this copy to it),
+ * and the free-key figures come from the catalogue the API exports, not from
+ * a literal: "200 free requests/month" stayed here after the key that needs no
+ * e-mail started at a smaller allowance.
  */
+
+import catalogue from "@/data/onboarding.json";
+
+const FREE_KEY = `a free API key with no e-mail (${catalogue.anonymousMonthly} requests/month, ${catalogue.claimedMonthly} once claimed)`;
 
 const SOFTWARE_APPLICATION = {
   '@context': 'https://schema.org',
@@ -40,12 +50,13 @@ const SOFTWARE_APPLICATION = {
   operatingSystem: 'Web, REST API, MCP',
   url: 'https://ibanforge.com',
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (1,100+ SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring. Pay-per-call in USDC via x402, or 200 free requests/month with an API key. Native MCP server for Claude Desktop, Cursor, and Cline.',
+    'Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, BG, CH, LI), the bank and BIC with their source, SEPA and VoP readiness from the EPC registers where they list the bank, and bank-level sanctions (OFAC, EU, UN).' +
+    ` It does not check the payee's name. Prepaid packs by card, a Pro subscription, or pay-per-call in USDC via x402; ${FREE_KEY}. Native MCP server for Claude Desktop, Cursor, and Cline.`,
   offers: [
     {
       '@type': 'Offer',
       name: 'Validate IBAN',
-      description: 'Validate single IBAN with BIC lookup, issuer classification, SEPA + VoP flags',
+      description: 'Validate single IBAN with the bank-code verdict, BIC lookup with its source, issuer classification, SEPA and VoP readiness',
       price: '0.005',
       priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
@@ -61,7 +72,7 @@ const SOFTWARE_APPLICATION = {
     {
       '@type': 'Offer',
       name: 'Lookup BIC',
-      description: 'Lookup BIC/SWIFT against 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for 39k+ rows sourced from GLEIF',
+      description: 'Lookup BIC/SWIFT against 121k+ BIC entries: GLEIF (39k+ rows, with LEI), a public copy of the SWIFT directory frozen in January 2018 (about two thirds of the rows), and rows from the Bundesbank, SIX, NBP and EBA STEP2',
       price: '0.003',
       priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
@@ -78,31 +89,32 @@ const SOFTWARE_APPLICATION = {
       '@type': 'Offer',
       name: 'Compliance check',
       description:
-        'Full compliance triage: sanctions (OFAC), FATF, SEPA Instant, VoP, risk score (0-100)',
+        "Bank-level compliance triage: sanctions lists (OFAC, EU, UN) on the payee's bank (BIC8), the country against a fixed sanctions list, FATF, SEPA Instant, VoP readiness, risk score (0-100)",
       price: '0.02',
       priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
     },
     {
       '@type': 'Offer',
-      name: 'Free tier',
-      description: '200 requests/month free with an API key',
+      name: 'Free API key',
+      description: `No e-mail required: ${catalogue.anonymousMonthly} requests/month, ${catalogue.claimedMonthly} once the key is claimed`,
       price: '0',
       priceCurrency: 'USD',
-      eligibleQuantity: { '@type': 'QuantitativeValue', value: 200, unitText: 'requests/month' },
+      eligibleQuantity: { '@type': 'QuantitativeValue', value: catalogue.anonymousMonthly, unitText: 'requests/month' },
     },
   ],
   featureList: [
     'IBAN validation (ISO 13616 mod-97 + BBAN)',
-    'BIC/SWIFT lookup against 121k+ BIC entries (39k+ LEI-enriched via GLEIF)',
+    'Bank-code verdict against the national register (DE, AT, BE, SK, BG, CH, LI)',
+    'BIC/SWIFT lookup against 121k+ BIC entries; validation answers name the source of every BIC',
     'Swiss BC-Nummer / IID lookup (1,100+ SIX BankMaster)',
     'EMI / vIBAN / neobank issuer classification',
     'SEPA Instant reachability flag',
-    'VoP (PSR 2024/886) participant check',
-    'Compliance risk scoring (OFAC)',
+    "VoP readiness of the payee's bank (Regulation (EU) 2024/886)",
+    'Bank-level risk scoring (OFAC, EU, UN, FATF)',
     'x402 micropayments (USDC on Base L2)',
     'Native MCP server (Claude Desktop, Cursor, Cline)',
-    '200 free requests/month with API key',
+    FREE_KEY.charAt(0).toUpperCase() + FREE_KEY.slice(1),
     'Official npm SDK @ibanforge/sdk',
   ],
 };
@@ -120,7 +132,9 @@ const ORGANIZATION = {
     'https://github.com/cammac-creator/ibanforge',
     'https://www.npmjs.com/package/ibanforge-mcp',
     'https://www.npmjs.com/package/@ibanforge/sdk',
-    'https://registry.modelcontextprotocol.io/servers/com.ibanforge/mcp',
+    // The registry lists the server under io.github.cammac-creator/ibanforge;
+    // the com.ibanforge/mcp path this used to name answers 404.
+    'https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge',
   ],
 };
 

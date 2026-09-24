@@ -22,7 +22,7 @@ Posez une politique de budget avant le premier paiement réel. Un agent avec un 
 
 ## Étape 2 — Alimentez-le en USDC sur Base
 
-C'est l'étape qui demande encore un humain aujourd'hui : déposer des USDC sur le wallet (retrait d'exchange, onramp, ou le parcours de financement de votre plateforme). **5 $ couvrent 1 000 validations.** Le gas n'est pas votre problème — x402 utilise des autorisations USDC sans gas, le facilitateur règle le transfert.
+C'est l'étape qui demande encore un humain aujourd'hui : déposer des USDC sur le wallet (retrait d'exchange, onramp, ou le parcours de financement de votre plateforme). **4 $ couvrent 1 000 validations avec un pack** (`POST /v1/credits/buy/1k`) ; payée à l'appel, une validation coûte 0,005 $. Le gas n'est pas votre problème — x402 utilise des autorisations USDC sans gas, le facilitateur règle le transfert.
 
 Pour répéter le flux sans argent réel, le faucet CDP alimente un wallet de test **base-sepolia** — mais IBANforge règle sur **Base mainnet** (`eip155:8453`) : la répétition doit viser votre propre serveur de test, pas notre API.
 

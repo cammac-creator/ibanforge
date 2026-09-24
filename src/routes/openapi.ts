@@ -12,6 +12,10 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
 import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
+// The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
+import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
+import { BUNDLES } from './api-keys.js';
+import { PRO_PRICE_USD } from '../lib/payment-links.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
 // contrat qui recopie son propre chiffre sera faux au prochain réglage.
 import {
@@ -44,7 +48,7 @@ import {
 const openapi = new Hono();
 
 // Version is read from package.json so the spec can never drift from the
-// deployed server again (the spec is fetched ~20k times/month by machines
+// deployed server again (the spec is fetched by machines
 // that code against it — it must tell the truth).
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require('../../package.json') as { version: string };
@@ -56,20 +60,27 @@ const buildRawSpec = () => ({
     title: 'IBANforge API',
     version: PKG_VERSION,
     // This string is the first thing every agent reads about the product, on
-    // the surface machines fetch ~20k times/month. Kept in sync with the
-    // positioning already served by llms.txt and the MCP descriptors — a
-    // generic "IBAN + BIC API" line commoditises the two differentiators
-    // (Swiss SIX clearing depth, sanctions screening) for free.
+    // the surface machines fetch the most. Until 24/09/2026 it opened
+    // on "Pre-payout screening for AI agents" and Swiss clearing, and the
+    // assistants that read it filed IBANforge as a Swiss tool for agents with
+    // a sanctions screening of the payee. The paragraph now comes from
+    // src/lib/positioning.ts, the same one llms.txt serves, with the register
+    // countries read from the code. Card before x402: the brief of that day.
     description:
-      'Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. ' +
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — ' +
-      'full payment-rail participation, the deepest Swiss clearing data in any public API), ' +
-      'EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring. ' +
-      'Four ways to pay, no dead-ends, and the first needs no email address: a free API key (' +
+      positioningLong() +
+      ' ' +
+      NOT_WHAT_IT_IS +
+      ' Also: Swiss clearing with payment-rail participation (SIX BankMaster), the UK modulus check, and the official identity of the bank from central-bank lists (France, Spain). ' +
+      'Ways to pay, none a dead-end: prepaid credit packs by card or USDC, no expiry, ' +
+      packSummary(BUNDLES) +
+      '; a Pro subscription by card ($' +
+      PRO_PRICE_USD +
+      ' a month); or pay-per-call via x402 micropayments (USDC on Base L2, no signup). ' +
+      'Before paying, a free API key needs no email address: ' +
       ANONYMOUS_MONTHLY_LIMIT +
-      ' req/month, empty body), the same key claimed to ' +
+      ' req/month with an empty body, and the same key claimed reaches ' +
       FREE_TIER_MONTHLY_LIMIT +
-      ' a month, prepaid credit packs (card or USDC), or pay-per-call via x402 micropayments (USDC on Base L2, no signup).',
+      ' a month.',
     contact: {
       url: 'https://ibanforge.com',
     },
@@ -90,12 +101,10 @@ const buildRawSpec = () => ({
         description:
           'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first ' +
           REST_TRIAL_DAILY_LIMIT +
-          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64) — send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. Those ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ' are a day, on this route only; the key carries ' +
-          ANONYMOUS_MONTHLY_LIMIT +
-          ' a month, on every endpoint, and one call at POST /v1/keys/claim raises it to ' +
+          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64): send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. The trial is counted per day and covers this route only. The key that needs no email is another door: every endpoint, and ' +
           FREE_TIER_MONTHLY_LIMIT +
+          ' requests a month once claimed with one call at POST /v1/keys/claim; taken with an empty body it starts at ' +
+          ANONYMOUS_MONTHLY_LIMIT +
           ' a month. Past ' +
           REST_TRIAL_DAILY_LIMIT +
           ', the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
@@ -305,9 +314,12 @@ const buildRawSpec = () => ({
     '/v1/iban/compliance': {
       post: {
         operationId: 'complianceCheck',
-        summary: 'Full IBAN compliance check',
+        summary: 'Bank-level compliance triage for an IBAN',
         description:
-          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC, EU, UN), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
+          // The list of authorities is spelled out on this line rather than
+          // read from BANK_LEVEL_SANCTIONS: this file is a coverage surface of
+          // sanctions-claims.test.ts, which reads the source line by line.
+          "Validates an IBAN and returns everything from /v1/iban/validate PLUS a pre-payment triage layer: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country checked against a fixed list of sanctioned jurisdictions, never the payee's name; FATF status; SEPA Instant reachability; whether the EPC Verification of Payee register lists the bank as ready (VoP readiness); and a composite risk score (0-100). Costs $0.02 USDC via x402.",
         tags: ['Compliance'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -2858,7 +2870,7 @@ const buildRawSpec = () => ({
           uptime_seconds: { type: 'number' },
           bic_database_entries: {
             type: 'integer',
-            description: 'Number of BIC entries currently loaded (refreshed monthly from public sources)',
+            description: `Number of BIC entries currently loaded: GLEIF and national registers are refreshed monthly; the SwiftCodes rows are a public copy of the SWIFT directory frozen in ${frozenBicShare().month ?? 'an earlier year'}, re-imported unchanged. Each source's own data date is its source_as_of in bic_sources.`,
             example: getEntryCount(),
           },
           bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },

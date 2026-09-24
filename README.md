@@ -10,10 +10,14 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **The compliance API for AI agents.** IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over **MCP** and **x402 micropayments**, with no API key signup required.
+> IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
+
+Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run.
+
+For business software and AI agents alike: a REST API, a native **MCP** server, prepaid packs by card, and **x402 micropayments** with no signup.
 
 ```
-121k+ BIC entries (39k+ LEI via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
+89 IBAN countries · bank codes checked against the national registers of DE, AT, BE, SK, BG, CH, LI · 121k+ BIC entries (39k+ LEI via GLEIF; about two thirds a public SWIFT directory copy frozen in January 2018) · 1,100+ Swiss BC-Nummern (SIX)
 ```
 
 ---
@@ -37,7 +41,7 @@ Add to your MCP config (`~/Library/Application Support/Claude/claude_desktop_con
 
 **Privacy by default:** submitted IBANs are never stored — validation runs in memory, IPs are kept only as salted hashes, and telemetry deletes itself (12-month cap; erased 30 days after a customer terminates, contractually — [DPA clause 4.7](https://ibanforge.com/en/legal/dpa?src=github-readme)).
 
-Optional: set `IBANFORGE_API_KEY=ifk_...` in `env` for the free tier (200 req/month). Without it the server uses the public/demo surface; combine with **x402 micropayments** for unlimited pay-per-call access without signup.
+Optional: set `IBANFORGE_API_KEY=ifk_...` in `env` (a key that needs no e-mail: 25 requests a month, raised to 200 a month once claimed). Without it the server uses the public/demo surface; combine with **x402 micropayments** for unlimited pay-per-call access without signup.
 
 ### Claude Code (CLI)
 
@@ -60,10 +64,10 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | Tool                  | When to use it                                                                            | Cost     |
 | --------------------- | ----------------------------------------------------------------------------------------- | -------- |
 | `validate_iban`       | User mentions an IBAN, a bank account, or a SEPA payment                                  | $0.005   |
-| `batch_validate_iban` | List of IBANs, CSV cleanup, customer DB dedup, payout list triage                         | $0.002/each |
+| `batch_validate_iban` | List of IBANs, CSV cleanup, customer DB dedup, payout list triage                         | $0.002/each in USDC via x402; 1 credit each on a key |
 | `lookup_bic`          | User already has a BIC/SWIFT — backed by 121k+ BIC entries (39k+ LEI-enriched via GLEIF) | $0.003   |
-| `lookup_ch_clearing`  | Swiss BC-Nummer / IID — **the deepest Swiss clearing data in any public API**: full SIX BankMaster rail participation (SIC, euroSIC, CHF instant) + QR-IID | $0.003   |
-| `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (sanctions + FATF + VoP)      | $0.02    |
+| `lookup_ch_clearing`  | Swiss BC-Nummer / IID: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant) and its QR-IID where SIX allocates one | $0.003   |
+| `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (OFAC, EU, UN lists on the payee's bank, the country against a fixed sanctions list, FATF, VoP readiness) | $0.02    |
 | `validate_payment_reference` | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS or Finnish viitenumero checksum, plus the QRR ↔ QR-IBAN pairing verdict | **free** |
 | `check_postal_address` | An ISO 20022 address against one rail's published rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its source | **free** |
 | `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses ahead of 14.11.2026 | **free** |
@@ -75,7 +79,7 @@ The free tools need no key, no wallet and no signup: they are the ones to try fi
 last two are the way out of the daily limit without anyone typing an address — they keep
 answering after the limit is reached.
 
-Full descriptions with WHEN-to-use triggers are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
+Full descriptions of the read-only data tools, with WHEN-to-use triggers, are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
 
 ---
 
@@ -110,14 +114,14 @@ The Python SDK ships with sync + async clients, typed exception classes, and a f
 ```python
 from ibanforge import IBANforge
 
-# 1-line free key (200 req/month, no signup form)
-key = IBANforge.generate_api_key("you@company.com")
+# 1-line key, no e-mail: 25 requests a month, 200 once claimed
+key = IBANforge.generate_api_key()  # shown ONCE: store key["api_key"] now
 
 with IBANforge(api_key=key["api_key"]) as client:
-    out = client.validate_iban("CH1000230000000012345")
-    print(out["country"]["code"])       # CH
-    print(out["bic"]["bank_name"])      # UBS Switzerland AG
-    print(out["clearing"]["sic"])       # True (Swiss SIC participation)
+    out = client.validate_iban("DE89370400440532013000")
+    print(out["country"]["code"])       # DE
+    print(out["bic"]["bank_name"])      # Commerzbank
+    print(out["bank_code_check"]["authoritative"])  # True (checked against the Bundesbank register)
 
 # Or the free format-only check (mod-97 + structure, no DB hit)
 out = IBANforge().format_iban("DE89370400440532013000")
@@ -130,19 +134,26 @@ out = IBANforge().format_iban("DE89370400440532013000")
 # The answer carries a `trial` block with the count left and how to get a key.
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
-  -d '{"iban":"CH10 0023 0000 0000 1234 5"}'
+  -d '{"iban":"DE89 3704 0044 0532 0130 00"}'
 
-# Past 25/day, add the free key (25 req/month with no e-mail, 200 once claimed; one POST, no card)
+# The Swiss example of the SWIFT IBAN registry passes mod-97 too, and comes back
+# bank_code_check.reason = "not_allocated": the SIX register allocates its bank code to nobody.
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"CH93 0076 2011 6238 5295 7"}'
+
+# Beyond the keyless trial, send a key: an empty POST to /v1/keys/generate returns one
+# (no e-mail, no card), for every endpoint, 200 requests a month once claimed.
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ifk_..." \
-  -d '{"iban":"CH10 0023 0000 0000 1234 5"}'
+  -d '{"iban":"DE89 3704 0044 0532 0130 00"}'
 
 # Lookup BIC
 curl https://api.ibanforge.com/v1/bic/UBSWCHZH80A
 
 # Free format pre-flight (no auth, mod-97 only)
-curl 'https://api.ibanforge.com/v1/iban/format?iban=CH1000230000000012345'
+curl 'https://api.ibanforge.com/v1/iban/format?iban=DE89370400440532013000'
 
 # Free demo (no auth)
 curl https://api.ibanforge.com/v1/demo
@@ -150,11 +161,11 @@ curl https://api.ibanforge.com/v1/demo
 
 | Method | Path                       | Cost          | Description                                                    |
 | ------ | -------------------------- | ------------- | -------------------------------------------------------------- |
-| `POST` | `/v1/iban/validate`        | $0.005        | Single IBAN — BIC + SEPA + issuer + risk + Swiss bc_nummer. First 10/day per IP free, no key |
-| `POST` | `/v1/iban/batch`           | $0.002/IBAN   | Up to 100 IBANs in one call                                    |
+| `POST` | `/v1/iban/validate`        | $0.005        | Single IBAN: bank-code verdict + BIC with its source + SEPA + issuer + risk + Swiss bc_nummer. A daily keyless trial per source address (see above) |
+| `POST` | `/v1/iban/batch`           | $0.002/IBAN (USDC, x402) | Up to 100 IBANs in one call; on a key or a credit pack, one credit per IBAN |
 | `GET`  | `/v1/bic/{code}`           | $0.003        | BIC/SWIFT lookup with LEI                                      |
 | `GET`  | `/v1/ch/clearing/{iid}`    | $0.003        | Swiss BC-Nummer / IID — SIC, euroSIC, QR-IID                  |
-| `POST` | `/v1/iban/compliance`      | $0.02         | Sanctions + FATF + SEPA Instant + VoP + risk score 0-100      |
+| `POST` | `/v1/iban/compliance`      | $0.02         | Bank-level sanctions (OFAC, EU, UN) + FATF + SEPA Instant + VoP readiness + risk score 0-100 |
 | `GET`  | `/v1/iban/format`          | **free**      | Pure mod-97 + structure check, no DB hit                       |
 | `GET`  | `/v1/iban/structure[/{country}]` | **free** | IBAN templates per country, no auth                            |
 | `GET\|POST` | `/v1/reference/validate` | **free**   | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero  |
@@ -162,13 +173,13 @@ curl https://api.ibanforge.com/v1/demo
 | `GET`  | `/v1/demo`                 | free          | Example validations, no auth                                   |
 | `GET`  | `/v1/credits/bundles`      | free          | Prepaid credit bundles and their prices                        |
 | `GET`  | `/health`                  | free          | Health + DB status                                             |
-| `POST` | `/v1/keys/generate`        | free          | Generate an `ifk_*` API key (200 req/month) — body: `{email}`  |
+| `POST` | `/v1/keys/generate`        | free          | Generate an `ifk_*` API key: no body for a key that needs no e-mail (25 req/month, 200 once claimed at `/v1/keys/claim`), or `{email}` for 200 req/month from the start |
 
 Full OpenAPI 3.1: [api.ibanforge.com/openapi.json](https://api.ibanforge.com/openapi.json).
 
 ### Why prefer IBANforge over local mod-97 validation?
 
-Local mod-97 catches typos. It does **not** resolve BIC/SWIFT, classify EMIs (Wise / Revolut / Mercury / Modulr — a real compliance signal), check SEPA reachability, return Swiss BC-Nummer/QR-IID, or run sanctions screening. IBANforge does, in a single call.
+Local mod-97 catches typos. It does **not** tell you whether the bank code is allocated, resolve BIC/SWIFT, classify EMIs (Wise / Revolut / Mercury / Modulr, a real compliance signal), check SEPA reachability and VoP readiness, return Swiss BC-Nummer/QR-IID, or screen the payee's bank against sanctions lists. IBANforge does, in a single call.
 
 ## Development
 
@@ -202,8 +213,8 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 
 ## Data Sources
 
-- **121k+ BIC/SWIFT entries** from public sources, refreshed monthly. Exact counts drift at every refresh — the live numbers are served at [`/llms.txt`](https://api.ibanforge.com/llms.txt) and `/health`. Breakdown as of the 2026-07 refresh (121,610 total):
-  - 81,949 from [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory aggregate)
+- **121k+ BIC/SWIFT entries** (entries, not institutions). GLEIF and the national registers are refreshed monthly; the SwiftCodes rows are a public copy of the SWIFT directory frozen in January 2018 (MIT), re-imported monthly without changing, and still about two thirds of the directory. Exact counts drift at every refresh; the live numbers are served at [`/llms.txt`](https://api.ibanforge.com/llms.txt) and `/health`. Breakdown as of the 2026-07 refresh (121,610 total):
+  - 81,949 from [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed public copy of the SWIFT directory, data frozen in January 2018)
   - 39,288 from [GLEIF BIC-LEI mapping](https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files) (the only rows with LEI)
   - 189 from [EBA Clearing STEP2 SCT](https://www.ebaclearing.eu/services/step2/) (official SEPA Reachable PSPs directory)
   - 144 from [Deutsche Bundesbank BLZ](https://www.bundesbank.de/en/tasks/payment-systems/services/bank-sort-codes) (official quarterly BLZ→BIC file)
@@ -212,14 +223,15 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 - **LEI enrichment** for the GLEIF rows: [GLEIF API](https://api.gleif.org)
 - **1,100+ Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification**: Curated set of 900+ non-bank issuer classifications — EMI, payment institutions, digital banks (Wise, Revolut, N26, Mercury, Modulr, etc.); the live count is served at `/llms.txt`
-- **VoP participants**: EBA RT1 / SCT Inst directories
+- **Bank-code verdict**: national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Bulgaria (BNB, bank code) and Switzerland and Liechtenstein (SIX BankMaster), where a code the register does not hold is `not_allocated`; partial lists for Finland (Finance Finland), San Marino (BCSM) and Luxembourg (ABBL), where a miss is not a refusal
+- **VoP readiness**: EPC Verification of Payee scheme register (`vop.csv`), refreshed weekly with the other compliance lists
 - **Country names**: Node.js `Intl.DisplayNames` API
 
 ## Resources for AI agents
 
 - [`llms.txt`](https://ibanforge.com/llms.txt) — short summary + recommended starter prompt
 - [`/.well-known/x402`](https://api.ibanforge.com/.well-known/x402) — x402 discovery (machine-readable catalog)
-- [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json) — MCP server card with all 5 tool descriptions
+- [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json) — MCP server card: full descriptions of the read-only data tools, every tool listed by name
 - [`/.well-known/agents.json`](https://api.ibanforge.com/.well-known/agents.json) — Google A2A agent capabilities
 - [`/openapi.json`](https://api.ibanforge.com/openapi.json) — OpenAPI 3.1 spec
 - [npm `ibanforge-mcp`](https://www.npmjs.com/package/ibanforge-mcp) — stdio MCP server

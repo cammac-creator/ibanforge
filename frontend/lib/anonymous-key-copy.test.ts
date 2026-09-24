@@ -112,10 +112,23 @@ describe('les textes de la clé sans e-mail', () => {
       const texte = applati(lire(rel));
       for (const phrase of phrases) expect(texte, `${rel} : ${phrase}`).toContain(phrase);
     }
-    // La FAQ la plus lue du site dit les deux, dans les trois langues.
-    expect(applati(en.pricing.faq[2].answer)).toContain('25 a day on one route, 25 a month on all of them');
-    expect(applati(fr.pricing.faq[2].answer)).toContain('25 par jour sur une route, 25 par mois sur toutes');
-    expect(applati(de.pricing.faq[2].answer)).toContain('25 pro Tag auf einer Route, 25 pro Monat auf allen');
+    // La FAQ la plus lue du site dit les deux, dans les trois langues, chacun
+    // avec son unité et sa portée. Depuis le 24/09/2026, jamais dans la même
+    // phrase : « 25 par jour sur une route, 25 par mois sur toutes » se lisait
+    // « la clé vaut moins que pas de clé » (seconde analyse des réponses d'IA).
+    // Chaque porte est nommée, la clé est annoncée par ses 200 une fois réclamée.
+    const faq: Array<[string, string, string[]]> = [
+      ['en', en.pricing.faq[2].answer, ['up to 25 times a day', 'on that route only', 'for every endpoint', '200 requests a month', 'starts at 25 requests a month']],
+      ['fr', fr.pricing.faq[2].answer, ['jusqu’à 25 fois par jour', 'sur cette seule route', 'sur tous les endpoints', '200 requêtes par mois', 'démarre à 25 requêtes par mois']],
+      ['de', de.pricing.faq[2].answer, ['bis zu 25-mal pro Tag', 'nur auf dieser Route', 'für alle Endpunkte', '200 Anfragen pro Monat', 'mit 25 Anfragen pro Monat']],
+    ];
+    for (const [langue, reponse, phrases] of faq) {
+      const texte = applati(reponse);
+      for (const phrase of phrases) expect(texte, `${langue} : ${phrase}`).toContain(phrase);
+      for (const phrase of texte.split(/(?<=[.!?])\s+/)) {
+        expect((phrase.match(/(?<![.,\d])25(?![.,]?\d)/g) ?? []).length, `${langue} : ${phrase}`).toBeLessThan(2);
+      }
+    }
   });
 
   it('n’annoncent rien de la vague 2 comme existant', () => {

@@ -5,6 +5,15 @@ import { createRequire } from 'node:module';
 import { PAYMENT_LINKS, PRO_PAYMENT_LINK } from '../lib/payment-links.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import {
+  bicDirectorySentence,
+  frozenBicShare,
+  namesOf,
+  positioningLong,
+  positioningOneLine,
+  registerCountries,
+} from '../lib/positioning.js';
+import { MCP_TOOLS } from '../mcp/inventory.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -19,12 +28,20 @@ landing.get('/', (c) => {
   // every visitor and every crawler. The demo now calls /internal/playground,
   // which attaches the key server-side. Audit 2026-07-25, finding 4.
 
+  // Every figure and country list below is read (src/lib/positioning.ts,
+  // datasetFacts, the MCP inventory): until 24/09/2026 this page said
+  // "GLEIF-sourced", "38K" and "8 tools", three facts none of which held.
+  const F = datasetFacts();
+  const registerNames = namesOf(registerCountries().authoritative);
+  const toolNames = MCP_TOOLS.map((t) => t.name);
+  const toolList = `${toolNames.slice(0, -1).join(', ')} and ${toolNames[toolNames.length - 1]}`;
+  const frozenMonth = frozenBicShare().month;
+
   const jsonLdWebAPI = JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'WebAPI',
     name: 'IBANforge',
-    description:
-      'IBAN validation, BIC/SWIFT lookup, and compliance risk scoring API for developers and AI agents',
+    description: positioningOneLine(),
     url: 'https://api.ibanforge.com',
     documentation: 'https://api.ibanforge.com/openapi.json',
     provider: { '@type': 'Organization', name: 'IBANforge', url: 'https://ibanforge.com' },
@@ -53,7 +70,7 @@ landing.get('/', (c) => {
         name: 'What is IBANforge?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'IBANforge is a REST API for IBAN validation, BIC/SWIFT lookup, and compliance risk scoring. It covers 89 countries with 121K+ BIC entries from public sources (GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP), 38K of which are LEI-enriched via GLEIF.',
+          text: `${positioningLong()} ${bicDirectorySentence({ withCount: true })}`,
         },
       },
       {
@@ -69,7 +86,7 @@ landing.get('/', (c) => {
         name: 'Can AI agents use IBANforge?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Yes. IBANforge is MCP-native with 8 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference, and check_postal_address. Compatible with Claude, GPT, and any MCP client.',
+          text: `Yes. IBANforge is MCP-native with ${MCP_TOOLS.length} tools: ${toolList}. Compatible with Claude, GPT, and any MCP client.`,
         },
       },
       {
@@ -77,7 +94,7 @@ landing.get('/', (c) => {
         name: 'What countries does IBANforge support?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'IBANforge supports 89 countries with full BBAN parsing, SEPA membership detection, Verification of Payee (VoP) reachability status, and country-level risk classification.',
+          text: `IBANforge validates IBANs from ${F.claim.countries} countries with full BBAN parsing, SEPA membership, the Verification of Payee (VoP) duty of the country and the VoP readiness of the bank, and country-level risk classification. The bank code is checked against the national register in ${registerNames}.`,
         },
       },
     ],
@@ -1005,19 +1022,19 @@ landing.get('/', (c) => {
               <span class="hero-badge hero-badge-amber">x402 MICROPAYMENTS</span>
               <span class="hero-badge hero-badge-amber">MCP NATIVE</span>
               <span class="hero-badge hero-badge-green">121K BICs</span>
-              <span class="hero-badge hero-badge-red">🇨🇭 SWISS BC-NUMMER</span>
+              <span class="hero-badge hero-badge-red">NATIONAL REGISTERS</span>
             </div>
             <h1>IBAN<span>forge</span></h1>
             <p class="hero-sub">Validate IBANs. Lookup BICs. Score risk.</p>
             <p class="hero-sub"><strong>One API for developers &amp; AI agents.</strong></p>
             <p class="hero-features">
-              Compliance-grade validation &middot; Bank-level sanctions screening &middot; SEPA
-              &amp; VoP coverage &middot; 89 countries
+              Bank-code verdict from national registers &middot; Bank-level sanctions screening
+              &middot; SEPA &amp; VoP readiness &middot; ${F.claim.countries} IBAN countries
             </p>
             <div class="hero-moat">
-              <strong>The deepest Swiss clearing data in any public API</strong> &mdash; every
-              <strong>BC-Nummer</strong> from SIX BankMaster with full payment-rail participation
-              (SIC, euroSIC, CHF Instant Payments) and <strong>QR-IID</strong> coverage.
+              <strong>Swiss clearing:</strong> every <strong>IID</strong> of the SIX BankMaster with
+              its payment-rail participation (SIC, euroSIC, CHF Instant Payments) and, where SIX
+              allocates one, its <strong>QR-IID</strong>, refreshed monthly.
             </div>
             <div class="hero-ctas">
               <a href="#tryit" class="cta cta-primary">Try it free &darr;</a>
@@ -1115,9 +1132,12 @@ landing.get('/', (c) => {
                   </svg>
                 </div>
                 <div class="feat-stat">121K</div>
-                <h3>BICs across 89 countries</h3>
+                <h3>BIC entries, ${F.claim.countries} IBAN countries</h3>
                 <p>
-                  GLEIF-sourced database with LEI enrichment. Full BBAN parsing per country format.
+                  BIC directory from GLEIF, national
+                  registers${frozenMonth ? ` and a public directory dated ${frozenMonth}` : ''};
+                  every validation names its source. Bank codes checked against the national
+                  register in ${registerNames}. Full BBAN parsing per country format.
                 </p>
               </div>
               <div class="feat-card">
@@ -1137,8 +1157,9 @@ landing.get('/', (c) => {
                 </div>
                 <h3>Compliance &amp; Risk Scoring</h3>
                 <p>
-                  Sanctions screening (OFAC), FATF status, composite risk score 0&ndash;100,
-                  ${datasetFacts().claim.emiOnly} EMI/neobank classifications, Swiss clearing data.
+                  Bank-level sanctions screening (OFAC, EU, UN on the BIC8, not the payee), FATF
+                  status, composite risk score 0&ndash;100, ${F.claim.emiOnly} EMI/neobank
+                  classifications, Swiss clearing data.
                 </p>
               </div>
               <div class="feat-card">
@@ -1160,8 +1181,8 @@ landing.get('/', (c) => {
                 </div>
                 <h3>MCP Native</h3>
                 <p>
-                  8 tools for AI agents via Model Context Protocol. Works with Claude, GPT, and any
-                  MCP client.
+                  ${MCP_TOOLS.length} tools for AI agents via Model Context Protocol. Works with
+                  Claude, GPT, and any MCP client.
                 </p>
               </div>
               <div class="feat-card">
@@ -1438,8 +1459,9 @@ landing.get('/', (c) => {
               <div>
                 <h3>AI Agents? Use MCP</h3>
                 <p>
-                  Add IBANforge to your agent with <code>npm run mcp</code> &mdash; exposes 8 tools
-                  via stdio transport. Compatible with Claude Desktop, Cursor, and any MCP client.
+                  Add IBANforge to your agent with <code>npm run mcp</code> &mdash; exposes
+                  ${MCP_TOOLS.length} tools via stdio transport. Compatible with Claude Desktop,
+                  Cursor, and any MCP client.
                 </p>
               </div>
             </div>

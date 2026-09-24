@@ -245,6 +245,17 @@ export const FREE_ENDPOINTS: readonly FreeEndpoint[] = [
 ];
 
 /**
+ * The tools only the npm package `ibanforge-mcp` exposes, on top of MCP_TOOLS.
+ *
+ * The creditor-file audit is paid by a one-off Stripe Checkout rather than a
+ * key or x402, so it lives in the stdio package alone (see A_ONLY_TOOLS in
+ * scripts/mcp-parity.test.ts, which checks this list against the package).
+ * Named here so /llms.txt can say what `npx -y ibanforge-mcp` adds instead of
+ * counting the HTTP tools as the package's (review of 24/09/2026).
+ */
+export const STDIO_ONLY_TOOLS: readonly string[] = ['audit_creditor_file', 'audit_status'];
+
+/**
  * The tools an agent calls to obtain data: everything that does not write.
  *
  * Derived rather than listed, so the seven-versus-eight distinction cannot
