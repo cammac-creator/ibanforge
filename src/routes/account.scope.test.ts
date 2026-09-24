@@ -75,11 +75,12 @@ describe('portée d’une session : lecture seule', () => {
     const ip = { 'x-real-ip': '198.51.100.81' };
 
     // Une route payante en lecture : le paywall, exactement comme sans rien.
-    for (const header of [
+    const presentations: Array<Record<string, string>> = [
       { Authorization: `Bearer ${token}` },
       { 'X-API-Key': token },
       { Cookie: `${ACCOUNT_COOKIE}=${token}` },
-    ]) {
+    ];
+    for (const header of presentations) {
       const bic = await app.request(`${API}/v1/bic/COBADEFFXXX`, { headers: { ...ip, ...header } });
       expect(bic.status, JSON.stringify(Object.keys(header))).toBe(402);
       expect(bic.headers.get('X-Quota-Used')).toBeNull();
@@ -135,11 +136,12 @@ describe('portée d’une session : lecture seule', () => {
       ['POST', '/v1/keys/claim'],
       ['GET', '/v1/credits/balance'],
     ];
+    const presentations: Array<Record<string, string>> = [
+      { Cookie: `${ACCOUNT_COOKIE}=${token}` },
+      { Authorization: `Bearer ${token}` },
+    ];
     for (const [method, path] of routes) {
-      for (const header of [
-        { Cookie: `${ACCOUNT_COOKIE}=${token}` },
-        { Authorization: `Bearer ${token}` },
-      ]) {
+      for (const header of presentations) {
         const res = await app.request(`${API}${path}`, {
           method,
           headers: { 'x-real-ip': '198.51.100.82', 'Content-Type': 'application/json', ...header },
