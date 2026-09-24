@@ -714,7 +714,7 @@
       "no": "Nein",
       "retry": "Prüfung erneut starten, um ein verwertbares Ergebnis zu erhalten.",
       "savedExample": "Gespeichertes Beispiel · für eine aktuelle Prüfung erneut starten",
-      "savedExampleOn": "Gespeichertes Beispiel, am {date} von der API abgerufen · keine Live-Antwort: Starten Sie eine Prüfung für eine aktuelle",
+      "savedExampleOn": "Gespeichertes Beispiel, am {date} von der API abgerufen · keine Live-Antwort: Starten Sie eine Prüfung für eine aktuelle Antwort",
       "apiResponse": "Antwort von der API empfangen",
       "localCheckInvalid": "Eine zusätzliche nationale Prüfung ist fehlgeschlagen. Eine gültige IBAN-Struktur reicht nicht aus: bestätigen Sie diese Angaben vor der Zahlung."
     }

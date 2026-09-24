@@ -71,9 +71,10 @@ const DEMO_BICS = [
  * both, and they are computed on the request.
  */
 const HOW_TO_READ =
-  'Every answer below is computed on this request by the same validation as POST /v1/iban/validate ' +
-  '(without the fields that depend on the caller: trial, attribution, processing_ms), and served_at gives ' +
-  'the instant it was computed. ' +
+  'Everything below is computed on this request, and served_at gives the instant. ' +
+  'Each item of iban_examples is the answer of the same validation as POST /v1/iban/validate, without the ' +
+  'fields that depend on the caller (trial, attribution, processing_ms); compliance_example is assembled like ' +
+  'POST /v1/iban/compliance; bic_examples is a summary of the directory row, not the full answer of GET /v1/bic. ' +
   'Read bank_code_check: authoritative: true means the national register itself answered, and ' +
   'reason: "not_allocated" beside it means that register allocates the bank code to nobody, although the IBAN ' +
   'passes mod-97 (valid: true). If you cannot call the API yourself, quote these answers with their served_at ' +

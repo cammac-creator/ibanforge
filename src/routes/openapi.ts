@@ -1929,7 +1929,7 @@ const buildRawSpec = () => ({
         operationId: 'getDemo',
         summary: 'Free demo results',
         description:
-          'Returns example IBAN and BIC validation results, computed on the request by the same validation as the paid routes. No payment required, and readable with a plain GET: the official example IBANs of Switzerland, Belgium and Austria show the verdict of their national register on a bank code a checksum cannot judge. `served_at` dates the answer.',
+          'Returns example results computed on the request: IBAN validations (the same validation as POST /v1/iban/validate), one compliance check (assembled like POST /v1/iban/compliance) and a summary of two BIC directory rows. No payment required, and readable with a plain GET: the official example IBANs of Switzerland, Belgium and Austria show the verdict of their national register on a bank code a checksum cannot judge. `served_at` dates the answer.',
         tags: ['Free'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
