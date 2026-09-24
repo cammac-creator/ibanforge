@@ -1830,8 +1830,16 @@ function sameMessageId(
   direction: string,
   msgDate: unknown,
   subject: unknown,
+  incomingId: string,
 ): string | null {
   if (direction === 'draft' || typeof msgDate !== 'string') return null;
+  // Une ligne désignée par un id que nous tenons déjà se met à jour elle-même.
+  // La réconciliation ci-dessous sert aux ids NOUVEAUX d'un second écrivain ; elle
+  // ne doit jamais détourner la mise à jour d'une ligne existante vers sa jumelle.
+  // Vécu le 24.09.2026 : des lettres enregistrées deux fois avant cette
+  // réconciliation, le robot de traduction posait la traduction de la copie A…
+  // sur la copie B, et retraduisait A tous les quarts d'heure, pour rien.
+  if (db.prepare('SELECT 1 FROM email_messages WHERE id = ?').get(incomingId)) return incomingId;
   const at = new Date(
     msgDate.length === 16 ? `${msgDate}:00Z` : msgDate.endsWith('Z') ? msgDate : `${msgDate}Z`,
   );
@@ -1963,7 +1971,8 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
           : 0;
       // See sameMessageId: a second writer's id for a row we already hold
       // lands on the row, not beside it.
-      const id = sameMessageId(db, email, direction, r.msg_date, r.subject) ?? r.id.slice(0, 200);
+      const ownId = r.id.slice(0, 200);
+      const id = sameMessageId(db, email, direction, r.msg_date, r.subject, ownId) ?? ownId;
       upsert.run({
         id,
         customer_email: email,
