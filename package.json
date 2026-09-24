@@ -70,7 +70,7 @@
     "iban-core": "npm:ibanforge@2.1.0",
     "stripe": "^22.6.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.5.4"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
