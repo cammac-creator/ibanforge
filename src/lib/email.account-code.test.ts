@@ -48,4 +48,12 @@ describe('buildAccountCodeEmail', () => {
     // La phrase qui rassure la personne qui n'a rien demandé.
     expect(mail.text).toContain('nobody can sign in without this code');
   });
+
+  it('le mail dit de ne jamais transmettre le code, dans ses deux parties', () => {
+    // N'importe qui peut faire envoyer un code à n'importe quelle adresse : la
+    // mise en garde est la parade à la personne qui le demanderait ensuite.
+    const warning = 'Never share this code. IBANforge will never ask you for it.';
+    expect(mail.text).toContain(warning);
+    expect(mail.html).toContain(warning);
+  });
 });

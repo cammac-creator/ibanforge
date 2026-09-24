@@ -541,7 +541,13 @@ export async function sendKeyVerificationEmail(p: { to: string; code: string }):
  * Le code est seul sur sa ligne, comme dans le mail de vérification : un lecteur
  * automatique le trouve sans heuristique, et iOS le propose dans le champ
  * `one-time-code` de la page.
+ *
+ * N'importe qui peut faire envoyer un code à n'importe quelle adresse, et le
+ * code figure dans l'objet (écran verrouillé, notifications) : le mail dit donc
+ * aussi de ne jamais le transmettre (`NEVER_SHARE`).
  */
+const NEVER_SHARE = 'Never share this code. IBANforge will never ask you for it.';
+
 export function buildAccountCodeEmail(p: { code: string; ttlMinutes: number }): {
   subject: string;
   text: string;
@@ -550,7 +556,7 @@ export function buildAccountCodeEmail(p: { code: string; ttlMinutes: number }): 
   const subject = `${p.code} is your IBANforge sign-in code`;
   const text =
     `Your IBANforge sign-in code:\n\n${p.code}\n\n` +
-    `Enter it where you asked for it, within ${p.ttlMinutes} minutes. ` +
+    `Enter it where you asked for it, within ${p.ttlMinutes} minutes. ${NEVER_SHARE}\n\n` +
     `If you did not ask for it, ignore this mail: nobody can sign in without this code.\n\nIBANforge`;
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
@@ -558,6 +564,7 @@ export function buildAccountCodeEmail(p: { code: string; ttlMinutes: number }): 
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your sign-in code</h1>
     <p style="font-size:32px;letter-spacing:.3em;font-family:monospace;color:#fafafa;margin:18px 0">${p.code}</p>
     <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">Enter it where you asked for it, within ${p.ttlMinutes} minutes.</p>
+    <p style="color:#fafafa;font-size:14px;margin:0 0 10px">${NEVER_SHARE}</p>
     <p style="color:#71717a;font-size:12px;margin:14px 0 0">If you did not ask for it, ignore this mail: nobody can sign in without this code.</p>
   </div></body></html>`;
   return { subject, text, html };
