@@ -48,6 +48,18 @@ import {
   DEVICE_USER_CODE_LENGTH,
   DEVICE_VERIFICATION_URI,
 } from '../lib/device-grant.js';
+// La page du compte (lot C3, 25.09.2026) : le nom du cookie, la durée de la
+// session, la taille d'une page et la fenêtre du rapport sont ceux que le module
+// du compte applique, lus et non recopiés. L'interdit du consentement est la
+// constante partagée : une route qui poste un code à une adresse le porte.
+import {
+  ACCOUNT_COOKIE,
+  ACCOUNT_REPORT_MAX_DAYS,
+  ACCOUNT_SESSION_DAYS,
+  OVERVIEW_PAGE_SIZE,
+} from '../lib/account.js';
+import { ACCOUNT_PAGE } from '../lib/first-call.js';
+import { CONSENT_BOUNDARY } from '../lib/consent.js';
 
 const openapi = new Hono();
 
@@ -1488,7 +1500,8 @@ const buildRawSpec = () => ({
         operationId: 'getApiKeyReport',
         summary: 'Read everything this key did',
         description:
-          'Self-service report for the presented key: daily traffic, endpoints called, what failed with a plain-language cause and a suggested fix, and how many distinct networks the key was called from. Authentication is the key itself, and the report only ever covers that key. A human-readable version of the same data is at https://ibanforge.com/en/account. ' +
+          'Self-service report for the presented key: daily traffic, endpoints called, what failed with a plain-language cause and a suggested fix, and how many distinct networks the key was called from. Authentication is the key itself, and the report only ever covers that key. ' +
+          `A person reads the same data on the account page, ${ACCOUNT_PAGE}, by signing in with the e-mail address of the key or by pasting the key (see GET /v1/account/keys/report). ` +
           'The footprint reports `unusual: null`, never false, for a key with no traffic: a key that has never been called has not passed a leak check, it has nothing to judge. ' +
           'Its `usage` block is the one GET /v1/keys/usage serves, `basis` included.',
         tags: ['API Keys'],
@@ -1656,6 +1669,243 @@ const buildRawSpec = () => ({
           },
           '401': { description: 'No Authorization: Bearer ifk_… header ("missing_key")' },
           '404': { description: 'Key not found or inactive ("invalid_key")' },
+        },
+      },
+    },
+    // La page du compte (lots C1 à C3, 25.09.2026). Cinq routes publiques,
+    // faites pour une PERSONNE dans un navigateur sur la page du compte : une
+    // adresse reçoit un code à 6 chiffres, le code ouvre une session en cookie,
+    // la session LIT les clés de cette adresse et n'en change aucune. Source de
+    // vérité : `src/routes/account.ts` (le test `openapi.account.test.ts` lit
+    // ses statuts et ses codes d'erreur). La route d'administration qui coupe
+    // les sessions d'une adresse n'est pas publique et ne figure pas ici.
+    '/v1/account/code': {
+      post: {
+        operationId: 'requestAccountSignInCode',
+        summary: 'Mail a 6-digit sign-in code for the account page',
+        description:
+          `First step of signing in to the account page, ${ACCOUNT_PAGE}. Made for a person in a browser: the address receives a 6-digit code, and POST /v1/account/session exchanges it for a read-only session. ` +
+          `The code is valid ${VERIFICATION_TTL_MINUTES} minutes and allows ${VERIFICATION_MAX_ATTEMPTS} tries; a new code replaces the previous one. ` +
+          'The same 202 answers, and the same mail leaves, whether or not the address carries keys: this route never tells whether an address holds a key. ' +
+          'The code is mailed to the normalized form of the address: a "+tag" is dropped, and at Gmail the dots too. ' +
+          'The codes mailed to one address, one domain and one network are capped per day, in one budget shared with POST /v1/keys/generate and POST /v1/keys/claim. ' +
+          'Send the request as application/json; a browser Origin that is not the site is refused. ' +
+          `An agent holding a key reads the same figures with GET /v1/keys/usage and GET /v1/keys/report, and has no reason to call this route. ${CONSENT_BOUNDARY}`,
+        tags: ['Account'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    maxLength: 254,
+                    example: 'you@company.com',
+                    description: 'One plain address: no list, no display name, no quotes.',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '202': {
+            description: 'A code left for this address. The same body answers for every address.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['status', 'expires_in'],
+                  properties: {
+                    status: { type: 'string', enum: ['code_sent'] },
+                    expires_in: { type: 'integer', example: VERIFICATION_TTL_MINUTES * 60, description: 'Seconds the code stays valid.' },
+                  },
+                },
+              },
+            },
+          },
+          '400': {
+            description:
+              '"invalid_json": the body is not a JSON object. "invalid_email": not one plain address, or its normalized form is not one. "disposable_email": a throwaway or placeholder domain. "undeliverable_email": the domain has no mail server, or the mail server refused the address.',
+          },
+          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+          '429': {
+            description:
+              '"code_rate_limited": too many codes today for this address, its domain or this network. Try again tomorrow, or paste an API key on the account page.',
+          },
+          '503': {
+            description:
+              '"code_unavailable": sign-in codes cannot be sent right now (the mail relay is down, or the hourly ceiling of sign-in codes is reached). Try again later, or paste an API key on the account page.',
+          },
+        },
+      },
+    },
+    '/v1/account/session': {
+      post: {
+        operationId: 'openAccountSession',
+        summary: 'Exchange the sign-in code for a session cookie',
+        description:
+          `Second step of signing in to the account page. A right code opens a session: the answer sets the cookie ${ACCOUNT_COOKIE} (HttpOnly, Secure, SameSite=Strict, Path=/v1/account, ${ACCOUNT_SESSION_DAYS} days from sign-in) and never carries the session token in its body. ` +
+          'Every code that cannot be used (wrong, expired, tried too many times, never asked for, or not six digits) gets the same 400 "invalid_code": ask for a new code. An entry that is not six digits does not count as a try. ' +
+          'A right code opens a session whether or not the address carries keys; GET /v1/account/overview then says what it holds. The session reads and never writes: it cannot rotate, revoke, claim or top up a key, and it opens no paid route. ' +
+          'Same write rules as POST /v1/account/code: application/json, and the browser Origin is checked.',
+        tags: ['Account'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'code'],
+                properties: {
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    maxLength: 254,
+                    example: 'you@company.com',
+                    description: 'The address the code was asked for, written as the person typed it.',
+                  },
+                  code: { type: 'string', pattern: '^[0-9]{6}$', example: '123456', description: 'The 6-digit code of the most recent mail.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Signed in. Set-Cookie carries the session; the body only says so, with the end of the session.',
+            headers: {
+              'Set-Cookie': {
+                description: `${ACCOUNT_COOKIE}=…; Max-Age=${ACCOUNT_SESSION_DAYS * 24 * 60 * 60}; Path=/v1/account; HttpOnly; Secure; SameSite=Strict`,
+                schema: { type: 'string' },
+              },
+            },
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['signed_in', 'expires_at'],
+                  properties: {
+                    signed_in: { type: 'boolean', enum: [true] },
+                    expires_at: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+          '400': {
+            description:
+              '"invalid_json", "invalid_email", or "invalid_code": one answer for every code that cannot be used. Ask for a new code with POST /v1/account/code.',
+          },
+          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+        },
+      },
+    },
+    '/v1/account/overview': {
+      get: {
+        operationId: 'getAccountOverview',
+        summary: 'Every active key of the signed-in address',
+        description:
+          `Read-only view of the account page: the active keys whose address normalizes to the signed-in one, ${OVERVIEW_PAGE_SIZE} per page, the most recently called first. ` +
+          'For each key: its prefix (never the key itself), its plan, its monthly allowance (the figures of GET /v1/keys/usage) or its credit balance, the calls of this month, the last call, the alerts mailed, and the link that manages a Pro or Editor subscription. `inactive_keys` counts the deactivated keys of the address, without detail. ' +
+          'Authentication is the session cookie set by POST /v1/account/session; a browser sends it with credentials: "include". Never cached (Cache-Control: no-store).',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        parameters: [
+          {
+            name: 'page',
+            in: 'query',
+            required: false,
+            description: 'Page number, from 1.',
+            schema: { type: 'integer', minimum: 1, default: 1 },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'The overview of the signed-in address.',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/AccountOverview' } } },
+          },
+          '401': {
+            description:
+              '"signed_out": no session, an expired or revoked one, or the account cookie sent twice. A cookie that leads to no live session is cleared.',
+          },
+        },
+      },
+    },
+    '/v1/account/keys/report': {
+      get: {
+        operationId: 'getAccountKeyReport',
+        summary: 'The report of one key of the signed-in address',
+        description:
+          'The same body as GET /v1/keys/report (key_prefix, usage, report), for one key of the signed-in address named by its prefix, without the key itself. ' +
+          `The prefix travels as a query parameter, never in the path. The window is capped at ${ACCOUNT_REPORT_MAX_DAYS} days here, and report.window_days says the window served. ` +
+          'A prefix that is unknown, deactivated or attached to another address gets the same 404. Never cached (Cache-Control: no-store).',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        parameters: [
+          {
+            name: 'prefix',
+            in: 'query',
+            required: true,
+            description: 'The key_prefix of the key, as the overview lists it.',
+            schema: { type: 'string', maxLength: 64, example: 'ifk_3f9c1a7e' },
+          },
+          {
+            name: 'days',
+            in: 'query',
+            required: false,
+            description: `Window in days, clamped to 1..${ACCOUNT_REPORT_MAX_DAYS}. Defaults to 30.`,
+            schema: { type: 'integer', minimum: 1, maximum: ACCOUNT_REPORT_MAX_DAYS, default: 30 },
+          },
+        ],
+        responses: {
+          '200': { description: 'key_prefix, usage (as GET /v1/keys/usage serves it) and report (as GET /v1/keys/report serves it).' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '404': {
+            description:
+              '"not_found": no such key in this account. The same answer for an unknown prefix and for the prefix of another address.',
+          },
+        },
+      },
+    },
+    '/v1/account/logout': {
+      post: {
+        operationId: 'closeAccountSession',
+        summary: 'Sign out of the account page, here or everywhere',
+        description:
+          'Ends the session of this browser and clears its cookie. With {"all": true}, ends every session of the signed-in address (sign out everywhere). ' +
+          'Signing out with no live session is not an error: 204 all the same. Same write rules as POST /v1/account/code: application/json, and the browser Origin is checked.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  all: { type: 'boolean', default: false, description: 'true ends every session of the address, in every browser.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '204': { description: 'Signed out. The cookie is cleared.' },
+          '400': { description: '"invalid_json": the body is present and is not a JSON object.' },
+          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared and nothing is revoked.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
         },
       },
     },
@@ -2242,6 +2492,16 @@ const buildRawSpec = () => ({
           FREE_TIER_MONTHLY_LIMIT +
           ' a month once claimed, or a custom quota for paid keys',
       },
+      // Le cookie de la page du compte (lot C3). Il ne vaut que sur
+      // /v1/account/* : aucune autre route du service ne lit de cookie.
+      accountSession: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: ACCOUNT_COOKIE,
+        description:
+          `Session of the account page, set by POST /v1/account/session: HttpOnly, Secure, SameSite=Strict, Path=/v1/account, ${ACCOUNT_SESSION_DAYS} days from sign-in. ` +
+          'Read-only: it opens no paid route and no route that acts on a key.',
+      },
     },
     schemas: {
       /**
@@ -2278,6 +2538,76 @@ const buildRawSpec = () => ({
             type: 'string',
             description: 'Human-readable sentence explaining the failure. Wording may change; the token above will not.',
             example: 'Maximum 100 IBANs per batch request',
+          },
+        },
+      },
+      // La vue du compte (GET /v1/account/overview), telle que `buildOverview`
+      // la construit dans `src/lib/account.ts`. Jamais servis : la clé brute,
+      // son empreinte, sa lignée, une empreinte d'adresse IP.
+      AccountOverview: {
+        type: 'object',
+        required: ['email', 'session_expires_at', 'month', 'page', 'pages', 'keys', 'inactive_keys'],
+        properties: {
+          email: { type: 'string', description: 'The address typed at sign-in, in lower case.', example: 'you@company.com' },
+          session_expires_at: { type: 'string', format: 'date-time', description: 'When the session ends; sign in again after it.' },
+          month: { type: 'string', example: '2026-09', description: 'The calendar month (UTC) that calls_this_month counts.' },
+          page: { type: 'integer', minimum: 1 },
+          pages: { type: 'integer', minimum: 1 },
+          keys: { type: 'array', items: { $ref: '#/components/schemas/AccountKey' } },
+          inactive_keys: { type: 'integer', description: 'Deactivated keys of the address (revoked or rotated), counted without detail.' },
+        },
+      },
+      AccountKey: {
+        type: 'object',
+        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'actions'],
+        properties: {
+          key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
+          created_at: { type: ['string', 'null'], format: 'date-time' },
+          plan: { type: 'string', enum: ['free', 'custom', 'pack', 'pro', 'editor'] },
+          allowance: {
+            type: ['object', 'null'],
+            description: 'The monthly allowance, with the figures of GET /v1/keys/usage. null on a credit key, whose balance is in credits.',
+            properties: {
+              basis: { type: 'string', enum: ['monthly', 'lifetime'] },
+              limit: { type: 'integer' },
+              used: { type: 'integer' },
+              remaining: { type: 'integer' },
+            },
+          },
+          credits: {
+            type: ['object', 'null'],
+            description: 'The prepaid balance of a credit key. null on any other key.',
+            properties: { remaining: { type: 'integer' }, purchased_total: { type: 'integer' } },
+          },
+          subscription: {
+            type: ['object', 'null'],
+            properties: {
+              plan: { type: 'string', enum: ['pro', 'editor'] },
+              status: { type: 'string', enum: ['active'] },
+              manage_url: { type: 'string', format: 'uri', description: 'The customer portal: card, invoices, cancellation.' },
+            },
+          },
+          calls_this_month: { type: 'integer', description: 'Calls billed to the key this month, credit calls included.' },
+          last_call_at: { type: ['string', 'null'], format: 'date-time' },
+          alerts: {
+            type: 'array',
+            description: 'The alerts mailed for this key, the most recent first.',
+            items: {
+              type: 'object',
+              properties: {
+                kind: { type: 'string', enum: ['quota_80', 'credits_low'] },
+                sent_at: { type: ['string', 'null'], format: 'date-time' },
+              },
+            },
+          },
+          actions: {
+            type: 'object',
+            description: 'Links the page may offer. topup and subscribe_pro are null until those journeys exist; manage_subscription is the portal of a subscribed key.',
+            properties: {
+              topup: { type: ['string', 'null'] },
+              subscribe_pro: { type: ['string', 'null'] },
+              manage_subscription: { type: ['string', 'null'] },
+            },
           },
         },
       },
@@ -3194,6 +3524,10 @@ const buildRawSpec = () => ({
       name: 'API Keys',
       description:
         'API key management — mint a key with or without an email address, claim it, rotate it, check its usage',
+    },
+    {
+      name: 'Account',
+      description: `The account page, ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a read-only session cookie that shows every key of that address. Rotating or revoking a key still takes the key itself.`,
     },
     { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N credits; batch validation debits 1 credit per IBAN' },
     { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },

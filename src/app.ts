@@ -71,6 +71,10 @@ import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_PERIOD, TRIAL_RESET, trialResetsAt } fro
 // dériverait de celle du 402 au premier réglage.
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './lib/tiers.js';
 import { CONSENT_ASK, CONSENT_BOUNDARY, CONSENT_FIELDS } from './lib/consent.js';
+// La page du compte (lot C3, 25.09.2026) : son adresse et la durée de sa
+// session, lues là où elles se décident.
+import { ACCOUNT_PAGE } from './lib/first-call.js';
+import { ACCOUNT_SESSION_DAYS } from './lib/account.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 // BUNDLES is the price list GET /v1/credits/bundles serves: llms.txt quotes the
 // pack price from it. A retyped "$5" survived here a week after the pack moved
@@ -462,7 +466,7 @@ ${cannotCallLines().join('\n')}
 - **Free key, no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month):** POST https://api.ibanforge.com/v1/keys/generate with no body at all returns an \`ifk_\` key on the spot — no address, no card, nothing to confirm. Nothing is mailed and no record is opened. Then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`). Batch validation counts 1 request per IBAN — on API keys and credit packs alike.
 - **Claim the same key to ${FREE_TIER_MONTHLY_LIMIT} req/month:** POST https://api.ibanforge.com/v1/keys/claim with header \`Authorization: Bearer ifk_...\` (never in the body), once the key has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "${CONSENT_ASK}" — or an x402 payment made on the key. ${CONSENT_BOUNDARY} The mailed code gives ${FREE_TIER_MONTHLY_LIMIT} every month; a payment gives ${FREE_TIER_MONTHLY_LIMIT} once.
 - **Optional at creation:** POST /v1/keys/generate with \`{"email":"you@company.com"}\` issues the same key already at the full allowance (\`tier: "email"\`, no \`claim_url\`): there is nothing left to claim, and POST /v1/keys/claim on it answers 409 already_claimed. The address is never required, and the keyless trial below needs no key at all.
-- **See what a key did:** GET https://api.ibanforge.com/v1/keys/report with the key itself. Returns its traffic, the endpoints it called, what failed WITH the cause and a fix, and how many distinct networks used it. Human-readable at https://ibanforge.com/en/account. No account, no password: the key is the credential.
+- **See what a key did:** GET https://api.ibanforge.com/v1/keys/report with the key itself. Returns its traffic, the endpoints it called, what failed WITH the cause and a fix, and how many distinct networks used it. A person reads the same on the account page, ${ACCOUNT_PAGE}: sign in with the e-mail address of the keys (a 6-digit code by mail, no password), or paste a key. That page only reads: calling the API, rotating or revoking a key still takes the key itself.
 - **Credit packs (card or USDC):** prepaid credits, never expire: ${packSummary(BUNDLES)}. Card: https://ibanforge.com/pricing — USDC: POST /v1/credits/buy/1k|5k|25k (list: GET /v1/credits/bundles)
 - **Pro subscription (card):** $${PRO_PRICE_USD}/month for ${PRO_MONTHLY_LIMIT.toLocaleString('en-US')} requests, resets on the 1st, cancel anytime: https://ibanforge.com/pricing (checkout link in GET /v1/credits/bundles → subscription)
 - **Pay per call (x402, USDC on Base L2), an option with no signup:** see https://api.ibanforge.com/.well-known/x402. The batch rate ($${BATCH_PRICE_PER_IBAN} per IBAN) applies to these per-call USDC payments; on a key or a credit pack, one IBAN in a batch uses one credit.
@@ -500,6 +504,7 @@ ${cannotCallLines().join('\n')}
 - GET /v1/credits/bundles — free, list prepaid credit bundles
 - POST /v1/credits/buy/:bundle — buy credits via x402 (${packList}); the same packs are sold by card at https://ibanforge.com/pricing
 - POST /v1/feedback — free, report incorrect data or claim x402 refunds (MCP tool: \`send_feedback\`, the only one that writes)
+- POST /v1/account/code, POST /v1/account/session, GET /v1/account/overview, GET /v1/account/keys/report?prefix=ifk_..., POST /v1/account/logout — free, the sign-in of the account page ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a session cookie (${ACCOUNT_SESSION_DAYS} days) that reads every key of that address and changes none. An agent holding a key reads the same figures with GET /v1/keys/usage and GET /v1/keys/report. ${CONSENT_BOUNDARY}
 
 ## Concrete examples (copy-paste curls)
 
@@ -1073,6 +1078,17 @@ export function buildApp(): Hono<HonoEnv> {
           'POST /v1/keys/device/token',
           'GET /v1/keys/usage',
           'GET /v1/keys/report',
+        ],
+        // La page du compte (lot C3, 25.09.2026) : gratuites aussi, mais faites
+        // pour une personne dans un navigateur (code par mail, puis cookie de
+        // session). Une liste à part plutôt que dans `free`, pour qu'un agent
+        // ne les prenne pas pour une porte à essayer avec l'adresse de quelqu'un.
+        account: [
+          'POST /v1/account/code',
+          'POST /v1/account/session',
+          'GET /v1/account/overview',
+          'GET /v1/account/keys/report',
+          'POST /v1/account/logout',
         ],
       },
       // 🚨 Les mêmes octets que le corps du 402 et que `GET /mcp`, importés et
