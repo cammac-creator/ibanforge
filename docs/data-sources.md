@@ -195,6 +195,27 @@ base ait moins de 21 jours, et l'inscrit dans `metadata.carried_over` (liste et 
 des lignes) : les listes qui ont rafraîchi partent, la liste en panne est servie périmée et
 dite telle, et une panne de trois semaines fait de nouveau échouer le run.
 
+## Carte composite `src/db/bic_data.json` (code banque → BIC)
+
+Absente de cet inventaire jusqu'au 24/09/2026. Environ 24 000 clés `PAYS:code`,
+servies avec `authoritative: false` là où aucun registre national ne répond.
+Origines, relevées dans l'historique git et dans les scripts des projets amont :
+
+| Origine | Pays | Données d'origine |
+|---|---|---|
+| sigalor/iban-to-bic (MIT), `scripts/build-bic-data.ts` | DE, AT, FR, NL, BE, ES, LU | fichiers publiés par les banques nationales et associations : Bundesbank (DE), OeNB (AT), BNB (BE), Betaalvereniging (NL), BCE (FR, ES), **registre de l'ABBL (LU)** |
+| schwifty (MIT), import du 08/04/2026 (`9e8e34a8`) | 42 pays, dont NO, SI, **FI**, IT, LT, ES, **PL** | registres nationaux compilés par schwifty : **EWIB de la NBP (PL)**, **Finance Finland (FI)**, OeNB (AT), etc. |
+| SIX BankMaster | CH | voir plus haut |
+| clés dérivées de `bic_entries` (`51f86e96`) | GB, IE et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` |
+| ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
+
+Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
+droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
+PL et FI sortent du dépôt public** (conditions non établies, non commerciales,
+ou permission limitée à l'API : ABBL, voir la section ABBL plus bas). Les
+autres pays tirés de schwifty restent à vérifier un par un. Détail et
+attributions : `NOTICE`.
+
 ## Hors dépôt, délibérément
 
 **Vocalink — table de contrôle modulo britannique** (`valacdos.txt`,
@@ -647,6 +668,19 @@ toute sous-licence ; jamais le logo ; jamais d'implication d'endossement.
 Le contenu écrit (hors data) est en CC BY 4.0. Attribution posée le 26/08
 sur les pages data-sources publiques (3 langues).
 
+**Formule remplie le 24/09/2026** (l'ancienne, « accessed at each plenary
+sync », n'avait ni l'année ni une date de consultation) :
+
+> FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
+
+Elle est construite par `fatfCitation()` à partir de `FATF_AS_OF` (mois de la
+plénière) et de `FATF_ACCESSED_ON` (jour de lecture des déclarations du GAFI :
+le 10/07/2026, commit `766d711d`, qui a synchronisé les listes sur la plénière
+des 17-19 juin), dans `src/lib/compliance-static.ts`. Les trois pages
+data-sources et `NOTICE` ne peuvent pas appeler la fonction :
+`src/routes/fatf-attribution.test.ts` les épingle sur elle, et échoue si
+`FATF_AS_OF` avance sans une nouvelle date de consultation.
+
 **EPC — ❌ NON COMMERCIAL par défaut → permission d'abord.**
 > « In principle, the information contained in this website can be
 > reproduced, redistributed and transmitted for **non-commercial purposes**,
@@ -894,9 +928,13 @@ répertoire de codes de paiement.
 
 ### La position et la réponse reçue
 
-Nous ne redistribuons pas le fichier : nous servons **un enregistrement par
-requête**, noms verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la
-version et la date d'effet lues sur la page.
+**Position retenue par Claude-Alain le 24/09/2026 : le registre slovaque est
+publiable, avec la citation.** L'API sert **un enregistrement par requête**, noms
+verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la version et la
+date d'effet lues sur la page. Les lignes extraites figurent aussi dans le dépôt
+public (`data/bic.sqlite`, `frontend/data/registers/sk-bank.json`), avec la même
+citation dans `NOTICE` (groupe A). Le fichier électronique de la NBS lui-même
+n'est ni republié ni modifié.
 
 **Réponse de la NBS du 09/09/2026, relue le 14/09/2026**, à la demande du
 26/08 sur l'extraction de champs dans une API commerciale : la NBS indique

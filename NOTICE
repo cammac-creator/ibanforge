@@ -209,10 +209,10 @@ Jurisdictions, and FATF membership
          June 2026).
   Terms: "you can extract from, download, copy, adapt, print, distribute,
          share and embed data for any purpose, even for commercial use",
-         with credit in the FATF's citation format:
-           FATF (year), (dataset name), (data source) DOI or URL (accessed on (date)).
-         Credit as published on the IBANforge data sources page:
-           FATF, High-Risk and Other Monitored Jurisdictions, www.fatf-gafi.org (accessed at each plenary sync)
+         with credit in the FATF's citation format, "FATF (year), (dataset
+         name), (data source) DOI or URL (accessed on (date))":
+           FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
+         The year and the access date change with each plenary sync.
          Reuse of these records carries the same attribution requirement.
          No endorsement by the FATF is implied.
 
