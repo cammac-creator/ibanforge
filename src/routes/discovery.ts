@@ -2,6 +2,14 @@ import { createRequire } from 'node:module';
 import { Hono } from 'hono';
 import type { Handler } from 'hono';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import {
+  BANK_LEVEL_SANCTIONS,
+  bicDirectorySentence,
+  codesOf,
+  positioningOneLine,
+  registerCountries,
+  serverDescription,
+} from '../lib/positioning.js';
 import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 import { dataTools, FREE_ENDPOINTS } from '../mcp/inventory.js';
 import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
@@ -10,6 +18,9 @@ import { CONSENT_BOUNDARY } from '../lib/consent.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
+
+/** The countries whose national register settles a negative, read from the code (DE, AT, ...). */
+const REGISTER_CODES = codesOf(registerCountries().authoritative);
 
 const require = createRequire(import.meta.url);
 const SERVER_VERSION = (require('../../package.json') as { version: string }).version;
@@ -52,7 +63,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     method: 'POST',
     path: '/v1/iban/validate',
     price_usdc: 0.005,
-    description: 'Validate single IBAN with BIC lookup, SEPA data, issuer classification',
+    description: `Validate single IBAN with the bank-code verdict (national register in ${REGISTER_CODES}), BIC lookup with its source, SEPA data, issuer classification`,
   },
   {
     method: 'POST',
@@ -72,8 +83,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     method: 'POST',
     path: '/v1/iban/compliance',
     price_usdc: 0.02,
-    description:
-      'Pre-payout screening — check the bank behind a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100)',
+    description: `Pre-payment triage of the bank behind an IBAN: validation + ${BANK_LEVEL_SANCTIONS} + FATF status + SEPA Instant reachability + VoP readiness of the bank + risk score (0-100)`,
   },
   {
     method: 'GET',
@@ -127,7 +137,7 @@ const x402Document: Handler = (c) => {
   return c.json({
     x402Version: 2,
     name: 'IBANforge',
-    description: `IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, ${F.claim.issuers} non-bank issuer classifications (EMI, payment institutions, digital banks), refreshed monthly.`,
+    description: `${serverDescription()} ${F.claim.issuers} non-bank issuer classifications (EMI, payment institutions, digital banks). Card payment (prepaid packs, Pro) or x402 pay-per-call in USDC.`,
     homepage: 'https://ibanforge.com',
     documentation: 'https://ibanforge.com/docs',
     pricing: 'https://ibanforge.com/pricing',
@@ -280,8 +290,7 @@ discovery.get('/mcp/.well-known/oauth-protected-resource', (c) =>
 const AGENT_MANIFEST = {
   schema_version: 'v1',
   name: 'IBANforge',
-  description:
-    'Pre-payout compliance screening for autonomous agents — check the bank behind a counterparty IBAN before you send funds: validation, sanctions, Swiss clearing, SEPA/VoP reachability and risk scoring.',
+  description: positioningOneLine(),
   url: 'https://ibanforge.com',
   contact: 'https://github.com/cammac-creator/ibanforge',
   // One capability per data tool, read from the inventory, then the
@@ -289,13 +298,19 @@ const AGENT_MANIFEST = {
   // to be typed out and had been missing the two 2026-08-26 tools ever since
   // (audit 2026-09-01, MCP-18): a crawler reading this file learned nothing
   // about the only two capabilities it could have exercised for free.
+  //
+  // The cross-cutting names say what is checked, not what it resembles
+  // (24/09/2026): `vop_check` and `sanctions_screening` read as a name check
+  // and a screening of the payee, and assistants repeated them as such.
+  // `swift_lookup` duplicated `bic_lookup` and suggested a SWIFT feed we do
+  // not hold.
   capabilities: [
     ...dataTools()
       .map((t) => t.capability)
       .filter((slug): slug is string => slug !== null),
-    'swift_lookup',
-    'sanctions_screening',
-    'vop_check',
+    'bank_code_register_check',
+    'bank_level_sanctions_screening',
+    'vop_readiness',
     'emi_classification',
     'viban_detection',
     'country_risk_scoring',
@@ -358,9 +373,8 @@ interface A2ASkillDetail {
  */
 const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
   validate_iban: {
-    description:
-      'Structure (mod-97 + country BBAN), issuing bank with BIC, bank-code check against 6 national registers, EMI/vIBAN classification, SEPA + VoP reachability.',
-    tags: ['iban', 'validation', 'sepa', 'vop', 'bank'],
+    description: `Structure (mod-97 + country BBAN) in ${F.claim.countries} countries, the issuing bank and BIC with their source, a bank-code verdict from the national register in ${REGISTER_CODES} (a miss there means not allocated), EMI/vIBAN classification, SEPA, SEPA Instant and VoP readiness of the bank.`,
+    tags: ['iban', 'validation', 'bank-code', 'national-register', 'sepa', 'vop', 'bank'],
     examples: ['Validate DE89370400440532013000 and tell me the issuing bank.'],
   },
   batch_validate_iban: {
@@ -369,8 +383,7 @@ const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
     tags: ['iban', 'batch', 'payout'],
   },
   lookup_bic: {
-    description:
-      'Resolve a BIC against 121k+ entries (39k+ LEI-enriched via GLEIF): bank name, city, country, LEI, address where published.',
+    description: `Resolve a BIC: bank name, city, country, LEI, address where published. ${bicDirectorySentence({ withCount: true })}`,
     tags: ['bic', 'swift', 'lei'],
   },
   lookup_ch_clearing: {
@@ -379,8 +392,7 @@ const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
     tags: ['swiss', 'clearing', 'qr-iid', 'six'],
   },
   check_compliance: {
-    description:
-      'Bank-level sanctions (OFAC + EU, BIC8 level — not name screening), FATF lists, SEPA/VoP reachability, 0-100 risk score.',
+    description: `Bank-level triage: ${BANK_LEVEL_SANCTIONS}; FATF lists; SEPA Instant reachability; whether the bank answers VoP requests; a 0-100 risk score.`,
     tags: ['sanctions', 'fatf', 'risk', 'compliance'],
   },
   validate_payment_reference: {
@@ -419,9 +431,11 @@ const A2A_AGENT_CARD = {
     { url: 'https://api.ibanforge.com', protocolBinding: 'HTTP+JSON', protocolVersion: '1.0' },
   ],
   name: 'IBANforge',
+  // The first half is the shared one line (src/lib/positioning.ts); the second
+  // is the honesty note this card cannot drop.
   description:
-    'Pre-payout IBAN screening: validation, issuing-bank identification, sanctions (OFAC), ' +
-    'Swiss clearing, SEPA + VoP reachability and risk scoring. IBANforge is a tool-style API ' +
+    `${positioningOneLine()} It does not check the payee's name. ` +
+    'Also Swiss clearing (SIX BankMaster) and the UK modulus check. IBANforge is a tool-style API ' +
     '(REST + MCP), not a conversational A2A agent: integrate via the MCP server at ' +
     'https://api.ibanforge.com/mcp (or `npx -y ibanforge-mcp`), or the REST API described by ' +
     'the OpenAPI document. This card exists so A2A-aware crawlers can index the skills.',
@@ -513,10 +527,8 @@ discovery.get('/.well-known/api-catalog', (c) =>
 const APIS_JSON = {
   name: 'IBANforge',
   description:
-    `Pre-payout IBAN screening for developers and AI agents: validation, issuing-bank ` +
-    `identification against ${F.claim.bic} BIC entries and 6 national bank registers, Swiss ` +
-    `clearing (${F.claim.chClearing} SIX entries), sanctions at bank level, SEPA + VoP ` +
-    `reachability, risk scoring. ${F.claim.countries} IBAN countries.`,
+    `${positioningOneLine()} ${bicDirectorySentence({ withCount: true })} ` +
+    `Also Swiss clearing (${F.claim.chClearing} SIX BankMaster entries) and the UK modulus check.`,
   url: 'https://api.ibanforge.com/apis.json',
   tags: ['iban', 'bic', 'sepa', 'compliance', 'banking', 'fintech', 'mcp', 'x402'],
   created: '2026-04-01',
@@ -595,8 +607,7 @@ for (const path of ['/apis.json', '/.well-known/apis.json']) {
 // directory crawlers (a modest monthly stream previously landed in 404).
 const AGENTS_TXT = `# IBANforge — agent & API discovery
 
-IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk
-scoring API, built for AI agents and developers.
+${positioningOneLine()}
 
 ## Discovery endpoints
 - A2A agent card:       https://api.ibanforge.com/.well-known/agent-card.json
@@ -634,13 +645,10 @@ const GLAMA_MANIFEST = {
   maintainers: ['cammac-creator'],
   name: 'IBANforge',
   description:
-    `Check the bank behind a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, ` +
-    `Swiss BC-Nummer clearing with payment-rail participation, sanctions screening (OFAC) ` +
-    `at bank level, SEPA and VoP reachability, and a 0-100 risk score. ` +
-    `${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; further rows from the ` +
-    `SwiftCodes (MIT), Bundesbank, SIX and EBA STEP2 SCT), ${F.claim.chClearing} Swiss clearing ` +
-    `entries from the SIX BankMaster refreshed monthly, ${F.claim.countries} countries. ` +
-    `MCP-native over HTTP and stdio, x402 micropayments on Base L2, and a free API key that needs no e-mail.`,
+    `${serverDescription()} Also Swiss clearing with payment-rail participation ` +
+    `(${F.claim.chClearing} SIX BankMaster entries) and a 0-100 risk score. ` +
+    `MCP-native over HTTP and stdio; prepaid packs by card, or x402 micropayments on Base L2; ` +
+    `and a free API key that needs no e-mail.`,
   homepage: 'https://ibanforge.com',
   repository: 'https://github.com/cammac-creator/ibanforge',
   documentation: 'https://ibanforge.com/docs/mcp',
@@ -676,8 +684,7 @@ const GLAMA_MANIFEST = {
     },
     {
       name: 'check_compliance',
-      description:
-        'Sanctions (OFAC) at bank level + FATF + SEPA reachability + VoP + risk score ($0.02)',
+      description: `Bank-level triage: ${BANK_LEVEL_SANCTIONS} + FATF + SEPA reachability + VoP readiness + risk score ($0.02)`,
     },
     {
       name: 'lookup_ch_clearing',

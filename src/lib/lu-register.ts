@@ -43,6 +43,15 @@ let cached:
   { path: string; mtime: number; inode: number; size: number; register: LuRegister } | undefined;
 
 /**
+ * Le registre est-il branché sur ce déploiement ? Lu à chaque appel, comme
+ * `lookupLuCode` : les textes qui nomment les registres (`src/lib/positioning.ts`)
+ * ne citent le Luxembourg que là où ses réponses existent.
+ */
+export function luRegisterConfigured(): boolean {
+  return Boolean(process.env.LU_REGISTER_PATH);
+}
+
+/**
  * Activation explicite par fichier privé. Une erreur de lecture configurée remonte
  * jusqu'au garde-fou de l'enrichissement ; elle ne devient jamais une non-attribution.
  * Le remplacement atomique du fichier est détecté sans redémarrer l'API.

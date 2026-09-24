@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup, registeredAddress, sharedBic8Stats } from '../lib/bic-lookup.js';
+import { frozenBicShare } from '../lib/positioning.js';
 import { screenBicSanctions } from '../lib/compliance.js';
 import { praAuthorisationByLei, type PraAuthorisation } from '../lib/pra-banks.js';
 import { officialIdentityByLei, type OfficialIdentity } from '../lib/official-identity.js';
@@ -240,8 +241,14 @@ bicLookup.get('/v1/bic/:code', (c) => {
     } else if (sanctions.listed) {
       parts.push('We hold no record under this BIC8, so we cannot name the institution behind it.');
     } else {
+      // The directory is not GLEIF alone, and an absence proves nothing: the
+      // old wording credited GLEIF for a directory two thirds of which is a
+      // public copy frozen years ago (24/09/2026). The month is read from the
+      // data, like every other surface that names it.
+      const frozenMonth = frozenBicShare().month;
       parts.push(
-        'BIC format valid but not found in database. Data sourced from GLEIF — coverage may be partial.',
+        `BIC format valid but not in our BIC directory (GLEIF, national registers${frozenMonth ? ` and a public copy of the SWIFT directory dated ${frozenMonth}` : ''}): ` +
+          'coverage may be partial, so an absence here does not mean the BIC is unallocated.',
       );
     }
 

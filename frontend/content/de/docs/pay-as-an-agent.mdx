@@ -22,7 +22,7 @@ Setzen Sie eine Budget-Policy, bevor die erste echte Zahlung fließt. Ein Agent 
 
 ## Schritt 2 — Mit USDC auf Base aufladen
 
-Das ist der eine Schritt, der heute noch einen Menschen braucht: USDC auf das Wallet bringen (Exchange-Auszahlung, Onramp oder der Funding-Flow Ihrer Plattform). **5 $ decken 1.000 Validierungen.** Gas ist nicht Ihr Problem — x402 nutzt gaslose USDC-Autorisierungen, der Facilitator wickelt den Transfer ab.
+Das ist der eine Schritt, der heute noch einen Menschen braucht: USDC auf das Wallet bringen (Exchange-Auszahlung, Onramp oder der Funding-Flow Ihrer Plattform). **4 $ decken 1.000 Validierungen mit einem Paket** (`POST /v1/credits/buy/1k`); pro Aufruf bezahlt, kostet eine Validierung 0,005 $. Gas ist nicht Ihr Problem — x402 nutzt gaslose USDC-Autorisierungen, der Facilitator wickelt den Transfer ab.
 
 Zum Üben ohne echtes Geld füllt der CDP-Faucet ein **base-sepolia**-Testwallet — IBANforge rechnet allerdings auf **Base Mainnet** (`eip155:8453`) ab: Die Probe muss also gegen Ihren eigenen Testserver laufen, nicht gegen unsere API.
 

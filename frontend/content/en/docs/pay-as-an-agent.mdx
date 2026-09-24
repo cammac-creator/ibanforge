@@ -22,7 +22,7 @@ Set a budget policy before the first real payment. An agent with an unbounded wa
 
 ## Step 2 — Fund it with USDC on Base
 
-This is the one step that still needs a human today: put USDC on the wallet (exchange withdrawal, onramp, or your platform's wallet funding flow). **$5 covers 1,000 validations.** Gas is not your problem — x402 uses gasless USDC authorizations, the facilitator settles the transfer.
+This is the one step that still needs a human today: put USDC on the wallet (exchange withdrawal, onramp, or your platform's wallet funding flow). **$4 covers 1,000 validations with one pack** (`POST /v1/credits/buy/1k`); paid call by call, a validation is $0.005. Gas is not your problem — x402 uses gasless USDC authorizations, the facilitator settles the transfer.
 
 To rehearse the flow without real money first, CDP's faucet funds a **base-sepolia** test wallet — but note that IBANforge settles on **Base mainnet** (`eip155:8453`), so the rehearsal target must be your own test server, not our API.
 

@@ -4,6 +4,11 @@ import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
+import { BANK_LEVEL_SANCTIONS, codesOf, registerCountries } from '../lib/positioning.js';
+// The price list GET /v1/credits/bundles serves, for the WORDS of the pack
+// descriptions only: the price the paywall charges is the `price` literal of
+// each route below, untouched (a price is Claude-Alain's decision).
+import { BUNDLES } from '../routes/api-keys.js';
 import {
   BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI,
   NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI,
@@ -242,7 +247,10 @@ export function buildRouteTable(
   const TRUST_TAG_VALIDATE = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI via GLEIF) + ${F.claim.chClearing} SIX · ${V}`;
   const TRUST_TAG_BIC = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly) · ${V}`;
   const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, refreshed monthly · ${V}`;
-  const TRUST_TAG_COMPLIANCE = `Production · ${PERF} · OFAC + FATF + SEPA + VoP · weekly refresh · ${V}`;
+  const TRUST_TAG_COMPLIANCE = `Production · ${PERF} · OFAC, EU, UN + FATF + SEPA + VoP · weekly refresh · ${V}`;
+  // Read from the code that decides the verdict (src/lib/positioning.ts).
+  const REGISTER_CODES = codesOf(registerCountries().authoritative);
+  const PACK_1K = BUNDLES['1k'];
   const TRUST_TAG_BATCH = `Production · ${PERF} for a 100-IBAN batch · ${F.claim.bic} BICs · ${V}`;
   // No PERF claim here: a cache miss is a live call to the register, and the
   // sub-5 ms figure would be false for exactly the calls that cost the most.
@@ -398,7 +406,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description: `Validate a European IBAN and enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, a bank account, a SEPA payment or asks who the bank is. Returns: valid, country, BIC/SWIFT, bank name, EMI/vIBAN flag, SEPA + VoP reachability, risk score, Swiss bc_nummer for CH/LI. ${TRUST_TAG_VALIDATE}.`,
+      description: `Validate an IBAN (${F.claim.countries} countries) with bank and routing data. Use whenever an IBAN or a bank account comes up. Returns: valid, country, bank-code verdict (national register in ${REGISTER_CODES}), BIC and bank with their source, EMI/vIBAN flag, SEPA and VoP readiness, risk indicators, Swiss bc_nummer for CH/LI. ${TRUST_TAG_VALIDATE}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -532,7 +540,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description: `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
+      description: `Pre-payment triage of the bank behind an IBAN: ${BANK_LEVEL_SANCTIONS}; FATF status; SEPA Instant reachability; whether the bank answers VoP requests. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -653,8 +661,10 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description:
-        'Prepaid bundle of 1,000 credits for AI agents — 1 credit = 1 validation/lookup, batch validation debits 1 credit per IBAN. Same per-credit cost as retail (0.005 USDC) but only ONE x402 settlement instead of 1,000 — most agent stacks handle a single payment far better than micropayments. Returns ifk_xxx key with 1,000 credits valid for any /v1/iban/* or /v1/bic/* endpoint. No expiry.',
+      // "Same per-credit cost as retail (0.005 USDC)" survived here after the
+      // pack moved to $4 on 16/09/2026, and the 402 served it to every agent
+      // that probed the route. The per-credit figure is now computed.
+      description: `Prepaid bundle of 1,000 credits: 1 credit = 1 validation or lookup, and batch validation debits 1 credit per IBAN. ${PACK_1K.price_usdc / PACK_1K.credits} USDC per credit, cheaper than paying per call (0.005), with only ONE x402 settlement instead of 1,000: most agent stacks handle a single payment far better than micropayments. The same pack is sold by card at https://ibanforge.com/pricing. Returns an ifk_xxx key with 1,000 credits valid for any /v1/iban/* or /v1/bic/* endpoint. No expiry.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {

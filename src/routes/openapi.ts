@@ -12,6 +12,10 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
 import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
+// The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
+import { NOT_WHAT_IT_IS, positioningLong } from '../lib/positioning.js';
+import { BUNDLES } from './api-keys.js';
+import { PRO_PRICE_USD } from '../lib/payment-links.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
 // contrat qui recopie son propre chiffre sera faux au prochain réglage.
 import {
@@ -56,20 +60,27 @@ const buildRawSpec = () => ({
     title: 'IBANforge API',
     version: PKG_VERSION,
     // This string is the first thing every agent reads about the product, on
-    // the surface machines fetch ~20k times/month. Kept in sync with the
-    // positioning already served by llms.txt and the MCP descriptors — a
-    // generic "IBAN + BIC API" line commoditises the two differentiators
-    // (Swiss SIX clearing depth, sanctions screening) for free.
+    // the surface machines fetch ~20k times/month. Until 24/09/2026 it opened
+    // on "Pre-payout screening for AI agents" and Swiss clearing, and the
+    // assistants that read it filed IBANforge as a Swiss tool for agents with
+    // a sanctions screening of the payee. The paragraph now comes from
+    // src/lib/positioning.ts, the same one llms.txt serves, with the register
+    // countries read from the code. Card before x402: the brief of that day.
     description:
-      'Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. ' +
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — ' +
-      'full payment-rail participation, the deepest Swiss clearing data in any public API), ' +
-      'EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring. ' +
-      'Four ways to pay, no dead-ends, and the first needs no email address: a free API key (' +
+      positioningLong() +
+      ' ' +
+      NOT_WHAT_IT_IS +
+      ' Also: Swiss clearing with payment-rail participation (SIX BankMaster), the UK modulus check, and the official identity of the bank from central-bank lists (France, Spain). ' +
+      'Ways to pay, none a dead-end: prepaid credit packs by card or USDC, from $' +
+      BUNDLES['1k'].price_usdc +
+      ' per 1,000 calls with no expiry; a Pro subscription by card ($' +
+      PRO_PRICE_USD +
+      ' a month); or pay-per-call via x402 micropayments (USDC on Base L2, no signup). ' +
+      'Before paying, a free API key needs no email address: ' +
       ANONYMOUS_MONTHLY_LIMIT +
-      ' req/month, empty body), the same key claimed to ' +
+      ' req/month with an empty body, and the same key claimed reaches ' +
       FREE_TIER_MONTHLY_LIMIT +
-      ' a month, prepaid credit packs (card or USDC), or pay-per-call via x402 micropayments (USDC on Base L2, no signup).',
+      ' a month.',
     contact: {
       url: 'https://ibanforge.com',
     },
@@ -305,9 +316,12 @@ const buildRawSpec = () => ({
     '/v1/iban/compliance': {
       post: {
         operationId: 'complianceCheck',
-        summary: 'Full IBAN compliance check',
+        summary: 'Bank-level compliance triage for an IBAN',
         description:
-          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC, EU, UN), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
+          // The list of authorities is spelled out on this line rather than
+          // read from BANK_LEVEL_SANCTIONS: this file is a coverage surface of
+          // sanctions-claims.test.ts, which reads the source line by line.
+          "Validates an IBAN and returns everything from /v1/iban/validate PLUS a pre-payment triage layer: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8) and country, never on the payee's name; FATF status; SEPA Instant reachability; whether the bank answers Verification of Payee requests (VoP readiness); and a composite risk score (0-100). Costs $0.02 USDC via x402.",
         tags: ['Compliance'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {

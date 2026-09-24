@@ -24,6 +24,7 @@ import {
 } from '../lib/address-conformity.js';
 import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { bicDirectorySentence, serverDescription } from '../lib/positioning.js';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
 // send_feedback : même insertion et mêmes clips de longueur que la route
@@ -125,7 +126,8 @@ const server = new McpServer(
     name: 'ibanforge',
     title: 'IBANforge',
     version: pkg.version,
-    description: `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, refreshed monthly.`,
+    // Same first line as the HTTP transport, from src/lib/positioning.ts.
+    description: serverDescription(),
     websiteUrl: 'https://ibanforge.com',
     icons: [
       {
@@ -157,7 +159,7 @@ server.registerTool(
 When to use: verifying a payment recipient before a wire transfer, checking a bank account during onboarding, or confirming IBAN format and bank identity in a KYC workflow.
 When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheaper per IBAN). For compliance/sanctions screening, use check_compliance instead.
 
-Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, resolves the BIC from a local database of ${F.claim.bic} entries (GLEIF-sourced), and classifies the issuer type. Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
+Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, checks the bank code against the national register where one is read, resolves the BIC from a local directory and names the source of that answer, and classifies the issuer type. ${bicDirectorySentence({ withCount: true })} Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
 
 Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, lei, lei_status, address: { type: 'registered', street, post_code, region, city, country, romanized, romanization, source, language, as_of } | null } | null, sepa: { member, schemes, vop_required }, issuer: { type, name, classification: curated | register | default }, psd_registration: { registered, entity_type, name, country, competent_authority, source, as_of }, risk_indicators: { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope: 'country', vop_coverage }, bank_code_check { value, status: verified | not_in_register | unavailable, reason? (present whenever status is not verified: not_allocated | absent_from_reference_data | no_reference_data_for_country | register_names_no_holder | national_register_unavailable | lookup_failed — the last two describe IBANforge and never the beneficiary, and neither may be escalated into a refusal), match: register | prefix | null, register, authoritative, candidates?, retired?, superseded_by?, as_of }, modulus_check { checked, passed, source, table_fetched_on } (GB only), official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of, authoritative } (present only on a match), next_steps [{ code, do, because, action? }], clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }
 
@@ -280,7 +282,7 @@ server.registerTool(
 When to use: identifying the bank behind a BIC/SWIFT code for compliance checks, payment routing validation, correspondent banking lookups, or KYC enrichment.
 When NOT to use: if you already have an IBAN, use validate_iban instead — it resolves the BIC automatically as part of the validation. For sanctions/compliance screening, use check_compliance.
 
-Behavior: this tool is read-only with no side effects. It validates the BIC format (ISO 9362), then queries a local SQLite database of ${F.claim.bic} institutions sourced from GLEIF. For BIC11 lookups, if the specific branch is not found, it falls back to the head office (XXX suffix). Detects test BICs (e.g., MARKDEF patterns). Response time is under 10ms. Returns a single JSON object.
+Behavior: this tool is read-only with no side effects. It validates the BIC format (ISO 9362), then queries the local BIC directory. ${bicDirectorySentence({ withCount: true })} For BIC11 lookups, if the specific branch is not found, it falls back to the head office (XXX suffix). Detects test BICs (e.g., MARKDEF patterns). Response time is under 10ms. Returns a single JSON object.
 
 Input: accepts BIC8 (e.g., 'UBSWCHZH') or BIC11 (e.g., 'UBSWCHZH80A'). Case-insensitive.
 
@@ -371,14 +373,14 @@ server.registerTool(
   'check_compliance',
   {
     title: 'Compliance Risk Check',
-    description: `Run a full compliance check on an IBAN: validates the IBAN, enriches with bank data, then screens against sanctions lists, checks SEPA reachability, verifies VoP participation, and computes a composite risk score.
+    description: `Run a compliance triage on an IBAN: validates the IBAN, enriches it with bank data, then screens the payee's BANK (BIC8) and its country against sanctions lists (OFAC, EU, UN), checks SEPA reachability, checks whether the bank answers Verification of Payee (VoP) requests, and computes a composite risk score. It never screens the payee's name.
 
-When to use: assessing compliance risk of a payment recipient for AML/KYC workflows, verifying an IBAN is not associated with a sanctioned country or bank, checking SEPA Instant and Verification of Payee participation, or producing a structured risk assessment before approving a payment.
+When to use: triaging the bank behind a payment recipient before a payout, verifying that the payee's bank or its country is not under sanctions, checking SEPA Instant reachability and whether the bank answers VoP requests, or producing a structured risk assessment before approving a payment.
 When NOT to use: for simple IBAN format validation without compliance data, use validate_iban (4x cheaper). For BIC-only lookups, use lookup_bic.
 
-Behavior: this tool is read-only with no side effects. It performs IBAN validation and enrichment (same as validate_iban), then queries a local compliance database for sanctions (OFAC, EU, UN lists), FATF grey/black list status, SEPA scheme participation (SCT, SDD, SCT_INST), and VoP participant status. Computes a composite risk score from 0 (lowest risk) to 100 (highest risk) based on 11 weighted risk flags. Response time is under 50ms. Returns a single JSON object. Scope: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name and is not a substitute for KYC/AML name screening. If compliance data is unavailable for a country/BIC, returns a fallback risk_level of 'elevated' with a flag 'compliance_data_unavailable'.
+Behavior: this tool is read-only with no side effects. It performs IBAN validation and enrichment (same as validate_iban), then queries a local compliance database for sanctions (OFAC, EU, UN lists), FATF grey/black list status, SEPA scheme participation (SCT, SDD, SCT_INST), and whether the bank is listed as ready in the EPC VoP register. Computes a composite risk score from 0 (lowest risk) to 100 (highest risk), capped at 100, from the weighted risk flags listed below. Response time is under 50ms. Returns a single JSON object. Scope: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name and is not a substitute for KYC/AML name screening. If compliance data is unavailable for a country/BIC, returns a fallback risk_level of 'elevated' with a flag 'compliance_data_unavailable'.
 
-Risk score weights: sanctioned country (+50), sanctioned bank (+50), FATF black list (+30), FATF grey list (+20), high-risk country (+20), elevated-risk country (+10), payment institution issuer (+15), EMI issuer (+10), no SEPA Instant (+5), no VoP (+5), test BIC (+30).
+Risk score weights, by the flag each one raises: sanctioned_country +50, sanctioned_bank +80, fatf_black_list +30, fatf_grey_list +20, fatf_suspended +10, payment_institution_issuer +15, emi_issuer +10, high_risk_country +20, elevated_risk_country +10, test_bic +30, bank_code_not_allocated +40, bank_code_unverified +10, no_sepa_instant +5, no_vop +5. The last two count only when a bank was resolved; otherwise the flag no_bank_resolved is raised, with no weight.
 
 Risk levels: low (0-19), medium (20-39), elevated (40-59), high (60-79), critical (80-100).
 

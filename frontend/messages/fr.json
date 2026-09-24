@@ -2060,11 +2060,19 @@
         },
         "bankData": {
           "label": "Identification de la banque (BIC, nom)",
-          "ibanforge": "121k+ BIC, 39k+ enrichis LEI via GLEIF, rafraîchis chaque mois",
+          "ibanforge": "121k+ entrées BIC (des lignes, pas des établissements) : GLEIF et registres nationaux rafraîchis chaque mois, environ deux tiers issus d'une copie publique de l'annuaire SWIFT figée en janvier 2018 ; 39k+ enrichies LEI via GLEIF. Chaque validation nomme la source de son BIC.",
           "ibancom": "Oui, c'est leur cœur de produit",
           "ibanapi": "« Si disponible » selon leur doc",
           "libs": "Selon la bibliothèque : schwifty peut retrouver le BIC d’un IBAN à partir de ses données de codes banque.",
           "abstract": "La réponse publiée contient iban et is_valid ; aucun BIC ni nom de banque n’est documenté."
+        },
+        "bankCode": {
+          "label": "Code banque vérifié dans le registre national (absent = non attribué)",
+          "ibanforge": "DE, AT, BE, SK, BG, CH, LI : le registre national lui-même. Listes partielles en FI, SM et LU, où une absence ne vaut pas refus. Ailleurs, une carte composite, signalée authoritative: false.",
+          "ibancom": "Non vérifié par nous",
+          "ibanapi": "Non vérifié par nous",
+          "libs": "Non vérifié par nous",
+          "abstract": "Non vérifié par nous"
         },
         "swiss": {
           "label": "Profondeur clearing suisse (SIC / euroSIC / QR-IID)",
@@ -2076,7 +2084,7 @@
         },
         "compliance": {
           "label": "Pré-check compliance (sanctions, FATF, obligation VoP)",
-          "ibanforge": "Un endpoint, 0,02 $ : filtrage banques (OFAC, EU, UN), listes FATF, données SEPA/VoP, score 0–100",
+          "ibanforge": "Un endpoint, 0,02 $ : filtrage banques (OFAC, EU, UN), listes FATF, joignabilité SEPA et VoP de la banque, score 0–100",
           "ibancom": "Produits séparés (BAV/VoP dès 2 000 € les 2 500 vérifications)",
           "ibanapi": "Non",
           "libs": "Non",
@@ -2121,8 +2129,9 @@
       "heading": "Là où IBANforge est le bon choix",
       "items": [
         "L'économie du pay-once : des crédits prépayés qui n'expirent jamais, au lieu d'un abonnement à amortir.",
-        "Les paiements suisses : les données de clearing suisse les plus profondes de toutes les API IBAN publiques (SIX BankMaster, rails instantanés, QR-IID).",
-        "Un seul appel de triage compliance avant un versement : sanctions + FATF + SEPA/VoP + score de risque en une requête à 0,02 $.",
+        "Les codes banque allemands, autrichiens, belges, slovaques et bulgares vérifiés dans le registre national : un IBAN bien formé dont personne ne détient le code banque est arrêté avant le paiement.",
+        "Les paiements suisses : chaque IID du SIX BankMaster avec sa participation aux rails (SIC, euroSIC, instantané CHF) et son QR-IID.",
+        "Un seul appel de triage compliance avant un versement : sanctions de la banque + FATF + joignabilité SEPA + VoP + score de risque en une requête à 0,02 $.",
         "Les agents IA et l'automatisation : outils MCP natifs, 402 lisibles par machine avec instructions exactes, paiement autonome x402."
       ]
     },

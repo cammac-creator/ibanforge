@@ -52,6 +52,11 @@ import {
   buildValidateAndExplainPrompt,
 } from '../lib/mcp-resources.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import {
+  BANK_LEVEL_SANCTIONS,
+  bicDirectorySentence,
+  serverDescription,
+} from '../lib/positioning.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import { MCP_DAILY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
@@ -446,7 +451,10 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       name: 'ibanforge',
       title: 'IBANforge',
       version: pkg.version,
-      description: `Pre-payout screening for agents — check the bank behind a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA/VoP reachability, sanctions and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
+      // The first line every MCP client and directory reads. Written once in
+      // src/lib/positioning.ts, where the register countries and the share of
+      // the frozen 2018 directory copy are read from the data (24/09/2026).
+      description: serverDescription(),
       websiteUrl: 'https://ibanforge.com',
       icons: [
         {
@@ -475,7 +483,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
     {
       title: 'Validate IBAN',
       description:
-        'Verify whether a European IBAN is valid AND enrich it with bank, compliance and routing data. ' +
+        `Verify whether an IBAN from any of the ${F.claim.countries} IBAN countries is valid AND enrich it with bank, compliance and routing data. ` +
         'USE WHEN: the user mentions an IBAN, asks to validate an IBAN and identify the issuing bank, asks to detect a typo in an IBAN, ' +
         'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
         'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
@@ -553,7 +561,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
         'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-        `BACKED BY: ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly. ` +
+        `BACKED BY: ${bicDirectorySentence({ withCount: true })} ${F.claim.lei} of the rows carry an LEI from GLEIF. ` +
         costLine('$0.003 per call'),
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
@@ -618,12 +626,12 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
     {
       title: 'Compliance Check',
       description:
-        'Run a full pre-flight compliance check on an IBAN before sending a SEPA / cross-border payment. ' +
+        'Run a pre-flight compliance triage on an IBAN before sending a SEPA / cross-border payment. ' +
         'USE WHEN: the user is about to send a payment / payout / refund and wants to triage risk first, ' +
-        'asks "is this IBAN safe to pay?", asks for sanctions screening, asks if a SEPA Instant transfer will succeed, ' +
+        "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
         'or needs a numeric risk score for an internal payment-approval workflow. ' +
         'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
-        'CHECKS: IBAN validity + sanctions (OFAC list, FATF jurisdictions) + SEPA Instant reachability + VoP (EU 2024/886) participant. ' +
+        `CHECKS: IBAN validity + ${BANK_LEVEL_SANCTIONS} + country sanctions and FATF status + SEPA Instant reachability + whether the bank answers Verification of Payee (VoP) requests; the name check itself is done by the payee's bank, never here. ` +
         'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop). ' +
         costLine('$0.02 per call'),
       inputSchema: {
@@ -781,7 +789,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
         'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
         'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
-        'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
+        'EVERY IID OF THE SIX BANKMASTER, with its full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
         `BACKED BY: ${F.claim.chClearing} SIX BankMaster entries (Swiss official source, refreshed monthly). ` +
         'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
         'Only relevant for CH and LI accounts. ' +

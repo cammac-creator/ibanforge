@@ -24,6 +24,9 @@ const ROWS = [
   "example",
   "freeTier",
   "bankData",
+  // The bank-code verdict of the national register, before the Swiss row:
+  // it is the check a checksum cannot make, in seven countries (24/09/2026).
+  "bankCode",
   "swiss",
   "compliance",
   "agents",
@@ -256,7 +259,7 @@ export default async function ComparePage({
           {t("forWho.heading")}
         </h2>
         <ul className="flex flex-col gap-4">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <li
               key={i}
               className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-5 flex gap-3 items-start"

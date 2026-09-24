@@ -2060,11 +2060,19 @@
         },
         "bankData": {
           "label": "Bank identification (BIC, name)",
-          "ibanforge": "121k+ BICs, 39k+ LEI-enriched via GLEIF, refreshed monthly",
+          "ibanforge": "121k+ BIC entries (entries, not institutions): GLEIF and national registers refreshed monthly, about two thirds from a public copy of the SWIFT directory frozen in January 2018; 39k+ LEI-enriched via GLEIF. Every validation names the source of its BIC.",
           "ibancom": "Yes — their core product",
           "ibanapi": "“If available” per their docs",
           "libs": "Varies by library: schwifty can resolve an IBAN’s BIC from its bank-code data.",
           "abstract": "The published response contains iban and is_valid; no BIC or bank name is documented."
+        },
+        "bankCode": {
+          "label": "Bank code checked against the national register (a miss means not allocated)",
+          "ibanforge": "DE, AT, BE, SK, BG, CH, LI: the national register itself. Partial lists in FI, SM and LU, where a miss is not a refusal. Elsewhere a composite map, answered with authoritative: false.",
+          "ibancom": "Not checked by us",
+          "ibanapi": "Not checked by us",
+          "libs": "Not checked by us",
+          "abstract": "Not checked by us"
         },
         "swiss": {
           "label": "Swiss clearing depth (SIC / euroSIC / QR-IID)",
@@ -2076,7 +2084,7 @@
         },
         "compliance": {
           "label": "Compliance pre-check (sanctions, FATF, VoP requirement)",
-          "ibanforge": "One endpoint, $0.02: bank screening (OFAC, EU, UN), FATF lists, SEPA/VoP data, 0–100 risk score",
+          "ibanforge": "One endpoint, $0.02: bank screening (OFAC, EU, UN), FATF lists, SEPA reachability and VoP readiness of the bank, 0–100 risk score",
           "ibancom": "Separate products (BAV/VoP from €2,000 per 2,500 verifications)",
           "ibanapi": "No",
           "libs": "No",
@@ -2121,8 +2129,9 @@
       "heading": "Where IBANforge is the strong pick",
       "items": [
         "Pay-once economics: prepaid credits that never expire instead of a subscription you must amortize.",
-        "Swiss payments: the deepest public Swiss clearing data of any IBAN API (SIX BankMaster, instant rails, QR-IID).",
-        "One compliance triage call before a payout: sanctions + FATF + SEPA/VoP + risk score in a single $0.02 request.",
+        "German, Austrian, Belgian, Slovak and Bulgarian bank codes checked against the national register: a well-formed IBAN whose bank code nobody holds is caught before the payment.",
+        "Swiss payments: every IID of the SIX BankMaster with its rail participation (SIC, euroSIC, CHF instant) and QR-IID.",
+        "One compliance triage call before a payout: bank-level sanctions + FATF + SEPA reachability + VoP readiness + risk score in a single $0.02 request.",
         "AI agents and automation: native MCP tools, machine-readable 402s with exact top-up instructions, x402 autonomous payment."
       ]
     },
@@ -2842,7 +2851,7 @@
   "countries": {
     "eyebrow": "IBAN by country",
     "metaTitle": "{country} IBAN: format, length and example",
-    "metaDescription": "A {country} IBAN has {length} characters. Field-by-field layout, the official example {example}, SEPA membership, Verification of Payee, the bank-code register and the exact answer of the IBANforge API.",
+    "metaDescription": "Every {country} IBAN has {length} characters. Field-by-field layout, the official example {example}, SEPA membership, Verification of Payee, the bank-code register and the exact answer of the IBANforge API.",
     "title": "{country} IBAN",
     "subtitle": "{length} characters: the country code, two check digits, then the BBAN cut as below.",
     "indexTitle": "The IBAN format of every country",

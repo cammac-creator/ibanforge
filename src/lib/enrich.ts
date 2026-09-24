@@ -421,6 +421,15 @@ const STRUCTURAL_BIC_PREFIX_RULE: Record<string, string> = {
 };
 
 /**
+ * The countries whose authority publishes the structural rule above, for the
+ * surfaces that say what we check country by country (`src/lib/positioning.ts`).
+ * An accessor, like `registerCoverage`, so the map itself stays private.
+ */
+export function structuralRuleCountries(): string[] {
+  return Object.keys(STRUCTURAL_BIC_PREFIX_RULE);
+}
+
+/**
  * Does the published structural rule explain this pairing?
  *
  * Requires all three: the country publishes the rule, the bank code is the four

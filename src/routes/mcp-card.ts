@@ -1,6 +1,13 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import {
+  BANK_LEVEL_SANCTIONS,
+  bicDirectorySentence,
+  codesOf,
+  registerCountries,
+  serverDescription,
+} from '../lib/positioning.js';
 import { MCP_TOOLS, dataTools, priceLabel } from '../mcp/inventory.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
@@ -20,14 +27,12 @@ const pkg = require('../../package.json') as { version: string };
  * which is the behaviour that makes a ninth tool publish itself.
  */
 const LONG_DESCRIPTIONS: Record<string, string> = {
-  validate_iban:
-    'Verify a European IBAN AND enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, asks who the bank is, or asks whether the recipient bank is reachable on SEPA rails. Returns: valid, country, BIC, bank name, EMI/vIBAN flag, SEPA + VoP, risk_score, Swiss bc_nummer for CH/LI. Does not confirm the account exists or belongs to anyone. Cost: $0.005.',
+  validate_iban: `Verify an IBAN from any of the ${F.claim.countries} IBAN countries AND enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, asks who the bank is, asks whether the bank code exists, or asks whether the recipient bank is reachable on SEPA rails. Returns: valid, country, the bank-code verdict (national register in ${codesOf(registerCountries().authoritative)}, where a miss means not allocated), BIC and bank name with their source, EMI/vIBAN flag, SEPA and VoP readiness, risk indicators, Swiss bc_nummer for CH/LI. Does not confirm the account exists or belongs to anyone. Cost: $0.005.`,
   batch_validate_iban:
     'Validate up to 100 IBANs in one call (cheaper than calling validate_iban repeatedly). Use for CSV/spreadsheet cleanup, customer DB dedup, or pre-flight payout list triage. Cost: $0.002 per IBAN, max $0.20 per batch.',
-  lookup_bic: `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly). Cost: $0.003.`,
-  check_compliance:
-    'Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. Cost: $0.02.',
-  lookup_ch_clearing: `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC and the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID — the deepest Swiss clearing data in any public API. Backed by ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly). Cost: $0.003. Only relevant for CH/LI accounts.`,
+  lookup_bic: `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. ${bicDirectorySentence({ withCount: true })} Cost: $0.003.`,
+  check_compliance: `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: ${BANK_LEVEL_SANCTIONS}; FATF status of the country; SEPA Instant reachability; whether the bank answers Verification of Payee (VoP) requests. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. Cost: $0.02.`,
+  lookup_ch_clearing: `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC and the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID, for every IID of the SIX BankMaster: ${F.claim.chClearing} entries, refreshed monthly. Cost: $0.003. Only relevant for CH/LI accounts.`,
   validate_payment_reference:
     'Validate a structured payment reference — RF/ISO 11649 ("SCOR", mod 97-10), Swiss QR reference ("QRR", 27 digits, modulo 10 recursive), Belgian OGM/VCS, Finnish viitenumero — each against a dated primary source that publishes the rule. Pass an IBAN and you also get the PAIRING verdict: a QRR reference may only travel with a QR-IBAN (SIX range 30000-31999) and an ISO 11649 reference may not, per the Swiss Implementation Guidelines. Norwegian KID and Swedish OCR are recognised but answer valid: null — their rules are configured per creditor account by the beneficiary bank. Cost: free.',
   check_postal_address:
@@ -46,7 +51,8 @@ const LONG_DESCRIPTIONS: Record<string, string> = {
 // the card and the tool servers drift apart in the first place.
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
-  description: `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
+  // The line Smithery and the MCP directories index. From src/lib/positioning.ts.
+  description: serverDescription(),
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,
