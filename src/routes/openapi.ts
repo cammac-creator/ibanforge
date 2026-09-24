@@ -18,6 +18,7 @@ import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 // The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
 import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
+import { nationalRegisterBicNames } from '../lib/register-lists.js';
 import { BUNDLES } from './api-keys.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
@@ -2396,7 +2397,7 @@ const buildRawSpec = () => ({
                 enum: ['national_register', 'curated_map', 'directory_prefix'],
                 description:
                   'WHERE the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-                  'national_register: the country\'s own register publishes this BIC for this bank code — today Switzerland, Liechtenstein, Germany, Austria, Belgium, Bulgaria, Slovakia and San Marino; the SIX BankMaster carries the exact 11-character BIC per IID and the German Bankleitzahlendatei per BLZ. ' +
+                  `national_register: the country's own register publishes this BIC for this bank code — today ${nationalRegisterBicNames()}; the SIX BankMaster carries the exact 11-character BIC per IID and the German Bankleitzahlendatei per BLZ. ` +
                   'curated_map: our maintained bank-code map made the pairing on an exact key. Usually right, and not an allocation record. ' +
                   'directory_prefix: the bic8 LIKE fallback, which can match several institutions at once — read bank_code_check.candidates. ' +
                   'Answers the settlement question directly: only national_register is settlement-grade, so outside those registers a derived BIC is advisory and should be confirmed with the beneficiary or your bank before it becomes a stored routing instruction.',

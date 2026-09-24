@@ -13,7 +13,7 @@ import { getBicDB } from './db.js';
  * so none needs the extra columns de-blz.ts has; one table serves all four
  * rather than four near-identical modules.
  *
- * As with CH, LI, DE and FI, being here is a claim that an absence means the
+ * As with CH, LI, DE and BG, being here is a claim that an absence means the
  * code is allocated to nobody. Seeded by scripts/seed-national.ts.
  */
 export interface NationalCodeEntry {

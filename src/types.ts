@@ -173,9 +173,11 @@ export type OperationType =
  * directories, not the national bank-code register, so an absence there is
  * evidence of nothing more than absence. Switzerland and Liechtenstein are
  * checked against the register itself (SIX BankMaster), Germany against the
- * Bundesbank Bankleitzahlendatei, Bulgaria against the Bulgarian National
- * Bank's BAE register and Slovakia against the Národná banka Slovenska
- * prevodník, and only there does `not_in_register` mean
+ * Bundesbank Bankleitzahlendatei, Austria and Belgium against their central
+ * banks' registers, Bulgaria against the Bulgarian National Bank's BAE
+ * register, Slovakia against the Národná banka Slovenska prevodník and Czechia
+ * against the Česká národní banka číselník (the served list is built in
+ * src/lib/register-lists.ts), and only there does `not_in_register` mean
  * the code is not allocated. San Marino sits between the two: its register
  * NAMES the holder of a code it lists, but the Central Bank publishes its
  * operating banks rather than the allocation of the code space, so a miss
@@ -407,10 +409,10 @@ export interface IBANValidationResult {
      *
      * - `national_register` — the country's own register publishes this BIC for
      *   this bank code. Today: Switzerland, Liechtenstein, Germany, Austria,
-     *   Belgium, Bulgaria, Slovakia and San Marino — the SIX
+     *   Belgium, Bulgaria, Slovakia, Czechia and San Marino — the SIX
      *   BankMaster carries the exact 11-character BIC per IID, the Bundesbank
      *   Bankleitzahlendatei the exact 11-character BIC per BLZ, and the OeNB,
-     *   NBB, BNB BAE, NBS and BCSM registers publish the institution's BIC per
+     *   NBB, BNB BAE, NBS, ČNB and BCSM registers publish the institution's BIC per
      *   bank code. San Marino is the case where this flag and
      *   `bank_code_check.authoritative` part company: the pairing is the
      *   supervisor's, the code space is not its to settle. Settlement-grade,
@@ -427,7 +429,7 @@ export interface IBANValidationResult {
      *
      * Only one of the three is a register of allocations, and saying so plainly
      * is worth more than a field that flatters the other two. Coverage grows by
-     * ingestion — DE, then AT, BE, BG and SK — and this field is what makes that
+     * ingestion — DE, then AT, BE, BG, SK and CZ — and this field is what makes that
      * growth visible without a re-read of the docs.
      */
     basis?: BicBasis;

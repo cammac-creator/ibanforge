@@ -8,6 +8,13 @@
  * drifted description here is worse than none: it would tell an agent it may
  * treat a miss as non-existence in a country where it may not.
  */
+import {
+  authoritativeCountInWords,
+  authoritativeRegisterClause,
+  institutionDepthSentences,
+  noStreetCodes,
+} from './register-lists.js';
+
 export const BANK_CODE_CHECK_SCHEMA = {
   type: 'object' as const,
   description:
@@ -57,8 +64,14 @@ export const BANK_CODE_CHECK_SCHEMA = {
     },
     authoritative: {
       type: 'boolean',
+      // The country list and its count are read from the code that decides the
+      // verdict (src/lib/register-lists.ts): typed by hand, this sentence said
+      // "all seven" for a day after Czechia became the eighth.
       description:
-        'True only where that reference set is the national register: today CH and LI against the SIX BankMaster, DE against the Bundesbank Bankleitzahlendatei, AT against the Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis, BE against the Banque nationale de Belgique bank identification codes, BG against the Bulgarian National Bank BAE register, and SK against the Národná banka Slovenska prevodník of identification codes for the domestic payment system. This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence. One asymmetry worth knowing: a Bulgarian BAE code covers IBAN positions 5-12 (bank code AND branch digits) while the verdict is made on the four-letter bank code alone, because the register does not enumerate every bank branch to one standard. The negative direction carries full weight in all seven. Three registers name holders WITHOUT settling a negative, so authoritative is false for them: a listed code names its holder (status verified, with institution) while an absence stays absent_from_reference_data and never becomes not_allocated. They are Finland, whose Finance Finland list is a transcription dated 2025-10 that nothing refreshes, and which allocates prefixes to banking groups rather than to institutions, so a Finnish verified confirms the group and its BIC rather than one specific bank; San Marino, whose Central Bank publishes its operating BANKS, not the allocation of the ABI code space; and Luxembourg, where the ABBL register of IBAN/BIC codes answers on deployments that load it.',
+        `True only where that reference set is the national register: today ${authoritativeRegisterClause()}. ` +
+        'This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence. One asymmetry worth knowing: a Bulgarian BAE code covers IBAN positions 5-12 (bank code AND branch digits) while the verdict is made on the four-letter bank code alone, because the register does not enumerate every bank branch to one standard. ' +
+        `The negative direction carries full weight in all ${authoritativeCountInWords()}. ` +
+        'Three registers name holders WITHOUT settling a negative, so authoritative is false for them: a listed code names its holder (status verified, with institution) while an absence stays absent_from_reference_data and never becomes not_allocated. They are Finland, whose Finance Finland list is a transcription dated 2025-10 that nothing refreshes, and which allocates prefixes to banking groups rather than to institutions, so a Finnish verified confirms the group and its BIC rather than one specific bank; San Marino, whose Central Bank publishes its operating BANKS, not the allocation of the ABI code space; and Luxembourg, where the ABBL register of IBAN/BIC codes answers on deployments that load it.',
     },
     candidates: {
       type: 'integer',
@@ -78,13 +91,14 @@ export const BANK_CODE_CHECK_SCHEMA = {
     institution: {
       type: 'object',
       description:
-        'What the national register publishes about the allocated institution. Present only where a register named the holder, which is not the same as an authoritative answer — composite-map hits stay bare (naming a BIC holder is the bic block, and its address would imply a register that was not consulted), while Finland, San Marino and Luxembourg carry this block with authoritative false because their registers name holders without settling a negative. Depth varies by register: SIX (CH/LI) and the OeNB (AT) publish the full seat address, the Bundesbank (DE) publishes postal code and town only, the Banque nationale de Belgique (BE), the Bulgarian National Bank (BG), the Národná banka Slovenska (SK) and the ABBL (LU) publish names alone, the Central Bank of the Republic of San Marino (SM) publishes the registered office; for Finland the name is the banking group the code belongs to (Nordea Bank for code 1), not an individual institution. Names are served exactly as the register writes them, which for BG means Cyrillic and for SK means Slovak diacritics — transliterating would be an alteration the terms of both publishers forbid. Absent fields are null, never guessed. This is the institution allocated the BANK CODE — not a branch, and not proof of any account.',
+        'What the national register publishes about the allocated institution. Present only where a register named the holder, which is not the same as an authoritative answer — composite-map hits stay bare (naming a BIC holder is the bic block, and its address would imply a register that was not consulted), while Finland, San Marino and Luxembourg carry this block with authoritative false because their registers name holders without settling a negative. ' +
+        `${institutionDepthSentences()} ` +
+        'Absent fields are null, never guessed. This is the institution allocated the BANK CODE — not a branch, and not proof of any account.',
       properties: {
         name: { type: 'string' },
         street: {
           type: ['string', 'null'],
-          description:
-            'One line, house number included, matching the GLEIF shape. Null where the register publishes none (DE, BE, SK).',
+          description: `One line, house number included, matching the GLEIF shape. Null where the register publishes none (${noStreetCodes()}).`,
         },
         post_code: { type: ['string', 'null'] },
         town: { type: ['string', 'null'] },
@@ -111,7 +125,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     as_of: {
       type: 'string',
       description:
-        'Year-month the consulted reference set was last refreshed. Where the register publishes an effective date of its own it is that date, not ours: the Bulgarian BAE register is republished on request rather than on a calendar, and the Slovak prevodník is published as a numbered edition carrying its own effective date, so dating either with our monthly refresh would misreport how current it is.',
+        'Year-month the consulted reference set was last refreshed. Where the register publishes an effective date of its own it is that date, not ours: the Bulgarian BAE register is republished on request rather than on a calendar, and the Slovak prevodník and the Czech číselník are published as numbered editions carrying their own effective date, so dating any of them with our monthly refresh would misreport how current it is. The Czech National Bank publishes each edition ahead of its effective date: as_of is the effective date of the edition in force, never that of an edition announced but not yet in force.',
     },
   },
   required: ['value', 'status', 'match', 'register', 'authoritative', 'as_of'],
