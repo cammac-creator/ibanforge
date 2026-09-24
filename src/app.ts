@@ -370,7 +370,7 @@ function buildLlmsTxt(): string {
   // paragraph and positioning.test.ts holds it there.
   const bic = bicDirectoryBreakdown();
   // The licence of the BIC-to-LEI Mapping Table asks for its notice with the
-  // version date on any copy (review of 25/09/2026). The version is read from
+  // version date on any copy (review of 24/09/2026). The version is read from
   // the load date of the gleif rows, never typed: see src/lib/bic-lei-notice.ts.
   const mappingVersion = mappingVersionFromLoad(
     getSourceFreshness().find((s) => s.source === 'gleif')?.last_updated,

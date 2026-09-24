@@ -277,7 +277,7 @@ describe('the contract covers the routes and fields the server actually serves',
     expect(spec.paths[path][method], `${path} has no ${method} operation`).toBeDefined();
   });
 
-  it('declares every block and field the free demo serves (D7, 25/09/2026)', () => {
+  it('declares every block and field the free demo serves (D7, 24/09/2026)', () => {
     const demo = spec.paths['/v1/demo'].get as {
       responses: {
         '200': {

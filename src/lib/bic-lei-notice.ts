@@ -5,7 +5,7 @@
  * by SWIFT, under the BIC/LEI Mapping Table License Agreement (Annex II,
  * 21 December 2017). The licence is royalty-free for any purpose provided that
  * any copy of the Mapping Table, in whole or in part, carries the notice below,
- * with the month and year of the Mapping Table version. Until 25/09/2026 the
+ * with the month and year of the Mapping Table version. Until 24/09/2026 the
  * served text said "This service uses the BIC to LEI relationship file. The
  * mapping table has been developed by SWIFT", which is not that notice and
  * carried no version.

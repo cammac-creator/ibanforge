@@ -9,8 +9,8 @@ import { closeAll } from './db.js';
 /**
  * The BIC/LEI Mapping Table licence asks for its notice, with the version
  * month, on any copy. Held on the served /llms.txt (read from the data, so the
- * monthly refresh can never turn this red) and on the static llms.txt of the
- * site (any version month, since that file points to the served one).
+ * monthly refresh can never turn this red); the static llms.txt of the site
+ * points to the served one and types no version.
  */
 
 afterAll(() => closeAll());
@@ -50,13 +50,18 @@ describe('the notice, word for word', () => {
     expect(text).not.toContain('This service uses the BIC to LEI relationship file');
   });
 
-  it('is carried by the static llms.txt of the site, which points to the served one', () => {
+  it('is pointed to by the static llms.txt of the site, with no version typed there', () => {
+    // A static file cannot follow the monthly refresh: a typed month would be
+    // wrong from the next refresh on (review of 24/09/2026). It sends the reader
+    // to the served notice instead.
     const text = readFileSync(
       join(import.meta.dirname, '..', '..', 'frontend', 'public', 'llms.txt'),
       'utf8',
     );
-    expect(text).toMatch(NOTICE);
-    expect(text).toContain('served live at https://api.ibanforge.com/llms.txt');
+    const line = text.split('\n').find((l) => l.startsWith('BIC-to-LEI relationship file'));
+    expect(line).toBeDefined();
+    expect(line).toContain('served live at https://api.ibanforge.com/llms.txt');
+    expect(line).not.toMatch(/database rights [A-Z][a-z]+ \d{4}/);
     expect(text).not.toContain('This service uses the BIC to LEI relationship file');
   });
 });

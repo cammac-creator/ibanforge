@@ -327,7 +327,7 @@ export const READ_ONLY_ANSWERS: readonly ReadOnlyAnswer[] = [
   {
     url: 'https://api.ibanforge.com/v1/demo',
     shows:
-      // Provenance only, like the labels of demo.ts (review of 25/09/2026,
+      // Provenance only, like the labels of demo.ts (review of 24/09/2026,
       // D15): the verdicts live in the answer, dated by as_of.
       'the full validation, computed by the API when the address is opened (served_at gives the instant): ' +
       'a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, ' +
@@ -360,7 +360,7 @@ export const NO_SIMULATION_RULE =
   '(served_at, as_of, or the date of the page).';
 
 /**
- * The connector route, said with its limit (review of 25/09/2026, D8). A
+ * The connector route, said with its limit (review of 24/09/2026, D8). A
  * connector with no key draws on the keyless MCP allowance like any caller,
  * counted per source address, and in Claude its calls leave from Anthropic's
  * cloud (Anthropic's page, "Network requirements"): the allowance is shared

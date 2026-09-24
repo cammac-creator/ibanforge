@@ -932,7 +932,7 @@ describe('the week of the keyless REST trial', () => {
   });
 
   it('keeps refused MCP session openings out of rest_attempts_uncounted too', () => {
-    // Relecture du 25/09/2026, D2 : le court-circuit du jour comptait encore les
+    // Relecture du 24/09/2026, D2 : le court-circuit du jour comptait encore les
     // refus d'ouverture de session dans la colonne de l'essai REST.
     at('2026-09-29T08:00:00Z');
     countDailyUnits(INIT, 31, 30);

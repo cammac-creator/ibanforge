@@ -631,7 +631,7 @@ describe('what the trial measures', () => {
  * Two separate allowances of the same size (Claude-Alain's decision of
  * 24/09/2026, evening, point 2): the keyless REST trial and the keyless MCP
  * access never share a bucket. Held here, through the real app and the real
- * routes (review of 25/09/2026, D12): the ledger tests fix both buckets by
+ * routes (review of 24/09/2026, D12): the ledger tests fix both buckets by
  * hand and cannot fail, whatever bucket a route picks.
  */
 describe('the keyless MCP allowance and the REST trial are separate', () => {
