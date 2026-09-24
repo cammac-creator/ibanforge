@@ -541,3 +541,25 @@ describe('the overview asks for keys that exist', () => {
     expect(missing).toEqual([]);
   });
 });
+
+/**
+ * The keyless trial's card writes no figure of its own.
+ *
+ * Its "exhausted" label said « 10/jour » from 06/09 to 24/09/2026, while the
+ * code applied 25 a day and then 25 a week: a figure typed into a translation
+ * is a figure nothing keeps true. The allowance lives in src/lib/trial.ts; the
+ * card names the step and leaves the number to the documentation.
+ */
+describe('the keyless trial card on the dashboard', () => {
+  it.each([
+    ['en', en],
+    ['fr', fr],
+    ['de', de],
+  ] as const)('carries no figure and no daily unit in its labels (%s)', (_lang, messages) => {
+    const trial = messages.dashboard.overview.fresh.doors.trial;
+    for (const label of [trial.title, trial.exhausted, trial.tried]) {
+      expect(label).not.toMatch(/\d/);
+      expect(label).not.toMatch(/\bday\b|jour|\bTag\b/i);
+    }
+  });
+});

@@ -133,6 +133,31 @@ const OTHER_DAILY_QUOTAS: Array<{ about: RegExp; value: number }> = [
 ];
 
 /**
+ * L'essai quotidien dit SANS chiffre (relecture du 24/09/2026, D18).
+ *
+ * Les deux motifs chiffrés ci-dessus commencent par `(\d+)` : « on the keyless
+ * trial the counters are daily and that field reads `day` » et « the keyless
+ * daily allowance described above » leur ont échappé, dans trois langues, sur
+ * des pages que ce garde lit. Celui-ci lit les mots.
+ *
+ * « journalier » et non « journali » : « journalisé » et « journaux » vivent
+ * sur les mêmes pages. Les deux exemptions du motif chiffré valent ici aussi :
+ * une ligne du MCP hébergé (compté au jour, et c'est juste) et une ligne sur la
+ * création de clés par réseau (« … per network per day … today »).
+ */
+const DAILY_WORDS =
+  /\bdaily (allowance|trial|quota)\b|\bdaily\b[^.\n]{0,20}\b(allowance|trial)\b|counters are daily|reads `day`|vaut `day`|trägt `day`|journalier|quotidien|t[aä]glich|Zähler pro Tag|\btoday\b|midnight UTC|aujourd.hui|minuit|\bheute\b|Mitternacht/i;
+const PER_NETWORK = /per network|par réseau|pro Netz/i;
+
+/**
+ * Exempté nommément : le README du paquet npm `ibanforge-mcp` (`mcp/`, hors du
+ * périmètre de la PR 235) dit encore l'essai quotidien. Il se corrige avec la
+ * prochaine publication du paquet, qui est le geste de Claude-Alain : retirer
+ * alors cette exemption, le garde doit rester vert sans elle.
+ */
+const DAILY_WORDS_EXEMPT = new Set(['mcp/README.md']);
+
+/**
  * « Compté en mémoire, par instance ».
  *
  * 🚨 Le texte allemand réel est « im Arbeitsspeicher je Serverinstanz » : un
@@ -162,6 +187,8 @@ interface Tally {
   daily: Array<{ ref: string; value: number; other: boolean }>;
   /** Every weekly figure written by hand on a line about the trial. */
   weekly: Array<{ ref: string; value: number }>;
+  /** A daily trial said in words, with no figure. */
+  dailyWords: string[];
   memory: string[];
   sharing: string[];
   secondPerson: string[];
@@ -173,6 +200,7 @@ function tally(): Tally {
     ordinal: [],
     daily: [],
     weekly: [],
+    dailyWords: [],
     memory: [],
     sharing: [],
     secondPerson: [],
@@ -205,6 +233,14 @@ function tally(): Tally {
         out.daily.push({ ref, value, other });
       }
       for (const m of line.matchAll(WEEKLY_FIGURE)) out.weekly.push({ ref, value: Number(m[1]) });
+      if (
+        !DAILY_WORDS_EXEMPT.has(file) &&
+        DAILY_WORDS.test(line) &&
+        !ABOUT_MCP.test(line) &&
+        !PER_NETWORK.test(line)
+      ) {
+        out.dailyWords.push(ref);
+      }
       if (MEMORY_CLAIM.test(line)) out.memory.push(ref);
     });
   }
@@ -244,6 +280,11 @@ describe('la prose statique de l’essai', () => {
       .filter(({ other }) => !other)
       .map(({ ref, value }) => `${ref}: ${value} par jour`);
     expect(wrong, wrong.join('\n')).toEqual([]);
+  });
+
+  it('ne dit pas non plus l’essai quotidien en toutes lettres (daily, today, `day`)', () => {
+    const { dailyWords } = tally();
+    expect(dailyWords, dailyWords.join('\n')).toEqual([]);
   });
 
   it('écrit le plafond de la semaine que le code applique, sur chaque ligne qui le cite', () => {
@@ -364,6 +405,27 @@ describe('les motifs eux-mêmes', () => {
     '10 MCP tool calls/day per source address',
   ])('ne prend pas un autre nombre pour le plafond de la semaine : %s', (line) => {
     expect(weeklyValues(line)).toEqual([]);
+  });
+
+  it.each([
+    // Les quatre lignes réelles qui ont échappé au motif chiffré.
+    '`month` is the calendar month (`YYYY-MM`); on the keyless trial the counters are daily and that field reads `day`.',
+    "sur l'essai sans clé, les compteurs sont journaliers et ce champ vaut `day`.",
+    'beim Test ohne Schlüssel zählen die Zähler pro Tag, und das Feld trägt `day`.',
+    'the same call still works within the keyless daily allowance described above: a `trial` block',
+  ])('repère l’essai quotidien dit sans chiffre : %s', (line) => {
+    expect(DAILY_WORDS.test(line)).toBe(true);
+  });
+
+  it.each([
+    // Justes, et laissées passer par les exemptions ou par le motif lui-même.
+    'At most 3 free keys per network per day — existing keys keep working. Need more capacity today? No key needed for x402.',
+    'The MCP taster keeps answering after its daily allowance, with no key at all.',
+    'Until 24 September 2026 the keyless trial was daily; it is counted by the week.',
+    'Il peut être journalisé sans risque, même sans clé.',
+  ])('laisse passer une phrase juste : %s', (line) => {
+    const caught = DAILY_WORDS.test(line) && !ABOUT_MCP.test(line) && !PER_NETWORK.test(line);
+    expect(caught).toBe(false);
   });
 
   it('reconnaît une ligne du MCP, dont le plafond du jour est un autre quota', () => {

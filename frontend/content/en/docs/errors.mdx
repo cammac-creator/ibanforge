@@ -1,12 +1,12 @@
 ---
 title: "Error Reference"
-description: "Every HTTP status and error code of the IBANforge API: invalid IBANs, request errors, payment and quota (402), body size (413), rate limit (429), and where to get help."
+description: "The HTTP statuses of the IBANforge API and the error codes its routes share: invalid IBANs, request errors, payment and quota (402), body size (413), rate limit (429), and where to get help."
 order: 6
 ---
 
 # Error Reference
 
-IBANforge uses standard HTTP status codes and returns structured JSON errors, `{"error": "<token>", "message": "<sentence>"}`. Branch on `error`, which is stable; `message` may be reworded. This page covers every status and code you might encounter.
+IBANforge uses standard HTTP status codes and returns structured JSON errors, `{"error": "<token>", "message": "<sentence>"}`. Branch on `error`, which is stable; `message` may be reworded. This page covers the statuses of the API and the codes its routes share; a code that belongs to one route only (API keys, UK firms) is on that route's page.
 
 **An invalid IBAN is not an error status.** `POST /v1/iban/validate` answers HTTP `200` with `valid: false`, an `error` code and an `error_detail` sentence. Only the request itself (its JSON, a missing field, payment, quota, size, rate) changes the HTTP status.
 
@@ -16,16 +16,19 @@ IBANforge uses standard HTTP status codes and returns structured JSON errors, `{
 |---|---|---|
 | `200` | OK | The request was answered. An invalid IBAN still returns `200` with `valid: false`; an unknown BIC returns `200` with `found: false` |
 | `400` | Bad Request | Malformed JSON, a missing field, or an invalid parameter |
-| `402` | Payment Required | A paid route called with no key, no payment and no free allowance left: the x402 payment envelope, with a `cause` when one applies |
+| `401` | Unauthorized | The key routes only (`GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`): `missing_key` or `invalid_key`. A paid route never answers `401` |
+| `402` | Payment Required | A paid route called without a usable way to pay: no key and no free allowance left, a key that is invalid or has spent its allowance or credits, or a payment that was refused. The x402 payment envelope, with a `cause` when one applies |
 | `404` | Not Found | Unknown endpoint |
 | `405` | Method Not Allowed | Right path, wrong method (for example `GET /v1/keys/generate`); the `allow` field names the method to use |
+| `409` | Conflict | The key routes only: `already_claimed`, `already_claimed_elsewhere`, `verification_in_flight`. See [API keys](/docs/api-keys) |
 | `413` | Payload Too Large | Request body over 256 KB |
 | `429` | Too Many Requests | More than 100 requests in one minute from the same IP address; wait for `Retry-After` |
 | `500` | Internal Server Error | Unexpected server error (please report it, see [Support](#support)) |
+| `502`, `503` | Bad Gateway, Service Unavailable | The x402 payment rail could not be reached or answered with an error. Retry later. The UK firms route has its own `502` and `503` codes, on [its page](/docs/gb-firms) |
 
 ## Validation error codes
 
-These appear in the body of a `200` answer when `valid` is `false`: the request succeeded, the IBAN did not pass. `POST /v1/iban/validate`, each item of `POST /v1/iban/batch` and the free `GET /v1/iban/format` use the same six codes.
+These appear in the body of a `200` answer when `valid` is `false`: the request succeeded, the IBAN did not pass. `POST /v1/iban/validate`, each item of `POST /v1/iban/batch` and the free `GET /v1/iban/format` use the same six codes. One exception on `/v1/iban/format`: a length out of bounds (fewer than 15 or more than 34 characters once spaces and hyphens are removed, or more than 64 as sent) is a `400 invalid_iban_length`, not a `200`.
 
 | Code | Description | Example cause |
 |---|---|---|
@@ -72,7 +75,7 @@ These return a status other than `200`.
 | `placeholder_literal` | `GET /v1/bic/{code}`, `GET /v1/ch/clearing/{iid}` | The literal placeholder of the OpenAPI document was sent instead of a value |
 | `invalid_iid_format` | `GET /v1/ch/clearing/{iid}` | The IID is not a number of 1 to 5 digits |
 | `missing_iban` | `GET` and `POST /v1/iban/format` | No `iban` query parameter or body field |
-| `invalid_iban_length` | `GET` and `POST /v1/iban/format` | Fewer than 15 or more than 34 characters once spaces and hyphens are removed |
+| `invalid_iban_length` | `GET` and `POST /v1/iban/format` | Fewer than 15 or more than 34 characters once spaces and hyphens are removed, or more than 64 characters as sent |
 
 ### Example: bad request
 
@@ -85,7 +88,7 @@ These return a status other than `200`.
 
 ### 402 Payment Required
 
-Returned when a paid route is called with no key, no payment and no free allowance left. The body is the x402 payment envelope; the `PAYMENT-SIGNATURE` header (x402 v2) or `X-PAYMENT` (v1) settles it. When a precise reason applies, the body also carries `cause.reason` and a `message` that names the way out:
+Returned when a paid route is called without a usable way to pay: no key and no free allowance left, a key that is invalid or has spent its allowance or credits, or a payment that was sent and refused. The body is the x402 payment envelope; the `PAYMENT-SIGNATURE` header (x402 v2) or `X-PAYMENT` (v1) settles it. When a precise reason applies, the body also carries `cause.reason` and a `message` that names the way out:
 
 | `cause.reason` | When |
 |---|---|
@@ -114,6 +117,8 @@ Returned when a paid route is called with no key, no payment and no free allowan
 }
 ```
 
+When a payment was sent and refused, the body also carries `payment_error` with the reason.
+
 See [x402 Payments](/docs/x402) for how to handle this, and [API keys](/docs/api-keys) for the free key.
 
 ### 404 Not Found
@@ -136,7 +141,7 @@ An unknown code is not a 404: `GET /v1/bic/{code}` answers `200` with `found: fa
 
 `rate_limit_exceeded`: more than 100 requests in one minute from the same IP address. The answer carries a `Retry-After` header and a `retry_after` field, both in seconds. Every counted response carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` (seconds), plus the older `X-RateLimit-*` headers, whose reset is a Unix timestamp. `/health`, `/ping`, `/openapi.json` and `/v1/demo` are not counted. The same limit is published at [`/.well-known/rate-limits.yml`](https://api.ibanforge.com/.well-known/rate-limits.yml).
 
-Taking and claiming keys have their own daily limits, with their own `429` codes: see [API keys](/docs/api-keys). A key's monthly allowance is not a `429`: it ends in the `402` above, and every answer served on a key carries `X-Quota-Used`, `X-Quota-Limit` and `X-Quota-Remaining` (`GET /v1/keys/usage` returns the same count).
+Taking and claiming keys have their own daily limits, with their own `429` codes: see [API keys](/docs/api-keys). A key's monthly allowance is not a `429`: it ends in the `402` above. Every answer served on a monthly key (free or claimed) carries `X-Quota-Used`, `X-Quota-Limit` and `X-Quota-Remaining` (`GET /v1/keys/usage` returns the same count); a prepaid credit key carries `X-Credits-Remaining` and `X-Credits-Total` instead (`GET /v1/credits/balance`).
 
 ### 500 Internal Server Error
 

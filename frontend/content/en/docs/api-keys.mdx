@@ -288,12 +288,13 @@ a key claimed by payment — its 200 are counted once, across all months, not re
 `credits` means a prepaid balance, with nothing enforced against `limit`. The `claim` block is
 served only on a key that can still be claimed.
 
-`month` is the calendar month the counters belong to (`YYYY-MM`); on the keyless trial the counters are daily and that field reads `day`. This endpoint is free and does not consume quota.
+`month` is the calendar month the counters belong to (`YYYY-MM`). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`, as does the `X-Trial-Period` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same.
 
 ## Watching your quota
 
-Every authenticated response carries your counters, on success as well as on
-refusal, so you can act before you reach the wall rather than when you hit it:
+Every response served on a monthly key carries your counters, on success as well as on
+refusal, so you can act before you reach the wall rather than when you hit it (a prepaid
+credit key carries `X-Credits-Remaining` and `X-Credits-Total` instead):
 
 ```
 X-Quota-Used: 7

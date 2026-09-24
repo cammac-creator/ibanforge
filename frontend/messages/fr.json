@@ -915,9 +915,9 @@
             "title": "Essai sans clé (API REST)",
             "step": "Étape",
             "tried": "Ont essayé sans clé",
-            "exhausted": "Ont épuisé les 10/jour",
+            "exhausted": "Ont épuisé l'essai de la semaine",
             "keys": "Clés nées de l'essai",
-            "note": "Une ligne par adresse et par jour, pas par appel. Une clé compte ici si elle a été créée avec source=api-trial."
+            "note": "Essais : une ligne par adresse et par jour. Épuisements : une ligne par source et par semaine. Jamais par appel. Une clé compte ici si elle a été créée avec source=api-trial."
           },
           "names": {
             "nav_key": "En-tête → Votre clé",

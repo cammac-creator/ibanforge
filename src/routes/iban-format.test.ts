@@ -191,7 +191,11 @@ describe('/v1/iban/format measures the IBAN, not its printed form', () => {
       body: JSON.stringify({ iban: padded }),
     });
     expect(r.status).toBe(400);
-    expect(((await r.json()) as { error: string }).error).toBe('invalid_iban_length');
+    const body = (await r.json()) as { error: string; message: string };
+    expect(body.error).toBe('invalid_iban_length');
+    // The raw cap names itself: "at most 34" would be false for this IBAN,
+    // which is 21 characters once the spaces are gone.
+    expect(body.message).toMatch(/64 characters as sent/);
   });
 });
 

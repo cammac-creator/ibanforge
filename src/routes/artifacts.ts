@@ -145,7 +145,7 @@ safety:
 const RATE_LIMITS = `# Rate limits — IBANforge
 specification: rate-limits
 version: '1.0'
-updated: '2026-09-15'
+updated: '2026-09-24'
 
 default:
   requests: ${RATE_PER_MIN}
@@ -230,7 +230,7 @@ const ERROR_SEMANTICS = `# Error semantics — IBANforge
 # for humans and may change at any time.
 specification: error-semantics
 version: '1.0'
-updated: '2026-08-14'
+updated: '2026-09-24'
 
 shape:
   content_type: application/json
@@ -259,37 +259,47 @@ codes:
     retryable: false
     meaning: A path parameter was sent as the literal '{code}' or '{iid}' copied
       from the OpenAPI spec instead of being substituted.
-  - code: unauthorized
-    status: 401
-    retryable: false
-    meaning: The API key is missing, malformed, or revoked.
-  - code: quota_exceeded
-    status: 402
-    retryable: false
-    meaning: The key's monthly allowance or credit balance is spent. Buy credits
-      or wait for the reset.
   - code: payment_required
     status: 402
     retryable: true
-    meaning: An x402-payable endpoint called without payment. The body carries the
-      full payment requirements (x402 v2), and so does the PAYMENT-REQUIRED
+    meaning: A paid endpoint called without a usable way to pay. The body carries
+      the full payment requirements (x402 v2), and so does the PAYMENT-REQUIRED
       response header; retry with a PAYMENT-SIGNATURE header. A v1 X-PAYMENT
       signature is still accepted. When a payment WAS sent and refused, the
-      reason is in payment_error.
+      reason is in payment_error. A paid route never answers 401 or 403, and a
+      key never gets a code of its own here - the reason is in cause.reason -
+      invalid_api_key (a key was sent, unknown or revoked), key_revoked_burst,
+      monthly_quota_exhausted or monthly_quota_insufficient (a monthly key has
+      spent its allowance), credits_exhausted or credits_insufficient (a prepaid
+      key), trial_exhausted (the keyless trial of POST /v1/iban/validate is used
+      up for the week), trial_unavailable. A value that does not start with ifk_
+      is not read as a key at all.
+  - code: missing_key
+    status: 401
+    retryable: false
+    meaning: The key routes only (GET /v1/keys/usage, GET /v1/keys/report,
+      GET /v1/credits/balance, POST /v1/keys/claim) - no key was sent.
+  - code: invalid_key
+    status: 401
+    retryable: false
+    meaning: The key routes only - the key sent is unknown or inactive.
   - code: not_found
     status: 404
     retryable: false
-    meaning: The BIC or clearing number is not in the reference data. This is an
-      answer about the identifier, not a fault.
+    meaning: Unknown endpoint. An unknown BIC is not a 404 - GET /v1/bic/{code}
+      answers 200 with found false - and neither is an unknown clearing number,
+      which answers 200 with found false and error clearing_not_found.
   - code: rate_limit_exceeded
     status: 429
     retryable: true
     meaning: Too many requests in the window. Honour Retry-After.
-  - code: internal_error
-    status: 500
-    retryable: true
-    meaning: Our fault. Safe to retry: every paid endpoint is read-only, so a
-      retry cannot double-charge a side effect.
+
+unexpected_failure:
+  status: 500
+  retryable: true
+  body: The plain text "Internal Server Error", with no JSON envelope and no code.
+  meaning: Our fault. Safe to retry - every paid endpoint is read-only, so a
+    retry cannot double-charge a side effect.
 
 idempotency:
   natural: >-
@@ -457,7 +467,7 @@ everything else.
 
 const AUTH = `# Authentication — IBANforge
 
-**Updated:** 2026-08-14
+**Updated:** 2026-09-24
 
 There are three ways to call a paid endpoint, and an agent can use any of them
 without a human being present for the first two.
@@ -513,8 +523,12 @@ database, so it survives a redeploy.
 | Situation | Status | \`error\` |
 |---|---|---|
 | No credential on a paid endpoint | 402 | \`payment_required\` |
-| Key missing, malformed or revoked | 401 | \`unauthorized\` |
-| Allowance or credits spent | 402 | \`quota_exceeded\` |
+| Key unknown or revoked | 402 | \`payment_required\`, \`cause.reason = invalid_api_key\` (\`key_revoked_burst\` for a burst revocation) |
+| Allowance or credits spent | 402 | \`payment_required\`, \`cause.reason = monthly_quota_exhausted\` or \`credits_exhausted\` (\`…_insufficient\` for a batch) |
+| Keyless trial used up for the week | 402 | \`payment_required\`, \`cause.reason = trial_exhausted\` |
+
+A paid route never answers 401. A value that does not start with \`ifk_\` is not
+read as a key at all: the call is treated as keyless.
 
 A failed payment never returns a partial answer, so a payment problem can
 never be mistaken for a screening result.

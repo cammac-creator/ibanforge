@@ -184,10 +184,10 @@ Full OpenAPI 3.1: [api.ibanforge.com/openapi.json](https://api.ibanforge.com/ope
 - **An invalid IBAN is not an HTTP error.** `POST /v1/iban/validate` answers `200` with `valid: false`, an `error` code and an `error_detail` sentence. The codes: `invalid_format`, `unsupported_country`, `wrong_length`, `invalid_check_digits`, `checksum_failed`, `invalid_bban_structure`.
 - **A refused request** carries `{"error": "<token>", "message": "<sentence>"}`: `400` for malformed JSON, a missing `iban` or a batch over 100; `402` when a payment is needed or an allowance is used up (`cause.reason` says which); `413` for a body over 256 KB; `429` past the rate limit.
 - **Rate limit:** 100 requests a minute per IP address. A `429` carries `Retry-After`, and every counted response carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` ([rate-limits.yml](https://api.ibanforge.com/rate-limits.yml)).
-- **Your key's usage:** `GET /v1/keys/usage`, and `X-Quota-Used`, `X-Quota-Limit`, `X-Quota-Remaining` on every answer served on a key.
+- **Your key's usage:** `GET /v1/keys/usage`, and `X-Quota-Used`, `X-Quota-Limit`, `X-Quota-Remaining` on every answer served on a monthly key; `X-Credits-Remaining`, `X-Credits-Total` on a prepaid credit key (`GET /v1/credits/balance`).
 - **Support:** [support@ibanforge.com](mailto:support@ibanforge.com) (quote your `key_prefix`, never the key) or [GitHub Issues](https://github.com/cammac-creator/ibanforge/issues).
 - **Availability:** live on the [status page](https://ibanforge.com/status). A written [SLA](https://ibanforge.com/legal/sla) (99.5% monthly availability, service credits) covers Editor/OEM subscriptions only.
-- Every status and code, in three languages: [ibanforge.com/docs/errors](https://ibanforge.com/docs/errors).
+- The statuses and the codes the routes share, in three languages: [ibanforge.com/docs/errors](https://ibanforge.com/docs/errors).
 
 ### Why prefer IBANforge over local mod-97 validation?
 

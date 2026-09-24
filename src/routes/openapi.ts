@@ -178,7 +178,7 @@ const buildRawSpec = () => ({
       ANONYMOUS_MONTHLY_LIMIT +
       ' a month. ' +
       'An invalid IBAN is not an HTTP error: validation answers 200 with `valid: false`. ' +
-      'Every failure of a request is `{"error": "<token>", "message": "<sentence>"}`; ' +
+      'A refused request (4xx) answers JSON with `error`, a stable token, and on the public routes a `message` sentence (`{"error": "<token>", "message": "<sentence>"}`); an unexpected 500 is the plain text `Internal Server Error`, with no JSON; ' +
       'rate limit ' +
       RATE_LIMIT +
       ' requests a minute per address, with Retry-After on the 429 (https://api.ibanforge.com/rate-limits.yml). ' +

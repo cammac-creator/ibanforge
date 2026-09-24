@@ -42,10 +42,14 @@ const SEPARATORS = /[\s-]/g;
 const RAW_MAX = 64;
 const TOO_SHORT = 'IBAN must be at least 15 characters, spaces and hyphens aside';
 const TOO_LONG = 'IBAN must be at most 34 characters, spaces and hyphens aside';
+// Its own sentence (review of 24/09/2026): an IBAN of 21 characters padded past
+// 64 is refused by the raw cap, and "at most 34" would be false for it.
+const TOO_LONG_RAW =
+  'IBAN must be at most 64 characters as sent, and 34 once spaces and hyphens are removed';
 
 /** Why the length rules the input out, or null when the library may judge it. */
 function lengthProblem(raw: string): string | null {
-  if (raw.length > RAW_MAX) return TOO_LONG;
+  if (raw.length > RAW_MAX) return TOO_LONG_RAW;
   const compact = raw.replace(SEPARATORS, '');
   if (compact.length < 15) return TOO_SHORT;
   if (compact.length > 34) return TOO_LONG;

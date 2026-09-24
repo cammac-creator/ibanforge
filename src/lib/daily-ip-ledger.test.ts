@@ -796,6 +796,37 @@ describe('the week of the keyless REST trial', () => {
     reviewLedgerVolume();
   });
 
+  it('keeps a new source in the day trace when only the week is full', () => {
+    // Relecture du 24/09/2026 (D3) : la source comptée en mémoire sortait
+    // avant d'écrire la ligne du jour et disparaissait de toute la surface
+    // d'administration, précisément pendant une rotation de sources.
+    at('2026-09-29T08:00:00Z');
+    countWeeklyTrialUnits(OTHER, 1, REST_TRIAL_WEEKLY_LIMIT);
+    reviewLedgerVolume(Number.MAX_SAFE_INTEGER, 1);
+    try {
+      for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
+        expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(true);
+      }
+      // L'appel qui franchit le plafond est encore écrit, comme en base ; les
+      // suivants ne coûtent aucune écriture et vont dans les tentatives.
+      expect(countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT).allowed).toBe(false);
+      const before = writes();
+      for (let i = 0; i < 4; i += 1) countWeeklyTrialUnits(BUCKET, 1, REST_TRIAL_WEEKLY_LIMIT);
+      expect(writes() - before).toBe(0);
+      expect(weeklyRows().map((r) => r.bucket)).toEqual([OTHER]);
+      expect(countTrialBucketsToday()).toEqual({
+        buckets: 2,
+        units: 1 + REST_TRIAL_WEEKLY_LIMIT + 1,
+      });
+      snapshotTrialDay('2026-09-29');
+      const row = getTrialDaily(90).find((r) => r.day === '2026-09-29');
+      expect(row?.rest_buckets).toBe(2);
+      expect(row?.rest_attempts_uncounted).toBe(4);
+    } finally {
+      reviewLedgerVolume();
+    }
+  });
+
   it('answers degraded, never a fabricated ceiling, when its table is gone', () => {
     getStatsDB().exec('DROP TABLE IF EXISTS trial_weekly');
     resetDailyLedgerStatements();

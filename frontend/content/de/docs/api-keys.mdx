@@ -297,14 +297,15 @@ vorliegt. `basis` sagt, welche Obergrenze wirklich gilt: `monthly` ist der Norma
 alle Monate und werden nicht aufgefüllt — und `credits` ist ein Prepaid-Guthaben, gegen das `limit`
 nichts durchsetzt. Der `claim`-Block wird nur bei einem noch beanspruchbaren Schlüssel mitgeliefert.
 
-`month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`); beim Test ohne Schlüssel zählen die Zähler pro Tag, und das Feld trägt `day`. Dieser Endpunkt ist kostenlos
+`month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`). Die Kostprobe ohne Schlüssel hat hier keinen Schlüssel abzufragen: Ihre Zähler laufen pro Woche (ISO-Woche in UTC, Rücksetzung am Montag um 00:00 UTC), und in ihrem `402 trial_exhausted` trägt das Feld `cause.quota.month` den Wert `week`, ebenso der Header `X-Trial-Period`. Ohne Schlüssel antwortet dieser Endpunkt mit `401 missing_key`, mit einem unbekannten oder inaktiven Schlüssel mit `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` und `POST /v1/keys/claim` antworten ebenso. Dieser Endpunkt ist kostenlos
 und verbraucht kein Kontingent.
 
 ## Ihr Kontingent im Blick behalten
 
-Jede authentifizierte Antwort trägt Ihre Zähler mit, bei Erfolg wie bei
+Jede Antwort auf einen Monatsschlüssel trägt Ihre Zähler mit, bei Erfolg wie bei
 Ablehnung, damit Sie handeln können bevor Sie an die Grenze stossen und nicht
-erst dann:
+erst dann (ein Schlüssel mit Prepaid-Guthaben trägt stattdessen
+`X-Credits-Remaining` und `X-Credits-Total`):
 
 ```
 X-Quota-Used: 7

@@ -915,9 +915,9 @@
             "title": "Keyless trial (REST API)",
             "step": "Step",
             "tried": "Tried without a key",
-            "exhausted": "Ran out of the 10/day",
+            "exhausted": "Used up the weekly trial",
             "keys": "Keys born of the trial",
-            "note": "One line per address and per day, not per call. A key counts here when it was created with source=api-trial."
+            "note": "Tried: one line per address and per day. Used up: one line per source and per week. Never per call. A key counts here when it was created with source=api-trial."
           },
           "names": {
             "nav_key": "Header → Your key",

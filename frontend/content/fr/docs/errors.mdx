@@ -1,12 +1,12 @@
 ---
 title: "Référence des erreurs"
-description: "Chaque statut HTTP et chaque code d'erreur de l'API IBANforge : IBAN invalides, erreurs de requête, paiement et quota (402), taille du corps (413), limite de débit (429), et où trouver de l'aide."
+description: "Les statuts HTTP de l'API IBANforge et les codes d'erreur que ses routes partagent : IBAN invalides, erreurs de requête, paiement et quota (402), taille du corps (413), limite de débit (429), et où trouver de l'aide."
 order: 6
 ---
 
 # Référence des erreurs
 
-IBANforge utilise les codes de statut HTTP standards et renvoie des erreurs structurées en JSON, `{"error": "<jeton>", "message": "<phrase>"}`. Aiguillez sur `error`, qui est stable ; `message` peut être reformulé. Cette page couvre chaque statut et chaque code que vous pouvez rencontrer.
+IBANforge utilise les codes de statut HTTP standards et renvoie des erreurs structurées en JSON, `{"error": "<jeton>", "message": "<phrase>"}`. Aiguillez sur `error`, qui est stable ; `message` peut être reformulé. Cette page couvre les statuts de l'API et les codes que ses routes partagent ; un code propre à une seule route (clés API, établissements britanniques) figure sur la page de cette route.
 
 **Un IBAN invalide n'est pas un statut d'erreur.** `POST /v1/iban/validate` répond HTTP `200` avec `valid: false`, un code `error` et une phrase `error_detail`. Seule la requête elle-même (son JSON, un champ manquant, le paiement, le quota, la taille, le débit) change le statut HTTP.
 
@@ -16,16 +16,19 @@ IBANforge utilise les codes de statut HTTP standards et renvoie des erreurs stru
 |---|---|---|
 | `200` | OK | La requête a reçu sa réponse. Un IBAN invalide renvoie quand même `200` avec `valid: false` ; un BIC inconnu renvoie `200` avec `found: false` |
 | `400` | Bad Request | JSON mal formé, champ manquant ou paramètre invalide |
-| `402` | Payment Required | Route payante appelée sans clé, sans paiement et sans franchise gratuite restante : l'enveloppe de paiement x402, avec une `cause` quand elle s'applique |
+| `401` | Unauthorized | Les routes des clés seulement (`GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`) : `missing_key` ou `invalid_key`. Une route payante ne répond jamais `401` |
+| `402` | Payment Required | Route payante appelée sans moyen de payer utilisable : ni clé ni franchise gratuite restante, une clé invalide ou dont la franchise ou les crédits sont épuisés, ou un paiement refusé. L'enveloppe de paiement x402, avec une `cause` quand elle s'applique |
 | `404` | Not Found | Endpoint inconnu |
 | `405` | Method Not Allowed | Bon chemin, mauvaise méthode (par exemple `GET /v1/keys/generate`) ; le champ `allow` nomme la méthode à utiliser |
+| `409` | Conflict | Les routes des clés seulement : `already_claimed`, `already_claimed_elsewhere`, `verification_in_flight`. Voir [Clés API](/docs/api-keys) |
 | `413` | Payload Too Large | Corps de requête au-delà de 256 Ko |
 | `429` | Too Many Requests | Plus de 100 requêtes en une minute depuis la même adresse IP ; attendez `Retry-After` |
 | `500` | Internal Server Error | Erreur inattendue du serveur (merci de nous la signaler, voir [Support](#support)) |
+| `502`, `503` | Bad Gateway, Service Unavailable | Le rail de paiement x402 est injoignable ou a répondu par une erreur. Réessayez plus tard. La route des établissements britanniques a ses propres codes `502` et `503`, sur [sa page](/docs/gb-firms) |
 
 ## Codes d'erreur de validation
 
-Ils apparaissent dans le corps d'une réponse `200` quand `valid` vaut `false` : la requête a réussi, l'IBAN n'a pas passé. `POST /v1/iban/validate`, chaque élément de `POST /v1/iban/batch` et la route gratuite `GET /v1/iban/format` emploient les mêmes six codes.
+Ils apparaissent dans le corps d'une réponse `200` quand `valid` vaut `false` : la requête a réussi, l'IBAN n'a pas passé. `POST /v1/iban/validate`, chaque élément de `POST /v1/iban/batch` et la route gratuite `GET /v1/iban/format` emploient les mêmes six codes. Une exception sur `/v1/iban/format` : une longueur hors bornes (moins de 15 ou plus de 34 caractères une fois les espaces et traits d'union retirés, ou plus de 64 tels qu'envoyés) répond `400 invalid_iban_length`, et non `200`.
 
 | Code | Description | Cause type |
 |---|---|---|
@@ -72,7 +75,7 @@ Ils renvoient un statut autre que `200`.
 | `placeholder_literal` | `GET /v1/bic/{code}`, `GET /v1/ch/clearing/{iid}` | Le paramètre fictif du document OpenAPI a été envoyé tel quel au lieu d'une valeur |
 | `invalid_iid_format` | `GET /v1/ch/clearing/{iid}` | L'IID n'est pas un nombre de 1 à 5 chiffres |
 | `missing_iban` | `GET` et `POST /v1/iban/format` | Ni paramètre `iban` dans l'adresse ni champ `iban` dans le corps |
-| `invalid_iban_length` | `GET` et `POST /v1/iban/format` | Moins de 15 ou plus de 34 caractères une fois les espaces et traits d'union retirés |
+| `invalid_iban_length` | `GET` et `POST /v1/iban/format` | Moins de 15 ou plus de 34 caractères une fois les espaces et traits d'union retirés, ou plus de 64 caractères tels qu'envoyés |
 
 ### Exemple : requête incorrecte
 
@@ -85,7 +88,7 @@ Ils renvoient un statut autre que `200`.
 
 ### 402 Payment Required
 
-Renvoyé quand une route payante est appelée sans clé, sans paiement et sans franchise gratuite restante. Le corps est l'enveloppe de paiement x402 ; l'en-tête `PAYMENT-SIGNATURE` (x402 v2) ou `X-PAYMENT` (v1) la règle. Quand une raison précise s'applique, le corps porte aussi `cause.reason` et un `message` qui nomme la sortie :
+Renvoyé quand une route payante est appelée sans moyen de payer utilisable : ni clé ni franchise gratuite restante, une clé invalide ou dont la franchise ou les crédits sont épuisés, ou un paiement envoyé puis refusé. Le corps est l'enveloppe de paiement x402 ; l'en-tête `PAYMENT-SIGNATURE` (x402 v2) ou `X-PAYMENT` (v1) la règle. Quand une raison précise s'applique, le corps porte aussi `cause.reason` et un `message` qui nomme la sortie :
 
 | `cause.reason` | Quand |
 |---|---|
@@ -114,6 +117,8 @@ Renvoyé quand une route payante est appelée sans clé, sans paiement et sans f
 }
 ```
 
+Quand un paiement a été envoyé et refusé, le corps porte aussi `payment_error` avec la raison.
+
 Consultez [Paiements x402](/docs/x402) pour savoir comment gérer cela, et [Clés API](/docs/api-keys) pour la clé gratuite.
 
 ### 404 Not Found
@@ -136,7 +141,7 @@ Un code inconnu n'est pas un 404 : `GET /v1/bic/{code}` répond `200` avec `foun
 
 `rate_limit_exceeded` : plus de 100 requêtes en une minute depuis la même adresse IP. La réponse porte un en-tête `Retry-After` et un champ `retry_after`, tous deux en secondes. Chaque réponse décomptée porte `RateLimit-Limit`, `RateLimit-Remaining` et `RateLimit-Reset` (en secondes), plus les anciens en-têtes `X-RateLimit-*`, dont la remise à zéro est un horodatage Unix. `/health`, `/ping`, `/openapi.json` et `/v1/demo` ne sont pas décomptés. La même limite est publiée dans [`/.well-known/rate-limits.yml`](https://api.ibanforge.com/.well-known/rate-limits.yml).
 
-Prendre et réclamer une clé ont leurs propres limites du jour, avec leurs propres codes `429` : voir [Clés API](/docs/api-keys). Le quota du mois d'une clé n'est pas un `429` : il se termine par le `402` ci-dessus, et chaque réponse servie sur une clé porte `X-Quota-Used`, `X-Quota-Limit` et `X-Quota-Remaining` (`GET /v1/keys/usage` rend le même décompte).
+Prendre et réclamer une clé ont leurs propres limites du jour, avec leurs propres codes `429` : voir [Clés API](/docs/api-keys). Le quota du mois d'une clé n'est pas un `429` : il se termine par le `402` ci-dessus. Chaque réponse servie sur une clé mensuelle (gratuite ou réclamée) porte `X-Quota-Used`, `X-Quota-Limit` et `X-Quota-Remaining` (`GET /v1/keys/usage` rend le même décompte) ; une clé à crédits prépayés porte à la place `X-Credits-Remaining` et `X-Credits-Total` (`GET /v1/credits/balance`).
 
 ### 500 Internal Server Error
 

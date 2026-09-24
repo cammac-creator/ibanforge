@@ -239,9 +239,24 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
           remaining: 0,
         },
       });
-      // "A developer hit the ceiling", once per address per day. The second
-      // refusal of the same day says nothing the first did not.
-      if (countDailyUnits(`evt:trial-exhausted:${ip}`, 1, 1).allowed) {
+      // "A source hit the ceiling", once per source and per WEEK: written on the
+      // call that crosses it, and on no other.
+      //
+      // 🚨 Until 24/09/2026 this was deduplicated per address and per DAY, which
+      // was right while the allowance was daily. Once the refusal lasts until
+      // Monday, a source that comes back every day would have written one
+      // "exhausted" a day with no "tried" beside it (a refused call is not
+      // served), and the doors card would show more sources that ran out than
+      // sources that tried. `spent.used` is the week's count, including this
+      // call: it equals limit + 1 exactly once per source and per week. It keeps
+      // growing in memory on the refusals that follow, and after a redeploy the
+      // next write in the database lands at limit + 2, so the event is not
+      // written again.
+      //
+      // ⚠️ Reserve for lot 5: if the effective limit is lowered during a week, a
+      // source already above the new limit will not cross it and writes no
+      // event. Decide it when the breaker is wired, not here.
+      if (spent.used === limit + 1) {
         recordSafely(() => recordServerEvent('api:trial-exhausted'), 'web_event');
       }
       await next();

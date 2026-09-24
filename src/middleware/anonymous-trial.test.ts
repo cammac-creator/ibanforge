@@ -14,7 +14,12 @@ import type { AddressInfo } from 'node:net';
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from './x402.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
-import { resetDailyLedger, resetDailyLedgerStatements } from '../lib/daily-ip-ledger.js';
+import {
+  forgetLedgerMemory,
+  resetDailyLedger,
+  resetDailyLedgerStatements,
+  sweepDailyLedger,
+} from '../lib/daily-ip-ledger.js';
 import { generateApiKey } from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 import { CONSENT_FIELDS } from '../lib/consent.js';
@@ -503,12 +508,19 @@ describe('the trial stays out of the way', () => {
 });
 
 describe('what the trial measures', () => {
-  const names = (): string[] =>
-    (
-      getStatsDB().prepare('SELECT name FROM web_events ORDER BY id').all() as Array<{
-        name: string;
-      }>
-    ).map((r) => r.name);
+  // La table naît au premier événement écrit (`ensureTable` de web-events.ts) :
+  // lancé seul, un test lit avant qu'elle existe.
+  const names = (): string[] => {
+    try {
+      return (
+        getStatsDB().prepare('SELECT name FROM web_events ORDER BY id').all() as Array<{
+          name: string;
+        }>
+      ).map((r) => r.name);
+    } catch {
+      return [];
+    }
+  };
 
   it('writes one api:trial per address per day, not one per call', async () => {
     const before = names().filter((n) => n === 'api:trial').length;
@@ -519,12 +531,52 @@ describe('what the trial measures', () => {
     expect(names().filter((n) => n === 'api:trial').length - before).toBe(1);
   });
 
-  it('writes one api:trial-exhausted on the first refusal of the day', async () => {
-    const before = names().filter((n) => n === 'api:trial-exhausted').length;
+  it('writes one api:trial-exhausted per source and per WEEK, however many days it comes back', async () => {
+    // 🚨 Relecture du 24/09/2026 (D1) : dédoublonné au jour, l'événement
+    // s'écrivait chaque jour où une source épuisée revenait au refus, sans
+    // « essayé » en face, et la carte des portes affichait 1 essayé pour
+    // 7 épuisés. Seul `Date` est simulé ; le tick horaire est rejoué à la main.
+    const count = (name: string) => names().filter((n) => n === name).length;
+    const triedBefore = count('api:trial');
+    const exhaustedBefore = count('api:trial-exhausted');
     const h = freshHeaders();
-    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT + 2; i += 1)
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-10-05T09:00:00Z'));
+      for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT + 1; i += 1) {
+        await validate({ iban: VALID_IBAN }, h);
+      }
+      for (const day of ['06', '07', '08', '09', '10', '11']) {
+        vi.setSystemTime(new Date(`2026-10-${day}T09:00:00Z`));
+        sweepDailyLedger();
+        expect((await validate({ iban: VALID_IBAN }, h)).status).toBe(402);
+      }
+      expect(count('api:trial') - triedBefore).toBe(1);
+      expect(count('api:trial-exhausted') - exhaustedBefore).toBe(1);
+      // Le lundi suivant rouvre l'essai : un « essayé » de plus, aucun
+      // « épuisé » de plus.
+      vi.setSystemTime(new Date('2026-10-12T00:00:01Z'));
+      sweepDailyLedger();
+      expect((await validate({ iban: VALID_IBAN }, h)).status).toBe(200);
+      expect(count('api:trial') - triedBefore).toBe(2);
+      expect(count('api:trial-exhausted') - exhaustedBefore).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not write api:trial-exhausted again after a redeploy', async () => {
+    const count = () => names().filter((n) => n === 'api:trial-exhausted').length;
+    const before = count();
+    const h = freshHeaders();
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT + 1; i += 1)
       await validate({ iban: VALID_IBAN }, h);
-    expect(names().filter((n) => n === 'api:trial-exhausted').length - before).toBe(1);
+    // Un redéploiement oublie la marque en mémoire et rouvre la base :
+    // l'écriture suivante en base arrive au-delà de limit + 1.
+    forgetLedgerMemory();
+    closeAll();
+    expect((await validate({ iban: VALID_IBAN }, h)).status).toBe(402);
+    expect(count() - before).toBe(1);
   });
 
   it('books no revenue for a call nobody paid for', async () => {

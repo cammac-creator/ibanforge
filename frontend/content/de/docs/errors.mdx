@@ -1,12 +1,12 @@
 ---
 title: "Fehlerreferenz"
-description: "Jeder HTTP-Status und jeder Fehlercode der IBANforge-API: ungültige IBANs, Anfragefehler, Zahlung und Kontingent (402), Grösse des Body (413), Ratenlimit (429), und wo es Hilfe gibt."
+description: "Die HTTP-Statuscodes der IBANforge-API und die Fehlercodes, die ihre Routen teilen: ungültige IBANs, Anfragefehler, Zahlung und Kontingent (402), Grösse des Body (413), Ratenlimit (429), und wo es Hilfe gibt."
 order: 6
 ---
 
 # Fehlerreferenz
 
-IBANforge verwendet standardmässige HTTP-Statuscodes und gibt strukturierte Fehler im JSON-Format zurück, `{"error": "<token>", "message": "<text>"}`. Verzweigen Sie auf `error`, das stabil bleibt; `message` kann umformuliert werden. Diese Seite behandelt jeden Status und jeden Code, der auftreten kann.
+IBANforge verwendet standardmässige HTTP-Statuscodes und gibt strukturierte Fehler im JSON-Format zurück, `{"error": "<token>", "message": "<text>"}`. Verzweigen Sie auf `error`, das stabil bleibt; `message` kann umformuliert werden. Diese Seite behandelt die Statuscodes der API und die Codes, die ihre Routen teilen; ein Code, der nur zu einer Route gehört (API-Schlüssel, britische Institute), steht auf der Seite dieser Route.
 
 **Eine ungültige IBAN ist kein Fehlerstatus.** `POST /v1/iban/validate` antwortet mit HTTP `200`, `valid: false`, einem `error`-Code und einem Satz in `error_detail`. Nur die Anfrage selbst (ihr JSON, ein fehlendes Feld, Zahlung, Kontingent, Grösse, Rate) ändert den HTTP-Status.
 
@@ -16,16 +16,19 @@ IBANforge verwendet standardmässige HTTP-Statuscodes und gibt strukturierte Feh
 |---|---|---|
 | `200` | OK | Die Anfrage wurde beantwortet. Eine ungültige IBAN liefert trotzdem `200` mit `valid: false`; ein unbekannter BIC liefert `200` mit `found: false` |
 | `400` | Bad Request | Fehlerhaftes JSON, ein fehlendes Feld oder ein ungültiger Parameter |
-| `402` | Payment Required | Kostenpflichtige Route ohne Schlüssel, ohne Zahlung und ohne verbleibendes Gratiskontingent: der x402-Zahlungsumschlag, mit einer `cause`, wenn eine zutrifft |
+| `401` | Unauthorized | Nur die Schlüsselrouten (`GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`): `missing_key` oder `invalid_key`. Eine kostenpflichtige Route antwortet nie mit `401` |
+| `402` | Payment Required | Kostenpflichtige Route ohne brauchbaren Zahlungsweg: weder Schlüssel noch verbleibendes Gratiskontingent, ein ungültiger Schlüssel oder einer, dessen Kontingent oder Guthaben verbraucht ist, oder eine abgelehnte Zahlung. Der x402-Zahlungsumschlag, mit einer `cause`, wenn eine zutrifft |
 | `404` | Not Found | Unbekannter Endpunkt |
 | `405` | Method Not Allowed | Richtiger Pfad, falsche Methode (zum Beispiel `GET /v1/keys/generate`); das Feld `allow` nennt die richtige Methode |
+| `409` | Conflict | Nur die Schlüsselrouten: `already_claimed`, `already_claimed_elsewhere`, `verification_in_flight`. Siehe [API-Schlüssel](/docs/api-keys) |
 | `413` | Payload Too Large | Body der Anfrage über 256 KB |
 | `429` | Too Many Requests | Mehr als 100 Anfragen in einer Minute von derselben IP-Adresse; warten Sie `Retry-After` ab |
 | `500` | Internal Server Error | Unerwarteter Serverfehler (bitte melden, siehe [Support](#support)) |
+| `502`, `503` | Bad Gateway, Service Unavailable | Die x402-Zahlungsschiene war nicht erreichbar oder hat mit einem Fehler geantwortet. Später erneut versuchen. Die Route der britischen Institute hat eigene `502`- und `503`-Codes, auf [ihrer Seite](/docs/gb-firms) |
 
 ## Validierungsfehlercodes
 
-Sie stehen im Body einer `200`-Antwort, wenn `valid` den Wert `false` hat: Die Anfrage war erfolgreich, die IBAN hat die Prüfung nicht bestanden. `POST /v1/iban/validate`, jedes Element von `POST /v1/iban/batch` und die kostenlose Route `GET /v1/iban/format` verwenden dieselben sechs Codes.
+Sie stehen im Body einer `200`-Antwort, wenn `valid` den Wert `false` hat: Die Anfrage war erfolgreich, die IBAN hat die Prüfung nicht bestanden. `POST /v1/iban/validate`, jedes Element von `POST /v1/iban/batch` und die kostenlose Route `GET /v1/iban/format` verwenden dieselben sechs Codes. Eine Ausnahme auf `/v1/iban/format`: Eine Länge ausserhalb der Grenzen (weniger als 15 oder mehr als 34 Zeichen ohne Leerzeichen und Bindestriche, oder mehr als 64 wie gesendet) ergibt `400 invalid_iban_length`, nicht `200`.
 
 | Code | Beschreibung | Beispielursache |
 |---|---|---|
@@ -72,7 +75,7 @@ Sie liefern einen anderen Status als `200`.
 | `placeholder_literal` | `GET /v1/bic/{code}`, `GET /v1/ch/clearing/{iid}` | Der Platzhalter des OpenAPI-Dokuments wurde wörtlich gesendet statt eines Werts |
 | `invalid_iid_format` | `GET /v1/ch/clearing/{iid}` | Die IID ist keine Zahl mit 1 bis 5 Ziffern |
 | `missing_iban` | `GET` und `POST /v1/iban/format` | Weder Parameter `iban` in der Adresse noch Feld `iban` im Body |
-| `invalid_iban_length` | `GET` und `POST /v1/iban/format` | Weniger als 15 oder mehr als 34 Zeichen, sobald Leerzeichen und Bindestriche entfernt sind |
+| `invalid_iban_length` | `GET` und `POST /v1/iban/format` | Weniger als 15 oder mehr als 34 Zeichen, sobald Leerzeichen und Bindestriche entfernt sind, oder mehr als 64 Zeichen wie gesendet |
 
 ### Beispiel: Fehlerhafte Anfrage
 
@@ -85,7 +88,7 @@ Sie liefern einen anderen Status als `200`.
 
 ### 402 Payment Required
 
-Wird zurückgegeben, wenn eine kostenpflichtige Route ohne Schlüssel, ohne Zahlung und ohne verbleibendes Gratiskontingent aufgerufen wird. Der Body ist der x402-Zahlungsumschlag; der Header `PAYMENT-SIGNATURE` (x402 v2) oder `X-PAYMENT` (v1) begleicht ihn. Wenn ein genauer Grund zutrifft, trägt der Body zusätzlich `cause.reason` und eine `message`, die den Ausweg nennt:
+Wird zurückgegeben, wenn eine kostenpflichtige Route ohne brauchbaren Zahlungsweg aufgerufen wird: weder Schlüssel noch verbleibendes Gratiskontingent, ein ungültiger Schlüssel oder einer, dessen Kontingent oder Guthaben verbraucht ist, oder eine gesendete und abgelehnte Zahlung. Der Body ist der x402-Zahlungsumschlag; der Header `PAYMENT-SIGNATURE` (x402 v2) oder `X-PAYMENT` (v1) begleicht ihn. Wenn ein genauer Grund zutrifft, trägt der Body zusätzlich `cause.reason` und eine `message`, die den Ausweg nennt:
 
 | `cause.reason` | Wann |
 |---|---|
@@ -114,6 +117,8 @@ Wird zurückgegeben, wenn eine kostenpflichtige Route ohne Schlüssel, ohne Zahl
 }
 ```
 
+Wurde eine Zahlung gesendet und abgelehnt, trägt der Body zusätzlich `payment_error` mit dem Grund.
+
 Wie Sie damit umgehen, steht unter [x402-Zahlungen](/docs/x402); den kostenlosen Schlüssel erklärt [API-Schlüssel](/docs/api-keys).
 
 ### 404 Not Found
@@ -136,7 +141,7 @@ Ein unbekannter Code ist kein 404: `GET /v1/bic/{code}` antwortet mit `200` und 
 
 `rate_limit_exceeded`: mehr als 100 Anfragen in einer Minute von derselben IP-Adresse. Die Antwort trägt einen Header `Retry-After` und ein Feld `retry_after`, beide in Sekunden. Jede gezählte Antwort trägt `RateLimit-Limit`, `RateLimit-Remaining` und `RateLimit-Reset` (Sekunden), dazu die älteren Header `X-RateLimit-*`, deren Reset ein Unix-Zeitstempel ist. `/health`, `/ping`, `/openapi.json` und `/v1/demo` werden nicht gezählt. Dasselbe Limit ist unter [`/.well-known/rate-limits.yml`](https://api.ibanforge.com/.well-known/rate-limits.yml) veröffentlicht.
 
-Einen Schlüssel holen und beanspruchen haben eigene Tageslimits mit eigenen `429`-Codes: siehe [API-Schlüssel](/docs/api-keys). Das Monatskontingent eines Schlüssels ist kein `429`: Es endet mit dem `402` oben, und jede Antwort auf einen Schlüssel trägt `X-Quota-Used`, `X-Quota-Limit` und `X-Quota-Remaining` (`GET /v1/keys/usage` liefert denselben Stand).
+Einen Schlüssel holen und beanspruchen haben eigene Tageslimits mit eigenen `429`-Codes: siehe [API-Schlüssel](/docs/api-keys). Das Monatskontingent eines Schlüssels ist kein `429`: Es endet mit dem `402` oben. Jede Antwort auf einen Monatsschlüssel (kostenlos oder beansprucht) trägt `X-Quota-Used`, `X-Quota-Limit` und `X-Quota-Remaining` (`GET /v1/keys/usage` liefert denselben Stand); ein Schlüssel mit Prepaid-Guthaben trägt stattdessen `X-Credits-Remaining` und `X-Credits-Total` (`GET /v1/credits/balance`).
 
 ### 500 Internal Server Error
 

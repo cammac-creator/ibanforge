@@ -200,6 +200,29 @@ describe('les surfaces servies ne comptent plus l’essai au jour', () => {
     expect(seen, `aucune phrase sur l'essai dans ${path}`).toBeGreaterThan(0);
   });
 
+  // Relecture du 24/09/2026 (D18) : l'essai quotidien dit sans chiffre. Pas de
+  // « daily », « today » ni « midnight » tout courts ici : la note historique
+  // de l'OpenAPI (« the trial was daily ») et la phrase MCP de /v1 (« after
+  // the daily limit ») sont justes et rougiraient.
+  const DAILY_WORDS =
+    /\bdaily (allowance|trial|quota)\b|\bdaily\b[^.\n]{0,20}\b(allowance|trial)\b|counters are daily|reads `day`|"month":"day"/i;
+
+  it.each([
+    '/llms.txt',
+    '/openapi.json',
+    '/.well-known/auth.md',
+    '/.well-known/rate-limits.yml',
+    '/.well-known/error-semantics.yml',
+    '/.well-known/mcp/server-card.json',
+    '/v1',
+  ])('%s ne dit pas l’essai quotidien en toutes lettres', async (path) => {
+    const text = await body(path);
+    const found = text
+      .split(/(?<=[.!?])\s+/)
+      .filter((sentence) => DAILY_WORDS.test(sentence) && !OTHER.test(sentence));
+    expect(found, found.join('\n')).toEqual([]);
+  });
+
   it('attrape la régression qu’il existe pour attraper', () => {
     const sentence = 'Keyless trial: 25 validations a day per source address.';
     expect([...sentence.matchAll(DAILY)].map((m) => Number(m[1]))).toEqual([25]);

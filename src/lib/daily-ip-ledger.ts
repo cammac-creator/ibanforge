@@ -625,6 +625,23 @@ export function resetDailyLedger(): void {
   }
 }
 
+/**
+ * Seam de test : ce qu'un redémarrage du conteneur oublie, et rien d'autre.
+ *
+ * Vide les structures mémoire (marques de dépassement, compteurs de repli,
+ * tentatives court-circuitées, contre-pression) et garde les tables, pour
+ * prouver ce qu'un redéploiement fait réellement. `closeAll()` seul ne le
+ * prouve pas : il ferme la connexion mais laisse la mémoire du module.
+ */
+export function forgetLedgerMemory(): void {
+  memoryCounts.clear();
+  overLimit.clear();
+  uncountedAttemptsToday = { day: '', n: 0 };
+  ledgerFull = false;
+  ledgerFullDay = '';
+  resetWeeklyMemory();
+}
+
 /** Le jour UTC d'il y a `minutes` minutes, pour rester sur la plage de la clé. */
 function dayMinutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString().slice(0, 10);
@@ -1002,11 +1019,29 @@ export function countWeeklyTrialUnits(
 
   try {
     if (weeklyFull && weeklyFullWeek !== week) weeklyFull = false;
-    if (weeklyFull && !(weekExistsStmt().get(week, key) as { hit: number } | undefined)) {
-      return countWeekInMemory(key, units, limit, week);
-    }
     if (ledgerFull && ledgerFullDay !== day) ledgerFull = false;
     const writeDay = !ledgerFull || !!(existsStmt().get(day, key) as { hit: number } | undefined);
+    if (weeklyFull && !(weekExistsStmt().get(week, key) as { hit: number } | undefined)) {
+      // La table de la semaine est pleine et ne connaît pas ce seau : la
+      // décision se prend en mémoire, mais la TRACE du jour garde la source,
+      // sous la seule condition du registre du jour, exactement comme le chemin
+      // en base ci-dessous (relecture du 24/09/2026, D3). Sans cela, pendant
+      // une rotation de sources, c'est-à-dire précisément quand elle compte, la
+      // source disparaissait de la trace, des fenêtres et de l'administration.
+      // Même règle que le chemin en base : l'appel qui franchit le plafond est
+      // encore écrit, les suivants passent par la marque et vont dans
+      // `rest_attempts_uncounted`.
+      //
+      // ⚠️ Deux limites connues, tenues pour acceptables parce que ce seuil
+      // n'est atteint que sous une rotation massive, qui déclenche l'alerte
+      // `trial:volume-week` : une source comptée en mémoire retrouve une
+      // semaine neuve à chaque redémarrage, et `weeklyMemory` n'est vidée que
+      // le lundi (pas de taille maximale).
+      const counted = countWeekInMemory(key, units, limit, week);
+      if (writeDay) spendStmt().get(day, key, units);
+      if (!counted.allowed) weeklyOverLimit.set(key, { week, used: counted.used, limit });
+      return counted;
+    }
     const used = weekTx()(week, day, key, units, writeDay);
     if (used > limit) weeklyOverLimit.set(key, { week, used, limit });
     return { allowed: used <= limit, used, remaining: Math.max(0, limit - used) };
