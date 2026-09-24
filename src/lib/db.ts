@@ -1311,6 +1311,10 @@ function openStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
     if (msgCols.length && !msgCols.includes('body'))
       statsDB.exec('ALTER TABLE email_messages ADD COLUMN body TEXT');
+    // L'objet traduit, pour la lecture seulement : une réponse garde l'objet
+    // d'origine (« Re: … »), dans la langue du correspondant.
+    if (msgCols.length && !msgCols.includes('subject_fr'))
+      statsDB.exec('ALTER TABLE email_messages ADD COLUMN subject_fr TEXT');
     // "This one needs no answer" — a thank-you, a read receipt, a ticket bot.
     //
     // 🚨 The marker belongs to the MESSAGE, not to the contact, and that is the

@@ -1496,6 +1496,32 @@ describe('POST /v1/admin/email-messages — one message, one row, whatever id it
     expect(rows.find((m) => m.id === `twin-b-${RUN_TAG}`)?.snippet_fr).toBe('Madame, Monsieur (B)');
   });
 
+  it("l'objet traduit est gardé, servi, et survit à une resynchronisation brute", async () => {
+    // Comme le corps traduit : la relecture nocturne de la boîte ne porte pas de
+    // traduction et ne doit pas l'effacer. L'objet d'origine, lui, ne bouge pas.
+    const who = `objet-${RUN_TAG}@alpha.example.net`;
+    const base = {
+      id: `objet-${RUN_TAG}`,
+      customer_email: who,
+      direction: 'in',
+      msg_date: '2026-09-08T10:00:00',
+      subject: 'Frage zum nächsten Import',
+      snippet: 'Guten Tag',
+    };
+    await post([
+      { ...base, lang: 'de', snippet_fr: 'Bonjour', subject_fr: 'Question sur le prochain import' },
+    ]);
+    await post([base]);
+    const res = await app().request('/v1/admin/email-messages?since=2026-09-08&fields=summary', {
+      headers: H,
+    });
+    const all = ((await res.json()) as { messages: Array<Record<string, unknown>> }).messages;
+    const row = all.find((m) => m.id === `objet-${RUN_TAG}`);
+    expect(row?.subject).toBe('Frage zum nächsten Import');
+    expect(row?.subject_fr).toBe('Question sur le prochain import');
+    expect(row?.snippet_fr).toBe('Bonjour');
+  });
+
   it('two different subjects in the same minute stay two rows', async () => {
     await post([
       {

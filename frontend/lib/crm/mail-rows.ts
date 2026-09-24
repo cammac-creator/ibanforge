@@ -6,7 +6,7 @@ import { heatOf } from './heat';
 import { lastInboundMessage, noReplyHolds } from './no-reply';
 import { nextActionLabel } from './situation';
 import type { Contact, Message, NextAction, Situation } from './types';
-import { previewReading, type Reading } from './reading';
+import { previewReading, subjectReading, type Reading } from './reading';
 
 export type MailFilterKey =
   | 'reply'
@@ -321,6 +321,15 @@ function lastPreview(messages: Message[]): Reading | null {
 }
 
 /** The last message carrying the field, searched from the end. */
+/** L'objet du dernier message qui en a un, lu en français quand sa traduction existe. */
+function lastSubject(messages: Message[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (m?.subject) return subjectReading(m) || m.subject;
+  }
+  return null;
+}
+
 function lastWith(messages: Message[], field: 'subject' | 'snippet' | 'msg_date'): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const value = messages[i]?.[field];
@@ -404,7 +413,7 @@ function toRow(
     // The email is the fallback, not a placeholder: an address is something the
     // operator can act on, whereas "sans nom" is not.
     who: c.company || c.email,
-    subject: lastWith(c.messages, 'subject') ?? 'Aucun échange',
+    subject: lastSubject(c.messages) ?? 'Aucun échange',
     preview: reading?.text ?? '',
     previewLang: reading?.lang ?? null,
     previewTranslated: reading?.translated ?? false,
@@ -446,7 +455,7 @@ function toRow(
     // registry we asked about redistribution" — rather than the desk's address
     // or the subject a clerk chose.
     search: fold(
-      `${c.company ?? ''} ${c.email} ${institutionSearch(c)} ${c.messages.map((m) => `${m.subject ?? ''} ${m.snippet ?? ''}`).join(' ')}`,
+      `${c.company ?? ''} ${c.email} ${institutionSearch(c)} ${c.messages.map((m) => `${m.subject ?? ''} ${m.subject_fr ?? ''} ${m.snippet ?? ''}`).join(' ')}`,
     ),
   };
 }
