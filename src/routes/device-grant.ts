@@ -49,6 +49,7 @@ import { isAllowedOrigin } from '../lib/cors-origins.js';
 import { extractClientIp } from '../lib/stats.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
 import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
+import { isPlainEmail } from '../lib/email-shape.js';
 import { deliverKeyVerificationEmail } from '../lib/email.js';
 import { opsFail } from '../lib/ops-alert.js';
 import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribution.js';
@@ -549,7 +550,7 @@ deviceGrant.post('/v1/keys/device/approve', async (c) => {
 
   // ── Branche e-mail : le contrôle d'adresse d'abord, l'envoi ensuite ───────
   if (rawEmail !== '') {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(rawEmail) || rawEmail.length > 255) {
+    if (!isPlainEmail(rawEmail)) {
       return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
     }
     if (process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' && isDisposableDomain(rawEmail)) {

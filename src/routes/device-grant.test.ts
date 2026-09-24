@@ -1271,6 +1271,30 @@ describe('les corps illisibles', () => {
   });
 });
 
+describe("l'adresse de l'approbation", () => {
+  // Une seule adresse simple (src/lib/email-shape.ts) : une liste, un nom
+  // affiché ou des guillemets sont refusés avant que le code ne parte.
+  it.each([
+    'appareil+x,autre@alpha.example.net',
+    'appareil@alpha.example.net;autre@alpha.example.net',
+    'Acme <appareil@alpha.example.net>',
+    '"appareil,autre"@alpha.example.net',
+  ])('une adresse qui en nomme plusieurs est refusée sans envoi : %j', async (email) => {
+    const app = makeApp();
+    const opened = await open(app);
+    const token = await tokenFor(app, opened.user_code);
+    const before = mail.sent.length;
+    const res = await post(app, '/v1/keys/device/approve', {
+      user_code: opened.user_code,
+      approval_token: token,
+      email,
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('invalid_email');
+    expect(mail.sent.length).toBe(before);
+  });
+});
+
 /**
  * 🚨 LE DERNIER BLOC DU FICHIER, ET IL DOIT LE RESTER : il ARME le disjoncteur
  * global, état qui vit dans `kv_state` et survivrait aux tests suivants. Son
