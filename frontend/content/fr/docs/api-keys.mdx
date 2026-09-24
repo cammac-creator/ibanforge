@@ -293,7 +293,7 @@ appartient à une clé réclamée par paiement — ses 200 sont comptés une foi
 non rechargés ; `credits` est un solde prépayé, et rien n'est alors opposé à `limit`. Le bloc `claim`
 n'est servi que sur une clé encore réclamable.
 
-`month` est le mois calendaire auquel se rapportent les compteurs (`YYYY-MM`). L'essai sans clé n'a pas de clé à consulter ici : ses compteurs sont hebdomadaires (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC), et dans son `402 trial_exhausted` le champ `cause.quota.month` vaut `week`, comme l'en-tête `X-Trial-Period`. Sans clé, cet endpoint répond `401 missing_key`, et avec une clé inconnue ou inactive `401 invalid_key` ; `GET /v1/keys/report`, `GET /v1/credits/balance` et `POST /v1/keys/claim` répondent de même. Cet endpoint est
+`month` est le mois calendaire auquel se rapportent les compteurs (`YYYY-MM`). L'essai sans clé n'a pas de clé à consulter ici : ses compteurs sont hebdomadaires (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC), et dans son `402 trial_exhausted`, le champ `cause.quota.month` vaut `week`. Une réponse servie sans clé porte `X-Trial-Period: week` ; le 402 ne porte aucun en-tête `X-Trial-*`. Sans clé, cet endpoint répond `401 missing_key`, et avec une clé inconnue ou inactive `401 invalid_key` ; `GET /v1/keys/report`, `GET /v1/credits/balance` et `POST /v1/keys/claim` répondent de même (la réclamation accepte encore une clé coupée pour une rafale d'inscriptions automatiques, puisque la réclamer est ce qui la rétablit). `POST /v1/keys/revoke` et `POST /v1/keys/rotate` répondent `401 missing_key` sans clé, et `404 invalid_key` pour une clé inconnue ou déjà révoquée. Cet endpoint est
 gratuit et ne consomme pas de quota.
 
 ## Surveiller votre quota

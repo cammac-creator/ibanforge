@@ -16,15 +16,16 @@ IBANforge verwendet standardmässige HTTP-Statuscodes und gibt strukturierte Feh
 |---|---|---|
 | `200` | OK | Die Anfrage wurde beantwortet. Eine ungültige IBAN liefert trotzdem `200` mit `valid: false`; ein unbekannter BIC liefert `200` mit `found: false` |
 | `400` | Bad Request | Fehlerhaftes JSON, ein fehlendes Feld oder ein ungültiger Parameter |
-| `401` | Unauthorized | Nur die Schlüsselrouten (`GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`): `missing_key` oder `invalid_key`. Eine kostenpflichtige Route antwortet nie mit `401` |
+| `401` | Unauthorized | Nur die Schlüsselrouten. `missing_key` (kein Schlüssel gesendet) auf `GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`, `POST /v1/keys/revoke` und `POST /v1/keys/rotate`; `invalid_key` (unbekannter oder inaktiver Schlüssel) auf den ersten vier. `POST /v1/keys/claim` nimmt einen wegen einer Welle automatischer Anmeldungen gesperrten Schlüssel weiterhin an: Die Beanspruchung holt ihn zurück. Eine kostenpflichtige Route antwortet nie mit `401` |
+| `403` | Forbidden | `verification_required`: `POST /v1/keys/generate` mit einer Adresse, aus einem Netz, das kürzlich einen Schlüssel geholt hat; ein Code wurde gesendet, wiederholen Sie die Anfrage damit. `forbidden_origin`: Freigabe oder Ablehnung eines Geräteschlüssels (`POST /v1/keys/device/approve`, `/deny`) von einer Seite mit anderer Herkunft |
 | `402` | Payment Required | Kostenpflichtige Route ohne brauchbaren Zahlungsweg: weder Schlüssel noch verbleibendes Gratiskontingent, ein ungültiger Schlüssel oder einer, dessen Kontingent oder Guthaben verbraucht ist, oder eine abgelehnte Zahlung. Der x402-Zahlungsumschlag, mit einer `cause`, wenn eine zutrifft |
-| `404` | Not Found | Unbekannter Endpunkt |
+| `404` | Not Found | Unbekannter Endpunkt. Auf `POST /v1/keys/revoke` und `POST /v1/keys/rotate` `invalid_key`: Der Schlüssel ist unbekannt oder bereits widerrufen |
 | `405` | Method Not Allowed | Richtiger Pfad, falsche Methode (zum Beispiel `GET /v1/keys/generate`); das Feld `allow` nennt die richtige Methode |
-| `409` | Conflict | Nur die Schlüsselrouten: `already_claimed`, `already_claimed_elsewhere`, `verification_in_flight`. Siehe [API-Schlüssel](/docs/api-keys) |
+| `409` | Conflict | Nur die Schlüsselrouten. `already_claimed`: Der Schlüssel hat die anonyme Stufe bereits verlassen. `already_claimed_elsewhere`: Diese Adresse hält bereits einen beanspruchten Schlüssel oder hat in den letzten 24 Stunden einen beansprucht. `verification_in_flight`: Für diese Adresse wurde gerade ein Code ausgestellt; verwenden Sie ihn oder versuchen Sie es in einigen Minuten erneut |
 | `413` | Payload Too Large | Body der Anfrage über 256 KB |
 | `429` | Too Many Requests | Mehr als 100 Anfragen in einer Minute von derselben IP-Adresse; warten Sie `Retry-After` ab |
 | `500` | Internal Server Error | Unerwarteter Serverfehler (bitte melden, siehe [Support](#support)) |
-| `502`, `503` | Bad Gateway, Service Unavailable | Die x402-Zahlungsschiene war nicht erreichbar oder hat mit einem Fehler geantwortet. Später erneut versuchen. Die Route der britischen Institute hat eigene `502`- und `503`-Codes, auf [ihrer Seite](/docs/gb-firms) |
+| `502`, `503` | Bad Gateway, Service Unavailable | Die x402-Zahlungsschiene war nicht erreichbar oder hat mit einem Fehler geantwortet. Später erneut versuchen. Auf den Schlüsselrouten `503 verification_unavailable`: Die Bestätigungsmail konnte nicht gesendet werden (Schlüssel mit Adresse, Beanspruchung, Gerätefreigabe); in einigen Minuten erneut versuchen. Die Route der britischen Institute hat eigene `502`- und `503`-Codes, auf [ihrer Seite](/docs/gb-firms) |
 
 ## Validierungsfehlercodes
 

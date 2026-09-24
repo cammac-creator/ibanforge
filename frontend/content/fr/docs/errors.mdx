@@ -16,15 +16,16 @@ IBANforge utilise les codes de statut HTTP standards et renvoie des erreurs stru
 |---|---|---|
 | `200` | OK | La requête a reçu sa réponse. Un IBAN invalide renvoie quand même `200` avec `valid: false` ; un BIC inconnu renvoie `200` avec `found: false` |
 | `400` | Bad Request | JSON mal formé, champ manquant ou paramètre invalide |
-| `401` | Unauthorized | Les routes des clés seulement (`GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`) : `missing_key` ou `invalid_key`. Une route payante ne répond jamais `401` |
+| `401` | Unauthorized | Les routes des clés seulement. `missing_key` (aucune clé envoyée) sur `GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`, `POST /v1/keys/revoke` et `POST /v1/keys/rotate` ; `invalid_key` (clé inconnue ou inactive) sur les quatre premières. `POST /v1/keys/claim` accepte encore une clé coupée pour une rafale d'inscriptions automatiques : la réclamer est ce qui la rétablit. Une route payante ne répond jamais `401` |
+| `403` | Forbidden | `verification_required` : `POST /v1/keys/generate` avec une adresse, depuis un réseau qui a pris une clé récemment ; un code a été envoyé, répétez la requête avec lui. `forbidden_origin` : approbation ou refus d'une clé par appareil (`POST /v1/keys/device/approve`, `/deny`) depuis une page d'une autre origine |
 | `402` | Payment Required | Route payante appelée sans moyen de payer utilisable : ni clé ni franchise gratuite restante, une clé invalide ou dont la franchise ou les crédits sont épuisés, ou un paiement refusé. L'enveloppe de paiement x402, avec une `cause` quand elle s'applique |
-| `404` | Not Found | Endpoint inconnu |
+| `404` | Not Found | Endpoint inconnu. Sur `POST /v1/keys/revoke` et `POST /v1/keys/rotate`, `invalid_key` : la clé est inconnue ou déjà révoquée |
 | `405` | Method Not Allowed | Bon chemin, mauvaise méthode (par exemple `GET /v1/keys/generate`) ; le champ `allow` nomme la méthode à utiliser |
-| `409` | Conflict | Les routes des clés seulement : `already_claimed`, `already_claimed_elsewhere`, `verification_in_flight`. Voir [Clés API](/docs/api-keys) |
+| `409` | Conflict | Les routes des clés seulement. `already_claimed` : la clé a déjà quitté le palier anonyme. `already_claimed_elsewhere` : cette adresse porte déjà une clé réclamée, ou en a réclamé une dans les dernières 24 heures. `verification_in_flight` : un code pour cette adresse vient d'être émis ; utilisez-le, ou réessayez dans quelques minutes |
 | `413` | Payload Too Large | Corps de requête au-delà de 256 Ko |
 | `429` | Too Many Requests | Plus de 100 requêtes en une minute depuis la même adresse IP ; attendez `Retry-After` |
 | `500` | Internal Server Error | Erreur inattendue du serveur (merci de nous la signaler, voir [Support](#support)) |
-| `502`, `503` | Bad Gateway, Service Unavailable | Le rail de paiement x402 est injoignable ou a répondu par une erreur. Réessayez plus tard. La route des établissements britanniques a ses propres codes `502` et `503`, sur [sa page](/docs/gb-firms) |
+| `502`, `503` | Bad Gateway, Service Unavailable | Le rail de paiement x402 est injoignable ou a répondu par une erreur. Réessayez plus tard. Sur les routes des clés, `503 verification_unavailable` : le mail de vérification n'a pas pu partir (clé créée avec une adresse, réclamation, approbation par appareil) ; réessayez dans quelques minutes. La route des établissements britanniques a ses propres codes `502` et `503`, sur [sa page](/docs/gb-firms) |
 
 ## Codes d'erreur de validation
 

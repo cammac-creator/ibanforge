@@ -288,7 +288,7 @@ a key claimed by payment — its 200 are counted once, across all months, not re
 `credits` means a prepaid balance, with nothing enforced against `limit`. The `claim` block is
 served only on a key that can still be claimed.
 
-`month` is the calendar month the counters belong to (`YYYY-MM`). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`, as does the `X-Trial-Period` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same.
+`month` is the calendar month the counters belong to (`YYYY-MM`). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`. A served keyless answer carries `X-Trial-Period: week`; the 402 carries no `X-Trial-*` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same (the claim still accepts a key cut off for a burst of automated signups, since claiming is how it comes back). `POST /v1/keys/revoke` and `POST /v1/keys/rotate` answer `401 missing_key` without a key, and `404 invalid_key` for an unknown or already revoked one.
 
 ## Watching your quota
 

@@ -278,11 +278,26 @@ codes:
     status: 401
     retryable: false
     meaning: The key routes only (GET /v1/keys/usage, GET /v1/keys/report,
-      GET /v1/credits/balance, POST /v1/keys/claim) - no key was sent.
+      GET /v1/credits/balance, POST /v1/keys/claim, POST /v1/keys/revoke,
+      POST /v1/keys/rotate) - no key was sent.
   - code: invalid_key
     status: 401
     retryable: false
-    meaning: The key routes only - the key sent is unknown or inactive.
+    meaning: The key routes only - the key sent is unknown or inactive. It is a
+      401 on GET /v1/keys/usage, GET /v1/keys/report, GET /v1/credits/balance and
+      POST /v1/keys/claim, and a 404 on POST /v1/keys/revoke and
+      POST /v1/keys/rotate. POST /v1/keys/claim still accepts a key cut off for
+      a burst of automated signups, since claiming is how it comes back.
+  - code: verification_required
+    status: 403
+    retryable: true
+    meaning: POST /v1/keys/generate with an address, from a network that took a
+      key recently. A code was mailed - repeat the request with it.
+  - code: forbidden_origin
+    status: 403
+    retryable: false
+    meaning: A device key approved or refused (POST /v1/keys/device/approve or
+      /deny) from a page on another origin.
   - code: not_found
     status: 404
     retryable: false
@@ -293,6 +308,12 @@ codes:
     status: 429
     retryable: true
     meaning: Too many requests in the window. Honour Retry-After.
+  - code: verification_unavailable
+    status: 503
+    retryable: true
+    meaning: The key routes only - the verification mail could not be sent (a
+      key created with an address, a claim, a device approval). Try again in a
+      few minutes.
 
 unexpected_failure:
   status: 500
@@ -498,8 +519,10 @@ Authorization: Bearer ifk_xxxxxxxx
 - Claim it: \`POST /v1/keys/claim\`, key in the \`Authorization\` header.
 - Check remaining allowance: \`GET /v1/keys/usage\`.
 
-The key goes in the \`Authorization\` header only. It is never accepted in a
-query string, so it cannot end up in a proxy log or a browser history.
+Prefer the \`Authorization\` header. The key is also read from an
+\`X-API-Key\` header and, for a client that cannot set a header, from an
+\`?api_key=\` query parameter; a key in a query string can end up in a proxy log
+or a browser history, so use it only where no header can be set.
 
 ## 3. MCP, anonymous
 

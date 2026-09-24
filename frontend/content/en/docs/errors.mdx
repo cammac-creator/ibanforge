@@ -16,15 +16,16 @@ IBANforge uses standard HTTP status codes and returns structured JSON errors, `{
 |---|---|---|
 | `200` | OK | The request was answered. An invalid IBAN still returns `200` with `valid: false`; an unknown BIC returns `200` with `found: false` |
 | `400` | Bad Request | Malformed JSON, a missing field, or an invalid parameter |
-| `401` | Unauthorized | The key routes only (`GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`): `missing_key` or `invalid_key`. A paid route never answers `401` |
+| `401` | Unauthorized | The key routes only. `missing_key` (no key sent) on `GET /v1/keys/usage`, `GET /v1/keys/report`, `GET /v1/credits/balance`, `POST /v1/keys/claim`, `POST /v1/keys/revoke` and `POST /v1/keys/rotate`; `invalid_key` (unknown or inactive key) on the first four. `POST /v1/keys/claim` still accepts a key cut off for a burst of automated signups: claiming is how it comes back. A paid route never answers `401` |
+| `403` | Forbidden | `verification_required`: `POST /v1/keys/generate` with an address, from a network that took a key recently; a code was mailed, repeat the request with it. `forbidden_origin`: approving or refusing a device key (`POST /v1/keys/device/approve`, `/deny`) from a page on another origin |
 | `402` | Payment Required | A paid route called without a usable way to pay: no key and no free allowance left, a key that is invalid or has spent its allowance or credits, or a payment that was refused. The x402 payment envelope, with a `cause` when one applies |
-| `404` | Not Found | Unknown endpoint |
+| `404` | Not Found | Unknown endpoint. On `POST /v1/keys/revoke` and `POST /v1/keys/rotate`, `invalid_key`: the key is unknown or already revoked |
 | `405` | Method Not Allowed | Right path, wrong method (for example `GET /v1/keys/generate`); the `allow` field names the method to use |
-| `409` | Conflict | The key routes only: `already_claimed`, `already_claimed_elsewhere`, `verification_in_flight`. See [API keys](/docs/api-keys) |
+| `409` | Conflict | The key routes only. `already_claimed`: the key is already past the anonymous tier. `already_claimed_elsewhere`: that address already holds a claimed key, or claimed one in the last 24 hours. `verification_in_flight`: a code for that address was issued moments ago; use it, or try again in a few minutes |
 | `413` | Payload Too Large | Request body over 256 KB |
 | `429` | Too Many Requests | More than 100 requests in one minute from the same IP address; wait for `Retry-After` |
 | `500` | Internal Server Error | Unexpected server error (please report it, see [Support](#support)) |
-| `502`, `503` | Bad Gateway, Service Unavailable | The x402 payment rail could not be reached or answered with an error. Retry later. The UK firms route has its own `502` and `503` codes, on [its page](/docs/gb-firms) |
+| `502`, `503` | Bad Gateway, Service Unavailable | The x402 payment rail could not be reached or answered with an error. Retry later. On the key routes, `503 verification_unavailable`: the verification mail could not be sent (a key created with an address, a claim, a device approval); try again in a few minutes. The UK firms route has its own `502` and `503` codes, on [its page](/docs/gb-firms) |
 
 ## Validation error codes
 

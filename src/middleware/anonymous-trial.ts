@@ -256,6 +256,12 @@ export function anonymousTrialMiddleware(): MiddlewareHandler<HonoEnv> {
       // ⚠️ Reserve for lot 5: if the effective limit is lowered during a week, a
       // source already above the new limit will not cross it and writes no
       // event. Decide it when the breaker is wired, not here.
+      //
+      // ⚠️ Reserve on the memory path: a source counted in memory rather than
+      // in `trial_weekly` (the shared `unknown` bucket, or a new source while
+      // the week's table is full) starts again from zero after a restart. It is
+      // served 25 more calls, and crosses the ceiling, and writes this event,
+      // once more. Only the database path is restart-proof.
       if (spent.used === limit + 1) {
         recordSafely(() => recordServerEvent('api:trial-exhausted'), 'web_event');
       }
