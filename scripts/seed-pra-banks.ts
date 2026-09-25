@@ -15,7 +15,8 @@
 import { createRequire } from 'node:module';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { RESTRICTED_FLOORS } from '../src/lib/restricted-family.js';
+import { PRA_LIST_MONTHS_BACK, RESTRICTED_FLOORS } from '../src/lib/restricted-family.js';
+import { reportSeedMember } from './seed-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -52,6 +53,13 @@ function listUrl(year: number, month: number): string {
  * une seule valeur, 200.
  */
 const MIN_EXPECTED_ROWS = RESTRICTED_FLOORS.pra;
+
+/**
+ * Le membre de la famille « sous conditions » que ce seeder remplit
+ * (src/lib/restricted-family.ts), nommé dans le rapport de la chaîne privée de
+ * la surcouche (scripts/seed-report.ts). Sans SEED_REPORT_PATH, aucun rapport.
+ */
+const PRA_MEMBER = 'pra';
 
 // ---------------------------------------------------------------------------
 // Parsing
@@ -297,7 +305,9 @@ interface Downloaded {
 async function downloadList(now = new Date()): Promise<Downloaded> {
   const attempts: string[] = [];
 
-  for (let back = 0; back < 3; back++) {
+  // PRA_LIST_MONTHS_BACK (2) : la même fenêtre borne la reprise d'une liste en
+  // panne dans la chaîne privée de la surcouche (scripts/restricted-carry-over.ts).
+  for (let back = 0; back <= PRA_LIST_MONTHS_BACK; back++) {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
     const year = d.getUTCFullYear();
     const month = d.getUTCMonth() + 1;
@@ -353,6 +363,7 @@ async function main(): Promise<void> {
     // table already in the database stays, attribution and all.
     console.error(`[pra] download failed: ${(err as Error).message}`);
     console.log('[pra] pra_banks left untouched. Exiting 0 so the build is not broken.');
+    reportSeedMember({ member: PRA_MEMBER, state: 'failed', cause: 'download_failed' });
     return;
   }
 
@@ -362,6 +373,7 @@ async function main(): Promise<void> {
   } catch (err) {
     console.error(`[pra] parse failed on ${downloaded.url}: ${(err as Error).message}`);
     console.log('[pra] pra_banks left untouched (nothing was dropped). Exiting 0.');
+    reportSeedMember({ member: PRA_MEMBER, state: 'failed', cause: 'unreadable' });
     return;
   }
 
@@ -370,6 +382,7 @@ async function main(): Promise<void> {
       `[pra] sanity floor: parsed ${parsed.rows.length} firms but expected at least ${MIN_EXPECTED_ROWS}.`,
     );
     console.log('[pra] pra_banks left untouched (nothing was dropped). Exiting 0.');
+    reportSeedMember({ member: PRA_MEMBER, state: 'failed', cause: 'below_floor' });
     return;
   }
 
@@ -426,6 +439,7 @@ async function main(): Promise<void> {
   console.log(`Joining a BIC row: ${joined}`);
   console.log('\nDone! pra_banks seeded in data/bic.sqlite');
   console.log('Attribution required by the permission: "Bank of England (List of Banks, ' + parsed.list_month + ')"');
+  reportSeedMember({ member: PRA_MEMBER, state: 'loaded', processed: parsed.rows.length });
 }
 
 const invokedDirectly = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

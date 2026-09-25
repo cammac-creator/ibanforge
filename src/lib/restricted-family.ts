@@ -307,6 +307,26 @@ export const RESTRICTED_FLOORS = {
   pra: 200,
 } as const;
 
+/**
+ * L'ordre dans lequel la reconstruction insère les sources de `bic_entries` :
+ * OeNB, NBP, puis EBA STEP2 (scripts/enrich-bic-database.ts les importe dans cet
+ * ordre, chacune par INSERT OR IGNORE : la première arrivée garde un BIC11
+ * commun). La reprise d'un membre en panne (scripts/restricted-carry-over.ts)
+ * réinsère ses lignes à la même place, pour que la préséance reste celle d'un
+ * passage où la source aurait répondu. Chaque valeur est aussi l'identifiant du
+ * membre (`where.value` = `id` pour ces trois membres).
+ */
+export const RESTRICTED_BIC_INSERT_ORDER = ['oenb', 'nbp', 'eba_step2'] as const;
+
+/**
+ * La fenêtre de la liste PRA de la Bank of England, en mois : le seeder
+ * (scripts/seed-pra-banks.ts) prend la liste du mois courant ou, si elle n'est
+ * pas encore publiée, celle de l'un des deux mois précédents. La reprise d'une
+ * liste en panne n'accepte rien de plus ancien que ce que le seeder publierait
+ * lui-même ce jour-là (scripts/restricted-carry-over.ts). Une seule valeur.
+ */
+export const PRA_LIST_MONTHS_BACK = 2;
+
 export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
   // --- bic.sqlite -----------------------------------------------------------
   {

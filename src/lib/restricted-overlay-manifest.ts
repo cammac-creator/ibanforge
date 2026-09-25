@@ -25,10 +25,27 @@
  * SHRINK_GUARD_MIN_ROWS lignes baisserait de plus de 10 %. Elle compare les
  * MANIFESTES, pas les fichiers : une surcouche précédente d'une autre version de
  * format (refusée par le chargeur d'aujourd'hui) ne la désarme pas.
+ *
+ * ## Les membres repris (depuis le 25/09/2026)
+ *
+ * Quand la source d'un membre est en panne au passage mensuel, ce membre est
+ * repris tel quel de la surcouche précédente (scripts/restricted-carry-over.ts)
+ * et le fichier le dit dans ses métadonnées. Le manifeste le recopie, champ
+ * `carried_over` de l'entrée du fichier : `{ "<membre>": { "source_date",
+ * "cause" } }`, absent quand rien n'est repris. Il est relu DEPUIS LE FICHIER à
+ * chaque manifeste, y compris quand le passage hebdomadaire reprend le fichier
+ * BIC tel quel : l'information suit le fichier tant qu'il est servi. Un lecteur
+ * plus ancien ignore ce champ.
  */
 import { basename } from 'node:path';
 import type { OverlayKind } from './restricted-family.js';
-import { SHRINK_GUARD_MIN_ROWS, inspectOverlay } from './restricted-overlay.js';
+import {
+  SHRINK_GUARD_MIN_ROWS,
+  carriedOverFromMeta,
+  inspectOverlay,
+  parseCarriedOver,
+  type CarriedOverMember,
+} from './restricted-overlay.js';
 
 /** Version du format. Une autre valeur est refusée, jamais devinée. */
 export const MANIFEST_FORMAT = 1;
@@ -61,6 +78,8 @@ export interface ManifestFile {
   public_commit: string | null;
   /** Les lignes de chaque membre de la famille, telles que le chargeur les compte. */
   members: Record<string, number>;
+  /** Les membres repris de la surcouche précédente (voir l'en-tête) ; absent si aucun. */
+  carried_over?: Record<string, CarriedOverMember>;
 }
 
 export interface OverlayManifest {
@@ -111,7 +130,21 @@ function parseFile(value: unknown): ManifestFile | null {
     if (typeof rows !== 'number' || !Number.isSafeInteger(rows) || rows < 0) return null;
     counts[id] = rows;
   }
-  return { name, sha256, bytes, generated_at: generatedAt, public_commit: commit, members: counts };
+  // Facultatif ; s'il est là, chaque membre repris est un membre du fichier.
+  let carried: Record<string, CarriedOverMember> | null = null;
+  if (value.carried_over !== undefined) {
+    carried = parseCarriedOver(value.carried_over);
+    if (!carried || Object.keys(carried).some((id) => !Object.hasOwn(counts, id))) return null;
+  }
+  return {
+    name,
+    sha256,
+    bytes,
+    generated_at: generatedAt,
+    public_commit: commit,
+    members: counts,
+    ...(carried && Object.keys(carried).length > 0 ? { carried_over: carried } : {}),
+  };
 }
 
 /**
@@ -171,8 +204,25 @@ export function manifestEntryFor(options: {
   const bytes = inspection.bytes as number;
   const members = Object.fromEntries(inspection.members.map((m) => [m.id, m.rows]));
   const name = basename(path);
-  if (options.previous && options.previous.sha256 === sha256)
-    return { ...options.previous, name, bytes, members };
+  // Toujours relu du fichier, même inchangé : un fichier BIC repris par le passage
+  // hebdomadaire garde la liste de ses membres repris.
+  let carriedOver: Record<string, CarriedOverMember>;
+  try {
+    carriedOver = carriedOverFromMeta(inspection.meta);
+  } catch {
+    throw new Error(`Surcouche ${kind} : liste des membres repris illisible`);
+  }
+  // Seuls les membres de la famille d'aujourd'hui : un membre sorti de la famille
+  // depuis l'écriture du fichier ferait refuser le manifeste entier par le lecteur.
+  carriedOver = Object.fromEntries(
+    Object.entries(carriedOver).filter(([id]) => Object.hasOwn(members, id)),
+  );
+  const carried = Object.keys(carriedOver).length > 0 ? { carried_over: carriedOver } : {};
+  if (options.previous && options.previous.sha256 === sha256) {
+    const kept: ManifestFile = { ...options.previous, name, bytes, members };
+    delete kept.carried_over;
+    return { ...kept, ...carried };
+  }
   const generatedAt = instant(inspection.meta?.created_at);
   if (!generatedAt) throw new Error(`Surcouche ${kind} sans date de création lisible`);
   return {
@@ -182,6 +232,7 @@ export function manifestEntryFor(options: {
     generated_at: generatedAt,
     public_commit: options.publicCommit,
     members,
+    ...carried,
   };
 }
 

@@ -100,6 +100,82 @@ export const OVERLAY_META_TABLE = 'overlay_meta';
 export const OVERLAY_MEMBERS_TABLE = 'overlay_members';
 /** Au-delà, ce n'est pas une surcouche : quelques Mo aujourd'hui pour les deux. */
 const MAX_OVERLAY_BYTES = 256 * 1024 * 1024;
+/**
+ * Clés de `overlay_meta` écrites par la reprise membre par membre
+ * (scripts/restricted-carry-over.ts), depuis le 25/09/2026. De simples clés en
+ * plus : le format reste le 2, et un chargeur qui ne les connaît pas les ignore.
+ * - `seed_started_at` : l'instant où le passage `seed` a commencé, avant tout
+ *   téléchargement ; les sources des membres qui ne sont pas repris ont été lues
+ *   après lui.
+ * - `carried_over` : les membres repris tels quels de la surcouche précédente,
+ *   en JSON `{ "<membre>": { "source_date": "<instant>", "cause": "<code>" } }` ;
+ *   `source_date` est la date d'origine de leurs lignes, jamais rajeunie d'une
+ *   reprise à l'autre. Absente quand rien n'est repris.
+ */
+export const OVERLAY_META_SEED_STARTED_AT = 'seed_started_at';
+export const OVERLAY_META_CARRIED_OVER = 'carried_over';
+
+/** Un membre repris de la surcouche précédente, tel que le fichier et le manifeste le décrivent. */
+export interface CarriedOverMember {
+  /** Date d'origine des lignes reprises (instant ISO 8601 en UTC). */
+  source_date: string;
+  /** Code court de la panne (`http_503`, `network`, `below_floor`…), jamais un message. */
+  cause: string;
+}
+
+/** Ce que la reprise écrit dans la surcouche qu'elle produit (voir les clés ci-dessus). */
+export interface OverlayRefresh {
+  seedStartedAt: string;
+  carriedOver: Record<string, CarriedOverMember>;
+}
+
+const CARRY_MEMBER_ID = /^[a-z0-9_]{1,64}$/;
+const CARRY_CAUSE = /^[a-z0-9_]{1,40}$/;
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+
+function isIsoInstant(value: unknown): value is string {
+  return typeof value === 'string' && ISO_INSTANT.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+/**
+ * Relit une liste de membres repris (`carried_over` d'une surcouche ou d'un
+ * manifeste), champ par champ. `null` à la moindre forme inattendue : jamais
+ * devinée, jamais recopiée.
+ */
+export function parseCarriedOver(value: unknown): Record<string, CarriedOverMember> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const members: Record<string, CarriedOverMember> = {};
+  for (const [id, entry] of Object.entries(value)) {
+    if (!CARRY_MEMBER_ID.test(id)) return null;
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return null;
+    const { source_date: sourceDate, cause } = entry as Record<string, unknown>;
+    if (!isIsoInstant(sourceDate)) return null;
+    if (typeof cause !== 'string' || !CARRY_CAUSE.test(cause)) return null;
+    members[id] = { source_date: sourceDate, cause };
+  }
+  return members;
+}
+
+/**
+ * Les membres repris d'une surcouche, lus dans ses métadonnées : `{}` quand elle
+ * n'en porte pas (toute surcouche écrite avant le 25/09/2026, ou sans reprise).
+ * Une valeur illisible est refusée : elle ne vient que de l'extraction.
+ */
+export function carriedOverFromMeta(
+  meta: Record<string, string> | undefined,
+): Record<string, CarriedOverMember> {
+  const raw = meta?.[OVERLAY_META_CARRIED_OVER];
+  if (raw === undefined) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  const members = parseCarriedOver(parsed);
+  if (!members) throw new Error(`Métadonnée ${OVERLAY_META_CARRIED_OVER} illisible`);
+  return members;
+}
 
 /** Ce qu'il advient d'un membre : servi par la surcouche, gardé du public, ou refusé. */
 export type MemberState = 'applied' | 'kept_public' | 'refused';
@@ -934,6 +1010,10 @@ function memberDates(
  *
  * `sourcePath` est ouvert par ATTACH : passer une COPIE (une base WAL ouverte
  * crée ses compagnons à côté d'elle).
+ *
+ * `refresh` (passage `seed` de la base BIC seulement) : l'instant du début du
+ * passage et les membres repris de la surcouche précédente, écrits dans
+ * `overlay_meta` (OVERLAY_META_SEED_STARTED_AT, OVERLAY_META_CARRIED_OVER).
  */
 export function extractOverlay(options: {
   kind: OverlayKind;
@@ -941,9 +1021,22 @@ export function extractOverlay(options: {
   outPath: string;
   generator: string;
   allowShrink?: boolean;
+  /** La reprise membre par membre du passage `seed` (voir OVERLAY_META_CARRIED_OVER). */
+  refresh?: OverlayRefresh;
 }): ExtractResult {
-  const { kind, sourcePath, outPath, generator } = options;
+  const { kind, sourcePath, outPath, generator, refresh } = options;
   if (!outPath.endsWith('.sqlite')) throw new Error('La surcouche doit finir par .sqlite');
+  // Relue avant toute écriture : seule la version contrôlée entre dans le fichier.
+  const carriedOver = refresh ? parseCarriedOver(refresh.carriedOver) : null;
+  if (refresh) {
+    const ids = new Set(membersOf(kind).map((m) => m.id));
+    if (
+      !isIsoInstant(refresh.seedStartedAt) ||
+      !carriedOver ||
+      Object.keys(carriedOver).some((id) => !ids.has(id))
+    )
+      throw new Error('Reprise mal décrite : surcouche non écrite');
+  }
   const previous = existsSync(outPath) ? inspectOverlay(outPath, kind) : null;
   const temporary = `${outPath}.tmp-${randomUUID()}`;
   const db = openDatabase(temporary);
@@ -1036,6 +1129,11 @@ export function extractOverlay(options: {
           }
         ).d;
         if (updated) insertMeta.run('source_bic_entries_updated_at', updated);
+      }
+      if (refresh && carriedOver) {
+        insertMeta.run(OVERLAY_META_SEED_STARTED_AT, refresh.seedStartedAt);
+        if (Object.keys(carriedOver).length > 0)
+          insertMeta.run(OVERLAY_META_CARRIED_OVER, JSON.stringify(carriedOver));
       }
     })();
     db.exec('DETACH DATABASE src');
