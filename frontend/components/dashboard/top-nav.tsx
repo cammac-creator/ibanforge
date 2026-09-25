@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Bot,
   ChevronRight,
+  DoorOpen,
   LayoutDashboard,
   Mail,
   MessagesSquare,
@@ -28,6 +29,8 @@ const DESTINATIONS = [
   { key: 'clients', path: '/dashboard/clients', icon: Users },
   { key: 'bots', path: '/dashboard/clients-bot', icon: Bot },
   { key: 'forums', path: '/dashboard/forums', icon: MessagesSquare },
+  // Le tableau des portes du lundi (plan d'audit, semaine 2).
+  { key: 'doors', path: '/dashboard/portes', icon: DoorOpen },
 ] as const;
 
 export function TopNav() {
@@ -112,7 +115,9 @@ export function TopNav() {
           <summary
             className={styles.mobileLink}
             aria-label={t('more')}
-            data-active={current.key === 'bots' || current.key === 'forums'}
+            data-active={
+              current.key === 'bots' || current.key === 'forums' || current.key === 'doors'
+            }
           >
             <MoreHorizontal size={21} aria-hidden />
             <span>{t('more')}</span>
