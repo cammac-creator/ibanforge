@@ -16,6 +16,7 @@ import {
   consumeOneTimeKey,
   consumeOneTimeKeyByPaymentRef,
   OEM_MONTHLY_LIMIT,
+  PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { findPurchaseByRef } from '../lib/key-purchases.js';
 
@@ -50,6 +51,19 @@ stripeRetrieve.get('/v1/stripe/key/:session_id', (c) => {
         key_prefix: purchase.key_prefix,
         credits_added: purchase.credits,
         note: 'Credits added to the key you already hold: nothing to change in your integration.',
+      });
+    }
+    // Un abonnement posé sur une clé EXISTANTE (lot B2, 25.09.2026) : aucune
+    // clé brute non plus. La formule, son allocation et le préfixe de la clé,
+    // rien d'autre ; relisible, la page ne porte aucun secret.
+    if (purchase && purchase.kind === 'subscription' && purchase.outcome === 'attached') {
+      const plan = purchase.bundle === 'oem' ? 'oem' : 'pro';
+      return c.json({
+        subscription_attached: true,
+        plan,
+        key_prefix: purchase.key_prefix,
+        monthly_limit: plan === 'oem' ? OEM_MONTHLY_LIMIT : PRO_MONTHLY_LIMIT,
+        note: 'The subscription is on the key you already hold: nothing to change in your integration.',
       });
     }
   }

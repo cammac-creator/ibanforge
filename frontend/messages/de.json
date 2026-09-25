@@ -555,6 +555,7 @@
       "title": "Lieber eine feste Monatsrechnung?",
       "text": "Pro: 10'000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit im Kundenportal kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
       "note": "Die Integration in Ihr Produkt ist innerhalb der Grenzen und Bedingungen Ihres Tarifs erlaubt. Für ein schriftliches SLA, Supportzusagen oder höhere Volumen nutzen Sie das Editor/OEM-Angebot.",
+      "existingKey": "Sie haben schon einen Schlüssel? Buchen Sie Pro darauf über <account>Ihr Konto</account>: Das Kontingent landet auf genau diesem Schlüssel, an Ihrer Integration ändert sich nichts.",
       "price": "29 $",
       "per": "/ Monat",
       "cta": "Pro abonnieren",
@@ -2326,7 +2327,9 @@
     "topupTitle": "Diesen Schlüssel aufladen",
     "topupHint": "Zahlung per Karte: Die Credits landen auf genau diesem Schlüssel. An Ihrer Integration ändert sich nichts.",
     "topupUnproven": "Dieser Schlüssel trägt Ihre Adresse, sie wurde bei seiner Erstellung aber nicht mit einem Code bestätigt. Laden Sie ihn nur auf, wenn Sie ihn als Ihren erkennen.",
-    "topupCredits": "{credits} Credits"
+    "topupCredits": "{credits} Credits",
+    "topupPro": "Pro auf diesem Schlüssel: {requests} Anfragen pro Monat",
+    "topupProPrice": "29 $ / Monat"
   },
   "sources": {
     "meta": {

@@ -555,6 +555,7 @@
       "title": "Prefer a flat monthly bill?",
       "text": "Pro: 10,000 requests a month, every endpoint, resets on the 1st, cancel anytime from the customer portal. Card checkout through Stripe, your key arrives by e-mail right after payment and works within seconds.",
       "note": "Integration into your product is permitted within your plan’s limits and terms. For a written SLA, support commitments or higher volumes, see the Editor/OEM plan.",
+      "existingKey": "Already have a key? Take Pro on it from <account>your account page</account>: the allowance lands on that same key, nothing to change in your integration.",
       "price": "$29",
       "per": "/ month",
       "cta": "Subscribe to Pro",
@@ -2326,7 +2327,9 @@
     "topupTitle": "Recharge this key",
     "topupHint": "Pay by card: the credits land on this same key. Nothing to change in your integration.",
     "topupUnproven": "This key carries your address, but that address was not confirmed by a code when the key was created. Recharge it only if you recognise it as yours.",
-    "topupCredits": "{credits} credits"
+    "topupCredits": "{credits} credits",
+    "topupPro": "Pro on this key: {requests} requests a month",
+    "topupProPrice": "$29 / month"
   },
   "sources": {
     "meta": {

@@ -28,11 +28,14 @@ import {
 } from '../lib/api-keys.js';
 import { ensureTopupRef, findPurchaseByRef } from '../lib/key-purchases.js';
 import {
+  buildCreditsWarningEmail,
   buildSubscriptionAttachedEmail,
   buildSubscriptionEndedEmail,
   buildProKeyEmail,
   PRO_CANCELLATION_SENTENCE,
 } from '../lib/email.js';
+import { Hono } from 'hono';
+import { stripeRetrieve } from './stripe-retrieve.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 import { startFakeFacilitator, type FakeFacilitator } from '../test-support/fake-facilitator.js';
 
@@ -182,6 +185,16 @@ function keyRow(keyHash: string) {
   };
 }
 
+async function usageOf(key: string) {
+  ip += 1;
+  const res = await buildApp().request('https://api.ibanforge.com/v1/keys/usage', {
+    headers: { Authorization: `Bearer ${key}`, 'x-real-ip': `198.51.100.${(ip % 250) + 1}` },
+  });
+  return (await res.json()) as { topup?: { by_card?: Record<string, string>; pro?: string } };
+}
+
+const PRO_LINK = 'https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04';
+
 async function call(key: string) {
   ip += 1;
   return buildApp().request('https://api.ibanforge.com/v1/iban/validate', {
@@ -200,7 +213,8 @@ function freeKeyWithPackThenPro(tag: string) {
   const key = freeKey(tag);
   const ref = ensureTopupRef(key.key_hash)!;
   processStripeEvent(packCheckout({ sessionId: `cs_test_${uniq(`${tag}-pack`)}`, ref }));
-  const sessionId = `cs_test_${uniq(`${tag}-pro`)}`;
+  // Des soulignés, jamais un tiret : la page de succès n'accepte que `cs_test_[A-Za-z0-9_]+`.
+  const sessionId = `cs_test_${uniq(`${tag}_pro`).replace(/-/g, '_')}`;
   const subscriptionId = `sub_test_${uniq(tag)}`;
   const keysBeforePro = keyCount();
   const attached = processStripeEvent(proCheckout({ sessionId, subscriptionId, ref }));
@@ -513,6 +527,90 @@ describe('renouvellement et contestation', () => {
     expect(dispute.body).toMatchObject({ ignored: 'no_matching_purchase' });
     expect(validateApiKey(key.api_key).creditsRemaining).toBe(1000);
     expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+  });
+});
+
+describe('les surfaces : Pro sur CETTE clé, jamais à un abonné', () => {
+  it('le 402 d’une clé née d’un abonnement terminé propose Pro sur elle-même', async () => {
+    const subscriptionId = `sub_test_${uniq('wall')}`;
+    const minted = processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('wall')}`, subscriptionId }),
+    );
+    const rawKey = minted.notify!.rawKey;
+    processStripeEvent(subscriptionDeleted(subscriptionId));
+    const res = await call(rawKey);
+    expect(res.status).toBe(402);
+    const ref = ensureTopupRef(validateApiKey(rawKey).keyHash)!;
+    const body = (await res.json()) as {
+      cause?: { detail?: string };
+      credit_packs?: { topup_this_key?: { pro?: { by_card?: string } } };
+    };
+    expect(body.credit_packs?.topup_this_key?.pro?.by_card).toBe(
+      `${PRO_LINK}?client_reference_id=${ref}`,
+    );
+    expect(JSON.stringify(body)).toContain(
+      `Or Pro on this same key, a flat $29/month for 10,000 requests: ${PRO_LINK}?client_reference_id=${ref}`,
+    );
+  });
+
+  it('usage : le lien Pro de la clé sans abonnement vivant, aucun avec', async () => {
+    const key = freeKey('usage');
+    const ref = ensureTopupRef(key.key_hash)!;
+    expect((await usageOf(key.api_key)).topup?.pro).toBe(`${PRO_LINK}?client_reference_id=${ref}`);
+    processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('usage')}`,
+        subscriptionId: `sub_test_${uniq('usage')}`,
+        ref,
+      }),
+    );
+    const during = await usageOf(key.api_key);
+    expect(during.topup?.by_card?.['1k']).toContain(ref);
+    expect(during.topup?.pro).toBeUndefined();
+  });
+
+  it('la page de succès reçoit subscription_attached, sans clé ni secret', async () => {
+    const { key, sessionId } = freeKeyWithPackThenPro('success');
+    const app = new Hono();
+    app.route('/', stripeRetrieve);
+    const res = await app.request(`/v1/stripe/key/${sessionId}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      subscription_attached: true,
+      plan: 'pro',
+      key_prefix: key.key_prefix,
+      monthly_limit: PRO_MONTHLY_LIMIT,
+    });
+    expect(body.api_key).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain(key.api_key);
+    // Relisible : aucun secret n'y est.
+    expect((await app.request(`/v1/stripe/key/${sessionId}`)).status).toBe(200);
+  });
+
+  it('le mail des 10 % : Pro sur la clé, ou aucun Pro pour un abonné', () => {
+    const ref = `ifr_${'b'.repeat(32)}`;
+    const offer = buildCreditsWarningEmail({
+      keyPrefix: 'ifk_0123abcd',
+      remaining: 100,
+      total: 1000,
+      proMonthlyLimit: PRO_MONTHLY_LIMIT,
+      topupRef: ref,
+    });
+    expect(offer.text).toContain(`${PRO_LINK}?client_reference_id=${ref}`);
+    expect(offer.text).toContain('A pack or Pro bought from these links lands on this same key');
+    expect(offer.text).not.toContain('delivered as a new key');
+    const subscriber = buildCreditsWarningEmail({
+      keyPrefix: 'ifk_0123abcd',
+      remaining: 100,
+      total: 1000,
+      proMonthlyLimit: PRO_MONTHLY_LIMIT,
+      topupRef: ref,
+      offerPro: false,
+    });
+    expect(subscriber.text).not.toContain(PRO_LINK);
+    expect(subscriber.html).not.toContain(PRO_LINK);
+    expect(subscriber.text).toContain('A pack bought from these links lands on this same key');
   });
 });
 

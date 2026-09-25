@@ -110,17 +110,20 @@ export function proLink(ref: string): string {
  * La même offre que CARD_CHECKOUT_HINT, pour une clé VALIDE : les packs y
  * rechargent cette clé-ci, rien ne change dans l'intégration du porteur.
  *
- * Pro n'y est proposé que comme ce qu'il est aujourd'hui, une clé neuve :
- * l'abonnement sur la clé existante est le lot B2, et promettre « on this
- * key » avant lui serait écrire ce que la route ne fait pas.
+ * Pro se pose sur CETTE clé depuis le lot B2 (25.09.2026), par le lien porteur
+ * de sa référence. Il n'est proposé qu'à une clé qui n'a pas d'abonnement
+ * vivant (`withPro`) : le webhook refuse d'en poser un second (ZG10), et
+ * proposer Pro à un abonné Pro n'a pas de sens.
  */
-export function topupHint(ref: string): string {
+export function topupHint(ref: string, opts: { withPro?: boolean } = {}): string {
   const packs = PACK_OFFERS.map(
     (p) => `${p.credits.toLocaleString('en-US')} credits $${p.priceUsd}: ${topupLink(p.slug, ref)}`,
   ).join(' · ');
   return (
     `Recharge THIS key by card, nothing to change in your integration: ${packs}. ` +
-    'Prefer USDC? POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it. ' +
-    `Or Pro, a flat $${PRO_PRICE_USD}/month for 10,000 requests, delivered as a new key: ${PRO_PAYMENT_LINK}`
+    'Prefer USDC? POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it' +
+    (opts.withPro === false
+      ? ''
+      : `. Or Pro on this same key, a flat $${PRO_PRICE_USD}/month for 10,000 requests: ${proLink(ref)}`)
   );
 }

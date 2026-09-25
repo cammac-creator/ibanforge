@@ -266,7 +266,7 @@ describe('recharger cette clé', () => {
       { ...PACK_KEY, address_proven: false, actions: { ...PACK_KEY.actions, topup: LINKS } },
       '2026-09',
     );
-    expect(unproven?.topup).toEqual({ links: LINKS, proven: false });
+    expect(unproven?.topup).toEqual({ links: LINKS, proven: false, pro: null });
     const proven = sheetFromOverviewKey(
       { ...PACK_KEY, address_proven: true, actions: { ...PACK_KEY.actions, topup: LINKS } },
       '2026-09',
@@ -327,7 +327,29 @@ describe('recharger cette clé', () => {
     expect(sheet?.allowance).toEqual({ lifetime: false, remaining: 50, limit: 200 });
     expect(sheet?.credits).toEqual({ remaining: 1000, total: 1000 });
     // Tenir la clé prouve qu'elle est la sienne : aucun doute à lever.
-    expect(sheet?.topup).toEqual({ links: LINKS, proven: null });
+    expect(sheet?.topup).toEqual({ links: LINKS, proven: null, pro: null });
+  });
+
+  it('Pro sur cette clé (lot B2) : le lien suit, jamais un lien qui n’est pas https', () => {
+    const PRO = 'https://buy.stripe.com/ddd?client_reference_id=ifr_' + '1'.repeat(32);
+    const viewed = sheetFromOverviewKey(
+      {
+        ...PACK_KEY,
+        address_proven: false,
+        actions: { ...PACK_KEY.actions, topup: LINKS, subscribe_pro: PRO },
+      },
+      '2026-09',
+    );
+    // La même mise en garde couvre la recharge et Pro : la section les porte ensemble.
+    expect(viewed?.topup).toEqual({ links: LINKS, proven: false, pro: PRO });
+    const hostile = sheetFromOverviewKey(
+      {
+        ...PACK_KEY,
+        actions: { ...PACK_KEY.actions, topup: LINKS, subscribe_pro: 'javascript:alert(1)' },
+      },
+      '2026-09',
+    );
+    expect(hostile?.topup?.pro).toBeNull();
   });
 });
 

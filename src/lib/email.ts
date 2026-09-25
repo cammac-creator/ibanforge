@@ -445,6 +445,12 @@ export interface CreditsWarningInput {
   proMonthlyLimit: number;
   /** La référence de recharge de la clé (lot B1) : les liens rechargent alors CETTE clé. */
   topupRef?: string | null;
+  /**
+   * Proposer Pro (lot B2) : vrai par défaut, faux pour une clé qui porte déjà un
+   * abonnement vivant. Avec une référence, le lien Pro pose l'abonnement sur
+   * CETTE clé.
+   */
+  offerPro?: boolean;
 }
 
 /**
@@ -467,13 +473,17 @@ export function buildCreditsWarningEmail(p: CreditsWarningInput): {
 } {
   const remaining = p.remaining.toLocaleString('en-US');
   const total = p.total.toLocaleString('en-US');
-  const pro = p.proMonthlyLimit.toLocaleString('en-US');
+  const proLimit = p.proMonthlyLimit.toLocaleString('en-US');
   const pct = Math.round(CREDITS_NOTICE_RATIO * 100);
   const subject = `${remaining} IBANforge credits left on key ${p.keyPrefix} (${pct}% alert)`;
   const links = packLinks(p.topupRef);
+  const offerPro = p.offerPro !== false;
+  // Lot B2 : avec la référence, Pro se pose aussi sur cette clé.
+  const pro = p.topupRef ? proLink(p.topupRef) : PRO_PAYMENT_LINK;
   const sameKey = p.topupRef
-    ? 'A pack bought from these links lands on this same key: nothing to change in your integration. ' +
-      'Pro is delivered as a new key.'
+    ? offerPro
+      ? 'A pack or Pro bought from these links lands on this same key: nothing to change in your integration.'
+      : 'A pack bought from these links lands on this same key: nothing to change in your integration.'
     : 'For now, a purchase by card arrives as a new key: put it in place of this one in your integration.';
 
   const text =
@@ -483,8 +493,8 @@ export function buildCreditsWarningEmail(p: CreditsWarningInput): {
     `  1,000 credits  $4   ${links['1k']}\n` +
     `  5,000 credits  $20  ${links['5k']}\n` +
     ` 25,000 credits  $80  ${links['25k']}\n` +
-    `Or a flat $${PRO_PRICE_USD}/month for ${pro} requests: ${PRO_PAYMENT_LINK}\n\n` +
-    `${sameKey}\n\n` +
+    (offerPro ? `Or a flat $${PRO_PRICE_USD}/month for ${proLimit} requests: ${pro}\n` : '') +
+    `\n${sameKey}\n\n` +
     `Your balance any time:\n` +
     `  - your account page: sign in at ${ACCOUNT_PAGE} with this e-mail address, no key to paste\n` +
     `  - the X-Credits-Remaining header on every paid response\n` +
@@ -502,7 +512,7 @@ export function buildCreditsWarningEmail(p: CreditsWarningInput): {
       <p style="margin:0 0 8px"><a href="${links['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
       <p style="margin:0 0 8px"><a href="${links['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
       <p style="margin:0 0 8px"><a href="${links['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
-      <p style="margin:0"><a href="${PRO_PAYMENT_LINK}" style="color:#fbbf24;text-decoration:none">Pro · ${pro} requests a month · $${PRO_PRICE_USD} →</a></p>
+      ${offerPro ? `<p style="margin:0"><a href="${pro}" style="color:#fbbf24;text-decoration:none">Pro · ${proLimit} requests a month · $${PRO_PRICE_USD} →</a></p>` : ''}
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 18px">${sameKey}</p>
     <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>

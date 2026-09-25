@@ -24,6 +24,7 @@ import {
   findBurstRevokedKey,
   markShieldBirth,
   ownAllowanceDefault,
+  hasActiveSubscription,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { ensureTopupRef, SALE_OUTCOMES_SQL } from '../lib/key-purchases.js';
@@ -35,6 +36,7 @@ import {
   PRO_PAYMENT_LINK,
   PRO_PORTAL_URL,
   PRO_PRICE_USD,
+  proLink,
   topupLinks,
 } from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
@@ -705,8 +707,9 @@ apiKeys.get('/v1/credits/bundles', (c) => {
  * donne qu'un droit, payer pour cette clé. `null` si la base refuse l'écriture
  * de la référence : la lecture ne tombe jamais en 500 pour elle.
  *
- * Pro n'y figure pas : l'abonnement sur la clé existante est le lot B2, et le
- * lien Pro d'aujourd'hui frappe une clé neuve.
+ * `pro` (lot B2) : le lien Pro porteur de la même référence, qui pose
+ * l'abonnement sur CETTE clé. Absent quand la clé porte déjà un abonnement
+ * vivant : le webhook refuse d'en poser un second (ZG10).
  */
 function topupBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> | null {
   const ref = ensureTopupRef(v.keyHash);
@@ -714,6 +717,7 @@ function topupBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
   return {
     same_key: true,
     by_card: topupLinks(ref),
+    ...(hasActiveSubscription(v.keyHash) ? {} : { pro: proLink(ref) }),
     by_usdc: 'POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it',
     ...(v.tier === 'anonymous'
       ? {

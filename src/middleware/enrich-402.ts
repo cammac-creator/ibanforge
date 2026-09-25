@@ -21,11 +21,12 @@ import {
   PRICING_PAGE,
   PRO_PAYMENT_LINK,
   PRO_PRICE_USD,
+  proLink,
   topupLinks,
 } from '../lib/payment-links.js';
 import { ACCOUNT_PAGE } from '../lib/first-call.js';
 import { ensureTopupRef } from '../lib/key-purchases.js';
-import { getKeyTier } from '../lib/api-keys.js';
+import { getKeyTier, hasActiveSubscription } from '../lib/api-keys.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -699,6 +700,16 @@ function topupThisKeyField(
       'Recharge the key you presented: the credits land on this same key, nothing to change in your integration.',
     by_card: topupLinks(ref),
     by_usdc: 'POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it',
+    // Pro sur CETTE clé (lot B2), seulement sans abonnement vivant : le
+    // webhook refuse d'en poser un second (ZG10).
+    ...(hasActiveSubscription(keyHash)
+      ? {}
+      : {
+          pro: {
+            description: `Pro on this same key: $${PRO_PRICE_USD}/month for 10,000 requests, resets on the 1st, cancel anytime.`,
+            by_card: proLink(ref),
+          },
+        }),
     ...(anonymous
       ? {
           note:

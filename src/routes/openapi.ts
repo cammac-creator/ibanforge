@@ -1545,7 +1545,8 @@ const buildRawSpec = () => ({
           'each call draws on the allowance first, then on the credits, and every billed response says which one ' +
           'paid it in X-Charged-From ("allowance", "credits" or "allowance+credits"). credits_total is everything ' +
           'ever bought on the key, recharges included. `topup` carries the card links that recharge THIS key ' +
-          '(they name it by a recharge reference, never by the key) and the USDC route to call with the key presented.',
+          '(they name it by a recharge reference, never by the key) and the USDC route to call with the key presented; ' +
+          'on a key without a subscription, `topup.pro` is the Pro link that puts the subscription on THIS key.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
@@ -1979,7 +1980,7 @@ const buildRawSpec = () => ({
         operationId: 'getCreditBalance',
         summary: 'Read the remaining credits of the presented key',
         description:
-          'For a key with prepaid credits: credits_remaining, credits_total (everything ever bought on the key, recharges included), credits_used and the top-up endpoints. For a key without credits the answer is type: "subscription" with a pointer to GET /v1/keys/usage. On every key, `allowance` gives the allowance of the key (null on a key born of a purchase, which has none), `billing_order` is "allowance_then_credits" on a key that holds both, and `topup` carries the card links that recharge THIS key. When the credits of a key born of a purchase run out, billed routes answer 402 with cause.reason "credits_exhausted", the same links, and X-Credits-Topup-Url (the 1,000-credit one). Authentication is the key itself, in any of the three places every billed route accepts: Authorization: Bearer, X-API-Key, or ?api_key=.',
+          'For a key with prepaid credits: credits_remaining, credits_total (everything ever bought on the key, recharges included), credits_used and the top-up endpoints. For a key without credits the answer is type: "subscription" with a pointer to GET /v1/keys/usage. On every key, `allowance` gives the allowance of the key (null on a key born of a purchase, which has none), `billing_order` is "allowance_then_credits" on a key that holds both, and `topup` carries the card links that recharge THIS key (and, on a key without a subscription, `topup.pro`: the Pro link that puts the subscription on it). When the credits of a key born of a purchase run out, billed routes answer 402 with cause.reason "credits_exhausted", the same links, and X-Credits-Topup-Url (the 1,000-credit one). Authentication is the key itself, in any of the three places every billed route accepts: Authorization: Bearer, X-API-Key, or ?api_key=.',
         tags: ['Credits'],
         security: [{ apiKey: [] }],
         responses: {
@@ -2690,7 +2691,7 @@ const buildRawSpec = () => ({
           },
           actions: {
             type: 'object',
-            description: 'Links the page may offer. topup recharges THIS key by card (the links carry its recharge reference, never the key); subscribe_pro is null until that journey exists; manage_subscription is the portal of a subscribed key.',
+            description: 'Links the page may offer. topup recharges THIS key by card (the links carry its recharge reference, never the key); subscribe_pro is the Pro link that puts the subscription on THIS key, null on a key that already carries one; manage_subscription is the portal of a subscribed key.',
             properties: {
               topup: {
                 type: ['object', 'null'],

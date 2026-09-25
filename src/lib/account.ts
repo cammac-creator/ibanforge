@@ -610,8 +610,11 @@ export function buildOverview(
     // Une clé à crédits SANS allocation propre : son `limit` n'est opposé à
     // rien. Une clé mixte (lot B1) montre les deux blocs.
     const isCreditKey = hasCredits && (row.monthly_limit ?? ownAllowanceDefault(row.tier)) <= 0;
-    const topup = (block.topup as { by_card?: Record<'1k' | '5k' | '25k', string> } | null)
-      ?.by_card;
+    const topupBlock = block.topup as {
+      by_card?: Record<'1k' | '5k' | '25k', string>;
+      pro?: string;
+    } | null;
+    const topup = topupBlock?.by_card;
     const subscription =
       plan === 'pro' || plan === 'editor'
         ? { plan, status: 'active' as const, manage_url: PRO_PORTAL_URL }
@@ -641,12 +644,14 @@ export function buildOverview(
       address_proven:
         !!row.claimed_at && !!row.claim_method && MAILBOX_PROOFS.has(row.claim_method),
       // `topup` depuis le lot B1 : les liens portent la référence de la clé.
-      // `subscribe_pro` attend le lot B2 : le lien Pro d'aujourd'hui frappe
-      // une clé neuve. Le portail Stripe, lui, existe déjà : c'est une page de
-      // connexion par e-mail, sans secret.
+      // `subscribe_pro` depuis le lot B2 : le lien Pro porteur de la même
+      // référence pose l'abonnement sur CETTE clé ; absent quand elle en porte
+      // déjà un vivant (le bloc `topup` ne le donne alors pas). Même mise en
+      // garde qu'une recharge quand l'adresse n'est pas prouvée (I1). Le
+      // portail Stripe est une page de connexion par e-mail, sans secret.
       actions: {
         topup: topup ?? null,
-        subscribe_pro: null,
+        subscribe_pro: topupBlock?.pro ?? null,
         manage_subscription: subscription ? PRO_PORTAL_URL : null,
       },
     };

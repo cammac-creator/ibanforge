@@ -89,6 +89,8 @@ nothing at all:
 
 **Pro subscription (card):**
 - $29 a month for 10,000 requests, resets on the 1st, cancel anytime: https://ibanforge.com/pricing
+- Already hold a key? Pro lands on it: open the link under `topup.pro` in GET /v1/keys/usage or GET /v1/credits/balance (`credit_packs.topup_this_key.pro` in a 402 served to the key), or take it from the account page. It is not offered to a key that already carries a subscription.
+- Cancelling does not deactivate the key: at the end of the month already paid it returns to what it had before the subscription; a key created by the subscription itself then answers 402 with the links that recharge it or subscribe it again.
 
 **x402 micropayments (an option: no signup, USDC on Base L2):**
 - In USDC per call: Validate IBAN: $0.005 · Batch: $0.002/IBAN · BIC lookup: $0.003 · CH clearing: $0.003 · Compliance: $0.02

@@ -387,6 +387,15 @@ X-Charged-From: allowance+credits
 mensuelle. Une clé née d'un achat répond `402` avec `cause.reason: "credits_exhausted"` et les liens
 qui la rechargent (`X-Credits-Topup-Url` porte celui du pack de 1 000 crédits).
 
+**Pro sur la clé que vous avez déjà.** Les mêmes endroits portent un lien Pro qui pose l'abonnement
+sur CETTE clé : `topup.pro` dans `GET /v1/keys/usage` et `GET /v1/credits/balance`,
+`credit_packs.topup_this_key.pro` dans un `402` servi à la clé, et la page du compte. La clé a alors
+10 000 requêtes par mois, utilisées avant les crédits qui lui restent. Le lien n'est pas proposé à une
+clé qui porte déjà un abonnement. Résilier ne désactive pas la clé : à la fin du mois déjà payé, elle
+retrouve ce qu'elle avait avant l'abonnement, son allocation gratuite si elle en avait une et les
+crédits qui lui restent. Une clé créée par l'abonnement lui-même répond alors `402` avec les liens qui
+la rechargent ou la réabonnent, sans être remplacée.
+
 ## Lorsque votre quota est dépassé
 
 Votre intégration ne tombe **pas** sur un cul-de-sac. Une fois les requêtes du mois épuisées, l'API répond `402 Payment Required` (x402) plutôt qu'un 429 sec, avec des en-têtes qui disent exactement ce qui s'est passé :

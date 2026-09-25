@@ -377,6 +377,15 @@ X-Charged-From: allowance+credits
 key born of a purchase answers `402` with `cause.reason: "credits_exhausted"` and the links that
 recharge it (`X-Credits-Topup-Url` carries the 1,000-credit one).
 
+**Pro on the key you already hold.** The same places carry a Pro link that puts the subscription on
+THIS key: `topup.pro` in `GET /v1/keys/usage` and `GET /v1/credits/balance`,
+`credit_packs.topup_this_key.pro` in a `402` served to the key, and the account page. The key then
+has 10,000 requests a month, used before any credits left on it. The link is not offered to a key
+that already carries a subscription. Cancelling does not deactivate the key: at the end of the month
+already paid it returns to what it had before the subscription, its free allowance if it had one and
+any credits left on it. A key created by the subscription itself then answers `402` with the links
+that recharge it or subscribe it again, without being replaced.
+
 ## When you exceed the quota
 
 Your integration does **not** hit a hard dead-end. Once the monthly requests are used up, the API answers `402 Payment Required` (x402) instead of a blunt 429, with hint headers telling you exactly what happened:

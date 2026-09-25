@@ -555,6 +555,7 @@
       "title": "Vous préférez une facture mensuelle fixe ?",
       "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro le 1er, résiliable à tout moment depuis le portail client. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
       "note": "L’intégration dans votre produit est permise dans les limites et conditions de votre offre. Pour un SLA écrit, des engagements de support ou des volumes plus élevés, consultez l’offre éditeur/OEM.",
+      "existingKey": "Vous avez déjà une clé ? Prenez Pro dessus depuis <account>votre compte</account> : l’allocation arrive sur cette même clé, rien à changer dans votre intégration.",
       "price": "29 $",
       "per": "/ mois",
       "cta": "Souscrire à Pro",
@@ -2326,7 +2327,9 @@
     "topupTitle": "Recharger cette clé",
     "topupHint": "Paiement par carte : les crédits arrivent sur cette même clé. Rien à changer dans votre intégration.",
     "topupUnproven": "Cette clé porte votre adresse, mais celle-ci n’a pas été confirmée par un code à la création de la clé. Ne la rechargez que si vous la reconnaissez comme la vôtre.",
-    "topupCredits": "{credits} crédits"
+    "topupCredits": "{credits} crédits",
+    "topupPro": "Pro sur cette clé : {requests} requêtes par mois",
+    "topupProPrice": "29 $ / mois"
   },
   "sources": {
     "meta": {
