@@ -83,6 +83,45 @@ describe('draftOne retry on unparseable generation', () => {
   });
 });
 
+describe('compteur de dépense du radar', () => {
+  beforeEach(() => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'test-key-not-real');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('écrit les jetons de chaque génération au journal, jamais son texte', async () => {
+    const body = {
+      model: 'claude-sonnet-5',
+      content: [{ type: 'text', text: FULL_OUTPUT }],
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 1830, output_tokens: 412 },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        ),
+      ),
+    );
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await draftOne(PROSPECT);
+
+    const lines = info.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[usage]'));
+    expect(lines).toEqual([
+      '[usage] site=prospect-radar model=claude-sonnet-5 input_tokens=1830 output_tokens=412 cache_write=0 cache_read=0 web_search=0',
+    ]);
+  });
+});
+
 describe('le palier anonyme ne produit aucune fiche de prospection', () => {
   it('une clé anonyme n’est pas un candidat ; la même clé au palier gratuit en est un', async () => {
     // 🚨 Le défaut que ce test ferme. La sentinelle du palier anonyme n'est pas
