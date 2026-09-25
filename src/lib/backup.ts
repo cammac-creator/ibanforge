@@ -36,7 +36,7 @@ import { getStatsDB } from './db.js';
 import { recordEvent } from './events.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
-export const BACKUP_FORMAT = 7;
+export const BACKUP_FORMAT = 8;
 /**
  * Ce qu'un restaurateur d'aujourd'hui sait lire. Le format 1 n'a pas les deux
  * journaux du palier de clé (key_claims, key_settlements), le format 2 n'a pas
@@ -45,14 +45,16 @@ export const BACKUP_FORMAT = 7;
  * journal des bascules du disjoncteur (breaker_transitions, lot 5), le format 5
  * n'a pas les naissances de clés (key_creations, revue du 15/09), le format 6
  * n'a pas les deux compteurs journaliers des portes d'agent
- * (device_grant_daily, mcp_remote_daily, chantier « mesure agents ») : ils y
+ * (device_grant_daily, mcp_remote_daily, chantier « mesure agents »), le
+ * format 7 n'a pas le registre des achats ni les références de recharge
+ * (key_purchases, key_topup_refs, chantier « clé unique », lot B1) : ils y
  * valent [] et le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
  * le format rend irrestaurable tout dump pris avant la livraison — sur une base
  * qui n'a pas d'autre sauvegarde. Et incrémenter plutôt que ne rien faire :
  * sans numéro, un dump tronqué et un dump légitimement ancien seraient
  * indiscernables, et le `?? []` masquerait l'un comme l'autre.
  */
-export const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7] as const;
+export const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 export interface BackupPayload {
   format: number;
@@ -69,6 +71,8 @@ export interface BackupPayload {
     key_creations?: number;
     device_grant_daily?: number;
     mcp_remote_daily?: number;
+    key_purchases?: number;
+    key_topup_refs?: number;
   };
   api_keys: Array<Record<string, unknown>>;
   api_usage: Array<Record<string, unknown>>;
@@ -128,6 +132,20 @@ export interface BackupPayload {
    */
   device_grant_daily?: Array<Record<string, unknown>>;
   mcp_remote_daily?: Array<Record<string, unknown>>;
+  /**
+   * Format 8. Le registre des achats (une ligne par paiement) et la référence
+   * de recharge de chaque lignée (lot B1, 25.09.2026).
+   *
+   * Le registre est la source de vérité de l'argent depuis ce lot : sans lui,
+   * une base restaurée perdrait l'idempotence de chaque paiement (une session
+   * Stripe rejouée recréditerait une clé) et toutes les ventes par recharge.
+   * Les références, elles, sont ce que portent les liens déjà envoyés dans les
+   * mails et les 402 : une référence perdue ferait frapper une clé neuve à qui
+   * voulait recharger la sienne. `payer_email` voyage avec sa ligne : c'est
+   * une donnée client, comme les adresses d'`api_keys` du même fichier.
+   */
+  key_purchases?: Array<Record<string, unknown>>;
+  key_topup_refs?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -190,6 +208,12 @@ export function exportPaidState(takenAt: string): BackupPayload {
   const mcpDays = db.prepare('SELECT * FROM mcp_remote_daily').all() as Array<
     Record<string, unknown>
   >;
+  const purchases = db.prepare('SELECT * FROM key_purchases').all() as Array<
+    Record<string, unknown>
+  >;
+  const topupRefs = db.prepare('SELECT * FROM key_topup_refs').all() as Array<
+    Record<string, unknown>
+  >;
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
   // indistinguishable from any other call. This annotation puts it on the
@@ -217,6 +241,8 @@ export function exportPaidState(takenAt: string): BackupPayload {
       key_creations: creations.length,
       device_grant_daily: grantDays.length,
       mcp_remote_daily: mcpDays.length,
+      key_purchases: purchases.length,
+      key_topup_refs: topupRefs.length,
     },
     api_keys: keys,
     api_usage: usage,
@@ -228,6 +254,8 @@ export function exportPaidState(takenAt: string): BackupPayload {
     key_creations: creations,
     device_grant_daily: grantDays,
     mcp_remote_daily: mcpDays,
+    key_purchases: purchases,
+    key_topup_refs: topupRefs,
   };
 }
 
@@ -252,6 +280,10 @@ export interface RestoreReport {
   grant_days_skipped: number;
   mcp_days_inserted: number;
   mcp_days_skipped: number;
+  purchases_inserted: number;
+  purchases_skipped: number;
+  topup_refs_inserted: number;
+  topup_refs_skipped: number;
 }
 
 /**
@@ -296,6 +328,10 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     grant_days_skipped: 0,
     mcp_days_inserted: 0,
     mcp_days_skipped: 0,
+    purchases_inserted: 0,
+    purchases_skipped: 0,
+    topup_refs_inserted: 0,
+    topup_refs_skipped: 0,
   };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
@@ -364,6 +400,24 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     for (const row of payload.mcp_remote_daily ?? []) {
       if (insertRow('mcp_remote_daily', row)) report.mcp_days_inserted++;
       else report.mcp_days_skipped++;
+    }
+    // Absents d'un dump aux formats 1 à 7 ; un dump au format 8 les porte
+    // toujours, même vides. `INSERT OR IGNORE` sur `payment_ref` et sur la
+    // lignée : une ligne déjà présente (rattrapage au démarrage, paiement reçu
+    // depuis) n'est jamais écrasée par celle du dump.
+    for (const row of payload.key_purchases ?? []) {
+      // Sans son `id` : l'identité d'un paiement est `payment_ref`. Fusionné
+      // dans une base vivante, un `id` du dump pourrait tomber sur celui d'un
+      // AUTRE paiement reçu depuis, et `INSERT OR IGNORE` écarterait alors un
+      // paiement réel en silence.
+      const { id: _id, ...purchase } = row;
+      void _id;
+      if (insertRow('key_purchases', purchase)) report.purchases_inserted++;
+      else report.purchases_skipped++;
+    }
+    for (const row of payload.key_topup_refs ?? []) {
+      if (insertRow('key_topup_refs', row)) report.topup_refs_inserted++;
+      else report.topup_refs_skipped++;
     }
   });
   run();

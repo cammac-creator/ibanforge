@@ -2611,14 +2611,18 @@ const buildRawSpec = () => ({
       },
       AccountKey: {
         type: 'object',
-        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'actions'],
+        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'address_proven', 'actions'],
         properties: {
           key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
           created_at: { type: ['string', 'null'], format: 'date-time' },
-          plan: { type: 'string', enum: ['free', 'custom', 'pack', 'pro', 'editor'] },
+          plan: {
+            type: 'string',
+            enum: ['free', 'custom', 'pack', 'pro', 'editor', 'free+pack', 'custom+pack', 'pro+pack', 'editor+pack'],
+            description: 'A key that holds an allowance AND prepaid credits carries both parts, such as free+pack: the allowance is drawn first, then the credits.',
+          },
           allowance: {
             type: ['object', 'null'],
-            description: 'The monthly allowance, with the figures of GET /v1/keys/usage. null on a credit key, whose balance is in credits.',
+            description: 'The allowance, with the figures of GET /v1/keys/usage. null on a key born of a purchase, which has no allowance of its own and whose balance is in credits.',
             properties: {
               basis: { type: 'string', enum: ['monthly', 'lifetime'] },
               limit: { type: 'integer' },
@@ -2628,7 +2632,7 @@ const buildRawSpec = () => ({
           },
           credits: {
             type: ['object', 'null'],
-            description: 'The prepaid balance of a credit key. null on any other key.',
+            description: 'The prepaid balance of a key that holds credits, alone or beside an allowance. purchased_total is the total ever bought on the key, recharges included. null on a key without credits.',
             properties: { remaining: { type: 'integer' }, purchased_total: { type: 'integer' } },
           },
           subscription: {
@@ -2652,11 +2656,22 @@ const buildRawSpec = () => ({
               },
             },
           },
+          address_proven: {
+            type: 'boolean',
+            description: 'True when the address of this key was proven by a code (created or claimed with a 6-digit code). An address typed at a checkout, or given to a first key without a code, is not: the page then asks you to recognise the key before recharging it.',
+          },
           actions: {
             type: 'object',
-            description: 'Links the page may offer. topup and subscribe_pro are null until those journeys exist; manage_subscription is the portal of a subscribed key.',
+            description: 'Links the page may offer. topup recharges THIS key by card (the links carry its recharge reference, never the key); subscribe_pro is null until that journey exists; manage_subscription is the portal of a subscribed key.',
             properties: {
-              topup: { type: ['string', 'null'] },
+              topup: {
+                type: ['object', 'null'],
+                properties: {
+                  '1k': { type: 'string', format: 'uri' },
+                  '5k': { type: 'string', format: 'uri' },
+                  '25k': { type: 'string', format: 'uri' },
+                },
+              },
               subscribe_pro: { type: ['string', 'null'] },
               manage_subscription: { type: ['string', 'null'] },
             },

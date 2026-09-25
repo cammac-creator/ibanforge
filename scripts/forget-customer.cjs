@@ -135,11 +135,29 @@ if (hasTable('orphan_mail')) {
   targets.push(['orphan_mail', "FROM orphan_mail WHERE lower(sender) = ? OR lower(sender) LIKE '%<' || ? || '>%'", [email, email]]);
 }
 
+// Le registre des achats (lot B1, 25.09.2026) : l'adresse saisie par un payeur
+// est EFFACÉE de sa ligne, la ligne reste. C'est une pièce de l'argent (un
+// paiement, son montant, la clé créditée), que la comptabilité garde comme
+// Stripe garde la sienne ; l'adresse n'y servait que de contact de service.
+const anonymise = [];
+if (hasTable('key_purchases')) {
+  anonymise.push([
+    'key_purchases',
+    'FROM key_purchases WHERE lower(payer_email) = ?',
+    'UPDATE key_purchases SET payer_email = NULL WHERE lower(payer_email) = ?',
+    [email],
+  ]);
+}
+
 let total = 0;
 for (const [label, where, params] of targets) {
   const n = db.prepare(`SELECT COUNT(*) AS n ${where}`).get(...params).n;
   total += n;
   console.log(`${label.padEnd(16)} ${n} row(s)`);
+}
+for (const [label, where, , params] of anonymise) {
+  const n = db.prepare(`SELECT COUNT(*) AS n ${where}`).get(...params).n;
+  console.log(`${label.padEnd(16)} ${n} row(s) keep their line, the payer address is erased`);
 }
 if (keys.length) {
   console.log(`\nKeys involved: ${prefixes.map((p) => `${p}…`).join(', ')}`);
@@ -154,6 +172,10 @@ const run = db.transaction(() => {
   for (const [label, where, params] of targets) {
     const res = db.prepare(`DELETE ${where}`).run(...params);
     console.log(`deleted ${String(res.changes).padStart(5)}  ${label}`);
+  }
+  for (const [label, , update, params] of anonymise) {
+    const res = db.prepare(update).run(...params);
+    console.log(`erased  ${String(res.changes).padStart(5)}  ${label} (payer address)`);
   }
 });
 run();

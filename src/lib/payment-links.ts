@@ -49,3 +49,66 @@ export const CARD_CHECKOUT_HINT =
   `Pay by card in one click: ${ENTRY_PAYMENT_LINK} (1,000 credits, $4) ` +
   `— all packs: ${PRICING_PAGE} ` +
   `— or a flat $${PRO_PRICE_USD}/month for 10,000 requests: ${PRO_PAYMENT_LINK}`;
+
+// ─── Recharger CETTE clé (chantier « clé unique », lot B1, 25.09.2026) ──────
+
+export type PackSlug = keyof typeof PAYMENT_LINKS;
+
+/**
+ * Les packs dans l'ordre où on les propose, avec ce qu'ils contiennent et ce
+ * qu'ils coûtent. Les prix sont ceux de BUNDLES (`src/routes/api-keys.ts`), que
+ * `payment-links.test.ts` compare à ceux-ci : un module de `lib/` n'importe pas
+ * une route, et un prix qui dériverait ici ferait mentir le 402 et les mails.
+ */
+export const PACK_OFFERS: ReadonlyArray<{ slug: PackSlug; credits: number; priceUsd: number }> = [
+  { slug: '1k', credits: 1000, priceUsd: 4 },
+  { slug: '5k', credits: 5000, priceUsd: 20 },
+  { slug: '25k', credits: 25000, priceUsd: 80 },
+];
+
+/** La forme d'une référence de recharge : `ifr_` puis 128 bits tirés au hasard. */
+export const TOPUP_REF_PATTERN = /^ifr_[0-9a-f]{32}$/;
+
+/**
+ * Le lien de paiement d'un pack, porteur de la référence de recharge d'une clé.
+ *
+ * Stripe rend `client_reference_id` tel quel dans `checkout.session.completed`
+ * (alphanumérique, tirets et soulignés, 200 caractères au plus) : c'est ce qui
+ * fait atterrir le pack sur la clé au lieu d'en frapper une neuve. La référence
+ * n'est PAS un secret de la clé : elle ne permet que de payer pour elle (voir
+ * `src/lib/key-purchases.ts`). Une référence mal formée n'est jamais recopiée
+ * dans une adresse : le lien public est rendu tel quel.
+ */
+export function topupLink(slug: PackSlug, ref: string): string {
+  const base = PAYMENT_LINKS[slug];
+  if (!TOPUP_REF_PATTERN.test(ref)) return base;
+  return `${base}?client_reference_id=${ref}`;
+}
+
+/** Les trois liens de recharge d'une clé. */
+export function topupLinks(ref: string): Record<PackSlug, string> {
+  return {
+    '1k': topupLink('1k', ref),
+    '5k': topupLink('5k', ref),
+    '25k': topupLink('25k', ref),
+  };
+}
+
+/**
+ * La même offre que CARD_CHECKOUT_HINT, pour une clé VALIDE : les packs y
+ * rechargent cette clé-ci, rien ne change dans l'intégration du porteur.
+ *
+ * Pro n'y est proposé que comme ce qu'il est aujourd'hui, une clé neuve :
+ * l'abonnement sur la clé existante est le lot B2, et promettre « on this
+ * key » avant lui serait écrire ce que la route ne fait pas.
+ */
+export function topupHint(ref: string): string {
+  const packs = PACK_OFFERS.map(
+    (p) => `${p.credits.toLocaleString('en-US')} credits $${p.priceUsd}: ${topupLink(p.slug, ref)}`,
+  ).join(' · ');
+  return (
+    `Recharge THIS key by card, nothing to change in your integration: ${packs}. ` +
+    'Prefer USDC? POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it. ' +
+    `Or Pro, a flat $${PRO_PRICE_USD}/month for 10,000 requests, delivered as a new key: ${PRO_PAYMENT_LINK}`
+  );
+}

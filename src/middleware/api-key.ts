@@ -3,14 +3,18 @@ import type { HonoEnv } from '../types.js';
 import {
   validateApiKey,
   checkAndIncrementQuota,
+  chargeAllowanceThenCredits,
   decrementQuota,
   decrementCredits,
   refundCredit,
+  refundMixed,
   recordMonthlyObservation,
   FREE_TIER_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
-import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
+import { CARD_CHECKOUT_HINT, topupHint, topupLink } from '../lib/payment-links.js';
+import { ensureTopupRef } from '../lib/key-purchases.js';
+import type { KeyTier } from '../lib/tiers.js';
 import {
   crossesCreditsNotice,
   maybeSendCreditsWarning,
@@ -125,6 +129,11 @@ const FREE_ROUTE_PREFIXES = [
   '/v1/test-iban',
   '/v1/audit',
   '/v1/ch/qr-bill',
+  // Acheter un pack en présentant sa clé (lot B1, 25.09.2026) : la présenter
+  // désigne la clé à recharger, elle ne doit pas coûter une unité. La garde du
+  // rail x402 (`isSellingRoute`) exige toujours le paiement sur cette route :
+  // une clé ne sert jamais à acquérir une allocation.
+  '/v1/credits/buy',
 ];
 
 function isFreeRoute(path: string): boolean {
@@ -157,6 +166,501 @@ async function billableUnits(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Prom
   return Math.min(ibans.length, 100);
 }
 
+type Ctx = Parameters<MiddlewareHandler<HonoEnv>>[0];
+
+/**
+ * Les sorties d'une clé VALIDE arrêtée par le mur (lot B1, règle A) : recharger
+ * CETTE clé, par carte avec sa référence, ou en USDC en la présentant.
+ *
+ * Sans référence (base qui refuse l'écriture : `ensureTopupRef` rend null), on
+ * retombe sur l'offre d'avant ce lot, qui frappe une clé neuve : un texte moins
+ * bon, jamais un 500.
+ */
+function payOptions(ref: string | null): string {
+  return ref
+    ? `${topupHint(ref)}. Or pay per call via x402.`
+    : `${CARD_CHECKOUT_HINT}. Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.`;
+}
+
+/** Ce que l'en-tête `X-Credits-Topup-Hint` dit, selon qu'une référence existe. */
+function topupHintHeader(ref: string | null): string {
+  return ref
+    ? 'POST /v1/credits/buy/1k with this key presented: the credits land on this key'
+    : 'POST /v1/credits/buy/1k for a fresh 1,000-credit bundle';
+}
+
+/**
+ * Les en-têtes de recharge d'un refus, sur une clé valide. `X-Credits-Topup-Url`
+ * est le lien du pack d'entrée porteur de la référence : un client qui ne lit
+ * que les en-têtes a un lien à ouvrir, pas une phrase à analyser.
+ */
+function setTopupHeaders(c: Ctx, ref: string | null): void {
+  c.header('X-Credits-Topup-Hint', topupHintHeader(ref));
+  if (ref) c.header('X-Credits-Topup-Url', topupLink('1k', ref));
+}
+
+/**
+ * Le chemin des crédits seuls : une clé sans allocation propre (née d'un
+ * achat, ou anonyme passée au palier payant). Inchangé pour une clé qui a des
+ * crédits, sauf les textes du refus, qui proposent de recharger CETTE clé.
+ */
+async function serveFromCredits(c: Ctx, next: () => Promise<void>, k: KeyContext): Promise<void> {
+  const { keyHash, units, creditsTotal } = k;
+  const hasBalance = typeof k.creditsRemaining === 'number';
+
+  // Une route gratuite ne coûte rien et ne refuse jamais, même à une clé vide
+  // ou sans solde du tout (`0 + 0 > 0` est faux, et une clé sans colonne de
+  // solde ne doit pas tomber dans le refus de la règle A pour un format).
+  if (units === 0) {
+    c.set('apiKeyAuthenticated', true);
+    if (hasBalance) c.header('X-Credits-Total', String(creditsTotal ?? 0));
+    await next();
+    if (hasBalance) c.header('X-Credits-Remaining', String(k.creditsRemaining));
+    return;
+  }
+
+  const { ok, remaining } = hasBalance
+    ? decrementCredits(keyHash, units)
+    : { ok: false, remaining: 0 };
+  if (!ok) {
+    // remaining > 0 : le solde existe mais ne couvre pas ce lot (tout ou rien,
+    // rien n'a été débité). remaining === 0 : l'épuisement classique.
+    const shortfall = remaining > 0;
+    const ref = ensureTopupRef(keyHash);
+    const total = creditsTotal ?? 0;
+    c.set('paywallCause', {
+      reason: shortfall ? 'credits_insufficient' : 'credits_exhausted',
+      detail: shortfall
+        ? `This batch of ${units} IBANs needs ${units} credits (1 credit per IBAN) but only ${remaining} remain on this key: nothing was debited. ` +
+          `Send a batch of ≤${remaining} IBANs, or top up now. ${payOptions(ref)}`
+        : `This key's prepaid credits are used up (${total.toLocaleString('en-US')} credits bought on it so far). ` +
+          `The key stays valid: ${payOptions(ref)}`,
+      credits: {
+        required: units,
+        remaining,
+        total,
+        topup: ref ? topupLink('1k', ref) : 'POST /v1/credits/buy/1k|5k|25k',
+      },
+    });
+    c.header(shortfall ? 'X-Credits-Insufficient' : 'X-Credits-Exhausted', 'true');
+    c.header('X-Credits-Required', String(units));
+    c.header('X-Credits-Remaining', String(remaining));
+    c.header('X-Credits-Total', String(total));
+    setTopupHeaders(c, ref);
+    await next();
+    return;
+  }
+  c.header('X-Credits-Total', String(creditsTotal ?? 0));
+  if (units > 1) c.header('X-Credits-Charged', String(units));
+  c.header('X-Charged-From', 'credits');
+  c.set('apiKeyAuthenticated', true);
+  // Count the call against the month as well — an OBSERVATION, never a
+  // ceiling. This branch used to touch credits_remaining and nothing else,
+  // so `api_usage` was silent for every prepaid customer and every aggregate
+  // reading it (CRM months_by_key, monthly sparkline) understated exactly
+  // the customers who pay. No limit is tested here and none ever will be:
+  // a credit key is turned away by its balance, above, and by nothing else.
+  // Nothing is billed twice either — the debit stays the single
+  // decrementCredits call.
+  // Guarded, because this write sits BETWEEN the debit and the answer:
+  // stats.sqlite has writers outside this process (admin scripts), and a
+  // BUSY here would charge the credit and then fail the very call it paid
+  // for. A lost observation costs one unit on a chart; it is logged and
+  // accepted. The debit above stays unguarded on purpose — money, not
+  // telemetry.
+  let observedMonth: string | null = null;
+  try {
+    observedMonth = recordMonthlyObservation(keyHash, units);
+  } catch (err) {
+    console.error('[stats] monthly observation failed:', err instanceof Error ? err.message : err);
+  }
+  await next();
+  // Refund credits on 4xx client errors (mirror monthly quota behavior).
+  // Same reason as the quota headers below: the balance is published after
+  // the refund, otherwise it advertises credits that were handed back.
+  let left = remaining;
+  if (c.res.status >= 400 && c.res.status < 500) {
+    refundCredit(keyHash, units);
+    // The observation is refunded on the SAME month the increment landed
+    // on, for the reason decrementQuota documents: across a month boundary
+    // the two differ, and the drift is permanent. Skipped when the
+    // increment itself failed above — refunding an observation that never
+    // landed would double-shrink the month. Guarded like the increment:
+    // the customer's 4xx answer must not become a 500 over telemetry.
+    if (observedMonth !== null) {
+      try {
+        decrementQuota(keyHash, units, observedMonth);
+      } catch (err) {
+        console.error(
+          '[stats] observation refund failed:',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+    left = remaining + units;
+  }
+  c.header('X-Credits-Remaining', String(left));
+  warnOnCreditsCrossing(k, remaining + units, left);
+}
+
+/**
+ * L'avertissement des 10 %, sur le solde d'avant et d'après cet appel.
+ *
+ * L'assiette est le solde juste après la dernière recharge
+ * (`credits_notice_base`, à défaut le cumul) : avec des recharges fréquentes,
+ * un seuil pris sur le cumul finirait au-dessus du solde maximal, et l'alerte
+ * ne partirait plus jamais. Le verrou, lui, reste sur le cumul : une recharge
+ * le change, donc réarme l'alerte, et un pack déjà averti garde son verrou.
+ *
+ * Sans attendre, comme l'avertissement mensuel : l'appel du client n'attend
+ * jamais le relais de courrier, et un échec finit dans le journal.
+ */
+function warnOnCreditsCrossing(k: KeyContext, before: number, after: number): void {
+  const base = k.creditsNoticeBase ?? k.creditsTotal ?? 0;
+  if (!k.email || !crossesCreditsNotice(before, after, base)) return;
+  void maybeSendCreditsWarning({
+    keyHash: k.keyHash,
+    email: k.email,
+    keyPrefix: k.keyPrefix,
+    remaining: after,
+    total: k.creditsTotal ?? 0,
+    base,
+  }).catch((err) =>
+    console.error('[credits-notice] warning failed:', err instanceof Error ? err.message : err),
+  );
+}
+
+/** Ce que les trois chemins savent de la clé présentée. */
+interface KeyContext {
+  keyHash: string;
+  keyPrefix: string;
+  email: string | undefined;
+  tier: KeyTier | undefined;
+  /** L'allocation du mois : Pro ou éditeur, allocation propre sinon, 0 pour une clé née d'un achat. */
+  allowance: number;
+  noRecredit: boolean;
+  creditsRemaining: number | undefined;
+  creditsTotal: number | undefined;
+  creditsNoticeBase: number | undefined;
+  units: number;
+}
+
+/**
+ * Le chemin de l'allocation seule : une clé sans crédits à dépenser. C'est le
+ * comportement d'avant ce lot, texte du refus excepté.
+ */
+async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyContext): Promise<void> {
+  const { keyHash, units, tier, allowance: monthlyLimit } = k;
+  const noRecredit = k.noRecredit;
+  const quota = checkAndIncrementQuota(keyHash, monthlyLimit, units, noRecredit);
+
+  if (!quota.allowed) {
+    // Quota exhausted — or too small for this batch (all-or-nothing, nothing
+    // was consumed). Instead of returning a hard 429 (which is a dead-end
+    // for autonomous agents), we fall through WITHOUT setting
+    // apiKeyAuthenticated. The x402 middleware will then advertise
+    // payment requirements and the agent can pay-per-call seamlessly until
+    // their quota resets next month.
+    // Hint headers tell the agent what happened so it can log + decide.
+    const shortfall = quota.remaining > 0;
+    // 🚨 L'assiette du plafond n'est pas toujours le mois, et trois phrases
+    // le disaient sans regarder.
+    //
+    // `no_recredit = 1` fait mesurer le plafond sur la SOMME de tous les mois
+    // (`checkAndIncrementQuota`), donc rien ne repart le 1er : c'est le cas
+    // d'une clé née sous alerte du disjoncteur et d'une clé promue contre un
+    // paiement (« 200 une fois, pas 200 par mois »). Servir « it resets on
+    // the 1st » à ces deux populations, et leur attribuer `used`/`limit` au
+    // mois courant, c'est promettre un retour d'allocation qui n'arrivera
+    // jamais — et le site comme le `notice` du 201 disent l'inverse.
+    const lifetime = noRecredit === true;
+    // « for 2026-09 » est faux sur une assiette de vie : les deux nombres
+    // sont alors la somme de tous les mois.
+    const spentOn = lifetime ? 'in total on this key' : `for ${quota.month}`;
+    // Une clé ANONYME à `no_recredit` ne peut être qu'une clé née sous
+    // alerte : un paiement l'aurait fait sortir du palier anonyme. Test sur
+    // le PALIER et non sur le plafond (une clé bouclier porte 5, pas 25).
+    const shield = lifetime && tier === 'anonymous';
+    // La référence de recharge de CETTE clé (lot B1), prise seulement ici, sur
+    // le chemin du refus : jamais une écriture sur le chemin chaud d'un appel
+    // servi.
+    const ref = ensureTopupRef(keyHash);
+
+    // ⚠️ Aucune de ces phrases ne renvoie vers l'essai sans clé, plus
+    // généreux en validations : y renvoyer apprendrait à un client à JETER sa
+    // clé pour retrouver du quota, ce qui détruit la seule identité stable
+    // qu'on ait de lui et le remet en concurrence avec tout son réseau.
+    //
+    // 🚨 Et le rail de réclamation passe EN PREMIER sur les deux populations
+    // anonymes : c'est la seule sortie gratuite, et elle relève la clé en
+    // main au lieu d'en frapper une seconde.
+    const anonymousExhausted =
+      `This key's anonymous allowance is spent for ${quota.month} (${quota.used}/${quota.limit} requests) — ` +
+      'it resets on the 1st. Free way out now: claim this key at POST /v1/keys/claim with a mailbox you can ' +
+      `read, for ${FREE_TIER_MONTHLY_LIMIT} a month on the same key — same secret, same prefix, same history. ` +
+      `Or pay per call via x402; $${CLAIM_MIN_PAID_USD} settled on this key raises it to ` +
+      `${FREE_TIER_MONTHLY_LIMIT}, once.`;
+
+    const shieldExhausted =
+      `This key was issued with a reduced allowance and it is spent (${quota.used}/${quota.limit} requests ` +
+      'counted over the whole life of the key: a reduced allowance does not start over on the 1st). ' +
+      'It goes back up on its own within a few hours. To lift it to ' +
+      `${FREE_TIER_MONTHLY_LIMIT} a month right away, claim this key: POST /v1/keys/claim with a mailbox you ` +
+      'can read. Or pay per call via x402, which needs no key at all.';
+
+    // 🚨 Cette phrase ne propose PAS le code par mail : une clé déjà sortie
+    // du palier anonyme se voit répondre 409 `already_claimed`. Promettre
+    // une sortie gratuite que la route refuse serait pire que se taire.
+    const paidOnceExhausted =
+      `This key's allowance is spent: ${quota.used}/${quota.limit} requests counted over the whole life of ` +
+      'the key, because it was granted against a payment — once, not every month, so nothing starts over on ' +
+      `the 1st. To keep going now: ${payOptions(ref)}`;
+
+    const monthlyExhausted =
+      `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
+      `it resets on the 1st of next month. To keep going now: ${payOptions(ref)}`;
+
+    const exhausted = shield
+      ? shieldExhausted
+      : lifetime
+        ? paidOnceExhausted
+        : tier === 'anonymous'
+          ? anonymousExhausted
+          : monthlyExhausted;
+
+    const resets = shield
+      ? 'not monthly — it goes back up within a few hours, or at once if this key is claimed'
+      : lifetime
+        ? 'never — this allowance was granted once, not monthly'
+        : '1st of month';
+
+    c.set('paywallCause', {
+      reason: shortfall ? 'monthly_quota_insufficient' : 'monthly_quota_exhausted',
+      tier,
+      detail: shortfall
+        ? `This batch of ${units} IBANs needs ${units} requests from this key's allowance (1 per IBAN) but only ${quota.remaining} remain ${spentOn} ` +
+          `(${quota.used}/${quota.limit} used) — nothing was consumed. Send a batch of ≤${quota.remaining} IBANs, ` +
+          `or lift the limit now. ${payOptions(ref)}`
+        : exhausted,
+      quota: {
+        used: quota.used,
+        limit: quota.limit,
+        month: quota.month,
+        resets,
+        required: units,
+        remaining: quota.remaining,
+      },
+    });
+    c.header(shortfall ? 'X-Quota-Insufficient' : 'X-Quota-Exhausted', 'true');
+    c.header('X-Quota-Required', String(units));
+    c.header('X-Quota-Remaining', String(quota.remaining));
+    c.header('X-Quota-Used', String(quota.used));
+    c.header('X-Quota-Limit', String(quota.limit));
+    c.header('X-Quota-Month', quota.month);
+    // 🚨 La moitié lisible par une machine du correctif ci-dessus : sur une
+    // assiette de vie, `X-Quota-Month` dit dans quel mois la consommation a
+    // été ÉCRITE, pas sur quoi le plafond est mesuré. Sans cet en-tête, un
+    // client qui ne lit que les en-têtes programmerait une reprise le 1er.
+    c.header('X-Quota-Basis', lifetime ? 'lifetime' : 'month');
+    c.header(
+      'X-Quota-Reset-Hint',
+      shield
+        ? 'no monthly reset; lifted when the alert clears, or at once by a claim'
+        : lifetime
+          ? 'no monthly reset; this allowance was granted once'
+          : 'monthly, 1st of month',
+    );
+    // Les sorties payantes de CETTE clé, pour un client qui ne lit que les
+    // en-têtes. Une clé anonyme les reçoit aussi : le corps du 402 lui dit
+    // qu'un achat la fait sortir du palier anonyme (enrich-402).
+    if (typeof k.creditsTotal === 'number') {
+      c.header('X-Credits-Remaining', String(Math.max(0, k.creditsRemaining ?? 0)));
+      c.header('X-Credits-Total', String(k.creditsTotal));
+    }
+    setTopupHeaders(c, ref);
+    await next();
+    return;
+  }
+
+  if (units > 1) c.header('X-Quota-Charged', String(units));
+  if (units > 0) c.header('X-Charged-From', 'allowance');
+
+  // Upsell on the trajectory, not on the wall. A daily job cannot catch a
+  // client that burns nearly its whole monthly allowance in a matter of
+  // minutes (a real, measured case), so the warning is triggered by the very
+  // call that crosses 80%.
+  // Fire-and-forget: the customer's request must never wait on SMTP. The
+  // notice bookkeeping touches the DB, so a lock or an in-flight shutdown
+  // can reject — that must land in the log, never as an unhandled rejection.
+  //
+  // 🚨 Branche ENTIÈRE sautée sur le palier anonyme, en-tête compris. Le
+  // seuil est un RATIO (0,8), pas un nombre : à 200 il vaut 160, à 25 il
+  // vaut 20, donc le franchissement arrive huit fois plus tôt. Et la garde
+  // `&& email` ne protège rien ici, puisque `email` vaut la sentinelle, qui
+  // est vraie. Sans cette exclusion, une clé anonyme annonce à 20 unités un
+  // avertissement par mail qui n'existera jamais : la sentinelle n'a pas
+  // d'arobase, donc quota-notice rend `no_contact`. L'appelant ne perd aucun
+  // signal, les quatre en-têtes X-Quota-* disent déjà tout.
+  if (quota.crossedNoticeThreshold && k.email && tier !== 'anonymous') {
+    c.header('X-Quota-Notice', 'threshold-crossed');
+    void maybeSendQuotaWarning({
+      keyHash,
+      email: k.email,
+      keyPrefix: k.keyPrefix,
+      used: quota.used,
+      limit: quota.limit,
+      month: quota.month,
+    }).catch((err) =>
+      console.error('[quota-notice] warning failed:', err instanceof Error ? err.message : err),
+    );
+  }
+
+  // The free tier carries its credit: a key at or under the free allowance
+  // gets the attribution block on every paid-endpoint response. Prepaid,
+  // Pro and OEM keys take the other branch or a higher limit, and never do.
+  // `> 0` depuis le lot B1 : une allocation écrite à 0 n'est pas le gratuit.
+  c.set('freeTier', monthlyLimit > 0 && monthlyLimit <= FREE_TIER_MONTHLY_LIMIT);
+  c.set('apiKeyAuthenticated', true);
+  await next();
+
+  // Refund the quota slots if the downstream handler rejected the request
+  // with a 4xx client error (bad input, validation failure). Otherwise an
+  // attacker could burn a key's monthly quota for free by spamming invalid
+  // payloads. 5xx is NOT refunded — we charge for server-side failures to
+  // avoid hiding infrastructure problems.
+  let used = quota.used;
+  if (c.res.status >= 400 && c.res.status < 500) {
+    // Refund onto the month the increment was billed to, not the wall-clock
+    // month now — they differ across a month boundary and the mismatch is
+    // permanent for a key on the lifetime basis.
+    decrementQuota(keyHash, units, quota.month);
+    used = Math.max(quota.used - units, 0);
+  }
+  setQuotaHeaders(c, { used, limit: quota.limit, month: quota.month });
+  // Une clé rechargée puis vidée garde son cumul : le montrer à côté du quota
+  // dit au porteur où il en est des deux compteurs.
+  if (typeof k.creditsTotal === 'number') {
+    c.header('X-Credits-Remaining', String(Math.max(0, k.creditsRemaining ?? 0)));
+    c.header('X-Credits-Total', String(k.creditsTotal));
+  }
+}
+
+/**
+ * Le chemin mixte (règle B) : une clé qui a une allocation ET des crédits.
+ * L'allocation du mois passe d'abord, puis les crédits ; un lot qui déborde
+ * est découpé, dans une seule transaction (`chargeAllowanceThenCredits`).
+ */
+async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Promise<void> {
+  const { keyHash, units, allowance } = k;
+  const charge = chargeAllowanceThenCredits(keyHash, allowance, units, k.noRecredit);
+  const total = k.creditsTotal ?? 0;
+  const month = charge.month;
+
+  if (!charge.allowed) {
+    const left = Math.max(0, allowance - charge.measured);
+    const credits = charge.creditsAfter;
+    const shortfall = credits > 0;
+    const ref = ensureTopupRef(keyHash);
+    c.set('paywallCause', {
+      reason: shortfall ? 'credits_insufficient' : 'credits_exhausted',
+      tier: k.tier,
+      detail:
+        `This batch of ${units} IBANs needs ${units} units but this key has ${left} left on its allowance ` +
+        `and ${credits} prepaid credits: nothing was consumed. Send a batch of ≤${left + credits} IBANs, or top up now. ` +
+        payOptions(ref),
+      quota: {
+        used: Math.min(charge.measured, allowance),
+        limit: allowance,
+        month,
+        resets: k.noRecredit
+          ? 'never — this allowance was granted once, not monthly'
+          : '1st of month',
+        required: units,
+        remaining: left,
+      },
+      credits: {
+        required: units - left,
+        remaining: credits,
+        total,
+        topup: ref ? topupLink('1k', ref) : 'POST /v1/credits/buy/1k|5k|25k',
+      },
+    });
+    c.header(shortfall ? 'X-Credits-Insufficient' : 'X-Credits-Exhausted', 'true');
+    c.header('X-Credits-Required', String(units - left));
+    c.header('X-Credits-Remaining', String(credits));
+    c.header('X-Credits-Total', String(total));
+    c.header('X-Quota-Used', String(Math.min(charge.measured, allowance)));
+    c.header('X-Quota-Limit', String(allowance));
+    c.header('X-Quota-Remaining', String(left));
+    c.header('X-Quota-Month', month);
+    setTopupHeaders(c, ref);
+    await next();
+    return;
+  }
+
+  if (units > 0) {
+    c.header(
+      'X-Charged-From',
+      charge.fromCredits === 0
+        ? 'allowance'
+        : charge.fromAllowance === 0
+          ? 'credits'
+          : 'allowance+credits',
+    );
+  }
+  if (units > 1 && charge.fromAllowance > 0) {
+    c.header('X-Quota-Charged', String(charge.fromAllowance));
+  }
+  if (units > 1 && charge.fromCredits > 0) {
+    c.header('X-Credits-Charged', String(charge.fromCredits));
+  }
+  c.header('X-Credits-Total', String(total));
+
+  // L'alerte des 80 % porte sur la part d'allocation, et sa variante dit que
+  // les crédits prennent le relais : « calls stop until the 1st » serait faux.
+  if (charge.crossedNoticeThreshold && k.email && k.tier !== 'anonymous') {
+    c.header('X-Quota-Notice', 'threshold-crossed');
+    void maybeSendQuotaWarning({
+      keyHash,
+      email: k.email,
+      keyPrefix: k.keyPrefix,
+      used: charge.measured + charge.fromAllowance,
+      limit: allowance,
+      month,
+      creditsRemaining: charge.creditsAfter,
+    }).catch((err) =>
+      console.error('[quota-notice] warning failed:', err instanceof Error ? err.message : err),
+    );
+  }
+
+  // L'attribution due sur le gratuit reste exactement où elle était : un appel
+  // payé, même en partie, par des crédits n'en porte pas, et une allocation
+  // relevée (pilote, Pro) non plus.
+  c.set(
+    'freeTier',
+    charge.fromCredits === 0 && allowance > 0 && allowance <= FREE_TIER_MONTHLY_LIMIT,
+  );
+  c.set('apiKeyAuthenticated', true);
+  await next();
+
+  let usedAfter = charge.measured + units;
+  let creditsAfter = charge.creditsAfter;
+  if (c.res.status >= 400 && c.res.status < 500) {
+    // Les deux compteurs, sur le mois FACTURÉ, comme les deux autres chemins.
+    refundMixed(keyHash, charge);
+    usedAfter = charge.measured;
+    creditsAfter = charge.creditsAfter + charge.fromCredits;
+  }
+  // `count` peut dépasser l'allocation (il compte aussi les appels payés en
+  // crédits) : `Used` est plafonné à l'allocation, sans quoi un porteur lirait
+  // un dépassement de plafond qui n'existe pas.
+  setQuotaHeaders(c, { used: Math.min(usedAfter, allowance), limit: allowance, month });
+  c.header('X-Credits-Remaining', String(creditsAfter));
+  if (charge.fromCredits > 0) {
+    warnOnCreditsCrossing(k, charge.creditsAfter + charge.fromCredits, creditsAfter);
+  }
+}
+
 export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     const key = extractKey(c);
@@ -174,6 +678,7 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       creditsRemaining,
       creditsTotal,
       noRecredit,
+      creditsNoticeBase,
     } = validateApiKey(key);
 
     if (!valid) {
@@ -231,292 +736,36 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     c.set('apiKeyHash', keyHash);
 
     // Billable units for this request: 1 everywhere except batch validation,
-    // which bills 1 per IBAN (same rule as the x402 per-IBAN price).
-    const units = await billableUnits(c);
+    // which bills 1 per IBAN (same rule as the x402 per-IBAN price), and 0 on
+    // the free routes — acheter un pack compris, depuis le lot B1.
+    const k: KeyContext = {
+      keyHash,
+      keyPrefix: key.slice(0, 12),
+      email,
+      tier,
+      allowance: monthlyLimit,
+      noRecredit: noRecredit === true,
+      creditsRemaining,
+      creditsTotal,
+      creditsNoticeBase,
+      units: await billableUnits(c),
+    };
 
-    // Bundle credits path: the key has a prepaid balance (credits_remaining
-    // is an integer, monthly_limit is NULL). Decrement atomically and serve.
-    // When credits run out (or don't cover this batch), fall through to x402
-    // instead of hard-blocking, exactly like the monthly-quota path below.
-    if (typeof creditsRemaining === 'number') {
-      const { ok, remaining } = decrementCredits(keyHash, units);
-      if (!ok) {
-        // remaining > 0 means the balance exists but can't cover this batch
-        // (all-or-nothing — nothing was debited). remaining === 0 is the
-        // classic exhaustion.
-        const shortfall = remaining > 0;
-        c.set('paywallCause', {
-          reason: shortfall ? 'credits_insufficient' : 'credits_exhausted',
-          detail: shortfall
-            ? `This batch of ${units} IBANs needs ${units} credits (1 credit per IBAN) but only ${remaining} remain — nothing was debited. ` +
-              `Send a batch of ≤${remaining} IBANs, or top up now. ${CARD_CHECKOUT_HINT}. ` +
-              'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.'
-            : `Your prepaid credit bundle (${creditsTotal ?? 0} credits) is used up. ${CARD_CHECKOUT_HINT}. ` +
-              'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.',
-          credits: {
-            required: units,
-            remaining,
-            total: creditsTotal ?? 0,
-            topup: 'POST /v1/credits/buy/1k|5k|25k',
-          },
-        });
-        c.header(shortfall ? 'X-Credits-Insufficient' : 'X-Credits-Exhausted', 'true');
-        c.header('X-Credits-Required', String(units));
-        c.header('X-Credits-Remaining', String(remaining));
-        c.header('X-Credits-Total', String(creditsTotal ?? 0));
-        c.header('X-Credits-Topup-Hint', 'POST /v1/credits/buy/1k for a fresh 1,000-credit bundle');
-        await next();
-        return;
-      }
-      c.header('X-Credits-Total', String(creditsTotal ?? 0));
-      if (units > 1) c.header('X-Credits-Charged', String(units));
-      c.set('apiKeyAuthenticated', true);
-      // Count the call against the month as well — an OBSERVATION, never a
-      // ceiling. This branch used to touch credits_remaining and nothing else,
-      // so `api_usage` was silent for every prepaid customer and every aggregate
-      // reading it (CRM months_by_key, monthly sparkline) understated exactly
-      // the customers who pay. No limit is tested here and none ever will be:
-      // a credit key is turned away by its balance, above, and by nothing else.
-      // Nothing is billed twice either — the debit stays the single
-      // decrementCredits call.
-      // Guarded, because this write sits BETWEEN the debit and the answer:
-      // stats.sqlite has writers outside this process (admin scripts), and a
-      // BUSY here would charge the credit and then fail the very call it paid
-      // for. A lost observation costs one unit on a chart; it is logged and
-      // accepted. The debit above stays unguarded on purpose — money, not
-      // telemetry.
-      let observedMonth: string | null = null;
-      try {
-        observedMonth = recordMonthlyObservation(keyHash, units);
-      } catch (err) {
-        console.error(
-          '[stats] monthly observation failed:',
-          err instanceof Error ? err.message : err,
-        );
-      }
-      await next();
-      // Refund credits on 4xx client errors (mirror monthly quota behavior).
-      // Same reason as the quota headers below: the balance is published after
-      // the refund, otherwise it advertises credits that were handed back.
-      let left = remaining;
-      if (c.res.status >= 400 && c.res.status < 500) {
-        refundCredit(keyHash, units);
-        // The observation is refunded on the SAME month the increment landed
-        // on, for the reason decrementQuota documents: across a month boundary
-        // the two differ, and the drift is permanent. Skipped when the
-        // increment itself failed above — refunding an observation that never
-        // landed would double-shrink the month. Guarded like the increment:
-        // the customer's 4xx answer must not become a 500 over telemetry.
-        if (observedMonth !== null) {
-          try {
-            decrementQuota(keyHash, units, observedMonth);
-          } catch (err) {
-            console.error(
-              '[stats] observation refund failed:',
-              err instanceof Error ? err.message : err,
-            );
-          }
-        }
-        left = remaining + units;
-      }
-      c.header('X-Credits-Remaining', String(left));
-      // L'avertissement des 10 % d'un pack. `remaining + units` est le solde
-      // avant cet appel ; `left`, le solde après un éventuel remboursement : un
-      // appel rendu sur un 4xx ne peut donc jamais être celui qui a franchi. Sans
-      // attendre, comme l'avertissement mensuel : l'appel du client n'attend
-      // jamais le relais de courrier, et un échec finit dans le journal, jamais
-      // en rejet non traité.
-      if (email && crossesCreditsNotice(remaining + units, left, creditsTotal ?? 0)) {
-        void maybeSendCreditsWarning({
-          keyHash,
-          email,
-          keyPrefix: key.slice(0, 12),
-          remaining: left,
-          total: creditsTotal ?? 0,
-        }).catch((err) =>
-          console.error(
-            '[credits-notice] warning failed:',
-            err instanceof Error ? err.message : err,
-          ),
-        );
-      }
+    // Le choix du chemin (spec du lot B1, §6.1). L'allocation du mois vaut
+    // `monthly_limit` : Pro pendant l'abonnement, allocation propre sinon, et 0
+    // pour une clé née d'un achat, qui n'a donc jamais « 200 par mois ».
+    //   - allocation 0 : les crédits seuls, comme une clé de pack l'a toujours
+    //     été ; à zéro, le refus de la règle A, avec les liens de CETTE clé ;
+    //   - pas de crédits à dépenser : l'allocation seule, comme avant ;
+    //   - les deux : l'allocation d'abord, puis les crédits (règle B).
+    if (k.allowance <= 0) {
+      await serveFromCredits(c, next, k);
       return;
     }
-
-    // Monthly subscription path (existing behavior).
-    const quota = checkAndIncrementQuota(keyHash, monthlyLimit, units, noRecredit);
-
-    if (!quota.allowed) {
-      // Quota exhausted — or too small for this batch (all-or-nothing, nothing
-      // was consumed). Instead of returning a hard 429 (which is a dead-end
-      // for autonomous agents), we fall through WITHOUT setting
-      // apiKeyAuthenticated. The x402 middleware will then advertise
-      // payment requirements and the agent can pay-per-call seamlessly until
-      // their quota resets next month.
-      // Hint headers tell the agent what happened so it can log + decide.
-      const shortfall = quota.remaining > 0;
-      // 🚨 L'assiette du plafond n'est pas toujours le mois, et trois phrases
-      // le disaient sans regarder.
-      //
-      // `no_recredit = 1` fait mesurer le plafond sur la SOMME de tous les mois
-      // (`checkAndIncrementQuota`), donc rien ne repart le 1er : c'est le cas
-      // d'une clé née sous alerte du disjoncteur et d'une clé promue contre un
-      // paiement (« 200 une fois, pas 200 par mois »). Servir « it resets on
-      // the 1st » à ces deux populations, et leur attribuer `used`/`limit` au
-      // mois courant, c'est promettre un retour d'allocation qui n'arrivera
-      // jamais — et le site comme le `notice` du 201 disent l'inverse.
-      const lifetime = noRecredit === true;
-      // « for 2026-09 » est faux sur une assiette de vie : les deux nombres
-      // sont alors la somme de tous les mois.
-      const spentOn = lifetime ? 'in total on this key' : `for ${quota.month}`;
-      // Une clé ANONYME à `no_recredit` ne peut être qu'une clé née sous
-      // alerte : un paiement l'aurait fait sortir du palier anonyme. Test sur
-      // le PALIER et non sur le plafond (une clé bouclier porte 5, pas 25).
-      const shield = lifetime && tier === 'anonymous';
-
-      // ⚠️ Aucune de ces phrases ne renvoie vers l'essai sans clé, plus
-      // généreux en validations : y renvoyer apprendrait à un client à JETER sa
-      // clé pour retrouver du quota, ce qui détruit la seule identité stable
-      // qu'on ait de lui et le remet en concurrence avec tout son réseau.
-      //
-      // 🚨 Et le rail de réclamation passe EN PREMIER sur les deux populations
-      // anonymes : c'est la seule sortie gratuite, et elle relève la clé en
-      // main au lieu d'en frapper une seconde.
-      const anonymousExhausted =
-        `This key's anonymous allowance is spent for ${quota.month} (${quota.used}/${quota.limit} requests) — ` +
-        'it resets on the 1st. Free way out now: claim this key at POST /v1/keys/claim with a mailbox you can ' +
-        `read, for ${FREE_TIER_MONTHLY_LIMIT} a month on the same key — same secret, same prefix, same history. ` +
-        `Or pay per call via x402; $${CLAIM_MIN_PAID_USD} settled on this key raises it to ` +
-        `${FREE_TIER_MONTHLY_LIMIT}, once.`;
-
-      const shieldExhausted =
-        `This key was issued with a reduced allowance and it is spent (${quota.used}/${quota.limit} requests ` +
-        'counted over the whole life of the key: a reduced allowance does not start over on the 1st). ' +
-        'It goes back up on its own within a few hours. To lift it to ' +
-        `${FREE_TIER_MONTHLY_LIMIT} a month right away, claim this key: POST /v1/keys/claim with a mailbox you ` +
-        'can read. Or pay per call via x402, which needs no key at all.';
-
-      // 🚨 Cette phrase ne propose PAS le code par mail : une clé déjà sortie
-      // du palier anonyme se voit répondre 409 `already_claimed`. Promettre
-      // une sortie gratuite que la route refuse serait pire que se taire.
-      const paidOnceExhausted =
-        `This key's allowance is spent: ${quota.used}/${quota.limit} requests counted over the whole life of ` +
-        'the key, because it was granted against a payment — once, not every month, so nothing starts over on ' +
-        `the 1st. To keep going now: ${CARD_CHECKOUT_HINT}. ` +
-        'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.';
-
-      const monthlyExhausted =
-        `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
-        `it resets on the 1st of next month. To keep going now: ${CARD_CHECKOUT_HINT}. ` +
-        'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.';
-
-      const exhausted = shield
-        ? shieldExhausted
-        : lifetime
-          ? paidOnceExhausted
-          : tier === 'anonymous'
-            ? anonymousExhausted
-            : monthlyExhausted;
-
-      const resets = shield
-        ? 'not monthly — it goes back up within a few hours, or at once if this key is claimed'
-        : lifetime
-          ? 'never — this allowance was granted once, not monthly'
-          : '1st of month';
-
-      c.set('paywallCause', {
-        reason: shortfall ? 'monthly_quota_insufficient' : 'monthly_quota_exhausted',
-        tier,
-        detail: shortfall
-          ? `This batch of ${units} IBANs needs ${units} requests from this key's allowance (1 per IBAN) but only ${quota.remaining} remain ${spentOn} ` +
-            `(${quota.used}/${quota.limit} used) — nothing was consumed. Send a batch of ≤${quota.remaining} IBANs, ` +
-            `or lift the limit now. ${CARD_CHECKOUT_HINT}. ` +
-            'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.'
-          : exhausted,
-        quota: {
-          used: quota.used,
-          limit: quota.limit,
-          month: quota.month,
-          resets,
-          required: units,
-          remaining: quota.remaining,
-        },
-      });
-      c.header(shortfall ? 'X-Quota-Insufficient' : 'X-Quota-Exhausted', 'true');
-      c.header('X-Quota-Required', String(units));
-      c.header('X-Quota-Remaining', String(quota.remaining));
-      c.header('X-Quota-Used', String(quota.used));
-      c.header('X-Quota-Limit', String(quota.limit));
-      c.header('X-Quota-Month', quota.month);
-      // 🚨 La moitié lisible par une machine du correctif ci-dessus : sur une
-      // assiette de vie, `X-Quota-Month` dit dans quel mois la consommation a
-      // été ÉCRITE, pas sur quoi le plafond est mesuré. Sans cet en-tête, un
-      // client qui ne lit que les en-têtes programmerait une reprise le 1er.
-      c.header('X-Quota-Basis', lifetime ? 'lifetime' : 'month');
-      c.header(
-        'X-Quota-Reset-Hint',
-        shield
-          ? 'no monthly reset; lifted when the alert clears, or at once by a claim'
-          : lifetime
-            ? 'no monthly reset; this allowance was granted once'
-            : 'monthly, 1st of month',
-      );
-      await next();
+    if (typeof k.creditsRemaining !== 'number' || k.creditsRemaining <= 0) {
+      await serveFromAllowance(c, next, k);
       return;
     }
-
-    if (units > 1) c.header('X-Quota-Charged', String(units));
-
-    // Upsell on the trajectory, not on the wall. A daily job cannot catch a
-    // client that burns nearly its whole monthly allowance in a matter of
-    // minutes (a real, measured case), so the warning is triggered by the very
-    // call that crosses 80%.
-    // Fire-and-forget: the customer's request must never wait on SMTP. The
-    // notice bookkeeping touches the DB, so a lock or an in-flight shutdown
-    // can reject — that must land in the log, never as an unhandled rejection.
-    //
-    // 🚨 Branche ENTIÈRE sautée sur le palier anonyme, en-tête compris. Le
-    // seuil est un RATIO (0,8), pas un nombre : à 200 il vaut 160, à 25 il
-    // vaut 20, donc le franchissement arrive huit fois plus tôt. Et la garde
-    // `&& email` ne protège rien ici, puisque `email` vaut la sentinelle, qui
-    // est vraie. Sans cette exclusion, une clé anonyme annonce à 20 unités un
-    // avertissement par mail qui n'existera jamais : la sentinelle n'a pas
-    // d'arobase, donc quota-notice rend `no_contact`. L'appelant ne perd aucun
-    // signal, les quatre en-têtes X-Quota-* disent déjà tout.
-    if (quota.crossedNoticeThreshold && email && tier !== 'anonymous') {
-      c.header('X-Quota-Notice', 'threshold-crossed');
-      void maybeSendQuotaWarning({
-        keyHash,
-        email,
-        keyPrefix: key.slice(0, 12),
-        used: quota.used,
-        limit: quota.limit,
-        month: quota.month,
-      }).catch((err) =>
-        console.error('[quota-notice] warning failed:', err instanceof Error ? err.message : err),
-      );
-    }
-
-    // The free tier carries its credit: a key at or under the free allowance
-    // gets the attribution block on every paid-endpoint response. Prepaid,
-    // Pro and OEM keys take the other branch or a higher limit, and never do.
-    c.set('freeTier', monthlyLimit <= FREE_TIER_MONTHLY_LIMIT);
-    c.set('apiKeyAuthenticated', true);
-    await next();
-
-    // Refund the quota slots if the downstream handler rejected the request
-    // with a 4xx client error (bad input, validation failure). Otherwise an
-    // attacker could burn a key's monthly quota for free by spamming invalid
-    // payloads. 5xx is NOT refunded — we charge for server-side failures to
-    // avoid hiding infrastructure problems.
-    let used = quota.used;
-    if (c.res.status >= 400 && c.res.status < 500) {
-      // Refund onto the month the increment was billed to, not the wall-clock
-      // month now — they differ across a month boundary and the mismatch is
-      // permanent for a key on the lifetime basis.
-      decrementQuota(keyHash, units, quota.month);
-      used = Math.max(quota.used - units, 0);
-    }
-    setQuotaHeaders(c, { used, limit: quota.limit, month: quota.month });
+    await serveMixed(c, next, k);
   };
 }

@@ -23,13 +23,20 @@ import {
   claimKey,
   findBurstRevokedKey,
   markShieldBirth,
+  ownAllowanceDefault,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
+import { ensureTopupRef } from '../lib/key-purchases.js';
 import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
 import { paidSoFarUsd } from '../lib/key-settlements.js';
 import { CREDITS_NOTICE_LOCK_PREFIX } from '../lib/quota-notice.js';
 import { restoreBurstRevocation } from '../lib/key-revocations.js';
-import { PRO_PAYMENT_LINK, PRO_PRICE_USD } from '../lib/payment-links.js';
+import {
+  PRO_PAYMENT_LINK,
+  PRO_PORTAL_URL,
+  PRO_PRICE_USD,
+  topupLinks,
+} from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
 import { getKeyReport } from '../lib/key-report.js';
 import { exportPaidState } from '../lib/backup.js';
@@ -691,34 +698,82 @@ apiKeys.get('/v1/credits/bundles', (c) => {
 // because it must be mounted AFTER the x402 middleware to be payment-gated.
 // `apiKeys` here is mounted before x402 (free routes only).
 
+/**
+ * Les liens pour recharger CETTE clé (lot B1, 25.09.2026), servis seulement à
+ * qui s'est authentifié : par la clé elle-même, ou par la session du compte
+ * pour une clé de son adresse (SPEC-COMPTE §8, point 12bis). La référence ne
+ * donne qu'un droit, payer pour cette clé. `null` si la base refuse l'écriture
+ * de la référence : la lecture ne tombe jamais en 500 pour elle.
+ *
+ * Pro n'y figure pas : l'abonnement sur la clé existante est le lot B2, et le
+ * lien Pro d'aujourd'hui frappe une clé neuve.
+ */
+function topupBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> | null {
+  const ref = ensureTopupRef(v.keyHash);
+  if (!ref) return null;
+  return {
+    same_key: true,
+    by_card: topupLinks(ref),
+    by_usdc: 'POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it',
+    ...(v.tier === 'anonymous'
+      ? {
+          note:
+            'This key is anonymous: once it buys credits it leaves the anonymous tier for good and keeps no ' +
+            'free monthly allowance. Claim it by e-mail first (POST /v1/keys/claim) to keep one.',
+        }
+      : {}),
+  };
+}
+
 apiKeys.get('/v1/credits/balance', (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ifk_')) {
-    return c.json(
-      { error: 'missing_key', message: 'Provide your API key via Authorization: Bearer ifk_xxx' },
-      401,
-    );
+  // Les trois dialectes des routes facturées (lot B1) : un client qui envoie
+  // `X-API-Key` lisait ici un 401 qui ressemble à « clé invalide ».
+  const key = presentedKey(c);
+  if (!key) {
+    return c.json({ error: 'missing_key', message: MISSING_KEY_MESSAGE }, 401);
   }
-  const key = authHeader.slice(7);
   const v = validateApiKey(key);
   if (!v.valid) {
     return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
   }
+  // L'allocation du mois d'une clé qui en a une, sur la MÊME assiette que le
+  // plafond (usageBlock). `null` pour une clé née d'un achat, qui n'en a pas.
+  const allowance =
+    v.monthlyLimit > 0
+      ? (() => {
+          const u = getUsage(v.keyHash, v.monthlyLimit, v.noRecredit === true);
+          return {
+            basis: v.noRecredit === true ? 'lifetime' : 'monthly',
+            limit: u.limit,
+            used: u.used,
+            remaining: u.remaining,
+            month: u.month,
+          };
+        })()
+      : null;
+  const topup = topupBlock(v);
   if (typeof v.creditsRemaining !== 'number') {
     return c.json({
       type: 'subscription',
       key_prefix: key.slice(0, 12),
       message:
-        'This is a monthly subscription key, not a credit bundle. Use GET /v1/keys/usage for monthly stats.',
+        'This key draws on a monthly allowance and holds no prepaid credits. Use GET /v1/keys/usage for monthly stats; ' +
+        'credits bought with the links in `topup` land on this same key.',
+      allowance,
+      topup,
     });
   }
   return c.json({
     type: 'credit_bundle',
     key_prefix: key.slice(0, 12),
     credits_remaining: v.creditsRemaining,
+    // Le CUMUL acheté sur la clé depuis le lot B1 : une recharge l'augmente.
     credits_total: v.creditsTotal ?? 0,
     credits_used: (v.creditsTotal ?? 0) - v.creditsRemaining,
     topup_endpoints: Object.keys(BUNDLES).map((s) => `POST /v1/credits/buy/${s}`),
+    allowance,
+    ...(allowance ? { billing_order: 'allowance_then_credits' } : {}),
+    topup,
   });
 });
 
@@ -743,7 +798,13 @@ apiKeys.get('/v1/credits/balance', (c) => {
  * par `validationFromRow`, puisqu'une session ne détient pas la clé brute.
  */
 function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> {
-  const isCreditKey = typeof v.creditsRemaining === 'number';
+  // Depuis le lot B1, une clé peut avoir une allocation ET des crédits (clé
+  // mixte). `basis` dit alors l'assiette de l'allocation, qui passe d'abord, et
+  // le solde est servi à côté avec l'ordre de facturation. `credits` reste
+  // réservé à la clé sans allocation propre, née d'un achat.
+  const hasCredits = typeof v.creditsRemaining === 'number';
+  const isCreditKey = hasCredits && v.monthlyLimit <= 0;
+  const isMixed = hasCredits && v.monthlyLimit > 0;
   const noRecredit = v.noRecredit === true;
   // 🚨 Mesuré sur la MÊME assiette que le plafond. `checkAndIncrementQuota`
   // compare une clé hors du reset mensuel à la somme de TOUS ses mois ; ce bloc
@@ -775,13 +836,26 @@ function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
             'Full balance: GET /v1/credits/balance.',
         }
       : {}),
-    ...(!isCreditKey && noRecredit
+    ...(isMixed
+      ? {
+          credits_remaining: v.creditsRemaining,
+          credits_total: v.creditsTotal ?? 0,
+          billing_order: 'allowance_then_credits',
+          note:
+            'This key has an allowance and prepaid credits: each call draws on the allowance first, then on the credits. ' +
+            '`used` counts every call served in the period, credits included, so `remaining` is what is left of the ' +
+            'allowance alone. Full balance: GET /v1/credits/balance.',
+        }
+      : {}),
+    ...(!hasCredits && noRecredit
       ? {
           note:
             '`month` is the current calendar month, not the basis: this key is measured over its whole life, so ' +
             '`used` and `remaining` count every month it has ever served. The allowance does not start over on the 1st.',
         }
       : {}),
+    // Recharger CETTE clé (lot B1) : les liens portent sa référence.
+    topup: topupBlock(v),
     // Le chemin de sortie, servi uniquement à qui peut l'emprunter. Structuré
     // et non en prose : un agent lit mieux un compteur qu'une phrase.
     ...(tier === 'anonymous'
@@ -930,14 +1004,43 @@ apiKeys.post('/v1/keys/revoke', (c) => {
     );
   }
   const key = authHeader.slice(7);
+  // Ce que la révocation emporte, lu AVANT elle (lot B1, constat C7) : les
+  // crédits restants sont perdus avec la clé, et un abonnement qui y est
+  // attaché continue d'être facturé par Stripe. `/rotate` garde les deux.
+  const before = validateApiKey(key);
+  const subscription = before.valid
+    ? (
+        getStatsDB()
+          .prepare('SELECT stripe_subscription_id FROM api_keys WHERE key_hash = ?')
+          .get(before.keyHash) as { stripe_subscription_id: string | null } | undefined
+      )?.stripe_subscription_id
+    : null;
   const revoked = revokeApiKey(key);
   if (!revoked) {
     return c.json({ error: 'invalid_key', message: 'Key not found or already revoked.' }, 404);
+  }
+  const lostCredits =
+    typeof before.creditsRemaining === 'number' && before.creditsRemaining > 0
+      ? before.creditsRemaining
+      : 0;
+  const warnings: string[] = [];
+  if (lostCredits > 0) {
+    warnings.push(
+      `The ${lostCredits} prepaid credits left on this key are gone with it. ` +
+        'To replace a leaked key without losing them, POST /v1/keys/rotate instead: the new key keeps the balance.',
+    );
+  }
+  if (subscription) {
+    warnings.push(
+      'A subscription is attached to this key and is still billed: revoking the key does not cancel it. ' +
+        `Cancel it in the customer portal (${PRO_PORTAL_URL}) or write to support@ibanforge.com.`,
+    );
   }
   return c.json({
     revoked: true,
     key_prefix: key.slice(0, 12),
     message: 'Key permanently deactivated. Rotate to get a fresh one.',
+    ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
   });
 });
 
@@ -965,7 +1068,9 @@ apiKeys.post('/v1/keys/rotate', (c) => {
     {
       api_key: rotated.api_key,
       key_prefix: rotated.key_prefix,
-      monthly_limit: rotated.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT,
+      // L'allocation propre ÉCRITE, avec le défaut du palier (lot B1) : 0 pour
+      // une clé née d'un achat, qui n'a jamais eu « 200 par mois ».
+      monthly_limit: rotated.monthly_limit ?? ownAllowanceDefault(rotated.tier),
       credits_remaining: rotated.credits_remaining,
       // Le palier SURVIT à la rotation, et le dire ici est ce qui le prouve à
       // son porteur : une clé anonyme tournée reste anonyme, une clé réclamée
@@ -973,7 +1078,8 @@ apiKeys.post('/v1/keys/rotate', (c) => {
       // sans quoi une clé « à vie » se relirait « par mois » après un /rotate.
       tier: rotated.tier,
       basis:
-        typeof rotated.credits_remaining === 'number'
+        typeof rotated.credits_remaining === 'number' &&
+        (rotated.monthly_limit ?? ownAllowanceDefault(rotated.tier)) <= 0
           ? 'credits'
           : rotated.no_recredit === 1
             ? 'lifetime'

@@ -4,6 +4,8 @@ import {
   PRO_PAYMENT_LINK,
   PRO_PORTAL_URL,
   PRO_PRICE_USD,
+  topupLinks,
+  type PackSlug,
 } from './payment-links.js';
 import { CREDITS_NOTICE_RATIO } from './tiers.js';
 import {
@@ -113,6 +115,15 @@ function reportUndelivered(what: string, to: string, alert: boolean): void {
 function reportKeyDelivered(what: string): void {
   if (process.env.VITEST) return;
   void opsOk('mail:key-delivery', `${what}: delivered.`);
+}
+
+/**
+ * Les liens de pack d'un mail : ceux de CETTE clé quand sa référence de
+ * recharge est connue (lot B1, 25.09.2026 : le pack atterrit sur la clé du
+ * porteur), sinon les liens publics, qui frappent une clé neuve.
+ */
+function packLinks(topupRef: string | null | undefined): Record<PackSlug, string> {
+  return topupRef ? topupLinks(topupRef) : { ...PAYMENT_LINKS };
 }
 
 export interface ApiKeyEmailInput {
@@ -324,6 +335,13 @@ export interface QuotaWarningInput {
   limit: number;
   month: string;
   keyPrefix: string;
+  /**
+   * Une clé mixte (allocation + crédits, lot B1) : le solde qui prend le relais
+   * une fois l'allocation épuisée. Absent = une clé sans crédits, comme avant.
+   */
+  creditsRemaining?: number;
+  /** La référence de recharge de la clé : les liens rechargent alors CETTE clé. */
+  topupRef?: string | null;
 }
 
 /**
@@ -345,14 +363,32 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
   const pct = Math.round((p.used / p.limit) * 100);
   const left = Math.max(0, p.limit - p.used);
   const subject = `You are at ${pct}% of your IBANforge free tier (80% alert)`;
+  const links = packLinks(p.topupRef);
+  // Une clé qui a aussi des crédits ne s'arrête pas le 1er : ses crédits
+  // prennent le relais, sans interruption (règle B, lot B1).
+  const credits =
+    typeof p.creditsRemaining === 'number' && p.creditsRemaining > 0
+      ? p.creditsRemaining.toLocaleString('en-US')
+      : null;
+  const afterAllowance = credits
+    ? `About ${left} calls left on this allowance, then your ${credits} prepaid credits on this key take over, without interruption.`
+    : `About ${left} calls left before validation stops until the 1st of next month.`;
+  const afterAllowanceHtml = credits
+    ? `About <b style="color:#fafafa">${left}</b> left, then your <b style="color:#fafafa">${credits}</b> prepaid credits on this key take over, without interruption.`
+    : `About <b style="color:#fafafa">${left}</b> left before calls stop until the 1st.`;
+  const sameKey = p.topupRef
+    ? 'A pack bought from these links lands on this same key: nothing to change in your integration.\n'
+    : '';
 
   const text =
     `Heads up: key ${p.keyPrefix} has used ${p.used} of its ${p.limit} free requests for ${p.month}.\n` +
-    `About ${left} calls left before validation stops until the 1st of next month.\n\n` +
+    `${afterAllowance}\n\n` +
     `Keep it running, pay by card in one click:\n` +
-    `  1,000 credits  $4   ${PAYMENT_LINKS['1k']}\n` +
-    `  5,000 credits  $20  ${PAYMENT_LINKS['5k']}\n` +
-    ` 25,000 credits  $80  ${PAYMENT_LINKS['25k']}\n\n` +
+    `  1,000 credits  $4   ${links['1k']}\n` +
+    `  5,000 credits  $20  ${links['5k']}\n` +
+    ` 25,000 credits  $80  ${links['25k']}\n` +
+    sameKey +
+    `\n` +
     // L'alerte part à l'adresse de la clé : c'est elle qui ouvre le compte
     // (lot C3, 25.09.2026). « The key stays in your browser » ne décrivait que
     // le repli où l'on colle la clé.
@@ -366,12 +402,13 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">You are at ${pct}% of your free tier</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${p.used} of ${p.limit}</b> requests for ${p.month}. About <b style="color:#fafafa">${left}</b> left before calls stop until the 1st.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${p.used} of ${p.limit}</b> requests for ${p.month}. ${afterAllowanceHtml}</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 18px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Keep it running, pay by card</div>
-      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
-      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
-      <p style="margin:0"><a href="${PAYMENT_LINKS['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
+      <p style="margin:0"><a href="${links['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
+      ${p.topupRef ? '<p style="color:#71717a;font-size:12px;margin:10px 0 0">A pack bought here lands on this same key: nothing to change in your integration.</p>' : ''}
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire, no subscription. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
     <p style="font-size:13px;margin:14px 0 0"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause. ${ACCOUNT_SIGN_IN}</span></p>
@@ -405,6 +442,8 @@ export interface CreditsWarningInput {
   total: number;
   /** L'allocation Pro, passée en paramètre pour que ce module reste à l'écart du magasin des clés. */
   proMonthlyLimit: number;
+  /** La référence de recharge de la clé (lot B1) : les liens rechargent alors CETTE clé. */
+  topupRef?: string | null;
 }
 
 /**
@@ -414,9 +453,11 @@ export interface CreditsWarningInput {
  *
  * Il dit ce qui se passe à zéro (un 402 sur cette clé), parce que c'est ce
  * qu'un porteur qui fait tourner un circuit de production doit savoir avant que
- * cela arrive. Et il dit clairement qu'un achat par carte arrive aujourd'hui
- * sous une NOUVELLE clé : sinon, un porteur qui rachète un pack et continue
- * d'appeler avec celle-ci lirait le 402 suivant comme une panne de notre côté.
+ * cela arrive. Depuis le lot B1 (25.09.2026), ses liens portent la référence de
+ * recharge de la clé : le pack acheté atterrit sur CETTE clé, et la phrase qui
+ * disait qu'un achat par carte arrive sous une clé neuve est retirée. Sans
+ * référence (base indisponible à l'envoi), les liens publics restent, avec la
+ * phrase d'avant, qui est alors vraie.
  */
 export function buildCreditsWarningEmail(p: CreditsWarningInput): {
   subject: string;
@@ -428,16 +469,21 @@ export function buildCreditsWarningEmail(p: CreditsWarningInput): {
   const pro = p.proMonthlyLimit.toLocaleString('en-US');
   const pct = Math.round(CREDITS_NOTICE_RATIO * 100);
   const subject = `${remaining} IBANforge credits left on key ${p.keyPrefix} (${pct}% alert)`;
+  const links = packLinks(p.topupRef);
+  const sameKey = p.topupRef
+    ? 'A pack bought from these links lands on this same key: nothing to change in your integration. ' +
+      'Pro is delivered as a new key.'
+    : 'For now, a purchase by card arrives as a new key: put it in place of this one in your integration.';
 
   const text =
     `Heads up: key ${p.keyPrefix} has ${remaining} of its ${total} prepaid credits left.\n` +
     `When they run out, calls with this key answer HTTP 402 (payment required) until you top up.\n\n` +
     `Keep it running, pay by card in one click:\n` +
-    `  1,000 credits  $4   ${PAYMENT_LINKS['1k']}\n` +
-    `  5,000 credits  $20  ${PAYMENT_LINKS['5k']}\n` +
-    ` 25,000 credits  $80  ${PAYMENT_LINKS['25k']}\n` +
+    `  1,000 credits  $4   ${links['1k']}\n` +
+    `  5,000 credits  $20  ${links['5k']}\n` +
+    ` 25,000 credits  $80  ${links['25k']}\n` +
     `Or a flat $${PRO_PRICE_USD}/month for ${pro} requests: ${PRO_PAYMENT_LINK}\n\n` +
-    `For now, a purchase by card arrives as a new key: put it in place of this one in your integration.\n\n` +
+    `${sameKey}\n\n` +
     `Your balance any time:\n` +
     `  - your account page: sign in at ${ACCOUNT_PAGE} with this e-mail address, no key to paste\n` +
     `  - the X-Credits-Remaining header on every paid response\n` +
@@ -452,12 +498,12 @@ export function buildCreditsWarningEmail(p: CreditsWarningInput): {
     <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has <b style="color:#fafafa">${remaining} of its ${total}</b> prepaid credits left. When they run out, calls with this key answer <b style="color:#fafafa">HTTP 402</b> (payment required) until you top up.</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 12px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Keep it running, pay by card</div>
-      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
-      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
-      <p style="margin:0 0 8px"><a href="${PAYMENT_LINKS['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
       <p style="margin:0"><a href="${PRO_PAYMENT_LINK}" style="color:#fbbf24;text-decoration:none">Pro · ${pro} requests a month · $${PRO_PRICE_USD} →</a></p>
     </div>
-    <p style="color:#71717a;font-size:13px;margin:0 0 18px">For now, a purchase by card arrives as a new key: put it in place of this one in your integration.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 18px">${sameKey}</p>
     <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
@@ -476,6 +522,69 @@ export async function sendCreditsWarningEmail(
   const { subject, text, html } = buildCreditsWarningEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
   if (!ok) reportUndelivered('credits warning', p.to, false);
+  return ok;
+}
+
+export interface RechargeEmailInput {
+  keyPrefix: string;
+  creditsAdded: number;
+  /** Le solde de la clé juste après la recharge. */
+  balance: number;
+  bundle: string;
+}
+
+/**
+ * Le mail d'une RECHARGE (lot B1, 25.09.2026) : un pack acheté par carte avec la
+ * référence d'une clé a atterri sur cette clé. Aucune clé brute, et il n'y en a
+ * pas à donner : le porteur l'a déjà, et rien ne change dans son intégration.
+ * C'est la phrase qui compte, et elle vient en premier.
+ *
+ * Envoyé à l'adresse de la clé quand elle est joignable, sinon à celle du
+ * payeur (contact de service, jamais l'identité de la clé).
+ */
+export function buildRechargeEmail(p: RechargeEmailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const added = p.creditsAdded.toLocaleString('en-US');
+  const balance = p.balance.toLocaleString('en-US');
+  const noticePct = Math.round(CREDITS_NOTICE_RATIO * 100);
+  const text =
+    `Key ${p.keyPrefix} recharged: +${added} credits (pack ${p.bundle}). Balance: ${balance}.\n` +
+    `Nothing to change in your integration: keep calling with the same key.\n\n` +
+    `Your balance any time:\n` +
+    `  - your account page: sign in at ${ACCOUNT_PAGE} with the address attached to the key, no key to paste\n` +
+    `  - the X-Credits-Remaining header on every paid response\n` +
+    `  - GET https://api.ibanforge.com/v1/credits/balance\n` +
+    `We e-mail you once when ${noticePct}% of the balance is left.\n\n` +
+    `Terms: https://ibanforge.com/legal/terms (unused card-paid packs: 14-day refund)\n\nIBANforge`;
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Key ${p.keyPrefix} recharged</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px"><b style="color:#fafafa">+${added} credits</b> (pack ${p.bundle}). Balance: <b style="color:#fafafa">${balance}</b>.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Nothing to change in your integration: keep calling with the same key.</p>
+    <div style="font-size:13px;color:#a1a1aa;margin:0 0 6px">Your balance any time</div>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 22px">We e-mail you once when ${noticePct}% of the balance is left.</p>
+    <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+  </div></body></html>`;
+  return {
+    subject: `IBANforge key ${p.keyPrefix} recharged: +${added} credits`,
+    text,
+    html,
+  };
+}
+
+/** Envoie le mail de recharge. Même contrat sans échec bloquant que les autres. */
+export async function sendRechargeEmail(p: RechargeEmailInput & { to: string }): Promise<boolean> {
+  const { subject, text, html } = buildRechargeEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) reportUndelivered('recharge confirmation', p.to, false);
   return ok;
 }
 

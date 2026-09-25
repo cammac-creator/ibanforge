@@ -17,6 +17,7 @@ import {
   consumeOneTimeKeyByPaymentRef,
   OEM_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
+import { findPurchaseByRef } from '../lib/key-purchases.js';
 
 export const stripeRetrieve = new Hono();
 
@@ -34,6 +35,24 @@ stripeRetrieve.get('/v1/stripe/key/:session_id', (c) => {
   }
 
   const result = consumeOneTimeKey(sessionId);
+
+  // Une RECHARGE (lot B1, 25.09.2026) : le pack a atterri sur une clé que son
+  // porteur détient déjà, donc il n'y a aucune clé brute à rendre. La page de
+  // succès reçoit le préfixe et les crédits ajoutés, et rien d'autre : ni
+  // solde, ni clé (l'identifiant de session voyage dans l'historique du
+  // navigateur). Relisible autant de fois que la page se recharge : elle ne
+  // porte aucun secret.
+  if (!result) {
+    const purchase = findPurchaseByRef(`stripe:${sessionId}`);
+    if (purchase && purchase.kind === 'pack' && purchase.outcome === 'credited') {
+      return c.json({
+        recharged: true,
+        key_prefix: purchase.key_prefix,
+        credits_added: purchase.credits,
+        note: 'Credits added to the key you already hold: nothing to change in your integration.',
+      });
+    }
+  }
 
   if (!result) {
     return c.json(

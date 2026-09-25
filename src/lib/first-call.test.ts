@@ -133,6 +133,13 @@ describe('outgoing message bodies carry no em or en dash', () => {
       total: 1000,
       proMonthlyLimit: 10_000,
     }),
+    // La recharge de la même clé (lot B1, 25.09.2026).
+    buildRechargeEmail: emailModule.buildRechargeEmail({
+      keyPrefix: FAKE_PREFIX,
+      creditsAdded: 1000,
+      balance: 1050,
+      bundle: '1k',
+    }),
     // Added 2026-09-01 (BIZ-14). These two messages were live and unswept: both
     // were assembled inside their async sender, so the lock test above could not
     // see them and the OEM subject shipped an em dash. Making them pure is what

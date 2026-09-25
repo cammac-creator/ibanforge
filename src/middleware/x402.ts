@@ -1,5 +1,4 @@
 import type { Context, MiddlewareHandler } from 'hono';
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
@@ -24,10 +23,19 @@ import { getIbansArray } from '../lib/request-helpers.js';
 // Read-only reuse: the SAME digest the purchase route derives a recovery ref
 // from, so an unconfirmed settlement can hand back the recovery URL its own
 // 502 would otherwise discard. Imported, never redefined: two hashes that had
-// to agree would eventually stop agreeing.
-import { settlementRef } from '../routes/credits-buy.js';
+// to agree would eventually stop agreeing. Since lot B1 (25.09.2026) both the
+// digest and the request-scoped slot live in src/lib/settlement-slot.ts, so
+// the purchase route can read the slot without importing this file.
+import {
+  newSettlementSlot,
+  runInSlot,
+  settlementRef,
+  currentSettlementSlot,
+  type SettlementSlot,
+} from '../lib/settlement-slot.js';
 import { opsFail } from '../lib/ops-alert.js';
 import { settleAndMaybeClaim } from '../lib/key-settlements.js';
+import { confirmPurchase, failPurchase } from '../lib/key-purchases.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -1144,19 +1152,9 @@ export function withFacilitatorTimeout<T>(
 //
 // The flag has to be request-scoped: the facilitator client is memoized for the
 // whole process, so a module-level boolean would leak one request's timeout
-// onto another's response under concurrency.
-export interface SettlementSlot {
-  unconfirmed: FacilitatorTimeoutError | null;
-  /**
-   * Le prix que le paywall a COTÉ pour cette requête, en dollars. null =
-   * inconnu, et le journal n'écrit alors RIEN : la référence de paiement est
-   * unique, donc une ligne à zéro consommerait la référence à jamais et
-   * rendrait silencieusement inopérante toute écriture correcte ultérieure.
-   * Une ligne absente se rattrape, une ligne fausse non.
-   */
-  quotedUsd: number | null;
-}
-const settlementSlot = new AsyncLocalStorage<SettlementSlot>();
+// onto another's response under concurrency. The slot itself (and its
+// AsyncLocalStorage) lives in src/lib/settlement-slot.ts since lot B1.
+export type { SettlementSlot };
 
 /**
  * Test seam for the one link that has no other observable effect: the
@@ -1167,8 +1165,8 @@ const settlementSlot = new AsyncLocalStorage<SettlementSlot>();
  * green. Exercised by x402.test.ts against a fake facilitator.
  */
 export function runInSettlementSlot<T>(fn: () => T): { slot: SettlementSlot; out: T } {
-  const slot: SettlementSlot = { unconfirmed: null, quotedUsd: null };
-  const out = settlementSlot.run(slot, fn);
+  const slot = newSettlementSlot();
+  const out = runInSlot(slot, fn);
   return { slot, out };
 }
 
@@ -1184,6 +1182,12 @@ export function unconfirmedSettlementBody(
   err: FacilitatorTimeoutError,
   ms: number,
   recoveryRef?: string | null,
+  /**
+   * Ce que la route de vente a ouvert pendant ce règlement (lot B1) : une
+   * recharge de la clé présentée n'a rien à récupérer, et une clé neuve ne
+   * s'active qu'une fois le règlement confirmé.
+   */
+  purchase?: 'topup' | 'mint' | null,
 ): {
   error: string;
   message: string;
@@ -1212,20 +1216,34 @@ export function unconfirmedSettlementBody(
       authoritative: false,
       timeout_ms: ms,
     },
-    // 🚨 On a route that SELLS a pack, the handler already minted the key before
-    // settle ran, and its response carried the one-time recovery URL. This 502
-    // replaces that response, so without the line below we would destroy the
-    // very recovery path the buyer needs precisely in the case where they may
-    // have paid. The ref is the same digest credits-buy.ts computes, so the
-    // recovery endpoint answers to it unchanged.
-    ...(recoveryRef
+    // 🚨 On a route that SELLS a pack, the handler already opened the purchase
+    // before settle ran, and its response carried the one-time recovery URL.
+    // This 502 replaces that response, so without the lines below we would
+    // destroy the very recovery path the buyer needs precisely in the case where
+    // they may have paid. The ref is the same digest credits-buy.ts computes, so
+    // the recovery endpoint answers to it unchanged.
+    //
+    // Depuis le lot B1 (25.09.2026) rien n'est crédité ni activé avant un
+    // règlement CONFIRMÉ : la note le dit, au lieu de promettre une clé qui
+    // n'existe pas encore. Le rapprochement se fait à la main, sur l'achat en
+    // attente, une fois la chaîne relue.
+    ...(purchase === 'topup'
       ? {
-          recovery_url: `https://api.ibanforge.com/v1/credits/recover/${recoveryRef}`,
           recovery_note:
-            'If your payment did settle, the key it bought already exists. Fetch it ONCE at recovery_url. ' +
-            'Buying again would pay a second time for a pack you may already own.',
+            'If your payment did settle, the credits are added to the key you presented once we have ' +
+            'confirmed the settlement on-chain; unconfirmed settlements are reconciled by hand. ' +
+            'Do NOT pay again: write to support@ibanforge.com with the transaction hash if the balance ' +
+            'has not moved within a day.',
         }
-      : {}),
+      : recoveryRef
+        ? {
+            recovery_url: `https://api.ibanforge.com/v1/credits/recover/${recoveryRef}`,
+            recovery_note:
+              'If your payment did settle, the key it bought exists and becomes active, and recoverable ONCE at ' +
+              'recovery_url, as soon as we have confirmed the settlement on-chain (unconfirmed settlements are ' +
+              'reconciled by hand). Buying again would pay a second time for a pack you may already own.',
+          }
+        : {}),
   };
 }
 
@@ -1245,7 +1263,7 @@ export function boundFacilitator<
         // Record, then rethrow untouched: the SDK still runs its own failure
         // path, we only remember WHY it is about to answer 402.
         if (err instanceof FacilitatorTimeoutError) {
-          const slot = settlementSlot.getStore();
+          const slot = currentSettlementSlot();
           if (slot) slot.unconfirmed = err;
         }
         throw err;
@@ -1296,11 +1314,22 @@ export function boundFacilitator<
  * payé en 500.
  */
 function recordSettlementForKey(c: Context<HonoEnv>, slot: SettlementSlot, outcome: unknown): void {
-  const settled = outcome === undefined;
+  // 🚨 `outcome === undefined` dit que le paiement a été VÉRIFIÉ, pas qu'il a
+  // été RÉGLÉ (constat C2 du lot B1, 25.09.2026) : le SDK rend `undefined` sur
+  // toute la branche vérifiée, règlement refusé compris, et remplace alors la
+  // réponse par un 402. Sur cette branche, `c.res` est TOUJOURS posé par le
+  // SDK : lire son statut y est sûr, et c'est la seconde moitié de la preuve.
+  // La mise en garde de la condition 2 ci-dessus vise l'autre branche, où
+  // `outcome !== undefined`, et cette conjonction ne l'atteint jamais.
+  const settled = outcome === undefined && c.res.status < 400;
   const keyHash = c.get('apiKeyHash');
   const ref = settlementRef(c);
   const usd = slot.quotedUsd;
   const route = `${c.req.method} ${new URL(c.req.url).pathname}`;
+  // Une route de VENTE n'écrit jamais ce journal (lot B1) : un pack acheté en
+  // présentant sa clé la recharge, il ne lui accorde plus « 200 une fois ».
+  // Un achat ne crée jamais de gratuit ; son argent vit au registre des achats.
+  if (isSellingRoute(c.req.method, new URL(c.req.url).pathname)) return;
   if (!settled || !keyHash || !ref) return;
   if (typeof usd !== 'number' || usd <= 0) {
     // Réglé, mais la cotation manque : on le DIT, on n'invente pas un montant.
@@ -1329,6 +1358,66 @@ function recordSettlementForKey(c: Context<HonoEnv>, slot: SettlementSlot, outco
       3,
     );
   }
+}
+
+/**
+ * Le second temps d'un achat en USDC (lot B1, 25.09.2026).
+ *
+ * Le SDK exécute la route AVANT de régler : la route de vente n'ouvre donc
+ * qu'une ligne `pending` (recharge de la clé présentée, ou clé neuve inactive)
+ * et l'inscrit dans le créneau. Ici, le règlement est connu :
+ *
+ *  - CONFIRMÉ (`outcome === undefined`, aucun délai dépassé, `c.res` < 400) :
+ *    `confirmPurchase` crédite la clé ou active la clé neuve, une fois ;
+ *  - REFUSÉ (le SDK a remplacé la réponse par son 402) : `failPurchase`, rien
+ *    n'est crédité, la clé neuve reste morte et sans clé brute ;
+ *  - INCONNU (délai du facilitateur, ou toute autre réponse) : la ligne reste
+ *    en attente, et un humain rapproche à la main après avoir relu la chaîne.
+ *
+ * Sous try/catch : une écriture de confirmation qui échoue ne transforme pas
+ * un 201 payé en 500 ; la ligne reste en attente et l'alerte le dit.
+ */
+function settlePendingPurchase(c: Context<HonoEnv>, slot: SettlementSlot, outcome: unknown): void {
+  const purchase = slot.purchase;
+  if (!purchase) return;
+  const verified = outcome === undefined;
+  try {
+    if (verified && !slot.unconfirmed && c.res.status < 400) {
+      const result = confirmPurchase(purchase.id);
+      try {
+        slot.afterConfirm?.(result);
+      } catch (err) {
+        console.error(
+          '[x402] after-confirm hook failed:',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+      if (result.status === 'minted_fallback') {
+        void opsFail(
+          `x402:topup-fallback:${purchase.id}`,
+          `A USDC pack settled for a key that is no longer active: a new key was minted instead (purchase ${purchase.id}), recoverable once by its settlement reference.`,
+          1,
+        );
+      }
+      return;
+    }
+    if (verified && !slot.unconfirmed && c.res.status === 402) {
+      failPurchase(purchase.id);
+      return;
+    }
+  } catch (err) {
+    void opsFail(
+      `x402:purchase-confirm:${purchase.id}`,
+      `A settled USDC pack could not be recorded (purchase ${purchase.id}): it stays pending. ${err instanceof Error ? err.message : String(err)}`,
+      1,
+    );
+    return;
+  }
+  void opsFail(
+    `x402:purchase-unconfirmed:${purchase.id}`,
+    `A USDC pack settlement has an unknown outcome (purchase ${purchase.id}, status ${c.res.status}): the purchase stays pending until reconciled by hand (POST /v1/admin/purchases/${purchase.id}/confirm or /fail).`,
+    1,
+  );
 }
 
 // The wallet is NOT baked in here: prices and payTo are resolved per request by
@@ -1504,7 +1593,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             // getStore() rend undefined si le prix est évalué HORS du run() :
             // ce n'est pas une erreur, on rend le prix sans rien retenir. Une
             // exception ici tuerait le paywall.
-            const slot = settlementSlot.getStore();
+            const slot = currentSettlementSlot();
             if (slot) {
               const n = Number(String(priced).replace(/^\$/, ''));
               slot.quotedUsd = Number.isFinite(n) && n > 0 ? n : null;
@@ -1558,8 +1647,12 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // Run the paywall inside a request-scoped slot so a settle that timed out
       // can be told apart from a settle that was refused. Both leave the SDK
       // answering `402 {}`; only one of them means "we do not know".
-      const slot: SettlementSlot = { unconfirmed: null, quotedUsd: null };
-      const outcome = await settlementSlot.run(slot, () => middleware(c, next));
+      const slot = newSettlementSlot();
+      const outcome = await runInSlot(slot, () => middleware(c, next));
+      // L'achat que la route de vente a ouvert (lot B1) : confirmé seulement
+      // sur un règlement CONFIRMÉ, échoué sur un refus, laissé en attente et
+      // signalé quand on ne sait pas.
+      settlePendingPurchase(c, slot, outcome);
       if (!slot.unconfirmed) {
         recordSettlementForKey(c, slot, outcome);
         return outcome;
@@ -1579,7 +1672,14 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       const recoveryRef = isSellingRoute(c.req.method, new URL(c.req.url).pathname)
         ? settlementRef(c)
         : null;
-      const body = JSON.stringify(unconfirmedSettlementBody(slot.unconfirmed, ms, recoveryRef));
+      const body = JSON.stringify(
+        unconfirmedSettlementBody(
+          slot.unconfirmed as FacilitatorTimeoutError,
+          ms,
+          recoveryRef,
+          slot.purchase?.kind ?? null,
+        ),
+      );
       c.res = undefined;
       c.res = new Response(body, {
         status: 502,
