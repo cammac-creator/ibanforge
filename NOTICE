@@ -79,7 +79,8 @@ Files concerned:
   src/lib/fi-register.ts, for its list of bank codes
   scripts/data/eu-emi-register-2026-05-22.json
   scripts/data/iban-registry-2026-05-22.json
-  test fixtures and sample API responses elsewhere (see group C)
+  test fixtures and sample API responses elsewhere that repeat these records
+    (see group C)
 
 Earlier commits of this repository, and forks of it, keep copies of these
 files. The data in those copies remains subject to its publishers' terms.
