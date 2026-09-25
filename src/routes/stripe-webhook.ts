@@ -22,6 +22,12 @@
  * `subscription_cycle` dans `subscription_payments`, sans rien frapper. Le
  * premier paiement d'un abonnement reste sur sa clé (voir
  * src/lib/subscription-payments.ts).
+ *
+ * Remboursements et litiges (25/09/2026, décision de Claude-Alain : retrait
+ * automatique après la mise en ligne de la recharge) : `charge.refunded` (total)
+ * et `charge.dispute.created` reprennent les crédits du pack payé, par le même
+ * code que la route d'administration (src/lib/key-purchases.ts). Voir
+ * REVERSAL_EVENTS ci-dessous.
  */
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
@@ -38,7 +44,13 @@ import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
 import { recordSubscriptionInvoice, stripeId } from '../lib/subscription-payments.js';
 import { notifyOps, opsFail } from '../lib/ops-alert.js';
-import { applyCardPackPaymentInTx, recordSubscriptionMintInTx } from '../lib/key-purchases.js';
+import {
+  applyCardPackPaymentInTx,
+  recordSubscriptionMintInTx,
+  reverseCardPurchaseInTx,
+  type CardReversal,
+  type ReversalReason,
+} from '../lib/key-purchases.js';
 import { isReachableContact } from '../lib/quota-notice.js';
 import {
   sendApiKeyEmail,
@@ -110,6 +122,31 @@ const MINTING_EVENTS: ReadonlySet<string> = new Set([
   'checkout.session.completed',
   'checkout.session.async_payment_succeeded',
 ]);
+
+/**
+ * Les évènements qui reprennent les crédits d'un pack payé par carte (décision
+ * de Claude-Alain du 25.09.2026 : retrait automatique, après la mise en ligne
+ * de la recharge de la même clé).
+ *
+ *  - `charge.refunded` : seul un remboursement TOTAL reprend. Un remboursement
+ *    partiel est une négociation (spec §9) : journal et alerte, rien de repris.
+ *    Des remboursements partiels qui s'additionnent deviennent totaux au
+ *    dernier évènement, qui reprend une fois.
+ *  - `charge.dispute.created` : tout litige reprend, quels que soient son statut
+ *    et son montant, c'est la lettre de la décision. Un litige gagné ensuite ne
+ *    rend rien de lui-même : un humain restitue depuis le registre.
+ *
+ * L'achat se retrouve par l'intention de paiement que le webhook écrit sur sa
+ * ligne depuis le lot B1. Jamais plus que les crédits du pack, jamais sous
+ * zéro, jamais une clé désactivée. Un remboursement ou un litige qui ne mène à
+ * aucun achat répond 200 `ignored` avec un journal, jamais une erreur que
+ * Stripe rejouerait des jours : le compte Stripe porte aussi les audits de
+ * fichier et les paiements d'un autre projet.
+ *
+ * 🚨 Le point d'écoute Stripe doit être abonné aux deux : sans eux, rien
+ * n'arrive ici, et la route d'administration reste le seul moyen de reprendre.
+ */
+const REVERSAL_EVENTS: ReadonlySet<string> = new Set(['charge.refunded', 'charge.dispute.created']);
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -211,6 +248,150 @@ function sessionTag(sessionId: string): string {
   return createHash('sha256').update(sessionId).digest('hex').slice(0, 12);
 }
 
+/** Ce qu'un remboursement ou un litige dit du paiement, sans rien écrire. */
+function reversalOf(event: Stripe.Event): {
+  paymentIntent: string | null;
+  reason: ReversalReason;
+  partial: boolean;
+} {
+  if (event.type === 'charge.refunded') {
+    const charge = event.data.object as Stripe.Charge;
+    // Total quand Stripe le dit (`refunded`), ou quand le cumul remboursé
+    // couvre le montant du paiement.
+    const full =
+      charge.refunded === true ||
+      (typeof charge.amount === 'number' &&
+        charge.amount > 0 &&
+        typeof charge.amount_refunded === 'number' &&
+        charge.amount_refunded >= charge.amount);
+    return { paymentIntent: stripeId(charge.payment_intent), reason: 'refunded', partial: !full };
+  }
+  const dispute = event.data.object as Stripe.Dispute;
+  return { paymentIntent: stripeId(dispute.payment_intent), reason: 'disputed', partial: false };
+}
+
+/**
+ * La réponse à Stripe, le journal et l'alerte d'un remboursement ou d'un
+ * litige. Le journal ne garde que des identifiants Stripe et de l'achat ;
+ * l'alerte, le préfixe de la clé et le numéro de l'achat (à relire par
+ * `GET /v1/admin/purchases`), jamais une adresse. Une alerte par achat et par
+ * raison : un évènement rejoué sous un autre identifiant ne la relance pas.
+ */
+function reversalAnswer(
+  event: Stripe.Event,
+  reason: ReversalReason,
+  reversal: CardReversal,
+): { status: number; body: Record<string, unknown>; alert?: { key: string; detail: string } } {
+  const base = { received: true, event_id: event.id };
+  const what = reason === 'refunded' ? 'remboursé' : 'contesté (litige)';
+  if (reversal.kind === 'no_payment_intent' || reversal.kind === 'unknown') {
+    const ignored = reversal.kind === 'unknown' ? 'no_matching_purchase' : 'no_payment_intent';
+    console.info(`[stripe-webhook] ${event.type} ignored (${ignored}), event ${event.id}`);
+    return { status: 200, body: { ...base, ignored } };
+  }
+  if (reversal.kind === 'ambiguous') {
+    const ids = reversal.purchases.map((p) => p.id).join(', ');
+    console.warn(`[stripe-webhook] ${event.type}: several purchases (${ids}), nothing taken back`);
+    return {
+      status: 200,
+      body: { ...base, ignored: 'ambiguous_payment_intent' },
+      alert: {
+        key: `stripe:reversal-ambiguous:${reversal.purchases[0].id}`,
+        detail:
+          `Un paiement ${what} chez Stripe mène à plusieurs achats du registre (${ids}) : ` +
+          'rien n’a été repris. À relire dans les outils privés.',
+      },
+    };
+  }
+  if (reversal.kind === 'partial_refund') {
+    const p = reversal.purchase;
+    console.info(`[stripe-webhook] partial refund on purchase ${p.id}, nothing taken back`);
+    return {
+      status: 200,
+      body: {
+        ...base,
+        reversal: {
+          reason,
+          outcome: 'partial_refund',
+          purchase_id: p.id,
+          key_prefix: p.key_prefix,
+          removed_credits: 0,
+        },
+      },
+      alert: {
+        key: `stripe:refund-partial:${p.id}:${sessionTag(event.id)}`,
+        detail:
+          `Remboursement PARTIEL chez Stripe de l’achat ${p.id} (clé ${p.key_prefix}…) : rien ` +
+          'n’a été repris, c’est une négociation. Pour reprendre le pack entier : ' +
+          `POST /v1/admin/purchases/${p.id}/clawback.`,
+      },
+    };
+  }
+
+  const out = reversal.outcome;
+  const p = out.purchase;
+  const alertKey = `stripe:${reason === 'refunded' ? 'refund' : 'dispute'}:${p.id}`;
+  if (out.status === 'clawed_back') {
+    const prefix = out.keyPrefix ?? p.key_prefix;
+    const packCredits = p.credits ?? 0;
+    console.info(
+      `[stripe-webhook] ${event.type}: purchase ${p.id} ${reason}, ${out.removed} of ${packCredits} credits taken back`,
+    );
+    const why =
+      out.keyPrefix === null
+        ? ' Aucune clé active dans la lignée : rien n’a été repris.'
+        : out.removed < packCredits
+          ? ' Il restait moins que le pack sur la clé : seul le solde a été repris.'
+          : '';
+    return {
+      status: 200,
+      body: {
+        ...base,
+        reversal: {
+          reason,
+          outcome: 'clawed_back',
+          purchase_id: p.id,
+          key_prefix: prefix,
+          removed_credits: out.removed,
+          pack_credits: packCredits,
+        },
+      },
+      alert: {
+        key: alertKey,
+        detail:
+          `Un pack payé par carte a été ${what} chez Stripe : ${out.removed} crédits repris sur ` +
+          `la clé ${prefix}… (achat ${p.id}), jamais sous zéro, clé toujours active.${why}` +
+          (reason === 'disputed'
+            ? ' Litige gagné : rien n’est rendu de lui-même, restituer à la main depuis le registre.'
+            : ''),
+      },
+    };
+  }
+  console.info(
+    `[stripe-webhook] ${event.type}: purchase ${p.id} ${out.status}, nothing taken back`,
+  );
+  const body = {
+    ...base,
+    reversal: {
+      reason,
+      outcome: out.status,
+      purchase_id: p.id,
+      key_prefix: p.key_prefix,
+      removed_credits: 0,
+    },
+  };
+  // Déjà repris (rejeu sous un autre identifiant, remboursement après la route
+  // d'administration) : seul un litige mérite encore un regard humain.
+  if (out.status === 'unchanged' && reason === 'refunded') return { status: 200, body };
+  const detail =
+    out.status === 'unchanged'
+      ? `Un paiement de pack déjà repris (${p.outcome}) est ${what} chez Stripe (achat ${p.id}) : rien de plus n’a été repris.`
+      : out.status === 'not_a_pack'
+        ? `Un paiement d’abonnement a été ${what} chez Stripe (achat ${p.id}, clé ${p.key_prefix}…) : rien n’a été repris ; l’abonnement se gère dans Stripe.`
+        : `Un achat jamais réglé (${p.outcome}) est ${what} chez Stripe (achat ${p.id}) : rien n’a été repris. À relire.`;
+  return { status: 200, body, alert: { key: alertKey, detail } };
+}
+
 export function processStripeEvent(event: Stripe.Event): {
   status: number;
   body: Record<string, unknown>;
@@ -282,6 +463,24 @@ export function processStripeEvent(event: Stripe.Event): {
       status: 200,
       body: { received: true, event_id: event.id, invoice: invoice.id ?? null, ...outcome },
     };
+  }
+
+  // Remboursement ou litige : la reprise et l'évènement traité dans UNE
+  // transaction IMMEDIATE. Un arrêt entre les deux ne peut ni reprendre sans
+  // marquer l'évènement (Stripe rejoue, l'issue de la ligne tient), ni marquer
+  // sans reprendre.
+  if (REVERSAL_EVENTS.has(event.type)) {
+    const reversal = reversalOf(event);
+    const outcome = db
+      .transaction(() => {
+        const out = reverseCardPurchaseInTx(db, reversal);
+        db.prepare(
+          'INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
+        ).run(event.id, event.type);
+        return out;
+      })
+      .immediate();
+    return reversalAnswer(event, reversal.reason, outcome);
   }
 
   if (!MINTING_EVENTS.has(event.type)) {

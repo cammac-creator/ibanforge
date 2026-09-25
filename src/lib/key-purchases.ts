@@ -790,7 +790,9 @@ export function failPurchase(id: number): { status: 'failed' | 'unchanged' | 'no
     .immediate();
 }
 
-// ─── La reprise sur remboursement ou litige (administration) ─────────────────
+// ─── La reprise sur remboursement ou litige ──────────────────────────────────
+
+export type ReversalReason = 'refunded' | 'disputed';
 
 export type ClawbackOutcome =
   | {
@@ -805,48 +807,109 @@ export type ClawbackOutcome =
   | { status: 'not_settled'; purchase: PurchaseRow };
 
 /**
- * Reprend les crédits d'un pack remboursé ou disputé (spec §9, Q9 : la route
- * d'administration d'abord ; l'automatisme par webhook exige un réglage du
- * compte Stripe, qui est la décision de Claude-Alain).
+ * Reprend les crédits d'un pack remboursé ou disputé (spec §9), dans la
+ * transaction de l'appelant. Deux appelants, un seul code :
+ *
+ *  - la route d'administration (`POST /v1/admin/purchases/:id/clawback`), par
+ *    `clawbackPurchase` ci-dessous ;
+ *  - le webhook Stripe, sur `charge.refunded` (remboursement TOTAL) et
+ *    `charge.dispute.created` (décision de Claude-Alain du 25.09.2026 : retrait
+ *    automatique après la mise en ligne de la recharge), par
+ *    `reverseCardPurchaseInTx`, dans la même transaction que
+ *    `processed_webhooks`.
  *
  * Bornée aux crédits DE CET ACHAT et au solde présent : jamais sous zéro,
  * jamais `active = 0`. Une carte volée utilisée sur la référence d'une
  * victime, puis rétrofacturée, ne peut donc lui retirer que ce pack-là.
- * Idempotente : un second appel sur la même ligne ne reprend rien de plus.
- * Un remboursement PARTIEL n'est pas une reprise : il se négocie et se
- * consigne à la main, cette route ne le fait pas.
+ * Idempotente : l'issue de la ligne (`refunded`, `disputed`) est la barrière,
+ * un second appel sur la même ligne ne reprend rien de plus, quelle que soit
+ * sa raison. Un remboursement PARTIEL n'est pas une reprise : il se négocie
+ * et se consigne à la main, aucun des deux appelants ne le fait.
  */
-export function clawbackPurchase(id: number, reason: 'refunded' | 'disputed'): ClawbackOutcome {
+export function clawbackPurchaseInTx(db: Db, id: number, reason: ReversalReason): ClawbackOutcome {
+  const row = findPurchaseById(id, db);
+  if (!row) return { status: 'not_found' };
+  if (row.outcome === 'refunded' || row.outcome === 'disputed') {
+    return { status: 'unchanged', purchase: row };
+  }
+  if (row.kind !== 'pack') return { status: 'not_a_pack', purchase: row };
+  if (!isSaleOutcome(row.outcome)) return { status: 'not_settled', purchase: row };
+  const active = db
+    .prepare(
+      `SELECT key_hash, key_prefix FROM api_keys
+        WHERE COALESCE(lineage_hash, key_hash) = ? AND active = 1 LIMIT 2`,
+    )
+    .all(row.lineage_hash) as Array<{ key_hash: string; key_prefix: string }>;
+  const target = active.length === 1 ? active[0] : null;
+  const removed = target ? clawbackCreditsInTx(db, target.key_hash, row.credits ?? 0) : 0;
+  db.prepare(
+    `UPDATE key_purchases SET outcome = ?, clawback_credits = ?, ended_at = datetime('now')
+      WHERE id = ?`,
+  ).run(reason, removed, id);
+  return {
+    status: 'clawed_back',
+    removed,
+    keyPrefix: target?.key_prefix ?? null,
+    purchase: findPurchaseById(id, db) as PurchaseRow,
+  };
+}
+
+/** La reprise, dans sa propre transaction (route d'administration). */
+export function clawbackPurchase(id: number, reason: ReversalReason): ClawbackOutcome {
   const db = getStatsDB();
+  return db.transaction((): ClawbackOutcome => clawbackPurchaseInTx(db, id, reason)).immediate();
+}
+
+/**
+ * Les achats qu'une intention de paiement Stripe a réglés. Au plus deux lus :
+ * un seul est attendu (une session de Checkout, une intention), deux disent
+ * une anomalie que le webhook ne tranche pas.
+ *
+ * 🚨 Seuls les achats écrits par le webhook depuis le lot B1 portent leur
+ * intention : les lignes rattrapées depuis `api_keys` (packs d'avant le lot)
+ * n'en ont pas, et ne sont donc jamais retrouvées ici. Leur reprise passe par
+ * la route d'administration.
+ */
+export function findPurchasesByPaymentIntent(
+  paymentIntent: string,
+  db: Db = getStatsDB(),
+): PurchaseRow[] {
   return db
-    .transaction((): ClawbackOutcome => {
-      const row = findPurchaseById(id, db);
-      if (!row) return { status: 'not_found' };
-      if (row.outcome === 'refunded' || row.outcome === 'disputed') {
-        return { status: 'unchanged', purchase: row };
-      }
-      if (row.kind !== 'pack') return { status: 'not_a_pack', purchase: row };
-      if (!['credited', 'minted', 'minted_fallback'].includes(row.outcome)) {
-        return { status: 'not_settled', purchase: row };
-      }
-      const active = db
-        .prepare(
-          `SELECT key_hash, key_prefix FROM api_keys
-            WHERE COALESCE(lineage_hash, key_hash) = ? AND active = 1 LIMIT 2`,
-        )
-        .all(row.lineage_hash) as Array<{ key_hash: string; key_prefix: string }>;
-      const target = active.length === 1 ? active[0] : null;
-      const removed = target ? clawbackCreditsInTx(db, target.key_hash, row.credits ?? 0) : 0;
-      db.prepare(
-        `UPDATE key_purchases SET outcome = ?, clawback_credits = ?, ended_at = datetime('now')
-          WHERE id = ?`,
-      ).run(reason, removed, id);
-      return {
-        status: 'clawed_back',
-        removed,
-        keyPrefix: target?.key_prefix ?? null,
-        purchase: findPurchaseById(id, db) as PurchaseRow,
-      };
-    })
-    .immediate();
+    .prepare('SELECT * FROM key_purchases WHERE stripe_payment_intent = ? ORDER BY id LIMIT 2')
+    .all(paymentIntent) as PurchaseRow[];
+}
+
+export type CardReversal =
+  | { kind: 'no_payment_intent' }
+  | { kind: 'unknown' }
+  | { kind: 'ambiguous'; purchases: PurchaseRow[] }
+  | { kind: 'partial_refund'; purchase: PurchaseRow }
+  | { kind: 'reversed'; outcome: Exclude<ClawbackOutcome, { status: 'not_found' }> };
+
+/**
+ * Un remboursement ou un litige Stripe, à appeler DANS la transaction du
+ * webhook (qui y écrit aussi `processed_webhooks`). Rien n'y alerte ni n'y
+ * journalise : l'appelant le fait hors de la transaction, d'après l'issue.
+ *
+ *  - pas d'intention de paiement, ou aucune ligne qui la porte : `no_payment_intent`
+ *    ou `unknown`, rien d'écrit. Le compte Stripe porte aussi les paiements
+ *    d'un autre projet et les audits de fichier : ce n'est pas une anomalie ;
+ *  - deux lignes : `ambiguous`, rien d'écrit, jamais une reprise devinée ;
+ *  - remboursement partiel : `partial_refund`, rien d'écrit (spec §9) ;
+ *  - sinon la reprise commune (`clawbackPurchaseInTx`).
+ */
+export function reverseCardPurchaseInTx(
+  db: Db,
+  p: { paymentIntent: string | null; reason: ReversalReason; partial: boolean },
+): CardReversal {
+  if (!p.paymentIntent) return { kind: 'no_payment_intent' };
+  const purchases = findPurchasesByPaymentIntent(p.paymentIntent, db);
+  if (purchases.length === 0) return { kind: 'unknown' };
+  if (purchases.length > 1) return { kind: 'ambiguous', purchases };
+  const purchase = purchases[0];
+  if (p.partial) return { kind: 'partial_refund', purchase };
+  const outcome = clawbackPurchaseInTx(db, purchase.id, p.reason);
+  // La ligne vient d'être lue dans cette transaction : elle existe.
+  if (outcome.status === 'not_found') return { kind: 'unknown' };
+  return { kind: 'reversed', outcome };
 }
