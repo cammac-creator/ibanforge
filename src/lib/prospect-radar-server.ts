@@ -44,6 +44,7 @@ import {
 } from './company-profiles.js';
 import { getClientProfiles } from './stats.js';
 import { isInternalEmail } from './internal-accounts.js';
+import { logModelUsage } from './model-usage.js';
 
 const TICK_MS = 60 * 60 * 1000;
 const BOOT_DELAY_MS = 4 * 60 * 1000; // offset from the lifecycle (5') and forum (3') radars
@@ -137,7 +138,7 @@ async function callAnthropic(
     body: JSON.stringify({
       // The model's thinking block spends the SAME max_tokens budget as the
       // answer, and the customer-context block lengthens that thinking: at
-      // 3000 the ctenifaktur draft came back truncated before ===END=== on
+      // 3000 one prospect's draft came back truncated before ===END=== on
       // every 6h run while an isolated repro (no context block) parsed fine.
       // Headroom is cheap, truncation costs a whole generation.
       model: 'claude-sonnet-5',
@@ -155,6 +156,7 @@ async function callAnthropic(
     content?: Array<{ type: string; text?: string }>;
     stop_reason?: string;
   };
+  logModelUsage('prospect-radar', data);
   const text = (data.content ?? []).map((c) => c.text ?? '').join('');
   const stopReason = data.stop_reason ?? '?';
   if (!text.trim()) throw new Error(`generation empty (stop_reason=${stopReason})`);
