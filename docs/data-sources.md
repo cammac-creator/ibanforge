@@ -23,8 +23,9 @@ aucun fichier de ce dépôt, hors historique git :
 | exports AT, BE, SM ; blocs EPC des autres exports et des exemples | `frontend/data/`, fixtures MCP et SDK, documentation | les pages `/at`, `/be`, `/sm` lisent l'API à la demande |
 | entrées GB (FCA) | `scripts/data/eu-emi-register-2026-05-22.json` | non |
 
-Les robots publics tournent avec `SEED_FAMILY=public` (valeur par défaut) : ils
-ne téléchargent plus aucun membre et écrivent des bases sans la famille ;
+Les robots publics tournent sans `SEED_FAMILY` (mode public ; la variable n'accepte
+que `restricted`, toute autre valeur est refusée) : ils ne téléchargent plus aucun
+membre et écrivent des bases sans la famille ;
 `src/lib/public-base-family-free.test.ts` échoue si une ligne revient. Les bases
 suivies se reconstruisent sans téléchargement par `npm run overlay -- strip`.
 Sans surcouche, chaque réponse qui dépend de la famille dit « non consulté »
@@ -333,8 +334,11 @@ liste des membres vit en UN endroit,
 Les quatre derniers membres sont venus après la première surcouche publiée
 (`mayBeAbsent`) : un fichier écrit avant eux ne les porte pas, et le chargeur les
 lit « absents » (ni servis ni refusés, sans alerte) au lieu de refuser le fichier.
-Un membre déjà servi qui deviendrait absent reste une perte : le rechargement garde
-ce qu'il sert et la porte du manifeste refuse la release (`lost_member`). Les clés
+Un membre déjà servi qui deviendrait absent reste une perte, refusée partout : le
+tirage refuse le fichier (`members_lost`), le rechargement garde ce qu'il sert, le
+redémarrage préfère la copie acceptée dès qu'un de ses membres manque au fichier
+posé, et la porte du manifeste refuse la release (`lost_member`, même sous
+« accepter une baisse »). Les clés
 viennent chaque mois de la dernière publication de mdomke/schwifty sur PyPI
 (`scripts/seed-curated-map.ts`, empreinte SHA-256 de la roue vérifiée contre
 l'index) ; la liste finlandaise, statique (un PDF transcrit à la main), est
@@ -415,7 +419,7 @@ viennent du fichier Bank Master de SIX (« may be used freely »).
   `SEED_TMP_DIR` dans son dossier de travail : les téléchargements et la base de
   conformité en construction ne passent plus par `.tmp-bic-enrich/` et
   `.tmp-compliance/` du checkout (désormais ignorés par git). Sans ces variables
-  (`SEED_FAMILY` vaut `public` par défaut depuis le 25/09/2026), les workflows publics
+  (sans `SEED_FAMILY`, le mode public, depuis le 25/09/2026), les workflows publics
   écrivent des bases sans la famille et ne téléchargent aucun de ses membres.
 
 ## Ce que les surfaces publiques annoncent

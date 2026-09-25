@@ -234,8 +234,8 @@ ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script re
 ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
 
 **Le retrait (étape 6, 25.09.2026)** : plus rien de la famille dans ce dépôt, hors historique
-git. Les seeders publics tournent avec `SEED_FAMILY=public` par défaut et ne téléchargent aucun
-membre ; les bases suivies se reconstruisent sans la famille (`npm run overlay -- strip`, sans
+git. Les seeders publics tournent sans `SEED_FAMILY` (mode public ; seule la valeur `restricted`
+est admise) et ne téléchargent aucun membre ; les bases suivies se reconstruisent sans la famille (`npm run overlay -- strip`, sans
 téléchargement) et `src/lib/public-base-family-free.test.ts` échoue si une ligne revient ; la
 carte composite n'a plus les clés AT, BE, LU, PL et FI (les clés PL, FI et LU et la liste
 finlandaise reviennent par la surcouche : membres `map_pl`, `map_fi`, `map_lu` et

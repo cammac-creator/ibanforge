@@ -558,7 +558,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/validate \\
   -d '{"iban":"DE89370400440532013000"}'
 \`\`\`
 
-Response (real API output of 2026-09, trimmed to the fields agents typically need):
+Response (real API output of 2026-09, from a deployment where the EPC registers were not loaded, trimmed to the fields agents typically need):
 \`\`\`json
 {
   "iban": "DE89370400440532013000",

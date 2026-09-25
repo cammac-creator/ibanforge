@@ -31,9 +31,9 @@ Quatre décisions de conception, dites franchement :
 - **La jointure se fait par LEI, jamais par ressemblance de noms.** La liste publie l'identifiant LEI de chaque firme, et nos données GLEIF aussi. Le rapprochement par noms entre registres est la fabrique des fausses concordances ; une jointure par identifiant tient ou ne tient pas.
 - **Le bloc est borné aux BIC GB et GI.** Pour les succursales, la liste donne le LEI du *siège* — et un LEI de siège est rattaché aux BIC de tout le groupe, dans le monde entier. Sans la borne, la jointure aurait revendiqué un agrément britannique sur plus d'un millier de BIC non britanniques — mesuré sur les données réelles avant la mise en service, puis borné.
 - **Il ne répond jamais `authorised: false`.** Le préambule de la liste dit lui-même qu'elle ne remplace pas le Financial Services Register. L'absence d'une firme de notre copie d'un instantané mensuel est l'absence d'une affirmation, pas un constat.
-- **L'attribution porte le mois, et un test l'impose.** « Bank of England (List of Banks, 2026-08) » figure au pied de page, dans les docs et sur les surfaces lisibles par machine, le mois étant lu depuis les données chargées. Si un rafraîchissement futur charge une nouvelle liste et qu'une surface affiche encore l'ancien mois, le build échoue. La permission venait avec une condition ; la condition est devenue de l'infrastructure.
+- **L'attribution porte le mois, et un contrôle y veille.** « Bank of England (List of Banks, 2026-08) » figure au pied de page, dans les docs et sur les surfaces lisibles par machine. Les réponses de l'API portent le mois de la liste qu'elles servent. Quand un rafraîchissement mensuel charge une nouvelle liste, une alerte nomme chaque surface statique qui affiche encore l'ancien mois, pour que nous la mettions à jour. La permission venait avec une condition ; la condition est devenue de l'infrastructure.
 
-La liste se rafraîchit chaque mois par le même workflow que nos autres registres.
+La liste se rafraîchit chaque mois, comme nos autres registres.
 
 ## Livré aussi cette semaine
 

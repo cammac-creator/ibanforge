@@ -133,8 +133,8 @@ npm run build             # next build
   script refuses, and `.gitignore` catches `restricted-*.sqlite*` and `*.merged-*.sqlite*`),
   never add a table or a source to the family anywhere but that constant, and never let a
   public workflow download or commit the family. Since the removal (step 6, 25 September
-  2026) none of it is in this repository: the public seeders run with `SEED_FAMILY=public`
-  by default and never download a member, the tracked databases are rebuilt without it
+  2026) none of it is in this repository: the public seeders run without `SEED_FAMILY`
+  (public mode; the variable only accepts `restricted`) and never download a member, the tracked databases are rebuilt without it
   (`npm run overlay -- strip`, no download) and `src/lib/public-base-family-free.test.ts`
   fails if a row comes back, the composite map no longer carries the AT, BE, LU, PL and FI
   keys (the PL, FI and LU keys and the Finnish list come back from the overlay: members

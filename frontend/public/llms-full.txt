@@ -124,7 +124,7 @@ Authorization: Bearer ifk_...
 Drop the `Authorization` line and the same call still works within the keyless
 weekly allowance described above: the response then carries a `trial` block instead of being billed.
 
-Response (real API output of 2026-09, trimmed to the fields agents use most):
+Response (real API output of 2026-09, from a deployment where the EPC registers were not loaded, trimmed to the fields agents use most):
 ```json
 {
   "iban": "DE89370400440532013000",
@@ -149,7 +149,7 @@ POST https://api.ibanforge.com/v1/iban/compliance
 {"iban": "DE89370400440532013000"}
 ```
 
-Returns the validate fields plus a nested `compliance` block (real API output of 2026-09, trimmed):
+Returns the validate fields plus a nested `compliance` block (real API output of 2026-09, from a deployment where the EPC registers and the UN list were not loaded, as its flags say; trimmed):
 ```json
 {
   "iban": "DE89370400440532013000",

@@ -32,10 +32,22 @@
  * - le registre nomme le titulaire du code : la page ;
  * - le registre dit que personne ne tient ce code (AT, BE : `not_allocated`),
  *   ou la liste saint-marinaise ne le porte pas : `null`, la page répond 404 ;
- * - tout le reste (API injoignable, clé refusée, registre non chargé en
- *   production, réponse inattendue) : une erreur, jamais une page fausse. Le
- *   cache de Next garde alors la dernière page réussie.
+ * - tout le reste (API injoignable ou muette au-delà de LIVE_TIMEOUT_MS, clé
+ *   refusée, registre non chargé en production, réponse inattendue) : une
+ *   erreur, jamais une page fausse. Le cache de Next garde alors la dernière
+ *   page réussie.
+ *
+ * ## Ce que coûte une page, sur la clé du bac à sable
+ *
+ * Au plus un appel à l'API par code et par jour. `generateMetadata` et la page
+ * lisent le même code dans la même requête : la lecture est mémorisée pour la
+ * requête (`cache` de React), un seul appel au premier affichage. Entre deux
+ * requêtes, le cache de données de Next garde la réponse de l'API un jour, POST
+ * compris (sa clé de cache porte le corps, donc l'IBAN), qu'elle donne une page
+ * ou une 404 (un code que personne ne tient) : une 404 ne recoûte rien avant le
+ * lendemain. Un code mal formé n'appelle jamais l'API.
  */
+import { cache } from 'react';
 
 export type LiveRegisterCountry = 'AT' | 'BE' | 'SM';
 
@@ -48,6 +60,13 @@ const REGISTER_PREFIX: Record<LiveRegisterCountry, string> = {
 
 /** Durée de cache d'une réponse de l'API pour une page de code, en secondes. */
 export const LIVE_REVALIDATE_SECONDS = 86_400;
+
+/**
+ * Délai d'attente d'une lecture de l'API, en millisecondes : au-delà, une erreur
+ * (la page déjà en cache reste servie), jamais un rendu qui attend jusqu'au
+ * plafond de l'hébergeur.
+ */
+export const LIVE_TIMEOUT_MS = 8_000;
 
 export interface LiveRegisterEntry {
   country: LiveRegisterCountry;
@@ -95,7 +114,8 @@ export function ibanCheckDigits(country: string, bban: string): string {
   let expanded = '';
   for (const ch of rearranged) expanded += /[A-Z]/.test(ch) ? String(ch.charCodeAt(0) - 55) : ch;
   let rem = 0;
-  for (let i = 0; i < expanded.length; i += 7) rem = Number(`${rem}${expanded.slice(i, i + 7)}`) % 97;
+  for (let i = 0; i < expanded.length; i += 7)
+    rem = Number(`${rem}${expanded.slice(i, i + 7)}`) % 97;
   return String(98 - rem).padStart(2, '0');
 }
 
@@ -230,9 +250,10 @@ export function interpretLiveAnswer(
 
 /**
  * Lit la page d'un code à l'API. Côté serveur seulement : la clé du bac à sable
- * n'existe que dans l'environnement du serveur.
+ * n'existe que dans l'environnement du serveur. Mémorisée pour la requête (voir
+ * « Ce que coûte une page » en tête).
  */
-export async function fetchLiveRegisterEntry(
+export const fetchLiveRegisterEntry = cache(async function fetchLiveRegisterEntry(
   cc: LiveRegisterCountry,
   rawCode: string,
 ): Promise<LiveRegisterEntry | null> {
@@ -241,15 +262,26 @@ export async function fetchLiveRegisterEntry(
   const iban = liveExampleIban(cc, code);
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const key = process.env.PLAYGROUND_API_KEY || '';
-  const res = await fetch(`${apiUrl}/v1/iban/validate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(key ? { Authorization: `Bearer ${key}` } : {}),
-    },
-    body: JSON.stringify({ iban }),
-    next: { revalidate: LIVE_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) throw new RegisterPageUnavailableError(`${cc} ${code}: the API answered ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(`${apiUrl}/v1/iban/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { Authorization: `Bearer ${key}` } : {}),
+      },
+      body: JSON.stringify({ iban }),
+      next: { revalidate: LIVE_REVALIDATE_SECONDS },
+      // Hors de la clé de cache de Next : le délai ne change rien à la mise en cache.
+      signal: AbortSignal.timeout(LIVE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === 'TimeoutError';
+    throw new RegisterPageUnavailableError(
+      `${cc} ${code}: ${timedOut ? `no API answer within ${LIVE_TIMEOUT_MS} ms` : 'the API is unreachable'}`,
+    );
+  }
+  if (!res.ok)
+    throw new RegisterPageUnavailableError(`${cc} ${code}: the API answered ${res.status}`);
   return interpretLiveAnswer(cc, code, iban, (await res.json()) as Json);
-}
+});

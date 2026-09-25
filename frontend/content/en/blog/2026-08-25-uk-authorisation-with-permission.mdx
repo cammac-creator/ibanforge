@@ -31,9 +31,9 @@ Four design decisions worth stating plainly:
 - **The join is by LEI, never by name similarity.** The list publishes each firm's Legal Entity Identifier, and so does our GLEIF data. Name matching across registers is how phantom matches are born; an identifier join either holds or it does not.
 - **The block is bounded to GB and GI BICs.** The list gives branch entries their *head office* LEI, and a head office LEI is attached to that group's BICs worldwide. Unbounded, the join would have claimed UK authorisation on more than a thousand non-UK BICs — we measured it on the real data before shipping, then bounded it.
 - **It never answers `authorised: false`.** The list's own preamble says it does not supersede the Financial Services Register. A firm's absence from our copy of a monthly snapshot is the absence of a claim, not a finding.
-- **The attribution carries the month, and a test enforces it.** "Bank of England (List of Banks, 2026-08)" appears in the footer, the docs and the machine-readable surfaces, with the month read from the loaded data. If a future refresh loads a new list and any surface still shows the old month, the build fails. The permission came with a condition; the condition is now infrastructure.
+- **The attribution carries the month, and a check watches it.** "Bank of England (List of Banks, 2026-08)" appears in the footer, the docs and the machine-readable surfaces. The API's own answers carry the month of the list they serve. When a monthly refresh loads a new list, an alert names every static surface that still shows the old month, for us to update. The permission came with a condition; the condition is now infrastructure.
 
-The list refreshes monthly through the same workflow as our other registers.
+The list refreshes monthly, like our other registers.
 
 ## Also shipped this week
 

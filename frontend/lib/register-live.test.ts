@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  LIVE_TIMEOUT_MS,
   RegisterPageUnavailableError,
   computeCin,
   fetchLiveRegisterEntry,
@@ -214,5 +215,22 @@ describe("asking the API", () => {
   it("turns an API failure into an error, never into a page or a 404", async () => {
     vi.stubGlobal("fetch", async () => new Response("{}", { status: 402 }));
     await expect(fetchLiveRegisterEntry("BE", "990")).rejects.toThrow(RegisterPageUnavailableError);
+  });
+
+  it("gives up after LIVE_TIMEOUT_MS: an error, never a render that waits for the host's limit", async () => {
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      signal = init.signal ?? undefined;
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    });
+    await expect(fetchLiveRegisterEntry("AT", "19981")).rejects.toThrow(
+      new RegisterPageUnavailableError(`AT 19981: no API answer within ${LIVE_TIMEOUT_MS} ms`),
+    );
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(LIVE_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("fetch failed");
+    });
+    await expect(fetchLiveRegisterEntry("AT", "19981")).rejects.toThrow(/unreachable/);
   });
 });
