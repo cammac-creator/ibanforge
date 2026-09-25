@@ -895,7 +895,12 @@ export type CardReversal =
  *    ou `unknown`, rien d'écrit. Le compte Stripe porte aussi les paiements
  *    d'un autre projet et les audits de fichier : ce n'est pas une anomalie ;
  *  - deux lignes : `ambiguous`, rien d'écrit, jamais une reprise devinée ;
- *  - remboursement partiel : `partial_refund`, rien d'écrit (spec §9) ;
+ *  - remboursement partiel : `partial_refund`, rien d'écrit (spec §9), mais
+ *    seulement sur un pack pas encore repris (relecture de la PR 263, D3) : un
+ *    partiel livré APRÈS un remboursement total (Stripe ne garantit aucun
+ *    ordre) ou après une reprise par la route d'administration rend
+ *    `unchanged`, et un partiel sur une ligne qui n'est pas un pack rend
+ *    `not_a_pack`, sans jamais rien écrire ;
  *  - sinon la reprise commune (`clawbackPurchaseInTx`).
  */
 export function reverseCardPurchaseInTx(
@@ -907,7 +912,18 @@ export function reverseCardPurchaseInTx(
   if (purchases.length === 0) return { kind: 'unknown' };
   if (purchases.length > 1) return { kind: 'ambiguous', purchases };
   const purchase = purchases[0];
-  if (p.partial) return { kind: 'partial_refund', purchase };
+  if (p.partial) {
+    // La barrière de l'issue et la nature de l'achat d'abord : l'alerte d'un
+    // partiel propose de reprendre le pack entier, ce qui serait faux sur un
+    // pack déjà repris ou sur un abonnement. Aucune écriture sur un partiel.
+    if (purchase.outcome === 'refunded' || purchase.outcome === 'disputed') {
+      return { kind: 'reversed', outcome: { status: 'unchanged', purchase } };
+    }
+    if (purchase.kind !== 'pack') {
+      return { kind: 'reversed', outcome: { status: 'not_a_pack', purchase } };
+    }
+    return { kind: 'partial_refund', purchase };
+  }
   const outcome = clawbackPurchaseInTx(db, purchase.id, p.reason);
   // La ligne vient d'être lue dans cette transaction : elle existe.
   if (outcome.status === 'not_found') return { kind: 'unknown' };

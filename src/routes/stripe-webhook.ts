@@ -253,6 +253,8 @@ function reversalOf(event: Stripe.Event): {
   paymentIntent: string | null;
   reason: ReversalReason;
   partial: boolean;
+  /** Le statut du litige tel que Stripe l'envoie ; null pour un remboursement. */
+  disputeStatus: string | null;
 } {
   if (event.type === 'charge.refunded') {
     const charge = event.data.object as Stripe.Charge;
@@ -264,10 +266,33 @@ function reversalOf(event: Stripe.Event): {
         charge.amount > 0 &&
         typeof charge.amount_refunded === 'number' &&
         charge.amount_refunded >= charge.amount);
-    return { paymentIntent: stripeId(charge.payment_intent), reason: 'refunded', partial: !full };
+    return {
+      paymentIntent: stripeId(charge.payment_intent),
+      reason: 'refunded',
+      partial: !full,
+      disputeStatus: null,
+    };
   }
   const dispute = event.data.object as Stripe.Dispute;
-  return { paymentIntent: stripeId(dispute.payment_intent), reason: 'disputed', partial: false };
+  // Le statut est lu, pas jugé : tout litige reprend le pack (décision du
+  // 25.09.2026). Il dit seulement si c'est une demande de renseignements
+  // (`warning_*` : les fonds ne sont pas retirés) ou une rétrofacturation
+  // (relecture de la PR 263, D1).
+  const status = typeof dispute.status === 'string' && dispute.status ? dispute.status : null;
+  return {
+    paymentIntent: stripeId(dispute.payment_intent),
+    reason: 'disputed',
+    partial: false,
+    disputeStatus: status,
+  };
+}
+
+/**
+ * Une demande de renseignements de la banque du payeur, pas encore un litige :
+ * Stripe la signale par un statut `warning_*`, et les fonds ne sont pas retirés.
+ */
+function isInquiry(disputeStatus: string | null): boolean {
+  return disputeStatus !== null && disputeStatus.startsWith('warning_');
 }
 
 /**
@@ -281,17 +306,32 @@ function reversalAnswer(
   event: Stripe.Event,
   reason: ReversalReason,
   reversal: CardReversal,
+  disputeStatus: string | null = null,
 ): { status: number; body: Record<string, unknown>; alert?: { key: string; detail: string } } {
   const base = { received: true, event_id: event.id };
-  const what = reason === 'refunded' ? 'remboursé' : 'contesté (litige)';
+  const inquiry = reason === 'disputed' && isInquiry(disputeStatus);
+  const what =
+    reason === 'refunded'
+      ? 'remboursé'
+      : inquiry
+        ? 'visé par une demande de renseignements de la banque du payeur'
+        : 'contesté (litige)';
+  // Le statut du litige, dans le journal et dans le bloc `reversal` : sans lui,
+  // une demande de renseignements se lisait comme un litige (relecture, D1).
+  const statusNote = reason === 'disputed' ? ` (dispute status ${disputeStatus ?? 'unknown'})` : '';
+  const statusField = reason === 'disputed' ? { dispute_status: disputeStatus } : {};
   if (reversal.kind === 'no_payment_intent' || reversal.kind === 'unknown') {
     const ignored = reversal.kind === 'unknown' ? 'no_matching_purchase' : 'no_payment_intent';
-    console.info(`[stripe-webhook] ${event.type} ignored (${ignored}), event ${event.id}`);
+    console.info(
+      `[stripe-webhook] ${event.type}${statusNote} ignored (${ignored}), event ${event.id}`,
+    );
     return { status: 200, body: { ...base, ignored } };
   }
   if (reversal.kind === 'ambiguous') {
     const ids = reversal.purchases.map((p) => p.id).join(', ');
-    console.warn(`[stripe-webhook] ${event.type}: several purchases (${ids}), nothing taken back`);
+    console.warn(
+      `[stripe-webhook] ${event.type}${statusNote}: several purchases (${ids}), nothing taken back`,
+    );
     return {
       status: 200,
       body: { ...base, ignored: 'ambiguous_payment_intent' },
@@ -335,7 +375,7 @@ function reversalAnswer(
     const prefix = out.keyPrefix ?? p.key_prefix;
     const packCredits = p.credits ?? 0;
     console.info(
-      `[stripe-webhook] ${event.type}: purchase ${p.id} ${reason}, ${out.removed} of ${packCredits} credits taken back`,
+      `[stripe-webhook] ${event.type}${statusNote}: purchase ${p.id} ${reason}, ${out.removed} of ${packCredits} credits taken back`,
     );
     const why =
       out.keyPrefix === null
@@ -349,6 +389,7 @@ function reversalAnswer(
         ...base,
         reversal: {
           reason,
+          ...statusField,
           outcome: 'clawed_back',
           purchase_id: p.id,
           key_prefix: prefix,
@@ -356,24 +397,37 @@ function reversalAnswer(
           pack_credits: packCredits,
         },
       },
-      alert: {
-        key: alertKey,
-        detail:
-          `Un pack payé par carte a été ${what} chez Stripe : ${out.removed} crédits repris sur ` +
-          `la clé ${prefix}… (achat ${p.id}), jamais sous zéro, clé toujours active.${why}` +
-          (reason === 'disputed'
-            ? ' Litige gagné : rien n’est rendu de lui-même, restituer à la main depuis le registre.'
-            : ''),
-      },
+      alert: inquiry
+        ? {
+            // Une clé à part : si la demande devient un litige et que Stripe
+            // l'annonce, cette alerte-là peut encore partir.
+            key: `stripe:dispute-inquiry:${p.id}`,
+            detail:
+              `Demande de renseignements de la banque du payeur (${disputeStatus}) sur un pack payé par carte ` +
+              `(achat ${p.id}, clé ${prefix}…) : ce n’est pas encore un litige, les fonds ne sont PAS retirés. ` +
+              `${out.removed} crédits ont quand même été repris (décision du 25.09.2026), jamais sous zéro, ` +
+              `clé toujours active.${why} Répondre à la demande dans Stripe. Si elle se referme sans litige, ` +
+              `les ${out.removed} crédits sont à restituer à la main (aucune route ne les remet encore).`,
+          }
+        : {
+            key: alertKey,
+            detail:
+              `Un pack payé par carte a été ${what} chez Stripe : ${out.removed} crédits repris sur ` +
+              `la clé ${prefix}… (achat ${p.id}), jamais sous zéro, clé toujours active.${why}` +
+              (reason === 'disputed'
+                ? ' Litige gagné : rien n’est rendu de lui-même, restituer à la main depuis le registre.'
+                : ''),
+          },
     };
   }
   console.info(
-    `[stripe-webhook] ${event.type}: purchase ${p.id} ${out.status}, nothing taken back`,
+    `[stripe-webhook] ${event.type}${statusNote}: purchase ${p.id} ${out.status}, nothing taken back`,
   );
   const body = {
     ...base,
     reversal: {
       reason,
+      ...statusField,
       outcome: out.status,
       purchase_id: p.id,
       key_prefix: p.key_prefix,
@@ -480,7 +534,7 @@ export function processStripeEvent(event: Stripe.Event): {
         return out;
       })
       .immediate();
-    return reversalAnswer(event, reversal.reason, outcome);
+    return reversalAnswer(event, reversal.reason, outcome, reversal.disputeStatus);
   }
 
   if (!MINTING_EVENTS.has(event.type)) {
