@@ -553,7 +553,7 @@ const CHECK_COMPLIANCE_OUTPUT_SCHEMA = {
         .nullable()
         .optional()
         .describe(
-          'At least one of the three schemes lists the bank; null when the EPC registers were not consulted.',
+          'At least one of the three schemes lists the bank; null when the EPC registers were not consulted (screened false). Outside the SEPA area the country answers (false) whether or not the registers are loaded.',
         ),
     }),
     vop: z.object({

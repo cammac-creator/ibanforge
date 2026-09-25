@@ -70,7 +70,7 @@ export const BANK_REACHABILITY_NOTE =
 
 /** `sepa.vop_register_status` et `compliance.vop.register_status`. */
 export const VOP_REGISTER_STATUS_NOTE =
-  "The bank's status in the EPC Verification of Payee register: active (the same as vop_participant true), pending, inactive, or not_listed when the register has no row for it; null when no BIC resolved or the register was not consulted. It says whether the payee's bank answers VoP requests; IBANforge never runs the name check itself.";
+  "The bank's status in the EPC Verification of Payee register: active (the same as vop_participant true), pending, inactive, or not_listed when the register has no row for it; null when no BIC resolved or the register was not consulted (screened false). Outside the SEPA area the country answers instead of the register (not_listed on POST /v1/iban/compliance) whether or not the register is loaded; the validation carries no sepa.vop_register_status there. It says whether the payee's bank answers VoP requests; IBANforge never runs the name check itself.";
 
 /**
  * La tête de la ligne « Returns » de validate_iban (et du lot, et de la
@@ -81,4 +81,4 @@ export const VALIDATE_TRUTH_RETURNS =
 
 /** Les noms honnêtes du bloc de conformité, pour la description de check_compliance. */
 export const COMPLIANCE_HONEST_NAMES =
-  "compliance.sanctions.institution_listed says whether the payee's bank is on a list (null when no bank was screened, where bank_sanctioned still answers false) and payee_screened is always false; compliance.reachability.listed_in_epc_registers and compliance.vop.register_status name the registers' answers, null when not consulted. The flag bank_code_inferred carries no weight.";
+  "compliance.sanctions.institution_listed says whether the payee's bank is on a list (null when no bank was screened, where bank_sanctioned still answers false) and payee_screened is always false; compliance.reachability.listed_in_epc_registers and compliance.vop.register_status name the registers' answers, null when not consulted (screened false); outside the SEPA area the country answers (false, not_listed) whether or not the registers are loaded. The flag bank_code_inferred carries no weight.";
