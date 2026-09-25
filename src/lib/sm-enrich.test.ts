@@ -1,12 +1,4 @@
-import { describe, it, expect } from 'vitest';
-import { validateIBAN } from './iban.js';
-import { enrichResult } from './enrich.js';
-import {
-  nationalRegisterAvailable,
-  nationalRegisterCredit,
-  nationalRegisterEdition,
-  nationalRegisterIsExhaustive,
-} from './national-registers.js';
+import { afterAll, describe, it, expect, vi } from 'vitest';
 
 /**
  * San Marino — a register that names holders without covering the space.
@@ -17,10 +9,32 @@ import {
  * list of banks, not an allocation of the ABI space) and not
  * `national_register_unavailable` (the register was consulted and answered).
  *
+ * Il tourne sur une page INVENTÉE (src/test-support/restricted-fixtures.ts) :
+ * la BCSM ne publie aucune condition d'utilisation, ses lignes quittent donc le
+ * dépôt public avec les autres registres de licence inconnue (décision du
+ * 24/09/2026), et un test qui se sautait sans elles ne testerait rien sur une
+ * copie publique.
+ *
  * A San Marino BBAN is `1!a5!n5!n12!c`: a CIN letter, then five digits of ABI
- * in IBAN positions 6-10, five of CAB, and twelve of account. Every IBAN below
- * was generated mod-97 and is asserted valid before anything is read from it.
+ * in IBAN positions 6-10, five of CAB, and twelve of account. Chaque IBAN
+ * ci-dessous est construit par le mod-97 du jeu d'essai et vérifié valide avant
+ * toute lecture.
  */
+const { fixture, FX, SM_SOURCE } = await vi.hoisted(async () => {
+  const m = await import('../test-support/restricted-fixtures.js');
+  return { fixture: m.installRestrictedFixture(), FX: m.FIXTURE, SM_SOURCE: m.SM_SOURCE };
+});
+afterAll(() => fixture.restore());
+
+const { validateIBAN } = await import('./iban.js');
+const { enrichResult } = await import('./enrich.js');
+const {
+  lookupNationalCode,
+  nationalRegisterCredit,
+  nationalRegisterEdition,
+  nationalRegisterIsExhaustive,
+} = await import('./national-registers.js');
+
 function check(iban: string) {
   const r = validateIBAN(iban);
   expect(r.valid, `${iban} must be a valid IBAN for this test to mean anything`).toBe(true);
@@ -28,19 +42,25 @@ function check(iban: string) {
   return r;
 }
 
-const noSM = !nationalRegisterAvailable('SM');
-
-/** ABI 03034, Banca Agricola Commerciale — on the BCSM page. */
-const LISTED = 'SM15U0303409800000000270100';
+/** La banque inventée, sur la page inventée. */
+const LISTED = FX.SM.iban(FX.SM.bank.code);
 /** The same bank with a different CIN letter: our validator accepts any. */
-const LISTED_OTHER_CIN = 'SM32A0303409800000000270100';
+const LISTED_OTHER_CIN = FX.SM.iban(FX.SM.bank.code, 'A');
 /** The ISO 13616 registry's own San Marino example. Its ABI is not on the page. */
 const SWIFT_EXAMPLE = 'SM86U0322509800000000270100';
-/** A fabricated ABI, on the page and in no directory. */
-const FABRICATED = 'SM35U9999909800000000270100';
+/** A fabricated ABI, on no page and in no directory. */
+const FABRICATED = FX.SM.iban(FX.SM.unlistedCode);
+
+describe('the page really is the invented one', () => {
+  it('holds the invented bank and none of the real ones', () => {
+    // 06067 est une vraie banque en activité ; ici personne ne le détient.
+    expect(lookupNationalCode('SM', FX.SM.bank.code)?.name).toBe(FX.SM.bank.name);
+    expect(lookupNationalCode('SM', '06067')).toBeNull();
+  });
+});
 
 describe('the BCSM list names the holder of a code it carries', () => {
-  it.skipIf(noSM)('verifies a listed bank and serves what the supervisor publishes', () => {
+  it('verifies a listed bank and serves what the supervisor publishes', () => {
     const r = check(LISTED);
     expect(r.bank_code_check?.status).toBe('verified');
     expect(r.bank_code_check?.match).toBe('register');
@@ -48,28 +68,27 @@ describe('the BCSM list names the holder of a code it carries', () => {
     const inst = r.bank_code_check?.institution;
     // The full registered office, which this page publishes and Belgium's does
     // not — depth follows the register, never a house style.
-    expect(inst?.name).toBe('Banca Agricola Commerciale Istituto Bancario Sammarinese s.p.a.');
-    expect(inst?.street).toBe('Via 3 settembre, 316');
-    expect(inst?.post_code).toBe('47891');
-    expect(inst?.town).toBe('Dogana');
+    expect(inst?.name).toBe(FX.SM.bank.name);
+    expect(inst?.street).toBe(FX.SM.bank.street);
+    expect(inst?.post_code).toBe(FX.SM.bank.post_code);
+    expect(inst?.town).toBe(FX.SM.bank.town);
     expect(inst?.country).toBe('SM');
     // The page publishes no LEI, so none is served. Joining one from GLEIF
     // would be our enrichment wearing the BCSM's credit.
     expect(inst?.lei).toBeUndefined();
   });
 
-  it.skipIf(noSM)('serves the name the institution actually has, not the markup artefact', () => {
-    // 🚨 The page marks this name up as two adjacent <strong> with no space
-    // between them, so it RENDERS as "BancaAgricola" in a browser. Our own
-    // GLEIF row for BASMSMSM reads "BANCA AGRICOLA COMMERCIALE …", so the space
-    // is the institution's, not ours to invent.
-    expect(check(LISTED).bic?.bank_name).toContain('Banca Agricola');
-    expect(check(LISTED).bic?.bank_name).not.toContain('BancaAgricola');
+  it('serves the supervisor s name for the institution in the BIC block too', () => {
+    // L'artefact de balisage de la vraie page (deux <strong> collés, rendus
+    // « BancaAgricola ») relève du parseur, tenu là où il est testé
+    // (scripts/seed-national.test.ts). Reste à tenir ici : le bloc BIC nomme
+    // l'établissement comme la page.
+    expect(check(LISTED).bic?.bank_name).toBe(FX.SM.bank.name);
   });
 
-  it.skipIf(noSM)('does not care which CIN letter the IBAN carries', () => {
+  it('does not care which CIN letter the IBAN carries', () => {
     // The CIN is a check character over the BBAN, not part of the bank code.
-    expect(check(LISTED_OTHER_CIN).bank_code_check?.value).toBe('03034');
+    expect(check(LISTED_OTHER_CIN).bank_code_check?.value).toBe(FX.SM.bank.code);
     expect(check(LISTED_OTHER_CIN).bank_code_check?.status).toBe('verified');
   });
 });
@@ -78,7 +97,7 @@ describe('the BCSM list names the holder of a code it carries', () => {
  * The property this file is for.
  */
 describe('a code the list does not carry keeps the answer it always had', () => {
-  it.skipIf(noSM)('never says not_allocated, and never blames the register', () => {
+  it('never says not_allocated, and never blames the register', () => {
     for (const iban of [SWIFT_EXAMPLE, FABRICATED]) {
       const r = check(iban);
       const check_ = r.bank_code_check;
@@ -101,7 +120,7 @@ describe('a code the list does not carry keeps the answer it always had', () => 
     }
   });
 
-  it.skipIf(noSM)('says the same about the ISO registry example as about a made-up code', () => {
+  it('says the same about the ISO registry example as about a made-up code', () => {
     // The registry's own San Marino example carries an ABI the operating-banks
     // page does not list. For Austria and Slovakia that is a FINDING — their
     // registers allocate, so the example points at nobody. Here it is not: the
@@ -116,9 +135,9 @@ describe('a code the list does not carry keeps the answer it always had', () => 
 });
 
 describe('the BIC pairing is the supervisor s, even though the code space is not', () => {
-  it.skipIf(noSM)('serves the register BIC as national_register', () => {
+  it('serves the register BIC as national_register', () => {
     const r = check(LISTED);
-    expect(r.bic?.code).toBe('BASMSMSM');
+    expect(r.bic?.code).toBe(FX.SM.bank.bic);
     // The mirror image of Switzerland: there the SIX register settles the CODE
     // while the BIC comes from our curated map, so bank_code_check is
     // authoritative and bic is not. Here it is the other way round — the BCSM
@@ -130,7 +149,7 @@ describe('the BIC pairing is the supervisor s, even though the code space is not
     expect(r.bic?.source).toBe(nationalRegisterEdition('SM').source);
   });
 
-  it.skipIf(noSM)('resolves a bank our curated map could never have reached', () => {
+  it('resolves a bank our curated map could never have reached', () => {
     // Measured 06/09/2026, before the register: every San Marino IBAN answered
     // `bic: null`. The eleven curated SM keys are four-letter BIC stems
     // (SM:BASM, SM:MAOI …) and a San Marino IBAN carries five DIGITS, so they
@@ -140,10 +159,10 @@ describe('the BIC pairing is the supervisor s, even though the code space is not
 });
 
 describe('the attribution, and what its date belongs to', () => {
-  it.skipIf(noSM)('words San Marino s credit as a READ date, not an edition', () => {
+  it('words San Marino s credit as a READ date, not an edition', () => {
     const { source, as_of } = nationalRegisterEdition('SM');
-    expect(source).toBe('Central Bank of the Republic of San Marino, operating banks');
-    expect(as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(source).toBe(SM_SOURCE);
+    expect(as_of).toBe(FX.SM.bank.as_of);
     // "read on" is the whole point: the BCSM publishes no edition and no
     // revision date, so a bare parenthesis would read as the source's own date
     // and overstate it. Slovakia's, which IS the register's date, reads plain.

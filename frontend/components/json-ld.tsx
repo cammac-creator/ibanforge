@@ -50,7 +50,7 @@ const SOFTWARE_APPLICATION = {
   operatingSystem: 'Web, REST API, MCP',
   url: 'https://ibanforge.com',
   description:
-    'Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, BG, CH, LI), the bank and BIC with their source, SEPA and VoP readiness from the EPC registers where they list the bank, and bank-level sanctions (OFAC, EU, UN).' +
+    'Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, CZ, BG, CH, LI), the bank and BIC with their source, SEPA and VoP readiness from the EPC registers where they list the bank, and bank-level sanctions (OFAC, EU, UN).' +
     ` It does not check the payee's name. Prepaid packs by card, a Pro subscription, or pay-per-call in USDC via x402; ${FREE_KEY}. Native MCP server for Claude Desktop, Cursor, and Cline.`,
   offers: [
     {
@@ -105,7 +105,7 @@ const SOFTWARE_APPLICATION = {
   ],
   featureList: [
     'IBAN validation (ISO 13616 mod-97 + BBAN)',
-    'Bank-code verdict against the national register (DE, AT, BE, SK, BG, CH, LI)',
+    'Bank-code verdict against the national register (DE, AT, BE, SK, CZ, BG, CH, LI)',
     'BIC/SWIFT lookup against 121k+ BIC entries; validation answers name the source of every BIC',
     'Swiss BC-Nummer / IID lookup (1,100+ SIX BankMaster)',
     'EMI / vIBAN / neobank issuer classification',

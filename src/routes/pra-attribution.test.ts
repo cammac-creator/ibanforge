@@ -36,23 +36,54 @@ const SURFACES = [
 
 const CREDIT = /Bank of England \(List of Banks, (\d{4}-\d{2})\)/g;
 
+/**
+ * Comparé à la liste que porte réellement la base servie, jamais à un jeu
+ * d'essai : un mois inventé pour un test correspondrait aux surfaces par
+ * construction, ou les ferait rougir pour rien.
+ *
+ * La liste quitte le dépôt public (décision du 24/09/2026). Sur une base sans
+ * elle, la comparaison surface par surface ci-dessous ne peut pas tourner et se
+ * déclare sautée ; elle appartient alors à l'endroit où la liste est chargée
+ * (le rafraîchissement privé qui l'apporte). Tant que la liste est là, elle
+ * tourne ici comme toujours. Le dernier test prouve que la comparaison mord
+ * encore, sur toute copie du dépôt.
+ */
 const loaded = getPraBanksCount() > 0;
+
+/** Les mois de crédit qu'écrit une surface. */
+function creditMonths(relative: string): string[] {
+  const text = readFileSync(join(ROOT, relative), 'utf8');
+  return [...text.matchAll(CREDIT)].map((m) => m[1]!);
+}
+
+/** Chaque crédit de surface qui nomme un autre mois que `month`. */
+function staleCredits(month: string): string[] {
+  return SURFACES.flatMap((relative) =>
+    creditMonths(relative)
+      .filter((m) => m !== month)
+      .map((m) => `${relative}: ${m}`),
+  );
+}
 
 describe('Bank of England attribution', () => {
   it.each(SURFACES)('%s names the Bank of England with a month', (relative) => {
-    const text = readFileSync(join(ROOT, relative), 'utf8');
-    const months = [...text.matchAll(CREDIT)].map((m) => m[1]);
     // Presence first: the credit disappearing is the same breach as the credit
     // being wrong, and a bare "Bank of England" with no month does not satisfy
     // the condition either.
-    expect(months.length).toBeGreaterThan(0);
+    expect(creditMonths(relative).length).toBeGreaterThan(0);
   });
 
   it.skipIf(!loaded).each(SURFACES)('%s names the month actually loaded', (relative) => {
-    const text = readFileSync(join(ROOT, relative), 'utf8');
-    const months = [...text.matchAll(CREDIT)].map((m) => m[1]);
-    for (const month of months) {
-      expect(month).toBe(getPraListMonth());
-    }
+    const loadedMonth = getPraListMonth()!;
+    expect(staleCredits(loadedMonth).filter((c) => c.startsWith(`${relative}:`))).toEqual([]);
+  });
+
+  it('flags every surface once the loaded month moves on', () => {
+    // Le rafraîchissement qui apporte un nouveau mois doit faire rougir les
+    // crédits jusqu'à ce qu'ils soient corrigés dans le même commit. Un mois
+    // qu'aucune surface ne peut porter prouve que la comparaison le ferait :
+    // chaque surface est signalée, aucune n'est sautée.
+    const flagged = new Set(staleCredits('1999-01').map((c) => c.split(':')[0]));
+    expect([...flagged].sort()).toEqual([...SURFACES].sort());
   });
 });

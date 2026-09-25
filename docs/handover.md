@@ -163,6 +163,17 @@ touching any register.** Four rules distilled from it:
 4. **A register's own robots file is respected as policy.** One central bank names our
    crawler; that is not something to "fix" with a user-agent rotation.
 
+**Un registre qui fait foi se relit plus souvent que le mensuel.** Depuis le 25.09.2026, le
+registre tchèque (ČNB) est relu chaque jour par `.github/workflows/refresh-cz-register.yml` :
+la ČNB publie ses éditions à l'avance et pas toujours le 1er, et un code absent y vaut refus.
+Ce workflow peut donc pousser `data/bic.sqlite` sur `main` n'importe quel jour (seulement quand
+le contenu tchèque change) : `git fetch` et rebase avant chaque push, comme toujours. Il
+partage le groupe de concurrence `bic-sqlite-writer` avec `refresh-bic.yml`. Un échec de
+lecture garde l'édition en place et fait passer le run au rouge avec une alerte Telegram.
+La bascule vers une édition annoncée se fait à la requête, à minuit heure de Prague
+(`activeTable()`, `src/lib/national-registers.ts`). Un prochain registre à publication non
+mensuelle suit le même modèle.
+
 Known gaps a newcomer should expect to work on, in order:
 
 - **The `NOTICE` file requires a verbatim attribution sentence for the BIC-to-LEI mapping

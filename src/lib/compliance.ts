@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
-import { getComplianceDB } from './compliance-db.js';
+import { complianceTableLoaded, getComplianceDB } from './compliance-db.js';
+import { getSepaInfo } from './countries.js';
 import type {
   SanctionsCheck,
   ReachabilityCheck,
@@ -20,15 +21,30 @@ export function checkSanctions(countryCode: string, bic8: string | null): Sancti
     _checkSanctionedCountry = db.prepare(
       'SELECT sanction_type FROM sanctioned_countries WHERE country_code = ?',
     );
-  if (!_checkSanctionedBank)
-    _checkSanctionedBank = db.prepare('SELECT source_list FROM sanctioned_entities WHERE bic8 = ?');
   if (!_checkFatf)
     _checkFatf = db.prepare('SELECT status FROM fatf_countries WHERE country_code = ?');
 
   const countrySanction = _checkSanctionedCountry.get(countryCode) as
     { sanction_type: string } | undefined;
-  const bankSanctions = bic8 ? (_checkSanctionedBank.all(bic8) as { source_list: string }[]) : [];
   const fatfRow = _checkFatf.get(countryCode) as { status: string } | undefined;
+
+  // L'axe banque, seulement quand il y a une banque ET une liste à consulter
+  // (25/09/2026). Sans liste chargée, sauter cette seule recherche : les axes
+  // pays et GAFI ont leurs propres tables et répondent quand même. Tout faire
+  // tomber dans le repli « base illisible » disait `country_sanctioned: false`
+  // sur des tables lues, et une banque résolue d'un pays sanctionné passait de
+  // critical à elevated. La requête n'est préparée qu'ici, après la sonde :
+  // préparée sans condition, une table supprimée faisait lever même un IBAN
+  // sans banque résolue.
+  const bankScreened = bic8 !== null && complianceTableLoaded('sanctioned_entities');
+  let bankSanctions: { source_list: string }[] = [];
+  if (bankScreened) {
+    if (!_checkSanctionedBank)
+      _checkSanctionedBank = db.prepare(
+        'SELECT source_list FROM sanctioned_entities WHERE bic8 = ?',
+      );
+    bankSanctions = _checkSanctionedBank.all(bic8) as { source_list: string }[];
+  }
 
   return {
     country_sanctioned: !!countrySanction,
@@ -37,7 +53,7 @@ export function checkSanctions(countryCode: string, bic8: string | null): Sancti
     fatf_status: (fatfRow?.status as SanctionsCheck['fatf_status']) ?? 'non_member',
     // The country and FATF axes answered; the bank axis only did if there was a
     // bank to ask about. See the field note in types.ts.
-    bank_screened: bic8 !== null,
+    bank_screened: bankScreened,
   };
 }
 
@@ -63,6 +79,11 @@ export interface BicSanctionsScreen {
 }
 
 export function screenBicSanctions(bic8: string): BicSanctionsScreen {
+  // Aucune liste chargée, c'est la même nouvelle qu'une base illisible : rien
+  // n'a été consulté, donc rien ci-dessous ne peut se lire « propre ».
+  if (!complianceTableLoaded('sanctioned_entities')) {
+    return { screened: false, listed: null, matched_lists: [] };
+  }
   try {
     const db = getComplianceDB();
     if (!_checkSanctionedBank)
@@ -80,8 +101,60 @@ export function screenBicSanctions(bic8: string): BicSanctionsScreen {
   }
 }
 
-export function checkReachability(bic8: string | null): ReachabilityCheck {
+/**
+ * Territoires de la zone géographique SEPA que getSepaInfo() ne compte pas
+ * comme membres, alors que le registre EPC porte leurs banques (vérifié le
+ * 25/09/2026 : GG, GP, JE, MQ et RE y figurent). Les départements et
+ * collectivités d'outre-mer français, Jersey, Guernesey, l'île de Man et Åland.
+ */
+const SEPA_SCOPE_TERRITORIES = new Set([
+  'AX',
+  'BL',
+  'GF',
+  'GG',
+  'GP',
+  'IM',
+  'JE',
+  'MF',
+  'MQ',
+  'PM',
+  'RE',
+  'YT',
+]);
+
+/**
+ * Le pays est-il hors de la zone SEPA, si bien que la réponse ne dépend pas du
+ * registre EPC ?
+ *
+ * Aucune banque d'un tel pays ne peut figurer dans les registres des schémas :
+ * « pas de SEPA Instant, pas de VoP » y est un constat tiré du pays, registre
+ * chargé ou non. Faux pour un pays inconnu (pas de pays, pas de constat).
+ */
+function outsideSepaScope(countryCode: string | undefined): boolean {
+  if (!countryCode) return false;
+  return !getSepaInfo(countryCode).member && !SEPA_SCOPE_TERRITORIES.has(countryCode);
+}
+
+/**
+ * @param countryCode Le pays qui décide si le registre est nécessaire : celui
+ *   de l'IBAN sur le chemin IBAN, celui du BIC sur le chemin BIC. Facultatif :
+ *   sans lui, un registre absent donne toujours « non consulté ».
+ */
+export function checkReachability(bic8: string | null, countryCode?: string): ReachabilityCheck {
   if (!bic8) return { sepa_instant: false, sct: false, sdd: false, screened: false };
+  // Un registre EPC qui n'est pas chargé n'a pas été consulté. Répondre
+  // `screened: true` ici disait « non joignable » de toutes les banques, et
+  // ajoutait 5 à leur score de risque, sur une table simplement absente. Hors
+  // de la zone SEPA, en revanche, le pays suffit : la réponse reste celle
+  // d'une base complète, avec ou sans registre.
+  if (!complianceTableLoaded('sepa_participants')) {
+    return {
+      sepa_instant: false,
+      sct: false,
+      sdd: false,
+      screened: outsideSepaScope(countryCode),
+    };
+  }
   const db = getComplianceDB();
   if (!_checkReachability)
     _checkReachability = db.prepare('SELECT scheme FROM sepa_participants WHERE bic8 = ?');
@@ -95,8 +168,13 @@ export function checkReachability(bic8: string | null): ReachabilityCheck {
   };
 }
 
-export function checkVop(bic8: string | null): VopCheck {
+export function checkVop(bic8: string | null, countryCode?: string): VopCheck {
   if (!bic8) return { participant: false, status: 'not_found', screened: false };
+  // Même règle que checkReachability : pas de registre VoP chargé, pas de
+  // réponse VoP, sauf hors de la zone SEPA où le pays répond.
+  if (!complianceTableLoaded('vop_participants')) {
+    return { participant: false, status: 'not_found', screened: outsideSepaScope(countryCode) };
+  }
   const db = getComplianceDB();
   if (!_checkVop) _checkVop = db.prepare('SELECT status FROM vop_participants WHERE bic8 = ?');
   const row = _checkVop.get(bic8) as { status: string } | undefined;
@@ -126,6 +204,9 @@ export function checkVop(bic8: string | null): VopCheck {
  */
 export type BankCodeConfidence = 'confirmed' | 'unverified' | 'denied';
 
+/** Le score minimal d'une banque résolue qu'aucune liste de sanctions n'a pu contrôler. */
+export const SANCTIONS_LISTS_UNAVAILABLE_FLOOR = 50;
+
 export function calculateRiskScore(
   sanctions: SanctionsCheck,
   reachability: ReachabilityCheck,
@@ -134,9 +215,18 @@ export function calculateRiskScore(
   countryRisk: string,
   isTestBic: boolean,
   bankCode: BankCodeConfidence = 'confirmed',
+  /**
+   * Une banque a-t-elle été résolue (un BIC8 était en main) ? Par défaut, ce
+   * que dit `bank_screened`, qui n'est plus la même chose depuis le
+   * 25/09/2026 : une banque résolue n'est pas passée aux listes quand aucune
+   * liste n'est chargée. buildComplianceResult() passe la valeur exacte.
+   */
+  bankResolved: boolean = sanctions.bank_screened,
 ): { risk_score: number; risk_level: ScoredRiskLevel; flags: string[] } {
   let score = 0;
   const flags: string[] = [];
+  // Une banque résolue, et aucune liste de sanctions chargée pour la contrôler.
+  const sanctionsListsUnavailable = bankResolved && !sanctions.bank_screened;
 
   if (sanctions.country_sanctioned) {
     score += 50;
@@ -218,32 +308,150 @@ export function calculateRiskScore(
   // `bank_code_not_allocated` (+40); a second weight for the same fact would be
   // double-counting, and inventing one merely to keep scores from moving would
   // reintroduce a number that means "we did not check".
-  if (!reachability.screened || !vop.screened) {
+  //
+  // (25/09/2026) Qu'une banque ait été résolue se lit désormais dans
+  // `bankResolved` (un BIC8 était en main), plus dans les deux champs
+  // `screened` ni dans `bank_screened` : ceux-ci disent aussi « le registre ou
+  // la liste n'est pas chargé », et une banque résolue ne doit pas être décrite
+  // comme non résolue parce qu'une table manque.
+  //
+  // Un registre non chargé se note de la même façon, axe par axe et pour la
+  // même raison : `sepa_register_unavailable` et `vop_register_unavailable` ne
+  // pèsent rien, parce qu'ils décrivent ce que nous n'avons pas pu consulter,
+  // pas la banque. Les noter, c'est ce qui faisait passer une banque ordinaire
+  // de 0 à 10 sur une base sans les tables EPC. Hors de la zone SEPA, le pays
+  // répond à la place du registre (`screened: true`) et les points restent.
+  if (!bankResolved) {
     flags.push('no_bank_resolved');
   } else {
-    if (!reachability.sepa_instant) {
+    if (!reachability.screened) {
+      flags.push('sepa_register_unavailable');
+    } else if (!reachability.sepa_instant) {
       score += 5;
       flags.push('no_sepa_instant');
     }
-    if (!vop.participant) {
+    if (!vop.screened) {
+      flags.push('vop_register_unavailable');
+    } else if (!vop.participant) {
       score += 5;
       flags.push('no_vop');
     }
   }
 
   score = Math.min(score, 100);
-  const risk_level: ScoredRiskLevel =
-    score >= 80
-      ? 'critical'
-      : score >= 60
-        ? 'high'
-        : score >= 40
-          ? 'elevated'
-          : score >= 20
-            ? 'medium'
-            : 'low';
+  // Une banque résolue que nous n'avons pu passer à aucune liste : jamais
+  // « low », jamais moins qu'elevated (50), comme le repli d'une base
+  // illisible. Un plancher et non un poids : un risque déjà établi par le pays
+  // ou le GAFI n'en est jamais diminué.
+  if (sanctionsListsUnavailable) {
+    flags.push('sanctions_lists_unavailable');
+    score = Math.max(score, SANCTIONS_LISTS_UNAVAILABLE_FLOOR);
+  }
+  return { risk_score: score, risk_level: levelOf(score), flags };
+}
 
-  return { risk_score: score, risk_level, flags };
+/** Le niveau que porte un score. */
+function levelOf(score: number): ScoredRiskLevel {
+  return score >= 80
+    ? 'critical'
+    : score >= 60
+      ? 'high'
+      : score >= 40
+        ? 'elevated'
+        : score >= 20
+          ? 'medium'
+          : 'low';
+}
+
+/** Le score minimal d'une réponse dont une table de conformité n'a pas pu être lue. */
+export const COMPLIANCE_DATA_UNAVAILABLE_FLOOR = 50;
+
+/**
+ * Le verdict quand une table de conformité est présente mais illisible (une
+ * recherche a levé : schéma inattendu, page corrompue).
+ *
+ * Jusqu'au 25/09/2026, les deux appelants remplaçaient alors TOUT le verdict par
+ * un bloc écrit en dur : `country_sanctioned: false`, `fatf_status:
+ * 'non_member'`, 50. Un « non » sur des axes dont les tables se lisaient très
+ * bien : une table VoP illisible suffisait à faire passer une banque
+ * biélorusse de critical à elevated, pays sanctionné effacé.
+ *
+ * Désormais chaque axe est lu dans son propre try. Ce qui se lit répond ; ce
+ * qui ne se lit pas répond « non consulté » (hors de la zone SEPA, le pays
+ * répond pour SEPA et VoP, comme ailleurs). Le drapeau reste
+ * `compliance_data_unavailable`, en tête, avec les drapeaux pondérés qui
+ * expliquent le score ; les trois drapeaux « non chargé » s'effacent devant
+ * lui, qui dit déjà que quelque chose n'a pas été lu. Le score ne descend
+ * jamais sous 50, ni sous ce que les axes lus établissent.
+ *
+ * Si même les axes pays et GAFI ne se lisent pas, la réponse reste celle
+ * d'avant (`country_sanctioned: false`, `non_member`) : le contrat n'a pas de
+ * valeur « non consulté » pour ces deux champs.
+ */
+export function unreadableComplianceResult(
+  countryCode: string,
+  bic8: string | null,
+  issuerType: string,
+  countryRisk: string,
+  isTestBic: boolean,
+  bankCode: BankCodeConfidence = 'confirmed',
+): ComplianceResult {
+  const attempt = <T>(...tries: Array<() => T>): T | null => {
+    for (const t of tries) {
+      try {
+        return t();
+      } catch {
+        // L'axe suivant, ou « non consulté » : voir la note de la fonction.
+      }
+    }
+    return null;
+  };
+  const sanctions: SanctionsCheck = attempt(
+    () => checkSanctions(countryCode, bic8),
+    () => checkSanctions(countryCode, null),
+  ) ?? {
+    country_sanctioned: false,
+    bank_sanctioned: false,
+    matched_lists: [],
+    fatf_status: 'non_member',
+    bank_screened: false,
+  };
+  const byCountry = bic8 !== null && outsideSepaScope(countryCode);
+  const reachability: ReachabilityCheck = attempt(() => checkReachability(bic8, countryCode)) ?? {
+    sepa_instant: false,
+    sct: false,
+    sdd: false,
+    screened: byCountry,
+  };
+  const vop: VopCheck = attempt(() => checkVop(bic8, countryCode)) ?? {
+    participant: false,
+    status: 'not_found',
+    screened: byCountry,
+  };
+  const scored = calculateRiskScore(
+    sanctions,
+    reachability,
+    vop,
+    issuerType,
+    countryRisk,
+    isTestBic,
+    bankCode,
+    bic8 !== null,
+  );
+  const NOT_LOADED = new Set([
+    'sanctions_lists_unavailable',
+    'sepa_register_unavailable',
+    'vop_register_unavailable',
+  ]);
+  const risk_score = Math.max(scored.risk_score, COMPLIANCE_DATA_UNAVAILABLE_FLOOR);
+  return {
+    sanctions,
+    reachability,
+    vop,
+    risk_score,
+    risk_level: levelOf(risk_score),
+    flags: ['compliance_data_unavailable', ...scored.flags.filter((f) => !NOT_LOADED.has(f))],
+  };
 }
 
 /**
@@ -297,8 +505,10 @@ export function buildComplianceResult(
   // to be added up into a reassuring 10.
   if (!valid) return unassessableCompliance();
   const sanctions = checkSanctions(countryCode, bic8);
-  const reachability = checkReachability(bic8);
-  const vop = checkVop(bic8);
+  // Le pays passé ici est celui de l'IBAN sur le chemin IBAN, celui du BIC sur
+  // le chemin BIC : c'est lui qui dit si la réponse SEPA dépend du registre.
+  const reachability = checkReachability(bic8, countryCode);
+  const vop = checkVop(bic8, countryCode);
   const { risk_score, risk_level, flags } = calculateRiskScore(
     sanctions,
     reachability,
@@ -307,6 +517,7 @@ export function buildComplianceResult(
     countryRisk,
     isTestBic,
     bankCode,
+    bic8 !== null,
   );
   return { sanctions, reachability, vop, risk_score, risk_level, flags };
 }

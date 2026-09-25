@@ -1,7 +1,7 @@
 # IBANforge
 
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://api.ibanforge.com/health)
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.7.0-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.8.0-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
 [![npm ibanforge-mcp](https://img.shields.io/npm/v/ibanforge-mcp?label=ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
 [![npm @ibanforge/sdk](https://img.shields.io/npm/v/@ibanforge/sdk?label=@ibanforge/sdk)](https://www.npmjs.com/package/@ibanforge/sdk)
 [![PyPI ibanforge](https://img.shields.io/pypi/v/ibanforge?label=pypi%20ibanforge)](https://pypi.org/project/ibanforge/)
@@ -10,14 +10,14 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
+> IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Czech Republic, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
 
 Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run.
 
 For business software and AI agents alike: a REST API, a native **MCP** server, prepaid packs by card, and **x402 micropayments** with no signup.
 
 ```
-89 IBAN countries · bank codes checked against the national registers of DE, AT, BE, SK, BG, CH, LI · 121k+ BIC entries (39k+ LEI via GLEIF; about two thirds a public copy of the SWIFT directory frozen in January 2018) · 1,100+ Swiss BC-Nummern (SIX)
+89 IBAN countries · bank codes checked against the national registers of DE, AT, BE, SK, CZ, BG, CH, LI · 121k+ BIC entries (39k+ LEI via GLEIF; about two thirds a public copy of the SWIFT directory frozen in January 2018) · 1,100+ Swiss BC-Nummern (SIX)
 ```
 
 ---
@@ -248,7 +248,7 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 - **LEI enrichment** for the GLEIF rows: [GLEIF API](https://api.gleif.org)
 - **1,100+ Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification**: Curated set of 900+ non-bank issuer classifications — EMI, payment institutions, digital banks (Wise, Revolut, N26, Mercury, Modulr, etc.); the live count is served at `/llms.txt`
-- **Bank-code verdict**: national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Bulgaria (BNB, bank code) and Switzerland and Liechtenstein (SIX BankMaster), where a code the register does not hold is `not_allocated`; partial lists for Finland (Finance Finland), San Marino (BCSM) and Luxembourg (ABBL), where a miss is not a refusal
+- **Bank-code verdict**: national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Czech Republic (ČNB), Bulgaria (BNB, bank code) and Switzerland and Liechtenstein (SIX BankMaster), where a code the register does not hold is `not_allocated`; partial lists for Finland (Finance Finland), San Marino (BCSM) and Luxembourg (ABBL), where a miss is not a refusal
 - **VoP readiness**: EPC Verification of Payee scheme register (`vop.csv`), refreshed weekly with the other compliance lists
 - **Country names**: Node.js `Intl.DisplayNames` API
 

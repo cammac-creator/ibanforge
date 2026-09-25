@@ -1,4 +1,5 @@
 import type { DemandGapRow, DemandGapSummary } from './demand-gaps.js';
+import { registerCoverage } from './enrich.js';
 
 /**
  * The monthly turn of the living tool: the demand ledger proposes, the
@@ -46,8 +47,9 @@ export interface DemandProposal {
  * Where the national bank-code register lives, for the countries the ledger
  * is most likely to name. A hint, not a promise: each entry is what we know
  * of the publisher, to save the first hour of the search. Countries we
- * already consult (DE, CH, LI, AT, BE, BG, SK, FI, PL, NL, ES via the MFI lists)
- * are not here on purpose: a gap there is a register we hold, not one to plug.
+ * already consult (DE, CH, LI, AT, BE, BG, SK, CZ, FI, PL, NL, ES via the MFI
+ * lists) are not here on purpose: a gap there is a register we hold, not one
+ * to plug.
  */
 export const REGISTER_HINTS: Readonly<Record<string, string>> = {
   TR: 'TCMB, liste des participants EFT (codes banque à 5 chiffres)',
@@ -62,7 +64,6 @@ export const REGISTER_HINTS: Readonly<Record<string, string>> = {
   DK: 'registreringsnumre, Finans Danmark',
   NO: 'Bankregisteret, Bits AS',
   HU: 'bank azonosító, GIRO Zrt.',
-  CZ: 'číselník kódů platebního styku, Česká národní banka',
   RO: 'Banca Națională a României, registrul instituțiilor de credit',
   GR: 'Hellenic Bank Association / Bank of Greece',
 };
@@ -98,6 +99,12 @@ export function proposeFromDemand(summary: DemandGapSummary, month: string): Dem
   for (const r of rows) {
     if (r.kind !== 'bank_code' || !r.country) continue;
     if (!r.outcome.includes('absent_from_reference_data')) continue;
+    // A country whose register we already read in full is never a register to
+    // plug, whatever the window still holds. Rows written before its register
+    // joined keep their old outcome for as long as the window reads them (30
+    // days for the monthly proposal, up to a year on the dashboard): without
+    // this, the month Czechia joined would have proposed plugging the ČNB.
+    if (registerCoverage(r.country).basis === 'authoritative') continue;
     const cur = perCountry.get(r.country) ?? { hits: 0, codes: 0, code: r.code };
     cur.hits += r.hits;
     cur.codes += 1;

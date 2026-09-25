@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { demo, DEMO_IBANS, OFFICIAL_EXAMPLE_IBANS } from './demo.js';
 import { validateIBAN } from '../lib/iban.js';
@@ -13,6 +13,20 @@ import { enrichResult } from '../lib/enrich.js';
  *   - it shows the verdict a checksum cannot give, on the official examples;
  *   - it dates itself, so that a copy quoted weeks later says when it was true.
  */
+
+/**
+ * Les exemples officiels sont tranchés par les registres autrichien et belge,
+ * qui quittent le dépôt public (décision du 24/09/2026). Comme le demande le
+ * test ci-dessous, les tests reçoivent des registres inventés
+ * (src/test-support/restricted-fixtures.ts) plutôt que de retirer les exemples :
+ * la production lit toujours les vrais. Installés avant l'évaluation des imports
+ * ci-dessus (vi.hoisted passe en premier).
+ */
+const { fixture } = await vi.hoisted(async () => {
+  const m = await import('../test-support/restricted-fixtures.js');
+  return { fixture: m.installRestrictedFixture() };
+});
+afterAll(() => fixture.restore());
 
 function makeApp() {
   const app = new Hono();
@@ -68,10 +82,11 @@ describe('GET /v1/demo', () => {
   it.each(OFFICIAL_EXAMPLE_IBANS.map((e) => [e.iban, e.label]))(
     'shows %s as the national register answers it: allocated to nobody',
     async (iban) => {
-      // If a register leaves the repository, this turns red: give the tests a
-      // synthetic register (fictitious codes) rather than dropping the example,
-      // since production still reads the register. Only if the register starts
-      // allocating one of these codes does the example leave the demo.
+      // Sur les registres inventés, un code autrichien ou belge absent des
+      // lignes inventées est refusé d'office : ce test tient la forme de la
+      // démo, pas les vrais registres. La règle « l'exemple quitte la démo le
+      // jour où son registre attribue le code » est vérifiée sur les vrais
+      // registres par demo-examples-real-data.test.ts.
       const body = await getDemo();
       const example = body.iban_examples.find((e) => e.iban === iban)!;
       expect(example.valid).toBe(true);

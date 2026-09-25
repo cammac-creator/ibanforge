@@ -12,6 +12,13 @@ permissions:
   # l'ÉTAPE qui a cassé au lieu de dire « quelque chose a échoué ».
   actions: read
 
+# One writer of data/bic.sqlite at a time. refresh-cz-register.yml commits the
+# same file daily; sharing the group makes the two queue rather than race on
+# the 1st, and cancel-in-progress stays false so neither kills the other.
+concurrency:
+  group: bic-sqlite-writer
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -51,7 +58,17 @@ jobs:
       - name: Seed German Bankleitzahlen (Bundesbank)
         run: npm run db:seed-blz
 
-      - name: Refresh Austrian, Belgian, Slovak and San Marino registers
+      # The Czech register rides the same step, last. It exits 0 and leaves both
+      # Czech tables as they were when cnb.cz cannot be read, contradicts
+      # itself or serves an older edition than the one already in force (a
+      # refusal page served with HTTP 200 included); only a change of FORMAT
+      # fails the step, because that is what a human has to read. Same rule as
+      # the Bulgarian step below. It is not silent either: it writes the output
+      # `cz_register` (loaded / not_loaded), and the step « Czech register not
+      # loaded » at the end turns not_loaded into a red run and the Telegram
+      # alert, once every other source has been committed.
+      - name: Refresh Austrian, Belgian, Slovak, San Marino and Czech registers
+        id: seed_national
         run: npm run db:seed-national
 
       # The Bulgarian National Bank's BAE register. Same reason as the German
@@ -203,6 +220,17 @@ jobs:
           echo "::error::heartbeat KO après 10 tentatives sur environ 5 minutes — l'API ne répond pas"
           exit 1
 
+      # The Czech register could not be read (cnb.cz unreachable, refusing
+      # GitHub's runners, contradictory, or older than the edition in force).
+      # The seeder kept the Czech tables and let the month go on; this step is
+      # the alarm, placed AFTER the commit and the heartbeat so it costs no other
+      # source: it turns the run red, and the Telegram step below names it.
+      - name: Czech register not loaded (cnb.cz)
+        if: success() && steps.seed_national.outputs.cz_register == 'not_loaded'
+        run: |
+          echo "::error title=Czech register not loaded::the ČNB register was not re-read this month; the other sources are committed, the Czech edition already loaded is still served"
+          exit 1
+
       # Failure notification. GitHub's default only emails whoever last edited
       # the cron, and it is individually disableable: refresh-bic failed on
       # 2026-05-01 AND 2026-06-01 with nobody acting for two months. The same
@@ -240,6 +268,7 @@ jobs:
           CONSEQ="la base BIC N’A PAS été rafraîchie ; la version précédente reste servie."
           case "$STEP" in
             *Heartbeat*) CONSEQ="la base BIC a bien été rafraîchie ET poussée, mais l’API n’a pas répondu au battement en 5 minutes — vérifier que le service est debout." ;;
+            "Czech register not loaded"*) CONSEQ="les autres sources ont été rafraîchies et poussées ; seul le registre tchèque (ČNB) n’a pas été relu — l’édition déjà chargée reste servie. Lire le journal de l’étape de relecture." ;;
           esac
           MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
                   "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$CONSEQ" "$RUN_URL")

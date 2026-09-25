@@ -141,7 +141,7 @@ import {
 import { bicLeiMappingNotice, mappingVersionFromLoad } from './lib/bic-lei-notice.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { bgAttribution, getBgBankCodeCount } from './lib/bg-bae.js';
-import { nationalRegisterCredit } from './lib/national-registers.js';
+import { nationalRegisterCredit, withRegisterClock } from './lib/national-registers.js';
 import {
   getBdeListDate,
   getBdeMfiCount,
@@ -243,7 +243,19 @@ const SKIP_TRACKING = new Set([
 // /llms.txt — emerging standard (llmstxt.org) for AI agents to understand the API.
 // Counts are read live from the database on first request and memoized —
 // hardcoded numbers rot at every monthly data refresh, and agents DO verify.
+//
+// Memoized per EDITION of the dated registers, not per process: the Czech
+// register switches editions at midnight in Prague without a deploy (see
+// PENDING_TABLE in national-registers.ts), and a text built once would keep
+// crediting the old edition while every validation already credits the new
+// one. The key is the credits themselves, read per request (a map read and a
+// small query each); the text is rebuilt only when one of them changes.
 let llmsTxtCache: string | null = null;
+let llmsTxtKey: string | null = null;
+
+function llmsTxtEditionKey(): string {
+  return ['SK', 'CZ', 'SM'].map((cc) => nationalRegisterCredit(cc) ?? '').join('|');
+}
 
 function buildLlmsTxt(): string {
   const bicCount = getEntryCount().toLocaleString('en-US');
@@ -349,6 +361,16 @@ function buildLlmsTxt(): string {
   const skSourceLine = skCredit
     ? `\n- Slovak bank codes: ${skCredit} — reproduced with attribution under the NBS site terms (source named, file unaltered)`
     : '';
+  // Czechia, on the same rule. The ČNB site terms ("Podmínky užívání
+  // internetových stránek ČNB", § 3) allow storing, passing on and reproducing
+  // its information provided the ČNB is always named as the source, in its own
+  // words "Zdroj: ČNB", and an extract changes neither the facts nor their
+  // sense. The credit, with the edition in force and its effective date, is
+  // read from the rows; absent entirely when no Czech register is loaded.
+  const czCredit = nationalRegisterCredit('CZ');
+  const czSourceLine = czCredit
+    ? `\n- Czech bank codes: ${czCredit} — reproduced with attribution under the ČNB site terms (source named, facts unaltered)`
+    : '';
   // San Marino. Credited on the same rule and from the same columns, with one
   // difference stated rather than hidden: bcsm.sm publishes no terms of use at
   // all, so the licence is recorded as UNKNOWN and the credit is given by
@@ -434,7 +456,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${smSourceLine}${luSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${smSourceLine}${luSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}
@@ -1002,8 +1024,16 @@ export function buildApp(): Hono<HonoEnv> {
   });
 
   app.get('/llms.txt', (c) => {
-    if (!llmsTxtCache) llmsTxtCache = buildLlmsTxt();
-    return c.text(llmsTxtCache, 200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    // One instant for the key and the text, so both name the same edition.
+    const text = withRegisterClock(() => {
+      const key = llmsTxtEditionKey();
+      if (!llmsTxtCache || llmsTxtKey !== key) {
+        llmsTxtCache = buildLlmsTxt();
+        llmsTxtKey = key;
+      }
+      return llmsTxtCache;
+    });
+    return c.text(text, 200, { 'Content-Type': 'text/plain; charset=utf-8' });
   });
 
   // /v1 index — agents that probe /v1 root expect a discovery hint instead of 404

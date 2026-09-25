@@ -6,6 +6,7 @@ import { resetStatements } from './bic-lookup.js';
 import { resetNationalRegisterStatements } from './national-registers.js';
 import { buildCanonicalBillableFilter, resetStatsStatements } from './stats.js';
 import { closeComplianceDB } from './compliance-db.js';
+import { resetComplianceStatements } from './compliance.js';
 import { resetChClearingStatements } from './ch-clearing.js';
 import { resetPraBanksStatements } from './pra-banks.js';
 import { resetOfficialIdentityStatements } from './official-identity.js';
@@ -2011,4 +2012,8 @@ export function closeAll(): void {
   // that repairs the file would keep /health red forever (PERF-03, 2026-09-01).
   statsDbState = { ok: true };
   closeComplianceDB();
+  // Les requêtes de contrôle ont été préparées sur la connexion qu'on vient de
+  // fermer, comme celles des registres plus haut : sans cette ligne, le premier
+  // contrôle après une réouverture répondrait depuis une connexion morte.
+  resetComplianceStatements();
 }

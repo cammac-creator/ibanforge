@@ -46,6 +46,9 @@ describe('screening keyed on a BIC reaches the banks no IBAN can', () => {
     // Positions 5-6 of a BIC are its country. No resolution step, no bank code,
     // nothing to fail — which is why this input is better than an IBAN here.
     expect(r.country.code).toBe('LY');
+    expect(r.compliance.sanctions.bank_screened).toBe(true);
+    // La Libye est hors de la zone SEPA : le pays répond à la place du registre
+    // EPC, chargé ou non (25/09/2026), et les deux axes restent contrôlés.
     expect(r.compliance.reachability.screened).toBe(true);
     expect(r.compliance.vop.screened).toBe(true);
   });

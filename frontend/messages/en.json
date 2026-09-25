@@ -2070,7 +2070,7 @@
         },
         "bankCode": {
           "label": "Bank code checked against the national register (a miss means not allocated)",
-          "ibanforge": "DE, AT, BE, SK, BG, CH, LI: the national register itself. Partial lists in FI, SM and LU, where a miss is not a refusal. Elsewhere a composite map, answered with authoritative: false.",
+          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: the national register itself. Partial lists in FI, SM and LU, where a miss is not a refusal. Elsewhere a composite map, answered with authoritative: false.",
           "ibancom": "Not checked by us",
           "ibanapi": "Announced on their home page (24 September 2026): the bank code in the IBAN is resolved against their own bank registry (central banks, SEPA data and manual review). Whether a code missing from it means not allocated: not checked by us.",
           "libs": "Varies by library: schwifty rejects a bank code unknown to its bundled registry. Others not checked by us.",

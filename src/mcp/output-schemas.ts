@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { nationalRegisterBicCodes } from '../lib/register-lists.js';
 
 /**
  * The `outputSchema` every MCP tool declares, shared by the two internal
@@ -116,7 +117,7 @@ export const BIC_BASIS_SCHEMA = z
   .optional()
   .describe(
     'Where the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-      'national_register (the country register publishes this BIC for this bank code — today CH, LI, DE, AT, BE, BG, SK and SM; settlement-grade) | ' +
+      `national_register (the country register publishes this BIC for this bank code — today ${nationalRegisterBicCodes()}; settlement-grade) | ` +
       'curated_map (our maintained bank-code map, exact key, usually right and not an allocation record) | ' +
       'directory_prefix (the bic8 LIKE fallback, which can match several institutions — read bank_code_check.candidates). ' +
       'Outside a national_register basis the BIC is ADVISORY: confirm it with the beneficiary or the bank before storing it as a routing instruction.',
@@ -292,7 +293,7 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
         .nullable()
         .optional()
         .describe(
-          'true = resolved bank is listed as ready in the EPC VoP scheme register; null = no institution resolved.',
+          'true = resolved bank is listed as ready in the EPC VoP scheme register; null = no institution resolved, or the VoP register is not loaded (not consulted); a resolved bank outside the SEPA area is answered false from the country either way.',
         ),
       // Declared because `enrichResult` now serves it: the SDK validates
       // this payload against the schema and drops `structuredContent`

@@ -26,7 +26,7 @@
  * Use a register-allocated code, or GET /v1/test-iban, which mints one.
  */
 
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const DEFAULT_BASE_URL = 'https://api.ibanforge.com';
 
 /**

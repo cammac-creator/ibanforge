@@ -18,6 +18,7 @@ import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 // The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
 import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
+import { nationalRegisterBicNames } from '../lib/register-lists.js';
 import { BUNDLES } from './api-keys.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
@@ -2726,7 +2727,7 @@ const buildRawSpec = () => ({
                 enum: ['national_register', 'curated_map', 'directory_prefix'],
                 description:
                   'WHERE the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-                  'national_register: the country\'s own register publishes this BIC for this bank code — today Switzerland, Liechtenstein, Germany, Austria, Belgium, Bulgaria, Slovakia and San Marino; the SIX BankMaster carries the exact 11-character BIC per IID and the German Bankleitzahlendatei per BLZ. ' +
+                  `national_register: the country's own register publishes this BIC for this bank code — today ${nationalRegisterBicNames()}; the SIX BankMaster carries the exact 11-character BIC per IID and the German Bankleitzahlendatei per BLZ. ` +
                   'curated_map: our maintained bank-code map made the pairing on an exact key. Usually right, and not an allocation record. ' +
                   'directory_prefix: the bic8 LIKE fallback, which can match several institutions at once — read bank_code_check.candidates. ' +
                   'Answers the settlement question directly: only national_register is settlement-grade, so outside those registers a derived BIC is advisory and should be confirmed with the beneficiary or your bank before it becomes a stored routing instruction.',
@@ -2849,7 +2850,7 @@ const buildRawSpec = () => ({
               vop_participant: {
                 type: ['boolean', 'null'],
                 description:
-                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved. Listing means the bank answers VoP requests — it does not run the name check for you.',
+                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved or when the VoP register is not loaded on this deployment (not consulted, which is not a "no"); a resolved bank outside the SEPA area is answered false from the country either way. Listing means the bank answers VoP requests — it does not run the name check for you.',
               },
               basis: {
                 type: 'string',
@@ -3321,6 +3322,11 @@ const buildRawSpec = () => ({
               sepa_instant: { type: 'boolean', description: 'Whether the bank supports SEPA Instant Credit Transfer' },
               sct: { type: 'boolean', description: 'SEPA Credit Transfer participant' },
               sdd: { type: 'boolean', description: 'SEPA Direct Debit participant' },
+              screened: {
+                type: 'boolean',
+                description:
+                  'False when the EPC scheme registers were not consulted: no bank resolved, or the registers are not loaded on this deployment. The three booleans above are then defaults, not findings, and carry no risk weight (flag sepa_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the registers: screened stays true.',
+              },
             },
           },
           vop: {
@@ -3328,6 +3334,11 @@ const buildRawSpec = () => ({
             properties: {
               participant: { type: 'boolean', description: 'Whether the bank participates in Verification of Payee' },
               status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
+              screened: {
+                type: 'boolean',
+                description:
+                  'False when the EPC VoP register was not consulted: no bank resolved, or the register is not loaded on this deployment. `status: not_found` then describes the absence of a query, not of a registration (flag vop_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the register: screened stays true.',
+              },
             },
           },
           risk_score: {
@@ -3343,7 +3354,7 @@ const buildRawSpec = () => ({
             description:
               'unassessable means the IBAN itself failed validation, so no screening was possible. It is the absence of a verdict, never a favourable one: do not treat it as low.',
           },
-          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
+          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. Three flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable and vop_register_unavailable. sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
         },
       },
       ChClearingResult: {

@@ -173,9 +173,11 @@ export type OperationType =
  * directories, not the national bank-code register, so an absence there is
  * evidence of nothing more than absence. Switzerland and Liechtenstein are
  * checked against the register itself (SIX BankMaster), Germany against the
- * Bundesbank Bankleitzahlendatei, Bulgaria against the Bulgarian National
- * Bank's BAE register and Slovakia against the Národná banka Slovenska
- * prevodník, and only there does `not_in_register` mean
+ * Bundesbank Bankleitzahlendatei, Austria and Belgium against their central
+ * banks' registers, Bulgaria against the Bulgarian National Bank's BAE
+ * register, Slovakia against the Národná banka Slovenska prevodník and Czechia
+ * against the Česká národní banka číselník (the served list is built in
+ * src/lib/register-lists.ts), and only there does `not_in_register` mean
  * the code is not allocated. San Marino sits between the two: its register
  * NAMES the holder of a code it lists, but the Central Bank publishes its
  * operating banks rather than the allocation of the code space, so a miss
@@ -407,10 +409,10 @@ export interface IBANValidationResult {
      *
      * - `national_register` — the country's own register publishes this BIC for
      *   this bank code. Today: Switzerland, Liechtenstein, Germany, Austria,
-     *   Belgium, Bulgaria, Slovakia and San Marino — the SIX
+     *   Belgium, Bulgaria, Slovakia, Czechia and San Marino — the SIX
      *   BankMaster carries the exact 11-character BIC per IID, the Bundesbank
      *   Bankleitzahlendatei the exact 11-character BIC per BLZ, and the OeNB,
-     *   NBB, BNB BAE, NBS and BCSM registers publish the institution's BIC per
+     *   NBB, BNB BAE, NBS, ČNB and BCSM registers publish the institution's BIC per
      *   bank code. San Marino is the case where this flag and
      *   `bank_code_check.authoritative` part company: the pairing is the
      *   supervisor's, the code space is not its to settle. Settlement-grade,
@@ -427,7 +429,7 @@ export interface IBANValidationResult {
      *
      * Only one of the three is a register of allocations, and saying so plainly
      * is worth more than a field that flatters the other two. Coverage grows by
-     * ingestion — DE, then AT, BE, BG and SK — and this field is what makes that
+     * ingestion — DE, then AT, BE, BG, SK and CZ — and this field is what makes that
      * growth visible without a re-read of the docs.
      */
     basis?: BicBasis;
@@ -536,6 +538,9 @@ export interface IBANValidationResult {
      * Bank-level VoP readiness: true when the resolved institution is listed
      * as "ready" in the EPC Verification of Payee scheme register; false when
      * it is not; null when no institution was resolved (no subject, no claim).
+     * Nul aussi quand le registre VoP n'est pas chargé : non consulté, donc pas
+     * d'affirmation non plus (25/09/2026). Hors de la zone SEPA, le pays répond
+     * `false`, registre ou non.
      * Listing means the bank answers VoP requests — it does not run the name
      * check for you and says nothing about a specific account.
      */
@@ -925,6 +930,10 @@ export interface SanctionsCheck {
    *
    * When false, `bank_sanctioned` and `matched_lists` carry no information —
    * do not branch on them.
+   *
+   * Faux aussi quand une banque a été résolue mais qu'aucune liste de
+   * sanctions n'est chargée (25/09/2026) : le drapeau
+   * `sanctions_lists_unavailable` le dit, et le score ne descend pas sous 50.
    */
   bank_screened: boolean;
 }
@@ -937,6 +946,10 @@ export interface ReachabilityCheck {
    * False when no institution resolved, so the three booleans above are
    * defaults rather than findings. The EPC registers are keyed by BIC8; with no
    * BIC there is no key and no lookup happened.
+   * Faux aussi quand les registres EPC ne sont pas chargés (25/09/2026) : la
+   * recherche n'avait rien à consulter, ce qui est la même absence de constat.
+   * Sauf pour un pays hors de la zone SEPA : le pays répond, `screened` reste
+   * vrai, et la réponse est celle d'une base complète.
    */
   screened: boolean;
 }
@@ -947,6 +960,8 @@ export interface VopCheck {
   /**
    * False when no institution resolved. `status: 'not_found'` then describes
    * the absence of a query, not the absence of a registration.
+   * Faux aussi quand le registre VoP n'est pas chargé (25/09/2026), sauf pour
+   * un pays hors de la zone SEPA, où le pays répond.
    */
   screened: boolean;
 }

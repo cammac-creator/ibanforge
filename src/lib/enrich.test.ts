@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { enrichResult, isTestBic } from './enrich.js';
 import { validateIBAN } from './iban.js';
+import { complianceTableLoaded } from './compliance-db.js';
 import type { IBANValidationResult } from '../types.js';
 
 describe('enrichResult', () => {
@@ -105,19 +106,9 @@ describe('enrichResult', () => {
       expect(result.bic!.address ?? null).toBeNull();
     });
 
-    it('keeps the register LEI and the directory LEI as separate claims', () => {
-      // Austria is the only country where both are populated: the OeNB names
-      // the holder of the bank code, GLEIF names the entity behind the resolved
-      // BIC. They agree here, and the test asserts the register's value is not
-      // dropped when the directory also has one — a caller who wants the
-      // authority on the code they asked about needs it to still be there.
-      const result = validateIBAN('AT580010000234573201');
-      enrichResult(result);
-
-      const registerLei = result.bank_code_check?.institution?.lei;
-      expect(registerLei).toMatch(/^[A-Z0-9]{20}$/);
-      expect(result.bic!.lei).toMatch(/^[A-Z0-9]{20}$/);
-    });
+    // « keeps the register LEI and the directory LEI as separate claims » est
+    // passé dans at-be-enrich.test.ts le 25/09/2026, sur le registre autrichien
+    // inventé : le vrai quitte le dépôt public.
 
     it('leaves lei and address absent rather than empty when the BIC is unresolved', () => {
       // A country with no reference data must not gain a hollow address block:
@@ -276,14 +267,23 @@ describe('enrichResult', () => {
   });
 
   describe('sepa.vop_participant (bank-level EPC VoP readiness)', () => {
-    it('is a boolean when an institution was resolved', () => {
+    it('is a boolean when an institution was resolved and the register is loaded', () => {
       // Not pinned to a specific bank being "ready": the EPC register is
       // refreshed weekly and banks join it — only the CONTRACT is stable
-      // (resolved institution → boolean, never undefined/null).
+      // (resolved institution → boolean, never undefined).
+      // Depuis le 25/09/2026, le contrat a une seconde condition : un registre
+      // VoP non chargé n'a pas été consulté, et la réponse est alors null,
+      // jamais false. Les deux branches sont prouvées sur données inventées dans
+      // restricted-data-absent.test.ts ; celle-ci tient quel que soit l'état de
+      // la base servie.
       const result = validateIBAN('DE89370400440532013000');
       enrichResult(result);
       expect(result.bic?.code).toBeTruthy();
-      expect(typeof result.sepa!.vop_participant).toBe('boolean');
+      if (complianceTableLoaded('vop_participants')) {
+        expect(typeof result.sepa!.vop_participant).toBe('boolean');
+      } else {
+        expect(result.sepa!.vop_participant).toBeNull();
+      }
     });
 
     it('is null when no institution was resolved — no subject, no claim', () => {

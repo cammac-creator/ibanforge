@@ -1,54 +1,47 @@
-import { describe, it, expect } from 'vitest';
-import { getBicDB } from './db.js';
-import {
-  getPraBanksCount,
-  getPraListMonth,
-  praAttribution,
-  praAuthorisationByLei,
-} from './pra-banks.js';
-import { enrichResult } from './enrich.js';
-import { validateIBAN } from './iban.js';
+import { afterAll, describe, it, expect, vi } from 'vitest';
 
 /**
- * These read the shipped data/bic.sqlite, like the register tests next door.
- * They skip rather than fail on a database seeded before scripts/seed-pra-banks.ts
- * existed — the module's whole contract in that case is "say nothing".
+ * La liste de la Bank of England, sur une copie INVENTÉE
+ * (src/test-support/restricted-fixtures.ts).
+ *
+ * La permission du 25/08/2026 couvre l'usage de la liste comme source de
+ * référence dans l'API, pas la redistribution du fichier : la liste quitte donc
+ * le dépôt public (décision du 24/09/2026). Ces tests lisaient les lignes
+ * livrées et se sautaient quand il n'y en avait pas ; ils tournent désormais sur
+ * des firmes inventées sous des LEI inventés, sur toute copie. La branche
+ * « rien de chargé » vit dans restricted-data-absent.test.ts, sur une base sans
+ * la liste : aucune des deux branches n'a plus à se sauter.
  */
-const loaded = getPraBanksCount() > 0;
+const { fixture, FX } = await vi.hoisted(async () => {
+  const m = await import('../test-support/restricted-fixtures.js');
+  return { fixture: m.installRestrictedFixture(), FX: m.FIXTURE };
+});
+afterAll(() => fixture.restore());
 
-/** A real row from the shipped table, picked live so a monthly refresh cannot stale it. */
-function sample(section: string): { lei: string; firm_name: string; frn: string } | undefined {
-  if (!loaded) return undefined;
-  return getBicDB()
-    .prepare(
-      "SELECT lei, firm_name, frn FROM pra_banks WHERE section = ? AND lei IS NOT NULL AND lei != '' LIMIT 1",
-    )
-    .get(section) as { lei: string; firm_name: string; frn: string } | undefined;
-}
+const { getBicDB } = await import('./db.js');
+const { getPraBanksCount, getPraListMonth, praAttribution, praAuthorisationByLei } =
+  await import('./pra-banks.js');
+const { enrichResult } = await import('./enrich.js');
+const { validateIBAN } = await import('./iban.js');
 
 describe('pra_banks counts and attribution', () => {
   it('answers a live count instead of a literal', () => {
     // The list changes every month. Any served surface quoting a number takes
     // it from here; a hardcoded one is wrong by the second refresh.
-    expect(typeof getPraBanksCount()).toBe('number');
-    expect(getPraBanksCount()).toBeGreaterThanOrEqual(0);
+    // Compter les lignes inventées prouve aussi que ce fichier lit le jeu
+    // d'essai, pas la liste livrée.
+    expect(getPraBanksCount()).toBe(3);
   });
 
-  it.skipIf(!loaded)('carries a well-formed month read from the list itself', () => {
+  it('carries the month read from the list itself', () => {
+    expect(getPraListMonth()).toBe(FX.PRA.month);
     expect(getPraListMonth()).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
   });
 
-  it.skipIf(!loaded)('builds the attribution the permission requires', () => {
+  it('builds the attribution the permission requires', () => {
     // The Bank of England's permission (25/08/2026) is conditional on naming
     // the Bank AND the month of the list. Both halves come from the database.
-    expect(praAttribution()).toBe(`Bank of England (List of Banks, ${getPraListMonth()})`);
-  });
-
-  it.skipIf(loaded)('answers 0 and null when nothing is loaded, rather than throwing', () => {
-    // /llms.txt reads the count on a cold start; a throw here would be a 500.
-    expect(getPraBanksCount()).toBe(0);
-    expect(getPraListMonth()).toBeNull();
-    expect(praAttribution()).toBeNull();
+    expect(praAttribution()).toBe(`Bank of England (List of Banks, ${FX.PRA.month})`);
   });
 });
 
@@ -74,14 +67,13 @@ describe('praAuthorisationByLei', () => {
     expect(praAuthorisationByLei('213800UUGANOMFJ9X769', 'GBR')).toBeNull();
   });
 
-  it.skipIf(!loaded)('resolves a UK-incorporated firm on its own LEI', () => {
-    const row = sample('uk_incorporated');
-    expect(row).toBeDefined();
-    const hit = praAuthorisationByLei(row!.lei, 'GB');
+  it('resolves a UK-incorporated firm on its own LEI', () => {
+    const row = FX.PRA.ukIncorporated;
+    const hit = praAuthorisationByLei(row.lei, 'GB');
     expect(hit).toMatchObject({
       authorised: true,
-      firm_name: row!.firm_name,
-      frn: row!.frn,
+      firm_name: row.firm_name,
+      frn: row.frn,
       section: 'uk_incorporated',
       basis: 'lei',
       source: 'Bank of England, List of Banks',
@@ -89,12 +81,11 @@ describe('praAuthorisationByLei', () => {
     expect(hit!.list_month).toBe(getPraListMonth());
   });
 
-  it.skipIf(!loaded)('resolves a UK branch of a foreign bank on the GB side', () => {
+  it('resolves a UK branch of a foreign bank on the GB side', () => {
     // The London branch genuinely is authorised to take deposits. This is the
     // direction the head-office LEI may be used in.
-    const row = sample('non_uk_branch');
-    expect(row).toBeDefined();
-    const hit = praAuthorisationByLei(row!.lei, 'GB');
+    const row = FX.PRA.nonUkBranch;
+    const hit = praAuthorisationByLei(row.lei, 'GB');
     expect(hit).toMatchObject({
       authorised: true,
       section: 'non_uk_branch',
@@ -102,49 +93,47 @@ describe('praAuthorisationByLei', () => {
     });
   });
 
-  it.skipIf(!loaded)('refuses to carry a UK authorisation onto the parent’s foreign BICs', () => {
+  it('refuses to carry a UK authorisation onto the parent’s foreign BICs', () => {
     // THE false positive this scope exists for. The branch section's third
     // column is headed "Head Office LEI": that identifier belongs to the entity
     // abroad, and GLEIF maps it to every BIC that entity owns worldwide.
     // Measured on the shipped database at ingestion time, a bare LEI join
     // reached over a thousand non-GB BIC rows — each one a paid answer claiming
     // a UK deposit authorisation for, say, a Frankfurt or Tokyo BIC.
-    const row = sample('non_uk_branch');
-    expect(row).toBeDefined();
+    const row = FX.PRA.nonUkBranch;
     for (const cc of ['DE', 'FR', 'JP', 'US', 'NL']) {
-      expect(praAuthorisationByLei(row!.lei, cc)).toBeNull();
+      expect(praAuthorisationByLei(row.lei, cc)).toBeNull();
     }
   });
 
-  it.skipIf(!loaded)('lets a Gibraltar firm answer for GI as well as GB', () => {
-    const row = sample('gibraltar_branch');
-    expect(row).toBeDefined();
-    expect(praAuthorisationByLei(row!.lei, 'GI')?.section).toBe('gibraltar_branch');
-    expect(praAuthorisationByLei(row!.lei, 'GB')?.section).toBe('gibraltar_branch');
-    expect(praAuthorisationByLei(row!.lei, 'ES')).toBeNull();
+  it('lets a Gibraltar firm answer for GI as well as GB', () => {
+    const row = FX.PRA.gibraltar;
+    expect(praAuthorisationByLei(row.lei, 'GI')?.section).toBe('gibraltar_branch');
+    expect(praAuthorisationByLei(row.lei, 'GB')?.section).toBe('gibraltar_branch');
+    expect(praAuthorisationByLei(row.lei, 'ES')).toBeNull();
   });
 
-  it.skipIf(!loaded)('matches on the LEI alone, never on the firm name', () => {
+  it('matches on the LEI alone, never on the firm name', () => {
     // The list's own name for a firm and the BIC directory's differ in case,
     // punctuation and legal suffix ("Barclays Bank UK PLC" vs "BARCLAYS BANK UK
     // PLC"). Name similarity is how one bank ends up wearing another's licence,
     // so the join has one key and it is exact.
-    const row = sample('uk_incorporated');
-    expect(row).toBeDefined();
+    const row = FX.PRA.ukIncorporated;
     const byName = getBicDB()
       .prepare('SELECT COUNT(*) AS cnt FROM pra_banks WHERE lei = ?')
-      .get(row!.lei) as { cnt: number };
+      .get(row.lei) as { cnt: number };
     expect(byName.cnt).toBe(1);
   });
 });
 
 describe('GB IBAN enrichment', () => {
-  it.skipIf(!loaded)('attaches the PRA block to a GB IBAN whose BIC carries a listed LEI', () => {
-    const result = validateIBAN('GB33BUKB20201555555555');
+  it('attaches the PRA block to a GB IBAN whose BIC carries a listed LEI', () => {
+    const result = validateIBAN(FX.PRA.gbIban);
     enrichResult(result);
 
     expect(result.valid).toBe(true);
-    expect(result.bic?.lei).toBeTruthy();
+    expect(result.bic?.code.slice(0, 8)).toBe(FX.directory.gb.bic8);
+    expect(result.bic?.lei).toBe(FX.PRA.ukIncorporated.lei);
     expect(result.pra_authorisation).toMatchObject({
       authorised: true,
       section: 'uk_incorporated',
@@ -152,39 +141,12 @@ describe('GB IBAN enrichment', () => {
       source: 'Bank of England, List of Banks',
     });
     expect(result.pra_authorisation!.list_month).toBe(getPraListMonth());
-    expect(result.pra_authorisation!.frn).toMatch(/^\d+$/);
+    expect(result.pra_authorisation!.frn).toBe(FX.PRA.ukIncorporated.frn);
   });
 
   it('leaves the block off a non-GB IBAN entirely', () => {
     const result = validateIBAN('DE89370400440532013000');
     enrichResult(result);
     expect(result.pra_authorisation).toBeUndefined();
-  });
-});
-
-describe('curated map vs PRA register', () => {
-  /**
-   * The PRA join made a curation error VISIBLE: GB:BUKB was curated as
-   * "Bank of Scotland" while BUKB resolves (via LEI) to Barclays Bank UK PLC
-   * on the PRA list. Fixed 26/08/2026; this test pins the one key measured
-   * wrong. Deliberately NOT a generic name-match guard: of 5,177 curated GB
-   * keys only 4 diverge from the PRA name, and 3 of those are legitimate
-   * trading names (NatWest, Halifax, Wise) a generic rule would break.
-   */
-  it('GB:BUKB names the same institution as the PRA register', async () => {
-    const { readFileSync } = await import('node:fs');
-    const curated = JSON.parse(
-      readFileSync(new URL('../db/bic_data.json', import.meta.url), 'utf8'),
-    ) as Record<string, { bic: string; bank_name: string }>;
-    const entry = curated['GB:BUKB'];
-    expect(entry.bic).toBe('BUKBGB22');
-    expect(entry.bank_name).toContain('Barclays');
-    const row = getBicDB()
-      .prepare('SELECT lei FROM bic_entries WHERE bic8 = ? AND lei IS NOT NULL LIMIT 1')
-      .get('BUKBGB22') as { lei: string } | undefined;
-    if (row?.lei) {
-      const pra = praAuthorisationByLei(row.lei, 'GB');
-      if (pra) expect(pra.firm_name).toContain('Barclays');
-    }
   });
 });

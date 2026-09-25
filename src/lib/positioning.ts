@@ -49,7 +49,21 @@ import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
  * IBANforge as a Swiss tool. A country the code adds that is missing here is
  * appended after these, in code order, never dropped.
  */
-const DISPLAY_ORDER = ['DE', 'AT', 'BE', 'SK', 'BG', 'CH', 'LI', 'FI', 'SM', 'LU', 'LV', 'GI'];
+const DISPLAY_ORDER = [
+  'DE',
+  'AT',
+  'BE',
+  'SK',
+  'CZ',
+  'BG',
+  'CH',
+  'LI',
+  'FI',
+  'SM',
+  'LU',
+  'LV',
+  'GI',
+];
 
 function byDisplayOrder(codes: readonly string[]): string[] {
   const rank = (cc: string): number => {

@@ -62,6 +62,7 @@ import {
   bicDirectorySentence,
   serverDescription,
 } from '../lib/positioning.js';
+import { authoritativeVerdictSentence } from '../lib/register-lists.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import { MCP_WEEKLY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
@@ -508,7 +509,9 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required, vop_participant — is the resolved bank listed as ready in the EPC VoP register }, ' +
         'risk_indicators { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope, vop_coverage }, and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
         'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, is open, or belongs to any particular person; verify the payee by name before sending funds. ' +
-        'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI against the SIX BankMaster, DE against the Bundesbank Bankleitzahlendatei, AT against the OeNB register, BE against the NBB register, BG against the BNB BAE register and SK against the Národná banka Slovenska prevodník) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution. ' +
+        'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. ' +
+        `${authoritativeVerdictSentence()} ` +
+        'match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution. ' +
         costLine('$0.005 per call'),
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),

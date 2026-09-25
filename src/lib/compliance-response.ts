@@ -3,6 +3,7 @@ import {
   buildComplianceResult,
   type BankCodeConfidence,
   unassessableCompliance,
+  unreadableComplianceResult,
 } from './compliance.js';
 import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult, isTestBic } from './enrich.js';
@@ -99,20 +100,16 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
     // The database is unreachable, which is a different thing from an IBAN we
     // could not read: here we HAVE a valid IBAN and cannot check it, so the
     // honest answer is elevated-and-say-so, not unassessable.
-    compliance = {
-      sanctions: {
-        country_sanctioned: false,
-        bank_sanctioned: false,
-        matched_lists: [],
-        fatf_status: 'non_member',
-        bank_screened: false,
-      },
-      reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
-      vop: { participant: false, status: 'not_found', screened: false },
-      risk_score: 50,
-      risk_level: 'elevated',
-      flags: ['compliance_data_unavailable'],
-    };
+    // Depuis le 25/09/2026, les axes encore lisibles répondent quand même :
+    // voir unreadableComplianceResult().
+    compliance = unreadableComplianceResult(
+      countryCode,
+      bic8,
+      issuerType,
+      countryRisk,
+      isTestBic,
+      bankCode,
+    );
   }
 
   return { ...result, compliance, meta: getComplianceMeta() };
@@ -166,20 +163,13 @@ export function buildBicComplianceResponse(
       isTestBic(bic8),
     );
   } catch {
-    compliance = {
-      sanctions: {
-        country_sanctioned: false,
-        bank_sanctioned: false,
-        matched_lists: [],
-        fatf_status: 'non_member',
-        bank_screened: false,
-      },
-      reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
-      vop: { participant: false, status: 'not_found', screened: false },
-      risk_score: 50,
-      risk_level: 'elevated',
-      flags: ['compliance_data_unavailable'],
-    };
+    compliance = unreadableComplianceResult(
+      countryCode,
+      bic8,
+      issuerType,
+      countryRisk,
+      isTestBic(bic8),
+    );
   }
 
   return {

@@ -2070,7 +2070,7 @@
         },
         "bankCode": {
           "label": "Bankcode gegen das nationale Register geprüft (fehlt er dort, ist er nicht vergeben)",
-          "ibanforge": "DE, AT, BE, SK, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM und LU, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false.",
+          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM und LU, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false.",
           "ibancom": "Von uns nicht geprüft",
           "ibanapi": "Laut ihrer Startseite (24. September 2026): Der Bankcode der IBAN wird mit ihrem eigenen Bankregister abgeglichen (Zentralbanken, SEPA-Daten und manuelle Prüfung). Ob ein dort fehlender Code nicht vergeben ist: von uns nicht geprüft.",
           "libs": "Je nach Bibliothek: schwifty lehnt einen Bankcode ab, den sein mitgeliefertes Register nicht kennt. Andere von uns nicht geprüft.",
