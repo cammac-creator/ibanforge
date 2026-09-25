@@ -174,6 +174,15 @@ La bascule vers une édition annoncée se fait à la requête, à minuit heure d
 (`activeTable()`, `src/lib/national-registers.ts`). Un prochain registre à publication non
 mensuelle suit le même modèle.
 
+Depuis le 25.09.2026 (PR 260), l'Italie (Banca d'Italia) est le premier registre **partiel**
+qui connaît aussi les codes radiés : rangée dans `NON_EXHAUSTIVE_REGISTERS`, jamais dans
+`NATIONAL_REGISTERS`, elle ne produit aucun refus. Un code radié répond `verified` avec
+`retired: true`, `retired_on` et `superseded_by` (successeur légal), `bic: null`. Relue chaque
+jeudi par `.github/workflows/refresh-it-register.yml`, dans le même groupe `bic-sqlite-writer` :
+il y a donc **trois écrivains** de `data/bic.sqlite` (mensuel, tchèque, italien), et GitHub ne
+garde qu'un run en attente par groupe ; un run annulé n'alerte pas. Cas possible le 1er d'un
+mois qui tombe un jeudi.
+
 Known gaps a newcomer should expect to work on, in order:
 
 - **The `NOTICE` file requires a verbatim attribution sentence for the BIC-to-LEI mapping
