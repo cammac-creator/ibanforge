@@ -495,6 +495,33 @@ describe('la fin de l’abonnement (T5)', () => {
   });
 });
 
+describe('Q11 telle quelle : un renouvellement échoué ne change rien, la fin rend l’allocation d’avant', () => {
+  // « If a renewal payment fails, the key keeps its Pro allowance while the
+  // payment is retried; if the subscription ends, the key returns to what it had
+  // before the subscription. » Le point d'écoute ne reçoit aujourd'hui ni
+  // invoice.payment_failed ni customer.subscription.updated ; s'ils arrivaient,
+  // ils ne toucheraient pas la clé. Seul customer.subscription.deleted la change.
+  it('invoice.payment_failed et un abonnement passé past_due laissent le Pro à la clé', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('q11');
+    for (const type of ['invoice.payment_failed', 'customer.subscription.updated']) {
+      const result = processStripeEvent({
+        id: `evt_${uniq('q11')}`,
+        type,
+        data: {
+          object:
+            type === 'invoice.payment_failed'
+              ? { id: `in_${uniq('q11')}`, object: 'invoice', billing_reason: 'subscription_cycle' }
+              : { id: subscriptionId, object: 'subscription', status: 'past_due' },
+        },
+      } as unknown as Stripe.Event);
+      expect(result.body.ignored_event_type).toBe(type);
+      expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+    }
+    processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(200);
+  });
+});
+
 describe('renouvellement et contestation', () => {
   it('renouvellement invoice.paid attribué à la clé existante', () => {
     const { key, subscriptionId } = freeKeyWithPackThenPro('renewal');
