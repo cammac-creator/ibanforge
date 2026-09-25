@@ -345,7 +345,7 @@ describe('la clé a changé depuis l’achat', () => {
       refundEvent({ paymentIntent, amount: 400, amountRefunded: 400 }),
     );
     expect(result.body.reversal).toMatchObject({ outcome: 'clawed_back', removed_credits: 0 });
-    expect(result.alert?.detail).toContain('Aucune clé active');
+    expect(result.alert?.detail).toContain('Pas exactement une clé active');
     expect(validateApiKey(key.api_key).valid).toBe(false);
     expect(
       (

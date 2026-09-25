@@ -339,7 +339,7 @@ function reversalAnswer(
     );
     const why =
       out.keyPrefix === null
-        ? ' Aucune clé active dans la lignée : rien n’a été repris.'
+        ? ' Pas exactement une clé active dans la lignée (aucune, ou plusieurs) : rien n’a été repris.'
         : out.removed < packCredits
           ? ' Il restait moins que le pack sur la clé : seul le solde a été repris.'
           : '';
