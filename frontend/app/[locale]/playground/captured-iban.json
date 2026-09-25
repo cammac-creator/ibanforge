@@ -1,21 +1,8 @@
 {
-  "captured_at": "2026-09-25",
+  "captured_at": "2026-09-05",
   "response": {
     "iban": "CH1000230000000012345",
     "valid": true,
-    "bank_code_holder": "confirmed",
-    "checks": {
-      "iban_structure": "pass",
-      "iban_checksum": "pass",
-      "bank_code": "pass",
-      "bic": "pass",
-      "national_check_digits": "not_checked",
-      "account_exists": "not_checked",
-      "payee_name": "not_checked",
-      "institution_sanctions": "not_checked",
-      "country_sanctions": "not_checked",
-      "payee_sanctions": "not_checked"
-    },
     "country": {
       "code": "CH",
       "name": "Switzerland"
@@ -29,46 +16,33 @@
       "member": true,
       "schemes": [
         "SCT",
-        "SDD"
+        "SDD",
+        "SCT_INST"
       ],
-      "vop_required": false
+      "vop_required": false,
+      "vop_participant": false,
+      "basis": "epc_register"
     },
     "formatted": "CH10 0023 0000 0000 1234 5",
     "cost_usdc": 0,
     "bic": {
-      "code": "UBSWCHZH80A",
+      "code": "UBSWCHZH",
       "bank_name": "UBS Switzerland AG",
       "city": "Zürich",
-      "source": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+      "source": "IBANforge curated bank-code map",
       "as_of": "2026-09",
-      "basis": "national_register",
-      "authoritative": true,
-      "lei": "549300WOIFUSNYH0FL22",
-      "lei_status": "ACTIVE",
-      "address": {
-        "type": "registered",
-        "street": "Bahnhofstrasse 45",
-        "post_code": "8001",
-        "region": "CH-ZH",
-        "city": "Zurich",
-        "country": "CH",
-        "romanized": "Bahnhofstrasse 45",
-        "romanization": "original_latin",
-        "source": "GLEIF",
-        "language": "en",
-        "as_of": "2025-12-29"
-      },
+      "basis": "curated_map",
+      "authoritative": false,
+      "lei": null,
+      "lei_status": null,
+      "address": null,
       "postal_address": {
-        "strt_nm": "Bahnhofstrasse",
-        "bldg_nb": "45",
-        "pst_cd": "8098",
-        "twn_nm": "Zürich",
+        "twn_nm": "ZURICH",
         "ctry": "CH",
         "format": "structured",
-        "source": "SIX BankMaster (Swiss IID register)",
-        "as_of": "2026-09-01"
-      },
-      "bic8": "UBSWCHZH"
+        "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
+        "as_of": null
+      }
     },
     "issuer": {
       "type": "bank",
@@ -121,6 +95,6 @@
         "action": "POST /v1/iban/compliance"
       }
     ],
-    "processing_ms": 0.12
+    "processing_ms": 0.07
   }
 }

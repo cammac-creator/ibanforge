@@ -7715,6 +7715,5981 @@
   "type": "payment_institution"
  },
  {
+  "name": "SGM - FOREIGN EXCHANGE LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Finblocks Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Guavapay Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "DiPocket Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Larstal Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "xpate ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Sunrate Partners UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Pomelo Group Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "3S Money Club Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Bondsmith Savings Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAYWARD SERVICES LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Prepaid Services Company Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "WTUK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "TrueLayer Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Circle UK Trading Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BANKORO LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Uber Payments UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "TRANSWAP TECHNOLOGIES (UK) LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Think Money Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "FinPayTech Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BNKPro Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MultiPass Platforms Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "ZELLER UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Moorwand Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "ODOLA LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "eToro Money UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Zota Technologies (UK) Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Optal Financial Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Andaria Financial Services UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Tipalti Europe Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "CREZCO LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAGONXT PAYMENTS UK LTD.",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Lycamoney Financial Services Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAYALLY LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "LUMON PAY LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAX2PAY LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Shout 2020 Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Silicon Silk Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BEPI LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Syncom (UK) Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Ziglu Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "DigiDoe Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Soldo Financial Services Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "UNLIMIT UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Interpay UK ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "A Plus Payment Solutions Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Push Labs Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "ONLINE PAYMENT PLATFORM LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "FINSEI LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Billon Financial Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "REMITTANCE360 LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "GLOBUS PAYMENTS LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Fondy Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Nium Fintech Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "KLARNA FINANCIAL SERVICES UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Mercury Foreign Exchange Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Paynetics UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "VFX Financial PLC",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Airbnb Payments UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Skrill Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Emerald Financial Group (UK) Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Argentex LLP",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Ace Union Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Payler Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "KDMS PAYMENTS LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "CFS-ZIPP Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Fiat Republic Financial Services Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MONTIFY LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Stripe Payments UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BASTION FINGROUP LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Shrap Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "FORISGFS UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SafeNetPay Services Company Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Epayments Systems Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Rightcard Payment Services Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Navro Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Tompay Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "TalkRemit Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Fintech Valley Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "FAIRMAY LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "AF Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Luxon Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Volt Technologies Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PingPong Payment (UK) Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "THE MINTED APP LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "World First UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "RIPPLE MARKETS UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Tide Platform Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Wirex Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "CURRENXIE UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "myPOS Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Travelex Europe Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Euronet 360 Finance Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Payver Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BeAccount Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Taptap Send UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "FIRE FINANCIAL SERVICES LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Squareup Europe Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Caxton Payments Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "IFX (UK) Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "OMNIO EMI LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "HY10 GLOBAL LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "GBXP LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Amaiz Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SEACHANGE FINANCIAL SERVICES LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MAAYAN PAYMENTS LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "APRON PAYMENTS LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Ebury Partners UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "EMBED PAY LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Contis Financial Services Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "The Currency Cloud Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "One Money Mail Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "WORLDPAY (UK) LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SYNC.MONEY UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MADFIN TECH LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Finseta Payment Solutions Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MONELIQ LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Global Star Finance Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Azure Payments Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Simplepay London Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "OMEGA BAAP LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "TENORA FINANCIAL SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MONEX EUROPE LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PRACTIKA FINANCE LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Ozan Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Viola Money (Europe) Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "eCOMM Merchant Solutions Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Algbra FS UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "NIUM Payments UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAYRON LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Cardaq Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAYHAWK FINANCIAL SERVICES LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BOURN TECHNOLOGIES LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "UK First Fintech Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Noveba Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MARTRUST CORPORATION LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Transactworld Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Finmo UK Group Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MP Payments UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SPEND LTD.",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SETTLEGO SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "TRUSTIE TECHNOLOGY LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "CB Payments Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Google Payment Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "New Wave Capital Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Vitesse PSP Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Transferra Un Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "UKFX Holdings Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Paysafe Financial Services Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PERATERA UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Sedel Capital LLP",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Monitox Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Frontier Global Consultants Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PayPal UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "WECOLLECT (LONDON) LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Airwallex (UK) Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "NEBEUS SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PPRO Financial Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PIXXLES LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Transfergo Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Curve UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BOUND RATES LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "GVS Prepaid Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "TEAPAYMENT LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Altery LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "ZEN-UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "ISX Financial UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Sendspend Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "First Rate Exchange Services Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "WorldRemit Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Prepaid Financial Services Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PANPAY UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "ETA Money Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "WireBloom LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Azimo Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "LUMINARY INC FINANCE LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Privalgo Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Hargreaves Lansdown Savings Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "W1TTY Global Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "VertoFX Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Ecommerce Technologies LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Opay Holding Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Bilderlings Pay Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Enumis Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Babb Remit Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Unison Global Markets (UGM) Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "iBanFirst Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SumUp Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MoneyNetInt Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAYABL. (UK) LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "KP PAY LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "TELLEROO LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Prepay Technologies Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "RIPPLING PAYMENTS UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "THE PAYMENT FIRM LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PSI-Pay Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Euro Exchange Securities UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "EXEPAY LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "CBH Wealth UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PLUM FINTECH PAYMENTS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Fasterpay Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "CashDash UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "KURINGO UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PLATA CAPITAL UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Glint Pay Services Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "CAPI MONEY UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Leatherback Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Privat 3 Money Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MiFinity UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "NUVEI FINANCIAL SERVICES LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BRITE PAYMENTS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Cambridge Mercantile Corp. (UK) Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MONAVATE LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "EQUALS MONEY INTERNATIONAL LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MONIEPOINT UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "FIDO FINANCE LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Bedford Pay LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Checkout Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "eBay Commerce UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Monetley LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Cublox Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Modulr FS Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Nation Remit Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PaySend PLC",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MANGOPAY U.K. LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Brazauk Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "AIUK Services Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Nochex Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Redbanx Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MAP E-PAY SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Payen Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Payoma Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Remium Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Rapyd Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Aspire Payments limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Nvayo Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Teya Solutions Ltd.",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "UKForex Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Clear Junction Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Authpay Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Currencies Direct Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "eMerchantPay Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Revolut Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Park Card Services Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Financial House Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Keel Money Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "INCARD LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Equiniti Global Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAYWISER LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "WEAVEPAY LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Optimus Cards UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SYSTEM PAY SERVICES LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Tor Currency Exchange Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Enfuce UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PAYMENT CARD SOLUTIONS (UK) LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Digital Capital Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PLEO FINANCIAL SERVICES UK LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Swift Payment Technologies Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Gemini Payments UK, LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Paynetworx Group Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Kashet Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Xchange Finance Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "COLIBRIX LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Cashflows Europe Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "VIVA WALLET.COM LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MONESE LTD",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "MIR Limited UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Crossbeam Financial Services Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PayrNet Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "PESAPEER PAYMENTS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "INTERPOLITAN MONEY P.L.C.",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "VINTED PAY LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Centtrip Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Boku Account Services UK Ltd",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "D T & T Corporation Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "RONGHAN INTERNATIONAL LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Decta Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "NAYAX FINANCIAL SERVICES LTD.",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Pay Set Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Allpay Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "SMARTFLOW PAYMENTS LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Eqwire UK Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Wise Payments Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Payoneer Payment Services (UK) Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Alpha FX Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Kitakami Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Paymentsense Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Allied Wallet Limited",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "BOOKING HOLDINGS FINANCIAL SERVICES UK LIMITED",
+  "country": "GB",
+  "type": "emi"
+ },
+ {
+  "name": "Token.io Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Velocity Transfers UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CREATIVE MOBILE TECHNOLOGIES (UK) LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Xtransfer UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Amazon Payments UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PHOTON DANCE FINTECH UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Treasury Port Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MONNEO LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GRANTS PAYMENTSOLUTIONS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ALTUS INVESTMENT MANAGEMENT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PLAID FINANCIAL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GEMBA FINANCE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cashfac PLC",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Swift Finance Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Thirdfort Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DNA Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BCB Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Moneyhub Financial Technology Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Income Group Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GLO CURRENCY UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MAREX FX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Reflow Zone Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GLOBAL FINANCIAL INNOVATIONS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CREDIT LADDER LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fractal Labs Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Zeux IT Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Insignis Asset Management Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Altaif Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Vibe Pay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PLANET MERCHANT SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Western Union Payment Services GB Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "M A Fastmove Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TILL DEAL LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UNIVERSAL PARTNERS FX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Angra Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ASCENDANTFX CAPITAL UK, LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FM FINANCE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Funtech Global Communications Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CREDEC LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Payescape Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Global Private Solutions Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ballinger & Co. Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mia Pago Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Windcave Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Yaspa Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Yapily Connect LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FIREANTPAY (UK) LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ecospend Technologies Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shell U.K. Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "OPTIMAL CURRENCY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "OBN Global Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Naudapay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "THE SMART REQUEST COMPANY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYZEN LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Debit Direct Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mon Remit Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cabvision Network Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Quickremit Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Acquired Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Currensea Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pay Perform Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Excel Currencies Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fin Center Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Chip Financial Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SENDSII LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EPAYPRO UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Petricore Partners Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PINNACLEPAY GROUP LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Lateral Payment Solutions Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Evelyn Partners Investment Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "One.io UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FLYTASK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Lapay UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REAL MONEY SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Novatum Tech Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GLO REMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "STREAM FINANCIAL SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Optim System Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REAL REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Trilo Group Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MONEK MERCHANT SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SWAPFOREX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Riverside Escrow Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CURB MOBILITY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Finthesis Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Roqqett Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KALPIXPAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Volt Technologies Holdings Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Buckzy Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Vyne Technologies Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ExpenseDoc Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FUMOPAY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Finexer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ClearAccept Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Blackthorn Finance Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HUM'S REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SCIOPAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BC Remittance Ltd.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UNIPAAS Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GLOBEPAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "mmob Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMEETA LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GLOBAL REMIT FINANCIAL SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Lighthouse FX Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TrustUk Payments Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PREMIER FOREX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hope Macy Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fena Labs Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Obconnect Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LunaPay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CCBill UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FASTPAY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cheddar Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LEVANTINE EXPRESS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FOREIGN CURRENCY PARTNERS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Agility Forex (UK) LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CORPORATE AVENUE SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CAPITEX GROUP LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Owl Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "YouLend Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DEEL PAYMENTS UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Integrated International Payroll Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "XACE Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMIT CHOICE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EVO PAYMENTS UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Wonderful Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Convera UK Financial Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ryft Pay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sonali Pay UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MOLLIE UK LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "VERIFONE PAYMENTS UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "First Merchant Processing (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "WORLDLINE MERCHANT SERVICES UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Raisin Platforms Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYSTRAX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SMEB Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "STERLING CONSORTIUM LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tink Financial Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CSC ESCROW & SETTLEMENT (UK) LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Premier Vet Alliance Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Africhange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Billhop UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fiscal FX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DebenhamsPayplus Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ramsdens Financial Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Trustly UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Transcard Payments Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MASTERCARD OB SERVICES UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Atoa Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DLOCAL OPCO UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HedgeFlows Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Digital Completion UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Katanox Financial Technology Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ares Management Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cleartoken Depository Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ALLSTAR BUSINESS SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SOVEREIGN INTERNATIONAL (UK) LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMOTE PAYMENTS SERVICES UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TAXIWORLD LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ACQUIOM FINANCIAL UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CREMELLO CURRENCY MANAGEMENT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MAMA MONEY UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ZILCH TECHNOLOGY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TFBN SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DEK-CO (UK) LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Zedra Trust Company (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Instinet Europe Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Capital One (Europe) plc",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MBNA Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Creation Financial Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TTT Moneycorp Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HiFX Europe Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AIRPLUS INTERNATIONAL LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "StoneX Financial Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GLOBAL INVESTMENT STRATEGY UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Jalloh Enterprise Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GPUK LLP",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Global Reach Partners Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PXP Financial Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Global Currency Exchange Network Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "A Place in the Sun Currency Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LCC Trans-Sending Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "WorldPay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Smart Currency Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Unity Link Financial Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Equals Money UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KBR Foreign Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "A N EXPRESS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Euronet Payment Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Equals Money PLC",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LIX FX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "American Express Payment Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Weblink International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ACE MONEY TRANSFER LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DAHABSHIIL TRANSFER SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Rational Foreign Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "COBANQ LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FX Master Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "WINHOPE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Moneyto Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Currency Matters Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "STABLE CORNER LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "WORLDPAY AP LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CP Express Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MoneyGram International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Exchange4Free Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Yes Cash Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "INTER CITY MONEY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sky Forex Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MASTERCARD TRANSACTION SERVICES (UK) LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Worldwide Currencies Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Metro Remittance (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Easysend Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CONVERA UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Terra Payment Services (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dex International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sable International FX Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Currency Solutions Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GCC Exchange UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMITIX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "JUICY HOLDINGS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Afro International (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Speed Financial Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Noble Travel and Money Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Lumon Risk Management Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NordPay Financial Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Integral FX LLP",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Link FX PLC",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Trans-Fast Remittance (London) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CROSSBARFX Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Central FX Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Real Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Alico (UK) Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EBURY MASS PAYMENTS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Segregated Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "OPAL TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ZEEPAY JV UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Brac Saajan Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CELERGATE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FTFT FINANCE UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Supersonicz Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "JN Money Services (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Flywire Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KMB International Money Transfer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Volopa Financial Services (Scotland) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RVB Currency UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "A to Z 4U Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Connect Plus Business Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kantox LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "East Atlantic Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "iRemit Global Remittance Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Visa Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MUTHOOT GLOBAL UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "APS INTERNATIONAL LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ARIANA EXCHANGE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Halo Financial Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Universe Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NewDay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Overseas Express Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MDRN-FX SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "IPAYLINKS UK LLP",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Global Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dolfin Financial (UK) Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hafiz Bros Travel & Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Send Money India Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AGPAYTECH LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FREEMARKETFX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Speed Remit Worldwide Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Eurochange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Anpa Forward Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Master Services Europe Group Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Minas Center Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "JNFX Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Paymaster24 Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FIN2GO LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Regent Foreign Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Affiniture Cards Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Lightway Finance Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Speed Enterprise Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UNIVERSAL SECURITIES & INVESTMENTS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sasai Fintech Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TRANZYPAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "First Data Europe Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GoCardless Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Finsbury Foreign Exchange Solution Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tonio Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Anjna Enterprise Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Onafriq UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Quantfury Trading UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Thomas Exchange UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UK EXCHANGE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ParityFX Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dollar East Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYPOINT PAYMENT SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GEOND LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Inara-Transfers Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Currency Matters International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cashpot Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Transfer Rapid Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tangopay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Midpoint & Transfer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "INDIGO FX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CENTRAVA LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Flagstone Group LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Eris FX Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ecommpay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Yayeh Instant Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Payinc Group Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bottomline Payment Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Automatic Data Processing Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Daytona Capital Management Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sentenial Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Connectum Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Afrotrade Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Altras International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ClubWise Software Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BLUESNAP PAYMENT SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EQUIRE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Global Web Pay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fast Track Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "IFS Currency Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NEC Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "IFIC Money Transfer (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Currency Global Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AMERICAN EXPRESS SERVICES EUROPE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dixipay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Supercapital Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Paaysay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Roze Int (Pvt) Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Prune Payments Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bibby Foreign Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "B Transfer Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Covercy Europe Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Alter Domus Agency Services (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shift Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Clear Treasury (UK Trading) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kabayan Capital Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "London & Zurich Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "WEPAY PAYMENTS LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "A&B General (UK) Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Crosspay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TransferTo Mobile Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NIUM SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Transpaygo Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMITLY U.K., LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RSM 2000 Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Access Paysuite Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Vowpay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Madison CF UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PayXpert Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "U Remit (UK) Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bureau Buttercrane Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Invictus Ventures Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Geoswift UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kapook UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Key Currency Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Debit Finance Collections Plc",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Foenix Partners Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NEST Management Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Monevium Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Akoni Hub Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "VARSOVIAFX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EXPERIAN REFI SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pollen Technologies Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fibonatix (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shieldpay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TROLLEY PAYMENTS UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "JAJA FINANCE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SHIFT4 PAYMENTS UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Harlands Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EXPRESS REMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ALT 21 LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LL PAY UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Millbank FX Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "VESTA MERCHANT SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Verofy Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Unified Finance Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Arbitrage Capital Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Paymentwall Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MY EU PAY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pelican Payment Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ardohr Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Nexpay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bud Financial Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Giving.com Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SECURE COLLECTIONS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ETHER SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tymit Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Online Giving Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MR.KLASS.COM LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Regents Sarafi Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Soni Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pay365 Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "OHENTPAY UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SKY PAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Zambezi FX Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Swift Payment Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kabir Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FA GLOBAL BK FINANCE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Myremit Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Safariremit Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Membership Plans Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TIC REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BNC LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Triple Tee Fast Connect Ltd.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SteadyPay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BMS UN LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MTC GROUP LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UK FRONTIER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Orient Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GAHEEZ LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PERSICI FINANCIAL SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KIXY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "OLOMPIC (O.I.M.T.) LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DIGISEND LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Huveane Capital Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SIKAFX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Two Kuva Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ali Asghar Nasehi",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Luxfin Capital Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Top Xchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Roberts & Partners",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SALAUDDIN GLOBAL TRADING LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RED SEA MONEY TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Javan Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CTT Charity Payments Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "World Cash Ltd.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Khadim Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Expedez Financial Services LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "General Softwares Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Faghani LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "D-way Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Access Finance Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYREMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Eunibenz Concept Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAMIR TRAVEL AND EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Watan Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Money Transfer International Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PHOENIX PAYMENT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AMO Money Transfer & Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shippersworld Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Safari General Trading Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "S-EXPRESS MONEY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Baaz Money Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "THE PALM MONEY SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "United Remit Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ALWAKEEL INTERNATIONAL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DOS & Co. Ltd.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PEARON BLU EXPRESS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Blessed Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KHANAN SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pay Quik Financial Services LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "regal fast move ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PG-Sterling UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "E-Transfers Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Brian Hannon",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cela Remit Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hami Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "First Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Unique Global Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AZIZI EXCHANGE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Juni Holdings Inc Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "One World Connect Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ben Saad Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Belyfted Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Oakmon Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "E27 Partners UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DOMEGO-ARK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fast Pace Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Vienna Money Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FX Zone Express Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Union Nepal Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Interbacs Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "YARKSH FX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pagotec Consultancy Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GIVEALL PAYMENT SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shamloo Foreign Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SAHAR EXCHANGE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ABU EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RemittVen Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LAUSANNE FINANCE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NMS EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PREMIER PAYMENT SOLUTIONS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ANGLO TECH SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Easy Ex Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AR Worldwide Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ASIABILL EU COMPANY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Universal Exchange and Travel Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RIZ REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SWAPMONEY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EFULUUS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "2PAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LONDON MONEY EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "incuto Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DIAMOND-CUBE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CSL PAY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RCPAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Horseed Express Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TRANSWORLD INT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hassan Money Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYMOB TECHNOLOGY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "E-SMART MONEY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BRIT FX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Blackstone Solicitors Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Transfer Direct Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SimbaPay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SIMPLY COLLECT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Transfer Rocket Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kamal Trades UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NATION TRANSFER LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TAIMOOR SHAH SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KAMAL EXCHANGE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ARMAN EXCHAGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Thestral Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SAHAR SERVICES UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CLYDESTONE UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UNIQUE B LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SwooshTransfer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Transfer East LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LADANEXPRESS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMIT UNION LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LINK FOREX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SUPER TRANSFER UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HEWAD EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CURRENCY CLEAR LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KOCHAY EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "YOUSEND PAYMENTS LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "VALUT CURRENCY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KORD PAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Excelpost Service UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BREINROCK UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ONEAFRICA TECHNOLOGIES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CRYLON LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EXPRESS LINKS INTERNATIONAL LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMITISE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NEXTLEVEL PAYMENTS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Abdali Xchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MEK-SKY CLOTHING AND REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GUL EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Easy Cash Card Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RELIABLE REMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BAYZE TRADING LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AREMCO SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TapTap Giving Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "STERLING MONEY EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AFRIKMONEY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Housecure Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sukate & Bezeboh Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bazar Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MONEYTRANS UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dream Travel & Money Transfer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAISA EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "IMAD SARAFI LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SKYNET TECHNOLOGY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "THE REMIT FIRM LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FASTREMS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LAPISLINK LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "QUIVA TRANSFERS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DZX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Learn Me Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMITCO LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MODX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ZXTECH LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LKS Global Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Adale Dawit Dagnachew (ADD) Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UMBRELLA CONSULTANTS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "WORTHING FX SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Alice Oliver Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Helix Pay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TETRAD INCORPORATION LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "VREMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fayzano Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Transfa Pay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "QUICK CURRENCY EXCHANGE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Patient Plan Direct Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KV Money Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UDIAL SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BROAD MONEY PAYMENT & DIGITAL SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KSHER WIKAAS UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KeyChain FinTech (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sycous Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ASSURED PAY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cowrie Transfer Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Chaabi UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "JIK FINANCIAL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CAILORA LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Yaldirim Phone Shop (London) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Marbo Global Investments Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CF Global Trading (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "IFEPAY SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UNITED WORLDWIDE TRAVEL LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mina Express Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cerro Catedral Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Standard Exchange Company (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BRITANNIA LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Intergrity Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Clarico Pay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Maven Global LLP",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Juba Express Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Rasaki Obafemi Anifowoshe",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "POWER TRANSFER LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Secure MT Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bhandari Brothers Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "INSAAF PAY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mehdy Shojai",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Business Links International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NittyGritty Solutions Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EMAN SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Velocity Trade International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bilex World Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ATAL EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Gabtrans UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Monex International Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Amal UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Haji Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LEXHAM LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Khyber Exchange & Travel Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Iftin Express Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Worldwide West 2 East Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "R U B ENTERPRISES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Zamak Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EXIM Exchange Company (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Express Currency Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMITJUNCTION LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "A R Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BELL REMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Stargate Network Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TELE TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Noble Traders Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sangerwal Money Transfer Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hashim Travel Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Alpha & Omega Trading Company Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PayOnlime Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "United Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Omanye Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CAPITAL REMITTANCE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Rak Traders Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Remitm Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Western Thrace Exchange",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Vakili Exchange",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Top Rate Mutual Finance Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ASIA MONEY TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Zamzam Exchange International Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kanson Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Omolara Zainab Bishi",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sudamero UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Subhida UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hodan Global Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HAMAYON EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Amal UK Express Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Universe Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Click 4 Currency Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KHAN EXCHANGE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Towfiiq Money Transfer & Telecom Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Centrexcard Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Flocash Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Optimus Pay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CabCard Services (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Online Student Support Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Horizon Remitance Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Edward Olakunle Adebanjo",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HASHAMI SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kunzle Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bakaal Worldwide Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BA Exchange Company (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kwik Transfer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kokeb Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LANKA SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mercantile Exchange House (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Vicom Inter-Commercials Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Justremit limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BALAZOO EXPRESS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dipa Travel Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MAT & SAM AFRIC LINK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "V SEND LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Rashid Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mohammad Hadi Balouti",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Top Connect Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tawakal UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Superprime Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SAAF SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Sunny Oladeru Odubela",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYMENEX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Open World Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Affinity Global Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Starrz-Link Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Niavaran Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Parsa Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KogoPay (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Attijariwafa Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TRUST REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Goldluxel Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LDN FX Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Finiere Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GOLDEN XPRESS UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Currency Xtra Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Global Transact Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Peniel Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PEARL PAYMENTS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HAMZAH SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kashing Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Link World Money Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LVMI Company Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TransferCorp Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "High Projects Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shinwari Forex Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Euro Money Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mbakey Export and Finance Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NEXDI LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ARIA REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "APFIN LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Konnekt Business Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bakhter Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shaheen Exchange & Travels Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "RELY REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Asiana Money Transfer & Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LINKREMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ecodas Services UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "YOU TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Money Matter (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ADAM REMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Clickpay Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hogmall Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ceviant Payments UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BAHAR MONEY TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Forex Money Transfer Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BICCO EXPRESS UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Riaan Money Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Oneworld Foreign Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Union Bureau De Change Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Jumblebee Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "JULA FINANCE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Juw-an Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FLIP SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MILLAT SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Capitel C Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FLEX INSTANT SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KLINK TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pay Wink Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Alrafidain Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "International Money Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PAYWASTOON MONEY TRANSFER LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fortune Portfolio Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "GorGor Capital Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "John Blayney Stuart and Richard John Alan Stuart",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Global- Investment Ukay Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Warty Financial & Transfer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "LAYLA London Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Orion Global Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FGC Exchange Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Himark Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MONEYFEX LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Neth Associates Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "VIP PAYMENTS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "REMITRISE LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SHAMSHAD SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SMARTTWAY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AJB GLOBAL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Anthony Francis Farrell",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Frugal Business Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ASEEL TRADING LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Shelbourne Financial Solutions Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dickson Osagie",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Afsheen Fallahi",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "ARISE VENTURES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CAPTA FX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MARSHAL REMIT LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Direct Remit Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cash Money Global Money Transfer Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Security for Expenses Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AMINA EXCHANGE & TRAVEL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Union Money Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pay-Safe Financial Solutions Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Yuan Capital Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MAS CONSULTS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UNITED MONEY SERVICES LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tranzfar Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Zarghoon Money Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TWICEAFAM SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "The Good Box Co Labs Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FAST FX LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Alma Attic Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "T&M Logistics Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TOTAL DOMINION LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CPS Transfers Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BCON SOLUTIONS LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UK ASIA REMIT LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hazarbuz Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Radiantlife Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "OLWEN TRADING COMPANY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FAST & RELIABLE SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NetG5 Global Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Expresslink Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FOLLAT & J LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "YONNA GLOBAL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Salary Finance Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "KMBAL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Atlas General Trading Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TROSTIFY LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "XMG FINANCIAL SERVICES LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Teeparam Exchange Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tamsey Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Zapptek Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "World Wide Money Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Apple Payments Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "THE IDCO. LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Smarter Financial Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SAGE (UK) LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FreeAgent Central Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Finmo Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Money Dashboard Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PERFECT DATA SOLUTIONS LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "TRANSUNION INTERNATIONAL UK LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Xero (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Moneyinfo Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CLEO AI LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Quick File Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Qbroot Financial Solutions Pvt Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Y Tree Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Yodlee Inc. UK Branch",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Friendly Score UK Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Salt Edge Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "HubSolv Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Lifescale Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Pave Fintech Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Loyalbe Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dataswyft Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Score Genius Technology Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Intelliflo Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Swoop Finance Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Certua Financial Information Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Cirrostratus Exedra Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Finpoint Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Plum Fintech Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UT Tax Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Dext Software Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Wolters Kluwer (UK) Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Clear Books Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Armalytix Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Hammock Financial Services Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Bippit Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "E-Crunch Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "USNOOP LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Open B Gateway Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tembo Savings Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tristev Finance Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "PayStream Accounting Services Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Capium Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Inni Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Landlord Vision Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EMBER BY STARLING LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "BROOKSON LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Kuflink One Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "IN-SYNC GROUP LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tell Money Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Rimbal Systems Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "East Lothian Housing Association",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Agency Software Worldwide Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "OneID Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Mydex Data Services Community Interest Company",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "@COCONUT PLATFORM LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Fintelli Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "E-Doc Online Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Iplicit Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Equifax Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "SIKOIA LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "DGM Agility Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Aperidata Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Ayiza Software Labs Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Circit UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CLEARSCORE EVERYWHERE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Scoresmatter Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "122 Ideas Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Salad Technologies Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "UOME UK LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "MONOLAY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "NORWICH FINANCE TECHNOLOGY LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "QUARTZ DIGITAL LTD",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Clarity Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "AJ Bell Management Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "True Potential Investments LLP",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Clear Score Technology Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Experian Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Tail Offers Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Iwoca Ltd",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Funding Options Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Digital Moneybox Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Intuit Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "FUNDINGXCHANGE LIMITED",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "CRIF RealTime Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Consents Online Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "9 Spokes UK Limited",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "EMMA TECHNOLOGIES LTD.",
+  "country": "GB",
+  "type": "payment_institution"
+ },
+ {
+  "name": "Monzo Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Starling Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Revolut NewCo UK",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Atom Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Zopa Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "ClearBank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Tandem Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "OakNorth Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Allica Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Monument Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Kroo Bank",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
+  "name": "Chase UK",
+  "country": "GB",
+  "type": "digital_bank"
+ },
+ {
   "name": "N26 Bank",
   "country": "DE",
   "type": "digital_bank"

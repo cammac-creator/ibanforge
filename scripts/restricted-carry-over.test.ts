@@ -307,6 +307,22 @@ describe('overlay seed --kind bic : reprise membre par membre', () => {
     expect(fiRows).toEqual(rowsOf(september, 'fi_monetary_codes', 'as_of', '2026-01-15'));
     expect(metaOf(out).carried_over).toBeUndefined();
     expect(inspectOverlay(out, 'bic').members.every((m) => m.state === 'applied')).toBe(true);
+
+    // Le mois suivant, recopiée de la recopie : datée de janvier, la liste a bien
+    // plus de 45 jours, et n'a jamais été « reprise ». Ni borne d'âge, ni refus, ni
+    // annonce ; sa date reste celle de la liste, jamais celle d'un passage.
+    const november = passage('novembre-statique', {
+      previous: out,
+      now: '2026-11-01T07:30:00.000Z',
+      net: { stamp: '2026-11-01 07:31:00' },
+    });
+    expect(november.error).toBeUndefined();
+    expect(november.output!.carried_over).toEqual([]);
+    expect(november.logs).toEqual([]);
+    expect(rowsOf(november.out, 'fi_monetary_codes', 'as_of', '2026-01-15')).toEqual(fiRows);
+    expect(inspectOverlay(november.out, 'bic').members.every((m) => m.state === 'applied')).toBe(
+      true,
+    );
   });
 
   it('premier passage des membres tardifs, leur source en panne : absents, le reste publié', () => {

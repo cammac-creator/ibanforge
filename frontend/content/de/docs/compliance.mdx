@@ -67,24 +67,23 @@ POST https://api.ibanforge.com/v1/iban/compliance
       "matched_lists": [],
       "fatf_status": "member"
     },
-    "reachability": { "sepa_instant": false, "sct": false, "sdd": false, "screened": false },
-    "vop": { "participant": false, "status": "not_found", "screened": false },
+    "reachability": { "sepa_instant": true, "sct": true, "sdd": true },
+    "vop": { "participant": true, "status": "active" },
     "risk_score": 0,
     "risk_level": "low",
-    "flags": ["sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"]
+    "flags": []
   },
   "meta": {
     "scope": "bank_bic_only",
     "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
     "sanctions_as_of": "2026-07-05T04:29:13.136Z",
-    "fatf_as_of": "2026-02"
+    "fatf_as_of": "2026-02",
+    "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD"
   },
   "cost_usdc": 0.02,
   "processing_ms": 25.66
 }
 ```
-
-Dieses Beispiel zeigt die Antwort, wenn die EPC-Register und die Liste der Vereinten Nationen für den Aufruf nicht abgefragt wurden: `screened: false` bei `reachability` und `vop` sowie je ein `*_unavailable`-Flag pro ausgelassener Quelle, sodass ein `false` dort nichts beweist. Wurden sie abgefragt, steht `screened` auf `true` und die Werte sind die der Bank.
 
 ### Der `compliance`-Block
 

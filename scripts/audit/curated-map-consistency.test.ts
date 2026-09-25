@@ -62,10 +62,7 @@ describe('curated bank-code map', () => {
     // The header comment in bic-lookup.ts read "6907 entries, 40+ countries"
     // against 24,069 and 75 — stale by a factor of three. Pin the floor so the
     // prose and the file cannot drift that far apart again unnoticed.
-    // 25/09/2026 : 18 467 clés dans 70 pays après le retrait des clés AT, BE,
-    // LU, PL et FI (famille sous conditions, NOTICE groupe C) ; plancher abaissé
-    // en conséquence, toujours assez haut pour qu'une perte massive se voie.
-    expect(audit.total).toBeGreaterThan(18_000);
-    expect(audit.countries).toBeGreaterThanOrEqual(70);
+    expect(audit.total).toBeGreaterThan(20_000);
+    expect(audit.countries).toBeGreaterThan(70);
   });
 });

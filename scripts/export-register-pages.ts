@@ -1,26 +1,8 @@
 /**
  * Export the data behind the public register pages (/blz/{blz} for Germany,
- * /iid/{iid} for Switzerland, /sk/{code} for Slovakia, /it/{code} for Italy)
- * into frontend/data/registers/*.json.
- *
- * ## Austria, Belgium and San Marino are not exported any more
- *
- * Since the withdrawal step (25/09/2026), their registers belong to the
- * restricted family (src/lib/restricted-family.ts): the API serves them from a
- * private overlay, and nothing in this public repository may carry their rows.
- * Their pages (/at, /be, /sm) are rendered on demand by the site, one code per
- * request, from the API's own answer (frontend/lib/register-live.ts). This
- * script writes no file for them, and the monthly refresh deletes nothing it
- * did not write.
- *
- * ## No EPC-derived field in the exported answers
- *
- * The block printed on each page used to carry `sepa.schemes`,
- * `sepa.vop_participant` and `sepa.basis`, read from the EPC scheme and VoP
- * registers: a copy of those registers, one bank per page, in a public file.
- * They are restricted too. The block keeps the country-level SEPA facts
- * (`member`, `vop_required`), which come from the ISO registry and the IPR, not
- * from the EPC.
+ * /iid/{iid} for Switzerland, /at/{code} for Austria, /be/{code} for Belgium,
+ * /sk/{code} for Slovakia, /sm/{code} for San Marino) into
+ * frontend/data/registers/*.json.
  *
  * ## Why the pages read a JSON and not the API at request time
  *
@@ -45,8 +27,8 @@
  * Every other code still has a page, rendered on demand, and joins the sitemap
  * once the first batch shows it earns its place.
  *
- * Slovakia (38 codes) has no batch at all: at that size the batch IS the
- * register, and the rule this section exists for does not bite.
+ * Slovakia (38 codes) and San Marino (4) have no batch at all: at that size the
+ * batch IS the register, and the rule this section exists for does not bite.
  *
  * L'Italie (/it/{code}, 25/09/2026) : le premier lot est l'ensemble des codes en
  * vigueur ; les codes que la Banca d'Italia a radiés ont aussi leur page, rendue
@@ -169,9 +151,13 @@ function apiBlock(answer: Json): Json {
       'lei',
     ]),
     bank_code_check: answer.bank_code_check ?? null,
-    // Country-level facts only: the bank-level fields come from the EPC
-    // registers, which this public file must not copy (see the header).
-    sepa: pick(answer.sepa as Json, ['member', 'vop_required']),
+    sepa: pick(answer.sepa as Json, [
+      'member',
+      'schemes',
+      'vop_required',
+      'vop_participant',
+      'basis',
+    ]),
     issuer: pick(answer.issuer as Json, ['type', 'name', 'classification']),
     risk_indicators: pick(answer.risk_indicators as Json, [
       'country_risk',
@@ -300,10 +286,10 @@ for (const r of iidRows) {
 }
 
 // ---------------------------------------------------------------------------
-// Slovakia: one synthetic IBAN per national bank code, the validate route's own
-// answer. The register lives in national_bank_codes (NBS prevodník) and carries
-// its own edition date. Austria, Belgium and San Marino share the table but not
-// the licence: they are restricted, and exported nowhere (see the header).
+// Austria, Belgium and Slovakia: one synthetic IBAN per national bank code, the
+// validate route's own answer. All three registers live in national_bank_codes
+// (OeNB directory, NBB list, NBS prevodník); the edition date is the one the
+// route stamps, except for Slovakia, which carries the register's own.
 // ---------------------------------------------------------------------------
 interface NationalRow {
   country: string;
@@ -314,17 +300,116 @@ interface NationalRow {
   post_code: string | null;
   town: string | null;
   lei: string | null;
-  /** The credit its licence requires, and the edition date. */
+  /** Slovakia only: the credit its licence requires, and the edition date. */
   source: string | null;
   as_of: string | null;
 }
 const nationalRows = bic
   .prepare(
-    "SELECT country, code, name, bic, street, post_code, town, lei, source, as_of FROM national_bank_codes WHERE country = 'SK' ORDER BY country, code",
+    "SELECT country, code, name, bic, street, post_code, town, lei, source, as_of FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SK', 'SM') ORDER BY country, code",
   )
   .all() as NationalRow[];
+const stamp = new Date().toISOString().slice(0, 7);
+const asOf = (answer: Json): string =>
+  ((answer.bank_code_check as Json | undefined)?.as_of as string | undefined) ?? stamp;
 const registerName = (answer: Json, fallback: string): string =>
   ((answer.bank_code_check as Json | undefined)?.register as string | undefined) ?? fallback;
+
+// Austria: five-digit Bankleitzahl, positions 5 to 9 of the IBAN, then an
+// eleven-digit account. Related codes are the other codes of the same BIC8.
+const atRows = nationalRows.filter((r) => r.country === 'AT');
+const atByBic8 = new Map<string, string[]>();
+for (const r of atRows) {
+  if (!r.bic) continue;
+  const k = r.bic.slice(0, 8);
+  atByBic8.set(k, [...(atByBic8.get(k) ?? []), r.code]);
+}
+const at: Json = {};
+let atSource = 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis';
+for (const r of atRows) {
+  const bban = `${r.code}00000000001`;
+  const iban = `AT${checkDigits('AT', bban)}${bban}`;
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`AT ${r.code}: synthetic IBAN ${iban} is not valid`);
+  atSource = registerName(answer, atSource);
+  const related = (r.bic ? (atByBic8.get(r.bic.slice(0, 8)) ?? []) : [])
+    .filter((c) => c !== r.code)
+    .slice(0, 12);
+  at[r.code] = {
+    register: {
+      code: r.code,
+      name: r.name,
+      bic: r.bic,
+      street: r.street,
+      post_code: r.post_code,
+      town: r.town,
+      lei: r.lei,
+      as_of: asOf(answer),
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related,
+  };
+}
+// First batch: every institution once (first code per BIC8) before any
+// institution twice, capped so the batch stays a list a reader would look up.
+const AT_BATCH_CAP = 400;
+const seenBic8 = new Set<string>();
+const atFirst: string[] = [];
+const atRest: string[] = [];
+for (const r of atRows) {
+  if (!r.bic) continue;
+  const k = r.bic.slice(0, 8);
+  if (seenBic8.has(k)) atRest.push(r.code);
+  else {
+    seenBic8.add(k);
+    atFirst.push(r.code);
+  }
+}
+const atBatch1 = [...atFirst, ...atRest].slice(0, AT_BATCH_CAP);
+
+// Belgium: three-digit bank identifier, seven-digit account, two national
+// check digits (the first ten digits modulo 97, 97 when the remainder is 0).
+// The NBB allocates blocks of identifiers to one institution, so one page per
+// code would be the same page a hundred times over: every code keeps its
+// address, but the first code of a block is the bank's canonical page and the
+// others point to it.
+const beRows = nationalRows.filter((r) => r.country === 'BE');
+const groupKey = (r: NationalRow): string => `${r.name}|${r.bic ?? ''}`;
+const beGroups = new Map<string, string[]>();
+for (const r of beRows) beGroups.set(groupKey(r), [...(beGroups.get(groupKey(r)) ?? []), r.code]);
+const be: Json = {};
+let beSource = 'Banque nationale de Belgique, identification des banques';
+for (const r of beRows) {
+  const account = '0000001';
+  const nationalCheck = String(Number(`${r.code}${account}`) % 97 || 97).padStart(2, '0');
+  const bban = `${r.code}${account}${nationalCheck}`;
+  const iban = `BE${checkDigits('BE', bban)}${bban}`;
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`BE ${r.code}: synthetic IBAN ${iban} is not valid`);
+  beSource = registerName(answer, beSource);
+  const group = beGroups.get(groupKey(r)) ?? [r.code];
+  be[r.code] = {
+    register: {
+      code: r.code,
+      name: r.name,
+      bic: r.bic,
+      canonical: group[0],
+      group_codes: group,
+      as_of: asOf(answer),
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related: group.filter((c) => c !== r.code).slice(0, 12),
+  };
+}
+const beBatch1 = [...beGroups.values()].map((codes) => codes[0]);
 
 // Slovakia: four-digit payment code in IBAN positions 5-8, then a six-digit
 // account prefix and a ten-digit account number. No national check digits —
@@ -332,10 +417,10 @@ const registerName = (answer: Json, fallback: string): string =>
 //
 // The whole register is 38 codes, so there is no first batch to choose: every
 // code is a payment service provider a reader may genuinely look up, and the
-// "scaled content" concern the German batch exists for does not
+// "scaled content" concern the German and Austrian batches exist for does not
 // arise at this size. batch1 is the register.
 //
-// `related` groups by BIC8, and comes out EMPTY for every
+// `related` groups by BIC8 as Austria does, and comes out EMPTY for every
 // Slovak code (measured 06/09/2026): no two codes share a BIC8 — 3100 and 5600
 // are one bank under two different BICs, and the Fio and J&T pairs are separate
 // Czech and Slovak entities. An empty list is the truthful answer, and with 38
@@ -382,6 +467,56 @@ for (const r of skRows) {
 }
 const skBatch1 = skRows.map((r) => r.code);
 
+// San Marino: a CIN letter, five digits of ABI in IBAN positions 6-10, five of
+// CAB, twelve of account. Le CIN est une lettre de contrôle sur l'ABI, le CAB
+// et le compte, et l'API la contrôle depuis le 25/09/2026
+// (`checks.national_check_digits`) : il est donc calculé ici par le module
+// qu'elle applique. Un « U » fixe, celui de l'exemple du registre ISO 13616
+// (ABI 03225, qui n'est pas dans la liste), était faux pour les quatre banques
+// de la liste et faisait répondre `fail` à nos propres exemples.
+//
+// Four banks, all four pre-rendered, `related` empty for the same reason it is
+// in Slovakia: no two share a BIC8, and the index page IS the list.
+//
+// ⚠️ The api block on these pages says `authoritative: false` and it is not a
+// defect: the BCSM publishes its operating banks, not the allocation of the ABI
+// space. The page text has to carry that, or a reader will read four verified
+// answers as a register that settles negatives too.
+const smRows = nationalRows.filter((r) => r.country === 'SM');
+const sm: Json = {};
+let smSource = 'Central Bank of the Republic of San Marino, operating banks';
+for (const r of smRows) {
+  const cin = computeItalianCin(r.code, '09800', '000000270100');
+  if (!cin) throw new Error(`SM ${r.code}: the ABI code is not five digits`);
+  const bban = `${cin}${r.code}09800000000270100`;
+  const iban = `SM${checkDigits('SM', bban)}${bban}`;
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`SM ${r.code}: synthetic IBAN ${iban} is not valid`);
+  smSource = registerName(answer, smSource);
+  sm[r.code] = {
+    register: {
+      code: r.code,
+      name: r.name,
+      bic: r.bic,
+      street: r.street,
+      post_code: r.post_code,
+      town: r.town,
+      // The day the page was read, in full, plus the credit string — the BCSM
+      // states no edition, so the page must be able to say "read on" rather
+      // than imply the source dated it.
+      as_of: r.as_of,
+      source: r.source,
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related: [],
+  };
+}
+const smBatch1 = smRows.map((r) => r.code);
+
 // ---------------------------------------------------------------------------
 // Italie : un IBAN synthétique par code ABI, la réponse de la route elle-même
 // (25/09/2026). Un CIN (lettre de contrôle sur l'ABI, le CAB et le compte) puis
@@ -392,7 +527,7 @@ const skBatch1 = skRows.map((r) => r.code);
 // Deux sortes de codes, deux tables : ceux que la Banca d'Italia tient en vigueur
 // (`national_bank_codes`, le premier lot) et ceux qu'elle a radiés
 // (`national_bank_codes_retired`), dont la page dit la date et le successeur
-// légal. Un registre partiel : les pages le disent.
+// légal. Un registre partiel : les pages le disent, comme celles de Saint-Marin.
 // ---------------------------------------------------------------------------
 interface ItalianRow {
   code: string;
@@ -523,6 +658,28 @@ if (wants('CH'))
       entries: ch,
     }),
   );
+if (wants('AT'))
+  writeFileSync(
+    resolve(OUT_DIR, 'at-blz.json'),
+    JSON.stringify({
+      generated_at,
+      source: atSource,
+      count: Object.keys(at).length,
+      batch1: atBatch1,
+      entries: at,
+    }),
+  );
+if (wants('BE'))
+  writeFileSync(
+    resolve(OUT_DIR, 'be-bank.json'),
+    JSON.stringify({
+      generated_at,
+      source: beSource,
+      count: Object.keys(be).length,
+      batch1: beBatch1,
+      entries: be,
+    }),
+  );
 if (wants('SK'))
   writeFileSync(
     resolve(OUT_DIR, 'sk-bank.json'),
@@ -532,6 +689,17 @@ if (wants('SK'))
       count: Object.keys(sk).length,
       batch1: skBatch1,
       entries: sk,
+    }),
+  );
+if (wants('SM'))
+  writeFileSync(
+    resolve(OUT_DIR, 'sm-bank.json'),
+    JSON.stringify({
+      generated_at,
+      source: smSource,
+      count: Object.keys(sm).length,
+      batch1: smBatch1,
+      entries: sm,
     }),
   );
 // Pas de fichier vide : une base sans registre italien laisse it-bank.json tel
@@ -560,6 +728,11 @@ if (!ONLY) {
   console.log(
     `sk-bank.json: ${Object.keys(sk).length} codes, batch1 ${skBatch1.length}, ` +
       `${skRows.filter((r) => r.bic).length} carrying a BIC`,
+  );
+  console.log(`sm-bank.json: ${Object.keys(sm).length} operating banks, batch1 ${smBatch1.length}`);
+  console.log(`at-blz.json: ${Object.keys(at).length} codes, batch1 ${atBatch1.length}`);
+  console.log(
+    `be-bank.json: ${Object.keys(be).length} codes in ${beGroups.size} institutions, batch1 ${beBatch1.length}`,
   );
   console.log(
     `ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`,

@@ -2388,7 +2388,7 @@
     },
     "registers": {
       "title": "Nationale Register, konsultiert und benannt",
-      "body": "Die Schweiz und Liechtenstein lösen gegen SIX BankMaster auf, Deutschland gegen die Bundesbank, Österreich gegen die OeNB, Belgien gegen die Banque nationale de Belgique: jeder Treffer nennt sein Register in bank_code_check.register und datiert es in as_of. Wo kein nationales Register konsultiert wird, antwortet die zusammengesetzte BIC-Karte, und die Antwort sagt, dass sie nicht massgeblich ist.",
+      "body": "Die Schweiz und Liechtenstein lösen gegen SIX BankMaster auf, Deutschland gegen die Bundesbank, Österreich gegen die OeNB, Belgien gegen die Banque nationale de Belgique, Finnland gegen Finance Finland — jeder Treffer nennt sein Register in bank_code_check.register und datiert es in as_of. Wo kein nationales Register konsultiert wird, antwortet die zusammengesetzte BIC-Karte, und die Antwort sagt, dass sie nicht massgeblich ist.",
       "link": "Die lange Fassung, Register für Register"
     },
     "honest": {
@@ -2722,8 +2722,6 @@
   },
   "registers": {
     "common": {
-      "privateRegisterNote": "Dieses Register liefern wir aus einer privaten Datei, statt es zu veröffentlichen: Jeder Code behält seine Seite, live von der API gelesen, aber die vollständige Liste wird hier nicht erneut veröffentlicht. Geben Sie oben einen Code ein, um seine Seite zu öffnen.",
-      "apiTextLive": "Der Block unten ist die Antwort der API selbst für diesen Code, live von api.ibanforge.com gelesen und einen Tag lang behalten, gekürzt auf die Felder, mit denen ein Leser arbeiten kann. Nichts ist nachbearbeitet.",
       "apiTitle": "Was die API für diesen Code antwortet",
       "apiText": "Der Block unten ist die Antwort der Route selbst, erzeugt vom Code, der api.ibanforge.com bedient, auf dem Register zum angegebenen Stand. Nichts ist nachbearbeitet.",
       "exampleTitle": "IBAN-Aufbau mit diesem Code",
@@ -2832,12 +2830,12 @@
       "structure": "Eine österreichische IBAN besteht aus AT, zwei Prüfziffern, der fünfstelligen Bankleitzahl und der elfstelligen Kontonummer. Für die Bankleitzahl kann das OeNB-Verzeichnis bürgen; die Kontonummer kennt nur die Bank.",
       "docLink": "Wie das österreichische Register antwortet",
       "indexTitle": "Österreichische Bankleitzahlen (OeNB-Verzeichnis)",
-      "indexIntro": "Suchen Sie eine Bankleitzahl im Verzeichnis der Oesterreichischen Nationalbank: das Institut, seine Sitzadresse und seinen LEI, soweit das Register sie veröffentlicht, den zugehörigen BIC und die exakte Antwort der IBANforge-API, live gelesen.",
+      "indexIntro": "Jede Bankleitzahl des Verzeichnisses der Oesterreichischen Nationalbank, mit dem Institut, seiner Sitzadresse und seinem LEI, soweit das Register sie veröffentlicht, dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Monatlich mit dem Register aktualisiert.",
       "countryLink": "Das Format der österreichischen IBAN, mit dem offiziellen Beispiel"
     },
     "be": {
       "metaTitle": "Belgischer Bankcode {code}: {name}",
-      "metaDescription": "Bankkennung {code} in der Liste der Belgischen Nationalbank: {name}, BIC {bic}. IBAN-Aufbau, SEPA-Erreichbarkeit und die exakte Antwort der IBANforge-API.",
+      "metaDescription": "Bankkennung {code} in der Liste der Belgischen Nationalbank: {name}, BIC {bic}. Die Codes derselben Bank, IBAN-Aufbau, SEPA-Erreichbarkeit und die exakte Antwort der IBANforge-API.",
       "eyebrow": "Liste der Belgischen Nationalbank",
       "title": "Belgischer Bankcode {code}",
       "subtitle": "{name}",
@@ -2845,12 +2843,15 @@
         "code": "Bankkennung",
         "bank": "Institut",
         "bic": "BIC",
+        "groupCodes": "Codes dieser Bank",
         "none": "keine"
       },
+      "groupNote": "Die Belgische Nationalbank weist einem Institut ganze Blöcke von Kennungen zu. Die Liste unten zeigt eine Seite pro Bank; jeder Code eines Blocks hat seine eigene Adresse und verweist auf sie.",
+      "canonicalNote": "Dieser Code gehört zu einem Block, der einer einzigen Bank zugewiesen ist. Die Seite der Bank ist",
       "structure": "Eine belgische IBAN besteht aus BE, zwei Prüfziffern, der dreistelligen Bankkennung, der siebenstelligen Kontonummer und zwei nationalen Prüfziffern (die ersten zehn Ziffern modulo 97). Für die Kennung kann die Liste der BNB bürgen; die Kontonummer kennt nur die Bank.",
       "docLink": "Wie das belgische Register antwortet",
       "indexTitle": "Belgische Bankcodes (BNB-Liste)",
-      "indexIntro": "Suchen Sie eine in der Liste der Belgischen Nationalbank zugewiesene Bankkennung: das Institut, den zugehörigen BIC und die exakte Antwort der IBANforge-API, live gelesen. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat.",
+      "indexIntro": "Jede in der Liste der Belgischen Nationalbank zugewiesene Bankkennung, eine Seite pro Institut, mit dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat.",
       "countryLink": "Das Format der belgischen IBAN, mit dem offiziellen Beispiel",
       "integrateLink": "Belgische Bankcodes in Ihrer Anwendung prüfen"
     },
@@ -2892,7 +2893,7 @@
       "notExhaustive": "Die Zentralbank veröffentlicht die von ihr beaufsichtigten Banken, nicht die Vergabe des ABI-Coderaums. Ein Code auf dieser Liste hat also einen benannten Inhaber, ein fehlender Code beweist dagegen nichts: San Marino lizenziert auch Zahlungs- und E-Geld-Institute, die keine Banken sind, und die offizielle san-marinesische Beispiel-IBAN trägt selbst einen ABI-Code, der nicht auf dieser Seite steht. Deshalb antwortet die API hier authoritative: false — anders als bei Österreich oder der Slowakei ist ein Fehlen nie ein Grund, eine Zahlung zu stoppen.",
       "docLink": "Wie die san-marinesische Liste antwortet",
       "indexTitle": "San-marinesische Bankleitzahlen (operative Banken der BCSM)",
-      "indexIntro": "Suchen Sie einen ABI-Code in der Liste der operativen Banken der Zentralbank der Republik San Marino: die Bank, den BIC, den die Zentralbank ihm zuordnet, den Sitz und die genaue Antwort der IBANforge-API, live gelesen.",
+      "indexIntro": "Die vier operativen Banken der Zentralbank der Republik San Marino, mit dem ABI-Code, dem BIC, den die Zentralbank ihm zuordnet, dem Sitz und der genauen Antwort der IBANforge-API. Monatlich mit den anderen Registern aufgefrischt.",
       "countryLink": "Der Aufbau der san-marinesischen IBAN, mit dem offiziellen Beispiel"
     }
   },
@@ -2968,9 +2969,7 @@
     },
     "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}.",
     "exampleNotAllocated": "Die Prüfziffern dieses offiziellen Beispiels stimmen, und doch meldet {register}, dass niemand diesen Bankcode hält: Genau das fängt unsere Bankcode-Prüfung ab, und genau das sieht eine Prüfsumme allein nicht.",
-    "examplePartialRegister": "Ein Teil der Bankleitzahlen dieses Landes wird zusätzlich von einer Aufsichtsliste benannt, zu der wir je eine Seite ausliefern — doch diese Liste veröffentlicht nicht die Vergabe des Coderaums: Ein dort fehlender Code ist deshalb kein nie vergebener Code.",
-    "examplePrivateRegister": "Die API prüft die Bankcodes dieses Landes gegen {register}. Dieses Register liefern wir aus einer privaten Datei, statt es zu veröffentlichen: Seine Antwort auf dieses Beispiel wird hier also nicht abgeschrieben, sie wird live bei der Anfrage berechnet.",
-    "examplePrivateRegisterLink": "Das Beispiel im Playground ausprobieren"
+    "examplePartialRegister": "Ein Teil der Bankleitzahlen dieses Landes wird zusätzlich von einer Aufsichtsliste benannt, zu der wir je eine Seite ausliefern — doch diese Liste veröffentlicht nicht die Vergabe des Coderaums: Ein dort fehlender Code ist deshalb kein nie vergebener Code."
   },
   "tools": {
     "keyBlock": {

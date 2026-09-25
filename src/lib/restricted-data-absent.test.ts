@@ -166,13 +166,6 @@ describe('control: the invented datasets answer when they are loaded', () => {
     expect(r.sepa?.vop_participant).toBe(false);
   });
 
-  it('reports a clean bank as clean, `false`, once every promised list is loaded', () => {
-    // Le pendant de bic-compliance.test.ts et bic-lookup.test.ts, qui tournent
-    // sur la base publique (sans l'ONU) et y lisent `null`.
-    const s = mods().compliance.screenBicSanctions('COBADEFF');
-    expect(s).toEqual({ screened: true, listed: false, matched_lists: [] });
-  });
-
   it('names the UN list, and matches on it, when it is loaded', () => {
     expect(mods().complianceDb.loadedSanctionsLists()).toContain('UN');
     const r = mods().response.buildBicComplianceResponse(FX.UN.onlyUn);
@@ -320,7 +313,6 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
   it('degrades Austria to "register unavailable", never to a denial', () => {
     // Un code que la carte composite ne porte pas non plus : rien ne peut y répondre.
     const r = validate(mods(), FX.AT.iban(FX.AT.unallocatedCode));
-    expect(r.bank_code_check?.status).toBe('unavailable');
     expect(r.bank_code_check?.reason).toBe('national_register_unavailable');
     expect(r.bank_code_check?.authoritative).toBe(false);
     expect(r.next_steps?.map((s) => s.code)).not.toContain('bank_code_not_allocated');
@@ -328,64 +320,28 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
 
   it('degrades Belgium the same way', () => {
     const r = validate(mods(), FX.BE.iban(FX.BE.unallocatedCode));
-    expect(r.bank_code_check?.status).toBe('unavailable');
     expect(r.bank_code_check?.reason).toBe('national_register_unavailable');
     expect(r.bank_code_check?.authoritative).toBe(false);
     expect(r.next_steps?.map((s) => s.code)).not.toContain('bank_code_not_allocated');
   });
 
-  // Les pays dont la carte composite a perdu ses clés à l'étape du retrait
-  // (WITHDRAWN_BANK_CODE_COUNTRIES) et qui n'ont aucun registre, public ou
-  // privé : rien ne tranche leurs codes, et la réponse le dit, jamais « absent ».
-  it.each([
-    ['PL', 'PL61109010140000071219812874'],
-    ['FI', 'FI2112345600000785'],
-  ])('answers %s "no reference data", never "absent" nor a denial', (_cc, iban) => {
-    const r = validate(mods(), iban);
-    expect(r.bank_code_check?.status).toBe('unavailable');
-    expect(r.bank_code_check?.reason).toBe('no_reference_data_for_country');
-    expect(r.bank_code_check?.authoritative).toBe(false);
-    expect(r.bic ?? null).toBeNull();
-  });
-
-  it('answers Luxembourg "not consulted" while its private register is not loaded', () => {
-    // Le registre de l'ABBL ne vit que dans un fichier privé (LU_REGISTER_PATH),
-    // et la carte composite a perdu ses clés luxembourgeoises à l'étape du
-    // retrait : sans le fichier, personne ne tranche.
-    const saved = process.env.LU_REGISTER_PATH;
-    delete process.env.LU_REGISTER_PATH;
-    try {
-      const r = validate(mods(), 'LU280019400644750000');
-      expect(r.bank_code_check?.status).toBe('unavailable');
-      expect(r.bank_code_check?.reason).toBe('national_register_unavailable');
-      expect(r.bank_code_check?.authoritative).toBe(false);
-    } finally {
-      if (saved !== undefined) process.env.LU_REGISTER_PATH = saved;
-    }
-  });
-
-  it('answers a real Austrian code "not consulted" too: the composite map no longer carries Austria', () => {
-    // Jusqu'à l'étape du retrait (25/09/2026), src/db/bic_data.json portait des
-    // clés autrichiennes tirées par une compilation tierce du fichier de l'OeNB,
-    // et un vrai code revenait `verified` par la carte sans le registre. Ces
-    // clés ont quitté le dépôt avec le registre : sans la surcouche, un vrai
-    // code autrichien n'est plus tranché par personne, et le dit.
+  it('lets the composite map answer an Austrian code it carries, labelled as the map', () => {
+    // Documenté ici, pas modifié : src/db/bic_data.json porte encore des clés
+    // autrichiennes (tirées par une compilation tierce du fichier de l'OeNB),
+    // si bien qu'un vrai code autrichien revient `verified` sans le registre.
+    // L'étiquette est honnête (la carte composite, `authoritative: false`),
+    // mais ces clés sont elles-mêmes des données du registre qui s'en va, et
+    // leur sort appartient à la modification qui retire le registre.
     const r = validate(mods(), FX.AT.iban('12000'));
-    expect(r.bank_code_check?.status).toBe('unavailable');
-    expect(r.bank_code_check?.reason).toBe('national_register_unavailable');
+    expect(r.bank_code_check?.status).toBe('verified');
+    expect(r.bank_code_check?.register).toMatch(/composite/i);
     expect(r.bank_code_check?.authoritative).toBe(false);
-    expect(r.bic ?? null).toBeNull();
+    expect(r.bic?.basis).not.toBe('national_register');
   });
 
-  it('answers San Marino "not consulted" while its private list is not loaded', () => {
-    // Bascule voulue de l'étape du retrait (25/09/2026). Avant, une liste
-    // absente laissait Saint-Marin répondre comme avant qu'elle existe,
-    // `absent_from_reference_data` : « absent de nos données », d'un code que
-    // la seule liste qui le tranche n'a pas pu lire. Maintenant la liste vit
-    // dans la surcouche privée, et son absence se dit « non consulté ».
+  it('answers San Marino as before its list existed', () => {
     const r = validate(mods(), FX.SM.iban(FX.SM.bank.code));
-    expect(r.bank_code_check?.status).toBe('unavailable');
-    expect(r.bank_code_check?.reason).toBe('national_register_unavailable');
+    expect(r.bank_code_check?.reason).toBe('absent_from_reference_data');
     expect(r.bank_code_check?.authoritative).toBe(false);
   });
 

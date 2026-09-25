@@ -208,7 +208,7 @@ export function institutionDepthSentences(): string {
     `${andList(postTown)} ${verb(postTown, 'publish', 'publishes')} postal code and town only, ` +
     `${andList(names)} ${verb(names, 'publish', 'publishes')} names alone, ` +
     `${andList(office)} ${verb(office, 'publish', 'publishes')} the registered office; ` +
-    'for Finland the name is the banking group the code belongs to, not an individual institution. ' +
+    'for Finland the name is the banking group the code belongs to (Nordea Bank for code 1), not an individual institution. ' +
     `Names are served exactly as the register writes them, which ${andList(scripts)} — ` +
     'transliterating would be an alteration the terms of those publishers forbid.'
   );

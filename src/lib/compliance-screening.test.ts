@@ -114,12 +114,25 @@ describe('"nothing to screen" is reported as such, never as "screened and clean"
   });
 });
 
-/*
- * « VoP carries the status the EPC register publishes » lisait ici le vrai
- * registre VoP de l'EPC (une inscription « pending », une « active »). Ce
- * registre a quitté la base de ce dépôt à l'étape du retrait (25/09/2026) : il
- * est servi depuis la surcouche privée. Les mêmes règles (une inscription en
- * attente reste `pending` et ne compte pas comme participant ; une inscription
- * active est un participant) sont prouvées sur des inscriptions inventées dans
- * src/lib/restricted-data-absent.test.ts, bloc « control ».
- */
+describe('VoP carries the status the EPC register publishes', () => {
+  it('reports a pending registration as pending, not as absent', () => {
+    // The register publishes "Pending EDS registration" alongside "Ready for
+    // operations". Those rows used to be dropped, which read as `not_found` —
+    // indistinguishable from a bank that never registered at all.
+    const v = checkVop('AFRIFRPP');
+    expect(v.status).toBe('pending');
+    expect(v.screened).toBe(true);
+  });
+
+  it('does NOT count a pending registration as a participant', () => {
+    // The direction of the error matters: telling a payer a name check is
+    // available before it is would be a false positive on a regulatory field.
+    expect(checkVop('AFRIFRPP').participant).toBe(false);
+  });
+
+  it('an active participant is still a participant', () => {
+    const v = checkVop('COBADEFF');
+    expect(v.status).toBe('active');
+    expect(v.participant).toBe(true);
+  });
+});

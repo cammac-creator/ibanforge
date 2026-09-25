@@ -83,13 +83,15 @@ function walk(dir: string, out: string[] = []): string[] {
  * Les listes de sanctions que la production sert depuis la surcouche PRIVÉE, et
  * non depuis la base de ce dépôt.
  *
- * L'ONU depuis l'étape du retrait (25/09/2026) : tous droits réservés, la liste
- * est gardée (décision du 24/09/2026) mais servie depuis un fichier privé
- * (membre `un` de src/lib/restricted-family.ts). Ajoutée DANS LE MÊME COMMIT
- * que la base publique qui ne la porte plus : le workflow hebdomadaire de
- * rafraîchissement lance ce fichier sur la base publique, et sans cette ligne il
- * lirait « l'ONU n'est pas contrôlée » et rougirait sur chaque surface qui dit,
- * à juste titre, qu'elle l'est. Quand la surcouche manque, la réponse le dit
+ * L'ONU : tous droits réservés, la liste est gardée (décision du 24/09/2026)
+ * mais servie depuis un fichier privé (membre `un` de
+ * src/lib/restricted-family.ts). Déclarée le 25/09/2026, AVANT que ses lignes
+ * quittent la base publique (étape du retrait) : tant que la base les porte,
+ * `loaded` contient déjà l'ONU et la déclaration ne change rien, ni à ce test
+ * ni à aucune réponse. Le jour où elles la quittent, le workflow hebdomadaire de
+ * rafraîchissement, qui lance ce fichier sur la base publique, ne lira pas
+ * « l'ONU n'est pas contrôlée » et ne rougira pas sur chaque surface qui dit, à
+ * juste titre, qu'elle l'est. Quand la surcouche manque, la réponse le dit
  * elle-même (`unscreened_lists`, drapeau `sanctions_list_unavailable_un`).
  *
  * Ajouter une liste ici, c'est affirmer que la production la sert sans que ce

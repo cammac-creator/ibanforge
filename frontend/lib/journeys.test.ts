@@ -6,8 +6,7 @@ import { join } from "node:path";
 import { JourneyActions } from "@/components/journey-actions";
 import { JOURNEY_PAGES } from "./journeys";
 import { getCountry } from "./countries";
-import { getBlz } from "./registers";
-import { normaliseLiveCode } from "./register-live";
+import { getBlz, getBeCode } from "./registers";
 
 function render(path: string, locale = "en") {
   return renderToStaticMarkup(createElement(JourneyActions, { path, locale }));
@@ -27,11 +26,8 @@ describe("Parcours depuis les pages existantes", () => {
       } else if (section === "blz") {
         expect(getBlz(slug), path).toBeTruthy();
       } else if (section === "be") {
-        // Les pages belges sont rendues à la demande depuis l'API depuis l'étape
-        // du retrait (25/09/2026) : plus de liste locale pour vérifier le code,
-        // seulement sa forme et la route qui le sert.
-        expect(normaliseLiveCode("BE", slug), path).toBe(slug);
-        expect(existsSync(join(process.cwd(), "app", "[locale]", "be", "[code]", "page.tsx")), path).toBe(true);
+        // La page retenue doit être la canonique, pas un autre code du même groupe.
+        expect(getBeCode(slug)?.register.canonical, path).toBe(slug);
       } else {
         expect(existsSync(join(process.cwd(), "app", "[locale]", section, "page.tsx")), path).toBe(true);
       }

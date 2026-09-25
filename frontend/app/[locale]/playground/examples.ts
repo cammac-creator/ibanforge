@@ -9,12 +9,6 @@
  *  - NTSBDEB1 (N26) → full GLEIF address + active LEI.
  *  - DE89370400440532013000 → compliance risk 0/low, honest scope disclaimer.
  *  - GET /v1/ch/clearing/230 (UBS) → richest, exclusive Swiss dataset.
- *
- * 25/09/2026 : dans l'exemple de conformité, les valeurs tirées des registres
- * EPC et de la liste ONU (famille sous conditions, src/lib/restricted-family.ts)
- * sont remplacées par la réponse de l'API sans eux : `screened: false`, un
- * drapeau `*_unavailable` par source absente, `sources` sans UN ni EPC. Le
- * reste de la capture est inchangé.
  */
 
 import capturedIban from './captured-iban.json';
@@ -142,11 +136,11 @@ export const DEFAULT_RESULT: Record<PlaygroundMode, Record<string, unknown>> = {
         matched_lists: [],
         fatf_status: 'member',
       },
-      reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
-      vop: { participant: false, status: 'not_found', screened: false },
+      reachability: { sepa_instant: true, sct: true, sdd: true },
+      vop: { participant: true, status: 'active' },
       risk_score: 0,
       risk_level: 'low',
-      flags: ['sepa_register_unavailable', 'vop_register_unavailable', 'sanctions_list_unavailable_un'],
+      flags: [],
     },
     meta: {
       scope: 'bank_bic_only',
@@ -154,7 +148,7 @@ export const DEFAULT_RESULT: Record<PlaygroundMode, Record<string, unknown>> = {
         'Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.',
       sanctions_as_of: '2026-07-05T04:29:13.136Z',
       fatf_as_of: '2026-02',
-      sources: 'EU,OFAC,FATF',
+      sources: 'OFAC,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST',
     },
     processing_ms: 0.3,
   },

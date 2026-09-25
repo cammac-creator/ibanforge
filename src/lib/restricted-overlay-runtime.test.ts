@@ -201,6 +201,36 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
   const liveDir = (): string[] => readdirSync(join(fixture.dir, 'live')).sort();
   const mergedFiles = (): string[] => liveDir().filter((n) => n.includes('.merged-'));
 
+  it('une surcouche qui ne porte pas encore les membres tardifs : servie, /health les nomme', async () => {
+    // La release que la production tire avant les membres venus après la première
+    // surcouche : la famille complète, sans leurs tables. Acceptée sans refus, et
+    // /health nomme ce qui lui manque, jusqu'à la release qui les porte.
+    mkdirSync(join(fixture.dir, 'v0'));
+    const older = join(fixture.dir, 'v0', 'sans-tardifs-source.sqlite');
+    copyFileSync(fixture.bicPath, older);
+    const o = openDb(older);
+    o.exec('DROP TABLE curated_bank_codes');
+    o.exec('DROP TABLE fi_monetary_codes');
+    o.close();
+    const withoutLate = extractOverlay({
+      kind: 'bic',
+      sourcePath: older,
+      outPath: join(fixture.dir, 'v0', 'restricted-bic.sqlite'),
+      generator: 'test',
+    }).path;
+    deposit(withoutLate, live.bic);
+    const outcomes = runtime.reloadRestrictedOverlays();
+    expect(outcomes.map((o) => [o.kind, o.changed, o.status.state, o.rejected])).toEqual([
+      ['bic', true, 'applied', null],
+    ]);
+    const h = await health();
+    expect(h.restricted_overlays.bic).toMatchObject({
+      state: 'applied',
+      absent: ['map_pl', 'map_fi', 'map_lu', 'register_fi'],
+    });
+    expect(h.restricted_overlays.compliance).toEqual({ state: 'refused', sha256: null });
+  });
+
   it("le fichier arrive pendant que l'API tourne : servi après rechargement", async () => {
     deposit(v1.bic, live.bic);
     deposit(v1.compliance, live.compliance);
@@ -228,6 +258,8 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
 
     const h = await health();
     expect(h.restricted_overlays.bic.state).toBe('applied');
+    // La release porte les membres tardifs : plus rien d'absent.
+    expect(h.restricted_overlays.bic.absent).toBeUndefined();
     expect(h.restricted_overlays.compliance.sha256).toMatch(/^[0-9a-f]{12}$/);
     // La surcouche servie est gardée comme dernière acceptée (R3).
     for (const kind of ['bic', 'compliance'] as const) {

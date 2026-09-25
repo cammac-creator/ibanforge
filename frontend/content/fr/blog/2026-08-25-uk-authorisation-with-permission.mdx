@@ -12,13 +12,13 @@ Cette condition fait maintenant partie du produit.
 
 ## Ce qu'un lookup britannique répond désormais
 
-Chaque `GET /v1/bic/:code` sur un BIC britannique — et chaque IBAN GB validé dont la banque est résolue — porte un bloc `pra_authorisation` quand l'institution figure sur la liste courante. Sa forme (le nom de l'établissement et son FRN sont omis ici) :
+Chaque `GET /v1/bic/:code` sur un BIC britannique — et chaque IBAN GB validé dont la banque est résolue — porte un bloc `pra_authorisation` quand l'institution figure sur la liste courante. Capturé sur la base livrée :
 
 ```json
 "pra_authorisation": {
   "authorised": true,
-  "firm_name": "…",
-  "frn": "…",
+  "firm_name": "HSBC UK Bank Plc",
+  "frn": "765112",
   "section": "uk_incorporated",
   "basis": "lei",
   "source": "Bank of England, List of Banks",

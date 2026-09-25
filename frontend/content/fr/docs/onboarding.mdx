@@ -111,8 +111,8 @@ Voici la réponse allemande de l'étape 2, coupée là où elle se répète :
     "member": true,
     "schemes": ["SCT", "SDD", "SCT_INST"],
     "vop_required": true,
-    "vop_participant": null,
-    "basis": "country_default"
+    "vop_participant": true,
+    "basis": "epc_register"
   },
   "formatted": "DE89 3704 0044 0532 0130 00",
   "bic": {
@@ -175,7 +175,7 @@ Bloc par bloc :
 | `attribution` | offre gratuite | `text`, `url`, `note`. Quand des résultats de l'offre gratuite sont montrés à des personnes, affichez le crédit ; un résultat qui reste dans votre backend ne doit rien. |
 | `trial` | sans clé uniquement | Voir l'étape 1. |
 
-**Il n'y a pas de bloc `vop` de premier niveau.** Verification of Payee se lit dans trois champs : `sepa.vop_required` (le pays est-il sous l'obligation), `sepa.vop_participant` (l'établissement résolu est-il inscrit comme prêt au registre EPC, `null` quand aucun établissement n'est résolu ou quand ce registre n'a pas été consulté pour la réponse, comme dans l'exemple ci-dessus) et `risk_indicators.vop_coverage`. Le raisonnement complet est sur la page [VoP](/docs/vop).
+**Il n'y a pas de bloc `vop` de premier niveau.** Verification of Payee se lit dans trois champs : `sepa.vop_required` (le pays est-il sous l'obligation), `sepa.vop_participant` (l'établissement résolu est-il inscrit comme prêt au registre EPC, `null` quand aucun établissement n'est résolu) et `risk_indicators.vop_coverage`. Le raisonnement complet est sur la page [VoP](/docs/vop).
 
 Deux blocs n'apparaissent que pour certains pays : ne conditionnez pas votre code à leur présence.
 

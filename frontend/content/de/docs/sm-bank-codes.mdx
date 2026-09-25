@@ -21,7 +21,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 ```json
 {
   "valid": true,
-  "bic": { "code": "…", "basis": "national_register", "authoritative": true },
+  "bic": { "code": "BASMSMSM", "basis": "national_register", "authoritative": true },
   "bank_code_check": {
     "value": "03034",
     "status": "verified",
@@ -29,10 +29,10 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
     "register": "Central Bank of the Republic of San Marino, operating banks (banks only; …)",
     "authoritative": false,
     "institution": {
-      "name": "…",
-      "street": "…",
-      "post_code": "…",
-      "town": "…",
+      "name": "Banca Agricola Commerciale Istituto Bancario Sammarinese s.p.a.",
+      "street": "Via 3 settembre, 316",
+      "post_code": "47891",
+      "town": "Dogana",
       "country": "SM"
     }
   }

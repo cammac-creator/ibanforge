@@ -21,23 +21,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # 🔒 Public lists only, since the withdrawal step (25/09/2026): OFAC, the EU
-      # list and SECO, plus the static FATF and country tables. The UN list (all
-      # rights reserved) and the EPC scheme and VoP registers (non-commercial by
-      # default) belong to the restricted family (src/lib/restricted-family.ts):
-      # without SEED_FAMILY the refresher neither downloads nor writes them, and
-      # the API serves them from the private overlay a private repository rebuilds
-      # every week. The run logs and the commit are public.
-      - name: Refresh compliance data (public lists)
+      - name: Refresh compliance data
         run: npm run compliance:refresh
       # A source download can fail silently inside the refresher (best-effort
       # feeds). Committing that database would make every served coverage claim
       # a lie — exactly what happened on 2026-08-02 when the EU list failed in
       # the runner. The claims test is the gate: degraded data must fail here.
-      # The second file refuses any row of the restricted family in the database
-      # about to be committed.
-      - name: Claims must match the refreshed data, and no restricted row ships
-        run: npx vitest run src/routes/sanctions-claims.test.ts src/lib/public-base-family-free.test.ts
+      - name: Claims must match the refreshed data
+        run: npx vitest run src/routes/sanctions-claims.test.ts
       - name: Check for changes
         id: changes
         run: |

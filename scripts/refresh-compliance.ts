@@ -1,18 +1,8 @@
 /**
  * Compliance data refresh script.
  * Downloads primary-source sanctions lists (OFAC/EU/UN/SECO) + EPC SEPA
- * registers and builds compliance.sqlite. Uses the official lists directly —
- * no OpenSanctions (CC-BY-NC) dependency.
- *
- * 🔒 Deux modes depuis l'étape du retrait (25/09/2026, src/lib/restricted-family.ts) :
- * - sans SEED_FAMILY (le robot public du dimanche, la copie d'un contributeur) :
- *   les listes publiques seules, OFAC, UE et SECO, plus les listes statiques.
- *   La liste de l'ONU (tous droits réservés) et les registres EPC (non commerciaux
- *   par défaut) ne sont NI téléchargés NI écrits : leurs tables restent vides, et
- *   l'API les sert depuis la surcouche privée ;
- * - `SEED_FAMILY=restricted` (la chaîne privée, `npm run overlay:seed -- --kind
- *   compliance`, qui pose la variable) : tout, exactement comme avant, dans une
- *   copie de travail hors du dépôt, dont seule la famille est ensuite extraite.
+ * registers and builds compliance.sqlite. Uses the official, freely
+ * redistributable lists directly — no OpenSanctions (CC-BY-NC) dependency.
  *
  * Run with: npm run compliance:refresh  (or: npx tsx scripts/refresh-compliance.ts)
  */
@@ -41,19 +31,11 @@ import {
   SANCTIONED_COUNTRIES_SECTORAL,
 } from '../src/lib/compliance-static.js';
 import { validateBIC } from '../src/lib/bic-validator.js';
-import { seedFamilyFromEnv } from '../src/lib/restricted-family.js';
 import {
   carryOverList,
   CARRY_OVER_MAX_AGE_DAYS,
   type CarryOverResult,
 } from './compliance-carry-over.js';
-
-/**
- * Lu une fois, avant tout téléchargement : `restricted` refait tout comme avant
- * (chaîne privée), `public` n'approche ni l'ONU ni l'EPC (voir l'en-tête).
- */
-const FAMILY = seedFamilyFromEnv();
-const WITH_RESTRICTED = FAMILY === 'restricted';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
@@ -639,31 +621,25 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
     }
 
     // ---- UN SC consolidated XML (best-effort) ----
-    // Chaîne privée seulement : la liste de l'ONU est tous droits réservés, elle
-    // n'entre plus dans la base de ce dépôt (ni téléchargée, ni reprise).
-    if (!WITH_RESTRICTED) {
-      console.log('  UN: skipped (restricted family, rebuilt by the private chain only)');
-    } else {
-      try {
-        const xmlPath = resolve(TMP_DIR, 'un_consolidated.xml');
-        console.log('  Fetching UN consolidated list...');
-        await downloadFile('https://scsanctions.un.org/resources/xml/en/consolidated.xml', xmlPath);
-        const { readFileSync } = await import('node:fs');
-        const text = readFileSync(xmlPath, 'utf-8');
-        const seen = new Set<string>();
-        const batch: Array<[string, string, string, string, number]> = [];
-        let unresolved = 0;
-        for (const { bic8, inDirectory } of extractBics(text, seen)) {
-          if (!inDirectory) unresolved++;
-          batch.push([bic8, 'UN-listed entity', 'UN', '', inDirectory ? 1 : 0]);
-        }
-        if (batch.length) insertBatch(batch);
-        tally.kept += batch.length;
-        console.log(`  UN: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
-      } catch (err) {
-        console.warn(`  WARNING: UN download/parse failed: ${(err as Error).message}`);
-        reportCarryOver('UN', carryOverList(db, FINAL_DB_PATH, 'UN'));
+    try {
+      const xmlPath = resolve(TMP_DIR, 'un_consolidated.xml');
+      console.log('  Fetching UN consolidated list...');
+      await downloadFile('https://scsanctions.un.org/resources/xml/en/consolidated.xml', xmlPath);
+      const { readFileSync } = await import('node:fs');
+      const text = readFileSync(xmlPath, 'utf-8');
+      const seen = new Set<string>();
+      const batch: Array<[string, string, string, string, number]> = [];
+      let unresolved = 0;
+      for (const { bic8, inDirectory } of extractBics(text, seen)) {
+        if (!inDirectory) unresolved++;
+        batch.push([bic8, 'UN-listed entity', 'UN', '', inDirectory ? 1 : 0]);
       }
+      if (batch.length) insertBatch(batch);
+      tally.kept += batch.length;
+      console.log(`  UN: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
+    } catch (err) {
+      console.warn(`  WARNING: UN download/parse failed: ${(err as Error).message}`);
+      reportCarryOver('UN', carryOverList(db, FINAL_DB_PATH, 'UN'));
     }
 
     // ---- SECO (CH) consolidated list — XML (best-effort) ----
@@ -1037,23 +1013,14 @@ async function main(): Promise<void> {
   // 4. Primary-source sanctions (OFAC/EU/UN/SECO, BIC-level)
   const sanctionsTally = await fetchPrimarySanctions(db);
 
-  if (WITH_RESTRICTED) {
-    // 5. EPC SEPA registers
-    await fetchSepaRegisters(db);
+  // 5. EPC SEPA registers
+  await fetchSepaRegisters(db);
 
-    // 6. VoP register (real data)
-    await fetchVopRegister(db);
+  // 6. VoP register (real data)
+  await fetchVopRegister(db);
 
-    // 6b. Documented EMI BIC aliases (EPC membership under a different BIC8)
-    applyEmiAliases(db);
-  } else {
-    // Les tables EPC restent créées et VIDES (createSchema) : c'est la forme que
-    // la base publique porte depuis l'étape du retrait, et celle que la fusion
-    // de la surcouche attend (src/lib/restricted-overlay.ts).
-    console.log(
-      '\n[3-4/5] EPC SEPA and VoP registers skipped: restricted family, served from the private overlay',
-    );
-  }
+  // 6b. Documented EMI BIC aliases (EPC membership under a different BIC8)
+  applyEmiAliases(db);
 
   // 7. Metadata
   insertMetadata(db);

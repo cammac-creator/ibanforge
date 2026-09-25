@@ -154,7 +154,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   "country": { "code": "CH", "name": "Switzerland" },
   "check_digits": "55",
   "bban": { "bank_code": "30024", "account_number": "123000889012" },
-  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false, "vop_participant": null },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false, "vop_participant": false },
   "formatted": "CH55 3002 4123 0008 8901 2",
   "bic": {
     "code": "VABECH22",
@@ -347,23 +347,21 @@ Cette même classification alimente le score de risque de [`POST /v1/iban/compli
       "fatf_status": "member",
       "bank_screened": true
     },
-    "reachability": { "sepa_instant": false, "sct": false, "sdd": false, "screened": false },
-    "vop": { "participant": false, "status": "not_found", "screened": false },
-    "risk_score": 0,
+    "reachability": { "sepa_instant": false, "sct": true, "sdd": false, "screened": true },
+    "vop": { "participant": false, "status": "not_found", "screened": true },
+    "risk_score": 10,
     "risk_level": "low",
-    "flags": ["sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"]
+    "flags": ["no_sepa_instant", "no_vop"]
   },
   "meta": {
     "scope": "bank_bic_only",
     "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
     "sanctions_as_of": "2026-08-24T15:52:44.509Z",
     "fatf_as_of": "2026-06",
-    "sources": "EU,OFAC,FATF"
+    "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD"
   }
 }
 ```
-
-Cet exemple montre la réponse quand les registres de l'EPC et la liste de l'ONU n'ont pas été consultés pour l'appel : `screened: false` sur `reachability` et `vop`, et un drapeau `*_unavailable` par source laissée de côté, si bien qu'un `false` n'y prouve rien. Quand ils ont été consultés, `screened` vaut `true` et les valeurs sont celles de la banque.
 
 Ce `meta.disclaimer` n'est pas un ornement et il n'est pas adouci ici : il s'agit d'un **tri informatif, pas d'un produit AML/CFT réglementé**. Le filtrage des sanctions s'opère au niveau de la banque (BIC8) sur les données OFAC, EU et UN — il signale l'établissement teneur, jamais le nom du bénéficiaire ou du titulaire. C'est un signal amont qui dit quel type d'établissement se tient derrière un identifiant ; l'identification des utilisateurs finaux au titre de l'art. 22(3) se joue chez l'établissement émetteur, avec des moyens que nous ne détenons ni ne remplaçons.
 

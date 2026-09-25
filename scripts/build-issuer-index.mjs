@@ -2,7 +2,7 @@
  * Build the issuer index of the iban-core package (written OUTSIDE this repo,
  * to ../iban-core/src/issuers-generated.ts — see the write at the end of file).
  *
- * Cross-matches the EBA PIR register snapshot against the BIC
+ * Cross-matches the EBA PIR + FCA UK EMI/PI register snapshot against the BIC
  * base (bic_entries) by exact normalized-name match, and emits a
  * BIC8 -> IssuerType map. This extends classifyIssuer's stage-1 coverage well
  * beyond the hand-curated KNOWN_ISSUERS list.
@@ -13,14 +13,9 @@
  *   EBA PIR: POST https://euclid.eba.europa.eu/register/api/search/entities
  *            body {"$and":[{"_payload.EntityType":"PSD_EMI"}]} (and PSD_EEMI,
  *            PSD_PI, PSD_AISP); fields ENT_NAM / ENT_COU_RES.
+ *   FCA UK : CSV exports "E-Money Firms" + "Firms with PSD Permissions".
  *   Then rewrite scripts/data/eu-emi-register-YYYY-MM-DD.json as
  *   [{ name, country, type }] with type in {emi,digital_bank,payment_institution}.
- *
- * 25/09/2026 : la part britannique (exports CSV de la FCA, « E-Money Firms » et
- * « Firms with PSD Permissions ») est retirée de l'instantané du dépôt public :
- * les conditions du site de la FCA interdisent de redistribuer un flux de
- * données sans permission écrite. Ne pas la remettre ici ; l'index déjà généré
- * dans ../iban-core n'est pas régénéré par ce retrait.
  */
 import Database from 'better-sqlite3';
 import { readFileSync, writeFileSync } from 'node:fs';

@@ -7,13 +7,6 @@
  * 2. Deutsche Bundesbank BLZ file (BLZ→BIC mapping, quarterly)
  * 3. SIX Group Bank Master (Swiss BC→BIC, daily)
  *
- * Et trois sources de la famille sous conditions (src/lib/restricted-family.ts) :
- * l'annuaire SEPA de l'OeNB, l'annuaire EWIB de la NBP et la liste STEP2 d'EBA
- * CLEARING. Depuis l'étape du retrait (25/09/2026), elles ne sont lues QUE par la
- * chaîne privée (`SEED_FAMILY=restricted`, posée par `npm run overlay:seed`) ;
- * sans la variable, ce script ne lit que les trois sources publiques ci-dessus et
- * ne télécharge rien de la famille.
- *
  * Run with: npm run bic:enrich
  */
 
@@ -545,14 +538,9 @@ async function main(): Promise<void> {
   const beforeBic8 = (db.prepare('SELECT COUNT(DISTINCT bic8) as n FROM bic_entries').get() as { n: number }).n;
   console.log(`Before: ${beforeCount} entries, ${beforeBic8} unique BIC8`);
 
-  // Deux modes, jamais les deux à la fois (src/lib/restricted-family.ts,
-  // seedFamilyFromEnv) :
-  // - sans SEED_FAMILY, le robot public et toute copie d'un contributeur : les
-  //   sources publiques seules. Depuis l'étape du retrait (25/09/2026), l'OeNB,
-  //   la NBP et EBA STEP2 ne sont plus téléchargées ici : la base de ce dépôt
-  //   ne les porte plus, et un robot public ne doit jamais les y remettre ;
-  // - SEED_FAMILY=restricted, la chaîne privée de la surcouche : ces trois
-  //   sources seules.
+  // SEED_FAMILY=restricted : les seules sources de la famille « sous
+  // conditions » (src/lib/restricted-family.ts), pour la surcouche privée. Sans
+  // la variable, rien ne change : toutes les sources, dans le même ordre.
   const family = seedFamilyFromEnv();
   if (family === 'restricted') {
     const expected = [...RESTRICTED_BIC_INSERT_ORDER].sort();
@@ -561,15 +549,10 @@ async function main(): Promise<void> {
       throw new Error(`La famille déclare ${declared.join(',')} ; ce seeder importe ${expected.join(',')}. À réaligner.`);
     }
     console.log('SEED_FAMILY=restricted : OeNB, NBP et EBA Step2 seulement (surcouche privée)');
-  } else {
-    console.log(
-      'Sources publiques seulement (SwiftCodes, Bundesbank, SIX). OeNB, NBP et EBA Step2 ' +
-        'appartiennent à la famille sous conditions : chaîne privée seulement (SEED_FAMILY=restricted).',
-    );
   }
 
   // Import sources
-  if (family === 'public') {
+  if (family === 'all') {
     await importSwiftCodes(db);
     await importBundesbank(db);
     await importSixBankMaster(db);
@@ -577,7 +560,8 @@ async function main(): Promise<void> {
   // OeNB, NBP puis EBA STEP2, dans l'ordre que la reprise d'un membre en panne
   // reproduit (RESTRICTED_BIC_INSERT_ORDER). Chacune seule : une panne n'arrête
   // pas les autres. Avec SEED_REPORT_PATH (chaîne privée de la surcouche),
-  // l'issue de chacune est notée pour la reprise (scripts/seed-report.ts).
+  // l'issue de chacune est notée pour la reprise (scripts/seed-report.ts) ; sans
+  // la variable, rien de plus qu'avant.
   const familyImports: Record<
     (typeof RESTRICTED_BIC_INSERT_ORDER)[number],
     [string, (target: Database.Database) => Promise<number>]
@@ -586,16 +570,14 @@ async function main(): Promise<void> {
     nbp: ['NBP', importNBP],
     eba_step2: ['EBA Step2', importEbaStep2],
   };
-  if (family === 'restricted') {
-    for (const source of RESTRICTED_BIC_INSERT_ORDER) {
-      const [label, importSource] = familyImports[source];
-      try {
-        const processed = await importSource(db);
-        reportSeedMember({ member: source, state: 'loaded', processed });
-      } catch (err) {
-        console.warn(`  WARNING: ${label} import failed: ${(err as Error).message}`);
-        reportSeedMember({ member: source, state: 'failed', cause: failureCause(err) });
-      }
+  for (const source of RESTRICTED_BIC_INSERT_ORDER) {
+    const [label, importSource] = familyImports[source];
+    try {
+      const processed = await importSource(db);
+      reportSeedMember({ member: source, state: 'loaded', processed });
+    } catch (err) {
+      console.warn(`  WARNING: ${label} import failed: ${(err as Error).message}`);
+      reportSeedMember({ member: source, state: 'failed', cause: failureCause(err) });
     }
   }
 

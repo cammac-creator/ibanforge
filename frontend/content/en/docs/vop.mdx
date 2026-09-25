@@ -42,12 +42,10 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
     "member": true,
     "schemes": ["SCT", "SDD", "SCT_INST"],
     "vop_required": true,
-    "vop_participant": null
+    "vop_participant": true
   }
 }
 ```
-
-`vop_participant` reads `true` when the EPC register lists the resolved bank as ready and `false` when it does not list it. It is `null` when no bank resolved, or when the register was not consulted for the call, as in this example.
 
 A Swiss counterpart, by contrast, typically returns `"vop_required": false, "vop_participant": false` — Switzerland is SEPA-reachable but not under the IPR, and most Swiss institutions are not VoP scheme participants.
 

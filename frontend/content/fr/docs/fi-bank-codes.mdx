@@ -8,13 +8,11 @@ order: 11
 
 Les codes banque finlandais viennent de la liste des **codes d'établissements monétaires de Finance Finland**, et ils se comportent autrement que les registres nationaux que nous lisons en Allemagne, en Autriche ou en Belgique, pour trois raisons.
 
-D'abord, le code n'est pas une tranche fixe de l'IBAN : les codes d'établissement finlandais font **un à quatre caractères** en tête du BBAN, si bien que le contrôle lit le *plus long préfixe attribué* plutôt qu'une découpe positionnelle. Une tranche fixe de trois chiffres interrogerait un code que personne n'a reçu, et refuserait un groupe dont le code est plus court.
+D'abord, le code n'est pas une tranche fixe de l'IBAN : les codes d'établissement finlandais font **un à quatre caractères** en tête du BBAN, si bien que le contrôle lit le *plus long préfixe attribué* plutôt qu'une découpe positionnelle. Prenez une tranche fixe de trois chiffres dans `FI21 1234 5600 0007 85` et vous interrogeriez `123`, refusant au passage le plus grand groupe bancaire du pays, dont le code est simplement `1`.
 
 Ensuite, **les codes finlandais sont attribués à des groupes bancaires, pas à des établissements individuels.**
 
 Enfin, et c'est le point à intégrer dans votre conception, **la liste que nous détenons est partielle.** C'est une transcription de la publication de Finance Finland datée du 15 octobre 2025, que rien ne rafraîchit automatiquement. Depuis le 16 septembre 2026, l'API la traite donc comme une liste qui nomme des titulaires sans refuser personne : un résultat est servi, une absence n'est pas un refus.
-
-L'éditeur n'a jamais confirmé les conditions de réutilisation de la liste : depuis le 25 septembre 2026, l'API la lit dans un fichier privé, et non plus dans son dépôt public. Une réponse servie sans ce fichier dit que la liste n'a pas été consultée (`status: "unavailable"`), jamais qu'un code est refusé.
 
 ## Un appel
 
@@ -24,24 +22,24 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "FI2112345600000785"}'
 ```
 
-La réponse est abrégée ci-dessous au bloc dont traite cette page. Les valeurs propres à la liste (le code, le groupe et le mois de la liste) sont omises ici ; l'API les sert.
+La réponse est abrégée ci-dessous au bloc dont traite cette page ; la même réponse porte aussi l'objet `bic`, dont le `code` vaut ici `NDEAFIHHXXX`.
 
 ```json
 {
   "valid": true,
   "bank_code_check": {
-    "value": "…",
+    "value": "1",
     "status": "verified",
     "match": "register",
     "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
     "authoritative": false,
-    "as_of": "…",
-    "institution": { "name": "…", "street": null, "post_code": null, "town": null, "country": "FI" }
+    "as_of": "2025-10",
+    "institution": { "name": "Nordea Bank", "street": null, "post_code": null, "town": null, "country": "FI" }
   }
 }
 ```
 
-C'est **l'IBAN d'exemple officiel finlandais**. `value` est le code attribué dont parle la réponse, qui peut compter moins de trois chiffres, et `institution.name` est le groupe bancaire qui le détient.
+C'est **l'IBAN d'exemple officiel finlandais**, et il est le contre-exemple des exemples cassés : contrairement aux exemples officiels belge, suisse et autrichien, dont les codes banque ne sont [attribués à personne](/blog/2026-08-06-example-ibans-unallocated-bank-codes), l'exemple finlandais se résout proprement, parce que le code `1` est réel et appartient au groupe bancaire Nordea.
 
 ## Lisez la chaîne `register`, elle travaille
 
@@ -60,11 +58,11 @@ La raison tient à la liste elle-même : une transcription que rien ne rafraîch
 
 ## Le bloc `institution` pour la Finlande
 
-Un résultat porte un bloc `institution` avec le nom du **groupe bancaire** auquel appartient le code, sans adresse : la liste n'en publie pas, et un code de groupe n'a pas de siège unique à décrire. `authoritative: false` reste à côté, pour la raison ci-dessus.
+Un résultat porte un bloc `institution` avec le nom du **groupe bancaire** auquel appartient le code (`Nordea Bank` pour le code `1`), sans adresse : la liste n'en publie pas, et un code de groupe n'a pas de siège unique à décrire. `authoritative: false` reste à côté, pour la raison ci-dessus.
 
 ## Fraîcheur
 
-`as_of` est le mois de la liste elle-même, et non celui de notre rafraîchissement mensuel : rien ne relit automatiquement la publication de Finance Finland, et une réponse sur laquelle vous agissez doit dire l'âge de sa liste.
+`as_of` est la date de la liste elle-même, `2025-10`, et non celle de notre rafraîchissement mensuel : rien ne relit automatiquement la publication de Finance Finland, et une réponse sur laquelle vous agissez doit dire l'âge de sa liste.
 
 ## Les limites honnêtes
 

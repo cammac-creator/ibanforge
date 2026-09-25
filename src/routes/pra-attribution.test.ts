@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getPraListMonth, getPraBanksCount } from '../lib/pra-banks.js';
-import {
-  PRA_CREDIT_SURFACES,
-  praCreditMonths,
-  stalePraCredits,
-} from '../lib/restricted-data-audit.js';
 
 /**
  * The Bank of England's permission to use the "List of PRA-regulated Banks"
@@ -26,37 +22,47 @@ import {
  */
 const ROOT = join(import.meta.dirname, '..', '..');
 
-/**
- * Every static surface that must carry the credit, and must carry it dated.
- * Shared with the private quality gate (src/lib/restricted-data-audit.ts), which
- * compares them to the list the overlay actually serves.
- */
-const SURFACES = PRA_CREDIT_SURFACES;
+/** Every static surface that must carry the credit, and must carry it dated. */
+const SURFACES = [
+  'frontend/public/llms.txt',
+  'frontend/public/llms-full.txt',
+  'frontend/messages/en.json',
+  'frontend/messages/fr.json',
+  'frontend/messages/de.json',
+  'frontend/content/en/docs/data-sources.mdx',
+  'frontend/content/fr/docs/data-sources.mdx',
+  'frontend/content/de/docs/data-sources.mdx',
+];
+
+const CREDIT = /Bank of England \(List of Banks, (\d{4}-\d{2})\)/g;
 
 /**
  * Comparé à la liste que porte réellement la base servie, jamais à un jeu
  * d'essai : un mois inventé pour un test correspondrait aux surfaces par
  * construction, ou les ferait rougir pour rien.
  *
- * La liste a quitté le dépôt public à l'étape du retrait (25/09/2026). Sur la
- * base de ce dépôt, la comparaison surface par surface ci-dessous ne peut pas
- * tourner et se déclare sautée : elle est faite là où la liste est chargée, par
- * la porte de qualité privée (`npm run overlay -- check`, qui appelle
- * auditOverlayData de src/lib/restricted-data-audit.ts à chaque reconstruction
- * et annote le passage d'un avertissement par crédit en retard). Sur une base
- * qui porte la liste (une copie fusionnée), elle tourne ici comme toujours. Le
- * dernier test prouve que la comparaison mord encore, sur toute copie du dépôt.
+ * La liste quitte le dépôt public (décision du 24/09/2026). Sur une base sans
+ * elle, la comparaison surface par surface ci-dessous ne peut pas tourner et se
+ * déclare sautée ; elle appartient alors à l'endroit où la liste est chargée
+ * (le rafraîchissement privé qui l'apporte). Tant que la liste est là, elle
+ * tourne ici comme toujours. Le dernier test prouve que la comparaison mord
+ * encore, sur toute copie du dépôt.
  */
 const loaded = getPraBanksCount() > 0;
 
 /** Les mois de crédit qu'écrit une surface. */
 function creditMonths(relative: string): string[] {
-  return praCreditMonths(ROOT, relative);
+  const text = readFileSync(join(ROOT, relative), 'utf8');
+  return [...text.matchAll(CREDIT)].map((m) => m[1]!);
 }
 
 /** Chaque crédit de surface qui nomme un autre mois que `month`. */
 function staleCredits(month: string): string[] {
-  return stalePraCredits(ROOT, month);
+  return SURFACES.flatMap((relative) =>
+    creditMonths(relative)
+      .filter((m) => m !== month)
+      .map((m) => `${relative}: ${m}`),
+  );
 }
 
 describe('Bank of England attribution', () => {

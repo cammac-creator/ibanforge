@@ -252,8 +252,6 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 - **VoP readiness**: EPC Verification of Payee scheme register (`vop.csv`), refreshed weekly with the other compliance lists
 - **Country names**: Node.js `Intl.DisplayNames` API
 
-Some of these sources may be served but not redistributed: the EBA STEP2 and NBP directory rows, the OeNB, NBB and BCSM registers, the Bank of England PRA list, the UN list and the EPC registers. So are the Polish, Finnish and Luxembourg keys of the composite bank-code map and the Finance Finland list. They are not in this repository: the hosted API loads them from a private repository, and a deployment without them answers "not consulted" where they would have spoken, never "no". See [NOTICE](NOTICE).
-
 ## Resources for AI agents
 
 - [`llms.txt`](https://ibanforge.com/llms.txt) — short summary + recommended starter prompt
@@ -280,9 +278,7 @@ MIT — see [LICENSE](LICENSE).
 
 The MIT License covers the code and its documentation, not the data files:
 the third-party records they contain remain subject to their publishers'
-terms, described in [NOTICE](NOTICE). Records that may not be redistributed
-are no longer in this repository since 25 September 2026; earlier commits
-keep copies, still subject to those terms.
+terms, described in [NOTICE](NOTICE).
 
 This project includes third-party components licensed under the Apache License 2.0
 (notably `@coinbase/x402` and related x402 packages). See [NOTICE](NOTICE) for

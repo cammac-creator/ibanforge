@@ -111,8 +111,8 @@ Here is the German answer from step 2, cut where it repeats itself:
     "member": true,
     "schemes": ["SCT", "SDD", "SCT_INST"],
     "vop_required": true,
-    "vop_participant": null,
-    "basis": "country_default"
+    "vop_participant": true,
+    "basis": "epc_register"
   },
   "formatted": "DE89 3704 0044 0532 0130 00",
   "bic": {
@@ -175,7 +175,7 @@ Block by block:
 | `attribution` | on the free tier | `text`, `url`, `note`. When free-tier results are shown to people, display the credit; a result that stays in your backend owes nothing. |
 | `trial` | keyless only | See step 1. |
 
-**There is no top-level `vop` block.** Verification of Payee is read in three fields: `sepa.vop_required` (is the country under the obligation), `sepa.vop_participant` (is the resolved institution listed as ready in the EPC register, `null` when no institution resolved or when that register was not consulted for the answer, as in the example above) and `risk_indicators.vop_coverage`. The full reasoning is on the [VoP readiness](/docs/vop) page.
+**There is no top-level `vop` block.** Verification of Payee is read in three fields: `sepa.vop_required` (is the country under the obligation), `sepa.vop_participant` (is the resolved institution listed as ready in the EPC register, `null` when no institution resolved) and `risk_indicators.vop_coverage`. The full reasoning is on the [VoP readiness](/docs/vop) page.
 
 Two blocks appear only for some countries, so do not key your code on their presence:
 

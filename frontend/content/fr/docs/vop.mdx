@@ -42,12 +42,10 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
     "member": true,
     "schemes": ["SCT", "SDD", "SCT_INST"],
     "vop_required": true,
-    "vop_participant": null
+    "vop_participant": true
   }
 }
 ```
-
-`vop_participant` vaut `true` quand le registre de l'EPC liste la banque résolue comme prête et `false` quand il ne la liste pas. Il vaut `null` quand aucune banque n'est résolue, ou quand le registre n'a pas été consulté pour l'appel, comme dans cet exemple.
 
 Une contrepartie suisse renvoie au contraire typiquement `"vop_required": false, "vop_participant": false` — la Suisse est joignable en SEPA mais hors du champ de l'IPR, et la plupart des établissements suisses ne participent pas au scheme VoP.
 

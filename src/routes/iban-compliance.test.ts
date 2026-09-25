@@ -117,14 +117,11 @@ describe('POST /v1/iban/compliance', () => {
     expect(c.flags).toContain('high_risk_country');
   });
 
-  it('Revolut LT IBAN is screened under the BIC8 its IBANs resolve to, never as "not reachable"', async () => {
+  it('Revolut LT IBAN reaches SEPA (SCT + instant + VoP) via the documented BIC alias', async () => {
     // Revolut Bank UAB participates in EPC schemes under RVUALT2V while its
     // customer IBANs resolve to BIC REVOLT21 — the reflex test any fintech
-    // prospect runs. sct:false here would be factually wrong (their IBANs
-    // receive SCTs daily). The alias copies the registered BIC's EPC rows onto
-    // REVOLT21 when the registers are rebuilt (scripts/refresh-compliance.ts,
-    // EMI_BIC_ALIASES), which since the withdrawal step (25/09/2026) happens in
-    // the private chain only: this repository's database carries no EPC row.
+    // prospect runs. sct:false here is factually wrong (their IBANs receive
+    // SCTs daily).
     const { body } = await check('LT353250012345678901');
     expect(body.valid).toBe(true);
     // The curated key is written REVOLT21XXX and is now served as written; the
@@ -133,24 +130,14 @@ describe('POST /v1/iban/compliance', () => {
     expect((body.bic as { code: string; bic8: string }).code).toBe('REVOLT21XXX');
     expect((body.bic as { code: string; bic8: string }).bic8).toBe('REVOLT21');
     const c = body.compliance as {
-      reachability: { sct: boolean; sepa_instant: boolean; sdd: boolean; screened: boolean };
-      vop: { participant: boolean; screened: boolean };
+      reachability: { sct: boolean; sepa_instant: boolean; sdd: boolean };
+      vop: { participant: boolean };
       flags: string[];
     };
-    if (c.reachability.screened) {
-      // A database that carries the registers (a merged copy): the alias answers.
-      expect(c.reachability.sct).toBe(true);
-      expect(c.reachability.sepa_instant).toBe(true);
-      expect(c.reachability.sdd).toBe(true);
-      expect(c.vop.participant).toBe(true);
-    } else {
-      // The public database: not consulted, and said so, never "not reachable".
-      expect(c.vop.screened).toBe(false);
-      expect(c.flags).toEqual(
-        expect.arrayContaining(['sepa_register_unavailable', 'vop_register_unavailable']),
-      );
-      expect(c.flags).not.toContain('no_sepa_instant');
-    }
+    expect(c.reachability.sct).toBe(true);
+    expect(c.reachability.sepa_instant).toBe(true);
+    expect(c.reachability.sdd).toBe(true);
+    expect(c.vop.participant).toBe(true);
     expect(c.flags).not.toContain('no_vop');
   });
 

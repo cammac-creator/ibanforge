@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import { buildComplianceResponse } from './compliance-response.js';
+import { getComplianceDB } from './compliance-db.js';
 import { getSepaInfo, SEPA_MEMBERS_EXTRA, SEPA_MEMBERS_EXTRA_AS_OF } from './countries.js';
 
 /**
@@ -24,33 +25,37 @@ function enrich(iban: string) {
 const DE_SCT_ONLY = 'DE57100505000123456789';
 
 describe('DATA-02 — sepa.schemes at the grain the contract promises', () => {
-  // « serves the register schemes for a bank the EPC register knows » et « says
-  // the same thing on /v1/iban/validate and /v1/iban/compliance » lisaient ici
-  // le vrai registre EPC (LBS NordOst). Ce registre a quitté la base de ce dépôt
-  // à l'étape du retrait (25/09/2026) : les deux règles sont prouvées sur des
-  // inscriptions inventées dans src/lib/restricted-data-absent.test.ts (bloc
-  // « control », « serves the bank s own schemes, the same on validate and on
-  // compliance »). Ce qui reste vrai ici, sur la base publique : sans registre
-  // consulté, la validation garde le pays et le dit, et la conformité le dit
-  // aussi, sans rien affirmer de la banque.
-  it('keeps the country answer on both endpoints while the EPC register is not consulted', () => {
+  it('serves the register schemes for a bank the EPC register knows', () => {
     const result = enrich(DE_SCT_ONLY);
+
+    // Not hardcoded against a snapshot of the dataset: the assertion is that
+    // the served answer IS the register's answer for this BIC8, whatever the
+    // next monthly refresh makes of it.
+    const bic8 = result.bic!.code.slice(0, 8);
+    const rows = getComplianceDB()
+      .prepare('SELECT scheme FROM sepa_participants WHERE bic8 = ?')
+      .all(bic8) as Array<{ scheme: string }>;
+    const registered = new Set(rows.map((r) => r.scheme));
+    expect(
+      registered.size,
+      `${bic8} must be in the EPC register for this test to mean anything`,
+    ).toBeGreaterThan(0);
+
+    expect(result.sepa!.basis).toBe('epc_register');
+    expect(new Set(result.sepa!.schemes)).toEqual(registered);
+  });
+
+  it('says the same thing on /v1/iban/validate and /v1/iban/compliance', () => {
+    // The finding itself: validate announced "SDD available" where compliance,
+    // reading the register beside it, answered `sdd: false`. One IBAN, one
+    // answer, whichever endpoint is asked.
     const response = buildComplianceResponse(DE_SCT_ONLY);
-    if (response.compliance.reachability.screened) {
-      // Une base qui porte le registre (une copie fusionnée) : la règle d'origine.
-      const schemes = new Set(response.sepa!.schemes);
-      const reach = response.compliance.reachability;
-      expect(schemes.has('SCT')).toBe(reach.sct);
-      expect(schemes.has('SDD')).toBe(reach.sdd);
-      expect(schemes.has('SCT_INST')).toBe(reach.sepa_instant);
-      return;
-    }
-    expect(result.sepa!.basis).toBe('country_default');
-    expect(result.sepa!.vop_participant).toBeNull();
-    expect(response.compliance.reachability.listed_in_epc_registers).toBeNull();
-    expect(response.compliance.flags).toEqual(
-      expect.arrayContaining(['sepa_register_unavailable', 'vop_register_unavailable']),
-    );
+    const schemes = new Set(response.sepa!.schemes);
+    const reach = response.compliance.reachability;
+
+    expect(schemes.has('SCT')).toBe(reach.sct);
+    expect(schemes.has('SDD')).toBe(reach.sdd);
+    expect(schemes.has('SCT_INST')).toBe(reach.sepa_instant);
   });
 
   it('keeps the country answer, and says so, when no institution was resolved', () => {
@@ -113,14 +118,30 @@ describe('DATA-03 — the five SEPA members the frozen library set misses', () =
     expect(getSepaInfo('BR')).toEqual({ member: false, schemes: [], vop_required: false });
   });
 
-  // « keeps the hardcoded schemes equal to the register they were read from »
-  // comparait la table ci-dessus au vrai registre EPC. Ce registre ne vit plus
-  // que dans la surcouche privée (étape du retrait, 25/09/2026) : la comparaison
-  // est faite à chaque reconstruction de la surcouche de conformité par la porte
-  // privée (`npm run overlay -- check`, auditOverlayData dans
-  // src/lib/restricted-data-audit.ts), un avertissement par pays qui dérive.
-  it('hands the comparison with the register to the private gate', () => {
-    expect(SEPA_MEMBERS_EXTRA_AS_OF).toMatch(/^\d{4}-\d{2}$/);
-    expect(Object.keys(SEPA_MEMBERS_EXTRA).sort()).toEqual(['AL', 'MD', 'ME', 'MK', 'RS']);
+  it('keeps the hardcoded schemes equal to the register they were read from', () => {
+    // The table in countries.ts cannot query the database (it is the offline
+    // country table every route imports), so this is what stops it from rotting
+    // in silence: the next register refresh that adds SDD to a Serbian bank
+    // fails here instead of ageing unnoticed.
+    const rows = getComplianceDB()
+      .prepare(
+        `SELECT substr(bic8, 5, 2) AS cc, scheme FROM sepa_participants
+         WHERE substr(bic8, 5, 2) IN ('AL', 'MD', 'ME', 'MK', 'RS') GROUP BY cc, scheme`,
+      )
+      .all() as Array<{ cc: string; scheme: string }>;
+
+    const fromRegister = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!fromRegister.has(row.cc)) fromRegister.set(row.cc, new Set());
+      fromRegister.get(row.cc)!.add(row.scheme);
+    }
+
+    for (const [cc, schemes] of Object.entries(SEPA_MEMBERS_EXTRA)) {
+      expect(
+        new Set(schemes),
+        `${cc} in SEPA_MEMBERS_EXTRA (as of ${SEPA_MEMBERS_EXTRA_AS_OF})`,
+      ).toEqual(fromRegister.get(cc));
+    }
+    expect([...fromRegister.keys()].sort()).toEqual(Object.keys(SEPA_MEMBERS_EXTRA).sort());
   });
 });
