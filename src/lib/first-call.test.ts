@@ -152,6 +152,19 @@ describe('outgoing message bodies carry no em or en dash', () => {
       plan: 'pro',
     }),
     buildProKeyEmail: emailModule.buildProKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 10_000 }),
+    // L'abonnement sur la même clé (lot B2, 25.09.2026) : posé, puis terminé.
+    buildSubscriptionAttachedEmail: emailModule.buildSubscriptionAttachedEmail({
+      keyPrefix: FAKE_PREFIX,
+      plan: 'pro',
+      monthlyLimit: 10_000,
+    }),
+    buildSubscriptionEndedEmail: emailModule.buildSubscriptionEndedEmail({
+      keyPrefix: FAKE_PREFIX,
+      plan: 'pro',
+      allowance: 0,
+      creditsRemaining: null,
+      topupRef: `ifr_${'0'.repeat(32)}`,
+    }),
     buildKeyVerificationEmail: emailModule.buildKeyVerificationEmail({ code: '123456' }),
     // Le code de connexion à la page du compte (lot C1, 24.09.2026).
     buildAccountCodeEmail: emailModule.buildAccountCodeEmail({ code: '123456', ttlMinutes: 15 }),

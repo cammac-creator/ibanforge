@@ -473,6 +473,8 @@ type KeyRow = ApiKeyValidationRow & {
   key_prefix: string;
   created_at: string | null;
   stripe_subscription_id: string | null;
+  /** La fin de l'abonnement (lot B2) : la clé reste active et garde l'identifiant. */
+  subscription_ended_at?: string | null;
   claimed_at?: string | null;
   claim_method?: string | null;
 };
@@ -493,13 +495,16 @@ function planOf(row: KeyRow): AccountPlan {
   const hasCredits = row.credits_remaining !== null;
   // Une clé à crédits sans allocation propre est un pack, et seulement cela.
   if (hasCredits && allowance <= 0) return 'pack';
-  const base: AllowancePlan = row.stripe_subscription_id
-    ? allowance >= OEM_MONTHLY_LIMIT
-      ? 'editor'
-      : 'pro'
-    : allowance <= FREE_TIER_MONTHLY_LIMIT
-      ? 'free'
-      : 'custom';
+  // Un abonnement VIVANT (lot B2) : une clé dont l'abonnement est terminé garde
+  // l'identifiant mais a retrouvé son allocation d'avant.
+  const base: AllowancePlan =
+    row.stripe_subscription_id && !row.subscription_ended_at
+      ? allowance >= OEM_MONTHLY_LIMIT
+        ? 'editor'
+        : 'pro'
+      : allowance <= FREE_TIER_MONTHLY_LIMIT
+        ? 'free'
+        : 'custom';
   return hasCredits ? `${base}+pack` : base;
 }
 
@@ -554,7 +559,8 @@ export function buildOverview(
 
   const rows = db
     .prepare(
-      `SELECT key_hash, key_prefix, created_at, stripe_subscription_id, claimed_at, claim_method,
+      `SELECT key_hash, key_prefix, created_at, stripe_subscription_id, subscription_ended_at,
+              claimed_at, claim_method,
               ${API_KEY_VALIDATION_COLUMNS},
               (SELECT r.created_at FROM request_log r
                 WHERE r.key_prefix = api_keys.key_prefix

@@ -1019,10 +1019,14 @@ apiKeys.post('/v1/keys/revoke', (c) => {
   // crédits restants sont perdus avec la clé, et un abonnement qui y est
   // attaché continue d'être facturé par Stripe. `/rotate` garde les deux.
   const before = validateApiKey(key);
+  // Un abonnement VIVANT seulement (lot B2) : une clé dont l'abonnement est
+  // terminé garde son identifiant, mais plus rien n'est facturé.
   const subscription = before.valid
     ? (
         getStatsDB()
-          .prepare('SELECT stripe_subscription_id FROM api_keys WHERE key_hash = ?')
+          .prepare(
+            'SELECT stripe_subscription_id FROM api_keys WHERE key_hash = ? AND subscription_ended_at IS NULL',
+          )
           .get(before.keyHash) as { stripe_subscription_id: string | null } | undefined
       )?.stripe_subscription_id
     : null;

@@ -4,6 +4,7 @@ import {
   PRO_PAYMENT_LINK,
   PRO_PORTAL_URL,
   PRO_PRICE_USD,
+  proLink,
   topupLinks,
   type PackSlug,
 } from './payment-links.js';
@@ -715,6 +716,18 @@ export async function deliverAccountCodeEmail(p: {
  */
 export type SubscriptionEmailPlan = 'oem' | 'pro';
 
+/**
+ * La résiliation d'un abonnement, dans les mots des conditions générales 1.9
+ * (§3, phrase Q11 décidée par Claude-Alain le 24.09.2026, mot pour mot). Un mail
+ * ne promet rien de plus que les conditions : depuis le lot B2, une résiliation
+ * ne désactive plus la clé.
+ */
+export const PRO_CANCELLATION_SENTENCE =
+  'Cancelling stops the next renewal. The key is not deactivated: at the end of the month already paid it ' +
+  'returns to what it had before the subscription (its free allowance if it had one, and any credits left ' +
+  'on it); a key created by the subscription itself then needs a new payment, which it can receive without ' +
+  'being replaced.';
+
 const SUBSCRIPTION_EMAIL_COPY: Record<
   SubscriptionEmailPlan,
   { name: string; support: string; footer: string; legalLinks: boolean }
@@ -730,7 +743,7 @@ const SUBSCRIPTION_EMAIL_COPY: Record<
   // the first question a subscriber asks.
   pro: {
     name: 'Pro',
-    support: `Your card, your invoices and your cancellation are in your hands in the customer portal: ${PRO_PORTAL_URL} (sign in with the e-mail used at checkout). Cancelling stops the next renewal; the key keeps working until the end of the paid month. Questions or a plan change: support@ibanforge.com (mention Pro).`,
+    support: `Your card, your invoices and your cancellation are in your hands in the customer portal: ${PRO_PORTAL_URL} (sign in with the e-mail used at checkout). ${PRO_CANCELLATION_SENTENCE} Questions or a plan change: support@ibanforge.com (mention Pro).`,
     footer: 'IBAN and bank data API',
     legalLinks: false,
   },
@@ -835,6 +848,153 @@ export async function sendOemKeyEmail(p: {
   monthlyLimit: number;
 }): Promise<boolean> {
   return sendSubscriptionKeyEmail({ ...p, plan: 'oem' });
+}
+
+// ---------------------------------------------------------------------------
+// L'abonnement sur la même clé (chantier « clé unique », lot B2, 25.09.2026)
+// ---------------------------------------------------------------------------
+
+/** Le début de la phrase Q11 : ce qu'une résiliation fait à une clé qui existait avant. */
+const ATTACHED_CANCELLATION =
+  'Cancelling stops the next renewal. The key is not deactivated: at the end of the month already paid it ' +
+  'returns to what it had before the subscription (its free allowance if it had one, and any credits left on it).';
+
+export interface SubscriptionAttachedEmailInput {
+  keyPrefix: string;
+  plan: SubscriptionEmailPlan;
+  monthlyLimit: number;
+}
+
+/**
+ * Le mail d'un abonnement posé sur une clé EXISTANTE : aucune clé brute, le
+ * porteur l'a déjà, et rien ne change dans son intégration. Court et factuel :
+ * la formule, l'ordre de facturation (l'allocation d'abord, puis les crédits
+ * éventuels), le compte, le portail, et ce qu'une résiliation fait à la clé.
+ */
+export function buildSubscriptionAttachedEmail(p: SubscriptionAttachedEmailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const name = SUBSCRIPTION_EMAIL_COPY[p.plan].name;
+  const limit = p.monthlyLimit.toLocaleString('en-US');
+  const text =
+    `${name} is active on key ${p.keyPrefix}: ${limit} requests a month, resets on the 1st.\n` +
+    `Nothing to change in your integration: keep calling with the same key. Each call uses this ` +
+    `allowance first, then any prepaid credits left on the key.\n\n` +
+    `Your account (usage, subscription): ${ACCOUNT_PAGE}\n${ACCOUNT_SIGN_IN}\n` +
+    `Your card, your invoices and your cancellation: ${PRO_PORTAL_URL} (sign in with the e-mail used at checkout).\n` +
+    `${ATTACHED_CANCELLATION}\n\n` +
+    `Terms: https://ibanforge.com/en/legal/terms\n\nIBANforge`;
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${name} is active on key ${p.keyPrefix}</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px"><b style="color:#fafafa">${limit} requests a month</b>, resets on the 1st.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Nothing to change in your integration: keep calling with the same key. Each call uses this allowance first, then any prepaid credits left on the key.</p>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your account: usage, subscription &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${PRO_PORTAL_URL}" style="color:#fbbf24;text-decoration:none">Your card, invoices and cancellation &rarr;</a> <span style="color:#71717a">Sign in with the e-mail used at checkout.</span></p>
+    <p style="color:#71717a;font-size:13px;margin:14px 0 0">${ATTACHED_CANCELLATION}</p>
+    <p style="font-size:14px;margin:14px 0 0"><a href="https://ibanforge.com/en/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+  </div></body></html>`;
+  return { subject: `IBANforge ${name} active on key ${p.keyPrefix}`, text, html };
+}
+
+export async function sendSubscriptionAttachedEmail(
+  p: SubscriptionAttachedEmailInput & { to: string },
+): Promise<boolean> {
+  const { subject, text, html } = buildSubscriptionAttachedEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) reportUndelivered('subscription attached', p.to, false);
+  return ok;
+}
+
+export interface SubscriptionEndedEmailInput {
+  keyPrefix: string;
+  plan: SubscriptionEmailPlan;
+  /** L'allocation que la clé a retrouvée : 0 pour une clé née de l'abonnement. */
+  allowance: number;
+  /** Vrai quand cette allocation se compte sur la vie de la clé, pas au mois. */
+  lifetime?: boolean;
+  creditsRemaining: number | null;
+  /** La référence de recharge de la clé : les liens rechargent ou réabonnent CETTE clé. */
+  topupRef: string | null;
+}
+
+/**
+ * Le mail de fin d'abonnement (Q14 : court et factuel). La clé reste active :
+ * il dit ce qu'elle a désormais (son allocation d'avant, ses crédits), et, pour
+ * une clé qui n'a plus rien, que ses appels répondent 402 jusqu'à un nouveau
+ * paiement, avec les liens qui la rechargent ou la réabonnent SANS la remplacer.
+ */
+export function buildSubscriptionEndedEmail(p: SubscriptionEndedEmailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const name = SUBSCRIPTION_EMAIL_COPY[p.plan].name;
+  const credits =
+    typeof p.creditsRemaining === 'number' && p.creditsRemaining > 0
+      ? p.creditsRemaining.toLocaleString('en-US')
+      : null;
+  const allowance =
+    p.allowance > 0
+      ? `${p.allowance.toLocaleString('en-US')} requests ${p.lifetime ? 'counted over the whole life of the key' : 'a month'}`
+      : null;
+  const now = allowance
+    ? `It has its own allowance back: ${allowance}${credits ? `, then the ${credits} prepaid credits left on it` : ''}.`
+    : credits
+      ? `It draws on the ${credits} prepaid credits left on it. When they run out, calls answer HTTP 402 (payment required) until the key receives a new payment.`
+      : 'It has no allowance left: calls answer HTTP 402 (payment required) until the key receives a new payment.';
+  const links = packLinks(p.topupRef);
+  const pro = p.topupRef ? proLink(p.topupRef) : PRO_PAYMENT_LINK;
+  const sameKey = p.topupRef
+    ? 'These links pay for this same key: nothing to change in your integration.'
+    : 'For now these links deliver a new key: put it in place of this one in your integration.';
+  const text =
+    `The ${name} subscription on key ${p.keyPrefix} has ended. The key stays active.\n` +
+    `${now}\n\n` +
+    `To keep it running, by card:\n` +
+    `  1,000 credits  $4   ${links['1k']}\n` +
+    `  5,000 credits  $20  ${links['5k']}\n` +
+    ` 25,000 credits  $80  ${links['25k']}\n` +
+    `  Pro, $${PRO_PRICE_USD}/month  ${pro}\n` +
+    `${sameKey}\n\n` +
+    `Your account (usage, balance): ${ACCOUNT_PAGE}\n${ACCOUNT_SIGN_IN}\n\nIBANforge`;
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${name} ended on key ${p.keyPrefix}</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px">The key stays active.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">${now}</p>
+    <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 12px">
+      <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">To keep it running, by card</div>
+      <p style="margin:0 0 8px"><a href="${links['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
+      <p style="margin:0"><a href="${pro}" style="color:#fbbf24;text-decoration:none">Pro · $${PRO_PRICE_USD}/month →</a></p>
+    </div>
+    <p style="color:#71717a;font-size:13px;margin:0 0 18px">${sameKey}</p>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your account: usage, balance &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+  </div></body></html>`;
+  return {
+    subject: `IBANforge ${name} ended on key ${p.keyPrefix}: the key stays active`,
+    text,
+    html,
+  };
+}
+
+export async function sendSubscriptionEndedEmail(
+  p: SubscriptionEndedEmailInput & { to: string },
+): Promise<boolean> {
+  const { subject, text, html } = buildSubscriptionEndedEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) reportUndelivered('subscription ended', p.to, false);
+  return ok;
 }
 
 // ---------------------------------------------------------------------------

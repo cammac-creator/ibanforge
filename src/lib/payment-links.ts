@@ -95,6 +95,18 @@ export function topupLinks(ref: string): Record<PackSlug, string> {
 }
 
 /**
+ * Le lien Pro porteur de la référence de recharge d'une clé (lot B2,
+ * 25.09.2026) : l'abonnement se pose sur CETTE clé au lieu d'en frapper une
+ * neuve. Même règle que `topupLink` : une référence mal formée n'est jamais
+ * recopiée, le lien public est rendu tel quel. À ne proposer qu'à une clé qui
+ * n'a pas d'abonnement vivant : le webhook refuse d'en poser un second (ZG10).
+ */
+export function proLink(ref: string): string {
+  if (!TOPUP_REF_PATTERN.test(ref)) return PRO_PAYMENT_LINK;
+  return `${PRO_PAYMENT_LINK}?client_reference_id=${ref}`;
+}
+
+/**
  * La même offre que CARD_CHECKOUT_HINT, pour une clé VALIDE : les packs y
  * rechargent cette clé-ci, rien ne change dans l'intégration du porteur.
  *

@@ -198,6 +198,15 @@ function loadCreations(): CreationRow[] {
           AND k.issued_by_us = 0
           AND k.credits_remaining IS NULL
           AND k.credits_total IS NULL
+          -- Lot B2 (25.09.2026) : un abonnement se pose désormais sur une clé
+          -- existante, qui garde son palier « email ». Une clé qui porte un
+          -- abonnement, ou dont la lignée a payé, ne se regroupe jamais : le
+          -- regroupement la relabelliserait et lui poserait no_recredit.
+          AND k.stripe_subscription_id IS NULL
+          AND NOT EXISTS (
+                SELECT 1 FROM key_purchases kp
+                 WHERE kp.lineage_hash = COALESCE(k.lineage_hash, k.key_hash)
+                   AND kp.outcome <> 'failed')
           AND k.email NOT LIKE '%@cohorte.invalid'`,
     )
     .all(`-${LOOKBACK_HOURS} hours`)

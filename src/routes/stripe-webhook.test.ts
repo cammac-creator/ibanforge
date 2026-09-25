@@ -201,7 +201,10 @@ describe('processStripeEvent — Editor/OEM subscription', () => {
     expect(second.notify).toBeUndefined(); // no duplicate owner alert / email
   });
 
-  it('deactivates the key when the subscription is canceled', () => {
+  // Lot B2 (25.09.2026, décision de Claude-Alain du 24.09) : une résiliation ne
+  // désactive plus la clé. Née de l'abonnement, elle repasse à 0 et répond 402
+  // avec les liens qui la rechargent ou la réabonnent (règle A).
+  it('ends the subscription on the key without deactivating it', () => {
     const run = Date.now();
     const sessionId = `cs_test_oem_churn_${run}`;
     const subscriptionId = `sub_test_churn_${run}`;
@@ -213,8 +216,13 @@ describe('processStripeEvent — Editor/OEM subscription', () => {
       mockSubscriptionDeleted({ id: `evt_churn_${run}`, subscriptionId }),
     );
     expect(churn.status).toBe(200);
-    expect(churn.body.key_deactivated).toMatch(/^ifk_/);
-    expect(validateApiKey(delivered!.api_key).valid).toBe(false);
+    expect(churn.body.key_deactivated).toBe(false);
+    expect(churn.body.outcome).toBe('ended');
+    expect(churn.body.key_prefix).toMatch(/^ifk_/);
+    expect(churn.body.allowance_restored_to).toBe(0);
+    const v = validateApiKey(delivered!.api_key);
+    expect(v.valid).toBe(true);
+    expect(v.monthlyLimit).toBe(0);
   });
 
   it('answers 200 gracefully for an unknown canceled subscription', () => {
@@ -254,7 +262,7 @@ describe('processStripeEvent — Pro subscription (public monthly tier)', () => 
     expect(v.monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
   });
 
-  it('the Pro key dies with its subscription, like the OEM one', () => {
+  it('the Pro key outlives its subscription, like the OEM one (lot B2)', () => {
     const run = Date.now();
     const sessionId = `cs_test_pro_churn_${run}`;
     const subscriptionId = `sub_test_pro_churn_${run}`;
@@ -264,8 +272,9 @@ describe('processStripeEvent — Pro subscription (public monthly tier)', () => 
     const churn = processStripeEvent(
       mockSubscriptionDeleted({ id: `evt_pro_churn_${run}`, subscriptionId }),
     );
-    expect(churn.body.key_deactivated).toMatch(/^ifk_/);
-    expect(validateApiKey(delivered!.api_key).valid).toBe(false);
+    expect(churn.body.key_deactivated).toBe(false);
+    expect(churn.body.outcome).toBe('ended');
+    expect(validateApiKey(delivered!.api_key)).toMatchObject({ valid: true, monthlyLimit: 0 });
   });
 
   it('does not mint twice for the same pro session', () => {
@@ -280,7 +289,7 @@ describe('processStripeEvent — Pro subscription (public monthly tier)', () => 
 
 describe('résiliation après rotation d’une clé abonnée', () => {
   it.each(['oem', 'pro'] as const)(
-    'révoque la dernière clé %s après deux rotations et reste idempotent',
+    'termine l’abonnement de la dernière clé %s après deux rotations, sans la désactiver, et reste idempotent',
     (plan) => {
       const run = Date.now();
       const sessionId = `cs_test_${plan}_rotation_${run}`;
@@ -305,11 +314,16 @@ describe('résiliation après rotation d’une clé abonnée', () => {
         subscriptionId,
       });
       const canceled = processStripeEvent(cancellation);
-      expect(canceled.body.key_deactivated).toBe(last.key_prefix);
-      expect(validateApiKey(last.api_key).valid).toBe(false);
-      expect(rotateApiKey(last.api_key)).toBeNull();
+      // Lot B2 : la dernière clé est retrouvée par sa lignée, reste active et
+      // repasse à 0 (née de l'abonnement) ; les copies tournées restent mortes.
+      expect(canceled.body.outcome).toBe('ended');
+      expect(canceled.body.key_prefix).toBe(last.key_prefix);
+      expect(canceled.body.key_deactivated).toBe(false);
+      expect(validateApiKey(last.api_key)).toMatchObject({ valid: true, monthlyLimit: 0 });
+      expect(validateApiKey(first.api_key).valid).toBe(false);
 
-      // Une répétition de la résiliation ou du paiement ne réactive aucune clé.
+      // Une répétition de la résiliation ou du paiement ne rend pas le Pro et
+      // ne frappe aucune clé.
       const countAfterCancellation = keyCount();
       expect(processStripeEvent(cancellation).body.idempotent).toBe(true);
       const replayedCheckout = processStripeEvent(
@@ -317,7 +331,7 @@ describe('résiliation après rotation d’une clé abonnée', () => {
       );
       expect(replayedCheckout.notify).toBeUndefined();
       expect(keyCount()).toBe(countAfterCancellation);
-      expect(validateApiKey(last.api_key).valid).toBe(false);
+      expect(validateApiKey(last.api_key)).toMatchObject({ valid: true, monthlyLimit: 0 });
     },
   );
 });
@@ -721,7 +735,7 @@ describe('out-of-order delivery — the tombstone', () => {
     expect(keyCount()).toBe(before);
   });
 
-  it('still mints and deactivates normally when the order is normal', () => {
+  it('still mints and ends normally when the order is normal', () => {
     const run = Date.now();
     const subId = `sub_test_ordered_${run}`;
     const minted = processStripeEvent(
@@ -736,7 +750,10 @@ describe('out-of-order delivery — the tombstone', () => {
     const deleted = processStripeEvent(
       mockSubscriptionDeleted({ id: `evt_del_ord_${run}`, subscriptionId: subId }),
     );
-    expect(deleted.body.key_deactivated).toBe(minted.body.key_prefix);
+    // Lot B2 : la fin est posée sur la clé, qui reste active.
+    expect(deleted.body.outcome).toBe('ended');
+    expect(deleted.body.key_prefix).toBe(minted.body.key_prefix);
+    expect(deleted.body.key_deactivated).toBe(false);
   });
 });
 

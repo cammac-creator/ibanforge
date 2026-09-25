@@ -33,12 +33,7 @@ import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
 import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
-import {
-  generateOemKey,
-  deactivateBySubscription,
-  OEM_MONTHLY_LIMIT,
-  PRO_MONTHLY_LIMIT,
-} from '../lib/api-keys.js';
+import { OEM_MONTHLY_LIMIT, PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
@@ -46,7 +41,9 @@ import { recordSubscriptionInvoice, stripeId } from '../lib/subscription-payment
 import { notifyOps, opsFail } from '../lib/ops-alert.js';
 import {
   applyCardPackPaymentInTx,
-  recordSubscriptionMintInTx,
+  applyCardSubscriptionPaymentInTx,
+  endSubscriptionInTx,
+  ensureTopupRef,
   reverseCardPurchaseInTx,
   type CardReversal,
   type ReversalReason,
@@ -55,6 +52,8 @@ import { isReachableContact } from '../lib/quota-notice.js';
 import {
   sendApiKeyEmail,
   sendSubscriptionKeyEmail,
+  sendSubscriptionAttachedEmail,
+  sendSubscriptionEndedEmail,
   sendRechargeEmail,
   alertKeyDeliveryFailure,
   sendAuditReadyEmail,
@@ -81,8 +80,10 @@ export const STRIPE_OEM_PLAN = { monthly_limit: OEM_MONTHLY_LIMIT, price_usd: 14
 
 // Pro subscription (2026-09-02): the PUBLIC monthly tier, sold through a public
 // Payment Link on the pricing page (metadata.plan = 'pro'). Minted through the
-// same path as OEM: a monthly allowance that resets on the 1st, a key that
-// dies with its subscription. No SLA, no embedding rights.
+// same path as OEM: a monthly allowance that resets on the 1st. No SLA, no
+// embedding rights. Depuis le lot B2 (25.09.2026), le lien porteur de la
+// référence de recharge d'une clé pose l'abonnement sur CETTE clé, et la fin de
+// l'abonnement ne désactive plus rien : la clé retrouve ce qu'elle avait avant.
 export const STRIPE_PRO_PLAN = { monthly_limit: PRO_MONTHLY_LIMIT, price_usd: PRO_PRICE_USD };
 
 export type SubscriptionPlan = 'oem' | 'pro';
@@ -233,6 +234,50 @@ export interface StripeRechargeNotify {
   balance: number;
   bundle: string;
   amountUsd: number;
+}
+
+/**
+ * Un abonnement posé sur une clé existante, ou terminé (lot B2) : à annoncer
+ * hors de la transaction, seulement sur une VRAIE transition, jamais sur un
+ * rejeu. `to` : l'adresse joignable de la clé, sinon celle du payeur (contact de
+ * service, jamais l'identité de la clé).
+ */
+export type StripeSubscriptionNotify =
+  | {
+      kind: 'attached';
+      to: string | null;
+      keyPrefix: string;
+      plan: SubscriptionPlan;
+      monthlyLimit: number;
+      amountUsd: number;
+    }
+  | {
+      kind: 'ended';
+      to: string | null;
+      keyPrefix: string;
+      plan: SubscriptionPlan;
+      /** L'allocation que la clé a retrouvée : 0 pour une clé née de l'abonnement. */
+      allowance: number;
+      /** Vrai quand cette allocation se compte sur la vie de la clé. */
+      lifetime: boolean;
+      creditsRemaining: number | null;
+      /** La référence de recharge de la clé, pour les liens du mail. */
+      topupRef: string | null;
+    };
+
+/** La formule d'une ligne d'abonnement du registre ; Pro par défaut. */
+function planOfBundle(bundle: string | null | undefined): SubscriptionPlan {
+  return bundle === 'oem' ? 'oem' : 'pro';
+}
+
+/** Le contact de service d'une clé : son adresse joignable, sinon celle du payeur. */
+function serviceContactOf(keyHash: string, payerEmail: string | null): string | null {
+  const keyEmail = (
+    getStatsDB().prepare('SELECT email FROM api_keys WHERE key_hash = ?').get(keyHash) as
+      { email: string } | undefined
+  )?.email;
+  if (isReachableContact(keyEmail)) return keyEmail;
+  return isReachableContact(payerEmail) ? payerEmail : null;
 }
 
 /** Ce que le montant d'une session dit en dollars, ou le prix du pack à défaut. */
@@ -397,6 +442,7 @@ export function processStripeEvent(event: Stripe.Event): {
   body: Record<string, unknown>;
   notify?: StripePurchaseNotify;
   recharge?: StripeRechargeNotify;
+  subscription?: StripeSubscriptionNotify;
   /** Une alerte à lancer hors de la transaction ; sans adresse ni référence. */
   alert?: { key: string; detail: string };
 } {
@@ -409,31 +455,55 @@ export function processStripeEvent(event: Stripe.Event): {
     return { status: 200, body: { received: true, idempotent: true, event_id: event.id } };
   }
 
-  // Subscription churn: the Editor/OEM key dies with its subscription. A live
-  // key surviving a canceled subscription would be silent free service.
+  // La fin d'un abonnement (lot B2, 25.09.2026, décision du 24.09 : une
+  // résiliation ne désactive plus la clé). La clé retrouve ce qu'elle avait
+  // avant l'abonnement (0 pour une clé née de lui : elle répond alors 402 avec
+  // ses liens, règle A), garde ses crédits et son identifiant, reste active.
+  //
+  // 🚨 La pierre tombale est posée à CHAQUE fin, dans la même transaction que
+  // processed_webhooks : Stripe ne garantit aucun ordre, et une résiliation
+  // arrivée avant le checkout.session.completed qui frappe ou rattache la clé
+  // doit faire refuser ce dernier. Sans elle, la clé garderait un Pro que
+  // personne ne paie, et la barrière d'idempotence mangerait le rejeu.
   if (event.type === 'customer.subscription.deleted') {
     const sub = event.data.object as Stripe.Subscription;
-    const deactivatedPrefix = deactivateBySubscription(sub.id);
-    if (!deactivatedPrefix) {
-      // Nothing to deactivate YET. Stripe guarantees no delivery order, so
-      // this cancellation can land BEFORE the checkout.session.completed
-      // that mints the key — and the idempotency barrier would eat Stripe's
-      // replay of this event, leaving that key immortal. The tombstone makes
-      // the order irrelevant: a later mint against this subscription refuses.
-      db.prepare('INSERT OR IGNORE INTO dead_subscriptions (subscription_id) VALUES (?)').run(
-        sub.id,
-      );
-    }
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
-      event.id,
-      event.type,
-    );
+    const ended = db
+      .transaction(() => {
+        const out = endSubscriptionInTx(db, sub.id);
+        db.prepare(
+          'INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
+        ).run(event.id, event.type);
+        return out;
+      })
+      .immediate();
+    const body: Record<string, unknown> = {
+      received: true,
+      event_id: event.id,
+      subscription: sub.id,
+      outcome: ended.status,
+      key_deactivated: false,
+      ...(ended.status === 'ended'
+        ? { key_prefix: ended.keyPrefix, allowance_restored_to: ended.allowanceRestoredTo }
+        : ended.status === 'already_ended' || ended.status === 'moved_on'
+          ? { key_prefix: ended.keyPrefix }
+          : {}),
+    };
+    if (ended.status !== 'ended') return { status: 200, body };
+    const key = db
+      .prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?')
+      .get(ended.keyHash) as { credits_remaining: number | null } | undefined;
     return {
       status: 200,
-      body: {
-        received: true,
-        subscription: sub.id,
-        key_deactivated: deactivatedPrefix ?? false,
+      body,
+      subscription: {
+        kind: 'ended',
+        to: serviceContactOf(ended.keyHash, ended.purchase?.payer_email ?? null),
+        keyPrefix: ended.keyPrefix,
+        plan: planOfBundle(ended.purchase?.bundle),
+        allowance: ended.allowanceRestoredTo,
+        lifetime: ended.lifetime,
+        creditsRemaining: key?.credits_remaining ?? null,
+        topupRef: ensureTopupRef(ended.keyHash),
       },
     };
   }
@@ -634,42 +704,107 @@ export function processStripeEvent(event: Stripe.Event): {
         },
       };
     }
-    // Une transaction pour la frappe, le montant, la ligne du registre des
-    // achats (lot B1 : le registre distingue un premier paiement d'abonnement
-    // d'une recharge de pack) et l'évènement traité.
-    const { mint, paid } = db
+    const clientReferenceId =
+      typeof session.client_reference_id === 'string' ? session.client_reference_id : null;
+    // Une transaction pour le rattachement ou la frappe, le montant, la ligne du
+    // registre et l'évènement traité (lot B2 : le lien Pro porteur de la
+    // référence de recharge d'une clé pose l'abonnement sur CETTE clé).
+    const { outcome, paid } = db
       .transaction(() => {
-        const minted = generateOemKey(email, planConfig.monthly_limit, session.id, subscriptionId);
-        // After the mint: the row must exist for the amount to land on it.
-        const amount = recordAmountPaid(session);
-        recordSubscriptionMintInTx(db, {
+        const out = applyCardSubscriptionPaymentInTx(db, {
           sessionId: session.id,
           plan,
+          monthlyLimit: planConfig.monthly_limit,
           subscriptionId,
           amountMinor: session.amount_total ?? null,
           currency: session.currency ?? null,
           paymentIntent: stripeId(session.payment_intent),
           payerEmail: email,
+          clientReferenceId,
         });
+        // Le montant sur la clé que CETTE session a frappée (premier écrit
+        // gagnant). Un rattachement ne l'écrit jamais sur la clé : elle garde
+        // « l'achat qui l'a frappée », et le premier paiement de l'abonnement
+        // vit au registre.
+        const amount = out.kind === 'minted' ? recordAmountPaid(session) : null;
         db.prepare(
           'INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
         ).run(event.id, event.type);
-        return { mint: minted, paid: amount };
+        return { outcome: out, paid: amount };
       })
       .immediate();
+    const amountUsd = amountUsdOf(session, planConfig.price_usd);
+    const amountFields =
+      session.amount_total != null && session.currency != null
+        ? { amount_paid_minor: session.amount_total, amount_paid_currency: session.currency }
+        : null;
 
-    const notify: StripePurchaseNotify | undefined = mint.api_key
+    if (outcome.kind === 'idempotent') {
+      return {
+        status: 200,
+        body: {
+          received: true,
+          idempotent: true,
+          event_id: event.id,
+          plan,
+          key_prefix: outcome.purchase.key_prefix,
+          ...(amountFields ?? {}),
+        },
+      };
+    }
+
+    if (outcome.kind === 'attached') {
+      return {
+        status: 200,
+        body: {
+          received: true,
+          event_id: event.id,
+          plan,
+          monthly_limit: outcome.monthlyLimit,
+          attached: { key_prefix: outcome.keyPrefix, outcome: 'attached' },
+          ...(amountFields ?? {}),
+        },
+        subscription: {
+          kind: 'attached',
+          to: serviceContactOf(outcome.keyHash, email),
+          keyPrefix: outcome.keyPrefix,
+          plan,
+          monthlyLimit: outcome.monthlyLimit,
+          amountUsd,
+        },
+      };
+    }
+
+    const notify: StripePurchaseNotify | undefined = outcome.rawKey
       ? {
           email,
           bundle: plan,
           credits: 0,
           priceUsd: planConfig.price_usd,
-          keyPrefix: mint.key_prefix,
-          rawKey: mint.api_key,
+          keyPrefix: outcome.keyPrefix,
+          rawKey: outcome.rawKey,
           plan,
-          monthlyLimit: mint.monthly_limit,
+          monthlyLimit: outcome.monthlyLimit,
         }
       : undefined;
+    const fallback = outcome.fallback;
+    // Deux abonnements vivants sur une clé, c'est une double facturation
+    // silencieuse (ZG10) : la clé neuve est remise au payeur, et un humain
+    // rembourse ou résilie. Les autres replis disent seulement que la
+    // référence n'a pas servi (révoquée, inconnue, ambiguë).
+    const alert =
+      fallback && fallback !== 'no_subscription' && outcome.rawKey
+        ? {
+            key: `stripe:subscription-${fallback === 'double_subscription' ? 'double' : 'fallback'}:${sessionTag(session.id)}`,
+            detail:
+              fallback === 'double_subscription'
+                ? 'Un abonnement a été payé avec la référence d’une clé qui porte déjà un abonnement vivant : ' +
+                  'une clé neuve a été frappée et remise au payeur. Deux abonnements sont facturés : ' +
+                  'rembourser ou résilier l’un des deux dans Stripe.'
+                : `Un abonnement payé avec une référence de recharge n’a pas été posé sur sa clé (motif : ${fallback}) : ` +
+                  'une clé neuve a été frappée et remise au payeur. À relire dans les outils privés.',
+          }
+        : undefined;
 
     return {
       status: 200,
@@ -677,11 +812,21 @@ export function processStripeEvent(event: Stripe.Event): {
         received: true,
         event_id: event.id,
         plan,
-        monthly_limit: mint.monthly_limit,
-        key_prefix: mint.key_prefix,
+        monthly_limit: outcome.monthlyLimit,
+        key_prefix: outcome.keyPrefix,
+        ...(clientReferenceId && fallback
+          ? {
+              attached: {
+                key_prefix: outcome.keyPrefix,
+                outcome: 'minted_fallback',
+                fallback_reason: fallback,
+              },
+            }
+          : {}),
         ...(paid ?? {}),
       },
       notify,
+      ...(alert ? { alert } : {}),
     };
   }
 
@@ -929,6 +1074,42 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
         bundle: result.recharge.bundle,
       }).catch(() => {});
     }
+  }
+
+  // Un abonnement posé sur une clé existante, ou terminé (lot B2) : seulement
+  // sur une vraie transition, jamais sur un rejeu (qui ne produit pas de
+  // `subscription`). Le mail de fin est court et factuel (Q14).
+  if (result.subscription?.kind === 'attached') {
+    const s = result.subscription;
+    await notifyPurchaseTelegram({
+      amountUsd: s.amountUsd,
+      bundle: s.plan,
+      credits: 0,
+      keyPrefix: s.keyPrefix,
+      plan: s.plan,
+      monthlyLimit: s.monthlyLimit,
+      attached: true,
+    }).catch(() => {});
+    if (s.to && !process.env.VITEST) {
+      void sendSubscriptionAttachedEmail({
+        to: s.to,
+        keyPrefix: s.keyPrefix,
+        plan: s.plan,
+        monthlyLimit: s.monthlyLimit,
+      }).catch(() => {});
+    }
+  }
+  if (result.subscription?.kind === 'ended' && result.subscription.to && !process.env.VITEST) {
+    const s = result.subscription;
+    void sendSubscriptionEndedEmail({
+      to: s.to as string,
+      keyPrefix: s.keyPrefix,
+      plan: s.plan,
+      allowance: s.allowance,
+      lifetime: s.lifetime,
+      creditsRemaining: s.creditsRemaining,
+      topupRef: s.topupRef,
+    }).catch(() => {});
   }
 
   // Best-effort owner alert (Telegram). notifyPurchaseTelegram never throws and

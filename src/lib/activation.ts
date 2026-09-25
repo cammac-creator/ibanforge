@@ -2,7 +2,7 @@ import { getStatsDB } from './db.js';
 import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { isInternalEmail } from './internal-accounts.js';
 import { getServiceUsage, type ServiceUsage } from './service-usage.js';
-import { SUBSCRIPTION_KEY_SQL } from './subscription-payments.js';
+import { ACTIVE_SUBSCRIPTION_SQL, SUBSCRIPTION_KEY_SQL } from './subscription-payments.js';
 import { SALE_OUTCOMES_SQL } from './key-purchases.js';
 import { ownAllowanceDefault } from './api-keys.js';
 import type { KeyTier } from './tiers.js';
@@ -117,10 +117,25 @@ interface KeyRow {
   tier: string;
   /** 1 for a Stripe subscription key — see the SELECT. */
   subscription: number;
+  /**
+   * 1 tant que l'abonnement VIT (lot B2) : une résiliation ne désactive plus la
+   * clé, elle pose `subscription_ended_at` et garde l'identifiant.
+   */
+  live_subscription: number;
   /** La lignée de la clé : une rotation la garde, le registre des achats s'y rattache. */
   lineage: string;
   /** Les packs achetés par cette lignée, au registre des achats (lot B1). */
   pack_purchases: number;
+}
+
+/**
+ * Une clé d'abonnement AUJOURD'HUI : un abonnement vivant, ou une clé
+ * d'abonnement désactivée (résiliée avant le lot B2, ou tournée). Une clé
+ * active dont l'abonnement est terminé n'en est plus une : elle a retrouvé ce
+ * qu'elle avait avant l'abonnement.
+ */
+function subscriptionKeyNow(k: KeyRow): boolean {
+  return k.live_subscription === 1 || (k.subscription === 1 && k.active !== 1);
 }
 
 interface LogAgg {
@@ -180,6 +195,7 @@ export function getActivation(days = 30): ActivationResponse {
       // the revenue readings use the same text: one population of subscribers.
       `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier,
               CASE WHEN ${SUBSCRIPTION_KEY_SQL} THEN 1 ELSE 0 END AS subscription,
+              CASE WHEN ${ACTIVE_SUBSCRIPTION_SQL} THEN 1 ELSE 0 END AS live_subscription,
               COALESCE(lineage_hash, key_hash) AS lineage,
               (SELECT COUNT(*) FROM key_purchases kp
                 WHERE kp.lineage_hash = COALESCE(api_keys.lineage_hash, api_keys.key_hash)
@@ -248,9 +264,12 @@ export function getActivation(days = 30): ActivationResponse {
     // gratuit est donc l'allocation propre (> 0, hors abonnement), et non plus
     // l'absence de crédits ; la copie tournée, inactive, d'une clé mixte n'y
     // compte pas une seconde fois.
+    // Lot B2 : une clé dont l'abonnement est TERMINÉ reste active et retrouve
+    // son allocation d'avant ; c'est de nouveau un gratuit si elle en avait un.
+    // Une clé d'abonnement désactivée (résiliée avant ce lot) n'en est pas un.
     const freeKeys = list.filter(
       (k) =>
-        k.subscription !== 1 &&
+        !subscriptionKeyNow(k) &&
         (k.monthly_limit ?? ownAllowanceDefault(k.tier as KeyTier)) > 0 &&
         (k.credits_total == null || k.active === 1),
     );
@@ -266,9 +285,10 @@ export function getActivation(days = 30): ActivationResponse {
       );
     }
     const packs = [...packsByLineage.values()].reduce((a, n) => a + n, 0);
-    // Only a LIVE subscription makes a subscriber: a canceled one has its key
-    // deactivated by the customer.subscription.deleted webhook.
-    const subscriber = list.some((k) => k.subscription === 1 && k.active === 1);
+    // Only a LIVE subscription makes a subscriber. Depuis le lot B2, une
+    // résiliation ne désactive plus la clé : c'est la fin posée sur la clé
+    // (`subscription_ended_at`) qui le dit, plus sa désactivation.
+    const subscriber = list.some((k) => k.live_subscription === 1 && k.active === 1);
 
     let firstCall: string | null = null;
     let lastSeen: string | null = null;
@@ -319,7 +339,7 @@ export function getActivation(days = 30): ActivationResponse {
       email,
       keys: list.map((k) => ({
         key_prefix: k.key_prefix,
-        role: k.credits_total != null ? 'paid' : k.subscription === 1 ? 'subscription' : 'free',
+        role: k.credits_total != null ? 'paid' : subscriptionKeyNow(k) ? 'subscription' : 'free',
         active: k.active,
       })),
       signup_at: signupAt,

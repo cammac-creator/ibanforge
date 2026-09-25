@@ -1585,6 +1585,9 @@ function openStatsDB(): DatabaseType.Database {
     migrateLineageFacts(statsDB);
     // Après les lignées : le rattrapage du registre des achats lit lineage_hash.
     migrateKeyPurchases(statsDB);
+    // Après le registre : la fin d'un abonnement (lot B2) lit dead_subscriptions,
+    // posée bien plus haut, et rien d'autre.
+    migrateSubscriptionEnd(statsDB);
     // ─── Le compte client par e-mail (lot C1, 24/09/2026) ─────────────────
     //
     // Bloc autonome posé en DERNIER, après les faits de mesure, pour la même
@@ -2029,6 +2032,46 @@ function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
     .prepare(
       `UPDATE api_keys SET monthly_limit = 0
         WHERE tier = 'paid' AND monthly_limit IS NULL AND credits_total IS NOT NULL`,
+    )
+    .run();
+}
+
+/**
+ * La fin d'un abonnement sur sa clé (chantier « clé unique », lot B2,
+ * 25.09.2026). Depuis ce lot, une résiliation ne désactive plus la clé : elle
+ * lui rend ce qu'elle avait avant l'abonnement et pose `subscription_ended_at`.
+ * `stripe_subscription_id` n'est jamais effacé : il retrouve la clé d'un
+ * renouvellement et la garde hors du rayon du radar. « Abonné un jour » se lit
+ * donc sur l'identifiant, « abonné aujourd'hui » sur l'identifiant ET
+ * `subscription_ended_at IS NULL` (ACTIVE_SUBSCRIPTION_SQL,
+ * src/lib/subscription-payments.ts).
+ *
+ * Rattrapage, rejouable (ne touche que les NULL) : la fin n'est datée que si la
+ * pierre tombale le dit (relecture de la PR 259, D5), jamais par la date de
+ * désactivation d'une ligne, ni par « aucune clé active ne porte
+ * l'abonnement » : une rotation faite avant la PR 177 ne recopiait pas
+ * l'abonnement, et sa copie active sert encore un abonnement facturé. Sans
+ * pierre tombale, la fin reste inconnue (NULL) ; une clé désactivée par une
+ * résiliation d'avant ce lot reste désactivée (Q13), et ses lecteurs la
+ * lisent inactive.
+ */
+function migrateSubscriptionEnd(statsDB: DatabaseType.Database): void {
+  const keyCols = (
+    statsDB.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
+  ).map((r) => r.name);
+  if (!keyCols.includes('subscription_ended_at')) {
+    statsDB.exec('ALTER TABLE api_keys ADD COLUMN subscription_ended_at TEXT');
+  }
+  statsDB
+    .prepare(
+      `UPDATE api_keys
+          SET subscription_ended_at = (
+                SELECT COALESCE(d.recorded_at, datetime('now')) FROM dead_subscriptions d
+                 WHERE d.subscription_id = api_keys.stripe_subscription_id)
+        WHERE stripe_subscription_id IS NOT NULL
+          AND subscription_ended_at IS NULL
+          AND EXISTS (SELECT 1 FROM dead_subscriptions d
+                       WHERE d.subscription_id = api_keys.stripe_subscription_id)`,
     )
     .run();
 }
