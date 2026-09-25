@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { COUNTRY_RISK_AS_OF } from './countries.js';
+import { servedDatabasePath } from './restricted-overlay-runtime.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -14,7 +15,11 @@ let complianceDB: DatabaseType.Database | null = null;
 export function getComplianceDB(): DatabaseType.Database {
   if (!complianceDB) {
     const Database = require('better-sqlite3') as typeof DatabaseType;
-    complianceDB = new Database(COMPLIANCE_DB_PATH, { readonly: true });
+    // Sans RESTRICTED_COMPLIANCE_OVERLAY_PATH, COMPLIANCE_DB_PATH lui-même ;
+    // avec, la copie fusionnée construite à côté du fichier privé (ONU, EPC).
+    complianceDB = new Database(servedDatabasePath('compliance', COMPLIANCE_DB_PATH), {
+      readonly: true,
+    });
   }
   return complianceDB;
 }
@@ -29,6 +34,7 @@ export function closeComplianceDB(): void {
   // peut porter des tables que le précédent n'avait pas.
   _tableLoaded.clear();
   _sourcesMemo = undefined;
+  _unscreenedMemo = undefined;
 }
 
 /**
@@ -121,6 +127,48 @@ export function loadedSanctionsLists(): string[] {
       .prepare('SELECT DISTINCT source_list FROM sanctioned_entities ORDER BY source_list')
       .all() as Array<{ source_list: string }>
   ).map((r) => r.source_list);
+}
+
+/**
+ * Les listes de sanctions que chaque surface publique nomme (« OFAC, EU, UN » :
+ * README, documentation, serveur MCP, OpenAPI, pied de page). La porte des
+ * affirmations (src/routes/sanctions-claims.test.ts) vérifie que cette liste
+ * reste celle que les surfaces écrivent.
+ */
+export const PROMISED_SANCTIONS_LISTS: readonly string[] = ['EU', 'OFAC', 'UN'];
+
+/** Mémo par connexion, effacé par closeComplianceDB() comme les deux autres. */
+let _unscreenedMemo: string[] | undefined;
+
+/**
+ * Les listes promises que la base servie NE porte PAS, quand elle en porte au
+ * moins une (sans aucune liste, `sanctions_lists_unavailable` le dit déjà).
+ *
+ * ## Le faux « propre » que ceci empêche (25/09/2026)
+ *
+ * La liste de l'ONU quitte le dépôt public pour la surcouche privée. Surcouche
+ * absente ou refusée, l'UE et l'OFAC restent chargées : une banque inscrite par
+ * la SEULE ONU ressortait `bank_sanctioned: false`, `listed: false`, sans un mot,
+ * alors que personne n'avait consulté sa liste. Une réponse ne doit jamais dire
+ * « aucune correspondance » sur une liste qu'elle n'a pas lue : chaque liste
+ * manquante lève un drapeau sans poids qui la nomme
+ * (`sanctions_list_unavailable_un`), et l'examen par BIC répond `listed: null`
+ * quand rien ne correspond sur les listes lues.
+ *
+ * Une lecture qui échoue répond `[]` et n'est pas mémorisée : la table illisible
+ * a son propre repli (`compliance_data_unavailable`).
+ */
+export function unscreenedSanctionsLists(): string[] {
+  if (_unscreenedMemo !== undefined) return _unscreenedMemo;
+  if (!complianceTableLoaded('sanctioned_entities')) return [];
+  let loaded: string[];
+  try {
+    loaded = loadedSanctionsLists().map((l) => l.toUpperCase());
+  } catch {
+    return [];
+  }
+  _unscreenedMemo = PROMISED_SANCTIONS_LISTS.filter((l) => !loaded.includes(l));
+  return _unscreenedMemo;
 }
 
 /**

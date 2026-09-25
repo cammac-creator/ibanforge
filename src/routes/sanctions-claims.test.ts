@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadedSanctionsLists } from '../lib/compliance-db.js';
+import { loadedSanctionsLists, PROMISED_SANCTIONS_LISTS } from '../lib/compliance-db.js';
+import { RESTRICTED_FAMILY } from '../lib/restricted-family.js';
 
 /**
  * No served surface may claim a sanctions list we do not screen.
@@ -167,6 +168,19 @@ describe('sanctions coverage claims match what is served', () => {
     // rows appear. The claim string is now derived from this table rather than
     // retyped, so the two cannot drift apart again.
     expect([...served].sort()).toEqual(['EU', 'OFAC', 'UN']);
+  });
+
+  it('la liste promise par les réponses est celle que les surfaces nomment', () => {
+    // `PROMISED_SANCTIONS_LISTS` décide quand une réponse dit « cette liste n'a
+    // pas été consultée » (drapeau sans poids, `listed: null`) : elle doit
+    // nommer exactement ce que chaque surface affirme contrôler.
+    expect([...PROMISED_SANCTIONS_LISTS].sort()).toEqual(['EU', 'OFAC', 'UN']);
+    // Et la surcouche privée n'emporte jamais une liste publique.
+    const privateLists = RESTRICTED_FAMILY.filter(
+      (m) => m.table === 'sanctioned_entities' && m.where,
+    ).map((m) => m.where!.value);
+    expect(privateLists).toEqual(['UN']);
+    for (const list of REDISTRIBUTABLE) expect(privateLists).not.toContain(list);
   });
 
   it('holds every redistributable list in the loaded database, never behind the overlay', () => {

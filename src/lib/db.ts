@@ -2025,9 +2025,19 @@ export function closeAll(): void {
   // a close the next getStatsDB() decides afresh, otherwise a test (or a reseed)
   // that repairs the file would keep /health red forever (PERF-03, 2026-09-01).
   statsDbState = { ok: true };
+  closeComplianceConnection();
+}
+
+/**
+ * Ferme la base de conformité, ses mémos (closeComplianceDB) et les requêtes de
+ * contrôle préparées sur elle. Inscrite pour le rechargement de la surcouche
+ * privée, comme closeBicDB ci-dessus.
+ */
+export function closeComplianceConnection(): void {
   closeComplianceDB();
   // Les requêtes de contrôle ont été préparées sur la connexion qu'on vient de
   // fermer, comme celles des registres plus haut : sans cette ligne, le premier
   // contrôle après une réouverture répondrait depuis une connexion morte.
   resetComplianceStatements();
 }
+registerReferenceCloser('compliance', closeComplianceConnection);
