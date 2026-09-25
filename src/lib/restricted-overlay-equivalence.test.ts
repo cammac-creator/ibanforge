@@ -419,12 +419,12 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       expect(after.get(key), key).toEqual(value);
       identical++;
     }
-    if (REAL)
-      console.log(
-        `[équivalence] ${identical} réponses identiques sur ${before.size} ` +
-          `(${cases.ibans.length} IBAN, ${cases.bics.length} BIC, lot et démo) ; ` +
-          `par catégorie : ${JSON.stringify(coverage(after))}`,
-      );
+    // Des comptes seulement, jamais une valeur : la ligne sert la description de la PR.
+    console.log(
+      `[équivalence${REAL ? ', vraies bases' : ', famille inventée'}] ${identical} réponses identiques sur ${before.size} ` +
+        `(${cases.ibans.length} IBAN, ${cases.bics.length} BIC, lot et démo) ; ` +
+        `par catégorie : ${JSON.stringify(coverage(after))}`,
+    );
     expect(identical).toBe(before.size);
   });
 
