@@ -22,6 +22,7 @@ import { enrichResult } from './enrich.js';
 import { lookup as lookupBic } from './bic-lookup.js';
 import { customerContextBlock } from './company-profiles.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+import { logModelUsage } from './model-usage.js';
 
 export const PRODUCT_FACTS = [
   `Free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests/month on a key that needs no e-mail and no card, ${FREE_TIER_MONTHLY_LIMIT} a month once you claim it.`,
@@ -239,6 +240,7 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
     content?: Array<{ type: string; text?: string }>;
     stop_reason?: string;
   };
+  logModelUsage('forum-draft', data);
   const text = (data.content ?? []).map((c) => c.text ?? '').join('');
   if (!text.trim()) {
     throw new Error(`generation returned empty text (stop_reason=${data.stop_reason ?? '?'})`);
@@ -295,6 +297,7 @@ export async function translateToFr(draft: string): Promise<string | null> {
     throw new Error(`Anthropic HTTP ${res.status}: ${detail.slice(0, 120)}`);
   }
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  logModelUsage('forum-translate', data);
   const text = (data.content ?? [])
     .map((c) => c.text ?? '')
     .join('')
