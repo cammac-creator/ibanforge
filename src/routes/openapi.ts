@@ -3455,6 +3455,51 @@ const buildRawSpec = () => ({
             example: getEntryCount(),
           },
           bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },
+          // Served since 01/09/2026 and declared only now (25/09/2026), with
+          // its new neighbour below.
+          bic_sources: {
+            type: 'array',
+            description:
+              'Per-source freshness of the BIC directory. last_updated dates the IMPORT; source_as_of dates the upstream DATA where the two differ (a frozen public copy), null when no gap has been established. stale is true when the import is overdue or the source itself is frozen, and stale_reason says which.',
+            items: {
+              type: 'object',
+              required: ['source', 'entries', 'last_updated', 'source_as_of', 'stale', 'stale_reason'],
+              properties: {
+                source: { type: 'string' },
+                entries: { type: 'integer' },
+                last_updated: { type: ['string', 'null'] },
+                source_as_of: { type: ['string', 'null'] },
+                stale: { type: 'boolean' },
+                stale_reason: { type: ['string', 'null'], enum: ['import_overdue', 'source_frozen', null] },
+              },
+            },
+          },
+          frozen_bic_sources: {
+            type: 'array',
+            description:
+              'One entry per frozen source (the ones bic_sources dates with a source_as_of): its rows and BIC8, and how many of them no source refreshed this cycle still carries (GLEIF and the other directory sources without a vintage, the national registers, the EPC scheme registers). Recomputed at each deployment. When a trace source could not be read, complete is false and the two *_without_current_trace counts are null rather than guessed. An empty array means the figures could not be computed; it never turns this endpoint red.',
+            items: {
+              type: 'object',
+              required: [
+                'source',
+                'source_as_of',
+                'rows',
+                'bic8',
+                'rows_without_current_trace',
+                'bic8_without_current_trace',
+                'complete',
+              ],
+              properties: {
+                source: { type: 'string' },
+                source_as_of: { type: 'string', description: 'Year-month the source DATA is from.' },
+                rows: { type: 'integer' },
+                bic8: { type: 'integer' },
+                rows_without_current_trace: { type: ['integer', 'null'] },
+                bic8_without_current_trace: { type: ['integer', 'null'] },
+                complete: { type: 'boolean' },
+              },
+            },
+          },
         },
       },
       StatsOverview: {

@@ -5,6 +5,7 @@ import {
   unscreenedSanctionsLists,
 } from './compliance-db.js';
 import { getSepaInfo } from './countries.js';
+import { resetTraceIndex } from './bic-trace.js';
 import type {
   SanctionsCheck,
   ReachabilityCheck,
@@ -563,4 +564,6 @@ export function resetComplianceStatements(): void {
   _checkFatf = null;
   _checkReachability = null;
   _checkVop = null;
+  // Les registres EPC de cette base sont une source de trace (bic-trace.ts).
+  resetTraceIndex();
 }

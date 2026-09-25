@@ -29,6 +29,7 @@ import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
 import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
 import { recordEvent } from './lib/events.js';
+import { frozenTrace } from './lib/bic-trace.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -95,6 +96,18 @@ const port = parseInt(process.env.PORT ?? '3000', 10);
 
 const server: ServerType = serve({ fetch: app.fetch, port }, () => {
   console.log(`IBANforge running on http://localhost:${port}`);
+});
+
+// L'index des traces courantes (src/lib/bic-trace.ts) est chauffé juste après
+// l'ouverture du port, pour que le premier appel payant ne porte pas son calcul.
+// Jamais bloquant, jamais fatal : un échec laisse l'index se construire au
+// premier appel, qui répond « non consulté » s'il échoue encore.
+setImmediate(() => {
+  try {
+    frozenTrace();
+  } catch (err) {
+    console.error('Trace index not warmed:', err);
+  }
 });
 
 // Deploy marker for the dashboard charts. recordEvent dedups same-version

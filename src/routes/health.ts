@@ -13,6 +13,7 @@ import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
 import { verificationDelivery } from '../lib/key-creation-guard.js';
 import { servedAt } from '../lib/served-at.js';
 import { restrictedOverlayHealth } from '../lib/restricted-overlay-runtime.js';
+import { frozenTrace, type FrozenSourceTrace } from '../lib/bic-trace.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -102,6 +103,22 @@ const DEGRADED_REFUSAL_RATIO = 0.5;
 function probeSourceFreshness(): SourceFreshness[] {
   try {
     return getSourceFreshness();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Les lignes des sources figées qu'aucune source de ce cycle ne porte plus.
+ *
+ * Gardé comme probeSourceFreshness : une erreur rend un tableau vide, jamais un
+ * /health rouge. Mémorisé pour la vie du processus (src/lib/bic-trace.ts), donc
+ * recalculé à chaque déploiement, ce qui est le rythme des deux bases. Pas de
+ * ventilation par pays ici : cet endpoint est sondé toutes les 30 s.
+ */
+function probeFrozenTrace(): FrozenSourceTrace[] {
+  try {
+    return frozenTrace();
   } catch {
     return [];
   }
@@ -220,6 +237,12 @@ health.get('/health', (c) => {
       // Memoised — one scan per process, see getSourceFreshness. Never used
       // to fail the check: stale data is a degraded feature, not an outage.
       bic_sources: probeSourceFreshness(),
+      // AJOUTÉ le 25/09/2026 à côté du contrat, rien de renommé : pour chaque
+      // source figée (bic_sources.source_as_of), ses lignes et ses BIC8, et
+      // combien aucune source rafraîchie ce cycle ne porte plus. `complete:
+      // false` et des comptes nuls quand une source de trace n'a pas été lue.
+      // Des faits produit sur des registres publics, jamais une activité.
+      frozen_bic_sources: probeFrozenTrace(),
       // AJOUTÉ le 25/09/2026 à côté du contrat, rien de renommé : la surcouche
       // privée des données sous conditions est-elle servie sur chaque base
       // (`off` sans sa variable, `applied`, `kept_public` quand le public plus

@@ -15,6 +15,7 @@ import {
 import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
 import { sourceVintage } from './source-vintage.js';
+import { resetTraceIndex } from './bic-trace.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -903,4 +904,6 @@ export function resetStatements(): void {
   // Même base, même raison : une surcouche rechargée peut apporter ou retirer
   // les seules lignes d'un pays (src/lib/restricted-overlay-runtime.ts).
   referenceDataCache.clear();
+  // L'index des traces courantes est calculé sur la même base (bic-trace.ts).
+  resetTraceIndex();
 }
