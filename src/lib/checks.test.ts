@@ -232,7 +232,8 @@ function sample(): IBANValidationResult[] {
     'AT279999900000123456', // code autrichien fabriqué
     'FR1499999000010123456789A42', // absent de la carte composite
     'NL19BICK0123456789', // carte composite
-    'IT26X0311111101000000123456', // carte composite
+    'IT26X0311111101000000123456', // code radié par la Banca d'Italia (registre partiel)
+    'IT10N0760101600000000123456', // hors du registre italien : carte composite
     'CH9300762011623852957', // IID non attribué
   ];
   return [...Object.values(EXAMPLE_IBANS), ...fabricated].map(enriched).filter((r) => r.valid);
@@ -325,8 +326,13 @@ describe('maps every bank_code_check shape to exactly one bank_code_holder', () 
       'confirmed',
     ],
     ['partial register, found (FI)', () => 'FI2112345600000785', 'confirmed'],
+    // L'Italie (25/09/2026) : un code en vigueur est nommé par le registre ; un
+    // code radié n'a plus de titulaire aujourd'hui, donc `inferred`, jamais un
+    // refus ; Poste Italiane, hors du registre, garde la carte composite.
+    ['partial register, found (IT)', () => 'IT86W0306901600000000123456', 'confirmed'],
+    ['partial register, retired code (IT)', () => 'IT58V0311101600000000123456', 'inferred'],
     ['composite map (NL)', () => 'NL19BICK0123456789', 'inferred'],
-    ['composite map (IT)', () => 'IT26X0311111101000000123456', 'inferred'],
+    ['composite map (IT)', () => 'IT10N0760101600000000123456', 'inferred'],
     ['published structural rule (LV)', () => ibanFor('LV', 'HABA0012345678910'), 'inferred'],
     ['absent from the composite map (FR)', () => 'FR1499999000010123456789A42', 'unknown'],
   ];
@@ -347,6 +353,6 @@ describe('maps every bank_code_check shape to exactly one bank_code_holder', () 
       string,
       unknown
     >;
-    for (const key of ['NL:BICK', 'IT:03111', 'LV:HABA']) expect(map, key).toHaveProperty([key]);
+    for (const key of ['NL:BICK', 'IT:07601', 'LV:HABA']) expect(map, key).toHaveProperty([key]);
   });
 });

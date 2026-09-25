@@ -3,7 +3,7 @@ import path from 'path';
 
 /**
  * The public register pages (/blz/{blz}, /iid/{iid}, /at/{code}, /be/{code},
- * /sk/{code}) read a JSON exported by
+ * /sk/{code}, /sm/{code}, /it/{code}) read a JSON exported by
  * `npm run pages:export` in the API repository, which calls the API in-process
  * for every code: the "what the API answers" block on each page is the route's
  * own answer, not a re-implementation. See scripts/export-register-pages.ts.
@@ -164,6 +164,47 @@ export interface SmEntry {
   related: string[];
 }
 
+/**
+ * L'Italie (25/09/2026) : deux sortes de pages dans un même fichier. Un code EN
+ * VIGUEUR, que la Banca d'Italia inscrit aujourd'hui (siège légal en Italie et
+ * LEI quand elle le publie), et un code RADIÉ, dont la page dit la date et le
+ * successeur légal. Le registre est partiel : la réponse de l'API porte
+ * `authoritative: false` dans les deux cas, et les pages le disent.
+ */
+export type ItRegister =
+  | {
+      code: string;
+      status: "in_force";
+      name: string;
+      street: string | null;
+      post_code: string | null;
+      town: string | null;
+      lei: string | null;
+      /** L'édition, en entier : la date du fichier de la Banca d'Italia. */
+      as_of: string;
+      /** Le crédit stocké avec les lignes : auteur, jeu, licence CC BY 4.0. */
+      source: string;
+    }
+  | {
+      code: string;
+      status: "retired";
+      /** Le DERNIER titulaire, tel que le registre l'écrivait. */
+      name: string;
+      /** Dernier jour où le registre porte ce code pour ce titulaire. */
+      retired_on: string;
+      successor_code: string | null;
+      successor_name: string | null;
+      as_of: string;
+      source: string;
+    };
+
+export interface ItEntry {
+  register: ItRegister;
+  example_iban: string;
+  api: Record<string, unknown>;
+  related: string[];
+}
+
 interface RegisterFile<T> {
   generated_at: string;
   source: string;
@@ -178,6 +219,7 @@ let atCache: RegisterFile<AtEntry> | null = null;
 let beCache: RegisterFile<BeEntry> | null = null;
 let skCache: RegisterFile<SkEntry> | null = null;
 let smCache: RegisterFile<SmEntry> | null = null;
+let itCache: RegisterFile<ItEntry> | null = null;
 
 function read<T>(file: string): RegisterFile<T> {
   const raw = fs.readFileSync(path.join(process.cwd(), 'data', 'registers', file), 'utf-8');
@@ -236,6 +278,31 @@ export function smBankFile(): RegisterFile<SmEntry> {
  */
 export function smCredit(r: SmRegister): string {
   return `Source: ${r.source} (read on ${r.as_of})`;
+}
+
+export function itBankFile(): RegisterFile<ItEntry> {
+  if (!itCache) itCache = read<ItEntry>('it-bank.json');
+  return itCache;
+}
+
+/**
+ * Le crédit que la licence CC BY 4.0 demande, depuis le fichier lui-même :
+ * l'auteur, le jeu et la licence (stockés avec les lignes), l'édition, et
+ * l'indication des modifications. Même texte que nationalRegisterCredit('IT')
+ * de l'API, exprès : un crédit, deux surfaces.
+ */
+export function itCredit(r: ItRegister): string {
+  return `Source: ${r.source}, edition ${r.as_of}; normalised and joined by IBANforge`;
+}
+
+/**
+ * Les codes ABI ont cinq chiffres, et le registre les écrit sans zéro de tête
+ * (`3111` pour 03111) : on complète, comme l'API (`normaliseCode('IT', …)`),
+ * pour qu'une adresse tapée comme la source l'écrit ne tombe pas sur une 404.
+ */
+export function getItCode(code: string): ItEntry | null {
+  if (!/^\d{1,5}$/.test(code)) return null;
+  return itBankFile().entries[code.padStart(5, '0')] ?? null;
 }
 
 /** San Marino ABI codes are five digits; the BCSM prints them padded already. */

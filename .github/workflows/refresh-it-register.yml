@@ -1,0 +1,141 @@
+name: Refresh the Italian bank-code registers (Banca d'Italia)
+
+# Pourquoi une relecture à part, chaque semaine
+#
+# L'Italie est un registre PARTIEL : un code en vigueur nomme son titulaire, un
+# code radié répond `retired` avec sa date et son successeur légal, une absence
+# ne dit rien. Un registre en retard ne peut donc produire aucun refus ; il
+# garde seulement, jusqu'à la relecture suivante, la réponse d'avant pour un
+# code tout juste créé ou radié. La Banca d'Italia met à jour la liste des
+# intermédiaires chaque jour et celle des fusions chaque semaine (catalogue DCAT
+# de la Banca d'Italia) ; mesuré de juin à septembre 2026, le contenu qui compte
+# pour les IBAN change quelques fois par mois. Une relecture hebdomadaire suit
+# donc la source sans redéployer l'API pour rien : elle ne commite que si le
+# CONTENU italien a changé.
+#
+# Le jeudi : l'édition du mercredi soir (les fichiers lus le 25/09/2026 étaient
+# datés du mercredi 23/09, 22 h 34 et 22 h 45) est alors publiée.
+#
+# Ce que ce run peut toucher : les lignes italiennes de data/bic.sqlite et
+# frontend/data/registers/it-bank.json, rien d'autre. Seul le chargeur italien
+# tourne (`seed-national.ts IT` ne télécharge que chez bancaditalia.it), et
+# scripts/it-register-diff.ts refuse le commit si une autre table, un autre pays
+# ou le schéma diffère de la base commitée. Le rafraîchissement mensuel
+# (refresh-bic.yml) ne lit PAS l'Italie : il ne dépend pas de bancaditalia.it.
+#
+# Licence : open data CC BY 4.0 de la Banca d'Italia ; le crédit voyage dans les
+# lignes elles-mêmes, et les journaux (publics, comme le dépôt) ne portent que
+# l'édition, les décomptes et des adresses publiques.
+
+on:
+  schedule:
+    # Chaque jeudi à 05:37 UTC (07:37 à Rome en été, 06:37 en hiver).
+    - cron: '37 5 * * 4'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # Lire les jobs du run, pour que l'alerte nomme l'étape qui a cassé.
+  actions: read
+
+# Le même groupe que refresh-bic.yml et refresh-cz-register.yml : un seul
+# écrivain de data/bic.sqlite à la fois. Le jeudi, la relecture tchèque de
+# 05:17 et celle-ci font la queue au lieu de se disputer le même binaire ;
+# aucune n'annule l'autre.
+concurrency:
+  group: bic-sqlite-writer
+  cancel-in-progress: false
+
+jobs:
+  refresh-it:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Sort en 0 quand bancaditalia.it ne répond pas, répond une page à la
+      # place du fichier ou sert une édition plus ancienne que celle déjà
+      # chargée : les tables restent, et la sortie `it_register=not_loaded`
+      # sonne l'alarme en fin de run. Un changement de FORMAT fait échouer
+      # l'étape, pour qu'un humain le lise.
+      - name: Read the Italian registers (bancaditalia.it only)
+        id: seed_it
+        run: npx tsx scripts/seed-national.ts IT
+
+      # Les lignes italiennes seulement, comparées par contenu à la base
+      # commitée. Refuse (étape rouge, alerte) si autre chose diffère ; écrit
+      # `changed=true|false` sinon.
+      - name: Italian rows only, and did they change?
+        id: diff_it
+        run: npx tsx scripts/it-register-diff.ts
+
+      # Le même garde de qualité que le rafraîchissement mensuel, sur le
+      # changement italien : un registre effondré serait refusé ici, avant tout
+      # commit.
+      - name: Quality diff against the committed database
+        if: steps.diff_it.outputs.changed == 'true'
+        run: npx tsx scripts/refresh-diff.ts
+
+      - name: Run tests
+        if: steps.diff_it.outputs.changed == 'true'
+        run: npm run test
+
+      # Les pages /it lisent un JSON exporté de cette base par l'API elle-même :
+      # réexporté dans le même commit, sans toucher aux fichiers des autres
+      # registres (le filtre du script n'écrit que it-bank.json).
+      - name: Export the Italian register pages
+        if: steps.diff_it.outputs.changed == 'true'
+        run: npm run pages:export -- IT
+
+      - name: Commit the Italian registers
+        if: steps.diff_it.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/bic.sqlite frontend/data/registers/it-bank.json
+          git commit -m "chore(data): registres italiens de la Banca d'Italia, nouvelle édition (relecture hebdomadaire)"
+          git pull --rebase
+          git push
+
+      - name: Italian registers not loaded (bancaditalia.it)
+        if: success() && steps.seed_it.outputs.it_register == 'not_loaded'
+        run: |
+          echo "::error title=Italian registers not loaded::the Banca d'Italia registers could not be re-read this week; the Italian edition already loaded is still served"
+          exit 1
+
+      # La même alerte que refresh-bic.yml et refresh-cz-register.yml, mêmes secrets.
+      - name: Tell Telegram if anything above failed
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "::warning::secrets Telegram absents, alerte non envoyée"
+            exit 0
+          fi
+          STEP=""
+          if RAW=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+                     --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name' 2>/dev/null); then
+            STEP=$(printf '%s' "$RAW" | head -3 | paste -sd, -)
+          fi
+          [ -z "$STEP" ] && STEP="(étape inconnue, voir le run)"
+          CONSEQ="les registres italiens (Banca d’Italia) n’ont pas été relus ; l’édition déjà chargée reste servie."
+          case "$STEP" in
+            "Italian rows only"*) CONSEQ="la relecture a changé autre chose que les lignes italiennes : rien n’a été commité." ;;
+          esac
+          MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
+                  "🔴 IBANforge : le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$CONSEQ" "$RUN_URL")
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" >/dev/null

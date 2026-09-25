@@ -10,8 +10,14 @@
  * the strength of the claim is not, and it is decided in enrich.ts, which never
  * puts SM in NATIONAL_REGISTERS. Do not "tidy" that by adding it.
  *
- *   npx tsx scripts/seed-national.ts          # all
+ *   npx tsx scripts/seed-national.ts          # all (Italy excepted)
  *   npx tsx scripts/seed-national.ts AT       # one
+ *   npx tsx scripts/seed-national.ts IT       # Italy, only ever on its own
+ *
+ * ITALIE — Banca d'Italia, registres des banques, des établissements de paiement
+ * et de monnaie électronique (open data CC BY 4.0). NON exhaustif, comme
+ * Saint-Marin, avec en plus les codes radiés et leur successeur légal : tout est
+ * dans scripts/seed-national-it.ts, qui l'explique.
  *
  * CZECHIA — Česká národní banka, Číselník kódů platebního styku v České
  * republice. The one register here whose EDITIONS are published before they
@@ -129,6 +135,12 @@ import {
   seedFamilyFromEnv,
 } from '../src/lib/restricted-family.js';
 import { failureCause, reportSeedMember, seedReportActive } from './seed-report.js';
+import {
+  IT_DATASET_PAGE,
+  ItalianSourceNotLoaded,
+  reportItalianStatus,
+  seedItalianLive,
+} from './seed-national-it.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -1363,6 +1375,24 @@ async function main(): Promise<void> {
     } catch (e) {
       if (!(e instanceof CzechSourceNotLoaded)) throw e;
       reportCzechStatus('not_loaded', e.message);
+    }
+  }
+  // L'Italie, seulement quand on la NOMME (`seed-national.ts IT`), jamais dans
+  // la passe de tous les registres : son propre workflow hebdomadaire
+  // (refresh-it-register.yml) la relit, et le rafraîchissement mensuel ne doit
+  // pas dépendre de bancaditalia.it. Même discipline que la Tchéquie : une
+  // Banca d'Italia injoignable, qui répond une page ou une édition plus ancienne
+  // (ItalianSourceNotLoaded) laisse les tables italiennes telles quelles et le
+  // dit au workflow ; un fichier dont la forme a changé lève, pour un humain.
+  // Voir scripts/seed-national-it.ts.
+  if (only === 'IT') {
+    console.log(`IT: reading the Banca d'Italia registers (${IT_DATASET_PAGE})`);
+    try {
+      await seedItalianLive(db);
+      reportItalianStatus('loaded');
+    } catch (e) {
+      if (!(e instanceof ItalianSourceNotLoaded)) throw e;
+      reportItalianStatus('not_loaded', e.message);
     }
   }
   db.close();
