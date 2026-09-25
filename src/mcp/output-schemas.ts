@@ -1,5 +1,15 @@
 import { z } from 'zod';
 import { nationalRegisterBicCodes } from '../lib/register-lists.js';
+import {
+  BANK_CODE_HOLDER_NOTE,
+  BANK_REACHABILITY_NOTE,
+  BIC_SOURCE_AS_OF_NOTE,
+  CHECKS_NOTE,
+  LISTED_IN_CURRENT_SOURCE_NOTE,
+  VOP_REGISTER_STATUS_NOTE,
+  bicSourceNote,
+} from '../lib/field-notes.js';
+import { CHECK_KEYS } from '../lib/checks.js';
 
 /**
  * The `outputSchema` every MCP tool declares, shared by the two internal
@@ -195,12 +205,12 @@ const ENRICHED_BIC_SCHEMA = z
       .optional()
       .describe('Source of the bank-code/BIC pairing; keep its provenance.'),
     as_of: z.string().nullable().optional(),
-    source_as_of: z
-      .string()
+    source_as_of: z.string().optional().describe(BIC_SOURCE_AS_OF_NOTE),
+    listed_in_current_source: z
+      .boolean()
+      .nullable()
       .optional()
-      .describe(
-        'Year-month the SOURCE DATA is from, present only when it differs from as_of. as_of dates the import; for the redistributed SWIFT directory the upstream stopped publishing years ago, so as_of alone presents an old bank name as last month\'s. Absent means no gap has been established, never "this is current".',
-      ),
+      .describe(LISTED_IN_CURRENT_SOURCE_NOTE),
     lei: z
       .string()
       .nullable()
@@ -264,9 +274,30 @@ export const BANK_CODE_CHECK_SCHEMA = z
   })
   .optional();
 
+/**
+ * `checks` : un statut par contrôle (25/09/2026). Objet fermé à clés fixes, lues
+ * dans CHECK_KEYS : une clé ajoutée là est déclarée ici du même coup.
+ */
+const CHECKS_SCHEMA = z
+  .object(
+    Object.fromEntries(
+      CHECK_KEYS.map((k) => [
+        k,
+        z.string().describe('pass | fail | inferred | unknown | not_checked | not_applicable'),
+      ]),
+    ) as Record<(typeof CHECK_KEYS)[number], z.ZodString>,
+  )
+  .optional()
+  .describe(CHECKS_NOTE);
+
 const VALIDATE_IBAN_OUTPUT_SCHEMA = {
   iban: z.string().describe('Normalized IBAN (uppercase, no spaces).'),
   valid: z.boolean(),
+  bank_code_holder: z
+    .string()
+    .optional()
+    .describe(`confirmed | inferred | not_allocated | unknown. ${BANK_CODE_HOLDER_NOTE}`),
+  checks: CHECKS_SCHEMA,
   formatted: z.string().optional().describe('IBAN with 4-char groups for display.'),
   country: z
     .object({
@@ -305,6 +336,26 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
         .describe(
           'Where `schemes` came from: read at the EPC register for this bank, or defaulted from the country.',
         ),
+      // Le grain de la banque (25/09/2026), jamais emprunté au pays.
+      bank_reachability: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          `listed | not_listed | no_bank | bank_code_not_allocated, or null. ${BANK_REACHABILITY_NOTE}`,
+        ),
+      bank_schemes: z
+        .array(z.string())
+        .nullable()
+        .optional()
+        .describe(
+          "The bank's own schemes from the EPC registers when bank_reachability is listed; [] for an unallocated bank code; null otherwise.",
+        ),
+      vop_register_status: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(`active | pending | inactive | not_listed, or null. ${VOP_REGISTER_STATUS_NOTE}`),
     })
     .optional(),
   issuer: z
@@ -411,7 +462,10 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
   bic8: z.string().optional().describe('8-char form (institution-level).'),
   bic11: z.string().optional().describe('11-char form including branch.'),
   valid_format: z.boolean().optional(),
-  found: z.boolean().optional(),
+  found: z
+    .boolean()
+    .optional()
+    .describe('True only when the row names an institution: a record is complete or not found.'),
   institution: z.string().nullable().optional().describe('Bank legal name.'),
   country_code: z
     .string()
@@ -422,15 +476,19 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .nullable()
     .optional()
     .describe(
-      'DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.name, which falls back to the code rather than to null.',
+      "DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.name, which is never null: the row's country name, else the ISO name, else the code.",
     ),
   country: z
     .object({ code: z.string(), name: z.string() })
     .optional()
     .describe(
-      'Same shape as REST GET /v1/bic/:code. name falls back to the country code when the row carries no name.',
+      "Same shape as REST GET /v1/bic/:code. name is the row's country name, then the ISO name, and falls back to the country code only when neither exists.",
     ),
-  city: z.string().nullable().optional(),
+  city: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Null, never an empty string, when the source leaves the town blank.'),
   branch_code: z.string().optional(),
   branch_info: z.string().nullable().optional(),
   lei: z
@@ -440,6 +498,19 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .describe('Legal Entity Identifier (ISO 17442) if available.'),
   lei_status: z.string().nullable().optional(),
   is_test_bic: z.boolean().optional(),
+  // Ajoutés le 25/09/2026 : la source de la ligne, que cet outil ne rendait pas.
+  // Déclarés ici, sinon le client officiel refuse l'objet fermé.
+  source: z.string().nullable().optional().describe('Code of the dataset this row comes from.'),
+  source_name: z.string().nullable().optional().describe(bicSourceNote()),
+  source_as_of: z
+    .string()
+    .optional()
+    .describe('Year-month the source DATA is from, present only for a frozen copy.'),
+  listed_in_current_source: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe(LISTED_IN_CURRENT_SOURCE_NOTE),
   valid: z.boolean().optional().describe('Set when the BIC failed format validation.'),
   error: z.string().optional(),
 };
@@ -454,20 +525,46 @@ const CHECK_COMPLIANCE_OUTPUT_SCHEMA = {
           'False means no bank was screened; do not interpret bank_sanctioned as a finding.',
         ),
       country_sanctioned: z.boolean(),
-      bank_sanctioned: z.boolean(),
+      bank_sanctioned: z
+        .boolean()
+        .describe('False also when no bank was screened: read institution_listed.'),
       matched_lists: z.array(z.string()),
       fatf_status: z.string(),
+      // Noms honnêtes ajoutés le 25/09/2026, déclarés dans l'objet fermé.
+      institution_listed: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe(
+          "Whether the payee's BANK is on a sanctions list: bank_sanctioned when a bank was screened against every list this service names, null otherwise (never false without a screen).",
+        ),
+      payee_screened: z
+        .boolean()
+        .optional()
+        .describe('Always false: the payee (account holder) is never screened here.'),
     }),
     reachability: z.object({
       screened: z.boolean(),
       sepa_instant: z.boolean(),
       sct: z.boolean(),
       sdd: z.boolean(),
+      listed_in_epc_registers: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe(
+          'At least one of the three schemes lists the bank; null when the EPC registers were not consulted (screened false). Outside the SEPA area the country answers (false) whether or not the registers are loaded.',
+        ),
     }),
     vop: z.object({
       screened: z.boolean(),
       participant: z.boolean(),
       status: z.string(),
+      register_status: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(`active | pending | inactive | not_listed, or null. ${VOP_REGISTER_STATUS_NOTE}`),
     }),
     // .nullable() is load-bearing, not defensive. This tool returns
     // structuredContent, so the MCP SDK validates the payload against

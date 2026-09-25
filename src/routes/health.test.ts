@@ -211,6 +211,68 @@ describe('/health — per-source freshness (the living-tool block)', () => {
   });
 });
 
+/**
+ * Les lignes figées qu'aucune source de ce cycle ne porte plus (25/09/2026).
+ * Des invariants seulement : les comptes bougent à chaque rafraîchissement.
+ */
+describe('/health: frozen rows without a current trace', () => {
+  it('serves frozen_bic_sources with one entry per vintaged source', async () => {
+    const { frozenSources } = await import('../lib/source-vintage.js');
+    const body = (await (await app.request('/health')).json()) as {
+      frozen_bic_sources: Array<{
+        source: string;
+        source_as_of: string;
+        rows: number;
+        bic8: number;
+        rows_without_current_trace: number | null;
+        bic8_without_current_trace: number | null;
+        complete: boolean;
+      }>;
+    };
+    expect(body.frozen_bic_sources.map((f) => f.source)).toEqual(
+      frozenSources().map((f) => f.source),
+    );
+    // R1 de la relecture de la PR 254 : l'index n'est jamais complet tant que
+    // STEP2 et NBP ne se lisent qu'à travers l'annuaire dédoublonné. Pas de
+    // compte d'absences gonflé : `complete: false` et des comptes nuls.
+    for (const f of body.frozen_bic_sources) expect(f.complete).toBe(false);
+    for (const f of body.frozen_bic_sources) {
+      expect(f.source_as_of).toMatch(/^\d{4}-\d{2}$/);
+      expect(f.bic8).toBeLessThanOrEqual(f.rows);
+      if (f.complete) {
+        expect(f.rows_without_current_trace).not.toBeNull();
+        expect(f.rows_without_current_trace!).toBeLessThanOrEqual(f.rows);
+        expect(f.bic8_without_current_trace!).toBeLessThanOrEqual(f.bic8);
+      } else {
+        expect(f.rows_without_current_trace).toBeNull();
+        expect(f.bic8_without_current_trace).toBeNull();
+      }
+    }
+  });
+
+  it('keeps /health green when the trace index cannot be built', async () => {
+    vi.resetModules();
+    vi.doMock('../lib/bic-trace.js', () => ({
+      frozenTrace: () => {
+        throw new Error('trace index unavailable');
+      },
+    }));
+    try {
+      const { health: fresh } = await import('./health.js');
+      const isolated = new Hono();
+      isolated.route('/', fresh);
+      const res = await isolated.request('/health');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { status: string; frozen_bic_sources: unknown[] };
+      expect(body.status).toBe('ok');
+      expect(body.frozen_bic_sources).toEqual([]);
+    } finally {
+      vi.doUnmock('../lib/bic-trace.js');
+      vi.resetModules();
+    }
+  });
+});
+
 describe('GET /health — a public endpoint must not leak activity volume', () => {
   it('reports the verification channel as a state, never as a count', async () => {
     const res = await app.request('/health');

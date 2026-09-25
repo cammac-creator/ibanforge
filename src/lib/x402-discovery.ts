@@ -73,9 +73,28 @@ const ENTRIES: DiscoveryEntry[] = [
         },
       },
       // Real API response for the input above (captured from prod), cost shown at the x402 rate.
+      // `bank_code_holder` et `checks` ajoutés le 25/09/2026 : c'est CET exemple
+      // que servent le 402 et l'annonce Bazaar (celui d'enrich-402.ts n'est lu que
+      // par le repli). `sepa_reachability` y vaut ce que répond un déploiement
+      // sans les registres EPC (« non consulté ») : cet exemple ne porte aucune
+      // valeur tirée de ces registres sous conditions.
       outputExample: {
         iban: 'CH1000230000000012345',
         valid: true,
+        bank_code_holder: 'confirmed',
+        checks: {
+          iban_structure: 'pass',
+          iban_checksum: 'pass',
+          bank_code: 'pass',
+          bic: 'pass',
+          sepa_reachability: 'unknown',
+          national_check_digits: 'not_checked',
+          account_exists: 'not_checked',
+          payee_name: 'not_checked',
+          institution_sanctions: 'not_checked',
+          country_sanctions: 'not_checked',
+          payee_sanctions: 'not_checked',
+        },
         country: { code: 'CH', name: 'Switzerland' },
         check_digits: '10',
         bban: { bank_code: '00230', account_number: '000000012345' },

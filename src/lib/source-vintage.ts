@@ -59,6 +59,17 @@ export function sourceVintage(source: string | null | undefined): SourceVintage 
 }
 
 /**
+ * Toutes les sources dont le millésime ment, avec leur date.
+ *
+ * Lue par l'index des traces courantes (src/lib/bic-trace.ts) et par `/health`
+ * (`frozen_bic_sources`) : une source ajoutée ci-dessus y entre d'elle-même,
+ * aucune liste n'est recopiée ailleurs.
+ */
+export function frozenSources(): Array<{ source: string; as_of: string }> {
+  return Object.entries(SOURCE_VINTAGE).map(([source, v]) => ({ source, as_of: v.as_of }));
+}
+
+/**
  * The date to show for a source: its upstream vintage when the import date
  * lies, and the import date otherwise.
  *

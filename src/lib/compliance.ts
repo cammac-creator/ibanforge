@@ -5,6 +5,7 @@ import {
   unscreenedSanctionsLists,
 } from './compliance-db.js';
 import { getSepaInfo } from './countries.js';
+import { resetTraceIndex } from './bic-trace.js';
 import type {
   SanctionsCheck,
   ReachabilityCheck,
@@ -221,7 +222,7 @@ export function checkVop(bic8: string | null, countryCode?: string): VopCheck {
  * them the same would repeat, inside the score, exactly the collapse that
  * bank_code_check exists to undo.
  */
-export type BankCodeConfidence = 'confirmed' | 'unverified' | 'denied';
+export type BankCodeConfidence = 'confirmed' | 'inferred' | 'unverified' | 'denied';
 
 /** Le score minimal d'une banque résolue qu'aucune liste de sanctions n'a pu contrôler. */
 export const SANCTIONS_LISTS_UNAVAILABLE_FLOOR = 50;
@@ -319,6 +320,15 @@ export function calculateRiskScore(
   if (bankCode === 'unverified') {
     score += 10;
     flags.push('bank_code_unverified');
+  }
+  // Une banque nommée d'après une source qui ne tranche pas (la carte composite,
+  // le repli par préfixe) : `bank_code_holder` vaut `inferred`. SANS POIDS
+  // (25/09/2026), même doctrine que `no_bank_resolved` : le drapeau dit ce que
+  // vaut la réponse sans déplacer un seul score. Une banque déduite et une
+  // banque confirmée pèsent encore pareil ; le drapeau est là pour qu'un
+  // lecteur sache laquelle il a sous les yeux.
+  if (bankCode === 'inferred') {
+    flags.push('bank_code_inferred');
   }
   // The two reachability penalties below are only meaningful when a bank was
   // actually screened. With no resolved institution the EPC registers were
@@ -563,4 +573,6 @@ export function resetComplianceStatements(): void {
   _checkFatf = null;
   _checkReachability = null;
   _checkVop = null;
+  // Les registres EPC de cette base sont une source de trace (bic-trace.ts).
+  resetTraceIndex();
 }

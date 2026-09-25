@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildSpec } from './openapi.js';
+import { Hono } from 'hono';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
+import { bicLookup } from './bic-lookup.js';
+import { buildBicComplianceResponse, buildComplianceResponse } from '../lib/compliance-response.js';
+import type { HonoEnv } from '../types.js';
 
 /**
  * The machine contract must describe every step the endpoint actually demands.
@@ -339,15 +344,17 @@ describe('the contract covers the routes and fields the server actually serves',
         '200': {
           content: {
             'application/json': {
-              schema: { allOf: Array<{ properties?: Record<string, unknown> }> };
+              schema: { oneOf: Array<{ allOf?: Array<{ properties?: Record<string, unknown> }> }> };
             };
           };
         };
       };
     };
-    const extension = compliance.responses['200'].content['application/json'].schema.allOf.find(
-      (s) => s.properties,
-    );
+    // Depuis le 25/09/2026, la réponse 200 est un oneOf : la forme IBAN (allOf)
+    // puis la forme BIC.
+    const extension = compliance.responses['200'].content[
+      'application/json'
+    ].schema.oneOf[0]!.allOf!.find((s) => s.properties);
     expect(Object.keys(extension?.properties ?? {})).toContain('meta');
   });
 
@@ -367,11 +374,155 @@ describe('the contract covers the routes and fields the server actually serves',
       'psd_registration',
       'official_identity',
       'modulus_check',
+      'bank_code_holder',
+      'checks',
     ]) {
       const description = properties[field]?.description ?? '';
       expect(description, `${field} does not say when it appears`).toMatch(
         /present|absent|only|when/i,
       );
     }
+  });
+});
+
+/**
+ * Les champs de vérité du 25/09/2026 : servis par l'API, donc déclarés au
+ * contrat, avec les valeurs possibles lues dans le code qui les produit.
+ */
+describe('the truth fields are in the contract', () => {
+  type Schema = {
+    properties?: Record<string, Schema>;
+    enum?: unknown[];
+    items?: Schema;
+    description?: string;
+  };
+  const schemas = (buildSpec() as unknown as { components: { schemas: Record<string, Schema> } })
+    .components.schemas;
+
+  it('declares bank_code_holder and every checks key with its possible values', () => {
+    const v = schemas.IBANValidationResult.properties!;
+    expect(v.bank_code_holder.enum).toEqual(['confirmed', 'inferred', 'not_allocated', 'unknown']);
+    const checks = v.checks.properties!;
+    expect(Object.keys(checks)).toEqual([
+      'iban_structure',
+      'iban_checksum',
+      'bank_code',
+      'bic',
+      'sepa_reachability',
+      'national_check_digits',
+      'account_exists',
+      'payee_name',
+      'institution_sanctions',
+      'country_sanctions',
+      'payee_sanctions',
+    ]);
+    for (const never of ['account_exists', 'payee_name', 'payee_sanctions']) {
+      expect(checks[never].enum, never).toEqual(['not_checked']);
+    }
+    expect(v.checks.description).toMatch(/payee_name: never checked/);
+  });
+
+  it('declares the bank grain of sepa and the trace of the bic block', () => {
+    const v = schemas.IBANValidationResult.properties!;
+    const sepa = v.sepa.properties!;
+    expect(sepa.bank_reachability.enum).toEqual([
+      'listed',
+      'not_listed',
+      'no_bank',
+      'bank_code_not_allocated',
+      null,
+    ]);
+    expect(sepa).toHaveProperty('bank_schemes');
+    expect(sepa).toHaveProperty('vop_register_status');
+    expect(v.bic.properties!).toHaveProperty('listed_in_current_source');
+    // Les descriptions qui disaient trop : l'obligation VoP est celle du pays.
+    expect(sepa.vop_required.description).toMatch(/COUNTRY/);
+    expect(v.risk_indicators.properties!.vop_coverage.description).toMatch(/vop_register_status/);
+  });
+
+  it('declares frozen_bic_sources on HealthResponse, beside bic_sources', () => {
+    const h = schemas.HealthResponse.properties!;
+    expect(h).toHaveProperty('bic_sources');
+    expect(Object.keys(h.frozen_bic_sources.items!.properties!)).toEqual([
+      'source',
+      'source_as_of',
+      'rows',
+      'bic8',
+      'rows_without_current_trace',
+      'bic8_without_current_trace',
+      'complete',
+    ]);
+  });
+
+  it('declares source_name, source_as_of and listed_in_current_source on BICLookupResult', () => {
+    const b = schemas.BICLookupResult.properties!;
+    for (const k of ['source_name', 'source_as_of', 'listed_in_current_source']) {
+      expect(b, k).toHaveProperty(k);
+    }
+    expect(b.found.description).toMatch(/names an institution/);
+  });
+
+  it('declares the honest compliance names', () => {
+    const c = schemas.ComplianceResult.properties!;
+    expect(c.sanctions.properties!).toHaveProperty('institution_listed');
+    expect(c.sanctions.properties!.payee_screened.enum).toEqual([false]);
+    expect(c.reachability.properties!).toHaveProperty('listed_in_epc_registers');
+    expect(c.vop.properties!).toHaveProperty('register_status');
+    expect(c.flags.description).toMatch(/bank_code_inferred carries no weight/);
+  });
+});
+
+/**
+ * Relecture de la PR 254, R4 et R5 : des réponses réelles, validées contre le
+ * contrat servi. La forme BIC de la conformité n'y était pas déclarée, et
+ * `address` d'une fiche BIC était déclaré non nullable alors que la route le
+ * sert à `null` sur un BIC trouvé sans adresse enregistrée.
+ */
+describe('real answers validate against the served contract', () => {
+  const spec = buildSpec() as unknown as {
+    components: Record<string, unknown> & { schemas: Record<string, Record<string, unknown>> };
+    paths: Record<string, { post?: Record<string, unknown> }>;
+  };
+  /** Un schéma du document, avec les composants pour résoudre ses $ref. */
+  function validator(schema: Record<string, unknown>) {
+    return new AjvJsonSchemaValidator().getValidator({
+      ...schema,
+      components: spec.components,
+    } as Parameters<AjvJsonSchemaValidator['getValidator']>[0]);
+  }
+  const compliance = spec.paths['/v1/iban/compliance'].post as {
+    requestBody: { content: { 'application/json': { schema: Record<string, unknown> } } };
+    responses: { '200': { content: { 'application/json': { schema: Record<string, unknown> } } } };
+  };
+
+  it('accepts an iban body or a bic body, and refuses both together', () => {
+    const request = validator(compliance.requestBody.content['application/json'].schema);
+    expect(request({ iban: 'DE89370400440532013000' }).valid).toBe(true);
+    expect(request({ bic: 'COBADEFF' }).valid).toBe(true);
+    expect(request({ iban: 'DE89370400440532013000', bic: 'COBADEFF' }).valid).toBe(false);
+    expect(request({}).valid).toBe(false);
+  });
+
+  it('validates the IBAN and the BIC forms of a compliance answer', () => {
+    const response = validator(compliance.responses['200'].content['application/json'].schema);
+    const byIban = { ...buildComplianceResponse('DE89370400440532013000'), cost_usdc: 0.02 };
+    expect(response(byIban).errorMessage).toBeUndefined();
+    for (const bic of ['COBADEFF', 'ZZZZITMM']) {
+      const byBic = buildBicComplianceResponse(bic);
+      expect(response(byBic).errorMessage, bic).toBeUndefined();
+    }
+  });
+
+  it('validates a BIC record found without a registered address', async () => {
+    const app = new Hono<HonoEnv>();
+    app.route('/', bicLookup);
+    const record = validator({ $ref: '#/components/schemas/BICLookupResult' });
+    let withoutAddress = 0;
+    for (const code of ['UBSWCHZH', 'ZZZZITMM', 'DEUTDEFF']) {
+      const body = (await (await app.request(`/v1/bic/${code}`)).json()) as { address: unknown };
+      if (body.address === null) withoutAddress += 1;
+      expect(record(body).errorMessage, code).toBeUndefined();
+    }
+    expect(withoutAddress).toBeGreaterThan(0);
   });
 });

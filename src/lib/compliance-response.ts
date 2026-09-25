@@ -9,9 +9,81 @@ import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult, isTestBic } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import { validateBIC } from './bic-validator.js';
-import { lookup } from './bic-lookup.js';
+import { bicCountryName, lookup, namedRow } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import type { BicComplianceResponse, ComplianceResult, IBANValidationResult } from '../types.js';
+import { institutionListed, withComplianceChecks } from './checks.js';
+
+/**
+ * Les noms honnêtes du bloc `compliance` (25/09/2026), AJOUTÉS à côté des
+ * anciens, qui gardent leur valeur :
+ * - `sanctions.institution_listed` : `bank_sanctioned` quand une banque a été
+ *   criblée contre toutes les listes que le service nomme, `null` sinon ;
+ *   `bank_sanctioned: false` se lisait « propre » même sans criblage ;
+ * - `sanctions.payee_screened` : toujours `false`, le bénéficiaire n'est
+ *   jamais criblé ;
+ * - `reachability.listed_in_epc_registers` : un des trois schémas au moins,
+ *   `null` quand les registres n'ont pas été consultés ;
+ * - `vop.register_status` : le statut du registre VoP au bon nom, `null` quand
+ *   il n'a pas été consulté.
+ *
+ * UNE fonction, appliquée à chaque bloc qui sort d'ici (le chemin IBAN, le
+ * chemin BIC, la base illisible, l'IBAN invalide) : écrits à la main à côté de
+ * chaque assembleur, ces champs dériveraient.
+ */
+export function withHonestNames(compliance: ComplianceResult): ComplianceResult {
+  const { sanctions, reachability, vop } = compliance;
+  return {
+    ...compliance,
+    sanctions: {
+      ...sanctions,
+      institution_listed: institutionListed(compliance),
+      payee_screened: false,
+    },
+    reachability: {
+      ...reachability,
+      listed_in_epc_registers: reachability.screened
+        ? reachability.sct || reachability.sdd || reachability.sepa_instant
+        : null,
+    },
+    vop: {
+      ...vop,
+      register_status: vop.screened
+        ? vop.status === 'not_found'
+          ? 'not_listed'
+          : vop.status
+        : null,
+    },
+  };
+}
+
+/**
+ * Ce que le score doit savoir du code banque, lu dans `bank_code_holder`
+ * (25/09/2026) : `inferred` porte le drapeau sans poids `bank_code_inferred`,
+ * les trois autres gardent exactement le poids qu'ils avaient. Sans détenteur
+ * (enrichissement arrêté avant le verdict), l'ancienne lecture de
+ * `bank_code_check`, qui donnait `confirmed` faute de verdict.
+ */
+function bankCodeConfidence(result: IBANValidationResult): BankCodeConfidence {
+  switch (result.bank_code_holder) {
+    case 'confirmed':
+      return 'confirmed';
+    case 'inferred':
+      return 'inferred';
+    case 'not_allocated':
+      return 'denied';
+    case 'unknown':
+      return 'unverified';
+    default: {
+      const check = result.bank_code_check;
+      return !check || check.status === 'verified'
+        ? 'confirmed'
+        : check.authoritative
+          ? 'denied'
+          : 'unverified';
+    }
+  }
+}
 
 /**
  * The one place a compliance response is assembled.
@@ -58,7 +130,11 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
   // those misses added up to 10 out of 100, which reads as 'low'. See
   // unassessableCompliance() and the note on RiskLevel in types.ts.
   if (!result.valid) {
-    return { ...result, compliance: unassessableCompliance(), meta: getComplianceMeta() };
+    return {
+      ...result,
+      compliance: withHonestNames(unassessableCompliance()),
+      meta: getComplianceMeta(),
+    };
   }
 
   const countryCode = result.country?.code ?? '';
@@ -69,13 +145,7 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
   // exactly like Commerzbank, while next_steps routed callers here from the
   // endpoint that had stopped guessing. A pilot customer caught it by reading the two
   // payloads against each other.
-  const check = result.bank_code_check;
-  const bankCode: BankCodeConfidence =
-    !check || check.status === 'verified'
-      ? 'confirmed'
-      : check.authoritative
-        ? 'denied'
-        : 'unverified';
+  const bankCode = bankCodeConfidence(result);
   // Country risk comes straight from the country code — NEVER from
   // risk_indicators, which only exists when BBAN parsing/enrichment succeeded.
   // (Countries without a BBAN_STRUCTURE used to silently fall back to
@@ -112,7 +182,14 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
     );
   }
 
-  return { ...result, compliance, meta: getComplianceMeta() };
+  const honest = withHonestNames(compliance);
+  return {
+    ...result,
+    // Les deux axes de sanctions rejoignent les contrôles de la validation.
+    ...(result.checks ? { checks: withComplianceChecks(result.checks, honest) } : {}),
+    compliance: honest,
+    meta: getComplianceMeta(),
+  };
 }
 
 /** What the caller must be told when the BIC itself is malformed. */
@@ -144,7 +221,9 @@ export function buildBicComplianceResponse(
   const countryCode = validation.country_code;
   // The directory is consulted to NAME the institution, never to decide whether
   // to screen it. A miss here is a gap in our coverage, not an absence of risk.
-  const row = lookup(bic8);
+  // Une ligne sans nom ne nomme personne : traitée comme introuvable, comme
+  // GET /v1/bic/:code (25/09/2026).
+  const row = namedRow(lookup(bic8));
   const known = classifyIssuer(bic8, row?.institution ?? undefined);
   const issuerType = known?.type ?? 'bank';
   const countryRisk = getCountryRisk(countryCode);
@@ -178,8 +257,10 @@ export function buildBicComplianceResponse(
     valid_format: true,
     found: row !== null,
     institution: row?.institution ?? null,
-    country: { code: countryCode, name: row?.country_name ?? countryCode },
-    compliance,
+    // Le nom du pays, même pour un BIC que l'annuaire ne porte pas : il
+    // répondait le code sous le nom `name` (25/09/2026).
+    country: { code: countryCode, name: bicCountryName(row, countryCode) },
+    compliance: withHonestNames(compliance),
     meta: getComplianceMeta(),
     cost_usdc: 0,
   };
