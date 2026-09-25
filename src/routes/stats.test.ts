@@ -559,3 +559,179 @@ describe('/stats/* — no window is ever measured in silence (PERF-13)', () => {
     expect(res.status).toBe(403);
   });
 });
+
+/**
+ * Les jours clos de la tendance, calculés une fois et rangés (25.09.2026).
+ *
+ * La requête d'origine, d'un seul tenant, reste ici mot pour mot : c'est elle
+ * qui fait foi, et chaque test compare la tendance servie à ce qu'elle rendrait.
+ */
+describe('GET /stats/traffic-trend : les jours clos sont rangés, le jour en cours reste en direct', () => {
+  const ORIGINAL_SQL = `WITH classified AS (
+         SELECT date(created_at) AS d, status, ip_hash,
+           CASE
+             WHEN key_prefix IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email)) THEN 'internal'
+             WHEN key_prefix IS NOT NULL THEN 'with_key'
+             WHEN COALESCE(client_kind, 'api') IN ('mcp_http', 'mcp_stdio') THEN 'agent'
+             WHEN COALESCE(client_kind, 'api') = 'bot' THEN 'declared_bot'
+             WHEN COALESCE(client_kind, 'api') = 'web' THEN 'browser'
+             ELSE 'anonymous_api'
+           END AS nature
+         FROM request_log
+         WHERE created_at >= date('now', ?)
+       )
+       SELECT d AS date, COUNT(*) AS total,
+              SUM(nature = 'with_key') AS with_key, SUM(nature = 'agent') AS agent,
+              SUM(nature = 'declared_bot') AS declared_bot, SUM(nature = 'browser') AS browser,
+              SUM(nature = 'anonymous_api') AS anonymous_api, SUM(nature = 'internal') AS internal,
+              SUM(status = 404) AS not_found, SUM(status = 402) AS paywall,
+              SUM(status >= 500) AS server_error, COUNT(DISTINCT ip_hash) AS distinct_ips
+         FROM classified GROUP BY d ORDER BY d ASC`;
+  const PFX = 'ifk_rangement';
+  const PREVIOUS_FRAGMENTS = process.env.CRM_INTERNAL_EMAILS;
+
+  function original(period: number): unknown[] {
+    return getStatsDB()
+      .prepare(ORIGINAL_SQL)
+      .all(`-${period - 1} days`);
+  }
+  async function served(
+    period: number,
+  ): Promise<{ days: Array<{ date: string; total: number; with_key: number; internal: number }> }> {
+    const r = await app.request(`/stats/traffic-trend?period=${period}`, auth);
+    expect(r.status).toBe(200);
+    return (await r.json()) as never;
+  }
+  function log(daysAgo: number, key: string | null, kind: string | null, ip: string) {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO request_log (method, path, status, response_ms, created_at, hour, day_of_week, client_kind, ip_hash, key_prefix)
+         VALUES ('GET', '/v1/demo', 200, 5, datetime('now', ?), 12, 3, ?, ?, ?)`,
+      )
+      .run(`-${daysAgo} days`, kind, ip, key);
+  }
+  const dayOf = (daysAgo: number) =>
+    new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
+
+  beforeAll(() => {
+    process.env.CRM_INTERNAL_EMAILS = '';
+    getStatsDB()
+      .prepare('INSERT OR IGNORE INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)')
+      .run('hash-rangement', PFX, 'rangement@alpha.example.net');
+    log(12, PFX, 'api', 'ip-r1');
+    log(12, PFX, 'api', 'ip-r2');
+    log(12, null, 'web', 'ip-r3');
+    log(13, null, 'mcp_http', 'ip-r4');
+  });
+  afterAll(() => {
+    if (PREVIOUS_FRAGMENTS === undefined) delete process.env.CRM_INTERNAL_EMAILS;
+    else process.env.CRM_INTERNAL_EMAILS = PREVIOUS_FRAGMENTS;
+  });
+
+  it('rend exactement la requête d’origine, à froid puis depuis les jours rangés', async () => {
+    getStatsDB().prepare('DELETE FROM traffic_trend_days').run();
+    const froid = await served(30);
+    expect(froid.days).toEqual(original(30));
+    const rangees = getStatsDB().prepare('SELECT COUNT(*) AS n FROM traffic_trend_days').get() as {
+      n: number;
+    };
+    expect(rangees.n).toBe(29);
+    const chaud = await served(30);
+    expect(chaud.days).toEqual(original(30));
+    expect((await served(180)).days).toEqual(original(180));
+  });
+
+  it('un jour sans trafic est rangé vide et n’apparaît pas, comme avant', async () => {
+    await served(30);
+    const vide = dayOf(20);
+    const row = getStatsDB()
+      .prepare('SELECT row FROM traffic_trend_days WHERE day = ?')
+      .get(vide) as { row: string | null } | undefined;
+    expect(row).toBeDefined();
+    expect(row?.row).toBeNull();
+    expect((await served(30)).days.find((d) => d.date === vide)).toBeUndefined();
+  });
+
+  it('le jour en cours se lit en direct ; un jour clos rangé ne se recalcule pas', async () => {
+    const avant = await served(30);
+    const aujourdHui = dayOf(0);
+    const totalAvant = avant.days.find((d) => d.date === aujourdHui)?.total ?? 0;
+    const closAvant = avant.days.find((d) => d.date === dayOf(12));
+    log(0, null, 'web', 'ip-r5');
+    log(12, null, 'web', 'ip-r6');
+    const apres = await served(30);
+    expect(apres.days.find((d) => d.date === aujourdHui)?.total).toBe(totalAvant + 1);
+    expect(apres.days.find((d) => d.date === dayOf(12))).toEqual(closAvant);
+  });
+
+  it('une clé qui devient interne reclasse les jours déjà rangés', async () => {
+    getStatsDB().prepare('DELETE FROM traffic_trend_days').run();
+    const avant = (await served(30)).days.find((d) => d.date === dayOf(13));
+    getStatsDB()
+      .prepare('INSERT OR IGNORE INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)')
+      .run('hash-rangement-2', 'ifk_rangement2', 'rangement2@alpha.example.net');
+    log(13, 'ifk_rangement2', 'api', 'ip-r7');
+    getStatsDB().prepare('DELETE FROM traffic_trend_days WHERE day = ?').run(dayOf(13));
+    const client = (await served(30)).days.find((d) => d.date === dayOf(13));
+    expect(client?.with_key).toBe((avant?.with_key ?? 0) + 1);
+    getStatsDB()
+      .prepare('UPDATE api_keys SET email = ? WHERE key_prefix = ?')
+      .run('burst-rangement@cohorte.invalid', 'ifk_rangement2');
+    const interne = (await served(30)).days.find((d) => d.date === dayOf(13));
+    expect(interne?.with_key).toBe(avant?.with_key ?? 0);
+    expect(interne?.internal).toBe((avant?.internal ?? 0) + 1);
+    expect((await served(30)).days).toEqual(original(30));
+  });
+});
+
+describe('GET /stats/pulse', () => {
+  function op(daysAgo: number, type: string, rejected: string | null = null) {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO operations (operation_type, success, created_at, reject_reason) VALUES (?, 1, datetime('now', ?), ?)`,
+      )
+      .run(type, `-${daysAgo} days`, rejected);
+  }
+
+  beforeAll(() => {
+    op(0, 'iban_validate');
+    op(0, 'bic_lookup');
+    op(0, 'iban_validate', 'invalid_format');
+    op(1, 'iban_batch');
+    op(1, 'compliance');
+  });
+
+  it('demande le jeton et ne prend aucun paramètre', async () => {
+    expect((await app.request('/stats/pulse')).status).toBe(403);
+    const res = await app.request('/stats/pulse?period=30', auth);
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('unknown_parameter');
+  });
+
+  it('rend les mêmes nombres que /stats et /stats/history', async () => {
+    const pulse = (await (await app.request('/stats/pulse', auth)).json()) as Record<
+      string,
+      number | string | null
+    >;
+    const full = (await (await app.request('/stats', auth)).json()) as Record<string, unknown>;
+    expect(pulse.last_write_at).toBe(full.last_write_at);
+    expect(pulse.requests_today).toBe(full.requests_today);
+    expect(pulse.total_requests).toBe(full.total_requests);
+    const ops = (d?: { iban_validate: number; iban_batch: number; bic_lookup: number }) =>
+      d ? d.iban_validate + d.iban_batch + d.bic_lookup : 0;
+    const hist = getStatsHistory(2);
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    expect(pulse.operations_today).toBe(ops(hist.find((h) => h.date === today)));
+    expect(pulse.operations_yesterday).toBe(ops(hist.find((h) => h.date === yesterday)));
+    expect(pulse.operations_today).toBeGreaterThanOrEqual(2);
+    // La courbe des sept jours : jours vides compris, du plus ancien à aujourd'hui,
+    // et chaque jour vaut la ligne de l'historique du même jour.
+    const week = pulse.operations_by_day as unknown as Array<{ date: string; operations: number }>;
+    expect(week).toHaveLength(7);
+    expect(week[6].date).toBe(today);
+    expect(week[5].date).toBe(yesterday);
+    const hist7 = getStatsHistory(7);
+    for (const d of week) expect(d.operations).toBe(ops(hist7.find((h) => h.date === d.date)));
+  });
+});

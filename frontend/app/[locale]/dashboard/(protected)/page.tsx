@@ -32,6 +32,7 @@ import type {
   ErrorsResponse,
   HistoryEntry,
   HourlyResponse,
+  StatsPulse,
   StatsResponse,
 } from '@/components/dashboard/overview/types';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
@@ -87,8 +88,19 @@ export default async function DashboardPage({
   // off before the first <Suspense>, so they still run together — the win of
   // the old single Promise.all is kept, its cost (nothing on screen until the
   // slowest one landed) is not.
-  const statsP = stats<StatsResponse>('/stats');
-  const historyP = stats<HistoryEntry[]>(`/stats/history?period=${period}`);
+  // La vue « growth » ne lit que le pouls (25.09.2026) : `/stats` et
+  // `/stats/history` recalculent tout l'historique de `request_log` (plus d'une
+  // seconde, pendant laquelle l'API ne répond à personne) pour une heure et deux
+  // nombres. Les autres vues lisent toujours les routes entières.
+  const statsP = growth
+    ? Promise.resolve(notFetched<StatsResponse>())
+    : stats<StatsResponse>('/stats');
+  const historyP = growth
+    ? Promise.resolve(notFetched<HistoryEntry[]>())
+    : stats<HistoryEntry[]>(`/stats/history?period=${period}`);
+  const pulseP = growth
+    ? stats<StatsPulse>('/stats/pulse')
+    : Promise.resolve(notFetched<StatsPulse>());
   const funnelP = statsFor<{ rows?: BusinessFunnelDay[] }>(
     service,
     `/stats/business-funnel?period=${period}`,
@@ -165,7 +177,9 @@ export default async function DashboardPage({
   // Swallows its own failures already; the catch is belt and braces, because a
   // promise created here and awaited three sections down would otherwise be an
   // unhandled rejection before anyone looks at it.
-  const crmP = fetchCrmData().catch(() => null);
+  // La vue « growth » ne lit du CRM que les clés et leur activité : le courrier
+  // en version courte suffit (sans les corps, comme la page Clients).
+  const crmP = fetchCrmData(growth ? { lightMessages: true } : {}).catch(() => null);
 
   /**
    * ENS-11 (the double read of /v1/admin/activation) is NOT closed here, and
@@ -230,10 +244,10 @@ export default async function DashboardPage({
       <Suspense
         fallback={<div className="h-[70px] animate-pulse rounded-xl bg-[var(--ink-2)]/60" />}
       >
-        <HealthStrip statsPromise={statsP} compact={!service} />
+        <HealthStrip statsPromise={growth ? pulseP : statsP} compact={!service} />
       </Suspense>
       <Suspense fallback={null}>
-        <ApiDownBanner statsPromise={statsP} />
+        <ApiDownBanner statsPromise={growth ? pulseP : statsP} />
       </Suspense>
 
       {view === 'today' && (
@@ -291,21 +305,24 @@ export default async function DashboardPage({
             period={period}
           >
             <TrafficSection nowIso={readAtIso} trendPromise={trendP} />
-            <NewSection
-              locale={locale}
-              nowIso={readAtIso}
-              activationPromise={activationP}
-              clientsPromise={clientsP}
-              crmPromise={crmP}
-              historyPromise={historyP}
-              demandGapsPromise={demandGapsP}
-              feedbackPromise={feedbackP}
-              sourcesPromise={signupSourcesP}
-              sourcesWeekPromise={signupSourcesWeekP}
-              auditStatsPromise={auditStatsP}
-              doorsWeekPromise={doorsWeekP}
-              doorsMonthPromise={doorsMonthP}
-            />
+            {/* Sa propre attente : le trafic s'affiche sans attendre le CRM. */}
+            <Suspense fallback={<SectionSkeleton rows={4} />}>
+              <NewSection
+                locale={locale}
+                nowIso={readAtIso}
+                activationPromise={activationP}
+                clientsPromise={clientsP}
+                crmPromise={crmP}
+                pulsePromise={pulseP}
+                demandGapsPromise={demandGapsP}
+                feedbackPromise={feedbackP}
+                sourcesPromise={signupSourcesP}
+                sourcesWeekPromise={signupSourcesWeekP}
+                auditStatsPromise={auditStatsP}
+                doorsWeekPromise={doorsWeekP}
+                doorsMonthPromise={doorsMonthP}
+              />
+            </Suspense>
           </AudienceSection>
         </Suspense>
       )}
