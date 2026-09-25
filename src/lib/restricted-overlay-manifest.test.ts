@@ -87,6 +87,48 @@ describe('parseManifest', () => {
   });
 });
 
+describe('parseManifest, les membres repris (carried_over)', () => {
+  const bicFile = (carried: unknown): ManifestFile =>
+    ({
+      ...file({
+        name: 'restricted-bic.sqlite',
+        members: { eba_step2: 190, nbp: 20, register_at: 800 },
+      }),
+      carried_over: carried,
+    }) as ManifestFile;
+  const repris = { source_date: '2026-09-01T07:30:00.000Z', cause: 'http_503' };
+
+  it('relit la liste ; vide, le champ disparaît ; un manifeste sans elle reste lisible', () => {
+    const m = manifest({ bic: bicFile({ eba_step2: repris }) });
+    expect(parseManifest(JSON.stringify(m))).toEqual({ ok: true, manifest: m });
+    const empty = parseManifest(JSON.stringify(manifest({ bic: bicFile({}) })));
+    expect(empty.ok && 'carried_over' in empty.manifest.files.bic!).toBe(false);
+    const before = manifest({ bic: file({ name: 'restricted-bic.sqlite' }) });
+    expect(parseManifest(JSON.stringify(before))).toEqual({ ok: true, manifest: before });
+  });
+
+  it('refuse une liste mal formée, un message à la place d’un code, un membre étranger au fichier', () => {
+    const bad: unknown[] = [
+      [],
+      'eba_step2',
+      { eba_step2: { ...repris, source_date: '01.09.2026' } },
+      { eba_step2: { ...repris, source_date: '2026-09-01 07:30:00' } },
+      { eba_step2: { ...repris, cause: 'HTTP 503 for https://example.net/list.csv' } },
+      { eba_step2: { source_date: repris.source_date } },
+      { register_be: repris },
+      // Une propriété héritée n'est pas un membre du fichier.
+      { constructor: repris },
+    ];
+    for (const carried of bad) {
+      const m = manifest({ bic: bicFile(carried) });
+      expect(parseManifest(JSON.stringify(m)), JSON.stringify(carried)).toEqual({
+        ok: false,
+        error: 'manifest_file_invalid:bic',
+      });
+    }
+  });
+});
+
 describe('compareManifests, la porte de qualité', () => {
   const previous = manifest({ compliance: file(), bic: file({ name: 'restricted-bic.sqlite' }) });
 

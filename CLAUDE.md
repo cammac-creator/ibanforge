@@ -236,7 +236,14 @@ privé reconstruit la surcouche chaque semaine (conformité) et chaque mois (BIC
 aucune donnée, et publie une release : les deux fichiers et un `manifest.json`
 (`src/lib/restricted-overlay-manifest.ts` : SHA-256, taille, date de génération, commit public,
 lignes par membre), après une porte de qualité (`npm run overlay -- check`, puis `manifest
---previous` : aucun fichier ni membre perdu, aucun membre en baisse de plus de 10 %). Avec
+--previous` : aucun fichier ni membre perdu, aucun membre en baisse de plus de 10 %). Une
+source en panne au passage mensuel ne l'arrête plus : chaque seeder de la famille rend compte
+de chaque membre (`scripts/seed-report.ts`), et un membre dont la source a échoué est repris
+tel quel de la surcouche précédente posée au chemin de sortie, dates d'origine gardées
+(`scripts/restricted-carry-over.ts`), noté dans le fichier et le manifeste (`carried_over`) et
+annoncé par une annotation `::warning::` ; refus si aucun membre n'est frais, sans surcouche
+précédente, ou si une donnée reprise a plus de 45 jours ou une date inconnue, ou si sa liste
+PRA sort de la fenêtre du seeder. Avec
 `RESTRICTED_OVERLAY_PULL_REPO` (owner/name, écrit nulle part dans ce dépôt) et
 `RESTRICTED_OVERLAY_PULL_TOKEN` (jeton à grain fin, lecture seule du contenu de ce seul dépôt),
 la veille de dix minutes tire la dernière release toutes les quatre heures plus une gigue d'au

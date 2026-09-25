@@ -22,7 +22,12 @@ import { createReadStream } from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as XLSX from 'xlsx';
 import { getCountryName } from '../src/lib/countries.js';
-import { restrictedBicSources, seedFamilyFromEnv } from '../src/lib/restricted-family.js';
+import {
+  RESTRICTED_BIC_INSERT_ORDER,
+  restrictedBicSources,
+  seedFamilyFromEnv,
+} from '../src/lib/restricted-family.js';
+import { failureCause, reportSeedMember } from './seed-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
@@ -538,7 +543,7 @@ async function main(): Promise<void> {
   // la variable, rien ne change : toutes les sources, dans le même ordre.
   const family = seedFamilyFromEnv();
   if (family === 'restricted') {
-    const expected = ['eba_step2', 'nbp', 'oenb'];
+    const expected = [...RESTRICTED_BIC_INSERT_ORDER].sort();
     const declared = [...restrictedBicSources()].sort();
     if (declared.join(',') !== expected.join(',')) {
       throw new Error(`La famille déclare ${declared.join(',')} ; ce seeder importe ${expected.join(',')}. À réaligner.`);
@@ -552,9 +557,29 @@ async function main(): Promise<void> {
     await importBundesbank(db);
     await importSixBankMaster(db);
   }
-  try { await importOeNB(db); } catch (err) { console.warn(`  WARNING: OeNB import failed: ${(err as Error).message}`); }
-  try { await importNBP(db); } catch (err) { console.warn(`  WARNING: NBP import failed: ${(err as Error).message}`); }
-  try { await importEbaStep2(db); } catch (err) { console.warn(`  WARNING: EBA Step2 import failed: ${(err as Error).message}`); }
+  // OeNB, NBP puis EBA STEP2, dans l'ordre que la reprise d'un membre en panne
+  // reproduit (RESTRICTED_BIC_INSERT_ORDER). Chacune seule : une panne n'arrête
+  // pas les autres. Avec SEED_REPORT_PATH (chaîne privée de la surcouche),
+  // l'issue de chacune est notée pour la reprise (scripts/seed-report.ts) ; sans
+  // la variable, rien de plus qu'avant.
+  const familyImports: Record<
+    (typeof RESTRICTED_BIC_INSERT_ORDER)[number],
+    [string, (target: Database.Database) => Promise<number>]
+  > = {
+    oenb: ['OeNB', importOeNB],
+    nbp: ['NBP', importNBP],
+    eba_step2: ['EBA Step2', importEbaStep2],
+  };
+  for (const source of RESTRICTED_BIC_INSERT_ORDER) {
+    const [label, importSource] = familyImports[source];
+    try {
+      const processed = await importSource(db);
+      reportSeedMember({ member: source, state: 'loaded', processed });
+    } catch (err) {
+      console.warn(`  WARNING: ${label} import failed: ${(err as Error).message}`);
+      reportSeedMember({ member: source, state: 'failed', cause: failureCause(err) });
+    }
+  }
 
   // Count after
   const afterCount = (db.prepare('SELECT COUNT(*) as n FROM bic_entries').get() as { n: number }).n;
