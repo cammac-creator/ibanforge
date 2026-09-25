@@ -212,18 +212,24 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 
 Ce qui peut être servi mais pas redistribué (lignes EBA STEP2, NBP et OeNB de l'annuaire,
 registres AT, BE et SM, liste PRA, liste ONU, registres EPC) est listé UNE fois, dans
-`src/lib/restricted-family.ts`. En production, il vient d'un fichier privé par base,
-désigné par `RESTRICTED_BIC_OVERLAY_PATH` et `RESTRICTED_COMPLIANCE_OVERLAY_PATH`
-(chemins absolus sur le volume Railway, `/app/data/…`), fusionné au démarrage dans une
-copie de la base publique fraîche (`src/lib/restricted-overlay.ts`,
-`restricted-overlay-runtime.ts`). Recharger : remplacer le fichier de façon atomique
-(voisin puis `mv`), l'API le contrôle en dix minutes au plus et garde le précédent si le
-nouveau est refusé. État : `GET /health` → `restricted_overlays`. Construire :
-`npm run overlay -- extract` (sans téléchargement) ou `npm run overlay:seed` (circuit
-privé seulement). **Jamais** commiter une surcouche ni une copie fusionnée, jamais en
-écrire une dans le dépôt (le script refuse ; `.gitignore` attrape `restricted-*.sqlite*`
-et `*.merged-*.sqlite*`), jamais ajouter une table ou une source à la famille ailleurs
-que dans cette constante. Même règle dans `AGENTS.md`.
+`src/lib/restricted-family.ts`, avec la définition de chaque table et la façon de dater ses
+lignes. En production, il vient d'un fichier privé par base, désigné par
+`RESTRICTED_BIC_OVERLAY_PATH` et `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (chemins absolus sur
+le volume Railway, `/app/data/…`), fusionné au démarrage dans une copie de la base publique
+fraîche (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), membre par
+membre, la donnée la plus fraîche l'emportant : le public est gardé (`kept_public`) quand il
+est plus récent, ou non daté et différent. La dernière surcouche acceptée est gardée à côté
+(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé.
+Recharger : remplacer le fichier de façon atomique (voisin puis `mv`), l'API le contrôle en
+dix minutes au plus, ne refusionne que cette base, et garde ce qu'elle sert si le nouveau est
+refusé ou perdrait un membre servi. État : `GET /health` → `restricted_overlays`. Construire :
+`npm run overlay -- extract` (sans téléchargement) ou `npm run overlay:seed` (circuit privé
+seulement). Retirer : ôter la variable, redémarrer, vérifier `off`, puis effacer
+`restricted-*.merged-*`, `restricted-*.accepted.sqlite` et la surcouche dans l'ancien dossier ;
+effacer le seul fichier privé n'est PAS un retour arrière. **Jamais** commiter une surcouche
+ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script refuse ;
+`.gitignore` attrape `restricted-*.sqlite*` et `*.merged-*.sqlite*`), jamais ajouter une table
+ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
 
 ## MCP Integration
 
