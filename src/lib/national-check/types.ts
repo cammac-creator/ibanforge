@@ -26,8 +26,8 @@
  *   pour qu'une entrée imprévue ne produise jamais un verdict inventé.
  *
  * Un pays sans algorithme ne reçoit AUCUN bloc (la fonction d'entrée rend
- * `null`) : l'absence de contrôle se dira ailleurs, dans le champ de ce qui
- * n'a pas été vérifié, et non par un faux `not_applicable`.
+ * `null`) : l'absence de contrôle se dit dans `checks.national_check_digits`
+ * (`not_checked`), et non par un faux `not_applicable`.
  *
  * ## La langue
  *
@@ -39,6 +39,13 @@
 export type NationalCheckScheme = 'fr_rib_key' | 'be_mod97' | 'it_cin' | 'es_dc';
 
 export type NationalCheckStatus = 'pass' | 'fail' | 'not_applicable';
+
+/** Les trois statuts, pour les schémas publiés (OpenAPI, MCP). */
+export const NATIONAL_CHECK_STATUSES: readonly NationalCheckStatus[] = Object.freeze([
+  'pass',
+  'fail',
+  'not_applicable',
+]);
 
 export interface NationalCheck {
   /** Code pays de l'IBAN tel qu'il a été reçu : MC reste MC, SM reste SM. */

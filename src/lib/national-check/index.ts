@@ -5,16 +5,19 @@ import { checkItalianCin } from './it-cin.js';
 import type { NationalCheck, NationalCheckScheme } from './types.js';
 
 export type { NationalCheck, NationalCheckScheme, NationalCheckStatus } from './types.js';
+export { NATIONAL_CHECK_STATUSES } from './types.js';
 
 /**
  * Point d'entrée des clés de contrôle nationales : un IBAN en entrée, un bloc
  * en sortie, ou `null` quand le pays n'a pas d'algorithme ici.
  *
- * ## État au 24.09.2026 : écrit, PAS branché
+ * ## Branché le 25.09.2026
  *
- * Aucune réponse de l'API ne sert encore ce bloc. Le branchement dans
- * l'enrichissement viendra après les changements en cours sur le contrat des
- * réponses, avec sa documentation et son annonce au journal des changements.
+ * L'enrichissement (`src/lib/enrich.ts`) sert ce bloc tel quel sous le nom
+ * `national_check_digits`, sur tout IBAN valide de ces pays, et
+ * `checks.national_check_digits` reprend son statut (`src/lib/checks.ts`).
+ * Strictement additif : ni `valid`, ni `bank_code_holder`, ni le score de
+ * risque, ni `next_steps` ne le lisent.
  *
  * ## Ce que la fonction attend
  *
@@ -42,6 +45,16 @@ export const NATIONAL_CHECK_SCHEMES: Readonly<Record<string, NationalCheckScheme
   SM: 'it_cin',
   ES: 'es_dc',
 });
+
+/** Les noms d'algorithme servis, dans l'ordre de la table, sans doublon. */
+export const NATIONAL_CHECK_SCHEME_NAMES: readonly NationalCheckScheme[] = Object.freeze([
+  ...new Set(Object.values(NATIONAL_CHECK_SCHEMES)),
+]);
+
+/** Les pays couverts, dans l'ordre de la table. */
+export const NATIONAL_CHECK_COUNTRIES: readonly string[] = Object.freeze(
+  Object.keys(NATIONAL_CHECK_SCHEMES),
+);
 
 const CHECKERS: Readonly<
   Record<NationalCheckScheme, (country: string, bban: string) => NationalCheck>

@@ -8,9 +8,15 @@ import {
   BIC_SOURCE_AS_OF_NOTE,
   CHECKS_NOTE,
   LISTED_IN_CURRENT_SOURCE_NOTE,
+  NATIONAL_CHECK_DIGITS_NOTE,
   VOP_REGISTER_STATUS_NOTE,
 } from '../lib/field-notes.js';
 import { BANK_CODE_HOLDERS, CHECK_KEYS, CHECK_VALUES } from '../lib/checks.js';
+import {
+  NATIONAL_CHECK_COUNTRIES,
+  NATIONAL_CHECK_SCHEME_NAMES,
+  NATIONAL_CHECK_STATUSES,
+} from '../lib/national-check/index.js';
 import { frozenSources } from '../lib/source-vintage.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 // Read from the route rather than retyped: the enum of error types and the
@@ -2738,6 +2744,32 @@ const buildRawSpec = () => ({
             properties: Object.fromEntries(
               CHECK_KEYS.map((k) => [k, { type: 'string', enum: [...CHECK_VALUES[k]] }]),
             ),
+          },
+          // Ajouté le 25/09/2026 : la preuve de checks.national_check_digits hors du
+          // Royaume-Uni. `country` et `scheme` restent des chaînes (pas d'enum) :
+          // l'Allemagne en ajoutera, et un enum fermé casserait les clients générés.
+          national_check_digits: {
+            type: 'object',
+            description: NATIONAL_CHECK_DIGITS_NOTE,
+            required: ['country', 'scheme', 'status'],
+            properties: {
+              country: {
+                type: 'string',
+                example: NATIONAL_CHECK_COUNTRIES[0],
+                description: `The IBAN country: MC stays MC, SM stays SM. Today: ${NATIONAL_CHECK_COUNTRIES.join(', ')}.`,
+              },
+              scheme: {
+                type: 'string',
+                example: NATIONAL_CHECK_SCHEME_NAMES[0],
+                description: `The algorithm applied, a stable snake_case name. Today: ${NATIONAL_CHECK_SCHEME_NAMES.join(', ')}.`,
+              },
+              status: { type: 'string', enum: [...NATIONAL_CHECK_STATUSES] },
+              detail: {
+                type: 'string',
+                description:
+                  'Present on fail and not_applicable only: one sentence saying which digits disagree. It never gives the expected key.',
+              },
+            },
           },
           country: {
             type: 'object',

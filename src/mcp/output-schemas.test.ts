@@ -185,6 +185,39 @@ describe('the truth fields are declared, so the schema never strips them', () =>
     }
   });
 
+  it('validate_iban, batch_validate_iban and check_compliance keep the national_check_digits block', () => {
+    // Exemples du registre (pass) et un CIN faussé, chiffres ISO recalculés (fail).
+    const cases = [
+      'FR1420041010050500013M02606',
+      'BE68539007547034',
+      'IT60X0542811101000000123456',
+      'ES9121000418450200051332',
+      'IT65A0542811101000000123456',
+    ];
+    const validate = z.object(TOOL_OUTPUT_SCHEMAS.validate_iban);
+    const batch = z.object(TOOL_OUTPUT_SCHEMAS.batch_validate_iban);
+    const compliance = z.object(TOOL_OUTPUT_SCHEMAS.check_compliance);
+    const statuses = new Set<string>();
+    for (const iban of cases) {
+      const r = enriched(iban);
+      expect(r.valid, iban).toBe(true);
+      expect(r.national_check_digits, iban).toBeDefined();
+      statuses.add(r.national_check_digits!.status);
+      expect(validate.parse(r).national_check_digits, iban).toEqual(r.national_check_digits);
+      expect(
+        batch.parse({ results: [r], count: 1 }).results[0]!.national_check_digits,
+        iban,
+      ).toEqual(r.national_check_digits);
+      const c = { ...buildComplianceResponse(iban), cost_usdc: 0 };
+      const parsed = compliance.parse(c);
+      expect(parsed.national_check_digits, iban).toEqual(
+        (c as { national_check_digits?: unknown }).national_check_digits,
+      );
+    }
+    // Les deux statuts réellement servis passent le schéma.
+    expect([...statuses].sort()).toEqual(['fail', 'pass']);
+  });
+
   it('check_compliance keeps the honest names inside its closed blocks', () => {
     const schema = z.object(TOOL_OUTPUT_SCHEMAS.check_compliance);
     for (const iban of ['DE23999999990000000000', 'DE89370400440532013000', 'not-an-iban']) {

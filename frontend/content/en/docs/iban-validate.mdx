@@ -234,6 +234,36 @@ The BIC in the response is **derived** from the bank code the IBAN carries, and 
 
 > `bic.authoritative` and `bank_code_check.authoritative` answer **different questions**. Switzerland used to be where they visibly differed and no longer is: the BIC now comes from the SIX BankMaster's own column, so both are `true` there. San Marino is where they still part, in the other direction — the pairing is the supervisor's (`bic.authoritative: true`) while the code space is not its to settle (`bank_code_check.authoritative: false`). The first is about the code's existence, the second about the pairing that produced the BIC.
 
+### National check digits (`checks.national_check_digits`)
+
+Several countries keep a check key of their own inside the BBAN, older than the IBAN. It is a second check, independent of MOD-97: a tool that builds an IBAN around a wrong account number gets the IBAN check digits right without effort, but not the national key. IBANforge recomputes that key from the IBAN alone, in the same call and at no extra cost.
+
+| Country | `scheme` | The key that is checked |
+|---|---|---|
+| France, Monaco | `fr_rib_key` | The RIB key, the last two digits of the BBAN, over the bank code, the branch code and the account number (letters in the account number are converted by the RIB table) |
+| Belgium | `be_mod97` | The last two digits: the first ten digits modulo 97, or 97 when the remainder is 0 |
+| Italy, San Marino | `it_cin` | The CIN, the control letter at the start of the BBAN, over the ABI, the CAB and the account number |
+| Spain | `es_dc` | The two DC digits, positions 9 and 10 of the BBAN |
+| United Kingdom | see `modulus_check` | The Vocalink modulus check over the sort code and the account number |
+
+For these six countries a valid IBAN carries a `national_check_digits` block, and `checks.national_check_digits` repeats its `status`. In the other countries (the United Kingdom aside) the check is `not_checked`: the German account-number methods, one per bank code, are not checked yet.
+
+```json
+{
+  "valid": true,
+  "checks": { "national_check_digits": "fail", "…": "…" },
+  "national_check_digits": {
+    "country": "FR",
+    "scheme": "fr_rib_key",
+    "status": "fail",
+    "detail": "The RIB key (the last two digits of the BBAN) does not match the bank code, branch code and account number: this account number cannot have been issued as written."
+  }
+}
+```
+
+- **`pass`**: the key matches, so the account number is well formed. It does not prove that the account exists or is open.
+- **`fail`**: the key does not match. This account number cannot have been issued as written: a typo, or a number made up. `valid` stays `true`, because the IBAN check digits are right; read the two separately, and confirm the details with the beneficiary before paying. `detail` says which digits disagree and never gives the expected key.
+
 ### Invalid IBAN (200)
 
 When the IBAN is invalid, the response still returns 200 but with `valid: false`:

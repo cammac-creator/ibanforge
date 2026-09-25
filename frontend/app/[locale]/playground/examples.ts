@@ -39,7 +39,7 @@ export interface Chip {
 export const CHIPS: Record<PlaygroundMode, Chip[]> = {
   iban: [
     { key: 'ibanCh', value: 'CH1000230000000012345', tone: 'ok' },
-    { key: 'ibanEmi', value: 'BE92967000000000', tone: 'warn' },
+    { key: 'ibanEmi', value: 'BE40967000000063', tone: 'warn' },
     { key: 'ibanInvalid', value: 'CH9300762011623852958', tone: 'err' },
     { key: 'ibanSanctions', value: 'RU0204452560040702810412345678901', tone: 'err', toMode: 'compliance' },
   ],
