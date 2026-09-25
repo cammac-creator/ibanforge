@@ -1393,7 +1393,8 @@
       "serviceIntro": "Service health, errors and technical details.",
       "revenueDetails": "View revenue details",
       "intro": "Your activity at a glance",
-      "audienceHeading": "Your audience, at a glance"
+      "audienceHeading": "Your audience, at a glance",
+      "doors": "Doors"
     },
     "audience": {
       "eyebrow": "Audience observatory",
