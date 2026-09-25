@@ -34,13 +34,19 @@ export interface WeekRow {
   doors: DoorRow[];
 }
 
+/**
+ * Les utilisateurs gratuits actifs à 200 par mois. Le seuil de 50 compte des
+ * PERSONNES (adresses distinctes) ; le nombre de clés est donné à côté.
+ */
 export interface FreeUsers {
   threshold: number;
+  threshold_counts: 'people';
   window_days: number;
   window: { from: string; to: string };
-  active: number;
-  calendar: Array<{ month: string; active: number; to_date: boolean }>;
-  crossed_by: Array<{ basis: 'window' | 'month'; month: string | null; active: number }>;
+  active_people: number;
+  active_keys: number;
+  calendar: Array<{ month: string; people: number; keys: number; to_date: boolean }>;
+  crossed_by: Array<{ basis: 'window' | 'month'; month: string | null; people: number }>;
   crossed: boolean;
 }
 
@@ -49,7 +55,14 @@ export interface LastWeek {
   title: string;
   monday: string;
   sunday: string;
-  numbers: { created: number; first_success: number; paid: number; free_active: number };
+  numbers: {
+    created: number;
+    first_success: number;
+    paid: number;
+    /** En personnes : le nombre que lit le seuil. */
+    free_active: number;
+    free_active_keys: number;
+  };
   nudged: number;
   called_after_nudge: number;
   followup_pending: number;
@@ -84,6 +97,7 @@ export interface DigestView {
     first_success: number;
     paid: number;
     free_active: number;
+    free_active_keys: number;
   } | null;
 }
 
@@ -91,6 +105,8 @@ export interface DigestState {
   enabled: boolean;
   blocked: ChannelBlock | null;
   window: { first: string; last: string; deadline: string };
+  /** Le lundi de la semaine en cours, et s'il a passé son heure limite (17:00). */
+  this_monday: { week: string; monday: string; deadline_passed: boolean };
   recent: DigestView[];
   latest_matches_page: boolean | null;
 }
@@ -163,15 +179,15 @@ const BLOCKS: Record<ChannelBlock, string> = {
 function reasonText(reason: string | null): string {
   if (!reason) return 'raison inconnue';
   if (reason in BLOCKS) return BLOCKS[reason as ChannelBlock];
-  if (reason === 'telegram_refused') return 'Telegram a refusé le message';
-  if (reason === 'send_timeout_ambiguous') {
-    return 'Telegram n’a pas répondu à temps, et le message a pu partir : pas de second essai';
+  if (reason.startsWith('telegram_refused')) return 'Telegram a refusé le message';
+  if (reason === 'send_unconfirmed') {
+    return 'Telegram n’a pas confirmé l’envoi (coupure ou délai dépassé) et le message a pu partir : pas de second essai';
   }
   if (reason === 'process_stopped_mid_send') return 'le serveur a redémarré pendant l’envoi';
   return reason;
 }
 
-export type Tone = 'ok' | 'wait' | 'warn';
+export type Tone = 'ok' | 'wait' | 'warn' | 'neutral';
 
 /**
  * Où en est le résumé du lundi qui porte sur la semaine passée, en une phrase.
@@ -184,6 +200,15 @@ export function digestStatus(digest: DigestState, lastWeek: LastWeek): { tone: T
   }
   const latest = digest.recent.find((r) => r.summary_week === lastWeek.week);
   if (!latest) {
+    // Aucune ligne pour ce lundi alors que son heure limite est passée : l'API
+    // ne tournait pas ce lundi-là, et ce résumé ne partira jamais. Le dire, au
+    // lieu d'annoncer un « prochain résumé » (relecture du 25.09.2026, D7).
+    if (digest.this_monday.deadline_passed) {
+      return {
+        tone: 'warn',
+        text: `Résumé de ce lundi ${dayMonth(digest.this_monday.monday)} pas parti : l’API ne tournait pas ce lundi.`,
+      };
+    }
     if (digest.blocked) {
       return {
         tone: 'warn',
@@ -204,7 +229,7 @@ export function digestStatus(digest: DigestState, lastWeek: LastWeek): { tone: T
       if (digest.latest_matches_page === false) {
         return {
           tone: 'warn',
-          text: `${when} ; depuis, des données sont arrivées en retard et la page a bougé.`,
+          text: `${when} ; depuis, la page a bougé : passage en payant, remboursement, ferme regroupée ou données arrivées en retard.`,
         };
       }
       return { tone: 'ok', text: `${when}.` };
@@ -215,7 +240,7 @@ export function digestStatus(digest: DigestState, lastWeek: LastWeek): { tone: T
             tone: 'warn',
             text: `Résumé prévu ce lundi, bloqué pour l’instant : ${reasonText(latest.skip_reason)}.`,
           }
-        : { tone: 'wait', text: `Résumé prévu ce lundi à ${latest.next_attempt_at} (heure suisse).` };
+        : { tone: 'wait', text: `Résumé prévu ce lundi ${latest.next_attempt_at} (heure suisse).` };
     case 'sending':
       return { tone: 'wait', text: 'Résumé en cours d’envoi.' };
     case 'failed':
@@ -247,18 +272,28 @@ export function sentNumbersIfDifferent(
   return latest?.numbers ?? null;
 }
 
-/** La ligne du seuil : le nombre du lundi, puis le mois civil de la définition du 22.09. */
+/** Le mois civil de la définition du 22.09, en personnes, avec les clés à côté. */
 export function freeUsersCalendarLine(free: FreeUsers): string {
   const parts = free.calendar.map(
-    (m) => `${fmt(m.active)} en ${monthName(m.month)}${m.to_date ? ' à ce jour' : ''}`,
+    (m) =>
+      `${count(m.people, 'personne', 'personnes')} (${count(m.keys, 'clé', 'clés')}) en ${monthName(m.month)}${m.to_date ? ' à ce jour' : ''}`,
   );
   return `Au mois civil, définition du 22.09 : ${parts.join(', ')}.`;
 }
 
-/** Le contrôle du parc, en une phrase. */
+/**
+ * La cohérence interne du tableau, en une phrase. Ce n'est PAS une preuve :
+ * les deux nombres sont comptés par la même règle, donc égaux par construction
+ * tant que le rangement ne perd ni ne double aucune clé (relecture du
+ * 25.09.2026, D4). La preuve que la règle est juste vient du recoupement
+ * indépendant, joué sur la production.
+ */
 export function controlLine(control: DoorBoardControl): string {
-  const head = `Colonne « créées », toutes semaines et toutes portes : ${fmt(control.created_total)}. Parc externe du jour, compté à part : ${fmt(control.external_fleet)}.`;
-  if (control.equal) return `${head} Égal.`;
+  const created = fmt(control.created_total);
+  const fleet = fmt(control.external_fleet);
+  if (control.equal) {
+    return `La colonne « créées », toutes semaines et toutes portes, fait ${created}, comme le parc externe compté par la même règle : le tableau ne perd ni ne double aucune clé.`;
+  }
   const gap = Math.abs(control.gap);
-  return `${head} Écart de ${fmt(gap)} ${gap === 1 ? 'clé' : 'clés'}, à regarder.`;
+  return `La colonne « créées » fait ${created}, le parc externe compté par la même règle ${fleet} : le tableau perd ou double ${count(gap, 'clé', 'clés')}, à regarder.`;
 }

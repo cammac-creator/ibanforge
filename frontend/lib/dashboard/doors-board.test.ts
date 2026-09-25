@@ -26,7 +26,7 @@ function payload(over: Partial<DoorsPayload> = {}): DoorsPayload {
     title: 'Semaine 40 · 28.09 au 04.10',
     monday: '2026-09-28',
     sunday: '2026-10-04',
-    numbers: { created: 1234, first_success: 3, paid: 1, free_active: 23 },
+    numbers: { created: 1234, first_success: 3, paid: 1, free_active: 23, free_active_keys: 27 },
     nudged: 2,
     called_after_nudge: 1,
     followup_pending: 1,
@@ -79,12 +79,14 @@ function payload(over: Partial<DoorsPayload> = {}): DoorsPayload {
     control: { created_total: 1276, external_fleet: 1276, equal: true, gap: 0, external_key_rows: 1280 },
     free_users: {
       threshold: 50,
+      threshold_counts: 'people',
       window_days: 30,
       window: { from: '2026-09-05', to: '2026-10-04' },
-      active: 23,
+      active_people: 23,
+      active_keys: 27,
       calendar: [
-        { month: '2026-09', active: 38, to_date: false },
-        { month: '2026-10', active: 9, to_date: true },
+        { month: '2026-09', people: 38, keys: 44, to_date: false },
+        { month: '2026-10', people: 1, keys: 1, to_date: true },
       ],
       crossed_by: [],
       crossed: false,
@@ -95,6 +97,7 @@ function payload(over: Partial<DoorsPayload> = {}): DoorsPayload {
       enabled: true,
       blocked: null,
       window: { first: '08:00', last: '10:59', deadline: '17:00' },
+      this_monday: { week: '2026-W41', monday: '2026-10-05', deadline_passed: true },
       recent: [],
       latest_matches_page: null,
     },
@@ -114,13 +117,25 @@ function view(p: Partial<DigestView>): DigestView {
     sent_at: '05.10 à 09:47',
     skip_reason: null,
     last_error: null,
-    numbers: { week: '2026-W40', created: 1234, first_success: 3, paid: 1, free_active: 23 },
+    numbers: {
+      week: '2026-W40',
+      created: 1234,
+      first_success: 3,
+      paid: 1,
+      free_active: 23,
+      free_active_keys: 27,
+    },
     ...p,
   };
 }
 
+/** Un état du résumé ; par défaut, le lundi de la semaine n'a pas encore passé 17:00. */
 function digest(p: Partial<DigestState>): DigestState {
-  return { ...payload().digest, ...p };
+  return {
+    ...payload().digest,
+    this_monday: { week: '2026-W41', monday: '2026-10-05', deadline_passed: false },
+    ...p,
+  };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -136,6 +151,11 @@ describe('l’état du résumé du lundi, en une phrase', () => {
       'Prochain résumé : lundi, à une minute tirée au hasard entre 08:00 et 10:59, heure suisse.',
     ],
     [
+      'lundi passé sans aucune ligne',
+      digest({ this_monday: { week: '2026-W41', monday: '2026-10-05', deadline_passed: true } }),
+      'Résumé de ce lundi 05.10 pas parti : l’API ne tournait pas ce lundi.',
+    ],
+    [
       'pas encore planifié et bloqué',
       digest({ blocked: 'telegram_not_configured' }),
       'Le prochain résumé du lundi ne pourra pas partir : Telegram n’est pas configuré sur l’API.',
@@ -148,14 +168,21 @@ describe('l’état du résumé du lundi, en une phrase', () => {
     [
       'prévu',
       digest({ recent: [view({ status: 'planned', departed_at: null, sent_at: null, numbers: null })] }),
-      'Résumé prévu ce lundi à 05.10 à 09:47 (heure suisse).',
+      'Résumé prévu ce lundi 05.10 à 09:47 (heure suisse).',
     ],
     [
-      'échec ambigu',
+      'envoi non confirmé',
       digest({
-        recent: [view({ status: 'failed', last_error: 'send_timeout_ambiguous', numbers: null })],
+        recent: [view({ status: 'failed', last_error: 'send_unconfirmed', numbers: null })],
       }),
-      'Résumé pas envoyé ce lundi : Telegram n’a pas répondu à temps, et le message a pu partir : pas de second essai.',
+      'Résumé pas envoyé ce lundi : Telegram n’a pas confirmé l’envoi (coupure ou délai dépassé) et le message a pu partir : pas de second essai.',
+    ],
+    [
+      'refus de Telegram, trois fois',
+      digest({
+        recent: [view({ status: 'failed', last_error: 'telegram_refused_429', numbers: null })],
+      }),
+      'Résumé pas envoyé ce lundi : Telegram a refusé le message.',
     ],
     [
       'sauté',
@@ -172,30 +199,43 @@ describe('l’état du résumé du lundi, en une phrase', () => {
     expect(digestStatus(state, last).text).not.toMatch(/[—–]/);
   });
 
-  it('montre les nombres envoyés seulement quand la page a bougé depuis', () => {
-    const sentNumbers = { week: '2026-W40', created: 1233, first_success: 3, paid: 1, free_active: 23 };
+  it('montre les nombres envoyés seulement quand la page a bougé depuis, et dit pourquoi elle peut bouger', () => {
+    const sentNumbers = {
+      week: '2026-W40',
+      created: 1233,
+      first_success: 3,
+      paid: 1,
+      free_active: 23,
+      free_active_keys: 27,
+    };
     const moved = digest({ recent: [view({ numbers: sentNumbers })], latest_matches_page: false });
     expect(sentNumbersIfDifferent(moved, last)).toEqual(sentNumbers);
-    expect(digestStatus(moved, last).tone).toBe('warn');
+    expect(digestStatus(moved, last)).toEqual({
+      tone: 'warn',
+      text:
+        'Résumé envoyé le lundi 05.10 à 09:47 (heure suisse) ; depuis, la page a bougé : passage en ' +
+        'payant, remboursement, ferme regroupée ou données arrivées en retard.',
+    });
     const same = digest({ recent: [view({})], latest_matches_page: true });
     expect(sentNumbersIfDifferent(same, last)).toBeNull();
   });
 });
 
 describe('les petites phrases de la page', () => {
-  it('dit le contrôle du parc, égal ou avec son écart', () => {
+  it('dit la cohérence interne sans la présenter comme une preuve', () => {
     const p = payload();
     expect(controlLine(p.control)).toBe(
-      'Colonne « créées », toutes semaines et toutes portes : 1\u00a0276. Parc externe du jour, compté à part : 1\u00a0276. Égal.',
+      'La colonne « créées », toutes semaines et toutes portes, fait 1\u00a0276, comme le parc externe compté par la même règle : le tableau ne perd ni ne double aucune clé.',
     );
-    expect(controlLine({ ...p.control, external_fleet: 1275, equal: false, gap: 1 })).toContain(
-      'Écart de 1 clé, à regarder.',
+    expect(controlLine(p.control)).not.toMatch(/preuve|Égal\./);
+    expect(controlLine({ ...p.control, external_fleet: 1275, equal: false, gap: 1 })).toBe(
+      'La colonne « créées » fait 1\u00a0276, le parc externe compté par la même règle 1\u00a0275 : le tableau perd ou double 1 clé, à regarder.',
     );
   });
 
   it('donne le mois civil de la définition du 22.09 à côté du nombre du lundi', () => {
     expect(freeUsersCalendarLine(payload().free_users)).toBe(
-      'Au mois civil, définition du 22.09 : 38 en septembre, 9 en octobre à ce jour.',
+      'Au mois civil, définition du 22.09 : 38 personnes (44 clés) en septembre, 1 personne (1 clé) en octobre à ce jour.',
     );
   });
 
@@ -222,13 +262,17 @@ describe('la vue, rendue au serveur', () => {
     // Les quatre nombres du lundi, groupés à la française.
     expect(html).toContain('1\u00a0234');
     expect(html).toContain('Premier appel réussi');
-    expect(html).toContain('Gratuits actifs à 200/mois');
-    expect(html).toContain('sur 30 jours, seuil 50');
+    expect(html).toContain('Gratuits actifs à 200/mois, en personnes');
+    expect(html).toContain('27 clés, sur 30 jours ; seuil 50 personnes');
+    expect(html).toContain('des personnes distinctes, derrière');
+    expect(html).toContain('compte les personnes (décision du 22.09)');
     expect(html).toContain(data.last_week.sentence);
     expect(html).toContain('Semaine 40 · 28.09 au 04.10');
     expect(html).toContain('avec les mêmes nombres que ci-dessus');
     expect(html).toContain('Inconnue (clé d’avant le marquage)');
-    expect(html).toContain('Parc externe du jour, compté à part : 1\u00a0276. Égal.');
+    expect(html).toContain('Cohérence interne');
+    expect(html).toContain('le tableau ne perd ni ne double aucune clé');
+    expect(html).not.toContain('emerald-500/30 bg-emerald-500/5 text-emerald-200">La colonne');
     expect(html).toContain('+1');
     // Les nombres s'accordent : 0 et 1 au singulier.
     expect(html).toContain('0 premier appel');
@@ -243,9 +287,10 @@ describe('la vue, rendue au serveur', () => {
     const data = payload({
       free_users: {
         ...p.free_users,
-        active: 51,
+        active_people: 51,
+        active_keys: 60,
         crossed: true,
-        crossed_by: [{ basis: 'window', month: null, active: 51 }],
+        crossed_by: [{ basis: 'window', month: null, people: 51 }],
       },
     });
     const html = renderToStaticMarkup(createElement(DoorsBoard, { data }));

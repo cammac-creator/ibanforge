@@ -28,6 +28,7 @@ const TONE_CLASS: Record<Tone, string> = {
   ok: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-200',
   wait: 'border-sky-500/30 bg-sky-500/5 text-sky-200',
   warn: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+  neutral: 'border-[var(--ink-4)]/60 bg-[var(--ink-1)]/30 text-[var(--fg-3)]',
 };
 
 const COLUMNS: Array<{ key: keyof DoorCounts; label: string; hint: string }> = [
@@ -161,7 +162,11 @@ export function DoorsBoard({ data }: { data: DoorsPayload }) {
   const sent = sentNumbersIfDifferent(data.digest, last);
   const shownWeeks = data.weeks.filter((w) => w.kind === 'current' || w.kind === 'complete');
   const detailWeeks = data.weeks.filter((w) => w.doors.length > 0);
-  const progress = Math.min(100, Math.round((free.active / Math.max(1, free.threshold)) * 100));
+  // Le seuil compte des personnes : la barre aussi.
+  const progress = Math.min(
+    100,
+    Math.round((free.active_people / Math.max(1, free.threshold)) * 100),
+  );
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -177,9 +182,9 @@ export function DoorsBoard({ data }: { data: DoorsPayload }) {
           <Tile label="Premier appel réussi" value={last.numbers.first_success} />
           <Tile label="Ont payé" value={last.numbers.paid} />
           <Tile
-            label="Gratuits actifs à 200/mois"
+            label="Gratuits actifs à 200/mois, en personnes"
             value={last.numbers.free_active}
-            note={`sur 30 jours, seuil ${fmt(free.threshold)}`}
+            note={`${count(last.numbers.free_active_keys, 'clé', 'clés')}, sur 30 jours ; seuil ${fmt(free.threshold)} personnes`}
           />
         </div>
         <p className="mt-3 text-sm leading-relaxed text-[var(--fg-2)]">{last.sentence}</p>
@@ -191,7 +196,8 @@ export function DoorsBoard({ data }: { data: DoorsPayload }) {
             Envoyé le lundi : {count(sent.created, 'clé créée', 'clés créées')},{' '}
             {count(sent.first_success, 'premier appel', 'premiers appels')},{' '}
             {count(sent.paid, 'paiement', 'paiements')},{' '}
-            {count(sent.free_active, 'gratuit actif', 'gratuits actifs')}.
+            {count(sent.free_active, 'gratuit actif', 'gratuits actifs')} (
+            {count(sent.free_active_keys, 'clé', 'clés')}).
           </p>
         )}
       </section>
@@ -201,14 +207,18 @@ export function DoorsBoard({ data }: { data: DoorsPayload }) {
           Utilisateurs gratuits à 200 par mois
         </h2>
         <p className="mt-2 text-sm text-[var(--fg-2)]">
-          <span className="text-lg font-semibold tabular-nums text-[var(--fg-1)]">{fmt(free.active)}</span>{' '}
-          sur les {fmt(free.window_days)} jours du {dayMonth(free.window.from)} au {dayMonth(free.window.to)}, pour un
-          seuil de réévaluation à plus de {fmt(free.threshold)} (décision du 22.09).
+          <span className="text-lg font-semibold tabular-nums text-[var(--fg-1)]">
+            {fmt(free.active_people)}
+          </span>{' '}
+          {free.active_people <= 1 ? 'utilisateur' : 'utilisateurs'} sur les {fmt(free.window_days)} jours
+          du {dayMonth(free.window.from)} au {dayMonth(free.window.to)}, des personnes distinctes, derrière{' '}
+          {count(free.active_keys, 'clé', 'clés')}. Le seuil de réévaluation, plus de{' '}
+          {fmt(free.threshold)}, compte les personnes (décision du 22.09).
         </p>
         <div
           className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--ink-4)]/50"
           role="img"
-          aria-label={`${fmt(free.active)} sur ${fmt(free.threshold)}`}
+          aria-label={`${fmt(free.active_people)} personnes sur ${fmt(free.threshold)}`}
         >
           <div
             className={`h-full rounded-full ${free.crossed ? 'bg-amber-400' : 'bg-sky-400/80'}`}
@@ -271,10 +281,12 @@ export function DoorsBoard({ data }: { data: DoorsPayload }) {
 
       <section className={overviewCard} aria-labelledby="doors-control">
         <h2 id="doors-control" className="text-sm font-semibold text-[var(--fg-1)]">
-          Contrôle
+          Cohérence interne
         </h2>
+        {/* Pas une pastille verte : l'égalité est vraie par construction (même règle
+            des deux côtés). Elle ne dit que « rien n'est perdu ni doublé ». */}
         <p
-          className={`mt-2 rounded-lg border px-3 py-2 text-[12.5px] ${TONE_CLASS[data.control.equal ? 'ok' : 'warn']}`}
+          className={`mt-2 rounded-lg border px-3 py-2 text-[12.5px] ${TONE_CLASS[data.control.equal ? 'neutral' : 'warn']}`}
         >
           {controlLine(data.control)}
         </p>

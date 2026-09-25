@@ -5,6 +5,7 @@ import {
   notFetched,
   type Fetched,
 } from '@/components/dashboard/overview/fetching';
+import { requireDashboardSession } from '@/lib/auth';
 import type { DoorsPayload } from '@/lib/dashboard/doors-board';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +18,15 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
  * seule lecture, `GET /v1/admin/doors`, celle dont le résumé Telegram du lundi
  * tire ses quatre nombres. Dix semaines : la fenêtre de mesure de la règle de
  * décision en compte dix.
+ *
+ * 🚨 La garde commune du tableau de bord ouvre la page, avant la lecture : Next
+ * rend le gabarit et la page en parallèle, et sans elle chaque visite anonyme
+ * ferait calculer tout le tableau à l'API avec le secret d'administration,
+ * avant d'être redirigée (relecture du 25.09.2026, D1 ;
+ * `lib/dashboard/session-guard.test.ts` l'exige de chaque page).
  */
 export default async function DoorsPage() {
+  await requireDashboardSession();
   const read: Fetched<DoorsPayload> = ADMIN_SECRET
     ? await fetchJSON<DoorsPayload>(`${API_URL}/v1/admin/doors?weeks=10`, {
         'X-Admin-Secret': ADMIN_SECRET,
