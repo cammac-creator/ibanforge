@@ -78,8 +78,10 @@ import { OVERLAY_ENV, type OverlayKind } from './restricted-family.js';
 import {
   acceptedCopyPath,
   inspectOverlay,
+  memberRefused,
   removeFileWithCompanions,
   sha256File,
+  type OverlayInspection,
 } from './restricted-overlay.js';
 import {
   MANIFEST_FILE_NAME,
@@ -537,6 +539,30 @@ interface KindResult {
   rejectFile?: boolean;
 }
 
+/**
+ * Ce qui fait refuser un fichier tiré, en un code court, ou `null` : le fichier
+ * refusé par le contrôle du chargeur, un membre refusé, ou un compte différent
+ * de celui que le manifeste annonce. Un membre ABSENT (venu après la première
+ * surcouche, que la release ne porte pas : voir `mayBeAbsent`,
+ * src/lib/restricted-family.ts) n'est pas un refus, et le manifeste ne doit pas
+ * l'annoncer : la release que la production tirait avant ces membres reste
+ * acceptée par le code qui les introduit.
+ */
+export function pulledFileProblem(
+  kind: OverlayKind,
+  inspection: OverlayInspection,
+  entry: ManifestFile,
+): string | null {
+  if (!inspection.ok) return `overlay_refused:${kind}:${inspection.error ?? '?'}`;
+  const refused = inspection.members.filter(memberRefused);
+  if (refused.length > 0)
+    return `members_refused:${kind}:${refused.map((m) => `${m.id}=${m.reason ?? '?'}`).join(',')}`;
+  const mismatch = inspection.members.find((m) =>
+    m.state === 'absent' ? entry.members[m.id] !== undefined : entry.members[m.id] !== m.rows,
+  );
+  return mismatch ? `manifest_mismatch:${kind}:${mismatch.id}` : null;
+}
+
 async function pullOne(
   api: GithubReleases,
   kind: OverlayKind,
@@ -576,27 +602,8 @@ async function pullOne(
     if (hash.digest('hex') !== entry.sha256)
       return { outcome: 'error', error: `sha256_mismatch:${kind}` };
     chmodSync(neighbour, 0o600);
-    const inspection = inspectOverlay(neighbour, kind);
-    if (!inspection.ok)
-      return {
-        outcome: 'error',
-        error: `overlay_refused:${kind}:${inspection.error ?? '?'}`,
-        rejectFile: true,
-      };
-    const refused = inspection.members.filter((m) => m.state !== 'applied');
-    if (refused.length > 0)
-      return {
-        outcome: 'error',
-        error: `members_refused:${kind}:${refused.map((m) => `${m.id}=${m.reason ?? '?'}`).join(',')}`,
-        rejectFile: true,
-      };
-    const mismatch = inspection.members.find((m) => entry.members[m.id] !== m.rows);
-    if (mismatch)
-      return {
-        outcome: 'error',
-        error: `manifest_mismatch:${kind}:${mismatch.id}`,
-        rejectFile: true,
-      };
+    const problem = pulledFileProblem(kind, inspectOverlay(neighbour, kind), entry);
+    if (problem) return { outcome: 'error', error: problem, rejectFile: true };
     // Le voisin devient le fichier de la variable d'un seul renommage : la veille
     // ne voit jamais un fichier à moitié écrit.
     renameSync(neighbour, target);

@@ -1,16 +1,22 @@
 ---
-title: "Finnish Bank Codes: What the API Checks Today"
-description: "What IBANforge checks on a Finnish IBAN since 25 September 2026: structure and check digits, and no bank-code verdict. The transcribed Finance Finland list was withdrawn, so a Finnish bank code answers \"no reference data\", never a refusal."
+title: "Finnish Bank Code Check (Finance Finland)"
+description: "Check a Finnish bank code against the Finance Finland monetary institution codes, and understand what makes Finland different: codes are allocated to banking groups, and the list we hold is partial, so a hit confirms the group and a miss refuses nothing."
 order: 11
 ---
 
-# Finnish bank codes: what the API checks today
+# Finnish bank code check: monetary institution codes
 
-A Finnish IBAN is `FI`, two check digits, then a fourteen-digit BBAN whose head is the **monetary institution code**: one to four characters, allocated by Finance Finland to **banking groups**, not to individual institutions.
+Finnish bank codes come from the **Finance Finland** list of monetary institution codes, and they behave unlike the national registers we read in Germany, Austria or Belgium in three ways.
 
-**Since 25 September 2026, IBANforge holds no reference data for Finnish bank codes.** Until then the API read a hand transcription of the Finance Finland list, dated 15 October 2025. Its terms of reuse were never confirmed by the publisher, and on that day we withdrew it, together with the Finnish keys of our composite bank-code map, which had been compiled from the same list. Nothing replaces them yet.
+First, the code is not a fixed slice of the IBAN: Finnish institution codes run **one to four characters** at the head of the BBAN, so the check reads the *longest allocated prefix* rather than a positional cut. A fixed three-digit slice would ask about a code nobody was given, and deny a group whose code is shorter.
 
-## What a Finnish answer says now
+Second, **Finnish codes are allocated to banking groups, not to individual institutions.**
+
+Third, and this is the one to design around, **the list we hold is partial.** It is a transcription of the Finance Finland publication dated 15 October 2025, and nothing refreshes it automatically. Since 16 September 2026 the API therefore treats it as a list that names holders without refusing anyone: a hit is served, a miss is not a denial.
+
+The publisher has never confirmed the terms for reusing the list, so since 25 September 2026 the API reads it from a private file, not from its public repository. An answer served without that file says the list was not consulted (`status: "unavailable"`), never that a code is refused.
+
+## One call
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -18,34 +24,54 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "FI2112345600000785"}'
 ```
 
-Abridged to the block this page is about:
+The response is abridged below to the block this page is about. The list's own values (the code, the group and the month of the list) are left out here; the API serves them.
 
 ```json
 {
   "valid": true,
   "bank_code_check": {
-    "value": "123",
-    "status": "unavailable",
-    "reason": "no_reference_data_for_country",
-    "match": null,
-    "register": null,
-    "authoritative": false
+    "value": "…",
+    "status": "verified",
+    "match": "register",
+    "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
+    "authoritative": false,
+    "as_of": "…",
+    "institution": { "name": "…", "street": null, "post_code": null, "town": null, "country": "FI" }
   }
 }
 ```
 
-- **`valid` is still the IBAN checksum and structure**, checked as for every country.
-- **`status: "unavailable"`** with **`reason: "no_reference_data_for_country"`**: we did not consult anything that could name the holder of the code. It is not a refusal, and you will never see `not_allocated` for Finland.
-- **`bic` is `null`**: no BIC is derived from a Finnish bank code any more. A BIC your payee gives you can still be checked on its own with `GET /v1/bic/{code}`.
+This is Finland's **official example IBAN**. `value` is the allocated code the answer is about, which can be shorter than three digits, and `institution.name` is the banking group that holds it.
 
-## What to do in a payment flow
+## Read the register string, it is doing work
 
-Treat a Finnish IBAN like any IBAN from a country without a register: a valid checksum is a good structural sign, and the name check (VoP) at the payer's bank is what confirms the account. Do not stop a payment because the bank code is unverified: the answer says we did not look, not that the code is wrong.
+Look at what `register` says: *"allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial"*. Both clauses ship **inside the response**, because a Finnish answer claims less than a German or Austrian one, in both directions:
+
+| Register | A `verified` result means | A code the list does not hold means |
+|---|---|---|
+| DE, AT, BE, SK, CZ, BG, CH / LI | the code is allocated to **this named institution** | not allocated: `not_in_register`, `authoritative: true` |
+| **FI** | the code is allocated to **this banking group** | nothing: the answer falls back to our composite map, `authoritative: false` |
+
+## What a miss means here
+
+A Finnish code the list does not carry is **never refused**. The answer falls through to what any country without a register gets: our composite bank-code map, `authoritative: false`, and at worst `status: "not_in_register"` with `reason: "absent_from_reference_data"`, which says something about our data and nothing about the code. You will never see `not_allocated` for Finland. The IBAN's checksum keeps saying `valid: true` beside it either way.
+
+The reason is the list itself: a transcription that nothing refreshes cannot tell a new or renamed institution from a code nobody holds, and a refusal read off an eleven-month-old list is not something a payment engine should stop on. Finland goes back to the registers that settle a negative once the list is re-read against a current publication.
+
+## The institution block for Finland
+
+A hit carries an `institution` block with the name of the **banking group** the code belongs to, and no address: the list publishes none, and a group-level code has no single seat to describe. `authoritative: false` stays beside it, for the reason above.
+
+## Freshness
+
+`as_of` is the month of the list itself, not our monthly refresh: nothing re-reads the Finance Finland publication automatically, and an answer you act on has to say how old its list is.
 
 ## The honest limits
 
-- **No bank-code verdict for Finland** until a list whose reuse we can establish is read again.
-- **We never check the account or its holder.** That was already true with the list.
-- **Prefix length still matters** if you read Finnish codes yourself: the code is the longest allocated prefix, one to four characters, not a fixed slice.
+- **A hit confirms the group, not the branch or the institution.** If your process needs to know exactly which member bank holds the account, a Finnish bank-code check is not the tool.
+- **A miss proves nothing.** The list is partial and dated; an absent code is not a refusal.
+- **We check the bank code, never the account or its holder.** Nothing in this answer looks past the code at the head of the BBAN.
+- **Prefix length matters.** The check uses the longest allocated prefix; a naive fixed-width slice of a Finnish BBAN will produce wrong lookups against any register, including this one.
+- **No addresses.** The list names groups and publishes no seat.
 
 Related: [What "verified" means](/docs/iban-validate) · [Data sources & provenance](/docs/data-sources) · [IBAN to BIC](/docs/iban-to-bic) · [Belgian bank codes](/docs/be-bank-codes)

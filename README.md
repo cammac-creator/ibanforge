@@ -248,11 +248,11 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 - **LEI enrichment** for the GLEIF rows: [GLEIF API](https://api.gleif.org)
 - **1,100+ Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification**: Curated set of 900+ non-bank issuer classifications — EMI, payment institutions, digital banks (Wise, Revolut, N26, Mercury, Modulr, etc.); the live count is served at `/llms.txt`
-- **Bank-code verdict**: national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Czech Republic (ČNB), Bulgaria (BNB, bank code) and Switzerland and Liechtenstein (SIX BankMaster), where a code the register does not hold is `not_allocated`; partial lists for Italy (Banca d'Italia, with the codes it has struck off and their legal successor), San Marino (BCSM) and Luxembourg (ABBL), where a miss is not a refusal
+- **Bank-code verdict**: national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Czech Republic (ČNB), Bulgaria (BNB, bank code) and Switzerland and Liechtenstein (SIX BankMaster), where a code the register does not hold is `not_allocated`; partial lists for Finland (Finance Finland), Italy (Banca d'Italia, with the codes it has struck off and their legal successor), San Marino (BCSM) and Luxembourg (ABBL), where a miss is not a refusal
 - **VoP readiness**: EPC Verification of Payee scheme register (`vop.csv`), refreshed weekly with the other compliance lists
 - **Country names**: Node.js `Intl.DisplayNames` API
 
-Some of these sources may be served but not redistributed: the EBA STEP2 and NBP directory rows, the OeNB, NBB and BCSM registers, the Bank of England PRA list, the UN list and the EPC registers. They are not in this repository: the hosted API loads them from a private repository, and a deployment without them answers "not consulted" where they would have spoken, never "no". Polish and Finnish bank codes resolve no BIC since 25 September 2026. See [NOTICE](NOTICE).
+Some of these sources may be served but not redistributed: the EBA STEP2 and NBP directory rows, the OeNB, NBB and BCSM registers, the Bank of England PRA list, the UN list and the EPC registers. So are the Polish, Finnish and Luxembourg keys of the composite bank-code map and the Finance Finland list. They are not in this repository: the hosted API loads them from a private repository, and a deployment without them answers "not consulted" where they would have spoken, never "no". See [NOTICE](NOTICE).
 
 ## Resources for AI agents
 

@@ -110,6 +110,12 @@ function pickCases(fullBic: string, fullCompliance: string): Cases {
         FIXTURE.BE.iban(FIXTURE.BE.unallocatedCode),
         FIXTURE.SM.iban(FIXTURE.SM.unlistedCode),
         FIXTURE.PRA.gbIban,
+        // Les membres venus après la première surcouche (lignes inventées de
+        // restricted-overlay-fixtures.ts) : une clé polonaise et une clé
+        // luxembourgeoise de la carte, un code de la liste finlandaise.
+        ibanFor('PL', '999000000000000000000001'),
+        ibanFor('LU', '8000000123456789'),
+        ibanFor('FI', '90000000000123'),
       );
     }
     const family = membersOf('bic')
@@ -233,6 +239,8 @@ function coverage(responses: Map<string, unknown>): Record<string, number> {
     un_matched: 0,
     gb_pra: 0,
     family_bic_found: 0,
+    curated_map: 0,
+    fi_register: 0,
   };
   for (const [key, value] of responses) {
     const body = (value as { body: Record<string, any> }).body; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -241,6 +249,12 @@ function coverage(responses: Map<string, unknown>): Record<string, number> {
       if (/Oesterreichische Nationalbank/.test(check.register)) count.at_register++;
       if (/Banque nationale de Belgique/.test(check.register)) count.be_register++;
       if (/San Marino/.test(check.register)) count.sm_register++;
+      if (/Finance Finland/.test(check.register)) count.fi_register++;
+      if (
+        /composite bank-code map/.test(check.register) &&
+        ['PL', 'LU'].includes(body.country?.code)
+      )
+        count.curated_map++;
     }
     if (key.startsWith('validate ') && body.sepa?.basis === 'epc_register') count.epc_register++;
     if (key.startsWith('compliance') && body.compliance?.sanctions?.matched_lists?.includes('UN'))
@@ -475,7 +489,7 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
 
   it('insère chaque membre depuis la surcouche, la base publique ne portant plus rien', () => {
     // identical_to_public: null = la base publique n'avait aucune ligne du membre.
-    expect(twins.length).toBe(10);
+    expect(twins.length).toBe(14);
     for (const [id, twin] of twins) expect(twin, id).toBeNull();
   });
 
@@ -512,6 +526,13 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
     expect(c.un_matched, "BIC nommé par la liste de l'ONU").toBeGreaterThanOrEqual(1);
     expect(c.gb_pra, 'BIC britannique avec son bloc PRA').toBeGreaterThanOrEqual(1);
     expect(c.family_bic_found, 'BIC EBA STEP2, NBP ou OeNB trouvé').toBeGreaterThanOrEqual(3);
+    if (!REAL) {
+      expect(
+        c.curated_map,
+        'clé PL ou LU de la carte servie par la surcouche',
+      ).toBeGreaterThanOrEqual(2);
+      expect(c.fi_register, 'code finlandais au verdict de la liste').toBeGreaterThanOrEqual(1);
+    }
   });
 
   it('cas (c) : base publique encore complète + surcouche extraite d’elle, mêmes réponses', () => {
@@ -539,6 +560,10 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       'compliance.un': 'kept_public:public_newer_or_undated',
       'compliance.epc_sepa': 'kept_public:public_newer_or_undated',
       'compliance.epc_vop': 'kept_public:public_newer_or_undated',
+      'bic.map_pl': 'applied:identical',
+      'bic.map_fi': 'applied:identical',
+      'bic.map_lu': 'applied:identical',
+      'bic.register_fi': 'applied:identical',
     });
     // Le montage doit mordre : la base plus récente répond autrement que la complète.
     const moved = [...before.keys()].filter(

@@ -135,8 +135,9 @@ npm run build             # next build
   by default and never download a member, the tracked databases are rebuilt without it
   (`npm run overlay -- strip`, no download) and `src/lib/public-base-family-free.test.ts`
   fails if a row comes back, the composite map no longer carries the AT, BE, LU, PL and FI
-  keys (Polish and Finnish codes resolve no BIC), and the /at, /be and /sm pages read the
-  API on demand. Without the overlay, every answer that needs the family says "not
+  keys (the PL, FI and LU keys and the Finnish list come back from the overlay: members
+  `map_pl`, `map_fi`, `map_lu` and `register_fi`, `mayBeAbsent`, rebuilt by
+  `scripts/seed-curated-map.ts`), and the /at, /be and /sm pages read the API on demand. Without the overlay, every answer that needs the family says "not
   consulted" (`national_register_unavailable`, `screened: false`, `*_unavailable` flags),
   never "no".
 - `src/lib/restricted-overlay-pull.ts`: the API refreshes those files itself (step 5,

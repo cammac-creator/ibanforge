@@ -1544,35 +1544,10 @@
     ],
     "vop_required": true
    },
-   "register": null,
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "FI",
-     "name": "Finland"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "123",
-     "status": "unavailable",
-     "reason": "no_reference_data_for_country",
-     "match": null,
-     "register": null,
-     "authoritative": false,
-     "as_of": "2026-09"
-    },
-    "sepa": {
-     "member": true,
-     "vop_required": true
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": true,
-     "test_bic": false
-    }
-   }
+   "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "FK": {
    "code": "FK",
@@ -4240,39 +4215,10 @@
     ],
     "vop_required": false
    },
-   "register": null,
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "PL",
-     "name": "Poland"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "10901014",
-     "status": "unavailable",
-     "reason": "no_reference_data_for_country",
-     "match": null,
-     "register": null,
-     "authoritative": false,
-     "as_of": "2026-09",
-     "check_digit": {
-      "valid": true,
-      "algorithm": "NBP settlement-number check digit: weighted sum of the first seven digits (weights 3,9,7,1,3,9,7), complement modulo 10"
-     }
-    },
-    "sepa": {
-     "member": true,
-     "vop_required": false
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": false,
-     "test_bic": false
-    }
-   }
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "PS": {
    "code": "PS",

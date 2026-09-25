@@ -13,6 +13,7 @@ import type DatabaseType from 'better-sqlite3';
 import {
   RESTRICTED_FAMILY,
   RESTRICTED_TABLES,
+  curatedMapCountries,
   membersOf,
   restrictedBicSources,
   restrictedRegisterCountries,
@@ -23,6 +24,7 @@ import {
   buildMergedDatabase,
   extractOverlay,
   inspectOverlay,
+  memberRefused,
   mergedPrefix,
   nextMergedPath,
   removeStaleMerged,
@@ -38,6 +40,7 @@ import {
   completeRestrictedFamily,
   type InventedFamily,
 } from '../test-support/restricted-overlay-fixtures.js';
+import { compareManifests, manifestEntryFor } from './restricted-overlay-manifest.js';
 
 /**
  * Les contrôles et la fusion de la surcouche privée, cas par cas, sur une
@@ -69,8 +72,22 @@ describe('la famille « sous conditions », une seule constante', () => {
       'register_be',
       'register_sm',
       'pra',
+      'map_pl',
+      'map_fi',
+      'map_lu',
+      'register_fi',
     ]);
     expect(membersOf('compliance').map((m) => m.id)).toEqual(['un', 'epc_sepa', 'epc_vop']);
+    // Les membres venus après la première surcouche, et eux seuls, peuvent manquer
+    // à un fichier ; la liste finlandaise est la seule liste statique.
+    expect(RESTRICTED_FAMILY.filter((m) => m.mayBeAbsent).map((m) => m.id)).toEqual([
+      'map_pl',
+      'map_fi',
+      'map_lu',
+      'register_fi',
+    ]);
+    expect(RESTRICTED_FAMILY.filter((m) => m.staticList).map((m) => m.id)).toEqual(['register_fi']);
+    expect([...curatedMapCountries()].sort()).toEqual(['FI', 'LU', 'PL']);
   });
 
   it('laisse la Slovaquie et la Tchéquie publiques', () => {
@@ -178,6 +195,8 @@ describe('surcouche : extraction, contrôle, fusion', () => {
     // Aucune table publique : ni l'annuaire suisse, ni les registres DE, BG, BCE.
     expect(tables).toEqual([
       'bic_entries',
+      'curated_bank_codes',
+      'fi_monetary_codes',
       'national_bank_codes',
       'overlay_members',
       'overlay_meta',
@@ -401,6 +420,10 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         register_be: 'applied:identical',
         register_sm: 'kept_public:public_newer_or_undated',
         pra: 'kept_public:public_newer_or_undated',
+        map_pl: 'applied:identical',
+        map_fi: 'applied:identical',
+        map_lu: 'applied:identical',
+        register_fi: 'applied:identical',
       });
       expect(result.state).toBe('kept_public');
       const out = openDb(result.path!, true);
@@ -623,8 +646,20 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         x.close();
         return { columns, indexes };
       };
-      for (const spec of RESTRICTED_TABLES[kind])
+      for (const spec of RESTRICTED_TABLES[kind]) {
+        // Les tables des membres venus après la première surcouche ne sont dans
+        // aucune base livrée : la fusion les crée depuis la constante.
+        const late = membersOf(kind)
+          .filter((m) => m.table === spec.name)
+          .every((m) => m.mayBeAbsent);
+        const shipped = openDb(source, true);
+        const present = !!shipped
+          .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+          .get(spec.name);
+        shipped.close();
+        if (late && !present) continue;
         expect(shape(scratch, spec.name), `${kind}.${spec.name}`).toEqual(shape(source, spec.name));
+      }
     }
   });
 
@@ -698,5 +733,116 @@ describe('surcouche : extraction, contrôle, fusion', () => {
     expect(left.sort()).toEqual(
       [kept, `${kept}-journal`].map((f) => f.slice(dir.length + 1)).sort(),
     );
+  });
+
+  describe('membres venus après la première surcouche (mayBeAbsent)', () => {
+    const LATE = ['map_fi', 'map_lu', 'map_pl', 'register_fi'];
+    /** Une base « d'avant » : la famille complète, sans les tables des membres tardifs. */
+    const withoutLateTables = (): string => {
+      const older = copy(fixture.bicPath);
+      const d = openDb(older);
+      d.exec('DROP TABLE curated_bank_codes');
+      d.exec('DROP TABLE fi_monetary_codes');
+      d.close();
+      return older;
+    };
+
+    it('une surcouche écrite avant eux les laisse absents : aucun refus, fusion entière', () => {
+      const out = join(dir, 'restricted-bic-avant.sqlite');
+      const extracted = extractOverlay({
+        kind: 'bic',
+        sourcePath: withoutLateTables(),
+        outPath: out,
+        generator: 'test',
+      });
+      expect([...extracted.absent].sort()).toEqual(LATE);
+      const report = inspectOverlay(out, 'bic');
+      expect(report.ok).toBe(true);
+      expect(report.members.filter(memberRefused)).toEqual([]);
+      expect(
+        report.members
+          .filter((m) => m.state === 'absent')
+          .map((m) => m.id)
+          .sort(),
+      ).toEqual(LATE);
+      // La base publique réelle ne porte pas ces tables : la fusion n'en crée aucune.
+      const pub = copy(publicBase.bic);
+      const d = openDb(pub);
+      d.exec('DROP TABLE curated_bank_codes');
+      d.exec('DROP TABLE fi_monetary_codes');
+      d.close();
+      const merged = buildMergedDatabase({
+        kind: 'bic',
+        publicPath: pub,
+        overlayPath: out,
+        outputPath: join(dir, 'fusion-avant.sqlite'),
+      });
+      expect(merged.state).toBe('applied');
+      const served = openDb(merged.path!, true);
+      const tables = (
+        served.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{
+          name: string;
+        }>
+      ).map((r) => r.name);
+      served.close();
+      expect(tables).not.toContain('curated_bank_codes');
+      expect(tables).not.toContain('fi_monetary_codes');
+      // Le manifeste ne liste pas un membre absent ; une release qui perdrait un
+      // membre porté par la précédente est refusée.
+      const entry = manifestEntryFor({ kind: 'bic', path: out, publicCommit: null });
+      for (const id of LATE) expect(entry.members[id], id).toBeUndefined();
+      const full = manifestEntryFor({ kind: 'bic', path: overlay.bic, publicCommit: null });
+      for (const id of LATE) expect(full.members[id], id).toBeGreaterThan(0);
+      const at = '2026-09-25T00:00:00.000Z';
+      const manifest = (file: typeof entry) => ({
+        format: 1 as const,
+        generated_at: at,
+        public_commit: null,
+        files: { bic: file },
+      });
+      expect([...compareManifests(manifest(full), manifest(entry))].sort()).toEqual(
+        LATE.map((id) => `lost_member:bic:${id}`).sort(),
+      );
+      expect(compareManifests(manifest(entry), manifest(full))).toEqual([]);
+    });
+
+    it('le tirage accepte une release écrite avant eux, et refuse un manifeste qui les annoncerait', async () => {
+      const { pulledFileProblem } = await import('./restricted-overlay-pull.js');
+      const out = join(dir, 'restricted-bic-avant-tirage.sqlite');
+      extractOverlay({
+        kind: 'bic',
+        sourcePath: withoutLateTables(),
+        outPath: out,
+        generator: 'test',
+      });
+      const inspection = inspectOverlay(out, 'bic');
+      const entry = manifestEntryFor({ kind: 'bic', path: out, publicCommit: null });
+      expect(pulledFileProblem('bic', inspection, entry)).toBeNull();
+      const lying = { ...entry, members: { ...entry.members, map_pl: 10 } };
+      expect(pulledFileProblem('bic', inspection, lying)).toBe('manifest_mismatch:bic:map_pl');
+    });
+
+    it('un membre toujours dû ne peut jamais être déclaré absent', () => {
+      expect(() =>
+        extractOverlay({
+          kind: 'bic',
+          sourcePath: fixture.bicPath,
+          outPath: join(dir, 'restricted-bic-pra-absente.sqlite'),
+          generator: 'test',
+          absentMembers: ['pra'],
+        }),
+      ).toThrow(/toujours dû/);
+    });
+
+    it('des lignes d’un membre tardif sans son compte font refuser ce membre', () => {
+      const forged = copy(overlay.bic);
+      const d = openDb(forged);
+      d.prepare("DELETE FROM overlay_members WHERE member = 'map_pl'").run();
+      d.close();
+      const report = inspectOverlay(forged, 'bic');
+      const pl = report.members.find((m) => m.id === 'map_pl')!;
+      expect(pl.state).toBe('refused');
+      expect(pl.reason).toBe('not_recorded');
+    });
   });
 });

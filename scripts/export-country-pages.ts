@@ -37,8 +37,9 @@ process.env.RATE_LIMIT_PER_MIN = '1000000';
 
 const { buildApp } = await import('../src/app.js');
 const { generateOemKey } = await import('../src/lib/api-keys.js');
-const { registerCoverage } = await import('../src/lib/enrich.js');
-const { restrictedRegisterCountries } = await import('../src/lib/restricted-family.js');
+const { COMPOSITE_REGISTER, registerCoverage } = await import('../src/lib/enrich.js');
+const { curatedMapCountries, restrictedRegisterCountries } =
+  await import('../src/lib/restricted-family.js');
 const { LU_SOURCE } = await import('../src/lib/lu-register.js');
 
 /**
@@ -46,7 +47,9 @@ const { LU_SOURCE } = await import('../src/lib/lu-register.js');
  * from a PRIVATE file, not from this repository's database (withdrawal step,
  * 25/09/2026): Austria, Belgium and San Marino from the restricted overlay
  * (src/lib/restricted-family.ts), Luxembourg from the ABBL file
- * (src/lib/lu-register.ts). This script runs on the public database, where
+ * (src/lib/lu-register.ts), Poland and Finland from the keys of the composite
+ * map and the Finnish list the overlay carries (members `map_pl`, `map_fi`,
+ * `register_fi`). This script runs on the public database, where
  * their example would answer "register not consulted", which is not what the
  * API answers in production. Their page therefore names the register (its
  * name, never its rows) and prints no exported answer: it sends the reader to
@@ -56,6 +59,12 @@ function privateRegister(
   cc: string,
 ): { register: string; basis: 'authoritative' | 'partial' } | null {
   if (cc === 'LU') return { register: LU_SOURCE.replace(/^Source:\s*/, ''), basis: 'partial' };
+  if (curatedMapCountries().has(cc)) {
+    // Finlande : la liste de Finance Finland (registre partiel) ; Pologne : la
+    // carte composite, qui n'est pas un registre et dont une absence ne prouve rien.
+    const coverage = registerCoverage(cc);
+    return { register: coverage.register ?? COMPOSITE_REGISTER, basis: 'partial' };
+  }
   if (!restrictedRegisterCountries().has(cc)) return null;
   const coverage = registerCoverage(cc);
   if (!coverage.register || coverage.basis === 'none') return null;

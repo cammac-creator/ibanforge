@@ -404,13 +404,16 @@ export function reloadRestrictedOverlays(
     if (!current) continue;
     const { status: next, frozen } = build(kind, current.public_path);
     recordSeen(next);
+    // Un membre servi aujourd'hui que le nouveau fichier refuse, ou ne porte plus
+    // du tout (absent, voir `mayBeAbsent`) : une perte, on garde ce qui est servi.
+    // Absent ne rend pas l'état « partiel » : la condition ne peut pas en dépendre.
     const lost =
       servesOverlay(current.state) &&
-      next.state === 'partial' &&
-      current.members.some(
-        (m) =>
-          m.state === 'applied' && next.members.find((n) => n.id === m.id)?.state === 'refused',
-      );
+      current.members.some((m) => {
+        if (m.state !== 'applied') return false;
+        const after = next.members.find((n) => n.id === m.id)?.state;
+        return after === 'refused' || after === 'absent';
+      });
     if (!(servesOverlay(next.state) || next.state === 'off') || lost) {
       housekeep(next, () => {
         dropMerged(next);
@@ -458,6 +461,7 @@ export function describeOverlayStatus(status: OverlayStatus): string {
   const members = status.members
     .map((m) => {
       if (m.state === 'refused') return `${m.id}=refusé(${m.reason ?? '?'})`;
+      if (m.state === 'absent') return `${m.id}=absent du fichier (non consulté)`;
       if (m.state === 'kept_public') return `${m.id}=public gardé (plus récent ou non daté)`;
       const why = m.decision ? `,${DECISION_LABEL[m.decision] ?? m.decision}` : '';
       return `${m.id}=${m.inserted ?? m.rows}${why}`;

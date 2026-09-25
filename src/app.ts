@@ -475,7 +475,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}

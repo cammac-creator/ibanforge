@@ -125,7 +125,22 @@ export interface CarryOverPlan {
   fresh: string[];
   /** Les membres à reprendre de la surcouche précédente. */
   carried: CarriedMember[];
+  /**
+   * Les listes statiques (`staticList`) recopiées telles quelles de la surcouche
+   * précédente : ni reprise, ni borne d'âge, ni annonce (leur date est celle de
+   * la liste).
+   */
+  statics: string[];
+  /**
+   * Les membres `mayBeAbsent` que ce passage ne portera pas : source en panne (ou
+   * liste statique) et rien à reprendre, la surcouche précédente ne les portant
+   * pas encore. Jamais un membre que la précédente servait.
+   */
+  absent: string[];
 }
+
+/** La cause qu'un seeder rapporte pour une liste statique (scripts/seed-curated-map.ts). */
+export const STATIC_LIST_REPORT = 'static_list';
 
 /**
  * Une date lue en UTC, en instant ISO 8601 : `YYYY-MM-DD HH:MM:SS` (SQLite,
@@ -284,10 +299,16 @@ export function planCarryOver(options: {
 
   const fresh: string[] = [];
   const pending: Array<{ member: RestrictedMember; cause: string }> = [];
+  const statics: RestrictedMember[] = [];
   const work = new Database(options.workPath, { readonly: true, fileMustExist: true });
   try {
     for (const member of members) {
       const r = report.get(member.id)!;
+      // Une liste statique que le seeder n'a pas rechargée : recopiée plus bas.
+      if (member.staticList && r.state === 'failed' && r.cause === STATIC_LIST_REPORT) {
+        statics.push(member);
+        continue;
+      }
       const cause =
         r.state === 'failed'
           ? (r.cause ?? 'error')
@@ -302,9 +323,31 @@ export function planCarryOver(options: {
   } finally {
     work.close();
   }
-  if (pending.length === 0) return { fresh, carried: [] };
 
   const problems: string[] = [];
+  const absent: string[] = [];
+  const staticCopied: string[] = [];
+  const beforeOf = (id: string) =>
+    previous?.inspection.ok ? previous.inspection.members.find((m) => m.id === id) : undefined;
+  // Les listes statiques : recopiées si la précédente les sert, absentes si elle
+  // ne les porte pas (ou s'il n'y a pas de précédente : rien à recopier).
+  for (const member of statics) {
+    const before = beforeOf(member.id);
+    if (before?.state === 'applied') staticCopied.push(member.id);
+    else if (!previous || before?.state === 'absent') absent.push(member.id);
+    else if (!previous.inspection.ok)
+      problems.push(
+        `${member.id} : liste statique à recopier d'une surcouche précédente refusée (${previous.inspection.error ?? 'erreur'})`,
+      );
+    else
+      problems.push(`${member.id} refusé dans la surcouche précédente (${before?.reason ?? '?'})`);
+  }
+  if (pending.length === 0) {
+    if (problems.length > 0)
+      throw new Error(`Reprise impossible, rien n’est écrit : ${problems.join(' ; ')}.`);
+    return { fresh, carried: [], statics: staticCopied, absent };
+  }
+
   const down = pending.map((p) => `${p.member.id} ${p.cause}`).join(', ');
   if (fresh.length === 0) problems.push(`aucun membre rafraîchi (${down})`);
   if (!previous)
@@ -318,6 +361,13 @@ export function planCarryOver(options: {
   if (previous?.inspection.ok) {
     for (const { member, cause } of pending) {
       const before = previous.inspection.members.find((m) => m.id === member.id);
+      // Un membre venu après la première surcouche, que la précédente ne porte pas
+      // encore : rien à reprendre, il reste absent, sans empêcher la publication
+      // des autres (la liste PRA et sa condition de mois comprises).
+      if (member.mayBeAbsent && before?.state === 'absent') {
+        absent.push(member.id);
+        continue;
+      }
       if (before?.state !== 'applied') {
         problems.push(
           `${member.id} refusé dans la surcouche précédente (${before?.reason ?? 'absent'})`,
@@ -358,7 +408,20 @@ export function planCarryOver(options: {
   }
   if (problems.length > 0)
     throw new Error(`Reprise impossible, rien n’est écrit : ${problems.join(' ; ')}.`);
-  return { fresh, carried };
+  return { fresh, carried, statics: staticCopied, absent };
+}
+
+/**
+ * La ligne qui annonce un membre absent de la surcouche écrite : une annotation
+ * GitHub, des codes seulement. Les réponses qui en dépendent disent « non
+ * consulté » jusqu'au passage qui le rapportera.
+ */
+export function absentAnnotation(kind: OverlayKind, memberId: string): string {
+  return (
+    `::warning title=Surcouche ${kind} membre absent::${memberId} absent de la surcouche écrite ` +
+    '(source en panne ou liste statique jamais chargée, et rien à reprendre de la précédente). ' +
+    'Les réponses qui en dépendent disent non consulté.'
+  );
 }
 
 /** L'ordre de réinsertion des membres d'une table en INSERT OR IGNORE. */

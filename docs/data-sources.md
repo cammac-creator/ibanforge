@@ -18,8 +18,8 @@ aucun fichier de ce dépôt, hors historique git :
 |---|---|---|
 | lignes `eba_step2`, `nbp`, `oenb` de `bic_entries` ; registres AT, BE, SM de `national_bank_codes` ; `pra_banks` | `data/bic.sqlite` | oui, depuis le dépôt privé (surcouche) |
 | liste `UN` de `sanctioned_entities` ; `sepa_participants` ; `vop_participants` | `data/compliance.sqlite` | oui, depuis le dépôt privé (surcouche) |
-| clés AT, BE, LU, PL, FI (5 454 clés) | `src/db/bic_data.json` | AT, BE : par les registres de la surcouche ; LU : par le registre de l'ABBL (fichier privé) ; **PL et FI : non, plus de BIC par code banque** |
-| liste transcrite de Finance Finland | `src/lib/fi-register.ts` (supprimé) | non |
+| clés AT, BE, LU, PL, FI (5 454 clés) | `src/db/bic_data.json` | AT, BE : par les registres de la surcouche ; **PL, FI, LU : par la surcouche** (membres `map_pl`, `map_fi`, `map_lu`, table `curated_bank_codes`, reconstruits chaque mois depuis la publication PyPI de schwifty) ; LU aussi par le registre de l'ABBL (fichier privé) |
+| liste transcrite de Finance Finland | `src/lib/fi-register.ts` (lit désormais la base servie) | oui, par la surcouche (membre `register_fi`, liste statique recopiée d'une surcouche à l'autre) |
 | exports AT, BE, SM ; blocs EPC des autres exports et des exemples | `frontend/data/`, fixtures MCP et SDK, documentation | les pages `/at`, `/be`, `/sm` lisent l'API à la demande |
 | entrées GB (FCA) | `scripts/data/eu-emi-register-2026-05-22.json` | non |
 
@@ -290,10 +290,13 @@ Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
 droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
 PL et FI sortent du dépôt public** (conditions non établies, non commerciales,
 ou permission limitée à l'API : ABBL, voir la section ABBL plus bas). **Fait le
-25/09/2026** : 5 454 clés retirées ; les codes polonais et finlandais ne
-résolvent plus de BIC (`bank_code_check.status: "unavailable"`, raison
-`no_reference_data_for_country`), les codes luxembourgeois passent par le
-registre de l'ABBL. Les
+25/09/2026** : 5 454 clés retirées. Le même jour, décision de la session
+principale : pas de perte de service, les clés PL, FI et LU et la liste
+finlandaise sont servies par la surcouche (membres `map_pl`, `map_fi`, `map_lu`
+et `register_fi`, venus après la première surcouche : un fichier écrit avant eux
+les laisse « absents », sans refus ni alerte). Sans surcouche, un code polonais
+ou finlandais répond `unavailable` / `no_reference_data_for_country` (non
+consulté). Les
 autres pays tirés de schwifty restent à vérifier un par un. Détail et
 attributions : `NOTICE`.
 
@@ -324,11 +327,27 @@ liste des membres vit en UN endroit,
 | `bic.sqlite` | `pra` | `pra_banks` entière |
 | `compliance.sqlite` | `un` | `sanctioned_entities` de la liste `UN` |
 | `compliance.sqlite` | `epc_sepa`, `epc_vop` | `sepa_participants` et `vop_participants` entières |
+| `bic.sqlite` | `map_pl`, `map_fi`, `map_lu` (depuis le 25/09/2026) | `curated_bank_codes` : les clés PL, FI et LU de la carte composite |
+| `bic.sqlite` | `register_fi` (depuis le 25/09/2026, liste statique) | `fi_monetary_codes` entière : la liste de Finance Finland |
+
+Les quatre derniers membres sont venus après la première surcouche publiée
+(`mayBeAbsent`) : un fichier écrit avant eux ne les porte pas, et le chargeur les
+lit « absents » (ni servis ni refusés, sans alerte) au lieu de refuser le fichier.
+Un membre déjà servi qui deviendrait absent reste une perte : le rechargement garde
+ce qu'il sert et la porte du manifeste refuse la release (`lost_member`). Les clés
+viennent chaque mois de la dernière publication de mdomke/schwifty sur PyPI
+(`scripts/seed-curated-map.ts`, empreinte SHA-256 de la roue vérifiée contre
+l'index) ; la liste finlandaise, statique (un PDF transcrit à la main), est
+recopiée telle quelle d'une surcouche à l'autre et ne change que par un geste
+manuel (`FI_LIST_PATH`).
 
 Hors de cette constante, retirés à l'étape du retrait (25/09/2026, règle de la
 décision du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C de
 `NOTICE`) : les clés AT, BE, LU, PL et FI de la carte composite
-`src/db/bic_data.json`, `src/lib/fi-register.ts`, les exports AT, BE et SM du site,
+`src/db/bic_data.json` et la liste transcrite de `src/lib/fi-register.ts` (les
+clés PL, FI et LU et la liste sont redevenues des membres le même jour, voir
+ci-dessus ; les clés AT et BE, non : les registres de la surcouche répondent), les
+exports AT, BE et SM du site,
 les blocs EPC des exports et des réponses d'exemple suivies (`frontend/data/countries.json`,
 `captured-iban.json`, `mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`,
 les fixtures des SDK .NET et Java, la documentation du site), et les entrées GB (FCA) de

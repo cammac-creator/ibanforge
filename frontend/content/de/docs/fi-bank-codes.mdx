@@ -1,16 +1,22 @@
 ---
-title: "Finnische Bankcodes: was die API heute prüft"
-description: "Was IBANforge seit dem 25. September 2026 an einer finnischen IBAN prüft: Aufbau und Prüfziffern, aber kein Urteil über den Bankcode. Die abgeschriebene Liste von Finance Finland wurde zurückgezogen: Ein finnischer Code antwortet „keine Referenzdaten“, nie mit einer Ablehnung."
+title: "Finnische Bankcodes prüfen (Finance Finland)"
+description: "Einen finnischen Bankcode gegen die Codes der monetären Institute von Finance Finland prüfen, und verstehen, was Finnland besonders macht: Codes sind Bankengruppen zugeteilt, und die Liste, die wir führen, ist unvollständig. Ein Treffer bestätigt die Gruppe, ein Fehlen lehnt nichts ab."
 order: 11
 ---
 
-# Finnische Bankcodes: was die API heute prüft
+# Finnische Bankcodes: die Codes der monetären Institute
 
-Eine finnische IBAN besteht aus `FI`, zwei Prüfziffern und einer vierzehnstelligen BBAN, an deren Anfang der **Code des monetären Instituts** steht: ein bis vier Zeichen, von Finance Finland an **Bankengruppen** vergeben, nicht an einzelne Institute.
+Finnische Bankcodes stammen aus der Liste der **Codes der monetären Institute von Finance Finland**, und sie verhalten sich in drei Punkten anders als die nationalen Register, die wir in Deutschland, Österreich oder Belgien lesen.
 
-**Seit dem 25. September 2026 hält IBANforge keine Referenzdaten für finnische Bankcodes.** Bis dahin las die API eine Abschrift der Liste von Finance Finland mit Stand 15. Oktober 2025. Ihre Weiterverwendungsbedingungen hat der Herausgeber nie bestätigt, und wir haben sie an diesem Tag zurückgezogen, zusammen mit den finnischen Schlüsseln unserer zusammengesetzten Bankcode-Karte, die aus derselben Liste stammten. Noch ersetzt sie nichts.
+Erstens ist der Code kein fester Ausschnitt der IBAN: Finnische Institutscodes sind **ein bis vier Zeichen** am Anfang des BBAN, die Prüfung liest deshalb das *längste vergebene Präfix* statt eines Schnitts nach Position. Ein fester dreistelliger Ausschnitt fragt nach einem Code, den niemand erhalten hat, und verneint eine Gruppe mit kürzerem Code.
 
-## Was eine finnische Antwort jetzt sagt
+Zweitens **sind finnische Codes Bankengruppen zugeteilt, nicht einzelnen Instituten.**
+
+Drittens, und darauf ist zu entwerfen, **ist die Liste, die wir führen, unvollständig.** Sie ist eine Abschrift der Veröffentlichung von Finance Finland vom 15. Oktober 2025, die nichts automatisch aktualisiert. Seit dem 16. September 2026 behandelt die API sie deshalb als Liste, die Inhaber nennt, ohne jemanden abzulehnen: Ein Treffer wird ausgeliefert, ein Fehlen ist keine Ablehnung.
+
+Der Herausgeber hat die Bedingungen für die Weiterverwendung der Liste nie bestätigt: Seit dem 25. September 2026 liest die API sie aus einer privaten Datei, nicht mehr aus ihrem öffentlichen Repository. Eine Antwort ohne diese Datei sagt, dass die Liste nicht abgefragt wurde (`status: "unavailable"`), nie, dass ein Code abgelehnt ist.
+
+## Ein Aufruf
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
@@ -18,34 +24,54 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "FI2112345600000785"}'
 ```
 
-Gekürzt auf den Block, um den es hier geht:
+Die Antwort ist unten auf den Block gekürzt, um den es auf dieser Seite geht. Die Werte der Liste selbst (der Code, die Gruppe und der Monat der Liste) sind hier ausgelassen; die API liefert sie.
 
 ```json
 {
   "valid": true,
   "bank_code_check": {
-    "value": "123",
-    "status": "unavailable",
-    "reason": "no_reference_data_for_country",
-    "match": null,
-    "register": null,
-    "authoritative": false
+    "value": "…",
+    "status": "verified",
+    "match": "register",
+    "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
+    "authoritative": false,
+    "as_of": "…",
+    "institution": { "name": "…", "street": null, "post_code": null, "town": null, "country": "FI" }
   }
 }
 ```
 
-- **`valid` bleibt die Prüfsumme und der Aufbau der IBAN**, geprüft wie für jedes Land.
-- **`status: "unavailable"`** mit **`reason: "no_reference_data_for_country"`**: Wir haben nichts konsultiert, das den Inhaber des Codes nennen könnte. Das ist keine Ablehnung, und `not_allocated` sehen Sie für Finnland nie.
-- **`bic` ist `null`**: Aus einem finnischen Bankcode wird kein BIC mehr abgeleitet. Einen BIC, den Ihr Zahlungsempfänger Ihnen nennt, können Sie weiterhin einzeln mit `GET /v1/bic/{code}` prüfen.
+Das ist **Finnlands offizielle Beispiel-IBAN**. `value` ist der vergebene Code, um den es in der Antwort geht, und kann kürzer als drei Ziffern sein; `institution.name` ist die Bankengruppe, die ihn hält.
 
-## Was in einem Zahlungsablauf zu tun ist
+## Lesen Sie die `register`-Zeichenkette, sie arbeitet
 
-Behandeln Sie eine finnische IBAN wie die eines Landes ohne Register: Eine gültige Prüfsumme ist ein gutes Zeichen für den Aufbau, und die Namensprüfung (VoP) bei der Bank des Zahlers bestätigt das Konto. Stoppen Sie keine Zahlung, weil der Bankcode nicht geprüft ist: Die Antwort sagt, dass wir nicht nachgesehen haben, nicht, dass der Code falsch ist.
+Sehen Sie, was `register` sagt: *„allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial"*. Beide Zusätze fahren **in der Antwort mit**, denn eine finnische Antwort behauptet weniger als eine deutsche oder österreichische, in beide Richtungen:
+
+| Register | Was ein `verified`-Ergebnis heißt | Was ein Code heißt, der auf der Liste fehlt |
+|---|---|---|
+| DE, AT, BE, SK, CZ, BG, CH / LI | der Code ist **diesem benannten Institut** zugeteilt | nicht vergeben: `not_in_register`, `authoritative: true` |
+| **FI** | der Code ist **dieser Bankengruppe** zugeteilt | nichts: Die Antwort fällt auf unsere zusammengesetzte Zuordnung zurück, `authoritative: false` |
+
+## Was ein Fehlen hier bedeutet
+
+Ein finnischer Code, den die Liste nicht führt, wird **nie abgelehnt**. Die Antwort fällt auf das zurück, was jedes Land ohne Register erhält: unsere zusammengesetzte Bankcode-Zuordnung, `authoritative: false`, und schlimmstenfalls `status: "not_in_register"` mit `reason: "absent_from_reference_data"`, was etwas über unsere Daten sagt und nichts über den Code. `not_allocated` sehen Sie für Finnland nie. Daneben sagt die Prüfziffer der IBAN in jedem Fall weiterhin `valid: true`.
+
+Der Grund liegt in der Liste selbst: Eine Abschrift, die nichts aktualisiert, kann ein neues oder umbenanntes Institut nicht von einem Code unterscheiden, den niemand hält, und eine Ablehnung aus einer elf Monate alten Liste ist kein Grund, eine Zahlung zu stoppen. Finnland kehrt zu den Registern zurück, die ein Fehlen entscheiden, sobald die Liste gegen eine aktuelle Veröffentlichung neu gelesen ist.
+
+## Der `institution`-Block für Finnland
+
+Ein Treffer trägt einen `institution`-Block mit dem Namen der **Bankengruppe**, der der Code gehört, ohne Adresse: Die Liste veröffentlicht keine, und ein Gruppencode hat keinen einzelnen Sitz zu beschreiben. `authoritative: false` bleibt daneben, aus dem oben genannten Grund.
+
+## Frische
+
+`as_of` ist der Monat der Liste selbst, nicht unsere monatliche Aktualisierung: Nichts liest die Veröffentlichung von Finance Finland automatisch neu ein, und eine Antwort, auf die Sie handeln, muss sagen, wie alt ihre Liste ist.
 
 ## Die ehrlichen Grenzen
 
-- **Kein Urteil über finnische Bankcodes**, bis eine Liste erneut gelesen wird, deren Weiterverwendung wir belegen können.
-- **Wir prüfen nie das Konto oder seinen Inhaber.** Das galt schon mit der Liste.
-- **Die Präfixlänge zählt weiterhin**, wenn Sie finnische Codes selbst lesen: Der Code ist das längste vergebene Präfix, ein bis vier Zeichen, keine feste Stelle.
+- **Ein Treffer bestätigt die Gruppe, nicht die Filiale und nicht das Institut.** Wenn Ihr Prozess genau wissen muss, welche Mitgliedsbank das Konto führt, ist eine finnische Bankcode-Prüfung nicht das Werkzeug.
+- **Ein Fehlen beweist nichts.** Die Liste ist unvollständig und datiert; ein fehlender Code ist keine Ablehnung.
+- **Wir prüfen den Bankcode, nie das Konto und nie den Inhaber.** Nichts in dieser Antwort blickt über den Code am Anfang des BBAN hinaus.
+- **Die Präfixlänge zählt.** Die Prüfung nimmt das längste vergebene Präfix; ein naiver Ausschnitt fester Breite aus einem finnischen BBAN erzeugt falsche Abfragen gegen jedes Register, auch gegen dieses.
+- **Keine Adressen.** Die Liste nennt Gruppen und veröffentlicht keinen Sitz.
 
-Siehe auch: [Was „verified“ bedeutet](/docs/iban-validate) · [Datenquellen](/docs/data-sources) · [Von der IBAN zum BIC](/docs/iban-to-bic) · [Belgische Bankcodes](/docs/be-bank-codes)
+Siehe auch: [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen & Provenienz](/docs/data-sources) · [IBAN zu BIC](/docs/iban-to-bic) · [Belgische Bankcodes](/docs/be-bank-codes)

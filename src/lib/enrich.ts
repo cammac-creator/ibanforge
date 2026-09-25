@@ -7,6 +7,7 @@
 import {
   lookupByCountryBank,
   countryHasReferenceData,
+  curatedKeysMissing,
   getReferenceAsOf,
   lookup,
   registeredAddress,
@@ -16,6 +17,7 @@ import {
 } from './bic-lookup.js';
 import { listedInCurrentSource } from './bic-trace.js';
 import { classifyIssuer } from './issuers.js';
+import { fiRegisterAsOf, lookupFiInstitution } from './fi-register.js';
 import {
   lookupNationalCode,
   lookupRetiredNationalCode,
@@ -188,7 +190,7 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   // publishes without a BIC, have no `bic` block to carry the edition's own
   // credit.
   CZ: 'Česká národní banka, Číselník kódů platebního styku v České republice (directory of payment-system codes; Zdroj: ČNB)',
-  // Bulgaria says what the claim covers. A BAE code is the
+  // Bulgaria says what the claim covers, like Finland does. A BAE code is the
   // NOTE: the bare name lives in BG_REGISTER_NAME below — the caveat qualifies
   // the VERDICT, and repeating it beside a BIC would attach it to a field it
   // says nothing about.
@@ -224,11 +226,18 @@ const NATIONAL_REGISTERS: Record<string, string> = {
  * banks only, in a country that also licenses non-bank payment institutions.
  */
 const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
-  // La Finlande n'y est plus depuis l'étape du retrait (25/09/2026) : la liste de
-  // Finance Finland transcrite à la main (ancien src/lib/fi-register.ts) a quitté
-  // le dépôt public avec les clés FI de la carte composite, ses conditions de
-  // réutilisation restant sans réponse. Un code finlandais répond désormais
-  // `unavailable` / `no_reference_data_for_country` : non consulté, jamais refusé.
+  // Finland moved here from NATIONAL_REGISTERS on 16/09/2026 (decision of
+  // Claude-Alain on the audit of that day). The Finance Finland list is a hand
+  // transcription dated 15.10.2025 that nothing refreshes: a miss on an
+  // eleven-month-old list is not a denial a caller should stop a payment on.
+  // A hit still names the banking group and its BIC and carries the list's
+  // own date. Back to NATIONAL_REGISTERS once the list is re-read against a
+  // current publication. Finland allocates prefixes to banking GROUPS, not
+  // institutions, so even a hit confirms the group rather than a bank.
+  // Depuis l'étape du retrait (25/09/2026), la liste est servie par la
+  // surcouche privée (membre `register_fi`, src/lib/fi-register.ts) : sans elle,
+  // aucun code finlandais n'est lu et la réponse dit « non consulté ».
+  FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)',
   SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
   // L'Italie (25/09/2026, décision de Claude-Alain du 24/09, point 5). Les
   // registres de la Banca d'Italia listent les banques, les établissements de
@@ -441,7 +450,7 @@ function askNationalRegister(
  * issue. The provenance belongs in the documentation, where it cannot be mistaken
  * for a claim of exhaustiveness. `source='bundesbank'` is 144 rows.
  */
-const COMPOSITE_REGISTER =
+export const COMPOSITE_REGISTER =
   'IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)';
 
 /**
@@ -543,6 +552,7 @@ function decideBankCode(
   // published rule for a pairing requires checking the rule actually produces
   // it, and that check is `resolvedBic.startsWith(bankCode)`.
   hit: { match: 'register' | 'prefix'; candidates?: number; code: string; checked?: string } | null,
+  bban: string | undefined,
   /**
    * A reference lookup this verdict would have read already failed. Consulted
    * ONLY in the composite fallback at the bottom: a national register that
@@ -608,6 +618,44 @@ function decideBankCode(
       institution: { name: lu.name, street: null, post_code: null, town: null, country: 'LU' },
     });
   }
+  // Finland (16/09/2026): the transcribed Finance Finland list confirms what it
+  // knows and says nothing about the rest. It needs the whole BBAN, not the
+  // 3-digit slice: institution codes run 1 to 4 characters and only the longest
+  // allocated prefix is the real one — asking about the slice would read a
+  // one-digit allocation as a three-digit one. A hit is served with the list's
+  // own date (a reader acting on it must know how old the list is); a code the
+  // list does not carry, or its unpopulated 72-78 band, falls through to the
+  // composite answer this country got before the list existed — never
+  // `not_allocated`.
+  if (cc === 'FI' && bban) {
+    const fi = lookupFiInstitution(bban);
+    // La date de la liste servie : toujours là quand la liste l'est (colonne NOT NULL).
+    const listAsOf = fiRegisterAsOf();
+    if (fi?.status === 'allocated' && fi.code && listAsOf) {
+      // La liste nomme le groupe détenteur : `confirmed`, même si cette liste
+      // transcrite n'entre pas dans les traces courantes (bic-trace.ts).
+      return withHolder('confirmed', {
+        value: fi.code,
+        status: 'verified',
+        match: 'register',
+        register: NON_EXHAUSTIVE_REGISTERS.FI,
+        authoritative: false,
+        as_of: listAsOf.slice(0, 7),
+        ...(fi.institution
+          ? {
+              institution: {
+                name: fi.institution,
+                street: null,
+                post_code: null,
+                town: null,
+                country: 'FI',
+              },
+            }
+          : {}),
+      });
+    }
+  }
+
   const partial = NON_EXHAUSTIVE_REGISTERS[cc];
   if (partial && nationalRegisterAvailable(cc)) {
     // Unguarded, like the authoritative registers: a read failure escapes to
@@ -719,7 +767,8 @@ function decideBankCode(
     return withHolder('inferred', {
       // The code the lookup really consulted: normally the positional slice,
       // but Iceland answers at the two-digit bank grain of its four-digit
-      // field, and the verdict must name what it is about.
+      // field, and the verdict must name what it is about — the same honesty
+      // `value` already has for Finland one branch up.
       value: hit.checked ?? bankCode,
       status: 'verified',
       match: hit.match,
@@ -765,7 +814,12 @@ function decideBankCode(
   // parler à sa place d'un code qu'elle ne porte pas.
   const privateDown = privateRegisterNotLoaded(cc);
   const registerDown = !!national || privateDown;
-  const hasData = !privateDown && countryHasReferenceData(cc);
+  // Les clés de la carte composite que la surcouche apporte (PL, FI, LU), non
+  // chargées : la carte n'a pas été consultée pour ce pays, une absence n'y prouve
+  // rien. Le Luxembourg garde son registre de l'ABBL (fichier privé), mais un code
+  // qu'il ne porte pas tombait ici sur les clés de la carte : sans elles, la
+  // réponse est « non consultée » (`unavailable`), jamais « absent de nos données ».
+  const hasData = !privateDown && !curatedKeysMissing(cc) && countryHasReferenceData(cc);
   // Absent de la carte, pas de données pour le pays, registre non consulté :
   // aucune conclusion sur le détenteur.
   return withHolder('unknown', {
@@ -834,11 +888,12 @@ function checkBankCode(
   cc: string,
   bankCode: string,
   hit: { match: 'register' | 'prefix'; candidates?: number; code: string; checked?: string } | null,
+  bban: string | undefined,
   /** A reference lookup feeding this verdict already failed; see enrichResult. */
   lookupFailed: boolean,
 ): BankCodeVerdict {
   try {
-    const verdict = decideBankCode(cc, bankCode, hit, lookupFailed);
+    const verdict = decideBankCode(cc, bankCode, hit, bban, lookupFailed);
     // Poland: the settlement number's own check digit is a fact the composite
     // map cannot give (lib/pl-settlement-number.ts). It rides beside the
     // verdict; it never changes `status`, because a structural impossibility
@@ -1488,7 +1543,10 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
     vop_coverage: result.sepa?.vop_required ?? false,
   };
 
-  const verdict = checkBankCode(cc, bankCode, hit, lookupFailed);
+  // The BBAN, taken from the normalised IBAN rather than reassembled from the
+  // parsed parts: Finland resolves on the whole string, and a country whose
+  // bank_code slice is not a prefix of the BBAN would silently reassemble wrong.
+  const verdict = checkBankCode(cc, bankCode, hit, result.iban.slice(4), lookupFailed);
   result.bank_code_check = verdict.check;
   // Qui détient le code, décidé par la branche même qui a rendu le verdict
   // (voir BankCodeVerdict), jamais relu dans ses chaînes.
@@ -1534,8 +1592,8 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
 
   // The demand ledger: a checksum-valid IBAN whose bank code we could not
   // verify is the traffic telling us which data to plug in next. Recorded on
-  // the CHECKED value (the code the verdict is about, Iceland's bank grain for
-  // one), never on invalid IBANs, whose slices are noise,
+  // the CHECKED value (the code the verdict is about — Iceland's bank grain,
+  // Finland's whole string), never on invalid IBANs, whose slices are noise,
   // and never on the textbook IBANs everybody pastes first (the registry's
   // own examples, our docs and sample file): they measure curiosity, not
   // demand, and CH93 0076… alone topped the ledger for two days.

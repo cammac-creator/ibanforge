@@ -18,7 +18,8 @@ import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
 import { sourceVintage } from './source-vintage.js';
 import { listedInCurrentSource, resetTraceIndex } from './bic-trace.js';
-import { RESTRICTED_FAMILY } from './restricted-family.js';
+import { RESTRICTED_FAMILY, curatedMapCountries } from './restricted-family.js';
+import { fiRegisterLoaded, lookupFiInstitution, resetFiRegister } from './fi-register.js';
 import { getCountryName } from './countries.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -154,11 +155,14 @@ function pruneStaleGermanCodes(data: Record<string, BicDataEntry>): Record<strin
  * Toutes les clés AT, BE, LU, PL et FI de bic_data.json venaient d'un registre
  * dont les conditions ne permettent pas la redistribution : l'OeNB, la BNB et
  * l'ABBL par la compilation de sigalor/iban-to-bic, la NBP et Finance Finland par
- * celle de schwifty. Elles sont retirées ; rien ne les sert en privé aujourd'hui.
- * Ce qui répond encore pour ces pays : les registres autrichien et belge de la
- * surcouche privée (src/lib/restricted-family.ts) et le registre luxembourgeois
- * privé (src/lib/lu-register.ts), quand ils sont chargés. La Pologne et la
- * Finlande n'ont plus aucune donnée de code bancaire.
+ * celle de schwifty. Elles sont retirées du fichier. Les clés PL, FI et LU
+ * reviennent par la surcouche privée quand elle les porte (membres `map_pl`,
+ * `map_fi`, `map_lu`, table `curated_bank_codes`, ajoutées au chargement par
+ * `addCuratedRows`), avec la liste finlandaise (src/lib/fi-register.ts). Les clés
+ * AT et BE, non : les registres autrichien et belge de la surcouche répondent
+ * pour ces pays, et le registre luxembourgeois privé (src/lib/lu-register.ts)
+ * pour le sien. Sans surcouche, la Pologne et la Finlande n'ont aucune donnée de
+ * code bancaire.
  *
  * Pourquoi un ensemble et pas une déduction : un code bancaire de ces pays est
  * NUMÉRIQUE, et la recherche par préfixe dans l'annuaire (stratégie 2 de
@@ -278,13 +282,91 @@ function addListedDutchProviders(data: Record<string, BicDataEntry>): Record<str
   return data;
 }
 
+/**
+ * Les clés de la carte composite que la surcouche privée apporte (PL, FI, LU ;
+ * table `curated_bank_codes`, src/lib/restricted-family.ts), ajoutées au fichier
+ * public au chargement. Une clé du fichier l'emporte : il n'en porte plus pour ces
+ * pays, et ne doit jamais être contredit en silence. Sans la table (base publique
+ * seule, ou surcouche qui ne porte pas ces membres), rien n'est ajouté et ces
+ * pays répondent « non consulté » (`WITHDRAWN_BANK_CODE_COUNTRIES`).
+ */
+function addCuratedRows(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  let rows: Array<{ country: string; code: string; bic: string }>;
+  try {
+    rows = getBicDB()
+      .prepare('SELECT country, code, bic FROM curated_bank_codes ORDER BY country, code')
+      .all() as typeof rows;
+  } catch {
+    return data;
+  }
+  const countries = curatedMapCountries();
+  for (const row of rows) {
+    if (!countries.has(row.country)) continue;
+    const key = `${row.country}:${row.code}`;
+    if (!data[key]) data[key] = { bic: row.bic };
+  }
+  return data;
+}
+
+/**
+ * Finnish prefixes the curated map claims and Finance Finland allocates to
+ * nobody are dropped at load time.
+ *
+ * The Swiss and German story a third time, with one twist: Finland allocates
+ * variable-length codes, so a curated 3-digit key must be resolved the same way
+ * a real BBAN is, by longest allocated prefix. Measured 29/07/2026, some of our
+ * Finnish keys asserted an institution the published list does not carry,
+ * led by two banks that left Finnish retail banking.
+ *
+ * Without this the same response could resolve a BIC for a code its own
+ * bank_code_check called not_in_register. Depuis l'étape du retrait
+ * (25/09/2026), la liste vient de la surcouche privée : sans elle, rien n'est
+ * élagué (les clés finlandaises n'y sont pas non plus).
+ */
+function pruneStaleFinnishCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  if (!fiRegisterLoaded()) return data;
+  for (const key of Object.keys(data)) {
+    if (!key.startsWith('FI:')) continue;
+    const raw = key.slice(3);
+    if (!/^\d{3}$/.test(raw)) continue;
+    // Pad to a BBAN-shaped string: the resolver reads a prefix, and the tail
+    // never participates in the decision.
+    const hit = lookupFiInstitution(raw.padEnd(14, '0'));
+    if (hit?.status === 'not_allocated') delete data[key];
+  }
+  return data;
+}
+
+/** Mémo par pays de `curatedKeysMissing` : vidé avec la base (resetStatements). */
+const curatedMissingCache = new Map<string, boolean>();
+
+/**
+ * Un pays dont les clés de la carte composite viennent de la surcouche (PL, FI,
+ * LU), sans aucune clé chargée : la surcouche manque ou ne porte pas ce membre.
+ * Une absence dans la carte ne dit alors rien du code (« non consulté »).
+ */
+export function curatedKeysMissing(countryCode: string): boolean {
+  const cc = countryCode.toUpperCase();
+  if (!curatedMapCountries().has(cc)) return false;
+  const cached = curatedMissingCache.get(cc);
+  if (cached !== undefined) return cached;
+  const prefix = `${cc}:`;
+  const missing = !Object.keys(getBicData()).some((k) => k.startsWith(prefix));
+  curatedMissingCache.set(cc, missing);
+  return missing;
+}
+
 function getBicData(): Record<string, BicDataEntry> {
   if (!bicDataCache) {
     const require = createRequire(import.meta.url);
     const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
     bicDataCache = addListedDutchProviders(
       pruneRetiredItalianCodes(
-        pruneStaleNationalCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
+        pruneStaleNationalCodes(
+          pruneStaleFinnishCodes(
+            pruneStaleGermanCodes(pruneStaleSwissCodes(addCuratedRows({ ...raw }))),
+          ),
+        ),
       ),
     );
   }
@@ -1071,6 +1153,11 @@ export function resetStatements(): void {
   // les seules lignes d'un pays (src/lib/restricted-overlay-runtime.ts).
   referenceDataCache.clear();
   restrictedDirectoryCache = undefined;
+  // La carte composite et la liste finlandaise lisent aussi la base servie : une
+  // surcouche rechargée peut apporter ou retirer les clés PL, FI et LU.
+  bicDataCache = null;
+  curatedMissingCache.clear();
+  resetFiRegister();
   // L'index des traces courantes est calculé sur la même base (bic-trace.ts).
   resetTraceIndex();
 }

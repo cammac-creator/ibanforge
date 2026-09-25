@@ -43,6 +43,7 @@ import {
   SHRINK_GUARD_MIN_ROWS,
   carriedOverFromMeta,
   inspectOverlay,
+  memberRefused,
   parseCarriedOver,
   type CarriedOverMember,
 } from './restricted-overlay.js';
@@ -194,7 +195,7 @@ export function manifestEntryFor(options: {
 }): ManifestFile {
   const { kind, path } = options;
   const inspection = inspectOverlay(path, kind);
-  const refused = inspection.members.filter((m) => m.state !== 'applied');
+  const refused = inspection.members.filter(memberRefused);
   if (!inspection.ok || refused.length > 0)
     throw new Error(
       `Surcouche ${kind} refusée par le contrôle du chargeur : ` +
@@ -202,7 +203,13 @@ export function manifestEntryFor(options: {
     );
   const sha256 = inspection.sha256 as string;
   const bytes = inspection.bytes as number;
-  const members = Object.fromEntries(inspection.members.map((m) => [m.id, m.rows]));
+  // Un membre absent (venu après la première surcouche, que ce fichier ne porte
+  // pas) n'est pas listé : la release suivante qui le porte ne sera pas lue comme
+  // une hausse depuis zéro, et une release qui le perdrait après l'avoir porté
+  // est refusée (`lost_member`).
+  const members = Object.fromEntries(
+    inspection.members.filter((m) => m.state !== 'absent').map((m) => [m.id, m.rows]),
+  );
   const name = basename(path);
   // Toujours relu du fichier, même inchangé : un fichier BIC repris par le passage
   // hebdomadaire garde la liste de ses membres repris.

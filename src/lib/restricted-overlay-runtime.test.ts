@@ -314,6 +314,40 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     expect(runtime.restrictedOverlaysChanged()).toEqual([]);
   });
 
+  it('une surcouche qui ne porterait plus un membre tardif servi est refusée (absent)', async () => {
+    // La même famille, sans les tables des membres venus après la première
+    // surcouche : le fichier est accepté seul (membres absents, aucun refus), mais
+    // il retirerait les clés PL, FI et LU servies aujourd'hui.
+    const older = join(fixture.dir, 'v2', 'sans-tardifs-source.sqlite');
+    copyFileSync(fixture.bicPath, older);
+    const o = openDb(older);
+    o.exec('DROP TABLE curated_bank_codes');
+    o.exec('DROP TABLE fi_monetary_codes');
+    o.close();
+    const withoutLate = extractOverlay({
+      kind: 'bic',
+      sourcePath: older,
+      outPath: join(fixture.dir, 'v2', 'sans-tardifs.sqlite'),
+      generator: 'test',
+    }).path;
+    const servedBefore = runtime.restrictedOverlayStatus().find((st) => st.kind === 'bic')!;
+    expect(servedBefore.members.find((m) => m.id === 'map_pl')?.state).toBe('applied');
+    deposit(withoutLate, live.bic);
+    const outcomes = runtime.reloadRestrictedOverlays();
+    expect(outcomes.map((o) => [o.kind, o.changed, o.rejected?.state])).toEqual([
+      ['bic', false, 'applied'],
+    ]);
+    expect(outcomes[0].rejected!.members.find((m) => m.id === 'map_pl')?.state).toBe('absent');
+    // Toujours servies : les clés tardives de la surcouche précédente.
+    const n = (
+      db.getBicDB().prepare('SELECT COUNT(*) AS n FROM curated_bank_codes').get() as { n: number }
+    ).n;
+    expect(n).toBeGreaterThan(0);
+    // Le dépôt suivant remet la version servie : rien ne change.
+    deposit(v2.bic, live.bic);
+    expect(runtime.reloadRestrictedOverlays().every((o) => !o.rejected)).toBe(true);
+  });
+
   it('au redémarrage, la dernière surcouche acceptée remplace le fichier refusé (R3)', async () => {
     const accepted = sha256File(join(fixture.dir, 'live', 'restricted-compliance.accepted.sqlite'));
     // Un redémarrage : connexions fermées, état oublié, fichiers gardés.

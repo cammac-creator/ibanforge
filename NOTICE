@@ -418,8 +418,8 @@ Verification of Payee schemes
 Narodowy Bank Polski (NBP)
   Formerly in: data/bic.sqlite, table bic_entries, source 'nbp' (21 rows); the
          3,004 PL keys of src/db/bic_data.json, taken by mdomke/schwifty
-         from the NBP's EWIB file. The API serves the bic_entries rows from
-         its private repository; the PL keys are no longer used.
+         from the NBP's EWIB file. The API serves the bic_entries rows and
+         the PL keys from its private repository.
   Terms: "Narodowy Bank Polski makes no objections to saving files, copying
          pages in full or in part or making printouts for personal use,
          provided that they do not serve commercial purposes."
@@ -454,15 +454,15 @@ Finance Finland (Finanssiala ry), Finnish monetary institution codes and
 BICs (list published 15 October 2025)
   Formerly in: src/lib/fi-register.ts (codes transcribed by hand); the 656 FI
          keys of src/db/bic_data.json, taken by mdomke/schwifty from
-         Finance Finland's publications. No longer used: the API holds no
-         Finnish bank-code data.
+         Finance Finland's publications. The API serves the list and the
+         keys from its private repository.
   Terms: none stated on the site. Not established.
 
 ABBL, Luxembourg Register of IBAN-BIC Codes
   Formerly in: the 143 LU keys of src/db/bic_data.json; 135 of them come from
          the sigalor/iban-to-bic dataset taken from the ABBL register, the
          other 8 from mdomke/schwifty. The API reads the register itself
-         from a private file.
+         from a private file, and the keys from its private repository.
   Terms: the ABBL's written confirmation of 15 September 2026 covers one
          normalised entry per API response, credited
            Source: ABBL, Luxembourg register of IBAN/BIC codes

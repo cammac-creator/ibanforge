@@ -9,8 +9,14 @@
  * publiés et n'est destinée qu'au dépôt privé de rafraîchissement.
  *
  *   extract --bic <base> --compliance <base> --out-dir <dossier> [--allow-shrink]
+ *           [--curated-map <bic_data.json> [--map-as-of AAAA-MM-JJ] [--map-source <crédit>]]
+ *           [--fi-list <liste.json>]
  *       Écrit <dossier>/restricted-bic.sqlite et restricted-compliance.sqlite à
- *       partir des bases actuelles, sans aucun téléchargement (Geste 4).
+ *       partir des bases actuelles, sans aucun téléchargement (Geste 4). Les
+ *       clés PL, FI et LU et la liste finlandaise, qui ne sont dans aucune base
+ *       publique, viennent d'une carte et d'une liste données en fichiers
+ *       (membres venus après la première surcouche) ; sans elles, ces membres
+ *       sont absents du fichier écrit.
  *   check --kind bic|compliance --overlay <fichier>
  *       Les contrôles du chargeur de l'API, sans rien écrire. Code 1 si refus.
  *       Puis les contrôles de données qui ont quitté la suite publique avec la
@@ -52,6 +58,7 @@
  *
  * Usage : npm run overlay -- <commande> [options]
  */
+import Database from 'better-sqlite3';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
@@ -76,6 +83,7 @@ import {
   buildMergedDatabase,
   extractOverlay,
   inspectOverlay,
+  memberRefused,
   removeFileWithCompanions,
   sha256File,
   stripFamily,
@@ -88,12 +96,19 @@ import {
   type OverlayManifest,
 } from '../src/lib/restricted-overlay-manifest.js';
 import {
+  absentAnnotation,
   applyCarryOver,
   carryOverAnnotation,
   freezePrevious,
   planCarryOver,
 } from './restricted-carry-over.js';
 import { SEED_REPORT_ENV, readSeedReport } from './seed-report.js';
+import {
+  curatedRowsFromMap,
+  parseFiList,
+  writeCuratedRows,
+  writeFiList,
+} from './seed-curated-map.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -228,6 +243,37 @@ function runSeeder(script: string, env: Record<string, string>): void {
   if (result.status !== 0) throw new Error(`${script} a échoué (code ${result.status})`);
 }
 
+/**
+ * Les membres venus après la première surcouche, chargés dans la COPIE de la base
+ * BIC avant l'extraction : les clés PL, FI et LU d'une carte composite
+ * (`--curated-map`, datées `--map-as-of`, créditées `--map-source`) et une liste
+ * finlandaise (`--fi-list`, au format de scripts/seed-curated-map.ts). Sans
+ * téléchargement : la preuve d'équivalence lit la carte et la liste d'une
+ * révision qui les portait encore. Jamais la base d'origine, seulement la copie.
+ */
+function loadLateMembers(copy: string, flags: Map<string, string | true>): void {
+  const mapPath = stringFlag(flags, 'curated-map');
+  const fiListPath = stringFlag(flags, 'fi-list');
+  if (!mapPath && !fiListPath) return;
+  const db = new Database(copy);
+  try {
+    if (mapPath) {
+      const asOf = stringFlag(flags, 'map-as-of') ?? null;
+      if (asOf !== null && !/^\d{4}-\d{2}-\d{2}$/.test(asOf))
+        throw new Error('--map-as-of attend une date AAAA-MM-JJ');
+      const source =
+        stringFlag(flags, 'map-source') ??
+        'IBANforge composite bank-code map (keys withdrawn from the public repository)';
+      const rows = curatedRowsFromMap(readFileSync(resolve(mapPath), 'utf8'));
+      for (const cc of ['PL', 'FI', 'LU'] as const)
+        writeCuratedRows(db, cc, rows[cc], source, asOf);
+    }
+    if (fiListPath) writeFiList(db, parseFiList(readFileSync(resolve(fiListPath), 'utf8')));
+  } finally {
+    db.close();
+  }
+}
+
 export function commandExtract(flags: Map<string, string | true>): unknown {
   const outDir = required(flags, 'out-dir');
   const sources: Array<[OverlayKind, string | undefined]> = [
@@ -243,6 +289,7 @@ export function commandExtract(flags: Map<string, string | true>): unknown {
       const out = join(outDir, OVERLAY_FILE_NAMES[kind]);
       prepareOutput(out);
       const copy = copyToScratch(resolve(source), scratch, `${kind}.sqlite`);
+      if (kind === 'bic') loadLateMembers(copy, flags);
       written.push(
         extractOverlay({
           kind,
@@ -309,6 +356,10 @@ export function commandSeed(
       launch('enrich-bic-database.ts', env);
       launch('seed-national.ts', env);
       launch('seed-pra-banks.ts', env);
+      // Les clés PL, FI et LU de la carte composite et la liste finlandaise
+      // (membres venus après la première surcouche). FI_LIST_PATH, s'il est posé,
+      // passe avec le reste de l'environnement (chargement de la liste statique).
+      launch('seed-curated-map.ts', env);
       const plan = planCarryOver({
         kind,
         workPath: work,
@@ -316,12 +367,14 @@ export function commandSeed(
         previous,
         now: now(),
       });
-      if (previous && plan.carried.length > 0)
+      // Les membres repris et les listes statiques : copiés tels quels de la précédente.
+      const copied = [...plan.carried.map((c) => c.member), ...plan.statics];
+      if (previous && copied.length > 0)
         applyCarryOver({
           kind,
           workPath: work,
           previousPath: previous.path,
-          members: plan.carried.map((c) => c.member),
+          members: copied,
         });
       const result = extractOverlay({
         kind,
@@ -329,6 +382,7 @@ export function commandSeed(
         outPath: out,
         generator: 'seed',
         allowShrink: flags.has('allow-shrink'),
+        absentMembers: plan.absent,
         refresh: {
           seedStartedAt: startedAt.toISOString(),
           carriedOver: Object.fromEntries(
@@ -337,7 +391,8 @@ export function commandSeed(
         },
       });
       for (const carried of plan.carried) log(carryOverAnnotation(kind, carried));
-      return { ...result, carried_over: plan.carried };
+      for (const id of plan.absent) log(absentAnnotation(kind, id));
+      return { ...result, carried_over: plan.carried, static_lists: plan.statics };
     }
     const publicBase = resolve(
       stringFlag(flags, 'public') ??
@@ -468,7 +523,8 @@ export function runCommand(argv: string[]): { code: number; output: unknown } {
       const kind = kindFlag(flags);
       const overlay = required(flags, 'overlay');
       const report = inspectOverlay(overlay, kind);
-      const refused = !report.ok || report.members.some((m) => m.state !== 'applied');
+      // Un membre absent (venu après la première surcouche) n'est pas un refus.
+      const refused = !report.ok || report.members.some(memberRefused);
       // Les contrôles qui ont suivi la famille dans la porte privée (étape du
       // retrait, 25/09/2026) : un texte public en retard sur la donnée servie.
       // Une annotation par écart, jamais un refus (src/lib/restricted-data-audit.ts).

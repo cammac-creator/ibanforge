@@ -26,15 +26,26 @@
  *   du MÊME fichier que le registre suisse (`bankmaster_V3.csv`, lu par
  *   scripts/enrich-bic-database.ts et scripts/seed-bc-nummer.ts), dont la
  *   description dit « may be used freely ». Publiques.
- * - Les données hors des deux bases, retirées du dépôt public à l'étape du retrait
- *   (25/09/2026, décision du 24/09/2026 « tout ce qui n'est pas redistribuable
- *   sort ») sans devenir des membres : les clés AT, BE, LU, PL et FI de la carte
- *   composite `src/db/bic_data.json`, la liste finlandaise transcrite (ancien
- *   `src/lib/fi-register.ts`), les exports du site pour AT, BE et SM (les pages
- *   sont rendues à la demande depuis l'API) et les blocs EPC des réponses
- *   d'exemple suivies. Ces données ne sont servies par aucune surcouche : une
- *   réponse qui en dépendait dit « non consulté » (src/lib/enrich.ts,
- *   `WITHDRAWN_BANK_CODE_COUNTRIES` dans src/lib/bic-lookup.ts).
+ * - Les clés AT et BE de la carte composite `src/db/bic_data.json`, retirées du
+ *   dépôt public à l'étape du retrait (25/09/2026, décision du 24/09/2026 « tout
+ *   ce qui n'est pas redistribuable sort ») sans devenir des membres : les
+ *   registres autrichien et belge de la surcouche répondent pour ces pays (preuve
+ *   centrale du 25/09/2026 : réponses identiques). De même les exports du site
+ *   pour AT, BE et SM (les pages sont rendues à la demande depuis l'API) et les
+ *   blocs EPC des réponses d'exemple suivies.
+ *
+ * ## Les membres venus après la première surcouche
+ *
+ * Les clés PL, FI et LU de la carte composite, et la liste finlandaise des codes
+ * d'établissement (ancien `src/lib/fi-register.ts`), sont devenues des membres le
+ * 25/09/2026 (décision de la session principale : servir ces clés depuis le dépôt
+ * privé, aucune perte de service) : tables `curated_bank_codes` et
+ * `fi_monetary_codes`, lues par la carte composite (src/lib/bic-lookup.ts) et par
+ * src/lib/fi-register.ts. Une surcouche écrite avant eux ne les porte pas : ils
+ * sont marqués `mayBeAbsent`, et un fichier qui ne les porte pas du tout (ni
+ * table, ni ligne, ni compte) les laisse « absents » au lieu d'être refusé. Sans
+ * eux, une réponse polonaise ou finlandaise dit « non consulté »
+ * (`WITHDRAWN_BANK_CODE_COUNTRIES` dans src/lib/bic-lookup.ts).
  *
  * ## Les minimums
  *
@@ -122,6 +133,27 @@ export interface RestrictedMember {
   minRows: number;
   /** Ce qu'est la source, pour les journaux et la table de métadonnées. */
   label: string;
+  /**
+   * Membre ajouté après la première surcouche publiée (25/09/2026) : un fichier
+   * qui ne le porte pas du tout (aucune ligne, aucun compte dans
+   * `overlay_members`) le laisse « absent » (non servi, « non consulté ») au lieu
+   * d'être refusé, sans alerte. Sans cela, la release que la production tire
+   * aujourd'hui serait refusée par le code qui introduit le membre, et le
+   * passage mensuel qui le construit ne tourne qu'après la fusion. Un membre
+   * déjà servi qui devient absent reste une perte : le rechargement garde ce
+   * qu'il sert (src/lib/restricted-overlay-runtime.ts) et la porte du manifeste
+   * refuse la release (`lost_member`). Jamais pour un membre de la première
+   * surcouche : un fichier qui en perdrait un doit toujours être refusé.
+   */
+  mayBeAbsent?: boolean;
+  /**
+   * Liste STATIQUE, sans source à télécharger (la liste finlandaise : un PDF
+   * transcrit à la main) : le passage mensuel la recopie telle quelle de la
+   * surcouche précédente, sans la compter comme reprise ni lui appliquer la
+   * borne d'âge des reprises (sa date est celle de la liste). Seul un geste
+   * manuel la remplace (FI_LIST_PATH, scripts/seed-curated-map.ts).
+   */
+  staticList?: boolean;
 }
 
 export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly RestrictedTable[]>> = {
@@ -251,6 +283,47 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
       freshness: 'list_month_then_updated_at',
       decideTogether: false,
     },
+    {
+      // Les clés de la carte composite que le dépôt public ne porte plus (PL, FI,
+      // LU) : un code bancaire, le BIC que la compilation lui donne. Aucune base
+      // publique ne porte cette table ; la fusion la crée depuis cette définition.
+      // `as_of` : la date de l'édition de la compilation lue (publication du
+      // paquet), la même pour toutes les lignes d'un passage.
+      name: 'curated_bank_codes',
+      columns: ['country', 'code', 'bic', 'source', 'as_of'],
+      onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE curated_bank_codes (
+  country TEXT NOT NULL,
+  code    TEXT NOT NULL,
+  bic     TEXT NOT NULL,
+  source  TEXT NOT NULL,
+  as_of   TEXT,
+  PRIMARY KEY (country, code)
+)`,
+      ],
+      freshness: 'max_as_of',
+      decideTogether: false,
+    },
+    {
+      // La liste finlandaise des codes d'établissement (Finance Finland) : un
+      // code, de un à quatre caractères, attribué à un groupe bancaire et à son
+      // BIC. Lue par préfixe le plus long (src/lib/fi-register.ts).
+      name: 'fi_monetary_codes',
+      columns: ['code', 'bic', 'institution', 'source', 'as_of'],
+      onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE fi_monetary_codes (
+  code        TEXT PRIMARY KEY,
+  bic         TEXT NOT NULL,
+  institution TEXT NOT NULL,
+  source      TEXT NOT NULL,
+  as_of       TEXT NOT NULL
+)`,
+      ],
+      freshness: 'max_as_of',
+      decideTogether: false,
+    },
   ],
   compliance: [
     {
@@ -307,6 +380,16 @@ export const RESTRICTED_FLOORS = {
   register_be: 650,
   register_sm: 3,
   pra: 200,
+  // Relevés le 25/09/2026 : 3 004 clés polonaises, 656 finlandaises et 143
+  // luxembourgeoises dans la carte de main ; 3 156, 666 et 118 dans la
+  // compilation schwifty 2025.9.0. La liste finlandaise de main comptait une
+  // centaine de codes (plages développées), la compilation en porte un par
+  // code à trois chiffres. Planchers bien en dessous, communs au seeder
+  // (scripts/seed-curated-map.ts).
+  map_pl: 2000,
+  map_fi: 400,
+  map_lu: 80,
+  register_fi: 50,
 } as const;
 
 /**
@@ -391,6 +474,45 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     where: null,
     minRows: RESTRICTED_FLOORS.pra,
     label: 'Bank of England, PRA List of Banks (permission for API use only)',
+  },
+  // Membres venus après la première surcouche (voir `mayBeAbsent`).
+  {
+    id: 'map_pl',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'PL' },
+    minRows: RESTRICTED_FLOORS.map_pl,
+    label:
+      'Polish bank codes of the composite map, from the NBP EWIB file (non-commercial by default)',
+    mayBeAbsent: true,
+  },
+  {
+    id: 'map_fi',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'FI' },
+    minRows: RESTRICTED_FLOORS.map_fi,
+    label: 'Finnish bank codes of the composite map, from Finance Finland (terms not established)',
+    mayBeAbsent: true,
+  },
+  {
+    id: 'map_lu',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'LU' },
+    minRows: RESTRICTED_FLOORS.map_lu,
+    label: 'Luxembourg bank codes of the composite map, from the ABBL register (API use only)',
+    mayBeAbsent: true,
+  },
+  {
+    id: 'register_fi',
+    kind: 'bic',
+    table: 'fi_monetary_codes',
+    where: null,
+    minRows: RESTRICTED_FLOORS.register_fi,
+    label: 'Finance Finland, Finnish monetary institution codes (terms not established)',
+    mayBeAbsent: true,
+    staticList: true,
   },
   // --- compliance.sqlite ----------------------------------------------------
   {
@@ -490,6 +612,15 @@ export function restrictedRegisterCountries(): Set<string> {
   return new Set(
     membersOf('bic')
       .filter((m) => m.table === 'national_bank_codes' && m.where)
+      .map((m) => m.where!.value),
+  );
+}
+
+/** Les pays dont les clés de la carte composite viennent de la surcouche (PL, FI, LU). */
+export function curatedMapCountries(): Set<string> {
+  return new Set(
+    membersOf('bic')
+      .filter((m) => m.table === 'curated_bank_codes' && m.where)
       .map((m) => m.where!.value),
   );
 }
