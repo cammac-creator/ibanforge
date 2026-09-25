@@ -594,6 +594,24 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     expect(again.kinds.bic).toBe('refused_before');
     expect(again.error).toBe(attempt.error);
     expect(fake.downloaded()).not.toContain('restricted-bic.sqlite');
+
+    // Le même refus, retenu par un code qui connaissait une autre famille (un
+    // déploiement plus ancien, qui ignorait un membre ajouté depuis) : oublié au
+    // redémarrage, le code d'aujourd'hui retente une fois, puis retient son refus.
+    const kept = JSON.parse(forum.kvGet('overlay:pull:state') ?? '{}');
+    expect(kept.rejected.bic.family).toBe(pull.FAMILY_SIGNATURE);
+    kept.rejected.bic.family = 'une-autre-famille';
+    forum.kvSet('overlay:pull:state', JSON.stringify(kept));
+    pull.resetOverlayPullForTests();
+    fake.requests = [];
+    const retried = await run();
+    expect(retried.kinds.bic).toBe('error');
+    expect(fake.downloaded()).toContain('restricted-bic.sqlite');
+    expect(JSON.parse(forum.kvGet('overlay:pull:state') ?? '{}').rejected.bic.family).toBe(
+      pull.FAMILY_SIGNATURE,
+    );
+    fake.requests = [];
+    expect((await run()).kinds.bic).toBe('refused_before');
   });
 
   it('surcouche qui perdrait un membre servi : refusée, la servie reste', async () => {

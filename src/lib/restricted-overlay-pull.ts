@@ -74,7 +74,7 @@ import {
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { kvGet, kvSet } from './forum-radar-server.js';
 import { opsFail, opsOk } from './ops-alert.js';
-import { OVERLAY_ENV, type OverlayKind } from './restricted-family.js';
+import { OVERLAY_ENV, RESTRICTED_FAMILY, type OverlayKind } from './restricted-family.js';
 import {
   acceptedCopyPath,
   inspectOverlay,
@@ -193,11 +193,26 @@ interface PullState {
   release: { tag: string; published_at: string | null } | null;
   /** Les derniers fichiers posés, pour dire d'où vient la surcouche servie. */
   delivered: DeliveredFile[];
-  /** Le dernier fichier refusé de chaque base : jamais retéléchargé. */
-  rejected: Partial<Record<OverlayKind, { sha256: string; error: string }>>;
+  /**
+   * Le dernier fichier refusé de chaque base : jamais retéléchargé, tant que le
+   * code qui l'a refusé connaît la même famille (`family`, voir FAMILY_SIGNATURE).
+   */
+  rejected: Partial<Record<OverlayKind, { sha256: string; error: string; family: string }>>;
   /** Ce qui était trop ancien à la dernière lecture de la release. */
   stale: string[];
 }
+
+/**
+ * La famille que ce code connaît (membres, bases, tables), en empreinte courte.
+ * Retenue avec chaque refus : une release refusée par un code plus ancien, qui
+ * ignorait un membre ajouté depuis, n'est pas refusée à jamais par le nouveau
+ * (étape du retrait, 25/09/2026 : la release qui porte les membres tardifs
+ * pourrait être tirée par l'ancien code avant le déploiement du nouveau).
+ */
+export const FAMILY_SIGNATURE = createHash('sha256')
+  .update(JSON.stringify(RESTRICTED_FAMILY.map((m) => [m.id, m.kind, m.table])))
+  .digest('hex')
+  .slice(0, 16);
 
 function emptyState(): PullState {
   return {
@@ -246,8 +261,17 @@ function reviveState(raw: unknown): PullState {
   if (isRecord(raw.rejected))
     for (const kind of KINDS) {
       const r = raw.rejected[kind];
-      if (isRecord(r) && typeof r.sha256 === 'string' && typeof r.error === 'string')
-        state.rejected[kind] = { sha256: r.sha256, error: r.error };
+      // Un refus retenu par un code qui connaissait une autre famille est oublié :
+      // le code d'aujourd'hui peut accepter ce que l'ancien refusait (un membre
+      // venu après lui, dont la table lui était inconnue). Il retente une fois ;
+      // s'il refuse à son tour, le refus est retenu sous sa propre famille.
+      if (
+        isRecord(r) &&
+        typeof r.sha256 === 'string' &&
+        typeof r.error === 'string' &&
+        r.family === FAMILY_SIGNATURE
+      )
+        state.rejected[kind] = { sha256: r.sha256, error: r.error, family: r.family };
     }
   if (Array.isArray(raw.stale))
     state.stale = raw.stale.filter((s): s is string => typeof s === 'string');
@@ -758,7 +782,11 @@ export async function runOverlayPull(options: PullOptions = {}): Promise<PullAtt
       kinds[kind] = result.outcome;
       if (result.error) errors.push(sanitize(result.error));
       if (result.rejectFile && result.error)
-        rejected[kind] = { sha256: entry.sha256, error: sanitize(result.error) };
+        rejected[kind] = {
+          sha256: entry.sha256,
+          error: sanitize(result.error),
+          family: FAMILY_SIGNATURE,
+        };
       // Un bon fichier arrivé depuis efface le souvenir d'un refus.
       if (result.outcome === 'installed' || result.outcome === 'up_to_date') delete rejected[kind];
       if (result.outcome === 'installed') installed.push(kind);
