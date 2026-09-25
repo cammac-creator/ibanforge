@@ -39,6 +39,10 @@ scripts/x402-pay.mjs
 data/uk-modulus.json
 # Registre ABBL : fichier privé, jamais de redistribution dans le dépôt.
 data/lu-register.json
+# Surcouche privée des données sous conditions (src/lib/restricted-family.ts) et
+# ses copies fusionnées : jamais dans le dépôt, où qu'elles soient posées.
+restricted-*.sqlite*
+*.merged-*.sqlite*
 
 # Regenerated from source for the contract linter — never committed
 openapi.generated.json

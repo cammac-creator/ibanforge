@@ -208,6 +208,23 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 - Country names populated via `Intl.DisplayNames` API (no hardcoded list).
 - Swiss clearing data includes BC-Nummern, SIC/euroSIC participation, QR-IID allocations, and institution classification.
 
+### Surcouche privée des données sous conditions (depuis le 25.09.2026)
+
+Ce qui peut être servi mais pas redistribué (lignes EBA STEP2, NBP et OeNB de l'annuaire,
+registres AT, BE et SM, liste PRA, liste ONU, registres EPC) est listé UNE fois, dans
+`src/lib/restricted-family.ts`. En production, il vient d'un fichier privé par base,
+désigné par `RESTRICTED_BIC_OVERLAY_PATH` et `RESTRICTED_COMPLIANCE_OVERLAY_PATH`
+(chemins absolus sur le volume Railway, `/app/data/…`), fusionné au démarrage dans une
+copie de la base publique fraîche (`src/lib/restricted-overlay.ts`,
+`restricted-overlay-runtime.ts`). Recharger : remplacer le fichier de façon atomique
+(voisin puis `mv`), l'API le contrôle en dix minutes au plus et garde le précédent si le
+nouveau est refusé. État : `GET /health` → `restricted_overlays`. Construire :
+`npm run overlay -- extract` (sans téléchargement) ou `npm run overlay:seed` (circuit
+privé seulement). **Jamais** commiter une surcouche ni une copie fusionnée, jamais en
+écrire une dans le dépôt (le script refuse ; `.gitignore` attrape `restricted-*.sqlite*`
+et `*.merged-*.sqlite*`), jamais ajouter une table ou une source à la famille ailleurs
+que dans cette constante. Même règle dans `AGENTS.md`.
+
 ## MCP Integration
 
 The MCP server exposes tools for AI agents:

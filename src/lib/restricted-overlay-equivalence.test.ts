@@ -196,9 +196,10 @@ async function loadGraph() {
   };
 }
 
-async function collect(cases: Cases, routes: Hono[]): Promise<Map<string, unknown>> {
+async function collect(cases: Cases, routes: unknown[]): Promise<Map<string, unknown>> {
   const app = new Hono();
-  for (const r of routes) app.route('/', r);
+  // Chaque route a son propre type d'environnement Hono ; montées ensemble, sans plus.
+  for (const r of routes) app.route('/', r as Hono);
   const out = new Map<string, unknown>();
   const post = (body: unknown): RequestInit => ({
     method: 'POST',
@@ -350,7 +351,10 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       compliance: status.find((s) => s.kind === 'compliance')!.served_path,
     };
     twins = status.flatMap((s) =>
-      s.members.map((m) => [`${s.kind}.${m.id}`, m.identical_to_public]),
+      s.members.map((m): [string, boolean | null | undefined] => [
+        `${s.kind}.${m.id}`,
+        m.identical_to_public,
+      ]),
     );
     graph.db.closeAll();
   }, 180_000);

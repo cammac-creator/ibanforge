@@ -269,6 +269,57 @@ attributions : `NOTICE`.
 tolère l'échec de ce téléchargement : un lien pourri doit coûter le contrôle
 britannique, jamais le déploiement.
 
+**La famille « sous conditions » — surcouche privée** (étape 3 de la sortie des
+données, 25/09/2026). Décision de Claude-Alain du 24/09/2026 : tout ce qui n'est
+pas redistribuable sort du dépôt public, l'ONU est gardée hors du dépôt, la
+Slovaquie reste publique. La liste des membres vit en UN endroit,
+`src/lib/restricted-family.ts` (extraction, chargeur et seeders la lisent) :
+
+| Base | Membre | Lignes |
+|---|---|---|
+| `bic.sqlite` | `eba_step2`, `nbp`, `oenb` | `bic_entries` de ces trois sources |
+| `bic.sqlite` | `register_at`, `register_be`, `register_sm` | `national_bank_codes` de ces trois pays |
+| `bic.sqlite` | `pra` | `pra_banks` entière |
+| `compliance.sqlite` | `un` | `sanctioned_entities` de la liste `UN` |
+| `compliance.sqlite` | `epc_sepa`, `epc_vop` | `sepa_participants` et `vop_participants` entières |
+
+Hors de cette constante, et à traiter à l'étape du retrait : `six_group` (à
+vérifier), la carte composite `src/db/bic_data.json` (clés AT, BE, LU, PL, FI),
+`src/lib/fi-register.ts`, les exports du site `frontend/data/registers/*.json` et
+les blocs EPC des exports.
+
+- **Deux fichiers privés**, un par base, désignés par `RESTRICTED_BIC_OVERLAY_PATH`
+  et `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (chemins absolus, sur le disque du
+  serveur, jamais dans le dépôt). Chacun porte les tables de la famille avec leurs
+  définitions et index, plus `overlay_meta` (format, base, date, générateur,
+  empreinte de la base lue, date de son dernier chargement) et `overlay_members`
+  (par membre : lignes, empreinte du contenu, dates reprises de la base, source).
+- **Fusion au démarrage** : `entrypoint.sh` recopie les bases publiques à chaque
+  démarrage ; l'API copie la base publique fraîche à côté du fichier privé, y
+  REMPLACE les lignes de chaque membre accepté par celles de la surcouche, et
+  ouvre cette copie. La base publique n'est jamais modifiée. Tant que la base
+  publique porte encore la famille, le journal dit pour chaque membre s'il était
+  identique aux lignes publiques remplacées : une surcouche plus ancienne qu'un
+  rafraîchissement public se voit là.
+- **Contrôles** : intégrité SQLite, version du format, base attendue, aucune table
+  inconnue ni ligne hors de la famille (sinon fichier refusé) ; pour chaque
+  membre, table et colonnes, plancher de lignes (ceux des seeders pour AT, BE, SM
+  et PRA), compte et empreinte du contenu (sinon membre refusé, les autres
+  servis). Refus : base publique seule, « non consulté » là où la donnée manque,
+  raison au journal, alerte d'exploitation. `GET /health` → `restricted_overlays`.
+- **Rechargement sans redémarrage** : un fichier remplacé (dépôt par un fichier
+  voisin puis `mv`) est vu en dix minutes au plus ; une nouvelle surcouche refusée
+  laisse la précédente en service.
+- **Extraction sans téléchargement** : `npm run overlay -- extract --bic <copie>
+  --compliance <copie> --out-dir <dossier hors du dépôt>` (refuse d'écrire dans
+  le dépôt, lit des copies, refuse sous un plancher ou sur une baisse de plus de
+  10 % sans `--allow-shrink`). Contrôle : `npm run overlay -- check`.
+- **Seeders à sortie choisie**, pour le futur dépôt privé de rafraîchissement :
+  `BIC_DB_PATH` (enrich, national, PRA), `COMPLIANCE_DB_PATH` (conformité),
+  `SEED_FAMILY=restricted` (la famille seule), enchaînés par
+  `npm run overlay:seed -- --kind bic|compliance --out <fichier>`. Sans ces
+  variables, les workflows publics écrivent exactement comme avant.
+
 ## Ce que les surfaces publiques annoncent
 
 - Pied de page, **corrigé le 22/08/2026** : il citait quatre sources sur treize et
