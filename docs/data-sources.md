@@ -34,6 +34,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation et traitement confirmés par écrit le 09/09/2026, **citation de la NBS obligatoire** ; conditions du fichier conservées | ✅ **réponse du 09/09/2026 relue le 14/09/2026** — ingérée le 06/09/2026, voir ci-dessous |
 | Česká národní banka — Číselník kódů platebního styku (`national_bank_codes` et `national_bank_codes_pending`, pays CZ) | 46 en édition 254 (effet 01.09.2026) | conditions du site, § 3 : stocker, transmettre et reproduire permis, **« Zdroj: ČNB » obligatoire**, faits et sens d'un extrait inchangés ; avis écrit du service des paiements du 27/08/2026 dans le même sens | ✅ **conditions lues le 24/09/2026 — ingéré le 25/09/2026**, voir ci-dessous |
+| Banca d'Italia : registres des banques, établissements de paiement et de monnaie électronique, historique et fusions (`national_bank_codes` et `national_bank_codes_retired`, pays IT) | 464 codes en vigueur et 1 907 radiés, édition du 23/09/2026 | open data **CC BY 4.0** (portail AgID dati.gov.it et catalogue DCAT de la Banca d'Italia) : réutilisation commerciale permise, **citer la source et indiquer les modifications** | ✅ **conditions lues le 24/09/2026 et relues le 25/09/2026, ingéré le 25/09/2026**, registre **partiel**, voir ci-dessous |
 | Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | ❓ **AUCUNE condition d'utilisation publiée** — ni licence, ni interdiction | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, licence `unknown`, lettre à écrire, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
@@ -250,6 +251,16 @@ le BIC que la ČNB publie pour le code. `pruneStaleNationalCodes()` et la garde
 de `lookupByCountryBank()` (`src/lib/bic-lookup.ts`) empêchent qu'une
 reconstruction du fichier ou une nouvelle édition les ramène.
 
+**Clés IT, 25/09/2026** : les 454 clés italiennes ont été confrontées aux registres
+de la Banca d'Italia (édition du 23/09/2026). 286 nomment un code en vigueur ;
+8 un code que les registres ne listent pas (Poste Italiane, le Trésor, des
+succursales d'établissements européens : une absence ne prouve rien, elles
+restent) ; **160 un code que la Banca d'Italia a radié**, dont `IT:03111`, qui
+servait « Banca Carige » pour le code d'UBI Banca, absorbée par Intesa Sanpaolo
+en 2021 : ces 160 clés sont retirées du fichier. `pruneRetiredItalianCodes()` et
+la garde de `lookupByCountryBank()` (`src/lib/bic-lookup.ts`) empêchent qu'une
+reconstruction du fichier ou une nouvelle radiation les ramène.
+
 Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
 droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
 PL et FI sortent du dépôt public** (conditions non établies, non commerciales,
@@ -272,7 +283,8 @@ britannique, jamais le déploiement.
 **La famille « sous conditions » — surcouche privée** (étape 3 de la sortie des
 données, 25/09/2026). Décision de Claude-Alain du 24/09/2026 : tout ce qui n'est
 pas redistribuable sort du dépôt public, l'ONU est gardée hors du dépôt, la
-Slovaquie reste publique (la Tchéquie aussi, conditions de la ČNB ci-dessous). La
+Slovaquie reste publique (la Tchéquie aussi, conditions de la ČNB ci-dessous ;
+l'Italie aussi, open data CC BY 4.0 de la Banca d'Italia, ci-dessous). La
 liste des membres vit en UN endroit,
 `src/lib/restricted-family.ts` (extraction, chargeur et seeders la lisent) :
 
@@ -1243,6 +1255,163 @@ dans `NATIONAL_REGISTERS` (`authoritative: true`), comme la Slovaquie.
   réelles, gardées avec un BIC nul.
 - L'historique des changements (PDF, depuis 2009) donne les successeurs en
   texte libre seulement : aucun `superseded_by` n'est servi pour la Tchéquie.
+
+## Banca d'Italia : les registres italiens (`national_bank_codes` et `national_bank_codes_retired`, pays IT)
+
+Ingérés le **25/09/2026** (édition du 23/09/2026). Deux jeux de l'open data de la
+Banca d'Italia (base GIAVA), repris sur le portail AgID dati.gov.it : « Lista
+intermediari » (`VFLUSSO_INTERMEDIARIO`, l'élenco **historique** des
+intermédiaires, mis à jour chaque jour) et « Lista fusioni, incorporazioni,
+cessioni attività e passività ecc. » (`VFLUSSO_EVENTO`, chaque semaine). Page de
+téléchargement : <https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/#/area-download>.
+Catalogue DCAT de la Banca d'Italia, qui déclare la licence jeu par jeu :
+<https://www.bancaditalia.it/footer/open-data/Open_Data_BdI.rdf>. Étude complète :
+dossier privé `docs/internal/registres-2026-09-24/`.
+
+### 🚨 Un registre partiel : une absence ne prouve rien
+
+Les registres listent les **banques** (`TIPO_ALBO` 001), les **établissements de
+paiement** (012) et de **monnaie électronique** (016, et l'ancien 010 pour
+l'historique) que la Banca d'Italia inscrit. Ils ne publient pas l'attribution de
+l'espace ABI, et trois émetteurs réels d'IBAN italiens n'y figurent pas : Poste
+Italiane (07601), la Banca d'Italia elle-même (01000, Trésor) et les succursales
+d'établissements de paiement européens (Qonto, 36092). L'Italie est donc dans
+`NON_EXHAUSTIVE_REGISTERS` (`src/lib/enrich.ts`), comme Saint-Marin : un code en
+vigueur nomme son titulaire (`verified`, `authoritative: false`), un code absent
+garde la réponse de la carte composite, jamais `not_allocated`.
+
+Le filtre se fait par **registre**, jamais par plage de codes : des établissements
+de paiement portent des codes 19xxx (AGOS-DUCATO 19309), et les autres registres
+(SGR, art. 106, OICR) nomment des sociétés qui n'émettent aucun IBAN.
+
+### Le vrai apport : les codes radiés
+
+Un code que le registre déclare **radié** est un fait positif, pas une absence.
+Il répond `verified` avec `retired: true`, `retired_on` (dernier jour où le
+registre porte le code pour son dernier titulaire) et, s'il existe,
+`superseded_by`, le **successeur légal** en vigueur ; `authoritative` reste
+false et le titulaire est `inferred` (personne ne tient ce code aujourd'hui).
+Jamais un refus : la durée pendant laquelle un ancien IBAN reste joignable après
+une fusion italienne n'est publiée nulle part. Le nom périmé de la carte curée
+n'est plus servi (`bic` est null).
+
+Trois règles, tenues par `scripts/seed-national-it.test.ts` :
+
+- l'historique se lit **par date** : un code peut être réattribué (03111 : Banca
+  Lombarda de 1998 à 2007, puis UBI Banca de 2008 à 2021) ou réinscrit (03268,
+  Banca Sella, radiée fin 2005 et réinscrite le lendemain). Un code qui a un
+  titulaire en vigueur est en vigueur ; sinon c'est son dernier titulaire qui
+  fait foi ;
+- le successeur se suit **par entité** (`ID_INT`), jamais par code, à travers
+  les seules fusions (002) et incorporations (003), jusqu'à la première entité en
+  vigueur. Une entité qui a changé de code (BNP Paribas SA, 03181 puis 03479) a
+  pour successeur son nouveau code. Les **cessions** d'actifs et de guichets ne
+  font pas de successeur légal : la Banca Popolare di Vicenza (05728, liquidée en
+  2017, actifs cédés à Intesa Sanpaolo) n'en a pas ;
+- ce successeur est **légal**, rien de plus : avant son absorption par Intesa
+  Sanpaolo, UBI avait cédé des guichets à BPER, dont les comptes sont partis chez
+  BPER. Le texte de `next_steps` le dit.
+
+Mesuré sur l'édition du 23/09/2026 : 464 codes en vigueur (414 banques, 39
+établissements de paiement, 11 de monnaie électronique), 1 907 codes radiés,
+dont 1 130 avec un successeur légal en vigueur. Aucune entité n'est le passif de
+deux fusions ou incorporations ; une seule incorporation prend effet loin de la
+radiation (IW Bank, sortie du registre des banques en 2022 et incorporée comme
+SIM en 2024 par Fideuram), et elle reste son successeur légal.
+
+### Ce qui a été lu, mot pour mot
+
+Conditions du site de la Banca d'Italia, lues le **24/09/2026** et relues le
+**25/09/2026** sur <https://www.bancaditalia.it/footer/copyright/index.html> :
+
+> « La stampa e il salvataggio (su disco o su altri supporti di memorizzazione)
+> dei contenuti di questo sito sono consentiti per solo uso personale, con
+> esclusione di ogni utilizzo per fini di lucro o per trarne qualsivoglia utilità
+> economica. […] Fanno eccezione gli open data della Banca d'Italia, inclusi nel
+> portale AgID raggiungibile al link https://dati.gov.it , i quali sono rilasciati
+> con licenza Creative Commons Attribuzione 4.0 Internazionale (CC-BY 4.0). Tale
+> licenza ne consente il riutilizzo, anche per fini commerciali, a condizione di
+> citarne la fonte indicando eventuali modifiche apportate. »
+
+Les deux jeux sont publiés sur dati.gov.it par l'organisation Banca d'Italia
+sous « Creative Commons Attribuzione 4.0 Internazionale (CC BY 4.0) » (API CKAN,
+24/09/2026), et le catalogue DCAT de la Banca d'Italia déclare la même licence
+pour chaque distribution (`<dct:license rdf:resource="https://creativecommons.org/licenses/by/4.0/"/>`,
+relu le 25/09/2026).
+
+Licence CC BY 4.0, section 3(a)(1), lue le 24/09/2026 sur
+<https://creativecommons.org/licenses/by/4.0/legalcode.en> : « identification of
+the creator(s) […]; a copyright notice; […] a URI or hyperlink to the Licensed
+Material to the extent reasonably practicable; indicate if You modified the
+Licensed Material […]; and indicate the Licensed Material is licensed under this
+Public License, and include the text of, or the URI or hyperlink to, this Public
+License. » Le jeu ne porte aucune mention de droit d'auteur à reproduire.
+
+Attention : le même institut publie d'autres documents hors du portail AgID (un
+ancien `Elenco_banche.pdf`, par exemple), qui restent sous l'interdiction
+générale. Seuls les jeux de dati.gov.it sont couverts.
+
+### La position
+
+- **Commercial** : oui, expressément.
+- **Permission écrite** : pas nécessaire. **Aucune lettre à écrire.**
+- **Mention** : l'auteur, le jeu, la licence et son URI, l'édition, et
+  l'indication des modifications (« normalised and joined by IBANforge » : codes
+  ramenés à cinq chiffres, codes en vigueur choisis, codes radiés datés et reliés
+  à leur successeur par la liste des fusions).
+
+### Ce que ça impose au code
+
+- `source` porte l'auteur, le jeu et la licence : « Banca d'Italia, Albi ed elenchi
+  di vigilanza (open data, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/) » ;
+  `as_of` porte l'édition, lue dans le **nom du fichier** du ZIP
+  (`2026-09-23_INTERMEDIARI.csv`), jamais dans `dct:modified` du catalogue, qui
+  date les métadonnées. `nationalRegisterCredit('IT')` en fait « Source: …,
+  edition AAAA-MM-JJ; normalised and joined by IBANforge » pour `/llms.txt`.
+- Le nom servi dans `bank_code_check.register` porte lui aussi l'auteur, le jeu,
+  la licence et la modification : sur un code radié, aucun bloc `bic` ne porte le
+  crédit à sa place. Même choix que « Zdroj: ČNB » dans le nom tchèque.
+- Le registre ne publie **aucun BIC** : pour un code en vigueur, le BIC servi
+  reste celui de la carte composite (`basis: curated_map`), jamais inventé.
+- Adresse servie : le siège légal **en Italie** (pour une banque étrangère, sa
+  succursale italienne, l'entité titulaire du code) ; le LEI quand la Banca
+  d'Italia le publie. Sur un code radié, le nom du dernier titulaire seulement.
+- **Relecture hebdomadaire** : `.github/workflows/refresh-it-register.yml`, chaque
+  jeudi à 05:37 UTC (le fichier des événements est hebdomadaire, celui des
+  intermédiaires quotidien ; mesuré de juin à septembre 2026, le contenu utile
+  change quelques fois par mois). Le chargeur italien tourne SEUL
+  (`seed-national.ts IT`, jamais dans la passe mensuelle, qui ne dépend donc pas
+  de bancaditalia.it). Il ne commite que si le CONTENU des lignes IT a changé
+  (`scripts/it-register-diff.ts` refuse le commit si une autre table, un autre
+  pays ou le schéma diffère), après le garde de qualité et les tests, et réexporte
+  alors les pages `/it` (`pages:export -- IT`). Groupe de concurrence
+  `bic-sqlite-writer`, partagé avec les deux autres écrivains de la base.
+- Une source **injoignable**, une **page** servie à la place du ZIP (le serveur
+  d'authentification répond une page HTML de 1 Ko sans pot à cookies) ou une
+  édition **plus ancienne** que celle déjà servie laissent les deux tables telles
+  quelles, écrivent `::warning::` et la sortie `it_register=not_loaded`, que la
+  dernière étape change en run rouge et en alerte Telegram. Un changement de
+  **format** (colonne manquante, nombre de champs qui bouge, archive sans le
+  fichier attendu, édition sous les planchers) fait échouer le run.
+
+### Les pièges de la source
+
+- **Poignée de main à cookies** : l'adresse de téléchargement répond 302 vers
+  `auth.bancaditalia.it/oam/…`, qui renvoie vers `infostat…/obrar.cgi`, qui renvoie
+  vers le fichier ; les cookies posés en chemin sont exigés au dernier saut. Le
+  chargeur suit les redirections à la main, un pot par téléchargement.
+- ZIP d'un seul CSV UTF-8 avec BOM, séparateur `;`, champs rembourrés d'une espace,
+  en-tête qui commence par « ID_INT » précédé d'une espace. Des **guillemets
+  littéraux** (« C.D. "ALBO UNICO" ») ne sont pas des délimiteurs : un analyseur CSV
+  classique les mangerait. Le commentaire de l'archive annonce une longueur plus
+  grande que celle qu'il a (`unzip` : « zipfile comment truncated »).
+- `COD_MECC` s'écrit sans zéro de tête (`3111` pour 03111) ; plusieurs milliers de
+  lignes anciennes n'ont pas de code du tout.
+- **Sans le filtre des périodes ouvertes** (`DATA_F_VAL = 9999-12-31`), on sert des
+  noms périmés.
+- Un code radié de la liste des banques peut rester vivant dans un autre registre
+  (une banque devenue SIM ou intermédiaire art. 106) : le chargeur ne regarde que
+  les quatre registres des IBAN, et le code est bien radié de ceux-là.
 
 ## BCSM — les banques opérationnelles de Saint-Marin (`national_bank_codes`, pays SM)
 

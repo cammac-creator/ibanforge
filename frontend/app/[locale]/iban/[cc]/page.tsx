@@ -15,8 +15,10 @@ import {
   formatIban,
   getCountry,
   isNationalRegister,
+  isPartialRegister,
   type CountryEntry,
 } from "@/lib/countries";
+import { itCopy } from "@/lib/it-register-copy";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
 
@@ -69,6 +71,10 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
   const tr = await getTranslations("registers");
   const country = countryName(entry.code, locale, entry.name_en);
   const national = isNationalRegister(entry);
+  // Un registre partiel a répondu pour l'exemple (l'Italie) : nommé tel quel,
+  // jamais sous le libellé de la carte composite. La phrase vient du module de
+  // textes des pages italiennes, `messages/*.json` étant hors de ce chantier.
+  const partial = !national && isPartialRegister(entry);
   const file = countriesFile();
 
   // The example, cut where the registry cuts it. What no field claims (a
@@ -99,12 +105,18 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
     [t("facts.example"), formatIban(entry.example)],
     [t("facts.sepa"), entry.sepa.member ? t("facts.sepaYes", { schemes: schemes(entry) }) : t("facts.sepaNo")],
     [t("facts.vop"), entry.sepa.vop_required ? t("facts.vopYes") : t("facts.vopNo")],
-    [t("facts.register"), entry.register ? (national ? entry.register : t("facts.registerComposite")) : t("facts.registerNone")],
+    [t("facts.register"), entry.register ? (national || partial ? entry.register : t("facts.registerComposite")) : t("facts.registerNone")],
   ];
 
   const checks: string[] = [
     t("checks.structure"),
-    entry.register ? (national ? t("checks.bankNational", { register: entry.register }) : t("checks.bankComposite")) : t("checks.bankNone"),
+    entry.register
+      ? national
+        ? t("checks.bankNational", { register: entry.register })
+        : partial
+          ? itCopy(locale).partialRegisterCheck(entry.register)
+          : t("checks.bankComposite")
+      : t("checks.bankNone"),
     entry.sepa.member ? t("checks.sepa", { schemes: schemes(entry) }) : t("checks.sepaOut"),
   ];
   if (entry.sepa.member) checks.push(t("checks.vop"));

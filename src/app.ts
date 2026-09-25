@@ -396,7 +396,7 @@ function buildLlmsTxt(): string {
   // écrite ici. Absente quand aucun registre italien n'est chargé.
   const itCredit = nationalRegisterCredit('IT');
   const itSourceLine = itCredit
-    ? `\n- Italian bank codes: ${itCredit} (${IT_DATASET_PAGE}) — the banks, payment institutions and e-money institutions the Banca d'Italia registers, reused under CC BY 4.0; a code it has struck off is served with its date and its legal successor, and an absence is not a non-allocation (Poste Italiane and branches of EU payment institutions hold codes outside these registers)`
+    ? `\n- Italian bank codes: ${itCredit} (${IT_DATASET_PAGE}). The banks, payment institutions and e-money institutions the Banca d'Italia registers, reused under CC BY 4.0; a code it has struck off is served with its date and its legal successor, and an absence is not a non-allocation (Poste Italiane and branches of EU payment institutions hold codes outside these registers)`
     : '';
   // Luxembourg: the ABBL register answers only where its file is configured,
   // so it is credited only there. Its terms ask for the source on every
