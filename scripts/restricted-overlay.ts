@@ -26,7 +26,17 @@
  * Usage : npm run overlay -- <commande> [options]
  */
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -35,6 +45,7 @@ import {
   buildMergedDatabase,
   extractOverlay,
   inspectOverlay,
+  removeFileWithCompanions,
   sha256File,
   stripFamily,
 } from '../src/lib/restricted-overlay.js';
@@ -48,17 +59,73 @@ export const OVERLAY_FILE_NAMES: Record<OverlayKind, string> = {
 };
 
 /**
- * Refuse toute écriture dans le dépôt, `data/` compris, et tout chemin relatif :
- * le chemin réel du dossier parent est comparé à celui du dépôt.
+ * Le dossier est-il dans un dépôt git (copie de travail, ou dossier `.git`) ?
+ * Sans git installé (image de production), la réponse est non et seule la
+ * comparaison avec le dépôt courant garde. Les variables `GIT_*` sont retirées :
+ * un `GIT_DIR` hérité ferait répondre git pour un autre dossier.
+ */
+function insideGitRepository(dir: string): boolean {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),
+  );
+  const result = spawnSync(
+    'git',
+    ['-C', dir, 'rev-parse', '--is-inside-work-tree', '--is-inside-git-dir'],
+    { env, encoding: 'utf8' },
+  );
+  if (result.error || result.status !== 0) return false;
+  return result.stdout.split('\n').some((line) => line.trim() === 'true');
+}
+
+/**
+ * Refuse toute écriture de la famille là où elle pourrait être commitée
+ * (relecture de la PR 252, R19 à R21) :
+ * - un chemin relatif ;
+ * - une sortie existante qui n'est pas un fichier ordinaire à un seul lien (lien
+ *   symbolique, lien dur, dossier) : écrire au travers atteindrait sa cible ;
+ * - un lien symbolique pendant dans le chemin ;
+ * - le dépôt courant, `data/` compris, comparé sur les chemins RÉELS du disque
+ *   (`realpathSync.native` : sur un disque insensible à la casse, `IBANforge/`
+ *   et `ibanforge/` sont le même dossier) ;
+ * - N'IMPORTE QUEL dépôt git ou copie de travail : les copies de travail voisines
+ *   partagent le même dépôt public. Le futur circuit privé (PR 4) écrit donc hors
+ *   de son checkout (`$RUNNER_TEMP`).
  */
 export function assertOutsideRepository(path: string, root: string = ROOT): void {
   if (!isAbsolute(path)) throw new Error(`Chemin absolu requis : ${path}`);
+  let own;
+  try {
+    own = lstatSync(path);
+  } catch {
+    own = null;
+  }
+  if (own && (own.isSymbolicLink() || !own.isFile() || own.nlink > 1))
+    throw new Error(`Sortie refusée, ce n'est pas un fichier ordinaire : ${path}`);
   let parent = dirname(path);
-  while (!existsSync(parent)) parent = dirname(parent);
-  const real = realpathSync(parent);
-  const repo = realpathSync(root);
+  while (!existsSync(parent)) {
+    let dangling = false;
+    try {
+      dangling = lstatSync(parent).isSymbolicLink();
+    } catch {
+      /* n'existe pas du tout : on remonte */
+    }
+    if (dangling) throw new Error(`Lien symbolique pendant dans le chemin : ${parent}`);
+    parent = dirname(parent);
+  }
+  const real = realpathSync.native(parent);
+  const repo = realpathSync.native(root);
   if (real === repo || real.startsWith(`${repo}/`))
     throw new Error(`Écriture refusée dans le dépôt public : ${path}`);
+  if (insideGitRepository(real))
+    throw new Error(
+      `Écriture refusée dans un dépôt git : ${path}. La surcouche s'écrit hors de tout dépôt.`,
+    );
+}
+
+/** La garde, puis le dossier de la sortie créé (0700) s'il manque (R14). */
+function prepareOutput(path: string): void {
+  assertOutsideRepository(path);
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 }
 
 function parseArgs(argv: string[]): { command: string; flags: Map<string, string | true> } {
@@ -129,7 +196,7 @@ export function commandExtract(flags: Map<string, string | true>): unknown {
     for (const [kind, source] of sources) {
       if (!source) continue;
       const out = join(outDir, OVERLAY_FILE_NAMES[kind]);
-      assertOutsideRepository(out);
+      prepareOutput(out);
       const copy = copyToScratch(resolve(source), scratch, `${kind}.sqlite`);
       written.push(
         extractOverlay({
@@ -150,7 +217,7 @@ export function commandExtract(flags: Map<string, string | true>): unknown {
 export function commandSeed(flags: Map<string, string | true>): unknown {
   const kind = kindFlag(flags);
   const out = required(flags, 'out');
-  assertOutsideRepository(out);
+  prepareOutput(out);
   const scratch = mkdtempSync(join(tmpdir(), 'ibanforge-overlay-seed-'));
   try {
     if (kind === 'bic') {
@@ -220,7 +287,7 @@ export function runCommand(argv: string[]): { code: number; output: unknown } {
     }
     case 'merge': {
       const out = required(flags, 'out');
-      assertOutsideRepository(out);
+      prepareOutput(out);
       const result = buildMergedDatabase({
         kind: kindFlag(flags),
         publicPath: required(flags, 'public'),
@@ -231,9 +298,18 @@ export function runCommand(argv: string[]): { code: number; output: unknown } {
     }
     case 'strip': {
       const out = required(flags, 'out');
-      assertOutsideRepository(out);
-      copyFileSync(required(flags, 'in'), out);
-      stripFamily(out, kindFlag(flags), { dropTables: flags.has('drop-tables') });
+      prepareOutput(out);
+      // Un voisin puis un renommage, comme l'extraction et la fusion : le
+      // renommage remplace l'entrée du dossier, il n'écrit jamais au travers
+      // d'un lien (R19).
+      const temporary = `${out}.tmp-${randomUUID()}`;
+      try {
+        copyFileSync(required(flags, 'in'), temporary);
+        stripFamily(temporary, kindFlag(flags), { dropTables: flags.has('drop-tables') });
+        renameSync(temporary, out);
+      } finally {
+        removeFileWithCompanions(temporary);
+      }
       return { code: 0, output: { path: out, sha256: sha256File(out) } };
     }
     case 'seed':
