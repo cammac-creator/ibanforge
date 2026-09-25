@@ -123,10 +123,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as XLSX from 'xlsx';
 import { PENDING_TABLE, registerToday } from '../src/lib/national-registers.js';
 import {
+  RESTRICTED_FAMILY,
   RESTRICTED_FLOORS,
   restrictedRegisterCountries,
   seedFamilyFromEnv,
 } from '../src/lib/restricted-family.js';
+import { failureCause, reportSeedMember, seedReportActive } from './seed-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -1313,7 +1315,26 @@ async function main(): Promise<void> {
     if (only && only !== cc) continue;
     if (restrictedOnly && !restricted.has(cc)) continue;
     console.log(`${cc}: downloading ${SOURCES[cc]}`);
-    write(db, cc, await parse());
+    // Chaîne privée de la surcouche (SEED_REPORT_PATH) : un registre de la
+    // famille en panne est noté, les autres continuent, et `overlay seed` le
+    // reprend de la surcouche précédente (scripts/restricted-carry-over.ts).
+    // Partout ailleurs, et pour la Slovaquie toujours, une panne arrête le
+    // seeder comme avant.
+    const member = seedReportActive()
+      ? RESTRICTED_FAMILY.find((m) => m.table === 'national_bank_codes' && m.where?.value === cc)
+      : undefined;
+    if (!member) {
+      write(db, cc, await parse());
+      continue;
+    }
+    try {
+      const entries = await parse();
+      write(db, cc, entries);
+      reportSeedMember({ member: member.id, state: 'loaded', processed: entries.length });
+    } catch (e) {
+      console.warn(`  ${cc}: NOT loaded (${e instanceof Error ? e.message : String(e)})`);
+      reportSeedMember({ member: member.id, state: 'failed', cause: failureCause(e) });
+    }
   }
   // Czechia last, and on its own path: it writes two tables, and it is the one
   // register here whose failure to LOAD must not fail the monthly refresh.
@@ -1330,7 +1351,11 @@ async function main(): Promise<void> {
   // the step output `cz_register`, and a later step of each workflow turns
   // `not_loaded` into a red step and the Telegram alert, AFTER the other
   // sources have been committed.
-  if (!only || only === 'CZ') {
+  //
+  // Jamais en mode famille (SEED_FAMILY=restricted) : la Tchéquie est publique
+  // et hors de la famille, la chaîne privée de la surcouche n'a pas à la lire.
+  // Le robot public, lui, la lit comme avant.
+  if (!restrictedOnly && (!only || only === 'CZ')) {
     console.log(`CZ: reading ${SOURCES.CZ}`);
     try {
       await seedCzechLive(db);

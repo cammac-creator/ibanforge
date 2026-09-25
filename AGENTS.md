@@ -137,7 +137,14 @@ npm run build             # next build
   and monthly (BIC), commits no data, and publishes a release: both files and a
   `manifest.json` (`src/lib/restricted-overlay-manifest.ts`: SHA-256, size, generation
   date, public commit, rows per member), after a quality gate (`npm run overlay -- check`,
-  then `manifest --previous`: no file or member lost, no member down more than 10%). With
+  then `manifest --previous`: no file or member lost, no member down more than 10%). One
+  source down at the monthly run no longer stops it: each family seeder reports each
+  member (`scripts/seed-report.ts`), and a member whose source failed is carried over as is
+  from the previous overlay placed at the output path, original dates kept
+  (`scripts/restricted-carry-over.ts`), recorded in the file and the manifest
+  (`carried_over`) and announced by a `::warning::` annotation; refused when no member
+  refreshed, without a previous overlay, or when a carried-over row is older than 45 days
+  or of unknown date, or its PRA list falls outside the seeder's window. With
   `RESTRICTED_OVERLAY_PULL_REPO` (owner/name, written nowhere in this repository) and
   `RESTRICTED_OVERLAY_PULL_TOKEN` (fine-grained, read-only Contents on that repository
   alone), the ten-minute watcher pulls the latest release every four hours plus up to

@@ -22,6 +22,13 @@
  *       famille seulement (SEED_FAMILY=restricted), téléchargements et bases
  *       temporaires dans le dossier de travail (SEED_TMP_DIR, hors du dépôt),
  *       puis extraction vers --out.
+ *       Pour la base BIC : chaque seeder dit l'issue de chaque membre
+ *       (SEED_REPORT_PATH, scripts/seed-report.ts) ; un membre dont la source est
+ *       en panne est repris tel quel de la surcouche précédente au même chemin,
+ *       dates d'origine comprises (scripts/restricted-carry-over.ts), annoncé
+ *       par une annotation `::warning::` et noté dans le fichier (`carried_over`).
+ *       Refus si aucun membre n'est frais, sans surcouche précédente, ou si une
+ *       donnée reprise dépasse sa borne.
  *       Pour la conformité : la surcouche précédente au même chemin est fusionnée
  *       d'abord, pour que la reprise d'une liste en panne (ONU) la retrouve.
  *   manifest --dir <dossier> --out <fichier> [--commit <sha>] [--previous <manifeste>] [--allow-shrink]
@@ -73,6 +80,13 @@ import {
   parseManifest,
   type OverlayManifest,
 } from '../src/lib/restricted-overlay-manifest.js';
+import {
+  applyCarryOver,
+  carryOverAnnotation,
+  freezePrevious,
+  planCarryOver,
+} from './restricted-carry-over.js';
+import { SEED_REPORT_ENV, readSeedReport } from './seed-report.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -238,13 +252,38 @@ export function commandExtract(flags: Map<string, string | true>): unknown {
   }
 }
 
-export function commandSeed(flags: Map<string, string | true>): unknown {
+/**
+ * Ce que `seed` emprunte au monde : les tests en passent des doublures (seeders
+ * sans réseau, horloge fixe, journal capturé) ; la ligne de commande, jamais.
+ */
+export interface SeedDependencies {
+  /** Lance scripts/<script> avec ces variables ; lève une erreur s'il échoue. */
+  runSeeder?: (script: string, env: Record<string, string>) => void;
+  /** L'horloge du passage : début du passage et âge des données reprises. */
+  now?: () => Date;
+  /** Où annoncer un membre repris (une annotation GitHub par ligne). */
+  log?: (line: string) => void;
+}
+
+export function commandSeed(
+  flags: Map<string, string | true>,
+  dependencies: SeedDependencies = {},
+): unknown {
   const kind = kindFlag(flags);
   const out = required(flags, 'out');
   prepareOutput(out);
+  const launch = dependencies.runSeeder ?? runSeeder;
+  const now = dependencies.now ?? (() => new Date());
+  const log = dependencies.log ?? ((line: string) => console.log(line));
   const scratch = mkdtempSync(join(tmpdir(), 'ibanforge-overlay-seed-'));
   try {
     if (kind === 'bic') {
+      // Avant tout téléchargement : les sources des membres frais sont lues après.
+      const startedAt = now();
+      // La surcouche précédente que le dépôt privé pose à la sortie, figée AVANT
+      // les seeders : la source d'une reprise, et la date d'origine de ce qu'elle
+      // reprend (scripts/restricted-carry-over.ts).
+      const previous = freezePrevious(out, scratch, kind);
       const publicBase = resolve(
         stringFlag(flags, 'public') ?? process.env.BIC_DB_PATH ?? join(ROOT, 'data/bic.sqlite'),
       );
@@ -253,21 +292,45 @@ export function commandSeed(flags: Map<string, string | true>): unknown {
       // d'une table vide : sinon l'INSERT OR IGNORE garderait à jamais les lignes
       // EBA STEP2, NBP ou OeNB disparues de leur source.
       stripFamily(work, 'bic');
+      const reportPath = join(scratch, 'rapport-seeders.jsonl');
       const env = {
         BIC_DB_PATH: work,
         SEED_FAMILY: 'restricted',
         SEED_TMP_DIR: join(scratch, 'tmp'),
+        [SEED_REPORT_ENV]: reportPath,
       };
-      runSeeder('enrich-bic-database.ts', env);
-      runSeeder('seed-national.ts', env);
-      runSeeder('seed-pra-banks.ts', env);
-      return extractOverlay({
+      launch('enrich-bic-database.ts', env);
+      launch('seed-national.ts', env);
+      launch('seed-pra-banks.ts', env);
+      const plan = planCarryOver({
+        kind,
+        workPath: work,
+        report: readSeedReport(reportPath),
+        previous,
+        now: now(),
+      });
+      if (previous && plan.carried.length > 0)
+        applyCarryOver({
+          kind,
+          workPath: work,
+          previousPath: previous.path,
+          members: plan.carried.map((c) => c.member),
+        });
+      const result = extractOverlay({
         kind,
         sourcePath: work,
         outPath: out,
         generator: 'seed',
         allowShrink: flags.has('allow-shrink'),
+        refresh: {
+          seedStartedAt: startedAt.toISOString(),
+          carriedOver: Object.fromEntries(
+            plan.carried.map((c) => [c.member, { source_date: c.source_date, cause: c.cause }]),
+          ),
+        },
       });
+      for (const carried of plan.carried) log(carryOverAnnotation(kind, carried));
+      return { ...result, carried_over: plan.carried };
     }
     const publicBase = resolve(
       stringFlag(flags, 'public') ??
