@@ -6,6 +6,7 @@ import {
   BIC_SOURCE_AS_OF_NOTE,
   CHECKS_NOTE,
   LISTED_IN_CURRENT_SOURCE_NOTE,
+  NATIONAL_CHECK_DIGITS_NOTE,
   VOP_REGISTER_STATUS_NOTE,
   bicSourceNote,
 } from '../lib/field-notes.js';
@@ -290,6 +291,22 @@ const CHECKS_SCHEMA = z
   .optional()
   .describe(CHECKS_NOTE);
 
+/**
+ * `national_check_digits` : la preuve de `checks.national_check_digits` pour FR,
+ * MC, BE, IT, SM et ES (25/09/2026). Déclaré ici parce que le schéma annoncé
+ * est fermé : un bloc absent du schéma serait retiré par Zod, et le client MCP
+ * officiel refuserait la réponse entière qui le porte.
+ */
+const NATIONAL_CHECK_DIGITS_SCHEMA = z
+  .object({
+    country: z.string().describe('The IBAN country (MC stays MC, SM stays SM).'),
+    scheme: z.string().describe('fr_rib_key | be_mod97 | it_cin | es_dc'),
+    status: z.string().describe('pass | fail | not_applicable'),
+    detail: z.string().optional().describe('Present on fail and not_applicable only.'),
+  })
+  .optional()
+  .describe(NATIONAL_CHECK_DIGITS_NOTE);
+
 const VALIDATE_IBAN_OUTPUT_SCHEMA = {
   iban: z.string().describe('Normalized IBAN (uppercase, no spaces).'),
   valid: z.boolean(),
@@ -298,6 +315,7 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
     .optional()
     .describe(`confirmed | inferred | not_allocated | unknown. ${BANK_CODE_HOLDER_NOTE}`),
   checks: CHECKS_SCHEMA,
+  national_check_digits: NATIONAL_CHECK_DIGITS_SCHEMA,
   formatted: z.string().optional().describe('IBAN with 4-char groups for display.'),
   country: z
     .object({

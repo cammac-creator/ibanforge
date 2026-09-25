@@ -625,10 +625,15 @@ Read these fields in this order. Stop at the first one that blocks.
 4. **\`modulus_check.passed\`** (GB only) — false means the sort code and account
    number cannot be a real pair, even though the IBAN itself is well-formed.
    \`checked: false\` means no check was possible, which is not a failure.
-5. **\`issuer.classification\`** — \`curated\` is an identification; \`default\`
+5. **\`national_check_digits.status\`** (FR, MC, BE, IT, SM and ES only): \`fail\`
+   means the national check key inside the BBAN (RIB key, Belgian check digits,
+   CIN, DC) does not match, so the account number cannot have been issued as
+   written, even though the IBAN itself is well-formed.
+   \`checks.national_check_digits\` repeats it.
+6. **\`issuer.classification\`** — \`curated\` is an identification; \`default\`
    means we fell back to "bank" without support for it. Count only \`curated\`
    when sizing exposure to virtual IBANs.
-6. **\`sepa.vop_participant\`** — whether the EPC VoP register lists the bank as
+7. **\`sepa.vop_participant\`** — whether the EPC VoP register lists the bank as
    ready to answer Verification of Payee requests. \`false\` proves nothing: a bank
    absent from that register reads \`false\` too.
 
@@ -636,7 +641,8 @@ Read these fields in this order. Stop at the first one that blocks.
 
 Treating a null or absent field as a denial. Null means "no substantiated
 answer", never "no". The fields that carry a denial say so explicitly through
-\`bank_code_check.authoritative\` or \`modulus_check.passed: false\`.
+\`bank_code_check.authoritative\`, \`modulus_check.passed: false\` or
+\`national_check_digits.status: "fail"\`.
 `;
 
 const SKILL_RESOLVE = `# Skill: resolve a bank from a BIC or a national clearing number

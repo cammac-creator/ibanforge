@@ -19,7 +19,8 @@
  *   bénéficiaire), pour qu'aucun lecteur ne les croie faits.
  *
  * La preuve de chaque contrôle reste dans son bloc (`bank_code_check`, `bic`,
- * `sepa`, `modulus_check`, `compliance`). Aucune explication par contrôle dans
+ * `sepa`, `modulus_check`, `national_check_digits`, `compliance`). Aucune
+ * explication par contrôle dans
  * la réponse : elle est statique et vit dans l'OpenAPI et les descriptions MCP
  * (CHECKS_NOT_CHECKED_NOTE), pour ne pas alourdir un lot de 100.
  *
@@ -109,21 +110,27 @@ export function bankCodeCheckStatus(holder: BankCodeHolder | undefined): Checks[
 }
 
 /**
- * La clé nationale. Le Royaume-Uni seul en 1.x : dérivée de `modulus_check`.
- * Ailleurs `not_checked`, jusqu'au branchement du module des clés nationales,
- * dont le résultat `null` (pas d'algorithme pour ce pays) donnera aussi
- * `not_checked`.
+ * La clé nationale.
+ *
+ * - Royaume-Uni : dérivée de `modulus_check`, comme depuis la 1.8.0.
+ * - France, Monaco, Belgique, Italie, Saint-Marin, Espagne (25/09/2026) : le
+ *   statut du bloc `national_check_digits`, tel quel. Le bloc est la preuve, ce
+ *   champ en est le résumé : les deux ne divergent jamais.
+ * - Ailleurs, et quand le bloc manque : `not_checked` (pas d'algorithme ici ;
+ *   l'Allemagne attend la méthode de chaque code banque).
  */
 function nationalCheckDigits(result: IBANValidationResult): Checks['national_check_digits'] {
-  if (result.country?.code !== 'GB') return 'not_checked';
-  const modulus = result.modulus_check;
-  // Table Vocalink absente : le contrôle n'a pas eu lieu.
-  if (!modulus) return 'not_checked';
-  // Aucune plage publiée ne couvre ce code guichet : pas de contrôle défini.
-  if (!modulus.checked) return 'not_applicable';
-  if (modulus.passed === true) return 'pass';
-  if (modulus.passed === false) return 'fail';
-  return 'not_checked';
+  if (result.country?.code === 'GB') {
+    const modulus = result.modulus_check;
+    // Table Vocalink absente : le contrôle n'a pas eu lieu.
+    if (!modulus) return 'not_checked';
+    // Aucune plage publiée ne couvre ce code guichet : pas de contrôle défini.
+    if (!modulus.checked) return 'not_applicable';
+    if (modulus.passed === true) return 'pass';
+    if (modulus.passed === false) return 'fail';
+    return 'not_checked';
+  }
+  return result.national_check_digits?.status ?? 'not_checked';
 }
 
 /** Les contrôles d'une validation. À n'appeler que sur un IBAN valide. */

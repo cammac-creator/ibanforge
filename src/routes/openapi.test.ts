@@ -376,6 +376,7 @@ describe('the contract covers the routes and fields the server actually serves',
       'modulus_check',
       'bank_code_holder',
       'checks',
+      'national_check_digits',
     ]) {
       const description = properties[field]?.description ?? '';
       expect(description, `${field} does not say when it appears`).toMatch(
@@ -420,6 +421,21 @@ describe('the truth fields are in the contract', () => {
       expect(checks[never].enum, never).toEqual(['not_checked']);
     }
     expect(v.checks.description).toMatch(/payee_name: never checked/);
+  });
+
+  it('declares the national_check_digits block beside checks, with the statuses the module serves', () => {
+    const v = schemas.IBANValidationResult.properties!;
+    const keys = Object.keys(v);
+    expect(keys.indexOf('national_check_digits')).toBe(keys.indexOf('checks') + 1);
+    const block = v.national_check_digits as Schema & { required?: string[] };
+    expect(Object.keys(block.properties!)).toEqual(['country', 'scheme', 'status', 'detail']);
+    expect(block.required).toEqual(['country', 'scheme', 'status']);
+    expect(block.properties!.status.enum).toEqual(['pass', 'fail', 'not_applicable']);
+    // Pas d'enum fermé : l'Allemagne ajoutera des pays et des noms d'algorithme.
+    expect(block.properties!.country.enum).toBeUndefined();
+    expect(block.properties!.scheme.enum).toBeUndefined();
+    expect(block.description).toMatch(/valid false|never makes valid false/);
+    expect(v.checks.description).toMatch(/FR and MC \(RIB key\)/);
   });
 
   it('declares the bank grain of sepa and the trace of the bic block', () => {

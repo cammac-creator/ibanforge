@@ -48,6 +48,7 @@ import type {
 import type { SepaScheme } from './countries.js';
 import { nextSteps } from './next-steps.js';
 import { buildChecks, type BankCodeHolder } from './checks.js';
+import { checkNationalKey } from './national-check/index.js';
 
 /**
  * The `bic` block of a validation result, widened with the ISO 20022 postal
@@ -1551,6 +1552,17 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
     if (modulus) result.modulus_check = modulus;
   }
 
+  // La clé de contrôle nationale du BBAN (FR, MC, BE, IT, SM, ES), même idée que
+  // le contrôle britannique ci-dessus : un second contrôle, indépendant du modulo
+  // 97, lu dans l'IBAN seul, sans appel ni base. Strictement additif (décision du
+  // 24/09/2026) : ni `valid`, ni `bank_code_holder`, ni le score, ni `next_steps`
+  // ne le lisent ; `checks.national_check_digits` reprend son statut (checks.ts).
+  // Le module découpe lui-même le BBAN brut : les champs `bban.*` d'iban-core
+  // rangent la clé dans le numéro de compte (FR, MC, ES) ou sautent le CIN (IT,
+  // SM). Aucun bloc pour un pays sans algorithme ici (`null`).
+  const national = checkNationalKey(result.iban);
+  if (national) result.national_check_digits = national;
+
   // United Kingdom, second answer: is the institution behind this IBAN one the
   // PRA authorises to accept deposits?
   //
@@ -1584,7 +1596,8 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
   if (identity) result.official_identity = identity;
 
   // Ce qui a été vérifié et ce qui ne l'a pas été, contrôle par contrôle : après
-  // tous les blocs qu'il lit (modulus_check compris), avant next_steps.
+  // tous les blocs qu'il lit (modulus_check et national_check_digits compris),
+  // avant next_steps.
   result.checks = buildChecks(result);
   putTruthAfterValid(result);
 

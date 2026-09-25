@@ -351,6 +351,7 @@ export interface RegisterInstitution {
 
 import type { NextStep } from './lib/next-steps.js';
 import type { BankCodeHolder, Checks } from './lib/checks.js';
+import type { NationalCheck } from './lib/national-check/index.js';
 
 /**
  * Whether the EPC scheme registers list the resolved BANK (never the country).
@@ -651,6 +652,19 @@ export interface IBANValidationResult {
    * IBAN itself invalid, so `valid` is untouched.
    */
   modulus_check?: UkModulusResult;
+  /**
+   * La clé de contrôle nationale du BBAN (clé RIB française et monégasque,
+   * chiffres de contrôle belges, CIN italien et saint-marinais, DC espagnol).
+   * Présent seulement sur un IBAN valide de FR, MC, BE, IT, SM ou ES ; absent
+   * ailleurs, où `checks.national_check_digits` dit `not_checked` (le
+   * Royaume-Uni garde `modulus_check`).
+   *
+   * Un second contrôle, indépendant du modulo 97, comme `modulus_check` :
+   * `fail` veut dire que ce numéro de compte n'a pas pu être émis tel qu'il est
+   * écrit, et ne rend jamais l'IBAN invalide (`valid` n'y touche pas). `pass`
+   * veut dire bien formé, jamais que le compte existe. Voir lib/national-check/.
+   */
+  national_check_digits?: NationalCheck;
   /**
    * The Bank of England's "List of PRA-regulated Banks" names the holder of the
    * resolved BIC's LEI. GB only, joined on LEI and never on names.
