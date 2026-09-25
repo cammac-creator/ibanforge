@@ -45,6 +45,8 @@ const PAGES_WITH_OWN_ALTERNATES = [
   "sk/[code]/page.tsx",
   "sm/page.tsx",
   "sm/[code]/page.tsx",
+  "it/page.tsx",
+  "it/[code]/page.tsx",
 ] as const;
 
 describe.each(PAGES_WITH_OWN_ALTERNATES)("%s", (file) => {
@@ -88,6 +90,8 @@ const EXPECTED_PATH: Record<(typeof PAGES_WITH_OWN_ALTERNATES)[number], string> 
   "sk/[code]/page.tsx": "`/sk/${r.code}`",
   "sm/page.tsx": '"/sm"',
   "sm/[code]/page.tsx": "`/sm/${r.code}`",
+  "it/page.tsx": '"/it"',
+  "it/[code]/page.tsx": "`/it/${r.code}`",
 };
 
 describe("alternatesFor path argument", () => {

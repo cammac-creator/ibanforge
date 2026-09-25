@@ -9,8 +9,10 @@ import { hasNonLatinScript } from './gleif-address.js';
 import {
   allocatedCodes,
   lookupNationalCode,
+  lookupRetiredNationalCode,
   nationalRegisterAvailable,
   normaliseCode,
+  retiredNationalCodes,
 } from './national-registers.js';
 import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
@@ -216,6 +218,39 @@ function pruneStaleNationalCodes(data: Record<string, BicDataEntry>): Record<str
 }
 
 /**
+ * Les clés italiennes que la Banca d'Italia déclare RADIÉES, élaguées au
+ * chargement (25/09/2026).
+ *
+ * Pas les clés absentes du registre : il n'est pas exhaustif (Poste Italiane, le
+ * Trésor et les succursales d'établissements de paiement européens émettent des
+ * IBAN hors de lui), et une absence ne prouve rien. Seulement une contradiction
+ * POSITIVE : le registre a connu ce code, l'a radié, et aucun titulaire ne le
+ * tient aujourd'hui. Mesuré le 25/09/2026, un bon tiers des clés italiennes de la
+ * carte étaient dans ce cas, et servaient `verified` avec le nom d'une banque
+ * disparue (03111, UBI Banca absorbée par Intesa Sanpaolo en 2021, répondait même
+ * « Banca Carige », elle-même absorbée par BPER en 2022).
+ *
+ * Les clés sont aussi retirées de bic_data.json ; cet élagage est ce qui empêche
+ * une reconstruction du fichier de les ramener. Il tourne une fois par
+ * processus, ce qui suffit : les tables italiennes ne changent qu'avec la base,
+ * donc qu'à un déploiement. Une clé élaguée retombe sur la recherche par préfixe,
+ * qui ne peut rien rendre pour un code numérique : `bic` est null, et le verdict
+ * dit la radiation, la date et le successeur légal (enrich.ts).
+ */
+function pruneRetiredItalianCodes(
+  data: Record<string, BicDataEntry>,
+): Record<string, BicDataEntry> {
+  const retired = retiredNationalCodes('IT');
+  if (retired.size === 0) return data;
+  for (const key of Object.keys(data)) {
+    if (!key.startsWith('IT:')) continue;
+    const code = normaliseCode('IT', key.slice(3));
+    if (code && retired.has(code)) delete data[key];
+  }
+  return data;
+}
+
+/**
  * Add the Dutch providers the curated map does not carry.
  *
  * The other direction of the same finding: our Dutch keys are derived from the
@@ -241,8 +276,10 @@ function getBicData(): Record<string, BicDataEntry> {
     const require = createRequire(import.meta.url);
     const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
     bicDataCache = addListedDutchProviders(
-      pruneStaleNationalCodes(
-        pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
+      pruneRetiredItalianCodes(
+        pruneStaleNationalCodes(
+          pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
+        ),
       ),
     );
   }
@@ -725,6 +762,17 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
     return null;
   }
 
+  // Italie (25/09/2026) : un code que la Banca d'Italia déclare RADIÉ ne résout
+  // plus rien, par aucune des deux stratégies. La clé curée est déjà élaguée au
+  // chargement (pruneRetiredItalianCodes) ; ce garde ajoute deux choses. Il suit
+  // la base sans attendre un redémarrage, comme le garde tchèque ci-dessus. Et
+  // il épargne la recherche par préfixe, structurellement vide pour un code
+  // numérique (aucun BIC8 ne commence par un chiffre) mais qui parcourt toutes
+  // les lignes italiennes de l'annuaire : mesuré le 25/09/2026, près de 2 ms par
+  // IBAN contre quelques microsecondes pour cette requête par clé primaire.
+  // Sans garde, comme le tchèque : une base illisible remonte en `lookup_failed`.
+  if (countryCode === 'IT' && lookupRetiredNationalCode('IT', bankCode)) return null;
+
   // Strategy 1: exact key lookup in bic_data.json
   const data = getBicData();
   const key = `${countryCode}:${bankCode}`;
@@ -754,7 +802,7 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
     // bank. In a cooperative network they identify a DIFFERENT legal entity from
     // the eight before them, which identify its clearing institution: ES 2045 is
     // written CECAESMM045, Caja de Ahorros de Ontinyent, and CECAESMM alone is
-    // Cecabank; IT 08095 is CCRTIT2TBCE, Banca Centro Emilia, and CCRTIT2T alone
+    // Cecabank; IT 08716 is CCRTIT2TBCL, Banca Centro Lazio, and CCRTIT2T alone
     // is Cassa Centrale Banca. Truncating answered the central institution under
     // the local bank's name — the failure a German integrator measured on
     // Sparkassen BIC8s before the Bundesbank register was read for the BIC.

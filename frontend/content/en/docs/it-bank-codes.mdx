@@ -1,0 +1,110 @@
+---
+title: "Italian Bank Code Lookup (Banca d'Italia)"
+description: "Look up an Italian ABI code (5 digits) against the Banca d'Italia registers of banks, payment and e-money institutions: the holder of a code in force and, for a code struck off, the date and the legal successor. A missing code proves nothing."
+order: 11
+---
+
+# Italian bank code lookup: the Banca d'Italia registers
+
+An Italian IBAN carries the **ABI code** in positions 6-10, after the CIN letter and before the five-digit CAB. The Banca d'Italia publishes, as open data under CC BY 4.0, the registers of the banks, payment institutions and e-money institutions it supervises, **with their history**: when each one was registered, when it was struck off, and the mergers and incorporations that absorbed it.
+
+IBANforge reads both every week, and answers three different things.
+
+## A code in force: the holder, named by the Banca d'Italia
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "IT86W0306901600000000123456"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_holder": "confirmed",
+  "bank_code_check": {
+    "value": "03069",
+    "status": "verified",
+    "match": "register",
+    "register": "Banca d'Italia, registers of banks, payment institutions and e-money institutions (…)",
+    "authoritative": false,
+    "institution": {
+      "name": "INTESA SANPAOLO S.P.A.",
+      "street": "PIAZZA SAN CARLO, 156",
+      "post_code": "10121",
+      "town": "TORINO",
+      "country": "IT",
+      "lei": "2W8N8UU78PMDQKZENC08"
+    },
+    "as_of": "2026-09"
+  }
+}
+```
+
+The name is served as the register writes it. The register publishes no BIC: the `bic` block beside the verdict still comes from our composite map (`basis: "curated_map"`).
+
+## A code the Banca d'Italia has struck off: retired, with its legal successor, never refused
+
+```json
+{
+  "valid": true,
+  "bank_code_holder": "inferred",
+  "bic": null,
+  "bank_code_check": {
+    "value": "03111",
+    "status": "verified",
+    "match": "register",
+    "authoritative": false,
+    "retired": true,
+    "retired_on": "2021-04-11",
+    "superseded_by": "03069",
+    "institution": {
+      "name": "UNIONE DI BANCHE ITALIANE SOCIETA' PER AZIONI (IN FORMA ABBREVIATA UBI BANCA)",
+      "street": null,
+      "post_code": null,
+      "town": null,
+      "country": "IT"
+    }
+  },
+  "next_steps": [{ "code": "bank_code_retired", "do": "Update the beneficiary details before sending. …" }]
+}
+```
+
+Until 25 September 2026 this code answered "Banca Carige": the wrong bank, itself absorbed in 2022. Read the new answer this way:
+
+- `retired: true` and `retired_on`: the last day the register lists the code for its last holder.
+- `superseded_by`: the **legal successor** by merger or incorporation, followed to a bank in force today (UBI Banca, then Intesa Sanpaolo). It is not necessarily the bank that holds the account: UBI transferred branches to BPER before it was absorbed. A transfer of assets (the liquidation of Banca Popolare di Vicenza in 2017, for example) makes no legal successor, and none is named.
+- `bank_code_holder: "inferred"`: nobody holds the code today, so `checks.bank_code` is `inferred`, not `pass`. A German code the Bundesbank is retiring stays `confirmed`, because it is still in the Bundesbank's current file.
+- No BIC: the one our map used to serve belonged to a bank that no longer holds the code.
+- **Never a refusal**: how long an old IBAN stays reachable after an Italian merger is not published anywhere. Ask the beneficiary for their current details.
+
+The official Italian example of the ISO 13616 registry, `IT60 X054 2811 1010 0000 0123 456`, is one of these codes: ABI 05428, Banca Popolare di Bergamo, absorbed by UBI Banca in 2017, itself absorbed by Intesa Sanpaolo in 2021.
+
+## A code the registers do not list: the answer we gave before, never "not allocated"
+
+The Banca d'Italia lists the institutions it registers, not the allocation of the ABI code space. **Poste Italiane (07601)**, the **Banca d'Italia itself (01000)** and the Italian branches of EU payment institutions (**Qonto, 36092**) issue real Italian IBANs outside these registers. So an Italian code the registers do not list gets exactly the answer it got before: our composite map, `authoritative: false`, and never `not_allocated`.
+
+## What the registers publish
+
+| Field | In the registers | Note |
+|---|---|---|
+| `name` | yes | as written by the Banca d'Italia |
+| `street` / `post_code` / `town` | yes | the registered office in Italy; for a foreign bank, its Italian branch |
+| `lei` | most codes in force | |
+| `bic` | no | the `bic` block stays our composite map's |
+| struck off, date, legal successor | yes | from the history and the list of mergers and incorporations |
+
+The filter is by **register** (banks, payment institutions, e-money institutions), never by code range: payment institutions hold 19xxx codes, and the other registers (asset managers, financial intermediaries) name companies that issue no IBAN.
+
+## Freshness and the credit
+
+The registers are re-read **every week**, and `as_of` is the edition: the date of the file the Banca d'Italia publishes. The data is open data under **CC BY 4.0**, which allows commercial reuse on condition of citing the source and indicating the changes. Every answer that uses it carries the credit in `bank_code_check.register`: *Banca d'Italia, Albi ed elenchi di vigilanza, CC BY 4.0, normalised and joined by IBANforge* (codes padded to five digits, codes in force selected, struck-off codes dated and joined to their legal successor). See [data sources](/docs/data-sources).
+
+## The honest limits
+
+- **We check the ABI code, never the account or its holder.**
+- **A miss is not a denial**, and a struck-off code is not one either.
+- **The legal successor is not a routing instruction.** Ask the beneficiary.
+- **Institution, not branch.** The CAB names a branch; we never deny on it.
+
+Related: [What "verified" means](/docs/iban-validate) · [Data sources & provenance](/docs/data-sources) · [San Marino bank codes](/docs/sm-bank-codes) · [The Italian codes, one per page](/it)

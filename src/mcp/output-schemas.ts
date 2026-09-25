@@ -265,12 +265,20 @@ export const BANK_CODE_CHECK_SCHEMA = z
       .boolean()
       .optional()
       .describe(
-        'True when an authoritative register is withdrawing the code. Still a verified result: it WAS allocated.',
+        'True when a register says the code is leaving (DE, authoritative) or has been struck off (IT, authoritative false, with retired_on). Still a verified result: it WAS allocated. Never a refusal.',
       ),
     superseded_by: z
       .string()
       .optional()
-      .describe('The bank code that takes over. Re-paper the beneficiary against it.'),
+      .describe(
+        'The bank code that takes over. DE: the successor the register designates, re-paper against it. IT: the legal successor by merger or incorporation, not necessarily the bank now holding the account.',
+      ),
+    retired_on: z
+      .string()
+      .optional()
+      .describe(
+        'YYYY-MM-DD, with retired where the register dates it (IT): the last day it lists this code for its last holder.',
+      ),
     as_of: z.string(),
   })
   .optional();

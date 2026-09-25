@@ -59,6 +59,7 @@ const DISPLAY_ORDER = [
   'CH',
   'LI',
   'FI',
+  'IT',
   'SM',
   'LU',
   'LV',

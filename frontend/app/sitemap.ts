@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { atBlzFile, beBankFile, chIidFile, deBlzFile, skBankFile, smBankFile } from "@/lib/registers";
+import { atBlzFile, beBankFile, chIidFile, deBlzFile, itBankFile, skBankFile, smBankFile } from "@/lib/registers";
 import { allCountryCodes } from "@/lib/countries";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
@@ -66,6 +66,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // language, like Slovakia.
   const sm = smBankFile();
   listRegister(Object.keys(sm.entries), sm.batch1, (c) => `/sm/${c}`, ["en"]);
+  // L'Italie en anglais seulement, comme Saint-Marin : l'italien n'est pas une
+  // langue du site. Seuls les codes en vigueur sont listés ; les pages des codes
+  // radiés existent pour qui tape un ancien code, elles ne se proposent pas.
+  const it = itBankFile();
+  listRegister(it.batch1, it.batch1, (c) => `/it/${c}`, ["en"]);
 
   // One page per IBAN country, in the three languages (2026-09-06).
   for (const cc of allCountryCodes()) {
@@ -96,6 +101,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/be`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/sk`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/sm`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/it`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },

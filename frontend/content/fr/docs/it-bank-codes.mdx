@@ -1,0 +1,110 @@
+---
+title: "Codes banque italiens (Banca d'Italia)"
+description: "Vérifier un code ABI italien (5 chiffres) contre les registres des banques, des établissements de paiement et de monnaie électronique de la Banca d'Italia : le titulaire d'un code en vigueur et, pour un code radié, la date et le successeur légal. Un code absent ne prouve rien."
+order: 11
+---
+
+# Codes banque italiens : les registres de la Banca d'Italia
+
+Un IBAN italien porte le **code ABI** en positions 6 à 10, après la lettre CIN et avant le CAB à cinq chiffres. La Banca d'Italia publie en open data, sous licence CC BY 4.0, les registres des banques, des établissements de paiement et de monnaie électronique qu'elle supervise, **avec leur historique** : l'inscription de chacun, sa radiation, et les fusions et incorporations qui l'ont absorbé.
+
+IBANforge relit les deux chaque semaine, et répond trois choses différentes.
+
+## Un code en vigueur : le titulaire, nommé par la Banca d'Italia
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "IT86W0306901600000000123456"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_holder": "confirmed",
+  "bank_code_check": {
+    "value": "03069",
+    "status": "verified",
+    "match": "register",
+    "register": "Banca d'Italia, registers of banks, payment institutions and e-money institutions (…)",
+    "authoritative": false,
+    "institution": {
+      "name": "INTESA SANPAOLO S.P.A.",
+      "street": "PIAZZA SAN CARLO, 156",
+      "post_code": "10121",
+      "town": "TORINO",
+      "country": "IT",
+      "lei": "2W8N8UU78PMDQKZENC08"
+    },
+    "as_of": "2026-09"
+  }
+}
+```
+
+Le nom est servi tel que le registre l'écrit. Le registre ne publie aucun BIC : le bloc `bic` à côté du verdict vient toujours de notre carte composite (`basis: "curated_map"`).
+
+## Un code que la Banca d'Italia a radié : retiré, avec son successeur légal, jamais refusé
+
+```json
+{
+  "valid": true,
+  "bank_code_holder": "inferred",
+  "bic": null,
+  "bank_code_check": {
+    "value": "03111",
+    "status": "verified",
+    "match": "register",
+    "authoritative": false,
+    "retired": true,
+    "retired_on": "2021-04-11",
+    "superseded_by": "03069",
+    "institution": {
+      "name": "UNIONE DI BANCHE ITALIANE SOCIETA' PER AZIONI (IN FORMA ABBREVIATA UBI BANCA)",
+      "street": null,
+      "post_code": null,
+      "town": null,
+      "country": "IT"
+    }
+  },
+  "next_steps": [{ "code": "bank_code_retired", "do": "Update the beneficiary details before sending. …" }]
+}
+```
+
+Jusqu'au 25 septembre 2026, ce code répondait « Banca Carige » : la mauvaise banque, elle-même absorbée en 2022. La nouvelle réponse se lit ainsi :
+
+- `retired: true` et `retired_on` : le dernier jour où le registre porte ce code pour son dernier titulaire.
+- `superseded_by` : le **successeur légal** par fusion ou incorporation, suivi jusqu'à une banque en vigueur aujourd'hui (UBI Banca, puis Intesa Sanpaolo). Ce n'est pas forcément la banque qui tient le compte : UBI avait cédé des agences à BPER avant d'être absorbée. Une cession d'actifs (la liquidation de la Banca Popolare di Vicenza en 2017, par exemple) ne fait pas de successeur légal, et aucun n'est nommé.
+- `bank_code_holder: "inferred"` : personne ne tient ce code aujourd'hui, donc `checks.bank_code` vaut `inferred`, pas `pass`. Un code allemand que la Bundesbank retire reste `confirmed`, parce qu'il figure encore dans son fichier en vigueur.
+- Aucun BIC : celui que notre carte servait appartenait à une banque qui ne tient plus ce code.
+- **Jamais un refus** : la durée pendant laquelle un ancien IBAN reste joignable après une fusion italienne n'est publiée nulle part. Demandez au bénéficiaire ses coordonnées à jour.
+
+L'exemple italien officiel du registre ISO 13616, `IT60 X054 2811 1010 0000 0123 456`, est l'un de ces codes : ABI 05428, Banca Popolare di Bergamo, absorbée par UBI Banca en 2017, elle-même absorbée par Intesa Sanpaolo en 2021.
+
+## Un code que les registres ne listent pas : la réponse d'avant, jamais « non attribué »
+
+La Banca d'Italia liste les établissements qu'elle inscrit, pas l'attribution de l'espace des codes ABI. **Poste Italiane (07601)**, la **Banca d'Italia elle-même (01000)** et les succursales italiennes d'établissements de paiement européens (**Qonto, 36092**) émettent de vrais IBAN italiens hors de ces registres. Un code italien que les registres ne listent pas reçoit donc exactement la réponse d'avant : notre carte composite, `authoritative: false`, et jamais `not_allocated`.
+
+## Ce que les registres publient
+
+| Champ | Dans les registres | Note |
+|---|---|---|
+| `name` | oui | tel qu'écrit par la Banca d'Italia |
+| `street` / `post_code` / `town` | oui | le siège légal en Italie ; pour une banque étrangère, sa succursale italienne |
+| `lei` | la plupart des codes en vigueur | |
+| `bic` | non | le bloc `bic` reste celui de notre carte composite |
+| radiation, date, successeur légal | oui | tirés de l'historique et de la liste des fusions et incorporations |
+
+Le filtre se fait par **registre** (banques, établissements de paiement, de monnaie électronique), jamais par plage de codes : des établissements de paiement portent des codes 19xxx, et les autres registres (sociétés de gestion, intermédiaires financiers) nomment des sociétés qui n'émettent aucun IBAN.
+
+## Fraîcheur et crédit
+
+Les registres sont relus **chaque semaine**, et `as_of` est l'édition : la date du fichier que publie la Banca d'Italia. Les données sont en open data sous **CC BY 4.0**, qui permet la réutilisation commerciale à condition de citer la source et d'indiquer les modifications. Chaque réponse qui s'en sert porte le crédit dans `bank_code_check.register` : *Banca d'Italia, Albi ed elenchi di vigilanza, CC BY 4.0, normalised and joined by IBANforge* (codes ramenés à cinq chiffres, codes en vigueur choisis, codes radiés datés et reliés à leur successeur légal). Voir [sources des données](/docs/data-sources).
+
+## Les limites honnêtes
+
+- **Nous vérifions le code ABI, jamais le compte ni son titulaire.**
+- **Une absence n'est pas un refus**, et un code radié non plus.
+- **Le successeur légal n'est pas une instruction de routage.** Demandez au bénéficiaire.
+- **L'établissement, pas l'agence.** Le CAB désigne une agence ; nous ne refusons jamais sur lui.
+
+À lire aussi : [Ce que « verified » signifie](/docs/iban-validate) · [Sources des données](/docs/data-sources) · [Codes banque saint-marinais](/docs/sm-bank-codes) · [Les codes italiens, un par page](/it)

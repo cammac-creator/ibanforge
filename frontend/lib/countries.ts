@@ -66,6 +66,7 @@ export const REGISTER_INDEX: Record<string, string> = {
   BE: '/be',
   SK: '/sk',
   SM: '/sm',
+  IT: '/it',
 };
 
 /**
@@ -89,6 +90,23 @@ export function formatIban(iban: string): string {
 /** The pretty JSON block every country page prints. */
 export function apiJson(api: Record<string, unknown>): string {
   return JSON.stringify(api, null, 2);
+}
+
+/**
+ * Le registre que l'API a lu pour l'exemple est-il un registre PARTIEL (il
+ * nomme le titulaire des codes qu'il liste sans trancher une absence) plutôt que
+ * notre carte composite ? L'Italie depuis le 25/09/2026 : l'exemple officiel
+ * (ABI 05428) répond depuis la Banca d'Italia, qui l'a radié, et la page ne doit
+ * pas dire « carte composite » d'une réponse qui n'en vient pas.
+ */
+export function isPartialRegister(entry: CountryEntry): boolean {
+  const check = entry.api.bank_code_check as { authoritative?: boolean; register?: string } | null | undefined;
+  return (
+    Boolean(entry.register) &&
+    check?.authoritative === false &&
+    typeof check.register === 'string' &&
+    !check.register.startsWith('IBANforge composite')
+  );
 }
 
 /** Whether the register the API used is a national one (authoritative) rather than our composite map. */
