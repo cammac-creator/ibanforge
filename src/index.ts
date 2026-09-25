@@ -98,6 +98,22 @@ function reportRestrictedOverlays(statuses: OverlayStatus[]): void {
           'Les données manquantes répondent « non consulté ».',
       );
     }
+    // Tant que la base publique porte encore la famille (jusqu'à l'étape du
+    // retrait), la surcouche REMPLACE des lignes que le robot public rafraîchit
+    // chaque semaine (EPC, ONU) et chaque mois (le reste). Une différence veut
+    // presque toujours dire une surcouche plus ancienne que le dernier
+    // rafraîchissement public : la dire, pour ré-extraire.
+    const drift = status.members.filter((m) => m.identical_to_public === false).map((m) => m.id);
+    if (drift.length > 0) {
+      console.error(`[surcouche] ${status.kind} : différente du public pour ${drift.join(', ')}`);
+      void opsFail(
+        `overlay:${status.kind}:drift`,
+        `Surcouche privée ${status.kind} différente des lignes publiques qu'elle remplace (${drift.join(', ')}) : ` +
+          'plus ancienne que le dernier rafraîchissement public ? La ré-extraire et la redéposer.',
+      );
+    } else if (status.state !== 'off') {
+      void opsOk(`overlay:${status.kind}:drift`);
+    }
   }
 }
 
