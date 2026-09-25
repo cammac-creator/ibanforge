@@ -1393,7 +1393,8 @@
       "serviceIntro": "La santé du service, les erreurs et les détails techniques.",
       "revenueDetails": "Voir le détail des revenus",
       "intro": "Le point sur l’activité",
-      "audienceHeading": "Votre audience, en clair"
+      "audienceHeading": "Votre audience, en clair",
+      "doors": "Portes"
     },
     "audience": {
       "eyebrow": "Observatoire de l’audience",

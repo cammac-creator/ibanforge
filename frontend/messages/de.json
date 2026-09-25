@@ -1393,7 +1393,8 @@
       "serviceIntro": "Dienststatus, Fehler und technische Details.",
       "revenueDetails": "Umsatzdetails ansehen",
       "intro": "Ihre Aktivitäten im Überblick",
-      "audienceHeading": "Ihre Zielgruppe auf einen Blick"
+      "audienceHeading": "Ihre Zielgruppe auf einen Blick",
+      "doors": "Eingänge"
     },
     "audience": {
       "eyebrow": "Zielgruppenübersicht",
