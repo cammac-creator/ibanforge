@@ -130,8 +130,15 @@ npm run build             # next build
   commit an overlay file or a merged copy, never write one inside any git repository (the
   script refuses, and `.gitignore` catches `restricted-*.sqlite*` and `*.merged-*.sqlite*`),
   never add a table or a source to the family anywhere but that constant, and never let a
-  public workflow download or commit the family: stopping them is the next step, not a
-  side effect.
+  public workflow download or commit the family. Since the removal (step 6, 25 September
+  2026) none of it is in this repository: the public seeders run with `SEED_FAMILY=public`
+  by default and never download a member, the tracked databases are rebuilt without it
+  (`npm run overlay -- strip`, no download) and `src/lib/public-base-family-free.test.ts`
+  fails if a row comes back, the composite map no longer carries the AT, BE, LU, PL and FI
+  keys (Polish and Finnish codes resolve no BIC), and the /at, /be and /sm pages read the
+  API on demand. Without the overlay, every answer that needs the family says "not
+  consulted" (`national_register_unavailable`, `screened: false`, `*_unavailable` flags),
+  never "no".
 - `src/lib/restricted-overlay-pull.ts`: the API refreshes those files itself (step 5,
   since 25 September 2026). A private repository rebuilds the overlay weekly (compliance)
   and monthly (BIC), commits no data, and publishes a release: both files and a

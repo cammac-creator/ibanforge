@@ -111,8 +111,8 @@ Hier die deutsche Antwort aus Schritt 2, gekürzt dort, wo sie sich wiederholt:
     "member": true,
     "schemes": ["SCT", "SDD", "SCT_INST"],
     "vop_required": true,
-    "vop_participant": true,
-    "basis": "epc_register"
+    "vop_participant": null,
+    "basis": "country_default"
   },
   "formatted": "DE89 3704 0044 0532 0130 00",
   "bic": {
@@ -175,7 +175,7 @@ Block für Block:
 | `attribution` | im kostenlosen Kontingent | `text`, `url`, `note`. Wenn Ergebnisse aus dem kostenlosen Kontingent Menschen gezeigt werden, zeigen Sie den Hinweis an; ein Ergebnis, das in Ihrem Backend bleibt, schuldet nichts. |
 | `trial` | nur ohne Schlüssel | Siehe Schritt 1. |
 
-**Es gibt keinen `vop`-Block auf oberster Ebene.** Verification of Payee wird in drei Feldern gelesen: `sepa.vop_required` (steht das Land unter der Pflicht), `sepa.vop_participant` (ist das aufgelöste Institut im EPC-Register als bereit gelistet, `null`, wenn kein Institut aufgelöst wurde) und `risk_indicators.vop_coverage`. Die vollständige Begründung steht auf der Seite [VoP](/docs/vop).
+**Es gibt keinen `vop`-Block auf oberster Ebene.** Verification of Payee wird in drei Feldern gelesen: `sepa.vop_required` (steht das Land unter der Pflicht), `sepa.vop_participant` (ist das aufgelöste Institut im EPC-Register als bereit gelistet, `null`, wenn kein Institut aufgelöst wurde oder dieses Register für die Antwort nicht abgefragt wurde, wie im Beispiel oben) und `risk_indicators.vop_coverage`. Die vollständige Begründung steht auf der Seite [VoP](/docs/vop).
 
 Zwei Blöcke erscheinen nur für bestimmte Länder — machen Sie Ihren Code nicht von ihrem Vorhandensein abhängig.
 

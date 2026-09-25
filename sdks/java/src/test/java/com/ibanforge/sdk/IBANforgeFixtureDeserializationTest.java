@@ -59,7 +59,7 @@ class IBANforgeFixtureDeserializationTest {
           "country": { "code": "CH", "name": "Switzerland" },
           "check_digits": "10",
           "bban": { "bank_code": "00230", "account_number": "000000012345" },
-          "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false, "vop_participant": false },
+          "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false, "vop_participant": null },
           "formatted": "CH10 0023 0000 0000 1234 5",
           "cost_usdc": 0,
           "bic": {
@@ -112,7 +112,9 @@ class IBANforgeFixtureDeserializationTest {
 
         assertTrue(r.sepa().member());
         assertEquals(java.util.List.of("SCT", "SDD"), r.sepa().schemes());
-        assertFalse(r.sepa().vopParticipant()); // false, not absent
+        // Registre VoP de l'EPC non consulté dans cet enregistrement (famille sous
+        // conditions retirée du dépôt public, 25/09/2026) : null, jamais false.
+        assertNull(r.sepa().vopParticipant());
 
         assertEquals("verified", r.bankCodeCheck().status());
         assertTrue(r.bankCodeCheck().authoritative());
@@ -319,18 +321,18 @@ class IBANforgeFixtureDeserializationTest {
           "modulus_check": { "checked": true, "passed": true, "source": "Vocalink modulus weight table (published for Pay.UK)", "table_fetched_on": "2026-08-14" },
           "compliance": {
             "sanctions": { "country_sanctioned": false, "bank_sanctioned": false, "matched_lists": [], "fatf_status": "member", "bank_screened": true },
-            "reachability": { "sepa_instant": false, "sct": true, "sdd": true, "screened": true },
-            "vop": { "participant": false, "status": "not_found", "screened": true },
-            "risk_score": 10,
+            "reachability": { "sepa_instant": false, "sct": false, "sdd": false, "screened": false },
+            "vop": { "participant": false, "status": "not_found", "screened": false },
+            "risk_score": 0,
             "risk_level": "low",
-            "flags": ["no_sepa_instant", "no_vop"]
+            "flags": ["sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"]
           },
           "meta": {
             "scope": "bank_bic_only",
             "disclaimer": "Informational triage only -- NOT a regulated AML/CFT product.",
             "sanctions_as_of": "2026-08-21T04:57:05.198Z",
             "fatf_as_of": "2026-06",
-            "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+            "sources": "EU,OFAC,FATF",
             "country_risk_as_of": "2026-07",
             "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis."
           },
@@ -344,12 +346,16 @@ class IBANforgeFixtureDeserializationTest {
         ComplianceResult r = client().checkCompliance("GB29NWBK60161331926819");
 
         // There is no top-level risk_score -- it must be read at compliance().riskScore().
-        assertEquals(10.0, r.compliance().riskScore());
+        assertEquals(0.0, r.compliance().riskScore());
         assertEquals("low", r.compliance().riskLevel());
         assertEquals("member", r.compliance().sanctions().fatfStatus());
-        assertTrue(r.compliance().reachability().sct());
+        // Registres EPC non consultés : screened false, le false de sct ne prouve rien.
+        assertFalse(r.compliance().reachability().sct());
+        assertFalse(r.compliance().reachability().screened());
         assertEquals("not_found", r.compliance().vop().status());
-        assertEquals(java.util.List.of("no_sepa_instant", "no_vop"), r.compliance().flags());
+        assertEquals(
+            java.util.List.of("sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"),
+            r.compliance().flags());
 
         assertEquals("bank_bic_only", r.meta().scope());
         assertEquals("2026-06", r.meta().fatfAsOf());

@@ -6,7 +6,8 @@
     "Every call listed here is one a README block actually makes. Adding a call to a README",
     "without adding it here makes the stub answer 599 and the test fail, on purpose.",
     "Recorded against a server in IBANFORGE_FREE_MODE=true, so `cost_usdc` reads 0 here; production charges the price listed in the README table. No README asserts on it.",
-    "`used_by` says which README(s) exercise the call. Each SDK's test asserts both directions: nothing it uses is unlisted, nothing listed for it goes unused."
+    "`used_by` says which README(s) exercise the call. Each SDK's test asserts both directions: nothing it uses is unlisted, nothing listed for it goes unused.",
+    "25/09/2026: the values read from the restricted family (the EPC scheme and VoP registers, the UN list), which this public repository no longer carries, were replaced in place by what the API answers without them (not consulted: vop_participant null, reachability and vop screened false, the *_register_unavailable flags, meta.sources without UN and EPC). Nothing else was re-recorded."
   ],
   "recorded_at": "2026-08-21T05:34:53.406Z",
   "recorded_against": "local server, IBANFORGE_FREE_MODE=true",
@@ -132,7 +133,7 @@
               "SDD"
             ],
             "vop_required": false,
-            "vop_participant": false
+            "vop_participant": null
           },
           "formatted": "CH10 0023 0000 0000 1234 5",
           "cost_usdc": 0,
@@ -301,7 +302,7 @@
               "SCT_INST"
             ],
             "vop_required": true,
-            "vop_participant": true
+            "vop_participant": null
           },
           "formatted": "DE89 3704 0044 0532 0130 00",
           "cost_usdc": 0,
@@ -392,7 +393,7 @@
                   "SDD"
                 ],
                 "vop_required": false,
-                "vop_participant": false
+                "vop_participant": null
               },
               "formatted": "CH10 0023 0000 0000 1234 5",
               "cost_usdc": 0,
@@ -475,7 +476,7 @@
                   "SCT_INST"
                 ],
                 "vop_required": true,
-                "vop_participant": true
+                "vop_participant": null
               },
               "formatted": "DE89 3704 0044 0532 0130 00",
               "cost_usdc": 0,
@@ -687,7 +688,7 @@
               "SDD"
             ],
             "vop_required": false,
-            "vop_participant": false
+            "vop_participant": null
           },
           "formatted": "GB29 NWBK 6016 1331 9268 19",
           "cost_usdc": 0,
@@ -743,20 +744,21 @@
             },
             "reachability": {
               "sepa_instant": false,
-              "sct": true,
-              "sdd": true,
-              "screened": true
+              "sct": false,
+              "sdd": false,
+              "screened": false
             },
             "vop": {
               "participant": false,
               "status": "not_found",
-              "screened": true
+              "screened": false
             },
-            "risk_score": 10,
+            "risk_score": 0,
             "risk_level": "low",
             "flags": [
-              "no_sepa_instant",
-              "no_vop"
+              "sepa_register_unavailable",
+              "vop_register_unavailable",
+              "sanctions_list_unavailable_un"
             ]
           },
           "meta": {
@@ -764,7 +766,7 @@
             "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
             "sanctions_as_of": "2026-08-21T04:57:05.198Z",
             "fatf_as_of": "2026-06",
-            "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+            "sources": "EU,OFAC,FATF",
             "country_risk_as_of": "2026-07",
             "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
           },
@@ -1762,7 +1764,7 @@
                   "SDD"
                 ],
                 "vop_required": false,
-                "vop_participant": false
+                "vop_participant": null
               },
               "formatted": "GB29 NWBK 6016 1331 9268 19",
               "cost_usdc": 0.005,
@@ -1830,7 +1832,7 @@
                   "SCT_INST"
                 ],
                 "vop_required": true,
-                "vop_participant": true
+                "vop_participant": null
               },
               "formatted": "DE89 3704 0044 0532 0130 00",
               "cost_usdc": 0.005,
@@ -1898,7 +1900,7 @@
                   "SDD"
                 ],
                 "vop_required": false,
-                "vop_participant": false
+                "vop_participant": null
               },
               "formatted": "CH56 0483 5012 3456 7800 9",
               "cost_usdc": 0.005,
@@ -1983,7 +1985,7 @@
                   "SCT_INST"
                 ],
                 "vop_required": true,
-                "vop_participant": true
+                "vop_participant": null
               },
               "formatted": "FR76 3000 6000 0112 3456 7890 189",
               "cost_usdc": 0.005,
@@ -2081,7 +2083,7 @@
                   "SCT_INST"
                 ],
                 "vop_required": true,
-                "vop_participant": true
+                "vop_participant": null
               },
               "formatted": "DE89 3704 0044 0532 0130 00",
               "cost_usdc": 0.02,
@@ -2137,26 +2139,30 @@
                   "bank_screened": true
                 },
                 "reachability": {
-                  "sepa_instant": true,
-                  "sct": true,
-                  "sdd": true,
-                  "screened": true
+                  "sepa_instant": false,
+                  "sct": false,
+                  "sdd": false,
+                  "screened": false
                 },
                 "vop": {
-                  "participant": true,
-                  "status": "active",
-                  "screened": true
+                  "participant": false,
+                  "status": "not_found",
+                  "screened": false
                 },
                 "risk_score": 0,
                 "risk_level": "low",
-                "flags": []
+                "flags": [
+                  "sepa_register_unavailable",
+                  "vop_register_unavailable",
+                  "sanctions_list_unavailable_un"
+                ]
               },
               "meta": {
                 "scope": "bank_bic_only",
                 "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
                 "sanctions_as_of": "2026-08-21T04:57:05.198Z",
                 "fatf_as_of": "2026-06",
-                "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+                "sources": "EU,OFAC,FATF",
                 "country_risk_as_of": "2026-07",
                 "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
               }

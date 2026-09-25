@@ -65,14 +65,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -139,10 +132,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -204,14 +194,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -251,41 +234,9 @@
     "vop_required": true
    },
    "register": "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "AT",
-     "name": "Austria"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "19043",
-     "status": "not_in_register",
-     "reason": "not_allocated",
-     "match": null,
-     "register": "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis",
-     "authoritative": true,
-     "as_of": "2026-09"
-    },
-    "sepa": {
-     "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": null,
-     "basis": "country_default"
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": true,
-     "test_bic": false
-    }
-   }
+   "register_basis": "authoritative",
+   "private_register": true,
+   "api": null
   },
   "AZ": {
    "code": "AZ",
@@ -339,10 +290,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -406,10 +354,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -449,41 +394,9 @@
     "vop_required": true
    },
    "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "BE",
-     "name": "Belgium"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "539",
-     "status": "not_in_register",
-     "reason": "not_allocated",
-     "match": null,
-     "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
-     "authoritative": true,
-     "as_of": "2026-09"
-    },
-    "sepa": {
-     "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": null,
-     "basis": "country_default"
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": true,
-     "test_bic": false
-    }
-   }
+   "register_basis": "authoritative",
+   "private_register": true,
+   "api": null
   },
   "BG": {
    "code": "BG",
@@ -554,12 +467,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": true,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -626,10 +534,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -693,10 +598,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -756,10 +658,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -828,10 +727,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -892,13 +788,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -961,10 +851,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -1041,14 +928,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -1125,12 +1005,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -1208,14 +1083,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -1279,10 +1147,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -1348,13 +1213,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -1421,10 +1280,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -1495,13 +1351,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -1574,10 +1424,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -1654,14 +1501,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -1704,55 +1544,28 @@
     ],
     "vop_required": true
    },
-   "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
      "code": "FI",
      "name": "Finland"
     },
-    "bic": {
-     "code": "NDEAFIHHXXX",
-     "bic8": "NDEAFIHH",
-     "bank_name": "Nordea Bank Abp",
-     "city": "Helsinki",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "529900ODI3047E2LIV03"
-    },
+    "bic": null,
     "bank_code_check": {
-     "value": "1",
-     "status": "verified",
-     "match": "register",
-     "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
+     "value": "123",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
+     "match": null,
+     "register": null,
      "authoritative": false,
-     "as_of": "2025-10",
-     "institution": {
-      "name": "Nordea Bank",
-      "street": null,
-      "post_code": null,
-      "town": null,
-      "country": "FI"
-     }
+     "as_of": "2026-09"
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
-    "issuer": {
-     "type": "bank",
-     "name": "Nordea Bank Abp",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "standard",
      "sepa_reachable": true,
@@ -1814,10 +1627,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -1875,10 +1685,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -1951,14 +1758,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -2034,13 +1834,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -2107,10 +1901,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -2171,13 +1962,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -2231,10 +2016,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -2307,14 +2089,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -2381,10 +2156,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -2452,10 +2224,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -2526,14 +2295,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -2609,12 +2371,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -2691,14 +2448,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -2762,10 +2512,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -2834,10 +2581,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -2913,12 +2657,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -2995,14 +2734,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": true
     },
     "issuer": null,
     "risk_indicators": {
@@ -3071,10 +2803,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -3141,10 +2870,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -3211,10 +2937,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -3281,10 +3004,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -3351,10 +3071,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -3431,13 +3148,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -3499,14 +3210,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": true
     },
     "issuer": null,
     "risk_indicators": {
@@ -3545,55 +3249,10 @@
     ],
     "vop_required": true
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "LU",
-     "name": "Luxembourg"
-    },
-    "bic": {
-     "code": "BCEELULL",
-     "bic8": "BCEELULL",
-     "bank_name": "Banque et Caisse d'Epargne de l'Etat, Luxembourg",
-     "city": "Luxembourg",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "R7CQUF1DQM73HUTV1078"
-    },
-    "bank_code_check": {
-     "value": "001",
-     "status": "verified",
-     "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
-     "as_of": "2026-09"
-    },
-    "sepa": {
-     "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
-    },
-    "issuer": {
-     "type": "bank",
-     "name": "Banque et Caisse d'Epargne de l'Etat, Luxembourg",
-     "classification": "default"
-    },
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": true,
-     "test_bic": false
-    }
-   }
+   "register": "ABBL, Luxembourg register of IBAN/BIC codes",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "LV": {
    "code": "LV",
@@ -3642,14 +3301,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": true
     },
     "issuer": null,
     "risk_indicators": {
@@ -3709,10 +3361,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -3776,14 +3425,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -3849,12 +3491,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -3914,12 +3551,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -3985,12 +3617,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -4048,10 +3675,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -4111,10 +3735,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -4187,14 +3808,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -4258,10 +3872,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -4325,10 +3936,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -4399,14 +4007,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -4476,13 +4077,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -4540,10 +4135,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -4606,10 +4198,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -4651,29 +4240,20 @@
     ],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
      "code": "PL",
      "name": "Poland"
     },
-    "bic": {
-     "code": "WBKPPLPPXXX",
-     "bic8": "WBKPPLPP",
-     "bank_name": "ERSTE BANK POLSKA SPÓŁKA AKCYJNA",
-     "city": "WARSZAWA",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "259400LGXW3K0GDAG361"
-    },
+    "bic": null,
     "bank_code_check": {
      "value": "10901014",
-     "status": "verified",
-     "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
+     "match": null,
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09",
      "check_digit": {
@@ -4683,19 +4263,9 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SCT_INST"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
-    "issuer": {
-     "type": "bank",
-     "name": "ERSTE BANK POLSKA SPÓŁKA AKCYJNA",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "standard",
      "sepa_reachable": true,
@@ -4756,10 +4326,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -4827,14 +4394,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": true
     },
     "issuer": null,
     "risk_indicators": {
@@ -4897,10 +4457,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -4961,13 +4518,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -5023,12 +4574,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -5088,10 +4634,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -5154,10 +4697,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -5221,10 +4761,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -5278,10 +4815,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -5347,14 +4881,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": false,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -5425,14 +4952,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": true,
-     "basis": "epc_register"
+     "vop_required": true
     },
     "issuer": {
      "type": "bank",
@@ -5500,14 +5020,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": true,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": true
     },
     "issuer": null,
     "risk_indicators": {
@@ -5552,42 +5065,10 @@
     ],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "SM",
-     "name": "San Marino"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "03225",
-     "status": "not_in_register",
-     "reason": "absent_from_reference_data",
-     "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
-     "as_of": "2026-09"
-    },
-    "sepa": {
-     "member": true,
-     "schemes": [
-      "SCT",
-      "SDD",
-      "SCT_INST"
-     ],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": false,
-     "test_bic": false
-    }
-   }
+   "register": "Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "SO": {
    "code": "SO",
@@ -5638,10 +5119,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -5710,10 +5188,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -5780,10 +5255,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -5841,10 +5313,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -5913,10 +5382,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -5974,10 +5440,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -6031,10 +5494,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -6101,12 +5561,7 @@
     },
     "sepa": {
      "member": true,
-     "schemes": [
-      "SCT"
-     ],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "epc_register"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",
@@ -6164,10 +5619,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -6227,10 +5679,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": null,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": null,
     "risk_indicators": {
@@ -6300,10 +5749,7 @@
     },
     "sepa": {
      "member": false,
-     "schemes": [],
-     "vop_required": false,
-     "vop_participant": false,
-     "basis": "country_default"
+     "vop_required": false
     },
     "issuer": {
      "type": "bank",

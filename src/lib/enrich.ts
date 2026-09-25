@@ -25,7 +25,7 @@ import {
   withRegisterClock,
 } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
-import { lookupLuCode } from './lu-register.js';
+import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
@@ -796,8 +796,18 @@ function decideBankCode(
   // `authoritative: false`), but the reason must not say "absent from our
   // reference data" when the reference data that decides this country was
   // never read.
-  const registerDown = !!national;
-  const hasData = countryHasReferenceData(cc);
+  //
+  // Même chose, depuis l'étape du retrait (25/09/2026), pour un registre PRIVÉ
+  // qui n'est pas chargé : Saint-Marin (surcouche privée) et le Luxembourg
+  // (fichier privé). Seulement quand il n'est PAS chargé : un registre partiel
+  // chargé qui ne porte pas le code n'a rien de « non consulté », il tombe comme
+  // avant jusqu'ici avec `absent_from_reference_data` (le piège documenté sur
+  // NON_EXHAUSTIVE_REGISTERS). Et le statut devient `unavailable` : la seule
+  // donnée qui tranche ce pays n'a pas été lue, la carte composite ne peut pas
+  // parler à sa place d'un code qu'elle ne porte pas.
+  const privateDown = privateRegisterNotLoaded(cc);
+  const registerDown = !!national || privateDown;
+  const hasData = !privateDown && countryHasReferenceData(cc);
   // Absent de la carte, pas de données pour le pays, registre non consulté :
   // aucune conclusion sur le détenteur.
   return withHolder('unknown', {
@@ -813,6 +823,19 @@ function decideBankCode(
     authoritative: false,
     as_of,
   });
+}
+
+/**
+ * Un registre servi depuis un fichier PRIVÉ, absent de ce déploiement : la
+ * liste saint-marinaise de la surcouche (src/lib/restricted-family.ts) ou le
+ * registre luxembourgeois (src/lib/lu-register.ts). Les registres autrichien et
+ * belge, eux aussi privés, sont dans NATIONAL_REGISTERS : leur absence est déjà
+ * « non consulté » par `registerDown`.
+ */
+function privateRegisterNotLoaded(cc: string): boolean {
+  if (cc === 'SM') return !nationalRegisterAvailable('SM');
+  if (cc === 'LU') return !luRegisterConfigured();
+  return false;
 }
 
 /**
@@ -1529,7 +1552,11 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
       sepa.bank_reachability = 'bank_code_not_allocated';
       sepa.bank_schemes = [];
     } else if (!result.bic?.code) {
-      sepa.bank_reachability = 'no_bank';
+      // Aucune banque résolue. Quand le verdict du code est lui-même
+      // `unavailable` (le registre qui la nommerait n'a pas été consulté, ou le
+      // pays n'a plus de données : étape du retrait, 25/09/2026), la joignabilité
+      // n'est pas « pas de banque » mais « non consultée » : null.
+      sepa.bank_reachability = verdict.check.status === 'unavailable' ? null : 'no_bank';
       sepa.bank_schemes = null;
     } else if (!reach?.screened) {
       // Registres EPC non chargés ou illisibles : non consulté, jamais

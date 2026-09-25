@@ -39,7 +39,6 @@ Les données tchèques sont reproduites au titre des conditions d'usage du site 
 | Pays | Registre | Rafraîchissement | Ce qu'il publie au-delà du code |
 |---|---|---|---|
 | **SM** | Banque centrale de la République de Saint-Marin, liste des banques opérationnelles | relu mensuellement (la page ne porte **ni édition ni date de révision** : `as_of` est le jour de notre lecture, et le crédit dit « read on ») | nom, BIC, et le siège social complet — plus profond que ce que publient BE, BG ou SK |
-| **FI** | Finance Finland, codes d'établissements monétaires (liste transcrite datée du 15.10.2025) | à chaque republication | les codes sont attribués à des **groupes bancaires**, pas à des établissements : un résultat confirme le groupe et son BIC, daté de la liste elle-même. Depuis le 16 septembre 2026, une absence de la liste n'est **pas** un refus : la liste est une transcription manuelle que rien ne rafraîchit, la Finlande répond donc comme avant la liste, `authoritative: false` |
 
 Saint-Marin est à part parce qu'il rompt la règle sur laquelle le tableau ci-dessus est bâti. La Banque centrale publie les quatre banques qu'elle **supervise** ; elle ne publie pas l'attribution de l'espace des codes ABI. Saint-Marin agrée aussi des prestataires de paiement et de monnaie électronique qui ne sont pas des banques (l'un détient un BIC saint-marinais et règle via EBA STEP2), et l'IBAN d'exemple officiel de Saint-Marin porte un code ABI absent de la page. Donc :
 
@@ -50,7 +49,7 @@ Un drapeau va dans l'autre sens : `bic.basis` vaut `national_register` et `bic.a
 
 **La licence est inconnue, et consignée comme inconnue.** bcsm.sm ne publie aucune condition d'utilisation — seulement une politique de confidentialité et un copyright en pied de page (vérifié le 06/09/2026). Notre position : quatre lignes de données de routage publiées par le superviseur pour être utilisées, servies un enregistrement par requête, créditées *Source: Central Bank of the Republic of San Marino, operating banks (read on …)* par choix et non par obligation. Une lettre à la Banque centrale est en attente ; en cas d'objection, le registre est retiré. Aucune clause n'est inventée entre-temps.
 
-La Finlande est descendue ici le 16 septembre 2026, depuis le tableau autoritatif ci-dessus : un refus fondé sur une transcription vieille de onze mois n'est pas une raison d'arrêter un paiement. Elle remontera quand la liste aura été relue sur une publication à jour.
+La Finlande est partie le 25 septembre 2026. Sa transcription manuelle de la liste de Finance Finland, dont l'éditeur n'a jamais confirmé les conditions de réutilisation, a été retirée avec les clés finlandaises de notre carte composite : un code banque finlandais répond désormais `status: "unavailable"` avec `reason: "no_reference_data_for_country"`. Non consulté, jamais refusé. Voir [codes banque finlandais](/docs/fi-bank-codes).
 
 ## La carte composite des BIC — là où `authoritative: false`
 

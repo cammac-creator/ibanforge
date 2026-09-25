@@ -21,18 +21,20 @@
  * - La Tchéquie aussi : les conditions de la ČNB permettent de stocker, transmettre
  *   et reproduire avec « Zdroj: ČNB » (docs/data-sources.md). Ni ses lignes ni la
  *   table de ses éditions annoncées (`national_bank_codes_pending`) ne sont membres.
- * - `bic_entries` de source `six_group` : à vérifier, faible enjeu, hors de cette étape.
- * - Les données hors des deux bases, à traiter à l'étape du retrait (règle de la
- *   décision du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C
- *   de NOTICE) : la carte composite `src/db/bic_data.json` (clés AT, BE, LU, PL,
- *   FI), `src/lib/fi-register.ts`, les exports du site
- *   `frontend/data/registers/*.json`, les blocs EPC des exports et des réponses
- *   d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
- *   `mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`, l'exemple
- *   de validation du llms.txt de l'API (`src/app.ts`) et sa copie du site
- *   (`frontend/public/llms-full.txt`),
- *   `frontend/content/{en,fr,de}/docs/onboarding.mdx`), et les entrées GB (FCA)
- *   de `scripts/data/eu-emi-register-2026-05-22.json`.
+ *   L'Italie non plus (open data CC BY 4.0 de la Banca d'Italia).
+ * - `bic_entries` de source `six_group` : vérifié le 25/09/2026, ces lignes viennent
+ *   du MÊME fichier que le registre suisse (`bankmaster_V3.csv`, lu par
+ *   scripts/enrich-bic-database.ts et scripts/seed-bc-nummer.ts), dont la
+ *   description dit « may be used freely ». Publiques.
+ * - Les données hors des deux bases, retirées du dépôt public à l'étape du retrait
+ *   (25/09/2026, décision du 24/09/2026 « tout ce qui n'est pas redistribuable
+ *   sort ») sans devenir des membres : les clés AT, BE, LU, PL et FI de la carte
+ *   composite `src/db/bic_data.json`, la liste finlandaise transcrite (ancien
+ *   `src/lib/fi-register.ts`), les exports du site pour AT, BE et SM (les pages
+ *   sont rendues à la demande depuis l'API) et les blocs EPC des réponses
+ *   d'exemple suivies. Ces données ne sont servies par aucune surcouche : une
+ *   réponse qui en dépendait dit « non consulté » (src/lib/enrich.ts,
+ *   `WITHDRAWN_BANK_CODE_COUNTRIES` dans src/lib/bic-lookup.ts).
  *
  * ## Les minimums
  *
@@ -453,14 +455,23 @@ export const OVERLAY_ENV: Readonly<Record<OverlayKind, string>> = {
 };
 
 /**
- * Ce qu'un seeder écrit : `all` sans variable (le comportement d'avant, inchangé),
- * `restricted` avec `SEED_FAMILY=restricted` (la famille seule, pour la chaîne
- * privée : `npm run overlay:seed`). Une autre valeur est une faute de frappe qui
- * ne doit pas passer pour « tout ».
+ * Ce qu'un seeder écrit.
+ *
+ * - `public` sans variable : les sources publiques SEULES, jamais un membre de la
+ *   famille. Depuis l'étape du retrait (25/09/2026), c'est le mode des robots
+ *   publics (refresh-bic.yml, refresh-compliance.yml, les relectures tchèque et
+ *   italienne) et de toute copie d'un contributeur : aucun ne télécharge ni
+ *   n'écrit plus la famille dans `data/`, d'où elle serait commitée.
+ * - `restricted` avec `SEED_FAMILY=restricted` : la famille seule, pour la chaîne
+ *   privée (`npm run overlay:seed`, qui pose la variable elle-même).
+ *
+ * Le défaut est le mode sûr exprès : un workflow qui oublierait la variable ne
+ * peut pas retélécharger la famille dans le dépôt public. Une autre valeur est
+ * une faute de frappe qui ne doit passer pour aucun des deux.
  */
-export function seedFamilyFromEnv(): 'all' | 'restricted' {
+export function seedFamilyFromEnv(): 'public' | 'restricted' {
   const value = process.env.SEED_FAMILY ?? '';
-  if (value === '') return 'all';
+  if (value === '') return 'public';
   if (value === 'restricted') return 'restricted';
   throw new Error(`SEED_FAMILY inconnu : « ${value} » (seule valeur admise : restricted)`);
 }

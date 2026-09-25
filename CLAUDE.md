@@ -231,6 +231,14 @@ ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script re
 `.gitignore` attrape `restricted-*.sqlite*` et `*.merged-*.sqlite*`), jamais ajouter une table
 ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
 
+**Le retrait (étape 6, 25.09.2026)** : plus rien de la famille dans ce dépôt, hors historique
+git. Les seeders publics tournent avec `SEED_FAMILY=public` par défaut et ne téléchargent aucun
+membre ; les bases suivies se reconstruisent sans la famille (`npm run overlay -- strip`, sans
+téléchargement) et `src/lib/public-base-family-free.test.ts` échoue si une ligne revient ; la
+carte composite n'a plus les clés AT, BE, LU, PL et FI (les codes polonais et finlandais ne
+résolvent plus de BIC) ; les pages /at, /be et /sm lisent l'API à la demande. Sans surcouche,
+chaque réponse qui dépend de la famille dit « non consulté », jamais « non ».
+
 **Le tirage (étape 5, depuis le 25.09.2026)** : `src/lib/restricted-overlay-pull.ts`. Un dépôt
 privé reconstruit la surcouche chaque semaine (conformité) et chaque mois (BIC), ne commite
 aucune donnée, et publie une release : les deux fichiers et un `manifest.json`

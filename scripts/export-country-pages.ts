@@ -16,6 +16,12 @@
  *
  * Run after the monthly register refresh (`npm run pages:export-countries`);
  * the JSON is committed so the frontend build needs nothing but the repository.
+ *
+ * Since the withdrawal step (25/09/2026) it runs on this repository's public
+ * database, which carries no row of the restricted family (the AT, BE and SM
+ * registers, the EPC registers, …): an example whose bank code only such a
+ * register decides answers "not consulted" here, and the page says what the
+ * register is, not what the private overlay would have answered.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -31,6 +37,30 @@ process.env.RATE_LIMIT_PER_MIN = '1000000';
 
 const { buildApp } = await import('../src/app.js');
 const { generateOemKey } = await import('../src/lib/api-keys.js');
+const { registerCoverage } = await import('../src/lib/enrich.js');
+const { restrictedRegisterCountries } = await import('../src/lib/restricted-family.js');
+const { LU_SOURCE } = await import('../src/lib/lu-register.js');
+
+/**
+ * The countries whose bank codes the API decides against a register it serves
+ * from a PRIVATE file, not from this repository's database (withdrawal step,
+ * 25/09/2026): Austria, Belgium and San Marino from the restricted overlay
+ * (src/lib/restricted-family.ts), Luxembourg from the ABBL file
+ * (src/lib/lu-register.ts). This script runs on the public database, where
+ * their example would answer "register not consulted", which is not what the
+ * API answers in production. Their page therefore names the register (its
+ * name, never its rows) and prints no exported answer: it sends the reader to
+ * the live API instead (`api: null`, `private_register: true`).
+ */
+function privateRegister(
+  cc: string,
+): { register: string; basis: 'authoritative' | 'partial' } | null {
+  if (cc === 'LU') return { register: LU_SOURCE.replace(/^Source:\s*/, ''), basis: 'partial' };
+  if (!restrictedRegisterCountries().has(cc)) return null;
+  const coverage = registerCoverage(cc);
+  if (!coverage.register || coverage.basis === 'none') return null;
+  return { register: coverage.register, basis: coverage.basis };
+}
 const {
   IBAN_LENGTHS,
   BBAN_STRUCTURE,
@@ -69,13 +99,12 @@ function apiBlock(answer: Json): Json {
       'lei',
     ]),
     bank_code_check: answer.bank_code_check ?? null,
-    sepa: pick(answer.sepa as Json, [
-      'member',
-      'schemes',
-      'vop_required',
-      'vop_participant',
-      'basis',
-    ]),
+    // Country-level facts only. The bank-level fields (`schemes` at the bank's
+    // grain, `vop_participant`, `basis`) come from the EPC scheme and VoP
+    // registers, restricted since the withdrawal step (25/09/2026,
+    // src/lib/restricted-family.ts): a public file must not copy them, even one
+    // bank per country. The country's own schemes stay in `sepa` beside `api`.
+    sepa: pick(answer.sepa as Json, ['member', 'vop_required']),
     issuer: pick(answer.issuer as Json, ['type', 'name', 'classification']),
     risk_indicators: pick(answer.risk_indicators as Json, [
       'country_risk',
@@ -145,6 +174,22 @@ for (const cc of codes) {
   if (answer.valid !== true)
     throw new Error(`${cc}: the registry example ${example} is not valid for the API`);
   const check = answer.bank_code_check as Json | undefined;
+  const hidden = privateRegister(cc);
+  if (hidden) {
+    countries[cc] = {
+      code: cc,
+      name_en: COUNTRY_NAMES[cc] ?? cc,
+      length: IBAN_LENGTHS[cc],
+      fields,
+      example,
+      sepa: getSepaInfo(cc),
+      register: hidden.register,
+      register_basis: hidden.basis,
+      private_register: true,
+      api: null,
+    };
+    continue;
+  }
   countries[cc] = {
     code: cc,
     name_en: COUNTRY_NAMES[cc] ?? cc,
@@ -178,11 +223,12 @@ writeFileSync(
     1,
   ),
 );
-const withRegister = codes.filter(
-  (cc) =>
-    ((countries[cc] as Json).api as Json).bank_code_check &&
-    (((countries[cc] as Json).api as Json).bank_code_check as Json).authoritative === true,
-).length;
+const withRegister = codes.filter((cc) => {
+  const entry = countries[cc] as Json;
+  if (entry.private_register) return entry.register_basis === 'authoritative';
+  const api = entry.api as Json;
+  return api.bank_code_check && (api.bank_code_check as Json).authoritative === true;
+}).length;
 console.log(
   `${codes.length} countries written to ${file}; ${withRegister} checked against a national register`,
 );

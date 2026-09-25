@@ -475,7 +475,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}
@@ -566,11 +566,13 @@ Response (real API output of 2026-09, trimmed to the fields agents typically nee
   "country": { "code": "DE", "name": "Germany" },
   "bic": { "code": "COBADEFFXXX", "bic8": "COBADEFF", "bank_name": "Commerzbank", "city": "Köln", "basis": "national_register", "authoritative": true, "source": "Deutsche Bundesbank Bankleitzahlendatei" },
   "issuer": { "type": "bank", "name": "Commerzbank", "classification": "default" },
-  "sepa": { "member": true, "schemes": ["SCT","SDD","SCT_INST"], "vop_required": true, "vop_participant": true, "basis": "epc_register" },
+  "sepa": { "member": true, "schemes": ["SCT","SDD","SCT_INST"], "vop_required": true, "vop_participant": null, "basis": "country_default" },
   "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "test_bic": false, "sepa_reachable": true, "sepa_reachable_scope": "country", "vop_coverage": true },
   "bank_code_check": { "value": "37040044", "status": "verified", "match": "register", "register": "Deutsche Bundesbank Bankleitzahlendatei", "authoritative": true, "as_of": "2026-09" }
 }
 \`\`\`
+
+\`sepa.vop_participant\` reads \`null\` in this example: that is the answer when the EPC Verification of Payee register was not consulted for the call. When it was, the field reads \`true\` or \`false\`, and \`sepa.basis\` turns to \`"epc_register"\` where the EPC scheme registers list the bank.
 
 The same call on \`CH9300762011623852957\`, the Swiss example of the SWIFT IBAN registry, passes mod-97 and comes back \`"valid": true\` with \`bank_code_check.status = "not_in_register"\`, \`reason = "not_allocated"\`, \`authoritative: true\`: the SIX BankMaster allocates that bank code to nobody. A Swiss IBAN whose code is allocated also carries a \`clearing\` block (SIC, euroSIC, CHF instant payments, QR-IID).
 

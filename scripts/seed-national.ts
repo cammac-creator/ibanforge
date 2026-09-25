@@ -1,6 +1,12 @@
 /**
  * Seed the Austrian, Belgian, Slovak, San Marino and Czech bank-code registers.
  *
+ * 🔒 DEPUIS LE 25/09/2026 (étape du retrait) : AT, BE et SM appartiennent à la
+ * famille sous conditions (src/lib/restricted-family.ts). Sans variable, ce
+ * script ne lit que les registres publics (SK, CZ, et IT quand on le nomme) ;
+ * `SEED_FAMILY=restricted`, posée par la chaîne privée (`npm run overlay:seed`),
+ * lit AT, BE et SM seuls. Nommer un pays hors de son mode est refusé.
+ *
  * ⚠️ FOUR of these five are exhaustive; San Marino is NOT. AT, BE, SK and CZ are
  * published by the authority that allocates the codes, which is what lets an
  * absence mean "held by nobody" rather than "absent from our map" — the claim
@@ -10,9 +16,10 @@
  * the strength of the claim is not, and it is decided in enrich.ts, which never
  * puts SM in NATIONAL_REGISTERS. Do not "tidy" that by adding it.
  *
- *   npx tsx scripts/seed-national.ts          # all (Italy excepted)
- *   npx tsx scripts/seed-national.ts AT       # one
+ *   npx tsx scripts/seed-national.ts          # every public register (SK, CZ)
+ *   npx tsx scripts/seed-national.ts CZ       # one
  *   npx tsx scripts/seed-national.ts IT       # Italy, only ever on its own
+ *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM (private chain)
  *
  * ITALIE — Banca d'Italia, registres des banques, des établissements de paiement
  * et de monnaie électronique (open data CC BY 4.0). NON exhaustif, comme
@@ -620,10 +627,11 @@ export function parseSanMarino(html: string, readOn: string): Entry[] {
     const name = line(/name\s*:\s*\n\s*([^\n]+)/i);
     if (!name) continue;
 
-    // "Registered office: Via 3 settembre, 316 - 47891 Dogana" — street, then a
+    // "Registered office: Via dell'Esempio, 101 - 47891 Contrada" (adresse
+    // inventée de la fixture de test, 25/09/2026) — street, then a
     // dash, then five digits of CAP and the town. Split on the postcode rather
     // than on the dash: street names on this page contain commas and numbers,
-    // and one of them ("P.tta del Titano, 2") would lose its house number to a
+    // and one of them (like "P.tta dell'Esempio, 2" in the fixture) would lose its house number to a
     // greedy comma split.
     const office = line(/Registered\s*office\s*:\s*([^\n]*)/i);
     const addr = office ? /^(.*?)\s*-\s*(\d{5})\s+(.+)$/.exec(office) : null;
@@ -1319,13 +1327,29 @@ async function main(): Promise<void> {
     ['SK', parseSlovakiaLive],
     ['SM', parseSanMarinoLive],
   ];
-  // SEED_FAMILY=restricted : AT, BE et SM seulement (la Slovaquie et la Tchéquie
-  // sont publiques), pour la surcouche privée. Sans la variable, tous comme avant.
+  // Deux modes, jamais les deux à la fois (seedFamilyFromEnv) :
+  // - sans SEED_FAMILY (robots publics, copie d'un contributeur) : les registres
+  //   publics seuls, la Slovaquie et la Tchéquie (l'Italie sur demande). Depuis
+  //   l'étape du retrait (25/09/2026), AT, BE et SM ne sont plus téléchargés ici :
+  //   la base de ce dépôt ne les porte plus ;
+  // - SEED_FAMILY=restricted (chaîne privée de la surcouche) : AT, BE et SM seuls.
+  // Un pays nommé hors de son mode est refusé plutôt que sauté en silence : une
+  // commande `seed-national.ts AT` lancée sans la variable écrirait la famille
+  // dans data/, d'où elle serait commitée.
   const restrictedOnly = seedFamilyFromEnv() === 'restricted';
   const restricted = restrictedRegisterCountries();
+  if (only && restricted.has(only) !== restrictedOnly) {
+    throw new Error(
+      restrictedOnly
+        ? `${only} est public : la chaîne privée (SEED_FAMILY=restricted) ne lit que ${[...restricted].join(', ')}.`
+        : `${only} appartient à la famille sous conditions (src/lib/restricted-family.ts) : il n'est ` +
+            'reconstruit que par la chaîne privée (SEED_FAMILY=restricted, npm run overlay:seed), ' +
+            'jamais dans la base de ce dépôt.',
+    );
+  }
   for (const [cc, parse] of jobs) {
     if (only && only !== cc) continue;
-    if (restrictedOnly && !restricted.has(cc)) continue;
+    if (restricted.has(cc) !== restrictedOnly) continue;
     console.log(`${cc}: downloading ${SOURCES[cc]}`);
     // Chaîne privée de la surcouche (SEED_REPORT_PATH) : un registre de la
     // famille en panne est noté, les autres continuent, et `overlay seed` le

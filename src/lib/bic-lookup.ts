@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { getBicDB } from './db.js';
 import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
-import { lookupFiInstitution } from './fi-register.js';
 import { hasNonLatinScript } from './gleif-address.js';
+import { luRegisterConfigured } from './lu-register.js';
 import {
   allocatedCodes,
   lookupNationalCode,
@@ -18,6 +18,7 @@ import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
 import { sourceVintage } from './source-vintage.js';
 import { listedInCurrentSource, resetTraceIndex } from './bic-trace.js';
+import { RESTRICTED_FAMILY } from './restricted-family.js';
 import { getCountryName } from './countries.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // 07/09/2026: GL:6471 (Grønlandsbanken) added by hand — the one Greenlandic
 // registration number the Danish FSA's register and Greenlandic institutions'
 // published account details agree on; see docs/data-sources.md.
+// 25/09/2026 : 18 467 clés dans 70 pays, après le retrait des clés AT, BE, LU,
+// PL et FI (famille sous conditions, NOTICE groupe C).
 // Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
 // ---------------------------------------------------------------------------
 
@@ -144,31 +147,35 @@ function pruneStaleGermanCodes(data: Record<string, BicDataEntry>): Record<strin
 }
 
 /**
- * Finnish prefixes the curated map claims and Finance Finland allocates to
- * nobody are dropped at load time.
+ * Les pays dont les clés de la carte composite ont quitté ce dépôt (étape du
+ * retrait, 25/09/2026, décision de Claude-Alain du 24/09/2026 « tout ce qui n'est
+ * pas redistribuable sort »).
  *
- * The Swiss and German story a third time, with one twist: Finland allocates
- * variable-length codes, so a curated 3-digit key must be resolved the same way
- * a real BBAN is, by longest allocated prefix. Measured 29/07/2026, 21 of our
- * 656 Finnish keys asserted an institution the published list does not carry,
- * led by Handelsbanken (31x) and Swedbank (38x), both of which left Finnish
- * retail banking.
+ * Toutes les clés AT, BE, LU, PL et FI de bic_data.json venaient d'un registre
+ * dont les conditions ne permettent pas la redistribution : l'OeNB, la BNB et
+ * l'ABBL par la compilation de sigalor/iban-to-bic, la NBP et Finance Finland par
+ * celle de schwifty. Elles sont retirées ; rien ne les sert en privé aujourd'hui.
+ * Ce qui répond encore pour ces pays : les registres autrichien et belge de la
+ * surcouche privée (src/lib/restricted-family.ts) et le registre luxembourgeois
+ * privé (src/lib/lu-register.ts), quand ils sont chargés. La Pologne et la
+ * Finlande n'ont plus aucune donnée de code bancaire.
  *
- * Without this the same response could resolve a BIC for a code its own
- * bank_code_check called not_in_register with authoritative: true.
+ * Pourquoi un ensemble et pas une déduction : un code bancaire de ces pays est
+ * NUMÉRIQUE, et la recherche par préfixe dans l'annuaire (stratégie 2 de
+ * `lookupByCountryBank`) ne peut rien y trouver, aucun BIC8 ne commençant par un
+ * chiffre. Les lignes d'annuaire de ces pays ne sont donc pas une donnée de
+ * référence pour leurs codes, et `countryHasReferenceData` ne doit plus les
+ * compter : sans cela, chaque IBAN polonais ou finlandais répondrait
+ * « absent de nos données » d'un code que nous n'avons plus aucun moyen de
+ * consulter, au lieu de « non consulté ».
  */
-function pruneStaleFinnishCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
-  for (const key of Object.keys(data)) {
-    if (!key.startsWith('FI:')) continue;
-    const raw = key.slice(3);
-    if (!/^\d{3}$/.test(raw)) continue;
-    // Pad to a BBAN-shaped string: the resolver reads a prefix, and the tail
-    // never participates in the decision.
-    const hit = lookupFiInstitution(raw.padEnd(14, '0'));
-    if (hit?.status === 'not_allocated') delete data[key];
-  }
-  return data;
-}
+export const WITHDRAWN_BANK_CODE_COUNTRIES: ReadonlySet<string> = new Set([
+  'AT',
+  'BE',
+  'LU',
+  'PL',
+  'FI',
+]);
 
 /**
  * Austrian, Belgian, Slovak and Czech codes the curated map claims and the
@@ -277,9 +284,7 @@ function getBicData(): Record<string, BicDataEntry> {
     const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
     bicDataCache = addListedDutchProviders(
       pruneRetiredItalianCodes(
-        pruneStaleNationalCodes(
-          pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
-        ),
+        pruneStaleNationalCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
       ),
     );
   }
@@ -325,7 +330,7 @@ export interface BankLookupHit {
    * The code actually consulted, when it is not the caller's positional slice.
    * Iceland is the one case today: the curated key is the two-digit bank grain
    * of the four-digit bank+branch field, and the verdict must name the code it
-   * is really about — the Finnish `value` motif, one layer down.
+   * is really about.
    */
   checked?: string;
   /** Human name of the dataset the row naming this institution came from. */
@@ -914,12 +919,55 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
  */
 const referenceDataCache = new Map<string, boolean>();
 
+let restrictedDirectoryCache: boolean | undefined;
+
+/**
+ * La partie PRIVÉE de l'annuaire est-elle servie ? Depuis l'étape du retrait
+ * (25/09/2026), les lignes STEP2, NBP et OeNB de `bic_entries` ne viennent plus
+ * que de la surcouche privée (src/lib/restricted-family.ts). Sans elle, un BIC
+ * que seules ces listes portent répond `found: false` : la réponse doit dire que
+ * cette partie n'a pas été consultée, jamais laisser croire à une absence.
+ *
+ * Vrai quand chaque membre de `bic_entries` qui doit porter des lignes (plancher
+ * non nul : STEP2 et NBP ; l'OeNB peut être vide légitimement) en porte au moins
+ * une dans la base servie. Mémorisé par connexion, vidé avec les requêtes
+ * préparées (resetStatements), donc à chaque rechargement de la surcouche.
+ */
+/** La phrase qui le dit, la même sur GET /v1/bic/:code et la conformité par BIC. */
+export const RESTRICTED_DIRECTORY_NOTE =
+  'The part of our directory served from a private file (EBA STEP2, NBP and OeNB records) is not loaded on this deployment and was not consulted.';
+
+export function restrictedDirectoryLoaded(): boolean {
+  if (restrictedDirectoryCache !== undefined) return restrictedDirectoryCache;
+  const db = getBicDB();
+  restrictedDirectoryCache = RESTRICTED_FAMILY.filter(
+    (m) => m.kind === 'bic' && m.table === 'bic_entries' && m.where && m.minRows > 0,
+  ).every(
+    (m) =>
+      !!db.prepare('SELECT 1 AS hit FROM bic_entries WHERE source = ? LIMIT 1').get(m.where!.value),
+  );
+  return restrictedDirectoryCache;
+}
+
 export function countryHasReferenceData(countryCode: string): boolean {
   const cached = referenceDataCache.get(countryCode);
   if (cached !== undefined) return cached;
 
   const prefix = `${countryCode}:`;
   let has = Object.keys(getBicData()).some((k) => k.startsWith(prefix));
+  if (!has && WITHDRAWN_BANK_CODE_COUNTRIES.has(countryCode)) {
+    // Les pays dont les clés ont quitté ce dépôt : seul un registre privé CHARGÉ
+    // est une donnée de référence pour leurs codes numériques, jamais les lignes
+    // de l'annuaire (voir WITHDRAWN_BANK_CODE_COUNTRIES). Mémorisé comme les
+    // autres : une surcouche rechargée vide ce mémo (resetStatements), et le
+    // fichier luxembourgeois ne se branche ou ne se débranche qu'au redémarrage.
+    has =
+      countryCode === 'LU'
+        ? luRegisterConfigured()
+        : (countryCode === 'AT' || countryCode === 'BE') && nationalRegisterAvailable(countryCode);
+    referenceDataCache.set(countryCode, has);
+    return has;
+  }
   if (!has) {
     const row = getBicDB()
       .prepare('SELECT 1 AS hit FROM bic_entries WHERE country_code = ? LIMIT 1')
@@ -1022,6 +1070,7 @@ export function resetStatements(): void {
   // Même base, même raison : une surcouche rechargée peut apporter ou retirer
   // les seules lignes d'un pays (src/lib/restricted-overlay-runtime.ts).
   referenceDataCache.clear();
+  restrictedDirectoryCache = undefined;
   // L'index des traces courantes est calculé sur la même base (bic-trace.ts).
   resetTraceIndex();
 }

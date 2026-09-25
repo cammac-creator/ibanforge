@@ -13,7 +13,7 @@ BIC directory, 121k+ entries (entries, not institutions): GLEIF and national reg
 ## What IBANforge checks, country by country
 
 - Checked against the national register, read in full: a code it does not hold comes back `not_allocated`, `authoritative: true`. Germany (Deutsche Bundesbank), Austria (Oesterreichische Nationalbank), Belgium (Banque nationale de Belgique), Slovakia (Národná banka Slovenska), Czech Republic (Česká národní banka, Zdroj: ČNB), Bulgaria (Bulgarian National Bank, bank code only), Switzerland and Liechtenstein (SIX BankMaster).
-- A partial register: a hit names the holder, a miss is not a refusal (`authoritative: false`). Finland (Finance Finland, codes of banking groups), Italy (Banca d'Italia, registers of banks, payment and e-money institutions; a code it has struck off comes back `retired`, with its date and legal successor, never as a refusal), San Marino (Central Bank of the Republic of San Marino, operating banks) and Luxembourg (ABBL register of IBAN/BIC codes).
+- A partial register: a hit names the holder, a miss is not a refusal (`authoritative: false`). Italy (Banca d'Italia, registers of banks, payment and e-money institutions; a code it has struck off comes back `retired`, with its date and legal successor, never as a refusal), San Marino (Central Bank of the Republic of San Marino, operating banks) and Luxembourg (ABBL register of IBAN/BIC codes).
 - A structural rule the authority publishes, not a register: Latvia and Gibraltar, where IBAN positions 5-8 are the first four characters of the BIC.
 - Official identity of the bank, from its national bank code: France (European Central Bank list of monetary financial institutions) and Spain (Banco de España). Spain also: whether the code belongs to a payment or e-money institution in the EBA PSD2 register.
 - United Kingdom: the Vocalink modulus check on the sort code and account number, and whether the bank is on the Bank of England list of banks authorised to take deposits.
@@ -29,7 +29,7 @@ BIC directory, 121k+ entries (entries, not institutions): GLEIF and national reg
 
 ## Data sources and attribution
 
-GLEIF · SIX BankMaster · SwiftCodes (MIT, a public copy of the SWIFT directory frozen in January 2018) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Česká národní banka · Bulgarian National Bank · Banca d'Italia · Central Bank of the Republic of San Marino · Finance Finland · ABBL · European Central Bank · Banco de España · EBA · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
+GLEIF · SIX BankMaster · SwiftCodes (MIT, a public copy of the SWIFT directory frozen in January 2018) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Česká národní banka · Bulgarian National Bank · Banca d'Italia · Central Bank of the Republic of San Marino · ABBL · European Central Bank · Banco de España · EBA · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
 UK deposit-taking authorisation: Bank of England (List of Banks, 2026-08), used with the Bank of England's written permission. The month of the list in force is served live at https://api.ibanforge.com/llms.txt
 Slovak bank codes: Národná banka Slovenska, Directory of identification codes for the domestic payment system (version 225, effective 2026-05-18), reproduced under the NBS site terms — the source is named and the file is not altered. The edition in force is served live at https://api.ibanforge.com/llms.txt
 Czech bank codes: Zdroj: ČNB, Číselník kódů platebního styku v ČR, reproduced under the ČNB site terms — the ČNB is named as the source and the facts are not altered. The ČNB publishes each numbered edition ahead of its effective date and we apply it from that date; this static file does not follow the editions, so the edition in force and its date are served live at https://api.ibanforge.com/llms.txt
@@ -132,11 +132,13 @@ Response (real API output of 2026-09, trimmed to the fields agents use most):
   "country": { "code": "DE", "name": "Germany" },
   "bic": { "code": "COBADEFFXXX", "bic8": "COBADEFF", "bank_name": "Commerzbank", "city": "Köln", "basis": "national_register", "authoritative": true, "source": "Deutsche Bundesbank Bankleitzahlendatei" },
   "issuer": { "type": "bank", "name": "Commerzbank" },
-  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true, "vop_participant": true, "basis": "epc_register" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true, "vop_participant": null, "basis": "country_default" },
   "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "test_bic": false, "sepa_reachable": true, "vop_coverage": true },
   "bank_code_check": { "value": "37040044", "status": "verified", "match": "register", "register": "Deutsche Bundesbank Bankleitzahlendatei", "authoritative": true, "as_of": "2026-09" }
 }
 ```
+
+`sepa.vop_participant` reads `null` in this example: that is the answer when the EPC Verification of Payee register was not consulted for the call. When it was, the field reads `true` or `false`, and `sepa.basis` turns to `"epc_register"` where the EPC scheme registers list the bank.
 
 The same call on `CH9300762011623852957`, the Swiss example of the SWIFT IBAN registry, passes mod-97 and comes back with `bank_code_check.status = "not_in_register"`, `reason = "not_allocated"`, `authoritative: true`: the SIX BankMaster allocates that bank code to nobody. A Swiss IBAN whose code is allocated also carries a `clearing` block (SIC, euroSIC, CHF instant payments, QR-IID).
 
@@ -154,16 +156,16 @@ Returns the validate fields plus a nested `compliance` block (real API output of
   "valid": true,
   "compliance": {
     "sanctions": { "country_sanctioned": false, "bank_sanctioned": false, "matched_lists": [], "fatf_status": "member", "bank_screened": true },
-    "reachability": { "sepa_instant": true, "sct": true, "sdd": true, "screened": true },
-    "vop": { "participant": true, "status": "active", "screened": true },
+    "reachability": { "sepa_instant": false, "sct": false, "sdd": false, "screened": false },
+    "vop": { "participant": false, "status": "not_found", "screened": false },
     "risk_score": 0,
     "risk_level": "low",
-    "flags": []
+    "flags": ["sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"]
   },
   "meta": { "scope": "bank_bic_only", "disclaimer": "...", "sanctions_as_of": "...", "fatf_as_of": "2026-06" }
 }
 ```
-Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions lists (OFAC, EU, UN) are matched on the bank (BIC8) only, and only those hits appear in `matched_lists`; the country is checked against a fixed list of sanctioned jurisdictions (`country_sanctioned`); the beneficiary name is never screened. `vop.participant` says whether the EPC VoP register lists the bank as ready (an absent bank comes back `false`); the name check itself is the bank's. Not a regulated AML/CFT product.
+Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions lists (OFAC, EU, UN) are matched on the bank (BIC8) only, and only those hits appear in `matched_lists`; the country is checked against a fixed list of sanctioned jurisdictions (`country_sanctioned`); the beneficiary name is never screened. `vop.participant` says whether the EPC VoP register lists the bank as ready (an absent bank comes back `false`); the name check itself is the bank's. This example shows the answer when the EPC registers and the United Nations list were not consulted: `screened: false` on `reachability` and `vop`, and one `*_unavailable` flag per source left out, so a `false` there proves nothing. When they were consulted, `screened` is `true` and the booleans are the bank's own. Not a regulated AML/CFT product.
 
 ## Why IBANforge?
 
