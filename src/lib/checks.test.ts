@@ -122,6 +122,27 @@ describe('the rules, on hand-built results', () => {
     expect(buildChecks(base()).national_check_digits).toBe('not_checked');
   });
 
+  it('national_check_digits repeats the status of the national_check_digits block (25/09/2026)', () => {
+    const fr = (status: 'pass' | 'fail' | 'not_applicable') =>
+      base({
+        country: { code: 'FR', name: 'France' },
+        national_check_digits: { country: 'FR', scheme: 'fr_rib_key', status },
+      });
+    for (const status of ['pass', 'fail', 'not_applicable'] as const) {
+      expect(buildChecks(fr(status)).national_check_digits, status).toBe(status);
+    }
+    // Pays du module sans bloc (résultat construit à la main) : rien n'a été contrôlé.
+    expect(
+      buildChecks(base({ country: { code: 'FR', name: 'France' } })).national_check_digits,
+    ).toBe('not_checked');
+    // Le Royaume-Uni ne lit que modulus_check, même si un bloc traînait.
+    const gbWithBlock = base({
+      country: { code: 'GB', name: 'United Kingdom' },
+      national_check_digits: { country: 'GB', scheme: 'fr_rib_key', status: 'fail' },
+    });
+    expect(buildChecks(gbWithBlock).national_check_digits).toBe('not_checked');
+  });
+
   it('payee_name, account_exists and payee_sanctions are always not_checked', () => {
     for (const holder of BANK_CODE_HOLDERS) {
       const c = buildChecks(base({ bank_code_holder: holder }));

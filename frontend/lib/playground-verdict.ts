@@ -8,7 +8,10 @@ export function playgroundVerdict(data: RecordValue, mode: 'iban' | 'compliance'
   const bic = record(data.bic);
   const compliance = record(data.compliance);
   const sanctions = record(compliance.sanctions);
-  const localCheckInvalid = record(bank.check_digit).valid === false || record(data.modulus_check).passed === false;
+  // Clé nationale fausse (clé RIB, CIN, DC, chiffres belges, modulus britannique) :
+  // `checks.national_check_digits` vaut `fail` depuis le 25/09/2026, `valid` reste vrai.
+  const localCheckInvalid = record(bank.check_digit).valid === false || record(data.modulus_check).passed === false
+    || record(data.checks).national_check_digits === 'fail';
   const ambiguous = typeof bank.candidates === 'number' && bank.candidates > 1;
   const bankStatus = data.valid !== true ? 'notChecked'
     : bank.status === 'not_in_register' && bank.authoritative === true && bank.reason === 'not_allocated' ? 'notAllocated'

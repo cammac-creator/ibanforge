@@ -172,6 +172,8 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     expect(h.restricted_overlays).toEqual({
       bic: { state: 'refused', sha256: null },
       compliance: { state: 'refused', sha256: null },
+      // Le tirage (étape 5), ajouté à côté : sans ses variables, `off` et rien d'autre.
+      pull: { state: 'off' },
     });
   });
 

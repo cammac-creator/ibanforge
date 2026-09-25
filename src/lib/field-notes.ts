@@ -61,8 +61,27 @@ export const CHECKS_NOTE =
   "account_exists: never checked here; only the payee's bank knows whether the account is open. " +
   "payee_sanctions: never checked; the sanctions screen of POST /v1/iban/compliance is made on the payee's bank (BIC8) and country only. " +
   'institution_sanctions and country_sanctions are filled by POST /v1/iban/compliance and not_checked on a validation. ' +
-  'national_check_digits: checked for GB (Vocalink modulus); other countries are being added. ' +
+  'national_check_digits: the check key a country keeps inside the BBAN, a second check independent of mod-97. ' +
+  'Checked for FR and MC (RIB key), BE (the last two digits, modulo 97), IT and SM (CIN) and ES (DC), with the proof in the national_check_digits block, ' +
+  'and for GB (Vocalink modulus), with the proof in modulus_check; not_checked elsewhere (the German account-number methods are not checked yet). ' +
+  'pass means the account number is well formed, never that the account exists; fail means it cannot have been issued as written, and valid stays true. ' +
   'A key may be added later; a key is never removed. Present only when valid is true.';
+
+/**
+ * Le bloc `national_check_digits` (clé de contrôle nationale du BBAN), pour
+ * l'OpenAPI et les schémas MCP. Les pays et les noms d'algorithme cités ici
+ * sont tenus par un test contre la table du module (national-check/index.ts).
+ */
+export const NATIONAL_CHECK_DIGITS_NOTE =
+  'The check key a country keeps inside the BBAN, recomputed from the IBAN alone. Present only on a valid IBAN of FR, MC, BE, IT, SM or ES (GB has modulus_check instead); absent elsewhere, where checks.national_check_digits is not_checked. ' +
+  'country is the IBAN country. scheme names the algorithm: fr_rib_key (FR and MC: the RIB key, the last two digits of the BBAN, over the bank code, branch code and account number), ' +
+  'be_mod97 (BE: the last two digits, the first ten digits modulo 97, or 97 when the remainder is 0), ' +
+  'it_cin (IT and SM: the CIN, the control letter at the start of the BBAN, over the ABI, CAB and account number), ' +
+  'es_dc (ES: the two DC digits, positions 9 and 10 of the BBAN). ' +
+  'status: pass (the key matches, so the account number is well formed; it does not prove the account exists or is open) or fail (the key does not match: this account number cannot have been issued as written, a typo or a made-up number). ' +
+  'A fail never makes valid false, because the IBAN check digits are right: read the two separately, and confirm the details with the beneficiary before paying. ' +
+  'not_applicable is reserved for a BBAN without the national layout, which a valid IBAN never has. ' +
+  'detail, present on fail and not_applicable only, says which digits disagree; it never gives the expected key. checks.national_check_digits repeats status.';
 
 /** `sepa.bank_reachability`. */
 export const BANK_REACHABILITY_NOTE =
@@ -77,7 +96,8 @@ export const VOP_REGISTER_STATUS_NOTE =
  * conformité, qui en reprennent la forme), dans les deux transports internes.
  */
 export const VALIDATE_TRUTH_RETURNS =
-  'bank_code_holder: confirmed (a register names who holds the bank code), inferred (we name a holder from a source that cannot settle it: our composite map, the prefix fallback, a published structural rule), not_allocated (the national register says nobody holds it: do not send) or unknown. valid stays true in all four: it only means the IBAN is well formed. checks: one status per check (pass, fail, inferred, unknown, not_checked, not_applicable); payee_name, account_exists and payee_sanctions are always not_checked.';
+  'bank_code_holder: confirmed (a register names who holds the bank code), inferred (we name a holder from a source that cannot settle it: our composite map, the prefix fallback, a published structural rule), not_allocated (the national register says nobody holds it: do not send) or unknown. valid stays true in all four: it only means the IBAN is well formed. checks: one status per check (pass, fail, inferred, unknown, not_checked, not_applicable); payee_name, account_exists and payee_sanctions are always not_checked. ' +
+  'national_check_digits { country, scheme, status: pass | fail, detail? } (FR, MC, BE, IT, SM and ES only): the national key inside the BBAN; fail means the account number cannot have been issued as written, and valid stays true.';
 
 /** Les noms honnêtes du bloc de conformité, pour la description de check_compliance. */
 export const COMPLIANCE_HONEST_NAMES =

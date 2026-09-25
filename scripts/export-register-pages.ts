@@ -66,6 +66,7 @@ process.env.RATE_LIMIT_PER_MIN = '1000000';
 const { buildApp } = await import('../src/app.js');
 const { generateOemKey } = await import('../src/lib/api-keys.js');
 const { getBicDB } = await import('../src/lib/db.js');
+const { computeItalianCin } = await import('../src/lib/national-check/it-cin.js');
 
 /** `npm run pages:export -- IT` : le pays dont on écrit le fichier ; tous sans argument. */
 const ONLY = process.argv[2]?.toUpperCase() ?? null;
@@ -467,9 +468,12 @@ for (const r of skRows) {
 const skBatch1 = skRows.map((r) => r.code);
 
 // San Marino: a CIN letter, five digits of ABI in IBAN positions 6-10, five of
-// CAB, twelve of account. The CIN is a check character over the BBAN and our
-// validator accepts any letter, so the synthetic example carries a fixed 'U' —
-// the same one the ISO 13616 registry's San Marino example uses.
+// CAB, twelve of account. Le CIN est une lettre de contrôle sur l'ABI, le CAB
+// et le compte, et l'API la contrôle depuis le 25/09/2026
+// (`checks.national_check_digits`) : il est donc calculé ici par le module
+// qu'elle applique. Un « U » fixe, celui de l'exemple du registre ISO 13616
+// (ABI 03225, qui n'est pas dans la liste), était faux pour les quatre banques
+// de la liste et faisait répondre `fail` à nos propres exemples.
 //
 // Four banks, all four pre-rendered, `related` empty for the same reason it is
 // in Slovakia: no two share a BIC8, and the index page IS the list.
@@ -482,7 +486,9 @@ const smRows = nationalRows.filter((r) => r.country === 'SM');
 const sm: Json = {};
 let smSource = 'Central Bank of the Republic of San Marino, operating banks';
 for (const r of smRows) {
-  const bban = `U${r.code}09800000000270100`;
+  const cin = computeItalianCin(r.code, '09800', '000000270100');
+  if (!cin) throw new Error(`SM ${r.code}: the ABI code is not five digits`);
+  const bban = `${cin}${r.code}09800000000270100`;
   const iban = `SM${checkDigits('SM', bban)}${bban}`;
   const answer = await call('/v1/iban/validate', {
     method: 'POST',

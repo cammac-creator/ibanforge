@@ -24,6 +24,18 @@
  *       puis extraction vers --out.
  *       Pour la conformité : la surcouche précédente au même chemin est fusionnée
  *       d'abord, pour que la reprise d'une liste en panne (ONU) la retrouve.
+ *   manifest --dir <dossier> --out <fichier> [--commit <sha>] [--previous <manifeste>] [--allow-shrink]
+ *       Le manifeste d'une release du dépôt privé (étape 5) : chaque surcouche
+ *       présente dans <dossier>, contrôlée comme le chargeur de l'API, avec son
+ *       empreinte, sa taille, sa date de génération, le commit du code public et
+ *       les lignes de chaque membre (src/lib/restricted-overlay-manifest.ts).
+ *       Avec --previous, la porte de qualité : rien n'est écrit (code 1) si un
+ *       fichier ou un membre de la release précédente manque, ou si un membre
+ *       baisse de plus de 10 % ; --allow-shrink après contrôle manuel.
+ *   verify --manifest <fichier> --dir <dossier>
+ *       Chaque fichier que nomme le manifeste est dans <dossier>, avec la taille
+ *       et l'empreinte annoncées. Code 1 sinon. Pour la release précédente
+ *       téléchargée par le dépôt privé, avant d'en reprendre quoi que ce soit.
  *
  * Usage : npm run overlay -- <commande> [options]
  */
@@ -35,9 +47,12 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -51,6 +66,13 @@ import {
   sha256File,
   stripFamily,
 } from '../src/lib/restricted-overlay.js';
+import {
+  MANIFEST_FORMAT,
+  compareManifests,
+  manifestEntryFor,
+  parseManifest,
+  type OverlayManifest,
+} from '../src/lib/restricted-overlay-manifest.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -282,6 +304,86 @@ export function commandSeed(flags: Map<string, string | true>): unknown {
   }
 }
 
+const KINDS: readonly OverlayKind[] = ['bic', 'compliance'];
+
+function readManifest(path: string): OverlayManifest {
+  const parsed = parseManifest(readFileSync(path, 'utf8'));
+  if (!parsed.ok) throw new Error(`Manifeste illisible (${parsed.error}) : ${path}`);
+  return parsed.manifest;
+}
+
+/**
+ * Le manifeste d'une release (voir l'en-tête). La porte de qualité passe AVANT
+ * toute écriture : une release refusée ne laisse aucun manifeste derrière elle,
+ * et le dépôt privé ne publie rien sans manifeste.
+ */
+export function commandManifest(flags: Map<string, string | true>): unknown {
+  const dir = required(flags, 'dir');
+  const out = required(flags, 'out');
+  // Avant le moindre travail, comme les autres commandes.
+  assertOutsideRepository(out);
+  const commit = stringFlag(flags, 'commit') ?? null;
+  if (commit !== null && !/^[0-9a-f]{7,40}$/.test(commit))
+    throw new Error('--commit attend une empreinte git (hexadécimal, 7 à 40 caractères)');
+  const previousPath = stringFlag(flags, 'previous');
+  const previous = previousPath ? readManifest(resolve(previousPath)) : null;
+  const files: OverlayManifest['files'] = {};
+  for (const kind of KINDS) {
+    const path = join(dir, OVERLAY_FILE_NAMES[kind]);
+    if (!existsSync(path)) continue;
+    files[kind] = manifestEntryFor({
+      kind,
+      path,
+      publicCommit: commit,
+      previous: previous?.files[kind],
+    });
+  }
+  if (Object.keys(files).length === 0) throw new Error(`Aucune surcouche dans ${dir}`);
+  const manifest: OverlayManifest = {
+    format: MANIFEST_FORMAT,
+    generated_at: new Date().toISOString(),
+    public_commit: commit,
+    files,
+  };
+  if (previous) {
+    const problems = compareManifests(previous, manifest, {
+      allowShrink: flags.has('allow-shrink'),
+    });
+    if (problems.length > 0)
+      throw new Error(
+        `Porte de qualité : release refusée face à la précédente (${problems.join(', ')}). ` +
+          'Rien n’est écrit. Contrôle manuel requis (--allow-shrink).',
+      );
+  }
+  prepareOutput(out);
+  const temporary = `${out}.tmp-${randomUUID()}`;
+  try {
+    writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+    renameSync(temporary, out);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+  return manifest;
+}
+
+/** Les fichiers d'une release téléchargée sont-ils ceux que son manifeste annonce ? */
+export function commandVerify(flags: Map<string, string | true>): {
+  code: number;
+  output: unknown;
+} {
+  const manifest = readManifest(required(flags, 'manifest'));
+  const dir = required(flags, 'dir');
+  const files = KINDS.flatMap((kind) => {
+    const entry = manifest.files[kind];
+    if (!entry) return [];
+    const path = join(dir, entry.name);
+    if (!existsSync(path)) return [{ kind, name: entry.name, state: 'missing' }];
+    const same = statSync(path).size === entry.bytes && sha256File(path) === entry.sha256;
+    return [{ kind, name: entry.name, state: same ? 'ok' : 'mismatch' }];
+  });
+  return { code: files.every((f) => f.state === 'ok') ? 0 : 1, output: files };
+}
+
 export function runCommand(argv: string[]): { code: number; output: unknown } {
   const { command, flags } = parseArgs(argv);
   switch (command) {
@@ -321,8 +423,12 @@ export function runCommand(argv: string[]): { code: number; output: unknown } {
     }
     case 'seed':
       return { code: 0, output: commandSeed(flags) };
+    case 'manifest':
+      return { code: 0, output: commandManifest(flags) };
+    case 'verify':
+      return commandVerify(flags);
     default:
-      throw new Error('Commande : extract | check | merge | strip | seed');
+      throw new Error('Commande : extract | check | merge | strip | seed | manifest | verify');
   }
 }
 

@@ -2,6 +2,7 @@ import { describe, it, expect, afterAll, vi } from 'vitest';
 import { Hono } from 'hono';
 import { testIban } from './test-iban.js';
 import { validateIBAN } from '../lib/iban.js';
+import { checkNationalKey } from '../lib/national-check/index.js';
 
 /**
  * Les IBAN de test autrichiens et belges sont tirés de ces registres, qui
@@ -69,11 +70,17 @@ describe('GET /v1/test-iban', () => {
   });
 
   it('BE: the national check digits are correct, not just the IBAN ones', async () => {
-    const res = await makeApp().request('/v1/test-iban?country=BE');
+    const res = await makeApp().request('/v1/test-iban?country=BE&count=10');
     const body = (await res.json()) as { test_ibans: Item[] };
-    const bban = body.test_ibans[0].iban.slice(4);
-    const national = Number(BigInt(bban.slice(0, 10)) % 97n) || 97;
-    expect(bban.slice(10, 12)).toBe(String(national).padStart(2, '0'));
+    expect(body.test_ibans.length).toBeGreaterThan(0);
+    for (const item of body.test_ibans) {
+      const bban = item.iban.slice(4);
+      const national = Number(BigInt(bban.slice(0, 10)) % 97n) || 97;
+      expect(bban.slice(10, 12)).toBe(String(national).padStart(2, '0'));
+      // Le module que l'API applique depuis le 25/09/2026 dit la même chose :
+      // un IBAN de test ne répond jamais `fail` à notre propre contrôle.
+      expect(checkNationalKey(item.iban)?.status, item.iban).toBe('pass');
+    }
   });
 });
 

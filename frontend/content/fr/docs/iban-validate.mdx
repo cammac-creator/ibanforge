@@ -234,6 +234,36 @@ Le BIC de la réponse est **dérivé** du code banque que porte l'IBAN, et ce qu
 
 > `bic.authoritative` et `bank_code_check.authoritative` répondent à **deux questions différentes**. La Suisse était l'endroit où l'écart se voyait, elle ne l'est plus : le BIC vient désormais de la colonne du SIX BankMaster lui-même, donc les deux valent `true`. Saint-Marin est l'endroit où ils divergent encore, en sens inverse : l'appariement est celui du superviseur (`bic.authoritative: true`) alors que l'espace des codes n'est pas le sien à attribuer (`bank_code_check.authoritative: false`). Le premier porte sur l'existence du code, le second sur l'appariement qui a produit le BIC.
 
+### Clés de contrôle nationales (`checks.national_check_digits`)
+
+Plusieurs pays gardent dans le BBAN une clé de contrôle qui leur est propre, plus ancienne que l'IBAN. C'est un second contrôle, indépendant du MOD-97 : un outil qui fabrique un IBAN autour d'un numéro de compte faux obtient sans effort des chiffres de contrôle IBAN justes, mais pas la clé nationale. IBANforge recalcule cette clé à partir de l'IBAN seul, dans le même appel et sans surcoût.
+
+| Pays | `scheme` | La clé contrôlée |
+|---|---|---|
+| France, Monaco | `fr_rib_key` | La clé RIB, les deux derniers chiffres du BBAN, calculée sur le code banque, le code guichet et le numéro de compte (les lettres du numéro de compte sont converties selon la table du RIB) |
+| Belgique | `be_mod97` | Les deux derniers chiffres : les dix premiers chiffres modulo 97, ou 97 quand le reste est nul |
+| Italie, Saint-Marin | `it_cin` | Le CIN, la lettre de contrôle en tête du BBAN, calculée sur l'ABI, le CAB et le numéro de compte |
+| Espagne | `es_dc` | Les deux chiffres DC, en positions 9 et 10 du BBAN |
+| Royaume-Uni | voir `modulus_check` | Le contrôle modulus de Vocalink sur le sort code et le numéro de compte |
+
+Pour ces six pays, un IBAN valide porte un bloc `national_check_digits`, et `checks.national_check_digits` en reprend le `status`. Dans les autres pays (hors Royaume-Uni), le contrôle vaut `not_checked` : les méthodes allemandes du numéro de compte, une par code banque, ne sont pas encore contrôlées.
+
+```json
+{
+  "valid": true,
+  "checks": { "national_check_digits": "fail", "…": "…" },
+  "national_check_digits": {
+    "country": "FR",
+    "scheme": "fr_rib_key",
+    "status": "fail",
+    "detail": "The RIB key (the last two digits of the BBAN) does not match the bank code, branch code and account number: this account number cannot have been issued as written."
+  }
+}
+```
+
+- **`pass`** : la clé correspond, le numéro de compte est bien formé. Cela ne prouve pas que le compte existe ni qu'il est ouvert.
+- **`fail`** : la clé ne correspond pas. Ce numéro de compte n'a pas pu être émis tel qu'il est écrit : une faute de frappe, ou un numéro inventé. `valid` reste `true`, parce que les chiffres de contrôle de l'IBAN sont justes ; lisez les deux séparément, et faites confirmer les coordonnées par le bénéficiaire avant de payer. `detail` dit quels chiffres ne concordent pas et ne donne jamais la clé attendue.
+
 ### IBAN invalide (200)
 
 Lorsque l'IBAN est invalide, la reponse renvoie toujours un code 200 mais avec `valid: false` :
