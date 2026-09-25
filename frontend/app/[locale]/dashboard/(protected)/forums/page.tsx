@@ -1,3 +1,4 @@
+import { requireDashboardSession } from '@/lib/auth';
 import { ForumsApp } from '@/components/crm/forums-app';
 
 /**
@@ -7,6 +8,7 @@ import { ForumsApp } from '@/components/crm/forums-app';
  * Auth lives in the (protected) layout; data flows through /api/crm proxies,
  * so this page stays a plain client-side shell.
  */
-export default function ForumsPage() {
+export default async function ForumsPage() {
+  await requireDashboardSession();
   return <ForumsApp />;
 }

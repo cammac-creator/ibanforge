@@ -1,3 +1,4 @@
+import { requireDashboardSession } from '@/lib/auth';
 import { getLocale } from 'next-intl/server';
 import { ClientsApp } from '@/components/crm/clients-app';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
@@ -13,6 +14,7 @@ export default async function ClientsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireDashboardSession();
   const locale = await getLocale();
   const params = await searchParams;
   const daysParam = Number(params.days ?? 90);

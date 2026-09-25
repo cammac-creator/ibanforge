@@ -1,3 +1,4 @@
+import { requireDashboardSession } from '@/lib/auth';
 import { JournalApp } from '@/components/crm/journal-app';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { buildContacts, fetchCrmData } from '@/lib/crm/build-contacts';
@@ -21,6 +22,7 @@ import { journalRows, unattachedCount } from '@/lib/crm/journal';
  * Contacts already downloads on the very same session.
  */
 export default async function CourrierPage() {
+  await requireDashboardSession();
   const data = await fetchCrmData();
 
   if (!data) {

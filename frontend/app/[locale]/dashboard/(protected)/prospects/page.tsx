@@ -1,3 +1,4 @@
+import { requireDashboardSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { localePath } from '@/lib/locale-path';
 
@@ -10,6 +11,7 @@ import { localePath } from '@/lib/locale-path';
  * would be cached hard and would outlive any future reshaping of these paths.
  */
 export default async function ProspectsPage({ params }: { params: Promise<{ locale: string }> }) {
+  await requireDashboardSession();
   const { locale } = await params;
   redirect(localePath(locale, '/dashboard/contacts?vue=prospection'));
 }

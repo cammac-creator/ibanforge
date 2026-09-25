@@ -1,3 +1,4 @@
+import { requireDashboardSession } from '@/lib/auth';
 import { CrmApp } from '@/components/crm/crm-app';
 import { AliasRules } from '@/components/crm/alias-rules';
 import { NoReplyRules } from '@/components/crm/no-reply-rules';
@@ -19,6 +20,7 @@ import { crmSnapshot } from '@/lib/crm/snapshot';
  * which the overview reads too: one origin, so the two pages cannot disagree.
  */
 export default async function ContactsPage() {
+  await requireDashboardSession();
   const data = await fetchCrmData();
 
   if (!data) {
