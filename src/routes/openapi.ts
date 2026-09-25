@@ -2519,7 +2519,7 @@ const buildRawSpec = () => ({
               vop_participant: {
                 type: ['boolean', 'null'],
                 description:
-                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved or when the VoP register is not loaded on this deployment (not consulted, which is not a "no"). Listing means the bank answers VoP requests — it does not run the name check for you.',
+                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved or when the VoP register is not loaded on this deployment (not consulted, which is not a "no"); a resolved bank outside the SEPA area is answered false from the country either way. Listing means the bank answers VoP requests — it does not run the name check for you.',
               },
               basis: {
                 type: 'string',
@@ -2994,7 +2994,7 @@ const buildRawSpec = () => ({
               screened: {
                 type: 'boolean',
                 description:
-                  'False when the EPC scheme registers were not consulted: no bank resolved, or the registers are not loaded on this deployment. The three booleans above are then defaults, not findings, and carry no risk weight (flag sepa_register_unavailable when a bank was resolved).',
+                  'False when the EPC scheme registers were not consulted: no bank resolved, or the registers are not loaded on this deployment. The three booleans above are then defaults, not findings, and carry no risk weight (flag sepa_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the registers: screened stays true.',
               },
             },
           },
@@ -3006,7 +3006,7 @@ const buildRawSpec = () => ({
               screened: {
                 type: 'boolean',
                 description:
-                  'False when the EPC VoP register was not consulted: no bank resolved, or the register is not loaded on this deployment. `status: not_found` then describes the absence of a query, not of a registration (flag vop_register_unavailable when a bank was resolved).',
+                  'False when the EPC VoP register was not consulted: no bank resolved, or the register is not loaded on this deployment. `status: not_found` then describes the absence of a query, not of a registration (flag vop_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the register: screened stays true.',
               },
             },
           },
@@ -3023,7 +3023,7 @@ const buildRawSpec = () => ({
             description:
               'unassessable means the IBAN itself failed validation, so no screening was possible. It is the absence of a verdict, never a favourable one: do not treat it as low.',
           },
-          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. Three flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable and vop_register_unavailable.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
+          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. Three flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable and vop_register_unavailable. sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
         },
       },
       ChClearingResult: {

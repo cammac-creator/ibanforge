@@ -82,10 +82,11 @@ describe('GET /v1/demo', () => {
   it.each(OFFICIAL_EXAMPLE_IBANS.map((e) => [e.iban, e.label]))(
     'shows %s as the national register answers it: allocated to nobody',
     async (iban) => {
-      // If a register leaves the repository, this turns red: give the tests a
-      // synthetic register (fictitious codes) rather than dropping the example,
-      // since production still reads the register. Only if the register starts
-      // allocating one of these codes does the example leave the demo.
+      // Sur les registres inventés, un code autrichien ou belge absent des
+      // lignes inventées est refusé d'office : ce test tient la forme de la
+      // démo, pas les vrais registres. La règle « l'exemple quitte la démo le
+      // jour où son registre attribue le code » est vérifiée sur les vrais
+      // registres par demo-examples-real-data.test.ts.
       const body = await getDemo();
       const example = body.iban_examples.find((e) => e.iban === iban)!;
       expect(example.valid).toBe(true);

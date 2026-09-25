@@ -25,22 +25,34 @@ export function closeComplianceDB(): void {
     complianceDB = null;
     _metaStmt = null;
   }
-  // Le mémo décrit la connexion qui vient de fermer : un fichier rouvert peut
-  // porter des tables que le précédent n'avait pas.
+  // Les mémos décrivent la connexion qui vient de fermer : un fichier rouvert
+  // peut porter des tables que le précédent n'avait pas.
   _tableLoaded.clear();
+  _sourcesMemo = undefined;
 }
 
 /**
- * Les tables de conformité dont l'absence doit se lire « non consulté ».
+ * Les tables de conformité que le code sonde avant de les consulter.
  *
  * `sanctioned_entities` porte les listes de sanctions, `sepa_participants` et
  * `vop_participants` les registres EPC des schémas SEPA et de la Verification
- * of Payee, `fatf_countries` les déclarations du GAFI.
+ * of Payee : ce sont elles qui peuvent manquer (sortie du dépôt public décidée
+ * le 24/09/2026), et leur absence se lit « non consulté » dans le corps des
+ * réponses.
+ *
+ * `fatf_countries` n'est sondée que pour nommer FATF dans `meta.sources` et
+ * dater `meta.fatf_as_of`. C'est une table publique et statique, remplie à
+ * chaque rafraîchissement depuis src/lib/compliance-static.ts, qui ne fait pas
+ * partie des tables qui peuvent manquer : le corps (`fatf_status`) n'est pas
+ * protégé pour elle et répond `non_member` sur une table vide, comme avant.
  */
 export type ComplianceTable =
   'sanctioned_entities' | 'sepa_participants' | 'vop_participants' | 'fatf_countries';
 
 const _tableLoaded = new Map<ComplianceTable, boolean>();
+
+/** `meta.sources` de la connexion ouverte, figé une fois les trois sondes tranchées. */
+let _sourcesMemo: string | null | undefined;
 
 /**
  * Une table peut-elle être consultée : existe-t-elle ET porte-t-elle au moins
@@ -65,8 +77,10 @@ const _tableLoaded = new Map<ComplianceTable, boolean>();
  * Une sonde qui ne peut pas tourner répond `false`, que chaque appelant traduit
  * en « non consulté » : une phrase sur nous, jamais sur la banque. Les
  * recherches elles-mêmes restent sans garde, si bien qu'une table présente mais
- * illisible remonte toujours jusqu'aux gardes qui répondent
- * `compliance_data_unavailable`.
+ * illisible remonte jusqu'aux gardes de l'appelant : sur la conformité, la
+ * réponse `compliance_data_unavailable` ; sur les surfaces sans score
+ * (validation, lot, outil MCP validate_iban), `sepa.vop_participant: null`
+ * (voir enrich.ts).
  *
  * Mémorisé par connexion (les tables ne changent pas sous une connexion en
  * lecture seule) et effacé par closeComplianceDB(). Une sonde qui a échoué
@@ -121,8 +135,18 @@ export function loadedSanctionsLists(): string[] {
  * table depuis : une chaîne qui nomme l'ONU ou l'EPC sur une base qui ne les
  * porte pas, c'est exactement l'affirmation que ce champ doit empêcher. Nulle
  * quand rien n'est chargé.
+ *
+ * Mémorisée par connexion : elle est servie dans chaque réponse de conformité
+ * (dont la démo gratuite), et la recalculer à chaque fois coûtait deux
+ * SELECT DISTINCT, dont un parcours complet de sepa_participants, soit un
+ * temps synchrone plusieurs fois supérieur à celui de la réponse sur une base
+ * complète. Elle n'est figée que lorsque les trois sondes qu'elle lit ont
+ * tranché : une sonde qui a échoué n'est pas mémorisée (voir
+ * complianceTableLoaded), et figer une chaîne amputée par un échec passager la
+ * servirait jusqu'au redémarrage. Effacée par closeComplianceDB().
  */
 export function loadedComplianceSources(): string | null {
+  if (_sourcesMemo !== undefined) return _sourcesMemo;
   const parts = [...loadedSanctionsLists()];
   if (complianceTableLoaded('fatf_countries')) parts.push('FATF');
   if (complianceTableLoaded('sepa_participants')) {
@@ -131,7 +155,12 @@ export function loadedComplianceSources(): string | null {
       .all() as Array<{ scheme: string }>;
     for (const r of schemes) parts.push(`EPC-${r.scheme}`);
   }
-  return parts.length > 0 ? parts.join(',') : null;
+  const sources = parts.length > 0 ? parts.join(',') : null;
+  const decided = (['sanctioned_entities', 'fatf_countries', 'sepa_participants'] as const).every(
+    (t) => _tableLoaded.has(t),
+  );
+  if (decided) _sourcesMemo = sources;
+  return sources;
 }
 
 export interface ComplianceMeta {
@@ -194,7 +223,8 @@ export function getComplianceMeta(): ComplianceMeta {
     return {
       ...base,
       sanctions_as_of: map.get('last_refresh') ?? null,
-      fatf_as_of: map.get('fatf_as_of') ?? null,
+      // Pas de date pour une liste GAFI que `sources` ne nomme pas.
+      fatf_as_of: complianceTableLoaded('fatf_countries') ? (map.get('fatf_as_of') ?? null) : null,
       // Calculé sur les lignes, pas relu dans la clé `sources` : voir
       // loadedComplianceSources().
       sources: loadedComplianceSources(),

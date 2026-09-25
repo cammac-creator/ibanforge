@@ -177,6 +177,55 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
     expect(r.compliance.flags).not.toContain('no_bank_resolved');
   });
 
+  it('keeps a Belarusian bank critical: outside the SEPA area the country answers', () => {
+    // Aucune banque d'un pays hors SEPA ne figure au registre : « pas de SEPA
+    // Instant, pas de VoP » y est un constat tiré du pays, registre ou non. Les
+    // retirer faisait passer cette banque de critical à high.
+    const r = mods().response.buildComplianceResponse('BY13NBRB3600900000002Z00AB00');
+    expect(r.bic?.code.slice(0, 8)).toBe('NBRBBY2X');
+    expect(r.compliance.reachability.screened).toBe(true);
+    expect(r.compliance.vop.screened).toBe(true);
+    expect(r.compliance.flags).toEqual(
+      expect.arrayContaining(['sanctioned_country', 'no_sepa_instant', 'no_vop']),
+    );
+    expect(r.compliance.flags).not.toContain('sepa_register_unavailable');
+    expect(r.compliance.risk_level).toBe('critical');
+    // Même règle par BIC.
+    const byBic = mods().response.buildBicComplianceResponse('NBRBBY2X');
+    if ('error' in byBic) throw new Error('should validate');
+    expect(byBic.compliance.flags).toEqual(expect.arrayContaining(['no_sepa_instant', 'no_vop']));
+    expect(byBic.compliance.risk_level).toBe('critical');
+  });
+
+  it('answers an ordinary non-SEPA IBAN exactly as a full database does', () => {
+    const r = mods().response.buildComplianceResponse('UA213223130000026007233566001');
+    expect(r.bic?.code).toBeTruthy();
+    expect(r.compliance.reachability).toEqual({
+      sepa_instant: false,
+      sct: false,
+      sdd: false,
+      screened: true,
+    });
+    expect(r.compliance.vop).toEqual({ participant: false, status: 'not_found', screened: true });
+    expect(r.compliance.flags).toEqual(expect.arrayContaining(['no_sepa_instant', 'no_vop']));
+    // Et la validation dit la même chose que la conformité : `false`, pas null.
+    expect(validate(mods(), 'UA213223130000026007233566001').sepa?.vop_participant).toBe(false);
+  });
+
+  it('leaves a territory the registers cover as "not consulted", by BIC', () => {
+    // getSepaInfo() ne compte pas la Martinique comme membre, alors que le
+    // registre porte ses banques : le raccourci par le pays leur donnerait un
+    // faux « non ». Banque inventée.
+    const r = mods().response.buildBicComplianceResponse('XMPLMQMX');
+    if ('error' in r) throw new Error('should validate');
+    expect(r.compliance.reachability.screened).toBe(false);
+    expect(r.compliance.vop.screened).toBe(false);
+    expect(r.compliance.flags).toEqual(
+      expect.arrayContaining(['sepa_register_unavailable', 'vop_register_unavailable']),
+    );
+    expect(r.compliance.flags).not.toContain('no_sepa_instant');
+  });
+
   it('answers vop_participant null and the country schemes on validate', () => {
     const r = validate(mods(), DE_ORDINARY);
     expect(r.sepa?.vop_participant).toBeNull();
@@ -246,37 +295,152 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
   });
 });
 
-describe('no sanctions list loaded at all', () => {
+/**
+ * Aucune liste de sanctions chargée : seule la recherche de la banque est
+ * sautée. Les axes pays et GAFI ont leurs propres tables et répondent quand
+ * même ; une banque résolue lève `sanctions_lists_unavailable` et ne descend
+ * pas sous 50. Rejoué table vidée PUIS table supprimée : préparée sans
+ * condition, la requête de la banque faisait lever même un IBAN sans banque
+ * résolue sur une table supprimée.
+ */
+describe.each(['DELETE FROM sanctioned_entities', 'DROP TABLE sanctioned_entities'])(
+  'no sanctions list loaded at all (%s)',
+  (statement) => {
+    const mods = useDatabase({}, (fixture) => {
+      const Database = require('better-sqlite3') as typeof DatabaseType;
+      const db = new Database(fixture.compliancePath);
+      db.prepare(statement).run();
+      db.close();
+    });
+
+    it('answers the BIC screen as not screened, never as clean', () => {
+      expect(mods().compliance.screenBicSanctions('COBADEFF')).toEqual({
+        screened: false,
+        listed: null,
+        matched_lists: [],
+      });
+    });
+
+    it('holds an ordinary bank at elevated, saying why, never at low', () => {
+      const r = mods().response.buildComplianceResponse(DE_ORDINARY);
+      expect(r.compliance.sanctions.bank_screened).toBe(false);
+      expect(r.compliance.flags).toContain('sanctions_lists_unavailable');
+      // La banque est bien résolue : ni « pas de banque », ni le repli d'une
+      // base illisible.
+      expect(r.compliance.flags).not.toContain('no_bank_resolved');
+      expect(r.compliance.flags).not.toContain('compliance_data_unavailable');
+      expect(r.compliance.risk_score).toBe(50);
+      expect(r.compliance.risk_level).toBe('elevated');
+      expect(r.meta.sources ?? '').not.toMatch(/(^|,)(EU|OFAC|UN)(,|$)/);
+    });
+
+    it('keeps a North Korean bank critical, with the country and FATF axes it read', () => {
+      // Le chemin BIC de /v1/iban/compliance. Tout faire tomber dans le repli
+      // disait `country_sanctioned: false` et `non_member` et donnait 50.
+      const r = mods().response.buildBicComplianceResponse('DCBKKPPY');
+      if ('error' in r) throw new Error('should validate');
+      expect(r.compliance.sanctions.country_sanctioned).toBe(true);
+      expect(r.compliance.sanctions.fatf_status).toBe('black_list');
+      expect(r.compliance.sanctions.bank_screened).toBe(false);
+      expect(r.compliance.flags).toContain('sanctions_lists_unavailable');
+      expect(r.compliance.risk_level).toBe('critical');
+    });
+
+    it('keeps a resolved Belarusian bank critical, not below what a full database says', () => {
+      const r = mods().response.buildComplianceResponse('BY13NBRB3600900000002Z00AB00');
+      expect(r.bic?.code.slice(0, 8)).toBe('NBRBBY2X');
+      expect(r.compliance.sanctions.country_sanctioned).toBe(true);
+      expect(r.compliance.flags).toEqual(
+        expect.arrayContaining(['sanctioned_country', 'sanctions_lists_unavailable']),
+      );
+      expect(r.compliance.risk_score).toBeGreaterThanOrEqual(80);
+      expect(r.compliance.risk_level).toBe('critical');
+    });
+
+    it('still screens the country when no bank is resolved', () => {
+      // Pas de BIC, pas d'axe banque : les axes pays et GAFI répondent seuls et
+      // rien ne prétend avoir contrôlé une banque. Un IBAN russe garde son
+      // verdict de pays sanctionné, quoi que portent les listes d'entités.
+      const r = mods().response.buildComplianceResponse('RU0204452560040702810412345678901');
+      expect(r.bic ?? null).toBeNull();
+      expect(r.compliance.sanctions.country_sanctioned).toBe(true);
+      expect(r.compliance.sanctions.bank_screened).toBe(false);
+      expect(r.compliance.flags).toContain('no_bank_resolved');
+      expect(r.compliance.flags).not.toContain('sanctions_lists_unavailable');
+      expect(r.compliance.risk_level).toBe('critical');
+    });
+  },
+);
+
+/**
+ * Une table VoP présente mais illisible (schéma inattendu, une ligne) : la
+ * sonde passe, la requête lève. La validation, le lot et l'outil MCP
+ * validate_iban tombaient en 500 ; la validation répond désormais « non
+ * consulté », et la conformité garde son repli `compliance_data_unavailable`.
+ */
+describe('a VoP table present but unreadable', () => {
   const mods = useDatabase({}, (fixture) => {
     const Database = require('better-sqlite3') as typeof DatabaseType;
     const db = new Database(fixture.compliancePath);
-    db.prepare('DELETE FROM sanctioned_entities').run();
+    db.exec('DROP TABLE vop_participants; CREATE TABLE vop_participants (x TEXT);');
+    db.prepare("INSERT INTO vop_participants (x) VALUES ('y')").run();
     db.close();
   });
 
-  it('answers the BIC screen as not screened, never as clean', () => {
-    expect(mods().compliance.screenBicSanctions('COBADEFF')).toEqual({
-      screened: false,
-      listed: null,
-      matched_lists: [],
-    });
+  it('answers vop_participant null on validate, instead of a 500', () => {
+    const r = validate(mods(), DE_ORDINARY);
+    expect(r.bic?.code).toBeTruthy();
+    expect(r.sepa?.vop_participant).toBeNull();
   });
 
-  it('answers compliance_data_unavailable rather than a reassuring score', () => {
-    // La règle déjà en place pour une base illisible : un IBAN valide que nous
-    // n'avons pas pu contrôler est « elevated, et on le dit », pas 0 / low.
+  it('answers compliance_data_unavailable on the paid screen', () => {
     const r = mods().response.buildComplianceResponse(DE_ORDINARY);
     expect(r.compliance.flags).toEqual(['compliance_data_unavailable']);
-    expect(r.compliance.risk_level).toBe('elevated');
-    expect(r.compliance.sanctions.bank_screened).toBe(false);
   });
+});
 
-  it('still screens the country when no bank is resolved', () => {
-    // Pas de BIC, pas d'axe banque : les axes pays et GAFI répondent seuls et
-    // rien ne prétend avoir contrôlé une banque. Un IBAN russe garde son verdict
-    // de pays sanctionné, quoi que portent les listes d'entités.
-    const r = mods().compliance.buildComplianceResult(true, 'RU', null, 'bank', 'high', false);
-    expect(r.sanctions.country_sanctioned).toBe(true);
-    expect(r.sanctions.bank_screened).toBe(false);
+/**
+ * Fermer la connexion oublie ce que les sondes, les requêtes préparées et
+ * `meta.sources` savaient. Les autres blocs rechargent les modules à chaque
+ * base et ne passent jamais par ce chemin ; celui-ci garde une seule instance
+ * des modules, ferme, modifie le fichier et relit.
+ */
+describe('closing the compliance connection', () => {
+  let fixture: RestrictedFixture;
+  beforeAll(() => {
+    fixture = installRestrictedFixture({});
+  }, 60_000);
+  afterAll(() => fixture.restore());
+
+  it('forgets the probes, the prepared statements and the sources string', async () => {
+    vi.resetModules();
+    const compliance = await import('./compliance.js');
+    const complianceDb = await import('./compliance-db.js');
+    const db = await import('./db.js');
+    const bic8 = FX.AT.bank.bic!.slice(0, 8);
+
+    // Prépare les deux requêtes et fige les sondes et la chaîne.
+    expect(compliance.checkVop(bic8).screened).toBe(true);
+    expect(compliance.checkReachability(bic8).screened).toBe(true);
+    expect(complianceDb.loadedComplianceSources()?.split(',')).toContain('UN');
+
+    db.closeAll();
+    const Database = require('better-sqlite3') as typeof DatabaseType;
+    const w = new Database(fixture.compliancePath);
+    w.prepare('DELETE FROM vop_participants').run();
+    w.prepare("DELETE FROM sanctioned_entities WHERE source_list = 'UN'").run();
+    w.close();
+
+    // Sans l'effacement des sondes, le registre VoP vidé resterait « chargé ».
+    expect(compliance.checkVop(bic8)).toEqual({
+      participant: false,
+      status: 'not_found',
+      screened: false,
+    });
+    // Sans la remise à zéro des requêtes, celle-ci partirait sur la connexion
+    // fermée (« The database connection is not open »).
+    expect(compliance.checkReachability(bic8).screened).toBe(true);
+    // Sans l'effacement du mémo, `meta.sources` nommerait encore l'ONU.
+    expect(complianceDb.loadedComplianceSources()?.split(',')).not.toContain('UN');
   });
 });

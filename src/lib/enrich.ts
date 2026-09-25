@@ -1272,9 +1272,25 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
   // institution was resolved — same rule as issuer.type: no substantiated
   // subject, no claim about it.
   // Nul aussi quand le registre VoP n'est pas chargé (25/09/2026) : `false`
-  // dirait alors « absente du registre » d'un registre que personne n'a consulté.
+  // dirait alors « absente du registre » d'un registre que personne n'a
+  // consulté. Sauf hors de la zone SEPA, où le pays répond (`false`), registre
+  // ou non : même règle que la conformité (checkVop reçoit le pays de l'IBAN).
+  //
+  // Le try est celui d'epcSchemesForBic8 ci-dessus, pour la même raison : une
+  // table VoP présente mais illisible (schéma inattendu) faisait tomber en 500
+  // la validation, le lot et l'outil MCP validate_iban. Ici, elle répond
+  // « non consulté ». Le try reste chez l'appelant, jamais dans checkVop :
+  // la conformité a besoin que checkVop lève pour répondre
+  // `compliance_data_unavailable`.
   if (result.sepa) {
-    const vop = result.bic?.code ? checkVop(result.bic.code.slice(0, 8)) : null;
+    let vop: ReturnType<typeof checkVop> | null = null;
+    if (result.bic?.code) {
+      try {
+        vop = checkVop(result.bic.code.slice(0, 8), cc);
+      } catch {
+        vop = null;
+      }
+    }
     result.sepa.vop_participant = vop?.screened ? vop.participant : null;
 
     // `schemes` at the grain the published contract promises it at (DATA-02,

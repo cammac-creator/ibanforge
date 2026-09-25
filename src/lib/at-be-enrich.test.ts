@@ -162,7 +162,7 @@ describe('the four registers keep their separate meanings', () => {
  * an EMI resolving to nothing while its BIC sat in our own database.
  */
 describe('the register BIC wins the served pairing', () => {
-  it('serves the register BIC, labelled as the register s', () => {
+  it('serves the register BIC under the register label', () => {
     const r = check(FX.BE.iban(FX.BE.bank.code));
     expect(r.bic?.code).toBe(FX.BE.bank.bic);
     expect(r.bic?.basis).toBe('national_register');
@@ -179,7 +179,10 @@ describe('the register BIC wins the served pairing', () => {
     expect(r.bic?.basis).toBe('national_register');
   });
 
-  it('serves the register BIC over the curated map for an Austrian code', () => {
+  // La priorité du BIC du registre sur une carte composite qui dit autre chose
+  // est tenue dans at-be-register-bic.test.ts : ici, la carte ne porte aucun
+  // des codes inventés, elle ne répond jamais.
+  it('serves the register BIC for an Austrian code', () => {
     const r = check(FX.AT.iban(FX.AT.bank.code));
     expect(r.bic?.code).toBe(FX.AT.bank.bic);
     expect(r.bic?.basis).toBe('national_register');
