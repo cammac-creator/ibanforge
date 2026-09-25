@@ -18,6 +18,9 @@
  *
  * - La Slovaquie reste publique (décision du 24/09/2026, point 4 : publiable avec
  *   la citation de la NBS). Ses lignes de `national_bank_codes` ne sont pas un membre.
+ * - La Tchéquie aussi : les conditions de la ČNB permettent de stocker, transmettre
+ *   et reproduire avec « Zdroj: ČNB » (docs/data-sources.md). Ni ses lignes ni la
+ *   table de ses éditions annoncées (`national_bank_codes_pending`) ne sont membres.
  * - `bic_entries` de source `six_group` : à vérifier, faible enjeu, hors de cette étape.
  * - Les données hors des deux bases (carte composite `src/db/bic_data.json`,
  *   `src/lib/fi-register.ts`, exports du site `frontend/data/registers/*.json`,

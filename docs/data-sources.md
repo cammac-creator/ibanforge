@@ -272,7 +272,8 @@ britannique, jamais le déploiement.
 **La famille « sous conditions » — surcouche privée** (étape 3 de la sortie des
 données, 25/09/2026). Décision de Claude-Alain du 24/09/2026 : tout ce qui n'est
 pas redistribuable sort du dépôt public, l'ONU est gardée hors du dépôt, la
-Slovaquie reste publique. La liste des membres vit en UN endroit,
+Slovaquie reste publique (la Tchéquie aussi, conditions de la ČNB ci-dessous). La
+liste des membres vit en UN endroit,
 `src/lib/restricted-family.ts` (extraction, chargeur et seeders la lisent) :
 
 | Base | Membre | Lignes |

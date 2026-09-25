@@ -599,6 +599,14 @@ function mergeFrozen(options: {
 // Extraction et retrait (scripts, tests, Geste 4)
 // ---------------------------------------------------------------------------
 
+/**
+ * En dessous, un pourcentage ne veut rien dire : la ligne OeNB unique qui
+ * disparaît (plancher 0), deux banques NBP fusionnées sur vingt et une, ou une
+ * inscription ONU en moins sur cinq sont des mois ordinaires, pas une source
+ * tronquée. Les planchers de chaque membre les gardent déjà.
+ */
+export const SHRINK_GUARD_MIN_ROWS = 50;
+
 export interface ExtractResult {
   path: string;
   sha256: string;
@@ -656,8 +664,9 @@ function memberDates(
  * Écrit la surcouche d'une base : exactement la famille, avec ses définitions de
  * tables et d'index, et ses métadonnées. N'écrit que `outPath`, par un fichier
  * temporaire renommé. Refuse sous un plancher, et (sauf `allowShrink`) une baisse
- * de plus de 10 % d'un membre par rapport à la surcouche précédente au même
- * chemin : une source tronquée ne remplace pas une édition entière.
+ * de plus de 10 % d'un membre d'au moins SHRINK_GUARD_MIN_ROWS lignes par rapport
+ * à la surcouche précédente au même chemin : une source tronquée ne remplace pas
+ * une édition entière.
  *
  * `sourcePath` est ouvert en lecture, par ATTACH : passer une COPIE (une base WAL
  * ouverte crée ses compagnons à côté d'elle).
@@ -724,7 +733,12 @@ export function extractOverlay(options: {
             `${member.id} : ${rows} lignes, plancher ${member.minRows}. Surcouche non écrite.`,
           );
         const before = previous?.members.find((m) => m.id === member.id);
-        if (!options.allowShrink && before && before.rows > 0 && rows < before.rows * 0.9)
+        if (
+          !options.allowShrink &&
+          before &&
+          before.rows >= SHRINK_GUARD_MIN_ROWS &&
+          rows < before.rows * 0.9
+        )
           throw new Error(
             `${member.id} : ${before.rows} -> ${rows} lignes, baisse de plus de 10 %. ` +
               'Contrôle manuel requis (--allow-shrink).',

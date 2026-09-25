@@ -65,7 +65,7 @@ describe('la famille « sous conditions », une seule constante', () => {
     expect(membersOf('compliance').map((m) => m.id)).toEqual(['un', 'epc_sepa', 'epc_vop']);
   });
 
-  it('laisse la Slovaquie publique (décision du 24/09/2026)', () => {
+  it('laisse la Slovaquie et la Tchéquie publiques', () => {
     expect([...restrictedRegisterCountries()].sort()).toEqual(['AT', 'BE', 'SM']);
     expect([...restrictedBicSources()].sort()).toEqual(['eba_step2', 'nbp', 'oenb']);
   });
@@ -182,7 +182,37 @@ describe('surcouche : extraction, contrôle, fusion', () => {
   });
 
   it('refuse une baisse de plus de 10 % sans autorisation explicite', () => {
+    // La surcouche précédente portait 150 inscriptions VoP de plus : la nouvelle,
+    // au-dessus de son plancher, en a perdu plus de 10 %.
     const out = join(dir, 'baisse.sqlite');
+    const bigger = copy(fixture.compliancePath);
+    const db = openDb(bigger);
+    const insert = db.prepare("INSERT INTO vop_participants (bic8, status) VALUES (?, 'active')");
+    for (let i = 0; i < 150; i++) insert.run(`XMPW${String(i).padStart(4, '0')}`);
+    db.close();
+    extractOverlay({ kind: 'compliance', sourcePath: bigger, outPath: out, generator: 'test' });
+    expect(() =>
+      extractOverlay({
+        kind: 'compliance',
+        sourcePath: fixture.compliancePath,
+        outPath: out,
+        generator: 'test',
+      }),
+    ).toThrow(/epc_vop.*baisse de plus de 10 %/);
+    expect(
+      extractOverlay({
+        kind: 'compliance',
+        sourcePath: fixture.compliancePath,
+        outPath: out,
+        generator: 'test',
+        allowShrink: true,
+      }).members.find((m) => m.id === 'epc_vop')?.rows,
+    ).toBeLessThan(1150);
+  });
+
+  it('ne garde pas les petits membres par un pourcentage : leurs planchers suffisent', () => {
+    // Une inscription ONU sur deux qui disparaît (50 %) est un mois ordinaire.
+    const out = join(dir, 'petit.sqlite');
     extractOverlay({
       kind: 'compliance',
       sourcePath: fixture.compliancePath,
@@ -195,16 +225,12 @@ describe('surcouche : extraction, contrôle, fusion', () => {
       FIXTURE.UN.onlyUn,
     );
     db.close();
-    expect(() =>
-      extractOverlay({ kind: 'compliance', sourcePath: smaller, outPath: out, generator: 'test' }),
-    ).toThrow(/baisse de plus de 10 %/);
     expect(
       extractOverlay({
         kind: 'compliance',
         sourcePath: smaller,
         outPath: out,
         generator: 'test',
-        allowShrink: true,
       }).members.find((m) => m.id === 'un')?.rows,
     ).toBe(1);
   });

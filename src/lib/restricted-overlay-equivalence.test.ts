@@ -134,8 +134,8 @@ function pickCases(fullBic: string, fullCompliance: string): Cases {
     const praBics = (
       bic
         .prepare(
-          `SELECT b.bic11 FROM bic_entries b JOIN pra_banks p ON p.lei = b.lei
-           ORDER BY b.bic11 LIMIT 2`,
+          `SELECT DISTINCT b.bic11 FROM bic_entries b JOIN pra_banks p ON p.lei = b.lei
+           WHERE b.country_code = 'GB' ORDER BY b.bic11 LIMIT 2`,
         )
         .all() as Array<{ bic11: string }>
     ).map((r) => r.bic11);
@@ -221,6 +221,36 @@ async function collect(cases: Cases, routes: unknown[]): Promise<Map<string, unk
   await call('batch', '/v1/iban/batch', post({ ibans: cases.ibans.slice(0, 100) }));
   await call('demo', '/v1/demo', { headers: DEV });
   return out;
+}
+
+/** Ce que les réponses montrent de chaque membre, compté (jamais de valeur). */
+function coverage(responses: Map<string, unknown>): Record<string, number> {
+  const count = {
+    at_register: 0,
+    be_register: 0,
+    sm_register: 0,
+    epc_register: 0,
+    un_matched: 0,
+    gb_pra: 0,
+    family_bic_found: 0,
+  };
+  for (const [key, value] of responses) {
+    const body = (value as { body: Record<string, any> }).body; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const check = body.bank_code_check;
+    if (key.startsWith('validate ') && check?.status === 'verified') {
+      if (/Oesterreichische Nationalbank/.test(check.register)) count.at_register++;
+      if (/Banque nationale de Belgique/.test(check.register)) count.be_register++;
+      if (/San Marino/.test(check.register)) count.sm_register++;
+    }
+    if (key.startsWith('validate ') && body.sepa?.basis === 'epc_register') count.epc_register++;
+    if (key.startsWith('compliance') && body.compliance?.sanctions?.matched_lists?.includes('UN'))
+      count.un_matched++;
+    if (key.startsWith('bic ') && body.country?.code === 'GB' && body.pra_authorisation)
+      count.gb_pra++;
+    if (key.startsWith('bic ') && body.found && ['eba_step2', 'nbp', 'oenb'].includes(body.source))
+      count.family_bic_found++;
+  }
+  return count;
 }
 
 function setEnv(values: Record<string, string | undefined>): void {
@@ -392,9 +422,24 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
     if (REAL)
       console.log(
         `[équivalence] ${identical} réponses identiques sur ${before.size} ` +
-          `(${cases.ibans.length} IBAN, ${cases.bics.length} BIC, lot et démo)`,
+          `(${cases.ibans.length} IBAN, ${cases.bics.length} BIC, lot et démo) ; ` +
+          `par catégorie : ${JSON.stringify(coverage(after))}`,
       );
     expect(identical).toBe(before.size);
+  });
+
+  it('compare vraiment chaque membre : chaque catégorie est dans les réponses', () => {
+    // Une comparaison « identique » sur des réponses qui ne touchent pas la
+    // famille ne prouverait rien : chaque catégorie doit y être, servie depuis
+    // la surcouche.
+    const c = coverage(after);
+    expect(c.at_register, 'IBAN autrichien au verdict du registre').toBeGreaterThanOrEqual(1);
+    expect(c.be_register, 'IBAN belge au verdict du registre').toBeGreaterThanOrEqual(1);
+    expect(c.sm_register, 'IBAN saint-marinais trouvé au registre').toBeGreaterThanOrEqual(1);
+    expect(c.epc_register, 'banque SEPA servie depuis le registre EPC').toBeGreaterThanOrEqual(1);
+    expect(c.un_matched, "BIC nommé par la liste de l'ONU").toBeGreaterThanOrEqual(1);
+    expect(c.gb_pra, 'BIC britannique avec son bloc PRA').toBeGreaterThanOrEqual(1);
+    expect(c.family_bic_found, 'BIC EBA STEP2, NBP ou OeNB trouvé').toBeGreaterThanOrEqual(3);
   });
 
   it('reconstruit les mêmes tables, ligne pour ligne, et le même ordre dans bic_entries', () => {
