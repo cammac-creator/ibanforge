@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildBicComplianceResponse } from './compliance-response.js';
 import { screenBicSanctions } from './compliance.js';
-import { complianceTableLoaded } from './compliance-db.js';
 
 /**
  * Closing the loop the sanctions fix left open.
@@ -48,10 +47,10 @@ describe('screening keyed on a BIC reaches the banks no IBAN can', () => {
     // nothing to fail — which is why this input is better than an IBAN here.
     expect(r.country.code).toBe('LY');
     expect(r.compliance.sanctions.bank_screened).toBe(true);
-    // Les axes EPC répondent dès que leur registre est chargé ; un registre non
-    // chargé n'a pas été consulté, et le dit (25/09/2026).
-    expect(r.compliance.reachability.screened).toBe(complianceTableLoaded('sepa_participants'));
-    expect(r.compliance.vop.screened).toBe(complianceTableLoaded('vop_participants'));
+    // La Libye est hors de la zone SEPA : le pays répond à la place du registre
+    // EPC, chargé ou non (25/09/2026), et les deux axes restent contrôlés.
+    expect(r.compliance.reachability.screened).toBe(true);
+    expect(r.compliance.vop.screened).toBe(true);
   });
 
   it('leaves an ordinary bank clean — the endpoint is not a yes-machine', () => {
