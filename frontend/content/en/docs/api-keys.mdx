@@ -290,6 +290,36 @@ served only on a key that can still be claimed.
 
 `month` is the calendar month the counters belong to (`YYYY-MM`). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`. A served keyless answer carries `X-Trial-Period: week`; the 402 carries no `X-Trial-*` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same (the claim still accepts a key cut off for a burst of automated signups, since claiming is how it comes back). `POST /v1/keys/revoke` and `POST /v1/keys/rotate` answer `401 missing_key` without a key, and `404 invalid_key` for an unknown or already revoked one.
 
+## Your account page
+
+[ibanforge.com/account](/account) shows every key attached to your e-mail address, with no key to
+paste. For each key: its plan, what is left this month or its credit balance, the calls this month,
+the last call, the alerts we mailed and, on a Pro or Editor / OEM subscription, the link that
+manages it. Open a key to read its last 30 days: the calls, the endpoints it reached, and what
+failed with the cause. The page shows the first characters of a key, never the key itself.
+
+**To sign in**, enter the address attached to your keys: the one you gave when you created or
+claimed a key, or the one you typed at checkout. We mail you a 6-digit code, valid 15 minutes, and
+you type it on the page. No password, and no link in the mail. The code goes out whether or not the
+address holds a key, so the page never tells anyone which addresses do.
+
+**The session lasts 7 days** from the moment you sign in; after that, the page asks for a new code.
+It lives in a sign-in cookie used for nothing else. *Sign out* ends it in this browser, *Sign out
+everywhere* ends every session of your address.
+
+**A key with no address**, taken or bought without one, belongs to no account: paste it on the same
+page instead. It goes straight from your browser to the API and nowhere else. You can always paste
+a key rather than sign in.
+
+**Rotating or revoking a key still takes the key itself**: paste it on that page, or send it to
+`POST /v1/keys/rotate` or `POST /v1/keys/revoke`. The session only reads: it changes no key, and it
+cannot give back a key you lost.
+
+The page calls five public routes, `POST /v1/account/code`, `POST /v1/account/session`,
+`GET /v1/account/overview`, `GET /v1/account/keys/report` and `POST /v1/account/logout`, described
+in the [OpenAPI contract](https://api.ibanforge.com/openapi.json). They are made for a person in a
+browser: with a key in hand, `GET /v1/keys/usage` and `GET /v1/keys/report` give the same figures.
+
 ## Watching your quota
 
 Every response served on a monthly key carries your counters, on success as well as on

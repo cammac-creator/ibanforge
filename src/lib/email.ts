@@ -15,6 +15,7 @@ import {
 import { opsFail, opsOk } from './ops-alert.js';
 import {
   ACCOUNT_PAGE,
+  ACCOUNT_SIGN_IN,
   KEY_PLACEHOLDER,
   buildFirstCallHtml,
   buildFirstCallText,
@@ -142,13 +143,16 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): {
   // appel » s'intitule « everything this key does », et un acheteur qui
   // cherchait ses « crédits restants » ne l'y a pas reconnu : la partie HTML ne
   // disait jamais « solde ».
+  //
+  // Depuis le lot C3 (25.09.2026), on s'y connecte avec l'adresse de ce mail,
+  // celle que l'acheteur a donnée au paiement : plus aucune clé à coller.
   const text =
     `Thanks for your purchase. Your IBANforge API key is ready.\n\n` +
     `API key: ${p.rawKey}\n` +
     `Credits: ${credits} (pack ${p.bundle})\n\n` +
     buildFirstCallText({ bearer: p.rawKey }) +
     `\nYour balance any time:\n` +
-    `  - your account page: ${ACCOUNT_PAGE} (paste this key)\n` +
+    `  - your account page: sign in at ${ACCOUNT_PAGE} with this e-mail address, no key to paste\n` +
     `  - the X-Credits-Remaining header on every paid response\n` +
     `  - curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n` +
     `We e-mail you once when ${noticePct}% of the pack is left.\n\n` +
@@ -168,7 +172,7 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): {
     <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe. It will not be shown again.</p>
     ${buildFirstCallHtml({ bearer: p.rawKey })}
     <div style="font-size:13px;color:#a1a1aa;margin:0 0 6px">Your balance any time</div>
-    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">Paste this key there.</span></p>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
     <p style="color:#71717a;font-size:13px;margin:0 0 22px">We e-mail you once when ${noticePct}% of the pack is left.</p>
     <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
@@ -349,8 +353,11 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
     `  1,000 credits  $4   ${PAYMENT_LINKS['1k']}\n` +
     `  5,000 credits  $20  ${PAYMENT_LINKS['5k']}\n` +
     ` 25,000 credits  $80  ${PAYMENT_LINKS['25k']}\n\n` +
-    `See where those calls went: https://ibanforge.com/en/account\n` +
-    `Your usage, what failed and why. The key stays in your browser.\n\n` +
+    // L'alerte part à l'adresse de la clé : c'est elle qui ouvre le compte
+    // (lot C3, 25.09.2026). « The key stays in your browser » ne décrivait que
+    // le repli où l'on colle la clé.
+    `See where those calls went: ${ACCOUNT_PAGE}\n` +
+    `${ACCOUNT_SIGN_IN} Your usage, what failed and why.\n\n` +
     `Credits never expire and carry no subscription. All packs: ${PRICING_PAGE}\n` +
     `Paying in USDC instead? POST /v1/credits/buy/1k|5k|25k, or per call via x402.\n\n` +
     `Need a higher monthly allowance or an embedding licence? Reply to this email.\n\nIBANforge`;
@@ -367,7 +374,7 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
       <p style="margin:0"><a href="${PAYMENT_LINKS['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire, no subscription. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
-    <p style="font-size:13px;margin:14px 0 0"><a href="https://ibanforge.com/en/account" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause.</span></p>
+    <p style="font-size:13px;margin:14px 0 0"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause. ${ACCOUNT_SIGN_IN}</span></p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Need a higher monthly allowance or an embedding licence? Just reply.</p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · <a href="${PRICING_PAGE}" style="color:#71717a">all packs</a></p>
@@ -432,7 +439,7 @@ export function buildCreditsWarningEmail(p: CreditsWarningInput): {
     `Or a flat $${PRO_PRICE_USD}/month for ${pro} requests: ${PRO_PAYMENT_LINK}\n\n` +
     `For now, a purchase by card arrives as a new key: put it in place of this one in your integration.\n\n` +
     `Your balance any time:\n` +
-    `  - your account page: ${ACCOUNT_PAGE} (paste the key)\n` +
+    `  - your account page: sign in at ${ACCOUNT_PAGE} with this e-mail address, no key to paste\n` +
     `  - the X-Credits-Remaining header on every paid response\n` +
     `  - GET https://api.ibanforge.com/v1/credits/balance\n\n` +
     `Credits never expire. Paying in USDC instead? POST /v1/credits/buy/1k|5k|25k.\n` +
@@ -451,7 +458,7 @@ export function buildCreditsWarningEmail(p: CreditsWarningInput): {
       <p style="margin:0"><a href="${PRO_PAYMENT_LINK}" style="color:#fbbf24;text-decoration:none">Pro · ${pro} requests a month · $${PRO_PRICE_USD} →</a></p>
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 18px">For now, a purchase by card arrives as a new key: put it in place of this one in your integration.</p>
-    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">Paste the key there.</span></p>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">A larger volume, or a question? Just reply.</p>
@@ -634,15 +641,20 @@ export function buildSubscriptionKeyEmail(p: {
   const legalText = copy.legalLinks
     ? `SLA: https://ibanforge.com/en/legal/sla\n` + `DPA: https://ibanforge.com/en/legal/dpa\n`
     : '';
+  // Le lien du compte ne vit plus dans cette rangée (lot C3, 25.09.2026) : il a
+  // sa propre ligne, pour les deux formules. L'éditeur n'en avait aucun dans la
+  // partie HTML (les liens SLA et DPA en tenaient la place), alors que c'est lui
+  // qui porte le plus de clés, une par client final.
   const legalHtml = copy.legalLinks
     ? `<a href="https://ibanforge.com/en/legal/sla" style="color:#fbbf24;text-decoration:none">Your SLA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/dpa" style="color:#fbbf24;text-decoration:none">DPA →</a> &nbsp;·&nbsp; `
-    : `<a href="https://ibanforge.com/en/account" style="color:#fbbf24;text-decoration:none">Your key at a glance →</a> &nbsp;·&nbsp; `;
+    : '';
 
   const text =
     `Welcome to IBANforge ${copy.name}.\n\n` +
     `API key: ${p.rawKey}\n` +
     `Plan: ${copy.name} subscription (${limit} requests/month, resets on the 1st)\n` +
-    `Your key at a glance: https://ibanforge.com/en/account\n` +
+    `Your account (balance, usage, subscription): ${ACCOUNT_PAGE}\n` +
+    `${ACCOUNT_SIGN_IN}\n` +
     legalText +
     `Terms: https://ibanforge.com/en/legal/terms\n\n` +
     `Use it as a Bearer token:\n` +
@@ -669,6 +681,7 @@ export function buildSubscriptionKeyEmail(p: {
      -X POST https://api.ibanforge.com/v1/iban/validate \\
      -H "content-type: application/json" \\
      -d '{"iban":"CH1000230000000012345"}'</pre>
+    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your account: balance, usage, subscription →</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <p style="font-size:14px;margin:0 0 6px">${legalHtml}<a href="https://ibanforge.com/en/legal/terms" style="color:#fbbf24;text-decoration:none">Terms →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Docs →</a></p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">${copy.support.replace('support@ibanforge.com', '<a href="mailto:support@ibanforge.com" style="color:#fbbf24;text-decoration:none">support@ibanforge.com</a>')}</p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">

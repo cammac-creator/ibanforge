@@ -137,3 +137,73 @@ describe('the first call is one click away', () => {
     expect(curlFor(FAKE_KEY)).toBe(buildFirstCallCurl(FAKE_KEY));
   });
 });
+
+/**
+ * Lot C3 (25.09.2026) : revoir cette clé plus tard, sans la coller.
+ *
+ * La page dit de se connecter au compte avec l'adresse saisie au paiement.
+ * Trois règles, chacune tenue ici sur la fonction que le navigateur exécute
+ * (extraite du script servi, comme `curlFor` plus haut) :
+ *  - l'adresse est du TEXTE échappé, jamais un morceau de lien : le lien reste
+ *    la page nue, écrite en littéral ci-dessous ;
+ *  - la phrase dit que le compte ne montre jamais la clé entière, parce que la
+ *    page crie juste au-dessus « Save this key now » ;
+ *  - sans adresse (le repère `stripe-buyer` de `generateStripeKey`), aucune
+ *    connexion n'est promise : on propose de coller la clé.
+ */
+describe('the account line: sign in with the checkout address, never in a link', () => {
+  const ACCOUNT_URL = 'https://ibanforge.com/account';
+
+  /** Une fonction du script servi, découpée par ses accolades comme `curlFor`. */
+  function lift(src: string, name: string): string {
+    const start = src.indexOf(`function ${name}`);
+    expect(start, `${name} is no longer in the page script`).toBeGreaterThan(-1);
+    return src.slice(start, src.indexOf('\n  }', start) + 4);
+  }
+
+  async function accountLine(): Promise<(email: unknown) => string> {
+    const html = await render();
+    const src = /<script>([\s\S]*?)<\/script>/.exec(html)![1];
+    return new Function(
+      `${lift(src, 'escapeHtml')}\n${lift(src, 'accountLine')}\nreturn accountLine;`,
+    )() as (email: unknown) => string;
+  }
+
+  const hrefs = (s: string): string[] => [...s.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+
+  it('with the checkout address: sign in with it, and the link is the bare page', async () => {
+    const line = (await accountLine())('acme@example.com');
+    expect(line).toContain(
+      `sign in at <a href="${ACCOUNT_URL}">ibanforge.com/account</a> with acme@example.com, no key to paste`,
+    );
+    expect(line).toContain('never the key itself');
+    expect(hrefs(line)).toEqual([ACCOUNT_URL]);
+  });
+
+  it('escapes whatever the address holds, and keeps it out of the link', async () => {
+    const line = (await accountLine())('x"><img src=x onerror=alert(1)>@alpha.example.net');
+    expect(line).not.toContain('<img');
+    expect(line).toContain('&lt;img');
+    expect(hrefs(line)).toEqual([ACCOUNT_URL]);
+  });
+
+  it('with no address (stripe-buyer, or none), promises no sign-in: paste the key', async () => {
+    const fn = await accountLine();
+    for (const email of ['stripe-buyer', null, undefined, '']) {
+      const line = fn(email);
+      expect(line, String(email)).toContain(`paste the key at <a href="${ACCOUNT_URL}">`);
+      expect(line, String(email)).not.toContain('sign in');
+    }
+  });
+
+  it('is wired into the page, and no link of the page is built from data', async () => {
+    const html = await render();
+    expect(html).toContain(
+      '\'<p class="small" id="accountline">\' + accountLine(data.email) + \'</p>\'',
+    );
+    // Un href assemblé par concaténation est la seule façon de glisser une
+    // adresse, une clé ou un identifiant de session dans un lien de cette page.
+    expect(html).not.toMatch(/href="'\s*\+/);
+    expect(html).not.toContain('Everything this key does, on one page');
+  });
+});

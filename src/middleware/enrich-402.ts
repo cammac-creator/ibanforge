@@ -22,6 +22,7 @@ import {
   PRO_PAYMENT_LINK,
   PRO_PRICE_USD,
 } from '../lib/payment-links.js';
+import { ACCOUNT_PAGE } from '../lib/first-call.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -648,6 +649,26 @@ function causeFields(cause: PaywallCause | undefined): Record<string, unknown> {
 }
 
 /**
+ * La page du compte, pour le porteur d'une clé VALIDE arrêté par le mur (lot
+ * C3, 25.09.2026) : il vient d'épuiser son allocation ou ses crédits, et la
+ * question suivante est « combien me reste-t-il, et où sont passés mes
+ * appels ? ». Une phrase courte, en texte, avec l'adresse de la page.
+ *
+ * 🚨 Le prédicat est `apiKeyPrefix`, que le middleware de clé ne pose QUE sur
+ * une clé valide, épuisement compris (`src/middleware/api-key.ts`). Jamais la
+ * simple présence d'un en-tête `Authorization` : une clé fausse ou révoquée
+ * n'a pas de compte à ouvrir, et un appel sans clé n'a rien à y lire.
+ *
+ * Dans le corps seulement : l'en-tête `PAYMENT-REQUIRED` porte les conditions
+ * de paiement, et rien d'autre.
+ */
+export const ACCOUNT_PAGE_402 = `Balance and usage of this key: ${ACCOUNT_PAGE} (sign in with its e-mail address, or paste the key).`;
+
+function accountPageField(keyPrefix: string | null | undefined): Record<string, unknown> {
+  return keyPrefix ? { account_page: ACCOUNT_PAGE_402 } : {};
+}
+
+/**
  * Causes where the caller ALREADY holds a key and has simply run out of
  * allowance. For them the free tier is not an upgrade path, it is a way to
  * never pay: the 2026-07-25 funnel audit measured a client hit the quota wall,
@@ -804,6 +825,7 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
         ...paymentErrorField(announcement),
         ...buildAccessRamp(),
         ...causeFields(paywallCause),
+        ...accountPageField(c.get('apiKeyPrefix')),
       },
       paywallCause,
     );

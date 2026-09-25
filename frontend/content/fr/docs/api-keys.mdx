@@ -296,6 +296,39 @@ n'est servi que sur une clé encore réclamable.
 `month` est le mois calendaire auquel se rapportent les compteurs (`YYYY-MM`). L'essai sans clé n'a pas de clé à consulter ici : ses compteurs sont hebdomadaires (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC), et dans son `402 trial_exhausted`, le champ `cause.quota.month` vaut `week`. Une réponse servie sans clé porte `X-Trial-Period: week` ; le 402 ne porte aucun en-tête `X-Trial-*`. Sans clé, cet endpoint répond `401 missing_key`, et avec une clé inconnue ou inactive `401 invalid_key` ; `GET /v1/keys/report`, `GET /v1/credits/balance` et `POST /v1/keys/claim` répondent de même (la réclamation accepte encore une clé coupée pour une rafale d'inscriptions automatiques, puisque la réclamer est ce qui la rétablit). `POST /v1/keys/revoke` et `POST /v1/keys/rotate` répondent `401 missing_key` sans clé, et `404 invalid_key` pour une clé inconnue ou déjà révoquée. Cet endpoint est
 gratuit et ne consomme pas de quota.
 
+## Votre page de compte
+
+[ibanforge.com/account](/account) montre toutes les clés liées à votre adresse e-mail, sans clé à
+coller. Pour chaque clé : sa formule, ce qui reste ce mois-ci ou son solde de crédits, les appels du
+mois, le dernier appel, les alertes que nous avons envoyées et, pour un abonnement Pro ou
+Éditeur / OEM, le lien qui le gère. Ouvrez une clé pour lire ses 30 derniers jours : les appels, les
+endpoints atteints, et ce qui a échoué avec la cause. La page montre les premiers caractères d'une
+clé, jamais la clé elle-même.
+
+**Pour vous connecter**, saisissez l'adresse liée à vos clés : celle que vous avez donnée en créant
+ou en réclamant une clé, ou celle que vous avez saisie au paiement. Nous vous envoyons un code à 6
+chiffres, valable 15 minutes, que vous saisissez sur la page. Ni mot de passe, ni lien dans le mail.
+Le code part que l'adresse porte une clé ou non : la page ne dit donc à personne quelles adresses en
+portent.
+
+**La session dure 7 jours** à partir de la connexion ; ensuite, la page demande un nouveau code. Elle
+vit dans un cookie de connexion qui ne sert à rien d'autre. *Se déconnecter* la termine dans ce
+navigateur, *Se déconnecter partout* termine toutes les sessions de votre adresse.
+
+**Une clé sans adresse**, prise ou achetée sans en donner une, n'appartient à aucun compte : sur la
+même page, collez-la plutôt. Elle part directement de votre navigateur vers l'API, et nulle part
+ailleurs. Vous pouvez toujours coller une clé plutôt que vous connecter.
+
+**Renouveler ou révoquer une clé demande toujours la clé elle-même** : collez-la sur cette page, ou
+envoyez-la à `POST /v1/keys/rotate` ou `POST /v1/keys/revoke`. La session ne fait que lire : elle ne
+change aucune clé, et ne peut pas vous rendre une clé perdue.
+
+La page appelle cinq routes publiques, `POST /v1/account/code`, `POST /v1/account/session`,
+`GET /v1/account/overview`, `GET /v1/account/keys/report` et `POST /v1/account/logout`, décrites
+dans le [contrat OpenAPI](https://api.ibanforge.com/openapi.json). Elles sont faites pour une
+personne dans un navigateur : avec une clé en main, `GET /v1/keys/usage` et `GET /v1/keys/report`
+donnent les mêmes chiffres.
+
 ## Surveiller votre quota
 
 Chaque réponse servie sur une clé mensuelle porte vos compteurs, en cas de succès
