@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { IBANValidationResult } from '../types.js';
+import { computeItalianCin } from './national-check/it-cin.js';
 
 /**
  * L'Italie de bout en bout, sur une édition FIXE (25/09/2026).
@@ -205,24 +206,13 @@ afterAll(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-/** Valeurs des positions impaires du CIN (A-Z et 0-9 lus comme 0-25 et 0-9). */
-const CIN_ODD = [
-  1, 0, 5, 7, 9, 13, 15, 17, 19, 21, 2, 4, 18, 20, 11, 3, 6, 8, 12, 14, 16, 10, 22, 25, 24, 23,
-];
-
 /**
  * Un IBAN italien valide pour un code ABI, CIN compris (la lettre de contrôle
- * que l'API vérifie aussi), sur un guichet et un compte inventés. Les IBAN de
- * l'étude du 24/09/2026 sont construits ainsi.
+ * que l'API vérifie aussi, calculée par son propre module), sur un guichet et un
+ * compte inventés. Les IBAN de l'étude du 24/09/2026 sont construits ainsi.
  */
 function itIban(abi: string, cab = '01600', account = '000000123456'): string {
-  const body = `${abi}${cab}${account}`;
-  let sum = 0;
-  for (let i = 0; i < body.length; i++) {
-    const v = /\d/.test(body[i]) ? Number(body[i]) : body.charCodeAt(i) - 65;
-    sum += i % 2 === 0 ? CIN_ODD[v] : v;
-  }
-  const bban = `${String.fromCharCode(65 + (sum % 26))}${body}`;
+  const bban = `${computeItalianCin(abi, cab, account)}${abi}${cab}${account}`;
   const digits = `${bban}IT00`.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
   const checkDigits = 98n - (BigInt(digits) % 97n);
   return `IT${checkDigits.toString().padStart(2, '0')}${bban}`;

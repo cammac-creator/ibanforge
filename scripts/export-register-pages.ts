@@ -565,17 +565,15 @@ const itRetired = bic
       .all() as ItalianRetiredRow[])
   : [];
 
-/** Valeurs des positions impaires du CIN (0-9 et A-Z lus comme 0-9 et 0-25). */
-const CIN_ODD = [
-  1, 0, 5, 7, 9, 13, 15, 17, 19, 21, 2, 4, 18, 20, 11, 3, 6, 8, 12, 14, 16, 10, 22, 25, 24, 23,
-];
-/** Un IBAN italien valide pour un code ABI, CIN compris, sur le guichet et le compte de l'étude. */
+/**
+ * Un IBAN italien valide pour un code ABI, CIN compris (calculé par le module
+ * que l'API applique, comme pour Saint-Marin plus haut), sur le guichet et le
+ * compte de l'étude.
+ */
 function italianIban(code: string): string {
-  const body = `${code}01600000000123456`;
-  let sum = 0;
-  for (let i = 0; i < body.length; i++)
-    sum += i % 2 === 0 ? CIN_ODD[Number(body[i])] : Number(body[i]);
-  const bban = `${String.fromCharCode(65 + (sum % 26))}${body}`;
+  const cin = computeItalianCin(code, '01600', '000000123456');
+  if (!cin) throw new Error(`IT ${code}: the ABI code is not five digits`);
+  const bban = `${cin}${code}01600000000123456`;
   return `IT${checkDigits('IT', bban)}${bban}`;
 }
 

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { validateIBAN } from './iban.js';
 import { enrichResult } from './enrich.js';
 import { getBicDB } from './db.js';
+import { computeItalianCin } from './national-check/it-cin.js';
 import {
   lookupNationalCode,
   nationalRegisterAvailable,
@@ -24,19 +25,9 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const CIN_ODD = [
-  1, 0, 5, 7, 9, 13, 15, 17, 19, 21, 2, 4, 18, 20, 11, 3, 6, 8, 12, 14, 16, 10, 22, 25, 24, 23,
-];
-
 /** Un IBAN italien valide pour un code ABI, CIN compris, sur un compte inventé. */
 function itIban(abi: string): string {
-  const body = `${abi}01600000000123456`;
-  let sum = 0;
-  for (let i = 0; i < body.length; i++) {
-    const v = Number(body[i]);
-    sum += i % 2 === 0 ? CIN_ODD[v] : v;
-  }
-  const bban = `${String.fromCharCode(65 + (sum % 26))}${body}`;
+  const bban = `${computeItalianCin(abi, '01600', '000000123456')}${abi}01600000000123456`;
   const digits = `${bban}IT00`.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
   return `IT${(98n - (BigInt(digits) % 97n)).toString().padStart(2, '0')}${bban}`;
 }
