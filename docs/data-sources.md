@@ -1126,6 +1126,21 @@ dans `NATIONAL_REGISTERS` (`authoritative: true`), comme la Slovaquie.
   répond aux machines de GitHub). Un changement de **format** (page de la ČNB
   sans la phrase « Číselník N platný od … », CSV sans son en-tête, édition sous
   le plancher) le fait échouer.
+- **Pas de silence** : une source non chargée écrit une annotation `::warning::`
+  et la sortie d'étape `cz_register=not_loaded`. Une étape finale « Czech
+  register not loaded (cnb.cz) » la change en run rouge, ce qui envoie l'alerte
+  Telegram existante. Dans le rafraîchissement mensuel, cette étape vient APRÈS
+  le commit et le battement : les autres sources sont déjà poussées.
+- **Relecture quotidienne** : `.github/workflows/refresh-cz-register.yml`, chaque
+  jour à 05:17 UTC, lance le chargeur tchèque SEUL (`seed-national.ts CZ`, rien
+  d'autre n'est téléchargé). Il ne commite que si le CONTENU des lignes CZ a
+  changé (`scripts/cz-register-diff.ts` compare la base à celle de HEAD, table
+  par table, et refuse le commit si une autre table, un autre pays ou le schéma
+  diffère), après le même garde de qualité (`refresh-diff.ts`) et les tests ;
+  même alerte Telegram. Groupe de concurrence `bic-sqlite-writer`, partagé avec
+  `refresh-bic.yml` : les deux ne s'écrasent jamais. Raison : une édition qui
+  entre en vigueur hors du 1er (251 le 16/03/2026) ferait sinon refuser, avec
+  autorité, les codes qu'elle crée jusqu'au mois suivant.
 
 ### Les pièges de la source
 

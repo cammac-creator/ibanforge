@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import Database from 'better-sqlite3';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   CzechSourceNotLoaded,
   czechNumberedCsvUrl,
@@ -8,6 +11,7 @@ import {
   parseCzech,
   parseCzechEditions,
   planCzechEditions,
+  reportCzechStatus,
   seedCzechLive,
   writeCzech,
   type CzechEdition,
@@ -892,5 +896,59 @@ describe('seedCzechLive', () => {
       CzechSourceNotLoaded,
     );
     vi.restoreAllMocks();
+  });
+});
+
+/**
+ * The alarm. A Czech register that could not be read must not stay a line in
+ * a log nobody opens: the workflows read `cz_register` from the step output
+ * and turn `not_loaded` into a red step, which is what sends the Telegram alert.
+ */
+describe('reportCzechStatus', () => {
+  const withOutput = (fn: (file: string) => void) => {
+    const dir = mkdtempSync(join(tmpdir(), 'cz-output-'));
+    try {
+      fn(join(dir, 'github_output'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('annotates the run and hands `not_loaded` to the workflow', () => {
+    withOutput((file) => {
+      const lines: string[] = [];
+      reportCzechStatus(
+        'not_loaded',
+        'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/ -> HTTP 403',
+        { GITHUB_OUTPUT: file },
+        (l) => lines.push(l),
+      );
+      expect(lines).toEqual([
+        '::warning title=Czech register not loaded::https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/ -> HTTP 403; the Czech tables stay as they were',
+      ]);
+      expect(readFileSync(file, 'utf8')).toBe('cz_register=not_loaded\n');
+    });
+  });
+
+  it('keeps a multi-line message on the one line a workflow command allows', () => {
+    const lines: string[] = [];
+    reportCzechStatus('not_loaded', 'first\nsecond 100%', {}, (l) => lines.push(l));
+    expect(lines[0]).toContain('first%0Asecond 100%25');
+    expect(lines[0].split('\n')).toHaveLength(1);
+  });
+
+  it('says `loaded` without any annotation when the register was read', () => {
+    withOutput((file) => {
+      const lines: string[] = [];
+      reportCzechStatus('loaded', '', { GITHUB_OUTPUT: file }, (l) => lines.push(l));
+      expect(lines).toEqual([]);
+      expect(readFileSync(file, 'utf8')).toBe('cz_register=loaded\n');
+    });
+  });
+
+  it('writes nothing outside Actions', () => {
+    const lines: string[] = [];
+    reportCzechStatus('loaded', '', {}, (l) => lines.push(l));
+    expect(lines).toEqual([]);
   });
 });

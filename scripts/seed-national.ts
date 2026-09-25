@@ -117,6 +117,7 @@
  * and does not flag it.
  */
 import Database from 'better-sqlite3';
+import { appendFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as XLSX from 'xlsx';
@@ -1204,6 +1205,35 @@ export async function seedCzechLive(
   writeCzech(db, current, pending, today);
 }
 
+/** A GitHub workflow command carries its message on one line: %, CR and LF are escaped. */
+function workflowData(text: string): string {
+  return text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
+/**
+ * Tell the workflow what became of the Czech register.
+ *
+ * `not_loaded` prints a `::warning::` annotation, which GitHub shows on the run
+ * page, and — when the step runs under Actions — writes `cz_register=not_loaded`
+ * to $GITHUB_OUTPUT, which is what the workflows read to raise the alarm. The
+ * exit code stays 0 on purpose: the monthly refresh runs this seeder before
+ * committing every other source of the month, and the alarm must not cost
+ * them (see the "Czech register not loaded" step of refresh-bic.yml).
+ */
+export function reportCzechStatus(
+  status: 'loaded' | 'not_loaded',
+  message = '',
+  env: NodeJS.ProcessEnv = process.env,
+  log: (line: string) => void = console.log,
+): void {
+  if (status === 'not_loaded') {
+    log(
+      `::warning title=Czech register not loaded::${workflowData(`${message}; the Czech tables stay as they were`)}`,
+    );
+  }
+  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `cz_register=${status}\n`);
+}
+
 function write(db: Database.Database, cc: string, entries: Entry[]): void {
   const floor = MIN_EXPECTED[cc];
   if (entries.length < floor) {
@@ -1277,13 +1307,19 @@ async function main(): Promise<void> {
   // the failure a human has to read. The Bulgarian step of the same workflow
   // follows the same rule. An announced edition already stored keeps taking
   // effect on its date through a failed month.
+  //
+  // Not silent, though: reportCzechStatus() writes a workflow annotation and
+  // the step output `cz_register`, and a later step of each workflow turns
+  // `not_loaded` into a red step and the Telegram alert, AFTER the other
+  // sources have been committed.
   if (!only || only === 'CZ') {
     console.log(`CZ: reading ${SOURCES.CZ}`);
     try {
       await seedCzechLive(db);
+      reportCzechStatus('loaded');
     } catch (e) {
       if (!(e instanceof CzechSourceNotLoaded)) throw e;
-      console.warn(`CZ: not loaded (${e.message}); the Czech tables stay as they were`);
+      reportCzechStatus('not_loaded', e.message);
     }
   }
   db.close();
