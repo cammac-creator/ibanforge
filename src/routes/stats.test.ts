@@ -676,7 +676,7 @@ describe('GET /stats/traffic-trend : les jours clos sont rangés, le jour en cou
     expect(client?.with_key).toBe((avant?.with_key ?? 0) + 1);
     getStatsDB()
       .prepare('UPDATE api_keys SET email = ? WHERE key_prefix = ?')
-      .run('burst-rangement@cohorte.invalid', 'ifk_rangement2');
+      .run('rangement-interne@example.com', 'ifk_rangement2');
     const interne = (await served(30)).days.find((d) => d.date === dayOf(13));
     expect(interne?.with_key).toBe(avant?.with_key ?? 0);
     expect(interne?.internal).toBe((avant?.internal ?? 0) + 1);
