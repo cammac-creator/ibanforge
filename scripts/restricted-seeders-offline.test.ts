@@ -166,6 +166,27 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
     }
   }, 240_000);
 
+  it('FI_LIST_PATH désigné mais illisible : le seeder de la carte sort en erreur, le passage s’arrête', () => {
+    // Relecture de la PR 267, point 5. Le code 1 fait lever `runSeeder`
+    // (scripts/restricted-overlay.ts) : `overlay seed` s'arrête avant l'extraction,
+    // rien n'est publié, et l'ancienne liste n'est jamais reprise.
+    const work = workCopy('liste-fi-illisible');
+    const report = join(dir, 'rapport-liste-fi.jsonl');
+    const result = run(
+      'seed-curated-map.ts',
+      childEnv({
+        BIC_DB_PATH: work,
+        SEED_FAMILY: 'restricted',
+        [SEED_REPORT_ENV]: report,
+        FI_LIST_PATH: join(dir, 'liste-fi-absente.json'),
+      }),
+    );
+    expect(result.status, result.stderr).toBe(1);
+    const reported = [...readSeedReport(report).values()].map((r) => r.member);
+    expect(reported).not.toContain('register_fi');
+    expect(reported).toContain('map_pl');
+  }, 120_000);
+
   it('sans SEED_REPORT_PATH, le seeder national s’arrête au premier pays en panne, comme avant', () => {
     const work = workCopy('sans-rapport');
     const journal = join(dir, 'adresses-sans-rapport.log');
