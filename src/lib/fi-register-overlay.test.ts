@@ -81,6 +81,10 @@ describe('la liste finlandaise : la plus récente sert, jamais un mélange des d
   it.each([
     ['à date égale', FI_REGISTER_AS_OF],
     ['plus ancienne', '2020-01-01'],
+    // Relecture de la PR 267, point 6 : comparées en texte, ces dates passaient
+    // pour plus récentes que la liste de ce dépôt.
+    ['datée d’un jour qui n’existe pas', '2099-99-99'],
+    ['datée d’autre chose qu’un jour', '2099-01-15 ou plus tard'],
   ])('%s, la liste de ce dépôt est gardée', (_label, asOf) => {
     redate(asOf);
     expect(fiRegisterAsOf()).toBe(FI_REGISTER_AS_OF);

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import {
+  MAX_WHEEL_BYTES,
   REGISTRY_FILES,
   SCHWIFTY_INDEX_URL,
   curatedRowsFromMap,
@@ -239,6 +240,108 @@ describe('seed-curated-map : clés PL, FI, LU et liste finlandaise, sans réseau
       map_fi: 'failed:below_floor',
       map_lu: 'failed:missing_file',
     });
+  });
+
+  it('taille annoncée au-delà du plafond : refusée avant toute lecture du corps', async () => {
+    // Relecture de la PR 267, point 6 : le plafond s'appliquait après la lecture complète.
+    const net = fakeNetwork(buildZip({ [REGISTRY_FILES.PL[0]!]: registry('PL', 3) }));
+    let read = false;
+    const fetchImpl: CuratedFetch = async (url) => {
+      const res = await net.fetchImpl(url);
+      if (url !== WHEEL_URL) return res;
+      return {
+        ...res,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-length' ? String(MAX_WHEEL_BYTES + 1) : null,
+        },
+        // Aucune lecture d'avance : `pull` ne tourne que si le corps est lu.
+        body: new ReadableStream<Uint8Array>(
+          {
+            pull() {
+              read = true;
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+        arrayBuffer: async () => {
+          read = true;
+          return new ArrayBuffer(0);
+        },
+      };
+    };
+    await seedCuratedMap({ db, fetchImpl, log: () => {} });
+    expect(read).toBe(false);
+    expect(states().map_pl).toBe('failed:download_failed');
+  });
+
+  it('corps sans annonce, plus long que le plafond : abandonné dès le dépassement', async () => {
+    const net = fakeNetwork(buildZip({ [REGISTRY_FILES.PL[0]!]: registry('PL', 3) }));
+    const chunk = new Uint8Array(1024 * 1024);
+    const total = MAX_WHEEL_BYTES + 8 * chunk.byteLength;
+    let served = 0;
+    const fetchImpl: CuratedFetch = async (url) => {
+      const res = await net.fetchImpl(url);
+      if (url !== WHEEL_URL) return res;
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (served >= total) return controller.close();
+          served += chunk.byteLength;
+          controller.enqueue(chunk);
+        },
+      });
+      return {
+        ...res,
+        headers: { get: () => null },
+        body,
+        // Ce que faisait l'ancien code : tout lire, puis mesurer.
+        arrayBuffer: async () => {
+          const reader = body.getReader();
+          let n = 0;
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            n += value.byteLength;
+          }
+          return new ArrayBuffer(n);
+        },
+      };
+    };
+    await seedCuratedMap({ db, fetchImpl, log: () => {} });
+    expect(states().map_pl).toBe('failed:download_failed');
+    expect(served).toBeLessThanOrEqual(MAX_WHEEL_BYTES + 2 * chunk.byteLength);
+  });
+
+  it('FI_LIST_PATH désigné mais illisible ou sous son plancher : le passage s’arrête', async () => {
+    // Relecture de la PR 267, point 5 : rendu comme une panne ordinaire, le passage
+    // reprenait l'ancienne liste, datée du début d'un passage, sans rien dire.
+    const net = fakeNetwork(buildZip({}), { indexStatus: 503 });
+    await expect(
+      seedCuratedMap({
+        db,
+        fetchImpl: net.fetchImpl,
+        fiListPath: join(dir, 'absente.json'),
+        log: () => {},
+      }),
+    ).rejects.toThrow(/FI_LIST_PATH/);
+    const short = join(dir, 'liste-courte.json');
+    writeFileSync(
+      short,
+      JSON.stringify({
+        as_of: '2099-01-15',
+        source: 'Remplissage',
+        codes: [{ code: '9000', bic: 'XMPRFIH1', institution: 'Remplissage FI 0' }],
+      }),
+    );
+    await expect(
+      seedCuratedMap({ db, fetchImpl: net.fetchImpl, fiListPath: short, log: () => {} }),
+    ).rejects.toThrow(/plancher/);
+    // Rien de dit pour la liste, rien d'écrit : la reprise ne la verra jamais comme
+    // une panne à reprendre.
+    expect(states().register_fi).toBeUndefined();
+    expect(
+      db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'fi_monetary_codes'").get(),
+    ).toBeUndefined();
   });
 
   it('FI_LIST_PATH : la liste finlandaise est chargée du fichier, contrôlée', async () => {

@@ -18,7 +18,11 @@
  * au redémarrage suivant (la copie acceptée est reprise, fusionnée avec la base
  * publique FRAÎCHE). Un nouveau fichier qui cesserait de servir un membre que la
  * surcouche courante servait est refusé de la même façon (relecture de la
- * PR 252, R2 et R3).
+ * PR 252, R2 et R3), qu'il refuse ce membre ou qu'il ne le porte plus du tout
+ * (un membre tardif « absent », voir `mayBeAbsent`) : au rechargement, et au
+ * redémarrage, où la copie acceptée l'emporte dès que le fichier perd un membre
+ * qu'elle sert, même s'il en gagne un autre, et n'est jamais écrasée par lui
+ * (relecture de la PR 267, défaut 1, et de la PR 270).
  *
  * La raison est gardée ici ; `src/lib/restricted-overlay-ops.ts` l'écrit au
  * journal et prévient par l'alerte d'exploitation. Ce module n'importe ni
@@ -37,6 +41,7 @@ import {
   promoteAcceptedCopy,
   removeFileWithCompanions,
   removeStaleMerged,
+  sha256File,
   type MemberReport,
   type MergeState,
 } from './restricted-overlay.js';
@@ -145,10 +150,39 @@ export function servesOverlay(state: OverlayState): boolean {
   return state === 'applied' || state === 'kept_public' || state === 'partial';
 }
 
-/** Membres non servis : un refus complet compte pire que tout refus partiel. */
-function refusedCount(status: OverlayStatus): number {
-  if (!servesOverlay(status.state)) return Number.POSITIVE_INFINITY;
-  return status.members.filter((m) => m.state === 'refused').length;
+/**
+ * Les membres qu'un état sert : acceptés, appliqués ou gardés derrière un public
+ * plus récent. Un membre refusé ou absent (un membre tardif que le fichier ne
+ * porte pas) n'en est pas ; un état qui ne sert pas la surcouche n'en sert aucun.
+ */
+export function servedMemberIds(status: OverlayStatus): Set<string> {
+  if (!servesOverlay(status.state)) return new Set();
+  return new Set(
+    status.members
+      .filter((m) => m.state === 'applied' || m.state === 'kept_public')
+      .map((m) => m.id),
+  );
+}
+
+/** Les membres que `other` sert et que `status` ne sert pas, dans l'ordre de la famille. */
+function membersLost(status: OverlayStatus, other: OverlayStatus): string[] {
+  const kept = servedMemberIds(status);
+  const before = servedMemberIds(other);
+  return other.members.map((m) => m.id).filter((id) => before.has(id) && !kept.has(id));
+}
+
+/** Le fichier de la variable ne sert pas chacun des membres de la famille. */
+function servesLess(status: OverlayStatus): boolean {
+  return servedMemberIds(status).size < status.members.length || status.members.length === 0;
+}
+
+/** L'empreinte d'un fichier, ou null s'il est illisible. */
+function fileSha256(path: string): string | null {
+  try {
+    return sha256File(path);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -268,10 +302,14 @@ function servedMerged(): Set<string> {
  * Le chemin qu'une base doit ouvrir. Appelé à l'ouverture de la connexion : la
  * fusion a lieu une fois par processus (et par rechargement), jamais par requête.
  *
- * Au démarrage, si le fichier de la variable est refusé (entier ou en partie) et
- * qu'une copie acceptée existe, celle-ci est fusionnée avec la base publique
- * fraîche ; la version qui sert le plus de membres l'emporte, le fichier de la
- * variable à égalité.
+ * Au démarrage, si le fichier de la variable ne sert pas chaque membre (refusé
+ * entier ou en partie, ou membre tardif absent) et qu'une copie acceptée
+ * différente existe, celle-ci est fusionnée avec la base publique fraîche. Comme
+ * au rechargement, ce sont les MEMBRES qui comptent, pas leur nombre : dès que le
+ * fichier de la variable perd un membre que la copie acceptée sert, elle
+ * l'emporte, même s'il en gagne un autre ou fait jeu égal, et elle reste la copie
+ * acceptée. Sinon le fichier de la variable sert, et la remplace (relecture de la
+ * PR 267, défaut 1, et de la PR 270, point 1).
  */
 export function servedDatabasePath(kind: OverlayKind, publicPath: string): string {
   const current = statuses.get(kind);
@@ -285,20 +323,23 @@ export function servedDatabasePath(kind: OverlayKind, publicPath: string): strin
   let next = built.status;
   let frozen = built.frozen;
   recordSeen(next);
-  if (
-    validOverlayPath(next.overlay_path) &&
-    (next.state === 'refused' || next.state === 'partial')
-  ) {
+  if (validOverlayPath(next.overlay_path) && servesLess(next)) {
     const accepted = acceptedCopyPath(next.overlay_path);
-    if (existsSync(accepted)) {
+    // La même empreinte : la copie acceptée ne servirait rien de plus.
+    if (existsSync(accepted) && (!next.sha256 || fileSha256(accepted) !== next.sha256)) {
       const alt = build(kind, publicPath, accepted).status;
-      if (refusedCount(alt) < refusedCount(next)) {
+      const lost = membersLost(next, alt);
+      if (lost.length > 0) {
         const refused = next;
         const refusedFrozen = frozen;
         frozen = undefined;
+        const reason =
+          refused.error || refused.members.some((m) => m.state === 'refused')
+            ? refusalReason(refused)
+            : `members_lost:${lost.join(',')}`;
         next = {
           ...alt,
-          error: `variable_file_refused:${refusalReason(refused)}`,
+          error: `variable_file_refused:${reason}`,
           file: refused.file,
         };
         housekeep(next, () => {

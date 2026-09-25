@@ -819,6 +819,14 @@ describe('surcouche : extraction, contrôle, fusion', () => {
       expect(pulledFileProblem('bic', inspection, entry)).toBeNull();
       const lying = { ...entry, members: { ...entry.members, map_pl: 10 } };
       expect(pulledFileProblem('bic', inspection, lying)).toBe('manifest_mismatch:bic:map_pl');
+      // Mais jamais quand la base sert déjà ces membres : le fichier les perdrait,
+      // et serait servi au redémarrage suivant (relecture de la PR 267, défaut 1).
+      expect(pulledFileProblem('bic', inspection, entry, new Set(['eba_step2', 'map_pl']))).toBe(
+        'members_lost:bic:map_pl',
+      );
+      expect(pulledFileProblem('bic', inspection, entry, new Set(LATE))).toBe(
+        'members_lost:bic:map_pl,map_fi,map_lu,register_fi',
+      );
     });
 
     it('un membre toujours dû ne peut jamais être déclaré absent', () => {
