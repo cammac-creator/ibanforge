@@ -64,7 +64,7 @@ import { failureCause, reportSeedMember } from './seed-report.js';
 /** L'index JSON du projet sur PyPI : version, roue, empreinte et date. */
 export const SCHWIFTY_INDEX_URL = 'https://pypi.org/pypi/schwifty/json';
 /** Une roue de schwifty pèse quelques centaines de Ko ; au-delà, ce n'est pas elle. */
-const MAX_WHEEL_BYTES = 32 * 1024 * 1024;
+export const MAX_WHEEL_BYTES = 32 * 1024 * 1024;
 
 /** Les registres de la roue, par pays, dans l'ordre de préférence. */
 export const REGISTRY_FILES: Readonly<Record<'PL' | 'FI' | 'LU', readonly string[]>> = {
@@ -110,6 +110,10 @@ export interface FiList {
 export type CuratedFetch = (url: string) => Promise<{
   ok: boolean;
   status: number;
+  /** La taille annoncée (`Content-Length`), lue avant le corps. */
+  headers?: { get(name: string): string | null };
+  /** Le corps en flux : lu par morceaux, abandonné au-delà du plafond. */
+  body?: ReadableStream<Uint8Array> | null;
   json(): Promise<unknown>;
   arrayBuffer(): Promise<ArrayBuffer>;
 }>;
@@ -327,12 +331,42 @@ export function schwiftySource(cc: 'PL' | 'FI' | 'LU', version: string): string 
   return `mdomke/schwifty ${version} (MIT), compiled from ${national}`;
 }
 
+/**
+ * Le corps d'une réponse, sans jamais lire plus de `max` octets (relecture de la
+ * PR 267, point 6) : la taille annoncée refuse avant la première lecture, et le
+ * flux est abandonné dès qu'il dépasse le plafond, annonce absente ou fausse.
+ */
+async function readCapped(res: Awaited<ReturnType<CuratedFetch>>, max: number): Promise<Buffer> {
+  const tooLarge = (): Error => new Error('schwifty : taille de la roue hors bornes');
+  const declared = res.headers?.get('content-length');
+  if (declared && /^\d+$/.test(declared) && Number(declared) > max) throw tooLarge();
+  if (res.body) {
+    const reader = res.body.getReader();
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        await reader.cancel().catch(() => undefined);
+        throw tooLarge();
+      }
+      chunks.push(Buffer.from(value));
+    }
+    return Buffer.concat(chunks, total);
+  }
+  // Sans flux (une doublure de test) : un seul bloc, borné aussitôt.
+  const body = Buffer.from(await res.arrayBuffer());
+  if (body.length > max) throw tooLarge();
+  return body;
+}
+
 async function download(fetchImpl: CuratedFetch, release: SchwiftyRelease): Promise<Buffer> {
   const res = await fetchImpl(release.url);
   if (!res.ok) throw new Error(`schwifty wheel: HTTP ${res.status}`);
-  const body = Buffer.from(await res.arrayBuffer());
-  if (body.length === 0 || body.length > MAX_WHEEL_BYTES)
-    throw new Error('schwifty : taille de la roue hors bornes');
+  const body = await readCapped(res, MAX_WHEEL_BYTES);
+  if (body.length === 0) throw new Error('schwifty : taille de la roue hors bornes');
   if (createHash('sha256').update(body).digest('hex') !== release.sha256)
     throw new Error('schwifty : empreinte de la roue différente de celle de l’index');
   return body;
@@ -350,6 +384,13 @@ export interface CuratedSeedResult {
  * Le passage : index, roue, registres, puis une écriture par membre, chacune
  * contrôlée contre son plancher. Un membre en panne n'écrit rien et le dit ; les
  * autres sont écrits. Ne lève jamais pour une panne de source.
+ *
+ * Une seule exception : un chargement EXPLICITE de la liste finlandaise
+ * (`fiListPath`, FI_LIST_PATH) qui échoue, fichier illisible ou sous le
+ * plancher, lève et arrête le passage. Rendu comme une panne ordinaire, il
+ * faisait reprendre l'ancienne liste de la surcouche précédente, datée du
+ * début d'un passage au lieu de la date de la liste, alors qu'on en chargeait
+ * une nouvelle (relecture de la PR 267, point 5).
  */
 export async function seedCuratedMap(options: {
   db: Database.Database;
@@ -421,16 +462,14 @@ export async function seedCuratedMap(options: {
     try {
       list = parseFiList(readFileSync(options.fiListPath, 'utf8'));
     } catch {
-      log('[carte] liste FI illisible : non écrite');
-      fail('register_fi', 'unreadable');
-      return result;
+      log('[carte] liste FI désignée par FI_LIST_PATH illisible : le passage s’arrête');
+      throw new Error('FI_LIST_PATH : liste finlandaise illisible, rien n’est publié');
     }
     if (list.codes.length < member('register_fi').minRows) {
       log(
-        `[carte] liste FI : ${list.codes.length} codes, plancher ${member('register_fi').minRows}`,
+        `[carte] liste FI : ${list.codes.length} codes, plancher ${member('register_fi').minRows} : le passage s’arrête`,
       );
-      fail('register_fi', 'below_floor');
-      return result;
+      throw new Error('FI_LIST_PATH : liste finlandaise sous son plancher, rien n’est publié');
     }
     writeFiList(options.db, list);
     result.written.register_fi = list.codes.length;

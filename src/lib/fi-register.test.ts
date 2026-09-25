@@ -12,7 +12,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
  * la date de la liste servie avec le verdict, et les clés de la carte que la
  * liste contredit élaguées au chargement.
  */
-const { fixture, ibanFor } = await vi.hoisted(async () => {
+const { fixture, ibanFor, Database } = await vi.hoisted(async () => {
   const m = await import('../test-support/restricted-fixtures.js');
   const family = await import('./restricted-family.js');
   const { createRequire } = await import('node:module');
@@ -39,13 +39,15 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
   key.run('PL', '99900000', 'XMPPPLPW');
   key.run('LU', '800', 'XMPMLULL');
   db.close();
-  return { fixture, ibanFor: m.ibanFor };
+  return { fixture, ibanFor: m.ibanFor, Database };
 });
 afterAll(() => fixture.restore());
 
 const { validateIBAN } = await import('./iban.js');
 const { enrichResult } = await import('./enrich.js');
-const { allocatedFiCodes, fiRegisterAsOf, lookupFiInstitution } = await import('./fi-register.js');
+const { allocatedFiCodes, fiRegisterAsOf, fiRegisterLoaded, lookupFiInstitution } =
+  await import('./fi-register.js');
+const { resetStatements } = await import('./bic-lookup.js');
 
 function check(iban: string) {
   const r = validateIBAN(iban);
@@ -113,5 +115,32 @@ describe('les clés polonaises et luxembourgeoises de la carte, servies par la s
       expect(r.bank_code_check?.register, iban).toMatch(/composite bank-code map/);
       expect(r.bic?.code?.slice(0, 8), iban).toBe(bic);
     }
+  });
+});
+
+describe('une date de la liste qui n’est pas un jour : la liste est écartée', () => {
+  /** Redate une ligne, puis oublie ce que la base servait (un rechargement). */
+  function redate(asOf: string): void {
+    const db = new Database(fixture.bicPath);
+    db.prepare("UPDATE fi_monetary_codes SET as_of = ? WHERE code = '47'").run(asOf);
+    db.close();
+    resetStatements();
+  }
+
+  it.each([
+    // Relecture de la PR 267, point 6 : comparées en texte, ces dates passaient
+    // pour des dates de liste, et finissaient dans `bank_code_check.as_of`.
+    ['datée d’un jour qui n’existe pas', '2099-99-99'],
+    ['datée d’autre chose qu’un jour', '2099-01-15 ou plus tard'],
+  ])('%s : non chargée, les codes finlandais disent « non consulté »', (_label, asOf) => {
+    redate(asOf);
+    try {
+      expect(fiRegisterLoaded()).toBe(false);
+      expect(fiRegisterAsOf()).toBeNull();
+      expect(lookupFiInstitution('12345600000785')).toBeNull();
+    } finally {
+      redate('2099-01-15');
+    }
+    expect(fiRegisterAsOf()).toBe('2099-01-15');
   });
 });

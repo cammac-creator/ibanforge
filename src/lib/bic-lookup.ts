@@ -209,7 +209,9 @@ export const WITHDRAWN_BANK_CODE_COUNTRIES: ReadonlySet<string> = new Set([
  * providers mostly, answered "not in register" like a code that does not
  * exist. The two keys are also gone from bic_data.json; this prune is what
  * keeps a rebuild of that file from bringing them back. Czech editions switch
- * on a date, though, and this runs once per process: the guard at the top of
+ * on a date, though, and this runs only when the map is built (the first
+ * lookup of a process, then after each reload of the private overlay, see
+ * resetStatements), never on a date: the guard at the top of
  * lookupByCountryBank is what follows the switch without a restart.
  */
 function pruneStaleNationalCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
@@ -242,11 +244,13 @@ function pruneStaleNationalCodes(data: Record<string, BicDataEntry>): Record<str
  * « Banca Carige », elle-même absorbée par BPER en 2022).
  *
  * Les clés sont aussi retirées de bic_data.json ; cet élagage est ce qui empêche
- * une reconstruction du fichier de les ramener. Il tourne une fois par
- * processus, ce qui suffit : les tables italiennes ne changent qu'avec la base,
- * donc qu'à un déploiement. Une clé élaguée retombe sur la recherche par préfixe,
- * qui ne peut rien rendre pour un code numérique : `bic` est null, et le verdict
- * dit la radiation, la date et le successeur légal (enrich.ts).
+ * une reconstruction du fichier de les ramener. Il tourne à chaque construction
+ * de la carte (au premier usage du processus, puis après chaque rechargement de
+ * la surcouche privée, voir resetStatements), ce qui suffit : les tables
+ * italiennes ne changent qu'avec la base publique, donc qu'à un déploiement. Une
+ * clé élaguée retombe sur la recherche par préfixe, qui ne peut rien rendre pour
+ * un code numérique : `bic` est null, et le verdict dit la radiation, la date et
+ * le successeur légal (enrich.ts).
  */
 function pruneRetiredItalianCodes(
   data: Record<string, BicDataEntry>,
@@ -850,7 +854,8 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
 
   // Czechia: the same guard, for a different reason. Its codes are numeric, so
   // the load-time prune in getBicData() would be enough — except that the prune
-  // runs once per process, and the ČNB switches editions on a DATE (see
+  // runs only when the map is built (first use, then after each reload of the
+  // private overlay), and the ČNB switches editions on a DATE (see
   // PENDING_TABLE in national-registers.ts). A code the new edition removes
   // must stop resolving to its old bank on that day, not at the next deploy;
   // otherwise the same answer would carry `not_allocated` in bank_code_check

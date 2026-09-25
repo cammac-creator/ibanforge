@@ -25,8 +25,10 @@
  *   ou de la copie acceptée, ni si ce même fichier a déjà été refusé ;
  * - sinon téléchargement plafonné, empreinte et taille vérifiées, puis
  *   `inspectOverlay` (les contrôles du chargeur : chaque membre doit y être
- *   accepté, sinon la surcouche servie perdrait un membre), et enfin écriture
- *   d'un voisin renommé de façon atomique sur le fichier de la variable.
+ *   accepté, et aucun membre que la base sert aujourd'hui ne doit y manquer, un
+ *   membre tardif absent compris : sinon la surcouche servie perdrait un membre),
+ *   et enfin écriture d'un voisin renommé de façon atomique sur le fichier de la
+ *   variable.
  * La veille (src/lib/restricted-overlay-ops.ts) recharge aussitôt la base
  * remplacée, avec son journal et ses alertes, et garde ce qu'elle sert si la
  * fusion refuse le fichier. Tout échec laisse en place ce qui est servi.
@@ -91,7 +93,11 @@ import {
   type ManifestFile,
   type OverlayManifest,
 } from './restricted-overlay-manifest.js';
-import { restrictedOverlayStatus, servesOverlay } from './restricted-overlay-runtime.js';
+import {
+  restrictedOverlayStatus,
+  servedMemberIds,
+  servesOverlay,
+} from './restricted-overlay-runtime.js';
 
 /** Les deux variables du tirage : toutes deux absentes, rien ne se passe. */
 export const PULL_ENV = {
@@ -565,22 +571,28 @@ interface KindResult {
 
 /**
  * Ce qui fait refuser un fichier tiré, en un code court, ou `null` : le fichier
- * refusé par le contrôle du chargeur, un membre refusé, ou un compte différent
- * de celui que le manifeste annonce. Un membre ABSENT (venu après la première
- * surcouche, que la release ne porte pas : voir `mayBeAbsent`,
- * src/lib/restricted-family.ts) n'est pas un refus, et le manifeste ne doit pas
- * l'annoncer : la release que la production tirait avant ces membres reste
- * acceptée par le code qui les introduit.
+ * refusé par le contrôle du chargeur, un membre refusé, un membre que la base
+ * sert aujourd'hui (`served`) et que le fichier ne porte plus, ou un compte
+ * différent de celui que le manifeste annonce. Un membre ABSENT (venu après la
+ * première surcouche, que la release ne porte pas : voir `mayBeAbsent`,
+ * src/lib/restricted-family.ts) n'est pas un refus tant que la base ne le sert
+ * pas, et le manifeste ne doit pas l'annoncer : la release que la production
+ * tirait avant ces membres reste acceptée par le code qui les introduit. Servi,
+ * il serait perdu (`members_lost`) : le fichier posé aurait été servi au
+ * redémarrage suivant (relecture de la PR 267, défaut 1).
  */
 export function pulledFileProblem(
   kind: OverlayKind,
   inspection: OverlayInspection,
   entry: ManifestFile,
+  served: ReadonlySet<string> = new Set(),
 ): string | null {
   if (!inspection.ok) return `overlay_refused:${kind}:${inspection.error ?? '?'}`;
   const refused = inspection.members.filter(memberRefused);
   if (refused.length > 0)
     return `members_refused:${kind}:${refused.map((m) => `${m.id}=${m.reason ?? '?'}`).join(',')}`;
+  const lost = inspection.members.filter((m) => m.state === 'absent' && served.has(m.id));
+  if (lost.length > 0) return `members_lost:${kind}:${lost.map((m) => m.id).join(',')}`;
   const mismatch = inspection.members.find((m) =>
     m.state === 'absent' ? entry.members[m.id] !== undefined : entry.members[m.id] !== m.rows,
   );
@@ -626,7 +638,13 @@ async function pullOne(
     if (hash.digest('hex') !== entry.sha256)
       return { outcome: 'error', error: `sha256_mismatch:${kind}` };
     chmodSync(neighbour, 0o600);
-    const problem = pulledFileProblem(kind, inspectOverlay(neighbour, kind), entry);
+    const status = restrictedOverlayStatus().find((s) => s.kind === kind);
+    const problem = pulledFileProblem(
+      kind,
+      inspectOverlay(neighbour, kind),
+      entry,
+      status ? servedMemberIds(status) : new Set(),
+    );
     if (problem) return { outcome: 'error', error: problem, rejectFile: true };
     // Le voisin devient le fichier de la variable d'un seul renommage : la veille
     // ne voit jamais un fichier à moitié écrit.

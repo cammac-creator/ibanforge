@@ -44,6 +44,23 @@ interface FiList {
 /** `undefined` : pas encore lue ; `null` : absente ou vide dans la base servie. */
 let cache: FiList | null | undefined;
 
+/** Une date de liste : AAAA-MM-JJ, et un vrai jour du calendrier ; sinon null. */
+function listDay(value: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value
+    ? value
+    : null;
+}
+
+/**
+ * La liste servie, lue une fois par connexion, ou null : pas de table (base
+ * publique seule, surcouche qui ne la porte pas), aucune ligne lisible, ou une
+ * date qui n'est pas un jour AAAA-MM-JJ. Une seule date mal formée écarte toute
+ * la liste : les codes finlandais disent alors « non consulté », jamais une date
+ * qu'on ne sait pas lire dans `bank_code_check.as_of` (relecture de la PR 267,
+ * point 6).
+ */
 function load(): FiList | null {
   if (cache !== undefined) return cache;
   let rows: Array<{ code: string; bic: string; institution: string; as_of: string | null }>;
@@ -64,8 +81,13 @@ function load(): FiList | null {
   let asOf: string | null = null;
   for (const row of rows) {
     if (!/^\d{1,4}$/.test(row.code)) continue;
+    const day = listDay(row.as_of);
+    if (!day) {
+      cache = null;
+      return cache;
+    }
     byCode.set(row.code, { bic: row.bic, institution: row.institution });
-    if (row.as_of && (!asOf || row.as_of > asOf)) asOf = row.as_of;
+    if (!asOf || day > asOf) asOf = day;
   }
   cache = byCode.size > 0 ? { byCode, asOf } : null;
   return cache;
