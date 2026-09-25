@@ -173,6 +173,31 @@ export function registerToday(cc: string, now: Date = new Date()): string {
 /** Building a formatter costs more than formatting: one per time zone, for the process. */
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
+/**
+ * The instant every register read of the current answer is decided at.
+ *
+ * One answer reads the register several times — availability, the edition and
+ * its credit, the code itself, the composite map's guard — and each read asks
+ * which edition is in force. Read against a live clock, an answer computed
+ * across midnight in Prague could take its verdict from one edition and its
+ * credit or its BIC from the next. Pinning one instant for the whole answer
+ * (and, through the EnrichCache, for a whole batch) makes that impossible.
+ *
+ * Safe as module state because every reader here is synchronous: nothing can
+ * interleave between the pin and its release. A nested pin keeps the outer one.
+ */
+let pinnedNow: Date | null = null;
+
+export function withRegisterClock<T>(fn: () => T, now: Date = new Date()): T {
+  if (pinnedNow) return fn();
+  pinnedNow = now;
+  try {
+    return fn();
+  } finally {
+    pinnedNow = null;
+  }
+}
+
 const stmts = new Map<EditionTable, import('better-sqlite3').Statement>();
 let tableChecked = false;
 let tablePresent = false;
@@ -273,7 +298,9 @@ function activeTable(cc: string): EditionTable {
   }
   if (!dates.pending) return CURRENT_TABLE;
   if (dates.current && dates.current >= dates.pending) return CURRENT_TABLE;
-  return dates.pending <= registerToday(cc) ? PENDING_TABLE : CURRENT_TABLE;
+  return dates.pending <= registerToday(cc, pinnedNow ?? new Date())
+    ? PENDING_TABLE
+    : CURRENT_TABLE;
 }
 
 export function nationalRegisterAvailable(cc: string): boolean {

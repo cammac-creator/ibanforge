@@ -253,6 +253,39 @@ describe('/llms.txt of the API follows the switch in the same process', () => {
   }, 60_000);
 });
 
+describe('one answer, one edition, even across midnight in Prague', () => {
+  it('keeps every read of a pinned answer on the edition of its instant', () => {
+    at('2026-08-31T21:59:59Z'); // 23:59:59 in Prague, 253 in force
+    const seen = lib.withRegisterClock(() => {
+      const before = lib.nationalRegisterEdition('CZ').source;
+      vi.setSystemTime(new Date('2026-08-31T22:00:30Z')); // midnight passes mid-answer
+      return [
+        before,
+        lib.nationalRegisterEdition('CZ').source,
+        lib.allocatedCodes('CZ').has('8190'),
+      ];
+    });
+    expect(seen).toEqual([source('253'), source('253'), true]);
+    // Released after the answer: the next one reads the new edition.
+    expect(lib.nationalRegisterEdition('CZ').source).toBe(source('254'));
+  });
+
+  it('answers a whole batch from the edition in force when the batch began', async () => {
+    const { createEnrichCache, enrichResult } = await import('./enrich.js');
+    const { validateIBAN } = await import('./iban.js');
+    at('2026-08-31T21:59:00Z');
+    const cache = createEnrichCache();
+    at('2026-08-31T22:01:00Z'); // the batch is still running after midnight
+    const r = validateIBAN(czIban('0800'));
+    enrichResult(r, cache);
+    expect(r.bank_code_check?.as_of).toBe('2026-07');
+    expect(r.bic?.source).toBe(source('253'));
+    const removed = validateIBAN(czIban(REMOVED_BY_254.code));
+    enrichResult(removed, cache);
+    expect(removed.bank_code_check?.status).toBe('verified');
+  });
+});
+
 describe('other registers are untouched by the Czech announcement', () => {
   it('keeps Slovakia on its own table and its own date', () => {
     at('2026-09-01T12:00:00Z');

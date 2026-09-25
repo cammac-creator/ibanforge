@@ -19,6 +19,7 @@ import {
   lookupNationalCode,
   nationalRegisterAvailable,
   nationalRegisterEdition,
+  withRegisterClock,
 } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode } from './lu-register.js';
@@ -821,10 +822,16 @@ interface BankResolution {
  */
 export interface EnrichCache {
   bank: Map<string, BankResolution>;
+  /**
+   * The instant the register editions are read at, for every answer of the
+   * batch: a batch straddling midnight in Prague answers from ONE Czech
+   * edition, as the memoised bank resolutions above already assume.
+   */
+  now?: Date;
 }
 
 export function createEnrichCache(): EnrichCache {
-  return { bank: new Map() };
+  return { bank: new Map(), now: new Date() };
 }
 
 /**
@@ -1163,6 +1170,12 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
  * same bank from asking the same question a hundred times.
  */
 export function enrichResult(result: IBANValidationResult, cache?: EnrichCache): void {
+  // One instant for every register read of this answer (or of the whole batch
+  // when the caller passes its cache): see withRegisterClock.
+  withRegisterClock(() => enrichResultAt(result, cache), cache?.now);
+}
+
+function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void {
   // The five SEPA members the library's frozen set does not carry (DATA-03,
   // 01/09/2026). `sepa` is filled by the library's own validate() before we get
   // here, so the correction has to be applied to the built block, and it is

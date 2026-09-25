@@ -137,7 +137,7 @@ import {
 import { bicLeiMappingNotice, mappingVersionFromLoad } from './lib/bic-lei-notice.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { bgAttribution, getBgBankCodeCount } from './lib/bg-bae.js';
-import { nationalRegisterCredit } from './lib/national-registers.js';
+import { nationalRegisterCredit, withRegisterClock } from './lib/national-registers.js';
 import {
   getBdeListDate,
   getBdeMfiCount,
@@ -1019,12 +1019,16 @@ export function buildApp(): Hono<HonoEnv> {
   });
 
   app.get('/llms.txt', (c) => {
-    const key = llmsTxtEditionKey();
-    if (!llmsTxtCache || llmsTxtKey !== key) {
-      llmsTxtCache = buildLlmsTxt();
-      llmsTxtKey = key;
-    }
-    return c.text(llmsTxtCache, 200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    // One instant for the key and the text, so both name the same edition.
+    const text = withRegisterClock(() => {
+      const key = llmsTxtEditionKey();
+      if (!llmsTxtCache || llmsTxtKey !== key) {
+        llmsTxtCache = buildLlmsTxt();
+        llmsTxtKey = key;
+      }
+      return llmsTxtCache;
+    });
+    return c.text(text, 200, { 'Content-Type': 'text/plain; charset=utf-8' });
   });
 
   // /v1 index — agents that probe /v1 root expect a discovery hint instead of 404
