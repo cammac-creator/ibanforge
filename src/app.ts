@@ -154,7 +154,7 @@ import {
   getPsdEntityCount,
   psdAttribution,
 } from './lib/psd-register.js';
-import { getIban, getIbansArray } from './lib/request-helpers.js';
+import { getIban, getIbansArray, getBic } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
 
@@ -699,7 +699,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 }
 
 // Pre-validate requests before x402 paywall (don't charge for invalid input).
-// Field names are case-insensitive (handled by route handlers via getIban/getIbansArray).
+// Field names are case-insensitive (handled by route handlers via getIban/getIbansArray/getBic).
 //
 // IMPORTANT: only run the pre-validation when the request has auth (API key
 // or x402 payment header). Unauthenticated probes (Decixa, x402scan, MCP
@@ -1158,11 +1158,20 @@ export function buildApp(): Hono<HonoEnv> {
     if (!isAuthenticatedProbe(c)) return next();
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     const iban = getIban(body);
-    if (!iban || typeof iban !== 'string' || iban.trim() === '') {
+    const bic = getBic(body);
+    const hasIban = typeof iban === 'string' && iban.trim() !== '';
+    const hasBic = typeof bic === 'string' && bic.trim() !== '';
+    // Cette route contrôle l'un OU l'autre champ ; c'est la route elle-même
+    // (src/routes/iban-compliance.ts) qui refuse les deux ensemble, et ce refus
+    // ne se duplique pas ici. Jusqu'au 25/09/2026, cette garde exigeait `iban`
+    // sans condition : un appelant authentifié qui n'envoyait que `bic`, ce que
+    // GET /v1/bic/:code lui conseille quand un BIC est sous sanctions, recevait
+    // un 400 avant que la route ne tourne.
+    if (!hasIban && !hasBic) {
       return c.json(
         {
           error: 'invalid_request',
-          message: "Request body must include an 'iban' field (case-insensitive).",
+          message: "Request body must include an 'iban' or a 'bic' field (case-insensitive).",
         },
         400,
       );
