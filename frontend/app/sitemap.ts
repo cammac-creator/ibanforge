@@ -5,6 +5,7 @@ import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
+import { urlFor } from "@/lib/seo";
 
 const BASE_URL = "https://ibanforge.com";
 
@@ -85,7 +86,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
     // Static pages
     entries.push(
-      { url: `${prefix}/`, changeFrequency: "weekly", priority: 1 },
+      // The home through `urlFor`, the helper that writes the canonical. Until
+      // 2026-09-25 this entry was `${prefix}/`, i.e. `/de/` and `/fr/`, which
+      // answer 308 towards `/de` and `/fr`: Search Console does not index a
+      // sitemap URL that redirects, and it still called both homes "unknown to
+      // Google" that morning. The root keeps its slash (`https://ibanforge.com/`).
+      { url: urlFor(locale, "/"), changeFrequency: "weekly", priority: 1 },
       { url: `${prefix}/agents`, changeFrequency: "monthly", priority: 0.95 },
       { url: `${prefix}/vendors`, changeFrequency: "monthly", priority: 0.85 },
       { url: `${prefix}/audit`, changeFrequency: "monthly", priority: 0.85 },
