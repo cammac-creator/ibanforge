@@ -18,10 +18,14 @@ import {
 } from '../lib/api-keys.js';
 import {
   clawbackPurchase,
+  confirmPurchase,
   ensureTopupRef,
+  findPurchaseById,
   findPurchaseByRef,
+  openUsdcMint,
   type PurchaseRow,
 } from '../lib/key-purchases.js';
+import { createAuditJob, getAuditJob } from '../lib/audit-jobs.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 
 afterEach(() => {
@@ -240,14 +244,16 @@ describe('remboursement partiel', () => {
 });
 
 describe('litige', () => {
-  it('reprend le pack d’une clé née d’un achat, quel que soit le statut du litige', () => {
-    const sessionId = `cs_test_${uniq('dispute-born')}`;
+  // Relecture de la PR 263, D1 : la règle ne change pas (tout
+  // charge.dispute.created reprend le pack, décision du 25.09.2026), mais le
+  // statut est lu, porté, et une demande de renseignements le dit.
+  it('une demande de renseignements (warning_*) reprend, et l’alerte dit que les fonds ne sont pas retirés', () => {
+    const sessionId = `cs_test_${uniq('dispute_inquiry')}`;
     const minted = processStripeEvent(packEvent({ sessionId }));
     const rawKey = minted.notify!.rawKey;
     expect(validateApiKey(rawKey).creditsRemaining).toBe(1000);
 
-    // Une simple demande de renseignements (`warning_*`) reprend aussi : c'est
-    // la lettre de la décision ; un humain restitue si elle se referme.
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const result = processStripeEvent(
       disputeEvent({
         paymentIntent: `pi_${sessionId}`,
@@ -258,17 +264,47 @@ describe('litige', () => {
     const purchase = purchaseOf(sessionId);
     expect(result.body.reversal).toMatchObject({
       reason: 'disputed',
+      dispute_status: 'warning_needs_response',
       outcome: 'clawed_back',
       purchase_id: purchase.id,
       removed_credits: 1000,
     });
     expect(purchase).toMatchObject({ outcome: 'disputed', clawback_credits: 1000 });
-    expect(result.alert?.key).toBe(`stripe:dispute:${purchase.id}`);
-    expect(result.alert?.detail).toContain('Litige gagné');
+    expect(info).toHaveBeenCalledWith(
+      expect.stringContaining('(dispute status warning_needs_response)'),
+    );
+    // Une clé à part : si la demande devient un litige, son alerte peut partir.
+    expect(result.alert?.key).toBe(`stripe:dispute-inquiry:${purchase.id}`);
+    const detail = result.alert?.detail ?? '';
+    expect(detail).toContain('Demande de renseignements');
+    expect(detail).toContain('les fonds ne sont PAS retirés');
+    expect(detail).toContain('Répondre à la demande dans Stripe');
+    expect(detail).toContain('les 1000 crédits sont à restituer à la main');
+    expect(detail).not.toContain('Litige gagné');
+    expect(detail).not.toContain('@');
     // Jamais une clé désactivée : elle reste valable, à zéro (règle A : 402 avec ses liens).
     const v = validateApiKey(rawKey);
     expect(v.valid).toBe(true);
     expect(v.creditsRemaining).toBe(0);
+  });
+
+  it('une rétrofacturation (needs_response) reprend, et l’alerte parle d’un litige', () => {
+    const sessionId = `cs_test_${uniq('dispute_chargeback')}`;
+    processStripeEvent(packEvent({ sessionId }));
+    const result = processStripeEvent(
+      disputeEvent({ paymentIntent: `pi_${sessionId}`, amount: 400, status: 'needs_response' }),
+    );
+    const purchase = purchaseOf(sessionId);
+    expect(result.body.reversal).toMatchObject({
+      reason: 'disputed',
+      dispute_status: 'needs_response',
+      outcome: 'clawed_back',
+      removed_credits: 1000,
+    });
+    expect(result.alert?.key).toBe(`stripe:dispute:${purchase.id}`);
+    expect(result.alert?.detail).toContain('contesté (litige)');
+    expect(result.alert?.detail).toContain('Litige gagné');
+    expect(result.alert?.detail).not.toContain('Demande de renseignements');
   });
 });
 
@@ -433,5 +469,188 @@ describe('la signature Stripe est vérifiée comme pour les autres évènements'
     expect(replay.status).toBe(200);
     expect(await replay.json()).toMatchObject({ idempotent: true });
     expect(validateApiKey(key.api_key).creditsRemaining).toBe(0);
+  });
+});
+
+describe('après la relecture de sécurité (D3, D5)', () => {
+  it('un remboursement partiel livré APRÈS le total ne reprend rien et ne lève aucune alerte (D3)', () => {
+    const { key, sessionId, paymentIntent } = rechargedFreeKey('partial_late');
+    // Deux remboursements partiels de 2 $ : le second, total, arrive le premier.
+    const full = processStripeEvent(
+      refundEvent({ paymentIntent, amount: 400, amountRefunded: 400 }),
+    );
+    expect(full.body.reversal).toMatchObject({ outcome: 'clawed_back', removed_credits: 1000 });
+    const late = processStripeEvent(
+      refundEvent({ paymentIntent, amount: 400, amountRefunded: 200 }),
+    );
+    expect(late.status).toBe(200);
+    expect(late.body.reversal).toMatchObject({ outcome: 'unchanged', removed_credits: 0 });
+    expect(late.alert).toBeUndefined();
+    expect(purchaseOf(sessionId)).toMatchObject({ outcome: 'refunded', clawback_credits: 1000 });
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(0);
+  });
+
+  it('un remboursement partiel après une reprise par la route d’administration : rien, sans alerte (D3)', () => {
+    const { key, sessionId, paymentIntent } = rechargedFreeKey('partial_admin');
+    expect(clawbackPurchase(purchaseOf(sessionId).id, 'refunded')).toMatchObject({
+      status: 'clawed_back',
+      removed: 1000,
+    });
+    const partial = processStripeEvent(
+      refundEvent({ paymentIntent, amount: 400, amountRefunded: 100 }),
+    );
+    expect(partial.body.reversal).toMatchObject({ outcome: 'unchanged' });
+    expect(partial.alert).toBeUndefined();
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(0);
+  });
+
+  it('un litige PUIS un remboursement : une seule reprise (D5)', () => {
+    const { key, sessionId, paymentIntent } = rechargedFreeKey('dispute_then_refund');
+    // Un second pack sur la même clé : ce qu'une reprise en double mangerait.
+    processStripeEvent(
+      packEvent({
+        sessionId: `cs_test_${uniq('dispute_then_refund2')}`,
+        ref: ensureTopupRef(key.key_hash)!,
+      }),
+    );
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(2000);
+    const dispute = processStripeEvent(
+      disputeEvent({ paymentIntent, amount: 400, status: 'needs_response' }),
+    );
+    expect(dispute.body.reversal).toMatchObject({ outcome: 'clawed_back', removed_credits: 1000 });
+    const refund = processStripeEvent(
+      refundEvent({ paymentIntent, amount: 400, amountRefunded: 400 }),
+    );
+    expect(refund.body.reversal).toMatchObject({ outcome: 'unchanged', removed_credits: 0 });
+    expect(refund.alert).toBeUndefined();
+    expect(purchaseOf(sessionId)).toMatchObject({ outcome: 'disputed', clawback_credits: 1000 });
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(1000);
+  });
+
+  it('deux achats pour une même intention (ambiguous) : rien repris, une alerte (D5)', () => {
+    const { key, sessionId, paymentIntent } = rechargedFreeKey('ambiguous');
+    const first = purchaseOf(sessionId);
+    // Une anomalie fabriquée : une seconde ligne qui porte la même intention.
+    getStatsDB()
+      .prepare(
+        `INSERT INTO key_purchases (payment_ref, rail, kind, outcome, lineage_hash, key_hash,
+                                    key_prefix, credits, stripe_payment_intent)
+         VALUES (?, 'card', 'pack', 'credited', ?, ?, ?, 1000, ?)`,
+      )
+      .run(
+        `stripe:cs_test_${uniq('ambiguous2')}`,
+        first.lineage_hash,
+        first.key_hash,
+        first.key_prefix,
+        paymentIntent,
+      );
+    const result = processStripeEvent(
+      refundEvent({ paymentIntent, amount: 400, amountRefunded: 400 }),
+    );
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ ignored: 'ambiguous_payment_intent' });
+    expect(result.alert?.key).toBe(`stripe:reversal-ambiguous:${first.id}`);
+    expect(findPurchaseById(first.id)).toMatchObject({
+      outcome: 'credited',
+      clawback_credits: null,
+    });
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(1000);
+  });
+
+  it('un échec d’écriture de l’évènement annule la reprise : solde et issue intacts, puis une reprise (D5)', () => {
+    const { key, sessionId, paymentIntent } = rechargedFreeKey('rollback');
+    const refund = refundEvent({ paymentIntent, amount: 400, amountRefunded: 400 });
+    const db = getStatsDB();
+    // Un déclencheur temporaire (propre à cette connexion) fait échouer
+    // l'INSERT dans processed_webhooks APRÈS la reprise, dans la même transaction.
+    db.exec(`CREATE TEMP TRIGGER fail_processed_insert BEFORE INSERT ON processed_webhooks
+             WHEN NEW.stripe_event_id = '${refund.id}'
+             BEGIN SELECT RAISE(ABORT, 'simulated failure'); END;`);
+    try {
+      expect(() => processStripeEvent(refund)).toThrow(/simulated failure/);
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS fail_processed_insert');
+    }
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(1000);
+    expect(purchaseOf(sessionId)).toMatchObject({ outcome: 'credited', clawback_credits: null });
+    expect(eventProcessed(refund.id)).toBe(false);
+    // Stripe relivre (la route aurait répondu 500) : une reprise, une seule.
+    const again = processStripeEvent(refund);
+    expect(again.body.reversal).toMatchObject({ outcome: 'clawed_back', removed_credits: 1000 });
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(0);
+  });
+
+  it('un achat USDC et un paiement d’audit ne sont jamais pris pour un pack (D5)', () => {
+    // Un pack USDC réglé : sa ligne ne porte jamais d'intention Stripe. Comme
+    // la vraie route, la référence du règlement nomme la ligne ET la clé.
+    const usdcRef = uniq('usdc');
+    const opened = openUsdcMint(null, {
+      paymentRef: `x402:${usdcRef}`,
+      ref: usdcRef,
+      bundle: '1k',
+      credits: 1000,
+      quotedUsd: 4,
+      payerEmail: null,
+    });
+    if (!('opened' in opened)) throw new Error('achat USDC non ouvert');
+    expect(confirmPurchase(opened.opened)).toMatchObject({ status: 'minted' });
+    // Un audit payé par carte : rien au registre des achats.
+    const job = createAuditJob({
+      filename: 'fictif.csv',
+      rows: 3,
+      tier: 'standard',
+      price: 149,
+      currency: 'USD',
+      lang: 'fr',
+      summary: {
+        rows: 3,
+        ok: 3,
+        warning: 0,
+        error: 0,
+        by_code: {},
+        countries: [],
+        rows_without_authoritative_register: 0,
+        columns_detected: ['iban'],
+        address_checked: false,
+        tier: 'standard',
+        price: 149,
+        currency: 'USD',
+      },
+      preview: [],
+      report: Buffer.from('rapport fictif'),
+    });
+    const auditIntent = `pi_${uniq('audit')}`;
+    processStripeEvent({
+      id: `evt_${uniq('audit')}`,
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: `cs_test_${uniq('audit')}`,
+          object: 'checkout.session',
+          payment_status: 'paid',
+          amount_total: 14900,
+          currency: 'usd',
+          customer_email: null,
+          customer_details: null,
+          payment_intent: auditIntent,
+          metadata: { audit_job: job.id },
+        },
+      },
+    } as unknown as Stripe.Event);
+    expect(getAuditJob(job.id)?.paid_at).not.toBeNull();
+
+    const refundAudit = processStripeEvent(
+      refundEvent({ paymentIntent: auditIntent, amount: 14900, amountRefunded: 14900 }),
+    );
+    expect(refundAudit.body).toMatchObject({ ignored: 'no_matching_purchase' });
+    expect(refundAudit.alert).toBeUndefined();
+    expect(getAuditJob(job.id)?.paid_at).not.toBeNull();
+    const disputeAny = processStripeEvent(
+      disputeEvent({ paymentIntent: `pi_${uniq('usdc_like')}`, amount: 400 }),
+    );
+    expect(disputeAny.body).toMatchObject({ ignored: 'no_matching_purchase' });
+    const usdc = findPurchaseById(opened.opened)!;
+    expect(usdc).toMatchObject({ rail: 'usdc', outcome: 'minted', stripe_payment_intent: null });
+    expect(usdc.clawback_credits).toBeNull();
   });
 });
