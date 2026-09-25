@@ -336,18 +336,30 @@ export interface OverlayHealth {
   sha256: string | null;
   /** Présent (et vrai) seulement quand la dernière surcouche acceptée est servie. */
   fallback?: true;
+  /**
+   * Présent seulement quand la surcouche servie ne porte pas des membres venus
+   * après la première surcouche (`mayBeAbsent`, src/lib/restricted-family.ts) :
+   * leurs identifiants. Disparaît dès qu'une release les porte.
+   */
+  absent?: string[];
 }
 
-/** La forme courte, publique, pour /health : un état et une empreinte abrégée. */
+/**
+ * La forme courte, publique, pour /health : un état, une empreinte abrégée, et
+ * les membres absents du fichier servi (des identifiants de code, rien d'autre).
+ */
 export function restrictedOverlayHealth(): Record<OverlayKind, OverlayHealth> {
   const short = (k: OverlayKind): OverlayHealth => {
     const s = statuses.get(k);
     // Base pas encore ouverte : la fusion n'a pas eu lieu, ce n'est pas un refus.
     if (!s) return { state: overlayPathFromEnv(k) ? 'pending' : 'off', sha256: null };
+    const serves = servesOverlay(s.state);
+    const absent = serves ? s.members.filter((m) => m.state === 'absent').map((m) => m.id) : [];
     return {
       state: s.state,
-      sha256: servesOverlay(s.state) ? (s.sha256?.slice(0, 12) ?? null) : null,
+      sha256: serves ? (s.sha256?.slice(0, 12) ?? null) : null,
       ...(s.fallback ? { fallback: true as const } : {}),
+      ...(absent.length > 0 ? { absent } : {}),
     };
   };
   return { bic: short('bic'), compliance: short('compliance') };
@@ -404,13 +416,16 @@ export function reloadRestrictedOverlays(
     if (!current) continue;
     const { status: next, frozen } = build(kind, current.public_path);
     recordSeen(next);
+    // Un membre servi aujourd'hui que le nouveau fichier refuse, ou ne porte plus
+    // du tout (absent, voir `mayBeAbsent`) : une perte, on garde ce qui est servi.
+    // Absent ne rend pas l'état « partiel » : la condition ne peut pas en dépendre.
     const lost =
       servesOverlay(current.state) &&
-      next.state === 'partial' &&
-      current.members.some(
-        (m) =>
-          m.state === 'applied' && next.members.find((n) => n.id === m.id)?.state === 'refused',
-      );
+      current.members.some((m) => {
+        if (m.state !== 'applied') return false;
+        const after = next.members.find((n) => n.id === m.id)?.state;
+        return after === 'refused' || after === 'absent';
+      });
     if (!(servesOverlay(next.state) || next.state === 'off') || lost) {
       housekeep(next, () => {
         dropMerged(next);
@@ -458,6 +473,7 @@ export function describeOverlayStatus(status: OverlayStatus): string {
   const members = status.members
     .map((m) => {
       if (m.state === 'refused') return `${m.id}=refusé(${m.reason ?? '?'})`;
+      if (m.state === 'absent') return `${m.id}=absent du fichier (non consulté)`;
       if (m.state === 'kept_public') return `${m.id}=public gardé (plus récent ou non daté)`;
       const why = m.decision ? `,${DECISION_LABEL[m.decision] ?? m.decision}` : '';
       return `${m.id}=${m.inserted ?? m.rows}${why}`;

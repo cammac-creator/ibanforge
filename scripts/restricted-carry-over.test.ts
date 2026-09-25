@@ -56,6 +56,8 @@ interface Network {
   ebaExtra?: readonly string[];
   /** Des membres dont le seeder ne dit rien (faute de code simulée). */
   silent?: readonly string[];
+  /** La liste finlandaise est rechargée d'un fichier (FI_LIST_PATH), au lieu d'être recopiée. */
+  fiList?: boolean;
 }
 
 /**
@@ -133,6 +135,48 @@ function fakeSeeders(sourcePath: string, net: Network) {
           )
           .run(net.praMonth ?? '2026-09', net.stamp).changes;
         note('pra', n);
+      } else if (script === 'seed-curated-map.ts') {
+        // Les membres venus après la première surcouche : clés PL, FI, LU de la
+        // carte composite copiées de la base d'essai, datées du passage ; la liste
+        // finlandaise, statique, n'est rechargée que d'un fichier.
+        const ensure = (name: string): void => {
+          const exists = db
+            .prepare("SELECT 1 FROM main.sqlite_master WHERE type = 'table' AND name = ?")
+            .get(name);
+          if (exists) return;
+          for (const sql of RESTRICTED_TABLES.bic.find((t) => t.name === name)!.ddl)
+            db.prepare(sql).run();
+        };
+        ensure('curated_bank_codes');
+        for (const [cc, member] of [
+          ['PL', 'map_pl'],
+          ['FI', 'map_fi'],
+          ['LU', 'map_lu'],
+        ] as const) {
+          if (down.has(member)) {
+            note(member, 0);
+            continue;
+          }
+          const n = db
+            .prepare(
+              `INSERT INTO main.curated_bank_codes (country, code, bic, source, as_of)
+               SELECT country, code, bic, source, ? FROM src.curated_bank_codes
+               WHERE country = ? ORDER BY rowid`,
+            )
+            .run(net.stamp.slice(0, 10), cc).changes;
+          note(member, n);
+        }
+        if (net.fiList) {
+          ensure('fi_monetary_codes');
+          const n = db
+            .prepare(
+              `INSERT INTO main.fi_monetary_codes (code, bic, institution, source, as_of)
+               SELECT code, bic, institution, source, as_of FROM src.fi_monetary_codes ORDER BY rowid`,
+            )
+            .run().changes;
+          note('register_fi', n);
+        } else if (!silent.has('register_fi'))
+          reportSeedMember({ member: 'register_fi', state: 'failed', cause: 'static_list' }, env);
       } else throw new Error(`Seeder inattendu : ${script}`);
     } finally {
       db.close();
@@ -234,7 +278,12 @@ describe('overlay seed --kind bic : reprise membre par membre', () => {
     fixture = installRestrictedFixture();
     family = completeRestrictedFamily(fixture.bicPath, fixture.compliancePath);
     root = mkdtempSync(join(tmpdir(), 'ibf-reprise-'));
-    const first = passage('septembre', { now: SEPTEMBER, net: { stamp: '2026-09-01 07:31:00' } });
+    // Le premier passage charge aussi la liste finlandaise statique (FI_LIST_PATH,
+    // un geste manuel) ; les suivants la recopient telle quelle.
+    const first = passage('septembre', {
+      now: SEPTEMBER,
+      net: { stamp: '2026-09-01 07:31:00', fiList: true },
+    });
     if (!first.output) throw first.error;
     september = first.out;
   }, 120_000);
@@ -242,6 +291,87 @@ describe('overlay seed --kind bic : reprise membre par membre', () => {
   afterAll(async () => {
     rmSync(root, { recursive: true, force: true });
     await fixture.restore();
+  });
+
+  it('la liste finlandaise statique est recopiée telle quelle, sans annonce ni reprise', () => {
+    const { out, output, logs, error } = passage('octobre-statique', {
+      previous: september,
+      now: OCTOBER,
+      net: { stamp: '2026-10-01 07:31:00' },
+    });
+    expect(error).toBeUndefined();
+    expect(output!.carried_over).toEqual([]);
+    expect(logs).toEqual([]);
+    const fiRows = rowsOf(out, 'fi_monetary_codes', 'as_of', '2026-01-15');
+    expect(fiRows.length).toBeGreaterThan(0);
+    expect(fiRows).toEqual(rowsOf(september, 'fi_monetary_codes', 'as_of', '2026-01-15'));
+    expect(metaOf(out).carried_over).toBeUndefined();
+    expect(inspectOverlay(out, 'bic').members.every((m) => m.state === 'applied')).toBe(true);
+
+    // Le mois suivant, recopiée de la recopie : datée de janvier, la liste a bien
+    // plus de 45 jours, et n'a jamais été « reprise ». Ni borne d'âge, ni refus, ni
+    // annonce ; sa date reste celle de la liste, jamais celle d'un passage.
+    const november = passage('novembre-statique', {
+      previous: out,
+      now: '2026-11-01T07:30:00.000Z',
+      net: { stamp: '2026-11-01 07:31:00' },
+    });
+    expect(november.error).toBeUndefined();
+    expect(november.output!.carried_over).toEqual([]);
+    expect(november.logs).toEqual([]);
+    expect(rowsOf(november.out, 'fi_monetary_codes', 'as_of', '2026-01-15')).toEqual(fiRows);
+    expect(inspectOverlay(november.out, 'bic').members.every((m) => m.state === 'applied')).toBe(
+      true,
+    );
+  });
+
+  it('premier passage des membres tardifs, leur source en panne : absents, le reste publié', () => {
+    // La release d'avant ces membres : la famille complète, sans leurs tables.
+    const older = join(root, 'avant-source.sqlite');
+    copyFileSync(fixture.bicPath, older);
+    const o = new Database(older);
+    o.exec('DROP TABLE curated_bank_codes');
+    o.exec('DROP TABLE fi_monetary_codes');
+    o.close();
+    const previous = extractOverlay({
+      kind: 'bic',
+      sourcePath: older,
+      outPath: join(root, 'avant.sqlite'),
+      generator: 'test',
+    }).path;
+    const { out, output, logs, error } = passage('octobre-premier', {
+      previous,
+      now: OCTOBER,
+      net: { stamp: '2026-10-01 07:31:00', down: ['map_pl', 'map_fi', 'map_lu'] },
+    });
+    expect(error).toBeUndefined();
+    const states = Object.fromEntries(
+      inspectOverlay(out, 'bic').members.map((m) => [m.id, m.state]),
+    );
+    expect(states).toMatchObject({
+      pra: 'applied',
+      eba_step2: 'applied',
+      map_pl: 'absent',
+      map_fi: 'absent',
+      map_lu: 'absent',
+      register_fi: 'absent',
+    });
+    expect(output!.carried_over).toEqual([]);
+    expect(logs.filter((l) => l.includes('membre absent'))).toHaveLength(4);
+    expect(runCommand(['check', '--kind', 'bic', '--overlay', out]).code).toBe(0);
+    // Leur source répond au passage suivant : ils arrivent, et rien n'est perdu.
+    const next = passage('novembre-premier', {
+      previous: out,
+      now: '2026-11-01T07:30:00.000Z',
+      net: { stamp: '2026-11-01 07:31:00' },
+    });
+    expect(next.error).toBeUndefined();
+    const after = Object.fromEntries(
+      inspectOverlay(next.out, 'bic').members.map((m) => [m.id, m.state]),
+    );
+    expect(after).toMatchObject({ map_pl: 'applied', map_fi: 'applied', map_lu: 'applied' });
+    // La liste statique n'a jamais été chargée : toujours absente, toujours dite.
+    expect(after.register_fi).toBe('absent');
   });
 
   it("l'ordre d'insertion partagé couvre exactement les sources de bic_entries", () => {

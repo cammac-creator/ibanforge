@@ -23,7 +23,12 @@ import {
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TSX = join(ROOT, 'node_modules', '.bin', 'tsx');
-const SEEDERS = ['enrich-bic-database.ts', 'seed-national.ts', 'seed-pra-banks.ts'];
+const SEEDERS = [
+  'enrich-bic-database.ts',
+  'seed-national.ts',
+  'seed-pra-banks.ts',
+  'seed-curated-map.ts',
+];
 
 const OFFLINE_FETCH = `
 import { appendFileSync } from 'node:fs';
@@ -109,6 +114,11 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       register_be: 'failed:http_503',
       register_sm: 'failed:http_503',
       pra: 'failed:download_failed',
+      map_pl: 'failed:http_503',
+      map_fi: 'failed:http_503',
+      map_lu: 'failed:http_503',
+      // La liste finlandaise est statique : jamais téléchargée, recopiée par `seed`.
+      register_fi: 'failed:static_list',
     });
     expect(Object.keys(states).sort()).toEqual(
       membersOf('bic')
@@ -127,6 +137,7 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       'nbb.be',
       'bcsm.sm',
       'bankofengland.co.uk',
+      'pypi.org',
     ])
       expect(
         urls.some((u) => u.includes(host)),
@@ -144,6 +155,12 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
         count("SELECT COUNT(*) AS n FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SM')"),
       ).toBe(0);
       expect(count('SELECT COUNT(*) AS n FROM pra_banks')).toBe(0);
+      // Les membres tardifs : aucune table créée pour rien quand la source est en panne.
+      expect(
+        count(
+          "SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('curated_bank_codes', 'fi_monetary_codes')",
+        ),
+      ).toBe(0);
     } finally {
       db.close();
     }

@@ -23,7 +23,7 @@
  */
 import { createRequire } from 'node:module';
 import type DatabaseType from 'better-sqlite3';
-import { RESTRICTED_FAMILY } from '../lib/restricted-family.js';
+import { RESTRICTED_FAMILY, RESTRICTED_TABLES } from '../lib/restricted-family.js';
 import { FIXTURE } from './restricted-fixtures.js';
 
 const require = createRequire(import.meta.url);
@@ -183,6 +183,35 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         .n;
       for (let i = praCount; i < floorOf('pra') + 5; i++)
         pra.run(`XMPF${tag(i)}`, `Remplissage PRA ${i}`, FIXTURE.PRA.month);
+
+      // Les membres venus après la première surcouche (clés PL, FI, LU de la carte
+      // composite, liste finlandaise) : tables créées depuis la constante, lignes
+      // inventées jusqu'aux planchers. BIC `XMP…`, noms « Remplissage ».
+      for (const spec of RESTRICTED_TABLES.bic.filter(
+        (t) => t.name === 'curated_bank_codes' || t.name === 'fi_monetary_codes',
+      )) {
+        const exists = bic
+          .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+          .get(spec.name);
+        if (!exists) for (const sql of spec.ddl) bic.prepare(sql).run();
+      }
+      const curated = bic.prepare(
+        `INSERT OR IGNORE INTO curated_bank_codes (country, code, bic, source, as_of)
+         VALUES (?, ?, ?, 'Remplissage', '2026-01-01')`,
+      );
+      // Pologne : huit chiffres, 999xxxxx ; Finlande et Luxembourg : trois chiffres.
+      for (let i = 0; i < floorOf('map_pl') + 5; i++)
+        curated.run('PL', String(99900000 + i), `XMPPPL${tag(i % 1296).slice(2)}XXX`);
+      for (let i = 0; i < floorOf('map_fi') + 5; i++)
+        curated.run('FI', String(500 + i).padStart(3, '0'), 'XMPMFIH1');
+      for (let i = 0; i < floorOf('map_lu') + 5; i++)
+        curated.run('LU', String(800 + i).padStart(3, '0'), 'XMPMLULL');
+      const fiList = bic.prepare(
+        `INSERT OR IGNORE INTO fi_monetary_codes (code, bic, institution, source, as_of)
+         VALUES (?, 'XMPRFIH1', ?, 'Remplissage', '2026-01-15')`,
+      );
+      for (let i = 0; i < floorOf('register_fi') + 5; i++)
+        fiList.run(String(9000 + i), `Remplissage FI ${i}`);
     })();
   } finally {
     bic.close();

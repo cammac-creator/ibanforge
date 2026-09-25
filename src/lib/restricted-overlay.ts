@@ -177,8 +177,17 @@ export function carriedOverFromMeta(
   return members;
 }
 
-/** Ce qu'il advient d'un membre : servi par la surcouche, gardé du public, ou refusé. */
-export type MemberState = 'applied' | 'kept_public' | 'refused';
+/**
+ * Ce qu'il advient d'un membre : servi par la surcouche, gardé du public, refusé,
+ * ou absent (un membre `mayBeAbsent` que le fichier ne porte pas du tout : ni
+ * servi, ni refusé, sans alerte ; voir src/lib/restricted-family.ts).
+ */
+export type MemberState = 'applied' | 'kept_public' | 'refused' | 'absent';
+
+/** Refusé, au sens des portes : ni servi ni absent (un membre absent n'est pas une faute du fichier). */
+export function memberRefused(member: { state: MemberState }): boolean {
+  return member.state !== 'applied' && member.state !== 'absent';
+}
 
 /** Pourquoi un membre accepté est servi par la surcouche, ou laissé au public. */
 export type MemberDecision =
@@ -539,6 +548,18 @@ export function inspectOverlay(path: string, kind: OverlayKind): OverlayInspecti
         rows: 0,
       };
       members.push(report);
+      // Un membre venu après la première surcouche que ce fichier ne porte pas du
+      // tout (aucun compte, aucune ligne) : absent, jamais refusé. Une table
+      // présente a déjà passé le contrôle de sa définition ci-dessus.
+      if (
+        member.mayBeAbsent &&
+        !recorded.has(member.id) &&
+        (!tables.includes(member.table) || countMember(db, 'main', member) === 0)
+      ) {
+        report.state = 'absent';
+        report.reason = 'not_in_file';
+        continue;
+      }
       if (!tables.includes(member.table)) {
         report.reason = 'table_missing';
         continue;
@@ -969,6 +990,8 @@ export const SHRINK_GUARD_MIN_ROWS = 50;
 export interface ExtractResult {
   path: string;
   sha256: string;
+  /** Membres `mayBeAbsent` que ce fichier ne porte pas (voir src/lib/restricted-family.ts). */
+  absent: string[];
   members: Array<{
     id: string;
     table: string;
@@ -1014,6 +1037,13 @@ function memberDates(
  * `refresh` (passage `seed` de la base BIC seulement) : l'instant du début du
  * passage et les membres repris de la surcouche précédente, écrits dans
  * `overlay_meta` (OVERLAY_META_SEED_STARTED_AT, OVERLAY_META_CARRIED_OVER).
+ *
+ * Membres absents : ceux de `absentMembers` (la reprise n'a rien à reprendre
+ * pour un membre que la surcouche précédente ne portait pas encore), et les
+ * membres `mayBeAbsent` dont la base lue n'a pas la table. Ni table (si aucun
+ * autre membre ne la porte), ni ligne, ni compte : le fichier ne les porte pas
+ * du tout, et le chargeur les lit absents. Jamais un membre de la première
+ * surcouche : pour lui, une table manquante reste une erreur.
  */
 export function extractOverlay(options: {
   kind: OverlayKind;
@@ -1023,9 +1053,18 @@ export function extractOverlay(options: {
   allowShrink?: boolean;
   /** La reprise membre par membre du passage `seed` (voir OVERLAY_META_CARRIED_OVER). */
   refresh?: OverlayRefresh;
+  /** Membres `mayBeAbsent` que ce fichier ne portera pas (voir ci-dessus). */
+  absentMembers?: readonly string[];
 }): ExtractResult {
   const { kind, sourcePath, outPath, generator, refresh } = options;
   if (!outPath.endsWith('.sqlite')) throw new Error('La surcouche doit finir par .sqlite');
+  const absent = new Set<string>();
+  for (const id of options.absentMembers ?? []) {
+    const member = membersOf(kind).find((m) => m.id === id);
+    if (!member?.mayBeAbsent)
+      throw new Error(`${id} : membre inconnu ou toujours dû, il ne peut pas être absent`);
+    absent.add(id);
+  }
   // Relue avant toute écriture : seule la version contrôlée entre dans le fichier.
   const carriedOver = refresh ? parseCarriedOver(refresh.carriedOver) : null;
   if (refresh) {
@@ -1061,8 +1100,17 @@ export function extractOverlay(options: {
       for (const spec of RESTRICTED_TABLES[kind]) {
         const own = membersOf(kind).filter((m) => m.table === spec.name);
         if (own.length === 0) continue;
-        if (!tableExists(db, 'src', spec.name))
+        if (!tableExists(db, 'src', spec.name)) {
+          // Une table que seuls des membres venus après la première surcouche
+          // portent : la base lue ne les a pas, ils sont absents.
+          if (own.every((m) => m.mayBeAbsent)) {
+            for (const m of own) absent.add(m.id);
+            continue;
+          }
           throw new Error(`Table absente de la base lue : ${spec.name}`);
+        }
+        const present = own.filter((m) => !absent.has(m.id));
+        if (present.length === 0) continue;
         const sourceColumns = tableColumns(db, 'src', spec.name);
         if (sourceColumns.join(',') !== spec.columns.join(','))
           throw new Error(
@@ -1070,7 +1118,7 @@ export function extractOverlay(options: {
               '(src/lib/restricted-family.ts) : la mettre à jour d’abord.',
           );
         createFromConstant(db, spec);
-        const union = unionPredicate(own);
+        const union = unionPredicate(present);
         const columns = spec.columns.map(quoteIdent).join(', ');
         // Les identifiants d'origine sont gardés DANS la surcouche : ils portent
         // l'ordre des lignes, que la fusion reproduit (ORDER BY rowid).
@@ -1084,6 +1132,7 @@ export function extractOverlay(options: {
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const member of membersOf(kind)) {
+        if (absent.has(member.id)) continue;
         const rows = countMember(db, 'main', member);
         if (rows < member.minRows)
           throw new Error(
@@ -1145,13 +1194,15 @@ export function extractOverlay(options: {
     // La surcouche écrite doit passer le contrôle du chargeur avant de remplacer
     // quoi que ce soit : jamais un fichier que l'API refuserait.
     const check = inspectOverlay(temporary, kind);
-    const refused = check.members.filter((m) => m.state !== 'applied');
+    const refused = check.members.filter(
+      (m) => memberRefused(m) || (m.state === 'absent') !== absent.has(m.id),
+    );
     if (!check.ok || refused.length > 0)
       throw new Error(
         `Surcouche refusée par son propre contrôle : ${check.error ?? refused.map((m) => `${m.id}=${m.reason}`).join(', ')}`,
       );
     renameSync(temporary, outPath);
-    return { path: outPath, sha256: sha256File(outPath), members };
+    return { path: outPath, sha256: sha256File(outPath), absent: [...absent], members };
   } catch (err) {
     if (db.open) db.close();
     removeFileWithCompanions(temporary);

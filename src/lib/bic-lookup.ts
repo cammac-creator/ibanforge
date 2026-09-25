@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { getBicDB } from './db.js';
 import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
-import { lookupFiInstitution } from './fi-register.js';
+import { lookupFiInstitution, resetFiRegister } from './fi-register.js';
+import { curatedMapCountries } from './restricted-family.js';
 import { hasNonLatinScript } from './gleif-address.js';
 import {
   allocatedCodes,
@@ -271,6 +272,65 @@ function addListedDutchProviders(data: Record<string, BicDataEntry>): Record<str
   return data;
 }
 
+/**
+ * Les clés de la carte composite que la surcouche privée peut apporter (PL, FI,
+ * LU ; membres `map_pl`, `map_fi`, `map_lu`, table `curated_bank_codes`,
+ * src/lib/restricted-family.ts), ajoutées au fichier public au chargement.
+ *
+ * La règle de fraîcheur de la fusion (src/lib/restricted-overlay.ts, cas (a) à
+ * (d)), appliquée pays par pays. Les clés du fichier public ne sont pas datées :
+ * tant qu'il porte au moins une clé d'un pays, c'est lui qui répond pour ce pays
+ * (d), et la surcouche n'y ajoute ni n'y remplace rien. Elle ne sert un pays que
+ * quand le fichier n'en porte plus aucune clé (a), ce que fait l'étape du
+ * retrait. Jamais les deux côtés mêlés dans un même pays : la fusion ne mêle
+ * jamais les lignes d'un membre. Sans la table (base publique seule, ou
+ * surcouche qui ne porte pas ces membres), rien n'est ajouté.
+ */
+function addCuratedRows(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  const countries = curatedMapCountries();
+  const carried = new Set<string>();
+  for (const key of Object.keys(data)) {
+    const cc = key.slice(0, key.indexOf(':'));
+    if (countries.has(cc)) carried.add(cc);
+  }
+  // Le fichier porte encore chaque pays : la base n'est même pas lue.
+  if (carried.size === countries.size) return data;
+  let rows: Array<{ country: string; code: string; bic: string }>;
+  try {
+    rows = getBicDB()
+      .prepare('SELECT country, code, bic FROM curated_bank_codes ORDER BY country, code')
+      .all() as typeof rows;
+  } catch {
+    // Pas de table : la base publique seule, ou une surcouche qui ne la porte pas.
+    return data;
+  }
+  for (const row of rows) {
+    if (!countries.has(row.country) || carried.has(row.country)) continue;
+    data[`${row.country}:${row.code}`] = { bic: row.bic };
+  }
+  return data;
+}
+
+/** Mémo par pays de `curatedKeysMissing` : vidé avec la base (resetStatements). */
+const curatedMissingCache = new Map<string, boolean>();
+
+/**
+ * Un pays dont les clés de la carte composite peuvent venir de la surcouche (PL,
+ * FI, LU), sans aucune clé chargée : ni le fichier public ni la surcouche ne les
+ * portent. Une absence dans la carte ne dit alors rien du code (« non
+ * consulté »). Jamais vrai tant que le fichier public porte le pays.
+ */
+export function curatedKeysMissing(countryCode: string): boolean {
+  const cc = countryCode.toUpperCase();
+  if (!curatedMapCountries().has(cc)) return false;
+  const cached = curatedMissingCache.get(cc);
+  if (cached !== undefined) return cached;
+  const prefix = `${cc}:`;
+  const missing = !Object.keys(getBicData()).some((k) => k.startsWith(prefix));
+  curatedMissingCache.set(cc, missing);
+  return missing;
+}
+
 function getBicData(): Record<string, BicDataEntry> {
   if (!bicDataCache) {
     const require = createRequire(import.meta.url);
@@ -278,7 +338,9 @@ function getBicData(): Record<string, BicDataEntry> {
     bicDataCache = addListedDutchProviders(
       pruneRetiredItalianCodes(
         pruneStaleNationalCodes(
-          pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
+          pruneStaleFinnishCodes(
+            pruneStaleGermanCodes(pruneStaleSwissCodes(addCuratedRows({ ...raw }))),
+          ),
         ),
       ),
     );
@@ -1022,6 +1084,12 @@ export function resetStatements(): void {
   // Même base, même raison : une surcouche rechargée peut apporter ou retirer
   // les seules lignes d'un pays (src/lib/restricted-overlay-runtime.ts).
   referenceDataCache.clear();
+  // La carte composite et la liste finlandaise lisent aussi la base servie : une
+  // surcouche rechargée peut apporter les clés PL, FI et LU ou une liste plus
+  // récente, et les élagages de la carte relisent les registres qu'elle sert.
+  bicDataCache = null;
+  curatedMissingCache.clear();
+  resetFiRegister();
   // L'index des traces courantes est calculé sur la même base (bic-trace.ts).
   resetTraceIndex();
 }

@@ -231,6 +231,15 @@ ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script re
 `.gitignore` attrape `restricted-*.sqlite*` et `*.merged-*.sqlite*`), jamais ajouter une table
 ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
 
+**Les membres venus après la première surcouche (25.09.2026)** : les clés PL, FI et LU de la
+carte composite et la liste finlandaise ont aussi leurs membres (`map_pl`, `map_fi`, `map_lu`,
+`register_fi`), marqués `mayBeAbsent` (une surcouche plus ancienne qui ne les porte pas reste
+acceptée, `/health` les nomme sous `restricted_overlays.bic.absent`) et reconstruits par
+`scripts/seed-curated-map.ts`. Tant que `src/db/bic_data.json` et `src/lib/fi-register.ts`
+portent encore ces données, le public répond (règle de fraîcheur pays par pays :
+`addCuratedRows` dans `src/lib/bic-lookup.ts` ; la liste finlandaise de la surcouche seulement
+si elle est strictement plus récente) : aucune réponse ne change avant l'étape du retrait.
+
 **Le tirage (étape 5, depuis le 25.09.2026)** : `src/lib/restricted-overlay-pull.ts`. Un dépôt
 privé reconstruit la surcouche chaque semaine (conformité) et chaque mois (BIC), ne commite
 aucune donnée, et publie une release : les deux fichiers et un `manifest.json`

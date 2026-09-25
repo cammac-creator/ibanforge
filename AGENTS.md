@@ -131,7 +131,14 @@ npm run build             # next build
   script refuses, and `.gitignore` catches `restricted-*.sqlite*` and `*.merged-*.sqlite*`),
   never add a table or a source to the family anywhere but that constant, and never let a
   public workflow download or commit the family: stopping them is the next step, not a
-  side effect.
+  side effect. The PL, FI and LU keys of the composite map and the Finnish list have
+  members too (`map_pl`, `map_fi`, `map_lu`, `register_fi`, 25 September 2026): marked
+  `mayBeAbsent` (an older overlay without them is accepted, `/health` lists them under
+  `restricted_overlays.bic.absent`), rebuilt by `scripts/seed-curated-map.ts`. While
+  `src/db/bic_data.json` and `src/lib/fi-register.ts` still carry that data, the public side
+  answers (the freshness rule, per country: `addCuratedRows` in `src/lib/bic-lookup.ts`;
+  the overlay's Finnish list only when strictly newer), so they change no answer before the
+  removal step.
 - `src/lib/restricted-overlay-pull.ts`: the API refreshes those files itself (step 5,
   since 25 September 2026). A private repository rebuilds the overlay weekly (compliance)
   and monthly (BIC), commits no data, and publishes a release: both files and a
