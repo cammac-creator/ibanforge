@@ -6,6 +6,7 @@ import {
   linkSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -17,6 +18,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertOutsideRepository, OVERLAY_FILE_NAMES, runCommand } from './restricted-overlay.js';
 import { sha256File } from '../src/lib/restricted-overlay.js';
+import { membersOf } from '../src/lib/restricted-family.js';
+import { parseManifest, type OverlayManifest } from '../src/lib/restricted-overlay-manifest.js';
 import {
   installRestrictedFixture,
   type RestrictedFixture,
@@ -191,6 +194,138 @@ describe('restricted-overlay.ts, commandes', () => {
     expect(() =>
       runCommand(['seed', '--kind', 'bic', '--out', join(ROOT, 'data', 'restricted-bic.sqlite')]),
     ).toThrow(/dépôt public/);
+    expect(() =>
+      runCommand(['manifest', '--dir', out, '--out', join(ROOT, 'data', 'manifest.json')]),
+    ).toThrow(/dépôt public/);
     expect(() => runCommand(['inconnue'])).toThrow(/Commande/);
+  });
+
+  // Étape 5 : le manifeste d'une release du dépôt privé, et sa porte de qualité.
+  const COMMIT_1 = '0123456789abcdef0123456789abcdef01234567';
+  const COMMIT_2 = 'fedcba9876543210fedcba9876543210fedcba98';
+  const readManifest = (path: string): OverlayManifest => {
+    const parsed = parseManifest(readFileSync(path, 'utf8'));
+    if (!parsed.ok) throw new Error(parsed.error);
+    return parsed.manifest;
+  };
+
+  it('manifest décrit chaque surcouche comme le chargeur la voit, verify la reconnaît', () => {
+    const manifestPath = join(fixture.dir, 'release-1', 'manifest.json');
+    const { code } = runCommand([
+      'manifest',
+      '--dir',
+      out,
+      '--out',
+      manifestPath,
+      '--commit',
+      COMMIT_1,
+    ]);
+    expect(code).toBe(0);
+    expect(statSync(manifestPath).mode & 0o777).toBe(0o600);
+    const manifest = readManifest(manifestPath);
+    expect(manifest.public_commit).toBe(COMMIT_1);
+    for (const kind of ['bic', 'compliance'] as const) {
+      const path = join(out, OVERLAY_FILE_NAMES[kind]);
+      const entry = manifest.files[kind]!;
+      expect(entry).toMatchObject({
+        name: OVERLAY_FILE_NAMES[kind],
+        sha256: sha256File(path),
+        bytes: statSync(path).size,
+        public_commit: COMMIT_1,
+      });
+      expect(Object.keys(entry.members).sort()).toEqual(
+        membersOf(kind)
+          .map((m) => m.id)
+          .sort(),
+      );
+    }
+    expect(runCommand(['verify', '--manifest', manifestPath, '--dir', out]).code).toBe(0);
+  });
+
+  it('manifest reprend le fichier inchangé ; la porte refuse sans rien écrire', () => {
+    const previousPath = join(fixture.dir, 'release-1', 'manifest.json');
+    const previous = readManifest(previousPath);
+    const dir = join(fixture.dir, 'release-2');
+    mkdirSync(dir);
+    // La base BIC est reprise telle quelle ; la conformité est reconstruite.
+    copyFileSync(join(out, OVERLAY_FILE_NAMES.bic), join(dir, OVERLAY_FILE_NAMES.bic));
+    runCommand(['extract', '--compliance', fixture.compliancePath, '--out-dir', dir]);
+    const next = join(dir, 'manifest.json');
+    runCommand([
+      'manifest',
+      '--dir',
+      dir,
+      '--out',
+      next,
+      '--commit',
+      COMMIT_2,
+      '--previous',
+      previousPath,
+    ]);
+    const manifest = readManifest(next);
+    expect(manifest.files.bic).toEqual(previous.files.bic);
+    expect(manifest.files.compliance!.public_commit).toBe(COMMIT_2);
+    expect(manifest.files.compliance!.sha256).not.toBe(previous.files.compliance!.sha256);
+
+    // Une release précédente plus fournie : chute brutale, rien n'est écrit.
+    const inflated = structuredClone(previous);
+    inflated.files.compliance!.members.epc_sepa = 1_000_000;
+    const inflatedPath = join(dir, 'precedente-gonflee.json');
+    writeFileSync(inflatedPath, JSON.stringify(inflated));
+    const refused = join(dir, 'refus.json');
+    expect(() =>
+      runCommand(['manifest', '--dir', dir, '--out', refused, '--previous', inflatedPath]),
+    ).toThrow(/Porte de qualité.*shrunk:compliance:epc_sepa/);
+    expect(existsSync(refused)).toBe(false);
+    // Un membre de la précédente absent de la nouvelle.
+    const lost = structuredClone(previous);
+    lost.files.bic!.members.membre_disparu = 3;
+    const lostPath = join(dir, 'precedente-membre.json');
+    writeFileSync(lostPath, JSON.stringify(lost));
+    expect(() =>
+      runCommand(['manifest', '--dir', dir, '--out', refused, '--previous', lostPath]),
+    ).toThrow(/lost_member:bic:membre_disparu/);
+    // Après contrôle manuel.
+    expect(
+      runCommand([
+        'manifest',
+        '--dir',
+        dir,
+        '--out',
+        refused,
+        '--previous',
+        inflatedPath,
+        '--allow-shrink',
+      ]).code,
+    ).toBe(0);
+  });
+
+  it('manifest refuse une surcouche que le chargeur refuserait', () => {
+    const dir = join(fixture.dir, 'release-abimee');
+    mkdirSync(dir);
+    writeFileSync(join(dir, OVERLAY_FILE_NAMES.bic), 'pas une base');
+    expect(() =>
+      runCommand(['manifest', '--dir', dir, '--out', join(dir, 'manifest.json')]),
+    ).toThrow(/refusée par le contrôle du chargeur/);
+    expect(existsSync(join(dir, 'manifest.json'))).toBe(false);
+  });
+
+  it('verify répond 1 quand un fichier manque ou diffère', () => {
+    const manifestPath = join(fixture.dir, 'release-1', 'manifest.json');
+    const dir = join(fixture.dir, 'release-verif');
+    mkdirSync(dir);
+    copyFileSync(join(out, OVERLAY_FILE_NAMES.bic), join(dir, OVERLAY_FILE_NAMES.bic));
+    const missing = runCommand(['verify', '--manifest', manifestPath, '--dir', dir]);
+    expect(missing.code).toBe(1);
+    expect(missing.output).toEqual([
+      { kind: 'bic', name: OVERLAY_FILE_NAMES.bic, state: 'ok' },
+      { kind: 'compliance', name: OVERLAY_FILE_NAMES.compliance, state: 'missing' },
+    ]);
+    writeFileSync(join(dir, OVERLAY_FILE_NAMES.compliance), 'autre contenu');
+    expect(runCommand(['verify', '--manifest', manifestPath, '--dir', dir]).output).toContainEqual({
+      kind: 'compliance',
+      name: OVERLAY_FILE_NAMES.compliance,
+      state: 'mismatch',
+    });
   });
 });

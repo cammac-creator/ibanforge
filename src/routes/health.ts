@@ -13,6 +13,10 @@ import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
 import { verificationDelivery } from '../lib/key-creation-guard.js';
 import { servedAt } from '../lib/served-at.js';
 import { restrictedOverlayHealth } from '../lib/restricted-overlay-runtime.js';
+import {
+  restrictedOverlayPullHealth,
+  type OverlayPullHealth,
+} from '../lib/restricted-overlay-pull.js';
 import { frozenTrace, type FrozenSourceTrace } from '../lib/bic-trace.js';
 
 const require = createRequire(import.meta.url);
@@ -121,6 +125,19 @@ function probeFrozenTrace(): FrozenSourceTrace[] {
     return frozenTrace();
   } catch {
     return [];
+  }
+}
+
+/**
+ * Le tirage de la surcouche privée (étape 5), gardé comme les sondes ci-dessus :
+ * un état illisible dit `error`, jamais un /health rouge. Mémoire seulement,
+ * aucun appel réseau : cet endpoint est sondé toutes les 30 s.
+ */
+function probeOverlayPull(): OverlayPullHealth {
+  try {
+    return restrictedOverlayPullHealth();
+  } catch {
+    return { state: 'error', error: 'pull_status_unreadable' };
   }
 }
 
@@ -252,7 +269,14 @@ health.get('/health', (c) => {
       // pour prouver un dépôt en ligne. Un état, jamais un compte ; jamais une
       // raison d'échouer le contrôle (une surcouche absente répond « non
       // consulté », pas une panne).
-      restricted_overlays: restrictedOverlayHealth(),
+      //
+      // `pull` AJOUTÉ à côté, rien de renommé (étape 5) : le tirage de la
+      // surcouche depuis le dépôt privé. `off` sans ses variables ; sinon
+      // `pending`, `ok` ou `error`, la dernière tentative et le dernier succès,
+      // la dernière release lue, et pour chaque base la release et la date de
+      // génération du fichier servi, avec son âge en jours. Jamais le nom du
+      // dépôt ni le jeton ; l'erreur est un code court.
+      restricted_overlays: { ...restrictedOverlayHealth(), pull: probeOverlayPull() },
     });
   } catch {
     // The probe itself may be the first thing to touch a broken stats database

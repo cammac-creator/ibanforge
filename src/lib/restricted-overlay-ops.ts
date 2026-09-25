@@ -17,8 +17,11 @@
  *   variable (sinon un bon dépôt suivi d'un redémarrage la laissait ouverte).
  * - `overlay:reload` : une exception pendant le rechargement. Fermée par le
  *   premier rechargement qui aboutit.
+ * - `overlay:pull` et `overlay:pull:stale` : le tirage de la surcouche privée
+ *   (étape 5), tenues par src/lib/restricted-overlay-pull.ts.
  */
 import { opsFail, opsOk } from './ops-alert.js';
+import { overlayPullTick } from './restricted-overlay-pull.js';
 import {
   describeOverlayStatus,
   reloadRestrictedOverlays,
@@ -88,9 +91,21 @@ export function reportBootOverlays(): void {
 
 /**
  * Un passage de la veille : ne recharge que les bases dont le fichier a changé
- * depuis le dernier vu, qu'il ait été accepté ou refusé (R1, R5).
+ * depuis le dernier vu, qu'il ait été accepté ou refusé (R1, R5). Puis le tirage
+ * de la surcouche privée, s'il est dû (étape 5, inerte sans ses variables) :
+ * quand il a remplacé le fichier d'une base, celle-ci est rechargée aussitôt,
+ * par le même chemin, avec le même journal et les mêmes alertes.
  */
 export function overlayWatchTick(): void {
+  reloadChangedOverlays();
+  void overlayPullTick()
+    .then((installed) => {
+      if (installed.length > 0) reloadChangedOverlays();
+    })
+    .catch(() => undefined);
+}
+
+function reloadChangedOverlays(): void {
   try {
     const changed = restrictedOverlaysChanged();
     if (changed.length === 0) return;
