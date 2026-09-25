@@ -276,6 +276,10 @@ belongs to anyone.
 
 MIT — see [LICENSE](LICENSE).
 
+The MIT License covers the code and its documentation, not the data files:
+the third-party records they contain remain subject to their publishers'
+terms, described in [NOTICE](NOTICE).
+
 This project includes third-party components licensed under the Apache License 2.0
 (notably `@coinbase/x402` and related x402 packages). See [NOTICE](NOTICE) for
 full attributions and required Apache 2.0 notices.
