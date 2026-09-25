@@ -22,9 +22,15 @@
  *   et reproduire avec « Zdroj: ČNB » (docs/data-sources.md). Ni ses lignes ni la
  *   table de ses éditions annoncées (`national_bank_codes_pending`) ne sont membres.
  * - `bic_entries` de source `six_group` : à vérifier, faible enjeu, hors de cette étape.
- * - Les données hors des deux bases (carte composite `src/db/bic_data.json`,
- *   `src/lib/fi-register.ts`, exports du site `frontend/data/registers/*.json`,
- *   blocs EPC des exports) : étape suivante du retrait, pas du chargeur.
+ * - Les données hors des deux bases, à traiter à l'étape du retrait (règle de la
+ *   décision du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C
+ *   de NOTICE) : la carte composite `src/db/bic_data.json` (clés AT, BE, LU, PL,
+ *   FI), `src/lib/fi-register.ts`, les exports du site
+ *   `frontend/data/registers/*.json`, les blocs EPC des exports et des réponses
+ *   d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
+ *   `mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`,
+ *   `frontend/content/{en,fr,de}/docs/onboarding.mdx`), et les entrées GB (FCA)
+ *   de `scripts/data/eu-emi-register-2026-05-22.json`.
  *
  * ## Les minimums
  *
@@ -65,6 +71,36 @@ export interface RestrictedTable {
    * refuse le membre.
    */
   onConflict: 'ignore' | 'fail';
+  /**
+   * La définition de la table et de ses index, telle que la base PUBLIQUE la
+   * porte. L'extraction crée les tables de la surcouche avec elle, et la fusion
+   * recrée avec elle une table que la base publique n'aurait plus. Jamais le SQL
+   * lu dans la surcouche elle-même : un fichier forgé pourrait y cacher une
+   * seconde instruction (relecture de la PR 252, R4). Un test compare ces
+   * définitions aux bases livrées.
+   */
+  ddl: readonly string[];
+  /**
+   * Comment dater les lignes d'un membre, de la même façon des deux côtés
+   * (surcouche et base publique), pour décider laquelle sert :
+   * - `base_last_refresh` : la date du dernier rafraîchissement de la base de
+   *   conformité (`metadata.last_refresh`), faute de date par ligne ;
+   * - `max_updated_at` : la plus récente des dates de chargement des lignes ;
+   * - `list_month_then_updated_at` : le mois de la liste, puis la date de
+   *   chargement (liste PRA : le mois est la condition de la permission) ;
+   * - `max_as_of` : la date d'édition la plus récente ; vide pour AT et BE, dont
+   *   les éditeurs ne datent rien, ce qui les laisse au public sauf contenu
+   *   identique (règle de fusion, src/lib/restricted-overlay.ts).
+   */
+  freshness: 'base_last_refresh' | 'max_updated_at' | 'list_month_then_updated_at' | 'max_as_of';
+  /**
+   * Les membres de la table se décident ensemble, tous par la surcouche ou tous
+   * par le public. Vrai pour `bic_entries` : OeNB, NBP et EBA STEP2 viennent du
+   * même passage mensuel, partagent un `INSERT OR IGNORE` et l'ordre des
+   * identifiants que lit la recherche par BIC8 ; en garder un et réinsérer
+   * l'autre à la fin changerait la préséance.
+   */
+  decideTogether: boolean;
 }
 
 /** Un membre : un jeu de lignes d'une source, dans une table. */
@@ -122,6 +158,37 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
       // publiques : un BIC11 déjà connu d'une source publique garde la ligne
       // publique. La fusion reproduit la même règle.
       onConflict: 'ignore',
+      ddl: [
+        `CREATE TABLE bic_entries (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  bic8         TEXT NOT NULL,
+  bic11        TEXT NOT NULL UNIQUE,
+  institution  TEXT,
+  country_code TEXT NOT NULL,
+  country_name TEXT,
+  city         TEXT,
+  branch_code  TEXT,
+  branch_info  TEXT,
+  lei          TEXT,
+  lei_status   TEXT,
+  is_test_bic  INTEGER DEFAULT 0,
+  source       TEXT DEFAULT 'gleif',
+  street         TEXT,
+  post_code      TEXT,
+  region         TEXT,
+  address_en     TEXT,
+  address_source TEXT,
+  address_lang   TEXT,
+  address_as_of  TEXT,
+  updated_at   TEXT DEFAULT (datetime('now'))
+)`,
+        'CREATE INDEX idx_bic8 ON bic_entries(bic8)',
+        'CREATE INDEX idx_bic11 ON bic_entries(bic11)',
+        'CREATE INDEX idx_lei ON bic_entries(lei)',
+        'CREATE INDEX idx_country ON bic_entries(country_code)',
+      ],
+      freshness: 'max_updated_at',
+      decideTogether: true,
     },
     {
       name: 'national_bank_codes',
@@ -138,6 +205,17 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
         'as_of',
       ],
       onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE national_bank_codes (
+  country TEXT NOT NULL,
+  code    TEXT NOT NULL,
+  name    TEXT NOT NULL,
+  bic     TEXT, street TEXT, post_code TEXT, town TEXT, lei TEXT, source TEXT, as_of TEXT,
+  PRIMARY KEY (country, code)
+)`,
+      ],
+      freshness: 'max_as_of',
+      decideTogether: false,
     },
     {
       name: 'pra_banks',
@@ -152,6 +230,22 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
         'updated_at',
       ],
       onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE pra_banks (
+  frn        TEXT NOT NULL,
+  firm_name  TEXT NOT NULL,
+  lei        TEXT,
+  section    TEXT NOT NULL,
+  lei_basis  TEXT NOT NULL,
+  list_month TEXT NOT NULL,
+  source     TEXT NOT NULL DEFAULT 'Bank of England',
+  updated_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (frn, section)
+)`,
+        'CREATE INDEX idx_pra_banks_lei ON pra_banks(lei)',
+      ],
+      freshness: 'list_month_then_updated_at',
+      decideTogether: false,
     },
   ],
   compliance: [
@@ -159,9 +253,47 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
       name: 'sanctioned_entities',
       columns: ['bic8', 'entity_name', 'source_list', 'country_code', 'directory_match'],
       onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE sanctioned_entities (
+  bic8        TEXT NOT NULL,
+  entity_name TEXT,
+  source_list TEXT NOT NULL,
+  country_code TEXT,
+  directory_match INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(bic8, source_list)
+)`,
+      ],
+      freshness: 'base_last_refresh',
+      decideTogether: false,
     },
-    { name: 'sepa_participants', columns: ['bic8', 'scheme', 'status'], onConflict: 'fail' },
-    { name: 'vop_participants', columns: ['bic8', 'status'], onConflict: 'fail' },
+    {
+      name: 'sepa_participants',
+      columns: ['bic8', 'scheme', 'status'],
+      onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE sepa_participants (
+  bic8   TEXT NOT NULL,
+  scheme TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  PRIMARY KEY (bic8, scheme)
+)`,
+      ],
+      freshness: 'base_last_refresh',
+      decideTogether: false,
+    },
+    {
+      name: 'vop_participants',
+      columns: ['bic8', 'status'],
+      onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE vop_participants (
+  bic8   TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'active'
+)`,
+      ],
+      freshness: 'base_last_refresh',
+      decideTogether: false,
+    },
   ],
 };
 

@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { copyFileSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import type DatabaseType from 'better-sqlite3';
 import { Hono } from 'hono';
 import { OVERLAY_ENV } from './restricted-family.js';
-import { extractOverlay, stripFamily } from './restricted-overlay.js';
+import { extractOverlay, sha256File, stripFamily } from './restricted-overlay.js';
 import {
   FIXTURE,
   installRestrictedFixture,
@@ -196,16 +196,19 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     expect(both.sanctions.unscreened_lists).toEqual(['UN']);
   });
 
+  const liveDir = (): string[] => readdirSync(join(fixture.dir, 'live')).sort();
+  const mergedFiles = (): string[] => liveDir().filter((n) => n.includes('.merged-'));
+
   it("le fichier arrive pendant que l'API tourne : servi après rechargement", async () => {
     deposit(v1.bic, live.bic);
     deposit(v1.compliance, live.compliance);
-    expect(runtime.restrictedOverlayFilesChanged()).toBe(true);
+    expect(runtime.restrictedOverlaysChanged()).toEqual(['bic', 'compliance']);
     const outcomes = runtime.reloadRestrictedOverlays();
     expect(outcomes.map((o) => [o.kind, o.changed, o.status.state, o.rejected])).toEqual([
       ['bic', true, 'applied', null],
       ['compliance', true, 'applied', null],
     ]);
-    expect(runtime.restrictedOverlayFilesChanged()).toBe(false);
+    expect(runtime.restrictedOverlaysChanged()).toEqual([]);
 
     const onlyUn = await complianceOfBic(FIXTURE.UN.onlyUn);
     expect(onlyUn.compliance.sanctions.bank_sanctioned).toBe(true);
@@ -224,17 +227,37 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     const h = await health();
     expect(h.restricted_overlays.bic.state).toBe('applied');
     expect(h.restricted_overlays.compliance.sha256).toMatch(/^[0-9a-f]{12}$/);
+    // La surcouche servie est gardée comme dernière acceptée (R3).
+    for (const kind of ['bic', 'compliance'] as const) {
+      const served = runtime.restrictedOverlayStatus().find((st) => st.kind === kind)!;
+      expect(sha256File(join(fixture.dir, 'live', `restricted-${kind}.accepted.sqlite`))).toBe(
+        served.sha256,
+      );
+    }
   });
 
-  it('une surcouche différente remplace la précédente, caches compris', async () => {
+  it('un dépôt de la seule conformité ne refusionne pas la base BIC (R5)', async () => {
+    const bicBefore = runtime.restrictedOverlayStatus().find((st) => st.kind === 'bic')!;
+    const bicConnection = db.getBicDB();
+    deposit(v2.compliance, live.compliance);
+    expect(runtime.restrictedOverlaysChanged()).toEqual(['compliance']);
+    const outcomes = runtime.reloadRestrictedOverlays();
+    expect(outcomes.map((o) => [o.kind, o.changed])).toEqual([['compliance', true]]);
+    const bicAfter = runtime.restrictedOverlayStatus().find((st) => st.kind === 'bic')!;
+    expect(bicAfter.served_path).toBe(bicBefore.served_path);
+    expect(bicAfter.built_at).toBe(bicBefore.built_at);
+    expect(db.getBicDB()).toBe(bicConnection);
+    expect((await complianceOfBic('XMPLATW1XXX')).compliance.vop.status).toBe('pending');
+  });
+
+  it('une surcouche BIC différente remplace la précédente, caches compris', async () => {
     // Le cache des recherches BIC est chaud avant le rechargement.
     const warm = await bic(family.eba[0]);
     expect((await bic(family.eba[0])).institution).toBe(warm.institution);
     expect(warm.institution).not.toBe('REMPLISSAGE EBA RENOMME');
 
     deposit(v2.bic, live.bic);
-    deposit(v2.compliance, live.compliance);
-    expect(runtime.restrictedOverlayFilesChanged()).toBe(true);
+    expect(runtime.restrictedOverlaysChanged()).toEqual(['bic']);
     const outcomes = runtime.reloadRestrictedOverlays();
     expect(outcomes.every((o) => o.changed && o.status.state === 'applied')).toBe(true);
 
@@ -243,32 +266,104 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     // L'ONU reste chargée (une autre inscription) : toutes les listes promises
     // ont été lues, et plus rien ne correspond. Un « non » ferme, cette fois.
     expect(onlyUn.sanctions).toEqual({ screened: true, listed: false, matched_lists: [] });
-    expect((await complianceOfBic('XMPLATW1XXX')).compliance.vop.status).toBe('pending');
-
     // Un seul fichier fusionné par base : les précédents sont effacés.
-    const merged = readdirSync(join(fixture.dir, 'live')).filter((n) => n.includes('.merged-'));
-    expect(merged.length).toBe(2);
+    expect(mergedFiles().length).toBe(2);
   });
 
-  it('une surcouche neuve refusée laisse la précédente en service', async () => {
-    const before = runtime.restrictedOverlayStatus().find((s) => s.kind === 'compliance')!;
+  it('un fichier refusé laisse la précédente en service, et la veille se calme (R1)', async () => {
+    const before = runtime.restrictedOverlayStatus();
     writeFileSync(`${live.compliance}.depot`, Buffer.from('pas une base SQLite'));
     renameSync(`${live.compliance}.depot`, live.compliance);
+    expect(runtime.restrictedOverlaysChanged()).toEqual(['compliance']);
     const outcomes = runtime.reloadRestrictedOverlays();
-    const compliance = outcomes.find((o) => o.kind === 'compliance')!;
-    expect(compliance.changed).toBe(false);
-    expect(compliance.rejected?.state).toBe('refused');
-    expect(compliance.status.sha256).toBe(before.sha256);
+    expect(outcomes.map((o) => [o.kind, o.changed, o.rejected?.state])).toEqual([
+      ['compliance', false, 'refused'],
+    ]);
+    // Le fichier refusé est vu : le passage suivant ne recommence rien.
+    expect(runtime.restrictedOverlaysChanged()).toEqual([]);
+    expect(runtime.reloadRestrictedOverlays()).toEqual([]);
+    expect(runtime.restrictedOverlayStatus()).toEqual(before);
     expect((await complianceOfBic('XMPLATW1XXX')).compliance.vop.status).toBe('pending');
+    const compliance = before.find((st) => st.kind === 'compliance')!;
     expect((await health()).restricted_overlays.compliance).toEqual({
       state: 'applied',
-      sha256: before.sha256!.slice(0, 12),
+      sha256: compliance.sha256!.slice(0, 12),
     });
+  });
+
+  it('une surcouche qui perdrait un membre servi est refusée, fichier fusionné compris (R2)', async () => {
+    // v2 avec une inscription VoP altérée : l'empreinte ne correspond plus,
+    // epc_vop serait refusé et ne serait plus servi.
+    const damaged = join(fixture.dir, 'v2', 'abimee.sqlite');
+    copyFileSync(v2.compliance, damaged);
+    const d = openDb(damaged);
+    d.prepare("UPDATE vop_participants SET status = 'active' WHERE bic8 = 'XMPLATW1'").run();
+    d.close();
+    deposit(damaged, live.compliance);
+    const outcomes = runtime.reloadRestrictedOverlays();
+    expect(outcomes.map((o) => [o.kind, o.changed, o.rejected?.state])).toEqual([
+      ['compliance', false, 'partial'],
+    ]);
+    expect(outcomes[0].rejected!.members.find((m) => m.id === 'epc_vop')?.reason).toBe(
+      'content_hash_mismatch',
+    );
+    expect((await complianceOfBic('XMPLATW1XXX')).compliance.vop.status).toBe('pending');
+    expect(mergedFiles().length).toBe(2);
+    expect(runtime.restrictedOverlaysChanged()).toEqual([]);
+  });
+
+  it('au redémarrage, la dernière surcouche acceptée remplace le fichier refusé (R3)', async () => {
+    const accepted = sha256File(join(fixture.dir, 'live', 'restricted-compliance.accepted.sqlite'));
+    // Un redémarrage : connexions fermées, état oublié, fichiers gardés.
+    db.closeAll();
+    runtime.resetRestrictedOverlayStateForTests();
+    expect((await complianceOfBic('XMPLATW1XXX')).compliance.vop.status).toBe('pending');
+    const compliance = runtime.restrictedOverlayStatus().find((st) => st.kind === 'compliance')!;
+    expect(compliance.state).toBe('applied');
+    expect(compliance.fallback).toBe(true);
+    expect(compliance.sha256).toBe(accepted);
+    expect(compliance.error).toMatch(/^variable_file_refused:members_refused:epc_vop=/);
+    expect((await health()).restricted_overlays.compliance).toEqual({
+      state: 'applied',
+      sha256: accepted.slice(0, 12),
+      fallback: true,
+    });
+    // Le fichier refusé est vu : la veille ne le reconstruit pas toutes les dix minutes.
+    await bic(family.eba[0]);
+    expect(runtime.restrictedOverlaysChanged()).toEqual([]);
+    expect(mergedFiles().length).toBe(2);
+  });
+
+  it('un chemin invalide ou un fichier retiré ne font pas boucler la veille (R1)', async () => {
+    const served = runtime.restrictedOverlayStatus().find((st) => st.kind === 'bic')!;
+    const notSqlite = join(fixture.dir, 'live', 'surcouche.db');
+    writeFileSync(notSqlite, 'x');
+    process.env[OVERLAY_ENV.bic] = notSqlite;
+    expect(runtime.restrictedOverlaysChanged()).toEqual(['bic']);
+    const invalid = runtime.reloadRestrictedOverlays();
+    expect(invalid.map((o) => [o.kind, o.changed, o.rejected?.error])).toEqual([
+      ['bic', false, 'overlay_path_invalid'],
+    ]);
+    expect(runtime.restrictedOverlaysChanged()).toEqual([]);
+
+    process.env[OVERLAY_ENV.bic] = live.bic;
+    rmSync(live.bic);
+    expect(runtime.restrictedOverlaysChanged()).toEqual(['bic']);
+    const missing = runtime.reloadRestrictedOverlays();
+    expect(missing.map((o) => [o.kind, o.changed, o.rejected?.error])).toEqual([
+      ['bic', false, 'overlay_file_missing'],
+    ]);
+    expect(runtime.restrictedOverlaysChanged()).toEqual([]);
+    // Toujours servie : effacer le fichier privé n'est PAS un retour arrière.
+    expect(runtime.restrictedOverlayStatus().find((st) => st.kind === 'bic')!.served_path).toBe(
+      served.served_path,
+    );
+    expect((await bic(family.eba[0])).found).toBe(true);
   });
 
   it('variable retirée : retour à la base publique seule', async () => {
     delete process.env[OVERLAY_ENV.bic];
-    expect(runtime.restrictedOverlayFilesChanged()).toBe(true);
+    expect(runtime.restrictedOverlaysChanged()).toEqual(['bic']);
     const outcomes = runtime.reloadRestrictedOverlays();
     const bicOutcome = outcomes.find((o) => o.kind === 'bic')!;
     expect(bicOutcome.changed).toBe(true);
@@ -276,8 +371,8 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     expect(bicOutcome.status.served_path).toBe(publicBase.bic);
     // La ligne EBA STEP2 inventée n'est plus servie.
     expect((await bic(family.eba[0])).found).toBe(false);
-    expect(
-      readdirSync(join(fixture.dir, 'live')).filter((n) => n.startsWith('restricted-bic.merged-')),
-    ).toEqual([]);
+    expect(liveDir().filter((n) => n.startsWith('restricted-bic.merged-'))).toEqual([]);
+    // La copie acceptée reste : la procédure de retrait l'efface à la main.
+    expect(liveDir()).toContain('restricted-bic.accepted.sqlite');
   });
 });

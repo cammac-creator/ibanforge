@@ -1,5 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import type DatabaseType from 'better-sqlite3';
@@ -12,6 +19,7 @@ import {
   seedFamilyFromEnv,
 } from './restricted-family.js';
 import {
+  type MemberReport,
   buildMergedDatabase,
   extractOverlay,
   inspectOverlay,
@@ -134,11 +142,14 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         report.members.every((m) => m.state === 'applied'),
         kind,
       ).toBe(true);
-      expect(report.meta).toMatchObject({ schema: '1', kind, generator: 'test' });
+      expect(report.meta).toMatchObject({ schema: '2', kind, generator: 'test' });
       expect(report.meta?.source_sha256).toMatch(/^[0-9a-f]{64}$/);
-      expect(report.meta?.source_refresh).toBeTruthy();
       expect(report.sha256).toBe(sha256File(overlay[kind]));
     }
+    // Les dates de la base lue, nommées pour ce qu'elles sont (R11).
+    expect(inspectOverlay(overlay.compliance, 'compliance').meta?.source_last_refresh).toBeTruthy();
+    expect(inspectOverlay(overlay.bic, 'bic').meta?.source_bic_entries_updated_at).toBeTruthy();
+    expect(inspectOverlay(overlay.bic, 'bic').meta?.source_refresh).toBeUndefined();
     const db = openDb(overlay.bic, true);
     const tables = (
       db
@@ -149,8 +160,20 @@ describe('surcouche : extraction, contrôle, fusion', () => {
     ).map((r) => r.name);
     const members = db
       .prepare('SELECT member, rows, loaded_at, as_of, label FROM overlay_members ORDER BY member')
-      .all() as Array<{ member: string; rows: number; as_of: string | null; label: string }>;
+      .all() as Array<{
+      member: string;
+      rows: number;
+      loaded_at: string | null;
+      as_of: string | null;
+      label: string;
+    }>;
     db.close();
+    // Un registre national n'a pas de date de chargement : jamais celle d'une
+    // autre table (R11). SM porte sa date de lecture en `as_of`.
+    for (const id of ['register_at', 'register_be', 'register_sm'])
+      expect(members.find((m) => m.member === id)?.loaded_at, id).toBeNull();
+    expect(members.find((m) => m.member === 'register_sm')?.as_of).toBeTruthy();
+    expect(members.find((m) => m.member === 'eba_step2')?.loaded_at).toBeTruthy();
     // Aucune table publique : ni l'annuaire suisse, ni les registres DE, BG, BCE.
     expect(tables).toEqual([
       'bic_entries',
@@ -326,39 +349,271 @@ describe('surcouche : extraction, contrôle, fusion', () => {
     );
   });
 
-  it('remplace les lignes que la base publique porte encore, et dit si elles étaient identiques', () => {
-    const same = buildMergedDatabase({
-      kind: 'bic',
-      publicPath: fixture.bicPath,
-      overlayPath: overlay.bic,
-      outputPath: join(dir, 'jumelle.sqlite'),
-    });
-    expect(same.members.every((m) => m.identical_to_public === true)).toBe(true);
+  describe('règle de fusion : la donnée la plus fraîche sert, membre par membre (R10)', () => {
+    const merge = (
+      kind: 'bic' | 'compliance',
+      publicPath: string,
+      overlayPath: string,
+      name: string,
+    ) => buildMergedDatabase({ kind, publicPath, overlayPath, outputPath: join(dir, name) });
+    const decisions = (members: MemberReport[]) =>
+      Object.fromEntries(members.map((m) => [m.id, `${m.state}:${m.decision ?? m.reason}`]));
+    /** Une copie de la base complète, modifiée par `edit`. */
+    const edited = (source: string, prefix: string, edit: (db: DatabaseType.Database) => void) => {
+      const path = copy(source, `${prefix}-${n++}.sqlite`);
+      const db = openDb(path);
+      edit(db);
+      db.close();
+      return path;
+    };
 
-    const older = copy(fixture.bicPath);
-    const db = openDb(older);
-    db.prepare(
-      "UPDATE national_bank_codes SET name = 'ANCIEN NOM' WHERE country = 'AT' AND code = ?",
-    ).run(FIXTURE.AT.bank.code);
-    db.close();
-    const merged = buildMergedDatabase({
-      kind: 'bic',
-      publicPath: older,
-      overlayPath: overlay.bic,
-      outputPath: join(dir, 'remplacee.sqlite'),
+    it('(c) contenu identique au public : la surcouche sert', () => {
+      const same = merge('bic', fixture.bicPath, overlay.bic, 'jumelle.sqlite');
+      expect(same.state).toBe('applied');
+      expect(same.members.every((m) => m.decision === 'identical')).toBe(true);
+      expect(same.members.every((m) => m.identical_to_public === true)).toBe(true);
     });
-    expect(merged.members.find((m) => m.id === 'register_at')?.identical_to_public).toBe(false);
-    expect(merged.members.find((m) => m.id === 'register_be')?.identical_to_public).toBe(true);
-    const out = openDb(merged.path!, true);
-    // La surcouche fait foi pour sa famille.
+
+    it("(d) public plus récent ou non daté : le public est gardé, et c'est lui qui est servi", () => {
+      const newer = edited(fixture.bicPath, 'public-bic', (db) => {
+        // AT : aucune date, contenu différent -> le public reste (personne ne date AT).
+        db.prepare(
+          "UPDATE national_bank_codes SET name = 'NOM PUBLIC PLUS RÉCENT' WHERE country = 'AT' AND code = ?",
+        ).run(FIXTURE.AT.bank.code);
+        // SM : nouvelle date de lecture.
+        db.prepare(
+          "UPDATE national_bank_codes SET as_of = '2099-01-01' WHERE country = 'SM'",
+        ).run();
+        // PRA : mois suivant.
+        db.prepare("UPDATE pra_banks SET list_month = '2099-01'").run();
+        // bic_entries : le passage mensuel a rechargé une ligne EBA STEP2.
+        db.prepare(
+          "UPDATE bic_entries SET institution = 'EBA PUBLIC', updated_at = '2099-01-01 00:00:00' WHERE bic11 = ?",
+        ).run(family.eba[0]);
+      });
+      const result = merge('bic', newer, overlay.bic, 'public-plus-recent.sqlite');
+      expect(decisions(result.members)).toEqual({
+        eba_step2: 'kept_public:public_newer_or_undated',
+        nbp: 'kept_public:public_newer_or_undated',
+        oenb: 'kept_public:public_newer_or_undated',
+        register_at: 'kept_public:public_newer_or_undated',
+        register_be: 'applied:identical',
+        register_sm: 'kept_public:public_newer_or_undated',
+        pra: 'kept_public:public_newer_or_undated',
+      });
+      expect(result.state).toBe('kept_public');
+      const out = openDb(result.path!, true);
+      expect(
+        out
+          .prepare("SELECT name FROM national_bank_codes WHERE country = 'AT' AND code = ?")
+          .get(FIXTURE.AT.bank.code),
+      ).toEqual({ name: 'NOM PUBLIC PLUS RÉCENT' });
+      expect(
+        out.prepare('SELECT institution FROM bic_entries WHERE bic11 = ?').get(family.eba[0]),
+      ).toEqual({ institution: 'EBA PUBLIC' });
+      expect(out.prepare('SELECT DISTINCT list_month AS m FROM pra_banks').all()).toEqual([
+        { m: '2099-01' },
+      ]);
+      out.close();
+    });
+
+    it('(b) surcouche strictement plus récente et différente : la surcouche sert', () => {
+      const fresher = edited(fixture.bicPath, 'plus-frais', (db) => {
+        db.prepare("UPDATE pra_banks SET list_month = '2099-02'").run();
+        db.prepare(
+          "UPDATE bic_entries SET institution = 'EBA PRIVE', updated_at = '2099-02-01 00:00:00' WHERE bic11 = ?",
+        ).run(family.eba[0]);
+      });
+      const fresherOverlay = extractOverlay({
+        kind: 'bic',
+        sourcePath: fresher,
+        outPath: join(dir, `restricted-plus-frais-${n++}.sqlite`),
+        generator: 'test',
+      }).path;
+      const result = merge('bic', fixture.bicPath, fresherOverlay, 'surcouche-plus-recente.sqlite');
+      expect(decisions(result.members)).toMatchObject({
+        eba_step2: 'applied:overlay_newer',
+        nbp: 'applied:overlay_newer',
+        oenb: 'applied:overlay_newer',
+        pra: 'applied:overlay_newer',
+        register_at: 'applied:identical',
+      });
+      const out = openDb(result.path!, true);
+      expect(
+        out.prepare('SELECT institution FROM bic_entries WHERE bic11 = ?').get(family.eba[0]),
+      ).toEqual({ institution: 'EBA PRIVE' });
+      out.close();
+    });
+
+    it("conformité : last_refresh servi jamais plus frais qu'un membre servi en (a) ou (b)", () => {
+      const olderRefresh = '2020-01-01T00:00:00.000Z';
+      const older = edited(fixture.compliancePath, 'conf-ancienne', (db) => {
+        db.prepare("UPDATE metadata SET value = ? WHERE key = 'last_refresh'").run(olderRefresh);
+      });
+      const olderOverlay = extractOverlay({
+        kind: 'compliance',
+        sourcePath: older,
+        outPath: join(dir, `restricted-conf-ancienne-${n++}.sqlite`),
+        generator: 'test',
+      }).path;
+      // Base publique de demain (sans la famille) : la surcouche ancienne sert (a),
+      // et la date servie descend à la sienne.
+      const result = merge(
+        'compliance',
+        publicBase.compliance,
+        olderOverlay,
+        'compliance-a.sqlite',
+      );
+      expect(result.state).toBe('applied');
+      expect(result.lowered_last_refresh).toBe(olderRefresh);
+      const out = openDb(result.path!, true);
+      expect(out.prepare("SELECT value FROM metadata WHERE key = 'last_refresh'").get()).toEqual({
+        value: olderRefresh,
+      });
+      out.close();
+      // Base publique encore complète, identique : (c), la date publique reste.
+      const twin = merge('compliance', fixture.compliancePath, olderOverlay, 'compliance-c.sqlite');
+      expect(twin.members.every((m) => m.decision === 'identical')).toBe(true);
+      expect(twin.lowered_last_refresh).toBeUndefined();
+    });
+
+    it('bic_entries : un membre refusé laisse les trois au public, jamais la moitié', () => {
+      const tampered = copy(overlay.bic);
+      const db = openDb(tampered);
+      db.prepare("UPDATE bic_entries SET institution = 'ALTÉRÉ' WHERE bic11 = ?").run(
+        family.nbp[0],
+      );
+      db.close();
+      const result = merge('bic', fixture.bicPath, tampered, 'groupe.sqlite');
+      expect(result.state).toBe('partial');
+      expect(decisions(result.members)).toMatchObject({
+        nbp: 'refused:content_hash_mismatch',
+        eba_step2: 'refused:group_member_refused:nbp',
+        oenb: 'refused:group_member_refused:nbp',
+      });
+    });
+
+    it('rien de la surcouche à servir : la base publique est servie telle quelle, sans copie', () => {
+      const newer = edited(fixture.compliancePath, 'conf-recente', (db) => {
+        db.prepare(
+          "UPDATE metadata SET value = '2099-01-01T00:00:00.000Z' WHERE key = 'last_refresh'",
+        ).run();
+        db.prepare("UPDATE vop_participants SET status = 'pending' WHERE bic8 = 'XMPLATW1'").run();
+        db.prepare("DELETE FROM sepa_participants WHERE bic8 = 'XMPLBEB1'").run();
+        db.prepare("DELETE FROM sanctioned_entities WHERE bic8 = ? AND source_list = 'UN'").run(
+          FIXTURE.UN.onlyUn,
+        );
+      });
+      const result = merge('compliance', newer, overlay.compliance, 'rien.sqlite');
+      expect(result.state).toBe('kept_public');
+      expect(result.path).toBeUndefined();
+      expect(readdirSync(dir).filter((f) => f.startsWith('rien.sqlite'))).toEqual([]);
+    });
+  });
+
+  it('ne fait jamais exécuter le SQL de la surcouche (R4)', () => {
+    // Un fichier forgé : une seconde instruction cachée derrière la définition de
+    // vop_participants, que SQLite ignore au chargement du schéma.
+    const forged = copy(overlay.compliance);
+    const db = openDb(forged);
+    const sql = (
+      db.prepare("SELECT sql FROM sqlite_master WHERE name = 'vop_participants'").get() as {
+        sql: string;
+      }
+    ).sql;
+    // better-sqlite3 refuse d'écrire le schéma hors du mode non sûr : c'est le
+    // geste d'un faussaire, pas d'une corruption ordinaire.
+    db.unsafeMode(true);
+    db.pragma('writable_schema = ON');
+    db.prepare("UPDATE sqlite_master SET sql = ? WHERE name = 'vop_participants'").run(
+      `${sql}; DELETE FROM main.sanctioned_entities WHERE source_list = 'OFAC'`,
+    );
+    db.pragma('writable_schema = OFF');
+    db.close();
+    const noTables = copy(publicBase.compliance);
+    stripFamily(noTables, 'compliance', { dropTables: true });
+    const ofacBefore = (() => {
+      const d = openDb(noTables, true);
+      const n = (
+        d
+          .prepare("SELECT COUNT(*) AS n FROM sanctioned_entities WHERE source_list = 'OFAC'")
+          .get() as {
+          n: number;
+        }
+      ).n;
+      d.close();
+      return n;
+    })();
+    expect(ofacBefore).toBeGreaterThan(0);
+    const result = buildMergedDatabase({
+      kind: 'compliance',
+      publicPath: noTables,
+      overlayPath: forged,
+      outputPath: join(dir, 'forge.sqlite'),
+    });
+    const out = openDb(result.path!, true);
     expect(
       (
         out
-          .prepare("SELECT name FROM national_bank_codes WHERE country = 'AT' AND code = ?")
-          .get(FIXTURE.AT.bank.code) as { name: string }
-      ).name,
-    ).toBe(FIXTURE.AT.bank.name);
+          .prepare("SELECT COUNT(*) AS n FROM sanctioned_entities WHERE source_list = 'OFAC'")
+          .get() as {
+          n: number;
+        }
+      ).n,
+    ).toBe(ofacBefore);
+    // La table recréée l'a été depuis la constante, pas depuis le texte forgé.
+    expect(
+      (
+        out.prepare("SELECT sql FROM sqlite_master WHERE name = 'vop_participants'").get() as {
+          sql: string;
+        }
+      ).sql,
+    ).not.toContain('DELETE');
     out.close();
+
+    // Une vue ou un déclencheur dans le fichier le fait refuser.
+    const withView = copy(overlay.compliance);
+    const v = openDb(withView);
+    v.exec('CREATE VIEW v AS SELECT 1');
+    v.close();
+    expect(inspectOverlay(withView, 'compliance').error).toBe('overlay_unexpected_objects');
+  });
+
+  it('les définitions de la constante sont celles des bases livrées', () => {
+    for (const [kind, source] of [
+      ['bic', fixture.bicPath],
+      ['compliance', fixture.compliancePath],
+    ] as const) {
+      const scratch = join(dir, `ddl-${kind}.sqlite`);
+      const d = openDb(scratch);
+      for (const spec of RESTRICTED_TABLES[kind]) for (const sql of spec.ddl) d.prepare(sql).run();
+      d.close();
+      const shape = (path: string, table: string) => {
+        const x = openDb(path, true);
+        const columns = x.prepare(`PRAGMA table_info("${table}")`).all();
+        // Chaque index (clés et contraintes comprises) : son unicité et ses colonnes.
+        const indexes = (
+          x.prepare(`PRAGMA index_list("${table}")`).all() as Array<{
+            name: string;
+            unique: number;
+            origin: string;
+          }>
+        )
+          .map((i) => ({
+            unique: i.unique,
+            origin: i.origin,
+            columns: (
+              x.prepare(`PRAGMA index_info("${i.name}")`).all() as Array<{ name: string }>
+            ).map((c) => c.name),
+            named: i.origin === 'c' ? i.name : null,
+          }))
+          .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+        x.close();
+        return { columns, indexes };
+      };
+      for (const spec of RESTRICTED_TABLES[kind])
+        expect(shape(scratch, spec.name), `${kind}.${spec.name}`).toEqual(shape(source, spec.name));
+    }
   });
 
   it('ne modifie jamais la base publique ni la surcouche, et ne laisse rien derrière un refus', () => {
@@ -382,6 +637,43 @@ describe('surcouche : extraction, contrôle, fusion', () => {
     expect(refused.state).toBe('refused');
     expect(readdirSync(dir).filter((f) => f.startsWith('jamais.sqlite'))).toEqual([]);
   });
+
+  it('une surcouche en WAL refusée ne laisse aucun compagnon derrière elle (R6)', () => {
+    const wal = copy(overlay.compliance);
+    const db = openDb(wal);
+    db.pragma('journal_mode = WAL');
+    db.prepare("UPDATE overlay_meta SET value = '99' WHERE key = 'schema'").run();
+    db.close();
+    const result = buildMergedDatabase({
+      kind: 'compliance',
+      publicPath: publicBase.compliance,
+      overlayPath: wal,
+      outputPath: join(dir, 'wal-refus.sqlite'),
+    });
+    expect(result.error).toBe('overlay_schema_version');
+    expect(readdirSync(dir).filter((f) => f.startsWith('wal-refus.sqlite'))).toEqual([]);
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    'un échec de copie dit sa cause, jamais « fichier absent » (R7)',
+    () => {
+      const locked = join(dir, 'verrouille');
+      mkdirSync(locked);
+      chmodSync(locked, 0o555);
+      try {
+        const result = buildMergedDatabase({
+          kind: 'compliance',
+          publicPath: publicBase.compliance,
+          overlayPath: overlay.compliance,
+          outputPath: join(locked, 'x.sqlite'),
+        });
+        expect(result.state).toBe('refused');
+        expect(result.error).toBe('overlay_copy_failed:EACCES');
+      } finally {
+        chmodSync(locked, 0o755);
+      }
+    },
+  );
 
   it('efface les fichiers fusionnés périmés, jamais celui qui est servi', () => {
     const base = join(dir, 'restricted-bic.sqlite');

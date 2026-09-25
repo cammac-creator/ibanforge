@@ -253,6 +253,34 @@ function coverage(responses: Map<string, unknown>): Record<string, number> {
   return count;
 }
 
+/**
+ * Une base publique PLUS RÉCENTE que la surcouche, comme après un passage du
+ * robot public : lignes datées changées (bic_entries, SM, PRA, `last_refresh`
+ * de la conformité) et une modification non datée (AT). BE reste identique.
+ * Générique : les mêmes gestes sur la famille inventée et sur les vraies bases.
+ */
+function makePublicNewer(bicPath: string, compliancePath: string): void {
+  const bic = openDb(bicPath, false);
+  bic.exec(`
+    UPDATE bic_entries SET updated_at = '2099-01-01 00:00:00', city = COALESCE(city, '') || ' (maj)'
+      WHERE source IN ('eba_step2', 'nbp', 'oenb');
+    UPDATE national_bank_codes SET name = name || ' (maj)' WHERE country = 'AT';
+    UPDATE national_bank_codes SET as_of = '2099-01-01', name = name || ' (maj)' WHERE country = 'SM';
+    UPDATE pra_banks SET list_month = '2099-01';
+  `);
+  bic.close();
+  const compliance = openDb(compliancePath, false);
+  compliance.exec(`
+    UPDATE metadata SET value = '2099-01-01T00:00:00.000Z' WHERE key = 'last_refresh';
+    UPDATE vop_participants SET status = CASE status WHEN 'active' THEN 'pending' ELSE 'active' END
+      WHERE rowid % 2 = 0;
+    DELETE FROM sepa_participants WHERE rowid % 3 = 0;
+    DELETE FROM sanctioned_entities
+      WHERE rowid = (SELECT MIN(rowid) FROM sanctioned_entities WHERE source_list = 'UN');
+  `);
+  compliance.close();
+}
+
 function setEnv(values: Record<string, string | undefined>): void {
   for (const [k, v] of Object.entries(values)) {
     if (v === undefined) delete process.env[k];
@@ -305,6 +333,13 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
   let merged: { bic: string; compliance: string };
   let states: string[];
   let twins: Array<[string, boolean | null | undefined]>;
+  /** Cas (c) : base publique encore complète + surcouche. */
+  let withFullPublic: Map<string, unknown>;
+  let fullPublicDecisions: Record<string, string>;
+  /** Cas (d) : base publique plus récente, seule puis avec la surcouche. */
+  let newerAlone: Map<string, unknown>;
+  let newerWithOverlay: Map<string, unknown>;
+  let newerDecisions: Record<string, string>;
   const saved = {
     BIC_DB_PATH: process.env.BIC_DB_PATH,
     COMPLIANCE_DB_PATH: process.env.COMPLIANCE_DB_PATH,
@@ -354,40 +389,77 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
     stripFamily(publicBase.compliance, 'compliance', { dropTables: true });
     cases = pickCases(full.bic, full.compliance);
 
-    // Montage 1 : la base complète, sans surcouche.
-    setEnv({
-      BIC_DB_PATH: full.bic,
-      COMPLIANCE_DB_PATH: full.compliance,
-      [OVERLAY_ENV.bic]: undefined,
-      [OVERLAY_ENV.compliance]: undefined,
-    });
-    let graph = await loadGraph();
-    before = await collect(cases, graph.routes);
-    graph.db.closeAll();
-
-    // Montage 2 : la base publique, et la surcouche par ses variables.
-    setEnv({
-      BIC_DB_PATH: publicBase.bic,
-      COMPLIANCE_DB_PATH: publicBase.compliance,
-      [OVERLAY_ENV.bic]: overlay.bic,
-      [OVERLAY_ENV.compliance]: overlay.compliance,
-    });
-    graph = await loadGraph();
-    after = await collect(cases, graph.routes);
-    const status = graph.runtime.restrictedOverlayStatus();
-    states = status.map((s) => `${s.kind}:${s.state}`);
-    merged = {
-      bic: status.find((s) => s.kind === 'bic')!.served_path,
-      compliance: status.find((s) => s.kind === 'compliance')!.served_path,
+    /** Un montage : bases servies, surcouche ou non, réponses collectées. */
+    const montage = async (bases: { bic: string; compliance: string }, withOverlay: boolean) => {
+      setEnv({
+        BIC_DB_PATH: bases.bic,
+        COMPLIANCE_DB_PATH: bases.compliance,
+        [OVERLAY_ENV.bic]: withOverlay ? overlay.bic : undefined,
+        [OVERLAY_ENV.compliance]: withOverlay ? overlay.compliance : undefined,
+      });
+      const graph = await loadGraph();
+      const responses = await collect(cases, graph.routes);
+      const status = graph.runtime.restrictedOverlayStatus();
+      graph.db.closeAll();
+      const decisions = Object.fromEntries(
+        status.flatMap((st) =>
+          st.members.map((m) => [`${st.kind}.${m.id}`, `${m.state}:${m.decision ?? m.reason}`]),
+        ),
+      );
+      return { responses, status, decisions };
     };
-    twins = status.flatMap((s) =>
-      s.members.map((m): [string, boolean | null | undefined] => [
-        `${s.kind}.${m.id}`,
+
+    // Montage 1 : la base complète, sans surcouche.
+    before = (await montage(full, false)).responses;
+
+    // Montage 2 : la base publique de demain, et la surcouche par ses variables (cas a).
+    const stripped = await montage(publicBase, true);
+    after = stripped.responses;
+    states = stripped.status.map((st) => `${st.kind}:${st.state}`);
+    // Copies des fichiers servis : le montage suivant, sur la même surcouche,
+    // efface les fichiers fusionnés qu'il ne sert pas.
+    merged = {
+      bic: join(dir, 'served-bic.sqlite'),
+      compliance: join(dir, 'served-compliance.sqlite'),
+    };
+    copyFileSync(stripped.status.find((st) => st.kind === 'bic')!.served_path, merged.bic);
+    copyFileSync(
+      stripped.status.find((st) => st.kind === 'compliance')!.served_path,
+      merged.compliance,
+    );
+    twins = stripped.status.flatMap((st) =>
+      st.members.map((m): [string, boolean | null | undefined] => [
+        `${st.kind}.${m.id}`,
         m.identical_to_public,
       ]),
     );
-    graph.db.closeAll();
-  }, 180_000);
+
+    // Montage 3 : la base publique d'aujourd'hui, encore complète, + la surcouche
+    // extraite d'elle (cas c : le premier dépôt).
+    const fullCopy = {
+      bic: join(dir, 'full-copy-bic.sqlite'),
+      compliance: join(dir, 'full-copy-compliance.sqlite'),
+    };
+    copyFileSync(full.bic, fullCopy.bic);
+    copyFileSync(full.compliance, fullCopy.compliance);
+    const twinRun = await montage(fullCopy, true);
+    withFullPublic = twinRun.responses;
+    fullPublicDecisions = twinRun.decisions;
+
+    // Montages 4 et 5 : une base publique plus récente que la surcouche (cas d),
+    // seule puis avec la surcouche.
+    const newer = {
+      bic: join(dir, 'newer-bic.sqlite'),
+      compliance: join(dir, 'newer-compliance.sqlite'),
+    };
+    copyFileSync(full.bic, newer.bic);
+    copyFileSync(full.compliance, newer.compliance);
+    makePublicNewer(newer.bic, newer.compliance);
+    newerAlone = (await montage(newer, false)).responses;
+    const newerRun = await montage(newer, true);
+    newerWithOverlay = newerRun.responses;
+    newerDecisions = newerRun.decisions;
+  }, 300_000);
 
   afterAll(async () => {
     setEnv(saved);
@@ -440,6 +512,47 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
     expect(c.un_matched, "BIC nommé par la liste de l'ONU").toBeGreaterThanOrEqual(1);
     expect(c.gb_pra, 'BIC britannique avec son bloc PRA').toBeGreaterThanOrEqual(1);
     expect(c.family_bic_found, 'BIC EBA STEP2, NBP ou OeNB trouvé').toBeGreaterThanOrEqual(3);
+  });
+
+  it('cas (c) : base publique encore complète + surcouche extraite d’elle, mêmes réponses', () => {
+    for (const [id, decision] of Object.entries(fullPublicDecisions))
+      expect(decision, id).toBe('applied:identical');
+    let identical = 0;
+    for (const [key, value] of before) {
+      expect(withFullPublic.get(key), key).toEqual(value);
+      identical++;
+    }
+    console.log(
+      `[équivalence${REAL ? ', vraies bases' : ', famille inventée'}] cas (c) : ${identical} réponses identiques sur ${before.size}`,
+    );
+  });
+
+  it('cas (d) : base publique plus récente, ce sont SES réponses qui sont servies', () => {
+    expect(newerDecisions).toEqual({
+      'bic.eba_step2': 'kept_public:public_newer_or_undated',
+      'bic.nbp': 'kept_public:public_newer_or_undated',
+      'bic.oenb': 'kept_public:public_newer_or_undated',
+      'bic.register_at': 'kept_public:public_newer_or_undated',
+      'bic.register_be': 'applied:identical',
+      'bic.register_sm': 'kept_public:public_newer_or_undated',
+      'bic.pra': 'kept_public:public_newer_or_undated',
+      'compliance.un': 'kept_public:public_newer_or_undated',
+      'compliance.epc_sepa': 'kept_public:public_newer_or_undated',
+      'compliance.epc_vop': 'kept_public:public_newer_or_undated',
+    });
+    // Le montage doit mordre : la base plus récente répond autrement que la complète.
+    const moved = [...before.keys()].filter(
+      (k) => JSON.stringify(newerAlone.get(k)) !== JSON.stringify(before.get(k)),
+    );
+    expect(moved.length).toBeGreaterThanOrEqual(10);
+    let identical = 0;
+    for (const [key, value] of newerAlone) {
+      expect(newerWithOverlay.get(key), key).toEqual(value);
+      identical++;
+    }
+    console.log(
+      `[équivalence${REAL ? ', vraies bases' : ', famille inventée'}] cas (d) : ${identical} réponses identiques à la base publique seule sur ${newerAlone.size} (${moved.length} différentes de la base d'avant)`,
+    );
   });
 
   it('reconstruit les mêmes tables, ligne pour ligne, et le même ordre dans bic_entries', () => {
