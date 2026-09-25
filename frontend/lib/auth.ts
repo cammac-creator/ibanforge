@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { createHmac, timingSafeEqual } from 'crypto';
 
 const SESSION_COOKIE = 'ibanforge_session';
@@ -111,6 +112,22 @@ export async function isAuthenticated(): Promise<boolean> {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return false;
   return verify(token) !== null;
+}
+
+/**
+ * La garde de chaque page du tableau de bord protégé, à appeler en tête de la
+ * page, avant toute lecture de données.
+ *
+ * Le gabarit `(protected)/layout.tsx` vérifie aussi la session, mais il ne
+ * suffit pas : Next rend le gabarit et la page en même temps, et ne réexécute
+ * pas un gabarit à chaque navigation. Une page qui lit ses données sans
+ * vérifier elle-même la session les calcule donc aussi pour une visite sans
+ * session (relecture de la PR 266, 25.09.2026). La vérification se fait au
+ * plus près des données ; `lib/dashboard/session-guard.test.ts` y veille pour
+ * chaque page.
+ */
+export async function requireDashboardSession(): Promise<void> {
+  if (!(await isAuthenticated())) redirect('/dashboard/login');
 }
 
 export function getSessionCookieConfig() {

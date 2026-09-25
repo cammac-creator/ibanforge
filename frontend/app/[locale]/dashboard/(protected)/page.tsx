@@ -1,3 +1,4 @@
+import { requireDashboardSession } from '@/lib/auth';
 import { Suspense } from 'react';
 import { overviewView } from '@/lib/dashboard/workspace';
 import { OverviewNavigation } from '@/components/dashboard/overview/navigation';
@@ -69,6 +70,7 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireDashboardSession();
   const locale = await getLocale();
   const params = await searchParams;
   const view = overviewView(params.view);
