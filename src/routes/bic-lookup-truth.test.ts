@@ -44,9 +44,23 @@ const { dbDir, previousPath, blankedAbi } = await vi.hoisted(async () => {
   const byBic11 = db.prepare(
     "SELECT bic11 FROM bic_entries WHERE bic11 = ? AND source = 'swiftcodes' AND city != ''",
   );
+  // Un code que le registre italien ne connaît pas (25/09/2026) : ailleurs, la
+  // Banca d'Italia nomme le titulaire (`confirmed`) ou dit le code radié, et la
+  // réponse ne passe plus par la seule carte composite que ce test décrit.
+  const known = new Set(
+    (
+      db
+        .prepare(
+          `SELECT code FROM national_bank_codes WHERE country = 'IT'
+           UNION SELECT code FROM national_bank_codes_retired WHERE country = 'IT'`,
+        )
+        .all() as Array<{ code: string }>
+    ).map((r) => r.code),
+  );
   let abi: string | null = null;
   for (const [key, entry] of Object.entries(map)) {
     if (!/^IT:\d{5}$/.test(key) || entry.city || entry.bic.length !== 11) continue;
+    if (known.has(key.slice(3))) continue;
     if (!byBic11.get(entry.bic)) continue;
     db.prepare("UPDATE bic_entries SET city = '' WHERE bic11 = ?").run(entry.bic);
     abi = key.slice(3);

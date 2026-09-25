@@ -193,12 +193,14 @@ describe('rendering', () => {
  */
 describe('the audit says, per country, whether a register settles an absence', () => {
   // Germany is authoritative (Bundesbank), San Marino partial (the BCSM lists
-  // banks, not the allocation of the code space), Italy has no register here.
-  const VALID_IT = 'IT60X0542811101000000123456';
+  // banks, not the allocation of the code space), Spain has no register here.
+  // (L'Italie servait d'exemple « sans registre » jusqu'au 25/09/2026 ; elle a
+  // depuis un registre partiel, celui de la Banca d'Italia.)
+  const VALID_ES = 'ES9121000418450200051332';
   const VALID_SM = 'SM86U0322509800000000270100';
 
   it('carries the three states per row and counts them once in the summary', () => {
-    const res = auditTable(['IBAN'], [[VALID_DE], [VALID_SM], [VALID_IT], [BAD_CHECK]]);
+    const res = auditTable(['IBAN'], [[VALID_DE], [VALID_SM], [VALID_ES], [BAD_CHECK]]);
     const byLine = new Map(res.rows.map((r) => [r.line, r]));
     expect(byLine.get(1)!.register_basis).toBe('authoritative');
     expect(byLine.get(1)!.register).toContain('Bundesbank');
@@ -211,21 +213,21 @@ describe('the audit says, per country, whether a register settles an absence', (
     const countries = new Map(res.summary.countries.map((c) => [c.code, c]));
     expect(countries.get('DE')!.register_basis).toBe('authoritative');
     expect(countries.get('SM')!.register_basis).toBe('partial');
-    expect(countries.get('IT')!.register_basis).toBe('none');
-    // San Marino and Italy: two rows no register could have contradicted. The
+    expect(countries.get('ES')!.register_basis).toBe('none');
+    // San Marino and Spain: two rows no register could have contradicted. The
     // unreadable row is excluded — it has no country to judge.
     expect(res.summary.rows_without_authoritative_register).toBe(2);
   });
 
   it('puts it in the free preview, not only in the paid workbook', () => {
-    const res = auditTable(['IBAN'], [[VALID_IT], [VALID_DE]]);
+    const res = auditTable(['IBAN'], [[VALID_ES], [VALID_DE]]);
     const basis = previewRows(res, 20).map((p) => p.register_basis);
     expect(basis).toContain('none');
     expect(basis).toContain('authoritative');
   });
 
   it('gives the workbook a column and the summary sheet a line, in the page language', () => {
-    const res = auditFile(csv(['IBAN', VALID_DE, VALID_IT]), 'x.csv');
+    const res = auditFile(csv(['IBAN', VALID_DE, VALID_ES]), 'x.csv');
     const wb = XLSX.read(buildWorkbook(res, 'fr'), { type: 'buffer' });
     const aoa = XLSX.utils.sheet_to_json<string[]>(wb.Sheets['Audit']!, { header: 1 });
     const col = aoa[0]!.indexOf('Registre national');
@@ -238,7 +240,7 @@ describe('the audit says, per country, whether a register settles an absence', (
       .map((r) => r.join(' | '))
       .join('\n');
     expect(flat).toContain('Registres nationaux');
-    expect(flat).toMatch(/IT — aucun/);
+    expect(flat).toMatch(/ES — aucun/);
   });
 });
 

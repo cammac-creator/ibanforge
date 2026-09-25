@@ -237,10 +237,11 @@ describe('enrichResult', () => {
     });
 
     it('does the same one country over (IT)', () => {
-      // ABI 08095 is CCRTIT2TBCE, Banca Centro Emilia; CCRTIT2T alone is Cassa
-      // Centrale Banca.
-      const bic = bicOf('IT12X0809500000000000000001');
-      expect(bic!.code).toBe('CCRTIT2TBCE');
+      // ABI 08716 is CCRTIT2TBCL, Banca Centro Lazio; CCRTIT2T alone is Cassa
+      // Centrale Banca. (08095, l'exemple d'avant le 25/09/2026, est un code que
+      // la Banca d'Italia a radié en 2018 : sa clé est élaguée, bic null.)
+      const bic = bicOf('IT10G0871601600000000123456');
+      expect(bic!.code).toBe('CCRTIT2TBCL');
       expect(bic!.bic8).toBe('CCRTIT2T');
       expect(bic!.basis).toBe('curated_map');
     });

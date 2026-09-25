@@ -122,6 +122,27 @@ describe('the rules, on hand-built results', () => {
     expect(buildChecks(base()).national_check_digits).toBe('not_checked');
   });
 
+  it('national_check_digits repeats the status of the national_check_digits block (25/09/2026)', () => {
+    const fr = (status: 'pass' | 'fail' | 'not_applicable') =>
+      base({
+        country: { code: 'FR', name: 'France' },
+        national_check_digits: { country: 'FR', scheme: 'fr_rib_key', status },
+      });
+    for (const status of ['pass', 'fail', 'not_applicable'] as const) {
+      expect(buildChecks(fr(status)).national_check_digits, status).toBe(status);
+    }
+    // Pays du module sans bloc (résultat construit à la main) : rien n'a été contrôlé.
+    expect(
+      buildChecks(base({ country: { code: 'FR', name: 'France' } })).national_check_digits,
+    ).toBe('not_checked');
+    // Le Royaume-Uni ne lit que modulus_check, même si un bloc traînait.
+    const gbWithBlock = base({
+      country: { code: 'GB', name: 'United Kingdom' },
+      national_check_digits: { country: 'GB', scheme: 'fr_rib_key', status: 'fail' },
+    });
+    expect(buildChecks(gbWithBlock).national_check_digits).toBe('not_checked');
+  });
+
   it('payee_name, account_exists and payee_sanctions are always not_checked', () => {
     for (const holder of BANK_CODE_HOLDERS) {
       const c = buildChecks(base({ bank_code_holder: holder }));
@@ -211,7 +232,8 @@ function sample(): IBANValidationResult[] {
     'AT279999900000123456', // code autrichien fabriqué
     'FR1499999000010123456789A42', // absent de la carte composite
     'NL19BICK0123456789', // carte composite
-    'IT26X0311111101000000123456', // carte composite
+    'IT26X0311111101000000123456', // code radié par la Banca d'Italia (registre partiel)
+    'IT10N0760101600000000123456', // hors du registre italien : carte composite
     'CH9300762011623852957', // IID non attribué
   ];
   return [...Object.values(EXAMPLE_IBANS), ...fabricated].map(enriched).filter((r) => r.valid);
@@ -304,8 +326,13 @@ describe('maps every bank_code_check shape to exactly one bank_code_holder', () 
       'confirmed',
     ],
     ['partial register, found (FI)', () => 'FI2112345600000785', 'confirmed'],
+    // L'Italie (25/09/2026) : un code en vigueur est nommé par le registre ; un
+    // code radié n'a plus de titulaire aujourd'hui, donc `inferred`, jamais un
+    // refus ; Poste Italiane, hors du registre, garde la carte composite.
+    ['partial register, found (IT)', () => 'IT86W0306901600000000123456', 'confirmed'],
+    ['partial register, retired code (IT)', () => 'IT58V0311101600000000123456', 'inferred'],
     ['composite map (NL)', () => 'NL19BICK0123456789', 'inferred'],
-    ['composite map (IT)', () => 'IT26X0311111101000000123456', 'inferred'],
+    ['composite map (IT)', () => 'IT10N0760101600000000123456', 'inferred'],
     ['published structural rule (LV)', () => ibanFor('LV', 'HABA0012345678910'), 'inferred'],
     ['absent from the composite map (FR)', () => 'FR1499999000010123456789A42', 'unknown'],
   ];
@@ -326,6 +353,6 @@ describe('maps every bank_code_check shape to exactly one bank_code_holder', () 
       string,
       unknown
     >;
-    for (const key of ['NL:BICK', 'IT:03111', 'LV:HABA']) expect(map, key).toHaveProperty([key]);
+    for (const key of ['NL:BICK', 'IT:07601', 'LV:HABA']) expect(map, key).toHaveProperty([key]);
   });
 });

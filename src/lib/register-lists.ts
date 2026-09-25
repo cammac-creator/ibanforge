@@ -79,6 +79,9 @@ const INSTITUTION_DEPTH: Record<string, InstitutionDepth> = {
   SK: { depth: 'name', publisher: 'the Národná banka Slovenska', script: 'Slovak diacritics' },
   CZ: { depth: 'name', publisher: 'the Česká národní banka', script: 'Czech diacritics' },
   LU: { depth: 'name', publisher: 'the ABBL' },
+  // Le siège légal en Italie (pour une banque étrangère, sa succursale
+  // italienne), et le LEI quand elle le publie. Sur un code radié, le nom seul.
+  IT: { depth: 'registered_office', publisher: "the Banca d'Italia" },
   SM: { depth: 'registered_office', publisher: 'the Central Bank of the Republic of San Marino' },
   FI: { depth: 'group', publisher: 'Finance Finland' },
 };

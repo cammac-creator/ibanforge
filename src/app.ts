@@ -143,7 +143,11 @@ import {
 import { bicLeiMappingNotice, mappingVersionFromLoad } from './lib/bic-lei-notice.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { bgAttribution, getBgBankCodeCount } from './lib/bg-bae.js';
-import { nationalRegisterCredit, withRegisterClock } from './lib/national-registers.js';
+import {
+  IT_DATASET_PAGE,
+  nationalRegisterCredit,
+  withRegisterClock,
+} from './lib/national-registers.js';
 import {
   getBdeListDate,
   getBdeMfiCount,
@@ -256,7 +260,7 @@ let llmsTxtCache: string | null = null;
 let llmsTxtKey: string | null = null;
 
 function llmsTxtEditionKey(): string {
-  return ['SK', 'CZ', 'SM'].map((cc) => nationalRegisterCredit(cc) ?? '').join('|');
+  return ['SK', 'CZ', 'SM', 'IT'].map((cc) => nationalRegisterCredit(cc) ?? '').join('|');
 }
 // Les comptes et le mois PRA viennent de la base servie : une surcouche privée
 // rechargée sans redémarrage doit les faire relire (restricted-overlay-runtime.ts).
@@ -387,6 +391,14 @@ function buildLlmsTxt(): string {
   const smSourceLine = smCredit
     ? `\n- San Marino bank codes: ${smCredit} — four operating banks, licence unknown (bcsm.sm publishes no terms of use); credited by choice, and the list names holders rather than allocating the code space, so an absence there is not a non-allocation`
     : '';
+  // L'Italie (25/09/2026). CC BY 4.0 : l'auteur, la licence et son URI,
+  // l'adresse du jeu et la mention des modifications, avec l'édition lue dans
+  // les lignes du chargeur (le nom du fichier de la Banca d'Italia), jamais
+  // écrite ici. Absente quand aucun registre italien n'est chargé.
+  const itCredit = nationalRegisterCredit('IT');
+  const itSourceLine = itCredit
+    ? `\n- Italian bank codes: ${itCredit} (${IT_DATASET_PAGE}). The banks, payment institutions and e-money institutions the Banca d'Italia registers, reused under CC BY 4.0; a code it has struck off is served with its date and its legal successor, and an absence is not a non-allocation (Poste Italiane and branches of EU payment institutions hold codes outside these registers)`
+    : '';
   // Luxembourg: the ABBL register answers only where its file is configured,
   // so it is credited only there. Its terms ask for the source on every
   // answer, which bank_code_check.register already carries with its date.
@@ -463,7 +475,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${smSourceLine}${luSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}

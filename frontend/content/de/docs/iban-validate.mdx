@@ -234,6 +234,36 @@ Der BIC in der Antwort ist aus dem Bankcode der IBAN **abgeleitet**, und was die
 
 > `bic.authoritative` und `bank_code_check.authoritative` beantworten **zwei verschiedene Fragen**. In der Schweiz wurde der Unterschied früher sichtbar, heute nicht mehr: Der BIC stammt jetzt aus der Spalte des SIX BankMaster selbst, beide sind dort also `true`. In San Marino gehen sie weiterhin auseinander, in die andere Richtung — die Zuordnung ist die der Aufsicht (`bic.authoritative: true`), während der Coderaum nicht von ihr vergeben wird (`bank_code_check.authoritative: false`). Das eine betrifft die Existenz des Codes, das andere die Zuordnung, die den BIC erzeugt hat.
 
+### Nationale Prüfziffern (`checks.national_check_digits`)
+
+Mehrere Länder führen im BBAN eine eigene Prüfziffer, die älter ist als die IBAN. Sie ist eine zweite Prüfung, unabhängig von MOD-97: Ein Werkzeug, das eine IBAN um eine falsche Kontonummer herum baut, rechnet die IBAN-Prüfziffern mühelos richtig, die nationale Prüfziffer aber nicht. IBANforge berechnet sie allein aus der IBAN nach, im selben Aufruf und ohne Aufpreis.
+
+| Land | `scheme` | Die geprüfte Prüfziffer |
+|---|---|---|
+| Frankreich, Monaco | `fr_rib_key` | Der RIB-Schlüssel, die letzten zwei Ziffern des BBAN, über Bankcode, Filialcode und Kontonummer (Buchstaben der Kontonummer werden nach der RIB-Tabelle umgesetzt) |
+| Belgien | `be_mod97` | Die letzten zwei Ziffern: die ersten zehn Ziffern modulo 97, oder 97, wenn der Rest 0 ist |
+| Italien, San Marino | `it_cin` | Der CIN, der Kontrollbuchstabe am Anfang des BBAN, über ABI, CAB und Kontonummer |
+| Spanien | `es_dc` | Die zwei DC-Ziffern, Positionen 9 und 10 des BBAN |
+| Vereinigtes Königreich | siehe `modulus_check` | Die Vocalink-Modulusprüfung über Sort Code und Kontonummer |
+
+Für diese sechs Länder trägt eine gültige IBAN einen Block `national_check_digits`, und `checks.national_check_digits` übernimmt dessen `status`. In den übrigen Ländern (außer dem Vereinigten Königreich) steht die Prüfung auf `not_checked`: Die deutschen Prüfziffernmethoden der Kontonummer, eine je Bankleitzahl, werden noch nicht geprüft.
+
+```json
+{
+  "valid": true,
+  "checks": { "national_check_digits": "fail", "…": "…" },
+  "national_check_digits": {
+    "country": "FR",
+    "scheme": "fr_rib_key",
+    "status": "fail",
+    "detail": "The RIB key (the last two digits of the BBAN) does not match the bank code, branch code and account number: this account number cannot have been issued as written."
+  }
+}
+```
+
+- **`pass`**: Die Prüfziffer stimmt, die Kontonummer ist also wohlgeformt. Das beweist nicht, dass das Konto existiert oder eröffnet ist.
+- **`fail`**: Die Prüfziffer stimmt nicht. Diese Kontonummer kann so, wie sie geschrieben ist, nicht vergeben worden sein: ein Tippfehler oder eine erfundene Nummer. `valid` bleibt `true`, denn die IBAN-Prüfziffern stimmen; lesen Sie beides getrennt und lassen Sie die Angaben vor der Zahlung vom Empfänger bestätigen. `detail` sagt, welche Ziffern nicht zusammenpassen, und nennt nie die erwartete Prüfziffer.
+
 ### Ungültige IBAN (200)
 
 Wenn die IBAN ungültig ist, gibt die Antwort dennoch den Statuscode 200 zurück, jedoch mit `valid: false`:

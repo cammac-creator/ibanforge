@@ -231,6 +231,28 @@ ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script re
 `.gitignore` attrape `restricted-*.sqlite*` et `*.merged-*.sqlite*`), jamais ajouter une table
 ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
 
+**Le tirage (étape 5, depuis le 25.09.2026)** : `src/lib/restricted-overlay-pull.ts`. Un dépôt
+privé reconstruit la surcouche chaque semaine (conformité) et chaque mois (BIC), ne commite
+aucune donnée, et publie une release : les deux fichiers et un `manifest.json`
+(`src/lib/restricted-overlay-manifest.ts` : SHA-256, taille, date de génération, commit public,
+lignes par membre), après une porte de qualité (`npm run overlay -- check`, puis `manifest
+--previous` : aucun fichier ni membre perdu, aucun membre en baisse de plus de 10 %). Avec
+`RESTRICTED_OVERLAY_PULL_REPO` (owner/name, écrit nulle part dans ce dépôt) et
+`RESTRICTED_OVERLAY_PULL_TOKEN` (jeton à grain fin, lecture seule du contenu de ce seul dépôt),
+la veille de dix minutes tire la dernière release toutes les quatre heures plus une gigue d'au
+plus trente minutes (une heure après un échec, jamais au démarrage) ; un fichier dont
+l'empreinte est déjà servie, en place ou acceptée n'est jamais retéléchargé ; sinon
+téléchargement plafonné, empreinte vérifiée, `inspectOverlay` doit accepter chaque membre, un
+voisin est écrit puis renommé sur le fichier de `RESTRICTED_*_OVERLAY_PATH`, et la base est
+rechargée aussitôt. Tout échec garde ce qui est servi. Les deux variables absentes : aucun
+appel réseau, aucune alerte, `GET /health` → `restricted_overlays.pull` vaut `off` ; sinon il
+donne l'état, la dernière tentative et le dernier succès, la dernière release, et pour chaque
+base la release et la date de génération du fichier servi, jamais le nom du dépôt ni le jeton.
+Alertes, refermées seules : `overlay:pull` (aucun tirage réussi depuis 24 h),
+`overlay:pull:stale` (dernière release de plus de 9 jours, ou fichier de plus de 9 jours pour
+la conformité, 35 pour le BIC, ou absent). Retirer : ôter d'abord les deux variables du
+tirage, puis retirer la surcouche comme ci-dessus.
+
 ## MCP Integration
 
 The MCP server exposes tools for AI agents:

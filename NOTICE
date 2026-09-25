@@ -275,6 +275,33 @@ payment system
          facts or their sense.
          https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/
 
+Banca d'Italia, Albi ed elenchi di vigilanza: registers of banks, payment
+institutions and e-money institutions ("Lista intermediari") and list of
+mergers and incorporations ("Lista fusioni, incorporazioni, cessioni attivita
+e passivita ecc.")
+  Where: data/bic.sqlite, table national_bank_codes, country IT (464 codes in
+         force, edition of 23 September 2026), and table
+         national_bank_codes_retired (1,907 codes the Banca d'Italia has
+         struck off, with the date and the legal successor in force);
+         frontend/data/registers/it-bank.json.
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
+         https://creativecommons.org/licenses/by/4.0/ ; the open data of the
+         Banca d'Italia published on the AgID portal dati.gov.it, which the
+         terms of its website exempt from the general reservation
+         (https://www.bancaditalia.it/footer/copyright/index.html).
+  Attribution:
+         Source: Banca d'Italia, Albi ed elenchi di vigilanza (open data,
+         CC BY 4.0), edition <date of the file>;
+         https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/#/area-download
+         (the edition is stored with every row)
+  Changes made: codes padded to five digits; only the registers whose codes
+         appear in IBANs (banks, payment institutions, e-money institutions)
+         are kept; codes in force selected from the history; codes without a
+         holder in force dated and joined, through the list of mergers and
+         incorporations, to their legal successor in force. No other field is
+         altered; names are kept as published.
+  Reuse of these records carries the same attribution requirement.
+
 Betaalvereniging Nederland, BIC list
   Where: src/db/nl-psp.json (94 entries).
   Terms: may be used free of charge without a formal licence agreement,

@@ -269,13 +269,32 @@ export interface BankCodeCheck {
   candidates?: number;
   /**
    * The register marks the code for deletion: the institution is being retired.
-   * Present only when true, and only from an authoritative register. A retired
-   * code WAS allocated, so answering `not_in_register` for it would be a worse
-   * lie than answering `verified` without qualification.
+   * Present only when true. A retired code WAS allocated, so answering
+   * `not_in_register` for it would be a worse lie than answering `verified`
+   * without qualification.
+   *
+   * Deux sources depuis le 25/09/2026 : un registre qui fait foi et marque un
+   * code qu'il retire (DE, `authoritative: true`, le code figure encore dans le
+   * fichier en vigueur), et l'historique de la Banca d'Italia pour un code
+   * qu'elle a déjà radié (IT, `authoritative: false`, `retired_on` présent,
+   * `bank_code_holder: inferred`). Ni l'un ni l'autre n'est un refus.
    */
   retired?: true;
-  /** The bank code that takes over, when the register names one. */
+  /**
+   * The bank code that takes over, when the register names one. Avec
+   * `authoritative: true` (DE), le code de reprise que le registre désigne ; avec
+   * `authoritative: false` (IT), le successeur LÉGAL par fusion ou incorporation,
+   * suivi jusqu'à un code en vigueur, qui n'est pas forcément la banque qui tient
+   * aujourd'hui le compte.
+   */
   superseded_by?: string;
+  /**
+   * 'AAAA-MM-JJ' : dernier jour où le registre porte ce code pour son dernier
+   * titulaire (pour un titulaire radié, la date de radiation publiée). Présent
+   * seulement avec `retired`, et seulement quand le registre date la radiation
+   * (l'Italie aujourd'hui).
+   */
+  retired_on?: string;
   /**
    * What the national register publishes about the allocated institution.
    * Present only on an authoritative answer: a composite-map hit stays bare
@@ -351,6 +370,7 @@ export interface RegisterInstitution {
 
 import type { NextStep } from './lib/next-steps.js';
 import type { BankCodeHolder, Checks } from './lib/checks.js';
+import type { NationalCheck } from './lib/national-check/index.js';
 
 /**
  * Whether the EPC scheme registers list the resolved BANK (never the country).
@@ -651,6 +671,19 @@ export interface IBANValidationResult {
    * IBAN itself invalid, so `valid` is untouched.
    */
   modulus_check?: UkModulusResult;
+  /**
+   * La clé de contrôle nationale du BBAN (clé RIB française et monégasque,
+   * chiffres de contrôle belges, CIN italien et saint-marinais, DC espagnol).
+   * Présent seulement sur un IBAN valide de FR, MC, BE, IT, SM ou ES ; absent
+   * ailleurs, où `checks.national_check_digits` dit `not_checked` (le
+   * Royaume-Uni garde `modulus_check`).
+   *
+   * Un second contrôle, indépendant du modulo 97, comme `modulus_check` :
+   * `fail` veut dire que ce numéro de compte n'a pas pu être émis tel qu'il est
+   * écrit, et ne rend jamais l'IBAN invalide (`valid` n'y touche pas). `pass`
+   * veut dire bien formé, jamais que le compte existe. Voir lib/national-check/.
+   */
+  national_check_digits?: NationalCheck;
   /**
    * The Bank of England's "List of PRA-regulated Banks" names the holder of the
    * resolved BIC's LEI. GB only, joined on LEI and never on names.

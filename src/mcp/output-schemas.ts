@@ -6,6 +6,7 @@ import {
   BIC_SOURCE_AS_OF_NOTE,
   CHECKS_NOTE,
   LISTED_IN_CURRENT_SOURCE_NOTE,
+  NATIONAL_CHECK_DIGITS_NOTE,
   VOP_REGISTER_STATUS_NOTE,
   bicSourceNote,
 } from '../lib/field-notes.js';
@@ -264,12 +265,20 @@ export const BANK_CODE_CHECK_SCHEMA = z
       .boolean()
       .optional()
       .describe(
-        'True when an authoritative register is withdrawing the code. Still a verified result: it WAS allocated.',
+        'True when a register says the code is leaving (DE, authoritative) or has been struck off (IT, authoritative false, with retired_on). Still a verified result: it WAS allocated. Never a refusal.',
       ),
     superseded_by: z
       .string()
       .optional()
-      .describe('The bank code that takes over. Re-paper the beneficiary against it.'),
+      .describe(
+        'The bank code that takes over. DE: the successor the register designates, re-paper against it. IT: the legal successor by merger or incorporation, not necessarily the bank now holding the account.',
+      ),
+    retired_on: z
+      .string()
+      .optional()
+      .describe(
+        'YYYY-MM-DD, with retired where the register dates it (IT): the last day it lists this code for its last holder.',
+      ),
     as_of: z.string(),
   })
   .optional();
@@ -290,6 +299,22 @@ const CHECKS_SCHEMA = z
   .optional()
   .describe(CHECKS_NOTE);
 
+/**
+ * `national_check_digits` : la preuve de `checks.national_check_digits` pour FR,
+ * MC, BE, IT, SM et ES (25/09/2026). Déclaré ici parce que le schéma annoncé
+ * est fermé : un bloc absent du schéma serait retiré par Zod, et le client MCP
+ * officiel refuserait la réponse entière qui le porte.
+ */
+const NATIONAL_CHECK_DIGITS_SCHEMA = z
+  .object({
+    country: z.string().describe('The IBAN country (MC stays MC, SM stays SM).'),
+    scheme: z.string().describe('fr_rib_key | be_mod97 | it_cin | es_dc'),
+    status: z.string().describe('pass | fail | not_applicable'),
+    detail: z.string().optional().describe('Present on fail and not_applicable only.'),
+  })
+  .optional()
+  .describe(NATIONAL_CHECK_DIGITS_NOTE);
+
 const VALIDATE_IBAN_OUTPUT_SCHEMA = {
   iban: z.string().describe('Normalized IBAN (uppercase, no spaces).'),
   valid: z.boolean(),
@@ -298,6 +323,7 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
     .optional()
     .describe(`confirmed | inferred | not_allocated | unknown. ${BANK_CODE_HOLDER_NOTE}`),
   checks: CHECKS_SCHEMA,
+  national_check_digits: NATIONAL_CHECK_DIGITS_SCHEMA,
   formatted: z.string().optional().describe('IBAN with 4-char groups for display.'),
   country: z
     .object({

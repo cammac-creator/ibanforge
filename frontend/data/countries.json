@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-24",
+ "generated_at": "2026-09-25",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -2967,30 +2967,30 @@
     ],
     "vop_required": true
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": "Banca d'Italia, registers of banks, payment institutions and e-money institutions (Albi ed elenchi di vigilanza, https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/#/area-download, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/, normalised and joined by IBANforge; Poste Italiane and branches of EU payment institutions hold ABI codes outside these registers, so an absence is not a non-allocation)",
    "api": {
     "valid": true,
     "country": {
      "code": "IT",
      "name": "Italy"
     },
-    "bic": {
-     "code": "BLOPIT22XXX",
-     "bic8": "BLOPIT22",
-     "bank_name": "UBI BANCA SCPA",
-     "city": "",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": null
-    },
+    "bic": null,
     "bank_code_check": {
      "value": "05428",
      "status": "verified",
      "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "register": "Banca d'Italia, registers of banks, payment institutions and e-money institutions (Albi ed elenchi di vigilanza, https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/#/area-download, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/, normalised and joined by IBANforge; Poste Italiane and branches of EU payment institutions hold ABI codes outside these registers, so an absence is not a non-allocation)",
      "authoritative": false,
+     "retired": true,
+     "retired_on": "2017-02-19",
+     "superseded_by": "03069",
+     "institution": {
+      "name": "BANCA POPOLARE DI BERGAMO S.P.A.",
+      "street": null,
+      "post_code": null,
+      "town": null,
+      "country": "IT"
+     },
      "as_of": "2026-09"
     },
     "sepa": {
@@ -3001,14 +3001,10 @@
       "SCT_INST"
      ],
      "vop_required": true,
-     "vop_participant": false,
+     "vop_participant": null,
      "basis": "country_default"
     },
-    "issuer": {
-     "type": "bank",
-     "name": "UBI BANCA SCPA",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "standard",
      "sepa_reachable": true,

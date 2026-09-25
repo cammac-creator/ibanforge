@@ -132,6 +132,27 @@ npm run build             # next build
   never add a table or a source to the family anywhere but that constant, and never let a
   public workflow download or commit the family: stopping them is the next step, not a
   side effect.
+- `src/lib/restricted-overlay-pull.ts`: the API refreshes those files itself (step 5,
+  since 25 September 2026). A private repository rebuilds the overlay weekly (compliance)
+  and monthly (BIC), commits no data, and publishes a release: both files and a
+  `manifest.json` (`src/lib/restricted-overlay-manifest.ts`: SHA-256, size, generation
+  date, public commit, rows per member), after a quality gate (`npm run overlay -- check`,
+  then `manifest --previous`: no file or member lost, no member down more than 10%). With
+  `RESTRICTED_OVERLAY_PULL_REPO` (owner/name, written nowhere in this repository) and
+  `RESTRICTED_OVERLAY_PULL_TOKEN` (fine-grained, read-only Contents on that repository
+  alone), the ten-minute watcher pulls the latest release every four hours plus up to
+  thirty minutes of jitter (one hour after a failure, never at start-up); a file whose
+  hash is already served, in place or accepted is never downloaded again; otherwise the
+  download is capped, its hash checked, `inspectOverlay` must accept every member, a
+  neighbour is written then renamed onto the file named by `RESTRICTED_*_OVERLAY_PATH`, and
+  that database is reloaded at once. Any failure keeps what is served. Both variables
+  unset: no network call, no alert, `GET /health` → `restricted_overlays.pull` is `off`;
+  otherwise it gives the state, the last attempt and success, the latest release, and for
+  each database the release and generation date of the served file, never the repository
+  name nor the token. Alerts, closed on their own: `overlay:pull` (no successful pull for
+  24 h), `overlay:pull:stale` (latest release older than 9 days, or a file older than 9 days
+  for compliance, 35 for BIC, or missing). To withdraw: remove both pull variables first,
+  then withdraw the overlay as above.
 ---
 
 ## Work in progress, at 10 September 2026

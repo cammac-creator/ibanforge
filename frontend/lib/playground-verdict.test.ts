@@ -35,6 +35,13 @@ describe("Portée des verdicts visibles", () => {
     }
     expect(verdict({ valid: true, modulus_check: { checked: false, passed: null } }, "iban").localCheckInvalid).toBe(false);
   });
+  it("remonte une clé nationale fausse (checks.national_check_digits), sans toucher à la structure", () => {
+    const fail = verdict({ valid: true, checks: { national_check_digits: "fail" }, national_check_digits: { country: "FR", scheme: "fr_rib_key", status: "fail" } }, "iban");
+    expect(fail).toMatchObject({ structure: "valid", localCheckInvalid: true, next: "confirmDetails" });
+    for (const status of ["pass", "not_checked", "not_applicable", undefined]) {
+      expect(verdict({ valid: true, checks: { national_check_digits: status } }, "iban").localCheckInvalid, String(status)).toBe(false);
+    }
+  });
   it("préserve la provenance distincte du code banque et du BIC", () => {
     expect(verdict({ valid: true, bank_code_check: { register: "Registre fictif", as_of: "2026-01-01" }, bic: { source: "Annuaire fictif", as_of: "2025-12-01" } }, "iban")).toMatchObject({ source: "Registre fictif", asOf: "2026-01-01", bicSource: "Annuaire fictif", bicAsOf: "2025-12-01" });
   });

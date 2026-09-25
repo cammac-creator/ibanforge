@@ -29,6 +29,22 @@
  *
  * Slovakia (38 codes) and San Marino (4) have no batch at all: at that size the
  * batch IS the register, and the rule this section exists for does not bite.
+ *
+ * L'Italie (/it/{code}, 25/09/2026) : le premier lot est l'ensemble des codes en
+ * vigueur ; les codes que la Banca d'Italia a radiés ont aussi leur page, rendue
+ * à la demande et hors du plan du site, parce que c'est là qu'un lecteur qui
+ * tape un ancien code apprend sa radiation et son successeur légal.
+ *
+ * ## Un seul pays, quand on le nomme
+ *
+ *   npm run pages:export          # tous les registres, comme avant
+ *   npm run pages:export -- IT    # n'écrit que it-bank.json
+ *
+ * La relecture hebdomadaire du registre italien (refresh-it-register.yml)
+ * réexporte ses pages sans réécrire les fichiers des autres registres, qui ne
+ * sont rafraîchis que par le cycle mensuel. Toutes les réponses sont quand même
+ * calculées (quelques secondes) : le filtre ne porte que sur l'écriture, ce qui
+ * laisse chaque section de ce fichier telle qu'elle était.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -50,6 +66,11 @@ process.env.RATE_LIMIT_PER_MIN = '1000000';
 const { buildApp } = await import('../src/app.js');
 const { generateOemKey } = await import('../src/lib/api-keys.js');
 const { getBicDB } = await import('../src/lib/db.js');
+const { computeItalianCin } = await import('../src/lib/national-check/it-cin.js');
+
+/** `npm run pages:export -- IT` : le pays dont on écrit le fichier ; tous sans argument. */
+const ONLY = process.argv[2]?.toUpperCase() ?? null;
+const wants = (cc: string): boolean => !ONLY || ONLY === cc;
 
 /** ISO 13616 check digits for country + bban (mod 97, chunked to stay in Number). */
 function checkDigits(country: string, bban: string): string {
@@ -447,9 +468,12 @@ for (const r of skRows) {
 const skBatch1 = skRows.map((r) => r.code);
 
 // San Marino: a CIN letter, five digits of ABI in IBAN positions 6-10, five of
-// CAB, twelve of account. The CIN is a check character over the BBAN and our
-// validator accepts any letter, so the synthetic example carries a fixed 'U' —
-// the same one the ISO 13616 registry's San Marino example uses.
+// CAB, twelve of account. Le CIN est une lettre de contrôle sur l'ABI, le CAB
+// et le compte, et l'API la contrôle depuis le 25/09/2026
+// (`checks.national_check_digits`) : il est donc calculé ici par le module
+// qu'elle applique. Un « U » fixe, celui de l'exemple du registre ISO 13616
+// (ABI 03225, qui n'est pas dans la liste), était faux pour les quatre banques
+// de la liste et faisait répondre `fail` à nos propres exemples.
 //
 // Four banks, all four pre-rendered, `related` empty for the same reason it is
 // in Slovakia: no two share a BIC8, and the index page IS the list.
@@ -462,7 +486,9 @@ const smRows = nationalRows.filter((r) => r.country === 'SM');
 const sm: Json = {};
 let smSource = 'Central Bank of the Republic of San Marino, operating banks';
 for (const r of smRows) {
-  const bban = `U${r.code}09800000000270100`;
+  const cin = computeItalianCin(r.code, '09800', '000000270100');
+  if (!cin) throw new Error(`SM ${r.code}: the ABI code is not five digits`);
+  const bban = `${cin}${r.code}09800000000270100`;
   const iban = `SM${checkDigits('SM', bban)}${bban}`;
   const answer = await call('/v1/iban/validate', {
     method: 'POST',
@@ -491,78 +517,224 @@ for (const r of smRows) {
 }
 const smBatch1 = smRows.map((r) => r.code);
 
+// ---------------------------------------------------------------------------
+// Italie : un IBAN synthétique par code ABI, la réponse de la route elle-même
+// (25/09/2026). Un CIN (lettre de contrôle sur l'ABI, le CAB et le compte) puis
+// cinq chiffres d'ABI, cinq de CAB, douze de compte ; guichet et compte inventés,
+// ceux des IBAN de l'étude du 24/09/2026, avec leur CIN calculé : l'API contrôle
+// aussi cette lettre, et un exemple faux répondrait `fail` sur nos propres pages.
+//
+// Deux sortes de codes, deux tables : ceux que la Banca d'Italia tient en vigueur
+// (`national_bank_codes`, le premier lot) et ceux qu'elle a radiés
+// (`national_bank_codes_retired`), dont la page dit la date et le successeur
+// légal. Un registre partiel : les pages le disent, comme celles de Saint-Marin.
+// ---------------------------------------------------------------------------
+interface ItalianRow {
+  code: string;
+  name: string;
+  street: string | null;
+  post_code: string | null;
+  town: string | null;
+  lei: string | null;
+  source: string | null;
+  as_of: string | null;
+}
+interface ItalianRetiredRow {
+  code: string;
+  name: string;
+  retired_on: string;
+  successor_code: string | null;
+  successor_name: string | null;
+  source: string | null;
+  as_of: string | null;
+}
+const itInForce = bic
+  .prepare(
+    "SELECT code, name, street, post_code, town, lei, source, as_of FROM national_bank_codes WHERE country = 'IT' ORDER BY code",
+  )
+  .all() as ItalianRow[];
+const itRetired = bic
+  .prepare(
+    "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'national_bank_codes_retired'",
+  )
+  .get()
+  ? (bic
+      .prepare(
+        "SELECT code, name, retired_on, successor_code, successor_name, source, as_of FROM national_bank_codes_retired WHERE country = 'IT' ORDER BY code",
+      )
+      .all() as ItalianRetiredRow[])
+  : [];
+
+/**
+ * Un IBAN italien valide pour un code ABI, CIN compris (calculé par le module
+ * que l'API applique, comme pour Saint-Marin plus haut), sur le guichet et le
+ * compte de l'étude.
+ */
+function italianIban(code: string): string {
+  const cin = computeItalianCin(code, '01600', '000000123456');
+  if (!cin) throw new Error(`IT ${code}: the ABI code is not five digits`);
+  const bban = `${cin}${code}01600000000123456`;
+  return `IT${checkDigits('IT', bban)}${bban}`;
+}
+
+const itEntries: Json = {};
+let itSource = "Banca d'Italia, registers of banks, payment institutions and e-money institutions";
+for (const r of itInForce) {
+  const iban = italianIban(r.code);
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`IT ${r.code}: synthetic IBAN ${iban} is not valid`);
+  itSource = registerName(answer, itSource);
+  itEntries[r.code] = {
+    register: {
+      code: r.code,
+      status: 'in_force',
+      name: r.name,
+      street: r.street,
+      post_code: r.post_code,
+      town: r.town,
+      lei: r.lei,
+      // L'édition entière et le crédit, lus dans la ligne : la licence CC BY 4.0
+      // demande de citer la source, et la page imprime la citation sans la
+      // reconstruire.
+      as_of: r.as_of,
+      source: r.source,
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related: [],
+  };
+}
+for (const r of itRetired) {
+  const iban = italianIban(r.code);
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`IT ${r.code}: synthetic IBAN ${iban} is not valid`);
+  itEntries[r.code] = {
+    register: {
+      code: r.code,
+      status: 'retired',
+      name: r.name,
+      retired_on: r.retired_on,
+      successor_code: r.successor_code,
+      successor_name: r.successor_name,
+      as_of: r.as_of,
+      source: r.source,
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related: [],
+  };
+}
+// Le premier lot, pré-rendu et listé : les codes en vigueur. Les codes radiés
+// restent rendus à la demande, pour qui tape un ancien code.
+const itBatch1 = itInForce.map((r) => r.code);
+
 mkdirSync(OUT_DIR, { recursive: true });
 const generated_at = new Date().toISOString().slice(0, 10);
-writeFileSync(
-  resolve(OUT_DIR, 'de-blz.json'),
-  JSON.stringify({
-    generated_at,
-    source: 'Deutsche Bundesbank Bankleitzahlendatei',
-    count: Object.keys(de).length,
-    batch1: deBatch1,
-    entries: de,
-  }),
-);
-writeFileSync(
-  resolve(OUT_DIR, 'ch-iid.json'),
-  JSON.stringify({
-    generated_at,
-    source: 'SIX BankMaster',
-    count: Object.keys(ch).length,
-    batch1: chBatch1,
-    entries: ch,
-  }),
-);
-writeFileSync(
-  resolve(OUT_DIR, 'at-blz.json'),
-  JSON.stringify({
-    generated_at,
-    source: atSource,
-    count: Object.keys(at).length,
-    batch1: atBatch1,
-    entries: at,
-  }),
-);
-writeFileSync(
-  resolve(OUT_DIR, 'be-bank.json'),
-  JSON.stringify({
-    generated_at,
-    source: beSource,
-    count: Object.keys(be).length,
-    batch1: beBatch1,
-    entries: be,
-  }),
-);
-writeFileSync(
-  resolve(OUT_DIR, 'sk-bank.json'),
-  JSON.stringify({
-    generated_at,
-    source: skSource,
-    count: Object.keys(sk).length,
-    batch1: skBatch1,
-    entries: sk,
-  }),
-);
-writeFileSync(
-  resolve(OUT_DIR, 'sm-bank.json'),
-  JSON.stringify({
-    generated_at,
-    source: smSource,
-    count: Object.keys(sm).length,
-    batch1: smBatch1,
-    entries: sm,
-  }),
-);
-console.log(`de-blz.json: ${Object.keys(de).length} BLZ, batch1 ${deBatch1.length}`);
-console.log(
-  `sk-bank.json: ${Object.keys(sk).length} codes, batch1 ${skBatch1.length}, ` +
-    `${skRows.filter((r) => r.bic).length} carrying a BIC`,
-);
-console.log(`sm-bank.json: ${Object.keys(sm).length} operating banks, batch1 ${smBatch1.length}`);
-console.log(`at-blz.json: ${Object.keys(at).length} codes, batch1 ${atBatch1.length}`);
-console.log(
-  `be-bank.json: ${Object.keys(be).length} codes in ${beGroups.size} institutions, batch1 ${beBatch1.length}`,
-);
-console.log(
-  `ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`,
-);
+if (wants('DE'))
+  writeFileSync(
+    resolve(OUT_DIR, 'de-blz.json'),
+    JSON.stringify({
+      generated_at,
+      source: 'Deutsche Bundesbank Bankleitzahlendatei',
+      count: Object.keys(de).length,
+      batch1: deBatch1,
+      entries: de,
+    }),
+  );
+if (wants('CH'))
+  writeFileSync(
+    resolve(OUT_DIR, 'ch-iid.json'),
+    JSON.stringify({
+      generated_at,
+      source: 'SIX BankMaster',
+      count: Object.keys(ch).length,
+      batch1: chBatch1,
+      entries: ch,
+    }),
+  );
+if (wants('AT'))
+  writeFileSync(
+    resolve(OUT_DIR, 'at-blz.json'),
+    JSON.stringify({
+      generated_at,
+      source: atSource,
+      count: Object.keys(at).length,
+      batch1: atBatch1,
+      entries: at,
+    }),
+  );
+if (wants('BE'))
+  writeFileSync(
+    resolve(OUT_DIR, 'be-bank.json'),
+    JSON.stringify({
+      generated_at,
+      source: beSource,
+      count: Object.keys(be).length,
+      batch1: beBatch1,
+      entries: be,
+    }),
+  );
+if (wants('SK'))
+  writeFileSync(
+    resolve(OUT_DIR, 'sk-bank.json'),
+    JSON.stringify({
+      generated_at,
+      source: skSource,
+      count: Object.keys(sk).length,
+      batch1: skBatch1,
+      entries: sk,
+    }),
+  );
+if (wants('SM'))
+  writeFileSync(
+    resolve(OUT_DIR, 'sm-bank.json'),
+    JSON.stringify({
+      generated_at,
+      source: smSource,
+      count: Object.keys(sm).length,
+      batch1: smBatch1,
+      entries: sm,
+    }),
+  );
+// Pas de fichier vide : une base sans registre italien laisse it-bank.json tel
+// qu'il était, plutôt que d'effacer les pages.
+if (wants('IT')) {
+  if (itInForce.length === 0) {
+    console.warn('it-bank.json: no Italian register in this database, file left as it was');
+  } else {
+    writeFileSync(
+      resolve(OUT_DIR, 'it-bank.json'),
+      JSON.stringify({
+        generated_at,
+        source: itSource,
+        count: Object.keys(itEntries).length,
+        batch1: itBatch1,
+        entries: itEntries,
+      }),
+    );
+    console.log(
+      `it-bank.json: ${itInForce.length} codes in force (batch1), ${itRetired.length} struck off`,
+    );
+  }
+}
+if (!ONLY) {
+  console.log(`de-blz.json: ${Object.keys(de).length} BLZ, batch1 ${deBatch1.length}`);
+  console.log(
+    `sk-bank.json: ${Object.keys(sk).length} codes, batch1 ${skBatch1.length}, ` +
+      `${skRows.filter((r) => r.bic).length} carrying a BIC`,
+  );
+  console.log(`sm-bank.json: ${Object.keys(sm).length} operating banks, batch1 ${smBatch1.length}`);
+  console.log(`at-blz.json: ${Object.keys(at).length} codes, batch1 ${atBatch1.length}`);
+  console.log(
+    `be-bank.json: ${Object.keys(be).length} codes in ${beGroups.size} institutions, batch1 ${beBatch1.length}`,
+  );
+  console.log(
+    `ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`,
+  );
+}
