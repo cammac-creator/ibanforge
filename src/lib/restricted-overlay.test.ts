@@ -545,31 +545,42 @@ describe('surcouche : extraction, contrôle, fusion', () => {
       return n;
     })();
     expect(ofacBefore).toBeGreaterThan(0);
+    // Le fichier forgé est refusé entier : son SQL n'est pas mot pour mot celui
+    // de la constante. La base publique reste intacte (aucune copie construite).
+    expect(inspectOverlay(forged, 'compliance').error).toBe('overlay_unexpected_ddl');
     const result = buildMergedDatabase({
       kind: 'compliance',
       publicPath: noTables,
       overlayPath: forged,
       outputPath: join(dir, 'forge.sqlite'),
     });
-    const out = openDb(result.path!, true);
+    expect(result.state).toBe('refused');
+    expect(result.error).toBe('overlay_unexpected_ddl');
+    expect(readdirSync(dir).filter((f) => f.startsWith('forge.sqlite'))).toEqual([]);
+    const pub = openDb(noTables, true);
     expect(
       (
-        out
+        pub
           .prepare("SELECT COUNT(*) AS n FROM sanctioned_entities WHERE source_list = 'OFAC'")
-          .get() as {
-          n: number;
-        }
+          .get() as { n: number }
       ).n,
     ).toBe(ofacBefore);
-    // La table recréée l'a été depuis la constante, pas depuis le texte forgé.
-    expect(
-      (
-        out.prepare("SELECT sql FROM sqlite_master WHERE name = 'vop_participants'").get() as {
-          sql: string;
-        }
-      ).sql,
-    ).not.toContain('DELETE');
-    out.close();
+    pub.close();
+
+    // Un index au SQL détourné est refusé de la même façon.
+    const forgedIndex = copy(overlay.bic);
+    const fi = openDb(forgedIndex);
+    fi.unsafeMode(true);
+    fi.pragma('writable_schema = ON');
+    fi.prepare(
+      "UPDATE sqlite_master SET sql = sql || '; DELETE FROM main.ch_clearing' WHERE name = 'idx_bic8'",
+    ).run();
+    fi.pragma('writable_schema = OFF');
+    fi.close();
+    expect(inspectOverlay(forgedIndex, 'bic').error).toBe('overlay_unexpected_ddl');
+    // Et la vraie surcouche extraite passe, mot pour mot, sur ses six tables.
+    expect(inspectOverlay(overlay.bic, 'bic').ok).toBe(true);
+    expect(inspectOverlay(overlay.compliance, 'compliance').ok).toBe(true);
 
     // Une vue ou un déclencheur dans le fichier le fait refuser.
     const withView = copy(overlay.compliance);

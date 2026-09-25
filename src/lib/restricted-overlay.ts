@@ -170,6 +170,15 @@ export interface MergeResult {
   frozen_path?: string;
 }
 
+/**
+ * Le code d'une erreur, jamais son message : les messages de fichiers portent des
+ * chemins complets, et ce texte part dans le journal et l'alerte (R7).
+ */
+export function errorCode(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && code !== '' ? code : 'erreur';
+}
+
 /** Empreinte SHA-256 d'un fichier, en hexadécimal. */
 export function sha256File(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -396,6 +405,23 @@ export function inspectOverlay(path: string, kind: OverlayKind): OverlayInspecti
         members,
       };
 
+    // Le SQL de chaque table de la famille, et de ses index, doit être MOT POUR MOT
+    // celui de la constante : un texte détourné dans sqlite_master (seconde
+    // instruction, index ou table au SQL modifié) passe l'intégrité SQLite, et
+    // n'a rien à faire dans un fichier que seule l'extraction écrit (R4).
+    for (const spec of RESTRICTED_TABLES[kind]) {
+      if (!tables.includes(spec.name)) continue;
+      const ddl = (
+        db
+          .prepare(
+            'SELECT sql FROM sqlite_master WHERE tbl_name = ? AND sql IS NOT NULL ORDER BY rowid',
+          )
+          .all(spec.name) as Array<{ sql: string }>
+      ).map((r) => r.sql);
+      if (JSON.stringify(ddl) !== JSON.stringify(spec.ddl))
+        return { ok: false, error: 'overlay_unexpected_ddl', sha256, meta, members };
+    }
+
     // Aucune ligne d'une table de la famille ne peut sortir des membres déclarés.
     for (const spec of RESTRICTED_TABLES[kind]) {
       if (!tables.includes(spec.name)) continue;
@@ -470,7 +496,7 @@ export function inspectOverlay(path: string, kind: OverlayKind): OverlayInspecti
   } catch (err) {
     return {
       ok: false,
-      error: `overlay_unreadable:${err instanceof Error ? err.message : String(err)}`,
+      error: `overlay_unreadable:${errorCode(err)}`,
       sha256,
       members,
     };
@@ -786,7 +812,7 @@ function mergeFrozen(options: {
         db.exec('RELEASE overlay_table');
         refuse(
           candidates.map((m) => m.id),
-          `merge_failed:${err instanceof Error ? err.message : String(err)}`,
+          `merge_failed:${errorCode(err)}`,
         );
       }
     }
@@ -845,7 +871,7 @@ function mergeFrozen(options: {
     removeFileWithCompanions(temporary);
     return finish({
       state: 'refused',
-      error: `merge_failed:${err instanceof Error ? err.message : String(err)}`,
+      error: `merge_failed:${errorCode(err)}`,
       sha256: inspection.sha256,
       members,
     });

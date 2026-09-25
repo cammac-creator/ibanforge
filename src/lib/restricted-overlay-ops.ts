@@ -53,7 +53,7 @@ export function reportRestrictedOverlays(statuses: OverlayStatus[]): void {
         `Surcouche privée ${status.kind} : entretien des fichiers en échec (${status.housekeeping_error}). ` +
           'Ce qui est servi est intact ; la copie acceptée peut manquer.',
       );
-    else if (status.state !== 'off') void opsOk(`overlay:${status.kind}:files`);
+    else void opsOk(`overlay:${status.kind}:files`);
     const line = describeOverlayStatus(status);
     const key = `overlay:${status.kind}`;
     const whole =

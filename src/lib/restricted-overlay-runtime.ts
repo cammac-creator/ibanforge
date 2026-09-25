@@ -32,6 +32,7 @@ import {
   acceptedCopyPath,
   buildMergedDatabase,
   discardFrozenCopy,
+  errorCode,
   nextMergedPath,
   promoteAcceptedCopy,
   removeFileWithCompanions,
@@ -213,7 +214,7 @@ function build(
       status: {
         ...base,
         state: 'refused',
-        error: `overlay_build_failed:${err instanceof Error ? err.message : String(err)}`,
+        error: `overlay_build_failed:${errorCode(err)}`,
         file,
       },
     };

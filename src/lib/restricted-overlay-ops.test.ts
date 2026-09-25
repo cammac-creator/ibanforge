@@ -67,6 +67,8 @@ describe('démarrage', () => {
     expect(keys(ops.opsOk)).toEqual([
       'overlay:bic:files',
       'overlay:bic',
+      // Aussi pour `off` : une alerte d'entretien d'avant un retrait se referme.
+      'overlay:compliance:files',
       'overlay:compliance',
       'overlay:bic:reload',
       'overlay:compliance:reload',

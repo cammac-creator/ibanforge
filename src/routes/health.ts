@@ -222,10 +222,13 @@ health.get('/health', (c) => {
       bic_sources: probeSourceFreshness(),
       // AJOUTÉ le 25/09/2026 à côté du contrat, rien de renommé : la surcouche
       // privée des données sous conditions est-elle servie sur chaque base
-      // (`off` sans sa variable, `applied`, `partial`, `refused`), avec les
-      // douze premiers caractères de son SHA-256, pour prouver un dépôt en
-      // ligne. Un état, jamais un compte ; jamais une raison d'échouer le
-      // contrôle (une surcouche absente répond « non consulté », pas une panne).
+      // (`off` sans sa variable, `applied`, `kept_public` quand le public plus
+      // récent est gardé, `partial`, `refused`, `pending` avant l'ouverture de
+      // la base), avec les douze premiers caractères du SHA-256 du fichier
+      // servi et `fallback: true` quand c'est la dernière surcouche acceptée,
+      // pour prouver un dépôt en ligne. Un état, jamais un compte ; jamais une
+      // raison d'échouer le contrôle (une surcouche absente répond « non
+      // consulté », pas une panne).
       restricted_overlays: restrictedOverlayHealth(),
     });
   } catch {
