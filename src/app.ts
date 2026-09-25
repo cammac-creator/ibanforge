@@ -1145,12 +1145,12 @@ export function buildApp(): Hono<HonoEnv> {
     const bic = getBic(body);
     const hasIban = typeof iban === 'string' && iban.trim() !== '';
     const hasBic = typeof bic === 'string' && bic.trim() !== '';
-    // This route screens EITHER field — the route itself
-    // (src/routes/iban-compliance.ts) is what refuses the two together, and
-    // that refusal must not be duplicated here. Until 25/09/2026 this guard
-    // demanded `iban` unconditionally, so an authenticated caller sending only
-    // `bic` — exactly what GET /v1/bic/:code tells a caller to do when a BIC is
-    // sanctioned — was turned back with a 400 before the route ever ran.
+    // Cette route contrôle l'un OU l'autre champ ; c'est la route elle-même
+    // (src/routes/iban-compliance.ts) qui refuse les deux ensemble, et ce refus
+    // ne se duplique pas ici. Jusqu'au 25/09/2026, cette garde exigeait `iban`
+    // sans condition : un appelant authentifié qui n'envoyait que `bic`, ce que
+    // GET /v1/bic/:code lui conseille quand un BIC est sous sanctions, recevait
+    // un 400 avant que la route ne tourne.
     if (!hasIban && !hasBic) {
       return c.json(
         {
