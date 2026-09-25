@@ -110,7 +110,28 @@ npm run build             # next build
 - `docs/data-sources.md` — every data source, its licence, and the permission we hold in
   writing. **Read it before touching a register.** Some sources impose an exact credit line
   and a notice that must be reproduced in full on every response.
-
+- `src/lib/restricted-family.ts` — the data we may serve but not redistribute (EBA STEP2,
+  NBP and OeNB directory rows, the AT, BE and SM registers, the PRA list, the UN list, both
+  EPC registers), listed ONCE, with each table's definition and how its rows are dated. In
+  production it comes from a private file per database, named by
+  `RESTRICTED_BIC_OVERLAY_PATH` and `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (absolute paths on
+  the Railway volume, `/app/data/…`), merged at start-up into a copy of the fresh public
+  database (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), member by
+  member, the fresher data winning: the public rows are kept (`kept_public`) when they are
+  newer, or undated and different. The last accepted file is kept beside the private one
+  (`*.accepted.sqlite`) and served at start-up if the file named by the variable is refused.
+  To reload, replace the file atomically (write a neighbour, then `mv`): the API checks it
+  within ten minutes, rebuilds only that database, and keeps what it serves if the new file
+  fails its checks or would drop a member served today. State: `GET /health` →
+  `restricted_overlays`. Build a file with `npm run overlay -- extract` (no download) or
+  `npm run overlay:seed` (private refresh only). To withdraw: remove the variable, restart,
+  check `off`, then delete `restricted-*.merged-*`, `restricted-*.accepted.sqlite` and the
+  overlay in the old folder; deleting the private file alone is NOT a rollback. **Never**
+  commit an overlay file or a merged copy, never write one inside any git repository (the
+  script refuses, and `.gitignore` catches `restricted-*.sqlite*` and `*.merged-*.sqlite*`),
+  never add a table or a source to the family anywhere but that constant, and never let a
+  public workflow download or commit the family: stopping them is the next step, not a
+  side effect.
 ---
 
 ## Work in progress, at 10 September 2026

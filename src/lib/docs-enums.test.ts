@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { PROMISED_SANCTIONS_LISTS } from './compliance-db.js';
 
 /**
  * The paid endpoint's docs described enums the API never served — fatf_status
@@ -27,8 +28,15 @@ const SERVED_RISK_LEVELS = ['low', 'medium', 'elevated', 'high', 'critical', 'un
 // the fallback the response layer serves for countries absent from the table.
 const SERVED_FATF = ['member', 'grey_list', 'black_list', 'suspended', 'non_member'];
 
-// Every flag name the scoring function can push.
-const SERVED_FLAGS = [...complianceSrc.matchAll(/flags\.push\('([a-z0-9_]+)'\)/g)].map((m) => m[1]);
+// Every flag name the scoring function can push: the literal ones, plus one
+// per promised sanctions list, built from a template (25/09/2026) that the
+// literal search cannot see. The template is pinned below, so a rename breaks
+// this guard instead of silently letting the docs cite a flag nobody serves.
+const LIST_FLAG_TEMPLATE = 'flags.push(`sanctions_list_unavailable_${list.toLowerCase()}`)';
+const SERVED_FLAGS = [
+  ...[...complianceSrc.matchAll(/flags\.push\('([a-z0-9_]+)'\)/g)].map((m) => m[1]),
+  ...PROMISED_SANCTIONS_LISTS.map((l) => `sanctions_list_unavailable_${l.toLowerCase()}`),
+];
 
 /** Backticked lowercase_snake tokens on one line — the doc's enum vocabulary. */
 function backtickTokens(line: string): string[] {
@@ -58,6 +66,15 @@ describe('the canonical lists are pinned to the source, not to this test', () =>
 
   it('the scoring function pushes at least the flags the docs cite', () => {
     expect(SERVED_FLAGS.length).toBeGreaterThan(5);
+  });
+
+  it('the per-list flag is still built from the template this list mirrors', () => {
+    expect(complianceSrc).toContain(LIST_FLAG_TEMPLATE);
+    const pushes = [...complianceSrc.matchAll(/flags\.push\(.*\)(?=;)/g)].map((m) => m[0]);
+    const other = pushes.filter(
+      (p) => !/^flags\.push\('[a-z0-9_]+'\)$/.test(p) && p !== LIST_FLAG_TEMPLATE,
+    );
+    expect(other).toEqual([]);
   });
 });
 

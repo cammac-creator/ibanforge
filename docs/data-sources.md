@@ -269,6 +269,94 @@ attributions : `NOTICE`.
 tolère l'échec de ce téléchargement : un lien pourri doit coûter le contrôle
 britannique, jamais le déploiement.
 
+**La famille « sous conditions » — surcouche privée** (étape 3 de la sortie des
+données, 25/09/2026). Décision de Claude-Alain du 24/09/2026 : tout ce qui n'est
+pas redistribuable sort du dépôt public, l'ONU est gardée hors du dépôt, la
+Slovaquie reste publique (la Tchéquie aussi, conditions de la ČNB ci-dessous). La
+liste des membres vit en UN endroit,
+`src/lib/restricted-family.ts` (extraction, chargeur et seeders la lisent) :
+
+| Base | Membre | Lignes |
+|---|---|---|
+| `bic.sqlite` | `eba_step2`, `nbp`, `oenb` | `bic_entries` de ces trois sources |
+| `bic.sqlite` | `register_at`, `register_be`, `register_sm` | `national_bank_codes` de ces trois pays |
+| `bic.sqlite` | `pra` | `pra_banks` entière |
+| `compliance.sqlite` | `un` | `sanctioned_entities` de la liste `UN` |
+| `compliance.sqlite` | `epc_sepa`, `epc_vop` | `sepa_participants` et `vop_participants` entières |
+
+Hors de cette constante, et à traiter à l'étape du retrait (règle de la décision
+du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C de `NOTICE`) :
+`six_group` (à vérifier), la carte composite `src/db/bic_data.json` (clés AT, BE,
+LU, PL, FI), `src/lib/fi-register.ts`, les exports du site
+`frontend/data/registers/*.json`, les blocs EPC des exports et des réponses
+d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
+`mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`,
+`frontend/content/{en,fr,de}/docs/onboarding.mdx`), et les entrées GB (FCA) de
+`scripts/data/eu-emi-register-2026-05-22.json`.
+
+- **Deux fichiers privés**, un par base, désignés par `RESTRICTED_BIC_OVERLAY_PATH`
+  et `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (chemins absolus, sur le disque du
+  serveur, jamais dans un dépôt). Chacun porte les tables de la famille, créées
+  depuis les définitions de la constante, plus `overlay_meta` (format, base, date,
+  générateur, empreinte de la base lue, et selon la base `source_last_refresh` =
+  `metadata.last_refresh` de la conformité lue, ou `source_bic_entries_updated_at`
+  = la plus récente date de chargement de `bic_entries` de la base BIC lue) et
+  `overlay_members` (par membre : lignes, empreinte du contenu, date de chargement
+  des lignes quand la table en porte une, `as_of` ou mois de liste, source ; aucune
+  date de chargement pour AT, BE et SM, que personne ne date).
+- **Fusion au démarrage, la donnée la plus fraîche servie membre par membre** :
+  `entrypoint.sh` recopie les bases publiques à chaque démarrage ; l'API copie la
+  base publique fraîche à côté du fichier privé et décide pour chaque membre :
+  la surcouche sert si la base publique n'a aucune ligne du membre, si la
+  surcouche est strictement plus récente (datée de la même façon des deux côtés :
+  `last_refresh` pour la conformité, plus récent `updated_at` pour OeNB, NBP et
+  EBA STEP2 décidés ensemble, mois de liste puis `updated_at` pour la PRA, `as_of`
+  pour SM), ou si les contenus sont identiques ; sinon les lignes publiques sont
+  gardées (`kept_public`, sans alerte : c'est un rafraîchissement public plus
+  récent). AT et BE, non datés, restent donc publics dès qu'ils diffèrent. Le
+  `last_refresh` servi n'est jamais plus frais qu'un membre servi par la
+  surcouche. La base publique n'est jamais modifiée.
+- **Contrôles** : intégrité SQLite, version du format (2), base attendue, aucune
+  vue ni déclencheur, aucune table inconnue ni ligne hors de la famille (sinon
+  fichier refusé) ; pour chaque membre, table et colonnes identiques à la
+  constante, plancher de lignes (ceux des seeders pour AT, BE, SM et PRA), compte
+  et empreinte du contenu (sinon membre refusé, les autres servis). Le SQL lu dans
+  la surcouche n'est jamais exécuté. Refus : raison au journal, alerte
+  d'exploitation `overlay:<base>`. `GET /health` → `restricted_overlays`.
+- **Dernière surcouche acceptée** : gardée à côté du fichier privé
+  (`restricted-<base>.accepted.sqlite`). Au démarrage, si le fichier de la variable
+  est refusé (entier ou en partie), elle est fusionnée avec la base publique
+  fraîche et servie à sa place (`fallback: true` dans `/health`, alerte rouge) ;
+  sans elle, base publique seule et « non consulté » là où la donnée manque.
+- **Rechargement sans redémarrage** : un fichier remplacé (dépôt par un fichier
+  voisin puis `mv`) est vu en dix minutes au plus, et seule sa base est
+  refusionnée. Un fichier refusé, ou qui cesserait de servir un membre servi
+  aujourd'hui, laisse la surcouche courante en service ; il n'est pas reconstruit
+  aux passages suivants tant qu'il ne change pas. Après avoir libéré un volume
+  plein, redéposer ou redémarrer.
+- **Retirer ou déplacer une surcouche** : retirer la variable, redémarrer,
+  vérifier `off` dans `/health`, puis effacer dans le dossier de l'ancien fichier
+  privé `restricted-*.merged-*.sqlite*`, `restricted-*.accepted.sqlite` et, si
+  l'on renonce, la surcouche elle-même. Sinon environ 36 Mo et une copie complète
+  de la famille restent sur le volume, et une variable reposée plus tard
+  reprendrait l'ancienne copie acceptée. Effacer le seul fichier privé n'est PAS
+  un retour arrière : la fusion déjà faite reste servie jusqu'au redémarrage.
+- **Extraction sans téléchargement** : `npm run overlay -- extract --bic <copie>
+  --compliance <copie> --out-dir <dossier hors de tout dépôt git>` (crée le
+  dossier en 0700 ; refuse tout dépôt git ou copie de travail, un lien ou un lien
+  dur en sortie ; lit des copies ; refuse sous un plancher ou sur une baisse de
+  plus de 10 % d'un membre d'au moins 50 lignes sans `--allow-shrink`). Contrôle :
+  `npm run overlay -- check`.
+- **Seeders à sortie choisie**, pour le futur dépôt privé de rafraîchissement :
+  `BIC_DB_PATH` (enrich, national, PRA), `COMPLIANCE_DB_PATH` (conformité),
+  `SEED_FAMILY=restricted` (la famille seule), enchaînés par
+  `npm run overlay:seed -- --kind bic|compliance --out <fichier>`. La sortie doit
+  être hors de tout dépôt (`$RUNNER_TEMP` en CI), et `overlay:seed` pose
+  `SEED_TMP_DIR` dans son dossier de travail : les téléchargements et la base de
+  conformité en construction ne passent plus par `.tmp-bic-enrich/` et
+  `.tmp-compliance/` du checkout (désormais ignorés par git). Sans ces variables, les workflows publics
+  écrivent exactement comme avant.
+
 ## Ce que les surfaces publiques annoncent
 
 - Pied de page, **corrigé le 22/08/2026** : il citait quatre sources sur treize et

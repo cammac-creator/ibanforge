@@ -15,13 +15,16 @@
 import { createRequire } from 'node:module';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { RESTRICTED_FLOORS } from '../src/lib/restricted-family.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
 const Database = require('better-sqlite3') as typeof import('better-sqlite3');
 
-const BIC_DB_PATH = resolve(__dirname, '../data/bic.sqlite');
+// BIC_DB_PATH choisit la base écrite (défaut inchangé : data/bic.sqlite) ; la
+// chaîne privée de la surcouche y passe une copie de travail.
+const BIC_DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
 
 /**
  * The list is published as `banks-list-YYMM.csv` under the year folder, early
@@ -44,8 +47,11 @@ function listUrl(year: number, month: number): string {
  * change our reader silently mangled — and the table it would replace is the
  * evidence behind a permission-bearing claim. Abort *before* touching the
  * database and let the existing rows stand, exactly as seed-bc-nummer.ts does.
+ *
+ * Partagé avec le chargeur de la surcouche privée (src/lib/restricted-family.ts) :
+ * une seule valeur, 200.
  */
-const MIN_EXPECTED_ROWS = 200;
+const MIN_EXPECTED_ROWS = RESTRICTED_FLOORS.pra;
 
 // ---------------------------------------------------------------------------
 // Parsing

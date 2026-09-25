@@ -1,5 +1,9 @@
 import type Database from 'better-sqlite3';
-import { complianceTableLoaded, getComplianceDB } from './compliance-db.js';
+import {
+  complianceTableLoaded,
+  getComplianceDB,
+  unscreenedSanctionsLists,
+} from './compliance-db.js';
 import { getSepaInfo } from './countries.js';
 import type {
   SanctionsCheck,
@@ -73,9 +77,19 @@ export function checkSanctions(countryCode: string, bic8: string | null): Sancti
 export interface BicSanctionsScreen {
   /** False when the sanctions database could not be read. Nothing below counts. */
   screened: boolean;
-  /** Null when `screened` is false — never `false`, which would be a claim. */
+  /**
+   * Null when `screened` is false — never `false`, which would be a claim.
+   * Null aussi (25/09/2026) quand rien ne correspond sur les listes lues alors
+   * qu'une liste promise manque (`unscreened_lists`) : un « non » sur l'UE et
+   * l'OFAC n'est pas un « non » sur l'ONU.
+   */
   listed: boolean | null;
   matched_lists: string[];
+  /**
+   * Les listes que chaque surface nomme et que ce déploiement n'a pas chargées.
+   * Présent seulement quand il en manque une : absent, toutes ont été lues.
+   */
+  unscreened_lists?: string[];
 }
 
 export function screenBicSanctions(bic8: string): BicSanctionsScreen {
@@ -91,10 +105,15 @@ export function screenBicSanctions(bic8: string): BicSanctionsScreen {
         'SELECT source_list FROM sanctioned_entities WHERE bic8 = ?',
       );
     const rows = _checkSanctionedBank.all(bic8) as { source_list: string }[];
+    // Une liste promise absente (l'ONU sans sa surcouche privée) : une
+    // correspondance ailleurs reste un « oui » ferme, mais aucune correspondance
+    // ne vaut plus « non » (voir unscreenedSanctionsLists).
+    const unscreened = unscreenedSanctionsLists();
     return {
       screened: true,
-      listed: rows.length > 0,
+      listed: rows.length > 0 ? true : unscreened.length > 0 ? null : false,
       matched_lists: rows.map((r) => r.source_list),
+      ...(unscreened.length > 0 ? { unscreened_lists: unscreened } : {}),
     };
   } catch {
     return { screened: false, listed: null, matched_lists: [] };
@@ -222,6 +241,12 @@ export function calculateRiskScore(
    * liste n'est chargée. buildComplianceResult() passe la valeur exacte.
    */
   bankResolved: boolean = sanctions.bank_screened,
+  /**
+   * Les listes promises que la base servie ne porte pas (voir
+   * unscreenedSanctionsLists) : un drapeau sans poids par liste, quand une
+   * banque a été passée aux listes chargées.
+   */
+  unscreenedLists: readonly string[] = [],
 ): { risk_score: number; risk_level: ScoredRiskLevel; flags: string[] } {
   let score = 0;
   const flags: string[] = [];
@@ -338,6 +363,14 @@ export function calculateRiskScore(
     }
   }
 
+  // Une banque passée aux listes chargées, mais pas à toutes celles que le
+  // service nomme : `bank_sanctioned: false` ne dit rien de la liste manquante.
+  // Sans poids, comme les registres non chargés : il décrit ce que nous n'avons
+  // pas lu, pas la banque (25/09/2026).
+  if (bankResolved && sanctions.bank_screened) {
+    for (const list of unscreenedLists)
+      flags.push(`sanctions_list_unavailable_${list.toLowerCase()}`);
+  }
   score = Math.min(score, 100);
   // Une banque résolue que nous n'avons pu passer à aucune liste : jamais
   // « low », jamais moins qu'elevated (50), comme le repli d'une base
@@ -437,6 +470,7 @@ export function unreadableComplianceResult(
     isTestBic,
     bankCode,
     bic8 !== null,
+    attempt(() => unscreenedSanctionsLists()) ?? [],
   );
   const NOT_LOADED = new Set([
     'sanctions_lists_unavailable',
@@ -518,6 +552,7 @@ export function buildComplianceResult(
     isTestBic,
     bankCode,
     bic8 !== null,
+    unscreenedSanctionsLists(),
   );
   return { sanctions, reachability, vop, risk_score, risk_level, flags };
 }

@@ -3289,7 +3289,12 @@ const buildRawSpec = () => ({
               screened: { type: 'boolean', description: 'Whether the screen ran.' },
               listed: {
                 type: ['boolean', 'null'],
-                description: 'true when the institution appears on a screened list, false when it does not, null when the screen could not run.',
+                description: 'true when the institution appears on a screened list, false when it does not, null when the screen could not run, or when nothing matched while one of the lists this service names is not loaded on this deployment (see unscreened_lists): a no on the lists read is not a no on the missing one.',
+              },
+              unscreened_lists: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Present only when one of the lists this service names is not loaded on this deployment: those lists were not consulted. Absent when every named list was read.',
               },
               // On one line, like its twin in ComplianceResult: the
               // sanctions-claims guard exempts a `matched_lists` declaration
@@ -3354,7 +3359,7 @@ const buildRawSpec = () => ({
             description:
               'unassessable means the IBAN itself failed validation, so no screening was possible. It is the absence of a verdict, never a favourable one: do not treat it as low.',
           },
-          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. Three flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable and vop_register_unavailable. sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
+          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. Some flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable, vop_register_unavailable, and sanctions_list_unavailable_<list> (one per named sanctions list not loaded on this deployment, for example sanctions_list_unavailable_un: the bank was screened against the other lists, so bank_sanctioned false says nothing about that one). sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
         },
       },
       ChClearingResult: {

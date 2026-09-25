@@ -8,7 +8,8 @@
  */
 import { serve, type ServerType } from '@hono/node-server';
 import { createRequire } from 'node:module';
-import { closeAll, initStatsDB, checkpointStatsWal } from './lib/db.js';
+import { closeAll, initStatsDB, checkpointStatsWal, getBicDB } from './lib/db.js';
+import { getComplianceDB } from './lib/compliance-db.js';
 import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
@@ -26,6 +27,7 @@ import { startMonthlyDemandLoop } from './lib/demand-proposal-server.js';
 import { startActivationNudge } from './lib/activation-nudge-server.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
+import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
 import { recordEvent } from './lib/events.js';
 
 // Fail-fast: refuse to start in production without wallet config
@@ -56,6 +58,36 @@ if (!statsState.ok) {
       "L'API écoute et répond 503 sur /health ; clés, quotas et crédits sont hors service.",
   );
 }
+
+// ─── Surcouche privée des données sous conditions (étape 3, 25/09/2026) ──────
+//
+// `entrypoint.sh` vient de recopier les deux bases publiques depuis l'image.
+// Ouvrir les deux connexions ICI, avant la première requête, fait la fusion au
+// démarrage (src/lib/restricted-overlay-runtime.ts) plutôt qu'au premier
+// client, et permet d'en dire le résultat : au journal, et par l'alerte
+// d'exploitation quand le fichier d'une variable n'est pas servi en entier
+// (src/lib/restricted-overlay-ops.ts). Sans variable, rien ne change : les bases
+// publiques s'ouvrent comme avant.
+//
+// Une base publique illisible ne fait pas tomber le démarrage ici : elle lève à
+// la première requête, exactement comme avant ce bloc.
+try {
+  getBicDB();
+  getComplianceDB();
+} catch (err) {
+  console.error(
+    'Reference database open failed at boot:',
+    err instanceof Error ? err.message : err,
+  );
+}
+reportBootOverlays();
+
+// Un fichier privé remplacé (dépôt manuel, puis tirage automatique à l'étape
+// suivante) est rechargé sans redémarrage : un `stat` par base toutes les dix
+// minutes, une fusion seulement pour la base dont le fichier a changé depuis le
+// dernier vu. Un fichier refusé n'est pas reconstruit au passage suivant.
+const OVERLAY_WATCH_MS = 10 * 60 * 1000;
+setInterval(overlayWatchTick, OVERLAY_WATCH_MS).unref();
 
 const app = buildApp();
 

@@ -7,6 +7,7 @@ import type { OfficialIdentity } from './lib/official-identity.js';
 import type { PsdRegistration } from './lib/psd-register.js';
 import type { ReferenceCheckBlock } from './lib/payment-reference.js';
 import type { KeyTier } from './lib/tiers.js';
+import type { BicSanctionsScreen } from './lib/compliance.js';
 
 export type { UkModulusResult, PraAuthorisation, PsdRegistration, ReferenceCheckBlock };
 
@@ -791,14 +792,14 @@ export interface BICLookupResult {
    * This is a WARNING, not a compliance report: it says nothing about the
    * country, FATF, or a beneficiary. Full screening is /v1/iban/compliance.
    */
-  sanctions: {
-    /** False when the sanctions database could not be read; `listed` is then null. */
-    screened: boolean;
-    /** Null when not screened — never `false`, which would be a claim we cannot make. */
-    listed: boolean | null;
-    /** Which lists matched, e.g. ["OFAC"], ["EU"]. Empty when clean or unscreened. */
-    matched_lists: string[];
-  };
+  /**
+   * One shape for the route and this contract (src/lib/compliance.ts):
+   * `screened` false when the sanctions database could not be read, `listed`
+   * null when not screened OR when nothing matched while a named list is not
+   * loaded (`unscreened_lists`), never `false`, which would be a claim we
+   * cannot make; `matched_lists` the lists that matched.
+   */
+  sanctions: BicSanctionsScreen;
   note?: string;
   cost_usdc: number;
   processing_ms?: number;

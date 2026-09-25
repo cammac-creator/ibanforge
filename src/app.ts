@@ -58,6 +58,7 @@ import { mcpCard } from './routes/mcp-card.js';
 // DX-01 / MCP-12).
 import { MCP_TOOLS, STDIO_ONLY_TOOLS, toolPriceLabel } from './mcp/inventory.js';
 import { feedback } from './routes/feedback.js';
+import { onReferenceDataReload } from './lib/restricted-overlay-runtime.js';
 import { opsHeartbeat } from './routes/ops-heartbeat.js';
 import { opsRecent } from './routes/ops-recent.js';
 import { createPlaygroundRelay } from './routes/playground.js';
@@ -256,6 +257,11 @@ let llmsTxtKey: string | null = null;
 function llmsTxtEditionKey(): string {
   return ['SK', 'CZ', 'SM'].map((cc) => nationalRegisterCredit(cc) ?? '').join('|');
 }
+// Les comptes et le mois PRA viennent de la base servie : une surcouche privée
+// rechargée sans redémarrage doit les faire relire (restricted-overlay-runtime.ts).
+onReferenceDataReload(() => {
+  llmsTxtCache = null;
+});
 
 function buildLlmsTxt(): string {
   const bicCount = getEntryCount().toLocaleString('en-US');
