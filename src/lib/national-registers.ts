@@ -15,16 +15,27 @@ import { getBicDB } from './db.js';
  *
  * As with CH, LI, DE and BG, being here is a claim that an absence means the
  * code is allocated to nobody. Seeded by scripts/seed-national.ts.
+ *
+ * Sauf pour les registres que EXHAUSTIVE ci-dessous dit partiels : Saint-Marin
+ * et, depuis le 25/09/2026, l'Italie (scripts/seed-national-it.ts), dont une
+ * absence ne dit rien. La table est partagée, la force de l'affirmation non.
  */
 export interface NationalCodeEntry {
   code: string;
   name: string;
   bic: string | null;
-  /** One line, house number included (OeNB publishes it that way); null for BE, SK and CZ. */
+  /**
+   * One line, house number included (OeNB publishes it that way); null for BE,
+   * SK and CZ. Pour l'Italie, le siège légal en Italie que publie la Banca
+   * d'Italia (pour une banque étrangère, sa succursale italienne).
+   */
   street: string | null;
   post_code: string | null;
   town: string | null;
-  /** LEI where the register publishes one (OeNB, 99% filled); null for BE, SK and CZ. */
+  /**
+   * LEI where the register publishes one (OeNB, 99% filled; la Banca d'Italia
+   * pour la plupart de ses codes en vigueur); null for BE, SK and CZ.
+   */
   lei: string | null;
   /**
    * The credit the register's own terms require, as the seeder read it.
@@ -44,7 +55,7 @@ export interface NationalCodeEntry {
 }
 
 /** Width of the bank code as an IBAN of that country carries it. */
-const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3, SK: 4, CZ: 4, SM: 5 };
+const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3, SK: 4, CZ: 4, SM: 5, IT: 5 };
 
 /**
  * 🚨 Which of these registers EXHAUST their country's bank-code space.
@@ -70,6 +81,15 @@ const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3, SK: 4, CZ: 4, SM: 5 }
  * example IBAN carries an ABI absent from the page. So a hit names the holder
  * and a MISS means nothing.
  *
+ * IT non plus (25/09/2026). Les registres de la Banca d'Italia listent les
+ * banques, les établissements de paiement et de monnaie électronique qu'elle
+ * inscrit, pas l'attribution de l'espace ABI : Poste Italiane (07601), la Banca
+ * d'Italia elle-même (01000) et les succursales d'établissements de paiement
+ * européens (Qonto, 36092) émettent de vrais IBAN italiens hors de ces
+ * registres. Un code trouvé nomme son titulaire, un code absent ne dit rien. Ce
+ * qu'ils disent EN PLUS, un code radié avec sa date et son successeur légal, vit
+ * dans RETIRED_TABLE ci-dessous et ne devient jamais un refus non plus.
+ *
  * enrich.ts reads this rather than hardcoding a country list, and the only
  * place a non-exhaustive register may lead is `verified` — never
  * `not_in_register`, never `not_allocated`.
@@ -80,6 +100,7 @@ const EXHAUSTIVE: Record<string, boolean> = {
   SK: true,
   CZ: true,
   SM: false,
+  IT: false,
 };
 
 /**
@@ -134,6 +155,37 @@ const CURRENT_TABLE = 'national_bank_codes';
  * whichever edition carries the newest date, in force or not.
  */
 export const PENDING_TABLE = 'national_bank_codes_pending';
+
+/**
+ * 🚨 Les codes qu'un registre NON EXHAUSTIF déclare radiés, avec la date et le
+ * successeur légal qu'il publie. L'Italie seule aujourd'hui (Banca d'Italia,
+ * scripts/seed-national-it.ts).
+ *
+ * Une table à part, et non une colonne de `national_bank_codes` : les colonnes de
+ * celle-ci sont fixées par la surcouche privée (src/lib/restricted-family.ts), et
+ * surtout un code radié n'est PAS attribué aujourd'hui. Le ranger dans la table
+ * des codes en vigueur le ferait lire par lookupNationalCode comme un code
+ * vivant.
+ *
+ * Colonnes : `code` (à la largeur de l'IBAN), `name` (le DERNIER titulaire, tel
+ * que le registre l'écrivait), `retired_on` (dernier jour où le registre porte ce
+ * code pour lui, 'AAAA-MM-JJ'), `successor_code` et `successor_name` (le
+ * successeur LÉGAL en vigueur aujourd'hui, suivi par fusions et incorporations ;
+ * null quand il n'y en a pas), `source` et `as_of` (le crédit et l'édition, comme
+ * dans `national_bank_codes`).
+ *
+ * Un code réattribué ne s'y trouve jamais : un code qui a un titulaire en vigueur
+ * est dans `national_bank_codes`, quoi que dise son passé.
+ */
+export const RETIRED_TABLE = 'national_bank_codes_retired';
+
+/**
+ * La page d'où l'on télécharge les registres italiens, citée comme adresse du
+ * jeu dans le crédit que la licence CC BY 4.0 demande (section 3(a)(1)(A)(v)).
+ * Une seule écriture : le chargeur, /llms.txt et la documentation la lisent ici.
+ */
+export const IT_DATASET_PAGE =
+  'https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/#/area-download';
 
 type EditionTable = typeof CURRENT_TABLE | typeof PENDING_TABLE;
 
@@ -203,6 +255,10 @@ let tableChecked = false;
 let tablePresent = false;
 let pendingChecked = false;
 let pendingPresent = false;
+/** La table des codes radiés (RETIRED_TABLE), sa présence et sa requête, pour le processus. */
+let retiredChecked = false;
+let retiredPresent = false;
+let retiredStmt: import('better-sqlite3').Statement | null = null;
 /**
  * Per country, the effective date of the announced edition and of the one in
  * force, read once per process: the database is read-only at run time and is
@@ -226,6 +282,9 @@ export function resetNationalRegisterStatements(): void {
   pendingChecked = false;
   pendingPresent = false;
   editionDates.clear();
+  retiredChecked = false;
+  retiredPresent = false;
+  retiredStmt = null;
 }
 
 function tableExists(name: string): boolean {
@@ -429,6 +488,11 @@ const CREDIT_FORMAT: Record<string, (source: string, asOf: string) => string> = 
   SK: (source, asOf) => `Zdroj: ${source} (${asOf})`,
   CZ: (source, asOf) => `${source} (platný od ${asOf})`,
   SM: (source, asOf) => `Source: ${source} (read on ${asOf})`,
+  // L'Italie : CC BY 4.0 demande l'auteur, la licence, et d'« indiquer les
+  // modifications apportées ». La ligne stockée porte l'auteur, le jeu et la
+  // licence ; la date est celle de l'édition (le nom du fichier de la Banca
+  // d'Italia), et la modification est dite ici, une fois pour toutes les surfaces.
+  IT: (source, asOf) => `Source: ${source}, edition ${asOf}; normalised and joined by IBANforge`,
 };
 
 /**
@@ -454,6 +518,81 @@ export function allocatedCodes(cc: string): ReadonlySet<string> {
   try {
     const rows = getBicDB()
       .prepare(`SELECT code FROM ${activeTable(cc)} WHERE country = ?`)
+      .all(cc) as Array<{ code: string }>;
+    return new Set(rows.map((r) => r.code));
+  } catch {
+    return new Set();
+  }
+}
+
+/** Ce qu'un registre non exhaustif publie d'un code qu'il a radié. Voir RETIRED_TABLE. */
+export interface RetiredNationalCode {
+  code: string;
+  /** Le dernier titulaire, tel que le registre l'écrivait. */
+  name: string;
+  /** 'AAAA-MM-JJ' : dernier jour où le registre porte ce code pour ce titulaire. */
+  retired_on: string;
+  /** Le successeur légal en vigueur, à la largeur de l'IBAN ; null quand il n'y en a pas. */
+  successor_code: string | null;
+  successor_name: string | null;
+  source: string | null;
+  as_of: string | null;
+}
+
+/** Une base construite avant le registre italien n'a pas la table : aucun code radié connu. */
+function retiredReady(): boolean {
+  if (!retiredChecked) {
+    retiredChecked = true;
+    retiredPresent = tableExists(RETIRED_TABLE);
+  }
+  return retiredPresent;
+}
+
+/**
+ * Le code, s'il est radié d'après le registre de ce pays ; null sinon.
+ *
+ * Réservé aux registres NON exhaustifs : c'est un fait positif du registre (il a
+ * connu ce code et l'a radié), jamais un refus, et enrich.ts ne le lit que dans
+ * sa branche non exhaustive, APRÈS une absence dans la table des codes en
+ * vigueur. Sans garde autour de la requête, comme lookupNationalCode : une base
+ * illisible remonte à checkBankCode, qui répond `unavailable` / `lookup_failed`.
+ */
+export function lookupRetiredNationalCode(
+  cc: string,
+  bankCode: string,
+): RetiredNationalCode | null {
+  if (!retiredReady()) return null;
+  const code = normaliseCode(cc, bankCode);
+  if (!code) return null;
+  if (!retiredStmt) {
+    retiredStmt = getBicDB().prepare(
+      `SELECT * FROM ${RETIRED_TABLE} WHERE country = ? AND code = ?`,
+    );
+  }
+  const row = retiredStmt.get(cc, code) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  const text = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
+  return {
+    code: String(row.code),
+    name: String(row.name),
+    retired_on: String(row.retired_on),
+    successor_code: text(row.successor_code),
+    successor_name: text(row.successor_name),
+    source: text(row.source),
+    as_of: text(row.as_of),
+  };
+}
+
+/**
+ * Tous les codes que le registre de ce pays déclare radiés, pour élaguer les clés
+ * de la carte curée qu'il contredit (bic-lookup.ts). Vide quand la table manque
+ * ou ne se lit pas : sans vérité à opposer, la carte reste telle quelle.
+ */
+export function retiredNationalCodes(cc: string): ReadonlySet<string> {
+  if (!retiredReady()) return new Set();
+  try {
+    const rows = getBicDB()
+      .prepare(`SELECT code FROM ${RETIRED_TABLE} WHERE country = ?`)
       .all(cc) as Array<{ code: string }>;
     return new Set(rows.map((r) => r.code));
   } catch {

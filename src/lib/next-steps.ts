@@ -92,12 +92,21 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   // The code is allocated and being withdrawn. Not a reason to stop, a reason to
   // update the beneficiary before the transition period ends. This is the
   // merged-bank case, which only a national register can answer.
+  //
+  // Un code DÉJÀ radié, daté (`retired_on`, l'Italie depuis le 25/09/2026), se
+  // dit autrement : il n'est pas « en cours de retrait », et son successeur est
+  // LÉGAL, pas forcément la banque qui tient le compte. Toujours pas un refus.
+  // Le texte allemand, lui, ne change pas d'un octet.
   if (check?.retired) {
     steps.push({
       code: 'bank_code_retired',
-      do: check.superseded_by
-        ? `Update the beneficiary details. The register is retiring this bank code; ${check.superseded_by} takes over.`
-        : 'Update the beneficiary details. The register is retiring this bank code and names no successor.',
+      do: check.retired_on
+        ? check.superseded_by
+          ? `Update the beneficiary details before sending. The register struck this bank code off on ${check.retired_on}; its legal successor by merger or incorporation holds bank code ${check.superseded_by}, which is not necessarily the bank that now holds the account.`
+          : `Update the beneficiary details before sending. The register struck this bank code off on ${check.retired_on} and names no legal successor.`
+        : check.superseded_by
+          ? `Update the beneficiary details. The register is retiring this bank code; ${check.superseded_by} takes over.`
+          : 'Update the beneficiary details. The register is retiring this bank code and names no successor.',
       because: `bank_code_check.retired is true in ${check.register ?? 'the national register'}`,
     });
   }
@@ -154,7 +163,11 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   }
 
   // 4. Ours to offer, and only once the account itself is not in doubt.
-  if (check?.status === 'verified') {
+  //
+  // Pas sur un code déjà radié (`retired_on`) : le registre dit que son
+  // titulaire n'existe plus, aucun BIC ne lui est servi, et il n'y a pas de
+  // banque à cribler avant que le bénéficiaire ait donné ses coordonnées à jour.
+  if (check?.status === 'verified' && !check.retired_on) {
     steps.push({
       code: 'screen_compliance',
       do:
@@ -180,6 +193,8 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   if (
     process.env.PARTNER_PAYQR === '1' &&
     check?.status === 'verified' &&
+    // Même garde que l'étape 4 : pas de QR de paiement vers un code déjà radié.
+    !check.retired_on &&
     result.sepa?.member &&
     country !== 'CH' &&
     country !== 'LI'

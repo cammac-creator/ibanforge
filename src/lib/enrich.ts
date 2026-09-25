@@ -19,6 +19,7 @@ import { classifyIssuer } from './issuers.js';
 import { FI_REGISTER_AS_OF, lookupFiInstitution } from './fi-register.js';
 import {
   lookupNationalCode,
+  lookupRetiredNationalCode,
   nationalRegisterAvailable,
   nationalRegisterEdition,
   withRegisterClock,
@@ -233,6 +234,19 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // institutions, so even a hit confirms the group rather than a bank.
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)',
   SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
+  // L'Italie (25/09/2026, décision de Claude-Alain du 24/09, point 5). Les
+  // registres de la Banca d'Italia listent les banques, les établissements de
+  // paiement et de monnaie électronique qu'elle inscrit ; Poste Italiane
+  // (07601), la Banca d'Italia elle-même (01000) et les succursales
+  // d'établissements de paiement européens (Qonto, 36092) émettent de vrais IBAN
+  // italiens hors de ces registres : une absence ne dit rien.
+  //
+  // Le nom porte le crédit que la licence CC BY 4.0 exige (l'auteur, le jeu, la
+  // licence et son URI, la mention des modifications), parce que c'est le seul
+  // champ présent sur CHAQUE réponse qui lit ce registre : un code radié n'a
+  // aucun bloc `bic` pour le porter à sa place. Même choix que « Zdroj: ČNB »
+  // dans le nom tchèque. L'édition voyage dans `as_of`.
+  IT: "Banca d'Italia, registers of banks, payment institutions and e-money institutions (Albi ed elenchi di vigilanza, https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/#/area-download, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/, normalised and joined by IBANforge; Poste Italiane and branches of EU payment institutions hold ABI codes outside these registers, so an absence is not a non-allocation)",
 };
 
 /**
@@ -642,8 +656,11 @@ function decideBankCode(
     // that cannot read its register should still say so rather than quietly
     // answer as though it had no register at all.
     const reg = lookupNationalCode(cc, bankCode);
+    // L'édition n'est lue que sur un résultat : une absence à Saint-Marin ne
+    // coûte pas une requête de plus qu'avant.
+    const editionMonth = () => nationalRegisterEdition(cc).as_of?.slice(0, 7);
     if (reg) {
-      const asOf = nationalRegisterEdition(cc).as_of?.slice(0, 7);
+      const asOf = editionMonth();
       return withHolder('confirmed', {
         value: bankCode,
         status: 'verified',
@@ -664,10 +681,57 @@ function decideBankCode(
         as_of: asOf ?? as_of,
       });
     }
+    // Le troisième cas (25/09/2026) : le registre a CONNU ce code et l'a radié,
+    // à telle date, successeur légal tel code. C'est un fait positif du
+    // registre, pas une absence, et il l'emporte sur la carte curée, qui servait
+    // pour ces codes le nom d'une banque disparue (03111, UBI Banca absorbée par
+    // Intesa Sanpaolo en 2021, répondait « Banca Carige »). La clé curée elle-même
+    // est élaguée au chargement (bic-lookup.ts) : `bic` est null, faute d'un BIC
+    // que quiconque tienne aujourd'hui pour ce code.
+    //
+    // 🚨 Ce cas ne devient JAMAIS un refus. Ni `not_in_register`, ni
+    // `not_allocated`, et `authoritative` reste false : la durée pendant laquelle
+    // un ancien IBAN reste joignable après une fusion italienne n'est pas connue,
+    // et un code peut être réattribué (le chargeur ne range ici que les codes
+    // sans titulaire en vigueur). `verified` avec `retired`, comme l'Allemagne
+    // sert ses codes retirés : un code radié A ÉTÉ attribué.
+    //
+    // Le détenteur est `inferred`, et c'est l'asymétrie avec l'Allemagne, voulue :
+    // un code que la Bundesbank retire figure encore dans son fichier en vigueur
+    // (`confirmed`), alors que celui-ci n'existe plus que dans l'historique de la
+    // Banca d'Italia. Personne ne le tient aujourd'hui d'après le registre, donc
+    // `checks.bank_code` ne peut pas dire `pass` ; le registre nomme seulement
+    // son dernier titulaire, dans `institution`.
+    //
+    // `superseded_by` est le successeur LÉGAL (fusion ou incorporation), suivi
+    // jusqu'à une entité en vigueur : pas forcément la banque qui tient le compte
+    // (UBI avait cédé des guichets à BPER avant d'être absorbée par Intesa).
+    const retired = lookupRetiredNationalCode(cc, bankCode);
+    if (retired) {
+      return withHolder('inferred', {
+        value: bankCode,
+        status: 'verified',
+        match: 'register',
+        register: partial,
+        authoritative: false,
+        retired: true as const,
+        retired_on: retired.retired_on,
+        ...(retired.successor_code ? { superseded_by: retired.successor_code } : {}),
+        institution: {
+          name: retired.name,
+          street: null,
+          post_code: null,
+          town: null,
+          country: cc,
+        },
+        as_of: editionMonth() ?? as_of,
+      });
+    }
     // No return: fall through. A San Marino code the page does not list gets
     // the composite answer it has always got, with `absent_from_reference_data`
     // as its reason — never `not_allocated`, never
-    // `national_register_unavailable`.
+    // `national_register_unavailable`. Same for an Italian code the Banca
+    // d'Italia never listed (Poste Italiane, the Treasury, EU branches).
   }
 
   if (hit) {

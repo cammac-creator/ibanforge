@@ -269,13 +269,32 @@ export interface BankCodeCheck {
   candidates?: number;
   /**
    * The register marks the code for deletion: the institution is being retired.
-   * Present only when true, and only from an authoritative register. A retired
-   * code WAS allocated, so answering `not_in_register` for it would be a worse
-   * lie than answering `verified` without qualification.
+   * Present only when true. A retired code WAS allocated, so answering
+   * `not_in_register` for it would be a worse lie than answering `verified`
+   * without qualification.
+   *
+   * Deux sources depuis le 25/09/2026 : un registre qui fait foi et marque un
+   * code qu'il retire (DE, `authoritative: true`, le code figure encore dans le
+   * fichier en vigueur), et l'historique de la Banca d'Italia pour un code
+   * qu'elle a déjà radié (IT, `authoritative: false`, `retired_on` présent,
+   * `bank_code_holder: inferred`). Ni l'un ni l'autre n'est un refus.
    */
   retired?: true;
-  /** The bank code that takes over, when the register names one. */
+  /**
+   * The bank code that takes over, when the register names one. Avec
+   * `authoritative: true` (DE), le code de reprise que le registre désigne ; avec
+   * `authoritative: false` (IT), le successeur LÉGAL par fusion ou incorporation,
+   * suivi jusqu'à un code en vigueur, qui n'est pas forcément la banque qui tient
+   * aujourd'hui le compte.
+   */
   superseded_by?: string;
+  /**
+   * 'AAAA-MM-JJ' : dernier jour où le registre porte ce code pour son dernier
+   * titulaire (pour un titulaire radié, la date de radiation publiée). Présent
+   * seulement avec `retired`, et seulement quand le registre date la radiation
+   * (l'Italie aujourd'hui).
+   */
+  retired_on?: string;
   /**
    * What the national register publishes about the allocated institution.
    * Present only on an authoritative answer: a composite-map hit stays bare

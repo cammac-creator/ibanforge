@@ -248,7 +248,7 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 - **LEI enrichment** for the GLEIF rows: [GLEIF API](https://api.gleif.org)
 - **1,100+ Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification**: Curated set of 900+ non-bank issuer classifications — EMI, payment institutions, digital banks (Wise, Revolut, N26, Mercury, Modulr, etc.); the live count is served at `/llms.txt`
-- **Bank-code verdict**: national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Czech Republic (ČNB), Bulgaria (BNB, bank code) and Switzerland and Liechtenstein (SIX BankMaster), where a code the register does not hold is `not_allocated`; partial lists for Finland (Finance Finland), San Marino (BCSM) and Luxembourg (ABBL), where a miss is not a refusal
+- **Bank-code verdict**: national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Czech Republic (ČNB), Bulgaria (BNB, bank code) and Switzerland and Liechtenstein (SIX BankMaster), where a code the register does not hold is `not_allocated`; partial lists for Finland (Finance Finland), Italy (Banca d'Italia, with the codes it has struck off and their legal successor), San Marino (BCSM) and Luxembourg (ABBL), where a miss is not a refusal
 - **VoP readiness**: EPC Verification of Payee scheme register (`vop.csv`), refreshed weekly with the other compliance lists
 - **Country names**: Node.js `Intl.DisplayNames` API
 

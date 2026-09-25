@@ -71,7 +71,8 @@ export const BANK_CODE_CHECK_SCHEMA = {
         `True only where that reference set is the national register: today ${authoritativeRegisterClause()}. ` +
         'This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence. One asymmetry worth knowing: a Bulgarian BAE code covers IBAN positions 5-12 (bank code AND branch digits) while the verdict is made on the four-letter bank code alone, because the register does not enumerate every bank branch to one standard. ' +
         `The negative direction carries full weight in all ${authoritativeCountInWords()}. ` +
-        'Three registers name holders WITHOUT settling a negative, so authoritative is false for them: a listed code names its holder (status verified, with institution) while an absence stays absent_from_reference_data and never becomes not_allocated. They are Finland, whose Finance Finland list is a transcription dated 2025-10 that nothing refreshes, and which allocates prefixes to banking groups rather than to institutions, so a Finnish verified confirms the group and its BIC rather than one specific bank; San Marino, whose Central Bank publishes its operating BANKS, not the allocation of the ABI code space; and Luxembourg, where the ABBL register of IBAN/BIC codes answers on deployments that load it.',
+        "Four registers name holders WITHOUT settling a negative, so authoritative is false for them: a listed code names its holder (status verified, with institution) while an absence stays absent_from_reference_data and never becomes not_allocated. They are Finland, whose Finance Finland list is a transcription dated 2025-10 that nothing refreshes, and which allocates prefixes to banking groups rather than to institutions, so a Finnish verified confirms the group and its BIC rather than one specific bank; Italy, whose Banca d'Italia registers list the banks, payment institutions and e-money institutions it registers while Poste Italiane, the Banca d'Italia itself and branches of EU payment institutions hold ABI codes outside them; San Marino, whose Central Bank publishes its operating BANKS, not the allocation of the ABI code space; and Luxembourg, where the ABBL register of IBAN/BIC codes answers on deployments that load it. " +
+        'Italy also publishes the codes it has struck off: such a code comes back verified with retired true, retired_on and, where one exists, superseded_by, and authoritative stays false. It is never a refusal.',
     },
     candidates: {
       type: 'integer',
@@ -81,17 +82,23 @@ export const BANK_CODE_CHECK_SCHEMA = {
     retired: {
       type: 'boolean',
       description:
-        'Present and true when an authoritative register marks the code for deletion: the institution is being retired. The code WAS allocated, so this is a verified result, not a denial. See superseded_by.',
+        "Present and true when a register says the code is leaving or has left: an authoritative register marking a code for deletion (DE, the code is still in its current file, authoritative true), or the Banca d'Italia's history for a code it has already struck off (IT, authoritative false, with retired_on, and bank_code_holder inferred because nobody holds the code today). The code WAS allocated, so this is a verified result, not a denial. See superseded_by.",
     },
     superseded_by: {
       type: 'string',
       description:
-        'The bank code that takes over, when the register names one. Re-paper the beneficiary against it.',
+        'The bank code that takes over, when the register names one. With authoritative true (DE), the successor code the register designates: re-paper the beneficiary against it. With authoritative false (IT), the LEGAL successor by merger or incorporation, followed to a code in force today: not necessarily the bank that now holds the account (a bank may have transferred branches to another bank before it was absorbed), so ask the beneficiary for their current details.',
+    },
+    retired_on: {
+      type: 'string',
+      format: 'date',
+      description:
+        'Present only with retired, where the register dates it (Italy today): the last day the register lists this code for its last holder, which for a holder struck off the register is the cancellation date it publishes. How long an old IBAN stays reachable after that date is not published, so this is not a statement that payments fail.',
     },
     institution: {
       type: 'object',
       description:
-        'What the national register publishes about the allocated institution. Present only where a register named the holder, which is not the same as an authoritative answer — composite-map hits stay bare (naming a BIC holder is the bic block, and its address would imply a register that was not consulted), while Finland, San Marino and Luxembourg carry this block with authoritative false because their registers name holders without settling a negative. ' +
+        'What the national register publishes about the allocated institution. Present only where a register named the holder, which is not the same as an authoritative answer — composite-map hits stay bare (naming a BIC holder is the bic block, and its address would imply a register that was not consulted), while Finland, Italy, San Marino and Luxembourg carry this block with authoritative false because their registers name holders without settling a negative. On an Italian code the register has struck off (retired true), it is the LAST holder, name only. ' +
         `${institutionDepthSentences()} ` +
         'Absent fields are null, never guessed. This is the institution allocated the BANK CODE — not a branch, and not proof of any account.',
       properties: {
@@ -125,7 +132,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     as_of: {
       type: 'string',
       description:
-        'Year-month the consulted reference set was last refreshed. For the composite map it is the refresh month of the BIC directory behind it, not the date of the pairing: the map itself is a static file. Where the register publishes an effective date of its own it is that date, not ours: the Bulgarian BAE register is republished on request rather than on a calendar, and the Slovak prevodník and the Czech číselník are published as numbered editions carrying their own effective date, so dating any of them with our monthly refresh would misreport how current it is. The Czech National Bank publishes each edition ahead of its effective date: as_of is the effective date of the edition in force, never that of an edition announced but not yet in force.',
+        "Year-month the consulted reference set was last refreshed. For the composite map it is the refresh month of the BIC directory behind it, not the date of the pairing: the map itself is a static file. Where the register publishes an effective date of its own it is that date, not ours: the Bulgarian BAE register is republished on request rather than on a calendar, and the Slovak prevodník and the Czech číselník are published as numbered editions carrying their own effective date, so dating any of them with our monthly refresh would misreport how current it is. The Czech National Bank publishes each edition ahead of its effective date: as_of is the effective date of the edition in force, never that of an edition announced but not yet in force. The Banca d'Italia dates each edition of its registers in the name of the published file, and as_of is that edition.",
     },
   },
   required: ['value', 'status', 'match', 'register', 'authoritative', 'as_of'],
@@ -141,7 +148,7 @@ export const NEXT_STEPS_SCHEMA = {
       code: {
         type: 'string',
         description:
-          'Stable identifier. Today: bank_code_not_allocated (the national register denies the code, do not send), bank_code_retired (allocated but being withdrawn, re-paper against superseded_by), verify_payee_name (we cannot confirm it, treat as unavailable and let a name check decide), bic_is_advisory (the BIC was picked from several candidates), issuer_not_a_known_iban_issuer (the code resolves to a BIC, but its holder is not among the providers known to issue IBANs in that country), test_bic, expect_virtual_iban (curated non-bank issuer, account holder and IBAN holder often differ), screen_compliance, generate_payment_qr (partner handoff to PayQR on a register-confirmed SEPA account: generate and self-check a SPAYD or EPC/GiroCode payment QR).',
+          'Stable identifier. Today: bank_code_not_allocated (the national register denies the code, do not send), bank_code_retired (allocated but being withdrawn, or already struck off where retired_on says when: update the beneficiary details, never a refusal), verify_payee_name (we cannot confirm it, treat as unavailable and let a name check decide), bic_is_advisory (the BIC was picked from several candidates), issuer_not_a_known_iban_issuer (the code resolves to a BIC, but its holder is not among the providers known to issue IBANs in that country), test_bic, expect_virtual_iban (curated non-bank issuer, account holder and IBAN holder often differ), screen_compliance, generate_payment_qr (partner handoff to PayQR on a register-confirmed SEPA account: generate and self-check a SPAYD or EPC/GiroCode payment QR).',
       },
       do: {
         type: 'string',
