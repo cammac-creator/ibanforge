@@ -8,11 +8,13 @@ order: 11
 
 Finnish bank codes come from the **Finance Finland** list of monetary institution codes, and they behave unlike the national registers we read in Germany, Austria or Belgium in three ways.
 
-First, the code is not a fixed slice of the IBAN: Finnish institution codes run **one to four characters** at the head of the BBAN, so the check reads the *longest allocated prefix* rather than a positional cut. Take a fixed three-digit slice of `FI21 1234 5600 0007 85` and you would ask about `123` and deny the country's largest banking group, whose code is simply `1`.
+First, the code is not a fixed slice of the IBAN: Finnish institution codes run **one to four characters** at the head of the BBAN, so the check reads the *longest allocated prefix* rather than a positional cut. A fixed three-digit slice would ask about a code nobody was given, and deny a group whose code is shorter.
 
 Second, **Finnish codes are allocated to banking groups, not to individual institutions.**
 
 Third, and this is the one to design around, **the list we hold is partial.** It is a transcription of the Finance Finland publication dated 15 October 2025, and nothing refreshes it automatically. Since 16 September 2026 the API therefore treats it as a list that names holders without refusing anyone: a hit is served, a miss is not a denial.
+
+The publisher has never confirmed the terms for reusing the list, so since 25 September 2026 the API reads it from a private file, not from its public repository. An answer served without that file says the list was not consulted (`status: "unavailable"`), never that a code is refused.
 
 ## One call
 
@@ -22,24 +24,24 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban": "FI2112345600000785"}'
 ```
 
-The response is abridged below to the block this page is about; the same answer also carries the `bic` object, whose `code` here is `NDEAFIHHXXX`.
+The response is abridged below to the block this page is about. The list's own values (the code, the group and the month of the list) are left out here; the API serves them.
 
 ```json
 {
   "valid": true,
   "bank_code_check": {
-    "value": "1",
+    "value": "…",
     "status": "verified",
     "match": "register",
     "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)",
     "authoritative": false,
-    "as_of": "2025-10",
-    "institution": { "name": "Nordea Bank", "street": null, "post_code": null, "town": null, "country": "FI" }
+    "as_of": "…",
+    "institution": { "name": "…", "street": null, "post_code": null, "town": null, "country": "FI" }
   }
 }
 ```
 
-This is Finland's **official example IBAN**, and it is the counter-example to the broken ones: unlike the Belgian, Swiss and Austrian official examples, whose bank codes are [allocated to nobody](/blog/2026-08-06-example-ibans-unallocated-bank-codes), the Finnish example resolves cleanly, because code `1` is real and belongs to the Nordea banking group.
+This is Finland's **official example IBAN**. `value` is the allocated code the answer is about, which can be shorter than three digits, and `institution.name` is the banking group that holds it.
 
 ## Read the register string, it is doing work
 
@@ -58,11 +60,11 @@ The reason is the list itself: a transcription that nothing refreshes cannot tel
 
 ## The institution block for Finland
 
-A hit carries an `institution` block with the name of the **banking group** the code belongs to (`Nordea Bank` for code `1`), and no address: the list publishes none, and a group-level code has no single seat to describe. `authoritative: false` stays beside it, for the reason above.
+A hit carries an `institution` block with the name of the **banking group** the code belongs to, and no address: the list publishes none, and a group-level code has no single seat to describe. `authoritative: false` stays beside it, for the reason above.
 
 ## Freshness
 
-`as_of` is the date of the list itself, `2025-10`, not our monthly refresh: nothing re-reads the Finance Finland publication automatically, and an answer you act on has to say how old its list is.
+`as_of` is the month of the list itself, not our monthly refresh: nothing re-reads the Finance Finland publication automatically, and an answer you act on has to say how old its list is.
 
 ## The honest limits
 

@@ -132,11 +132,13 @@ Response (real API output of 2026-09, trimmed to the fields agents use most):
   "country": { "code": "DE", "name": "Germany" },
   "bic": { "code": "COBADEFFXXX", "bic8": "COBADEFF", "bank_name": "Commerzbank", "city": "Köln", "basis": "national_register", "authoritative": true, "source": "Deutsche Bundesbank Bankleitzahlendatei" },
   "issuer": { "type": "bank", "name": "Commerzbank" },
-  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true, "vop_participant": true, "basis": "epc_register" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true, "vop_participant": null, "basis": "country_default" },
   "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "test_bic": false, "sepa_reachable": true, "vop_coverage": true },
   "bank_code_check": { "value": "37040044", "status": "verified", "match": "register", "register": "Deutsche Bundesbank Bankleitzahlendatei", "authoritative": true, "as_of": "2026-09" }
 }
 ```
+
+`sepa.vop_participant` reads `null` in this example: that is the answer when the EPC Verification of Payee register was not consulted for the call. When it was, the field reads `true` or `false`, and `sepa.basis` turns to `"epc_register"` where the EPC scheme registers list the bank.
 
 The same call on `CH9300762011623852957`, the Swiss example of the SWIFT IBAN registry, passes mod-97 and comes back with `bank_code_check.status = "not_in_register"`, `reason = "not_allocated"`, `authoritative: true`: the SIX BankMaster allocates that bank code to nobody. A Swiss IBAN whose code is allocated also carries a `clearing` block (SIC, euroSIC, CHF instant payments, QR-IID).
 
@@ -154,16 +156,16 @@ Returns the validate fields plus a nested `compliance` block (real API output of
   "valid": true,
   "compliance": {
     "sanctions": { "country_sanctioned": false, "bank_sanctioned": false, "matched_lists": [], "fatf_status": "member", "bank_screened": true },
-    "reachability": { "sepa_instant": true, "sct": true, "sdd": true, "screened": true },
-    "vop": { "participant": true, "status": "active", "screened": true },
+    "reachability": { "sepa_instant": false, "sct": false, "sdd": false, "screened": false },
+    "vop": { "participant": false, "status": "not_found", "screened": false },
     "risk_score": 0,
     "risk_level": "low",
-    "flags": []
+    "flags": ["sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"]
   },
   "meta": { "scope": "bank_bic_only", "disclaimer": "...", "sanctions_as_of": "...", "fatf_as_of": "2026-06" }
 }
 ```
-Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions lists (OFAC, EU, UN) are matched on the bank (BIC8) only, and only those hits appear in `matched_lists`; the country is checked against a fixed list of sanctioned jurisdictions (`country_sanctioned`); the beneficiary name is never screened. `vop.participant` says whether the EPC VoP register lists the bank as ready (an absent bank comes back `false`); the name check itself is the bank's. Not a regulated AML/CFT product.
+Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions lists (OFAC, EU, UN) are matched on the bank (BIC8) only, and only those hits appear in `matched_lists`; the country is checked against a fixed list of sanctioned jurisdictions (`country_sanctioned`); the beneficiary name is never screened. `vop.participant` says whether the EPC VoP register lists the bank as ready (an absent bank comes back `false`); the name check itself is the bank's. This example shows the answer when the EPC registers and the United Nations list were not consulted: `screened: false` on `reachability` and `vop`, and one `*_unavailable` flag per source left out, so a `false` there proves nothing. When they were consulted, `screened` is `true` and the booleans are the bank's own. Not a regulated AML/CFT product.
 
 ## Why IBANforge?
 

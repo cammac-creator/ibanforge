@@ -130,15 +130,17 @@ npm run build             # next build
   commit an overlay file or a merged copy, never write one inside any git repository (the
   script refuses, and `.gitignore` catches `restricted-*.sqlite*` and `*.merged-*.sqlite*`),
   never add a table or a source to the family anywhere but that constant, and never let a
-  public workflow download or commit the family: stopping them is the next step, not a
-  side effect. The PL, FI and LU keys of the composite map and the Finnish list have
-  members too (`map_pl`, `map_fi`, `map_lu`, `register_fi`, 25 September 2026): marked
-  `mayBeAbsent` (an older overlay without them is accepted, `/health` lists them under
-  `restricted_overlays.bic.absent`), rebuilt by `scripts/seed-curated-map.ts`. While
-  `src/db/bic_data.json` and `src/lib/fi-register.ts` still carry that data, the public side
-  answers (the freshness rule, per country: `addCuratedRows` in `src/lib/bic-lookup.ts`;
-  the overlay's Finnish list only when strictly newer), so they change no answer before the
-  removal step.
+  public workflow download or commit the family. Since the removal (step 6, 25 September
+  2026) none of it is in this repository: the public seeders run with `SEED_FAMILY=public`
+  by default and never download a member, the tracked databases are rebuilt without it
+  (`npm run overlay -- strip`, no download) and `src/lib/public-base-family-free.test.ts`
+  fails if a row comes back, the composite map no longer carries the AT, BE, LU, PL and FI
+  keys (the PL, FI and LU keys and the Finnish list come back from the overlay: members
+  `map_pl`, `map_fi`, `map_lu` and `register_fi`, `mayBeAbsent`, rebuilt by
+  `scripts/seed-curated-map.ts`; `/health` lists under `restricted_overlays.bic.absent`
+  those the served overlay lacks), and the /at, /be and /sm pages read the API on demand. Without the overlay, every answer that needs the family says "not
+  consulted" (`national_register_unavailable`, `screened: false`, `*_unavailable` flags),
+  never "no".
 - `src/lib/restricted-overlay-pull.ts`: the API refreshes those files itself (step 5,
   since 25 September 2026). A private repository rebuilds the overlay weekly (compliance)
   and monthly (BIC), commits no data, and publishes a release: both files and a

@@ -12,13 +12,13 @@ Diese Bedingung ist jetzt Teil des Produkts.
 
 ## Was ein britischer Lookup jetzt antwortet
 
-Jeder `GET /v1/bic/:code` auf einen britischen BIC — und jede validierte GB-IBAN, deren Bank aufgelöst wird — trägt einen `pra_authorisation`-Block, wenn das Institut auf der aktuellen Liste steht. Aus der ausgelieferten Datenbank erfasst:
+Jeder `GET /v1/bic/:code` auf einen britischen BIC — und jede validierte GB-IBAN, deren Bank aufgelöst wird — trägt einen `pra_authorisation`-Block, wenn das Institut auf der aktuellen Liste steht. Seine Form (Name und FRN des Instituts sind hier ausgelassen):
 
 ```json
 "pra_authorisation": {
   "authorised": true,
-  "firm_name": "HSBC UK Bank Plc",
-  "frn": "765112",
+  "firm_name": "…",
+  "frn": "…",
   "section": "uk_incorporated",
   "basis": "lei",
   "source": "Bank of England, List of Banks",

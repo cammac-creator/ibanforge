@@ -85,7 +85,7 @@ export const NATIONAL_CHECK_DIGITS_NOTE =
 
 /** `sepa.bank_reachability`. */
 export const BANK_REACHABILITY_NOTE =
-  'Whether the EPC scheme registers list the resolved BANK, never borrowed from the country (member, schemes and basis still describe the country and are unchanged). listed: the bank has rows in the SCT, SCT Inst or SDD register. not_listed: it has none (an absence from the register is not an exclusion from the scheme). no_bank: no BIC resolved for this bank code, so no bank could be looked up in the EPC registers (a register may still name the holder: see bank_code_holder and bank_code_check). bank_code_not_allocated: the national register says nobody holds the bank code. null: the registers are not loaded on this deployment (not consulted, never read as not_listed). Absent outside SEPA.';
+  'Whether the EPC scheme registers list the resolved BANK, never borrowed from the country (member, schemes and basis still describe the country and are unchanged). listed: the bank has rows in the SCT, SCT Inst or SDD register. not_listed: it has none (an absence from the register is not an exclusion from the scheme). no_bank: no BIC resolved for this bank code, so no bank could be looked up in the EPC registers (a register may still name the holder: see bank_code_holder and bank_code_check). bank_code_not_allocated: the national register says nobody holds the bank code. null: the registers are not loaded on this deployment, or no bank was resolved because the bank-code check itself is unavailable (not consulted, never read as not_listed or no_bank). Absent outside SEPA.';
 
 /** `sepa.vop_register_status` et `compliance.vop.register_status`. */
 export const VOP_REGISTER_STATUS_NOTE =

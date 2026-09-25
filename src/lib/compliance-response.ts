@@ -9,7 +9,13 @@ import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult, isTestBic } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import { validateBIC } from './bic-validator.js';
-import { bicCountryName, lookup, namedRow } from './bic-lookup.js';
+import {
+  RESTRICTED_DIRECTORY_NOTE,
+  bicCountryName,
+  lookup,
+  namedRow,
+  restrictedDirectoryLoaded,
+} from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import type { BicComplianceResponse, ComplianceResult, IBANValidationResult } from '../types.js';
 import { institutionListed, withComplianceChecks } from './checks.js';
@@ -261,6 +267,10 @@ export function buildBicComplianceResponse(
     // répondait le code sous le nom `name` (25/09/2026).
     country: { code: countryCode, name: bicCountryName(row, countryCode) },
     compliance: withHonestNames(compliance),
+    // Même phrase que GET /v1/bic/:code : sans la surcouche privée, un BIC que
+    // seules les listes STEP2, NBP ou OeNB portent n'est pas « absent », il n'a
+    // pas été cherché là (étape du retrait, 25/09/2026).
+    ...(row === null && !restrictedDirectoryLoaded() ? { note: RESTRICTED_DIRECTORY_NOTE } : {}),
     meta: getComplianceMeta(),
     cost_usdc: 0,
   };

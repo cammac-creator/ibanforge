@@ -3517,6 +3517,11 @@ const buildRawSpec = () => ({
             },
           },
           compliance: { $ref: '#/components/schemas/ComplianceResult' },
+          note: {
+            type: 'string',
+            description:
+              'Present only when found is false and the part of our directory served from a private file (EBA STEP2, NBP and OeNB records) is not loaded on this deployment: the BIC was not looked up there, so the absence says nothing.',
+          },
           meta: {
             type: 'object',
             description: 'The same provenance and scope block as on the IBAN form (scope, disclaimer, sanctions_as_of, fatf_as_of, sources).',

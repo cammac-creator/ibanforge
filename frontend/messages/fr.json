@@ -2388,7 +2388,7 @@
     },
     "registers": {
       "title": "Des registres nationaux, consultés et nommés",
-      "body": "La Suisse et le Liechtenstein se résolvent contre SIX BankMaster, l'Allemagne contre la Bundesbank, l'Autriche contre l'OeNB, la Belgique contre la Banque nationale de Belgique, la Finlande contre Finance Finland — chaque correspondance nomme son registre dans bank_code_check.register et le date dans as_of. Là où aucun registre national n'est consulté, la carte BIC composite répond à la place, et la réponse dit qu'elle ne fait pas autorité.",
+      "body": "La Suisse et le Liechtenstein se résolvent contre SIX BankMaster, l'Allemagne contre la Bundesbank, l'Autriche contre l'OeNB, la Belgique contre la Banque nationale de Belgique : chaque correspondance nomme son registre dans bank_code_check.register et le date dans as_of. Là où aucun registre national n'est consulté, la carte BIC composite répond à la place, et la réponse dit qu'elle ne fait pas autorité.",
       "link": "La version longue, registre par registre"
     },
     "honest": {
@@ -2722,6 +2722,8 @@
   },
   "registers": {
     "common": {
+      "privateRegisterNote": "Nous servons ce registre depuis un fichier privé au lieu de le publier : chaque code garde sa page, lue en direct à l'API, mais la liste complète n'est pas republiée ici. Tapez un code ci-dessus pour ouvrir sa page.",
+      "apiTextLive": "Le bloc ci-dessous est la réponse de l'API elle-même pour ce code, lue en direct sur api.ibanforge.com et gardée un jour, réduite aux champs qu'un lecteur peut utiliser. Rien n'est retouché.",
       "apiTitle": "Ce que l'API répond pour ce code",
       "apiText": "Le bloc ci-dessous est la réponse de la route elle-même, produite par le code qui sert api.ibanforge.com, sur le registre à la date indiquée. Rien n'est retouché.",
       "exampleTitle": "Structure de l'IBAN avec ce code",
@@ -2830,12 +2832,12 @@
       "structure": "Un IBAN autrichien, c'est AT, deux chiffres de contrôle, le code banque à cinq chiffres, puis le numéro de compte à onze chiffres. Le code banque est ce que le répertoire de l'OeNB peut garantir ; le numéro de compte n'est connu que de la banque.",
       "docLink": "Comment répond le registre autrichien",
       "indexTitle": "Codes banque autrichiens (répertoire OeNB)",
-      "indexIntro": "Chaque code banque du répertoire de l'Oesterreichische Nationalbank, avec l'établissement, l'adresse de son siège et son LEI quand le registre les publie, le BIC qu'il lui associe, et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre.",
+      "indexIntro": "Cherchez un code banque du répertoire de l'Oesterreichische Nationalbank : l'établissement, l'adresse de son siège et son LEI quand le registre les publie, le BIC qu'il lui associe, et la réponse exacte de l'API IBANforge, lue en direct.",
       "countryLink": "Le format de l'IBAN autrichien, avec l'exemple officiel"
     },
     "be": {
       "metaTitle": "Code banque belge {code} : {name}",
-      "metaDescription": "Identifiant bancaire {code} dans la liste de la Banque nationale de Belgique : {name}, BIC {bic}. Les codes de la même banque, la structure de l'IBAN, la portée SEPA et la réponse exacte de l'API IBANforge.",
+      "metaDescription": "Identifiant bancaire {code} dans la liste de la Banque nationale de Belgique : {name}, BIC {bic}. La structure de l'IBAN, la portée SEPA et la réponse exacte de l'API IBANforge.",
       "eyebrow": "Liste de la Banque nationale de Belgique",
       "title": "Code banque belge {code}",
       "subtitle": "{name}",
@@ -2843,15 +2845,12 @@
         "code": "Identifiant bancaire",
         "bank": "Établissement",
         "bic": "BIC",
-        "groupCodes": "Codes de cette banque",
         "none": "aucun"
       },
-      "groupNote": "La Banque nationale de Belgique attribue des blocs d'identifiants à un même établissement. La liste ci-dessous montre une page par banque ; chaque code d'un bloc a sa propre adresse et renvoie vers elle.",
-      "canonicalNote": "Ce code appartient à un bloc attribué à une seule banque. La page de la banque est",
       "structure": "Un IBAN belge, c'est BE, deux chiffres de contrôle, l'identifiant bancaire à trois chiffres, le numéro de compte à sept chiffres, puis deux chiffres de contrôle nationaux (les dix premiers chiffres modulo 97). L'identifiant est ce que la liste de la BNB peut garantir ; le numéro de compte n'est connu que de la banque.",
       "docLink": "Comment répond le registre belge",
       "indexTitle": "Codes banque belges (liste BNB)",
-      "indexIntro": "Chaque identifiant bancaire attribué dans la liste de la Banque nationale de Belgique, une page par établissement, avec le BIC qui lui est associé et la réponse exacte de l'API IBANforge. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée.",
+      "indexIntro": "Cherchez un identifiant bancaire attribué dans la liste de la Banque nationale de Belgique : l'établissement, le BIC qui lui est associé, et la réponse exacte de l'API IBANforge, lue en direct. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée.",
       "countryLink": "Le format de l'IBAN belge, avec l'exemple officiel",
       "integrateLink": "Contrôler les codes banque belges dans votre application"
     },
@@ -2893,7 +2892,7 @@
       "notExhaustive": "La Banque centrale publie les banques qu’elle supervise, pas l’attribution de l’espace des codes ABI. Un code présent dans cette liste a donc un titulaire nommé, et un code absent ne prouve rien : Saint-Marin agrée aussi des prestataires de services de paiement et de monnaie électronique qui ne sont pas des banques, et l’IBAN d’exemple officiel de Saint-Marin porte lui-même un code ABI absent de cette page. C’est pourquoi l’API répond ici authoritative: false — contrairement à l’Autriche ou à la Slovaquie, une absence n’est jamais une raison d’arrêter un paiement.",
       "docLink": "Ce que répond la liste saint-marinaise",
       "indexTitle": "Codes banque saint-marinais (banques opérationnelles BCSM)",
-      "indexIntro": "Les quatre banques opérationnelles de la Banque centrale de la République de Saint-Marin, avec le code ABI, le BIC que la Banque centrale lui associe, le siège social, et la réponse exacte de l’API IBANforge. Rafraîchi chaque mois avec les autres registres.",
+      "indexIntro": "Cherchez un code ABI dans la liste des banques opérationnelles de la Banque centrale de la République de Saint-Marin : la banque, le BIC que la Banque centrale lui associe, le siège social, et la réponse exacte de l’API IBANforge, lue en direct.",
       "countryLink": "Le format de l’IBAN saint-marinais, avec l’exemple officiel"
     }
   },
@@ -2969,7 +2968,9 @@
     },
     "sourceNote": "Source : registre ISO 13616 pour la longueur, le découpage et l'exemple ; réponse de l'API relevée le {date}.",
     "exampleNotAllocated": "La clé de contrôle de cet exemple officiel est juste, et pourtant {register} dit que personne ne détient son code banque : c'est exactement ce que notre contrôle du code banque attrape, et ce qu'une clé seule ne voit pas.",
-    "examplePartialRegister": "Une partie des codes banque de ce pays est en outre nommée par une liste du superviseur, dont nous servons une page par code — mais cette liste ne publie pas l'attribution de l'espace des codes : un code qui n'y figure pas n'est donc pas un code jamais attribué."
+    "examplePartialRegister": "Une partie des codes banque de ce pays est en outre nommée par une liste du superviseur, dont nous servons une page par code — mais cette liste ne publie pas l'attribution de l'espace des codes : un code qui n'y figure pas n'est donc pas un code jamais attribué.",
+    "examplePrivateRegister": "L'API contrôle les codes bancaires de ce pays contre {register}. Nous servons ce registre depuis un fichier privé au lieu de le publier : sa réponse à cet exemple n'est donc pas recopiée ici, elle est calculée en direct, à la requête.",
+    "examplePrivateRegisterLink": "Essayer l'exemple dans le bac à sable"
   },
   "tools": {
     "keyBlock": {

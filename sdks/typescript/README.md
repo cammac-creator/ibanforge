@@ -169,11 +169,10 @@ import { IBANforge } from '@ibanforge/sdk';
 const client = new IBANforge({ apiKey: 'ifk_...' });
 
 const c = await client.checkCompliance('GB29NWBK60161331926819');
-console.log(c.compliance.risk_score);              // 10
+console.log(typeof c.compliance.risk_score);       // 'number'
 console.log(c.compliance.risk_level);              // 'low'
 console.log(c.compliance.sanctions.matched_lists); // []
 console.log(c.compliance.sanctions.fatf_status);   // 'member'
-console.log(c.compliance.reachability.sct);        // true
 console.log(c.meta?.scope);                        // 'bank_bic_only'
 ```
 

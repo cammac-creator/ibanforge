@@ -4,9 +4,14 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { RegisterSearch } from "@/components/register-search";
 import { alternatesFor } from "@/lib/seo";
-import { beBankFile } from "@/lib/registers";
 import { localePath } from "@/lib/locale-path";
 
+/*
+ * Depuis l'étape du retrait (25/09/2026), cette page ne liste plus le registre :
+ * l'API le sert depuis une surcouche privée, et en afficher la liste complète
+ * serait le republier. Elle garde la recherche d'un code, qui ouvre la page de ce
+ * code, rendue à la demande depuis l'API (lib/register-live.ts).
+ */
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "registers" });
@@ -16,16 +21,14 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function BeIndexPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations("registers");
-  const file = beBankFile();
-  const rows = file.batch1.map((code) => file.entries[code]).filter(Boolean);
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-16 flex flex-col gap-8">
       <header className="flex flex-col gap-4">
         <Badge variant="outline" className="w-fit">{t("be.eyebrow")}</Badge>
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-balance">{t("be.indexTitle")}</h1>
         <p className="text-muted-foreground leading-relaxed max-w-prose">{t("be.indexIntro")}</p>
-        <RegisterSearch locale={locale} kind="be" label={t("common.searchLabel")} button={t("common.searchButton")} placeholder="001" />
-        <p className="text-xs text-muted-foreground">{t("be.groupNote")} {t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {file.generated_at}.</p>
+        <RegisterSearch locale={locale} kind="be" label={t("common.searchLabel")} button={t("common.searchButton")} placeholder="123" />
+        <p className="text-xs text-muted-foreground max-w-prose">{t("common.privateRegisterNote")}</p>
         {/* Page pilote du contrat de mesure (15.09.2026) : à côté de la recherche
             ponctuelle, une suite vers la documentation et l'intégration. */}
         <p className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -33,14 +36,6 @@ export default async function BeIndexPage({ params }: { params: Promise<{ locale
           <Link href={localePath(locale, "/docs/be-bank-codes")} data-evt="cta:be-integrate" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("be.integrateLink")}</Link>
         </p>
       </header>
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-        {rows.map((e) => (
-          <li key={e.register.code} className="flex gap-3 truncate">
-            <Link href={localePath(locale, `/be/${e.register.code}`)} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.code}</Link>
-            <span className="text-muted-foreground truncate">{e.register.name}{e.register.group_codes.length > 1 ? ` (${e.register.group_codes.length})` : ""}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

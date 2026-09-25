@@ -12,13 +12,13 @@ That condition is now part of the product.
 
 ## What a GB lookup answers now
 
-Every `GET /v1/bic/:code` on a UK BIC — and every validated GB IBAN whose bank resolves — carries a `pra_authorisation` block when the institution is on the current list. Captured from the shipped database:
+Every `GET /v1/bic/:code` on a UK BIC — and every validated GB IBAN whose bank resolves — carries a `pra_authorisation` block when the institution is on the current list. Its shape (the firm's name and FRN are left out here):
 
 ```json
 "pra_authorisation": {
   "authorised": true,
-  "firm_name": "HSBC UK Bank Plc",
-  "frn": "765112",
+  "firm_name": "…",
+  "frn": "…",
   "section": "uk_incorporated",
   "basis": "lei",
   "source": "Bank of England, List of Banks",
