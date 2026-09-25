@@ -236,8 +236,13 @@ async function serveFromCredits(c: Ctx, next: () => Promise<void>, k: KeyContext
       detail: shortfall
         ? `This batch of ${units} IBANs needs ${units} credits (1 credit per IBAN) but only ${remaining} remain on this key: nothing was debited. ` +
           `Send a batch of ≤${remaining} IBANs, or top up now. ${payOptions(ref, keyHash)}`
-        : `This key's prepaid credits are used up (${total.toLocaleString('en-US')} credits bought on it so far). ` +
-          `The key stays valid: ${payOptions(ref, keyHash)}`,
+        : creditsTotal == null
+          ? // Relecture de sécurité de la PR 264, D6 : une clé sans allocation
+            // ET sans aucun crédit acheté est une clé née d'un abonnement
+            // terminé (règle A). Lui parler de « crédits épuisés » serait faux.
+            `This key has no allowance since its subscription ended. The key stays valid: ${payOptions(ref, keyHash)}`
+          : `This key's prepaid credits are used up (${total.toLocaleString('en-US')} credits bought on it so far). ` +
+            `The key stays valid: ${payOptions(ref, keyHash)}`,
       credits: {
         required: units,
         remaining,

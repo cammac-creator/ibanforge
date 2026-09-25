@@ -425,8 +425,10 @@ type AllowancePlan = 'free' | 'custom' | 'pro' | 'editor';
 /**
  * La formule d'une clé. Une clé mixte (allocation ET crédits, lot B1) porte les
  * deux parties, `free+pack` par exemple, que la page lit partie par partie.
+ * `none` (relecture de la PR 264, D5) : ni allocation ni crédits, une clé née
+ * d'un abonnement terminé ; elle répond 402 avec les liens qui la rechargent.
  */
-export type AccountPlan = AllowancePlan | 'pack' | `${AllowancePlan}+pack`;
+export type AccountPlan = AllowancePlan | 'pack' | 'none' | `${AllowancePlan}+pack`;
 
 export interface OverviewKey {
   key_prefix: string;
@@ -495,6 +497,10 @@ function planOf(row: KeyRow): AccountPlan {
   const hasCredits = row.credits_remaining !== null;
   // Une clé à crédits sans allocation propre est un pack, et seulement cela.
   if (hasCredits && allowance <= 0) return 'pack';
+  // Ni allocation ni crédits (une clé née d'un abonnement terminé) : jamais
+  // « free », qui ferait lire une allocation gratuite à une clé qui répond 402
+  // (relecture de la PR 264, D5).
+  if (!hasCredits && allowance <= 0) return 'none';
   // Un abonnement VIVANT (lot B2) : une clé dont l'abonnement est terminé garde
   // l'identifiant mais a retrouvé son allocation d'avant.
   const base: AllowancePlan =

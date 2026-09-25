@@ -21,11 +21,13 @@ import { buildApp } from '../app.js';
 import { resetX402Paywall } from '../middleware/x402.js';
 import {
   generateApiKey,
+  markShieldBirth,
   PRO_MONTHLY_LIMIT,
   revokeApiKey,
   rotateApiKey,
   validateApiKey,
 } from '../lib/api-keys.js';
+import { ANONYMOUS_MONTHLY_LIMIT } from '../lib/tiers.js';
 import { ensureTopupRef, findPurchaseByRef } from '../lib/key-purchases.js';
 import {
   buildCreditsWarningEmail,
@@ -91,6 +93,7 @@ function proCheckout(opts: {
   email?: string | null;
   plan?: 'pro' | 'oem';
   paymentIntent?: string | null;
+  paymentStatus?: 'paid' | 'no_payment_required';
 }): Stripe.Event {
   return {
     id: `evt_${uniq('sub')}`,
@@ -101,7 +104,7 @@ function proCheckout(opts: {
         metadata: { plan: opts.plan ?? 'pro' },
         customer_email: opts.email ?? null,
         customer_details: opts.email ? { email: opts.email } : null,
-        payment_status: 'paid',
+        payment_status: opts.paymentStatus ?? 'paid',
         mode: 'subscription',
         subscription: opts.subscriptionId,
         amount_total: opts.plan === 'oem' ? 14900 : 2900,
@@ -286,21 +289,78 @@ describe('Pro sur une clé existante (T4)', () => {
     expect(again.notify).toBeUndefined();
   });
 
-  it('clé anonyme : elle quitte le palier anonyme sans gratuit, et sa fin la laisse à 0', () => {
+  // Relecture de sécurité de la PR 264, D1 (décision de la session principale,
+  // conforme à la phrase Q11 publiée) : la photo d'une clé anonyme dont le Pro
+  // est le premier achat est prise AVANT la promotion ZG1.
+  it('clé anonyme, Pro d’abord : palier payant et réclamée par paiement, sa fin lui rend son allocation anonyme', () => {
     const key = generateApiKey(null)!;
     const ref = ensureTopupRef(key.key_hash)!;
     const subscriptionId = `sub_test_${uniq('anon')}`;
-    const attached = processStripeEvent(
-      proCheckout({ sessionId: `cs_test_${uniq('anon')}`, subscriptionId, ref }),
-    );
+    const sessionId = `cs_test_${uniq('anon')}`;
+    const attached = processStripeEvent(proCheckout({ sessionId, subscriptionId, ref }));
     expect(attached.body.attached).toMatchObject({ outcome: 'attached' });
     expect(keyRow(key.key_hash)).toMatchObject({
       tier: 'paid',
       monthly_limit: PRO_MONTHLY_LIMIT,
     });
+    expect(findPurchaseByRef(`stripe:${sessionId}`)).toMatchObject({
+      prev_tier: 'anonymous',
+      prev_monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
+      prev_no_recredit: 0,
+    });
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({
+      outcome: 'ended',
+      allowance_restored_to: ANONYMOUS_MONTHLY_LIMIT,
+    });
+    expect(validateApiKey(key.api_key)).toMatchObject({
+      valid: true,
+      monthlyLimit: ANONYMOUS_MONTHLY_LIMIT,
+      tier: 'paid',
+    });
+    // Réclamée par paiement : hors du rayon du radar, et plus de réclamation par e-mail.
+    const claim = getStatsDB()
+      .prepare('SELECT claimed_at, claim_method FROM api_keys WHERE key_hash = ?')
+      .get(key.key_hash) as { claimed_at: string | null; claim_method: string | null };
+    expect(claim.claimed_at).not.toBeNull();
+    expect(claim.claim_method).toBe('stripe');
+  });
+
+  it('clé anonyme, pack d’abord puis Pro : ZG1 tient, sa fin la laisse à 0 avec ses crédits', () => {
+    const key = generateApiKey(null)!;
+    const ref = ensureTopupRef(key.key_hash)!;
+    processStripeEvent(packCheckout({ sessionId: `cs_test_${uniq('anon_pack')}`, ref }));
+    expect(validateApiKey(key.api_key)).toMatchObject({ monthlyLimit: 0, creditsRemaining: 1000 });
+    const subscriptionId = `sub_test_${uniq('anon_pack')}`;
+    processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('anon_pack_pro')}`, subscriptionId, ref }),
+    );
     const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
     expect(ended.body).toMatchObject({ outcome: 'ended', allowance_restored_to: 0 });
-    expect(validateApiKey(key.api_key)).toMatchObject({ valid: true, monthlyLimit: 0 });
+    expect(validateApiKey(key.api_key)).toMatchObject({
+      valid: true,
+      monthlyLimit: 0,
+      creditsRemaining: 1000,
+    });
+  });
+
+  it('clé anonyme née sous bouclier, Pro d’abord : sa fin lui rend l’allocation normale de son palier (ZG5)', () => {
+    const key = generateApiKey(null, 5)!;
+    markShieldBirth({ keyHash: key.key_hash, episodeId: `episode_${uniq('shield')}` });
+    const ref = ensureTopupRef(key.key_hash)!;
+    const subscriptionId = `sub_test_${uniq('shield')}`;
+    processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('shield')}`, subscriptionId, ref }),
+    );
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({
+      outcome: 'ended',
+      allowance_restored_to: ANONYMOUS_MONTHLY_LIMIT,
+    });
+    expect(keyRow(key.key_hash)).toMatchObject({
+      monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
+      no_recredit: 0,
+    });
   });
 
   it('référence mal formée : traitée comme absente, une clé neuve et aucune alerte', () => {
@@ -417,6 +477,10 @@ describe('la fin de l’abonnement (T5)', () => {
     expect(res.headers.get('x-credits-topup-url')).toBe(
       `https://buy.stripe.com/bJe3coeZb31P6CsamK8so05?client_reference_id=${ref}`,
     );
+    // Relecture de sécurité, D6 : jamais « crédits épuisés » à une clé qui n'en a jamais eu.
+    const text = JSON.stringify(await res.json());
+    expect(text).toContain('This key has no allowance since its subscription ended.');
+    expect(text).not.toContain('prepaid credits are used up');
   });
 
   it('résiliation avant rattachement : pierre tombale respectée', () => {
@@ -641,6 +705,131 @@ describe('les surfaces : Pro sur CETTE clé, jamais à un abonné', () => {
   });
 });
 
+describe('après la relecture de sécurité (D2, D3, D4, D7)', () => {
+  it('un abonnement réglé à zéro n’est pas refusé, mais alerte (D2)', () => {
+    const key = freeKey('unpaid');
+    const ref = ensureTopupRef(key.key_hash)!;
+    const attached = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('unpaid')}`,
+        subscriptionId: `sub_test_${uniq('unpaid')}`,
+        ref,
+        paymentStatus: 'no_payment_required',
+      }),
+    );
+    expect(attached.body.attached).toMatchObject({ outcome: 'attached' });
+    expect(attached.alert?.key).toMatch(/^stripe:unpaid-subscription:/);
+    expect(attached.alert?.detail).toContain('réglé à zéro');
+    expect(attached.alert?.detail).not.toContain('@');
+    // Sans référence : une clé neuve, et la même alerte.
+    const minted = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('unpaid_new')}`,
+        subscriptionId: `sub_test_${uniq('unpaid_new')}`,
+        paymentStatus: 'no_payment_required',
+      }),
+    );
+    expect(minted.notify?.rawKey).toMatch(/^ifk_/);
+    expect(minted.alert?.key).toMatch(/^stripe:unpaid-subscription:/);
+    // Payé normalement : aucune alerte.
+    const paid = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('paid_ok')}`,
+        subscriptionId: `sub_test_${uniq('paid_ok')}`,
+      }),
+    );
+    expect(paid.alert).toBeUndefined();
+  });
+
+  it('un paiement arrivé après sa pierre tombale alerte ; le rejeu d’une session livrée, non (D3)', () => {
+    const key = freeKey('skipped');
+    const ref = ensureTopupRef(key.key_hash)!;
+    const lateSub = `sub_test_${uniq('skipped')}`;
+    processStripeEvent(subscriptionDeleted(lateSub));
+    const late = processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('skipped')}`, subscriptionId: lateSub, ref }),
+    );
+    expect(late.body.skipped).toBe('subscription_already_canceled');
+    expect(late.alert?.key).toMatch(/^stripe:subscription-skipped:/);
+    expect(late.alert?.detail).toContain('Le client a payé sans rien recevoir');
+    expect(late.alert?.detail).not.toContain('@');
+
+    // Une session déjà livrée, rejouée après la fin normale : rien de nouveau.
+    const sessionId = `cs_test_${uniq('replayed')}`;
+    const liveSub = `sub_test_${uniq('replayed')}`;
+    processStripeEvent(proCheckout({ sessionId, subscriptionId: liveSub }));
+    processStripeEvent(subscriptionDeleted(liveSub));
+    const replay = processStripeEvent(proCheckout({ sessionId, subscriptionId: liveSub }));
+    expect(replay.body.skipped).toBe('subscription_already_canceled');
+    expect(replay.alert).toBeUndefined();
+  });
+
+  it('le mail de fin dit ce qui reste ce mois-ci (D4)', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('d4_month');
+    // Le mois compte déjà 3 000 appels payés en Pro.
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 3000)
+         ON CONFLICT (key_hash, month) DO UPDATE SET count = excluded.count`,
+      )
+      .run(key.key_hash, MONTH());
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.subscription).toMatchObject({
+      kind: 'ended',
+      allowance: 200,
+      lifetime: false,
+      remaining: 0,
+    });
+  });
+
+  it('une clé « 200 une fois » : rattachée, puis sa fin dit qu’il ne reste rien (D4)', () => {
+    const key = freeKey('d4_once');
+    // La promotion par paiement à l'appel : 200 une fois, sur la vie de la clé.
+    getStatsDB()
+      .prepare('UPDATE api_keys SET monthly_limit = 200, no_recredit = 1 WHERE key_hash = ?')
+      .run(key.key_hash);
+    const ref = ensureTopupRef(key.key_hash)!;
+    const subscriptionId = `sub_test_${uniq('d4_once')}`;
+    const sessionId = `cs_test_${uniq('d4_once')}`;
+    processStripeEvent(proCheckout({ sessionId, subscriptionId, ref }));
+    expect(findPurchaseByRef(`stripe:${sessionId}`)).toMatchObject({
+      prev_monthly_limit: 200,
+      prev_no_recredit: 1,
+    });
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 4000)
+         ON CONFLICT (key_hash, month) DO UPDATE SET count = excluded.count`,
+      )
+      .run(key.key_hash, MONTH());
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.subscription).toMatchObject({
+      kind: 'ended',
+      allowance: 200,
+      lifetime: true,
+      remaining: 0,
+    });
+    expect(keyRow(key.key_hash)).toMatchObject({ monthly_limit: 200, no_recredit: 1 });
+  });
+
+  it('une fin ambiguë (deux clés actives dans la lignée) alerte, sans rien rendre (D7)', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('d7');
+    // Une anomalie fabriquée : une seconde clé active dans la même lignée.
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, tier, lineage_hash, active)
+         VALUES (?, ?, 'acme@example.com', 'acme@example.com', 10000, 'email', ?, 1)`,
+      )
+      .run(`hash_${uniq('d7')}`, 'ifk_d7twin00', key.key_hash);
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body.outcome).toBe('ambiguous');
+    expect(ended.alert?.key).toMatch(/^stripe:subscription-end-ambiguous:/);
+    expect(ended.alert?.detail).not.toContain('@');
+    expect(ended.subscription).toBeUndefined();
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+  });
+});
+
 describe('les mails', () => {
   it('Pro rattaché : court, sans clé brute, sans tiret long', () => {
     const mail = buildSubscriptionAttachedEmail({
@@ -673,11 +862,39 @@ describe('les mails', () => {
       keyPrefix: 'ifk_0123abcd',
       plan: 'pro',
       allowance: 200,
+      remaining: 150,
       creditsRemaining: 1000,
       topupRef: ref,
     });
-    expect(free.text).toContain('200 requests a month, then the 1,000 prepaid credits left on it');
-    for (const part of [empty.subject, empty.text, empty.html, free.text]) {
+    expect(free.text).toContain('200 requests a month, 150 left this month.');
+    expect(free.text).toContain('Then the 1,000 prepaid credits left on it.');
+    // D4 : un mois déjà consommé par les appels payés en Pro.
+    const spent = buildSubscriptionEndedEmail({
+      keyPrefix: 'ifk_0123abcd',
+      plan: 'pro',
+      allowance: 200,
+      remaining: 0,
+      creditsRemaining: null,
+      topupRef: ref,
+    });
+    expect(spent.text).toContain('none left this month');
+    expect(spent.text).toContain('200 again from the 1st');
+    expect(spent.text).not.toContain('It has its own allowance back: 200 requests a month.');
+    // D4 : une clé « 200 une fois » dont la somme de vie dépasse l'allocation.
+    const once = buildSubscriptionEndedEmail({
+      keyPrefix: 'ifk_0123abcd',
+      plan: 'pro',
+      allowance: 200,
+      lifetime: true,
+      remaining: 0,
+      creditsRemaining: null,
+      topupRef: ref,
+    });
+    expect(once.text).toContain('is used up');
+    expect(once.text).toContain('nothing is left of it');
+    expect(once.text).toContain('HTTP 402');
+    expect(once.text).not.toContain('allowance back');
+    for (const part of [empty.subject, empty.text, empty.html, free.text, spent.text, once.text]) {
       expect(part).not.toContain('—');
     }
   });

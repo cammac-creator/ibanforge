@@ -2646,7 +2646,7 @@ const buildRawSpec = () => ({
           created_at: { type: ['string', 'null'], format: 'date-time' },
           plan: {
             type: 'string',
-            enum: ['free', 'custom', 'pack', 'pro', 'editor', 'free+pack', 'custom+pack', 'pro+pack', 'editor+pack'],
+            enum: ['free', 'custom', 'pack', 'none', 'pro', 'editor', 'free+pack', 'custom+pack', 'pro+pack', 'editor+pack'],
             description: 'A key that holds an allowance AND prepaid credits carries both parts, such as free+pack: the allowance is drawn first, then the credits.',
           },
           allowance: {

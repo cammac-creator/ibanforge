@@ -1028,7 +1028,7 @@
         "method": "Ce que mesure ce bloc",
         "definition": "Réponses HTTP 2xx sur les routes de validation IBAN, batch, compliance, recherche BIC et clearing suisse, avec la méthode attendue. Un verdict négatif peut être une réponse utile : 2xx ne veut pas dire « IBAN valide ».",
         "accounts": "Un compte regroupe les clés conservées sous une même adresse e-mail, y compris les anciennes clés remplacées. Ce n’est pas un nombre de personnes. Comptes internes, adresses génériques de paiement et préfixes ambigus exclus.",
-        "retention": "« Première » signifie première réponse retrouvée dans les traces conservées, pas première utilisation à vie ni nouvelle inscription. Les traces sont purgées après douze mois et après résiliation selon la politique existante.",
+        "retention": "« Première » signifie première réponse retrouvée dans les traces conservées, pas première utilisation à vie ni nouvelle inscription. Les traces sont purgées après douze mois, et 30 jours après la désactivation de la dernière clé d’un client (la fin d’un abonnement ne la déclenche plus).",
         "days": "Deux jours UTC distincts suffisent, même autour de minuit. Ce n’est ni un retour après 24 heures ni une rétention à J+7.",
         "limits": "Essais possibles inclus. Appels sans clé rattachable et MCP hébergé hors périmètre. Aucun rapprochement avec les clics, les visites ou les achats ; les anciens indicateurs « Ont appelé » gardent leur définition."
       },
@@ -2242,6 +2242,7 @@
       "free": "Gratuit",
       "custom": "Sur mesure",
       "pack": "Pack de crédits",
+      "none": "Sans allocation",
       "pro": "Pro",
       "editor": "Éditeur / OEM"
     },

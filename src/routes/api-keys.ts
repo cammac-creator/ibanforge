@@ -36,6 +36,7 @@ import {
   PRO_PAYMENT_LINK,
   PRO_PORTAL_URL,
   PRO_PRICE_USD,
+  ANONYMOUS_TOPUP_NOTE,
   proLink,
   topupLinks,
 } from '../lib/payment-links.js';
@@ -721,9 +722,7 @@ function topupBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
     by_usdc: 'POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it',
     ...(v.tier === 'anonymous'
       ? {
-          note:
-            'This key is anonymous: once it buys credits it leaves the anonymous tier for good and keeps no ' +
-            'free monthly allowance. Claim it by e-mail first (POST /v1/keys/claim) to keep one.',
+          note: ANONYMOUS_TOPUP_NOTE,
         }
       : {}),
   };
@@ -1706,11 +1705,14 @@ apiKeys.get('/v1/admin/keys', (c) => {
             -- « Payée » : frappée par une session Stripe, ou une lignée qui a un
             -- achat inscrit au registre (lot B1). Une clé gratuite rechargée par
             -- carte ne porte aucune session : sans le registre, elle se lisait
-            -- gratuite au CRM alors qu'elle venait de payer.
+            -- gratuite au CRM alors qu'elle venait de payer. Un abonnement posé
+            -- sur une clé existante (issue attached, lot B2) aussi : sans lui,
+            -- une clé Pro rattachée se lisait « free » à 10 000 par mois.
             CASE WHEN k.stripe_session_id IS NOT NULL
                    OR EXISTS (SELECT 1 FROM key_purchases kp
                                WHERE kp.lineage_hash = COALESCE(k.lineage_hash, k.key_hash)
-                                 AND kp.outcome IN ${SALE_OUTCOMES_SQL})
+                                 AND (kp.outcome IN ${SALE_OUTCOMES_SQL}
+                                      OR (kp.kind = 'subscription' AND kp.outcome = 'attached')))
                  THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,

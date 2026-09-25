@@ -29,7 +29,12 @@ function uniq(tag: string): string {
   return `${tag}_${Date.now()}_${seq}`;
 }
 
-function proCheckout(opts: { sessionId: string; subscriptionId: string; ref?: string | null }) {
+function proCheckout(opts: {
+  sessionId: string;
+  subscriptionId: string;
+  ref?: string | null;
+  email?: string | null;
+}) {
   return {
     id: `evt_${uniq('sub')}`,
     type: 'checkout.session.completed',
@@ -37,7 +42,7 @@ function proCheckout(opts: { sessionId: string; subscriptionId: string; ref?: st
       object: {
         id: opts.sessionId,
         metadata: { plan: 'pro' },
-        customer_email: null,
+        customer_email: opts.email ?? null,
         customer_details: null,
         payment_status: 'paid',
         mode: 'subscription',
@@ -127,6 +132,20 @@ describe('le drapeau abonné du CRM (activation)', () => {
     const after = getActivation().clients.find((c) => c.email === email);
     expect(after?.subscriber).toBe(false);
     expect(after?.keys[0]).toMatchObject({ role: 'free', active: 1 });
+  });
+});
+
+describe('une clé née d’un abonnement terminé au CRM (relecture de la PR 264, D5)', () => {
+  it('son rôle n’est jamais free : ni allocation ni crédits', () => {
+    const email = `${uniq('crm_ended')}@alpha.example.net`;
+    const subscriptionId = `sub_test_${uniq('crm_ended')}`;
+    processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('crm_ended')}`, subscriptionId, email }),
+    );
+    processStripeEvent(deleted(subscriptionId));
+    const client = getActivation().clients.find((c) => c.email === email);
+    expect(client?.subscriber).toBe(false);
+    expect(client?.keys[0]).toMatchObject({ role: 'subscription', active: 1 });
   });
 });
 

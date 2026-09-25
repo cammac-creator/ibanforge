@@ -389,6 +389,26 @@ describe('GET /v1/account/overview', () => {
     );
   });
 
+  // Relecture de sécurité de la PR 264, D5 : une clé née d'un abonnement
+  // terminé n'a ni allocation ni crédits, et répond 402. Jamais « Free ».
+  it('clé née d’un abonnement terminé : formule none, jamais free', async () => {
+    const email = 'abonnement-fini@alpha.example.net';
+    const born = generateOemKey(email, PRO_MONTHLY_LIMIT, 'cs_test_none', 'sub_test_none');
+    getStatsDB()
+      .prepare(
+        `UPDATE api_keys SET monthly_limit = 0, subscription_ended_at = datetime('now')
+          WHERE key_prefix = ?`,
+      )
+      .run(born.key_prefix);
+    const { body } = await overviewOf(email);
+    const view = body.keys.find((k) => k.key_prefix === born.key_prefix)!;
+    expect(view.plan).toBe('none');
+    expect(view.subscription).toBeNull();
+    expect(view.actions.manage_subscription).toBeNull();
+    // Pro lui est de nouveau proposé, sur elle-même.
+    expect(view.actions.subscribe_pro).toMatch(/client_reference_id=ifr_[0-9a-f]{32}$/);
+  });
+
   it('dernier appel et alertes reçues', async () => {
     const email = 'appels@alpha.example.net';
     const older = generateApiKey(email);

@@ -2047,7 +2047,11 @@ function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
  * src/lib/subscription-payments.ts).
  *
  * Rattrapage, rejouable (ne touche que les NULL) : la fin n'est datée que si la
- * pierre tombale le dit (relecture de la PR 259, D5), jamais par la date de
+ * pierre tombale le dit (relecture de la PR 259, D5), et seulement sur une clé
+ * INACTIVE (relecture de la PR 264, D7) : une clé active qui porterait un
+ * abonnement mort n'a pas reçu sa photo, et la dater sans rendre l'allocation
+ * la laisserait « plus abonnée » avec son allocation d'abonnement. Seul le
+ * webhook pose une fin sur une clé active. Jamais par la date de
  * désactivation d'une ligne, ni par « aucune clé active ne porte
  * l'abonnement » : une rotation faite avant la PR 177 ne recopiait pas
  * l'abonnement, et sa copie active sert encore un abonnement facturé. Sans
@@ -2070,6 +2074,7 @@ function migrateSubscriptionEnd(statsDB: DatabaseType.Database): void {
                  WHERE d.subscription_id = api_keys.stripe_subscription_id)
         WHERE stripe_subscription_id IS NOT NULL
           AND subscription_ended_at IS NULL
+          AND active = 0
           AND EXISTS (SELECT 1 FROM dead_subscriptions d
                        WHERE d.subscription_id = api_keys.stripe_subscription_id)`,
     )

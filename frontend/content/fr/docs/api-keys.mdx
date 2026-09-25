@@ -394,7 +394,10 @@ sur CETTE clé : `topup.pro` dans `GET /v1/keys/usage` et `GET /v1/credits/balan
 clé qui porte déjà un abonnement. Résilier ne désactive pas la clé : à la fin du mois déjà payé, elle
 retrouve ce qu'elle avait avant l'abonnement, son allocation gratuite si elle en avait une et les
 crédits qui lui restent. Une clé créée par l'abonnement lui-même répond alors `402` avec les liens qui
-la rechargent ou la réabonnent, sans être remplacée.
+la rechargent ou la réabonnent, sans être remplacée. Une clé anonyme qui prend Pro quitte le palier
+anonyme, et ne peut donc plus être réclamée par e-mail ; la fin de l'abonnement lui rend son allocation
+anonyme mensuelle. Celle qui a d'abord acheté des crédits l'avait déjà quitté pour de bon, sans
+allocation gratuite.
 
 ## Lorsque votre quota est dépassé
 

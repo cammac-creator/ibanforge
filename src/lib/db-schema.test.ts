@@ -348,6 +348,14 @@ describe('ouverture du schéma', () => {
                 'sub_test_gone_pro', 'hd');
       INSERT INTO dead_subscriptions (subscription_id, recorded_at)
         VALUES ('sub_test_gone_pro', '2026-09-01 10:00:00');
+      -- Relecture de la PR 264, D7 : une clé ACTIVE dont l'abonnement a une
+      -- pierre tombale n'a pas reçu sa photo ; le rattrapage ne la date pas.
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, stripe_session_id,
+                            stripe_subscription_id, lineage_hash)
+        VALUES ('hx', 'ifk_000000hx', 'acme@example.com', 1, 10000, 'cs_test_orphan_pro',
+                'sub_test_orphan_pro', 'hx');
+      INSERT INTO dead_subscriptions (subscription_id, recorded_at)
+        VALUES ('sub_test_orphan_pro', '2026-09-02 10:00:00');
     `);
     raw.close();
     const mod = await openAt(path);
@@ -364,6 +372,8 @@ describe('ouverture du schéma', () => {
       { key_hash: 'ho', active: 0, subscription_ended_at: null },
       // La copie active d'un abonnement vivant : jamais datée.
       { key_hash: 'hr', active: 1, subscription_ended_at: null },
+      // Active avec une pierre tombale : jamais datée par le rattrapage (D7).
+      { key_hash: 'hx', active: 1, subscription_ended_at: null },
     ]);
     mod.closeAll();
     // Rejouée à la réouverture : rien ne bouge.

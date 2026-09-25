@@ -138,6 +138,15 @@ function subscriptionKeyNow(k: KeyRow): boolean {
   return k.live_subscription === 1 || (k.subscription === 1 && k.active !== 1);
 }
 
+/**
+ * L'allocation propre écrite d'une clé, avec le défaut de son palier. Une clé
+ * sans allocation ni crédits (née d'un abonnement terminé, lot B2) n'est jamais
+ * un « free » : elle répond 402 (relecture de la PR 264, D5).
+ */
+function allowanceOf(k: KeyRow): number {
+  return k.monthly_limit ?? ownAllowanceDefault(k.tier as KeyTier);
+}
+
 interface LogAgg {
   key_prefix: string;
   first_call_at: string | null;
@@ -339,7 +348,14 @@ export function getActivation(days = 30): ActivationResponse {
       email,
       keys: list.map((k) => ({
         key_prefix: k.key_prefix,
-        role: k.credits_total != null ? 'paid' : subscriptionKeyNow(k) ? 'subscription' : 'free',
+        role:
+          k.credits_total != null
+            ? 'paid'
+            : subscriptionKeyNow(k) || (k.subscription === 1 && allowanceOf(k) <= 0)
+              ? 'subscription'
+              : allowanceOf(k) <= 0
+                ? 'paid'
+                : 'free',
         active: k.active,
       })),
       signup_at: signupAt,

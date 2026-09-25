@@ -244,6 +244,8 @@ describe('les écrans de la page du compte', () => {
 
     // Une formule que le site ne connaît pas encore : libellé de repli, rien ne casse.
     expect(parsePlan('free+enterprise')).toEqual({ parts: [], raw: 'free+enterprise' });
+    // Lot B2, relecture D5 : ni allocation ni crédits, jamais lu « free ».
+    expect(parsePlan('none')).toEqual({ parts: ['none'], raw: 'none' });
     expect(parsePlan('')).toBeNull();
     expect(parsePlan(undefined)).toBeNull();
   });

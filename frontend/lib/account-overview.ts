@@ -112,9 +112,10 @@ export function noticeFor(reply: ApiReply): Notice {
 
 // ─── La fiche d'une clé ──────────────────────────────────────────────────────
 
-export type PlanPart = 'free' | 'custom' | 'pack' | 'pro' | 'editor';
+/** `none` (lot B2) : ni allocation ni crédits, une clé née d'un abonnement terminé. */
+export type PlanPart = 'free' | 'custom' | 'pack' | 'none' | 'pro' | 'editor';
 
-const PLAN_PARTS: readonly PlanPart[] = ['free', 'custom', 'pack', 'pro', 'editor'];
+const PLAN_PARTS: readonly PlanPart[] = ['free', 'custom', 'pack', 'none', 'pro', 'editor'];
 
 export type AlertKind = 'quota_80' | 'credits_low';
 

@@ -33,7 +33,7 @@ import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
 import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
-import { OEM_MONTHLY_LIMIT, PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
+import { getUsage, OEM_MONTHLY_LIMIT, PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
@@ -44,6 +44,7 @@ import {
   applyCardSubscriptionPaymentInTx,
   endSubscriptionInTx,
   ensureTopupRef,
+  findPurchaseByRef,
   reverseCardPurchaseInTx,
   type CardReversal,
   type ReversalReason,
@@ -260,6 +261,13 @@ export type StripeSubscriptionNotify =
       allowance: number;
       /** Vrai quand cette allocation se compte sur la vie de la clé. */
       lifetime: boolean;
+      /**
+       * Ce qui RESTE de cette allocation au moment de la fin, lu par `getUsage`
+       * sur la même assiette que le plafond (relecture de la PR 264, D4) : le
+       * mois en cours compte déjà les appels payés en Pro, et une assiette de
+       * vie tous les mois de la clé.
+       */
+      remaining: number;
       creditsRemaining: number | null;
       /** La référence de recharge de la clé, pour les liens du mail. */
       topupRef: string | null;
@@ -542,6 +550,21 @@ export function processStripeEvent(event: Stripe.Event): {
           ? { key_prefix: ended.keyPrefix }
           : {}),
     };
+    // Relecture de sécurité de la PR 264, D7 : deux clés actives dans la même
+    // lignée (anomalie), rien n'est rendu et les deux gardent leur allocation.
+    // Un humain le sait, sans adresse ni identifiant Stripe dans le texte.
+    if (ended.status === 'ambiguous') {
+      return {
+        status: 200,
+        body,
+        alert: {
+          key: `stripe:subscription-end-ambiguous:${sessionTag(sub.id)}`,
+          detail:
+            'La fin d’un abonnement mène à deux clés actives dans la même lignée : rien n’a été rendu, ' +
+            'les deux gardent leur allocation d’abonnement. À relire dans les outils privés.',
+        },
+      };
+    }
     if (ended.status !== 'ended') return { status: 200, body };
     const key = db
       .prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?')
@@ -556,6 +579,7 @@ export function processStripeEvent(event: Stripe.Event): {
         plan: planOfBundle(ended.purchase?.bundle),
         allowance: ended.allowanceRestoredTo,
         lifetime: ended.lifetime,
+        remaining: getUsage(ended.keyHash, ended.allowanceRestoredTo, ended.lifetime).remaining,
         creditsRemaining: key?.credits_remaining ?? null,
         topupRef: ensureTopupRef(ended.keyHash),
       },
@@ -743,6 +767,12 @@ export function processStripeEvent(event: Stripe.Event): {
       subscriptionId &&
       db.prepare('SELECT 1 FROM dead_subscriptions WHERE subscription_id = ?').get(subscriptionId)
     ) {
+      // Relecture de sécurité de la PR 264, D3 : jamais un client qui paie sans
+      // rien recevoir sans alerte. Une session qui n'a encore rien livré (aucune
+      // ligne au registre) arrive après la fin de son abonnement : la
+      // résiliation a été reçue avant le paiement. Un simple rejeu d'une session
+      // déjà livrée, lui, ne dit rien de nouveau et n'alerte pas.
+      const delivered = findPurchaseByRef(`stripe:${session.id}`, db) !== null;
       db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
         event.id,
         event.type,
@@ -756,6 +786,17 @@ export function processStripeEvent(event: Stripe.Event): {
           skipped: 'subscription_already_canceled',
           subscription: subscriptionId,
         },
+        ...(delivered
+          ? {}
+          : {
+              alert: {
+                key: `stripe:subscription-skipped:${sessionTag(session.id)}`,
+                detail:
+                  'Un paiement d’abonnement est arrivé après la fin de cet abonnement (la résiliation a été ' +
+                  'reçue avant le paiement) : rien n’a été posé ni frappé. Le client a payé sans rien ' +
+                  'recevoir : rembourser, ou rétablir à la main. À relire dans les outils privés.',
+              },
+            }),
       };
     }
     const clientReferenceId =
@@ -807,6 +848,14 @@ export function processStripeEvent(event: Stripe.Event): {
       };
     }
 
+    // Relecture de sécurité de la PR 264, D2 : un abonnement réglé à zéro
+    // (essai gratuit, code promotionnel à 100 %) est légitime et n'est pas
+    // refusé, mais un humain le sait. Sans adresse ni session dans le texte.
+    const unpaid = session.payment_status === 'no_payment_required';
+    const unpaidDetail = (what: string): string =>
+      'Un abonnement a été réglé à zéro chez Stripe (aucun paiement requis : essai ou code ' +
+      `promotionnel), sans être refusé : ${what} À relire dans les outils privés.`;
+
     if (outcome.kind === 'attached') {
       return {
         status: 200,
@@ -818,6 +867,14 @@ export function processStripeEvent(event: Stripe.Event): {
           attached: { key_prefix: outcome.keyPrefix, outcome: 'attached' },
           ...(amountFields ?? {}),
         },
+        ...(unpaid
+          ? {
+              alert: {
+                key: `stripe:unpaid-subscription:${sessionTag(session.id)}`,
+                detail: unpaidDetail(`il a été posé sur la clé existante ${outcome.keyPrefix}….`),
+              },
+            }
+          : {}),
         subscription: {
           kind: 'attached',
           to: serviceContactOf(outcome.keyHash, email),
@@ -846,7 +903,7 @@ export function processStripeEvent(event: Stripe.Event): {
     // silencieuse (ZG10) : la clé neuve est remise au payeur, et un humain
     // rembourse ou résilie. Les autres replis disent seulement que la
     // référence n'a pas servi (révoquée, inconnue, ambiguë).
-    const alert =
+    const fallbackAlert =
       fallback && fallback !== 'no_subscription' && outcome.rawKey
         ? {
             key: `stripe:subscription-${fallback === 'double_subscription' ? 'double' : 'fallback'}:${sessionTag(session.id)}`,
@@ -859,6 +916,19 @@ export function processStripeEvent(event: Stripe.Event): {
                   'une clé neuve a été frappée et remise au payeur. À relire dans les outils privés.',
           }
         : undefined;
+    // Réglé à zéro ET replié : une seule alerte, qui dit les deux.
+    const alert =
+      unpaid && outcome.rawKey
+        ? fallbackAlert
+          ? {
+              ...fallbackAlert,
+              detail: `${fallbackAlert.detail} Réglé à zéro chez Stripe (aucun paiement requis).`,
+            }
+          : {
+              key: `stripe:unpaid-subscription:${sessionTag(session.id)}`,
+              detail: unpaidDetail(`une clé neuve ${outcome.keyPrefix}… a été frappée.`),
+            }
+        : fallbackAlert;
 
     return {
       status: 200,
@@ -1161,6 +1231,7 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       plan: s.plan,
       allowance: s.allowance,
       lifetime: s.lifetime,
+      remaining: s.remaining,
       creditsRemaining: s.creditsRemaining,
       topupRef: s.topupRef,
     }).catch(() => {});

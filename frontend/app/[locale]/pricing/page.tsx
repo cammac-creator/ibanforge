@@ -41,7 +41,9 @@ const CREDIT_PACKS = [
 const PRO_PAYMENT_LINK = "https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04"
 
 // Stripe customer portal (16/09/2026): the Pro subscriber manages their card,
-// invoices and cancellation there; the key stays valid until the paid period ends.
+// invoices and cancellation there. Depuis le lot B2 (25.09.2026), la résiliation
+// ne désactive plus la clé : à la fin du mois payé, elle retrouve ce qu'elle
+// avait avant l'abonnement (CGU 1.9, §3).
 const PRO_PORTAL_LINK = "https://billing.stripe.com/p/login/3cI00c18lauh1i8bqO8so00"
 
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {

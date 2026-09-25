@@ -85,6 +85,25 @@ export function topupLink(slug: PackSlug, ref: string): string {
   return `${base}?client_reference_id=${ref}`;
 }
 
+/**
+ * Ce qu'un paiement fait à une clé ANONYME, servi à côté de ses liens de
+ * recharge et de Pro (bloc `topup` de l'usage et du solde, `topup_this_key` du
+ * 402). Écrit une fois, pour que les deux blocs disent la même chose.
+ *
+ * Deux cas, qui suivent l'ordre de la spec (§4 : photo, puis promotion ZG1) :
+ *  - un pack d'abord : la clé quitte le palier anonyme pour de bon, sans
+ *    allocation gratuite ensuite (un achat ne crée jamais de gratuit) ;
+ *  - Pro d'abord : elle quitte aussi le palier anonyme (plus de réclamation par
+ *    e-mail), et la fin de l'abonnement lui rend son allocation anonyme
+ *    (décision de la session principale du 25.09.2026, phrase Q11 publiée).
+ * Aucun chiffre ici : les « 25 » ne partagent jamais une phrase.
+ */
+export const ANONYMOUS_TOPUP_NOTE =
+  'This key is anonymous. Buying credits makes it leave the anonymous tier for good, with no free monthly ' +
+  'allowance afterwards. Taking Pro on it also ends the anonymous tier (it can no longer be claimed by e-mail); ' +
+  'when the subscription ends, it gets its anonymous monthly allowance back. Claim it by e-mail first ' +
+  '(POST /v1/keys/claim): a claimed key keeps its free monthly allowance through a pack or a subscription.';
+
 /** Les trois liens de recharge d'une clé. */
 export function topupLinks(ref: string): Record<PackSlug, string> {
   return {

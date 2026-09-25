@@ -21,6 +21,7 @@ import {
   PRICING_PAGE,
   PRO_PAYMENT_LINK,
   PRO_PRICE_USD,
+  ANONYMOUS_TOPUP_NOTE,
   proLink,
   topupLinks,
 } from '../lib/payment-links.js';
@@ -712,9 +713,7 @@ function topupThisKeyField(
         }),
     ...(anonymous
       ? {
-          note:
-            'This key is anonymous: once it buys credits it leaves the anonymous tier for good and keeps no free ' +
-            'monthly allowance. Claim it by e-mail first (POST /v1/keys/claim) to keep one.',
+          note: ANONYMOUS_TOPUP_NOTE,
         }
       : {}),
   };

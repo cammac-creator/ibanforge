@@ -45,7 +45,7 @@ import {
   ownAllowanceDefault,
   type AllowancePhoto,
 } from './api-keys.js';
-import type { KeyTier } from './tiers.js';
+import { ANONYMOUS_MONTHLY_LIMIT, type KeyTier } from './tiers.js';
 import { markLineagePurchase } from './lineage-facts.js';
 import { recordCreditsPurchase } from './stats.js';
 
@@ -607,19 +607,49 @@ function attachToExistingKeyInTx(
 ): { purchaseId: number; photo: AllowancePhoto } | null {
   const row = db
     .prepare(
-      'SELECT tier, monthly_limit, no_recredit FROM api_keys WHERE key_hash = ? AND active = 1',
+      'SELECT tier, monthly_limit, no_recredit, shield_episode FROM api_keys WHERE key_hash = ? AND active = 1',
     )
     .get(target.keyHash) as
-    { tier: KeyTier; monthly_limit: number | null; no_recredit: number | null } | undefined;
+    | {
+        tier: KeyTier;
+        monthly_limit: number | null;
+        no_recredit: number | null;
+        shield_episode: string | null;
+      }
+    | undefined;
   if (!row) return null;
   const first = !lineageHasPurchase(target.lineageHash, db);
-  const photo: AllowancePhoto | null = first
-    ? applyFirstPurchaseInTx(db, target.keyHash, 'stripe')
-    : {
-        tier: row.tier,
-        monthlyLimit: row.monthly_limit ?? ownAllowanceDefault(row.tier),
-        noRecredit: row.no_recredit ?? 0,
-      };
+  let photo: AllowancePhoto | null;
+  if (first && row.tier === 'anonymous') {
+    // 🚨 Une clé ANONYME dont le Pro est le PREMIER achat : la photo est prise
+    // AVANT la promotion ZG1 (spec §4 : « photo prev_* et promotion ZG1 », dans
+    // cet ordre ; décision de la session principale du 25.09.2026, qui fait
+    // suivre au code la phrase Q11 publiée : « it returns to what it had before
+    // the subscription (its free allowance if it had one…) »). La fin de son Pro
+    // lui rend son allocation anonyme ; la clé reste au palier payant, réclamée
+    // par paiement, donc hors du rayon du radar. Née sous bouclier, elle
+    // retrouve l'allocation normale de son palier, pas le plafond réduit (ZG5).
+    // Une clé anonyme qui a d'abord acheté un pack n'arrive pas ici : son
+    // premier achat l'a déjà passée à 0 (ZG1), et c'est ce 0 qu'elle avait
+    // avant l'abonnement.
+    const shielded = row.shield_episode !== null;
+    photo = {
+      tier: 'anonymous',
+      monthlyLimit: shielded
+        ? ANONYMOUS_MONTHLY_LIMIT
+        : (row.monthly_limit ?? ANONYMOUS_MONTHLY_LIMIT),
+      noRecredit: shielded ? 0 : (row.no_recredit ?? 0),
+    };
+    applyFirstPurchaseInTx(db, target.keyHash, 'stripe');
+  } else {
+    photo = first
+      ? applyFirstPurchaseInTx(db, target.keyHash, 'stripe')
+      : {
+          tier: row.tier,
+          monthlyLimit: row.monthly_limit ?? ownAllowanceDefault(row.tier),
+          noRecredit: row.no_recredit ?? 0,
+        };
+  }
   if (!photo) return null;
   // La clé vient d'être lue active dans cette transaction IMMEDIATE : aucun
   // autre écrivain ne peut l'avoir désactivée entre-temps. Jeter annule tout,

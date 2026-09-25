@@ -1028,7 +1028,7 @@
         "method": "What this block measures",
         "definition": "HTTP 2xx responses on IBAN validation, batch, compliance, BIC lookup and Swiss clearing routes, with the expected method. A negative verdict can be useful: 2xx does not mean “valid IBAN”.",
         "accounts": "An account groups retained keys under the same email address, including replaced keys. This is not a count of people. Internal accounts, generic payment addresses and ambiguous prefixes are excluded.",
-        "retention": "“First” means the first response found in retained logs, not first-ever usage or a new signup. Logs are purged after twelve months and after cancellation under the existing policy.",
+        "retention": "“First” means the first response found in retained logs, not first-ever usage or a new signup. Logs are purged after twelve months, and 30 days after a customer's last key is deactivated (the end of a subscription no longer triggers it).",
         "days": "Two distinct UTC days suffice, even around midnight. This is neither a return after 24 hours nor day-seven retention.",
         "limits": "Trials may be included. Calls without an attributable key and hosted MCP are outside scope. No linkage to clicks, visits or purchases; the existing “Made a call” indicators keep their definition."
       },
@@ -2242,6 +2242,7 @@
       "free": "Free",
       "custom": "Custom",
       "pack": "Credit pack",
+      "none": "No allowance",
       "pro": "Pro",
       "editor": "Editor / OEM"
     },

@@ -928,6 +928,13 @@ export interface SubscriptionEndedEmailInput {
   allowance: number;
   /** Vrai quand cette allocation se compte sur la vie de la clé, pas au mois. */
   lifetime?: boolean;
+  /**
+   * Ce qui RESTE de cette allocation à la fin (relecture de la PR 264, D4),
+   * sur l'assiette du plafond : le mois en cours compte déjà les appels payés
+   * en Pro, et une assiette de vie tous les mois de la clé. Absent : l'allocation
+   * entière (aucune mesure fournie).
+   */
+  remaining?: number | null;
   creditsRemaining: number | null;
   /** La référence de recharge de la clé : les liens rechargent ou réabonnent CETTE clé. */
   topupRef: string | null;
@@ -949,15 +956,32 @@ export function buildSubscriptionEndedEmail(p: SubscriptionEndedEmailInput): {
     typeof p.creditsRemaining === 'number' && p.creditsRemaining > 0
       ? p.creditsRemaining.toLocaleString('en-US')
       : null;
-  const allowance =
-    p.allowance > 0
-      ? `${p.allowance.toLocaleString('en-US')} requests ${p.lifetime ? 'counted over the whole life of the key' : 'a month'}`
-      : null;
-  const now = allowance
-    ? `It has its own allowance back: ${allowance}${credits ? `, then the ${credits} prepaid credits left on it` : ''}.`
-    : credits
+  // Ce qui reste vraiment (D4) : jamais « it has its own allowance back » à une
+  // clé dont l'allocation est déjà consommée, ce mois-ci ou sur sa vie.
+  const n = (x: number): string => x.toLocaleString('en-US');
+  let now: string;
+  if (p.allowance > 0) {
+    const left = Math.max(0, Math.min(p.allowance, p.remaining ?? p.allowance));
+    const own = p.lifetime
+      ? left > 0
+        ? `It has its own one-time allowance back: ${n(left)} of ${n(p.allowance)} requests left, counted over the whole life of the key, subscription months included.`
+        : `Its own one-time allowance of ${n(p.allowance)} requests is used up: it is counted over the whole life of the key, subscription months included, so nothing is left of it.`
+      : left > 0
+        ? `It has its own allowance back: ${n(p.allowance)} requests a month, ${n(left)} left this month.`
+        : `It has its own allowance back: ${n(p.allowance)} requests a month, none left this month (the calls already made this month count), ${n(p.allowance)} again from the 1st.`;
+    const after = credits
+      ? ` Then the ${credits} prepaid credits left on it.`
+      : left > 0
+        ? ''
+        : p.lifetime
+          ? ' Calls answer HTTP 402 (payment required) until the key receives a new payment.'
+          : ' Until then, calls answer HTTP 402 (payment required) unless the key receives a new payment.';
+    now = own + after;
+  } else {
+    now = credits
       ? `It draws on the ${credits} prepaid credits left on it. When they run out, calls answer HTTP 402 (payment required) until the key receives a new payment.`
       : 'It has no allowance left: calls answer HTTP 402 (payment required) until the key receives a new payment.';
+  }
   const links = packLinks(p.topupRef);
   const pro = p.topupRef ? proLink(p.topupRef) : PRO_PAYMENT_LINK;
   const sameKey = p.topupRef
