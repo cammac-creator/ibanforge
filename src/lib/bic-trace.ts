@@ -31,21 +31,57 @@
  * INCOMPLET. Un BIC absent d'un index incomplet répond alors `null`, jamais
  * `false` : il a peut-être une trace dans ce que nous n'avons pas lu.
  *
+ * Et aujourd'hui l'index n'est JAMAIS complet : les listes EBA STEP2 et NBP ne
+ * sont lues qu'à travers l'annuaire dédoublonné, qui perd une partie de ce
+ * qu'elles portent (voir listsReadThroughDeduplicatedRows). `false` reste
+ * inatteignable jusqu'à la correction durable.
+ *
  * Aucune dépendance vers bic-lookup.ts (qui vide le mémo d'ici) : pas de cycle.
  */
 import type DatabaseType from 'better-sqlite3';
 import { getBicDB } from './db.js';
 import { getComplianceDB } from './compliance-db.js';
 import { frozenSources } from './source-vintage.js';
-import { RESTRICTED_FAMILY } from './restricted-family.js';
+import { RESTRICTED_FAMILY, restrictedBicSources, restrictedTable } from './restricted-family.js';
 
 export interface TraceIndex {
   /** Les BIC8 qu'au moins une source de ce cycle porte. */
   bic8s: Set<string>;
-  /** Faux dès qu'une source de trace n'a pas pu être lue. */
+  /** Faux dès qu'une source de trace n'a pas pu être lue EN ENTIER. */
   complete: boolean;
   /** Les sources lues, pour le diagnostic. */
   sources_read: string[];
+  /** Pourquoi l'index n'est pas complet (vide quand il l'est), pour le diagnostic. */
+  incomplete_reasons: string[];
+}
+
+/**
+ * Les listes de ce cycle que l'index ne lit qu'À TRAVERS l'annuaire dédoublonné,
+ * et qui ne peuvent donc pas être lues en entier (relecture de la PR 254, R1).
+ *
+ * Les lignes EBA STEP2, NBP et OeNB entrent dans `bic_entries` par
+ * `INSERT OR IGNORE`, après la copie figée : à l'import mensuel
+ * (scripts/enrich-bic-database.ts) comme à la fusion de la surcouche privée
+ * (`onConflict: 'ignore'` de la table dans restricted-family.ts). Un BIC11 que la
+ * copie figée portait déjà garde sa seule ligne figée, et sa présence dans la
+ * liste de ce cycle n'est écrite nulle part : mesuré le 25/09/2026, plus d'une
+ * centaine de BIC8 portés par STEP2 ou NBP répondaient « absent de toute liste à
+ * jour ».
+ * Tant que c'est ainsi, l'index ne se déclare jamais complet :
+ * `listed_in_current_source` vaut `true` ou `null`, jamais un `false` non
+ * prouvé (règle « non consulté » de la PR 249).
+ *
+ * Lu dans la constante de la famille, jamais recopié. Les lignes Bundesbank et
+ * SIX passent aussi par `INSERT OR IGNORE`, mais leurs registres entiers
+ * (`de_blz`, `ch_clearing`) sont lus comme trace : rien ne s'y perd.
+ *
+ * La correction durable, étape suivante : écrire les BIC8 lus dans ces listes
+ * dans une petite table de trace, hors de l'`INSERT OR IGNORE`, membre de la
+ * famille sous conditions, la lire ici, et vider cette liste.
+ */
+export function listsReadThroughDeduplicatedRows(): string[] {
+  if (restrictedTable('bic', 'bic_entries').onConflict !== 'ignore') return [];
+  return [...restrictedBicSources()].sort();
 }
 
 export interface FrozenSourceTrace {
@@ -139,15 +175,20 @@ function missingRestrictedMember(
  *
  * @param frozen Les sources millésimées, dont les lignes ne sont PAS une trace.
  *   Par défaut celles de source-vintage.ts ; un test peut en injecter d'autres.
+ * @param deduplicated Les listes lues seulement à travers l'annuaire dédoublonné
+ *   (listsReadThroughDeduplicatedRows) : tant qu'il en reste une, l'index n'est
+ *   pas complet. Un test passe `[]` pour éprouver la mécanique d'un index
+ *   complet, celle que la correction durable rendra réelle.
  */
 export function measureTraceIndex(
   bicDb: DatabaseType.Database,
   complianceDb: DatabaseType.Database,
   frozen: readonly string[] = frozenSources().map((f) => f.source),
+  deduplicated: readonly string[] = listsReadThroughDeduplicatedRows(),
 ): TraceIndex {
   const bic8s = new Set<string>();
   const sourcesRead: string[] = [];
-  let complete = true;
+  const reasons: string[] = [];
 
   const add = (rows: unknown[]): void => {
     for (const r of rows as Array<{ bic8: string | null }>) if (r.bic8) bic8s.add(r.bic8);
@@ -163,7 +204,7 @@ export function measureTraceIndex(
     add(bicDb.prepare(sql).all(...frozen));
     sourcesRead.push('bic_entries');
   } catch {
-    complete = false;
+    reasons.push('unreadable:bic_entries');
   }
 
   for (const q of TABLE_QUERIES) {
@@ -171,17 +212,24 @@ export function measureTraceIndex(
       add((q.db === 'bic' ? bicDb : complianceDb).prepare(q.sql).all());
       sourcesRead.push(q.table);
     } catch {
-      complete = false;
+      reasons.push(`unreadable:${q.table}`);
     }
   }
 
   try {
-    if (missingRestrictedMember(bicDb, complianceDb)) complete = false;
+    if (missingRestrictedMember(bicDb, complianceDb)) reasons.push('restricted_member_empty');
   } catch {
-    complete = false;
+    reasons.push('restricted_member_unreadable');
   }
 
-  return { bic8s, complete, sources_read: sourcesRead };
+  for (const list of deduplicated) reasons.push(`deduplicated_list_rows:${list}`);
+
+  return {
+    bic8s,
+    complete: reasons.length === 0,
+    sources_read: sourcesRead,
+    incomplete_reasons: reasons,
+  };
 }
 
 /**

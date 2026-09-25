@@ -108,6 +108,13 @@ void IBAN_ERROR_CODES_COMPLETE;
  * them to an x402 payer (no `trial` block, no `attribution`). Copied from a
  * local call on 24/09/2026; the bank data are public register entries.
  *
+ * Depuis le 25/09/2026 (relecture de la PR 254, R10), les valeurs que seuls les
+ * registres EPC donnent (famille sous conditions, src/lib/restricted-family.ts)
+ * sont celles d'un déploiement SANS ces registres : `vop_participant: null`,
+ * `basis: 'country_default'`, grain de la banque à `null`. Les schémas restent
+ * ceux du pays, que donne la bibliothèque. Aucune valeur tirée des registres
+ * sous conditions dans un exemple du dépôt public.
+ *
  * Why here at all: the second DeepSeek test of 24/09/2026 read this document,
  * found no example and concluded that the error handling was undocumented. The
  * invalid example is the point: a 200, not a 4xx.
@@ -118,6 +125,20 @@ const VALIDATE_EXAMPLES = {
     value: {
       iban: 'DE89370400440532013000',
       valid: true,
+      bank_code_holder: 'confirmed',
+      checks: {
+        iban_structure: 'pass',
+        iban_checksum: 'pass',
+        bank_code: 'pass',
+        bic: 'pass',
+        sepa_reachability: 'unknown',
+        national_check_digits: 'not_checked',
+        account_exists: 'not_checked',
+        payee_name: 'not_checked',
+        institution_sanctions: 'not_checked',
+        country_sanctions: 'not_checked',
+        payee_sanctions: 'not_checked',
+      },
       country: { code: 'DE', name: 'Germany' },
       check_digits: '89',
       bban: { bank_code: '37040044', account_number: '0532013000' },
@@ -125,8 +146,11 @@ const VALIDATE_EXAMPLES = {
         member: true,
         schemes: ['SCT', 'SDD', 'SCT_INST'],
         vop_required: true,
-        vop_participant: true,
-        basis: 'epc_register',
+        vop_participant: null,
+        basis: 'country_default',
+        bank_reachability: null,
+        bank_schemes: null,
+        vop_register_status: null,
       },
       formatted: 'DE89 3704 0044 0532 0130 00',
       cost_usdc: 0.005,
@@ -141,6 +165,7 @@ const VALIDATE_EXAMPLES = {
         lei: '851WYGNLUQLFZBSYGB56',
         lei_status: 'ACTIVE',
         bic8: 'COBADEFF',
+        listed_in_current_source: true,
       },
       issuer: { type: 'bank', name: 'Commerzbank', classification: 'default' },
       risk_indicators: {
@@ -459,18 +484,29 @@ const buildRawSpec = () => ({
           "Validates an IBAN and returns everything from /v1/iban/validate PLUS a pre-payment triage layer: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country checked against a fixed list of sanctioned jurisdictions, never the payee's name; FATF status; SEPA Instant reachability; whether the EPC Verification of Payee register lists the bank as ready (VoP readiness); and a composite risk score (0-100). Costs $0.02 USDC via x402.",
         tags: ['Compliance'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
+        // La forme BIC, servie depuis l'été et jamais déclarée (relecture de la
+        // PR 254, R4) : un client généré ne pouvait ni l'envoyer ni la lire,
+        // alors que GET /v1/bic y renvoie. Exactement un des deux champs, comme
+        // la route (iban-compliance.ts refuse les deux ensemble).
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['iban'],
+                description:
+                  'Send exactly one of `iban` or `bic`. The `bic` form screens a bank directly, for the banks no IBAN can reach; it answers BicComplianceResponse.',
+                oneOf: [{ required: ['iban'] }, { required: ['bic'] }],
                 properties: {
                   iban: {
                     type: 'string',
                     description: 'IBAN to check',
                     example: 'DE89370400440532013000',
+                  },
+                  bic: {
+                    type: 'string',
+                    description: 'BIC8 or BIC11 of the bank to screen, instead of an IBAN.',
+                    example: 'COBADEFF',
                   },
                 },
               },
@@ -479,10 +515,12 @@ const buildRawSpec = () => ({
         },
         responses: {
           '200': {
-            description: 'Compliance check result (includes full IBAN validation + compliance layer)',
+            description: 'Compliance check result: on an `iban`, the full IBAN validation plus the compliance layer; on a `bic`, BicComplianceResponse.',
             content: {
               'application/json': {
                 schema: {
+                  oneOf: [
+                  {
                   allOf: [
                     { $ref: '#/components/schemas/IBANValidationResult' },
                     {
@@ -523,12 +561,15 @@ const buildRawSpec = () => ({
                       },
                     },
                   ],
+                  },
+                  { $ref: '#/components/schemas/BicComplianceResponse' },
+                  ],
                 },
               },
             },
           },
           '402': { description: 'Payment required (x402) — $0.02 USDC' },
-          '400': { description: 'Missing or malformed request body' },
+          '400': { description: 'Missing or malformed request body, a malformed BIC, or both `iban` and `bic` in one body' },
         },
       },
     },
@@ -3297,8 +3338,11 @@ const buildRawSpec = () => ({
           },
           city: { type: ['string', 'null'], description: 'Null, never an empty string, when the source leaves the town blank.' },
           address: {
-            type: 'object',
-            description: 'Registered head-office address (present when available — GLEIF or directory sourced)',
+            // Nullable depuis le 25/09/2026 (relecture de la PR 254, R5) : la
+            // route sert toujours la clé, à `null` sans adresse enregistrée,
+            // trouvé ou non. Le bloc jumeau de la validation l'était déjà.
+            type: ['object', 'null'],
+            description: 'Registered head-office address (present when available, GLEIF or directory sourced). null when no registered address is on file, found or not; address_available says the same.',
             properties: {
               type: { type: 'string', example: 'registered' },
               street: { type: ['string', 'null'], example: 'Bahnhofstrasse 45' },
@@ -3335,7 +3379,7 @@ const buildRawSpec = () => ({
           listed_in_current_source: {
             type: ['boolean', 'null'],
             description:
-              'Whether the BIC8 asked about still appears in a list refreshed this cycle (GLEIF, the directory sources that carry no vintage, a national register, the EPC scheme registers), on every answer of valid format, found or not: a BIC absent from the directory can still be listed by an EPC register. null when one of those lists could not be read (never false by default). It does not prove the bank still exists under this name.',
+              'Whether the BIC8 asked about still appears in a list refreshed this cycle (GLEIF, the directory sources that carry no vintage, a national register, the EPC scheme registers), on every answer of valid format, found or not: a BIC absent from the directory can still be listed by an EPC register. true when one of them carries it; null when it was not found in what could be read in full (never false by default). It answers true or null today: the EBA STEP2 and NBP lists are only read through our deduplicated directory, so an absence is not proven. It does not prove the bank still exists under this name.',
           },
           official_identity: {
             ...OFFICIAL_IDENTITY_SCHEMA,
@@ -3376,6 +3420,40 @@ const buildRawSpec = () => ({
             },
           },
           cost_usdc: { type: 'number', example: 0.003 },
+          processing_ms: { type: 'number' },
+        },
+      },
+      // La réponse de la forme BIC de POST /v1/iban/compliance (relecture de la
+      // PR 254, R4), même forme que BicComplianceResponse dans src/types.ts.
+      BicComplianceResponse: {
+        type: 'object',
+        description:
+          'The answer to POST /v1/iban/compliance with a `bic`: the bank screened directly, without an IBAN. `found` says whether our directory names the institution, independently of the screen: found false with bank_sanctioned true is a real combination.',
+        required: ['bic', 'bic8', 'valid_format', 'found', 'institution', 'country', 'compliance', 'meta', 'cost_usdc'],
+        properties: {
+          bic: { type: 'string', example: 'COBADEFF' },
+          bic8: { type: 'string', example: 'COBADEFF' },
+          valid_format: { type: 'boolean' },
+          found: {
+            type: 'boolean',
+            description: 'True only when the directory row names an institution.',
+          },
+          institution: { type: ['string', 'null'] },
+          country: {
+            type: 'object',
+            required: ['code', 'name'],
+            properties: {
+              code: { type: 'string', description: 'Always characters 5-6 of the BIC.' },
+              name: { type: 'string', description: "The row's country name, then the ISO name, and the code only when neither exists." },
+            },
+          },
+          compliance: { $ref: '#/components/schemas/ComplianceResult' },
+          meta: {
+            type: 'object',
+            description: 'The same provenance and scope block as on the IBAN form (scope, disclaimer, sanctions_as_of, fatf_as_of, sources).',
+            required: ['scope', 'disclaimer'],
+          },
+          cost_usdc: { type: 'number' },
           processing_ms: { type: 'number' },
         },
       },
@@ -3423,7 +3501,7 @@ const buildRawSpec = () => ({
               listed_in_epc_registers: {
                 type: ['boolean', 'null'],
                 description:
-                  'Whether at least one of the three scheme registers lists the bank; null when the registers were not consulted (screened false). The same answer as sepa.bank_reachability on the validation.',
+                  'Whether at least one of the three scheme registers lists the bank; null when the registers were not consulted (screened false). For a bank resolved in the SEPA area, true matches sepa.bank_reachability listed and false matches not_listed; null also when no bank was resolved or the bank code is not allocated (the validation then says no_bank or bank_code_not_allocated). Outside the SEPA area the validation carries no bank_reachability: this field is false there for a resolved bank (the country answers, screened true) and null when no bank was resolved.',
               },
             },
           },
@@ -3575,7 +3653,7 @@ const buildRawSpec = () => ({
           frozen_bic_sources: {
             type: 'array',
             description:
-              'One entry per frozen source (the ones bic_sources dates with a source_as_of): its rows and BIC8, and how many of them no source refreshed this cycle still carries (GLEIF and the other directory sources without a vintage, the national registers, the EPC scheme registers). Recomputed at each deployment. When a trace source could not be read, complete is false and the two *_without_current_trace counts are null rather than guessed. An empty array means the figures could not be computed; it never turns this endpoint red.',
+              'One entry per frozen source (the ones bic_sources dates with a source_as_of): its rows and BIC8, and how many of them no source refreshed this cycle still carries (GLEIF and the other directory sources without a vintage, the national registers, the EPC scheme registers). Recomputed at each deployment. When a trace source could not be read in full, complete is false and the two *_without_current_trace counts are null rather than guessed; that is the case today, because the EBA STEP2 and NBP lists are only read through our deduplicated directory. An empty array means the figures could not be computed; it never turns this endpoint red.',
             items: {
               type: 'object',
               required: [

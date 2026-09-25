@@ -232,6 +232,10 @@ describe('/health: frozen rows without a current trace', () => {
     expect(body.frozen_bic_sources.map((f) => f.source)).toEqual(
       frozenSources().map((f) => f.source),
     );
+    // R1 de la relecture de la PR 254 : l'index n'est jamais complet tant que
+    // STEP2 et NBP ne se lisent qu'à travers l'annuaire dédoublonné. Pas de
+    // compte d'absences gonflé : `complete: false` et des comptes nuls.
+    for (const f of body.frozen_bic_sources) expect(f.complete).toBe(false);
     for (const f of body.frozen_bic_sources) {
       expect(f.source_as_of).toMatch(/^\d{4}-\d{2}$/);
       expect(f.bic8).toBeLessThanOrEqual(f.rows);

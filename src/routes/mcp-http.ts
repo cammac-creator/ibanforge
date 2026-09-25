@@ -624,9 +624,9 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         // for now so no agent breaks mid-conversation; it is deprecated and dated
         // in the tool description.
         //
-        // The two keep DIFFERENT null semantics on purpose. REST falls back to the
-        // country code when the row carries no name; the flat MCP key has always
-        // answered null. Mirroring REST into `country.name` while leaving
+        // The two keep DIFFERENT null semantics on purpose. REST gives the ISO
+        // name (the code only when no name exists) when the row carries none; the
+        // flat MCP key has always answered null. Mirroring REST into `country.name` while leaving
         // `country_name: null` is the honest reading of both histories: the nested
         // object is the aligned one, the flat pair is preserved exactly as it was.
         country: {

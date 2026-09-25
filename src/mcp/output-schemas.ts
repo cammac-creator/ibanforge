@@ -476,7 +476,7 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .nullable()
     .optional()
     .describe(
-      'DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.name, which falls back to the code rather than to null.',
+      "DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.name, which is never null: the row's country name, else the ISO name, else the code.",
     ),
   country: z
     .object({ code: z.string(), name: z.string() })

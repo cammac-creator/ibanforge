@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildSpec } from './openapi.js';
+import { Hono } from 'hono';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
+import { bicLookup } from './bic-lookup.js';
+import { buildBicComplianceResponse, buildComplianceResponse } from '../lib/compliance-response.js';
+import type { HonoEnv } from '../types.js';
 
 /**
  * The machine contract must describe every step the endpoint actually demands.
@@ -339,15 +344,17 @@ describe('the contract covers the routes and fields the server actually serves',
         '200': {
           content: {
             'application/json': {
-              schema: { allOf: Array<{ properties?: Record<string, unknown> }> };
+              schema: { oneOf: Array<{ allOf?: Array<{ properties?: Record<string, unknown> }> }> };
             };
           };
         };
       };
     };
-    const extension = compliance.responses['200'].content['application/json'].schema.allOf.find(
-      (s) => s.properties,
-    );
+    // Depuis le 25/09/2026, la réponse 200 est un oneOf : la forme IBAN (allOf)
+    // puis la forme BIC.
+    const extension = compliance.responses['200'].content[
+      'application/json'
+    ].schema.oneOf[0]!.allOf!.find((s) => s.properties);
     expect(Object.keys(extension?.properties ?? {})).toContain('meta');
   });
 
@@ -462,5 +469,60 @@ describe('the truth fields are in the contract', () => {
     expect(c.reachability.properties!).toHaveProperty('listed_in_epc_registers');
     expect(c.vop.properties!).toHaveProperty('register_status');
     expect(c.flags.description).toMatch(/bank_code_inferred carries no weight/);
+  });
+});
+
+/**
+ * Relecture de la PR 254, R4 et R5 : des réponses réelles, validées contre le
+ * contrat servi. La forme BIC de la conformité n'y était pas déclarée, et
+ * `address` d'une fiche BIC était déclaré non nullable alors que la route le
+ * sert à `null` sur un BIC trouvé sans adresse enregistrée.
+ */
+describe('real answers validate against the served contract', () => {
+  const spec = buildSpec() as unknown as {
+    components: Record<string, unknown> & { schemas: Record<string, Record<string, unknown>> };
+    paths: Record<string, { post?: Record<string, unknown> }>;
+  };
+  /** Un schéma du document, avec les composants pour résoudre ses $ref. */
+  function validator(schema: Record<string, unknown>) {
+    return new AjvJsonSchemaValidator().getValidator({
+      ...schema,
+      components: spec.components,
+    } as Parameters<AjvJsonSchemaValidator['getValidator']>[0]);
+  }
+  const compliance = spec.paths['/v1/iban/compliance'].post as {
+    requestBody: { content: { 'application/json': { schema: Record<string, unknown> } } };
+    responses: { '200': { content: { 'application/json': { schema: Record<string, unknown> } } } };
+  };
+
+  it('accepts an iban body or a bic body, and refuses both together', () => {
+    const request = validator(compliance.requestBody.content['application/json'].schema);
+    expect(request({ iban: 'DE89370400440532013000' }).valid).toBe(true);
+    expect(request({ bic: 'COBADEFF' }).valid).toBe(true);
+    expect(request({ iban: 'DE89370400440532013000', bic: 'COBADEFF' }).valid).toBe(false);
+    expect(request({}).valid).toBe(false);
+  });
+
+  it('validates the IBAN and the BIC forms of a compliance answer', () => {
+    const response = validator(compliance.responses['200'].content['application/json'].schema);
+    const byIban = { ...buildComplianceResponse('DE89370400440532013000'), cost_usdc: 0.02 };
+    expect(response(byIban).errorMessage).toBeUndefined();
+    for (const bic of ['COBADEFF', 'ZZZZITMM']) {
+      const byBic = buildBicComplianceResponse(bic);
+      expect(response(byBic).errorMessage, bic).toBeUndefined();
+    }
+  });
+
+  it('validates a BIC record found without a registered address', async () => {
+    const app = new Hono<HonoEnv>();
+    app.route('/', bicLookup);
+    const record = validator({ $ref: '#/components/schemas/BICLookupResult' });
+    let withoutAddress = 0;
+    for (const code of ['UBSWCHZH', 'ZZZZITMM', 'DEUTDEFF']) {
+      const body = (await (await app.request(`/v1/bic/${code}`)).json()) as { address: unknown };
+      if (body.address === null) withoutAddress += 1;
+      expect(record(body).errorMessage, code).toBeUndefined();
+    }
+    expect(withoutAddress).toBeGreaterThan(0);
   });
 });

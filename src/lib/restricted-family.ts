@@ -28,7 +28,9 @@
  *   FI), `src/lib/fi-register.ts`, les exports du site
  *   `frontend/data/registers/*.json`, les blocs EPC des exports et des réponses
  *   d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
- *   `mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`,
+ *   `mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`, l'exemple
+ *   de validation du llms.txt de l'API (`src/app.ts`) et sa copie du site
+ *   (`frontend/public/llms-full.txt`),
  *   `frontend/content/{en,fr,de}/docs/onboarding.mdx`), et les entrées GB (FCA)
  *   de `scripts/data/eu-emi-register-2026-05-22.json`.
  *

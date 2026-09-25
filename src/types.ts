@@ -498,9 +498,10 @@ export interface IBANValidationResult {
     /**
      * Whether this BIC8 still appears in a list refreshed this cycle: GLEIF,
      * the directory sources without a vintage, a national register, the EPC
-     * scheme registers. `null` when one of those could not be read (never
-     * `false` by default). It does not prove the bank still exists under this
-     * name. See lib/bic-trace.ts.
+     * scheme registers. `null` when it was not found in what could be read in
+     * full (never `false` by default); `true` or `null` only while the STEP2
+     * and NBP lists are read through the deduplicated directory. It does not
+     * prove the bank still exists under this name. See lib/bic-trace.ts.
      */
     listed_in_current_source?: boolean | null;
     /**
@@ -576,7 +577,7 @@ export interface IBANValidationResult {
     /**
      * Whether the EPC scheme registers list the resolved BANK, never borrowed
      * from the country: `listed`, `not_listed` (absence from the register is not
-     * exclusion from the scheme), `no_bank` (no institution resolved),
+     * exclusion from the scheme), `no_bank` (no BIC resolved: a register may still name the holder),
      * `bank_code_not_allocated`, or null when the registers are not loaded on
      * this deployment (not consulted). Absent outside SEPA.
      */
@@ -586,7 +587,7 @@ export interface IBANValidationResult {
     /**
      * The bank's status in the EPC VoP register: `active` (same as
      * `vop_participant: true`), `pending`, `inactive`, `not_listed`; null when
-     * no bank resolved or the register is not loaded. Absent outside SEPA.
+     * no BIC resolved or the register is not loaded. Absent outside SEPA.
      */
     vop_register_status?: 'active' | 'pending' | 'inactive' | 'not_listed' | null;
   };

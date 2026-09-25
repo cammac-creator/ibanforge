@@ -68,27 +68,9 @@ const PRICING: EndpointPricing[] = [
       },
     },
     // Real API response for CH1000230000000012345 (captured from prod, trimmed).
-    // `bank_code_holder` et `checks` ajoutés le 25/09/2026. `sepa_reachability`
-    // y vaut ce que répond un déploiement SANS les registres EPC (« non
-    // consulté ») : le dépôt public ne porte aucune valeur tirée de ces
-    // registres sous conditions, même dans un exemple.
     outputExample: {
       iban: 'CH1000230000000012345',
       valid: true,
-      bank_code_holder: 'confirmed',
-      checks: {
-        iban_structure: 'pass',
-        iban_checksum: 'pass',
-        bank_code: 'pass',
-        bic: 'pass',
-        sepa_reachability: 'unknown',
-        national_check_digits: 'not_checked',
-        account_exists: 'not_checked',
-        payee_name: 'not_checked',
-        institution_sanctions: 'not_checked',
-        country_sanctions: 'not_checked',
-        payee_sanctions: 'not_checked',
-      },
       country: { code: 'CH', name: 'Switzerland' },
       check_digits: '10',
       bban: { bank_code: '00230', account_number: '000000012345' },

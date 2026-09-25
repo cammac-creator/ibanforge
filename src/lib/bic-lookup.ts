@@ -324,6 +324,9 @@ const SOURCE_NAMES: Record<string, string> = {
   six_group: 'SIX BankMaster (Swiss IID register)',
   nbp: 'Narodowy Bank Polski',
   eba_step2: 'EBA Clearing STEP2 SCT participant list',
+  // Ajouté le 25/09/2026 (relecture de la PR 254, R9) : `source_name` promet un
+  // nom lisible pour chaque source de l'annuaire.
+  oenb: 'Oesterreichische Nationalbank SEPA directory',
 };
 
 /** The curated map is our own assembly, and says so rather than borrowing a registry's name. */

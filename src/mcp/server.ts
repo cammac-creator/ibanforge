@@ -296,7 +296,7 @@ Returns: { bic, bic8, bic11, valid_format, found, institution, country: { code, 
 
 found is true only when the row names an institution; city is null, never an empty string, when the source leaves the town blank. ${bicSourceNote({ withMonth: true })}
 
-country is the same shape as REST GET /v1/bic/:code: name is the row's country name, then the ISO name, and falls back to the country code only when neither exists. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null where country.name answers the code.
+country is the same shape as REST GET /v1/bic/:code: name is the row's country name, then the ISO name, and falls back to the country code only when neither exists. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null on a BIC we do not hold (found: false), where country.name gives the ISO name.
 
 Example: input 'BNPAFRPP' → { found: true, bic8: 'BNPAFRPP', bic11: 'BNPAFRPPXXX', institution: 'BNP PARIBAS', country: { code: 'FR', name: 'France' }, city: 'PARIS', lei: 'R0MUWSFPU8MPRO8K5P83', lei_status: 'ACTIVE', is_test_bic: false }
 Example: input 'INVALIDX' → { valid_format: true, found: false }
@@ -354,9 +354,9 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       // for now so no agent breaks mid-conversation; it is deprecated and dated
       // in the tool description.
       //
-      // The two keep DIFFERENT null semantics on purpose. REST falls back to the
-      // country code when the row carries no name; the flat MCP key has always
-      // answered null. Mirroring REST into `country.name` while leaving
+      // The two keep DIFFERENT null semantics on purpose. REST gives the ISO
+      // name (the code only when no name exists) when the row carries none; the
+      // flat MCP key has always answered null. Mirroring REST into `country.name` while leaving
       // `country_name: null` is the honest reading of both histories: the nested
       // object is the aligned one, the flat pair is preserved exactly as it was.
       country: {

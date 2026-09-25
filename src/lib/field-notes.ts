@@ -34,13 +34,14 @@ export function bicSourceNote(options: { withMonth?: boolean } = {}): string {
   return (
     'source names the dataset of this row and source_name spells it out; source_as_of is present only when that dataset is a copy frozen at that month' +
     (month ? ` (the public copy of the SWIFT directory, frozen in ${month})` : '') +
-    '. listed_in_current_source says whether this BIC8 still appears in a list refreshed this cycle (GLEIF, a national register, the EPC scheme registers, the EBA STEP2 list); null when one of those could not be read, never false by default. It does not prove the bank still exists under this name.'
+    '. listed_in_current_source says whether this BIC8 still appears in a list refreshed this cycle (GLEIF, a national register, the EPC scheme registers, the EBA STEP2 and NBP lists): true when one of them carries it, null when it was not found in what could be read in full. ' +
+    'It never answers false today: the EBA STEP2 and NBP lists are only read through our deduplicated directory, which can drop a BIC they carry, so an absence is not proven. It does not prove the bank still exists under this name.'
   );
 }
 
 /** `listed_in_current_source` sur le bloc `bic` d'une validation. */
 export const LISTED_IN_CURRENT_SOURCE_NOTE =
-  'Whether this BIC8 still appears in a list refreshed this cycle: GLEIF, the directory sources that carry no vintage, a national register, the EPC scheme registers. null when one of those could not be read on this deployment (not consulted, never false by default). It does NOT prove the bank still exists under this name: a clearing list can keep the name of a bank that was absorbed.';
+  'Whether this BIC8 still appears in a list refreshed this cycle: GLEIF, the directory sources that carry no vintage, a national register, the EPC scheme registers. true when one of them carries it; null when it was not found in what could be read in full (never false by default). false is reserved for an index built from every list read in full, which is not the case today: the EBA STEP2 and NBP lists are only read through our deduplicated directory, so this field answers true or null. It does NOT prove the bank still exists under this name: a clearing list can keep the name of a bank that was absorbed.';
 
 /** `source_as_of` sur le bloc `bic` d'une validation, élargi à la carte composite. */
 export const BIC_SOURCE_AS_OF_NOTE =
@@ -65,18 +66,18 @@ export const CHECKS_NOTE =
 
 /** `sepa.bank_reachability`. */
 export const BANK_REACHABILITY_NOTE =
-  'Whether the EPC scheme registers list the resolved BANK, never borrowed from the country (member, schemes and basis still describe the country and are unchanged). listed: the bank has rows in the SCT, SCT Inst or SDD register. not_listed: it has none (an absence from the register is not an exclusion from the scheme). no_bank: no institution resolved. bank_code_not_allocated: the national register says nobody holds the bank code. null: the registers are not loaded on this deployment (not consulted, never read as not_listed). Absent outside SEPA.';
+  'Whether the EPC scheme registers list the resolved BANK, never borrowed from the country (member, schemes and basis still describe the country and are unchanged). listed: the bank has rows in the SCT, SCT Inst or SDD register. not_listed: it has none (an absence from the register is not an exclusion from the scheme). no_bank: no BIC resolved for this bank code, so no bank could be looked up in the EPC registers (a register may still name the holder: see bank_code_holder and bank_code_check). bank_code_not_allocated: the national register says nobody holds the bank code. null: the registers are not loaded on this deployment (not consulted, never read as not_listed). Absent outside SEPA.';
 
 /** `sepa.vop_register_status` et `compliance.vop.register_status`. */
 export const VOP_REGISTER_STATUS_NOTE =
-  "The bank's status in the EPC Verification of Payee register: active (the same as vop_participant true), pending, inactive, or not_listed when the register has no row for it; null when no bank resolved or the register was not consulted. It says whether the payee's bank answers VoP requests; IBANforge never runs the name check itself.";
+  "The bank's status in the EPC Verification of Payee register: active (the same as vop_participant true), pending, inactive, or not_listed when the register has no row for it; null when no BIC resolved or the register was not consulted. It says whether the payee's bank answers VoP requests; IBANforge never runs the name check itself.";
 
 /**
  * La tête de la ligne « Returns » de validate_iban (et du lot, et de la
  * conformité, qui en reprennent la forme), dans les deux transports internes.
  */
 export const VALIDATE_TRUTH_RETURNS =
-  'bank_code_holder: confirmed (a register names who holds the bank code), inferred (we name a holder from our composite map, which cannot settle it), not_allocated (the national register says nobody holds it: do not send) or unknown. valid stays true in all four: it only means the IBAN is well formed. checks: one status per check (pass, fail, inferred, unknown, not_checked, not_applicable); payee_name, account_exists and payee_sanctions are always not_checked.';
+  'bank_code_holder: confirmed (a register names who holds the bank code), inferred (we name a holder from a source that cannot settle it: our composite map, the prefix fallback, a published structural rule), not_allocated (the national register says nobody holds it: do not send) or unknown. valid stays true in all four: it only means the IBAN is well formed. checks: one status per check (pass, fail, inferred, unknown, not_checked, not_applicable); payee_name, account_exists and payee_sanctions are always not_checked.';
 
 /** Les noms honnêtes du bloc de conformité, pour la description de check_compliance. */
 export const COMPLIANCE_HONEST_NAMES =
