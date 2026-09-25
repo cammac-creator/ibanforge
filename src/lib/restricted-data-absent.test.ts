@@ -212,19 +212,23 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
     expect(validate(mods(), 'UA213223130000026007233566001').sepa?.vop_participant).toBe(false);
   });
 
-  it('leaves a territory the registers cover as "not consulted", by BIC', () => {
-    // getSepaInfo() ne compte pas la Martinique comme membre, alors que le
-    // registre porte ses banques : le raccourci par le pays leur donnerait un
-    // faux « non ». Banque inventée.
-    const r = mods().response.buildBicComplianceResponse('XMPLMQMX');
-    if ('error' in r) throw new Error('should validate');
-    expect(r.compliance.reachability.screened).toBe(false);
-    expect(r.compliance.vop.screened).toBe(false);
-    expect(r.compliance.flags).toEqual(
-      expect.arrayContaining(['sepa_register_unavailable', 'vop_register_unavailable']),
-    );
-    expect(r.compliance.flags).not.toContain('no_sepa_instant');
-  });
+  // getSepaInfo() ne compte pas ces territoires comme membres, alors que le
+  // registre porte leurs banques : le raccourci par le pays leur donnerait un
+  // faux « non ». Banques inventées.
+  it.each(['GG', 'GP', 'JE', 'MQ', 'RE'])(
+    'leaves %s, a territory the registers cover, as "not consulted"',
+    (cc) => {
+      const r = mods().response.buildBicComplianceResponse(`XMPL${cc}2X`);
+      if ('error' in r) throw new Error('should validate');
+      expect(r.country.code).toBe(cc);
+      expect(r.compliance.reachability.screened).toBe(false);
+      expect(r.compliance.vop.screened).toBe(false);
+      expect(r.compliance.flags).toEqual(
+        expect.arrayContaining(['sepa_register_unavailable', 'vop_register_unavailable']),
+      );
+      expect(r.compliance.flags).not.toContain('no_sepa_instant');
+    },
+  );
 
   it('answers vop_participant null and the country schemes on validate', () => {
     const r = validate(mods(), DE_ORDINARY);
@@ -395,7 +399,68 @@ describe('a VoP table present but unreadable', () => {
 
   it('answers compliance_data_unavailable on the paid screen', () => {
     const r = mods().response.buildComplianceResponse(DE_ORDINARY);
-    expect(r.compliance.flags).toEqual(['compliance_data_unavailable']);
+    expect(r.compliance.flags[0]).toBe('compliance_data_unavailable');
+    // Le registre des schémas se lit (la banque n'y figure pas : constat) ; le
+    // registre VoP ne se lit pas : ni `no_vop`, ni « non chargé ».
+    expect(r.compliance.flags).toContain('no_sepa_instant');
+    expect(r.compliance.flags).not.toContain('no_vop');
+    expect(r.compliance.flags).not.toContain('vop_register_unavailable');
+    expect(r.compliance.vop.screened).toBe(false);
+    expect(r.compliance.risk_score).toBe(50);
+    expect(r.compliance.risk_level).toBe('elevated');
+  });
+
+  it('keeps a Belarusian bank critical, with the country axis it could read', () => {
+    // Le repli écrit en dur disait `country_sanctioned: false` et 50 : une table
+    // VoP illisible effaçait le pays sanctionné. Les axes lisibles répondent.
+    const r = mods().response.buildComplianceResponse('BY13NBRB3600900000002Z00AB00');
+    expect(r.compliance.flags[0]).toBe('compliance_data_unavailable');
+    expect(r.compliance.sanctions.country_sanctioned).toBe(true);
+    expect(r.compliance.flags).toContain('sanctioned_country');
+    expect(r.compliance.risk_level).toBe('critical');
+    const byBic = mods().response.buildBicComplianceResponse('NBRBBY2X');
+    if ('error' in byBic) throw new Error('should validate');
+    expect(byBic.compliance.sanctions.country_sanctioned).toBe(true);
+    expect(byBic.compliance.risk_level).toBe('critical');
+  });
+});
+
+/**
+ * Une table des schémas SEPA présente mais illisible : `meta.sources` omet les
+ * schémas qu'il n'a pas pu lire, et le reste de `meta` est servi. La lecture
+ * levait, et getComplianceMeta() mettait tout `meta` à null.
+ */
+describe('a SEPA scheme table present but unreadable', () => {
+  const mods = useDatabase({}, (fixture) => {
+    const Database = require('better-sqlite3') as typeof DatabaseType;
+    const db = new Database(fixture.compliancePath);
+    db.exec('DROP TABLE sepa_participants; CREATE TABLE sepa_participants (x TEXT);');
+    db.prepare("INSERT INTO sepa_participants (x) VALUES ('y')").run();
+    db.close();
+  });
+
+  it('keeps the rest of meta, and names no scheme it could not read', () => {
+    const meta = mods().complianceDb.getComplianceMeta();
+    expect(meta.sanctions_as_of).toBeTruthy();
+    expect(meta.fatf_as_of).toBeTruthy();
+    expect(meta.sources?.split(',')).toEqual(expect.arrayContaining(['EU', 'OFAC', 'FATF']));
+    expect(meta.sources ?? '').not.toMatch(/EPC-/);
+  });
+});
+
+/** La table GAFI vidée (hors scénario : elle est publique) : `meta` reste cohérent avec lui-même. */
+describe('an empty FATF table', () => {
+  const mods = useDatabase({}, (fixture) => {
+    const Database = require('better-sqlite3') as typeof DatabaseType;
+    const db = new Database(fixture.compliancePath);
+    db.prepare('DELETE FROM fatf_countries').run();
+    db.close();
+  });
+
+  it('neither names nor dates a FATF list it did not read', () => {
+    const meta = mods().complianceDb.getComplianceMeta();
+    expect(meta.sources?.split(',')).not.toContain('FATF');
+    expect(meta.fatf_as_of).toBeNull();
   });
 });
 
@@ -424,11 +489,18 @@ describe('closing the compliance connection', () => {
     expect(compliance.checkReachability(bic8).screened).toBe(true);
     expect(complianceDb.loadedComplianceSources()?.split(',')).toContain('UN');
 
-    db.closeAll();
+    // Les lignes ONU retirées par une AUTRE connexion, sans fermer la nôtre :
+    // la chaîne est mémorisée pour la connexion ouverte, elle ne change pas
+    // (sans le mémo, chaque réponse relançait deux SELECT DISTINCT).
     const Database = require('better-sqlite3') as typeof DatabaseType;
+    const other = new Database(fixture.compliancePath);
+    other.prepare("DELETE FROM sanctioned_entities WHERE source_list = 'UN'").run();
+    other.close();
+    expect(complianceDb.loadedComplianceSources()?.split(',')).toContain('UN');
+
+    db.closeAll();
     const w = new Database(fixture.compliancePath);
     w.prepare('DELETE FROM vop_participants').run();
-    w.prepare("DELETE FROM sanctioned_entities WHERE source_list = 'UN'").run();
     w.close();
 
     // Sans l'effacement des sondes, le registre VoP vidé resterait « chargé ».

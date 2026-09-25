@@ -242,10 +242,10 @@ describe('slovakSource', () => {
 const SM_READ_ON = '2026-01-15';
 
 const SM_PAGE = `<div class="pwr-rich-text">
-<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/91?hsLang=en" rel="noopener"><strong>Banca</strong><strong>Esempio Commerciale Istituto Bancario Sammarinese s.p.a.</strong></a><br>Registered office: Via dell'Esempio, 101 - 47891 Contrada<br>Phone/Fax: 0549 000001 / 000002<br>ABI Code: 09991<br>SWIFT BIC: XMPLSMSM</p>
+<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/91?hsLang=en" rel="noopener"><strong>Banca</strong><strong>Fantasia per Prove e Collaudi s.p.a.</strong></a><br>Registered office: Via dell'Esempio, 101 - 47891 Contrada<br>Phone/Fax: 0549 000001 / 000002<br>ABI Code: 09991<br>SWIFT BIC: XMPLSMSM</p>
 <p>Company name:<br><a href="/registro-soggetti-autorizzati/92?hsLang=en" rel="noopener"><strong>Banca di Prova s.p.a.</strong></a><br>Registered office: Strada della Prova, 22 - 47896 Borghetto<br>Phone/Fax: 0549 000003 / 000004<br>ABI Code: 09994<br>SWIFT BIC: XMPLSMS2</p>
-<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/93?hsLang=en" rel="noopener"><strong>Banca Fittizia di Investimento s.p.a.</strong></a><br>Registered office: Via Immaginaria, 3 - 47891 Contrada<br>Phone/Fax: 0549 000005 / 000006<br>ABI Code: 09992<br>SWIFT BIC: XMPLSMSMAAA</p>
-<p>Company name:<br><a href="/registro-soggetti-autorizzati/94?hsLang=en" rel="noopener"><strong>Cassa di Esempio della Repubblica s.p.a.</strong></a><br>Registered office: P.tta dell'Esempio, 2 - 47890 Borgo Esempio<br>Telephone/Fax: 0549 000007 / 000008<br>ABI Code: 09993<br>SWIFT BIC: XMPLSMS3</p>
+<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/93?hsLang=en" rel="noopener"><strong>Istituto Fittizio di Collaudo s.p.a.</strong></a><br>Registered office: Via Immaginaria, 3 - 47891 Contrada<br>Phone/Fax: 0549 000005 / 000006<br>ABI Code: 09992<br>SWIFT BIC: XMPLSMSMAAA</p>
+<p>Company name:<br><a href="/registro-soggetti-autorizzati/94?hsLang=en" rel="noopener"><strong>Cassa Immaginaria di Collaudo s.p.a.</strong></a><br>Registered office: P.tta dell'Esempio, 2 - 47890 Borgo Esempio<br>Telephone/Fax: 0549 000007 / 000008<br>ABI Code: 09993<br>SWIFT BIC: XMPLSMS3</p>
 <p>Some other paragraph on the page, carrying neither an ABI Code nor a BIC.</p>
 </div>`;
 
@@ -263,16 +263,14 @@ describe('parseSanMarino', () => {
     // institution's real name has the space (the bank's GLEIF-sourced row in
     // our directory carries it, checked 06/09/2026 on the real page's first
     // bank). Reading across an element boundary is not editing.
-    expect(smByCode(SM_PAGE).get('09991')?.name).toBe(
-      'Banca Esempio Commerciale Istituto Bancario Sammarinese s.p.a.',
-    );
+    expect(smByCode(SM_PAGE).get('09991')?.name).toBe('Banca Fantasia per Prove e Collaudi s.p.a.');
   });
 
   it('reads the block whose phone label differs from the other three', () => {
     // "Telephone/Fax:" on the fourth, "Phone/Fax:" on the others — proof the
     // parser anchors on ABI Code / SWIFT BIC alone.
     const row = smByCode(SM_PAGE).get('09993');
-    expect(row?.name).toBe('Cassa di Esempio della Repubblica s.p.a.');
+    expect(row?.name).toBe('Cassa Immaginaria di Collaudo s.p.a.');
     expect(row?.bic).toBe('XMPLSMS3');
   });
 

@@ -347,18 +347,111 @@ export function calculateRiskScore(
     flags.push('sanctions_lists_unavailable');
     score = Math.max(score, SANCTIONS_LISTS_UNAVAILABLE_FLOOR);
   }
-  const risk_level: ScoredRiskLevel =
-    score >= 80
-      ? 'critical'
-      : score >= 60
-        ? 'high'
-        : score >= 40
-          ? 'elevated'
-          : score >= 20
-            ? 'medium'
-            : 'low';
+  return { risk_score: score, risk_level: levelOf(score), flags };
+}
 
-  return { risk_score: score, risk_level, flags };
+/** Le niveau que porte un score. */
+function levelOf(score: number): ScoredRiskLevel {
+  return score >= 80
+    ? 'critical'
+    : score >= 60
+      ? 'high'
+      : score >= 40
+        ? 'elevated'
+        : score >= 20
+          ? 'medium'
+          : 'low';
+}
+
+/** Le score minimal d'une réponse dont une table de conformité n'a pas pu être lue. */
+export const COMPLIANCE_DATA_UNAVAILABLE_FLOOR = 50;
+
+/**
+ * Le verdict quand une table de conformité est présente mais illisible (une
+ * recherche a levé : schéma inattendu, page corrompue).
+ *
+ * Jusqu'au 25/09/2026, les deux appelants remplaçaient alors TOUT le verdict par
+ * un bloc écrit en dur : `country_sanctioned: false`, `fatf_status:
+ * 'non_member'`, 50. Un « non » sur des axes dont les tables se lisaient très
+ * bien : une table VoP illisible suffisait à faire passer une banque
+ * biélorusse de critical à elevated, pays sanctionné effacé.
+ *
+ * Désormais chaque axe est lu dans son propre try. Ce qui se lit répond ; ce
+ * qui ne se lit pas répond « non consulté » (hors de la zone SEPA, le pays
+ * répond pour SEPA et VoP, comme ailleurs). Le drapeau reste
+ * `compliance_data_unavailable`, en tête, avec les drapeaux pondérés qui
+ * expliquent le score ; les trois drapeaux « non chargé » s'effacent devant
+ * lui, qui dit déjà que quelque chose n'a pas été lu. Le score ne descend
+ * jamais sous 50, ni sous ce que les axes lus établissent.
+ *
+ * Si même les axes pays et GAFI ne se lisent pas, la réponse reste celle
+ * d'avant (`country_sanctioned: false`, `non_member`) : le contrat n'a pas de
+ * valeur « non consulté » pour ces deux champs.
+ */
+export function unreadableComplianceResult(
+  countryCode: string,
+  bic8: string | null,
+  issuerType: string,
+  countryRisk: string,
+  isTestBic: boolean,
+  bankCode: BankCodeConfidence = 'confirmed',
+): ComplianceResult {
+  const attempt = <T>(...tries: Array<() => T>): T | null => {
+    for (const t of tries) {
+      try {
+        return t();
+      } catch {
+        // L'axe suivant, ou « non consulté » : voir la note de la fonction.
+      }
+    }
+    return null;
+  };
+  const sanctions: SanctionsCheck = attempt(
+    () => checkSanctions(countryCode, bic8),
+    () => checkSanctions(countryCode, null),
+  ) ?? {
+    country_sanctioned: false,
+    bank_sanctioned: false,
+    matched_lists: [],
+    fatf_status: 'non_member',
+    bank_screened: false,
+  };
+  const byCountry = bic8 !== null && outsideSepaScope(countryCode);
+  const reachability: ReachabilityCheck = attempt(() => checkReachability(bic8, countryCode)) ?? {
+    sepa_instant: false,
+    sct: false,
+    sdd: false,
+    screened: byCountry,
+  };
+  const vop: VopCheck = attempt(() => checkVop(bic8, countryCode)) ?? {
+    participant: false,
+    status: 'not_found',
+    screened: byCountry,
+  };
+  const scored = calculateRiskScore(
+    sanctions,
+    reachability,
+    vop,
+    issuerType,
+    countryRisk,
+    isTestBic,
+    bankCode,
+    bic8 !== null,
+  );
+  const NOT_LOADED = new Set([
+    'sanctions_lists_unavailable',
+    'sepa_register_unavailable',
+    'vop_register_unavailable',
+  ]);
+  const risk_score = Math.max(scored.risk_score, COMPLIANCE_DATA_UNAVAILABLE_FLOOR);
+  return {
+    sanctions,
+    reachability,
+    vop,
+    risk_score,
+    risk_level: levelOf(risk_score),
+    flags: ['compliance_data_unavailable', ...scored.flags.filter((f) => !NOT_LOADED.has(f))],
+  };
 }
 
 /**

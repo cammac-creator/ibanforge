@@ -147,19 +147,34 @@ export function loadedSanctionsLists(): string[] {
  */
 export function loadedComplianceSources(): string | null {
   if (_sourcesMemo !== undefined) return _sourcesMemo;
-  const parts = [...loadedSanctionsLists()];
+  // Chaque lecture dans son propre try : une table présente mais illisible
+  // (colonne manquante) faisait lever ici, et getComplianceMeta() mettait
+  // alors TOUT `meta` à null, `sanctions_as_of` compris. Une source qui ne se
+  // lit pas n'a pas été consultée : elle n'est pas nommée, et rien n'est
+  // mémorisé, pour relire à la réponse suivante.
+  let failed = false;
+  const parts: string[] = [];
+  try {
+    parts.push(...loadedSanctionsLists());
+  } catch {
+    failed = true;
+  }
   if (complianceTableLoaded('fatf_countries')) parts.push('FATF');
   if (complianceTableLoaded('sepa_participants')) {
-    const schemes = getComplianceDB()
-      .prepare('SELECT DISTINCT scheme FROM sepa_participants ORDER BY scheme')
-      .all() as Array<{ scheme: string }>;
-    for (const r of schemes) parts.push(`EPC-${r.scheme}`);
+    try {
+      const schemes = getComplianceDB()
+        .prepare('SELECT DISTINCT scheme FROM sepa_participants ORDER BY scheme')
+        .all() as Array<{ scheme: string }>;
+      for (const r of schemes) parts.push(`EPC-${r.scheme}`);
+    } catch {
+      failed = true;
+    }
   }
   const sources = parts.length > 0 ? parts.join(',') : null;
   const decided = (['sanctioned_entities', 'fatf_countries', 'sepa_participants'] as const).every(
     (t) => _tableLoaded.has(t),
   );
-  if (decided) _sourcesMemo = sources;
+  if (decided && !failed) _sourcesMemo = sources;
   return sources;
 }
 
