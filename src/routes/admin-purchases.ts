@@ -13,10 +13,13 @@
  *  - `POST /v1/admin/purchases/:id/fail` : le même achat, quand le transfert
  *    n'a pas eu lieu. Rien n'est crédité, une clé neuve reste morte ;
  *  - `POST /v1/admin/purchases/:id/clawback` : la reprise d'un pack remboursé
- *    ou disputé, appelée par l'opérateur APRÈS avoir remboursé dans Stripe
- *    (spec §9, Q9). L'automatisme par webhook exigerait d'abonner le point
- *    d'écoute Stripe à `charge.refunded` et `charge.dispute.created` : un
- *    réglage du compte de paiement, donc la décision de Claude-Alain.
+ *    ou disputé (spec §9, Q9). Depuis la décision de Claude-Alain du
+ *    25.09.2026, le webhook Stripe la fait lui-même sur `charge.refunded`
+ *    (total) et `charge.dispute.created`, par le même code
+ *    (`clawbackPurchaseInTx`). La route reste pour ce que le webhook ne
+ *    retrouve pas : un pack d'avant le lot B1 (sa ligne rattrapée ne porte pas
+ *    d'intention de paiement), un remboursement partiel que l'opérateur décide
+ *    de traiter comme total, un évènement arrivé avant son achat.
  *
  * Toutes idempotentes : un second appel ne crédite ni ne reprend rien de plus.
  */
