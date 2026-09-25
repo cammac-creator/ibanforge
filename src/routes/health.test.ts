@@ -215,7 +215,7 @@ describe('/health — per-source freshness (the living-tool block)', () => {
  * Les lignes figées qu'aucune source de ce cycle ne porte plus (25/09/2026).
  * Des invariants seulement : les comptes bougent à chaque rafraîchissement.
  */
-describe('/health — frozen rows without a current trace', () => {
+describe('/health: frozen rows without a current trace', () => {
   it('serves frozen_bic_sources with one entry per vintaged source', async () => {
     const { frozenSources } = await import('../lib/source-vintage.js');
     const body = (await (await app.request('/health')).json()) as {

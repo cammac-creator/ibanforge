@@ -99,7 +99,7 @@ describe('buildComplianceResponse — a valid IBAN is scored exactly as before',
  * pour aucune entrée : il est recalculé ici avec l'ANCIENNE lecture de
  * `bank_code_check`, et les deux doivent être identiques.
  */
-describe('buildComplianceResponse — honest names, and a flag that carries no weight', () => {
+describe('buildComplianceResponse: honest names, and a flag that carries no weight', () => {
   const SERIES = [
     'IT60X0542811101000000123456',
     'IT26X0311111101000000123456',

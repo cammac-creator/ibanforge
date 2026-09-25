@@ -99,7 +99,7 @@ async function get(code: string): Promise<Record_> {
   return (await res.json()) as Record_;
 }
 
-describe('GET /v1/bic/:code — complete or not found', () => {
+describe('GET /v1/bic/:code: complete or not found', () => {
   it('never answers found:true without a name', async () => {
     const r = await get('XMPLITN1');
     expect(r.found).toBe(false);
