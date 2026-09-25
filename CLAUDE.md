@@ -219,7 +219,9 @@ le volume Railway, `/app/data/…`), fusionné au démarrage dans une copie de l
 fraîche (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), membre par
 membre, la donnée la plus fraîche l'emportant : le public est gardé (`kept_public`) quand il
 est plus récent, ou non daté et différent. La dernière surcouche acceptée est gardée à côté
-(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé.
+(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé ou sert
+moins de membres (un membre tardif absent compris) ; un fichier qui en sert moins ne la
+remplace jamais.
 Recharger : remplacer le fichier de façon atomique (voisin puis `mv`), l'API le contrôle en
 dix minutes au plus, ne refusionne que cette base, et garde ce qu'elle sert si le nouveau est
 refusé ou perdrait un membre servi. État : `GET /health` → `restricted_overlays`. Construire :
@@ -258,7 +260,8 @@ PRA sort de la fenêtre du seeder. Avec
 la veille de dix minutes tire la dernière release toutes les quatre heures plus une gigue d'au
 plus trente minutes (une heure après un échec, jamais au démarrage) ; un fichier dont
 l'empreinte est déjà servie, en place ou acceptée n'est jamais retéléchargé ; sinon
-téléchargement plafonné, empreinte vérifiée, `inspectOverlay` doit accepter chaque membre, un
+téléchargement plafonné, empreinte vérifiée, `inspectOverlay` doit accepter chaque membre et
+aucun membre servi ne doit y manquer (`members_lost`), un
 voisin est écrit puis renommé sur le fichier de `RESTRICTED_*_OVERLAY_PATH`, et la base est
 rechargée aussitôt. Tout échec garde ce qui est servi. Les deux variables absentes : aucun
 appel réseau, aucune alerte, `GET /health` → `restricted_overlays.pull` vaut `off` ; sinon il

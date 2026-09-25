@@ -129,9 +129,21 @@ const PUBLIC_LIST: FiList = { byCode: BY_CODE, asOf: FI_REGISTER_AS_OF };
 /** `undefined` : pas encore choisie depuis l'ouverture de la base. */
 let served: FiList | undefined;
 
+/** Une date de liste : AAAA-MM-JJ, et un vrai jour du calendrier ; sinon null. */
+function listDay(value: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value
+    ? value
+    : null;
+}
+
 /**
  * La liste de la surcouche privée, ou null : pas de table (base publique seule,
- * surcouche qui ne la porte pas), aucune ligne lisible, ou aucune date.
+ * surcouche qui ne la porte pas), aucune ligne lisible, ou une date qui n'est pas
+ * un jour AAAA-MM-JJ. Une seule date mal formée écarte toute la liste : comparée
+ * en texte, elle pourrait passer pour plus récente et finir dans
+ * `bank_code_check.as_of` (relecture de la PR 267, point 6).
  */
 function overlayList(): FiList | null {
   let rows: Array<{ code: string; bic: string; institution: string; as_of: string | null }>;
@@ -146,9 +158,10 @@ function overlayList(): FiList | null {
   let asOf: string | null = null;
   for (const row of rows) {
     if (!/^\d{1,4}$/.test(row.code)) continue;
+    const day = listDay(row.as_of);
+    if (!day) return null;
     byCode.set(row.code, { bic: row.bic, institution: row.institution });
-    const day = row.as_of?.slice(0, 10) ?? null;
-    if (day && (!asOf || day > asOf)) asOf = day;
+    if (!asOf || day > asOf) asOf = day;
   }
   return byCode.size > 0 && asOf ? { byCode, asOf } : null;
 }

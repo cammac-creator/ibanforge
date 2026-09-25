@@ -158,7 +158,33 @@ describe('compareManifests, la porte de qualité', () => {
   });
 
   it('le contrôle manuel laisse passer les baisses, jamais un fichier perdu', () => {
-    const next = manifest({ compliance: file({ members: { un: 5 } }) });
+    const next = manifest({
+      compliance: file({ members: { un: 5, epc_sepa: 3000, epc_vop: 1200 } }),
+    });
     expect(compareManifests(previous, next, { allowShrink: true })).toEqual(['lost_file:bic']);
+  });
+
+  it('ni un membre encore dans la famille ; seul un membre sorti de la famille peut manquer', () => {
+    // Relecture de la PR 267, défaut 1 : « accepter une baisse » ne dispense pas
+    // d'un membre perdu. `sorti` n'est plus un membre (une modification du code
+    // l'a retiré de la famille) : lui seul peut manquer sous le contrôle manuel.
+    const before = manifest({
+      compliance: file({ members: { un: 5, epc_sepa: 4000, epc_vop: 1200, sorti: 300 } }),
+      bic: file({ name: 'restricted-bic.sqlite', members: { eba_step2: 180, map_pl: 3000 } }),
+    });
+    const next = manifest({
+      compliance: file({ members: { un: 5, epc_sepa: 3000 } }),
+      bic: file({ name: 'restricted-bic.sqlite', members: { eba_step2: 180 } }),
+    });
+    expect(compareManifests(before, next, { allowShrink: true })).toEqual([
+      'lost_member:bic:map_pl',
+      'lost_member:compliance:epc_vop',
+    ]);
+    expect(compareManifests(before, next)).toEqual([
+      'lost_member:bic:map_pl',
+      'shrunk:compliance:epc_sepa:4000->3000',
+      'lost_member:compliance:epc_vop',
+      'lost_member:compliance:sorti',
+    ]);
   });
 });

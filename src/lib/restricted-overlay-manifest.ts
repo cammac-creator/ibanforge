@@ -38,7 +38,7 @@
  * plus ancien ignore ce champ.
  */
 import { basename } from 'node:path';
-import type { OverlayKind } from './restricted-family.js';
+import { membersOf, type OverlayKind } from './restricted-family.js';
 import {
   SHRINK_GUARD_MIN_ROWS,
   carriedOverFromMeta,
@@ -253,7 +253,9 @@ export function manifestEntryFor(options: {
  *
  * `allowShrink` (contrôle manuel, relance à la main) laisse passer les baisses
  * et les membres sortis de la famille par une modification du code, jamais un
- * fichier perdu.
+ * fichier perdu, ni un membre encore dans la famille (relecture de la PR 267,
+ * défaut 1 : une release qui perdrait un membre tardif servi, publiée sous
+ * « accepter une baisse », aurait fini servie au redémarrage suivant).
  */
 export function compareManifests(
   previous: OverlayManifest,
@@ -269,11 +271,14 @@ export function compareManifests(
       problems.push(`lost_file:${kind}`);
       continue;
     }
-    if (options.allowShrink) continue;
+    const family = new Set(membersOf(kind).map((m) => m.id));
     for (const [id, rows] of Object.entries(before.members)) {
       const now = after.members[id];
-      if (now === undefined) problems.push(`lost_member:${kind}:${id}`);
-      else if (rows >= SHRINK_GUARD_MIN_ROWS && now < rows * 0.9)
+      if (now === undefined) {
+        // Sorti de la famille par une modification du code : seul cas qu'un
+        // contrôle manuel peut laisser passer.
+        if (!options.allowShrink || family.has(id)) problems.push(`lost_member:${kind}:${id}`);
+      } else if (!options.allowShrink && rows >= SHRINK_GUARD_MIN_ROWS && now < rows * 0.9)
         problems.push(`shrunk:${kind}:${id}:${rows}->${now}`);
     }
   }
