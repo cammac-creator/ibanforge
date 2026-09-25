@@ -1982,7 +1982,7 @@
         },
         {
           "title": "Un dossier de confiance à transmettre aux achats",
-          "body": "DPA signable, conditions et politique de confidentialité publiées, page de statut en direct, changelog versionné. La validation ne stocke aucun IBAN : elle tourne en mémoire et seules les métadonnées pays + préfixe bancaire sont journalisées. L'audit de fichier, lui, est une prestation à part : il conserve son rapport — qui reprend les colonnes déposées — 2 heures sans paiement, 24 heures après, puis l'efface (voir la page Audit). Et quand un client part, sa télémétrie s'efface d'elle-même : supprimée par défaut 30 jours après la résiliation, contractuellement (clause 4.7 du DPA).",
+          "body": "DPA signable, conditions et politique de confidentialité publiées, page de statut en direct, changelog versionné. La validation ne stocke aucun IBAN : elle tourne en mémoire et seules les métadonnées pays + préfixe bancaire sont journalisées. L'audit de fichier, lui, est une prestation à part : il conserve son rapport — qui reprend les colonnes déposées — 2 heures sans paiement, 24 heures après, puis l'efface (voir la page Audit). Et quand un client part, sa télémétrie s'efface d'elle-même : supprimée par défaut 30 jours après la fin de la relation client, contractuellement (clause 4.7 du DPA).",
           "link": "Juridique et DPA"
         }
       ]
@@ -2112,7 +2112,7 @@
         },
         "trust": {
           "label": "Surface légale/ops publiée",
-          "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après résiliation (DPA 4.7)",
+          "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après la fin de la relation client (DPA 4.7)",
           "ibancom": "Conditions, politique de confidentialité, DPA et SLA publics ; modalités de redistribution à convenir avec le fournisseur.",
           "ibanapi": "Conditions et politique de confidentialité publiques ; engagements de service à vérifier auprès du fournisseur.",
           "libs": "Fichier de licence",

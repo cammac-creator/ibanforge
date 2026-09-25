@@ -185,7 +185,7 @@
       "madeNote": "Schweizer Clearingdaten direkt von SIX",
       "privacyLabel": "Privacy als Standard",
       "privacyValue": "IBANs nie gespeichert · selbstlöschende Telemetrie",
-      "privacyNote": "Gelöscht 30 Tage nach Kündigung — DPA Klausel 4.7",
+      "privacyNote": "Gelöscht 30 Tage nach Ende der Kundenbeziehung — DPA Klausel 4.7",
       "ariaLabel": "Datenquellen und Herkunft",
       "madeValue": "Aus der Schweiz"
     },
@@ -1982,7 +1982,7 @@
         },
         {
           "title": "Ein Vertrauenspaket für Ihren Einkauf",
-          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. Die Validierung speichert keine IBAN: Sie läuft im Arbeitsspeicher, protokolliert werden nur Land und Bankpräfix. Die Dateiprüfung ist eine eigene Leistung: Sie bewahrt ihren Bericht — der die hochgeladenen Spalten übernimmt — 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf und löscht ihn dann (siehe die Seite Prüfung). Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich (DPA Klausel 4.7).",
+          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. Die Validierung speichert keine IBAN: Sie läuft im Arbeitsspeicher, protokolliert werden nur Land und Bankpräfix. Die Dateiprüfung ist eine eigene Leistung: Sie bewahrt ihren Bericht — der die hochgeladenen Spalten übernimmt — 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf und löscht ihn dann (siehe die Seite Prüfung). Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Ende der Kundenbeziehung, vertraglich (DPA Klausel 4.7).",
           "link": "Rechtliches und DPA"
         }
       ]
@@ -2112,7 +2112,7 @@
         },
         "trust": {
           "label": "Veröffentlichte Rechts-/Ops-Unterlagen",
-          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich. Telemetrie löscht sich 30 Tage nach Kündigung selbst (DPA 4.7)",
+          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich. Telemetrie löscht sich 30 Tage nach Ende der Kundenbeziehung selbst (DPA 4.7)",
           "ibancom": "Öffentliche Bedingungen, Datenschutzerklärung, DPA und SLA; Weitervertriebsrechte werden mit dem Anbieter vereinbart.",
           "ibanapi": "Öffentliche Bedingungen und Datenschutzerklärung; Betriebszusagen beim Anbieter prüfen.",
           "libs": "Lizenzdatei",
