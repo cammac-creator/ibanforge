@@ -43,6 +43,11 @@ data/lu-register.json
 # ses copies fusionnées : jamais dans le dépôt, où qu'elles soient posées.
 restricted-*.sqlite*
 *.merged-*.sqlite*
+# Dossiers temporaires des seeders : sources téléchargées, dont des sources sous
+# conditions, et la base de conformité en construction. Effacés en fin de passage,
+# pas après un plantage.
+.tmp-bic-enrich/
+.tmp-compliance/
 
 # Regenerated from source for the contract linter — never committed
 openapi.generated.json

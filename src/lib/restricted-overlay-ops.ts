@@ -45,6 +45,15 @@ function servingSentence(status: OverlayStatus): string {
 /** Journal et alerte `overlay:<base>` pour des états servis. */
 export function reportRestrictedOverlays(statuses: OverlayStatus[]): void {
   for (const status of statuses) {
+    // L'entretien des fichiers : sans copie acceptée gardée, un fichier refusé au
+    // prochain démarrage ne serait plus remplacé par la dernière surcouche.
+    if (status.housekeeping_error)
+      void opsFail(
+        `overlay:${status.kind}:files`,
+        `Surcouche privée ${status.kind} : entretien des fichiers en échec (${status.housekeeping_error}). ` +
+          'Ce qui est servi est intact ; la copie acceptée peut manquer.',
+      );
+    else if (status.state !== 'off') void opsOk(`overlay:${status.kind}:files`);
     const line = describeOverlayStatus(status);
     const key = `overlay:${status.kind}`;
     const whole =

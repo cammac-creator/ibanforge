@@ -30,7 +30,11 @@ const DATA_DIR = resolve(__dirname, '../data');
 // chaîne privée (`npm run overlay:seed -- --kind bic`) y passe une copie de
 // travail, jamais data/ du dépôt.
 const BIC_DB_PATH = process.env.BIC_DB_PATH ?? resolve(DATA_DIR, 'bic.sqlite');
-const TMP_DIR = resolve(__dirname, '../.tmp-bic-enrich');
+// SEED_TMP_DIR : les téléchargements hors du dépôt (chaîne privée de la surcouche,
+// qui y reçoit des sources sous conditions). Défaut inchangé.
+const TMP_DIR = process.env.SEED_TMP_DIR
+  ? resolve(process.env.SEED_TMP_DIR, 'bic-enrich')
+  : resolve(__dirname, '../.tmp-bic-enrich');
 
 /**
  * SIX BankMaster TOWN values occasionally carry a company-form prefix

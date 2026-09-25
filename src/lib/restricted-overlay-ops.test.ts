@@ -42,6 +42,7 @@ function status(partial: Partial<OverlayStatus>): OverlayStatus {
     file: null,
     fallback: false,
     lowered_last_refresh: null,
+    housekeeping_error: null,
     ...partial,
   };
 }
@@ -64,11 +65,20 @@ describe('démarrage', () => {
     reportBootOverlays();
     expect(keys(ops.opsFail)).toEqual([]);
     expect(keys(ops.opsOk)).toEqual([
+      'overlay:bic:files',
       'overlay:bic',
       'overlay:compliance',
       'overlay:bic:reload',
       'overlay:compliance:reload',
     ]);
+  });
+
+  it('un entretien de fichiers en échec est dit, sans éteindre ce qui est servi', () => {
+    runtime.statuses = [status({ housekeeping_error: 'EISDIR' })];
+    reportBootOverlays();
+    expect(keys(ops.opsFail)).toEqual(['overlay:bic:files']);
+    expect(String(ops.opsFail.mock.calls[0][1])).toContain('EISDIR');
+    expect(keys(ops.opsOk)).toContain('overlay:bic');
   });
 
   it('un public plus récent gardé n’est jamais une alerte rouge', () => {
@@ -124,6 +134,11 @@ describe('veille', () => {
 
     runtime.reload = () => [{ kind: 'bic', changed: true, status: status({}), rejected: null }];
     overlayWatchTick();
-    expect(keys(ops.opsOk)).toEqual(['overlay:bic', 'overlay:bic:reload', 'overlay:reload']);
+    expect(keys(ops.opsOk)).toEqual([
+      'overlay:bic:files',
+      'overlay:bic',
+      'overlay:bic:reload',
+      'overlay:reload',
+    ]);
   });
 });

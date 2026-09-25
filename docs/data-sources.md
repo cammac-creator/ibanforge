@@ -350,8 +350,11 @@ d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
 - **Seeders à sortie choisie**, pour le futur dépôt privé de rafraîchissement :
   `BIC_DB_PATH` (enrich, national, PRA), `COMPLIANCE_DB_PATH` (conformité),
   `SEED_FAMILY=restricted` (la famille seule), enchaînés par
-  `npm run overlay:seed -- --kind bic|compliance --out <fichier>`, qui écrit hors
-  de son checkout (`$RUNNER_TEMP` en CI). Sans ces variables, les workflows publics
+  `npm run overlay:seed -- --kind bic|compliance --out <fichier>`. La sortie doit
+  être hors de tout dépôt (`$RUNNER_TEMP` en CI), et `overlay:seed` pose
+  `SEED_TMP_DIR` dans son dossier de travail : les téléchargements et la base de
+  conformité en construction ne passent plus par `.tmp-bic-enrich/` et
+  `.tmp-compliance/` du checkout (désormais ignorés par git). Sans ces variables, les workflows publics
   écrivent exactement comme avant.
 
 ## Ce que les surfaces publiques annoncent

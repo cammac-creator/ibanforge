@@ -376,3 +376,74 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     expect(liveDir()).toContain('restricted-bic.accepted.sqlite');
   });
 });
+
+describe("surcouche privée : un entretien de fichiers en échec n'interrompt rien", () => {
+  let fixture: RestrictedFixture;
+  let family: InventedFamily;
+  let runtime: typeof import('./restricted-overlay-runtime.js');
+  let live: string;
+  let publicBic: string;
+  let fresher: string;
+  const saved = process.env[OVERLAY_ENV.bic];
+
+  beforeAll(async () => {
+    fixture = installRestrictedFixture();
+    family = completeRestrictedFamily(fixture.bicPath, fixture.compliancePath);
+    mkdirSync(join(fixture.dir, 'live'));
+    live = join(fixture.dir, 'live', 'restricted-bic.sqlite');
+    extractOverlay({ kind: 'bic', sourcePath: fixture.bicPath, outPath: live, generator: 'test' });
+    // Une seconde surcouche, plus récente, pour le rechargement.
+    const changed = join(fixture.dir, 'plus-recente.sqlite');
+    copyFileSync(fixture.bicPath, changed);
+    const d = openDb(changed);
+    d.prepare(
+      "UPDATE bic_entries SET institution = 'AUTRE NOM', updated_at = '2099-01-01 00:00:00' WHERE bic11 = ?",
+    ).run(family.eba[0]);
+    d.close();
+    fresher = extractOverlay({
+      kind: 'bic',
+      sourcePath: changed,
+      outPath: join(fixture.dir, 'restricted-plus-recente.sqlite'),
+      generator: 'test',
+    }).path;
+    publicBic = join(fixture.dir, 'public-bic.sqlite');
+    copyFileSync(fixture.bicPath, publicBic);
+    stripFamily(publicBic, 'bic');
+    // L'obstacle : un dossier non vide là où la copie acceptée doit être écrite.
+    mkdirSync(join(fixture.dir, 'live', 'restricted-bic.accepted.sqlite'));
+    writeFileSync(join(fixture.dir, 'live', 'restricted-bic.accepted.sqlite', 'x'), 'x');
+    process.env[OVERLAY_ENV.bic] = live;
+    vi.resetModules();
+    runtime = await import('./restricted-overlay-runtime.js');
+  }, 180_000);
+
+  afterAll(async () => {
+    if (saved === undefined) delete process.env[OVERLAY_ENV.bic];
+    else process.env[OVERLAY_ENV.bic] = saved;
+    await fixture.restore();
+  });
+
+  it('au démarrage, l’état est gardé : deux ouvertures, une seule fusion', () => {
+    const first = runtime.servedDatabasePath('bic', publicBic);
+    const status = runtime.restrictedOverlayStatus()[0];
+    expect(status.state).toBe('applied');
+    expect(status.housekeeping_error).toBeTruthy();
+    expect(runtime.servedDatabasePath('bic', publicBic)).toBe(first);
+    expect(runtime.restrictedOverlayStatus()[0].built_at).toBe(status.built_at);
+  });
+
+  it('au rechargement, les caches inscrits sont vidés malgré l’échec', () => {
+    let resets = 0;
+    runtime.onReferenceDataReload(() => {
+      resets++;
+    });
+    copyFileSync(fresher, `${live}.depot`);
+    renameSync(`${live}.depot`, live);
+    const outcomes = runtime.reloadRestrictedOverlays();
+    expect(outcomes.map((o) => [o.kind, o.changed, o.status.state])).toEqual([
+      ['bic', true, 'applied'],
+    ]);
+    expect(outcomes[0].status.housekeeping_error).toBeTruthy();
+    expect(resets).toBe(1);
+  });
+});

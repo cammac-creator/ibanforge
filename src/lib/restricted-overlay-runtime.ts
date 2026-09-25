@@ -73,6 +73,12 @@ export interface OverlayStatus {
   fallback: boolean;
   /** `last_refresh` de la copie servie, ramené à celui d'un membre servi par la surcouche. */
   lowered_last_refresh: string | null;
+  /**
+   * L'entretien des fichiers (copie acceptée, restes de fusion) a échoué : le code
+   * seul, jamais un chemin. Ce qui est servi n'en dépend pas ; la protection de la
+   * copie acceptée, si.
+   */
+  housekeeping_error: string | null;
 }
 
 export interface ReloadOutcome {
@@ -168,6 +174,7 @@ function build(
     file: null,
     fallback: false,
     lowered_last_refresh: null,
+    housekeeping_error: null,
   };
   if (!overlayPath) return { status: base };
   // Signature d'abord, même pour un chemin refusé : la veille le reconnaîtra au
@@ -215,6 +222,24 @@ function build(
 
 function recordSeen(status: OverlayStatus): void {
   seen.set(status.kind, { overlayPath: status.overlay_path, file: status.file });
+}
+
+/**
+ * L'entretien des fichiers ne doit jamais interrompre un démarrage ni un
+ * rechargement : l'état est enregistré AVANT, et un échec (dossier à la place de
+ * la copie acceptée, volume plein…) est noté sur l'état, code seul. Sans cela,
+ * une exception avant l'enregistrement faisait refusionner la base à chaque
+ * ouverture de connexion, et une exception après la bascule sautait le vidage
+ * des caches (relecture de la PR 252).
+ */
+function housekeep(status: OverlayStatus, work: () => void): void {
+  try {
+    work();
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code ?? 'erreur';
+    status.housekeeping_error = code;
+    console.error(`[surcouche] ${status.kind} : entretien des fichiers en échec (${code})`);
+  }
 }
 
 /** Le fichier fusionné qu'un état a construit, s'il en a construit un. */
@@ -267,22 +292,34 @@ export function servedDatabasePath(kind: OverlayKind, publicPath: string): strin
     if (existsSync(accepted)) {
       const alt = build(kind, publicPath, accepted).status;
       if (refusedCount(alt) < refusedCount(next)) {
-        dropMerged(next);
-        discardFrozenCopy(frozen);
+        const refused = next;
+        const refusedFrozen = frozen;
         frozen = undefined;
-        next = { ...alt, error: `variable_file_refused:${refusalReason(next)}`, file: next.file };
-      } else dropMerged(alt);
+        next = {
+          ...alt,
+          error: `variable_file_refused:${refusalReason(refused)}`,
+          file: refused.file,
+        };
+        housekeep(next, () => {
+          dropMerged(refused);
+          discardFrozenCopy(refusedFrozen);
+        });
+      } else housekeep(next, () => dropMerged(alt));
     }
   }
-  if (frozen) {
-    if (servesOverlay(next.state) && !next.fallback && validOverlayPath(next.overlay_path))
-      promoteAcceptedCopy(frozen, acceptedCopyPath(next.overlay_path));
-    else discardFrozenCopy(frozen);
-  }
   statuses.set(kind, next);
-  // Restes d'un démarrage précédent ou d'un démarrage interrompu : ~36 Mo chacun.
-  if (validOverlayPath(next.overlay_path)) removeStaleMerged(next.overlay_path, servedMerged());
-  return next.served_path;
+  const served = next;
+  housekeep(served, () => {
+    if (frozen) {
+      if (servesOverlay(served.state) && !served.fallback && validOverlayPath(served.overlay_path))
+        promoteAcceptedCopy(frozen, acceptedCopyPath(served.overlay_path));
+      else discardFrozenCopy(frozen);
+    }
+    // Restes d'un démarrage précédent ou d'un démarrage interrompu : ~36 Mo chacun.
+    if (validOverlayPath(served.overlay_path))
+      removeStaleMerged(served.overlay_path, servedMerged());
+  });
+  return served.served_path;
 }
 
 /** L'état de chaque base déjà ouverte (une base jamais ouverte n'a pas d'état). */
@@ -374,8 +411,10 @@ export function reloadRestrictedOverlays(
           m.state === 'applied' && next.members.find((n) => n.id === m.id)?.state === 'refused',
       );
     if (!(servesOverlay(next.state) || next.state === 'off') || lost) {
-      dropMerged(next);
-      discardFrozenCopy(frozen);
+      housekeep(next, () => {
+        dropMerged(next);
+        discardFrozenCopy(frozen);
+      });
       outcomes.push({ kind, changed: false, status: current, rejected: next });
       continue;
     }
@@ -385,12 +424,15 @@ export function reloadRestrictedOverlays(
     }
     statuses.set(kind, next);
     closers.get(kind)?.();
-    if (frozen && validOverlayPath(next.overlay_path))
-      promoteAcceptedCopy(frozen, acceptedCopyPath(next.overlay_path));
-    else discardFrozenCopy(frozen);
-    if (current.served_path !== current.public_path) removeFileWithCompanions(current.served_path);
-    if (validOverlayPath(next.overlay_path)) removeStaleMerged(next.overlay_path, servedMerged());
     anyChanged = true;
+    housekeep(next, () => {
+      if (frozen && validOverlayPath(next.overlay_path))
+        promoteAcceptedCopy(frozen, acceptedCopyPath(next.overlay_path));
+      else discardFrozenCopy(frozen);
+      if (current.served_path !== current.public_path)
+        removeFileWithCompanions(current.served_path);
+      if (validOverlayPath(next.overlay_path)) removeStaleMerged(next.overlay_path, servedMerged());
+    });
     outcomes.push({ kind, changed: true, status: next, rejected: null });
   }
   if (anyChanged) for (const reset of reloadHooks) reset();

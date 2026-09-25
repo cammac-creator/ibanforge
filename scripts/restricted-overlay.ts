@@ -19,7 +19,9 @@
  *       Une copie de la base sans la famille : la base publique de demain.
  *   seed --kind bic|compliance --out <fichier> [--public <base>] [--bic-directory <base>] [--allow-shrink]
  *       Copie de travail de la base publique sans la famille, seeders de la
- *       famille seulement (SEED_FAMILY=restricted), puis extraction vers --out.
+ *       famille seulement (SEED_FAMILY=restricted), téléchargements et bases
+ *       temporaires dans le dossier de travail (SEED_TMP_DIR, hors du dépôt),
+ *       puis extraction vers --out.
  *       Pour la conformité : la surcouche précédente au même chemin est fusionnée
  *       d'abord, pour que la reprise d'une liste en panne (ONU) la retrouve.
  *
@@ -229,7 +231,11 @@ export function commandSeed(flags: Map<string, string | true>): unknown {
       // d'une table vide : sinon l'INSERT OR IGNORE garderait à jamais les lignes
       // EBA STEP2, NBP ou OeNB disparues de leur source.
       stripFamily(work, 'bic');
-      const env = { BIC_DB_PATH: work, SEED_FAMILY: 'restricted' };
+      const env = {
+        BIC_DB_PATH: work,
+        SEED_FAMILY: 'restricted',
+        SEED_TMP_DIR: join(scratch, 'tmp'),
+      };
       runSeeder('enrich-bic-database.ts', env);
       runSeeder('seed-national.ts', env);
       runSeeder('seed-pra-banks.ts', env);
@@ -261,6 +267,7 @@ export function commandSeed(flags: Map<string, string | true>): unknown {
     const bicDirectory = stringFlag(flags, 'bic-directory');
     runSeeder('refresh-compliance.ts', {
       COMPLIANCE_DB_PATH: work,
+      SEED_TMP_DIR: join(scratch, 'tmp'),
       ...(bicDirectory ? { BIC_DB_PATH: resolve(bicDirectory) } : {}),
     });
     return extractOverlay({

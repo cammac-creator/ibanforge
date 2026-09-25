@@ -39,7 +39,11 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
-const TMP_DIR = resolve(__dirname, '../.tmp-compliance');
+// SEED_TMP_DIR : la base temporaire (ONU et EPC compris) et les téléchargements
+// hors du dépôt, pour la chaîne privée de la surcouche. Défaut inchangé.
+const TMP_DIR = process.env.SEED_TMP_DIR
+  ? resolve(process.env.SEED_TMP_DIR, 'compliance')
+  : resolve(__dirname, '../.tmp-compliance');
 const TMP_DB_PATH = resolve(TMP_DIR, 'compliance.sqlite');
 // COMPLIANCE_DB_PATH choisit la base écrite, et BIC_DB_PATH l'annuaire qui
 // enrichit les BIC sanctionnés (défauts inchangés : data/). La chaîne privée de
