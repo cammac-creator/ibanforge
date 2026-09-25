@@ -162,6 +162,98 @@ describe('ouverture du schéma', () => {
     mod.closeAll();
   });
 
+  it('le registre des achats (lot B1) se pose sur une base neuve, une base ancienne, et se rejoue', async () => {
+    // Base neuve : les deux tables, la colonne et les index.
+    const fresh = await openAt(freshPath());
+    const fdb = fresh.getStatsDB();
+    expect(columns(fdb, 'api_keys')).toContain('credits_notice_base');
+    expect(columns(fdb, 'key_purchases')).toEqual(
+      expect.arrayContaining([
+        'payment_ref',
+        'lineage_hash',
+        'outcome',
+        'payer_email',
+        'prev_tier',
+      ]),
+    );
+    expect(columns(fdb, 'key_topup_refs').sort()).toEqual(
+      ['created_at', 'lineage_hash', 'ref'].sort(),
+    );
+    expect(indexes(fdb, 'key_purchases')).toEqual(
+      expect.arrayContaining(['idx_key_purchases_lineage', 'idx_key_purchases_created']),
+    );
+    fresh.closeAll();
+
+    // Base ancienne : un pack par carte, un pack USDC et une clé gratuite, au
+    // schéma d'avant le registre. Le rattrapage les inscrit et écrit 0 sur les
+    // deux packs, jamais sur la clé gratuite.
+    const path = freshPath();
+    const raw = new Database(path);
+    raw.exec(`
+      CREATE TABLE api_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT UNIQUE NOT NULL,
+        key_prefix TEXT NOT NULL,
+        email TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        active INTEGER DEFAULT 1,
+        monthly_limit INTEGER,
+        credits_remaining INTEGER,
+        credits_total INTEGER,
+        stripe_session_id TEXT,
+        amount_paid_minor INTEGER,
+        amount_paid_currency TEXT,
+        x402_payment_ref TEXT
+      );
+      INSERT INTO api_keys (key_hash, key_prefix, email, credits_remaining, credits_total, stripe_session_id, amount_paid_minor, amount_paid_currency)
+        VALUES ('hc', 'ifk_0000000c', 'acme@example.com', 900, 1000, 'cs_test_old', 400, 'usd');
+      INSERT INTO api_keys (key_hash, key_prefix, email, credits_remaining, credits_total, x402_payment_ref)
+        VALUES ('hu', 'ifk_0000000u', 'credits-buyer', 0, 5000, 'abcdef0123456789abcdef0123456789');
+      INSERT INTO api_keys (key_hash, key_prefix, email) VALUES ('hf', 'ifk_0000000f', 'free@alpha.example.net');
+    `);
+    raw.close();
+    const mod = await openAt(path);
+    const db = mod.getStatsDB();
+    const limits = db
+      .prepare('SELECT key_hash, tier, monthly_limit FROM api_keys ORDER BY key_hash')
+      .all();
+    expect(limits).toEqual([
+      { key_hash: 'hc', tier: 'paid', monthly_limit: 0 },
+      { key_hash: 'hf', tier: 'email', monthly_limit: null },
+      { key_hash: 'hu', tier: 'paid', monthly_limit: 0 },
+    ]);
+    const purchases = db
+      .prepare(
+        'SELECT payment_ref, rail, outcome, credits, amount_minor, backfilled FROM key_purchases ORDER BY payment_ref',
+      )
+      .all();
+    expect(purchases).toEqual([
+      {
+        payment_ref: 'stripe:cs_test_old',
+        rail: 'card',
+        outcome: 'minted',
+        credits: 1000,
+        amount_minor: 400,
+        backfilled: 1,
+      },
+      {
+        payment_ref: 'x402:abcdef0123456789abcdef0123456789',
+        rail: 'usdc',
+        outcome: 'minted',
+        credits: 5000,
+        amount_minor: null,
+        backfilled: 1,
+      },
+    ]);
+    // Rejouée : rien de plus.
+    mod.closeAll();
+    const again = mod.getStatsDB();
+    expect(
+      (again.prepare('SELECT COUNT(*) AS n FROM key_purchases').get() as { n: number }).n,
+    ).toBe(2);
+    mod.closeAll();
+  });
+
   it('avec deux key_prefix identiques, l’ouverture ne jette pas et l’index unique n’est PAS créé', async () => {
     const path = freshPath();
     const raw = new Database(path);
