@@ -752,6 +752,8 @@ export async function runOverlayPull(options: PullOptions = {}): Promise<PullAtt
       if (result.error) errors.push(sanitize(result.error));
       if (result.rejectFile && result.error)
         rejected[kind] = { sha256: entry.sha256, error: sanitize(result.error) };
+      // Un bon fichier arrivé depuis efface le souvenir d'un refus.
+      if (result.outcome === 'installed' || result.outcome === 'up_to_date') delete rejected[kind];
       if (result.outcome === 'installed') installed.push(kind);
       // D'où vient ce fichier : gardé pour /health, qui dit la release et l'âge
       // de la surcouche servie. Un fichier déjà posé garde sa première release.

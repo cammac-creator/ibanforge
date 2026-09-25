@@ -640,6 +640,8 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
       publishedAt: new Date(Date.now() - 10 * DAY).toISOString(),
     });
     await run();
+    // Les refus des tests précédents sont oubliés : chaque base est de nouveau à jour.
+    expect(JSON.parse(forum.kvGet('overlay:pull:state') ?? '{}').rejected).toEqual({});
     expect(alertKeys(ops.opsFail)).toContain('overlay:pull:stale');
     const staleCall = ops.opsFail.mock.calls.find((c) => c[0] === 'overlay:pull:stale')!;
     expect(String(staleCall[1])).toContain('release:10d');
