@@ -1,5 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
+  CzechSourceNotLoaded,
+  czechNumberedCsvUrl,
+  czechSource,
+  ensureNationalTables,
+  parseCzech,
+  parseCzechEditions,
+  planCzechEditions,
+  reportCzechStatus,
+  seedCzechLive,
+  writeCzech,
+  type CzechEdition,
   parseSanMarino,
   parseSlovakia,
   parseSlovakiaPage,
@@ -327,5 +342,613 @@ describe('parseSanMarino', () => {
     // throws on MIN_EXPECTED.SM and the rows already stored stand.
     const relabelled = SM_PAGE.replace(/ABI Code:/g, 'Codice ABI:');
     expect(parseSanMarino(relabelled, SM_READ_ON)).toHaveLength(0);
+  });
+});
+
+/**
+ * Czechia — the ČNB číselník.
+ *
+ * The fixtures reproduce the real markup and file of 25/09/2026, trimmed: the
+ * current page's nested list with its commented-out copy pointing at the ČNB's
+ * administration server (given ANOTHER number here, so that reading it would
+ * show), the history page's one-anchor items, and the CSV with its CRLF, its
+ * empty BIC cells, the trailing space of some CERTIS cells and no line ending
+ * after the last row.
+ */
+const CZ_PAGE_URL = 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/';
+const CZ_HISTORY_URL = 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/historicke-ciselniky/';
+
+const CZ_PAGE = `<head><link rel="stylesheet" href="/x.css"><title>Číselníky, seznamy, registry - Česká národní banka</title></head>
+<div class="headline"><h2 >Číselník kódů platebního styku v České republice</h2></div>
+<ul>
+<li>Aktuální Číselník kódů platebního styku v ČR
+<ul>
+<li>Číselník 254 <a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR.pdf">platný od 1. 9. 2026 (pdf, 186 kB)</a>, <a href="/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR.csv">(utf-8, csv, 3 kB)</a></li>
+</ul>
+</li>
+<li><a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_zmeny.pdf">Historie změn číselníku od 1. 3. 2009 (pdf, 581 kB)</a></li>
+<li><a href="/cs/platebni-styk/ucty-kody-bank/historicke-ciselniky/">Historické číselníky</a></li>
+</ul>
+<!--
+			<li>Číselník 999 <a href="https://admin-cnb.cz.net/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_999.pdf">platný od 1. 1. 2027 (pdf, 186 kB)</a>, <a href="https://admin-cnb.cz.net/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_999.csv">(utf-8, csv, 3 kB)</a></li>
+-->
+<ul><li><a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/seznam_platsys_ucast_cr.pdf">verze 116 platná od 1. 9. 2026 (pdf, 129 kB)</a></li></ul>`;
+
+const CZ_HISTORY = `<ul>
+<li><a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_254.pdf">Číselník 254 platný od 1. 9. 2026 (pdf, 186 kB)</a></li>
+<li><a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_253.pdf">Číselník 253 platný od 1. 7. 2026 (pdf, 192 kB)</a></li>
+<li><a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_251.pdf">Číselník 251 platný od 16. 3. 2026 (pdf, 272 kB)</a></li>
+<li><a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_248.pdf">Číselník 248 platný od 1. 10. 2025 (pdf, 268 kB)</a></li>
+<li><a href="/export/sites/cnb/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_247.pdf">Číselník 247 platný od 1. 10. 2025 (pdf, 267 kB)</a></li>
+</ul>`;
+
+const CZ_EDITION: CzechEdition = { version: '254', as_of: '2026-09-01', csv_url: null };
+
+const CZ_CSV = [
+  '\uFEFFKód platebního styku;Poskytovatel platebních služeb;BIC kód (SWIFT);Systém CERTIS',
+  '0100;Komerční banka, a.s.;KOMBCZPP;A',
+  '0800;Česká spořitelna, a.s.;GIBACZPX;A',
+  '2600;Citibank Europe plc, organizační složka;CITICZPX;A ',
+  '6600;Banking Circle S.A., Czech Republic;;-',
+  '7990;Modrá pyramida stavební spořitelna, a.s.;;A',
+  '8660;PAYMONT, UAB;;A',
+].join('\r\n');
+
+const czByCode = (text: string) =>
+  new Map(parseCzech(text, CZ_EDITION).map((e) => [e.code, e] as const));
+
+describe('parseCzechEditions', () => {
+  it('reads the number, the date and the linked CSV of the current page', () => {
+    expect(parseCzechEditions(CZ_PAGE, CZ_PAGE_URL)).toEqual([
+      {
+        version: '254',
+        as_of: '2026-09-01',
+        csv_url:
+          'https://www.cnb.cz/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR.csv',
+      },
+    ]);
+  });
+
+  it('ignores the commented-out copy that points at the administration server', () => {
+    const editions = parseCzechEditions(CZ_PAGE, CZ_PAGE_URL);
+    expect(editions.map((e) => e.version)).not.toContain('999');
+    expect(JSON.stringify(editions)).not.toContain('admin-cnb');
+  });
+
+  it('reads the history page, where the whole phrase sits in one anchor and no CSV is linked', () => {
+    const editions = parseCzechEditions(CZ_HISTORY, CZ_HISTORY_URL);
+    expect(editions.map((e) => [e.version, e.as_of, e.csv_url])).toEqual([
+      ['254', '2026-09-01', null],
+      ['253', '2026-07-01', null],
+      ['251', '2026-03-16', null],
+      ['248', '2025-10-01', null],
+      ['247', '2025-10-01', null],
+    ]);
+  });
+
+  it('skips an item whose date does not exist on the calendar', () => {
+    // On the current page that leaves no edition, which the seeder refuses as
+    // a changed layout; on the history page one typo costs one item, not the run.
+    const impossible = CZ_PAGE.replace('platný od 1. 9. 2026', 'platný od 31. 2. 2026');
+    expect(parseCzechEditions(impossible, CZ_PAGE_URL)).toEqual([]);
+    const history = CZ_HISTORY.replace('platný od 1. 7. 2026', 'platný od 31. 6. 2026');
+    expect(parseCzechEditions(history, CZ_HISTORY_URL).map((e) => e.version)).toEqual([
+      '254',
+      '251',
+      '248',
+      '247',
+    ]);
+  });
+
+  it('finds nothing on a page that changed shape, rather than something wrong', () => {
+    expect(parseCzechEditions(CZ_PAGE.replace(/Číselník 254/, 'Verze 254'), CZ_PAGE_URL)).toEqual(
+      [],
+    );
+  });
+});
+
+describe('planCzechEditions', () => {
+  const page = (version: string, as_of: string): CzechEdition => ({
+    version,
+    as_of,
+    csv_url:
+      'https://www.cnb.cz/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR.csv',
+  });
+  const history = parseCzechEditions(CZ_HISTORY, CZ_HISTORY_URL);
+
+  it('puts the current edition in force when its date has come', () => {
+    const plan = planCzechEditions([page('254', '2026-09-01')], '2026-09-25');
+    expect(plan.current.version).toBe('254');
+    expect(plan.pending).toBeNull();
+  });
+
+  it('keeps the edition in force and announces the next one while its date is to come', () => {
+    // The window 8190 fell into: 254 on the server from 24 August, in force
+    // from 1 September. Loading it on the 24th must not refuse 8190 for a week.
+    const plan = planCzechEditions(
+      [page('254', '2026-09-01'), ...history.filter((e) => e.version !== '254')],
+      '2026-08-24',
+    );
+    expect(plan.current.version).toBe('253');
+    expect(plan.pending?.version).toBe('254');
+    // The announced edition keeps the CSV the current page links.
+    expect(plan.pending?.csv_url).toMatch(/kody_bank_CR\.csv$/);
+  });
+
+  it('switches on an effective date that is not the 1st', () => {
+    const plan = planCzechEditions(history, '2026-03-15');
+    expect(plan.current.version).toBe('248');
+    // The NEXT edition to take effect, not the highest number announced: with
+    // 253 and 254 also ahead, 251 is the one that must apply on 16 March.
+    expect(plan.pending?.version).toBe('251');
+    expect(planCzechEditions(history, '2026-03-16').current.version).toBe('251');
+  });
+
+  it('takes the highest number in force, not the one before the announced edition', () => {
+    // 247 and 248 took effect on the same day.
+    expect(planCzechEditions(history, '2025-10-05').current.version).toBe('248');
+  });
+
+  it('loads nothing for an edition dated differently on the two pages', () => {
+    // CzechSourceNotLoaded: the tables stay, the monthly refresh goes on.
+    const plan = () => planCzechEditions([page('254', '2026-09-02'), ...history], '2026-09-25');
+    expect(plan).toThrow(CzechSourceNotLoaded);
+    expect(plan).toThrow(/dated/);
+  });
+
+  it('loads nothing when no edition it can see is in force yet', () => {
+    const plan = () => planCzechEditions([page('255', '2026-10-01')], '2026-09-25');
+    expect(plan).toThrow(CzechSourceNotLoaded);
+    expect(plan).toThrow(/in force/);
+  });
+});
+
+describe('parseCzech', () => {
+  it('reads codes, names and BICs as the ČNB writes them', () => {
+    const rows = czByCode(CZ_CSV);
+    expect(rows.size).toBe(6);
+    expect(rows.get('0100')).toMatchObject({ name: 'Komerční banka, a.s.', bic: 'KOMBCZPP' });
+    expect(rows.get('0800')).toMatchObject({ name: 'Česká spořitelna, a.s.', bic: 'GIBACZPX' });
+    expect(rows.get('2600')?.bic).toBe('CITICZPX');
+  });
+
+  it('removes the byte-order mark some editions open with', () => {
+    // 253 has one, 254 has none: with it, the header search fails.
+    expect(czByCode(CZ_CSV).size).toBe(czByCode(CZ_CSV.replace('\uFEFF', '')).size);
+  });
+
+  it('keeps a code the ČNB publishes without a BIC', () => {
+    const rows = czByCode(CZ_CSV);
+    // Real allocations: a payment institution, a building society, the last
+    // row (no line ending after it). Dropping them would refuse them.
+    expect(rows.get('6600')).toMatchObject({
+      name: 'Banking Circle S.A., Czech Republic',
+      bic: null,
+    });
+    expect(rows.get('7990')?.bic).toBeNull();
+    expect(rows.get('8660')?.name).toBe('PAYMONT, UAB');
+  });
+
+  it('carries the credit, the edition and its date on every row, and no address', () => {
+    for (const row of parseCzech(CZ_CSV, CZ_EDITION)) {
+      expect(row.source).toBe('Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze 254');
+      expect(row.as_of).toBe('2026-09-01');
+      expect([row.street, row.post_code, row.town, row.lei]).toEqual([null, null, null, null]);
+    }
+  });
+
+  it('refuses an HTML page served in place of the file', () => {
+    // The server labels the real CSV text/html, so the type proves nothing;
+    // the header row is what does.
+    expect(() => parseCzech('<!DOCTYPE html><html><body>404</body></html>', CZ_EDITION)).toThrow(
+      /Kód platebního styku/,
+    );
+  });
+
+  it('refuses a file whose separator changed', () => {
+    expect(() => parseCzech(CZ_CSV.replace(/;/g, ','), CZ_EDITION)).toThrow(/BIC column/);
+  });
+});
+
+describe('czechSource and the numbered file', () => {
+  it('opens on the words the ČNB terms prescribe, with the edition', () => {
+    expect(czechSource({ version: '255' })).toBe(
+      'Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze 255',
+    );
+  });
+
+  it('names the numbered CSV of an edition', () => {
+    expect(czechNumberedCsvUrl('254')).toBe(
+      'https://www.cnb.cz/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_254.csv',
+    );
+  });
+});
+
+describe('writeCzech', () => {
+  /** An edition of `n` invented codes, above the floor. */
+  const edition = (version: string, as_of: string, n = 40) => {
+    const ed: CzechEdition = { version, as_of, csv_url: null };
+    const text = [
+      'Kód platebního styku;Poskytovatel platebních služeb;BIC kód (SWIFT);Systém CERTIS',
+      ...Array.from({ length: n }, (_, i) => `${String(1000 + i)};Příkladová banka ${i}, a.s.;;A`),
+    ].join('\r\n');
+    return { edition: ed, entries: parseCzech(text, ed) };
+  };
+  const fresh = () => {
+    const db = new Database(':memory:');
+    ensureNationalTables(db);
+    return db;
+  };
+  const count = (db: Database.Database, table: string) =>
+    (db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE country = 'CZ'`).get() as { n: number })
+      .n;
+  const versionIn = (db: Database.Database, table: string) =>
+    (
+      db.prepare(`SELECT source FROM ${table} WHERE country = 'CZ' LIMIT 1`).get() as
+        { source: string } | undefined
+    )?.source;
+
+  it('writes the edition in force and the announced one side by side', () => {
+    const db = fresh();
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01', 39), '2026-08-24');
+    expect(count(db, 'national_bank_codes')).toBe(40);
+    expect(count(db, 'national_bank_codes_pending')).toBe(39);
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
+    expect(versionIn(db, 'national_bank_codes_pending')).toMatch(/verze 254$/);
+  });
+
+  it('clears the announcement once a newer edition is in force', () => {
+    const db = fresh();
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01'), '2026-08-24');
+    writeCzech(db, edition('254', '2026-09-01'), null, '2026-09-02');
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 254$/);
+    expect(count(db, 'national_bank_codes_pending')).toBe(0);
+  });
+
+  it('refuses to go back an edition, and leaves both tables as they were', () => {
+    const db = fresh();
+    writeCzech(db, edition('254', '2026-09-01'), edition('255', '2026-10-01'), '2026-09-25');
+    const back = () => writeCzech(db, edition('253', '2026-07-01'), null, '2026-09-25');
+    // Kept apart from a format change: the tables stay, the refresh goes on.
+    expect(back).toThrow(CzechSourceNotLoaded);
+    expect(back).toThrow(/go back/);
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 254$/);
+    expect(versionIn(db, 'national_bank_codes_pending')).toMatch(/verze 255$/);
+  });
+
+  it('refuses a short edition before touching anything, and fails the run', () => {
+    const db = fresh();
+    writeCzech(db, edition('253', '2026-07-01'), null, '2026-07-02');
+    const short = () => writeCzech(db, edition('254', '2026-09-01', 10), null, '2026-09-02');
+    expect(short).toThrow(/at least/);
+    // A truncated file or a changed format is for a human to read, not the
+    // keep-the-tables-and-carry-on kind.
+    expect(short).not.toThrow(CzechSourceNotLoaded);
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
+  });
+
+  it('refuses to go back behind an announced edition already in force', () => {
+    // 254 still sits in the pending table, but from 1 September activeTable()
+    // serves it: a stale page putting 253 in force must not bring 253 back.
+    const db = fresh();
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01'), '2026-08-24');
+    const stale = () => writeCzech(db, edition('253', '2026-07-01'), null, '2026-09-02');
+    expect(stale).toThrow(CzechSourceNotLoaded);
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
+    expect(versionIn(db, 'national_bank_codes_pending')).toMatch(/verze 254$/);
+  });
+
+  it('lets an announcement not yet in force be withdrawn', () => {
+    const db = fresh();
+    writeCzech(db, edition('253', '2026-07-01'), edition('254', '2026-09-01'), '2026-08-24');
+    writeCzech(db, edition('253', '2026-07-01'), null, '2026-08-30');
+    expect(versionIn(db, 'national_bank_codes')).toMatch(/verze 253$/);
+    expect(count(db, 'national_bank_codes_pending')).toBe(0);
+  });
+
+  it('leaves the other countries of the table alone', () => {
+    const db = fresh();
+    db.prepare(
+      `INSERT INTO national_bank_codes (country, code, name) VALUES ('SK', '0200', 'Všeobecná úverová banka, a.s.')`,
+    ).run();
+    writeCzech(db, edition('254', '2026-09-01'), null, '2026-09-02');
+    expect(
+      (
+        db.prepare(`SELECT COUNT(*) AS n FROM national_bank_codes WHERE country = 'SK'`).get() as {
+          n: number;
+        }
+      ).n,
+    ).toBe(1);
+  });
+});
+
+/**
+ * The whole Czech loading path, on a stubbed network: the page, the history,
+ * the numbered and unnumbered files, and every way the ČNB can fail to serve
+ * them. No request leaves the machine.
+ */
+describe('seedCzechLive', () => {
+  const PAGE = 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/';
+  const HISTORY = 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/historicke-ciselniky/';
+  const UNNUMBERED =
+    'https://www.cnb.cz/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR.csv';
+  const HEADER =
+    'Kód platebního styku;Poskytovatel platebních služeb;BIC kód (SWIFT);Systém CERTIS';
+
+  /** An edition of 40 invented codes; `extra` rows are appended, `certis` fills the last column. */
+  const csv = (extra: string[] = [], certis = 'A') =>
+    [
+      HEADER,
+      ...Array.from(
+        { length: 40 },
+        (_, i) => `${String(1000 + i)};Příkladová banka ${i}, a.s.;;${certis}`,
+      ),
+      ...extra,
+    ].join('\r\n');
+
+  const item = (version: string, date: string, href: string) =>
+    `<li>Číselník ${version} <a href="/x.pdf">platný od ${date} (pdf)</a>, <a href="${href}">(utf-8, csv)</a></li>`;
+  const page = (...items: string[]) =>
+    `<html><head><title>Číselníky, seznamy, registry - Česká národní banka</title></head><body><ul>${items.join('')}</ul></body></html>`;
+  const history = page(
+    '<li><a href="/254.pdf">Číselník 254 platný od 1. 9. 2026 (pdf)</a></li>',
+    '<li><a href="/253.pdf">Číselník 253 platný od 1. 7. 2026 (pdf)</a></li>',
+  );
+  const REFUSAL =
+    '<html><head><title>Request Rejected</title></head><body>The requested URL was rejected. Your support ID is: 0000000000.</body></html>';
+
+  type Route = () => Response | Promise<Response>;
+  const text =
+    (body: string, status = 200): Route =>
+    () =>
+      new Response(body, { status });
+  /** Headers arrive, then the connection is cut while the body streams. */
+  const cutMidBody: Route = () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(HEADER));
+          controller.error(new TypeError('terminated'));
+        },
+      }),
+      { status: 200 },
+    );
+
+  function network(routes: Record<string, Route>) {
+    const calls: string[] = [];
+    const fetchImpl = async (url: string) => {
+      calls.push(url);
+      const route = routes[url];
+      return route ? route() : new Response('Not Found', { status: 404 });
+    };
+    return { calls, fetchImpl };
+  }
+
+  const fresh = () => {
+    const db = new Database(':memory:');
+    ensureNationalTables(db);
+    return db;
+  };
+  const rows = (db: Database.Database, table: string) =>
+    db
+      .prepare(
+        `SELECT source, as_of, COUNT(*) AS n FROM ${table} WHERE country = 'CZ' GROUP BY source`,
+      )
+      .all() as Array<{ source: string; as_of: string; n: number }>;
+  const quiet = () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    return vi.spyOn(console, 'warn').mockImplementation(() => {});
+  };
+
+  it('loads the edition in force, and does not read the history when nothing is announced', async () => {
+    quiet();
+    const db = fresh();
+    const { calls, fetchImpl } = network({
+      [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv()),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes')).toEqual([
+      { source: czechSource({ version: '254' }), as_of: '2026-09-01', n: 40 },
+    ]);
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([]);
+    expect(calls).not.toContain(HISTORY);
+    vi.restoreAllMocks();
+  });
+
+  it('writes an announcement read from its numbered file even when only CERTIS changed', async () => {
+    // 248→249 changed nothing but the CERTIS column, which is not stored: the
+    // numbered file is edition 249 by construction, so 249 must be credited
+    // from its date rather than dropped as "identical".
+    quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(
+        page(
+          item('254', '1. 9. 2026', UNNUMBERED),
+          item('255', '1. 10. 2026', czechNumberedCsvUrl('255')),
+        ),
+      ),
+      [HISTORY]: text(history),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [czechNumberedCsvUrl('255')]: text(csv([], '-')),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([
+      { source: czechSource({ version: '255' }), as_of: '2026-10-01', n: 40 },
+    ]);
+    vi.restoreAllMocks();
+  });
+
+  it('does not write an announcement whose only file is the unnumbered one, unchanged', async () => {
+    const warn = quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(
+        page(item('254', '1. 9. 2026', UNNUMBERED), item('255', '1. 10. 2026', UNNUMBERED)),
+      ),
+      [HISTORY]: text(history),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv()),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes')[0].source).toBe(czechSource({ version: '254' }));
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([]);
+    expect(warn.mock.calls.flat().join(' ')).toMatch(/announcement not written/);
+    vi.restoreAllMocks();
+  });
+
+  it('writes the announcement once the unnumbered file has moved', async () => {
+    quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(
+        page(item('254', '1. 9. 2026', UNNUMBERED), item('255', '1. 10. 2026', UNNUMBERED)),
+      ),
+      [HISTORY]: text(history),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv(['2999;Nová banka, a.s.;NOVACZPP;A'])),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    expect(rows(db, 'national_bank_codes_pending')).toEqual([
+      { source: czechSource({ version: '255' }), as_of: '2026-10-01', n: 41 },
+    ]);
+    vi.restoreAllMocks();
+  });
+
+  /** Every failure below leaves a database that already holds 254 exactly as it was. */
+  const seeded = async () => {
+    quiet();
+    const db = fresh();
+    const { fetchImpl } = network({
+      [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+      [czechNumberedCsvUrl('254')]: text(csv()),
+      [UNNUMBERED]: text(csv()),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-25' });
+    return db;
+  };
+
+  it.each([
+    [
+      'the network is down',
+      {
+        fetchImpl: async () => {
+          throw new TypeError('fetch failed');
+        },
+      },
+    ],
+    ['the page answers 403', network({ [PAGE]: text('Forbidden', 403) })],
+    [
+      'a refusal page is served with 200 instead of the register page',
+      network({ [PAGE]: text(REFUSAL) }),
+    ],
+    [
+      'a refusal page is served with 200 instead of the numbered file',
+      network({
+        [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+        [czechNumberedCsvUrl('254')]: text(REFUSAL),
+        [UNNUMBERED]: text(csv()),
+      }),
+    ],
+    [
+      'the connection is cut while the file arrives',
+      network({
+        [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+        [czechNumberedCsvUrl('254')]: cutMidBody,
+      }),
+    ],
+  ])('keeps the tables and does not fail the month when %s', async (_label, net) => {
+    const db = await seeded();
+    const before = rows(db, 'national_bank_codes');
+    await expect(
+      seedCzechLive(db, { fetchImpl: net.fetchImpl, today: '2026-09-26' }),
+    ).rejects.toBeInstanceOf(CzechSourceNotLoaded);
+    expect(rows(db, 'national_bank_codes')).toEqual(before);
+    vi.restoreAllMocks();
+  });
+
+  it('loads the numbered file when only the linked one is a refusal page', async () => {
+    const db = await seeded();
+    const warn = quiet();
+    const { fetchImpl } = network({
+      [PAGE]: text(page(item('254', '1. 9. 2026', UNNUMBERED))),
+      [czechNumberedCsvUrl('254')]: text(csv(['2999;Nová banka, a.s.;NOVACZPP;A'])),
+      [UNNUMBERED]: text(REFUSAL),
+    });
+    await seedCzechLive(db, { fetchImpl, today: '2026-09-26' });
+    expect(rows(db, 'national_bank_codes')[0].n).toBe(41);
+    expect(warn.mock.calls.flat().join(' ')).toMatch(/without the comparison/);
+    vi.restoreAllMocks();
+  });
+
+  it('fails the run on a ČNB page that no longer states its edition', async () => {
+    // The bank's name is there, the phrase is not: that is the layout
+    // changing, for a human to read, not the ČNB refusing us.
+    const db = await seeded();
+    const { fetchImpl } = network({
+      [PAGE]: text(page('<li>Aktuální číselník: viz níže</li>')),
+    });
+    const run = seedCzechLive(db, { fetchImpl, today: '2026-09-26' });
+    await expect(run).rejects.toThrow(/layout changed/);
+    await expect(seedCzechLive(db, { fetchImpl, today: '2026-09-26' })).rejects.not.toBeInstanceOf(
+      CzechSourceNotLoaded,
+    );
+    vi.restoreAllMocks();
+  });
+});
+
+/**
+ * The alarm. A Czech register that could not be read must not stay a line in
+ * a log nobody opens: the workflows read `cz_register` from the step output
+ * and turn `not_loaded` into a red step, which is what sends the Telegram alert.
+ */
+describe('reportCzechStatus', () => {
+  const withOutput = (fn: (file: string) => void) => {
+    const dir = mkdtempSync(join(tmpdir(), 'cz-output-'));
+    try {
+      fn(join(dir, 'github_output'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('annotates the run and hands `not_loaded` to the workflow', () => {
+    withOutput((file) => {
+      const lines: string[] = [];
+      reportCzechStatus(
+        'not_loaded',
+        'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/ -> HTTP 403',
+        { GITHUB_OUTPUT: file },
+        (l) => lines.push(l),
+      );
+      expect(lines).toEqual([
+        '::warning title=Czech register not loaded::https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/ -> HTTP 403; the Czech tables stay as they were',
+      ]);
+      expect(readFileSync(file, 'utf8')).toBe('cz_register=not_loaded\n');
+    });
+  });
+
+  it('keeps a multi-line message on the one line a workflow command allows', () => {
+    const lines: string[] = [];
+    reportCzechStatus('not_loaded', 'first\nsecond 100%', {}, (l) => lines.push(l));
+    expect(lines[0]).toContain('first%0Asecond 100%25');
+    expect(lines[0].split('\n')).toHaveLength(1);
+  });
+
+  it('says `loaded` without any annotation when the register was read', () => {
+    withOutput((file) => {
+      const lines: string[] = [];
+      reportCzechStatus('loaded', '', { GITHUB_OUTPUT: file }, (l) => lines.push(l));
+      expect(lines).toEqual([]);
+      expect(readFileSync(file, 'utf8')).toBe('cz_register=loaded\n');
+    });
+  });
+
+  it('writes nothing outside Actions', () => {
+    const lines: string[] = [];
+    reportCzechStatus('loaded', '', {}, (l) => lines.push(l));
+    expect(lines).toEqual([]);
   });
 });

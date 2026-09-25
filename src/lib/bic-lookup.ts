@@ -6,7 +6,12 @@ import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
 import { lookupFiInstitution } from './fi-register.js';
 import { hasNonLatinScript } from './gleif-address.js';
-import { allocatedCodes, nationalRegisterAvailable, normaliseCode } from './national-registers.js';
+import {
+  allocatedCodes,
+  lookupNationalCode,
+  nationalRegisterAvailable,
+  normaliseCode,
+} from './national-registers.js';
 import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
 import { sourceVintage } from './source-vintage.js';
@@ -162,8 +167,8 @@ function pruneStaleFinnishCodes(data: Record<string, BicDataEntry>): Record<stri
 }
 
 /**
- * Austrian, Belgian and Slovak codes the curated map claims and the national
- * register does not allocate are dropped at load time.
+ * Austrian, Belgian, Slovak and Czech codes the curated map claims and the
+ * national register does not allocate are dropped at load time.
  *
  * Measured 29/07/2026, 8 of our 870 Austrian keys and 23 of our 781 Belgian ones
  * asserted an institution the register does not carry.
@@ -181,9 +186,19 @@ function pruneStaleFinnishCodes(data: Record<string, BicDataEntry>): Record<stri
  * hold no BIC at all, which no BIC-derived map could ever have carried). A
  * curated map that is the right length is not a register; only reading the
  * allocation tells the two apart.
+ *
+ * Czechia joined on 25/09/2026 with the same two-way disagreement: two of our
+ * keys named institutions the číselník no longer lists (4000, removed in April
+ * 2025 on a bank merger, and 8280, removed in December 2024), while twelve of
+ * its codes were absent from the map — building societies and non-bank
+ * providers mostly, answered "not in register" like a code that does not
+ * exist. The two keys are also gone from bic_data.json; this prune is what
+ * keeps a rebuild of that file from bringing them back. Czech editions switch
+ * on a date, though, and this runs once per process: the guard at the top of
+ * lookupByCountryBank is what follows the switch without a restart.
  */
 function pruneStaleNationalCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
-  for (const cc of ['AT', 'BE', 'SK'] as const) {
+  for (const cc of ['AT', 'BE', 'SK', 'CZ'] as const) {
     if (!nationalRegisterAvailable(cc)) continue;
     const known = allocatedCodes(cc);
     if (known.size === 0) continue;
@@ -629,6 +644,22 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
   // beside it names a bank. RZBB is that case today: Raiffeisenbank left
   // Bulgaria, the curated map still carries it, the register does not.
   if (countryCode === 'BG' && bgBaeRegisterAvailable() && !lookupBgBankCode(bankCode)) return null;
+
+  // Czechia: the same guard, for a different reason. Its codes are numeric, so
+  // the load-time prune in getBicData() would be enough — except that the prune
+  // runs once per process, and the ČNB switches editions on a DATE (see
+  // PENDING_TABLE in national-registers.ts). A code the new edition removes
+  // must stop resolving to its old bank on that day, not at the next deploy;
+  // otherwise the same answer would carry `not_allocated` in bank_code_check
+  // and the removed bank's name in `bic`. Unguarded like lookupNationalCode:
+  // a failure here reaches resolveBank's catch and becomes `lookup_failed`.
+  if (
+    countryCode === 'CZ' &&
+    nationalRegisterAvailable('CZ') &&
+    !lookupNationalCode('CZ', bankCode)
+  ) {
+    return null;
+  }
 
   // Strategy 1: exact key lookup in bic_data.json
   const data = getBicData();

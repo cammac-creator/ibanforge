@@ -2070,7 +2070,7 @@
         },
         "bankCode": {
           "label": "Code banque vérifié dans le registre national (absent = non attribué)",
-          "ibanforge": "DE, AT, BE, SK, BG, CH, LI : le registre national lui-même. Listes partielles en FI, SM et LU, où une absence ne vaut pas refus. Ailleurs, une carte composite, signalée authoritative: false.",
+          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI : le registre national lui-même. Listes partielles en FI, SM et LU, où une absence ne vaut pas refus. Ailleurs, une carte composite, signalée authoritative: false.",
           "ibancom": "Non vérifié par nous",
           "ibanapi": "Annoncé sur leur page d'accueil (24 septembre 2026) : le code banque de l'IBAN est rapproché de leur propre registre bancaire (banques centrales, données SEPA et relecture manuelle). Qu'un code absent de ce registre ne soit attribué à personne : non vérifié par nous.",
           "libs": "Selon la bibliothèque : schwifty refuse un code banque inconnu de son registre embarqué. Les autres, non vérifiées par nous.",

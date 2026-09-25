@@ -250,6 +250,24 @@ payment system
          for reuse, including processing, with the NBS cited as the source.
          https://nbs.sk/disclaimer-sk/
 
+Česká národní banka, Číselník kódů platebního styku v České republice
+(directory of payment-system codes in the Czech Republic)
+  Where: data/bic.sqlite, table national_bank_codes, country CZ (46 rows,
+         edition 254, effective 1 September 2026), and table
+         national_bank_codes_pending, which holds an edition announced
+         before its effective date (none at this revision);
+         frontend/data/countries.json (the Czech example's answer).
+  Attribution:
+         Zdroj: ČNB
+         (with the edition and its effective date, stored with every row)
+  Terms: the ČNB terms of use of its website (section 3) allow storing,
+         passing on and reproducing the information published there, except
+         texts that name an author and images whose rights the ČNB does not
+         hold; the ČNB must always be named as the source ("Zdroj: ČNB"),
+         the file must not be altered, and an extract must not change the
+         facts or their sense.
+         https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/
+
 Betaalvereniging Nederland, BIC list
   Where: src/db/nl-psp.json (94 entries).
   Terms: may be used free of charge without a formal licence agreement,
@@ -288,7 +306,7 @@ SIX Group AG, BIC entries
 
 Composite bank-code map, apart from the Austrian, Belgian, Finnish,
 Luxembourg and Polish keys listed in group C
-  Where: src/db/bic_data.json (18,629 of its 24,083 keys, in 70 of its
+  Where: src/db/bic_data.json (18,627 of its 24,081 keys, in 70 of its
          75 countries).
   Built from: the datasets of sigalor/iban-to-bic, which that project
          generates from files published by national central banks and

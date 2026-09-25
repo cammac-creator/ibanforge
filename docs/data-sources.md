@@ -33,6 +33,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 373 au 2026-09-16 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation et traitement confirmés par écrit le 09/09/2026, **citation de la NBS obligatoire** ; conditions du fichier conservées | ✅ **réponse du 09/09/2026 relue le 14/09/2026** — ingérée le 06/09/2026, voir ci-dessous |
+| Česká národní banka — Číselník kódů platebního styku (`national_bank_codes` et `national_bank_codes_pending`, pays CZ) | 46 en édition 254 (effet 01.09.2026) | conditions du site, § 3 : stocker, transmettre et reproduire permis, **« Zdroj: ČNB » obligatoire**, faits et sens d'un extrait inchangés ; avis écrit du service des paiements du 27/08/2026 dans le même sens | ✅ **conditions lues le 24/09/2026 — ingéré le 25/09/2026**, voir ci-dessous |
 | Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | ❓ **AUCUNE condition d'utilisation publiée** — ni licence, ni interdiction | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, licence `unknown`, lettre à écrire, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
@@ -193,7 +194,7 @@ deux dates.
 
 **Conséquence pratique** : une banque créée, absorbée ou renommée depuis 2018
 peut manquer, ou porter un nom périmé, dans la partie SwiftCodes du
-répertoire. Les registres nationaux (SIX, Bundesbank, OeNB, BNB, NBS, BNB
+répertoire. Les registres nationaux (SIX, Bundesbank, OeNB, BNB, NBS, ČNB, BNB
 bulgare) et GLEIF, eux, sont bien rafraîchis chaque mois — c'est pourquoi
 `bank_code_check` et `bic.basis` existent : ils disent quelle partie du
 répertoire a répondu.
@@ -240,6 +241,14 @@ Origines, relevées dans l'historique git et dans les scripts des projets amont 
 | SIX BankMaster | CH | voir plus haut |
 | clés dérivées de `bic_entries` (`51f86e96`) | GB, IE et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` |
 | ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
+
+**Clés CZ, 25/09/2026** : les 36 clés tchèques ont été confrontées au číselník
+de la ČNB (édition 254). Deux nommaient des codes supprimés, `CZ:4000` (Expobank
+CZ puis Max banka, supprimé le 09/04/2025 à la fusion avec Banka CREDITAS) et
+`CZ:8280` (supprimé le 01/12/2024) : retirées du fichier. Les 34 autres portent
+le BIC que la ČNB publie pour le code. `pruneStaleNationalCodes()` et la garde
+de `lookupByCountryBank()` (`src/lib/bic-lookup.ts`) empêchent qu'une
+reconstruction du fichier ou une nouvelle édition les ramène.
 
 Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
 droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
@@ -1011,6 +1020,141 @@ répond encore **HTTP 200** et sert une édition **périmée** (en-tête slovaqu
 arrivées — 2250, 3030, 6363). Mesuré le 06/09/2026. Le seeder part de la page
 et suit l'ancre qui finit par « (CSV) », dont l'UUID change à chaque version.
 
+
+## ČNB — le číselník tchèque (`national_bank_codes`, pays CZ)
+
+Ingéré le **25/09/2026** (édition 254, en vigueur depuis le 01/09/2026). Page
+officielle : <https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/>. Étude
+complète : dossier privé `docs/internal/registres-2026-09-24/`.
+
+### Ce qui a été lu, mot pour mot
+
+Conditions d'utilisation du site, « Podmínky užívání internetových stránek
+ČNB », § 3, lues à la source le **24/09/2026** :
+
+> « Naše internetové informace můžete ukládat, předávat dále a rozmnožovat s
+> výjimkou autorských textů, t.j. takových textů, v jejichž záhlaví nebo zápatí
+> je uveden autor […] a obrázků, z nichž je zřejmé, že práva k obrázkům nevlastní
+> ČNB. […] ČNB musí být vždy uvedena jako zdroj informací (Zdroj: ČNB), soubor
+> nesmí být obsahově ani jinak pozměňován a musí být otevřen vždy v novém okně
+> prohlížeče. Pokud je použit výňatek z textu, rozdělení na více textů nebo
+> spojení více textů, nesmí dojít ke změně faktů a smyslu textu. »
+> — <https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/>
+
+Traduction de travail : on peut stocker, transmettre et reproduire les
+informations du site, sauf textes signés et images de tiers ; la ČNB doit
+toujours être citée (« Zdroj: ČNB ») ; le fichier ne doit être modifié ni dans
+son contenu ni autrement, et il doit toujours être ouvert dans une nouvelle
+fenêtre du navigateur ; en cas d'extrait, de découpage ou de réunion de textes,
+les faits et le sens ne doivent pas changer.
+
+La clause de la nouvelle fenêtre vise l'ouverture d'un fichier de la ČNB dans
+un navigateur. IBANforge ne sert ni n'ouvre ce fichier : l'API sert des champs
+extraits, un enregistrement par requête, ce que couvre la phrase sur les
+extraits (et l'avis du 27/08/2026 cité plus bas). Elle est donc sans objet ici.
+
+Base de l'exhaustivité, vyhláška č. 169/2011 Sb., publiée par la ČNB
+(<https://www.cnb.cz/export/sites/cnb/cs/platebni-styk/.galleries/pravni_predpisy/download/vyhl_169_2011.pdf>),
+lue le **24/09/2026** et relue le **25/09/2026** sur le PDF publié (texte extrait
+par `pdftotext`, coupures de fin de ligne recollées) :
+
+> § 4 : « Číslo účtu ve formátu IBAN je tvořeno 24 alfanumerickými znaky, kdy
+> […] c) pátý až osmý znak obsahují číslice kódu platebního styku (§ 6) […] »
+>
+> § 6 al. 2 : « Česká národní banka uveřejňuje kódy platebního styku, které
+> poskytovateli platebních služeb přidělila, v Číselníku kódů platebního styku
+> v České republice, a to způsobem umožňujícím dálkový přístup. »
+
+Les positions 5 à 8 de tout IBAN tchèque sont le code de paiement, et la ČNB
+publie dans ce číselník les codes qu'elle a attribués : un code absent de
+l'édition en vigueur n'est attribué à personne. C'est ce qui range la Tchéquie
+dans `NATIONAL_REGISTERS` (`authoritative: true`), comme la Slovaquie.
+
+### La position
+
+- **Commercial** : aucune restriction commerciale dans ces conditions (la seule
+  interdiction commerciale de la page vise le logo de la ČNB).
+- **Extraction de champs** : prévue par la dernière phrase citée, à condition
+  que les faits et le sens restent intacts. L'API sert un enregistrement par
+  requête, noms verbatim (diacritiques compris), BIC tel que publié, avec
+  l'édition et sa date d'effet.
+- **Avis écrit** : réponse du département des paiements de la ČNB du
+  27/08/2026 à la demande du 26/08 : l'extraction du code et du BIC, avec la
+  source et la date, n'altère pas l'information ; avis personnel du service,
+  pas une position juridique de la ČNB. Les conditions du site suffisent sans
+  lui.
+- **Aucune lettre à écrire.**
+
+### Ce que ça impose au code
+
+- `source` porte la mention exigée **en tête** : « Zdroj: ČNB, Číselník kódů
+  platebního styku v ČR, verze N » ; `as_of` porte la date d'effet de
+  l'édition. `nationalRegisterCredit('CZ')` en fait « … verze N (platný od
+  AAAA-MM-JJ) » pour `/llms.txt`. Le nom du registre servi dans
+  `bank_code_check.register` contient lui aussi « Zdroj: ČNB », parce qu'un
+  refus et les codes publiés sans BIC n'ont pas de bloc `bic` pour porter la
+  mention.
+- **Chaque édition paraît avant sa date d'effet** (règles du ČKPS, art. III.3 ;
+  le CSV de l'édition 254 est daté du 24/08/2026 pour un effet au 01/09/2026),
+  et le CSV ne porte **ni numéro ni date** : le chargeur lit l'édition et la
+  date sur la page, garde l'édition en vigueur dans `national_bank_codes` et
+  l'édition annoncée dans `national_bank_codes_pending`. La bascule se fait **à
+  la requête**, à minuit heure de Prague le jour d'effet
+  (`src/lib/national-registers.ts`, `activeTable()`), jamais au jour du
+  téléchargement. Toutes les éditions ne partent pas le 1er (251 le
+  16/03/2026, 245 le 09/04/2025), alors que le rafraîchissement mensuel tourne
+  le 1er.
+- L'édition en vigueur se lit dans son CSV **numéroté**
+  (`kody_bank_CR_<N>.csv`). La page lie ce fichier numéroté pour une édition
+  annoncée (copie archivée du 28/08/2026 : 254 lié par `kody_bank_CR_254.csv`,
+  253 par le fichier non numéroté). Quand rien n'est annoncé, le numéroté est
+  comparé au CSV lié par la page ; s'ils diffèrent, ou si le lié ne se lit pas,
+  le numéroté est chargé, aucune annonce n'est écrite et un avertissement est
+  journalisé ; le rafraîchissement suivant relit la page.
+- Une annonce lue dans son fichier **numéroté** est écrite même si ses codes,
+  noms et BIC sont ceux de l'édition en vigueur (des éditions ne changent que
+  la colonne CERTIS, non stockée : 235→236, 248→249, 250→251). Seule une
+  annonce lue dans le fichier non numéroté, identique à l'édition en vigueur,
+  est écartée : ce fichier ne porte pas de numéro et n'a peut-être pas encore
+  bougé.
+- Une source **injoignable** (réseau, erreur HTTP, connexion coupée pendant le
+  transfert, délai dépassé), une **page de refus servie en HTTP 200** (page sans
+  le nom « Česká národní banka », ou HTML à la place d'un CSV), des dates
+  **contradictoires** entre la page et l'historique, ou une édition **plus
+  ancienne** que celle déjà servie laissent les deux tables telles quelles et
+  ne font pas échouer le rafraîchissement mensuel (on ne sait pas si cnb.cz
+  répond aux machines de GitHub). Un changement de **format** (page de la ČNB
+  sans la phrase « Číselník N platný od … », CSV sans son en-tête, édition sous
+  le plancher) le fait échouer.
+- **Pas de silence** : une source non chargée écrit une annotation `::warning::`
+  et la sortie d'étape `cz_register=not_loaded`. Une étape finale « Czech
+  register not loaded (cnb.cz) » la change en run rouge, ce qui envoie l'alerte
+  Telegram existante. Dans le rafraîchissement mensuel, cette étape vient APRÈS
+  le commit et le battement : les autres sources sont déjà poussées.
+- **Relecture quotidienne** : `.github/workflows/refresh-cz-register.yml`, chaque
+  jour à 05:17 UTC, lance le chargeur tchèque SEUL (`seed-national.ts CZ`, rien
+  d'autre n'est téléchargé). Il ne commite que si le CONTENU des lignes CZ a
+  changé (`scripts/cz-register-diff.ts` compare la base à celle de HEAD, table
+  par table, et refuse le commit si une autre table, un autre pays ou le schéma
+  diffère), après le même garde de qualité (`refresh-diff.ts`) et les tests ;
+  même alerte Telegram. Groupe de concurrence `bic-sqlite-writer`, partagé avec
+  `refresh-bic.yml` : les deux ne s'écrasent jamais. Raison : une édition qui
+  entre en vigueur hors du 1er (251 le 16/03/2026) ferait sinon refuser, avec
+  autorité, les codes qu'elle crée jusqu'au mois suivant.
+
+### Les pièges de la source
+
+- Le serveur envoie le CSV avec `Content-Type: text/html;charset=UTF-8` : rien
+  ne filtre sur le type, c'est la ligne d'en-tête qui prouve le fichier.
+- La page porte un bloc commenté qui pointe vers `admin-cnb.cz.net`, serveur
+  d'administration de la ČNB : les commentaires HTML sont retirés avant toute
+  lecture.
+- Certaines éditions ouvrent sur une marque d'ordre d'octets (253 oui, 254 non).
+- Onze codes de l'édition 254 n'ont pas de BIC (caisses d'épargne-logement,
+  coopérative, Banking Circle, Multitude Bank…) : ce sont des attributions
+  réelles, gardées avec un BIC nul.
+- L'historique des changements (PDF, depuis 2009) donne les successeurs en
+  texte libre seulement : aucun `superseded_by` n'est servi pour la Tchéquie.
 
 ## BCSM — les banques opérationnelles de Saint-Marin (`national_bank_codes`, pays SM)
 

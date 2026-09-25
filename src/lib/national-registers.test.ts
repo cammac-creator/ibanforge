@@ -53,6 +53,14 @@ describe('normaliseCode', () => {
     expect(normaliseCode('SK', '1100')).toBe('1100');
   });
 
+  it('keeps a Czech code at four', () => {
+    // The ČNB writes its codes with their leading zeros ('0100', Komerční
+    // banka); a Czech IBAN carries them in positions 5-8.
+    expect(normaliseCode('CZ', '0100')).toBe('0100');
+    expect(normaliseCode('CZ', '100')).toBe('0100');
+    expect(normaliseCode('CZ', '12345')).toBeNull();
+  });
+
   it('pads a San Marino ABI to five', () => {
     // The BCSM prints them padded already; the width is asserted anyway,
     // because IBAN positions 6-10 are what the lookup is compared against.
