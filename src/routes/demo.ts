@@ -40,11 +40,12 @@ export const DEMO_IBANS = [
  *
  * The labels name the PROVENANCE, never the verdict: the answer below each
  * label is computed on the request, from the register as it stands that month.
- * demo.test.ts asserts the verdict on the committed data. If a register leaves
- * the repository, give the tests a synthetic register (fictitious codes, see the
- * data-removal plan) rather than dropping the example: production still reads
- * the register. Only if the register starts allocating one of these codes does
- * the example leave this list.
+ * demo.test.ts asserts the shape of the demo on invented Austrian and Belgian
+ * registers (those two registers leave the public repository, decision of
+ * 24/09/2026). The rule "the example leaves this list the day its register
+ * allocates the code" is checked against the real registers by
+ * demo-examples-real-data.test.ts, which fails rather than skips when a
+ * register is missing: it moves to the private quality gate with the registers.
  */
 export const OFFICIAL_EXAMPLE_IBANS = [
   {

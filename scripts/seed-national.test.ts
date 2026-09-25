@@ -230,19 +230,22 @@ describe('slovakSource', () => {
 /**
  * San Marino — the BCSM "operating banks" page.
  *
- * The fixture reproduces the real markup of 06/09/2026, both traps included:
- * the first bank's name split across two adjacent <strong> with NO whitespace
- * between them, and the fourth block writing "Telephone/Fax:" where the others
- * write "Phone/Fax:" while the opening label alternates between "Corporate
- * name:" and "Company name:".
+ * The fixture reproduces the STRUCTURE of the page as read on 06/09/2026, with
+ * invented banks, codes, addresses and numbers (25/09/2026: the BCSM publishes
+ * no terms of use, so its content does not belong in a public repository, not
+ * even as a test fixture). Both traps of the real markup are kept: the first
+ * bank's name split across two adjacent <strong> with NO whitespace between
+ * them, and the fourth block writing "Telephone/Fax:" where the others write
+ * "Phone/Fax:" while the opening label alternates between "Corporate name:"
+ * and "Company name:".
  */
-const SM_READ_ON = '2026-09-06';
+const SM_READ_ON = '2026-01-15';
 
 const SM_PAGE = `<div class="pwr-rich-text">
-<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/5?hsLang=en" rel="noopener"><strong>Banca</strong><strong>Agricola Commerciale Istituto Bancario Sammarinese s.p.a.</strong></a><br>Registered office: Via 3 settembre, 316 - 47891 Dogana<br>Phone/Fax: 0549 871111 / 871222<br>ABI Code: 03034<br>SWIFT BIC: BASMSMSM</p>
-<p>Company name:<br><a href="/registro-soggetti-autorizzati/2?hsLang=en" rel="noopener"><strong>Banca di San Marino s.p.a.</strong></a><br>Registered office: Strada della Croce, 39 - 47896 Faetano<br>Phone/Fax: 0549 873411 / 873401<br>ABI Code: 08540<br>SWIFT BIC: MAOISMSM</p>
-<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/3?hsLang=en" rel="noopener"><strong>Banca Sammarinese di Investimento s.p.a.</strong></a><br>Registered office: Via Monaldo da Falciano, 3 - 47891 Rovereta<br>Phone/Fax: 0549 888801 / 888802<br>ABI Code: 03287<br>SWIFT BIC: BSDISMSD</p>
-<p>Company name:<br><a href="/registro-soggetti-autorizzati/48?hsLang=en" rel="noopener"><strong>Cassa di Risparmio della Repubblica di San Marino s.p.a.</strong></a><br>Registered office: P.tta del Titano, 2 - 47890 San Marino<br>Telephone/Fax: 0549 872311 / 872700<br>ABI Code: 06067<br>SWIFT BIC: CSSMSMSM</p>
+<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/91?hsLang=en" rel="noopener"><strong>Banca</strong><strong>Fantasia per Prove e Collaudi s.p.a.</strong></a><br>Registered office: Via dell'Esempio, 101 - 47891 Contrada<br>Phone/Fax: 0549 000001 / 000002<br>ABI Code: 09991<br>SWIFT BIC: XMPLSMSM</p>
+<p>Company name:<br><a href="/registro-soggetti-autorizzati/92?hsLang=en" rel="noopener"><strong>Banca di Prova s.p.a.</strong></a><br>Registered office: Strada della Prova, 22 - 47896 Borghetto<br>Phone/Fax: 0549 000003 / 000004<br>ABI Code: 09994<br>SWIFT BIC: XMPLSMS2</p>
+<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/93?hsLang=en" rel="noopener"><strong>Istituto Fittizio di Collaudo s.p.a.</strong></a><br>Registered office: Via Immaginaria, 3 - 47891 Contrada<br>Phone/Fax: 0549 000005 / 000006<br>ABI Code: 09992<br>SWIFT BIC: XMPLSMSMAAA</p>
+<p>Company name:<br><a href="/registro-soggetti-autorizzati/94?hsLang=en" rel="noopener"><strong>Cassa Immaginaria di Collaudo s.p.a.</strong></a><br>Registered office: P.tta dell'Esempio, 2 - 47890 Borgo Esempio<br>Telephone/Fax: 0549 000007 / 000008<br>ABI Code: 09993<br>SWIFT BIC: XMPLSMS3</p>
 <p>Some other paragraph on the page, carrying neither an ABI Code nor a BIC.</p>
 </div>`;
 
@@ -251,42 +254,40 @@ const smByCode = (html: string) =>
 
 describe('parseSanMarino', () => {
   it('reads the four operating banks and ignores the rest of the page', () => {
-    expect([...smByCode(SM_PAGE).keys()].sort()).toEqual(['03034', '03287', '06067', '08540']);
+    expect([...smByCode(SM_PAGE).keys()].sort()).toEqual(['09991', '09992', '09993', '09994']);
   });
 
   it('un-joins a name split across two adjacent <strong>', () => {
     // 🚨 The page's own markup carries no whitespace between </strong> and
-    // <strong>, so a browser renders "BancaAgricola" too. The institution's
-    // real name has the space: our GLEIF-sourced directory row for BASMSMSM
-    // reads "BANCA AGRICOLA COMMERCIALE ISTITUTO BANCARIO SAMMARINESE"
-    // (checked 06/09/2026). Reading across an element boundary is not editing.
-    expect(smByCode(SM_PAGE).get('03034')?.name).toBe(
-      'Banca Agricola Commerciale Istituto Bancario Sammarinese s.p.a.',
-    );
+    // <strong>, so a browser renders the two words glued together too. The
+    // institution's real name has the space (the bank's GLEIF-sourced row in
+    // our directory carries it, checked 06/09/2026 on the real page's first
+    // bank). Reading across an element boundary is not editing.
+    expect(smByCode(SM_PAGE).get('09991')?.name).toBe('Banca Fantasia per Prove e Collaudi s.p.a.');
   });
 
   it('reads the block whose phone label differs from the other three', () => {
     // "Telephone/Fax:" on the fourth, "Phone/Fax:" on the others — proof the
     // parser anchors on ABI Code / SWIFT BIC alone.
-    const row = smByCode(SM_PAGE).get('06067');
-    expect(row?.name).toBe('Cassa di Risparmio della Repubblica di San Marino s.p.a.');
-    expect(row?.bic).toBe('CSSMSMSM');
+    const row = smByCode(SM_PAGE).get('09993');
+    expect(row?.name).toBe('Cassa Immaginaria di Collaudo s.p.a.');
+    expect(row?.bic).toBe('XMPLSMS3');
   });
 
   it('splits the registered office on the postcode, not on the comma', () => {
-    // "P.tta del Titano, 2 - 47890 San Marino": a comma split would leave the
-    // house number behind, and the town is two words.
-    const row = smByCode(SM_PAGE).get('06067');
+    // "P.tta dell'Esempio, 2 - 47890 Borgo Esempio": a comma split would leave
+    // the house number behind, and the town is two words.
+    const row = smByCode(SM_PAGE).get('09993');
     expect([row?.street, row?.post_code, row?.town]).toEqual([
-      'P.tta del Titano, 2',
+      "P.tta dell'Esempio, 2",
       '47890',
-      'San Marino',
+      'Borgo Esempio',
     ]);
-    const dogana = smByCode(SM_PAGE).get('03034');
-    expect([dogana?.street, dogana?.post_code, dogana?.town]).toEqual([
-      'Via 3 settembre, 316',
+    const first = smByCode(SM_PAGE).get('09991');
+    expect([first?.street, first?.post_code, first?.town]).toEqual([
+      "Via dell'Esempio, 101",
       '47891',
-      'Dogana',
+      'Contrada',
     ]);
   });
 
@@ -309,16 +310,16 @@ describe('parseSanMarino', () => {
   });
 
   it('drops a block whose ABI is not five digits', () => {
-    const broken = SM_PAGE.replace('ABI Code: 03034', 'ABI Code: 0549 871111');
+    const broken = SM_PAGE.replace('ABI Code: 09991', 'ABI Code: 0549 000001');
     const rows = smByCode(broken);
-    expect(rows.has('03034')).toBe(false);
+    expect(rows.has('09991')).toBe(false);
     // The other three survive: one bad block is not a reason to lose the page.
     expect(rows.size).toBe(3);
   });
 
   it('drops a block whose BIC is not 8 or 11 characters', () => {
-    const broken = SM_PAGE.replace('SWIFT BIC: MAOISMSM', 'SWIFT BIC: n/a');
-    expect(smByCode(broken).has('08540')).toBe(false);
+    const broken = SM_PAGE.replace('SWIFT BIC: XMPLSMS2', 'SWIFT BIC: n/a');
+    expect(smByCode(broken).has('09994')).toBe(false);
   });
 
   it('parses to nothing when the labels change, so the floor refuses the write', () => {

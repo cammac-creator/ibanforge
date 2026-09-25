@@ -536,6 +536,9 @@ export interface IBANValidationResult {
      * Bank-level VoP readiness: true when the resolved institution is listed
      * as "ready" in the EPC Verification of Payee scheme register; false when
      * it is not; null when no institution was resolved (no subject, no claim).
+     * Nul aussi quand le registre VoP n'est pas chargé : non consulté, donc pas
+     * d'affirmation non plus (25/09/2026). Hors de la zone SEPA, le pays répond
+     * `false`, registre ou non.
      * Listing means the bank answers VoP requests — it does not run the name
      * check for you and says nothing about a specific account.
      */
@@ -925,6 +928,10 @@ export interface SanctionsCheck {
    *
    * When false, `bank_sanctioned` and `matched_lists` carry no information —
    * do not branch on them.
+   *
+   * Faux aussi quand une banque a été résolue mais qu'aucune liste de
+   * sanctions n'est chargée (25/09/2026) : le drapeau
+   * `sanctions_lists_unavailable` le dit, et le score ne descend pas sous 50.
    */
   bank_screened: boolean;
 }
@@ -937,6 +944,10 @@ export interface ReachabilityCheck {
    * False when no institution resolved, so the three booleans above are
    * defaults rather than findings. The EPC registers are keyed by BIC8; with no
    * BIC there is no key and no lookup happened.
+   * Faux aussi quand les registres EPC ne sont pas chargés (25/09/2026) : la
+   * recherche n'avait rien à consulter, ce qui est la même absence de constat.
+   * Sauf pour un pays hors de la zone SEPA : le pays répond, `screened` reste
+   * vrai, et la réponse est celle d'une base complète.
    */
   screened: boolean;
 }
@@ -947,6 +958,8 @@ export interface VopCheck {
   /**
    * False when no institution resolved. `status: 'not_found'` then describes
    * the absence of a query, not the absence of a registration.
+   * Faux aussi quand le registre VoP n'est pas chargé (25/09/2026), sauf pour
+   * un pays hors de la zone SEPA, où le pays répond.
    */
   screened: boolean;
 }
