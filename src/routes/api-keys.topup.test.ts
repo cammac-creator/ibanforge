@@ -141,7 +141,9 @@ describe('/v1/keys/revoke et /v1/keys/rotate', () => {
         headers: { Authorization: `Bearer ${pack.api_key}` },
       })
     ).json()) as { monthly_limit: number; basis: string };
-    expect(packRot.monthly_limit).toBe(0);
+    // 0 en base, mais la réponse d'avant le lot B1 (repli d'affichage, opposé à
+    // rien) : un porteur existant ne voit aucun chiffre changer.
+    expect(packRot.monthly_limit).toBe(200);
     expect(packRot.basis).toBe('credits');
   });
 });

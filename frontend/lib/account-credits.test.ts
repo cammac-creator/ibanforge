@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatGrouped } from './format-grouped';
-import { isCreditKey, readBalance, type AccountUsage } from './account-credits';
+import { isCreditKey, isMixedKey, readBalance, type AccountUsage } from './account-credits';
 
 /**
  * Fixtures inventées, et le chiffre du milieu est celui qui compte.
@@ -127,5 +127,40 @@ describe('le nombre tel que le lecteur le voit', () => {
     expect(digits(formatGrouped(24939, 'fr'))).toBe('24939');
     expect(digits(formatGrouped(24939, 'de'))).toBe('24939');
     expect(formatGrouped(24939, 'en')).toBe('24,939');
+  });
+});
+
+/**
+ * Lot B1 (25.09.2026) : une clé gratuite RECHARGÉE garde son allocation et y
+ * ajoute des crédits. Son `basis` nomme l'assiette de l'allocation, et le solde
+ * est servi à côté : les deux gouvernent, chacun à son tour.
+ */
+describe('une clé mixte (allocation puis crédits)', () => {
+  const MIXED_KEY: AccountUsage = {
+    ...MONTHLY_KEY,
+    used: 150,
+    remaining: 50,
+    credits_remaining: 1000,
+    credits_total: 1000,
+    billing_order: 'allowance_then_credits',
+  };
+
+  it('n’est ni une clé à crédits seule, ni une clé mensuelle seule', () => {
+    expect(isMixedKey(MIXED_KEY)).toBe(true);
+    expect(isCreditKey(MIXED_KEY)).toBe(false);
+    expect(isMixedKey({ ...MIXED_KEY, basis: 'lifetime' })).toBe(true);
+    // Une API d'avant le lot ne sert jamais les deux ensemble.
+    expect(isMixedKey(CREDIT_KEY)).toBe(false);
+    expect(isMixedKey(MONTHLY_KEY)).toBe(false);
+  });
+
+  it('montre les deux soldes', () => {
+    expect(readBalance(MIXED_KEY)).toEqual({
+      kind: 'mixed',
+      used: 150,
+      remaining: 50,
+      creditsRemaining: 1000,
+      creditsTotal: 1000,
+    });
   });
 });

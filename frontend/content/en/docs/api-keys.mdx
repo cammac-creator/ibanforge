@@ -96,7 +96,7 @@ same history, a bigger allowance. Three ways, take whichever fits.
 |---|---|---|
 | A mailed 6-digit code | 200 requests a month | **yes, every month** |
 | An x402 payment made with the key | 200 requests | **no — 200 once, not 200 a month** |
-| A prepaid pack bought with the key | 200 requests | **no — 200 once, not 200 a month** |
+| A prepaid pack bought with the key | its credits, on this same key | **no free allowance at all** (see below) |
 
 ### 1. A mailed 6-digit code
 
@@ -156,11 +156,14 @@ The threshold is the catalogue price of what the claim grants: small, and payabl
 
 ### 3. A prepaid pack bought with the key
 
-Buying a credit pack in USDC while presenting the key (`POST /v1/credits/buy/1k|5k|25k`) claims it
-the same way. The pack itself is a separate key preloaded with credits; the claim is a courtesy on
-the key you presented.
+A pack bought while presenting the key recharges that same key, and grants no free allowance: a
+purchase never creates one. **Claim before you buy.** An anonymous key that buys credits leaves the
+anonymous tier for good: it keeps its credits and no free monthly allowance, and
+`POST /v1/keys/claim` then answers `409 already_claimed`. Claimed first with a mailed code, the same
+key keeps its 200 a month and draws on its credits once the month is spent (see
+[Recharging a key](#recharging-a-key)).
 
-**These two rails grant 200 requests once, not 200 a month.** `GET /v1/keys/usage` then reports
+**The x402 rail grants 200 requests once, not 200 a month.** `GET /v1/keys/usage` then reports
 `basis: "lifetime"`, and the counters run over the whole life of the key rather than the calendar
 month. The mailed code is the recurring way, and it costs nothing: if you can read a mailbox, that
 is the better deal.
@@ -285,8 +288,13 @@ curl https://api.ibanforge.com/v1/keys/usage \
 `limit` is 25 on an anonymous key and 200 on a claimed one; `tier` says which. `basis` says which
 ceiling actually governs: `monthly` is the normal case and resets on the 1st, `lifetime` belongs to
 a key claimed by payment — its 200 are counted once, across all months, not refilled — and
-`credits` means a prepaid balance, with nothing enforced against `limit`. The `claim` block is
-served only on a key that can still be claimed.
+`credits` means a key born of a purchase, which draws on its prepaid balance alone: nothing is
+enforced against `limit`. The `claim` block is served only on a key that can still be claimed.
+
+A key that holds an allowance **and** credits, such as a free key you recharged, keeps the `basis`
+of its allowance and also carries `credits_remaining`, `credits_total` and
+`billing_order: "allowance_then_credits"`. On every key, `topup` carries the card links that
+recharge that same key.
 
 `month` is the calendar month the counters belong to (`YYYY-MM`). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`. A served keyless answer carries `X-Trial-Period: week`; the 402 carries no `X-Trial-*` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same (the claim still accepts a key cut off for a burst of automated signups, since claiming is how it comes back). `POST /v1/keys/revoke` and `POST /v1/keys/rotate` answer `401 missing_key` without a key, and `404 invalid_key` for an unknown or already revoked one.
 
@@ -338,6 +346,37 @@ The figures are the balance after the request settled: a call rejected with a
 polling to reading headers, `GET /v1/keys/usage` returns the same numbers, and
 it is free.
 
+## Recharging a key
+
+A pack lands on the key you already hold: nothing to change in your integration, and the credits
+never expire.
+
+- **By card**: open one of the links under `topup.by_card` (in `GET /v1/keys/usage`,
+  `GET /v1/credits/balance`, and `credit_packs.topup_this_key` in a `402` served to the key), or the
+  *Recharge this key* buttons of your [account page](/account). Each link carries the key's recharge
+  reference, never the key itself: it only lets someone pay for this key. The success page then says
+  which key was recharged, and you receive a confirmation mail.
+- **In USDC**: `POST /v1/credits/buy/1k|5k|25k` with the key presented as usual. Presenting it costs
+  no request, the answer carries `same_key: true`, and the credits are added once the payment
+  settles. Without a key, the same route sells a new key, as the [pricing page](/pricing) does.
+
+`credits_total` counts everything ever bought on the key, recharges included, and
+`X-Credits-Total` says the same.
+
+**On a key that holds both**, each call draws on the allowance first, then on the credits; a batch
+that crosses from one to the other is split between them, all or nothing. Every billed response says
+which one paid it:
+
+```
+X-Charged-From: allowance
+X-Charged-From: credits
+X-Charged-From: allowance+credits
+```
+
+**When the credits run out**, the key stays valid. A free key goes back to its monthly allowance. A
+key born of a purchase answers `402` with `cause.reason: "credits_exhausted"` and the links that
+recharge it (`X-Credits-Topup-Url` carries the 1,000-credit one).
+
 ## When you exceed the quota
 
 Your integration does **not** hit a hard dead-end. Once the monthly requests are used up, the API answers `402 Payment Required` (x402) instead of a blunt 429, with hint headers telling you exactly what happened:
@@ -352,7 +391,7 @@ X-Quota-Month: 2026-09
 The 402 body lists your options in machine-readable form:
 
 1. **Claim the key** — if it is still anonymous, a mailed code raises it and costs nothing.
-2. **Buy a prepaid credit pack** — by card on the [pricing page](/pricing), or in USDC via `POST /v1/credits/buy/1k|5k|25k`. Credits never expire and attach to your existing key.
+2. **Recharge this key**: by card with the links the 402 carries (`credit_packs.topup_this_key`, `X-Credits-Topup-Url`) or from your [account page](/account), or in USDC via `POST /v1/credits/buy/1k|5k|25k` with the key presented. The credits land on this same key and never expire. See [Recharging a key](#recharging-a-key).
 3. **Pay per call via x402** — an x402-compatible client pays automatically in USDC, no key change needed. See [x402 Payments](/docs/x402).
 4. **Wait for the monthly reset** — on a `monthly` basis the quota resets on the 1st; a key raised against a payment, or issued under a signup alert, reads `basis: lifetime` and does not.
 

@@ -31,7 +31,7 @@
  * Les erreurs ne s'affichent qu'en réponse à un geste.
  */
 
-import { isCreditKey, readBalance, type AccountUsage } from './account-credits';
+import { isCreditKey, isMixedKey, readBalance, type AccountUsage } from './account-credits';
 
 // ─── Réponses de l'API ───────────────────────────────────────────────────────
 
@@ -138,6 +138,41 @@ export interface KeySheet {
   alerts: Array<{ kind: AlertKind; sentAt: string | null }> | null;
   /** Le portail Stripe d'un abonné, seulement en https. */
   manageUrl: string | null;
+  /**
+   * Recharger CETTE clé (lot B1) : les trois liens de paiement, porteurs de sa
+   * référence, seulement en https. `proven` dit si l'adresse de la clé a été
+   * prouvée par un code (vue du compte) ; `null` en mode clé collée, où tenir
+   * la clé prouve déjà qu'elle est la sienne. La page n'offre la recharge d'une
+   * clé à l'adresse non prouvée qu'avec un avertissement (relecture de sécurité
+   * du lot C1, point I1).
+   */
+  topup: { links: Record<TopupSlug, string>; proven: boolean | null } | null;
+}
+
+export type TopupSlug = '1k' | '5k' | '25k';
+
+/**
+ * Les packs d'une recharge, dans l'ordre et aux prix de la page des tarifs
+ * (`app/[locale]/pricing/page.tsx`). Le prix n'est qu'un libellé : le montant
+ * payé est celui du lien Stripe, que l'API sert.
+ */
+export const TOPUP_PACKS: ReadonlyArray<{ slug: TopupSlug; credits: number; price: string }> = [
+  { slug: '1k', credits: 1000, price: '$4' },
+  { slug: '5k', credits: 5000, price: '$20' },
+  { slug: '25k', credits: 25000, price: '$80' },
+];
+
+/** Les trois liens, tous en https, ou rien : une recharge à moitié servie ne s'affiche pas. */
+function readTopupLinks(raw: unknown): Record<TopupSlug, string> | null {
+  const links = record(raw);
+  if (!links) return null;
+  const out: Partial<Record<TopupSlug, string>> = {};
+  for (const { slug } of TOPUP_PACKS) {
+    const url = safeHttpsUrl(links[slug]);
+    if (!url) return null;
+    out[slug] = url;
+  }
+  return out as Record<TopupSlug, string>;
 }
 
 function finite(v: unknown): number | null {
@@ -198,6 +233,8 @@ interface SheetInput {
   lastCall: { at: unknown } | null;
   alerts: unknown;
   manageUrl: unknown;
+  topup: unknown;
+  proven: unknown;
 }
 
 /**
@@ -246,6 +283,7 @@ function buildSheet(input: SheetInput): KeySheet | null {
     }
   }
 
+  const links = readTopupLinks(input.topup);
   return {
     prefix,
     plan: parsePlan(input.plan),
@@ -256,6 +294,7 @@ function buildSheet(input: SheetInput): KeySheet | null {
     lastCall: input.lastCall ? { at: text(input.lastCall.at) } : null,
     alerts: readAlerts(input.alerts),
     manageUrl: safeHttpsUrl(input.manageUrl),
+    topup: links ? { links, proven: typeof input.proven === 'boolean' ? input.proven : null } : null,
   };
 }
 
@@ -283,6 +322,10 @@ export function sheetFromOverviewKey(raw: unknown, month: unknown): KeySheet | n
     lastCall: { at: key.last_call_at },
     alerts: key.alerts,
     manageUrl: actions?.manage_subscription ?? subscription?.manage_url ?? null,
+    topup: actions?.topup ?? null,
+    // Absent d'une API d'avant le lot B1 : lu comme « non prouvée », pour que
+    // la page avertisse plutôt que de taire le doute.
+    proven: key.address_proven === true,
   });
 }
 
@@ -295,18 +338,24 @@ export function sheetFromOverviewKey(raw: unknown, month: unknown): KeySheet | n
 export function sheetFromReport(payload: KeyReportPayload): KeySheet | null {
   const usage = payload.usage;
   const credit = isCreditKey(usage);
+  // Une clé mixte (lot B1) montre ses deux soldes : l'allocation, puis les crédits.
+  const mixed = isMixedKey(usage);
   return buildSheet({
     prefix: payload.key_prefix,
     plan: null,
     allowance: credit
       ? null
       : { basis: usage.basis, limit: usage.limit, used: usage.used, remaining: usage.remaining },
-    credits: credit ? { remaining: usage.credits_remaining, total: usage.credits_total } : null,
+    credits:
+      credit || mixed ? { remaining: usage.credits_remaining, total: usage.credits_total } : null,
     callsThisMonth: usage.basis === 'lifetime' ? null : usage.used,
     month: usage.month,
     lastCall: null,
     alerts: null,
     manageUrl: null,
+    topup: usage.topup?.by_card ?? null,
+    // Le porteur a collé la clé : il la tient, aucun doute à lever.
+    proven: null,
   });
 }
 

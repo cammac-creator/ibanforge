@@ -10,7 +10,7 @@
  *
  * Les valeurs attendues ont été RELEVÉES sur le code d'avant le changement
  * (main à 373bf71b), par ce même scénario, puis gravées ici. Ce qui a changé
- * volontairement est listé dans `CHANGED_BY_DESIGN` avec son motif : jamais en
+ * volontairement est listé dans `expectedAfterB1` avec son motif : jamais en
  * silence.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -739,36 +739,24 @@ const BASELINE_373BF71B: Record<string, Observation> = {
   },
 };
 
-/** Les clés sans allocation propre : nées d'un achat de pack, ou pack offert. */
-const CREDIT_ONLY: ReadonlySet<string> = new Set([
-  'pack_card',
-  'pack_usdc_zero',
-  'pack_rotated',
-  'granted',
-]);
-
 /**
- * Ce qui change VOLONTAIREMENT pour un porteur existant, et pourquoi. Aucun de
- * ces champs ne décide de ce qu'une clé reçoit.
+ * Ce qui change VOLONTAIREMENT pour un porteur existant, et pourquoi. Un seul
+ * point, et il ne décide pas de ce qu'une clé reçoit.
  *
- * 1. `usage.limit` et `usage.remaining` d'une clé à crédits passent de 200 à 0.
- *    Leur `basis` est `credits` et leur note dit que rien ne leur est opposé :
- *    le 200 venait du repli `NULL → 200` sur une clé qui n'a jamais eu de
- *    plafond mensuel. La migration écrit 0, l'allocation propre d'une clé née
- *    d'un achat (spec §5.2).
- * 2. Acheter un pack en présentant une clé vide ne facture plus d'unité (la
- *    route de vente entre dans les routes gratuites du middleware des clés) :
- *    la réponse reste un 402 qui demande le paiement, sans la cause
- *    « crédits épuisés » que l'unité facturée faisait naître.
+ * Acheter un pack en présentant une clé vide ne facture plus d'unité : la route
+ * de vente entre dans les routes gratuites du middleware des clés (spec §3 et
+ * §4.4, décidé). Avant, le middleware débitait une unité, échouait sur le
+ * solde nul, posait la cause « crédits épuisés » et laissait passer au paywall
+ * x402, qui demandait le paiement. Après, le même paywall demande le même
+ * paiement, sans la cause que l'unité facturée faisait naître. Payé, l'achat ne
+ * coûte plus une unité en plus du pack.
+ *
+ * `usage.limit` et `usage.remaining` d'une clé à crédits ne changent PAS : la
+ * base porte 0, et la réponse garde le repli d'affichage d'avant (200, opposé à
+ * rien), faute de décision contraire.
  */
 function expectedAfterB1(name: string, before: Observation): Observation {
-  const [key] = name.split('.');
   const after: Observation = JSON.parse(JSON.stringify(before)) as Observation;
-  if (CREDIT_ONLY.has(key) && after.usage) {
-    const usage = after.usage as Record<string, unknown>;
-    usage.limit = 0;
-    usage.remaining = 0;
-  }
   if (name === 'pack_usdc_zero.buy.unpaid') {
     for (const field of ['cause_credits', 'x-credits-exhausted', 'x-credits-required']) {
       delete after[field];

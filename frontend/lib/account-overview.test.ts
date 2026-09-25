@@ -164,6 +164,7 @@ describe('les écrans de la page du compte', () => {
       lastCall: { at: '2026-09-18T08:15:00Z' },
       alerts: [{ kind: 'credits_low', sentAt: '2026-09-12T07:30:00Z' }],
       manageUrl: null,
+      topup: null,
     });
     expect(free).toMatchObject({
       plan: { parts: ['free'], raw: 'free' },
@@ -245,6 +246,88 @@ describe('les écrans de la page du compte', () => {
     expect(parsePlan('free+enterprise')).toEqual({ parts: [], raw: 'free+enterprise' });
     expect(parsePlan('')).toBeNull();
     expect(parsePlan(undefined)).toBeNull();
+  });
+});
+
+/**
+ * Lot B1 (25.09.2026) : recharger CETTE clé. Les liens portent sa référence ;
+ * une clé à l'adresse non prouvée n'est offerte qu'avec un avertissement
+ * (relecture de sécurité du lot C1, point I1).
+ */
+describe('recharger cette clé', () => {
+  const LINKS = {
+    '1k': 'https://buy.stripe.com/aaa?client_reference_id=ifr_' + '1'.repeat(32),
+    '5k': 'https://buy.stripe.com/bbb?client_reference_id=ifr_' + '1'.repeat(32),
+    '25k': 'https://buy.stripe.com/ccc?client_reference_id=ifr_' + '1'.repeat(32),
+  };
+
+  it('vue du compte : les trois liens, et la provenance de l’adresse', () => {
+    const unproven = sheetFromOverviewKey(
+      { ...PACK_KEY, address_proven: false, actions: { ...PACK_KEY.actions, topup: LINKS } },
+      '2026-09',
+    );
+    expect(unproven?.topup).toEqual({ links: LINKS, proven: false });
+    const proven = sheetFromOverviewKey(
+      { ...PACK_KEY, address_proven: true, actions: { ...PACK_KEY.actions, topup: LINKS } },
+      '2026-09',
+    );
+    expect(proven?.topup?.proven).toBe(true);
+    // Une API d'avant le lot ne sert pas la provenance : lue « non prouvée ».
+    const older = sheetFromOverviewKey(
+      { ...PACK_KEY, actions: { ...PACK_KEY.actions, topup: LINKS } },
+      '2026-09',
+    );
+    expect(older?.topup?.proven).toBe(false);
+  });
+
+  it('rien d’incomplet ni de non-https ne devient un bouton', () => {
+    const partial = sheetFromOverviewKey(
+      { ...PACK_KEY, actions: { ...PACK_KEY.actions, topup: { '1k': LINKS['1k'] } } },
+      '2026-09',
+    );
+    expect(partial?.topup).toBeNull();
+    const unsafe = sheetFromOverviewKey(
+      {
+        ...PACK_KEY,
+        actions: { ...PACK_KEY.actions, topup: { ...LINKS, '5k': 'javascript:alert(1)' } },
+      },
+      '2026-09',
+    );
+    expect(unsafe?.topup).toBeNull();
+  });
+
+  it('clé collée : une clé mixte montre ses deux soldes, et la recharge sans avertissement', () => {
+    const pasted: KeyReportPayload = {
+      key_prefix: 'ifk_5e6f7a8b',
+      usage: {
+        used: 150,
+        limit: 200,
+        remaining: 50,
+        month: '2026-09',
+        basis: 'monthly',
+        tier: 'email',
+        credits_remaining: 1000,
+        credits_total: 1000,
+        billing_order: 'allowance_then_credits',
+        topup: { by_card: LINKS },
+      },
+      report: {
+        window_days: 30,
+        total: 150,
+        ok: 150,
+        failed: 0,
+        avg_ms: 2,
+        days: [],
+        endpoints: [],
+        errors: [],
+        footprint: { distinct_networks: 1, unusual: false },
+      },
+    };
+    const sheet = sheetFromReport(pasted);
+    expect(sheet?.allowance).toEqual({ lifetime: false, remaining: 50, limit: 200 });
+    expect(sheet?.credits).toEqual({ remaining: 1000, total: 1000 });
+    // Tenir la clé prouve qu'elle est la sienne : aucun doute à lever.
+    expect(sheet?.topup).toEqual({ links: LINKS, proven: null });
   });
 });
 

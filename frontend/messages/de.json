@@ -536,7 +536,8 @@
         "title": "Prepaid-Credits",
         "body": "Im Paket kaufen, ohne Ablauf: 1k = 4 $, 5k = 20 $, 25k = 80 $ (bis 0,0032 $/Credit). Ein Credit = eine Validierung oder ein Lookup — ein Batch mit N IBANs verbraucht N Credits.",
         "note": "Stripe-Checkout — API-Schlüssel per E-Mail. Agenten können in USDC kaufen: POST /v1/credits/buy/1k|5k|25k.",
-        "cardLabel": "Mit Karte zahlen"
+        "cardLabel": "Mit Karte zahlen",
+        "rechargeExisting": "Sie haben schon einen Schlüssel? Laden Sie ihn über <account>Ihr Konto</account> auf: Die Credits landen auf genau diesem Schlüssel, an Ihrer Integration ändert sich nichts."
       }
     },
     "oem": {
@@ -2320,7 +2321,12 @@
     "leaveFailed": "Der Schlüssel konnte nicht widerrufen werden. Es wurde nichts geändert, er funktioniert weiterhin.",
     "leaveDpa": "Auftragsverarbeitungsvertrag lesen",
     "noKeyYet": "Noch keinen Schlüssel? 25 Aufrufe pro Monat ohne E-Mail; 200 pro Monat nach Bestätigung Ihrer Adresse. Ohne Karte.",
-    "getKey": "Gratis-Schlüssel holen"
+    "getKey": "Gratis-Schlüssel holen",
+    "mixedNote": "Jeder Aufruf nutzt zuerst das Kontingent, dann die Prepaid-Credits dieses Schlüssels.",
+    "topupTitle": "Diesen Schlüssel aufladen",
+    "topupHint": "Zahlung per Karte: Die Credits landen auf genau diesem Schlüssel. An Ihrer Integration ändert sich nichts.",
+    "topupUnproven": "Dieser Schlüssel trägt Ihre Adresse, sie wurde bei seiner Erstellung aber nicht mit einem Code bestätigt. Laden Sie ihn nur auf, wenn Sie ihn als Ihren erkennen.",
+    "topupCredits": "{credits} Credits"
   },
   "sources": {
     "meta": {

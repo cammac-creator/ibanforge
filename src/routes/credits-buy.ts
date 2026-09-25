@@ -152,6 +152,7 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
           same_key: true,
           recharged: true,
           key_prefix: presentedPrefix,
+          credits: bundle.credits,
           credits_added: bundle.credits,
           credits_remaining: balance,
           bundle: slug,
@@ -228,6 +229,9 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
         same_key: true,
         recharged: true,
         key_prefix: presentedPrefix,
+        // La taille du pack, comme sur une clé neuve : le contrat publié exige
+        // `credits`, et un client d'avant ce lot le lit.
+        credits: bundle.credits,
         credits_added: bundle.credits,
         bundle: slug,
         price_paid_usdc: bundle.price_usdc,

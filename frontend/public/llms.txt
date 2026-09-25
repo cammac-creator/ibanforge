@@ -109,7 +109,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - The hosted MCP transport has its own taster, not shared with that one: 25 tool calls a week per source address, same reset.
 - Free key, nothing asked: POST /v1/keys/generate with no body at all → an ifk_ key, 25 requests a month, on every endpoint. Nothing is mailed and no record is opened.
 - Same key, full free allowance: POST /v1/keys/claim with `Authorization: Bearer ifk_...` (never in the body), once the key has served one call. A 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose — gives 200 every month; an x402 payment made on the key gives 200 once.
-- Credit packs (card or USDC, never expire): 1k = $4, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
+- Credit packs (card or USDC, never expire): 1k = $4, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k. Presenting a key recharges THAT key (same key, nothing to change in your integration); by card, use the links under `topup` in GET /v1/keys/usage. A pack never grants a free allowance: claim an anonymous key by e-mail BEFORE buying to keep one.
 - Pro subscription (card): $29/month for 10,000 requests, resets on the 1st, cancel anytime → https://ibanforge.com/pricing?src=llms
 - x402 micropayments: pay per call in USDC on Base L2, no signup
 

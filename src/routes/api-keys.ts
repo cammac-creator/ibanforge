@@ -812,7 +812,18 @@ function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
   // total, pendant qu'un plafond de vie l'arrêtait. Défaut pré-existant devenu
   // visible : jusqu'ici seules des clés qui ne lisent pas leur rapport
   // portaient ce drapeau ; le chantier en crée deux populations qui le liront.
-  const usage = getUsage(v.keyHash, v.monthlyLimit, noRecredit);
+  //
+  // 🚨 Une clé née d'un achat n'a pas d'allocation propre (0 écrit en base
+  // depuis le lot B1), mais son `limit`/`remaining` restent servis comme avant
+  // ce lot : le repli d'affichage sur le palier gratuit, opposé à rien, que sa
+  // note dit. Les passer à 0 changerait la réponse d'un porteur existant (un
+  // client qui lit `remaining` au lieu de `credits_remaining` s'arrêterait
+  // net) : c'est une décision, pas une conséquence de la migration.
+  const usage = getUsage(
+    v.keyHash,
+    isCreditKey ? FREE_TIER_MONTHLY_LIMIT : v.monthlyLimit,
+    noRecredit,
+  );
   const tier = v.tier ?? 'email';
   return {
     ...usage,
@@ -1064,26 +1075,24 @@ apiKeys.post('/v1/keys/rotate', (c) => {
   if (!rotated) {
     return c.json({ error: 'invalid_key', message: 'Key not found or inactive.' }, 404);
   }
+  // L'allocation propre ÉCRITE, avec le défaut du palier (lot B1) : 0 pour une
+  // clé née d'un achat. Une telle clé se lit `credits`.
+  const ownAllowance = rotated.monthly_limit ?? ownAllowanceDefault(rotated.tier);
+  const creditOnly = typeof rotated.credits_remaining === 'number' && ownAllowance <= 0;
   return c.json(
     {
       api_key: rotated.api_key,
       key_prefix: rotated.key_prefix,
-      // L'allocation propre ÉCRITE, avec le défaut du palier (lot B1) : 0 pour
-      // une clé née d'un achat, qui n'a jamais eu « 200 par mois ».
-      monthly_limit: rotated.monthly_limit ?? ownAllowanceDefault(rotated.tier),
+      // Pour une clé à crédits, la valeur servie avant le lot B1 (le repli sur
+      // le palier gratuit, opposé à rien) : même motif que `usageBlock`.
+      monthly_limit: creditOnly ? FREE_TIER_MONTHLY_LIMIT : ownAllowance,
       credits_remaining: rotated.credits_remaining,
       // Le palier SURVIT à la rotation, et le dire ici est ce qui le prouve à
       // son porteur : une clé anonyme tournée reste anonyme, une clé réclamée
       // reste réclamée. Le `basis` suit le drapeau recopié par la rotation,
       // sans quoi une clé « à vie » se relirait « par mois » après un /rotate.
       tier: rotated.tier,
-      basis:
-        typeof rotated.credits_remaining === 'number' &&
-        (rotated.monthly_limit ?? ownAllowanceDefault(rotated.tier)) <= 0
-          ? 'credits'
-          : rotated.no_recredit === 1
-            ? 'lifetime'
-            : 'monthly',
+      basis: creditOnly ? 'credits' : rotated.no_recredit === 1 ? 'lifetime' : 'monthly',
       message: 'New key issued and the old one revoked. Save this — it will not be shown again.',
     },
     201,

@@ -99,7 +99,7 @@ préfixe, même historique, un quota plus grand. Trois voies, prenez celle qui v
 |---|---|---|
 | Un code à 6 chiffres reçu par mail | 200 requêtes par mois | **oui, chaque mois** |
 | Un règlement x402 fait avec la clé | 200 requêtes | **non — 200 une fois, pas 200 par mois** |
-| Un pack prépayé acheté avec la clé | 200 requêtes | **non — 200 une fois, pas 200 par mois** |
+| Un pack prépayé acheté avec la clé | ses crédits, sur cette même clé | **aucun gratuit** (voir plus bas) |
 
 ### 1. Un code à 6 chiffres reçu par mail
 
@@ -159,11 +159,14 @@ est le prix catalogue de ce que la réclamation accorde : faible, et réglable e
 
 ### 3. Un pack prépayé acheté avec la clé
 
-Acheter un pack de crédits en USDC en présentant la clé (`POST /v1/credits/buy/1k|5k|25k`) la
-réclame de la même façon. Le pack lui-même est une clé distincte, préchargée en crédits ; la
-réclamation est une courtoisie sur la clé que vous avez présentée.
+Un pack acheté en présentant la clé recharge cette même clé, et n'accorde aucun gratuit : un achat
+n'en crée jamais. **Réclamez avant d'acheter.** Une clé anonyme qui achète des crédits quitte le
+palier anonyme pour de bon : elle garde ses crédits et aucune allocation mensuelle gratuite, et
+`POST /v1/keys/claim` répond alors `409 already_claimed`. Réclamée d'abord par un code reçu par mail,
+la même clé garde ses 200 par mois et puise dans ses crédits une fois le mois épuisé (voir plus bas,
+« Recharger une clé »).
 
-**Ces deux voies accordent 200 requêtes une fois, pas 200 par mois.** `GET /v1/keys/usage` rapporte
+**La voie x402 accorde 200 requêtes une fois, pas 200 par mois.** `GET /v1/keys/usage` rapporte
 alors `basis: "lifetime"`, et les compteurs courent sur la vie entière de la clé plutôt que sur le
 mois calendaire. Le code reçu par mail est la voie récurrente, et elle ne coûte rien : si vous
 pouvez lire une boîte mail, c'est la meilleure affaire.
@@ -290,8 +293,13 @@ curl https://api.ibanforge.com/v1/keys/usage \
 `limit` vaut 25 sur une clé anonyme et 200 sur une clé réclamée ; `tier` dit laquelle. `basis` dit
 quel plafond gouverne vraiment : `monthly` est le cas normal, remis à zéro le 1er ; `lifetime`
 appartient à une clé réclamée par paiement — ses 200 sont comptés une fois, tous mois confondus, et
-non rechargés ; `credits` est un solde prépayé, et rien n'est alors opposé à `limit`. Le bloc `claim`
-n'est servi que sur une clé encore réclamable.
+non rechargés ; `credits` désigne une clé née d'un achat, qui ne puise que dans son solde prépayé :
+rien n'est alors opposé à `limit`. Le bloc `claim` n'est servi que sur une clé encore réclamable.
+
+Une clé qui a une allocation **et** des crédits, par exemple une clé gratuite que vous avez rechargée,
+garde le `basis` de son allocation et porte en plus `credits_remaining`, `credits_total` et
+`billing_order: "allowance_then_credits"`. Sur toute clé, `topup` porte les liens de paiement par
+carte qui rechargent cette même clé.
 
 `month` est le mois calendaire auquel se rapportent les compteurs (`YYYY-MM`). L'essai sans clé n'a pas de clé à consulter ici : ses compteurs sont hebdomadaires (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC), et dans son `402 trial_exhausted`, le champ `cause.quota.month` vaut `week`. Une réponse servie sans clé porte `X-Trial-Period: week` ; le 402 ne porte aucun en-tête `X-Trial-*`. Sans clé, cet endpoint répond `401 missing_key`, et avec une clé inconnue ou inactive `401 invalid_key` ; `GET /v1/keys/report`, `GET /v1/credits/balance` et `POST /v1/keys/claim` répondent de même (la réclamation accepte encore une clé coupée pour une rafale d'inscriptions automatiques, puisque la réclamer est ce qui la rétablit). `POST /v1/keys/revoke` et `POST /v1/keys/rotate` répondent `401 missing_key` sans clé, et `404 invalid_key` pour une clé inconnue ou déjà révoquée. Cet endpoint est
 gratuit et ne consomme pas de quota.
@@ -348,6 +356,37 @@ est remboursé, et ces en-têtes tiennent déjà compte du remboursement. Si vou
 préférez interroger plutôt que lire des en-têtes, `GET /v1/keys/usage` renvoie
 les mêmes nombres, et c'est gratuit.
 
+## Recharger une clé
+
+Un pack arrive sur la clé que vous avez déjà : rien à changer dans votre intégration, et les crédits
+n'expirent jamais.
+
+- **Par carte** : ouvrez l'un des liens de `topup.by_card` (dans `GET /v1/keys/usage`,
+  `GET /v1/credits/balance`, et `credit_packs.topup_this_key` dans un `402` servi à la clé), ou les
+  boutons *Recharger cette clé* de votre [page de compte](/account). Chaque lien porte la référence de
+  recharge de la clé, jamais la clé elle-même : il ne permet que de payer pour cette clé. La page de
+  succès dit ensuite quelle clé a été rechargée, et un mail de confirmation vous parvient.
+- **En USDC** : `POST /v1/credits/buy/1k|5k|25k` en présentant la clé comme d'habitude. La présenter
+  ne coûte aucune requête, la réponse porte `same_key: true`, et les crédits sont ajoutés une fois le
+  paiement réglé. Sans clé, la même route vend une clé neuve, comme la page [tarifs](/pricing).
+
+`credits_total` compte tout ce qui a été acheté sur la clé, recharges comprises, et
+`X-Credits-Total` dit la même chose.
+
+**Sur une clé qui a les deux**, chaque appel puise d'abord dans l'allocation, puis dans les crédits ;
+un lot qui passe de l'une aux autres est partagé entre elles, tout ou rien. Chaque réponse facturée
+dit qui l'a payée :
+
+```
+X-Charged-From: allowance
+X-Charged-From: credits
+X-Charged-From: allowance+credits
+```
+
+**Quand les crédits sont épuisés**, la clé reste valable. Une clé gratuite retrouve son allocation
+mensuelle. Une clé née d'un achat répond `402` avec `cause.reason: "credits_exhausted"` et les liens
+qui la rechargent (`X-Credits-Topup-Url` porte celui du pack de 1 000 crédits).
+
 ## Lorsque votre quota est dépassé
 
 Votre intégration ne tombe **pas** sur un cul-de-sac. Une fois les requêtes du mois épuisées, l'API répond `402 Payment Required` (x402) plutôt qu'un 429 sec, avec des en-têtes qui disent exactement ce qui s'est passé :
@@ -362,7 +401,7 @@ X-Quota-Month: 2026-09
 Le corps du 402 liste vos options, lisibles par machine :
 
 1. **Réclamer la clé** — si elle est encore anonyme, un code reçu par mail la relève et ne coûte rien.
-2. **Acheter un pack de crédits prépayés** — par carte sur la page [tarifs](/pricing), ou en USDC via `POST /v1/credits/buy/1k|5k|25k`. Les crédits n'expirent jamais et s'attachent à votre clé existante.
+2. **Recharger cette clé** : par carte avec les liens que porte le 402 (`credit_packs.topup_this_key`, `X-Credits-Topup-Url`) ou depuis votre [page de compte](/account), ou en USDC via `POST /v1/credits/buy/1k|5k|25k` en présentant la clé. Les crédits arrivent sur cette même clé et n'expirent jamais. Voir « Recharger une clé » plus haut.
 3. **Payer à l'appel via x402** — un client compatible x402 paie automatiquement en USDC, sans changer de clé. Voir [Paiements x402](/docs/x402).
 4. **Attendre la réinitialisation mensuelle** — sur une base `monthly`, le quota se réinitialise le 1er ; une clé relevée contre un paiement, ou née pendant une alerte, porte `basis: lifetime` et ne se réinitialise pas.
 

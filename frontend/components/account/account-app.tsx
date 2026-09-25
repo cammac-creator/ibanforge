@@ -18,6 +18,7 @@ import {
   readReport,
   resendWaitSeconds,
   sheetFromReport,
+  TOPUP_PACKS,
   type AccountScreen,
   type ApiReply,
   type KeyReport,
@@ -579,8 +580,11 @@ function KeySheetCard({ sheet, locale, children }: { sheet: KeySheet; locale: st
 
         {/* La note des crédits dit qu'aucun quota mensuel n'est opposé à la
             clé : vrai pour un pack seul, faux pour une clé mixte (après B1),
-            qui garde son allocation gratuite. */}
+            qui garde son allocation gratuite, et puise d'abord dedans. */}
         {sheet.credits && !sheet.allowance && <p className="text-sm text-muted-foreground">{t("creditsNote")}</p>}
+        {sheet.credits && sheet.allowance && <p className="text-sm text-muted-foreground">{t("mixedNote")}</p>}
+
+        {sheet.topup && <TopupLinks topup={sheet.topup} locale={locale} />}
 
         {(lastCall !== null || sheet.alerts !== null) && (
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
@@ -633,6 +637,47 @@ function KeySheetCard({ sheet, locale, children }: { sheet: KeySheet; locale: st
 
       {children}
     </article>
+  );
+}
+
+/**
+ * Recharger CETTE clé (lot B1, 25.09.2026) : trois liens de paiement Stripe,
+ * porteurs de la référence de la clé, qui font atterrir les crédits sur elle.
+ * Aucun secret dans ces liens : la référence ne permet que de payer pour la
+ * clé.
+ *
+ * 🚨 Une clé dont l'adresse n'a pas été prouvée par un code (première clé d'un
+ * réseau créée sans code, adresse saisie chez Stripe) peut porter l'adresse
+ * d'un tiers et donc s'afficher chez lui : la recharge n'est alors offerte
+ * qu'avec un avertissement (relecture de sécurité du lot C1, point I1). En mode
+ * clé collée (`proven` null), tenir la clé suffit.
+ */
+function TopupLinks({ topup, locale }: { topup: NonNullable<KeySheet["topup"]>; locale: string }) {
+  const t = useTranslations("account");
+  return (
+    <section className="space-y-2 rounded-lg border px-4 py-3">
+      <h3 className="text-sm font-semibold">{t("topupTitle")}</h3>
+      <p className="text-sm text-muted-foreground">{t("topupHint")}</p>
+      {topup.proven === false && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">{t("topupUnproven")}</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {TOPUP_PACKS.map((p) => (
+          <a
+            key={p.slug}
+            href={topup.links[p.slug]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-1 basis-24 flex-col items-center gap-0.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-center hover:border-amber-500/60 hover:bg-amber-500/10"
+          >
+            <span className="font-mono text-sm font-semibold text-amber-500">{p.price}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("topupCredits", { credits: formatGrouped(p.credits, locale) })}
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
 
