@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
 import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA, POSTAL_ADDRESS_SCHEMA } from '../lib/bank-code-schema.js';
+import { BIC_SOURCE_AS_OF_NOTE, LISTED_IN_CURRENT_SOURCE_NOTE } from '../lib/field-notes.js';
+import { frozenSources } from '../lib/source-vintage.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 // Read from the route rather than retyped: the enum of error types and the
 // flood cap are what the handler enforces, and a contract that quotes its own
@@ -2709,18 +2711,21 @@ const buildRawSpec = () => ({
                 description:
                   'The bank code you asked about, when the register answered for the one that took over its clearing. CH and LI only today: SIX marks an IID concatenated and publishes its successor. The IBAN stays valid and the account payable — a redirect is not a retirement.',
               },
-              bank_name: { type: ['string', 'null'] },
+              bank_name: { type: ['string', 'null'], description: 'Null, never an empty string, when no source names the institution.' },
               city: {
                 type: ['string', 'null'],
                 description:
-                  'Where the consulted register places THIS bank code. May differ from address.city, which is the legal seat — both true, different questions.',
+                  'Where the consulted register places THIS bank code. May differ from address.city, which is the legal seat — both true, different questions. Null, never an empty string, when the source leaves the town blank.',
               },
               source: { type: ['string', 'null'], description: 'Which dataset named this institution.' },
               as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed. This dates the IMPORT, which for one source is not the date of the data — see source_as_of.' },
               source_as_of: {
                 type: 'string',
-                description:
-                  "Year-month the source DATA is from, present ONLY when it differs from as_of. The redistributed SWIFT directory behind part of this reference set is a public repository whose publisher stopped updating it, so as_of alone would present an old bank name as last month's. Absent means no gap has been established between import and content, never 'this is current'.",
+                description: BIC_SOURCE_AS_OF_NOTE,
+              },
+              listed_in_current_source: {
+                type: ['boolean', 'null'],
+                description: LISTED_IN_CURRENT_SOURCE_NOTE,
               },
               basis: {
                 type: 'string',
@@ -3229,18 +3234,26 @@ const buildRawSpec = () => ({
           bic: { type: 'string', example: 'UBSWCHZH' },
           bic8: { type: 'string', example: 'UBSWCHZH' },
           bic11: { type: 'string', example: 'UBSWCHZHXXX' },
-          found: { type: 'boolean' },
+          found: {
+            type: 'boolean',
+            description: 'True only when the directory row names an institution: a record is complete or not found.',
+          },
           valid_format: { type: 'boolean' },
           institution: { type: ['string', 'null'], example: 'UBS AG' },
           country: {
             type: 'object',
             required: ['code', 'name'],
             properties: {
-              code: { type: 'string', example: 'CH' },
-              name: { type: 'string', example: 'Switzerland' },
+              code: { type: 'string', example: 'CH', description: 'Always characters 5-6 of the BIC.' },
+              name: {
+                type: 'string',
+                example: 'Switzerland',
+                description:
+                  "The row's country name, then the ISO name, and the code only when neither exists. Named on a BIC we do not hold as well.",
+              },
             },
           },
-          city: { type: ['string', 'null'] },
+          city: { type: ['string', 'null'], description: 'Null, never an empty string, when the source leaves the town blank.' },
           address: {
             type: 'object',
             description: 'Registered head-office address (present when available — GLEIF or directory sourced)',
@@ -3265,7 +3278,23 @@ const buildRawSpec = () => ({
           lei: { type: ['string', 'null'] },
           lei_status: { type: ['string', 'null'] },
           is_test_bic: { type: 'boolean' },
-          source: { type: ['string', 'null'] },
+          source: { type: ['string', 'null'], description: 'Code of the dataset this row comes from; source_name spells it out.' },
+          source_name: {
+            type: ['string', 'null'],
+            example: 'GLEIF LEI-to-BIC mapping',
+            description: 'Human name of the dataset this row comes from. Null when nothing was found.',
+          },
+          source_as_of: {
+            type: 'string',
+            example: frozenSources()[0]?.as_of,
+            description:
+              "Year-month the source DATA is from, present ONLY when the row's dataset is a frozen public copy re-imported unchanged. Absent means no gap has been established, never 'this is current'.",
+          },
+          listed_in_current_source: {
+            type: ['boolean', 'null'],
+            description:
+              'Whether the BIC8 asked about still appears in a list refreshed this cycle (GLEIF, the directory sources that carry no vintage, a national register, the EPC scheme registers), on every answer of valid format, found or not: a BIC absent from the directory can still be listed by an EPC register. null when one of those lists could not be read (never false by default). It does not prove the bank still exists under this name.',
+          },
           official_identity: {
             ...OFFICIAL_IDENTITY_SCHEMA,
             description:

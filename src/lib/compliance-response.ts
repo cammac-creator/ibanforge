@@ -9,7 +9,7 @@ import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult, isTestBic } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import { validateBIC } from './bic-validator.js';
-import { lookup } from './bic-lookup.js';
+import { bicCountryName, lookup, namedRow } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import type { BicComplianceResponse, ComplianceResult, IBANValidationResult } from '../types.js';
 
@@ -144,7 +144,9 @@ export function buildBicComplianceResponse(
   const countryCode = validation.country_code;
   // The directory is consulted to NAME the institution, never to decide whether
   // to screen it. A miss here is a gap in our coverage, not an absence of risk.
-  const row = lookup(bic8);
+  // Une ligne sans nom ne nomme personne : traitée comme introuvable, comme
+  // GET /v1/bic/:code (25/09/2026).
+  const row = namedRow(lookup(bic8));
   const known = classifyIssuer(bic8, row?.institution ?? undefined);
   const issuerType = known?.type ?? 'bank';
   const countryRisk = getCountryRisk(countryCode);
@@ -178,7 +180,9 @@ export function buildBicComplianceResponse(
     valid_format: true,
     found: row !== null,
     institution: row?.institution ?? null,
-    country: { code: countryCode, name: row?.country_name ?? countryCode },
+    // Le nom du pays, même pour un BIC que l'annuaire ne porte pas : il
+    // répondait le code sous le nom `name` (25/09/2026).
+    country: { code: countryCode, name: bicCountryName(row, countryCode) },
     compliance,
     meta: getComplianceMeta(),
     cost_usdc: 0,

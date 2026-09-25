@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult, createEnrichCache } from '../lib/enrich.js';
-import { lookup } from '../lib/bic-lookup.js';
+import { bicCountryName, bicSourceFields, lookup, namedRow, nonEmpty } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
@@ -25,6 +25,7 @@ import {
 import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { bicDirectorySentence, serverDescription } from '../lib/positioning.js';
+import { bicSourceNote } from '../lib/field-notes.js';
 import { authoritativeVerdictSentence, nationalRegisterBicCodes } from '../lib/register-lists.js';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
@@ -287,9 +288,11 @@ Behavior: this tool is read-only with no side effects. It validates the BIC form
 
 Input: accepts BIC8 (e.g., 'UBSWCHZH') or BIC11 (e.g., 'UBSWCHZH80A'). Case-insensitive.
 
-Returns: { bic, bic8, bic11, valid_format, found, institution, country: { code, name }, city, branch_code, branch_info, lei, lei_status, is_test_bic }
+Returns: { bic, bic8, bic11, valid_format, found, institution, country: { code, name }, city, branch_code, branch_info, lei, lei_status, is_test_bic, source, source_name, source_as_of?, listed_in_current_source }
 
-country is the same shape as REST GET /v1/bic/:code, and name falls back to the country code when the row carries no name. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null where country.name answers the code.
+found is true only when the row names an institution; city is null, never an empty string, when the source leaves the town blank. ${bicSourceNote({ withMonth: true })}
+
+country is the same shape as REST GET /v1/bic/:code: name is the row's country name, then the ISO name, and falls back to the country code only when neither exists. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null where country.name answers the code.
 
 Example: input 'BNPAFRPP' → { found: true, bic8: 'BNPAFRPP', bic11: 'BNPAFRPPXXX', institution: 'BNP PARIBAS', country: { code: 'FR', name: 'France' }, city: 'PARIS', lei: 'R0MUWSFPU8MPRO8K5P83', lei_status: 'ACTIVE', is_test_bic: false }
 Example: input 'INVALIDX' → { valid_format: true, found: false }
@@ -330,7 +333,8 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       };
     }
 
-    const row = lookup(validation.bic11!);
+    // Une fiche complète ou introuvable, comme GET /v1/bic/:code (25/09/2026).
+    const row = namedRow(lookup(validation.bic11!));
 
     const result = {
       bic: validation.bic,
@@ -353,14 +357,18 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       // object is the aligned one, the flat pair is preserved exactly as it was.
       country: {
         code: validation.country_code,
-        name: row?.country_name ?? validation.country_code,
+        name: bicCountryName(row, validation.country_code!),
       },
-      city: row?.city ?? null,
+      city: nonEmpty(row?.city),
       branch_code: validation.branch_code,
       branch_info: row?.branch_info ?? null,
       lei: row?.lei ?? null,
       lei_status: row?.lei_status ?? null,
       is_test_bic: validation.is_test_bic,
+      // La source de la ligne, que cet outil ne rendait pas du tout, et la
+      // trace du BIC8 dans une liste de ce cycle : mêmes champs que REST.
+      source: row?.source ?? null,
+      ...bicSourceFields(row, validation.bic8!),
     };
 
     return {

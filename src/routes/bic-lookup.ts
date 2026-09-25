@@ -2,7 +2,15 @@ import { attachAttribution } from '../lib/attribution.js';
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
-import { lookup, registeredAddress, sharedBic8Stats } from '../lib/bic-lookup.js';
+import {
+  bicCountryName,
+  bicSourceFields,
+  lookup,
+  namedRow,
+  nonEmpty,
+  registeredAddress,
+  sharedBic8Stats,
+} from '../lib/bic-lookup.js';
 import { frozenBicShare } from '../lib/positioning.js';
 import { screenBicSanctions } from '../lib/compliance.js';
 import { praAuthorisationByLei, type PraAuthorisation } from '../lib/pra-banks.js';
@@ -110,7 +118,9 @@ bicLookup.get('/v1/bic/:code', (c) => {
     );
   }
 
-  const row = lookup(validation.bic11!);
+  // Une fiche complète ou introuvable (25/09/2026) : une ligne sans nom est
+  // traitée comme un BIC introuvable, même chemin, même note.
+  const row = namedRow(lookup(validation.bic11!));
   const found = row !== null;
   const sanctions = screenBicSanctions(validation.bic8!);
   // Only consulted when no single institution resolved: this is what we still
@@ -185,9 +195,12 @@ bicLookup.get('/v1/bic/:code', (c) => {
     institution: row?.institution ?? null,
     country: {
       code: validation.country_code!,
-      name: row?.country_name ?? validation.country_code!,
+      // Le nom du pays, même quand le BIC est introuvable : il répondait le
+      // code (`"IT"`) sous le nom `name` (25/09/2026).
+      name: bicCountryName(row, validation.country_code!),
     },
-    city: row?.city ?? null,
+    // Jamais `""` : la liste STEP2 laisse la ville vide (25/09/2026).
+    city: nonEmpty(row?.city),
     address,
     address_available: address !== null,
     branch_code: validation.branch_code!,
@@ -196,6 +209,10 @@ bicLookup.get('/v1/bic/:code', (c) => {
     lei_status: row?.lei_status ?? null,
     is_test_bic: validation.is_test_bic!,
     source: row?.source ?? null,
+    // Ajoutés le 25/09/2026 : le nom lisible de la source, le mois de son
+    // contenu quand c'est une copie figée, et la trace du BIC8 dans une liste
+    // rafraîchie ce cycle, trouvé ou non.
+    ...bicSourceFields(row, validation.bic8!),
     // Screened on every answer, found or not. See the field note in types.ts:
     // answering a plain "not found" about a bank a sanctions authority has
     // designated is the most reassuring thing this endpoint can say about the

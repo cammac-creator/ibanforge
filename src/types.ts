@@ -479,6 +479,14 @@ export interface IBANValidationResult {
      */
     source_as_of?: string;
     /**
+     * Whether this BIC8 still appears in a list refreshed this cycle: GLEIF,
+     * the directory sources without a vintage, a national register, the EPC
+     * scheme registers. `null` when one of those could not be read (never
+     * `false` by default). It does not prove the bank still exists under this
+     * name. See lib/bic-trace.ts.
+     */
+    listed_in_current_source?: boolean | null;
+    /**
      * Legal Entity Identifier of the resolved institution, and whether GLEIF
      * still considers it active.
      *
@@ -779,6 +787,12 @@ export interface BICLookupResult {
   lei_status: string | null;
   is_test_bic: boolean;
   source: string | null;
+  /** Human name of `source` (25/09/2026). Null when nothing was found. */
+  source_name?: string | null;
+  /** Year-month the source DATA is from, present only for a frozen copy. See lib/source-vintage.ts. */
+  source_as_of?: string;
+  /** Whether the BIC8 asked about appears in a list refreshed this cycle. See lib/bic-trace.ts. */
+  listed_in_current_source?: boolean | null;
   /**
    * Bank-level sanctions screen on this BIC8.
    *

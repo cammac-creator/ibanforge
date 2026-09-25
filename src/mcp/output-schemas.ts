@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { nationalRegisterBicCodes } from '../lib/register-lists.js';
+import {
+  BIC_SOURCE_AS_OF_NOTE,
+  LISTED_IN_CURRENT_SOURCE_NOTE,
+  bicSourceNote,
+} from '../lib/field-notes.js';
 
 /**
  * The `outputSchema` every MCP tool declares, shared by the two internal
@@ -195,12 +200,12 @@ const ENRICHED_BIC_SCHEMA = z
       .optional()
       .describe('Source of the bank-code/BIC pairing; keep its provenance.'),
     as_of: z.string().nullable().optional(),
-    source_as_of: z
-      .string()
+    source_as_of: z.string().optional().describe(BIC_SOURCE_AS_OF_NOTE),
+    listed_in_current_source: z
+      .boolean()
+      .nullable()
       .optional()
-      .describe(
-        'Year-month the SOURCE DATA is from, present only when it differs from as_of. as_of dates the import; for the redistributed SWIFT directory the upstream stopped publishing years ago, so as_of alone presents an old bank name as last month\'s. Absent means no gap has been established, never "this is current".',
-      ),
+      .describe(LISTED_IN_CURRENT_SOURCE_NOTE),
     lei: z
       .string()
       .nullable()
@@ -411,7 +416,10 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
   bic8: z.string().optional().describe('8-char form (institution-level).'),
   bic11: z.string().optional().describe('11-char form including branch.'),
   valid_format: z.boolean().optional(),
-  found: z.boolean().optional(),
+  found: z
+    .boolean()
+    .optional()
+    .describe('True only when the row names an institution: a record is complete or not found.'),
   institution: z.string().nullable().optional().describe('Bank legal name.'),
   country_code: z
     .string()
@@ -428,9 +436,13 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .object({ code: z.string(), name: z.string() })
     .optional()
     .describe(
-      'Same shape as REST GET /v1/bic/:code. name falls back to the country code when the row carries no name.',
+      "Same shape as REST GET /v1/bic/:code. name is the row's country name, then the ISO name, and falls back to the country code only when neither exists.",
     ),
-  city: z.string().nullable().optional(),
+  city: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Null, never an empty string, when the source leaves the town blank.'),
   branch_code: z.string().optional(),
   branch_info: z.string().nullable().optional(),
   lei: z
@@ -440,6 +452,19 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .describe('Legal Entity Identifier (ISO 17442) if available.'),
   lei_status: z.string().nullable().optional(),
   is_test_bic: z.boolean().optional(),
+  // Ajoutés le 25/09/2026 : la source de la ligne, que cet outil ne rendait pas.
+  // Déclarés ici, sinon le client officiel refuse l'objet fermé.
+  source: z.string().nullable().optional().describe('Code of the dataset this row comes from.'),
+  source_name: z.string().nullable().optional().describe(bicSourceNote()),
+  source_as_of: z
+    .string()
+    .optional()
+    .describe('Year-month the source DATA is from, present only for a frozen copy.'),
+  listed_in_current_source: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe(LISTED_IN_CURRENT_SOURCE_NOTE),
   valid: z.boolean().optional().describe('Set when the BIC failed format validation.'),
   error: z.string().optional(),
 };

@@ -11,8 +11,10 @@ import {
   lookup,
   registeredAddress,
   bic8CountForPrefix,
+  nonEmpty,
   type BankLookupHit,
 } from './bic-lookup.js';
+import { listedInCurrentSource } from './bic-trace.js';
 import { classifyIssuer } from './issuers.js';
 import { FI_REGISTER_AS_OF, lookupFiInstitution } from './fi-register.js';
 import {
@@ -905,8 +907,8 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
         // register, not from the directory the fallback would have read.
         bic = {
           code: reg.bic,
-          bank_name: reg.name,
-          city: reg.town,
+          bank_name: nonEmpty(reg.name),
+          city: nonEmpty(reg.town),
           source: NATIONAL_REGISTERS.DE,
           as_of: getReferenceAsOf() || null,
           // The one basis that licenses settling against the BIC: the
@@ -956,8 +958,8 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       if (reg?.bic) {
         bic = {
           code: reg.bic,
-          bank_name: reg.name,
-          city: reg.address.town,
+          bank_name: nonEmpty(reg.name),
+          city: nonEmpty(reg.address.town),
           source: NATIONAL_REGISTERS[cc],
           as_of: getReferenceAsOf() || null,
           // The one basis that licenses settling against the BIC: BankMaster
@@ -997,7 +999,7 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       if (reg) {
         bic = {
           code: reg.bic,
-          bank_name: reg.name,
+          bank_name: nonEmpty(reg.name),
           city: null,
           source: reg.source,
           as_of: reg.published.slice(0, 7),
@@ -1018,7 +1020,7 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           // the file or the facts, so a Slovak or Czech name is served exactly
           // as published — the same rule that keeps Bulgarian names in
           // Cyrillic below.
-          bank_name: reg.name,
+          bank_name: nonEmpty(reg.name),
           // The OeNB publishes the seat; the NBB and the NBS publish names
           // only — so Belgium and Slovakia take the city from the directory row
           // for the BIC the register named, the same division of labour the
@@ -1030,7 +1032,12 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           // not XXX), so concatenating unconditionally built a 14-character
           // string that matches nothing — a lookup guaranteed to miss rather
           // than one that resolves the branch's own directory row.
-          city: reg.town ?? lookup(reg.bic.length === 8 ? `${reg.bic}XXX` : reg.bic)?.city ?? null,
+          //
+          // `""` devient null (25/09/2026) : la ligne d'annuaire peut venir de
+          // la liste STEP2, qui laisse la ville vide.
+          city: nonEmpty(
+            reg.town ?? lookup(reg.bic.length === 8 ? `${reg.bic}XXX` : reg.bic)?.city ?? null,
+          ),
           // The register's own credit where it stores one — Slovakia and
           // Czechia, whose terms make naming the source a condition of reuse
           // (the Czech one reads "Zdroj: ČNB, …, verze N"), and San Marino,
@@ -1074,12 +1081,12 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           code: reg.bic,
           // Verbatim, in Cyrillic, as the register writes it. Transliterating
           // would be the alteration its terms forbid.
-          bank_name: reg.name,
+          bank_name: nonEmpty(reg.name),
           // The register publishes no town. Taken from the directory row for the
           // BIC the register named — same division of labour the curated map
           // documents: one source decides WHICH institution holds the code, the
           // directory only supplies its details.
-          city: lookup(`${reg.bic}XXX`)?.city ?? null,
+          city: nonEmpty(lookup(`${reg.bic}XXX`)?.city),
           // The bare register name: the caveat NATIONAL_REGISTERS.BG carries is
           // about the bank-code verdict, not about this BIC.
           source: BG_REGISTER_NAME,
@@ -1154,7 +1161,16 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // in a cooperative network they name the local bank while the first eight name
   // its clearing institution, so an equality test on the full code turns a
   // correct BIC into a mismatch and a mismatch into a false match.
-  if (bic?.code) bic.bic8 = bic.code.slice(0, 8);
+  if (bic?.code) {
+    bic.bic8 = bic.code.slice(0, 8);
+    // Le BIC8 figure-t-il encore dans une liste rafraîchie ce cycle (GLEIF, un
+    // registre national, les registres EPC, la liste STEP2) ? Sur tout bloc,
+    // quelle que soit sa base : c'est la seule date d'une carte composite
+    // qu'aucune source ne contresigne plus. `null` quand une source de trace
+    // n'a pas pu être lue, jamais `false` par défaut (src/lib/bic-trace.ts).
+    // Ne prouve pas que la banque existe encore sous ce nom.
+    bic.listed_in_current_source = listedInCurrentSource(bic.bic8);
+  }
 
   return { hit, lookupFailed, bic };
 }

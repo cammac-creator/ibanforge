@@ -15,7 +15,8 @@ import {
 import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
 import { sourceVintage } from './source-vintage.js';
-import { resetTraceIndex } from './bic-trace.js';
+import { listedInCurrentSource, resetTraceIndex } from './bic-trace.js';
+import { getCountryName } from './countries.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -328,9 +329,68 @@ const SOURCE_NAMES: Record<string, string> = {
 /** The curated map is our own assembly, and says so rather than borrowing a registry's name. */
 const CURATED_MAP_SOURCE = 'IBANforge curated bank-code map';
 
-function sourceName(source: string | null | undefined): string | null {
+export function sourceName(source: string | null | undefined): string | null {
   if (!source) return null;
   return SOURCE_NAMES[source] ?? source;
+}
+
+/**
+ * Une chaîne vide n'est pas une valeur : elle devient `null`.
+ *
+ * La liste STEP2 d'EBA Clearing laisse la ville vide, et son import écrivait
+ * `""` dans la colonne ; servi tel quel, un nom ou une ville `""` se lit comme
+ * une donnée alors que c'est une absence (25/09/2026). Appliqué à l'assemblage
+ * de chaque bloc `bic` et de chaque fiche BIC, jamais à la base.
+ */
+export function nonEmpty(value: string | null | undefined): string | null {
+  return value == null || value.trim() === '' ? null : value;
+}
+
+/**
+ * La ligne de l'annuaire, seulement si elle nomme une institution.
+ *
+ * Une fiche BIC est complète ou introuvable : une ligne sans nom répondait
+ * `found: true` avec une institution nulle, c'est-à-dire une fiche qui ne dit
+ * pas de qui elle parle. Aucune ligne n'est dans ce cas aujourd'hui ; la règle
+ * empêche qu'un import futur en crée.
+ */
+export function namedRow<T extends Pick<BICRow, 'institution'>>(row: T | null): T | null {
+  return row && nonEmpty(row.institution) ? row : null;
+}
+
+/**
+ * Le nom du pays d'un BIC : celui de la ligne, sinon la liste ISO, sinon le
+ * code. Un BIC introuvable répondait le code (`"IT"`) sous le nom `name`.
+ */
+export function bicCountryName(
+  row: Pick<BICRow, 'country_name'> | null,
+  countryCode: string,
+): string {
+  return nonEmpty(row?.country_name) ?? getCountryName(countryCode) ?? countryCode;
+}
+
+/**
+ * Ce qu'une fiche BIC dit de sa source, partagé par `GET /v1/bic/:code` et
+ * l'outil MCP `lookup_bic` des deux transports.
+ *
+ * - `source_name` : le nom lisible du jeu de données de la ligne ;
+ * - `source_as_of` : présent seulement quand ce jeu est une copie figée
+ *   (src/lib/source-vintage.ts), avec le mois de son contenu ;
+ * - `listed_in_current_source` : le BIC8 demandé figure-t-il dans une liste
+ *   rafraîchie ce cycle (src/lib/bic-trace.ts) ? Calculé trouvé ou non : un
+ *   BIC absent de l'annuaire peut figurer dans un registre EPC, et le dire est
+ *   une information. Ne prouve pas que la banque existe encore sous ce nom.
+ */
+export function bicSourceFields(
+  row: Pick<BICRow, 'source'> | null,
+  bic8: string,
+): { source_name: string | null; source_as_of?: string; listed_in_current_source: boolean | null } {
+  const vintage = sourceVintage(row?.source);
+  return {
+    source_name: sourceName(row?.source),
+    ...(vintage ? { source_as_of: vintage.as_of } : {}),
+    listed_in_current_source: listedInCurrentSource(bic8),
+  };
 }
 
 const bicCache = new LRUCache<BICRow | null>(2000);
@@ -702,8 +762,8 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
     // comparing a supplied BIC must compare on `bic.bic8`; the served `code` is
     // now 8 or 11 characters depending on what the key holds.
     const bic = entry.bic;
-    let bankName = entry.bank_name ?? null;
-    let cityName = entry.city ?? null;
+    let bankName = nonEmpty(entry.bank_name);
+    let cityName = nonEmpty(entry.city);
 
     // The row is now read unconditionally rather than only to fill a missing
     // name or city, because it is also where the provenance comes from. The
@@ -714,9 +774,15 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
     // fallback for the keys the directory carries only at institution grain.
     const dbRow = (bic.length === 11 ? lookup(bic) : null) ?? lookup(bic.substring(0, 8));
     if (dbRow) {
-      bankName = bankName || dbRow.institution;
-      cityName = cityName || dbRow.city;
+      bankName = bankName || nonEmpty(dbRow.institution);
+      cityName = cityName || nonEmpty(dbRow.city);
     }
+    // La ligne de description vient d'une copie figée : `as_of` ci-dessous date
+    // la carte et l'annuaire de ce mois, pas le contenu de cette ligne. Le mois
+    // de son contenu l'accompagne, comme sur le repli par préfixe plus bas
+    // (25/09/2026). Lu dans source-vintage.ts, jamais écrit ici. La date de
+    // l'appariement fait par la carte elle-même reste inconnue.
+    const vintage = sourceVintage(dbRow?.source);
 
     return {
       code: bic,
@@ -729,6 +795,7 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
       // the map made would overstate what the registry actually says.
       source: CURATED_MAP_SOURCE,
       as_of: getReferenceAsOf() || null,
+      ...(vintage ? { source_as_of: vintage.as_of } : {}),
     };
   }
 
@@ -772,8 +839,8 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
 
   return {
     code: row.bic8,
-    bank_name: row.institution,
-    city: row.city,
+    bank_name: nonEmpty(row.institution),
+    city: nonEmpty(row.city),
     match: 'prefix',
     candidates: n,
     // Here the directory really is the source: the prefix search read this row
