@@ -1,6 +1,7 @@
 import { allBic8, getChClearingCount, getEntryCount, getLeiEnrichedCount } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import { IBAN_LENGTHS } from './countries.js';
+import { onReferenceDataReload } from './restricted-overlay-runtime.js';
 
 /**
  * The size of what we ship, said once.
@@ -141,3 +142,6 @@ export function datasetFacts(): DatasetFacts {
 export function resetDatasetFacts(): void {
   cached = null;
 }
+// Les comptes changent aussi quand la surcouche privée est rechargée sans
+// redémarrage (src/lib/restricted-overlay-runtime.ts).
+onReferenceDataReload(resetDatasetFacts);

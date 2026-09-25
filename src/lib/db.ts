@@ -16,6 +16,7 @@ import { resetBlzStatements } from './de-blz.js';
 import { normalizeEmail } from './email-norm.js';
 import { resetDailyLedgerStatements } from './daily-ip-ledger.js';
 import { resetLineageDayCache } from './lineage-facts.js';
+import { registerReferenceCloser, servedDatabasePath } from './restricted-overlay-runtime.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -46,7 +47,10 @@ let bicDB: DatabaseType.Database | null = null;
 export function getBicDB(): DatabaseType.Database {
   if (!bicDB) {
     const Db = loadDatabaseSync();
-    bicDB = new Db(BIC_DB_PATH, { readonly: true });
+    // Sans RESTRICTED_BIC_OVERLAY_PATH, c'est BIC_DB_PATH lui-même. Avec, une
+    // copie fusionnée construite à côté du fichier privé, jamais BIC_DB_PATH
+    // modifié (voir src/lib/restricted-overlay.ts).
+    bicDB = new Db(servedDatabasePath('bic', BIC_DB_PATH), { readonly: true });
   }
   return bicDB;
 }
@@ -1978,7 +1982,12 @@ function repairBackfilledRouteVerbs(statsDB: DatabaseType.Database): void {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-export function closeAll(): void {
+/**
+ * Ferme la seule base BIC et oublie tout ce qui a été préparé sur elle. Séparée
+ * de closeAll() pour le rechargement de la surcouche privée, qui ne doit jamais
+ * fermer stats.sqlite (clés, quotas, crédits) sous les requêtes en cours.
+ */
+export function closeBicDB(): void {
   if (bicDB) {
     bicDB.close();
     bicDB = null;
@@ -1994,6 +2003,11 @@ export function closeAll(): void {
     // lookup after a reseed.
     resetBlzStatements();
   }
+}
+registerReferenceCloser('bic', closeBicDB);
+
+export function closeAll(): void {
+  closeBicDB();
   if (statsDB) {
     statsDB.close();
     statsDB = null;

@@ -900,4 +900,7 @@ export function resetStatements(): void {
   // caller swapping databases must not keep the previous one's refresh date.
   lastUpdatedCache = undefined;
   sourceFreshnessCache = undefined;
+  // Même base, même raison : une surcouche rechargée peut apporter ou retirer
+  // les seules lignes d'un pays (src/lib/restricted-overlay-runtime.ts).
+  referenceDataCache.clear();
 }

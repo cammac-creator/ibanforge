@@ -122,6 +122,11 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as XLSX from 'xlsx';
 import { PENDING_TABLE, registerToday } from '../src/lib/national-registers.js';
+import {
+  RESTRICTED_FLOORS,
+  restrictedRegisterCountries,
+  seedFamilyFromEnv,
+} from '../src/lib/restricted-family.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -155,7 +160,15 @@ const SOURCES = {
  * mangled would come back well under these. Abort BEFORE touching the table and
  * let the existing data stand.
  */
-const MIN_EXPECTED: Record<string, number> = { AT: 700, BE: 650, SK: 25, SM: 3, CZ: 35 };
+const MIN_EXPECTED: Record<string, number> = {
+  // Les trois registres de la famille « sous conditions » partagent leur plancher
+  // avec le chargeur de la surcouche privée : une seule valeur par registre.
+  AT: RESTRICTED_FLOORS.register_at,
+  BE: RESTRICTED_FLOORS.register_be,
+  SK: 25,
+  SM: RESTRICTED_FLOORS.register_sm,
+  CZ: 35,
+};
 
 /**
  * The OeNB and NBB both redirect or refuse without a browser User-Agent.
@@ -1292,8 +1305,13 @@ async function main(): Promise<void> {
     ['SK', parseSlovakiaLive],
     ['SM', parseSanMarinoLive],
   ];
+  // SEED_FAMILY=restricted : AT, BE et SM seulement (la Slovaquie et la Tchéquie
+  // sont publiques), pour la surcouche privée. Sans la variable, tous comme avant.
+  const restrictedOnly = seedFamilyFromEnv() === 'restricted';
+  const restricted = restrictedRegisterCountries();
   for (const [cc, parse] of jobs) {
     if (only && only !== cc) continue;
+    if (restrictedOnly && !restricted.has(cc)) continue;
     console.log(`${cc}: downloading ${SOURCES[cc]}`);
     write(db, cc, await parse());
   }

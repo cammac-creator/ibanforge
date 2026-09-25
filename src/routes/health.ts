@@ -12,6 +12,7 @@ import { getComplianceDB } from '../lib/compliance-db.js';
 import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
 import { verificationDelivery } from '../lib/key-creation-guard.js';
 import { servedAt } from '../lib/served-at.js';
+import { restrictedOverlayHealth } from '../lib/restricted-overlay-runtime.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -219,6 +220,13 @@ health.get('/health', (c) => {
       // Memoised — one scan per process, see getSourceFreshness. Never used
       // to fail the check: stale data is a degraded feature, not an outage.
       bic_sources: probeSourceFreshness(),
+      // AJOUTÉ le 25/09/2026 à côté du contrat, rien de renommé : la surcouche
+      // privée des données sous conditions est-elle servie sur chaque base
+      // (`off` sans sa variable, `applied`, `partial`, `refused`), avec les
+      // douze premiers caractères de son SHA-256, pour prouver un dépôt en
+      // ligne. Un état, jamais un compte ; jamais une raison d'échouer le
+      // contrôle (une surcouche absente répond « non consulté », pas une panne).
+      restricted_overlays: restrictedOverlayHealth(),
     });
   } catch {
     // The probe itself may be the first thing to touch a broken stats database

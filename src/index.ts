@@ -8,7 +8,8 @@
  */
 import { serve, type ServerType } from '@hono/node-server';
 import { createRequire } from 'node:module';
-import { closeAll, initStatsDB, checkpointStatsWal } from './lib/db.js';
+import { closeAll, initStatsDB, checkpointStatsWal, getBicDB } from './lib/db.js';
+import { getComplianceDB } from './lib/compliance-db.js';
 import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
@@ -25,7 +26,14 @@ import { startCohortRadar } from './lib/cohort-radar-server.js';
 import { startMonthlyDemandLoop } from './lib/demand-proposal-server.js';
 import { startActivationNudge } from './lib/activation-nudge-server.js';
 import { startOpsProbes } from './lib/ops-probes.js';
-import { opsFail } from './lib/ops-alert.js';
+import { opsFail, opsOk } from './lib/ops-alert.js';
+import {
+  describeOverlayStatus,
+  reloadRestrictedOverlays,
+  restrictedOverlayFilesChanged,
+  restrictedOverlayStatus,
+  type OverlayStatus,
+} from './lib/restricted-overlay-runtime.js';
 import { recordEvent } from './lib/events.js';
 
 // Fail-fast: refuse to start in production without wallet config
@@ -56,6 +64,82 @@ if (!statsState.ok) {
       "L'API écoute et répond 503 sur /health ; clés, quotas et crédits sont hors service.",
   );
 }
+
+// ─── Surcouche privée des données sous conditions (étape 3, 25/09/2026) ──────
+//
+// `entrypoint.sh` vient de recopier les deux bases publiques depuis l'image.
+// Ouvrir les deux connexions ICI, avant la première requête, fait la fusion au
+// démarrage (src/lib/restricted-overlay-runtime.ts) plutôt qu'au premier
+// client, et permet d'en dire le résultat : au journal, et par l'alerte
+// d'exploitation quand une surcouche configurée n'a pas pu être servie. Sans
+// variable, rien ne change : les bases publiques s'ouvrent comme avant.
+//
+// Une base publique illisible ne fait pas tomber le démarrage ici : elle lève à
+// la première requête, exactement comme avant ce bloc.
+function reportRestrictedOverlays(statuses: OverlayStatus[]): void {
+  for (const status of statuses) {
+    const line = describeOverlayStatus(status);
+    const key = `overlay:${status.kind}`;
+    if (status.state === 'applied' || status.state === 'off') {
+      console.log(line);
+      void opsOk(key, status.state === 'applied' ? 'surcouche privée servie' : '');
+    } else {
+      console.error(line);
+      void opsFail(
+        key,
+        `Surcouche privée ${status.kind} ${status.state === 'partial' ? 'servie en partie' : 'NON servie'} : ` +
+          `${
+            status.error ??
+            status.members
+              .filter((m) => m.state !== 'applied')
+              .map((m) => `${m.id} (${m.reason})`)
+              .join(', ')
+          }. ` +
+          'Les données manquantes répondent « non consulté ».',
+      );
+    }
+  }
+}
+
+try {
+  getBicDB();
+  getComplianceDB();
+} catch (err) {
+  console.error(
+    'Reference database open failed at boot:',
+    err instanceof Error ? err.message : err,
+  );
+}
+reportRestrictedOverlays(restrictedOverlayStatus());
+
+// Un fichier privé remplacé (dépôt manuel, puis tirage automatique à l'étape
+// suivante) est rechargé sans redémarrage : un `stat` par base toutes les dix
+// minutes, une fusion seulement quand le fichier a changé. Une surcouche neuve
+// refusée laisse la précédente en service et prévient.
+const OVERLAY_WATCH_MS = 10 * 60 * 1000;
+setInterval(() => {
+  try {
+    if (!restrictedOverlayFilesChanged()) return;
+    for (const outcome of reloadRestrictedOverlays()) {
+      if (outcome.rejected) {
+        console.error(
+          `${describeOverlayStatus(outcome.rejected)} — la version précédente reste servie`,
+        );
+        void opsFail(
+          `overlay:${outcome.kind}:reload`,
+          `Nouvelle surcouche ${outcome.kind} refusée (${outcome.rejected.error ?? 'membres refusés'}) : la précédente reste servie.`,
+        );
+      } else if (outcome.changed) {
+        reportRestrictedOverlays([outcome.status]);
+        void opsOk(`overlay:${outcome.kind}:reload`, 'surcouche rechargée');
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Restricted overlay reload failed:', msg);
+    void opsFail('overlay:reload', `Rechargement de la surcouche en échec : ${msg}`);
+  }
+}, OVERLAY_WATCH_MS).unref();
 
 const app = buildApp();
 
