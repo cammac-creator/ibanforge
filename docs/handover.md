@@ -135,6 +135,7 @@ them are named beside each.
 | Every private frontend route answers 401 without a session — routes are discovered by glob, so a new one is enrolled the day it lands | `frontend/app/api/private-routes-auth.test.ts` |
 | The three message catalogues have identical keys and identical interpolations | `frontend/lib/messages-parity.test.ts` |
 | The Stripe account also carries another project's payments: the dashboard headline "Collected" counts packs + subscriptions + audits only, never `autre`; net, payouts and balance are account-wide because Stripe does not split them by product. A subscription renewal is recorded once, from `invoice.paid` with `billing_reason = subscription_cycle` — never the first invoice, whose amount already sits on the key | `src/lib/stripe-revenue.test.ts`, `src/routes/stripe-webhook.invoice.test.ts`, `frontend/lib/dashboard/stripe-revenue.test.ts` |
+| The customer account (`/v1/account/*`, page `/account`) never reads `api_keys` on `code` or `session`, so it cannot tell whether an address has keys; one `invalid_code` for every unusable code; the `ifs_` session token lives only in an `HttpOnly; SameSite=Strict` cookie scoped to `/v1/account`, stored hashed, and is never accepted as an API key. Its two tables are outside the backup and must stay covered by `scripts/forget-customer.cjs` | `src/routes/account.*.test.ts`, `src/lib/account.*.test.ts`, `scripts/forget-customer.account.test.ts` |
 
 **Three runtime ledgers live in memory, per instance**: the keyless trial, MCP sessions,
 and the rate limiter. The API therefore cannot run multiple instances without
@@ -161,6 +162,17 @@ touching any register.** Four rules distilled from it:
    BSB ; la restriction datée figure dans `docs/data-sources.md`.
 4. **A register's own robots file is respected as policy.** One central bank names our
    crawler; that is not something to "fix" with a user-agent rotation.
+
+**Un registre qui fait foi se relit plus souvent que le mensuel.** Depuis le 25.09.2026, le
+registre tchèque (ČNB) est relu chaque jour par `.github/workflows/refresh-cz-register.yml` :
+la ČNB publie ses éditions à l'avance et pas toujours le 1er, et un code absent y vaut refus.
+Ce workflow peut donc pousser `data/bic.sqlite` sur `main` n'importe quel jour (seulement quand
+le contenu tchèque change) : `git fetch` et rebase avant chaque push, comme toujours. Il
+partage le groupe de concurrence `bic-sqlite-writer` avec `refresh-bic.yml`. Un échec de
+lecture garde l'édition en place et fait passer le run au rouge avec une alerte Telegram.
+La bascule vers une édition annoncée se fait à la requête, à minuit heure de Prague
+(`activeTable()`, `src/lib/national-registers.ts`). Un prochain registre à publication non
+mensuelle suit le même modèle.
 
 Known gaps a newcomer should expect to work on, in order:
 
@@ -367,6 +379,35 @@ call), falls back to memory with `degraded: true` when the database refuses, and
 limit under alert; it is deliberately not wired until the daily peak has been measured
 (`GET /v1/admin/trial?days=14`, `peak_hour_buckets`). Proof of the port: a keyless call that answers
 402 keeps answering 402 across a redeploy.
+
+**Since 24 September the REST trial is counted by the WEEK** (Claude-Alain's decision: 25 a
+day was too much). `REST_TRIAL_WEEKLY_LIMIT` (25) per source and per ISO week in UTC, reset on
+Monday 00:00 UTC for everyone at once. The decision reads a table of its own, `trial_weekly`
+(`week` = the Monday as `YYYY-MM-DD`, `bucket`, `units`), through `countWeeklyTrialUnits`,
+which writes the `rest:<h>` row of the day in the same transaction. Why not sum the daily rows
+since Monday: `snapshotTrialDay(yesterday)` runs every hour and only abstains on an EMPTY day,
+so REST rows kept for a week would have made the tick after the first one overwrite
+`mcp_buckets`, `init_buckets` and `rest_attempts_uncounted` with zeros every day; and a sum per
+source on a `(day, bucket)` key scans the whole week. So `trial_ledger`, `trial_daily` and the
+MCP daily ceilings behave exactly as before; `rest_over_limit` now reads "sources that spent
+the whole week in one day". The `trial` block says `calls_used_this_week`,
+`calls_left_this_week`, `weekly_limit`, `resets` and `resets_at`; the daily names were removed
+(no published package read them). `X-Trial-Reset` is the ISO instant, `X-Trial-Period: week`.
+
+**The same evening, the keyless MCP access moved to the week as well** (Claude-Alain's
+decision). `MCP_WEEKLY_LIMIT` in `src/lib/mcp-limits.ts` (25; renamed from `MCP_DAILY_LIMIT` so
+that no forgotten use keeps compiling under a daily name) is spent per source and per ISO week
+in UTC through the same `trial_weekly` table, in a bucket of its own: the bare hash `<h>`,
+beside the trial's `rest:<h>`. The two allowances never share. What stays REST-only filters on
+the `rest:` prefix (`rest_attempts_uncounted`, the admin week total, which now shows
+`mcp_this_week` beside it). The daily rows are still written for `trial_daily`; only the
+ceiling on MCP session openings (`init:<h>`, `MCP_SESSIONS_PER_IP_DAY`) stays daily, because it
+bounds container memory rather than a free offer. `GET /v1` serves `mcp_weekly_limit` and
+`mcp_period`; `GET /mcp` adds `mcp_resets` and `mcp_resets_at`. The npm package
+`ibanforge-mcp` writes none of these figures, nor their period: a published package stays
+frozen until its next release, so its README and the instructions it serves point to
+`rate-limits.yml` and `GET /v1`, and `mcp/src/published-text.test.ts` refuses a quota figure or
+period in anything it serves.
 
 **The cohort radar sees anonymous keys since 15 September (lot 6), in report mode.** A second pass
 in `src/lib/cohort-radar-server.ts` loads anonymous and claimed keys with its OWN query (the e-mail
@@ -606,8 +647,8 @@ the candidate server before touching DNS**, and do not delete the SEO redirects 
 locale detection means an unprefixed URL legitimately serves a different language depending
 on the browser, so a naive fix breaks something that works.
 
-**The keyless trial is twenty-five calls a day, with no e-mail and no key — in the code
-since 15 September (lot 4 of the "key without e-mail" chantier).** The constant is used
+**The keyless trial is twenty-five calls a week since 24 September, with no e-mail and no
+key** (twenty-five a day from 15 September, lot 4 of the "key without e-mail" chantier). The constant is used
 properly inside `src/`; the surfaces that still write the number by hand are counted by
 `src/lib/trial-figures-static.test.ts`, whose cap only goes down. The README and the
 onboarding page were the last two to say ten (fixed 16 September).

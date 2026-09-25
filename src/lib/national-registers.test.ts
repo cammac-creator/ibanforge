@@ -1,11 +1,26 @@
-import { describe, it, expect } from 'vitest';
-import {
+import { afterAll, describe, it, expect, vi } from 'vitest';
+
+/**
+ * Les lignes autrichiennes, belges et saint-marinaises ci-dessous sont
+ * INVENTÉES (src/test-support/restricted-fixtures.ts) : ces trois registres
+ * quittent le dépôt public (décision du 24/09/2026), et un test de recherche
+ * qui se sautait sans eux ne testait rien sur une copie publique. Les lignes
+ * slovaques sont les vraies, publiques : les conditions de la NBS en permettent
+ * la réutilisation avec la citation.
+ */
+const { fixture, FX } = await vi.hoisted(async () => {
+  const m = await import('../test-support/restricted-fixtures.js');
+  return { fixture: m.installRestrictedFixture(), FX: m.FIXTURE };
+});
+afterAll(() => fixture.restore());
+
+const {
   lookupNationalCode,
   nationalRegisterAvailable,
   nationalRegisterCredit,
   nationalRegisterEdition,
   normaliseCode,
-} from './national-registers.js';
+} = await import('./national-registers.js');
 
 /**
  * Austria, Belgium and Slovakia share one table because they are structurally
@@ -38,6 +53,14 @@ describe('normaliseCode', () => {
     expect(normaliseCode('SK', '1100')).toBe('1100');
   });
 
+  it('keeps a Czech code at four', () => {
+    // The ČNB writes its codes with their leading zeros ('0100', Komerční
+    // banka); a Czech IBAN carries them in positions 5-8.
+    expect(normaliseCode('CZ', '0100')).toBe('0100');
+    expect(normaliseCode('CZ', '100')).toBe('0100');
+    expect(normaliseCode('CZ', '12345')).toBeNull();
+  });
+
   it('pads a San Marino ABI to five', () => {
     // The BCSM prints them padded already; the width is asserted anyway,
     // because IBAN positions 6-10 are what the lookup is compared against.
@@ -57,36 +80,40 @@ describe('normaliseCode', () => {
 describe('lookupNationalCode', () => {
   const skipIf = (cc: string) => !nationalRegisterAvailable(cc);
 
-  it.skipIf(skipIf('AT'))('resolves an Austrian institution', () => {
-    const hit = lookupNationalCode('AT', '12000');
+  it('resolves an Austrian institution', () => {
+    const hit = lookupNationalCode('AT', FX.AT.central.code);
     // The OeNB publishes 11 characters on every row, head offices included, and
     // the seeder stores what it publishes. This used to read 'BKAUATWW': the
     // truncation was invisible here because for a head office the trimmed three
     // characters are XXX, while one code group over they name a different bank.
-    expect(hit?.bic).toBe('BKAUATWWXXX');
-    expect(hit?.name).toMatch(/Bank Austria/i);
+    expect(hit?.bic).toBe(FX.AT.central.bic);
+    expect(hit?.name).toBe(FX.AT.central.name);
   });
 
-  it.skipIf(skipIf('AT'))('resolves the code the register writes unpadded', () => {
-    // Published as '100', carried in an IBAN as '00100'.
-    expect(lookupNationalCode('AT', '00100')?.bic).toBe('NABAATWWXXX');
+  it('resolves the code the register writes unpadded', () => {
+    // L'OeNB écrit son propre code '100', un IBAN porte '00100' ; la ligne
+    // inventée est stockée comme le fait le seeder, complétée.
+    expect(lookupNationalCode('AT', FX.AT.padded.code.replace(/^0+/, ''))?.bic).toBe(
+      FX.AT.padded.bic,
+    );
+    expect(lookupNationalCode('AT', FX.AT.padded.code)?.bic).toBe(FX.AT.padded.bic);
   });
 
-  it.skipIf(skipIf('AT'))('denies an Austrian code the register does not carry', () => {
-    expect(lookupNationalCode('AT', '99999')).toBeNull();
+  it('denies an Austrian code the register does not carry', () => {
+    expect(lookupNationalCode('AT', FX.AT.unallocatedCode)).toBeNull();
   });
 
-  it.skipIf(skipIf('BE'))('resolves a Belgian institution', () => {
-    expect(lookupNationalCode('BE', '001')?.bic).toBe('GEBABEBB');
-    expect(lookupNationalCode('BE', '734')?.bic).toBe('KREDBEBB');
+  it('resolves a Belgian institution', () => {
+    expect(lookupNationalCode('BE', FX.BE.bank.code)?.bic).toBe(FX.BE.bank.bic);
+    expect(lookupNationalCode('BE', FX.BE.emi.code)?.bic).toBe(FX.BE.emi.bic);
   });
 
-  it.skipIf(skipIf('BE'))('denies a Belgian slot the register marks free', () => {
+  it('denies a Belgian slot the register marks free', () => {
     // The NBB publishes all 1000 slots and writes 'VRIJ' in the BIC column for
     // the 210 it has not allocated. Storing those would turn an explicit
     // "nobody holds this" into a resolved bank, which is the exact opposite of
     // what the register says.
-    expect(lookupNationalCode('BE', '999')).toBeNull();
+    expect(lookupNationalCode('BE', FX.BE.unallocatedCode)).toBeNull();
   });
 
   it.skipIf(skipIf('SK'))('resolves a Slovak institution', () => {
@@ -113,23 +140,20 @@ describe('lookupNationalCode', () => {
     expect(hit?.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it.skipIf(skipIf('AT'))(
-    'leaves the credit columns null where the publisher asks for none',
-    () => {
-      const hit = lookupNationalCode('AT', '12000');
-      expect(hit?.source).toBeNull();
-      expect(hit?.as_of).toBeNull();
-    },
-  );
-
-  it.skipIf(skipIf('SM'))('resolves a San Marino operating bank, address included', () => {
-    const hit = lookupNationalCode('SM', '06067');
-    expect(hit?.bic).toBe('CSSMSMSM');
-    expect(hit?.name).toBe('Cassa di Risparmio della Repubblica di San Marino s.p.a.');
-    expect(hit?.town).toBe('San Marino');
+  it('leaves the credit columns null where the publisher asks for none', () => {
+    const hit = lookupNationalCode('AT', FX.AT.bank.code);
+    expect(hit?.source).toBeNull();
+    expect(hit?.as_of).toBeNull();
   });
 
-  it.skipIf(skipIf('SM'))('answers nothing for a code the BCSM page does not list', () => {
+  it('resolves a San Marino operating bank, address included', () => {
+    const hit = lookupNationalCode('SM', FX.SM.bank.code);
+    expect(hit?.bic).toBe(FX.SM.bank.bic);
+    expect(hit?.name).toBe(FX.SM.bank.name);
+    expect(hit?.town).toBe(FX.SM.bank.town);
+  });
+
+  it('answers nothing for a code the BCSM page does not list', () => {
     // 03225 is the ABI of the ISO registry's own San Marino example IBAN. Null
     // here is NOT a denial — the caller in enrich.ts falls through to the
     // composite map rather than reading it as one. See sm-enrich.test.ts.

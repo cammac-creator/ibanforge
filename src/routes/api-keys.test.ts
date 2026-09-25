@@ -1461,6 +1461,67 @@ describe('POST /v1/admin/email-messages — one message, one row, whatever id it
     expect(rows[0].origin).toBe('dashboard');
   });
 
+  it('a writer naming a row we already hold updates that row, even beside its twin', async () => {
+    // Deux copies d'une même lettre, écrites avant la réconciliation (ici posées
+    // directement en base) : la traduction postée pour l'une doit arriver sur
+    // elle, et non sur sa jumelle, sinon le robot qui la poste la retente sans fin.
+    // Une adresse à lui : les tests voisins comptent les lignes de TO.
+    const pair = `pair-${RUN_TAG}@alpha.example.net`;
+    const ins = getStatsDB().prepare(
+      "INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet) VALUES (?, ?, 'out', ?, ?, ?)",
+    );
+    ins.run(`twin-a-${RUN_TAG}`, pair, '2026-09-07T09:15:10', 'Twin letter', 'Dear Sir or Madam');
+    ins.run(`twin-b-${RUN_TAG}`, pair, '2026-09-07T09:15:10', 'Twin letter', 'Dear Sir or Madam');
+    for (const id of [`twin-a-${RUN_TAG}`, `twin-b-${RUN_TAG}`]) {
+      await post([
+        {
+          id,
+          customer_email: pair,
+          direction: 'out',
+          msg_date: '2026-09-07T09:15:10',
+          subject: 'Twin letter',
+          snippet: 'Dear Sir or Madam',
+          lang: 'en',
+          snippet_fr: `Madame, Monsieur (${id.startsWith('twin-a') ? 'A' : 'B'})`,
+        },
+      ]);
+    }
+    const res = await app().request('/v1/admin/email-messages?since=2026-09-07&fields=summary', {
+      headers: H,
+    });
+    const all = ((await res.json()) as { messages: Array<Record<string, unknown>> }).messages;
+    const rows = all.filter((m) => m.customer_email === pair);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((m) => m.id === `twin-a-${RUN_TAG}`)?.snippet_fr).toBe('Madame, Monsieur (A)');
+    expect(rows.find((m) => m.id === `twin-b-${RUN_TAG}`)?.snippet_fr).toBe('Madame, Monsieur (B)');
+  });
+
+  it("l'objet traduit est gardé, servi, et survit à une resynchronisation brute", async () => {
+    // Comme le corps traduit : la relecture nocturne de la boîte ne porte pas de
+    // traduction et ne doit pas l'effacer. L'objet d'origine, lui, ne bouge pas.
+    const who = `objet-${RUN_TAG}@alpha.example.net`;
+    const base = {
+      id: `objet-${RUN_TAG}`,
+      customer_email: who,
+      direction: 'in',
+      msg_date: '2026-09-08T10:00:00',
+      subject: 'Frage zum nächsten Import',
+      snippet: 'Guten Tag',
+    };
+    await post([
+      { ...base, lang: 'de', snippet_fr: 'Bonjour', subject_fr: 'Question sur le prochain import' },
+    ]);
+    await post([base]);
+    const res = await app().request('/v1/admin/email-messages?since=2026-09-08&fields=summary', {
+      headers: H,
+    });
+    const all = ((await res.json()) as { messages: Array<Record<string, unknown>> }).messages;
+    const row = all.find((m) => m.id === `objet-${RUN_TAG}`);
+    expect(row?.subject).toBe('Frage zum nächsten Import');
+    expect(row?.subject_fr).toBe('Question sur le prochain import');
+    expect(row?.snippet_fr).toBe('Bonjour');
+  });
+
   it('two different subjects in the same minute stay two rows', async () => {
     await post([
       {

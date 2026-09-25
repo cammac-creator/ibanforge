@@ -25,7 +25,7 @@ import { buildApp } from './app.js';
 import { resetX402Paywall } from './middleware/x402.js';
 import { generateCreditKey } from './lib/api-keys.js';
 import { getStatsDB, closeAll } from './lib/db.js';
-import { REST_TRIAL_DAILY_LIMIT } from './lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT } from './lib/trial.js';
 import { resetDailyLedger } from './lib/daily-ip-ledger.js';
 
 // Our own bucket in the in-memory rate limiter (100 req/min per IP, shared
@@ -268,7 +268,7 @@ describe('the keyless trial sits between the key and the paywall', () => {
       body: JSON.stringify({ iban: VALID_IBAN }),
     });
     expect(res.status).toBe(200);
-    expect(res.headers.get('x-trial-limit')).toBe(String(REST_TRIAL_DAILY_LIMIT));
+    expect(res.headers.get('x-trial-limit')).toBe(String(REST_TRIAL_WEEKLY_LIMIT));
   });
 
   it('still answers 402 to the empty-body probe every indexer sends', async () => {
@@ -444,6 +444,63 @@ describe('the 402 an indexer reads', () => {
     expect((await badIid.json()) as { error: string }).toMatchObject({
       error: 'invalid_iid_format',
     });
+  });
+});
+
+// ─── 3.5 The compliance pre-guard must accept a bic like the route does ──────
+//
+// Until 25/09/2026 this guard (app.ts, mounted before the paywall) demanded
+// `iban` unconditionally, even though the ROUTE (src/routes/iban-compliance.ts)
+// accepts `bic` instead. An authenticated caller — Bearer key or
+// x402 payer, the only two callers this guard even runs for — sending only
+// `bic` was turned back with a 400 before the route, and before x402, ever
+// ran. That closed exactly the path GET /v1/bic/:code tells a caller to take
+// when a BIC is on a sanctions list: `POST /v1/iban/compliance {"bic": "..."}`.
+describe('the /v1/iban/compliance pre-guard accepts a bic, like the route it guards', () => {
+  it('lets a Bearer-authenticated bic-only request through to a 200', async () => {
+    const key = generateCreditKey(null, 50);
+    const res = await req('/v1/iban/compliance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.api_key}` },
+      body: JSON.stringify({ bic: 'DEUTDEFF' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { compliance?: Record<string, unknown> };
+    expect(body.compliance).toBeDefined();
+  });
+
+  it('still answers 400 with the widened message when neither field is sent', async () => {
+    const key = generateCreditKey(null, 50);
+    const res = await req('/v1/iban/compliance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.api_key}` },
+      body: '{}',
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('invalid_request');
+    expect(body.message).toBe(
+      "Request body must include an 'iban' or a 'bic' field (case-insensitive).",
+    );
+  });
+
+  it('lets a bic-only x402 payer past the guard (payment fails further down, not here)', async () => {
+    // The guard only checks that a payment header is PRESENT — it never
+    // validates it, that is x402's job further down the stack. A garbage
+    // payment-signature is not a decodable payment, so x402 answers its own
+    // 402 quote — the point being it is x402's 402, never the guard's 400.
+    const res = await req('/v1/iban/compliance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'payment-signature': 'not-a-real-signature' },
+      body: JSON.stringify({ bic: 'DEUTDEFF' }),
+    });
+
+    expect(res.status, 'must not be the guard rejecting a bic-only body').not.toBe(400);
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('payment_required');
   });
 });
 

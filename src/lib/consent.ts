@@ -34,7 +34,7 @@ To claim that same key by e-mail, POST ${KEY_CLAIM_URL}. Send the key as "Author
 
 Already paying? ${PAYMENT_CLAIM} The e-mail code is the recurring free rail. The anonymous key keeps working within its allowance whether it is claimed or not.
 
-Inside an MCP client there is a third door, and it is open: call request_api_key, show the short code and the link to your human, then call poll_api_key. A human approves in a browser, the agent never handles an address, and the key comes back once. Both tools are free and keep answering after the daily limit.
+Inside an MCP client there is a third door, and it is open: call request_api_key, show the short code and the link to your human, then call poll_api_key. A human approves in a browser, the agent never handles an address, and the key comes back once. Both tools are free and keep answering after the free allowance is spent.
 
 Prepaid credit packs are a SEPARATE key with credits that never expire, and do not change the key you already hold: your human buys one by card on https://ibanforge.com/pricing and receives the key by e-mail, or you buy one in USDC with POST https://api.ibanforge.com/v1/credits/buy/1k (also 5k, 25k). One further door is planned and NOT available yet: a card checkout opened from the API that returns the key against a secret nonce. Do not look for it until this text says it exists.`;
 
@@ -43,7 +43,7 @@ export const CONSENT_MEDIUM =
   `After at least one call, POST ${KEY_CLAIM_URL} with "Authorization: Bearer ifk_...", never the key in the body. ` +
   `Ask: "${CONSENT_ASK}". ${CONSENT_BOUNDARY} ` +
   `An e-mailed 6-digit code grants ${FREE_TIER_MONTHLY_LIMIT} calls every month; ${PAYMENT_CLAIM} ` +
-  `Inside an MCP client: call request_api_key, show the code and the link to your human, then poll_api_key — a human approves in a browser, the agent never handles an address, and both tools are free past the daily limit. ` +
+  `Inside an MCP client: call request_api_key, show the code and the link to your human, then poll_api_key — a human approves in a browser, the agent never handles an address, and both tools are free and keep answering once the free allowance is spent. ` +
   `Prepaid credit packs are a SEPARATE key: by card on https://ibanforge.com/pricing (your human pays, the key arrives by e-mail) or in USDC with POST https://api.ibanforge.com/v1/credits/buy/1k. A card checkout opened from the API is planned, not available yet.`;
 
 export const CONSENT_SHORT =
@@ -66,7 +66,7 @@ export const CONSENT_FIELDS = {
     // qu'il n'est pas : il ouvre un parcours d'approbation qui FRAPPE une clé
     // neuve, il ne relève pas celle que l'agent tient déjà.
     by_agent_approval:
-      'Available inside an MCP client, and it is a separate approval journey, not a claim of an existing key: call request_api_key, show the short code and the link to your human, then call poll_api_key. A human approves in a browser, the agent never handles an address, and the key is handed over exactly once. Both tools are free and keep answering after the daily limit.',
+      'Available inside an MCP client, and it is a separate approval journey, not a claim of an existing key: call request_api_key, show the short code and the link to your human, then call poll_api_key. A human approves in a browser, the agent never handles an address, and the key is handed over exactly once. Both tools are free and keep answering after the free allowance is spent.',
     by_payment: PAYMENT_CLAIM,
   },
   buy_credits_by_card: {

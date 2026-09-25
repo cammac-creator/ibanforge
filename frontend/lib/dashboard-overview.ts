@@ -475,10 +475,12 @@ const TRIAL_SIGNUP_CHANNEL = 'src:api-trial';
 /**
  * The keyless REST trial, end to end: tried → hit the ceiling → took a key.
  *
- * The first two are address-days, not calls (the API writes one row per address
- * per day, whatever the volume), so "12 tried" means twelve address-days and not
- * twelve requests. The third is the only one that is money: a free key minted
- * with `source=api-trial`.
+ * Neither of the first two is a call. "Tried" is an address-day (one row per
+ * address per day, whatever the volume). "Exhausted" is a source-week since
+ * 24/09/2026, when the trial started to be counted by the ISO week: one row per
+ * source, written on the call that crosses the ceiling, however many days the
+ * source comes back to the refusal. The third is the only one that is money: a
+ * free key minted with `source=api-trial`.
  *
  * Missing readers give zero rather than null on purpose — the card already greys
  * the week column when its fetch failed, and a second unknown state on three

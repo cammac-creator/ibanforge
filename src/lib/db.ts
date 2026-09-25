@@ -6,6 +6,7 @@ import { resetStatements } from './bic-lookup.js';
 import { resetNationalRegisterStatements } from './national-registers.js';
 import { buildCanonicalBillableFilter, resetStatsStatements } from './stats.js';
 import { closeComplianceDB } from './compliance-db.js';
+import { resetComplianceStatements } from './compliance.js';
 import { resetChClearingStatements } from './ch-clearing.js';
 import { resetPraBanksStatements } from './pra-banks.js';
 import { resetOfficialIdentityStatements } from './official-identity.js';
@@ -15,6 +16,7 @@ import { resetBlzStatements } from './de-blz.js';
 import { normalizeEmail } from './email-norm.js';
 import { resetDailyLedgerStatements } from './daily-ip-ledger.js';
 import { resetLineageDayCache } from './lineage-facts.js';
+import { registerReferenceCloser, servedDatabasePath } from './restricted-overlay-runtime.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -45,7 +47,10 @@ let bicDB: DatabaseType.Database | null = null;
 export function getBicDB(): DatabaseType.Database {
   if (!bicDB) {
     const Db = loadDatabaseSync();
-    bicDB = new Db(BIC_DB_PATH, { readonly: true });
+    // Sans RESTRICTED_BIC_OVERLAY_PATH, c'est BIC_DB_PATH lui-même. Avec, une
+    // copie fusionnée construite à côté du fichier privé, jamais BIC_DB_PATH
+    // modifié (voir src/lib/restricted-overlay.ts).
+    bicDB = new Db(servedDatabasePath('bic', BIC_DB_PATH), { readonly: true });
   }
   return bicDB;
 }
@@ -1311,6 +1316,10 @@ function openStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
     if (msgCols.length && !msgCols.includes('body'))
       statsDB.exec('ALTER TABLE email_messages ADD COLUMN body TEXT');
+    // L'objet traduit, pour la lecture seulement : une réponse garde l'objet
+    // d'origine (« Re: … »), dans la langue du correspondant.
+    if (msgCols.length && !msgCols.includes('subject_fr'))
+      statsDB.exec('ALTER TABLE email_messages ADD COLUMN subject_fr TEXT');
     // "This one needs no answer" — a thank-you, a read receipt, a ticket bot.
     //
     // 🚨 The marker belongs to the MESSAGE, not to the contact, and that is the
@@ -1402,8 +1411,8 @@ function openStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_at TEXT');
     // ─── Registre des franchises d'essai (lot 4, 15/09/2026) ────────────────
     //
-    // Bloc autonome posé en DERNIER, exprès : deux `CREATE TABLE IF NOT EXISTS`
-    // et aucun `ALTER`, donc aucun index à créer après une colonne ajoutée et
+    // Bloc autonome posé en DERNIER, exprès : des `CREATE TABLE IF NOT EXISTS`
+    // (`trial_weekly` s'y ajoute le 24/09/2026) et aucun `ALTER`, donc aucun index à créer après une colonne ajoutée et
     // aucune garde `PRAGMA table_info` (le piège du 19/08, qui empêchait l'API
     // de démarrer, n'a pas de prise ici). Le placer à la fin garde la région
     // isolée des autres chantiers qui migrent `api_keys` en parallèle.
@@ -1487,6 +1496,24 @@ function openStatsDB(): DatabaseType.Database {
         shield_minutes          INTEGER NOT NULL DEFAULT 0,
         created_at              TEXT    DEFAULT (datetime('now'))
       ) WITHOUT ROWID;
+      -- Le compteur de la SEMAINE de l'essai REST sans clé (24/09/2026 :
+      -- 25 appels par semaine et par source, semaine ISO en UTC). Une table à
+      -- part, et non des seaux quotidiens sommés depuis le lundi : garder les
+      -- lignes rest de trial_ledger sept jours ferait réécrire par des zéros,
+      -- une heure après minuit, la trace que snapshotTrialDay vient d'écrire
+      -- (elle ne s'abstient que sur une journée vide), et la somme par source
+      -- balaierait toute la semaine sur une clé (day, bucket). trial_ledger,
+      -- trial_daily et les plafonds MCP quotidiens restent donc intacts.
+      --
+      -- week = le lundi « YYYY-MM-DD » de la semaine ISO en UTC ; bucket = le
+      -- même seau haché que trial_ledger ('rest:<h>'), jamais une adresse.
+      -- Purgée par le tick horaire dès que la semaine est passée.
+      CREATE TABLE IF NOT EXISTS trial_weekly (
+        week   TEXT    NOT NULL,
+        bucket TEXT    NOT NULL,
+        units  INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (week, bucket)
+      ) WITHOUT ROWID;
       -- ─── Les deux portes d'une identité d'AGENT, par jour ────────────────
       -- (chantier « mesure agents », 15/09/2026)
       --
@@ -1556,6 +1583,59 @@ function openStatsDB(): DatabaseType.Database {
       ) WITHOUT ROWID;
     `);
     migrateLineageFacts(statsDB);
+    // ─── Le compte client par e-mail (lot C1, 24/09/2026) ─────────────────
+    //
+    // Bloc autonome posé en DERNIER, après les faits de mesure, pour la même
+    // raison que les deux blocs précédents : des CREATE TABLE IF NOT EXISTS et
+    // aucun ALTER, donc aucune garde PRAGMA table_info et aucun index qui
+    // nommerait une colonne créée plus bas (le piège du 19/08). Hors de la
+    // sauvegarde (src/lib/backup.ts) : ce sont des données éphémères, sans
+    // valeur de restauration.
+    statsDB.exec(`
+      -- Les défis de connexion. Table à part de pending_verifications : un
+      -- code de connexion ne crée ni ne réclame une clé, et une demande de
+      -- connexion n'écrase jamais un défi de création ou de réclamation (dont
+      -- la clé primaire est l'adresse seule).
+      --
+      -- Pas de contre-apostrophe et pas de point d'interrogation dans ces
+      -- commentaires : ils vivent dans un littéral de gabarit JS.
+      --
+      -- email_norm est la forme normalisée, celle qui choisit les clés ;
+      -- code_hash est le sha256 du code, jamais le code lui-même.
+      CREATE TABLE IF NOT EXISTS account_login_codes (
+        email_norm TEXT PRIMARY KEY,
+        code_hash  TEXT NOT NULL,
+        attempts   INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at TEXT NOT NULL
+      );
+      -- Les sessions de lecture. Le jeton ne vit que dans le cookie du
+      -- navigateur ; seule son empreinte sha256 est ici. email_display est
+      -- l'adresse saisie, en minuscules : ce que l'écran affiche. Aucune
+      -- empreinte d'adresse IP ni d'agent : personne ne les lirait, et la
+      -- moindre collecte est la bonne.
+      CREATE TABLE IF NOT EXISTS account_sessions (
+        token_hash    TEXT PRIMARY KEY,
+        email_norm    TEXT NOT NULL,
+        email_display TEXT NOT NULL,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at    TEXT NOT NULL,
+        last_seen_at  TEXT,
+        revoked_at    TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_account_sessions_email ON account_sessions(email_norm);
+    `);
+    // Les jours clos de la tendance du trafic, calculés une fois (25.09.2026) :
+    // voir getTrafficTrend. Des comptes par jour, jamais une donnée personnelle ;
+    // table dérivée, qui se reconstruit seule si on la vide.
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS traffic_trend_days (
+        day          TEXT PRIMARY KEY,
+        internal_sig TEXT NOT NULL,
+        row          TEXT,
+        computed_at  TEXT NOT NULL
+      );
+    `);
   }
   return statsDB;
 }
@@ -1913,7 +1993,12 @@ function repairBackfilledRouteVerbs(statsDB: DatabaseType.Database): void {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-export function closeAll(): void {
+/**
+ * Ferme la seule base BIC et oublie tout ce qui a été préparé sur elle. Séparée
+ * de closeAll() pour le rechargement de la surcouche privée, qui ne doit jamais
+ * fermer stats.sqlite (clés, quotas, crédits) sous les requêtes en cours.
+ */
+export function closeBicDB(): void {
   if (bicDB) {
     bicDB.close();
     bicDB = null;
@@ -1929,6 +2014,11 @@ export function closeAll(): void {
     // lookup after a reseed.
     resetBlzStatements();
   }
+}
+registerReferenceCloser('bic', closeBicDB);
+
+export function closeAll(): void {
+  closeBicDB();
   if (statsDB) {
     statsDB.close();
     statsDB = null;
@@ -1946,5 +2036,19 @@ export function closeAll(): void {
   // a close the next getStatsDB() decides afresh, otherwise a test (or a reseed)
   // that repairs the file would keep /health red forever (PERF-03, 2026-09-01).
   statsDbState = { ok: true };
-  closeComplianceDB();
+  closeComplianceConnection();
 }
+
+/**
+ * Ferme la base de conformité, ses mémos (closeComplianceDB) et les requêtes de
+ * contrôle préparées sur elle. Inscrite pour le rechargement de la surcouche
+ * privée, comme closeBicDB ci-dessus.
+ */
+export function closeComplianceConnection(): void {
+  closeComplianceDB();
+  // Les requêtes de contrôle ont été préparées sur la connexion qu'on vient de
+  // fermer, comme celles des registres plus haut : sans cette ligne, le premier
+  // contrôle après une réouverture répondrait depuis une connexion morte.
+  resetComplianceStatements();
+}
+registerReferenceCloser('compliance', closeComplianceConnection);

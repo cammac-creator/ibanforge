@@ -17,6 +17,7 @@ import { localDay } from '@/lib/crm/snooze';
 import { kindWord, railColorOf, rowStatus, shortAge } from '@/lib/crm/table-view';
 import { CrmToolbar } from './crm-toolbar';
 import { NewInstitutionForm } from './new-institution';
+import { LangBadge } from './lang-badge';
 import { Archive, BellOff, Check, Clock3, MoreHorizontal, SearchX } from 'lucide-react';
 import styles from './workspace.module.css';
 
@@ -494,6 +495,15 @@ export function ContactTable({
                       </span>
                       {r.preview && (
                         <span className="text-[var(--fg-4)]">
+                          {/* La langue d'origine, dite par la pastille commune ; l'aperçu
+                              lui-même est en français dès qu'une traduction existe. */}
+                          <LangBadge
+                            lang={r.previewLang}
+                            translated={r.previewTranslated}
+                            compact
+                            hideFrench
+                            className="mr-1.5"
+                          />
                           {r.lastFromUs && <span className="text-amber-400/80">toi : </span>}
                           {r.preview}
                         </span>

@@ -245,6 +245,31 @@ export const FREE_ENDPOINTS: readonly FreeEndpoint[] = [
 ];
 
 /**
+ * The tools only the npm package `ibanforge-mcp` exposes, on top of MCP_TOOLS.
+ *
+ * The creditor-file audit is paid by a one-off Stripe Checkout rather than a
+ * key or x402, so it lives in the stdio package alone (see A_ONLY_TOOLS in
+ * scripts/mcp-parity.test.ts, which checks this list against the package).
+ * Named here so /llms.txt can say what `npx -y ibanforge-mcp` adds instead of
+ * counting the HTTP tools as the package's (review of 24/09/2026).
+ */
+export const STDIO_ONLY_TOOLS: readonly string[] = ['audit_creditor_file', 'audit_status'];
+
+/**
+ * The tools a keyless caller of the hosted transport can call past its
+ * allowance: they cost no unit, because each is a way out of the dead end the
+ * allowance creates (a complaint, or a key). Not the same list as the tools
+ * with no USDC price (`price: 'free'`): those still count against the keyless
+ * allowance. Moved here from src/routes/mcp-http.ts (review of 24/09/2026) so
+ * that the OpenAPI can say which is which without importing an MCP server.
+ */
+export const ALLOWANCE_EXEMPT_TOOLS: ReadonlySet<string> = new Set([
+  'send_feedback',
+  'request_api_key',
+  'poll_api_key',
+]);
+
+/**
  * The tools an agent calls to obtain data: everything that does not write.
  *
  * Derived rather than listed, so the seven-versus-eight distinction cannot

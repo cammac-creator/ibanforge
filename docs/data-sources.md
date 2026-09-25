@@ -15,8 +15,8 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 
 | Source | Lignes | Licence | Établie ? |
 |---|---:|---|---|
-| PeterNotenboom/SwiftCodes | 82 102 | MIT | ✅ licence dans le dépôt — ⚠️ **données figées à janvier 2018**, voir ci-dessous |
-| GLEIF (BIC↔LEI) | 39 297 | **CC0** | ✅ **vérifié à la source le 23/08/2026** |
+| PeterNotenboom/SwiftCodes | 82 102 | MIT accordée par l'auteur du dépôt, **pas par SWIFT** | ⚠️ **droits de SWIFT non établis** (groupe B de `NOTICE` depuis le 24/09/2026 ; le dépôt dit seulement « All the info is grabbed from public websites ») — ⚠️ **données figées à janvier 2018**, voir ci-dessous |
+| GLEIF (LEI) et table BIC↔LEI de SWIFT | 39 297 | **CC0** pour les données LEI ; la **table BIC↔LEI** relève de la licence de SWIFT, avec sa mention obligatoire (voir plus bas) | ✅ CC0 **vérifié à la source le 23/08/2026** ; licence SWIFT **lue le 24/09/2026** |
 | Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
 | SIX BankMaster (clearing suisse) | 1 164 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
 | SIX Group (BIC) | 20 | même publication que le BankMaster | ⚠️ à confirmer séparément |
@@ -26,13 +26,14 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Finance Finland (Finanssiala ry) — Finnish monetary institution codes and BICs (table `src/lib/fi-register.ts`, pays FI) | 20 lignes, édition du 15.10.2025 | aucune condition sur le site (lu le 16/09/2026) ; document PDF transcrit à la main | ⏳ **lettre envoyée le 16/09/2026** à ffi@financefinland.fi (permission, attribution, notification des éditions). **Régime prudent depuis le 16/09/2026** : un résultat confirme, une absence ne refuse rien (`authoritative: false`) |
 | Bulgarian National Bank — registre BAE et BIC (`bg_bae`, pays BG) | par édition du registre | réponse écrite du service de presse le 27/08/2026 : réutilisation permise « respecting the Rights for using the BNB site » = citer la source, ne pas altérer ni déformer | ✅ **accordée sous conditions le 27/08/2026** ; `source` et `as_of` stockés et servis, noms en cyrillique tels que publiés |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
-| OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
+| OFAC (sanctions) | — | domaine public, **17 U.S.C. §105** (le CC0 lu le 24/08/2026 dans l'inventaire du Treasury n'y figure plus le 24/09/2026) | ✅ §105 **vérifié le 24/08/2026** ; CC0 plus vérifiable depuis le 24/09/2026 |
 | ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
 | UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
 | Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
 | BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 373 au 2026-09-16 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation et traitement confirmés par écrit le 09/09/2026, **citation de la NBS obligatoire** ; conditions du fichier conservées | ✅ **réponse du 09/09/2026 relue le 14/09/2026** — ingérée le 06/09/2026, voir ci-dessous |
+| Česká národní banka — Číselník kódů platebního styku (`national_bank_codes` et `national_bank_codes_pending`, pays CZ) | 46 en édition 254 (effet 01.09.2026) | conditions du site, § 3 : stocker, transmettre et reproduire permis, **« Zdroj: ČNB » obligatoire**, faits et sens d'un extrait inchangés ; avis écrit du service des paiements du 27/08/2026 dans le même sens | ✅ **conditions lues le 24/09/2026 — ingéré le 25/09/2026**, voir ci-dessous |
 | Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | ❓ **AUCUNE condition d'utilisation publiée** — ni licence, ni interdiction | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, licence `unknown`, lettre à écrire, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
@@ -46,6 +47,34 @@ prochain lecteur puisse contredire plutôt que refaire.
 
 Aucune obligation d'attribution n'est énoncée. CC0 est une renonciation au droit
 d'auteur, pas une licence à conditions.
+
+**Table BIC↔LEI de SWIFT — licence lue le 24/09/2026.** ⚠️ La table qui relie
+les BIC aux LEI n'est pas couverte par le CC0 de GLEIF : elle est développée par
+SWIFT et publiée sous le *BIC/LEI Mapping Table License Agreement* (annexe II,
+21/12/2017), lié en pied de la page GLEIF. Licence gratuite pour tout usage, y
+compris commercial, « provided always that any copy of the Mapping Table, in
+whole or in part, includes the following notice » :
+> « SWIFT © and database rights [insert date (i.e. month and year) of the Mapping Table version].
+> All rights reserved.
+> This Mapping Table has been developed by SWIFT. Any use of the Mapping Table, in whole or
+> in part, is subject to the BIC/LEI Mapping Table License Agreement as published with the
+> Mapping Table available on GLEIF’s website.
+> The Mapping Table is updated monthly. For the latest BIC information and updates, always
+> refer to www.swift.com/bic . »
+> — <https://www.gleif.org/lei-data/lei-mapping/download-bic-to-lei-relationship-files/2017-12-21_annex-2_bic-to-lei-mapping-table-license-agreement_final.pdf>
+
+La formule servie jusqu'au 24/09/2026 (« This service uses the BIC to LEI
+relationship file… ») n'avait aucune source : elle ne figure pas dans cette
+licence. `NOTICE` porte la formule exacte, et `/llms.txt` de l'API la sert mot
+pour mot depuis la PR 240 (`src/lib/bic-lei-notice.ts`) ; le `llms.txt` du
+site renvoie à ce texte servi. Le mois de version n'est stocké nulle part :
+`src/db/seed.ts` prend la dernière table publiée (`mapping.gleif.org/api/v2/bic-lei/latest`)
+à chaque rafraîchissement mensuel ; les lignes `gleif` du 01/09/2026 viennent
+de la version d'août 2026 (`LEI-BIC-20260828.zip`). Le mois servi est donc
+déduit de la date de chargement des lignes `gleif` (le mois qui précède le
+rafraîchissement du 1er). Reste à faire : stocker ce mois au chargement, ce qui
+lèverait la seule limite de cette déduction (un rafraîchissement manuel lancé
+entre la publication de fin de mois et la fin de ce mois).
 
 **SIX BankMaster — usage libre.** ✅
 > « All the details published in the Bank Master Data are based on information
@@ -92,7 +121,7 @@ nicht zulässig » figure dans la section **images et vidéos**. La confondre av
 la règle sur les données ferait retirer une source utilisable — symétrique du
 piège SIX ci-dessus.
 
-**OFAC — CC0 1.0, déclaré par le Treasury pour CE dataset.** ✅ (24/08/2026)
+**OFAC — domaine public (17 U.S.C. §105) ; CC0 lu le 24/08/2026, plus vérifiable depuis le 24/09/2026.** ✅
 > « Copyright protection under this title is not available for any work of the
 > United States Government » — 17 U.S.C. §105
 > — <https://www.govinfo.gov/content/pkg/USCODE-2023-title17/html/USCODE-2023-title17-chap1-sec105.htm>
@@ -104,6 +133,10 @@ Treasury (obligatoire sous l'OPEN Government Data Act) porte pour la liste SDN
 <https://catalog.data.gov/dataset/specially-designated-nationals-sdn-and-blocked-persons-list>.
 Seules réserves (usa.gov) : ne pas suggérer d'endossement, ne pas utiliser les
 logos fédéraux. Nous ne faisons ni l'un ni l'autre.
+
+⚠️ **Relu le 24/09/2026 : `data.json` ne porte plus aucune entrée OFAC ou SDN**
+(231 jeux, aucun ne nomme la liste). La déclaration CC0 lue le 24/08 n'est donc
+plus vérifiable ; `NOTICE` ne cite plus que le §105, qui suffit.
 
 **ONU — établie, et c'est la réponse qui dérange.** ⚠️ (24/08/2026)
 > « None of the materials provided on this web site may be used, reproduced or
@@ -161,7 +194,7 @@ deux dates.
 
 **Conséquence pratique** : une banque créée, absorbée ou renommée depuis 2018
 peut manquer, ou porter un nom périmé, dans la partie SwiftCodes du
-répertoire. Les registres nationaux (SIX, Bundesbank, OeNB, BNB, NBS, BNB
+répertoire. Les registres nationaux (SIX, Bundesbank, OeNB, BNB, NBS, ČNB, BNB
 bulgare) et GLEIF, eux, sont bien rafraîchis chaque mois — c'est pourquoi
 `bank_code_check` et `bic.basis` existent : ils disent quelle partie du
 répertoire a répondu.
@@ -195,6 +228,35 @@ base ait moins de 21 jours, et l'inscrit dans `metadata.carried_over` (liste et 
 des lignes) : les listes qui ont rafraîchi partent, la liste en panne est servie périmée et
 dite telle, et une panne de trois semaines fait de nouveau échouer le run.
 
+## Carte composite `src/db/bic_data.json` (code banque → BIC)
+
+Absente de cet inventaire jusqu'au 24/09/2026. Environ 24 000 clés `PAYS:code`,
+servies avec `authoritative: false` là où aucun registre national ne répond.
+Origines, relevées dans l'historique git et dans les scripts des projets amont :
+
+| Origine | Pays | Données d'origine |
+|---|---|---|
+| sigalor/iban-to-bic (MIT), `scripts/build-bic-data.ts` | DE, AT, FR, NL, BE, ES, LU | fichiers publiés par les banques nationales et associations : Bundesbank (DE), OeNB (AT), BNB (BE), Betaalvereniging (NL), BCE (FR, ES), **registre de l'ABBL (LU)** |
+| schwifty (MIT), import du 08/04/2026 (`9e8e34a8`) | 42 pays, dont NO, SI, **FI**, IT, LT, ES, **PL** | registres nationaux compilés par schwifty : **EWIB de la NBP (PL)**, **Finance Finland (FI)**, OeNB (AT), etc. |
+| SIX BankMaster | CH | voir plus haut |
+| clés dérivées de `bic_entries` (`51f86e96`) | GB, IE et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` |
+| ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
+
+**Clés CZ, 25/09/2026** : les 36 clés tchèques ont été confrontées au číselník
+de la ČNB (édition 254). Deux nommaient des codes supprimés, `CZ:4000` (Expobank
+CZ puis Max banka, supprimé le 09/04/2025 à la fusion avec Banka CREDITAS) et
+`CZ:8280` (supprimé le 01/12/2024) : retirées du fichier. Les 34 autres portent
+le BIC que la ČNB publie pour le code. `pruneStaleNationalCodes()` et la garde
+de `lookupByCountryBank()` (`src/lib/bic-lookup.ts`) empêchent qu'une
+reconstruction du fichier ou une nouvelle édition les ramène.
+
+Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
+droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
+PL et FI sortent du dépôt public** (conditions non établies, non commerciales,
+ou permission limitée à l'API : ABBL, voir la section ABBL plus bas). Les
+autres pays tirés de schwifty restent à vérifier un par un. Détail et
+attributions : `NOTICE`.
+
 ## Hors dépôt, délibérément
 
 **Vocalink — table de contrôle modulo britannique** (`valacdos.txt`,
@@ -206,6 +268,94 @@ dite telle, et une panne de trois semaines fait de nouveau échouer le run.
 (4 fichiers packés : README, deux fichiers `dist`, manifeste). Le Dockerfile
 tolère l'échec de ce téléchargement : un lien pourri doit coûter le contrôle
 britannique, jamais le déploiement.
+
+**La famille « sous conditions » — surcouche privée** (étape 3 de la sortie des
+données, 25/09/2026). Décision de Claude-Alain du 24/09/2026 : tout ce qui n'est
+pas redistribuable sort du dépôt public, l'ONU est gardée hors du dépôt, la
+Slovaquie reste publique (la Tchéquie aussi, conditions de la ČNB ci-dessous). La
+liste des membres vit en UN endroit,
+`src/lib/restricted-family.ts` (extraction, chargeur et seeders la lisent) :
+
+| Base | Membre | Lignes |
+|---|---|---|
+| `bic.sqlite` | `eba_step2`, `nbp`, `oenb` | `bic_entries` de ces trois sources |
+| `bic.sqlite` | `register_at`, `register_be`, `register_sm` | `national_bank_codes` de ces trois pays |
+| `bic.sqlite` | `pra` | `pra_banks` entière |
+| `compliance.sqlite` | `un` | `sanctioned_entities` de la liste `UN` |
+| `compliance.sqlite` | `epc_sepa`, `epc_vop` | `sepa_participants` et `vop_participants` entières |
+
+Hors de cette constante, et à traiter à l'étape du retrait (règle de la décision
+du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C de `NOTICE`) :
+`six_group` (à vérifier), la carte composite `src/db/bic_data.json` (clés AT, BE,
+LU, PL, FI), `src/lib/fi-register.ts`, les exports du site
+`frontend/data/registers/*.json`, les blocs EPC des exports et des réponses
+d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
+`mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`,
+`frontend/content/{en,fr,de}/docs/onboarding.mdx`), et les entrées GB (FCA) de
+`scripts/data/eu-emi-register-2026-05-22.json`.
+
+- **Deux fichiers privés**, un par base, désignés par `RESTRICTED_BIC_OVERLAY_PATH`
+  et `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (chemins absolus, sur le disque du
+  serveur, jamais dans un dépôt). Chacun porte les tables de la famille, créées
+  depuis les définitions de la constante, plus `overlay_meta` (format, base, date,
+  générateur, empreinte de la base lue, et selon la base `source_last_refresh` =
+  `metadata.last_refresh` de la conformité lue, ou `source_bic_entries_updated_at`
+  = la plus récente date de chargement de `bic_entries` de la base BIC lue) et
+  `overlay_members` (par membre : lignes, empreinte du contenu, date de chargement
+  des lignes quand la table en porte une, `as_of` ou mois de liste, source ; aucune
+  date de chargement pour AT, BE et SM, que personne ne date).
+- **Fusion au démarrage, la donnée la plus fraîche servie membre par membre** :
+  `entrypoint.sh` recopie les bases publiques à chaque démarrage ; l'API copie la
+  base publique fraîche à côté du fichier privé et décide pour chaque membre :
+  la surcouche sert si la base publique n'a aucune ligne du membre, si la
+  surcouche est strictement plus récente (datée de la même façon des deux côtés :
+  `last_refresh` pour la conformité, plus récent `updated_at` pour OeNB, NBP et
+  EBA STEP2 décidés ensemble, mois de liste puis `updated_at` pour la PRA, `as_of`
+  pour SM), ou si les contenus sont identiques ; sinon les lignes publiques sont
+  gardées (`kept_public`, sans alerte : c'est un rafraîchissement public plus
+  récent). AT et BE, non datés, restent donc publics dès qu'ils diffèrent. Le
+  `last_refresh` servi n'est jamais plus frais qu'un membre servi par la
+  surcouche. La base publique n'est jamais modifiée.
+- **Contrôles** : intégrité SQLite, version du format (2), base attendue, aucune
+  vue ni déclencheur, aucune table inconnue ni ligne hors de la famille (sinon
+  fichier refusé) ; pour chaque membre, table et colonnes identiques à la
+  constante, plancher de lignes (ceux des seeders pour AT, BE, SM et PRA), compte
+  et empreinte du contenu (sinon membre refusé, les autres servis). Le SQL lu dans
+  la surcouche n'est jamais exécuté. Refus : raison au journal, alerte
+  d'exploitation `overlay:<base>`. `GET /health` → `restricted_overlays`.
+- **Dernière surcouche acceptée** : gardée à côté du fichier privé
+  (`restricted-<base>.accepted.sqlite`). Au démarrage, si le fichier de la variable
+  est refusé (entier ou en partie), elle est fusionnée avec la base publique
+  fraîche et servie à sa place (`fallback: true` dans `/health`, alerte rouge) ;
+  sans elle, base publique seule et « non consulté » là où la donnée manque.
+- **Rechargement sans redémarrage** : un fichier remplacé (dépôt par un fichier
+  voisin puis `mv`) est vu en dix minutes au plus, et seule sa base est
+  refusionnée. Un fichier refusé, ou qui cesserait de servir un membre servi
+  aujourd'hui, laisse la surcouche courante en service ; il n'est pas reconstruit
+  aux passages suivants tant qu'il ne change pas. Après avoir libéré un volume
+  plein, redéposer ou redémarrer.
+- **Retirer ou déplacer une surcouche** : retirer la variable, redémarrer,
+  vérifier `off` dans `/health`, puis effacer dans le dossier de l'ancien fichier
+  privé `restricted-*.merged-*.sqlite*`, `restricted-*.accepted.sqlite` et, si
+  l'on renonce, la surcouche elle-même. Sinon environ 36 Mo et une copie complète
+  de la famille restent sur le volume, et une variable reposée plus tard
+  reprendrait l'ancienne copie acceptée. Effacer le seul fichier privé n'est PAS
+  un retour arrière : la fusion déjà faite reste servie jusqu'au redémarrage.
+- **Extraction sans téléchargement** : `npm run overlay -- extract --bic <copie>
+  --compliance <copie> --out-dir <dossier hors de tout dépôt git>` (crée le
+  dossier en 0700 ; refuse tout dépôt git ou copie de travail, un lien ou un lien
+  dur en sortie ; lit des copies ; refuse sous un plancher ou sur une baisse de
+  plus de 10 % d'un membre d'au moins 50 lignes sans `--allow-shrink`). Contrôle :
+  `npm run overlay -- check`.
+- **Seeders à sortie choisie**, pour le futur dépôt privé de rafraîchissement :
+  `BIC_DB_PATH` (enrich, national, PRA), `COMPLIANCE_DB_PATH` (conformité),
+  `SEED_FAMILY=restricted` (la famille seule), enchaînés par
+  `npm run overlay:seed -- --kind bic|compliance --out <fichier>`. La sortie doit
+  être hors de tout dépôt (`$RUNNER_TEMP` en CI), et `overlay:seed` pose
+  `SEED_TMP_DIR` dans son dossier de travail : les téléchargements et la base de
+  conformité en construction ne passent plus par `.tmp-bic-enrich/` et
+  `.tmp-compliance/` du checkout (désormais ignorés par git). Sans ces variables, les workflows publics
+  écrivent exactement comme avant.
 
 ## Ce que les surfaces publiques annoncent
 
@@ -237,9 +387,12 @@ britannique, jamais le déploiement.
 
 ## Ce qui reste à faire, par ordre de risque
 
-1. **Établir les licences encore marquées ❌.** Sept sur treize sont établies
-   au 24/08 : SwiftCodes, GLEIF, Bundesbank, SIX BankMaster (23/08), puis
-   **UE (CC BY 4.0)**, **OFAC (CC0)** et **ONU** (24/08). Restent **EBA
+1. **Établir les licences encore marquées ❌.** Six sur treize sont établies :
+   GLEIF (CC0 pour les LEI, 23/08 ; licence SWIFT de la table BIC↔LEI, 24/09),
+   Bundesbank, SIX BankMaster (23/08), puis **UE (CC BY 4.0)**, **OFAC
+   (§105)** et **ONU** (24/08). **SwiftCodes n'en fait plus partie depuis le
+   24/09/2026** : la MIT vient de l'auteur du dépôt, les droits de SWIFT ne
+   sont pas établis (groupe B de `NOTICE`). Au 24/08, restaient **EBA
    Clearing** (« all rights reserved », aucun grant), **NBP**, **EPC** et le
    **GAFI** — les trois derniers derrière des murs anti-robot, voir la mesure
    ci-dessous. La position sur l'ONU est arrêtée depuis le 24/08 (voir la
@@ -647,6 +800,20 @@ toute sous-licence ; jamais le logo ; jamais d'implication d'endossement.
 Le contenu écrit (hors data) est en CC BY 4.0. Attribution posée le 26/08
 sur les pages data-sources publiques (3 langues).
 
+**Formule remplie le 24/09/2026** (l'ancienne formule publiée n'avait ni
+l'année ni une date de consultation) :
+
+> FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
+
+Elle est construite par `fatfCitation()` à partir de `FATF_AS_OF` (mois de la
+plénière) et de `FATF_ACCESSED_ON` (jour de lecture des déclarations du GAFI :
+le 10/07/2026, commit `766d711d`, qui a synchronisé les listes sur la plénière
+des 17-19 juin), dans `src/lib/compliance-static.ts`. Les trois pages
+data-sources et `NOTICE` ne peuvent pas appeler la fonction :
+`src/routes/fatf-attribution.test.ts` les épingle sur elle (ce fichier
+compris), et échoue si la date de consultation précède l'ouverture de la
+plénière (`FATF_PLENARY_OPENED_ON`, le 17/06/2026 pour la plénière de juin).
+
 **EPC — ❌ NON COMMERCIAL par défaut → permission d'abord.**
 > « In principle, the information contained in this website can be
 > reproduced, redistributed and transmitted for **non-commercial purposes**,
@@ -894,9 +1061,13 @@ répertoire de codes de paiement.
 
 ### La position et la réponse reçue
 
-Nous ne redistribuons pas le fichier : nous servons **un enregistrement par
-requête**, noms verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la
-version et la date d'effet lues sur la page.
+**Position retenue par Claude-Alain le 24/09/2026 : le registre slovaque est
+publiable, avec la citation.** L'API sert **un enregistrement par requête**, noms
+verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la version et la
+date d'effet lues sur la page. Les lignes extraites figurent aussi dans le dépôt
+public (`data/bic.sqlite`, `frontend/data/registers/sk-bank.json`), avec la même
+citation dans `NOTICE` (groupe A). Le fichier électronique de la NBS lui-même
+n'est ni republié ni modifié.
 
 **Réponse de la NBS du 09/09/2026, relue le 14/09/2026**, à la demande du
 26/08 sur l'extraction de champs dans une API commerciale : la NBS indique
@@ -937,6 +1108,141 @@ répond encore **HTTP 200** et sert une édition **périmée** (en-tête slovaqu
 arrivées — 2250, 3030, 6363). Mesuré le 06/09/2026. Le seeder part de la page
 et suit l'ancre qui finit par « (CSV) », dont l'UUID change à chaque version.
 
+
+## ČNB — le číselník tchèque (`national_bank_codes`, pays CZ)
+
+Ingéré le **25/09/2026** (édition 254, en vigueur depuis le 01/09/2026). Page
+officielle : <https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/>. Étude
+complète : dossier privé `docs/internal/registres-2026-09-24/`.
+
+### Ce qui a été lu, mot pour mot
+
+Conditions d'utilisation du site, « Podmínky užívání internetových stránek
+ČNB », § 3, lues à la source le **24/09/2026** :
+
+> « Naše internetové informace můžete ukládat, předávat dále a rozmnožovat s
+> výjimkou autorských textů, t.j. takových textů, v jejichž záhlaví nebo zápatí
+> je uveden autor […] a obrázků, z nichž je zřejmé, že práva k obrázkům nevlastní
+> ČNB. […] ČNB musí být vždy uvedena jako zdroj informací (Zdroj: ČNB), soubor
+> nesmí být obsahově ani jinak pozměňován a musí být otevřen vždy v novém okně
+> prohlížeče. Pokud je použit výňatek z textu, rozdělení na více textů nebo
+> spojení více textů, nesmí dojít ke změně faktů a smyslu textu. »
+> — <https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/>
+
+Traduction de travail : on peut stocker, transmettre et reproduire les
+informations du site, sauf textes signés et images de tiers ; la ČNB doit
+toujours être citée (« Zdroj: ČNB ») ; le fichier ne doit être modifié ni dans
+son contenu ni autrement, et il doit toujours être ouvert dans une nouvelle
+fenêtre du navigateur ; en cas d'extrait, de découpage ou de réunion de textes,
+les faits et le sens ne doivent pas changer.
+
+La clause de la nouvelle fenêtre vise l'ouverture d'un fichier de la ČNB dans
+un navigateur. IBANforge ne sert ni n'ouvre ce fichier : l'API sert des champs
+extraits, un enregistrement par requête, ce que couvre la phrase sur les
+extraits (et l'avis du 27/08/2026 cité plus bas). Elle est donc sans objet ici.
+
+Base de l'exhaustivité, vyhláška č. 169/2011 Sb., publiée par la ČNB
+(<https://www.cnb.cz/export/sites/cnb/cs/platebni-styk/.galleries/pravni_predpisy/download/vyhl_169_2011.pdf>),
+lue le **24/09/2026** et relue le **25/09/2026** sur le PDF publié (texte extrait
+par `pdftotext`, coupures de fin de ligne recollées) :
+
+> § 4 : « Číslo účtu ve formátu IBAN je tvořeno 24 alfanumerickými znaky, kdy
+> […] c) pátý až osmý znak obsahují číslice kódu platebního styku (§ 6) […] »
+>
+> § 6 al. 2 : « Česká národní banka uveřejňuje kódy platebního styku, které
+> poskytovateli platebních služeb přidělila, v Číselníku kódů platebního styku
+> v České republice, a to způsobem umožňujícím dálkový přístup. »
+
+Les positions 5 à 8 de tout IBAN tchèque sont le code de paiement, et la ČNB
+publie dans ce číselník les codes qu'elle a attribués : un code absent de
+l'édition en vigueur n'est attribué à personne. C'est ce qui range la Tchéquie
+dans `NATIONAL_REGISTERS` (`authoritative: true`), comme la Slovaquie.
+
+### La position
+
+- **Commercial** : aucune restriction commerciale dans ces conditions (la seule
+  interdiction commerciale de la page vise le logo de la ČNB).
+- **Extraction de champs** : prévue par la dernière phrase citée, à condition
+  que les faits et le sens restent intacts. L'API sert un enregistrement par
+  requête, noms verbatim (diacritiques compris), BIC tel que publié, avec
+  l'édition et sa date d'effet.
+- **Avis écrit** : réponse du département des paiements de la ČNB du
+  27/08/2026 à la demande du 26/08 : l'extraction du code et du BIC, avec la
+  source et la date, n'altère pas l'information ; avis personnel du service,
+  pas une position juridique de la ČNB. Les conditions du site suffisent sans
+  lui.
+- **Aucune lettre à écrire.**
+
+### Ce que ça impose au code
+
+- `source` porte la mention exigée **en tête** : « Zdroj: ČNB, Číselník kódů
+  platebního styku v ČR, verze N » ; `as_of` porte la date d'effet de
+  l'édition. `nationalRegisterCredit('CZ')` en fait « … verze N (platný od
+  AAAA-MM-JJ) » pour `/llms.txt`. Le nom du registre servi dans
+  `bank_code_check.register` contient lui aussi « Zdroj: ČNB », parce qu'un
+  refus et les codes publiés sans BIC n'ont pas de bloc `bic` pour porter la
+  mention.
+- **Chaque édition paraît avant sa date d'effet** (règles du ČKPS, art. III.3 ;
+  le CSV de l'édition 254 est daté du 24/08/2026 pour un effet au 01/09/2026),
+  et le CSV ne porte **ni numéro ni date** : le chargeur lit l'édition et la
+  date sur la page, garde l'édition en vigueur dans `national_bank_codes` et
+  l'édition annoncée dans `national_bank_codes_pending`. La bascule se fait **à
+  la requête**, à minuit heure de Prague le jour d'effet
+  (`src/lib/national-registers.ts`, `activeTable()`), jamais au jour du
+  téléchargement. Toutes les éditions ne partent pas le 1er (251 le
+  16/03/2026, 245 le 09/04/2025), alors que le rafraîchissement mensuel tourne
+  le 1er.
+- L'édition en vigueur se lit dans son CSV **numéroté**
+  (`kody_bank_CR_<N>.csv`). La page lie ce fichier numéroté pour une édition
+  annoncée (copie archivée du 28/08/2026 : 254 lié par `kody_bank_CR_254.csv`,
+  253 par le fichier non numéroté). Quand rien n'est annoncé, le numéroté est
+  comparé au CSV lié par la page ; s'ils diffèrent, ou si le lié ne se lit pas,
+  le numéroté est chargé, aucune annonce n'est écrite et un avertissement est
+  journalisé ; le rafraîchissement suivant relit la page.
+- Une annonce lue dans son fichier **numéroté** est écrite même si ses codes,
+  noms et BIC sont ceux de l'édition en vigueur (des éditions ne changent que
+  la colonne CERTIS, non stockée : 235→236, 248→249, 250→251). Seule une
+  annonce lue dans le fichier non numéroté, identique à l'édition en vigueur,
+  est écartée : ce fichier ne porte pas de numéro et n'a peut-être pas encore
+  bougé.
+- Une source **injoignable** (réseau, erreur HTTP, connexion coupée pendant le
+  transfert, délai dépassé), une **page de refus servie en HTTP 200** (page sans
+  le nom « Česká národní banka », ou HTML à la place d'un CSV), des dates
+  **contradictoires** entre la page et l'historique, ou une édition **plus
+  ancienne** que celle déjà servie laissent les deux tables telles quelles et
+  ne font pas échouer le rafraîchissement mensuel (on ne sait pas si cnb.cz
+  répond aux machines de GitHub). Un changement de **format** (page de la ČNB
+  sans la phrase « Číselník N platný od … », CSV sans son en-tête, édition sous
+  le plancher) le fait échouer.
+- **Pas de silence** : une source non chargée écrit une annotation `::warning::`
+  et la sortie d'étape `cz_register=not_loaded`. Une étape finale « Czech
+  register not loaded (cnb.cz) » la change en run rouge, ce qui envoie l'alerte
+  Telegram existante. Dans le rafraîchissement mensuel, cette étape vient APRÈS
+  le commit et le battement : les autres sources sont déjà poussées.
+- **Relecture quotidienne** : `.github/workflows/refresh-cz-register.yml`, chaque
+  jour à 05:17 UTC, lance le chargeur tchèque SEUL (`seed-national.ts CZ`, rien
+  d'autre n'est téléchargé). Il ne commite que si le CONTENU des lignes CZ a
+  changé (`scripts/cz-register-diff.ts` compare la base à celle de HEAD, table
+  par table, et refuse le commit si une autre table, un autre pays ou le schéma
+  diffère), après le même garde de qualité (`refresh-diff.ts`) et les tests ;
+  même alerte Telegram. Groupe de concurrence `bic-sqlite-writer`, partagé avec
+  `refresh-bic.yml` : les deux ne s'écrasent jamais. Raison : une édition qui
+  entre en vigueur hors du 1er (251 le 16/03/2026) ferait sinon refuser, avec
+  autorité, les codes qu'elle crée jusqu'au mois suivant.
+
+### Les pièges de la source
+
+- Le serveur envoie le CSV avec `Content-Type: text/html;charset=UTF-8` : rien
+  ne filtre sur le type, c'est la ligne d'en-tête qui prouve le fichier.
+- La page porte un bloc commenté qui pointe vers `admin-cnb.cz.net`, serveur
+  d'administration de la ČNB : les commentaires HTML sont retirés avant toute
+  lecture.
+- Certaines éditions ouvrent sur une marque d'ordre d'octets (253 oui, 254 non).
+- Onze codes de l'édition 254 n'ont pas de BIC (caisses d'épargne-logement,
+  coopérative, Banking Circle, Multitude Bank…) : ce sont des attributions
+  réelles, gardées avec un BIC nul.
+- L'historique des changements (PDF, depuis 2009) donne les successeurs en
+  texte libre seulement : aucun `superseded_by` n'est servi pour la Tchéquie.
 
 ## BCSM — les banques opérationnelles de Saint-Marin (`national_bank_codes`, pays SM)
 

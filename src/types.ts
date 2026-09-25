@@ -7,6 +7,7 @@ import type { OfficialIdentity } from './lib/official-identity.js';
 import type { PsdRegistration } from './lib/psd-register.js';
 import type { ReferenceCheckBlock } from './lib/payment-reference.js';
 import type { KeyTier } from './lib/tiers.js';
+import type { BicSanctionsScreen } from './lib/compliance.js';
 
 export type { UkModulusResult, PraAuthorisation, PsdRegistration, ReferenceCheckBlock };
 
@@ -75,17 +76,19 @@ export interface PaywallCause {
 }
 
 /**
- * A keyless REST call served on the daily trial (src/middleware/anonymous-trial.ts).
+ * A keyless REST call served on the weekly trial (src/middleware/anonymous-trial.ts).
  *
  * Present ONLY when the trial was actually granted, so `c.get('anonymousTrial')`
  * doubles as the predicate everything downstream branches on: the x402 skip, the
  * `trial` block in the body, the zero revenue, the response headers.
  */
 export interface AnonymousTrial {
-  /** Calls served to this address today, this one included. */
+  /** Calls served to this source this week (ISO week, UTC), this one included. */
   used: number;
   limit: number;
   remaining: number;
+  /** Next Monday 00:00:00 UTC, ISO 8601: when `remaining` goes back to `limit`. */
+  resetsAt: string;
 }
 
 type HonoEnv = {
@@ -120,7 +123,7 @@ type HonoEnv = {
     mcpToolName?: string | null;
     /** Set by the API-key middleware when the request is served on the free tier: the response then carries the attribution block. */
     freeTier?: boolean;
-    /** Set by the anonymous-trial middleware when a keyless validation is served on the daily allowance. */
+    /** Set by the anonymous-trial middleware when a keyless validation is served on the weekly allowance. */
     anonymousTrial?: AnonymousTrial;
   };
 };
@@ -171,9 +174,11 @@ export type OperationType =
  * directories, not the national bank-code register, so an absence there is
  * evidence of nothing more than absence. Switzerland and Liechtenstein are
  * checked against the register itself (SIX BankMaster), Germany against the
- * Bundesbank Bankleitzahlendatei, Bulgaria against the Bulgarian National
- * Bank's BAE register and Slovakia against the Národná banka Slovenska
- * prevodník, and only there does `not_in_register` mean
+ * Bundesbank Bankleitzahlendatei, Austria and Belgium against their central
+ * banks' registers, Bulgaria against the Bulgarian National Bank's BAE
+ * register, Slovakia against the Národná banka Slovenska prevodník and Czechia
+ * against the Česká národní banka číselník (the served list is built in
+ * src/lib/register-lists.ts), and only there does `not_in_register` mean
  * the code is not allocated. San Marino sits between the two: its register
  * NAMES the holder of a code it lists, but the Central Bank publishes its
  * operating banks rather than the allocation of the code space, so a miss
@@ -345,10 +350,27 @@ export interface RegisterInstitution {
 }
 
 import type { NextStep } from './lib/next-steps.js';
+import type { BankCodeHolder, Checks } from './lib/checks.js';
+
+/**
+ * Whether the EPC scheme registers list the resolved BANK (never the country).
+ * See `sepa.bank_reachability`.
+ */
+export type SepaBankReachability = 'listed' | 'not_listed' | 'no_bank' | 'bank_code_not_allocated';
 
 export interface IBANValidationResult {
   iban: string;
   valid: boolean;
+  /**
+   * Who holds the bank code: `confirmed` (a register names the holder),
+   * `inferred` (a source that does not settle it names one), `not_allocated`
+   * (the national register says nobody holds it) or `unknown`. Present only on
+   * a valid IBAN whose bank code was checked. `valid` stays true in all four.
+   * See lib/checks.ts.
+   */
+  bank_code_holder?: BankCodeHolder;
+  /** One short status per check, including those IBANforge never makes. See lib/checks.ts. */
+  checks?: Checks;
   country?: {
     code: string;
     name: string;
@@ -405,10 +427,10 @@ export interface IBANValidationResult {
      *
      * - `national_register` — the country's own register publishes this BIC for
      *   this bank code. Today: Switzerland, Liechtenstein, Germany, Austria,
-     *   Belgium, Bulgaria, Slovakia and San Marino — the SIX
+     *   Belgium, Bulgaria, Slovakia, Czechia and San Marino — the SIX
      *   BankMaster carries the exact 11-character BIC per IID, the Bundesbank
      *   Bankleitzahlendatei the exact 11-character BIC per BLZ, and the OeNB,
-     *   NBB, BNB BAE, NBS and BCSM registers publish the institution's BIC per
+     *   NBB, BNB BAE, NBS, ČNB and BCSM registers publish the institution's BIC per
      *   bank code. San Marino is the case where this flag and
      *   `bank_code_check.authoritative` part company: the pairing is the
      *   supervisor's, the code space is not its to settle. Settlement-grade,
@@ -425,7 +447,7 @@ export interface IBANValidationResult {
      *
      * Only one of the three is a register of allocations, and saying so plainly
      * is worth more than a field that flatters the other two. Coverage grows by
-     * ingestion — DE, then AT, BE, BG and SK — and this field is what makes that
+     * ingestion — DE, then AT, BE, BG, SK and CZ — and this field is what makes that
      * growth visible without a re-read of the docs.
      */
     basis?: BicBasis;
@@ -473,6 +495,15 @@ export interface IBANValidationResult {
      * has been established, never "this is current". See lib/source-vintage.ts.
      */
     source_as_of?: string;
+    /**
+     * Whether this BIC8 still appears in a list refreshed this cycle: GLEIF,
+     * the directory sources without a vintage, a national register, the EPC
+     * scheme registers. `null` when it was not found in what could be read in
+     * full (never `false` by default); `true` or `null` only while the STEP2
+     * and NBP lists are read through the deduplicated directory. It does not
+     * prove the bank still exists under this name. See lib/bic-trace.ts.
+     */
+    listed_in_current_source?: boolean | null;
     /**
      * Legal Entity Identifier of the resolved institution, and whether GLEIF
      * still considers it active.
@@ -534,12 +565,31 @@ export interface IBANValidationResult {
      * Bank-level VoP readiness: true when the resolved institution is listed
      * as "ready" in the EPC Verification of Payee scheme register; false when
      * it is not; null when no institution was resolved (no subject, no claim).
+     * Nul aussi quand le registre VoP n'est pas chargé : non consulté, donc pas
+     * d'affirmation non plus (25/09/2026). Hors de la zone SEPA, le pays répond
+     * `false`, registre ou non.
      * Listing means the bank answers VoP requests — it does not run the name
      * check for you and says nothing about a specific account.
      */
     vop_participant?: boolean | null;
     /** Where `schemes` comes from: the EPC registers (bank grain) or the country default. */
     basis?: 'country_default' | 'epc_register';
+    /**
+     * Whether the EPC scheme registers list the resolved BANK, never borrowed
+     * from the country: `listed`, `not_listed` (absence from the register is not
+     * exclusion from the scheme), `no_bank` (no BIC resolved: a register may still name the holder),
+     * `bank_code_not_allocated`, or null when the registers are not loaded on
+     * this deployment (not consulted). Absent outside SEPA.
+     */
+    bank_reachability?: SepaBankReachability | null;
+    /** The bank's own schemes from the EPC registers when `listed`; [] for an unallocated code; null otherwise. */
+    bank_schemes?: Array<'SCT' | 'SDD' | 'SCT_INST'> | null;
+    /**
+     * The bank's status in the EPC VoP register: `active` (same as
+     * `vop_participant: true`), `pending`, `inactive`, `not_listed`; null when
+     * no BIC resolved or the register is not loaded. Absent outside SEPA.
+     */
+    vop_register_status?: 'active' | 'pending' | 'inactive' | 'not_listed' | null;
   };
   issuer?: {
     /**
@@ -663,7 +713,7 @@ export interface IBANValidationResult {
   processing_ms?: number;
   /** Present on free-tier responses only. */
   attribution?: Attribution;
-  /** Present only on a call served by the keyless daily trial. @see TrialBlock */
+  /** Present only on a call served by the keyless weekly trial. @see TrialBlock */
   trial?: TrialBlock;
 }
 
@@ -677,15 +727,24 @@ export interface IBANValidationResult {
  * on the last one, when it is already too late to be a choice.
  */
 export interface TrialBlock {
-  calls_used_today: number;
-  calls_left_today: number;
-  daily_limit: number;
+  /**
+   * Since 24/09/2026 the trial is counted by the ISO WEEK (UTC), and every
+   * field says so in its name. The former `calls_used_today`,
+   * `calls_left_today` and `daily_limit` were removed rather than kept: they
+   * would have carried weekly counts under daily names, and no published
+   * package read them (sdks/, mcp/, integrations/ checked that day).
+   */
+  calls_used_this_week: number;
+  calls_left_this_week: number;
+  weekly_limit: number;
+  /** In words: "Monday 00:00 UTC". */
   resets: string;
+  /** The exact instant, ISO 8601: next Monday 00:00:00 UTC. */
+  resets_at: string;
   /**
    * Copy-pasteable: the request that mints a key with no address at all.
-   * Its figure is the ANONYMOUS monthly allowance, and the one thing this
-   * field must keep saying is which of the two 25s it means (a month, on
-   * every endpoint — not a day, on this route). See src/lib/trial.ts.
+   * It announces the key by its claimed monthly allowance and never puts the
+   * trial's figure beside the key's (see src/lib/trial.ts).
    */
   free_key: string;
   docs: string;
@@ -762,6 +821,12 @@ export interface BICLookupResult {
   lei_status: string | null;
   is_test_bic: boolean;
   source: string | null;
+  /** Human name of `source` (25/09/2026). Null when nothing was found. */
+  source_name?: string | null;
+  /** Year-month the source DATA is from, present only for a frozen copy. See lib/source-vintage.ts. */
+  source_as_of?: string;
+  /** Whether the BIC8 asked about appears in a list refreshed this cycle. See lib/bic-trace.ts. */
+  listed_in_current_source?: boolean | null;
   /**
    * Bank-level sanctions screen on this BIC8.
    *
@@ -775,14 +840,14 @@ export interface BICLookupResult {
    * This is a WARNING, not a compliance report: it says nothing about the
    * country, FATF, or a beneficiary. Full screening is /v1/iban/compliance.
    */
-  sanctions: {
-    /** False when the sanctions database could not be read; `listed` is then null. */
-    screened: boolean;
-    /** Null when not screened — never `false`, which would be a claim we cannot make. */
-    listed: boolean | null;
-    /** Which lists matched, e.g. ["OFAC"], ["EU"]. Empty when clean or unscreened. */
-    matched_lists: string[];
-  };
+  /**
+   * One shape for the route and this contract (src/lib/compliance.ts):
+   * `screened` false when the sanctions database could not be read, `listed`
+   * null when not screened OR when nothing matched while a named list is not
+   * loaded (`unscreened_lists`), never `false`, which would be a claim we
+   * cannot make; `matched_lists` the lists that matched.
+   */
+  sanctions: BicSanctionsScreen;
   note?: string;
   cost_usdc: number;
   processing_ms?: number;
@@ -914,8 +979,22 @@ export interface SanctionsCheck {
    *
    * When false, `bank_sanctioned` and `matched_lists` carry no information —
    * do not branch on them.
+   *
+   * Faux aussi quand une banque a été résolue mais qu'aucune liste de
+   * sanctions n'est chargée (25/09/2026) : le drapeau
+   * `sanctions_lists_unavailable` le dit, et le score ne descend pas sous 50.
    */
   bank_screened: boolean;
+  /**
+   * Whether the payee's BANK is on a sanctions list: `bank_sanctioned` when a
+   * bank was screened against every list this service names, null otherwise
+   * (no bank screened, or nothing matched while a named list is not loaded).
+   * Added 25/09/2026 beside `bank_sanctioned`, which answers false without a
+   * screen.
+   */
+  institution_listed?: boolean | null;
+  /** Always false: the payee (the account holder) is never screened. */
+  payee_screened?: false;
 }
 
 export interface ReachabilityCheck {
@@ -926,8 +1005,14 @@ export interface ReachabilityCheck {
    * False when no institution resolved, so the three booleans above are
    * defaults rather than findings. The EPC registers are keyed by BIC8; with no
    * BIC there is no key and no lookup happened.
+   * Faux aussi quand les registres EPC ne sont pas chargés (25/09/2026) : la
+   * recherche n'avait rien à consulter, ce qui est la même absence de constat.
+   * Sauf pour un pays hors de la zone SEPA : le pays répond, `screened` reste
+   * vrai, et la réponse est celle d'une base complète.
    */
   screened: boolean;
+  /** At least one of the three schemes; null when the registers were not consulted. */
+  listed_in_epc_registers?: boolean | null;
 }
 
 export interface VopCheck {
@@ -936,8 +1021,12 @@ export interface VopCheck {
   /**
    * False when no institution resolved. `status: 'not_found'` then describes
    * the absence of a query, not the absence of a registration.
+   * Faux aussi quand le registre VoP n'est pas chargé (25/09/2026), sauf pour
+   * un pays hors de la zone SEPA, où le pays répond.
    */
   screened: boolean;
+  /** The VoP register status under its own name (`not_found` → `not_listed`); null when not consulted. */
+  register_status?: 'active' | 'pending' | 'inactive' | 'not_listed' | null;
 }
 
 /**

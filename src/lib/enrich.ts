@@ -11,14 +11,17 @@ import {
   lookup,
   registeredAddress,
   bic8CountForPrefix,
+  nonEmpty,
   type BankLookupHit,
 } from './bic-lookup.js';
+import { listedInCurrentSource } from './bic-trace.js';
 import { classifyIssuer } from './issuers.js';
 import { FI_REGISTER_AS_OF, lookupFiInstitution } from './fi-register.js';
 import {
   lookupNationalCode,
   nationalRegisterAvailable,
   nationalRegisterEdition,
+  withRegisterClock,
 } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode } from './lu-register.js';
@@ -39,10 +42,12 @@ import type {
   BankCodeCheck,
   BicBasis,
   IBANValidationResult,
+  ReachabilityCheck,
   RegisterInstitution,
 } from '../types.js';
 import type { SepaScheme } from './countries.js';
 import { nextSteps } from './next-steps.js';
+import { buildChecks, type BankCodeHolder } from './checks.js';
 
 /**
  * The `bic` block of a validation result, widened with the ISO 20022 postal
@@ -75,26 +80,55 @@ type SepaBlockWithBasis = NonNullable<IBANValidationResult['sepa']> & {
 };
 
 /**
+ * What the EPC registers say about one institution, or null when the database
+ * cannot be read — the same failure discipline as the register blocks above.
+ *
+ * `screened: false` when the registers are not loaded on this deployment: not
+ * consulted, which the caller must never read as "not listed".
+ */
+function epcReachability(bic8: string): ReachabilityCheck | null {
+  try {
+    return checkReachability(bic8);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The schemes the EPC registers list for one institution, in the same order
  * the country-grain literal uses.
  *
  * Empty when the BIC8 has no row at all: absence from the register is not
  * evidence the bank is out of the scheme, so the caller keeps the country
- * answer rather than being told "no schemes". Empty likewise when the database
- * cannot be read — the same failure discipline as the register blocks above.
+ * answer rather than being told "no schemes". Empty likewise when the registers
+ * were not consulted.
  */
-function epcSchemesForBic8(bic8: string): SepaScheme[] {
-  try {
-    const reach = checkReachability(bic8);
-    if (!reach.screened) return [];
-    const schemes: SepaScheme[] = [];
-    if (reach.sct) schemes.push('SCT');
-    if (reach.sdd) schemes.push('SDD');
-    if (reach.sepa_instant) schemes.push('SCT_INST');
-    return schemes;
-  } catch {
-    return [];
-  }
+function epcSchemes(reach: ReachabilityCheck | null): SepaScheme[] {
+  if (!reach?.screened) return [];
+  const schemes: SepaScheme[] = [];
+  if (reach.sct) schemes.push('SCT');
+  if (reach.sdd) schemes.push('SDD');
+  if (reach.sepa_instant) schemes.push('SCT_INST');
+  return schemes;
+}
+
+/**
+ * `bank_code_holder` et `checks` juste après `valid` (25/09/2026) : un agent ou
+ * un humain qui lit la réponse de haut en bas rencontre ce que vaut la banque
+ * avant de s'arrêter sur « valid: true ». L'ordre des clés n'est pas
+ * contractuel ; l'objet reste le même (mutation en place).
+ */
+const TRUTH_FIRST = ['bank_code_holder', 'checks'];
+
+function putTruthAfterValid(result: IBANValidationResult): void {
+  const r = result as unknown as Record<string, unknown>;
+  const rest = Object.keys(r).filter((k) => !TRUTH_FIRST.includes(k));
+  const at = rest.indexOf('valid') + 1;
+  if (at === 0) return;
+  const order = [...rest.slice(0, at), ...TRUTH_FIRST.filter((k) => k in r), ...rest.slice(at)];
+  const copy = { ...r };
+  for (const k of Object.keys(r)) delete r[k];
+  for (const k of order) r[k] = copy[k];
 }
 
 /**
@@ -142,6 +176,17 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   // languages because the Slovak word is what the register is called at home
   // and the English one is what the page a reader will open says.
   SK: 'Národná banka Slovenska, prevodník of identification codes for the domestic payment system',
+  // Czechia. The one register here whose exhaustiveness is written in law:
+  // vyhláška č. 169/2011 Sb., § 4 c), makes IBAN positions 5-8 the payment code
+  // of § 6, and § 6 (2) has the ČNB publish every code it has allocated in this
+  // číselník. A code absent from the edition in force is allocated to nobody.
+  // "Zdroj: ČNB" sits in the name itself: the ČNB site terms make it a
+  // condition of every reuse ("ČNB musí být vždy uvedena jako zdroj
+  // informací"), and this string is what `bank_code_check.register` carries on
+  // EVERY answer the register decides — a refusal, and the codes the ČNB
+  // publishes without a BIC, have no `bic` block to carry the edition's own
+  // credit.
+  CZ: 'Česká národní banka, Číselník kódů platebního styku v České republice (directory of payment-system codes; Zdroj: ČNB)',
   // Bulgaria says what the claim covers, like Finland does. A BAE code is the
   // NOTE: the bare name lives in BG_REGISTER_NAME below — the caveat qualifies
   // the VERDICT, and repeating it beside a BIC would attach it to a field it
@@ -289,14 +334,15 @@ function askNationalRegister(
       },
     };
   }
-  if (cc === 'AT' || cc === 'BE' || cc === 'SK') {
+  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'CZ') {
     // Same safe failure as Germany: no table means no ground truth, so decline
     // authority rather than reading every code as unallocated.
     if (!nationalRegisterAvailable(cc)) return null;
     // Dated from the register where the register states a date, on the NEGATIVE
     // branch too: a denial a caller will act on has to say how current the list
-    // behind it is. Only Slovakia stores one — the NBS publishes a versioned
-    // edition with an effective date, while the OeNB and the NBB publish a
+    // behind it is. Slovakia and Czechia store one — the NBS and the ČNB publish
+    // versioned editions with an effective date (for Czechia, the edition IN
+    // FORCE today, not the one announced), while the OeNB and the NBB publish a
     // rolling file whose honest date is our own refresh month. `null` here
     // falls through to getReferenceAsOf() in the caller, which is exactly what
     // AT and BE were doing before this branch learned about editions.
@@ -307,10 +353,10 @@ function askNationalRegister(
       allocated: true,
       institution: {
         name: hit.name,
-        // OeNB: full seat address. BNB and NBS: names only — nulls are the
-        // honest shape of what Belgium and Slovakia publish, not missing data
-        // on our side, and inventing an address would be the distortion the
-        // NBS terms forbid.
+        // OeNB: full seat address. BNB, NBS and ČNB: names only — nulls are
+        // the honest shape of what Belgium, Slovakia and Czechia publish, not
+        // missing data on our side, and inventing an address would be the
+        // distortion the NBS and ČNB terms forbid.
         street: hit.street,
         post_code: hit.post_code,
         town: hit.town,
@@ -421,6 +467,15 @@ const STRUCTURAL_BIC_PREFIX_RULE: Record<string, string> = {
 };
 
 /**
+ * The countries whose authority publishes the structural rule above, for the
+ * surfaces that say what we check country by country (`src/lib/positioning.ts`).
+ * An accessor, like `registerCoverage`, so the map itself stays private.
+ */
+export function structuralRuleCountries(): string[] {
+  return Object.keys(STRUCTURAL_BIC_PREFIX_RULE);
+}
+
+/**
  * Does the published structural rule explain this pairing?
  *
  * Requires all three: the country publishes the rule, the bank code is the four
@@ -439,6 +494,24 @@ function structuralPrefixRule(
   if (!/^[A-Z]{4}$/.test(bankCode)) return null;
   if (!resolvedBic.toUpperCase().startsWith(bankCode)) return null;
   return { register, candidates: bic8CountForPrefix(cc, bankCode) };
+}
+
+/**
+ * Le verdict et le détenteur du code banque, sortis ENSEMBLE de la branche qui
+ * les décide (25/09/2026).
+ *
+ * `bank_code_holder` n'est jamais redéduit des chaînes de `bank_code_check`
+ * (le nom d'un registre peut changer, une branche en ajouter un) : chaque sortie
+ * de decideBankCode sait ce qu'elle vaut et le dit ici. Usage interne ;
+ * `checks.test.ts` tient la cohérence des deux champs.
+ */
+interface BankCodeVerdict {
+  check: BankCodeCheck;
+  holder: BankCodeHolder;
+}
+
+function withHolder(holder: BankCodeHolder, check: BankCodeCheck): BankCodeVerdict {
+  return { check, holder };
 }
 
 /**
@@ -469,7 +542,7 @@ function decideBankCode(
    * only authoritative verdict in the response.
    */
   lookupFailed: boolean,
-): BankCodeCheck {
+): BankCodeVerdict {
   const as_of = getReferenceAsOf();
   const national = NATIONAL_REGISTERS[cc];
 
@@ -478,7 +551,7 @@ function decideBankCode(
     // The register defines this code space but publishes no holder for it.
     // Silence is not a denial, so this reports unavailable and drops the
     // authority claim rather than telling a caller to stop a payment.
-    return {
+    return withHolder('unknown', {
       value: verdict.value ?? bankCode,
       status: 'unavailable',
       reason: 'register_names_no_holder',
@@ -486,10 +559,12 @@ function decideBankCode(
       register: national,
       authoritative: false,
       as_of: verdict.as_of ?? as_of,
-    };
+    });
   }
   if (national && verdict) {
-    return {
+    // Un code retiré ou redirigé a été attribué : le registre nomme bien son
+    // détenteur.
+    return withHolder(verdict.allocated ? 'confirmed' : 'not_allocated', {
       value: verdict.value ?? bankCode,
       status: verdict.allocated ? 'verified' : 'not_in_register',
       ...(verdict.allocated ? {} : { reason: 'not_allocated' as const }),
@@ -502,7 +577,7 @@ function decideBankCode(
       // The register's own date where it publishes one, our refresh month
       // otherwise. See the `as_of` note on the verdict shape above.
       as_of: verdict.as_of ?? as_of,
-    };
+    });
   }
 
   // A register that names holders without covering the space. Consulted BEFORE
@@ -513,7 +588,8 @@ function decideBankCode(
   // Le registre privé LU confirme un titulaire ; une absence n'autorise aucun rejet.
   const lu = cc === 'LU' ? lookupLuCode(bankCode) : null;
   if (lu) {
-    return {
+    // Registre partiel : un résultat trouvé nomme le détenteur.
+    return withHolder('confirmed', {
       value: bankCode,
       status: 'verified',
       match: 'register',
@@ -521,7 +597,7 @@ function decideBankCode(
       authoritative: false,
       as_of: lu.published.slice(0, 7),
       institution: { name: lu.name, street: null, post_code: null, town: null, country: 'LU' },
-    };
+    });
   }
   // Finland (16/09/2026): the transcribed Finance Finland list confirms what it
   // knows and says nothing about the rest. It needs the whole BBAN, not the
@@ -534,7 +610,9 @@ function decideBankCode(
   if (cc === 'FI' && bban) {
     const fi = lookupFiInstitution(bban);
     if (fi?.status === 'allocated' && fi.code) {
-      return {
+      // La liste nomme le groupe détenteur : `confirmed`, même si cette liste
+      // transcrite n'entre pas dans les traces courantes (bic-trace.ts).
+      return withHolder('confirmed', {
         value: fi.code,
         status: 'verified',
         match: 'register',
@@ -552,7 +630,7 @@ function decideBankCode(
               },
             }
           : {}),
-      };
+      });
     }
   }
 
@@ -566,7 +644,7 @@ function decideBankCode(
     const reg = lookupNationalCode(cc, bankCode);
     if (reg) {
       const asOf = nationalRegisterEdition(cc).as_of?.slice(0, 7);
-      return {
+      return withHolder('confirmed', {
         value: bankCode,
         status: 'verified',
         match: 'register',
@@ -584,7 +662,7 @@ function decideBankCode(
           ...(reg.lei ? { lei: reg.lei } : {}),
         },
         as_of: asOf ?? as_of,
-      };
+      });
     }
     // No return: fall through. A San Marino code the page does not list gets
     // the composite answer it has always got, with `absent_from_reference_data`
@@ -599,7 +677,9 @@ function decideBankCode(
     // the rule alone leaves standing.
     const structural = structuralPrefixRule(cc, bankCode, hit.code);
     if (structural) {
-      return {
+      // Une règle publiée dit comment LIRE l'IBAN, pas que le BIC visé a été
+      // attribué : le détenteur reste déduit.
+      return withHolder('inferred', {
         value: bankCode,
         status: 'verified',
         match: hit.match,
@@ -607,10 +687,12 @@ function decideBankCode(
         authoritative: false,
         ...(structural.candidates > 1 ? { candidates: structural.candidates } : {}),
         as_of,
-      };
+      });
     }
 
-    return {
+    // La carte composite ou le repli par préfixe, y compris pour un pays dont
+    // le registre n'a pas pu être lu : un détenteur nommé, jamais confirmé.
+    return withHolder('inferred', {
       // The code the lookup really consulted: normally the positional slice,
       // but Iceland answers at the two-digit bank grain of its four-digit
       // field, and the verdict must name what it is about — the same honesty
@@ -622,7 +704,7 @@ function decideBankCode(
       authoritative: false,
       ...(hit.match === 'prefix' ? { candidates: hit.candidates ?? 1 } : {}),
       as_of,
-    };
+    });
   }
 
   // Nothing resolved. Two very different things can produce that, and only one
@@ -631,7 +713,7 @@ function decideBankCode(
   // countryHasReferenceData() here would answer the first question with the
   // second one's evidence and publish `not_in_register` off an outage.
   if (lookupFailed) {
-    return {
+    return withHolder('unknown', {
       value: bankCode,
       status: 'unavailable',
       reason: 'lookup_failed',
@@ -639,7 +721,7 @@ function decideBankCode(
       register: null,
       authoritative: false,
       as_of,
-    };
+    });
   }
 
   // A country whose register we normally decide against, reaching this line,
@@ -651,7 +733,9 @@ function decideBankCode(
   // never read.
   const registerDown = !!national;
   const hasData = countryHasReferenceData(cc);
-  return {
+  // Absent de la carte, pas de données pour le pays, registre non consulté :
+  // aucune conclusion sur le détenteur.
+  return withHolder('unknown', {
     value: bankCode,
     status: hasData ? 'not_in_register' : 'unavailable',
     reason: registerDown
@@ -663,7 +747,7 @@ function decideBankCode(
     register: hasData ? COMPOSITE_REGISTER : null,
     authoritative: false,
     as_of,
-  };
+  });
 }
 
 /**
@@ -707,7 +791,7 @@ function checkBankCode(
   bban: string | undefined,
   /** A reference lookup feeding this verdict already failed; see enrichResult. */
   lookupFailed: boolean,
-): BankCodeCheck {
+): BankCodeVerdict {
   try {
     const verdict = decideBankCode(cc, bankCode, hit, bban, lookupFailed);
     // Poland: the settlement number's own check digit is a fact the composite
@@ -716,11 +800,11 @@ function checkBankCode(
     // and a register's silence are two different answers.
     if (cc === 'PL') {
       const checkDigit = polishSettlementCheckDigit(bankCode);
-      if (checkDigit) return { ...verdict, check_digit: checkDigit };
+      if (checkDigit) return { ...verdict, check: { ...verdict.check, check_digit: checkDigit } };
     }
     return verdict;
   } catch {
-    return {
+    return withHolder('unknown', {
       value: bankCode,
       status: 'unavailable',
       reason: 'lookup_failed',
@@ -728,7 +812,7 @@ function checkBankCode(
       register: null,
       authoritative: false,
       as_of: safeReferenceAsOf(),
-    };
+    });
   }
 }
 
@@ -751,7 +835,7 @@ function safeReferenceAsOf(): string {
  * two halves of the same object contradicting each other on the exact point at
  * issue. A derived boolean cannot do that.
  *
- * Only the national register is true today — served for DE, AT, BE, BG and SK —
+ * Only the national register is true today — served for DE, AT, BE, BG, SK and CZ —
  * and the flat answer "advisory outside a register" is worth more than a field
  * that flatters the other two. Adding a country here means its register
  * publishes the BIC per bank code AND that we read it — not that our pairing
@@ -800,10 +884,16 @@ interface BankResolution {
  */
 export interface EnrichCache {
   bank: Map<string, BankResolution>;
+  /**
+   * The instant the register editions are read at, for every answer of the
+   * batch: a batch straddling midnight in Prague answers from ONE Czech
+   * edition, as the memoised bank resolutions above already assume.
+   */
+  now?: Date;
 }
 
 export function createEnrichCache(): EnrichCache {
-  return { bank: new Map() };
+  return { bank: new Map(), now: new Date() };
 }
 
 /**
@@ -877,8 +967,8 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
         // register, not from the directory the fallback would have read.
         bic = {
           code: reg.bic,
-          bank_name: reg.name,
-          city: reg.town,
+          bank_name: nonEmpty(reg.name),
+          city: nonEmpty(reg.town),
           source: NATIONAL_REGISTERS.DE,
           as_of: getReferenceAsOf() || null,
           // The one basis that licenses settling against the BIC: the
@@ -928,8 +1018,8 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       if (reg?.bic) {
         bic = {
           code: reg.bic,
-          bank_name: reg.name,
-          city: reg.address.town,
+          bank_name: nonEmpty(reg.name),
+          city: nonEmpty(reg.address.town),
           source: NATIONAL_REGISTERS[cc],
           as_of: getReferenceAsOf() || null,
           // The one basis that licenses settling against the BIC: BankMaster
@@ -946,8 +1036,10 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
     }
   }
 
-  // Austria, Belgium and Slovakia: the same rule as Germany, one register over.
-  // All three tables carry a BIC per bank code. For AT and BE it was read only
+  // Austria, Belgium, Slovakia and Czechia: the same rule as Germany, one
+  // register over. All four tables carry a BIC per bank code (Czechia's joined
+  // on 25/09/2026, with codes the ČNB publishes without one — those keep the
+  // composite map's BIC, if it has one). For AT and BE it was read only
   // for the bank-code verdict until 29/08/2026, while the served BIC still came
   // from the composite map; measured against the registers, that split kept
   // three retired pairings in circulation (two Belgian, one Austrian) and
@@ -967,7 +1059,7 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       if (reg) {
         bic = {
           code: reg.bic,
-          bank_name: reg.name,
+          bank_name: nonEmpty(reg.name),
           city: null,
           source: reg.source,
           as_of: reg.published.slice(0, 7),
@@ -978,16 +1070,17 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       lookupFailed = true;
     }
   }
-  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'SM') {
+  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'CZ' || cc === 'SM') {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
       if (reg?.bic) {
         bic = {
           code: reg.bic,
-          // Verbatim, diacritics and all. The NBS terms forbid altering the
-          // file, so a Slovak name is served exactly as published — the same
-          // rule that keeps Bulgarian names in Cyrillic below.
-          bank_name: reg.name,
+          // Verbatim, diacritics and all. The NBS and ČNB terms forbid altering
+          // the file or the facts, so a Slovak or Czech name is served exactly
+          // as published — the same rule that keeps Bulgarian names in
+          // Cyrillic below.
+          bank_name: nonEmpty(reg.name),
           // The OeNB publishes the seat; the NBB and the NBS publish names
           // only — so Belgium and Slovakia take the city from the directory row
           // for the BIC the register named, the same division of labour the
@@ -999,18 +1092,24 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           // not XXX), so concatenating unconditionally built a 14-character
           // string that matches nothing — a lookup guaranteed to miss rather
           // than one that resolves the branch's own directory row.
-          city: reg.town ?? lookup(reg.bic.length === 8 ? `${reg.bic}XXX` : reg.bic)?.city ?? null,
-          // The register's own credit where it stores one — Slovakia, whose
-          // terms make naming the source a condition of reuse, and San Marino,
+          //
+          // `""` devient null (25/09/2026) : la ligne d'annuaire peut venir de
+          // la liste STEP2, qui laisse la ville vide.
+          city: nonEmpty(
+            reg.town ?? lookup(reg.bic.length === 8 ? `${reg.bic}XXX` : reg.bic)?.city ?? null,
+          ),
+          // The register's own credit where it stores one — Slovakia and
+          // Czechia, whose terms make naming the source a condition of reuse
+          // (the Czech one reads "Zdroj: ČNB, …, verze N"), and San Marino,
           // whose licence is unknown and which is therefore credited by choice
-          // rather than by obligation. Both are read from the row and never
+          // rather than by obligation. All are read from the row and never
           // written here. Austria and Belgium store none and take the
           // register's name.
           source: reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc],
-          // Year-month, as this field is documented. Slovakia states an
-          // effective date of its own and San Marino carries the day we read
-          // its page; AT and BE are dated by the reference set, which for a
-          // file re-read on our cycle is the honest answer.
+          // Year-month, as this field is documented. Slovakia and Czechia
+          // state an effective date of their own and San Marino carries the
+          // day we read its page; AT and BE are dated by the reference set,
+          // which for a file re-read on our cycle is the honest answer.
           as_of: reg.as_of?.slice(0, 7) ?? (getReferenceAsOf() || null),
           // Same licence as the German block above: the register publishes
           // this BIC per bank code, so the pairing is the register's, not ours.
@@ -1042,12 +1141,12 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           code: reg.bic,
           // Verbatim, in Cyrillic, as the register writes it. Transliterating
           // would be the alteration its terms forbid.
-          bank_name: reg.name,
+          bank_name: nonEmpty(reg.name),
           // The register publishes no town. Taken from the directory row for the
           // BIC the register named — same division of labour the curated map
           // documents: one source decides WHICH institution holds the code, the
           // directory only supplies its details.
-          city: lookup(`${reg.bic}XXX`)?.city ?? null,
+          city: nonEmpty(lookup(`${reg.bic}XXX`)?.city),
           // The bare register name: the caveat NATIONAL_REGISTERS.BG carries is
           // about the bank-code verdict, not about this BIC.
           source: BG_REGISTER_NAME,
@@ -1122,7 +1221,16 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // in a cooperative network they name the local bank while the first eight name
   // its clearing institution, so an equality test on the full code turns a
   // correct BIC into a mismatch and a mismatch into a false match.
-  if (bic?.code) bic.bic8 = bic.code.slice(0, 8);
+  if (bic?.code) {
+    bic.bic8 = bic.code.slice(0, 8);
+    // Le BIC8 figure-t-il encore dans une liste rafraîchie ce cycle (GLEIF, un
+    // registre national, les registres EPC, la liste STEP2) ? Sur tout bloc,
+    // quelle que soit sa base : c'est la seule date d'une carte composite
+    // qu'aucune source ne contresigne plus. `null` quand une source de trace
+    // n'a pas pu être lue, jamais `false` par défaut (src/lib/bic-trace.ts).
+    // Ne prouve pas que la banque existe encore sous ce nom.
+    bic.listed_in_current_source = listedInCurrentSource(bic.bic8);
+  }
 
   return { hit, lookupFailed, bic };
 }
@@ -1138,6 +1246,12 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
  * same bank from asking the same question a hundred times.
  */
 export function enrichResult(result: IBANValidationResult, cache?: EnrichCache): void {
+  // One instant for every register read of this answer (or of the whole batch
+  // when the caller passes its cache): see withRegisterClock.
+  withRegisterClock(() => enrichResultAt(result, cache), cache?.now);
+}
+
+function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void {
   // The five SEPA members the library's frozen set does not carry (DATA-03,
   // 01/09/2026). `sepa` is filled by the library's own validate() before we get
   // here, so the correction has to be applied to the built block, and it is
@@ -1262,10 +1376,30 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
   // 2025-10-09, payer-side real-time checks since 2026-04). Null when no
   // institution was resolved — same rule as issuer.type: no substantiated
   // subject, no claim about it.
+  // Nul aussi quand le registre VoP n'est pas chargé (25/09/2026) : `false`
+  // dirait alors « absente du registre » d'un registre que personne n'a
+  // consulté. Sauf hors de la zone SEPA, où le pays répond (`false`), registre
+  // ou non : même règle que la conformité (checkVop reçoit le pays de l'IBAN).
+  //
+  // Le try est celui d'epcSchemesForBic8 ci-dessus, pour la même raison : une
+  // table VoP présente mais illisible (schéma inattendu) faisait tomber en 500
+  // la validation, le lot et l'outil MCP validate_iban. Ici, elle répond
+  // « non consulté ». Le try reste chez l'appelant, jamais dans checkVop :
+  // la conformité a besoin que checkVop lève pour répondre
+  // `compliance_data_unavailable`.
+  // Gardés pour le grain de la banque, calculé plus bas une fois le détenteur
+  // du code connu.
+  let vop: ReturnType<typeof checkVop> | null = null;
+  let reach: ReachabilityCheck | null = null;
   if (result.sepa) {
-    result.sepa.vop_participant = result.bic?.code
-      ? checkVop(result.bic.code.slice(0, 8)).participant
-      : null;
+    if (result.bic?.code) {
+      try {
+        vop = checkVop(result.bic.code.slice(0, 8), cc);
+      } catch {
+        vop = null;
+      }
+    }
+    result.sepa.vop_participant = vop?.screened ? vop.participant : null;
 
     // `schemes` at the grain the published contract promises it at (DATA-02,
     // 01/09/2026). The OpenAPI description says "SEPA schemes the INSTITUTION
@@ -1285,8 +1419,8 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
     // BIC — a foreign branch's BIC would otherwise make `member: false` sit
     // beside a non-empty `schemes`.
     const sepa = result.sepa as SepaBlockWithBasis;
-    const registered =
-      sepa.member && result.bic?.code ? epcSchemesForBic8(result.bic.code.slice(0, 8)) : [];
+    if (sepa.member && result.bic?.code) reach = epcReachability(result.bic.code.slice(0, 8));
+    const registered = epcSchemes(reach);
     if (registered.length > 0) {
       sepa.schemes = registered;
       sepa.basis = 'epc_register';
@@ -1312,7 +1446,45 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
   // The BBAN, taken from the normalised IBAN rather than reassembled from the
   // parsed parts: Finland resolves on the whole string, and a country whose
   // bank_code slice is not a prefix of the BBAN would silently reassemble wrong.
-  result.bank_code_check = checkBankCode(cc, bankCode, hit, result.iban.slice(4), lookupFailed);
+  const verdict = checkBankCode(cc, bankCode, hit, result.iban.slice(4), lookupFailed);
+  result.bank_code_check = verdict.check;
+  // Qui détient le code, décidé par la branche même qui a rendu le verdict
+  // (voir BankCodeVerdict), jamais relu dans ses chaînes.
+  result.bank_code_holder = verdict.holder;
+
+  // SEPA au grain de la BANQUE, jamais emprunté au pays (25/09/2026). `schemes`
+  // et `basis` restent ce qu'ils étaient : un intégrateur qui ne lit qu'eux voit
+  // encore trois schémas pour un code que personne ne détient ; ces trois champs
+  // AJOUTÉS disent ce que le registre sait de la banque elle-même. Absents hors
+  // SEPA, même garde que `schemes` ci-dessus : la succursale étrangère d'une
+  // banque inscrite ne doit pas répondre `listed` à côté de `member: false`.
+  if (result.sepa?.member) {
+    const sepa = result.sepa;
+    if (verdict.holder === 'not_allocated') {
+      sepa.bank_reachability = 'bank_code_not_allocated';
+      sepa.bank_schemes = [];
+    } else if (!result.bic?.code) {
+      sepa.bank_reachability = 'no_bank';
+      sepa.bank_schemes = null;
+    } else if (!reach?.screened) {
+      // Registres EPC non chargés ou illisibles : non consulté, jamais
+      // `not_listed` (même règle que `vop_participant` depuis le 25/09/2026).
+      sepa.bank_reachability = null;
+      sepa.bank_schemes = null;
+    } else {
+      const schemes = epcSchemes(reach);
+      sepa.bank_reachability = schemes.length > 0 ? 'listed' : 'not_listed';
+      sepa.bank_schemes = schemes.length > 0 ? schemes : null;
+    }
+    // Le statut du BIC8 dans le registre VoP, au bon nom : `active` est
+    // l'actuel `vop_participant: true`. Nul sans banque ou sans registre lu.
+    sepa.vop_register_status =
+      result.bic?.code && vop?.screened
+        ? vop.status === 'not_found'
+          ? 'not_listed'
+          : vop.status
+        : null;
+  }
 
   // The demand ledger: a checksum-valid IBAN whose bank code we could not
   // verify is the traffic telling us which data to plug in next. Recorded on
@@ -1410,6 +1582,11 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
   // space, so absence from it is not evidence the code is unallocated.
   const identity = officialIdentityByNationalCode(cc, bankCode);
   if (identity) result.official_identity = identity;
+
+  // Ce qui a été vérifié et ce qui ne l'a pas été, contrôle par contrôle : après
+  // tous les blocs qu'il lit (modulus_check compris), avant next_steps.
+  result.checks = buildChecks(result);
+  putTruthAfterValid(result);
 
   // Last, so every field it reasons about is already populated.
   result.next_steps = nextSteps(result);

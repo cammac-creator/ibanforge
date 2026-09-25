@@ -203,6 +203,28 @@ describe('exportPaidState — what must never leave the server', () => {
     }
   });
 
+  it('les tables du compte client n’entrent pas dans la sauvegarde', () => {
+    // Lot C1 (24.09.2026) : codes de connexion et sessions sont éphémères, sans
+    // valeur de restauration, et une empreinte de jeton n'a rien à faire dans
+    // le seul fichier fait pour quitter le serveur.
+    const db = getStatsDB();
+    db.prepare(
+      `INSERT INTO account_login_codes (email_norm, code_hash, expires_at)
+       VALUES ('acme@example.com', 'empreinte-de-code-bk', datetime('now', '+15 minutes'))
+       ON CONFLICT(email_norm) DO UPDATE SET code_hash = excluded.code_hash`,
+    ).run();
+    db.prepare(
+      `INSERT OR REPLACE INTO account_sessions (token_hash, email_norm, email_display, expires_at)
+       VALUES ('empreinte-de-jeton-bk', 'acme@example.com', 'acme@example.com', datetime('now', '+7 days'))`,
+    ).run();
+    const dump = exportPaidState('2026-09-24T21:00:00Z');
+    expect(Object.keys(dump).some((k) => k.startsWith('account_'))).toBe(false);
+    expect(Object.keys(dump.counts).some((k) => k.startsWith('account_'))).toBe(false);
+    const raw = JSON.stringify(dump);
+    expect(raw).not.toContain('empreinte-de-code-bk');
+    expect(raw).not.toContain('empreinte-de-jeton-bk');
+  });
+
   it('writes one events row per export, with the volume it carried', () => {
     seedWithPlaintextKey('ifk_bk0102');
     const before = (

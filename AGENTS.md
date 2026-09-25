@@ -96,13 +96,42 @@ npm run build             # next build
   loaders. Each carries its source string and its `as_of`, and some carry licence
   conditions that must appear on every response built from them.
 - `src/lib/trial.ts` — the keyless trial, in figures and in words. Every surface quotes
-  these constants; none of them hardcodes the number.
+  these constants; none of them hardcodes the number. **The 25s never share a
+  sentence.** The keyless trial is 25 validations a week (ISO week, UTC), on
+  `POST /v1/iban/validate` only. The keyless access of the hosted `/mcp` transport is a
+  separate allowance, `MCP_WEEKLY_LIMIT` in `src/lib/mcp-limits.ts`: 25 tool units a week per
+  source address, a batch counting one per IBAN. The key that needs no e-mail is 25 requests a
+  month, on every endpoint. Name the door, and announce the key by its 200 once claimed;
+  `src/routes/free-doors-claims.test.ts` holds it. The npm package `ibanforge-mcp` quotes none
+  of these figures: it is frozen until its next release, so it points to `rate-limits.yml` and
+  `GET /v1` (`mcp/src/published-text.test.ts`).
 - `src/middleware/x402.ts` — prices. `frontend/data/` — what the site pre-renders,
   exported from the API by `npm run pages:export` and `pages:export-countries`.
 - `docs/data-sources.md` — every data source, its licence, and the permission we hold in
   writing. **Read it before touching a register.** Some sources impose an exact credit line
   and a notice that must be reproduced in full on every response.
-
+- `src/lib/restricted-family.ts` — the data we may serve but not redistribute (EBA STEP2,
+  NBP and OeNB directory rows, the AT, BE and SM registers, the PRA list, the UN list, both
+  EPC registers), listed ONCE, with each table's definition and how its rows are dated. In
+  production it comes from a private file per database, named by
+  `RESTRICTED_BIC_OVERLAY_PATH` and `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (absolute paths on
+  the Railway volume, `/app/data/…`), merged at start-up into a copy of the fresh public
+  database (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), member by
+  member, the fresher data winning: the public rows are kept (`kept_public`) when they are
+  newer, or undated and different. The last accepted file is kept beside the private one
+  (`*.accepted.sqlite`) and served at start-up if the file named by the variable is refused.
+  To reload, replace the file atomically (write a neighbour, then `mv`): the API checks it
+  within ten minutes, rebuilds only that database, and keeps what it serves if the new file
+  fails its checks or would drop a member served today. State: `GET /health` →
+  `restricted_overlays`. Build a file with `npm run overlay -- extract` (no download) or
+  `npm run overlay:seed` (private refresh only). To withdraw: remove the variable, restart,
+  check `off`, then delete `restricted-*.merged-*`, `restricted-*.accepted.sqlite` and the
+  overlay in the old folder; deleting the private file alone is NOT a rollback. **Never**
+  commit an overlay file or a merged copy, never write one inside any git repository (the
+  script refuses, and `.gitignore` catches `restricted-*.sqlite*` and `*.merged-*.sqlite*`),
+  never add a table or a source to the family anywhere but that constant, and never let a
+  public workflow download or commit the family: stopping them is the next step, not a
+  side effect.
 ---
 
 ## Work in progress, at 10 September 2026
@@ -123,13 +152,19 @@ GitHub and ships to the VPS over a restricted SSH key, and the legal texts updat
 records, a decision on a CDN in front, and the cutover. The reasoning is in the internal
 report named below.
 
-**The keyless trial is twenty-five calls a day, in the code since 15 September.**
-`REST_TRIAL_DAILY_LIMIT` in `src/lib/trial.ts` reads 25, counted per source address (IPv6
-per /64) and stored in the service database. No e-mail and no key are required for those
-calls, and a key that needs no e-mail exists beside it (25 requests a month, 200 once
-claimed). Every surface that quotes a figure is meant to read the constants;
-`src/lib/trial-figures-static.test.ts` caps the prose that still writes numbers by hand, so
-that cap can only go down.
+**The keyless trial is twenty-five calls a WEEK since 24 September** (Claude-Alain's
+decision; it was twenty-five a day from 15 September). `REST_TRIAL_WEEKLY_LIMIT` in
+`src/lib/trial.ts` reads 25, counted per source address (IPv6 per /64) and per ISO week in
+UTC, reset on Monday 00:00 UTC, in the table `trial_weekly` of the service database. The
+daily rows of `trial_ledger` are still written and still feed `trial_daily`. Since the
+evening of the same day, the keyless MCP tool calls are counted by the week as well, in a
+bucket of their own in the same table (`MCP_WEEKLY_LIMIT` in `src/lib/mcp-limits.ts`); the
+two allowances never share. Only the ceiling on MCP session openings
+(`MCP_SESSIONS_PER_IP_DAY`) stays daily. No e-mail and no key are required for those calls. The key that needs
+no e-mail is another door, announced by its 200 requests a month once claimed. Every surface
+that quotes a figure is meant to read the constants; `src/lib/trial-figures-static.test.ts`
+refuses the trial's figure beside a day, refuses any MCP line still counted by the day, and
+checks every weekly figure written by hand.
 
 ---
 

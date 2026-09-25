@@ -9,6 +9,7 @@ import {
 import { evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
 import { grantReservationCount } from '../lib/device-grant.js';
 import { normalizeEmail } from '../lib/email-norm.js';
+import { isPlainEmail } from '../lib/email-shape.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
@@ -26,6 +27,7 @@ import {
 } from '../lib/api-keys.js';
 import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
 import { paidSoFarUsd } from '../lib/key-settlements.js';
+import { CREDITS_NOTICE_LOCK_PREFIX } from '../lib/quota-notice.js';
 import { restoreBurstRevocation } from '../lib/key-revocations.js';
 import { PRO_PAYMENT_LINK, PRO_PRICE_USD } from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
@@ -108,6 +110,7 @@ import {
 import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribution.js';
 import { normalizeOrigin } from '../lib/key-origins.js';
 import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
+import { createAccountRoutes } from './account.js';
 import {
   sendApiKeyEmail,
   sendFreeKeyEmail,
@@ -274,8 +277,9 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
     }
 
-    // Stricter shape check: local-part@domain.tld (avoids "test@" or "foo@bar")
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    // Une seule adresse simple (src/lib/email-shape.ts) : ni « test@ », ni
+    // « foo@bar », ni rien qu'un en-tête de mail lirait comme deux adresses.
+    if (!isPlainEmail(email)) {
       return c.json(
         { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
         400,
@@ -733,6 +737,10 @@ apiKeys.get('/v1/credits/balance', (c) => {
  * One helper, and not a block copied into each route, precisely because there
  * are two: /v1/keys/usage and /v1/keys/report both answer the holder's own key,
  * and a holder must not read one figure on one and another on the other.
+ *
+ * Trois surfaces depuis le lot C1 (24.09.2026) : la page du compte le reçoit par
+ * `createAccountRoutes` (fin de fichier) et l'applique à une validation construite
+ * par `validationFromRow`, puisqu'une session ne détient pas la clé brute.
  */
 function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> {
   const isCreditKey = typeof v.creditsRemaining === 'number';
@@ -1054,7 +1062,7 @@ apiKeys.post('/v1/keys/claim', async (c) => {
     return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
   }
   const email = rawEmail.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+  if (!isPlainEmail(email)) {
     return c.json(
       { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
       400,
@@ -1755,6 +1763,8 @@ interface EmailMessageInput {
   subject?: unknown;
   snippet?: unknown;
   snippet_fr?: unknown;
+  /** L'objet traduit en français, pour la lecture seulement (voir db.ts). */
+  subject_fr?: unknown;
   lang?: unknown;
   body?: unknown;
   counterparty?: unknown;
@@ -1829,8 +1839,16 @@ function sameMessageId(
   direction: string,
   msgDate: unknown,
   subject: unknown,
+  incomingId: string,
 ): string | null {
   if (direction === 'draft' || typeof msgDate !== 'string') return null;
+  // Une ligne désignée par un id que nous tenons déjà se met à jour elle-même.
+  // La réconciliation ci-dessous sert aux ids NOUVEAUX d'un second écrivain ; elle
+  // ne doit jamais détourner la mise à jour d'une ligne existante vers sa jumelle.
+  // Vécu le 24.09.2026 : des lettres enregistrées deux fois avant cette
+  // réconciliation, le robot de traduction posait la traduction de la copie A…
+  // sur la copie B, et retraduisait A tous les quarts d'heure, pour rien.
+  if (db.prepare('SELECT 1 FROM email_messages WHERE id = ?').get(incomingId)) return incomingId;
   const at = new Date(
     msgDate.length === 16 ? `${msgDate}:00Z` : msgDate.endsWith('Z') ? msgDate : `${msgDate}Z`,
   );
@@ -1874,8 +1892,8 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   const clip = (v: unknown, n: number): string | null =>
     typeof v === 'string' && v.length ? v.slice(0, n) : null;
   const upsert = db.prepare(
-    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed, origin)
-     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @body, @counterparty, @no_reply_needed, @origin)
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, subject_fr, lang, body, counterparty, no_reply_needed, origin)
+     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @subject_fr, @lang, @body, @counterparty, @no_reply_needed, @origin)
      -- 🚨 no_reply_needed is deliberately ABSENT from the update list below, so
      -- an omitted column keeps its stored value. Ids are stable md5s and the
      -- whole mailbox is re-ingested every night: assigning it here would erase
@@ -1890,6 +1908,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
        -- re-sync of the same message carries none (translations are set out-of-band
        -- by translate-messages.py; a raw re-sync must not wipe them).
        snippet_fr = COALESCE(excluded.snippet_fr, snippet_fr),
+       subject_fr = COALESCE(excluded.subject_fr, subject_fr),
        lang = COALESCE(excluded.lang, lang),
        -- Same shape as the two above, for a different pair of writers. The
        -- nightly re-ingestion reads the mailbox and cannot know that a mail was
@@ -1962,7 +1981,8 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
           : 0;
       // See sameMessageId: a second writer's id for a row we already hold
       // lands on the row, not beside it.
-      const id = sameMessageId(db, email, direction, r.msg_date, r.subject) ?? r.id.slice(0, 200);
+      const ownId = r.id.slice(0, 200);
+      const id = sameMessageId(db, email, direction, r.msg_date, r.subject, ownId) ?? ownId;
       upsert.run({
         id,
         customer_email: email,
@@ -1971,6 +1991,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
         subject: normaliseSubject(r.subject) || null,
         snippet: clip(r.snippet, 300),
         snippet_fr: clip(r.snippet_fr, 8000),
+        subject_fr: normaliseSubject(r.subject_fr) || null,
         lang: clip(r.lang, 8),
         // 50 000, aligned with the send route and the draft store (dashboard
         // audit 2026-09-01, TABS-10): the 8 000 clip here silently amputated the
@@ -2021,8 +2042,8 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
   // dropping it from the light cut would make the caller with the least reason
   // to download bodies the only one unable to say who sent a mail.
   const columns = summaryOnly
-    ? `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, counterparty, no_reply_needed, origin`
-    : `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed, origin`;
+    ? `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, subject_fr, lang, counterparty, no_reply_needed, origin`
+    : `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, subject_fr, lang, body, counterparty, no_reply_needed, origin`;
   const rows = since
     ? db
         .prepare(`SELECT ${columns} FROM email_messages WHERE msg_date >= ? ORDER BY msg_date ASC`)
@@ -2325,12 +2346,16 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
   for (const r of usage)
     (monthsByKey[r.key_prefix] ??= []).push({ month: r.month, count: r.count });
   // Which keys we have already warned about their quota, so the panel does not
-  // suggest sending a notice twice.
+  // suggest sending a notice twice. Des mois seulement : l'avertissement des
+  // packs partage cette table sous une clé `credits-` (voir
+  // maybeSendCreditsWarning), et le CRM affiche chaque valeur d'ici comme
+  // « avertie à 80 % en <mois> ».
   const warned = db
     .prepare(
-      `SELECT k.key_prefix, q.month FROM quota_notices q JOIN api_keys k ON k.key_hash = q.key_hash`,
+      `SELECT k.key_prefix, q.month FROM quota_notices q JOIN api_keys k ON k.key_hash = q.key_hash
+       WHERE q.month NOT LIKE ?`,
     )
-    .all() as Array<{ key_prefix: string; month: string }>;
+    .all(`${CREDITS_NOTICE_LOCK_PREFIX}%`) as Array<{ key_prefix: string; month: string }>;
   const warnedByKey: Record<string, string[]> = {};
   for (const r of warned) (warnedByKey[r.key_prefix] ??= []).push(r.month);
 
@@ -3445,5 +3470,20 @@ apiKeys.post('/v1/admin/thread-read', async (c) => {
   ).run(body.email.trim().toLowerCase());
   return c.json({ ok: true });
 });
+
+// Le compte client par e-mail (lot C1, 24.09.2026) : six routes, montées ICI
+// pour passer, comme `/v1/keys/generate`, avant le middleware des clés et le
+// rail x402. Une fabrique qui reçoit ce dont elle a besoin de ce fichier, et
+// non un import dans l'autre sens : voir l'en-tête de `./account.ts` pour la
+// boucle d'import que cela évite. `usageBlock` passé tel quel est ce qui garantit
+// les MÊMES chiffres sur la page du compte et sur `/v1/keys/usage`.
+apiKeys.route(
+  '/',
+  createAccountRoutes({
+    usageBlock,
+    isAdminAuthorized,
+    isBlockedEmail: (email) => BLOCKED_EMAIL_DOMAINS.test(email),
+  }),
+);
 
 export { apiKeys };

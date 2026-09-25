@@ -19,8 +19,11 @@ export class IbanForgeApi implements ICredentialType {
       type: 'string',
       typeOptions: { password: true },
       default: '',
+      // 24/09/2026 : l'ancien texte n'offrait que la clé avec adresse (« POST
+      // your email »). La clé sans e-mail passe en premier ; `source: n8n`
+      // garde l'attribution de la porte d'entrée (src/lib/key-origins.ts).
       description:
-        'Free key: 200 requests/month, no card — POST your email to https://api.ibanforge.com/v1/keys/generate or use the dialog at https://ibanforge.com?src=n8n',
+        'A key that needs no e-mail and no card: POST https://api.ibanforge.com/v1/keys/generate with {"source":"n8n"} returns an ifk_ key worth 25 requests a month, raised to 200 a month once claimed at /v1/keys/claim. Or use the dialog at https://ibanforge.com?src=n8n',
     },
   ];
 

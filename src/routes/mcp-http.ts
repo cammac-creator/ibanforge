@@ -30,7 +30,7 @@ import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { createEnrichCache, enrichResult } from '../lib/enrich.js';
 import { recordFeedbackRow, FEEDBACK_ERROR_TYPES } from './feedback.js';
-import { lookup } from '../lib/bic-lookup.js';
+import { bicCountryName, bicSourceFields, lookup, namedRow, nonEmpty } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
@@ -43,7 +43,12 @@ import {
 import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 
 import { extractClientIp } from '../lib/stats.js';
-import { countDailyUnits, countDailyUnitsInMemory } from '../lib/daily-ip-ledger.js';
+import {
+  countDailyUnits,
+  countDailyUnitsInMemory,
+  countWeeklyTrialUnits,
+} from '../lib/daily-ip-ledger.js';
+import { TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 import { bumpMcpRemoteDaily } from '../lib/agent-entry-daily.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
 import {
@@ -52,9 +57,24 @@ import {
   buildValidateAndExplainPrompt,
 } from '../lib/mcp-resources.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import {
+  BANK_LEVEL_SANCTIONS,
+  bicDirectorySentence,
+  serverDescription,
+} from '../lib/positioning.js';
+import { authoritativeVerdictSentence } from '../lib/register-lists.js';
+import {
+  COMPLIANCE_HONEST_NAMES,
+  VALIDATE_TRUTH_RETURNS,
+  bicSourceNote,
+} from '../lib/field-notes.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
-import { MCP_DAILY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
+import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+
+/** The tools a call may name and be served; parity with registerTool is tested. */
+const MCP_TOOL_NAMES: ReadonlySet<string> = new Set(MCP_TOOLS.map((t) => t.name));
 import {
   ANONYMOUS_MONTHLY_LIMIT,
   FREE_TIER_MONTHLY_LIMIT,
@@ -210,13 +230,18 @@ export const mcpSessions = createMcpSessionStore();
  * off or hides the bill.
  */
 // 🚨 Le chiffre est INTERPOLÉ depuis mcp-limits.js, et c'est ce qui rend
-// l'interpolation possible : tant que `MCP_DAILY_LIMIT` était déclaré plus bas
+// l'interpolation possible : tant que la constante était déclarée plus bas
 // dans CE module, l'utiliser ici jetait un ReferenceError à l'import — l'API ne
-// démarrait plus. Valeur inchangée (le plafond MCP reste 10), dérive future
-// évitée.
-const FREE_TIER_NOTE =
-  `free: ${MCP_DAILY_LIMIT} units/IP/day on this transport, one per call and one per IBAN in batch_validate_iban, ` +
-  `or an ifk_ key with no e-mail at all — POST ${KEY_GENERATE_URL} with no body for ` +
+// démarrait plus.
+//
+// 🚨 Deux phrases, et c'est voulu (24/09/2026) : depuis que l'accès sans clé de
+// ce transport se compte à la semaine, son chiffre est celui de la clé sans
+// e-mail au mois. Dans une même phrase, les deux se liraient « la clé vaut la
+// même chose que pas de clé » (src/routes/free-doors-claims.test.ts).
+export const FREE_TIER_NOTE =
+  `free with no key on this transport: ${MCP_WEEKLY_LIMIT} units a week per source address, one per call and ` +
+  `one per IBAN in batch_validate_iban, reset on ${TRIAL_RESET}. ` +
+  `Or an ifk_ key with no e-mail at all: POST ${KEY_GENERATE_URL} with no body for ` +
   `${ANONYMOUS_MONTHLY_LIMIT} REST calls/month, and POST /v1/keys/claim lifts that same key to ` +
   `${FREE_TIER_MONTHLY_LIMIT} a month`;
 const costLine = (price: string): string => `COST: ${price} (${FREE_TIER_NOTE}).`;
@@ -291,7 +316,7 @@ const sessionCtx = new Map<string, McpCallContext>();
  * every proxy between an agent and here. The generator is sound
  * (`crypto.randomUUID()`), so the id cannot be guessed — what changes without
  * the binding is the blast radius of a LEAK, not its probability. Today a
- * stolen id is worth at most the daily unit allowance; without this, it would
+ * stolen id is worth at most the free unit allowance; without this, it would
  * be worth a live API key, collected by an argument-less `poll_api_key`.
  *
  * Purged on the first successful collection (a grant is collected once anyway)
@@ -446,7 +471,10 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       name: 'ibanforge',
       title: 'IBANforge',
       version: pkg.version,
-      description: `Pre-payout screening for agents — check the bank behind a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA/VoP reachability, sanctions and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
+      // The first line every MCP client and directory reads. Written once in
+      // src/lib/positioning.ts, where the register countries and the share of
+      // the frozen 2018 directory copy are read from the data (24/09/2026).
+      description: serverDescription(),
       websiteUrl: 'https://ibanforge.com',
       icons: [
         {
@@ -475,18 +503,21 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
     {
       title: 'Validate IBAN',
       description:
-        'Verify whether a European IBAN is valid AND enrich it with bank, compliance and routing data. ' +
+        `Verify whether an IBAN from any of the ${F.claim.countries} IBAN countries is valid AND enrich it with bank, compliance and routing data. ` +
         'USE WHEN: the user mentions an IBAN, asks to validate an IBAN and identify the issuing bank, asks to detect a typo in an IBAN, ' +
         'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
         'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
         'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ' +
         'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
         'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
-        'RETURNS: valid (boolean), country { code, name }, bic { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, lei, lei_status, address { street, post_code, region, city, country, romanized, romanization, source, language, as_of } } — basis says WHERE the bank code to BIC pairing came from (national_register | curated_map | directory_prefix) and authoritative, derived from it, says whether the BIC may be stored and settled against; outside a national_register pairing the BIC is advisory, confirm it before it becomes a routing instruction. code is 8 or 11 characters, as the consulted source publishes it: COMPARE A SUPPLIED BIC ON bic8, never on code — the branch code is informational and in a cooperative network it names the LOCAL bank while the first eight name its clearing institution (Swiss IID 30020 is RBABCH22180, Crédit Mutuel de la Vallée SA, while RBABCH22 alone is Entris Banking AG). redirected_from is present when the register answered for the bank code that took over the one you asked about (CH/LI: SIX redirects a concatenated IID, which does not make the IBAN invalid) — lei and address are read from the same directory row /v1/bic/:code serves, so this call already carries them; both are null when GLEIF publishes nothing for that BIC, which means "no LEI on file", not "the institution has none". bic.address is the LEGAL ENTITY seat, so bic.address.city may legitimately differ from bic.city (the register city for THIS bank code), and bic.address.as_of dates the entity last filing, usually much older than bic.as_of. ' +
-        'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required, vop_participant — is the resolved bank listed as ready in the EPC VoP register }, ' +
+        `RETURNS: ${VALIDATE_TRUTH_RETURNS} ` +
+        'valid (boolean), bank_code_holder, checks, country { code, name }, bic { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, source_as_of?, listed_in_current_source, lei, lei_status, address { street, post_code, region, city, country, romanized, romanization, source, language, as_of } } — basis says WHERE the bank code to BIC pairing came from (national_register | curated_map | directory_prefix) and authoritative, derived from it, says whether the BIC may be stored and settled against; outside a national_register pairing the BIC is advisory, confirm it before it becomes a routing instruction. code is 8 or 11 characters, as the consulted source publishes it: COMPARE A SUPPLIED BIC ON bic8, never on code — the branch code is informational and in a cooperative network it names the LOCAL bank while the first eight name its clearing institution (Swiss IID 30020 is RBABCH22180, Crédit Mutuel de la Vallée SA, while RBABCH22 alone is Entris Banking AG). redirected_from is present when the register answered for the bank code that took over the one you asked about (CH/LI: SIX redirects a concatenated IID, which does not make the IBAN invalid) — lei and address are read from the same directory row /v1/bic/:code serves, so this call already carries them; both are null when GLEIF publishes nothing for that BIC, which means "no LEI on file", not "the institution has none". bic.address is the LEGAL ENTITY seat, so bic.address.city may legitimately differ from bic.city (the register city for THIS bank code), and bic.address.as_of dates the entity last filing, usually much older than bic.as_of. ' +
+        'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required, vop_participant — is the resolved bank listed as ready in the EPC VoP register, bank_reachability, bank_schemes, vop_register_status: the bank itself in the EPC registers, never the country }, ' +
         'risk_indicators { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope, vop_coverage }, and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
         'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, is open, or belongs to any particular person; verify the payee by name before sending funds. ' +
-        'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI against the SIX BankMaster, DE against the Bundesbank Bankleitzahlendatei, AT against the OeNB register, BE against the NBB register, BG against the BNB BAE register and SK against the Národná banka Slovenska prevodník) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution. ' +
+        'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. ' +
+        `${authoritativeVerdictSentence()} ` +
+        'match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution. ' +
         costLine('$0.005 per call'),
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
@@ -510,12 +541,13 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
     {
       title: 'Batch Validate IBANs',
       description:
-        'Validate up to 100 IBANs in a single call at $0.002 per IBAN (60% cheaper than calling validate_iban repeatedly at $0.005). ' +
+        'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, it costs $0.002 per IBAN instead of $0.005 per validate_iban call; ' +
+        'on an API key or a credit pack each IBAN uses one request or credit, the same as one validate_iban call. ' +
         'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
         'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
         'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
         'RETURNS: { results: [...same shape as validate_iban], count, valid_count }. ' +
-        costLine('$0.002 per IBAN'),
+        costLine('$0.002 USDC per IBAN via x402'),
       inputSchema: {
         ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
       },
@@ -553,7 +585,8 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
         'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-        `BACKED BY: ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly. ` +
+        `BACKED BY: ${bicDirectorySentence({ withCount: true })} ${F.claim.lei} of the rows carry an LEI from GLEIF. ` +
+        `SOURCE: ${bicSourceNote({ withMonth: true })} ` +
         costLine('$0.003 per call'),
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
@@ -575,7 +608,8 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
           structuredContent: errorPayload as unknown as Record<string, unknown>,
         };
       }
-      const row = lookup(validation.bic11!);
+      // Une fiche complète ou introuvable, comme GET /v1/bic/:code (25/09/2026).
+      const row = namedRow(lookup(validation.bic11!));
       const result = {
         bic: validation.bic,
         bic8: validation.bic8,
@@ -590,21 +624,25 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         // for now so no agent breaks mid-conversation; it is deprecated and dated
         // in the tool description.
         //
-        // The two keep DIFFERENT null semantics on purpose. REST falls back to the
-        // country code when the row carries no name; the flat MCP key has always
-        // answered null. Mirroring REST into `country.name` while leaving
+        // The two keep DIFFERENT null semantics on purpose. REST gives the ISO
+        // name (the code only when no name exists) when the row carries none; the
+        // flat MCP key has always answered null. Mirroring REST into `country.name` while leaving
         // `country_name: null` is the honest reading of both histories: the nested
         // object is the aligned one, the flat pair is preserved exactly as it was.
         country: {
           code: validation.country_code,
-          name: row?.country_name ?? validation.country_code,
+          name: bicCountryName(row, validation.country_code!),
         },
-        city: row?.city ?? null,
+        city: nonEmpty(row?.city),
         branch_code: validation.branch_code,
         branch_info: row?.branch_info ?? null,
         lei: row?.lei ?? null,
         lei_status: row?.lei_status ?? null,
         is_test_bic: validation.is_test_bic,
+        // La source de la ligne, que cet outil ne rendait pas du tout, et la
+        // trace du BIC8 dans une liste de ce cycle : mêmes champs que REST.
+        source: row?.source ?? null,
+        ...bicSourceFields(row, validation.bic8!),
       };
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
@@ -618,13 +656,14 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
     {
       title: 'Compliance Check',
       description:
-        'Run a full pre-flight compliance check on an IBAN before sending a SEPA / cross-border payment. ' +
+        'Run a pre-flight compliance triage on an IBAN before sending a SEPA / cross-border payment. ' +
         'USE WHEN: the user is about to send a payment / payout / refund and wants to triage risk first, ' +
-        'asks "is this IBAN safe to pay?", asks for sanctions screening, asks if a SEPA Instant transfer will succeed, ' +
+        "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
         'or needs a numeric risk score for an internal payment-approval workflow. ' +
         'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
-        'CHECKS: IBAN validity + sanctions (OFAC list, FATF jurisdictions) + SEPA Instant reachability + VoP (EU 2024/886) participant. ' +
+        `CHECKS: IBAN validity + ${BANK_LEVEL_SANCTIONS} + FATF status + SEPA Instant reachability + whether the EPC Verification of Payee (VoP) register lists the bank as ready; the name check itself is done by the payee's bank, never here. ` +
         'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop). ' +
+        `${COMPLIANCE_HONEST_NAMES} ` +
         costLine('$0.02 per call'),
       inputSchema: {
         iban: z.string().describe('IBAN to check'),
@@ -781,7 +820,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
         'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
         'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
-        'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
+        'EVERY IID OF THE SIX BANKMASTER, with its full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
         `BACKED BY: ${F.claim.chClearing} SIX BankMaster entries (Swiss official source, refreshed monthly). ` +
         'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
         'Only relevant for CH and LI accounts. ' +
@@ -907,7 +946,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
         'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
         'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
-        'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+        'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
         'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
       inputSchema: {
         error_type: z
@@ -985,12 +1024,12 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       title: 'Request an IBANforge API key',
       description:
         'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
-        'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+        'USE WHEN: you used up the free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
         'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
         'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
         'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
         'Then call poll_api_key. ' +
-        'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+        'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent.',
       inputSchema: {
         client_name: z
           .string()
@@ -1095,7 +1134,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
         '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
         '`invalid_grant` means this code can no longer be used at all — stop. ' +
-        'This tool is free and does NOT count against the daily free-tier limit.',
+        'This tool is free and does NOT count against the free allowance.',
       inputSchema: {
         device_code: z
           .string()
@@ -1198,17 +1237,18 @@ function registeredToolNames(): string[] {
 }
 
 // ── MCP tool call rate limiting ───────────────────────────────────────────────
-// Free MCP access is limited to a handful of tool calls per IP per day.
+// Free MCP access is limited to a handful of tool calls per source per ISO week
+// (UTC, reset on Monday 00:00 UTC) since 24/09/2026; it was ten a day before.
 // Discovery (initialize, tools/list, resources/list) is unlimited.
 //
 // This is the ONE path where an assistant reaches a complete, correct answer
 // on its first try — including the paid Swiss clearing data — without a key or
 // a wallet (reco-IA audit, 2026-07-25). It is deliberately kept open as the
 // product's shop window, but it also hands out priced data for free, so the
-// allowance is a taster, not a tier: 10 calls is enough to evaluate the
-// service and far too few to run on. Announce it wherever it is offered —
-// an undocumented free path converts nobody.
-export { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+// allowance is a taster, not a tier: enough calls to evaluate the service and
+// far too few to run on. Announce it wherever it is offered — an undocumented
+// free path converts nobody.
+export { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 /**
  * Opening a session is not a tool call, so until 2026-09-01 it was counted by
  * nothing at all — and it is the expensive one (a whole McpServer, see the
@@ -1226,24 +1266,90 @@ export { MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
 setInterval(() => mcpSessions.sweep(), 10 * 60 * 1000).unref();
 
 /**
+ * The keyless allowance of the TOOL CALLS, counted by the ISO week in UTC since
+ * 24/09/2026 (Claude-Alain's decision: 25 a week per source, as the REST
+ * trial, and the two never shared).
+ *
  * `units` is the number of billable units this HTTP request carries — a
  * JSON-RPC batch bills every element, not one, and a `batch_validate_iban`
- * bills one per IBAN (see `mcpToolUnits`). Defaulting to 1 keeps the
- * single-message path unchanged.
+ * bills one per IBAN (see `mcpToolUnits`).
  *
- * `key` is the ledger entry, not necessarily an address: session openings are
- * counted on `init:<ip>` against their own ceiling.
+ * The counting reuses the REST trial's weekly ledger (`trial_weekly`), in a
+ * bucket of its own: the bare source hash, where the REST trial writes
+ * `rest:<hash>`. The daily row of the same bucket is still written for the
+ * trace (`trial_daily.mcp_buckets`, `mcp_units`). The entry grows even when the
+ * answer is a refusal, which is what stops a refused caller from retrying the
+ * cheap request all week.
  *
- * The counting itself lives in the shared daily ledger, unchanged: the entry
- * grows even when the answer is a refusal, which is what stops a refused
- * caller from retrying the cheap request all day.
+ * `now` is the same instant the refusal quotes its reset from: the week that
+ * counts the call and the week whose end it announces must be one, Sunday
+ * 23:59:59 included.
  */
-function checkMcpRateLimit(
+function checkMcpToolAllowance(
   key: string,
-  units = 1,
-  limit: number = MCP_DAILY_LIMIT,
+  units: number,
+  now: Date,
 ): { allowed: boolean; used: number; remaining: number; degraded?: true } {
-  return countDailyUnits(key, units, limit);
+  return countWeeklyTrialUnits(key, units, MCP_WEEKLY_LIMIT, now);
+}
+
+/**
+ * Session openings, on `init:<source>`, against their own DAILY ceiling. Not
+ * part of the free allowance: it bounds the memory of the container (one
+ * McpServer per session), so it stays counted by the day in the daily ledger.
+ */
+function checkMcpSessionLimit(key: string): {
+  allowed: boolean;
+  used: number;
+  remaining: number;
+  degraded?: true;
+} {
+  return countDailyUnits(key, 1, MCP_SESSIONS_PER_IP_DAY);
+}
+
+/**
+ * The JSON-RPC refusal of a tool call past the keyless allowance.
+ *
+ * A function, not an inline literal, so that the free-doors guard can read the
+ * exact sentences served (src/routes/free-doors-claims.test.ts). Each allowance
+ * is named, and the week's figure and the key's monthly figure never share a
+ * sentence.
+ */
+/**
+ * The refusal when the keyless allowance could not be counted at all.
+ *
+ * It used to say "use an API key or x402 to continue" on /mcp, which reads
+ * neither (review of 24/09/2026): the ways to continue are the REST API and the
+ * npm package.
+ */
+export const MCP_ACCOUNTING_UNAVAILABLE =
+  'Free-tier accounting is temporarily unavailable on this transport, which reads no key. ' +
+  'To continue, call the REST API (https://api.ibanforge.com/v1) with a key or an x402 payment, ' +
+  'or run the npm package ibanforge-mcp with IBANFORGE_API_KEY set.';
+
+export function mcpAllowanceRefusal(
+  used: number,
+  now: Date = new Date(),
+): {
+  code: number;
+  message: string;
+  data: { used: number; limit: number; remaining: number; period: 'week'; resets_at: string };
+} {
+  const resetsAt = trialResetsAt(now);
+  return {
+    code: -32000,
+    message:
+      `Weekly MCP free tier limit reached: ${MCP_WEEKLY_LIMIT} units a week per source address on this transport, ` +
+      `one per tool call and one per IBAN in batch_validate_iban; it resets on ${TRIAL_RESET} (${resetsAt}). ` +
+      'You can take a key without giving anyone an e-mail: POST ' +
+      `${KEY_GENERATE_URL} with no body at all returns an ifk_ key worth ` +
+      `${ANONYMOUS_MONTHLY_LIMIT} REST calls/month, on the spot. ` +
+      `POST ${KEY_CLAIM_URL} lifts that same key to ${FREE_TIER_MONTHLY_LIMIT} a month: a 6-digit code ` +
+      'on an address your human gives you for this, or an x402 payment on the key — that rail grants ' +
+      `${FREE_TIER_MONTHLY_LIMIT} once, not ${FREE_TIER_MONTHLY_LIMIT} a month. ` +
+      'See https://api.ibanforge.com/.well-known/x402',
+    data: { used, limit: MCP_WEEKLY_LIMIT, remaining: 0, period: 'week', resets_at: resetsAt },
+  };
 }
 
 /**
@@ -1288,11 +1394,7 @@ function mcpBucket(ip: string, prefix: '' | 'init:'): string {
  * tool free in one and not the other is either billed silently or documented
  * wrong.
  */
-export const MCP_FREE_TOOLS: ReadonlySet<string> = new Set([
-  'send_feedback',
-  'request_api_key',
-  'poll_api_key',
-]);
+export const MCP_FREE_TOOLS: ReadonlySet<string> = ALLOWANCE_EXEMPT_TOOLS;
 function mcpToolUnits(params: { name?: unknown; arguments?: unknown } | undefined): number {
   const name = typeof params?.name === 'string' ? params.name : '';
   if (MCP_FREE_TOOLS.has(name)) return 0;
@@ -1357,6 +1459,9 @@ mcpHttp.post('/mcp', async (c) => {
   // registre journalier ne compte que des UNITÉS — or cet outil coûte zéro unité
   // (`MCP_FREE_TOOLS`), donc il y est parfaitement invisible.
   let keyRequests = 0;
+  // Any tools/call at all, known tool or not: what the no-session answer below
+  // reads, so that no session is opened for a call that cannot be served.
+  let anyToolCall = false;
   try {
     const body = await cloned.json();
     // JSON-RPC allows a BATCH: the body may be an array of messages. On an
@@ -1372,9 +1477,16 @@ mcpHttp.post('/mcp', async (c) => {
       params?: { name?: unknown; arguments?: unknown };
     }> = Array.isArray(body) ? body : [body];
     const calls = messages.filter((m) => m?.method === 'tools/call');
-    toolCalls = calls.length;
-    keyRequests = calls.filter((m) => m?.params?.name === 'request_api_key').length;
-    toolUnits = calls.reduce((sum, m) => sum + mcpToolUnits(m?.params), 0);
+    anyToolCall = calls.length > 0;
+    // Only a tool this server registers can be served (review of 24/09/2026):
+    // a call to an unknown name gets "tool not found" from the SDK, so it is
+    // neither charged nor counted as a served call.
+    const servable = calls.filter(
+      (m) => typeof m?.params?.name === 'string' && MCP_TOOL_NAMES.has(m.params.name),
+    );
+    toolCalls = servable.length;
+    keyRequests = servable.filter((m) => m?.params?.name === 'request_api_key').length;
+    toolUnits = servable.reduce((sum, m) => sum + mcpToolUnits(m?.params), 0);
     toolName =
       calls
         .map((m) => (typeof m?.params?.name === 'string' ? m.params.name : null))
@@ -1405,104 +1517,16 @@ mcpHttp.post('/mcp', async (c) => {
   // que cette colonne existe pour fermer.
   if (toolName) c.set('mcpToolName', toolName);
 
-  if (toolUnits > 0) {
-    const limit = checkMcpRateLimit(mcpBucket(ip, ''), toolUnits);
-    if (limit.degraded) {
-      // La comptabilité est morte, pas le plafond : dire « Daily MCP free tier
-      // limit reached » serait un mensonge sur un compte qui n'a pas été tenu.
-      // Message distinct, et `degraded` dans les données pour que le client
-      // sache qu'il ne s'agit pas de sa consommation.
-      c.header('X-MCP-Outcome', 'rate_limited');
-      return c.json({
-        jsonrpc: '2.0',
-        id: rpcId,
-        error: {
-          code: -32000,
-          message:
-            'Free-tier accounting is temporarily unavailable; use an API key or x402 to continue. ' +
-            'See https://api.ibanforge.com/.well-known/x402',
-          data: { degraded: true },
-        },
-      });
-    }
-    if (!limit.allowed) {
-      // A refusal used to be indistinguishable from a success in request_log:
-      // both landed as `POST /mcp:tools-call 200`, because the marker below was
-      // set BEFORE this check (MCP-04, audit 2026-09-01). The outcome now rides
-      // on a response header the telemetry middleware reads, so nobody has to
-      // guess whether the free tier is turning agents away.
-      c.header('X-MCP-Outcome', 'rate_limited');
-      // Return a proper JSON-RPC error so the MCP client understands
-      return c.json({
-        jsonrpc: '2.0',
-        id: rpcId,
-        error: {
-          code: -32000,
-          message:
-            `Daily MCP free tier limit reached (${MCP_DAILY_LIMIT} units/day; one per tool call, one per IBAN in batch_validate_iban). ` +
-            'You can take a key without giving anyone an e-mail: POST ' +
-            `${KEY_GENERATE_URL} with no body at all returns an ifk_ key worth ` +
-            `${ANONYMOUS_MONTHLY_LIMIT} REST calls/month, on the spot. ` +
-            `POST ${KEY_CLAIM_URL} lifts that same key to ${FREE_TIER_MONTHLY_LIMIT} a month: a 6-digit code ` +
-            'on an address your human gives you for this, or an x402 payment on the key — that rail grants ' +
-            `${FREE_TIER_MONTHLY_LIMIT} once, not ${FREE_TIER_MONTHLY_LIMIT} a month. ` +
-            'See https://api.ibanforge.com/.well-known/x402',
-          data: { used: limit.used, limit: MCP_DAILY_LIMIT, remaining: 0 },
-        },
-      });
-    }
-  }
-
-  // Mark the request for the stats middleware: /mcp alone cannot tell a
-  // handshake from real usage, and 14k discovery requests once read as a
-  // traffic spike nobody could explain.
+  // 🚨 LA SESSION D'ABORD, LE DÉBIT ENSUITE (relecture du 24/09/2026, D1).
   //
-  // 🚨 Conditionné au NOMBRE d'appels, pas à leur coût, et c'est le seul des
-  // deux blocs à bouger. Un `request_api_key` coûte zéro unité et reste un
-  // appel d'outil : laissé sous `toolUnits > 0`, il disparaissait de la
-  // télémétrie, et la porte de sortie du plafond était la seule chose qu'on ne
-  // mesurait pas. La garde `toolUnits > 0` RESTE autour de `checkMcpRateLimit`
-  // au-dessus : la déplacer ferait entrer les outils gratuits dans la branche
-  // de refus, et comme `allowed = count <= limit` est faux dès le quota
-  // dépassé, `request_api_key` serait refusé APRÈS le plafond — l'inverse exact
-  // de ce que cet outil existe pour faire.
-  if (toolCalls > 0) c.set('mcpToolCall', true);
-
-  // ─── Le haut de l'entonnoir MCP distant, par jour ─────────────────────────
-  // (chantier « mesure agents », 15/09)
-  //
-  // 🚨 APRÈS la porte du plafond, exprès, et ce n'est pas un détail de
-  // placement : `daily-ip-ledger.ts` tient une carte `overLimit` en mémoire
-  // pour que le coût serveur d'un appelant refusé reste exactement zéro
-  // écriture, alors que le limiteur global lui laisse cent requêtes par
-  // minute. Compter ici les TENTATIVES aurait rendu à un refusé une écriture
-  // par requête dans le fichier qui porte `api_keys`, les crédits et les traces
-  // de paiement. `tool_calls` compte donc les appels SERVIS ; les refus se
-  // lisent déjà à part, sous `/mcp:tools-call:refused` dans `request_log`.
-  //
-  // Une seule écriture par requête `/mcp`, sur une table d'une ligne par jour.
-  if (toolCalls > 0) bumpMcpRemoteDaily({ toolCalls, keyRequests });
-
+  // L'allocation se débitait avant de savoir si la session existait : un
+  // `tools/call` sur une session inconnue (après chaque redéploiement, après
+  // 30 min d'inactivité, après une éviction) payait ses unités, un lot de 20
+  // IBAN en payait 20, puis recevait un 404 sans qu'aucun outil ait tourné. Au
+  // jour, l'unité perdue revenait le lendemain ; à la semaine, elle ne revient
+  // que le lundi. Aucun outil ne peut servir une requête sans session : on ne
+  // débite donc qu'une fois la session trouvée.
   const sessionId = c.req.header('mcp-session-id');
-
-  // 🚨 LE PORTEUR EST PRÉPARÉ ICI, AVANT DE SAVOIR S'IL Y A UNE SESSION, et
-  // l'ordre des gestes est la moitié de la correction.
-  //
-  // Sur une requête `initialize`, `sessionId` N'EXISTE PAS ENCORE : il vient de
-  // l'en-tête, et il n'est engendré qu'à l'intérieur du constructeur du
-  // transport, donc APRÈS. On prépare donc un objet, on le MUTE, et on ne
-  // l'enregistre qu'à l'ouverture de session, dans le crochet
-  // `onsessioninitialized`. C'est cet objet-là que les fermetures des outils
-  // tiennent.
-  //
-  // ⚠️ Mutation, JAMAIS remplacement. `sessionCtx.set(id, { ...ip })` à chaque
-  // requête laisserait les outils sur l'objet de l'ouverture, c'est-à-dire
-  // exactement l'empreinte figée que ce bloc existe pour éviter.
-  const known = sessionId ? sessionCtx.get(sessionId) : undefined;
-  const callCtx: McpCallContext = known ?? { ip: null, userAgent: null };
-  callCtx.ip = ip === 'unknown' ? null : ip;
-  callCtx.userAgent = c.req.header('user-agent') ?? null;
-
   let transport = sessionId ? mcpSessions.get(sessionId) : undefined;
 
   if (sessionId && !transport) {
@@ -1528,13 +1552,134 @@ mcpHttp.post('/mcp', async (c) => {
     );
   }
 
+  if (!sessionId && anyToolCall) {
+    // Un `tools/call` sans session, seul ou dans un lot avec `initialize`. Le
+    // SDK le refuse en 400 (« Server not initialized », « Only one
+    // initialization request is allowed ») ; le laisser aller jusqu'à lui
+    // consommait une ouverture de session, construisait un McpServer pour rien
+    // et, avant la correction ci-dessus, débitait l'allocation. On répond tôt,
+    // sans rien débiter, avec le geste qui marche.
+    return c.json(
+      {
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: {
+          code: -32000,
+          message:
+            'Bad Request: no session. Send initialize alone first, then send tools/call with the ' +
+            'mcp-session-id header that initialize returned.',
+        },
+      },
+      400,
+    );
+  }
+
+  // The transport refuses with 406 a POST whose Accept header does not list
+  // both application/json and text/event-stream: the same substring test as
+  // the SDK (@modelcontextprotocol/sdk 1.30.0, handlePostRequest). Such a call
+  // is never served, so it is neither charged nor counted (review of
+  // 24/09/2026). Mirrored rather than paraphrased: were the SDK to relax its
+  // test, the worst case is an unserved call left uncharged.
+  const accept = c.req.header('accept');
+  if (!accept?.includes('application/json') || !accept.includes('text/event-stream')) {
+    toolUnits = 0;
+    toolCalls = 0;
+    keyRequests = 0;
+  }
+
+  if (toolUnits > 0) {
+    const now = new Date();
+    const limit = checkMcpToolAllowance(mcpBucket(ip, ''), toolUnits, now);
+    if (limit.degraded) {
+      // La comptabilité est morte, pas le plafond : dire « Weekly MCP free tier
+      // limit reached » serait un mensonge sur un compte qui n'a pas été tenu.
+      // Message distinct, et `degraded` dans les données pour que le client
+      // sache qu'il ne s'agit pas de sa consommation.
+      c.header('X-MCP-Outcome', 'rate_limited');
+      return c.json({
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: {
+          code: -32000,
+          message: MCP_ACCOUNTING_UNAVAILABLE,
+          data: { degraded: true },
+        },
+      });
+    }
+    if (!limit.allowed) {
+      // A refusal used to be indistinguishable from a success in request_log:
+      // both landed as `POST /mcp:tools-call 200`, because the marker below was
+      // set BEFORE this check (MCP-04, audit 2026-09-01). The outcome now rides
+      // on a response header the telemetry middleware reads, so nobody has to
+      // guess whether the free tier is turning agents away.
+      c.header('X-MCP-Outcome', 'rate_limited');
+      // Return a proper JSON-RPC error so the MCP client understands
+      return c.json({
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: mcpAllowanceRefusal(limit.used, now),
+      });
+    }
+  }
+
+  // Mark the request for the stats middleware: /mcp alone cannot tell a
+  // handshake from real usage, and 14k discovery requests once read as a
+  // traffic spike nobody could explain.
+  //
+  // 🚨 Conditionné au NOMBRE d'appels, pas à leur coût, et c'est le seul des
+  // deux blocs à bouger. Un `request_api_key` coûte zéro unité et reste un
+  // appel d'outil : laissé sous `toolUnits > 0`, il disparaissait de la
+  // télémétrie, et la porte de sortie du plafond était la seule chose qu'on ne
+  // mesurait pas. La garde `toolUnits > 0` RESTE autour de `checkMcpToolAllowance`
+  // au-dessus : la déplacer ferait entrer les outils gratuits dans la branche
+  // de refus, et comme `allowed = count <= limit` est faux dès le quota
+  // dépassé, `request_api_key` serait refusé APRÈS le plafond — l'inverse exact
+  // de ce que cet outil existe pour faire.
+  if (toolCalls > 0) c.set('mcpToolCall', true);
+
+  // ─── Le haut de l'entonnoir MCP distant, par jour ─────────────────────────
+  // (chantier « mesure agents », 15/09)
+  //
+  // 🚨 APRÈS la porte du plafond, exprès, et ce n'est pas un détail de
+  // placement : `daily-ip-ledger.ts` tient une carte `overLimit` en mémoire
+  // pour que le coût serveur d'un appelant refusé reste exactement zéro
+  // écriture, alors que le limiteur global lui laisse cent requêtes par
+  // minute. Compter ici les TENTATIVES aurait rendu à un refusé une écriture
+  // par requête dans le fichier qui porte `api_keys`, les crédits et les traces
+  // de paiement. `tool_calls` compte donc les appels SERVIS ; les refus se
+  // lisent déjà à part, sous `/mcp:tools-call:refused` dans `request_log`.
+  // Depuis le 24/09/2026 (D1), ce point n'est atteint qu'avec une session
+  // vivante : un appel sur une session inconnue (404) ou sans session (400)
+  // repart plus haut et n'est plus compté ici.
+  //
+  // Une seule écriture par requête `/mcp`, sur une table d'une ligne par jour.
+  if (toolCalls > 0) bumpMcpRemoteDaily({ toolCalls, keyRequests });
+
+  // 🚨 LE PORTEUR EST PRÉPARÉ ICI, AVANT QU'UNE SESSION NEUVE SOIT CRÉÉE, et
+  // l'ordre des gestes est la moitié de la correction.
+  //
+  // Sur une requête `initialize`, `sessionId` N'EXISTE PAS ENCORE : il vient de
+  // l'en-tête, et il n'est engendré qu'à l'intérieur du constructeur du
+  // transport, donc APRÈS. On prépare donc un objet, on le MUTE, et on ne
+  // l'enregistre qu'à l'ouverture de session, dans le crochet
+  // `onsessioninitialized`. C'est cet objet-là que les fermetures des outils
+  // tiennent.
+  //
+  // ⚠️ Mutation, JAMAIS remplacement. `sessionCtx.set(id, { ...ip })` à chaque
+  // requête laisserait les outils sur l'objet de l'ouverture, c'est-à-dire
+  // exactement l'empreinte figée que ce bloc existe pour éviter.
+  const known = sessionId ? sessionCtx.get(sessionId) : undefined;
+  const callCtx: McpCallContext = known ?? { ip: null, userAgent: null };
+  callCtx.ip = ip === 'unknown' ? null : ip;
+  callCtx.userAgent = c.req.header('user-agent') ?? null;
+
   if (!transport) {
     // Opening a session costs a full McpServer, so it is metered like the tool
     // calls are (SEC-01, audit 2026-09-01). Checked here rather than on the
     // `initialize` method alone: this is the exact line where the memory is
     // about to be spent, whatever the body claims to be.
     const initBucket = mcpBucket(ip, 'init:');
-    let opened = checkMcpRateLimit(initBucket, 1, MCP_SESSIONS_PER_IP_DAY);
+    let opened = checkMcpSessionLimit(initBucket);
     if (opened.degraded) {
       // 🚨 Cette porte ne peut PAS être fail-open. Ce qui borne déjà : le
       // magasin plafonné à MCP_MAX_SESSIONS (LRU d'abord), la balayeuse d'idle
@@ -1676,8 +1821,16 @@ mcpHttp.get('/mcp', async (c) => {
         },
         tools: registeredToolNames(),
         free_tier: {
-          mcp_daily_limit: MCP_DAILY_LIMIT,
-          mcp_daily_limit_unit: 'one unit per tool call, one per IBAN in batch_validate_iban',
+          // 24/09/2026 : l'accès sans clé se compte à la semaine ISO (UTC).
+          // `mcp_daily_limit` et `mcp_daily_limit_unit` sont retirés plutôt que
+          // gardés : ils auraient porté un chiffre de la semaine sous un nom du
+          // jour, et un champ nommé qui ment reste affiché par les annuaires.
+          mcp_weekly_limit: MCP_WEEKLY_LIMIT,
+          mcp_weekly_limit_unit:
+            'one unit per tool call, one per IBAN in batch_validate_iban, per source address',
+          mcp_period: 'week',
+          mcp_resets: TRIAL_RESET,
+          mcp_resets_at: trialResetsAt(),
           mcp_sessions_per_day: MCP_SESSIONS_PER_IP_DAY,
           session_idle_timeout_minutes: MCP_SESSION_IDLE_MS / 60000,
           anonymous_key: `POST /v1/keys/generate with no body at all — no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST req/month`,

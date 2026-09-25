@@ -125,8 +125,8 @@ describe('lookup_bic: MCP and REST agree on the country shape', () => {
   });
 
   it('states that the two differ on the missing-name fallback', () => {
-    // country.name falls back to the code; country_name has always answered
-    // null. Silently mirroring one into the other would put "FR" and null in
+    // country.name gives the ISO name, the code only when none exists;
+    // country_name has always answered null. Silently mirroring one into the other would put "FR" and null in
     // the same body, which is the divergence being closed, one level down.
     expect(STDIO).toMatch(/country_name.*null|null.*country_name/s);
     expect(STDIO).toContain('falls back to the country code');

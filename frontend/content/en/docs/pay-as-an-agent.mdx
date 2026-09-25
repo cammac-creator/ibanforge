@@ -22,7 +22,7 @@ Set a budget policy before the first real payment. An agent with an unbounded wa
 
 ## Step 2 — Fund it with USDC on Base
 
-This is the one step that still needs a human today: put USDC on the wallet (exchange withdrawal, onramp, or your platform's wallet funding flow). **$5 covers 1,000 validations.** Gas is not your problem — x402 uses gasless USDC authorizations, the facilitator settles the transfer.
+This is the one step that still needs a human today: put USDC on the wallet (exchange withdrawal, onramp, or your platform's wallet funding flow). **$4 covers 1,000 validations with one pack** (`POST /v1/credits/buy/1k`); paid call by call, a validation is $0.005. Gas is not your problem — x402 uses gasless USDC authorizations, the facilitator settles the transfer.
 
 To rehearse the flow without real money first, CDP's faucet funds a **base-sepolia** test wallet — but note that IBANforge settles on **Base mainnet** (`eip155:8453`), so the rehearsal target must be your own test server, not our API.
 
@@ -61,8 +61,9 @@ Python: `pip install cdp-sdk "x402[evm,httpx]"` and use `x402HttpxClient` the sa
 ## Try before you spend
 
 - `GET /ping` and `GET /.well-known/x402` are free — the manifest lists every payable route with its exact price.
-- The [MCP server](/docs/mcp) gives 10 free tool calls per day — enough to check the data quality on your own IBANs.
-- The free API key tier (200 requests/month, [one per developer](/docs/api-keys)) exists for humans evaluating the service.
+- No key at all: up to 25 IBAN validations a week per source address, on `POST /v1/iban/validate` only, to try it out (reset on Monday at 00:00 UTC).
+- The [MCP server](/docs/mcp) gives 25 free tool calls a week per source address, with no key — enough to check the data quality on your own IBANs.
+- An [API key](/docs/api-keys) needs no e-mail and no card, and reaches 200 requests a month once claimed: enough to evaluate the other endpoints before paying.
 
 ## If something blocks you from paying
 

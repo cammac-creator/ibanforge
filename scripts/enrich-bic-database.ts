@@ -22,11 +22,19 @@ import { createReadStream } from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as XLSX from 'xlsx';
 import { getCountryName } from '../src/lib/countries.js';
+import { restrictedBicSources, seedFamilyFromEnv } from '../src/lib/restricted-family.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
-const BIC_DB_PATH = resolve(DATA_DIR, 'bic.sqlite');
-const TMP_DIR = resolve(__dirname, '../.tmp-bic-enrich');
+// BIC_DB_PATH choisit la base écrite (défaut inchangé : data/bic.sqlite). La
+// chaîne privée (`npm run overlay:seed -- --kind bic`) y passe une copie de
+// travail, jamais data/ du dépôt.
+const BIC_DB_PATH = process.env.BIC_DB_PATH ?? resolve(DATA_DIR, 'bic.sqlite');
+// SEED_TMP_DIR : les téléchargements hors du dépôt (chaîne privée de la surcouche,
+// qui y reçoit des sources sous conditions). Défaut inchangé.
+const TMP_DIR = process.env.SEED_TMP_DIR
+  ? resolve(process.env.SEED_TMP_DIR, 'bic-enrich')
+  : resolve(__dirname, '../.tmp-bic-enrich');
 
 /**
  * SIX BankMaster TOWN values occasionally carry a company-form prefix
@@ -525,10 +533,25 @@ async function main(): Promise<void> {
   const beforeBic8 = (db.prepare('SELECT COUNT(DISTINCT bic8) as n FROM bic_entries').get() as { n: number }).n;
   console.log(`Before: ${beforeCount} entries, ${beforeBic8} unique BIC8`);
 
+  // SEED_FAMILY=restricted : les seules sources de la famille « sous
+  // conditions » (src/lib/restricted-family.ts), pour la surcouche privée. Sans
+  // la variable, rien ne change : toutes les sources, dans le même ordre.
+  const family = seedFamilyFromEnv();
+  if (family === 'restricted') {
+    const expected = ['eba_step2', 'nbp', 'oenb'];
+    const declared = [...restrictedBicSources()].sort();
+    if (declared.join(',') !== expected.join(',')) {
+      throw new Error(`La famille déclare ${declared.join(',')} ; ce seeder importe ${expected.join(',')}. À réaligner.`);
+    }
+    console.log('SEED_FAMILY=restricted : OeNB, NBP et EBA Step2 seulement (surcouche privée)');
+  }
+
   // Import sources
-  await importSwiftCodes(db);
-  await importBundesbank(db);
-  await importSixBankMaster(db);
+  if (family === 'all') {
+    await importSwiftCodes(db);
+    await importBundesbank(db);
+    await importSixBankMaster(db);
+  }
   try { await importOeNB(db); } catch (err) { console.warn(`  WARNING: OeNB import failed: ${(err as Error).message}`); }
   try { await importNBP(db); } catch (err) { console.warn(`  WARNING: NBP import failed: ${(err as Error).message}`); }
   try { await importEbaStep2(db); } catch (err) { console.warn(`  WARNING: EBA Step2 import failed: ${(err as Error).message}`); }

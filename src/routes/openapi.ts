@@ -2,6 +2,16 @@ import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
 import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA, POSTAL_ADDRESS_SCHEMA } from '../lib/bank-code-schema.js';
+import {
+  BANK_CODE_HOLDER_NOTE,
+  BANK_REACHABILITY_NOTE,
+  BIC_SOURCE_AS_OF_NOTE,
+  CHECKS_NOTE,
+  LISTED_IN_CURRENT_SOURCE_NOTE,
+  VOP_REGISTER_STATUS_NOTE,
+} from '../lib/field-notes.js';
+import { BANK_CODE_HOLDERS, CHECK_KEYS, CHECK_VALUES } from '../lib/checks.js';
+import { frozenSources } from '../lib/source-vintage.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 // Read from the route rather than retyped: the enum of error types and the
 // flood cap are what the handler enforces, and a contract that quotes its own
@@ -10,8 +20,17 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // Même motif que la ligne ci-dessus : le contrat cite le plafond que le
 // middleware applique, jamais une copie retapée. 🚨 Y compris `example`, qui
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
+import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+import { RATE_LIMIT } from '../middleware/rate-limit.js';
+import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
+// The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
+import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
+import { nationalRegisterBicNames } from '../lib/register-lists.js';
+import { BUNDLES } from './api-keys.js';
+import { PRO_PRICE_USD } from '../lib/payment-links.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
 // contrat qui recopie son propre chiffre sera faux au prochain réglage.
 import {
@@ -40,14 +59,145 @@ import {
   DEVICE_USER_CODE_LENGTH,
   DEVICE_VERIFICATION_URI,
 } from '../lib/device-grant.js';
+// La page du compte (lot C3, 25.09.2026) : le nom du cookie, la durée de la
+// session, la taille d'une page et la fenêtre du rapport sont ceux que le module
+// du compte applique, lus et non recopiés. L'interdit du consentement est la
+// constante partagée : une route qui poste un code à une adresse le porte.
+import {
+  ACCOUNT_COOKIE,
+  ACCOUNT_REPORT_MAX_DAYS,
+  ACCOUNT_SESSION_DAYS,
+  OVERVIEW_PAGE_SIZE,
+} from '../lib/account.js';
+import { ACCOUNT_PAGE } from '../lib/first-call.js';
+import { CONSENT_BOUNDARY } from '../lib/consent.js';
 
 const openapi = new Hono();
 
 // Version is read from package.json so the spec can never drift from the
-// deployed server again (the spec is fetched ~20k times/month by machines
+// deployed server again (the spec is fetched by machines
 // that code against it — it must tell the truth).
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require('../../package.json') as { version: string };
+
+/**
+ * Every `error` code a validation can put next to `valid: false`.
+ *
+ * Until 24/09/2026 the contract listed four of the six the library emits, and
+ * a client switching on the published enum fell into its default branch on
+ * `invalid_check_digits` and `invalid_bban_structure`. The two type checks
+ * below refuse to compile if the list and `IBANValidationResult['error']`
+ * (the library's own union) ever disagree, in either direction.
+ */
+type IbanErrorCode = NonNullable<IBANValidationResult['error']>;
+const IBAN_ERROR_CODES = [
+  'invalid_format',
+  'unsupported_country',
+  'wrong_length',
+  'invalid_check_digits',
+  'checksum_failed',
+  'invalid_bban_structure',
+] as const satisfies readonly IbanErrorCode[];
+const IBAN_ERROR_CODES_COMPLETE: Exclude<IbanErrorCode, (typeof IBAN_ERROR_CODES)[number]> extends never
+  ? true
+  : never = true;
+void IBAN_ERROR_CODES_COMPLETE;
+
+/**
+ * A valid and an invalid answer of POST /v1/iban/validate, as the route serves
+ * them to an x402 payer (no `trial` block, no `attribution`). Copied from a
+ * local call on 24/09/2026; the bank data are public register entries.
+ *
+ * Depuis le 25/09/2026 (relecture de la PR 254, R10), les valeurs que seuls les
+ * registres EPC donnent (famille sous conditions, src/lib/restricted-family.ts)
+ * sont celles d'un déploiement SANS ces registres : `vop_participant: null`,
+ * `basis: 'country_default'`, grain de la banque à `null`. Les schémas restent
+ * ceux du pays, que donne la bibliothèque. Aucune valeur tirée des registres
+ * sous conditions dans un exemple du dépôt public.
+ *
+ * Why here at all: the second DeepSeek test of 24/09/2026 read this document,
+ * found no example and concluded that the error handling was undocumented. The
+ * invalid example is the point: a 200, not a 4xx.
+ */
+const VALIDATE_EXAMPLES = {
+  valid: {
+    summary: 'A valid German IBAN, its bank code checked in the Bundesbank register',
+    value: {
+      iban: 'DE89370400440532013000',
+      valid: true,
+      bank_code_holder: 'confirmed',
+      checks: {
+        iban_structure: 'pass',
+        iban_checksum: 'pass',
+        bank_code: 'pass',
+        bic: 'pass',
+        sepa_reachability: 'unknown',
+        national_check_digits: 'not_checked',
+        account_exists: 'not_checked',
+        payee_name: 'not_checked',
+        institution_sanctions: 'not_checked',
+        country_sanctions: 'not_checked',
+        payee_sanctions: 'not_checked',
+      },
+      country: { code: 'DE', name: 'Germany' },
+      check_digits: '89',
+      bban: { bank_code: '37040044', account_number: '0532013000' },
+      sepa: {
+        member: true,
+        schemes: ['SCT', 'SDD', 'SCT_INST'],
+        vop_required: true,
+        vop_participant: null,
+        basis: 'country_default',
+        bank_reachability: null,
+        bank_schemes: null,
+        vop_register_status: null,
+      },
+      formatted: 'DE89 3704 0044 0532 0130 00',
+      cost_usdc: 0.005,
+      bic: {
+        code: 'COBADEFFXXX',
+        bank_name: 'Commerzbank',
+        city: 'Köln',
+        source: 'Deutsche Bundesbank Bankleitzahlendatei',
+        as_of: '2026-09',
+        basis: 'national_register',
+        authoritative: true,
+        lei: '851WYGNLUQLFZBSYGB56',
+        lei_status: 'ACTIVE',
+        bic8: 'COBADEFF',
+        listed_in_current_source: true,
+      },
+      issuer: { type: 'bank', name: 'Commerzbank', classification: 'default' },
+      risk_indicators: {
+        issuer_type: 'bank',
+        country_risk: 'standard',
+        test_bic: false,
+        sepa_reachable: true,
+        sepa_reachable_scope: 'country',
+        vop_coverage: true,
+      },
+      bank_code_check: {
+        value: '37040044',
+        status: 'verified',
+        match: 'register',
+        register: 'Deutsche Bundesbank Bankleitzahlendatei',
+        authoritative: true,
+        institution: { name: 'Commerzbank', street: null, post_code: '50447', town: 'Köln', country: 'DE' },
+        as_of: '2026-09',
+      },
+    },
+  },
+  invalid: {
+    summary: 'An invalid IBAN: still HTTP 200, with valid false, error and error_detail',
+    value: {
+      iban: 'DE89370400440532013001',
+      valid: false,
+      error: 'checksum_failed',
+      error_detail: 'Modulo 97 check returned 28, expected 1.',
+      cost_usdc: 0.005,
+    },
+  },
+};
 
 // Built lazily on first request (needs a DB read for live counts), then memoized.
 const buildRawSpec = () => ({
@@ -56,22 +206,39 @@ const buildRawSpec = () => ({
     title: 'IBANforge API',
     version: PKG_VERSION,
     // This string is the first thing every agent reads about the product, on
-    // the surface machines fetch ~20k times/month. Kept in sync with the
-    // positioning already served by llms.txt and the MCP descriptors — a
-    // generic "IBAN + BIC API" line commoditises the two differentiators
-    // (Swiss SIX clearing depth, sanctions screening) for free.
+    // the surface machines fetch the most. Until 24/09/2026 it opened
+    // on "Pre-payout screening for AI agents" and Swiss clearing, and the
+    // assistants that read it filed IBANforge as a Swiss tool for agents with
+    // a sanctions screening of the payee. The paragraph now comes from
+    // src/lib/positioning.ts, the same one llms.txt serves, with the register
+    // countries read from the code. Card before x402: the brief of that day.
     description:
-      'Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. ' +
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — ' +
-      'full payment-rail participation, the deepest Swiss clearing data in any public API), ' +
-      'EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring. ' +
-      'Four ways to pay, no dead-ends, and the first needs no email address: a free API key (' +
-      ANONYMOUS_MONTHLY_LIMIT +
-      ' req/month, empty body), the same key claimed to ' +
+      positioningLong() +
+      ' ' +
+      NOT_WHAT_IT_IS +
+      ' Also: Swiss clearing with payment-rail participation (SIX BankMaster), the UK modulus check, and the official identity of the bank from central-bank lists (France, Spain). ' +
+      'Ways to pay, none a dead-end: prepaid credit packs by card or USDC, no expiry, ' +
+      packSummary(BUNDLES) +
+      '; a Pro subscription by card ($' +
+      PRO_PRICE_USD +
+      ' a month); or pay-per-call via x402 micropayments (USDC on Base L2, no signup). ' +
+      'Before paying, a free API key needs no email address: it reaches ' +
       FREE_TIER_MONTHLY_LIMIT +
-      ' a month, prepaid credit packs (card or USDC), or pay-per-call via x402 micropayments (USDC on Base L2, no signup).',
+      ' requests a month once claimed, and taken with an empty body it starts at ' +
+      ANONYMOUS_MONTHLY_LIMIT +
+      ' a month. ' +
+      'An invalid IBAN is not an HTTP error: validation answers 200 with `valid: false`. ' +
+      'A refused request (4xx) answers JSON with `error`, a stable token, and on the public routes a `message` sentence (`{"error": "<token>", "message": "<sentence>"}`); an unexpected 500 is the plain text `Internal Server Error`, with no JSON; ' +
+      'rate limit ' +
+      RATE_LIMIT +
+      ' requests a minute per address, with Retry-After on the 429 (https://api.ibanforge.com/rate-limits.yml). ' +
+      'Support: support@ibanforge.com, or GitHub Issues.',
+    // Audit of 24/09/2026: an assistant reading this document found no way to
+    // reach a person. The URL alone sent it to the home page.
     contact: {
-      url: 'https://ibanforge.com',
+      name: 'IBANforge support',
+      url: 'https://github.com/cammac-creator/ibanforge/issues',
+      email: 'support@ibanforge.com',
     },
   },
   externalDocs: {
@@ -89,16 +256,16 @@ const buildRawSpec = () => ({
         summary: 'Validate a single IBAN',
         description:
           'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ' calls a day from one source address are served with no key and no payment** (IPv6 counted per /64) — send a real `iban` and the response carries a `trial` block with the count left and how to take a key that needs no email at all. Those ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ' are a day, on this route only; the key carries ' +
-          ANONYMOUS_MONTHLY_LIMIT +
-          ' a month, on every endpoint, and one call at POST /v1/keys/claim raises it to ' +
+          REST_TRIAL_WEEKLY_LIMIT +
+          ' calls a week from one source address are served with no key and no payment** (IPv6 counted per /64; the week is the ISO week in UTC and resets on ' +
+          TRIAL_RESET +
+          '): send a real `iban` and the response carries a `trial` block with the count left this week, the reset instant, and how to take a key that needs no email at all. The trial covers this route only. The key that needs no email is another door: every endpoint, and ' +
           FREE_TIER_MONTHLY_LIMIT +
+          ' requests a month once claimed (POST /v1/keys/claim with a 6-digit code mailed to an address you read); taken with an empty body it starts at ' +
+          ANONYMOUS_MONTHLY_LIMIT +
           ' a month. Past ' +
-          REST_TRIAL_DAILY_LIMIT +
-          ', the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
+          REST_TRIAL_WEEKLY_LIMIT +
+          ' in the week, the route answers 402 again with `cause.reason = "trial_exhausted"` until the reset. **An invalid IBAN is not an HTTP error: the answer is HTTP 200 with `valid: false`, an `error` code and an `error_detail` sentence** (codes: `invalid_format`, `unsupported_country`, `wrong_length`, `invalid_check_digits`, `checksum_failed`, `invalid_bban_structure`). Only the request itself changes the status: 400 for malformed JSON or a missing `iban`, 402 for payment or an exhausted allowance, 413 for a body over 256 KB, 429 past the rate limit. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -134,18 +301,22 @@ const buildRawSpec = () => ({
         responses: {
           '200': {
             description:
-              'Validation result. Carries an optional `trial` block when the call was served by the keyless daily allowance (no key, no payment), and `cost_usdc: 0` with it — nobody was charged.',
+              'Validation result, for a valid AND for an invalid IBAN: an invalid IBAN is HTTP 200 with `valid: false`, `error` and `error_detail`, never a 4xx. Carries an optional `trial` block when the call was served by the keyless weekly trial (no key, no payment), and `cost_usdc: 0` with it — nobody was charged.',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/IBANValidationResult' },
+                examples: VALIDATE_EXAMPLES,
               },
             },
           },
           '402': {
             description:
-              'Payment required (x402). Also returned when the keyless daily trial is used up for this IP — `cause.reason = "trial_exhausted"`, with the count served today, the reset (midnight UTC) and the free-key route. An empty `{}` body always gets this 402, never a 400: that is the discovery probe x402 indexers send.',
+              'Payment required (x402). Also returned when the keyless weekly trial is used up for this source address — `cause.reason = "trial_exhausted"`, with the count served this week, the reset (' + TRIAL_RESET + ') and the free-key route — and when a key has used its allowance (`monthly_quota_exhausted`, `credits_exhausted`). Without a key, an empty `{}` body gets this 402 and spends nothing of the trial: that is the discovery probe x402 indexers send. With a key, the same empty body is a 400.',
           },
-          '400': { description: 'Missing or malformed request body' },
+          '400': {
+            description:
+              '`invalid_json` (the body is not JSON) or `invalid_request` (no `iban` string). An invalid IBAN is never a 400: it is a 200 with `valid: false`.',
+          },
         },
       },
     },
@@ -305,23 +476,37 @@ const buildRawSpec = () => ({
     '/v1/iban/compliance': {
       post: {
         operationId: 'complianceCheck',
-        summary: 'Full IBAN compliance check',
+        summary: 'Bank-level compliance triage for an IBAN',
         description:
-          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC, EU, UN), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
+          // The list of authorities is spelled out on this line rather than
+          // read from BANK_LEVEL_SANCTIONS: this file is a coverage surface of
+          // sanctions-claims.test.ts, which reads the source line by line.
+          "Validates an IBAN and returns everything from /v1/iban/validate PLUS a pre-payment triage layer: sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country checked against a fixed list of sanctioned jurisdictions, never the payee's name; FATF status; SEPA Instant reachability; whether the EPC Verification of Payee register lists the bank as ready (VoP readiness); and a composite risk score (0-100). Costs $0.02 USDC via x402.",
         tags: ['Compliance'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
+        // La forme BIC, servie depuis l'été et jamais déclarée (relecture de la
+        // PR 254, R4) : un client généré ne pouvait ni l'envoyer ni la lire,
+        // alors que GET /v1/bic y renvoie. Exactement un des deux champs, comme
+        // la route (iban-compliance.ts refuse les deux ensemble).
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['iban'],
+                description:
+                  'Send exactly one of `iban` or `bic`. The `bic` form screens a bank directly, for the banks no IBAN can reach; it answers BicComplianceResponse.',
+                oneOf: [{ required: ['iban'] }, { required: ['bic'] }],
                 properties: {
                   iban: {
                     type: 'string',
                     description: 'IBAN to check',
                     example: 'DE89370400440532013000',
+                  },
+                  bic: {
+                    type: 'string',
+                    description: 'BIC8 or BIC11 of the bank to screen, instead of an IBAN.',
+                    example: 'COBADEFF',
                   },
                 },
               },
@@ -330,10 +515,12 @@ const buildRawSpec = () => ({
         },
         responses: {
           '200': {
-            description: 'Compliance check result (includes full IBAN validation + compliance layer)',
+            description: 'Compliance check result: on an `iban`, the full IBAN validation plus the compliance layer; on a `bic`, BicComplianceResponse.',
             content: {
               'application/json': {
                 schema: {
+                  oneOf: [
+                  {
                   allOf: [
                     { $ref: '#/components/schemas/IBANValidationResult' },
                     {
@@ -374,12 +561,15 @@ const buildRawSpec = () => ({
                       },
                     },
                   ],
+                  },
+                  { $ref: '#/components/schemas/BicComplianceResponse' },
+                  ],
                 },
               },
             },
           },
           '402': { description: 'Payment required (x402) — $0.02 USDC' },
-          '400': { description: 'Missing or malformed request body' },
+          '400': { description: 'Missing or malformed request body, a malformed BIC, or both `iban` and `bic` in one body' },
         },
       },
     },
@@ -423,7 +613,7 @@ const buildRawSpec = () => ({
         operationId: 'formatCheckIBAN',
         summary: 'Free IBAN format check (mod-97 + structure)',
         description:
-          'FREE pure-format IBAN check: ISO 13616 mod-97 checksum, country-specific length, and BBAN parsing. No payment, no API key, no quota (global rate limit only). Does NOT touch the BIC, SEPA, VoP, sanctions, or Swiss clearing databases — use POST /v1/iban/validate ($0.005) when you need the full enrichment. Ideal for pre-filtering malformed IBANs before paying for validation.',
+          'FREE pure-format IBAN check: ISO 13616 mod-97 checksum, country-specific length, and BBAN parsing. No payment, no API key, no quota (global rate limit only). `valid: true` here means well formed and nothing more: this route does NOT touch the BIC, SEPA, VoP or Swiss clearing data, and does not say whether the bank code is allocated. Use POST /v1/iban/validate ($0.005) for that. Spaces and hyphens are removed before the length is measured, so an IBAN written in groups of four is accepted as printed. Also answers POST with the JSON body `{"iban": "..."}`. Ideal for pre-filtering malformed IBANs before paying for validation.',
         tags: ['Free'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -434,11 +624,12 @@ const buildRawSpec = () => ({
             name: 'iban',
             in: 'query',
             required: true,
-            description: 'IBAN to check (spaces allowed, will be normalized)',
+            description:
+              'IBAN to check. Spaces and hyphens are allowed and removed before the length is measured (15 to 34 characters once removed; at most 64 as sent).',
             schema: {
               type: 'string',
               minLength: 15,
-              maxLength: 34,
+              maxLength: 64,
               example: 'CH1000230000000012345',
             },
           },
@@ -453,7 +644,10 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '400': { description: 'Missing ?iban= query parameter, or IBAN shorter than 15 / longer than 34 characters' },
+          '400': {
+            description:
+              '`missing_iban` (no ?iban= query parameter), or `invalid_iban_length` (fewer than 15 or more than 34 characters once spaces and hyphens are removed, or more than 64 as sent)',
+          },
         },
       },
     },
@@ -1358,7 +1552,8 @@ const buildRawSpec = () => ({
         operationId: 'getApiKeyReport',
         summary: 'Read everything this key did',
         description:
-          'Self-service report for the presented key: daily traffic, endpoints called, what failed with a plain-language cause and a suggested fix, and how many distinct networks the key was called from. Authentication is the key itself, and the report only ever covers that key. A human-readable version of the same data is at https://ibanforge.com/en/account. ' +
+          'Self-service report for the presented key: daily traffic, endpoints called, what failed with a plain-language cause and a suggested fix, and how many distinct networks the key was called from. Authentication is the key itself, and the report only ever covers that key. ' +
+          `A person reads the same data on the account page, ${ACCOUNT_PAGE}, by signing in with the e-mail address of the key or by pasting the key (see GET /v1/account/keys/report). ` +
           'The footprint reports `unusual: null`, never false, for a key with no traffic: a key that has never been called has not passed a leak check, it has nothing to judge. ' +
           'Its `usage` block is the one GET /v1/keys/usage serves, `basis` included.',
         tags: ['API Keys'],
@@ -1526,6 +1721,243 @@ const buildRawSpec = () => ({
           },
           '401': { description: 'No Authorization: Bearer ifk_… header ("missing_key")' },
           '404': { description: 'Key not found or inactive ("invalid_key")' },
+        },
+      },
+    },
+    // La page du compte (lots C1 à C3, 25.09.2026). Cinq routes publiques,
+    // faites pour une PERSONNE dans un navigateur sur la page du compte : une
+    // adresse reçoit un code à 6 chiffres, le code ouvre une session en cookie,
+    // la session LIT les clés de cette adresse et n'en change aucune. Source de
+    // vérité : `src/routes/account.ts` (le test `openapi.account.test.ts` lit
+    // ses statuts et ses codes d'erreur). La route d'administration qui coupe
+    // les sessions d'une adresse n'est pas publique et ne figure pas ici.
+    '/v1/account/code': {
+      post: {
+        operationId: 'requestAccountSignInCode',
+        summary: 'Mail a 6-digit sign-in code for the account page',
+        description:
+          `First step of signing in to the account page, ${ACCOUNT_PAGE}. Made for a person in a browser: the address receives a 6-digit code, and POST /v1/account/session exchanges it for a read-only session. ` +
+          `The code is valid ${VERIFICATION_TTL_MINUTES} minutes and allows ${VERIFICATION_MAX_ATTEMPTS} tries; a new code replaces the previous one. ` +
+          'The same 202 answers, and the same mail leaves, whether or not the address carries keys: this route never tells whether an address holds a key. ' +
+          'The code is mailed to the normalized form of the address: a "+tag" is dropped, and at Gmail the dots too. ' +
+          'The codes mailed to one address, one domain and one network are capped per day, in one budget shared with POST /v1/keys/generate and POST /v1/keys/claim. ' +
+          'Send the request as application/json; a browser Origin that is not the site is refused. ' +
+          `An agent holding a key reads the same figures with GET /v1/keys/usage and GET /v1/keys/report, and has no reason to call this route. ${CONSENT_BOUNDARY}`,
+        tags: ['Account'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    maxLength: 254,
+                    example: 'you@example.com',
+                    description: 'One plain address: no list, no display name, no quotes.',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '202': {
+            description: 'A code left for this address. The same body answers for every address.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['status', 'expires_in'],
+                  properties: {
+                    status: { type: 'string', enum: ['code_sent'] },
+                    expires_in: { type: 'integer', example: VERIFICATION_TTL_MINUTES * 60, description: 'Seconds the code stays valid.' },
+                  },
+                },
+              },
+            },
+          },
+          '400': {
+            description:
+              '"invalid_json": the body is not a JSON object. "invalid_email": not one plain address, or its normalized form is not one. "disposable_email": a throwaway or placeholder domain. "undeliverable_email": the domain has no mail server, or the mail server refused the address.',
+          },
+          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+          '429': {
+            description:
+              '"code_rate_limited": too many codes today for this address, its domain or this network. Try again tomorrow, or paste an API key on the account page.',
+          },
+          '503': {
+            description:
+              '"code_unavailable": sign-in codes cannot be sent right now (the mail relay is down, or the hourly ceiling of sign-in codes is reached). Try again later, or paste an API key on the account page.',
+          },
+        },
+      },
+    },
+    '/v1/account/session': {
+      post: {
+        operationId: 'openAccountSession',
+        summary: 'Exchange the sign-in code for a session cookie',
+        description:
+          `Second step of signing in to the account page. A right code opens a session: the answer sets the cookie ${ACCOUNT_COOKIE} (HttpOnly, Secure, SameSite=Strict, Path=/v1/account, ${ACCOUNT_SESSION_DAYS} days from sign-in) and never carries the session token in its body. ` +
+          'Every code that cannot be used (wrong, expired, tried too many times, never asked for, or not six digits) gets the same 400 "invalid_code": ask for a new code. An entry that is not six digits does not count as a try. ' +
+          'A right code opens a session whether or not the address carries keys; GET /v1/account/overview then says what it holds. The session reads and never writes: it cannot rotate, revoke, claim or top up a key, and it opens no paid route. ' +
+          'Same write rules as POST /v1/account/code: application/json, and the browser Origin is checked.',
+        tags: ['Account'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'code'],
+                properties: {
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    maxLength: 254,
+                    example: 'you@example.com',
+                    description: 'The address the code was asked for, written as the person typed it.',
+                  },
+                  code: { type: 'string', pattern: '^[0-9]{6}$', example: '123456', description: 'The 6-digit code of the most recent mail.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Signed in. Set-Cookie carries the session; the body only says so, with the end of the session.',
+            headers: {
+              'Set-Cookie': {
+                description: `${ACCOUNT_COOKIE}=…; Max-Age=${ACCOUNT_SESSION_DAYS * 24 * 60 * 60}; Path=/v1/account; HttpOnly; Secure; SameSite=Strict`,
+                schema: { type: 'string' },
+              },
+            },
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['signed_in', 'expires_at'],
+                  properties: {
+                    signed_in: { type: 'boolean', enum: [true] },
+                    expires_at: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+          '400': {
+            description:
+              '"invalid_json", "invalid_email", or "invalid_code": one answer for every code that cannot be used. Ask for a new code with POST /v1/account/code.',
+          },
+          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+        },
+      },
+    },
+    '/v1/account/overview': {
+      get: {
+        operationId: 'getAccountOverview',
+        summary: 'Every active key of the signed-in address',
+        description:
+          `Read-only view of the account page: the active keys whose address normalizes to the signed-in one, ${OVERVIEW_PAGE_SIZE} per page, the most recently called first. ` +
+          'For each key: its prefix (never the key itself), its plan, its monthly allowance (the figures of GET /v1/keys/usage) or its credit balance, the calls of this month, the last call, the alerts mailed, and the link that manages a Pro or Editor subscription. `inactive_keys` counts the deactivated keys of the address, without detail. ' +
+          'Authentication is the session cookie set by POST /v1/account/session; a browser sends it with credentials: "include". Never cached (Cache-Control: no-store).',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        parameters: [
+          {
+            name: 'page',
+            in: 'query',
+            required: false,
+            description: 'Page number, from 1.',
+            schema: { type: 'integer', minimum: 1, default: 1 },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'The overview of the signed-in address.',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/AccountOverview' } } },
+          },
+          '401': {
+            description:
+              '"signed_out": no session, an expired or revoked one, or the account cookie sent twice. A cookie that leads to no live session is cleared.',
+          },
+        },
+      },
+    },
+    '/v1/account/keys/report': {
+      get: {
+        operationId: 'getAccountKeyReport',
+        summary: 'The report of one key of the signed-in address',
+        description:
+          'The same body as GET /v1/keys/report (key_prefix, usage, report), for one key of the signed-in address named by its prefix, without the key itself. ' +
+          `The prefix travels as a query parameter, never in the path. The window is capped at ${ACCOUNT_REPORT_MAX_DAYS} days here, and report.window_days says the window served. ` +
+          'A prefix that is unknown, deactivated or attached to another address gets the same 404. Never cached (Cache-Control: no-store).',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        parameters: [
+          {
+            name: 'prefix',
+            in: 'query',
+            required: true,
+            description: 'The key_prefix of the key, as the overview lists it.',
+            schema: { type: 'string', maxLength: 64, example: 'ifk_3f9c1a7e' },
+          },
+          {
+            name: 'days',
+            in: 'query',
+            required: false,
+            description: `Window in days, clamped to 1..${ACCOUNT_REPORT_MAX_DAYS}. Defaults to 30.`,
+            schema: { type: 'integer', minimum: 1, maximum: ACCOUNT_REPORT_MAX_DAYS, default: 30 },
+          },
+        ],
+        responses: {
+          '200': { description: 'key_prefix, usage (as GET /v1/keys/usage serves it) and report (as GET /v1/keys/report serves it).' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '404': {
+            description:
+              '"not_found": no such key in this account. The same answer for an unknown prefix and for the prefix of another address.',
+          },
+        },
+      },
+    },
+    '/v1/account/logout': {
+      post: {
+        operationId: 'closeAccountSession',
+        summary: 'Sign out of the account page, here or everywhere',
+        description:
+          'Ends the session of this browser and clears its cookie. With {"all": true}, ends every session of the signed-in address (sign out everywhere). ' +
+          'Signing out with no live session is not an error: 204 all the same. Same write rules as POST /v1/account/code: application/json, and the browser Origin is checked.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  all: { type: 'boolean', default: false, description: 'true ends every session of the address, in every browser.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '204': { description: 'Signed out. The cookie is cleared.' },
+          '400': { description: '"invalid_json": the body is present and is not a JSON object.' },
+          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared and nothing is revoked.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
         },
       },
     },
@@ -1800,7 +2232,8 @@ const buildRawSpec = () => ({
       get: {
         operationId: 'getDemo',
         summary: 'Free demo results',
-        description: 'Returns example IBAN and BIC validation results. No payment required.',
+        description:
+          'Returns example results computed on the request: IBAN validations (the same validation as POST /v1/iban/validate), one compliance check (assembled like POST /v1/iban/compliance) and a summary of two BIC directory rows. No payment required, and readable with a plain GET: the official example IBANs of Switzerland, Belgium and Austria show the verdict of their national register on a bank code a checksum cannot judge. `served_at` dates the answer.',
         tags: ['Free'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -1815,18 +2248,94 @@ const buildRawSpec = () => ({
                   type: 'object',
                   properties: {
                     message: { type: 'string' },
+                    served_at: {
+                      type: 'string',
+                      format: 'date-time',
+                      description:
+                        'When this answer was computed, ISO 8601 in UTC, to the second. Added on 24/09/2026, so that a copy of this page quoted later dates itself.',
+                    },
+                    how_to_read: {
+                      type: 'string',
+                      description:
+                        'How to read the verdict on the bank code, for a reader that cannot call the API itself.',
+                    },
                     iban_examples: {
                       type: 'array',
-                      items: { $ref: '#/components/schemas/IBANValidationResult' },
+                      description:
+                        'One validation result per example, computed on the request, each with a `label` that names the example (its bank, or its provenance for an official example IBAN).',
+                      // Review of 24/09/2026 (D7): `label` and
+                      // `compliance_example` were served and declared nowhere,
+                      // and `endpoint` was declared and never served.
+                      items: {
+                        allOf: [
+                          { $ref: '#/components/schemas/IBANValidationResult' },
+                          {
+                            type: 'object',
+                            required: ['label'],
+                            properties: {
+                              label: {
+                                type: 'string',
+                                description: 'Names the example: its bank, or its provenance for an official example IBAN.',
+                              },
+                            },
+                          },
+                        ],
+                      },
                     },
                     bic_examples: {
                       type: 'array',
+                      description: 'A summary of the directory row of two BICs, not the full answer of GET /v1/bic/{code}.',
                       items: {
                         type: 'object',
                         properties: {
                           label: { type: 'string' },
                           bic: { type: 'string' },
-                          endpoint: { type: 'string' },
+                          bic8: { type: 'string' },
+                          bic11: { type: 'string' },
+                          found: { type: 'boolean' },
+                          institution: { type: ['string', 'null'] },
+                          country: {
+                            type: 'object',
+                            properties: { code: { type: 'string' }, name: { type: ['string', 'null'] } },
+                          },
+                          city: { type: ['string', 'null'] },
+                          lei: { type: ['string', 'null'] },
+                          cost_usdc: { type: 'number', description: 'The list price of a BIC lookup; the demo itself is free.' },
+                        },
+                      },
+                    },
+                    compliance_example: {
+                      type: 'object',
+                      description: 'One compliance check, assembled like the answer of POST /v1/iban/compliance.',
+                      required: ['description', 'endpoint', 'cost', 'result'],
+                      properties: {
+                        description: { type: 'string' },
+                        endpoint: { type: 'string', example: 'POST /v1/iban/compliance' },
+                        cost: { type: 'string' },
+                        result: {
+                          oneOf: [
+                            {
+                              allOf: [
+                                { $ref: '#/components/schemas/IBANValidationResult' },
+                                {
+                                  type: 'object',
+                                  required: ['compliance', 'meta'],
+                                  properties: {
+                                    compliance: { $ref: '#/components/schemas/ComplianceResult' },
+                                    meta: {
+                                      type: 'object',
+                                      description: 'Provenance and scope of the verdict, as in POST /v1/iban/compliance.',
+                                    },
+                                  },
+                                },
+                              ],
+                            },
+                            {
+                              type: 'object',
+                              required: ['error'],
+                              properties: { error: { type: 'string', example: 'Compliance data unavailable' } },
+                            },
+                          ],
                         },
                       },
                     },
@@ -1952,11 +2461,32 @@ const buildRawSpec = () => ({
         operationId: 'mcpStreamableHttp',
         summary: 'MCP endpoint for AI agents (Streamable HTTP)',
         description:
-          'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes the same capabilities as this REST API as 7 MCP tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference and check_postal_address (both free), plus send_feedback. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec.',
+          // The tool list is read from the inventory (review of 24/09/2026,
+          // D6/D10/D17): "7 MCP tools" was typed here while the transport
+          // served eleven, three of them absent from the sentence.
+          'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes ' +
+          MCP_TOOLS.length +
+          ' MCP tools: ' +
+          MCP_TOOLS.map((t) => t.name).join(', ') +
+          '. With no USDC price: ' +
+          MCP_TOOLS.filter((t) => t.price === 'free')
+            .map((t) => t.name)
+            .join(', ') +
+          '. Outside the keyless allowance below (they cost no unit and keep answering once it is spent): ' +
+          MCP_TOOLS.filter((t) => ALLOWANCE_EXEMPT_TOOLS.has(t.name))
+            .map((t) => t.name)
+            .join(', ') +
+          '; request_api_key and poll_api_key are the way to a key. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec. With no credential it answers up to ' +
+          MCP_WEEKLY_LIMIT +
+          ' tool units a week per source address (one per tool call, one per IBAN in batch_validate_iban; the week is the ISO week in UTC and resets on ' +
+          TRIAL_RESET +
+          '), an allowance separate from the keyless REST trial.',
         tags: ['MCP'],
-        // Anonymous is a supported alternative here, not an oversight: the HTTP
-        // MCP transport answers a daily free allowance with no credential.
-        security: [{}, { apiKey: [] }],
+        // Anonymous only, and said so (review of 24/09/2026, D8): the HTTP MCP
+        // transport answers a weekly free allowance with no credential, and it
+        // reads no key at all (the key middleware is mounted on /v1/* only).
+        // Declaring `apiKey` here told a client a key would lift that allowance.
+        security: [{}],
         externalDocs: {
           description: 'MCP setup guide (Claude Desktop, Cursor, HTTP transport)',
           url: 'https://ibanforge.com/docs/mcp',
@@ -2014,6 +2544,16 @@ const buildRawSpec = () => ({
           FREE_TIER_MONTHLY_LIMIT +
           ' a month once claimed, or a custom quota for paid keys',
       },
+      // Le cookie de la page du compte (lot C3). Il ne vaut que sur
+      // /v1/account/* : aucune autre route du service ne lit de cookie.
+      accountSession: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: ACCOUNT_COOKIE,
+        description:
+          `Session of the account page, set by POST /v1/account/session: HttpOnly, Secure, SameSite=Strict, Path=/v1/account, ${ACCOUNT_SESSION_DAYS} days from sign-in. ` +
+          'Read-only: it opens no paid route and no route that acts on a key.',
+      },
     },
     schemas: {
       /**
@@ -2043,13 +2583,83 @@ const buildRawSpec = () => ({
           error: {
             type: 'string',
             description:
-              'Stable machine-readable token in snake_case, e.g. "invalid_iban", "payment_required", "payload_too_large", "rate_limited". Branch on this, never on `message`.',
-            example: 'invalid_iban',
+              'Stable machine-readable token in snake_case, e.g. "invalid_json", "invalid_request", "batch_too_large", "payment_required", "payload_too_large", "rate_limit_exceeded". Branch on this, never on `message`. An invalid IBAN is not an ApiError: validation answers 200 with `valid: false`.',
+            example: 'batch_too_large',
           },
           message: {
             type: 'string',
             description: 'Human-readable sentence explaining the failure. Wording may change; the token above will not.',
-            example: 'IBAN failed the mod-97 checksum.',
+            example: 'Maximum 100 IBANs per batch request',
+          },
+        },
+      },
+      // La vue du compte (GET /v1/account/overview), telle que `buildOverview`
+      // la construit dans `src/lib/account.ts`. Jamais servis : la clé brute,
+      // son empreinte, sa lignée, une empreinte d'adresse IP.
+      AccountOverview: {
+        type: 'object',
+        required: ['email', 'session_expires_at', 'month', 'page', 'pages', 'keys', 'inactive_keys'],
+        properties: {
+          email: { type: 'string', description: 'The address typed at sign-in, in lower case.', example: 'you@example.com' },
+          session_expires_at: { type: 'string', format: 'date-time', description: 'When the session ends; sign in again after it.' },
+          month: { type: 'string', example: '2026-09', description: 'The calendar month (UTC) that calls_this_month counts.' },
+          page: { type: 'integer', minimum: 1 },
+          pages: { type: 'integer', minimum: 1 },
+          keys: { type: 'array', items: { $ref: '#/components/schemas/AccountKey' } },
+          inactive_keys: { type: 'integer', description: 'Deactivated keys of the address (revoked or rotated), counted without detail.' },
+        },
+      },
+      AccountKey: {
+        type: 'object',
+        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'actions'],
+        properties: {
+          key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
+          created_at: { type: ['string', 'null'], format: 'date-time' },
+          plan: { type: 'string', enum: ['free', 'custom', 'pack', 'pro', 'editor'] },
+          allowance: {
+            type: ['object', 'null'],
+            description: 'The monthly allowance, with the figures of GET /v1/keys/usage. null on a credit key, whose balance is in credits.',
+            properties: {
+              basis: { type: 'string', enum: ['monthly', 'lifetime'] },
+              limit: { type: 'integer' },
+              used: { type: 'integer' },
+              remaining: { type: 'integer' },
+            },
+          },
+          credits: {
+            type: ['object', 'null'],
+            description: 'The prepaid balance of a credit key. null on any other key.',
+            properties: { remaining: { type: 'integer' }, purchased_total: { type: 'integer' } },
+          },
+          subscription: {
+            type: ['object', 'null'],
+            properties: {
+              plan: { type: 'string', enum: ['pro', 'editor'] },
+              status: { type: 'string', enum: ['active'] },
+              manage_url: { type: 'string', format: 'uri', description: 'The customer portal: card, invoices, cancellation.' },
+            },
+          },
+          calls_this_month: { type: 'integer', description: 'Calls billed to the key this month, credit calls included.' },
+          last_call_at: { type: ['string', 'null'], format: 'date-time' },
+          alerts: {
+            type: 'array',
+            description: 'The alerts mailed for this key, the most recent first.',
+            items: {
+              type: 'object',
+              properties: {
+                kind: { type: 'string', enum: ['quota_80', 'credits_low'] },
+                sent_at: { type: ['string', 'null'], format: 'date-time' },
+              },
+            },
+          },
+          actions: {
+            type: 'object',
+            description: 'Links the page may offer. topup and subscribe_pro are null until those journeys exist; manage_subscription is the portal of a subscribed key.',
+            properties: {
+              topup: { type: ['string', 'null'] },
+              subscribe_pro: { type: ['string', 'null'] },
+              manage_subscription: { type: ['string', 'null'] },
+            },
           },
         },
       },
@@ -2060,28 +2670,39 @@ const buildRawSpec = () => ({
           trial: {
             type: 'object',
             description:
-              'Present ONLY on a call served by the keyless daily trial: POST /v1/iban/validate with a real `iban` and no API key is served ' +
-              REST_TRIAL_DAILY_LIMIT +
-              ' times a day per source address (IPv6 counted per /64), with no payment. Says how many calls are left today and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint.',
+              'Present ONLY on a call served by the keyless weekly trial: POST /v1/iban/validate with a real `iban` and no API key is served ' +
+              REST_TRIAL_WEEKLY_LIMIT +
+              ' times a week per source address (IPv6 counted per /64; ISO week in UTC, reset on ' +
+              TRIAL_RESET +
+              '), with no payment. Says how many calls are left this week, when the count resets, and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint. Until 24 September 2026 the trial was daily and this block carried `calls_used_today`, `calls_left_today` and `daily_limit`; they were replaced, not kept, because they would have carried weekly counts under daily names.',
             required: [
-              'calls_used_today',
-              'calls_left_today',
-              'daily_limit',
+              'calls_used_this_week',
+              'calls_left_this_week',
+              'weekly_limit',
               'resets',
+              'resets_at',
               'free_key',
               'docs',
             ],
             properties: {
-              calls_used_today: { type: 'integer', example: 1 },
-              calls_left_today: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT - 1 },
-              daily_limit: { type: 'integer', example: REST_TRIAL_DAILY_LIMIT },
-              resets: { type: 'string', example: 'midnight UTC' },
+              calls_used_this_week: { type: 'integer', example: 1 },
+              calls_left_this_week: { type: 'integer', example: REST_TRIAL_WEEKLY_LIMIT - 1 },
+              weekly_limit: { type: 'integer', example: REST_TRIAL_WEEKLY_LIMIT },
+              resets: { type: 'string', example: TRIAL_RESET },
+              resets_at: {
+                type: 'string',
+                format: 'date-time',
+                description: 'Next Monday 00:00:00 UTC: the instant the weekly count goes back to zero.',
+                example: trialResetsAt(new Date('2026-09-24T12:00:00Z')),
+              },
               free_key: {
                 type: 'string',
                 description:
-                  'The request that ends the trial in your favour: a key that needs no email address, ' +
+                  'The request that ends the trial in your favour: a key that needs no email address, on every endpoint, ' +
+                  FREE_TIER_MONTHLY_LIMIT +
+                  ' requests a month once claimed (' +
                   ANONYMOUS_MONTHLY_LIMIT +
-                  ' requests a month on every endpoint.',
+                  ' a month before that).',
               },
               docs: { type: 'string', format: 'uri' },
             },
@@ -2099,7 +2720,25 @@ const buildRawSpec = () => ({
             },
           },
           iban: { type: 'string', description: 'The IBAN as provided (normalized)' },
-          valid: { type: 'boolean' },
+          valid: {
+            type: 'boolean',
+            description:
+              'ISO 13616 only: structure and mod-97. It says nothing about the bank: read bank_code_holder and checks before a payment.',
+          },
+          // Ajoutés le 25/09/2026 à côté de `valid`, qui ne change pas.
+          bank_code_holder: {
+            type: 'string',
+            enum: [...BANK_CODE_HOLDERS],
+            description: `${BANK_CODE_HOLDER_NOTE} Present ONLY when valid is true and the bank code was read from the BBAN.`,
+          },
+          checks: {
+            type: 'object',
+            description: CHECKS_NOTE,
+            required: [...CHECK_KEYS],
+            properties: Object.fromEntries(
+              CHECK_KEYS.map((k) => [k, { type: 'string', enum: [...CHECK_VALUES[k]] }]),
+            ),
+          },
           country: {
             type: 'object',
             properties: {
@@ -2139,25 +2778,28 @@ const buildRawSpec = () => ({
                 description:
                   'The bank code you asked about, when the register answered for the one that took over its clearing. CH and LI only today: SIX marks an IID concatenated and publishes its successor. The IBAN stays valid and the account payable — a redirect is not a retirement.',
               },
-              bank_name: { type: ['string', 'null'] },
+              bank_name: { type: ['string', 'null'], description: 'Null, never an empty string, when no source names the institution.' },
               city: {
                 type: ['string', 'null'],
                 description:
-                  'Where the consulted register places THIS bank code. May differ from address.city, which is the legal seat — both true, different questions.',
+                  'Where the consulted register places THIS bank code. May differ from address.city, which is the legal seat — both true, different questions. Null, never an empty string, when the source leaves the town blank.',
               },
               source: { type: ['string', 'null'], description: 'Which dataset named this institution.' },
               as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed. This dates the IMPORT, which for one source is not the date of the data — see source_as_of.' },
               source_as_of: {
                 type: 'string',
-                description:
-                  "Year-month the source DATA is from, present ONLY when it differs from as_of. The redistributed SWIFT directory behind part of this reference set is a public repository whose publisher stopped updating it, so as_of alone would present an old bank name as last month's. Absent means no gap has been established between import and content, never 'this is current'.",
+                description: BIC_SOURCE_AS_OF_NOTE,
+              },
+              listed_in_current_source: {
+                type: ['boolean', 'null'],
+                description: LISTED_IN_CURRENT_SOURCE_NOTE,
               },
               basis: {
                 type: 'string',
                 enum: ['national_register', 'curated_map', 'directory_prefix'],
                 description:
                   'WHERE the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-                  'national_register: the country\'s own register publishes this BIC for this bank code — today Switzerland, Liechtenstein, Germany, Austria, Belgium, Bulgaria, Slovakia and San Marino; the SIX BankMaster carries the exact 11-character BIC per IID and the German Bankleitzahlendatei per BLZ. ' +
+                  `national_register: the country's own register publishes this BIC for this bank code — today ${nationalRegisterBicNames()}; the SIX BankMaster carries the exact 11-character BIC per IID and the German Bankleitzahlendatei per BLZ. ` +
                   'curated_map: our maintained bank-code map made the pairing on an exact key. Usually right, and not an allocation record. ' +
                   'directory_prefix: the bic8 LIKE fallback, which can match several institutions at once — read bank_code_check.candidates. ' +
                   'Answers the settlement question directly: only national_register is settlement-grade, so outside those registers a derived BIC is advisory and should be confirmed with the beneficiary or your bank before it becomes a stored routing instruction.',
@@ -2240,8 +2882,9 @@ const buildRawSpec = () => ({
           // the answers it gets. Each now states its own condition.
           error: {
             type: 'string',
-            enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],
-            description: 'Present ONLY when `valid` is false. Absent on every successful validation.',
+            enum: IBAN_ERROR_CODES,
+            description:
+              'Present ONLY when `valid` is false, on an HTTP 200: an invalid IBAN is not an HTTP error. Absent on every successful validation.',
           },
           error_detail: {
             type: 'string',
@@ -2265,7 +2908,7 @@ const buildRawSpec = () => ({
               schemes: {
                 type: 'array',
                 description:
-                  'SEPA schemes available for this account. When the resolved institution has rows in the EPC scheme registers these are ITS schemes (basis = "epc_register"); otherwise the country-level schemes (basis = "country_default"). SCT = Credit Transfer, SDD = Direct Debit, SCT_INST = Instant Credit Transfer.',
+                  'SEPA schemes available for this account. When the resolved institution has rows in the EPC scheme registers these are ITS schemes (basis = "epc_register"); otherwise the country-level schemes (basis = "country_default"), even for a bank code nobody holds: for the bank itself, read bank_schemes and bank_reachability. SCT = Credit Transfer, SDD = Direct Debit, SCT_INST = Instant Credit Transfer.',
                 items: {
                   type: 'string',
                   enum: ['SCT', 'SDD', 'SCT_INST'],
@@ -2274,12 +2917,28 @@ const buildRawSpec = () => ({
               vop_required: {
                 type: 'boolean',
                 description:
-                  'Whether Verification of Payee (VoP) is required under EU Instant Payments Regulation for this institution',
+                  "Whether Verification of Payee (VoP) is required under the EU Instant Payments Regulation in this COUNTRY. It says nothing about the bank: read vop_register_status for the payee's bank.",
               },
               vop_participant: {
                 type: ['boolean', 'null'],
                 description:
-                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved. Listing means the bank answers VoP requests — it does not run the name check for you.',
+                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved or when the VoP register is not loaded on this deployment (not consulted, which is not a "no"); a resolved bank outside the SEPA area is answered false from the country either way. Listing means the bank answers VoP requests — it does not run the name check for you. The same as vop_register_status === "active"; vop_register_status also says pending.',
+              },
+              bank_reachability: {
+                type: ['string', 'null'],
+                enum: ['listed', 'not_listed', 'no_bank', 'bank_code_not_allocated', null],
+                description: BANK_REACHABILITY_NOTE,
+              },
+              bank_schemes: {
+                type: ['array', 'null'],
+                items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] },
+                description:
+                  "The bank's own schemes from the EPC registers when bank_reachability is listed; [] for a bank code nobody holds; null otherwise. Absent outside SEPA.",
+              },
+              vop_register_status: {
+                type: ['string', 'null'],
+                enum: ['active', 'pending', 'inactive', 'not_listed', null],
+                description: `${VOP_REGISTER_STATUS_NOTE} Absent outside SEPA.`,
               },
               basis: {
                 type: 'string',
@@ -2389,7 +3048,7 @@ const buildRawSpec = () => ({
               vop_coverage: {
                 type: 'boolean',
                 description:
-                  'Whether the institution is covered by Verification of Payee, reducing payee impersonation risk',
+                  "The COUNTRY's Verification of Payee obligation, identical to sepa.vop_required. It says nothing about the institution: for the payee's bank, read sepa.vop_register_status.",
               },
             },
             required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
@@ -2551,12 +3210,13 @@ const buildRawSpec = () => ({
           error: {
             type: 'string',
             description: 'Only when valid=false',
-            enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],
+            enum: IBAN_ERROR_CODES,
           },
           error_detail: { type: 'string', description: 'Only when valid=false' },
           upgrade_to_full_validation: {
             type: 'string',
-            description: 'Pointer to POST /v1/iban/validate for BIC, SEPA, VoP, sanctions and Swiss clearing enrichment',
+            description:
+              'Says what `valid: true` means on this route (well formed, nothing more) and what POST /v1/iban/validate adds: the bank and its BIC with their source, SEPA and VoP readiness, and, where the national register is read, whether the bank code is allocated at all',
           },
         },
       },
@@ -2657,21 +3317,32 @@ const buildRawSpec = () => ({
           bic: { type: 'string', example: 'UBSWCHZH' },
           bic8: { type: 'string', example: 'UBSWCHZH' },
           bic11: { type: 'string', example: 'UBSWCHZHXXX' },
-          found: { type: 'boolean' },
+          found: {
+            type: 'boolean',
+            description: 'True only when the directory row names an institution: a record is complete or not found.',
+          },
           valid_format: { type: 'boolean' },
           institution: { type: ['string', 'null'], example: 'UBS AG' },
           country: {
             type: 'object',
             required: ['code', 'name'],
             properties: {
-              code: { type: 'string', example: 'CH' },
-              name: { type: 'string', example: 'Switzerland' },
+              code: { type: 'string', example: 'CH', description: 'Always characters 5-6 of the BIC.' },
+              name: {
+                type: 'string',
+                example: 'Switzerland',
+                description:
+                  "The row's country name, then the ISO name, and the code only when neither exists. Named on a BIC we do not hold as well.",
+              },
             },
           },
-          city: { type: ['string', 'null'] },
+          city: { type: ['string', 'null'], description: 'Null, never an empty string, when the source leaves the town blank.' },
           address: {
-            type: 'object',
-            description: 'Registered head-office address (present when available — GLEIF or directory sourced)',
+            // Nullable depuis le 25/09/2026 (relecture de la PR 254, R5) : la
+            // route sert toujours la clé, à `null` sans adresse enregistrée,
+            // trouvé ou non. Le bloc jumeau de la validation l'était déjà.
+            type: ['object', 'null'],
+            description: 'Registered head-office address (present when available, GLEIF or directory sourced). null when no registered address is on file, found or not; address_available says the same.',
             properties: {
               type: { type: 'string', example: 'registered' },
               street: { type: ['string', 'null'], example: 'Bahnhofstrasse 45' },
@@ -2693,7 +3364,23 @@ const buildRawSpec = () => ({
           lei: { type: ['string', 'null'] },
           lei_status: { type: ['string', 'null'] },
           is_test_bic: { type: 'boolean' },
-          source: { type: ['string', 'null'] },
+          source: { type: ['string', 'null'], description: 'Code of the dataset this row comes from; source_name spells it out.' },
+          source_name: {
+            type: ['string', 'null'],
+            example: 'GLEIF LEI-to-BIC mapping',
+            description: 'Human name of the dataset this row comes from. Null when nothing was found.',
+          },
+          source_as_of: {
+            type: 'string',
+            example: frozenSources()[0]?.as_of,
+            description:
+              "Year-month the source DATA is from, present ONLY when the row's dataset is a frozen public copy re-imported unchanged. Absent means no gap has been established, never 'this is current'.",
+          },
+          listed_in_current_source: {
+            type: ['boolean', 'null'],
+            description:
+              'Whether the BIC8 asked about still appears in a list refreshed this cycle (GLEIF, the directory sources that carry no vintage, a national register, the EPC scheme registers), on every answer of valid format, found or not: a BIC absent from the directory can still be listed by an EPC register. true when one of them carries it; null when it was not found in what could be read in full (never false by default). It answers true or null today: the EBA STEP2 and NBP lists are only read through our deduplicated directory, so an absence is not proven. It does not prove the bank still exists under this name.',
+          },
           official_identity: {
             ...OFFICIAL_IDENTITY_SCHEMA,
             description:
@@ -2717,7 +3404,12 @@ const buildRawSpec = () => ({
               screened: { type: 'boolean', description: 'Whether the screen ran.' },
               listed: {
                 type: ['boolean', 'null'],
-                description: 'true when the institution appears on a screened list, false when it does not, null when the screen could not run.',
+                description: 'true when the institution appears on a screened list, false when it does not, null when the screen could not run, or when nothing matched while one of the lists this service names is not loaded on this deployment (see unscreened_lists): a no on the lists read is not a no on the missing one.',
+              },
+              unscreened_lists: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Present only when one of the lists this service names is not loaded on this deployment: those lists were not consulted. Absent when every named list was read.',
               },
               // On one line, like its twin in ComplianceResult: the
               // sanctions-claims guard exempts a `matched_lists` declaration
@@ -2731,6 +3423,40 @@ const buildRawSpec = () => ({
           processing_ms: { type: 'number' },
         },
       },
+      // La réponse de la forme BIC de POST /v1/iban/compliance (relecture de la
+      // PR 254, R4), même forme que BicComplianceResponse dans src/types.ts.
+      BicComplianceResponse: {
+        type: 'object',
+        description:
+          'The answer to POST /v1/iban/compliance with a `bic`: the bank screened directly, without an IBAN. `found` says whether our directory names the institution, independently of the screen: found false with bank_sanctioned true is a real combination.',
+        required: ['bic', 'bic8', 'valid_format', 'found', 'institution', 'country', 'compliance', 'meta', 'cost_usdc'],
+        properties: {
+          bic: { type: 'string', example: 'COBADEFF' },
+          bic8: { type: 'string', example: 'COBADEFF' },
+          valid_format: { type: 'boolean' },
+          found: {
+            type: 'boolean',
+            description: 'True only when the directory row names an institution.',
+          },
+          institution: { type: ['string', 'null'] },
+          country: {
+            type: 'object',
+            required: ['code', 'name'],
+            properties: {
+              code: { type: 'string', description: 'Always characters 5-6 of the BIC.' },
+              name: { type: 'string', description: "The row's country name, then the ISO name, and the code only when neither exists." },
+            },
+          },
+          compliance: { $ref: '#/components/schemas/ComplianceResult' },
+          meta: {
+            type: 'object',
+            description: 'The same provenance and scope block as on the IBAN form (scope, disclaimer, sanctions_as_of, fatf_as_of, sources).',
+            required: ['scope', 'disclaimer'],
+          },
+          cost_usdc: { type: 'number' },
+          processing_ms: { type: 'number' },
+        },
+      },
       ComplianceResult: {
         type: 'object',
         required: ['sanctions', 'reachability', 'vop', 'risk_score', 'risk_level', 'flags'],
@@ -2739,9 +3465,26 @@ const buildRawSpec = () => ({
             type: 'object',
             properties: {
               country_sanctioned: { type: 'boolean' },
-              bank_sanctioned: { type: 'boolean' },
+              bank_sanctioned: {
+                type: 'boolean',
+                description: 'False also when no bank was screened (bank_screened false): read institution_listed, which is null then.',
+              },
               matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC'] },
               fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'suspended', 'non_member'] },
+              bank_screened: {
+                type: 'boolean',
+                description: 'Whether a bank was screened at all. When false, bank_sanctioned and matched_lists carry no information.',
+              },
+              institution_listed: {
+                type: ['boolean', 'null'],
+                description:
+                  "Whether the payee's BANK is on a sanctions list: bank_sanctioned when a bank was screened against every list this service names; null when no bank was screened, or when nothing matched while one of those lists is not loaded on this deployment. Never false without a screen.",
+              },
+              payee_screened: {
+                type: 'boolean',
+                enum: [false],
+                description: 'Always false: the payee (the account holder) is never screened here, only the bank and the country.',
+              },
             },
           },
           reachability: {
@@ -2750,6 +3493,16 @@ const buildRawSpec = () => ({
               sepa_instant: { type: 'boolean', description: 'Whether the bank supports SEPA Instant Credit Transfer' },
               sct: { type: 'boolean', description: 'SEPA Credit Transfer participant' },
               sdd: { type: 'boolean', description: 'SEPA Direct Debit participant' },
+              screened: {
+                type: 'boolean',
+                description:
+                  'False when the EPC scheme registers were not consulted: no bank resolved, or the registers are not loaded on this deployment. The three booleans above are then defaults, not findings, and carry no risk weight (flag sepa_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the registers: screened stays true.',
+              },
+              listed_in_epc_registers: {
+                type: ['boolean', 'null'],
+                description:
+                  'Whether at least one of the three scheme registers lists the bank; null when the registers were not consulted (screened false). For a bank resolved in the SEPA area, true matches sepa.bank_reachability listed and false matches not_listed; null also when no bank was resolved or the bank code is not allocated (the validation then says no_bank or bank_code_not_allocated). Outside the SEPA area the validation carries no bank_reachability: this field is false there for a resolved bank (the country answers, screened true) and null when no bank was resolved.',
+              },
             },
           },
           vop: {
@@ -2757,6 +3510,16 @@ const buildRawSpec = () => ({
             properties: {
               participant: { type: 'boolean', description: 'Whether the bank participates in Verification of Payee' },
               status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
+              screened: {
+                type: 'boolean',
+                description:
+                  'False when the EPC VoP register was not consulted: no bank resolved, or the register is not loaded on this deployment. `status: not_found` then describes the absence of a query, not of a registration (flag vop_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the register: screened stays true.',
+              },
+              register_status: {
+                type: ['string', 'null'],
+                enum: ['active', 'pending', 'inactive', 'not_listed', null],
+                description: `status under its own name (not_found becomes not_listed); null when the register was not consulted (screened false). ${VOP_REGISTER_STATUS_NOTE}`,
+              },
             },
           },
           risk_score: {
@@ -2772,7 +3535,7 @@ const buildRawSpec = () => ({
             description:
               'unassessable means the IBAN itself failed validation, so no screening was possible. It is the absence of a verdict, never a favourable one: do not treat it as low.',
           },
-          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
+          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. bank_code_inferred carries no weight: the bank named is our inference from a source that does not settle the bank code (bank_code_holder inferred), and no score moves for it. Some flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable, vop_register_unavailable, and sanctions_list_unavailable_<list> (one per named sanctions list not loaded on this deployment, for example sanctions_list_unavailable_un: the bank was screened against the other lists, so bank_sanctioned false says nothing about that one). sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
         },
       },
       ChClearingResult: {
@@ -2855,13 +3618,64 @@ const buildRawSpec = () => ({
         properties: {
           status: { type: 'string', enum: ['ok'] },
           version: { type: 'string', example: PKG_VERSION },
+          served_at: {
+            type: 'string',
+            format: 'date-time',
+            description:
+              'When this answer left the server, ISO 8601 in UTC, to the second. Added on 24/09/2026: a copy of this endpoint quoted from an index or a cache now carries its own date.',
+          },
           uptime_seconds: { type: 'number' },
           bic_database_entries: {
             type: 'integer',
-            description: 'Number of BIC entries currently loaded (refreshed monthly from public sources)',
+            description: `Number of BIC entries currently loaded: GLEIF and national registers are refreshed monthly; the SwiftCodes rows are a public copy of the SWIFT directory frozen in ${frozenBicShare().month ?? 'an earlier year'}, re-imported unchanged. Each source's own data date is its source_as_of in bic_sources.`,
             example: getEntryCount(),
           },
           bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },
+          // Served since 01/09/2026 and declared only now (25/09/2026), with
+          // its new neighbour below.
+          bic_sources: {
+            type: 'array',
+            description:
+              'Per-source freshness of the BIC directory. last_updated dates the IMPORT; source_as_of dates the upstream DATA where the two differ (a frozen public copy), null when no gap has been established. stale is true when the import is overdue or the source itself is frozen, and stale_reason says which.',
+            items: {
+              type: 'object',
+              required: ['source', 'entries', 'last_updated', 'source_as_of', 'stale', 'stale_reason'],
+              properties: {
+                source: { type: 'string' },
+                entries: { type: 'integer' },
+                last_updated: { type: ['string', 'null'] },
+                source_as_of: { type: ['string', 'null'] },
+                stale: { type: 'boolean' },
+                stale_reason: { type: ['string', 'null'], enum: ['import_overdue', 'source_frozen', null] },
+              },
+            },
+          },
+          frozen_bic_sources: {
+            type: 'array',
+            description:
+              'One entry per frozen source (the ones bic_sources dates with a source_as_of): its rows and BIC8, and how many of them no source refreshed this cycle still carries (GLEIF and the other directory sources without a vintage, the national registers, the EPC scheme registers). Recomputed at each deployment. When a trace source could not be read in full, complete is false and the two *_without_current_trace counts are null rather than guessed; that is the case today, because the EBA STEP2 and NBP lists are only read through our deduplicated directory. An empty array means the figures could not be computed; it never turns this endpoint red.',
+            items: {
+              type: 'object',
+              required: [
+                'source',
+                'source_as_of',
+                'rows',
+                'bic8',
+                'rows_without_current_trace',
+                'bic8_without_current_trace',
+                'complete',
+              ],
+              properties: {
+                source: { type: 'string' },
+                source_as_of: { type: 'string', description: 'Year-month the source DATA is from.' },
+                rows: { type: 'integer' },
+                bic8: { type: 'integer' },
+                rows_without_current_trace: { type: ['integer', 'null'] },
+                bic8_without_current_trace: { type: ['integer', 'null'] },
+                complete: { type: 'boolean' },
+              },
+            },
+          },
         },
       },
       StatsOverview: {
@@ -2947,6 +3761,10 @@ const buildRawSpec = () => ({
       name: 'API Keys',
       description:
         'API key management — mint a key with or without an email address, claim it, rotate it, check its usage',
+    },
+    {
+      name: 'Account',
+      description: `The account page, ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a read-only session cookie that shows every key of that address. Rotating or revoking a key still takes the key itself.`,
     },
     { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N credits; batch validation debits 1 credit per IBAN' },
     { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },

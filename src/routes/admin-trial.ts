@@ -1,12 +1,15 @@
 import { Hono } from 'hono';
 import { isAdminAuthorized } from './api-keys.js';
 import {
+  countMcpWeek,
   countTrialActivitySince,
   countTrialBucketsSince,
   countTrialBucketsToday,
+  countTrialWeek,
   getTrialDaily,
 } from '../lib/daily-ip-ledger.js';
-import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 
 /**
  * Ce que l'essai sans clé a servi, aujourd'hui et les jours d'avant.
@@ -35,7 +38,17 @@ adminTrial.get('/v1/admin/trial', (c) => {
   // intermédiaire qui garderait la réponse montrerait une rafale éteinte.
   c.header('Cache-Control', 'private, no-store');
   return c.json({
-    daily_limit: REST_TRIAL_DAILY_LIMIT,
+    // Depuis le 24/09/2026, l'essai se décide à la semaine ISO (UTC). Les
+    // lignes du jour ci-dessous mesurent toujours au jour, comme avant.
+    weekly_limit: REST_TRIAL_WEEKLY_LIMIT,
+    resets: TRIAL_RESET,
+    resets_at: trialResetsAt(),
+    this_week: countTrialWeek(),
+    // L'accès MCP sans clé, compté à la semaine depuis le soir du 24/09/2026
+    // dans la même table, sous un seau distinct : ses totaux à part, pour que
+    // ceux de l'essai REST restent les siens.
+    mcp_weekly_limit: MCP_WEEKLY_LIMIT,
+    mcp_this_week: countMcpWeek(),
     // La journée courante, lue dans le registre vivant : elle n'est pas encore
     // dans `trial_daily`, que `snapshotTrialDay` n'écrira qu'au tick suivant.
     today: {

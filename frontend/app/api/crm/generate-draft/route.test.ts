@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
+import catalogue from '@/data/onboarding.json';
 
 /**
  * The proxy, checked on what it actually puts on the wire.
@@ -226,7 +227,9 @@ describe('POST /api/crm/generate-draft, correspondence with an institution', () 
     expect(context).toContain('Swiss commercial API');
     expect(context).toContain('permission is asked IN WRITING');
     // The identity block and the address rule the commercial road also carries.
-    expect(context).toContain('free tier 200 requests/month');
+    // The key is announced by its destination, read from the API's export.
+    expect(context).toContain(`${catalogue.claimedMonthly} requests a month once claimed`);
+    expect(context).not.toContain('from $4 per 1,000');
     expect(context).toContain('do not guess one');
   });
 

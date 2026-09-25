@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult, createEnrichCache } from '../lib/enrich.js';
-import { lookup } from '../lib/bic-lookup.js';
+import { bicCountryName, bicSourceFields, lookup, namedRow, nonEmpty } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
@@ -24,6 +24,13 @@ import {
 } from '../lib/address-conformity.js';
 import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { bicDirectorySentence, serverDescription } from '../lib/positioning.js';
+import {
+  COMPLIANCE_HONEST_NAMES,
+  VALIDATE_TRUTH_RETURNS,
+  bicSourceNote,
+} from '../lib/field-notes.js';
+import { authoritativeVerdictSentence, nationalRegisterBicCodes } from '../lib/register-lists.js';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
 // send_feedback : même insertion et mêmes clips de longueur que la route
@@ -125,7 +132,8 @@ const server = new McpServer(
     name: 'ibanforge',
     title: 'IBANforge',
     version: pkg.version,
-    description: `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, refreshed monthly.`,
+    // Same first line as the HTTP transport, from src/lib/positioning.ts.
+    description: serverDescription(),
     websiteUrl: 'https://ibanforge.com',
     icons: [
       {
@@ -155,15 +163,15 @@ server.registerTool(
     description: `Validate a single IBAN and retrieve the associated BIC/SWIFT code, bank details, SEPA membership, issuer classification, and risk indicators.
 
 When to use: verifying a payment recipient before a wire transfer, checking a bank account during onboarding, or confirming IBAN format and bank identity in a KYC workflow.
-When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheaper per IBAN). For compliance/sanctions screening, use check_compliance instead.
+When NOT to use: for multiple IBANs, use batch_validate_iban instead (one call for up to 100; paid per call in USDC via x402, an IBAN costs $0.002 there instead of $0.005 here, while on a key or a credit pack each IBAN uses one request or credit either way). For compliance/sanctions screening, use check_compliance instead.
 
-Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, resolves the BIC from a local database of ${F.claim.bic} entries (GLEIF-sourced), and classifies the issuer type. Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
+Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, checks the bank code against the national register where one is read, resolves the BIC from a local directory and names the source of that answer, and classifies the issuer type. ${bicDirectorySentence({ withCount: true })} Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
 
-Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, lei, lei_status, address: { type: 'registered', street, post_code, region, city, country, romanized, romanization, source, language, as_of } | null } | null, sepa: { member, schemes, vop_required }, issuer: { type, name, classification: curated | register | default }, psd_registration: { registered, entity_type, name, country, competent_authority, source, as_of }, risk_indicators: { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope: 'country', vop_coverage }, bank_code_check { value, status: verified | not_in_register | unavailable, reason? (present whenever status is not verified: not_allocated | absent_from_reference_data | no_reference_data_for_country | register_names_no_holder | national_register_unavailable | lookup_failed — the last two describe IBANforge and never the beneficiary, and neither may be escalated into a refusal), match: register | prefix | null, register, authoritative, candidates?, retired?, superseded_by?, as_of }, modulus_check { checked, passed, source, table_fetched_on } (GB only), official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of, authoritative } (present only on a match), next_steps [{ code, do, because, action? }], clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }
+Returns: ${VALIDATE_TRUTH_RETURNS} { valid, bank_code_holder, checks, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, lei, lei_status, address: { type: 'registered', street, post_code, region, city, country, romanized, romanization, source, language, as_of } | null } | null, sepa: { member, schemes, vop_required, bank_reachability, bank_schemes, vop_register_status }, issuer: { type, name, classification: curated | register | default }, psd_registration: { registered, entity_type, name, country, competent_authority, source, as_of }, risk_indicators: { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope: 'country', vop_coverage }, bank_code_check { value, status: verified | not_in_register | unavailable, reason? (present whenever status is not verified: not_allocated | absent_from_reference_data | no_reference_data_for_country | register_names_no_holder | national_register_unavailable | lookup_failed — the last two describe IBANforge and never the beneficiary, and neither may be escalated into a refusal), match: register | prefix | null, register, authoritative, candidates?, retired?, superseded_by?, as_of }, modulus_check { checked, passed, source, table_fetched_on } (GB only), official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of, authoritative } (present only on a match), next_steps [{ code, do, because, action? }], clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }. bic also carries listed_in_current_source (does this BIC8 still appear in a list refreshed this cycle; null when a list could not be read) and, when its directory row comes from a frozen copy, source_as_of. sepa.bank_reachability, bank_schemes and vop_register_status describe the bank itself in the EPC registers, never the country; absent outside SEPA.
 
 psd_registration is the EBA's PSD2 register naming the holder of the bank code as an authorised payment or e-money institution, with its competent authority, the attribution the EBA licence requires, and the date of the golden copy. It is served ONLY for countries where that register's national reference code was measured to be the code an IBAN actually carries — today Spain alone: the file holds no BIC and no LEI, and in its other 29 countries it files authorisations under company or tax numbers from unrelated registers. Absent on a miss, never negative — the register's own disclaimer states that an omitted institution is authorised all the same. When it is present it can also identify issuer.type, which is what classification: register means.
 
-When valid is false the object carries { valid: false, error, error_detail } and none of the enrichment fields. bic is null when no BBAN-to-BIC mapping exists for the bank code. bic.basis says WHERE the bank code to BIC pairing came from — national_register (the country register publishes this BIC for this bank code, today CH, LI, DE, AT, BE, BG, SK and SM), curated_map (our maintained map, an exact key and not an allocation record) or directory_prefix (the bic8 LIKE fallback, which can match several institutions; read bank_code_check.candidates) — and bic.authoritative is derived from it: true only for national_register. Outside that basis the BIC is ADVISORY, so confirm it with the beneficiary or the bank before storing it as a routing instruction. It is a different claim from bank_code_check.authoritative, which is about the BANK CODE: San Marino is where the two part — the BCSM does not publish the allocation of the code space, so bank_code_check.authoritative is false, yet the BIC it prints beside a code it lists is its own pairing and bic.authoritative is true. IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI against the SIX BankMaster, DE against the Bundesbank Bankleitzahlendatei, AT against the OeNB register, BE against the NBB register, BG against the BNB BAE register, and SK against the Národná banka Slovenska prevodník) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. San Marino is the one register here that does NOT settle a negative: the Central Bank of the Republic of San Marino publishes its operating BANKS, not the allocation of the ABI code space, so a listed code names its holder (status verified, with institution) while an absence stays absent_from_reference_data and never becomes not_allocated. That is why authoritative is false for it. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.  branch_code is present only for countries whose BBAN defines one; clearing is present only for CH and LI when the IID is in the SIX BankMaster. modulus_check is present only for GB: it runs the Vocalink modulus checksum over the sort code and account number the IBAN carries, which is a SECOND and independent check — a GB IBAN can pass mod-97 and still name an account no bank could have issued. passed false means the pair cannot be a real account and is a reason not to send; it does NOT make valid false, so read the two separately. checked false means the published table covers no range for that sort code, in which case Vocalink instructs that the pair be presumed valid — it is not a failed check. Checksum only: it does not prove the account exists or name its holder. official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of, authoritative: false } is present when a central bank publishes the holder of the resolved code (European Central Bank by LEI and for FR bank codes, Banco de Espana for ES bank codes). It is INFORMATIONAL ONLY and never changes valid or bank_code_check, because both publishers relay rather than allocate. Absent rather than negative on a miss. Its source and free_of_charge fields are licence conditions that travel with the data on every access, not decoration: do not strip them when relaying this answer to a user.
+When valid is false the object carries { valid: false, error, error_detail } and none of the enrichment fields. bic is null when no BBAN-to-BIC mapping exists for the bank code. bic.basis says WHERE the bank code to BIC pairing came from — national_register (the country register publishes this BIC for this bank code, today ${nationalRegisterBicCodes()}), curated_map (our maintained map, an exact key and not an allocation record) or directory_prefix (the bic8 LIKE fallback, which can match several institutions; read bank_code_check.candidates) — and bic.authoritative is derived from it: true only for national_register. Outside that basis the BIC is ADVISORY, so confirm it with the beneficiary or the bank before storing it as a routing instruction. It is a different claim from bank_code_check.authoritative, which is about the BANK CODE: San Marino is where the two part — the BCSM does not publish the allocation of the code space, so bank_code_check.authoritative is false, yet the BIC it prints beside a code it lists is its own pairing and bic.authoritative is true. IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. ${authoritativeVerdictSentence()} San Marino is the one register here that does NOT settle a negative: the Central Bank of the Republic of San Marino publishes its operating BANKS, not the allocation of the ABI code space, so a listed code names its holder (status verified, with institution) while an absence stays absent_from_reference_data and never becomes not_allocated. That is why authoritative is false for it. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.  branch_code is present only for countries whose BBAN defines one; clearing is present only for CH and LI when the IID is in the SIX BankMaster. modulus_check is present only for GB: it runs the Vocalink modulus checksum over the sort code and account number the IBAN carries, which is a SECOND and independent check — a GB IBAN can pass mod-97 and still name an account no bank could have issued. passed false means the pair cannot be a real account and is a reason not to send; it does NOT make valid false, so read the two separately. checked false means the published table covers no range for that sort code, in which case Vocalink instructs that the pair be presumed valid — it is not a failed check. Checksum only: it does not prove the account exists or name its holder. official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of, authoritative: false } is present when a central bank publishes the holder of the resolved code (European Central Bank by LEI and for FR bank codes, Banco de Espana for ES bank codes). It is INFORMATIONAL ONLY and never changes valid or bank_code_check, because both publishers relay rather than allocate. Absent rather than negative on a miss. Its source and free_of_charge fields are licence conditions that travel with the data on every access, not decoration: do not strip them when relaying this answer to a user.
 
 Supports ${F.claim.countries} countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
 
@@ -218,7 +226,7 @@ Behavior: this tool is read-only with no side effects. It validates each IBAN in
 
 Input constraints: minimum 1 IBAN, maximum 100 IBANs per call. Exceeding 100 returns a validation error.
 
-Returns: Array of objects, each identical in structure to the validate_iban response: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps }
+Returns: Array of objects, each identical in structure to the validate_iban response: { valid, bank_code_holder, checks, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps }
 
 Example: input ['DE89370400440532013000', 'INVALID123'] → [{ valid: true, ... }, { valid: false, error: 'Invalid checksum' }]
 
@@ -280,13 +288,15 @@ server.registerTool(
 When to use: identifying the bank behind a BIC/SWIFT code for compliance checks, payment routing validation, correspondent banking lookups, or KYC enrichment.
 When NOT to use: if you already have an IBAN, use validate_iban instead — it resolves the BIC automatically as part of the validation. For sanctions/compliance screening, use check_compliance.
 
-Behavior: this tool is read-only with no side effects. It validates the BIC format (ISO 9362), then queries a local SQLite database of ${F.claim.bic} institutions sourced from GLEIF. For BIC11 lookups, if the specific branch is not found, it falls back to the head office (XXX suffix). Detects test BICs (e.g., MARKDEF patterns). Response time is under 10ms. Returns a single JSON object.
+Behavior: this tool is read-only with no side effects. It validates the BIC format (ISO 9362), then queries the local BIC directory. ${bicDirectorySentence({ withCount: true })} For BIC11 lookups, if the specific branch is not found, it falls back to the head office (XXX suffix). Detects test BICs (e.g., MARKDEF patterns). Response time is under 10ms. Returns a single JSON object.
 
 Input: accepts BIC8 (e.g., 'UBSWCHZH') or BIC11 (e.g., 'UBSWCHZH80A'). Case-insensitive.
 
-Returns: { bic, bic8, bic11, valid_format, found, institution, country: { code, name }, city, branch_code, branch_info, lei, lei_status, is_test_bic }
+Returns: { bic, bic8, bic11, valid_format, found, institution, country: { code, name }, city, branch_code, branch_info, lei, lei_status, is_test_bic, source, source_name, source_as_of?, listed_in_current_source }
 
-country is the same shape as REST GET /v1/bic/:code, and name falls back to the country code when the row carries no name. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null where country.name answers the code.
+found is true only when the row names an institution; city is null, never an empty string, when the source leaves the town blank. ${bicSourceNote({ withMonth: true })}
+
+country is the same shape as REST GET /v1/bic/:code: name is the row's country name, then the ISO name, and falls back to the country code only when neither exists. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null on a BIC we do not hold (found: false), where country.name gives the ISO name.
 
 Example: input 'BNPAFRPP' → { found: true, bic8: 'BNPAFRPP', bic11: 'BNPAFRPPXXX', institution: 'BNP PARIBAS', country: { code: 'FR', name: 'France' }, city: 'PARIS', lei: 'R0MUWSFPU8MPRO8K5P83', lei_status: 'ACTIVE', is_test_bic: false }
 Example: input 'INVALIDX' → { valid_format: true, found: false }
@@ -327,7 +337,8 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       };
     }
 
-    const row = lookup(validation.bic11!);
+    // Une fiche complète ou introuvable, comme GET /v1/bic/:code (25/09/2026).
+    const row = namedRow(lookup(validation.bic11!));
 
     const result = {
       bic: validation.bic,
@@ -343,21 +354,25 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       // for now so no agent breaks mid-conversation; it is deprecated and dated
       // in the tool description.
       //
-      // The two keep DIFFERENT null semantics on purpose. REST falls back to the
-      // country code when the row carries no name; the flat MCP key has always
-      // answered null. Mirroring REST into `country.name` while leaving
+      // The two keep DIFFERENT null semantics on purpose. REST gives the ISO
+      // name (the code only when no name exists) when the row carries none; the
+      // flat MCP key has always answered null. Mirroring REST into `country.name` while leaving
       // `country_name: null` is the honest reading of both histories: the nested
       // object is the aligned one, the flat pair is preserved exactly as it was.
       country: {
         code: validation.country_code,
-        name: row?.country_name ?? validation.country_code,
+        name: bicCountryName(row, validation.country_code!),
       },
-      city: row?.city ?? null,
+      city: nonEmpty(row?.city),
       branch_code: validation.branch_code,
       branch_info: row?.branch_info ?? null,
       lei: row?.lei ?? null,
       lei_status: row?.lei_status ?? null,
       is_test_bic: validation.is_test_bic,
+      // La source de la ligne, que cet outil ne rendait pas du tout, et la
+      // trace du BIC8 dans une liste de ce cycle : mêmes champs que REST.
+      source: row?.source ?? null,
+      ...bicSourceFields(row, validation.bic8!),
     };
 
     return {
@@ -371,18 +386,18 @@ server.registerTool(
   'check_compliance',
   {
     title: 'Compliance Risk Check',
-    description: `Run a full compliance check on an IBAN: validates the IBAN, enriches with bank data, then screens against sanctions lists, checks SEPA reachability, verifies VoP participation, and computes a composite risk score.
+    description: `Run a compliance triage on an IBAN: validates the IBAN, enriches it with bank data, then screens the payee's BANK (BIC8) against sanctions lists (OFAC, EU, UN) and its country against a fixed list of sanctioned jurisdictions, checks SEPA reachability, checks whether the EPC Verification of Payee (VoP) register lists the bank as ready, and computes a composite risk score. It never screens the payee's name.
 
-When to use: assessing compliance risk of a payment recipient for AML/KYC workflows, verifying an IBAN is not associated with a sanctioned country or bank, checking SEPA Instant and Verification of Payee participation, or producing a structured risk assessment before approving a payment.
+When to use: triaging the bank behind a payment recipient before a payout, verifying that the payee's bank or its country is not under sanctions, checking SEPA Instant reachability and whether the EPC VoP register lists the bank as ready, or producing a structured risk assessment before approving a payment.
 When NOT to use: for simple IBAN format validation without compliance data, use validate_iban (4x cheaper). For BIC-only lookups, use lookup_bic.
 
-Behavior: this tool is read-only with no side effects. It performs IBAN validation and enrichment (same as validate_iban), then queries a local compliance database for sanctions (OFAC, EU, UN lists), FATF grey/black list status, SEPA scheme participation (SCT, SDD, SCT_INST), and VoP participant status. Computes a composite risk score from 0 (lowest risk) to 100 (highest risk) based on 11 weighted risk flags. Response time is under 50ms. Returns a single JSON object. Scope: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name and is not a substitute for KYC/AML name screening. If compliance data is unavailable for a country/BIC, returns a fallback risk_level of 'elevated' with a flag 'compliance_data_unavailable'.
+Behavior: this tool is read-only with no side effects. It performs IBAN validation and enrichment (same as validate_iban), then queries a local compliance database for sanctions (OFAC, EU, UN lists), FATF grey/black list status, SEPA scheme participation (SCT, SDD, SCT_INST), and whether the bank is listed as ready in the EPC VoP register. Computes a composite risk score from 0 (lowest risk) to 100 (highest risk), capped at 100, from the weighted risk flags listed below. Response time is under 50ms. Returns a single JSON object. Scope: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name and is not a substitute for KYC/AML name screening. If compliance data cannot be read, returns the flag 'compliance_data_unavailable' with a risk_level of at least 'elevated' (score 50 or more), keeping the country and FATF axes that could still be read.
 
-Risk score weights: sanctioned country (+50), sanctioned bank (+50), FATF black list (+30), FATF grey list (+20), high-risk country (+20), elevated-risk country (+10), payment institution issuer (+15), EMI issuer (+10), no SEPA Instant (+5), no VoP (+5), test BIC (+30).
+Risk score weights, by the flag each one raises: sanctioned_country +50, sanctioned_bank +80, fatf_black_list +30, fatf_grey_list +20, fatf_suspended +10, payment_institution_issuer +15, emi_issuer +10, high_risk_country +20, elevated_risk_country +10, test_bic +30, bank_code_not_allocated +40, bank_code_unverified +10, no_sepa_instant +5, no_vop +5. The last two count only when a bank was resolved and the EPC register behind each was consulted (outside the SEPA area the country answers for it); otherwise the flag no_bank_resolved, sepa_register_unavailable or vop_register_unavailable is raised, with no weight. A resolved bank that no sanctions list could be checked against raises sanctions_lists_unavailable and scores 50 at least. A bank screened while one named sanctions list is not loaded raises sanctions_list_unavailable_<list> (for example sanctions_list_unavailable_un), with no weight: bank_sanctioned false then says nothing about that list.
 
 Risk levels: low (0-19), medium (20-39), elevated (40-59), high (60-79), critical (80-100).
 
-Returns: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status }, reachability: { sepa_instant, sct, sdd }, vop: { participant, status }, risk_score, risk_level, flags } }
+Returns: { valid, bank_code_holder, checks, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status, bank_screened, institution_listed, payee_screened }, reachability: { sepa_instant, sct, sdd, screened, listed_in_epc_registers }, vop: { participant, status, screened, register_status }, risk_score, risk_level, flags } }. checks here also fills institution_sanctions and country_sanctions. ${COMPLIANCE_HONEST_NAMES}
 
 Example: input 'DE89370400440532013000' → { valid: true, compliance: { sanctions: { country_sanctioned: false, fatf_status: 'member' }, risk_score: 5, risk_level: 'low', flags: [] } }
 
@@ -737,7 +752,7 @@ server.registerTool(
       'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
       'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
       'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
       'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
     inputSchema: {
       error_type: z
@@ -810,12 +825,12 @@ server.registerTool(
     title: 'Request an IBANforge API key',
     description:
       'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
-      'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+      'USE WHEN: you used up the free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
       'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
       'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
       'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
       'Then call poll_api_key. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent.',
     inputSchema: {
       client_name: z
         .string()
@@ -905,7 +920,7 @@ server.registerTool(
       '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
       '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
       '`invalid_grant` means this code can no longer be used at all — stop. ' +
-      'This tool is free and does NOT count against the daily free-tier limit.',
+      'This tool is free and does NOT count against the free allowance.',
     inputSchema: {
       device_code: z
         .string()

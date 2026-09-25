@@ -66,6 +66,21 @@ describe('buildFirstCallText / buildFirstCallHtml', () => {
     expect(text).toContain(FAKE_KEY);
   });
 
+  // Lot C3 (25.09.2026). Écrit en littéral, jamais comparé à la constante
+  // elle-même : c'est la valeur qui est en jeu. L'anglais vit à la racine, et
+  // un lien de mail ne porte aucun paramètre (ni adresse, ni clé, ni code).
+  it('the account page is the root English page, with nothing in its address', () => {
+    expect(ACCOUNT_PAGE).toBe('https://ibanforge.com/account');
+  });
+
+  it('says how to sign in to that page, with no key to paste, in both parts', () => {
+    const text = buildFirstCallText({ bearer: FAKE_KEY });
+    const html = buildFirstCallHtml({ bearer: FAKE_KEY });
+    expect(text).toContain('Sign in with this e-mail address, no key to paste.');
+    expect(html).toContain('Sign in with this e-mail address, no key to paste.');
+    expect(html).toContain('href="https://ibanforge.com/account"');
+  });
+
   it('says plainly that a placeholder is a placeholder, and names the prefix', () => {
     const text = buildFirstCallText({ bearer: KEY_PLACEHOLDER, keyPrefix: FAKE_PREFIX });
     expect(text).toContain(KEY_PLACEHOLDER);
@@ -111,6 +126,13 @@ describe('outgoing message bodies carry no em or en dash', () => {
       month: '2026-08',
       keyPrefix: FAKE_PREFIX,
     }),
+    // L'avertissement des 10 % d'un pack (24.09.2026).
+    buildCreditsWarningEmail: emailModule.buildCreditsWarningEmail({
+      keyPrefix: FAKE_PREFIX,
+      remaining: 100,
+      total: 1000,
+      proMonthlyLimit: 10_000,
+    }),
     // Added 2026-09-01 (BIZ-14). These two messages were live and unswept: both
     // were assembled inside their async sender, so the lock test above could not
     // see them and the OEM subject shipped an em dash. Making them pure is what
@@ -124,6 +146,8 @@ describe('outgoing message bodies carry no em or en dash', () => {
     }),
     buildProKeyEmail: emailModule.buildProKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 10_000 }),
     buildKeyVerificationEmail: emailModule.buildKeyVerificationEmail({ code: '123456' }),
+    // Le code de connexion à la page du compte (lot C1, 24.09.2026).
+    buildAccountCodeEmail: emailModule.buildAccountCodeEmail({ code: '123456', ttlMinutes: 15 }),
     buildAuditReadyEmail: emailModule.buildAuditReadyEmail({
       to: 'buyer@example.com',
       lang: 'fr',
@@ -147,6 +171,15 @@ describe('outgoing message bodies carry no em or en dash', () => {
     expect(DASHES.test(mail.subject), `subject: ${mail.subject}`).toBe(false);
     expect(DASHES.test(mail.text), 'text part').toBe(false);
     expect(DASHES.test(mail.html), 'html part').toBe(false);
+  });
+
+  // Lot C3 (25.09.2026) : la même table verrouillée sert de balayage. Aucun
+  // mail ne mène plus à `/en/account`, qui ne vit que par une redirection ;
+  // un gabarit neuf qui l'écrirait en dur tomberait ici.
+  it.each(Object.entries(fixtures))('%s never points at /en/account', (_name, mail) => {
+    for (const part of [mail.subject, mail.text, mail.html]) {
+      expect(part).not.toContain('ibanforge.com/en/account');
+    }
   });
 });
 

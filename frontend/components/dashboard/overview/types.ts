@@ -25,6 +25,25 @@ export interface StatsResponse {
   top_countries: Array<{ country: string; count: number }>;
 }
 
+/**
+ * `GET /stats/pulse` (25.09.2026) : ce que la vue « growth » lit de l'API au lieu
+ * de `/stats` et de `/stats/history` entiers.
+ */
+export interface StatsPulse {
+  last_write_at: string | null;
+  requests_today: number;
+  total_requests: number;
+  operations_today: number;
+  operations_yesterday: number;
+  /** Les sept derniers jours UTC, du plus ancien à aujourd'hui. */
+  operations_by_day: Array<{ date: string; operations: number }>;
+}
+
+/** Le seul champ que lisent le bandeau de santé et la bannière « API injoignable ». */
+export interface LastWrite {
+  last_write_at?: string | null;
+}
+
 export interface HistoryEntry {
   date: string;
   expected_min: number | null;

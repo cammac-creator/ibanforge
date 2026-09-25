@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { MCP_TOOLS } from './inventory.js';
-import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -121,7 +121,15 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
    * réglage de palier fait rougir ce fichier au lieu de laisser le texte mentir.
    */
   it('les chiffres écrits sont ceux que le code applique', () => {
-    expect(MCP_INSTRUCTIONS).toContain(`Free tier: ${MCP_DAILY_LIMIT} tool calls/IP/day`);
+    expect(MCP_INSTRUCTIONS).toContain(
+      `Free tier: ${MCP_WEEKLY_LIMIT} tool calls a week per source address here`,
+    );
+    // Le quota de ce transport et celui de la clé sans e-mail ne partagent pas
+    // une phrase : depuis le 24/09/2026 ils portent le même chiffre.
+    const sentences = MCP_INSTRUCTIONS.split(/(?<=[.!?])\s+/);
+    const quota = sentences.find((x) => x.startsWith('Free tier:'));
+    expect(quota).toBeDefined();
+    expect(quota).not.toMatch(/month/);
     expect(MCP_INSTRUCTIONS).toContain(`${ANONYMOUS_MONTHLY_LIMIT} REST calls/month`);
     expect(MCP_INSTRUCTIONS).toContain(`${FREE_TIER_MONTHLY_LIMIT} REST calls/month`);
   });

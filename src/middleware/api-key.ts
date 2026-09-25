@@ -11,7 +11,11 @@ import {
 } from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
 import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
-import { maybeSendQuotaWarning } from '../lib/quota-notice.js';
+import {
+  crossesCreditsNotice,
+  maybeSendCreditsWarning,
+  maybeSendQuotaWarning,
+} from '../lib/quota-notice.js';
 import { burstRevocationFor } from '../lib/key-revocations.js';
 import { CLAIM_MIN_PAID_USD } from '../lib/tiers.js';
 
@@ -316,6 +320,26 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
         left = remaining + units;
       }
       c.header('X-Credits-Remaining', String(left));
+      // L'avertissement des 10 % d'un pack. `remaining + units` est le solde
+      // avant cet appel ; `left`, le solde après un éventuel remboursement : un
+      // appel rendu sur un 4xx ne peut donc jamais être celui qui a franchi. Sans
+      // attendre, comme l'avertissement mensuel : l'appel du client n'attend
+      // jamais le relais de courrier, et un échec finit dans le journal, jamais
+      // en rejet non traité.
+      if (email && crossesCreditsNotice(remaining + units, left, creditsTotal ?? 0)) {
+        void maybeSendCreditsWarning({
+          keyHash,
+          email,
+          keyPrefix: key.slice(0, 12),
+          remaining: left,
+          total: creditsTotal ?? 0,
+        }).catch((err) =>
+          console.error(
+            '[credits-notice] warning failed:',
+            err instanceof Error ? err.message : err,
+          ),
+        );
+      }
       return;
     }
 

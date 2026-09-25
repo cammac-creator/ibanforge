@@ -598,25 +598,35 @@ export function rotateApiKey(oldKey: string): {
   };
 }
 
-export function validateApiKey(key: string): ApiKeyValidation {
-  if (!key.startsWith(KEY_PREFIX))
-    return { valid: false, keyHash: '', monthlyLimit: DEFAULT_MONTHLY_LIMIT };
-  const keyHash = hashKey(key);
-  const row = getStatsDB()
-    .prepare(
-      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit, tier FROM api_keys WHERE key_hash = ? AND active = 1',
-    )
-    .get(keyHash) as
-    | {
-        email: string;
-        monthly_limit: number | null;
-        credits_remaining: number | null;
-        credits_total: number | null;
-        no_recredit: number | null;
-        tier: KeyTier;
-      }
-    | undefined;
-  if (!row) return { valid: false, keyHash, monthlyLimit: DEFAULT_MONTHLY_LIMIT };
+/**
+ * Les colonnes d'`api_keys` dont une validation est faite. Exportée pour que la
+ * vue du compte (`src/lib/account.ts`) lise EXACTEMENT les mêmes.
+ */
+export interface ApiKeyValidationRow {
+  email: string;
+  monthly_limit: number | null;
+  credits_remaining: number | null;
+  credits_total: number | null;
+  no_recredit: number | null;
+  tier: KeyTier;
+}
+
+/** La liste SQL de ces colonnes, pour la même raison : une seule lecture. */
+export const API_KEY_VALIDATION_COLUMNS =
+  'email, monthly_limit, credits_remaining, credits_total, no_recredit, tier';
+
+/**
+ * Une validation construite depuis une ligne ACTIVE d'`api_keys`, sans la clé
+ * brute.
+ *
+ * Pourquoi elle existe (compte client, lot C1, 24.09.2026) : la page du compte
+ * montre les clés d'une adresse à une session qui ne détient AUCUNE de ces
+ * clés. Sans ce constructeur, elle aurait recomposé la validation à la main, et
+ * le bloc d'usage (`usageBlock`) aurait pu servir sur le compte un autre chiffre
+ * que `/v1/keys/usage` pour la même clé. `validateApiKey` passe par ici aussi :
+ * un seul endroit décide ce que vaut un NULL (plafond par défaut, pas de crédit).
+ */
+export function validationFromRow(keyHash: string, row: ApiKeyValidationRow): ApiKeyValidation {
   return {
     valid: true,
     keyHash,
@@ -627,6 +637,17 @@ export function validateApiKey(key: string): ApiKeyValidation {
     creditsTotal: row.credits_total ?? undefined,
     noRecredit: row.no_recredit === 1,
   };
+}
+
+export function validateApiKey(key: string): ApiKeyValidation {
+  if (!key.startsWith(KEY_PREFIX))
+    return { valid: false, keyHash: '', monthlyLimit: DEFAULT_MONTHLY_LIMIT };
+  const keyHash = hashKey(key);
+  const row = getStatsDB()
+    .prepare(`SELECT ${API_KEY_VALIDATION_COLUMNS} FROM api_keys WHERE key_hash = ? AND active = 1`)
+    .get(keyHash) as ApiKeyValidationRow | undefined;
+  if (!row) return { valid: false, keyHash, monthlyLimit: DEFAULT_MONTHLY_LIMIT };
+  return validationFromRow(keyHash, row);
 }
 
 /**

@@ -148,6 +148,23 @@ describe('the Bazaar info block', () => {
     expect(info.output?.example).toHaveProperty('valid');
   });
 
+  it('validate sample carries bank_code_holder and checks, the fields that say what valid does not', async () => {
+    // Relecture de la PR 254 (R3) : l'exemple servi est celui de
+    // src/lib/x402-discovery.ts, pas celui du repli d'enrich-402.ts.
+    const app = makeApp(emptyBody);
+    const info = await bazaarOf(
+      await app.request('/v1/iban/validate', { method: 'POST', body: '{}' }),
+    );
+    const out = (info.output?.example ?? {}) as {
+      bank_code_holder?: string;
+      checks?: Record<string, string>;
+    };
+    expect(out.bank_code_holder).toBe('confirmed');
+    for (const never of ['payee_name', 'account_exists', 'payee_sanctions']) {
+      expect(out.checks?.[never], never).toBe('not_checked');
+    }
+  });
+
   it('compliance sample contains sanctions / fatf / sepa / vop', async () => {
     const app = makeApp(emptyBody);
     const info = await bazaarOf(

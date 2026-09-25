@@ -1,21 +1,21 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.cammac-creator/ibanforge",
-  "description": "Pre-payout IBAN screening for AI agents: validation, sanctions, Swiss clearing, risk scoring",
+  "description": "Check the bank behind an IBAN before you pay: bank-code check, BIC with source, bank-level sanctions",
   "status": "active",
   "repository": {
     "url": "https://github.com/cammac-creator/ibanforge",
     "source": "github",
     "subfolder": "mcp"
   },
-  "version": "1.7.0",
+  "version": "1.8.0",
   "websiteUrl": "https://ibanforge.com?src=mcp-registry",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "ibanforge-mcp",
-      "version": "1.7.0",
+      "version": "1.8.0",
       "transport": {
         "type": "stdio"
       },

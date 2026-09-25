@@ -19,6 +19,7 @@
 
 import type { NotFoundHandler } from 'hono';
 import type { HonoEnv } from '../types.js';
+import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 
 /**
  * Les seules confusions réellement observées en production. On ne devine que
@@ -48,6 +49,9 @@ const ENDPOINTS = {
   bic_lookup: 'GET /v1/bic/UBSWCHZH',
   ch_clearing: 'GET /v1/ch/clearing/230',
   free_format_check: 'GET /v1/iban/format?iban=CH93...',
+  // 24/09/2026: the one free page of real, full answers, which an assistant
+  // that can only read pages never found from here.
+  free_demo: 'GET https://api.ibanforge.com/v1/demo',
 } as const;
 
 export interface NotFoundBody {
@@ -107,6 +111,52 @@ export function methodMismatch(method: string, path: string): { allow: readonly 
   return { allow: route.allow };
 }
 
+/**
+ * Ce qu'un appelant qui ne sait envoyer que des GET peut lire à la place.
+ *
+ * Joint au 405 d'une route POST (24/09/2026) : un outil de lecture d'assistant
+ * (DeepSeek, ChatGPT gratuit, Gemini) n'envoie pas de POST, et tout ce que ce
+ * 405 lui disait menait vers un POST. Deux routes GET gratuites, avec ce que
+ * chacune établit, pour qu'aucune ne soit prise pour l'autre : la démo montre
+ * la validation complète sur des exemples fixes ; la route format ne juge que
+ * l'écriture de l'IBAN, jamais la banque.
+ */
+export const WITHOUT_POST = [
+  'GET https://api.ibanforge.com/v1/demo: real answers of the full validation (bank-code verdict of the national register, BIC with its source), computed on the request and dated by served_at, on fixed example IBANs.',
+  "GET https://api.ibanforge.com/v1/iban/format?iban=...: your IBAN's structure and mod-97 only; valid: true there says nothing about the bank.",
+] as const;
+
+/**
+ * La clé sans e-mail, dite au 405 de `GET /v1/keys/generate` (24/09/2026).
+ *
+ * Mesuré (voir `ROUTE_METHODS`) : des appelants distincts arrivent sur cette
+ * route en GET. Le corps ne leur disait pas que la route répond à un POST SANS
+ * corps. Deux règles :
+ *   - ce n'est PAS `TRIAL_FREE_KEY_HINT` (src/lib/trial.ts) : celle-ci porte le
+ *     jeton `api-trial`, qui compte les clés nées de l'essai sans clé, et une
+ *     clé prise ici n'en vient pas ;
+ *   - les chiffres viennent de `tiers.ts`, et le plafond de l'essai n'y est pas :
+ *     les deux 25 ne partagent jamais une phrase.
+ */
+export const KEY_WITHOUT_EMAIL =
+  'POST https://api.ibanforge.com/v1/keys/generate with no body at all returns an ifk_ key on the spot: ' +
+  'no e-mail, no card, nothing to confirm; an optional body {"source":"..."} (lower-case letters, digits, - and _) ' +
+  'says where you found us. ' +
+  `The key works on every endpoint, starts at ${ANONYMOUS_MONTHLY_LIMIT} requests a month, and reaches ` +
+  `${FREE_TIER_MONTHLY_LIMIT} a month once claimed at POST /v1/keys/claim.`;
+
+/** Les champs ajoutés au corps d'un 405, selon la route. Fonction pure. */
+export function methodMismatchExtras(
+  method: string,
+  path: string,
+  allow: readonly string[],
+): { without_post?: readonly string[]; key_without_email?: string } {
+  const extras: { without_post?: readonly string[]; key_without_email?: string } = {};
+  if (allow.includes('POST') && method !== 'POST') extras.without_post = WITHOUT_POST;
+  if (/^\/v1\/keys\/generate\/?$/.test(path)) extras.key_without_email = KEY_WITHOUT_EMAIL;
+  return extras;
+}
+
 /** Monté par `app.notFound(...)` dans src/index.ts. */
 export const notFoundHandler: NotFoundHandler<HonoEnv> = (c) => {
   const path = new URL(c.req.url).pathname;
@@ -116,7 +166,15 @@ export const notFoundHandler: NotFoundHandler<HonoEnv> = (c) => {
   const mismatch = methodMismatch(method, path);
   if (mismatch) {
     c.header('Allow', mismatch.allow.join(', '));
-    return c.json({ ...body, error: 'method_not_allowed', allow: mismatch.allow }, 405);
+    return c.json(
+      {
+        ...body,
+        error: 'method_not_allowed',
+        allow: mismatch.allow,
+        ...methodMismatchExtras(method, path, mismatch.allow),
+      },
+      405,
+    );
   }
 
   return c.json(body, 404);

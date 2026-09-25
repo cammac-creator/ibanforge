@@ -6,6 +6,7 @@ import { heatOf } from './heat';
 import { lastInboundMessage, noReplyHolds } from './no-reply';
 import { nextActionLabel } from './situation';
 import type { Contact, Message, NextAction, Situation } from './types';
+import { previewReading, subjectReading, type Reading } from './reading';
 
 export type MailFilterKey =
   | 'reply'
@@ -47,6 +48,14 @@ export interface MailRow {
   who: string;
   subject: string;
   preview: string;
+  /**
+   * Langue d'origine de l'aperçu, pour la pastille (lang-badge.tsx) ; null
+   * quand elle est inconnue. L'aperçu est en français dès qu'une traduction
+   * existe : c'était la seule liste du CRM qui montrait toujours l'original.
+   */
+  previewLang: string | null;
+  /** L'aperçu est la traduction française, et non le texte d'origine. */
+  previewTranslated: boolean;
   /** The preview is our own last mail, not the contact's — shown as « toi : ». */
   lastFromUs: boolean;
   /** Id of the newest message the contact wrote: the one « rien à répondre » marks from the row. */
@@ -291,7 +300,36 @@ function pickBy(input: RowsInput, keys: MailFilterKey[], bare: boolean): Contact
   });
 }
 
+/**
+ * La lecture du dernier message qui a un extrait, cherché depuis la fin : le
+ * même message que celui que l'aperçu montrait avant, lu comme le fil le lit.
+ */
+/** La longueur de l'extrait que l'API stocke (`snippet`), reprise pour l'aperçu traduit. */
+const PREVIEW_MAX = 280;
+
+function lastPreview(messages: Message[]): Reading | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (!m?.snippet) continue;
+    const reading = previewReading(m);
+    // Une traduction garde ses paragraphes et peut compter des milliers de
+    // caractères, là où l'extrait d'origine est une ligne de 280 au plus : la
+    // ligne d'aperçu reprend ce format.
+    return { ...reading, text: reading.text.replace(/\s+/g, ' ').trim().slice(0, PREVIEW_MAX) };
+  }
+  return null;
+}
+
 /** The last message carrying the field, searched from the end. */
+/** L'objet du dernier message qui en a un, lu en français quand sa traduction existe. */
+function lastSubject(messages: Message[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (m?.subject) return subjectReading(m) || m.subject;
+  }
+  return null;
+}
+
 function lastWith(messages: Message[], field: 'subject' | 'snippet' | 'msg_date'): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const value = messages[i]?.[field];
@@ -368,14 +406,17 @@ function toRow(
   woke: boolean,
   active: MailFilterKey,
 ): MailRow {
+  const reading = lastPreview(c.messages);
   return {
     id: c.id,
     kind: c.kind,
     // The email is the fallback, not a placeholder: an address is something the
     // operator can act on, whereas "sans nom" is not.
     who: c.company || c.email,
-    subject: lastWith(c.messages, 'subject') ?? 'Aucun échange',
-    preview: lastWith(c.messages, 'snippet') ?? '',
+    subject: lastSubject(c.messages) ?? 'Aucun échange',
+    preview: reading?.text ?? '',
+    previewLang: reading?.lang ?? null,
+    previewTranslated: reading?.translated ?? false,
     lastFromUs: lastFromUs(c.messages),
     lastInboundId: lastInboundMessage(c)?.id ?? null,
     rankReason: active === 'followup' ? followupReason(c, s) : null,
@@ -414,7 +455,7 @@ function toRow(
     // registry we asked about redistribution" — rather than the desk's address
     // or the subject a clerk chose.
     search: fold(
-      `${c.company ?? ''} ${c.email} ${institutionSearch(c)} ${c.messages.map((m) => `${m.subject ?? ''} ${m.snippet ?? ''}`).join(' ')}`,
+      `${c.company ?? ''} ${c.email} ${institutionSearch(c)} ${c.messages.map((m) => `${m.subject ?? ''} ${m.subject_fr ?? ''} ${m.snippet ?? ''}`).join(' ')}`,
     ),
   };
 }

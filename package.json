@@ -1,6 +1,6 @@
 {
   "name": "ibanforge",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "mcpName": "io.github.cammac-creator/ibanforge",
   "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance, issuer classification and risk indicators for AI agents. 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,100+ Swiss BC-Nummer from SIX, refreshed monthly. Supports 89 countries.",
@@ -55,7 +55,9 @@
     "deps:check": "tsx scripts/check-runtime-deps.ts",
     "pages:export": "tsx scripts/export-register-pages.ts",
     "pages:export-countries": "tsx scripts/export-country-pages.ts",
-    "backup:restore-test": "tsx scripts/restore-test.ts"
+    "backup:restore-test": "tsx scripts/restore-test.ts",
+    "overlay": "tsx scripts/restricted-overlay.ts",
+    "overlay:seed": "tsx scripts/restricted-overlay.ts seed"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

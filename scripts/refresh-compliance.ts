@@ -10,7 +10,14 @@
 import Database from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, rmSync, renameSync, existsSync, createWriteStream } from 'node:fs';
+import {
+  mkdirSync,
+  rmSync,
+  renameSync,
+  existsSync,
+  createWriteStream,
+  copyFileSync,
+} from 'node:fs';
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -32,9 +39,18 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
-const TMP_DIR = resolve(__dirname, '../.tmp-compliance');
+// SEED_TMP_DIR : la base temporaire (ONU et EPC compris) et les téléchargements
+// hors du dépôt, pour la chaîne privée de la surcouche. Défaut inchangé.
+const TMP_DIR = process.env.SEED_TMP_DIR
+  ? resolve(process.env.SEED_TMP_DIR, 'compliance')
+  : resolve(__dirname, '../.tmp-compliance');
 const TMP_DB_PATH = resolve(TMP_DIR, 'compliance.sqlite');
-const FINAL_DB_PATH = resolve(DATA_DIR, 'compliance.sqlite');
+// COMPLIANCE_DB_PATH choisit la base écrite, et BIC_DB_PATH l'annuaire qui
+// enrichit les BIC sanctionnés (défauts inchangés : data/). La chaîne privée de
+// la surcouche (`npm run overlay:seed -- --kind compliance`) y passe une copie
+// de travail, jamais data/ du dépôt, puis en extrait la famille (ONU, EPC).
+const FINAL_DB_PATH = process.env.COMPLIANCE_DB_PATH ?? resolve(DATA_DIR, 'compliance.sqlite');
+const BIC_DIRECTORY_PATH = process.env.BIC_DB_PATH ?? resolve(DATA_DIR, 'bic.sqlite');
 
 // ---------------------------------------------------------------------------
 // Static compliance data — FATF lists & sanctioned countries are maintained
@@ -278,7 +294,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
   // authority has designated is sanctioned whether or not we can name it, and
   // "we have never heard of this bank" is precisely the dangerous case, not a
   // reason for silence. What we cannot resolve is marked, not discarded.
-  const bicDB = new Database(resolve(DATA_DIR, 'bic.sqlite'), { readonly: true });
+  const bicDB = new Database(BIC_DIRECTORY_PATH, { readonly: true });
   const bicLookup = bicDB.prepare('SELECT 1 FROM bic_entries WHERE bic8 = ? LIMIT 1');
 
   const insertEntity = db.prepare(
@@ -1042,11 +1058,22 @@ async function main(): Promise<void> {
   // 9. Close DB and atomically replace final file
   db.close();
 
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
+  if (!existsSync(dirname(FINAL_DB_PATH))) {
+    mkdirSync(dirname(FINAL_DB_PATH), { recursive: true });
   }
 
-  renameSync(TMP_DB_PATH, FINAL_DB_PATH);
+  try {
+    renameSync(TMP_DB_PATH, FINAL_DB_PATH);
+  } catch (err) {
+    // Une sortie choisie (COMPLIANCE_DB_PATH) peut vivre sur un autre système de
+    // fichiers que .tmp-compliance/ : copie vers un voisin, puis renommage
+    // atomique. Le chemin par défaut, lui, se renomme comme avant.
+    if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+    const staged = `${FINAL_DB_PATH}.staged`;
+    copyFileSync(TMP_DB_PATH, staged);
+    renameSync(staged, FINAL_DB_PATH);
+    rmSync(TMP_DB_PATH, { force: true });
+  }
   console.log(`compliance.sqlite written to: ${FINAL_DB_PATH}`);
 
   // 10. Clean up temp dir

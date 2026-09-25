@@ -22,7 +22,7 @@ Posez une politique de budget avant le premier paiement réel. Un agent avec un 
 
 ## Étape 2 — Alimentez-le en USDC sur Base
 
-C'est l'étape qui demande encore un humain aujourd'hui : déposer des USDC sur le wallet (retrait d'exchange, onramp, ou le parcours de financement de votre plateforme). **5 $ couvrent 1 000 validations.** Le gas n'est pas votre problème — x402 utilise des autorisations USDC sans gas, le facilitateur règle le transfert.
+C'est l'étape qui demande encore un humain aujourd'hui : déposer des USDC sur le wallet (retrait d'exchange, onramp, ou le parcours de financement de votre plateforme). **4 $ couvrent 1 000 validations avec un pack** (`POST /v1/credits/buy/1k`) ; payée à l'appel, une validation coûte 0,005 $. Le gas n'est pas votre problème — x402 utilise des autorisations USDC sans gas, le facilitateur règle le transfert.
 
 Pour répéter le flux sans argent réel, le faucet CDP alimente un wallet de test **base-sepolia** — mais IBANforge règle sur **Base mainnet** (`eip155:8453`) : la répétition doit viser votre propre serveur de test, pas notre API.
 
@@ -61,8 +61,9 @@ Python : `pip install cdp-sdk "x402[evm,httpx]"` avec `x402HttpxClient` de la m�
 ## Essayer avant de dépenser
 
 - `GET /ping` et `GET /.well-known/x402` sont gratuits — le manifeste liste chaque route payante avec son prix exact.
-- Le [serveur MCP](/docs/mcp) offre 10 appels d'outil gratuits par jour — assez pour juger la qualité des données sur vos propres IBAN.
-- Le palier gratuit par clé API (200 requêtes/mois, [une par développeur](/docs/api-keys)) existe pour les humains qui évaluent le service.
+- Sans clé du tout : jusqu'à 25 validations d'IBAN par semaine et par adresse source, sur la seule route `POST /v1/iban/validate`, pour essayer (remise à zéro le lundi à 00:00 UTC).
+- Le [serveur MCP](/docs/mcp) offre 25 appels d'outil gratuits par semaine et par adresse source, sans clé — assez pour juger la qualité des données sur vos propres IBAN.
+- Une [clé API](/docs/api-keys) ne demande ni e-mail ni carte, et atteint 200 requêtes par mois une fois réclamée : de quoi évaluer les autres routes avant de payer.
 
 ## Si quelque chose vous empêche de payer
 

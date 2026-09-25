@@ -20,6 +20,10 @@ const PURGED_BY_TIME: Record<string, string> = {
   pending_verifications: 'supprimée à l’expiration du code (src/lib/verification.ts)',
   device_codes: 'TTL du device grant, purge datée (src/routes/device-grant.ts)',
   audit_jobs: 'expires_at, purge des travaux d’audit (src/lib/audit-jobs.ts)',
+  // Les deux tables du compte client (account_sessions, account_login_codes)
+  // sont aussi purgées par le temps (purgeAccountTables), mais une session
+  // vivante lit encore : elles sont effacées par l'outil d'oubli, qui les couvre
+  // donc, et ne figurent plus ici.
 };
 
 /** Colonnes qui portent un mot du lexique sans être une adresse. */

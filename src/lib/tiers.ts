@@ -7,6 +7,14 @@ export const SHIELD_MONTHLY_LIMIT = 5;
 export const UNIT_PRICE_USD = 0.005;
 export const CLAIM_MIN_PAID_USD = Number((FREE_TIER_MONTHLY_LIMIT * UNIT_PRICE_USD).toFixed(2));
 
+/**
+ * Part d'un pack prépayé sous laquelle son porteur reçoit un seul avertissement
+ * par e-mail (`maybeSendCreditsWarning`). Ici plutôt que dans `quota-notice.ts`
+ * parce que le mail d'achat l'annonce aussi, et que `email.ts` ne peut pas
+ * importer `quota-notice.ts` (qui l'importe déjà).
+ */
+export const CREDITS_NOTICE_RATIO = 0.1;
+
 /** Sentinelle technique, sans adresse ni fiche de prospect associée. */
 export const ANONYMOUS_CONTACT = 'anonymous';
 export const KEY_GENERATE_URL = 'https://api.ibanforge.com/v1/keys/generate';

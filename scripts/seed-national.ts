@@ -1,7 +1,7 @@
 /**
- * Seed the Austrian, Belgian, Slovak and San Marino bank-code registers.
+ * Seed the Austrian, Belgian, Slovak, San Marino and Czech bank-code registers.
  *
- * ⚠️ THREE of these four are exhaustive; San Marino is NOT. AT, BE and SK are
+ * ⚠️ FOUR of these five are exhaustive; San Marino is NOT. AT, BE, SK and CZ are
  * published by the authority that allocates the codes, which is what lets an
  * absence mean "held by nobody" rather than "absent from our map" — the claim
  * CH, LI, DE and FI already carry. The BCSM page is a list of *operating banks*,
@@ -12,6 +12,11 @@
  *
  *   npx tsx scripts/seed-national.ts          # all
  *   npx tsx scripts/seed-national.ts AT       # one
+ *
+ * CZECHIA — Česká národní banka, Číselník kódů platebního styku v České
+ * republice. The one register here whose EDITIONS are published before they
+ * take effect: read the notes on parseCzechEditions and planCzechEditions, and
+ * on PENDING_TABLE in src/lib/national-registers.ts, before touching it.
  *
  * AUSTRIA — Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis.
  * Republished DAILY, which is finer than the Bundesbank's monthly cycle. The
@@ -112,9 +117,16 @@
  * and does not flag it.
  */
 import Database from 'better-sqlite3';
+import { appendFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as XLSX from 'xlsx';
+import { PENDING_TABLE, registerToday } from '../src/lib/national-registers.js';
+import {
+  RESTRICTED_FLOORS,
+  restrictedRegisterCountries,
+  seedFamilyFromEnv,
+} from '../src/lib/restricted-family.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -126,6 +138,8 @@ const SOURCES = {
   SK: 'https://nbs.sk/en/payments/general-information/directories-and-registers/directory-identification-codes-domestic-payment-system-in-sr/',
   // An HTML page and nothing else: the BCSM publishes no file of any kind.
   SM: 'https://www.bcsm.sm/en/functions/statutory-functions/payment-system/operating-banks',
+  // The PAGE again: the CSV carries neither its edition nor its effective date.
+  CZ: 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/',
 } as const;
 
 /**
@@ -135,6 +149,8 @@ const SOURCES = {
  * Measured 06/09/2026: 38 Slovak ones — the whole Slovak payment system fits in
  * two screens, so its floor is set well under the count rather than just under
  * it, or an ordinary month in which four providers merge would fail the build.
+ * Measured 25/09/2026: 46 Czech codes in edition 254. Same reasoning as the
+ * Slovak floor, same family of register.
  * Measured 06/09/2026: 4 San Marino banks. A floor of 3 is not much of a guard
  * at that size, and it is not pretending to be one: the real protection there is
  * the per-field validation in parseSanMarino (five digits of ABI, a BIC of 8 or
@@ -144,7 +160,15 @@ const SOURCES = {
  * mangled would come back well under these. Abort BEFORE touching the table and
  * let the existing data stand.
  */
-const MIN_EXPECTED: Record<string, number> = { AT: 700, BE: 650, SK: 25, SM: 3 };
+const MIN_EXPECTED: Record<string, number> = {
+  // Les trois registres de la famille « sous conditions » partagent leur plancher
+  // avec le chargeur de la surcouche privée : une seule valeur par registre.
+  AT: RESTRICTED_FLOORS.register_at,
+  BE: RESTRICTED_FLOORS.register_be,
+  SK: 25,
+  SM: RESTRICTED_FLOORS.register_sm,
+  CZ: 35,
+};
 
 /**
  * The OeNB and NBB both redirect or refuse without a browser User-Agent.
@@ -619,6 +643,610 @@ async function parseSanMarinoLive(): Promise<Entry[]> {
   return entries;
 }
 
+// ---------------------------------------------------------------------------
+// Czechia
+// ---------------------------------------------------------------------------
+
+/**
+ * Every edition with its effective date, PDF links only. Read when the current
+ * page does not settle which edition is in force today — see seedCzechLive.
+ */
+const CZ_HISTORY_URL = 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/historicke-ciselniky/';
+
+/**
+ * The numbered CSV of an edition. Served for the current edition and past ones
+ * (measured 25/09/2026: 253 and 254 answer 200, 255 answers 404, and the
+ * `/export/sites/cnb/…` spelling of the same path answers 404 for all three).
+ * The page links it for an ANNOUNCED edition — an archived copy of 28/08/2026
+ * lists 253 with the unnumbered file and 254 with `kody_bank_CR_254.csv` — and
+ * once an edition is in force it links the unnumbered file instead. Reading the
+ * numbered file is what lets the edition in force be read while the unnumbered
+ * one may already carry the next.
+ */
+export function czechNumberedCsvUrl(version: string): string {
+  return `https://www.cnb.cz/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR_${version}.csv`;
+}
+
+export interface CzechEdition {
+  /** The číselník's own number, as the page prints it: '254'. */
+  version: string;
+  /** Effective date, ISO. The page writes it 'platný od D. M. YYYY'. */
+  as_of: string;
+  /** The CSV linked beside it, when the page links one (the history page does not). */
+  csv_url: string | null;
+}
+
+/**
+ * The ČNB's pages or files are in a state this run will not load: unreachable,
+ * contradictory, or older than what is stored. Both Czech tables are left
+ * exactly as they were and the monthly refresh goes on for every other source
+ * (see main). Everything else — a page or a file whose SHAPE changed — throws a
+ * plain Error and fails the run, because that is the failure a human has to
+ * read. Same rule as the Bulgarian step of the workflow.
+ */
+export class CzechSourceNotLoaded extends Error {}
+
+/** 'D', 'M', 'YYYY' to ISO, or null for a day the calendar does not have. */
+function isoDate(day: string, month: string, year: string): string | null {
+  const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  const probe = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(probe.getTime()) || probe.toISOString().slice(0, 10) !== iso) return null;
+  return iso;
+}
+
+/**
+ * Every "Číselník N platný od D. M. YYYY" a ČNB page states.
+ *
+ * ## 🚨 The HTML comments go first
+ *
+ * The current page carries a commented-out copy of its own list item, pointing
+ * at `admin-cnb.cz.net`, the ČNB's administration server (measured 25/09/2026).
+ * It reads "Číselník 254 platný od 1. 9. 2026" today, and nothing says it will
+ * follow the next edition: matched, it could date the register with an edition
+ * the public page does not state, and its links lead to a server the public
+ * cannot reach.
+ *
+ * ## One list item at a time
+ *
+ * The number, the date and the CSV link are related only by sitting in the same
+ * `<li>`, and on the current page that item is nested inside another whose text
+ * also says "Číselník" (without a number). So the markup is cut at each `</li>`
+ * and only what follows the last `<li` opening before it is read. `<link>` in
+ * the page head also begins with those three letters; the opening is matched
+ * with the character that must follow it.
+ *
+ * The phrase is matched on the TEXT, tags stripped and entities decoded: on the
+ * current page the date sits inside the PDF anchor ("Číselník 254 <a>platný od
+ * 1. 9. 2026 (pdf…)</a>"), on the history page the whole phrase does.
+ *
+ * An item whose date the calendar does not have is SKIPPED, with a warning:
+ * one typo among the 129 items of the history page must not stop a run, and
+ * on the current page a skipped item leaves no edition at all, which the
+ * caller refuses as a changed layout.
+ */
+export function parseCzechEditions(html: string, pageUrl: string): CzechEdition[] {
+  const visible = html.replace(/<!--[\s\S]*?-->/g, '');
+  const editions: CzechEdition[] = [];
+  for (const chunk of visible.split(/<\/li\s*>/i)) {
+    let start = -1;
+    for (const m of chunk.matchAll(/<li[\s>]/gi)) start = m.index ?? start;
+    if (start < 0) continue;
+    const item = chunk.slice(start);
+    const text = textOf(item).replace(/\s+/g, ' ');
+    const m = /[Čč]íselník\s+(\d+)\s+platn[ýáé]\s+od\s+(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/.exec(
+      text,
+    );
+    if (!m) continue;
+    let csv_url: string | null = null;
+    for (const a of item.matchAll(/<a\b[^>]*\bhref="([^"]+)"/gi)) {
+      const href = decodeEntities(a[1]);
+      if (/\.csv(?:[?#]|$)/i.test(href)) {
+        csv_url = new URL(href, pageUrl).toString();
+        break;
+      }
+    }
+    const as_of = isoDate(m[2], m[3], m[4]);
+    if (!as_of) {
+      console.warn(`  CZ: "${m[0]}" states no real date; that item is skipped`);
+      continue;
+    }
+    editions.push({ version: m[1], as_of, csv_url });
+  }
+  return editions;
+}
+
+/**
+ * Which edition is in force on `today`, and which one is announced.
+ *
+ * In force: the HIGHEST number whose date has come. Never "the number before
+ * the announced one": editions 247 and 248 both took effect on 1 October 2025,
+ * so numbers are the ČNB's order and dates only its calendar. Announced: the
+ * NEXT edition to take effect — the earliest date still to come, the highest
+ * number on that date — when it is newer than the one in force. Only one waits
+ * in the pending table; should the ČNB ever announce two ahead, the second is
+ * read by the refresh after the first takes effect.
+ *
+ * The same edition met on both pages must carry the same date there; if it does
+ * not, nothing here can tell which page is right, so nothing is loaded.
+ */
+export function planCzechEditions(
+  editions: readonly CzechEdition[],
+  today: string,
+): { current: CzechEdition; pending: CzechEdition | null } {
+  const byVersion = new Map<number, CzechEdition>();
+  for (const e of editions) {
+    const n = Number(e.version);
+    const seen = byVersion.get(n);
+    if (seen && seen.as_of !== e.as_of) {
+      throw new CzechSourceNotLoaded(
+        `CZ: edition ${e.version} is dated ${seen.as_of} on one ČNB page and ${e.as_of} on another, refusing to pick one`,
+      );
+    }
+    // The current page links a CSV, the history page does not: keep the link.
+    if (!seen || (!seen.csv_url && e.csv_url)) byVersion.set(n, e);
+  }
+  const newestFirst = [...byVersion.entries()].sort((a, b) => b[0] - a[0]).map(([, e]) => e);
+  const current = newestFirst.find((e) => e.as_of <= today);
+  if (!current) {
+    throw new CzechSourceNotLoaded(
+      `CZ: none of the editions the ČNB states (${newestFirst.map((e) => `${e.version} from ${e.as_of}`).join(', ') || 'none'}) is in force on ${today}`,
+    );
+  }
+  const announced = newestFirst.filter(
+    (e) => e.as_of > today && Number(e.version) > Number(current.version),
+  );
+  // newestFirst is sorted by number, so the first edition on the earliest date
+  // is the highest number on that date.
+  const nextDate = announced.reduce<string | null>(
+    (min, e) => (min === null || e.as_of < min ? e.as_of : min),
+    null,
+  );
+  const pending = announced.find((e) => e.as_of === nextDate) ?? null;
+  return { current, pending };
+}
+
+/**
+ * The credit the ČNB terms require, built from the edition the run read.
+ *
+ * It OPENS on "Zdroj: ČNB" — the terms' own words, "ČNB musí být vždy uvedena
+ * jako zdroj informací (Zdroj: ČNB)" — because this string is served as it is,
+ * as `bic.source`, on every answer whose BIC comes from the register.
+ */
+export function czechSource(edition: Pick<CzechEdition, 'version'>): string {
+  return `Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze ${edition.version}`;
+}
+
+/**
+ * Parse one číselník CSV. Pure, so its traps are held by a test.
+ *
+ * - UTF-8, as the page says ("utf-8, csv"). The server sends it with
+ *   `Content-Type: text/html;charset=UTF-8` (measured 25/09/2026), so nothing
+ *   here or in the download looks at the type: what proves the file is its
+ *   header row. An error page served with 200 has none and is refused.
+ * - A byte-order mark on some editions (253 has one, 254 does not). Removed
+ *   before the header search, which would otherwise read "\uFEFFKód…".
+ * - The code is written with its leading zeros (`0100`), unlike the Slovak
+ *   file. Padded anyway, so a change there cannot turn a real bank into
+ *   `not_allocated`.
+ * - Names verbatim, edges trimmed: the terms forbid changing the facts, and the
+ *   diacritics are part of the name ("Komerční banka, a.s.").
+ * - `BIC kód (SWIFT)` is empty on eleven rows of edition 254 (building
+ *   societies, a credit union, Banking Circle, Multitude Bank…). Those are real
+ *   allocations holding no BIC: stored with a null BIC, never dropped, or an
+ *   allocated code would read as allocated to nobody.
+ * - `Systém CERTIS` (A: direct participant in the Czech clearing, "-": not,
+ *   with a trailing space on some rows) is not stored: the verdict is about who
+ *   holds the code, not about how they clear.
+ * - The last line carries no line ending.
+ */
+export function parseCzech(text: string, edition: CzechEdition): Entry[] {
+  const lines = text
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((l) => l.trim());
+  const headerIdx = lines.findIndex((l) => /kód platebního styku/i.test(l));
+  if (headerIdx < 0) {
+    throw new Error(
+      'CZ: no header row carrying "Kód platebního styku": the format changed, or the server answered a page instead of the file',
+    );
+  }
+  const iBic = lines[headerIdx].split(';').findIndex((h) => /BIC|SWIFT/i.test(h));
+  // Same guard as Slovakia: a separator change leaves one field per line, the
+  // header search still succeeds, and the BIC column lands on index 0.
+  if (iBic < 2) throw new Error('CZ: the BIC column is not where a header row puts it');
+
+  const source = czechSource(edition);
+  const seen = new Map<string, Entry>();
+  for (const line of lines.slice(headerIdx + 1)) {
+    const f = line.split(';');
+    const code = pad(f[0] ?? '', 4);
+    if (!code || seen.has(code)) continue;
+    const name = (f[1] ?? '').trim();
+    if (!name) continue;
+    seen.set(code, {
+      code,
+      name,
+      bic: bicAsPublished(f[iBic] ?? ''),
+      // The číselník publishes a name and a BIC, no address and no LEI. Nulls
+      // are what the ČNB publishes, not data missing on our side.
+      street: null,
+      post_code: null,
+      town: null,
+      lei: null,
+      source,
+      as_of: edition.as_of,
+    });
+  }
+  return [...seen.values()];
+}
+
+/** Same allocation, same names, same BICs — the order of the rows aside. */
+function sameAllocation(a: readonly Entry[], b: readonly Entry[]): boolean {
+  const key = (rows: readonly Entry[]) =>
+    rows
+      .map((e) => `${e.code};${e.name};${e.bic ?? ''}`)
+      .sort()
+      .join('\n');
+  return key(a) === key(b);
+}
+
+/** The columns every edition table carries, for the current and the announced one alike. */
+const NATIONAL_COLUMNS = `
+      country   TEXT NOT NULL,
+      code      TEXT NOT NULL,
+      name      TEXT NOT NULL,
+      bic       TEXT,
+      street    TEXT,
+      post_code TEXT,
+      town      TEXT,
+      lei       TEXT,
+      source    TEXT,
+      as_of     TEXT,
+      PRIMARY KEY (country, code)`;
+
+/**
+ * The two tables, created where missing. The announced one is created on every
+ * run, so a reader of the database never has to wonder whether its absence
+ * means "nothing announced" or "seeded before announcements were kept".
+ */
+export function ensureNationalTables(db: Database.Database): void {
+  db.exec(`CREATE TABLE IF NOT EXISTS national_bank_codes (${NATIONAL_COLUMNS});`);
+  db.exec(`CREATE TABLE IF NOT EXISTS ${PENDING_TABLE} (${NATIONAL_COLUMNS});`);
+}
+
+function insertRows(db: Database.Database, table: string, cc: string, entries: Entry[]): void {
+  const ins = db.prepare(
+    `INSERT INTO ${table} (country, code, name, bic, street, post_code, town, lei, source, as_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (const e of entries) {
+    ins.run(
+      cc,
+      e.code,
+      e.name,
+      e.bic,
+      e.street,
+      e.post_code,
+      e.town,
+      e.lei,
+      e.source ?? null,
+      e.as_of ?? null,
+    );
+  }
+}
+
+/**
+ * Write the edition in force and the announced one, in ONE transaction.
+ *
+ * The announced table is emptied for Czechia on every run, whatever it held: a
+ * newer edition in force supersedes the announcement, and an announcement the
+ * ČNB withdrew must not take effect on its old date.
+ *
+ * Refused, with the tables untouched: an edition under the floor (a plain
+ * Error: a truncated file or a changed format, for a human to read), and an
+ * edition in force OLDER than the one the API already serves
+ * (CzechSourceNotLoaded: a stale copy of the page served by a cache would look
+ * like that, and going back an edition would re-allocate codes the ČNB has
+ * removed). "Already serves" includes an announced edition whose date has come
+ * by `today`: activeTable() answers from it from that date, even though it
+ * still sits in the pending table. An announcement not yet in force stays free
+ * to be replaced or withdrawn.
+ *
+ * `today` is the run's date in Prague, fixed once by the caller, so the plan
+ * and this check can never disagree about which edition is in force.
+ */
+export function writeCzech(
+  db: Database.Database,
+  current: CzechEditionRows,
+  pending: CzechEditionRows | null,
+  today: string,
+): void {
+  for (const part of pending ? [current, pending] : [current]) {
+    if (part.entries.length < MIN_EXPECTED.CZ) {
+      throw new Error(
+        `CZ: only ${part.entries.length} codes parsed in edition ${part.edition.version}, expected at least ${MIN_EXPECTED.CZ}. Refusing to replace the tables.`,
+      );
+    }
+  }
+  const versionOf = (source: string | null | undefined): number =>
+    Number(/verze (\d+)/.exec(source ?? '')?.[1] ?? 0);
+  const stored = db
+    .prepare(`SELECT source FROM national_bank_codes WHERE country = 'CZ' LIMIT 1`)
+    .get() as { source: string | null } | undefined;
+  const announced = db
+    .prepare(
+      `SELECT source, MIN(as_of) AS as_of FROM ${PENDING_TABLE} WHERE country = 'CZ' GROUP BY source`,
+    )
+    .all() as Array<{ source: string | null; as_of: string | null }>;
+  const served = Math.max(
+    versionOf(stored?.source),
+    ...announced.filter((a) => a.as_of && a.as_of <= today).map((a) => versionOf(a.source)),
+  );
+  if (served > Number(current.edition.version)) {
+    throw new CzechSourceNotLoaded(
+      `CZ: the API already serves edition ${served} while the ČNB pages put ${current.edition.version} in force. Refusing to go back an edition.`,
+    );
+  }
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM national_bank_codes WHERE country = 'CZ'`).run();
+    insertRows(db, 'national_bank_codes', 'CZ', current.entries);
+    db.prepare(`DELETE FROM ${PENDING_TABLE} WHERE country = 'CZ'`).run();
+    if (pending) insertRows(db, PENDING_TABLE, 'CZ', pending.entries);
+  });
+  tx();
+  console.log(
+    `  CZ: edition ${current.edition.version} in force from ${current.edition.as_of}, ${current.entries.length} codes written`,
+  );
+  console.log(`  CZ: attribution stored — "${current.entries[0]?.source}"`);
+  if (pending) {
+    console.log(
+      `  CZ: edition ${pending.edition.version} announced from ${pending.edition.as_of}, ${pending.entries.length} codes waiting in ${PENDING_TABLE}`,
+    );
+  }
+}
+
+/** The network, injectable so the whole loading path can be tested without it. */
+export type CzechFetch = (url: string, init?: RequestInit) => Promise<Response>;
+
+/** A server that sends headers and then stalls must not hold the monthly runner. */
+const CZ_FETCH_TIMEOUT_MS = 60_000;
+
+/**
+ * Download one ČNB address. Every failure of the NETWORK — no answer, an HTTP
+ * error, a timeout, a connection cut while the body arrives — becomes
+ * CzechSourceNotLoaded, including the body read: undici resolves fetch() on
+ * the headers and rejects arrayBuffer() later with a TypeError ("terminated"),
+ * which would otherwise fail the month. A 404 is null where the caller says the
+ * file may not exist (a numbered CSV not published yet).
+ */
+async function czechFetch(
+  fetchImpl: CzechFetch,
+  url: string,
+  optional = false,
+): Promise<Buffer | null> {
+  try {
+    const res = await fetchImpl(url, {
+      redirect: 'follow',
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(CZ_FETCH_TIMEOUT_MS),
+    });
+    if (optional && res.status === 404) return null;
+    if (!res.ok) throw new CzechSourceNotLoaded(`${url} -> HTTP ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  } catch (e) {
+    if (e instanceof CzechSourceNotLoaded) throw e;
+    throw new CzechSourceNotLoaded(`${url}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+const utf8 = (buf: Buffer): string => new TextDecoder('utf-8').decode(buf);
+
+/**
+ * A page where a file was expected. The server labels even the real CSV
+ * text/html, so the type proves nothing; the first character does. A refusal
+ * page (cnb.cz sets the cookie of an application firewall that answers its
+ * blocks with HTTP 200) is not a changed format: it is the ČNB not serving us
+ * today, and it must not cost the month. A file that is not HTML and has no
+ * header row we know is still a changed format, and still throws.
+ */
+function isHtml(body: string): boolean {
+  return body
+    .replace(/^\uFEFF/, '')
+    .trimStart()
+    .startsWith('<');
+}
+
+/** A short handle on a page, for a log line: its title, or its first words. */
+function pageHint(html: string): string {
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1];
+  return (title ?? textOf(html)).replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+
+export interface CzechEditionRows {
+  edition: CzechEdition;
+  entries: Entry[];
+  /**
+   * True when the rows come from the NUMBERED file of the edition, which is
+   * that edition by construction. False when they come from the unnumbered
+   * file, which states no number and may still carry the previous edition.
+   */
+  fromNumbered?: boolean;
+}
+
+/**
+ * One edition's rows, from its numbered CSV when the ČNB serves it and from the
+ * file the page links otherwise.
+ *
+ * `crossCheck`: when the page states NO announced edition, its linked file
+ * should be the edition in force, and both files are read and compared. If
+ * they differ, or the linked one cannot be read, the numbered file is still the
+ * edition its number says, so it is the one loaded; the difference is reported
+ * and nothing is announced. That is what the ČNB depositing the next file
+ * before updating its page would look like, and refusing both would only cost
+ * the month's refresh.
+ */
+async function readCzechEdition(
+  fetchImpl: CzechFetch,
+  edition: CzechEdition,
+  crossCheck: boolean,
+): Promise<CzechEditionRows> {
+  const numberedUrl = czechNumberedCsvUrl(edition.version);
+  const numberedBody = await czechFetch(fetchImpl, numberedUrl, true);
+  const numbered = numberedBody ? utf8(numberedBody) : null;
+  if (numbered !== null && isHtml(numbered)) {
+    throw new CzechSourceNotLoaded(
+      `${numberedUrl} answered a page, not the file ("${pageHint(numbered)}")`,
+    );
+  }
+  const linkedUrl = edition.csv_url && edition.csv_url !== numberedUrl ? edition.csv_url : null;
+  let linked: string | null = null;
+  if (linkedUrl && (crossCheck || numbered === null)) {
+    try {
+      const body = utf8((await czechFetch(fetchImpl, linkedUrl)) as Buffer);
+      if (isHtml(body)) {
+        throw new CzechSourceNotLoaded(
+          `${linkedUrl} answered a page, not the file ("${pageHint(body)}")`,
+        );
+      }
+      linked = body;
+    } catch (e) {
+      // Without a numbered file there is nothing else to load: the month's
+      // Czech tables stay as they are. With one, a linked file that cannot be
+      // read only costs the comparison.
+      if (!(e instanceof CzechSourceNotLoaded) || numbered === null) throw e;
+      console.warn(`  CZ: ${e.message}; the numbered file is loaded without the comparison`);
+    }
+  }
+  const primary = numbered ?? linked;
+  if (primary === null) {
+    throw new CzechSourceNotLoaded(
+      `no CSV for edition ${edition.version} (numbered file 404, none linked from the page)`,
+    );
+  }
+  const entries = parseCzech(primary, edition);
+  if (
+    crossCheck &&
+    numbered !== null &&
+    linked !== null &&
+    !sameAllocation(entries, parseCzech(linked, edition))
+  ) {
+    console.warn(
+      `  CZ: the page puts edition ${edition.version} in force, but the CSV it links differs from kody_bank_CR_${edition.version}.csv; the numbered file is loaded, nothing is announced, and the next refresh will read the page again`,
+    );
+  }
+  console.log(
+    `  CZ: edition ${edition.version} read from ${numbered !== null ? numberedUrl : linkedUrl}`,
+  );
+  return { edition, entries, fromNumbered: numbered !== null };
+}
+
+/**
+ * A ČNB page, or the reason it is not one. A page that does not even carry the
+ * bank's name is not the ČNB's layout having changed; it is a refusal or an
+ * error page served with 200 (see isHtml), so the month's Czech tables stay
+ * and the refresh goes on. The name is the anchor rather than a heading: a
+ * redesign that renamed a heading would otherwise pass as "unreachable", in
+ * silence, month after month.
+ */
+async function czechPage(fetchImpl: CzechFetch, url: string): Promise<string> {
+  const html = utf8((await czechFetch(fetchImpl, url)) as Buffer);
+  if (!html.includes('Česká národní banka')) {
+    throw new CzechSourceNotLoaded(`${url} is not a ČNB page ("${pageHint(html)}")`);
+  }
+  return html;
+}
+
+export interface CzechSeedOptions {
+  /** The network; `fetch` in production, a stub in the tests. */
+  fetchImpl?: CzechFetch;
+  /** The run's date in Prague, 'YYYY-MM-DD'; today in production. */
+  today?: string;
+}
+
+/**
+ * Read the ČNB pages, decide which edition is in force today (in Prague) and
+ * which one is announced, and write both.
+ *
+ * The history page is read only when the current page does not settle the
+ * edition in force on its own: when it states an edition not yet in force.
+ * That is the window the ČNB publishes ahead in, and the edition still in force
+ * then appears on the history page only.
+ *
+ * An announced edition read from the UNNUMBERED file cannot be told apart from
+ * the edition in force by its content alone — that file states no number. If
+ * the two are identical, the unnumbered file has not moved yet, and the
+ * announcement is NOT written: the next refresh will read it. Writing it would
+ * label edition N's rows as N+1 and let them take effect as such. An
+ * announcement read from its NUMBERED file is that edition by construction and
+ * is written even when its codes, names and BICs equal the edition in force:
+ * editions that change only a column we do not store (CERTIS participation)
+ * exist (235→236, 248→249, 250→251), and skipping them would keep crediting
+ * the previous edition and its date for a whole month.
+ */
+export async function seedCzechLive(
+  db: Database.Database,
+  options: CzechSeedOptions = {},
+): Promise<void> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const today = options.today ?? registerToday('CZ');
+  const page = await czechPage(fetchImpl, SOURCES.CZ);
+  const listed = parseCzechEditions(page, SOURCES.CZ);
+  if (listed.length === 0) {
+    throw new Error(
+      'CZ: no "Číselník N platný od D. M. YYYY" on the register page, layout changed. The date is half of the attribution the ČNB terms require and is never taken from a clock.',
+    );
+  }
+  let editions = listed;
+  if (listed.some((e) => e.as_of > today) || !listed.some((e) => e.as_of <= today)) {
+    const history = await czechPage(fetchImpl, CZ_HISTORY_URL);
+    editions = [...listed, ...parseCzechEditions(history, CZ_HISTORY_URL)];
+  }
+  const plan = planCzechEditions(editions, today);
+  console.log(
+    `  CZ: today ${today} in Prague; in force: ${plan.current.version} from ${plan.current.as_of}` +
+      (plan.pending
+        ? `; announced: ${plan.pending.version} from ${plan.pending.as_of}`
+        : '; nothing announced'),
+  );
+  const current = await readCzechEdition(fetchImpl, plan.current, plan.pending === null);
+  let pending = plan.pending ? await readCzechEdition(fetchImpl, plan.pending, false) : null;
+  if (pending && !pending.fromNumbered && sameAllocation(pending.entries, current.entries)) {
+    console.warn(
+      `  CZ: the unnumbered file read for announced edition ${pending.edition.version} is identical to edition ${current.edition.version}; announcement not written, the next refresh will read it`,
+    );
+    pending = null;
+  }
+  writeCzech(db, current, pending, today);
+}
+
+/** A GitHub workflow command carries its message on one line: %, CR and LF are escaped. */
+function workflowData(text: string): string {
+  return text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
+/**
+ * Tell the workflow what became of the Czech register.
+ *
+ * `not_loaded` prints a `::warning::` annotation, which GitHub shows on the run
+ * page, and — when the step runs under Actions — writes `cz_register=not_loaded`
+ * to $GITHUB_OUTPUT, which is what the workflows read to raise the alarm. The
+ * exit code stays 0 on purpose: the monthly refresh runs this seeder before
+ * committing every other source of the month, and the alarm must not cost
+ * them (see the "Czech register not loaded" step of refresh-bic.yml).
+ */
+export function reportCzechStatus(
+  status: 'loaded' | 'not_loaded',
+  message = '',
+  env: NodeJS.ProcessEnv = process.env,
+  log: (line: string) => void = console.log,
+): void {
+  if (status === 'not_loaded') {
+    log(
+      `::warning title=Czech register not loaded::${workflowData(`${message}; the Czech tables stay as they were`)}`,
+    );
+  }
+  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `cz_register=${status}\n`);
+}
+
 function write(db: Database.Database, cc: string, entries: Entry[]): void {
   const floor = MIN_EXPECTED[cc];
   if (entries.length < floor) {
@@ -656,21 +1284,7 @@ function write(db: Database.Database, cc: string, entries: Entry[]): void {
 async function main(): Promise<void> {
   const only = process.argv[2]?.toUpperCase();
   const db = new Database(DB_PATH);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS national_bank_codes (
-      country   TEXT NOT NULL,
-      code      TEXT NOT NULL,
-      name      TEXT NOT NULL,
-      bic       TEXT,
-      street    TEXT,
-      post_code TEXT,
-      town      TEXT,
-      lei       TEXT,
-      source    TEXT,
-      as_of     TEXT,
-      PRIMARY KEY (country, code)
-    );
-  `);
+  ensureNationalTables(db);
   // CREATE TABLE IF NOT EXISTS does not migrate an existing table — a base
   // seeded before the address columns existed needs an explicit ALTER, or the
   // INSERT below fails on column count. `source` and `as_of` joined the list
@@ -691,10 +1305,40 @@ async function main(): Promise<void> {
     ['SK', parseSlovakiaLive],
     ['SM', parseSanMarinoLive],
   ];
+  // SEED_FAMILY=restricted : AT, BE et SM seulement (la Slovaquie et la Tchéquie
+  // sont publiques), pour la surcouche privée. Sans la variable, tous comme avant.
+  const restrictedOnly = seedFamilyFromEnv() === 'restricted';
+  const restricted = restrictedRegisterCountries();
   for (const [cc, parse] of jobs) {
     if (only && only !== cc) continue;
+    if (restrictedOnly && !restricted.has(cc)) continue;
     console.log(`${cc}: downloading ${SOURCES[cc]}`);
     write(db, cc, await parse());
+  }
+  // Czechia last, and on its own path: it writes two tables, and it is the one
+  // register here whose failure to LOAD must not fail the monthly refresh.
+  // Whether cnb.cz answers GitHub's runners has not been verified; a refusal
+  // there would otherwise block every other source of the month from being
+  // committed. So an unreachable, contradictory or stale ČNB
+  // (CzechSourceNotLoaded) leaves both Czech tables exactly as they were and
+  // says so; a page or a file that changed shape still throws, because that is
+  // the failure a human has to read. The Bulgarian step of the same workflow
+  // follows the same rule. An announced edition already stored keeps taking
+  // effect on its date through a failed month.
+  //
+  // Not silent, though: reportCzechStatus() writes a workflow annotation and
+  // the step output `cz_register`, and a later step of each workflow turns
+  // `not_loaded` into a red step and the Telegram alert, AFTER the other
+  // sources have been committed.
+  if (!only || only === 'CZ') {
+    console.log(`CZ: reading ${SOURCES.CZ}`);
+    try {
+      await seedCzechLive(db);
+      reportCzechStatus('loaded');
+    } catch (e) {
+      if (!(e instanceof CzechSourceNotLoaded)) throw e;
+      reportCzechStatus('not_loaded', e.message);
+    }
   }
   db.close();
   console.log('done');

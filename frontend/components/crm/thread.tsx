@@ -6,32 +6,8 @@ import { dayLabel, formatStamp } from '@/lib/crm/format';
 import { toZurich } from '@/lib/crm/zurich';
 import { splitQuoted } from '@/lib/crm/quoted';
 import type { Message } from '@/lib/crm/types';
-
-const LANG_LABEL: Record<string, string> = {
-  fr: 'français',
-  en: 'anglais',
-  de: 'allemand',
-  it: 'italien',
-  es: 'espagnol',
-  pt: 'portugais',
-  nl: 'néerlandais',
-  zh: 'chinois',
-  ru: 'russe',
-  ar: 'arabe',
-  ja: 'japonais',
-  pl: 'polonais',
-  sv: 'suédois',
-  da: 'danois',
-  no: 'norvégien',
-  fi: 'finnois',
-  tr: 'turc',
-  el: 'grec',
-  he: 'hébreu',
-  cs: 'tchèque',
-  uk: 'ukrainien',
-  ro: 'roumain',
-  hu: 'hongrois',
-};
+import { subjectReading, usableLang } from '@/lib/crm/reading';
+import { LangBadge } from './lang-badge';
 
 function Bubble({
   m,
@@ -62,7 +38,7 @@ function Bubble({
   // Show a French translation by default for any non-French message, English
   // included. Guard against malformed lang values (a model echoing a
   // placeholder, or 'und').
-  const validLang = !!(m.lang && /^[a-z]{2,3}$/.test(m.lang) && m.lang !== 'und');
+  const validLang = usableLang(m.lang) !== null;
   const hasFr = !!(validLang && m.lang !== 'fr' && m.snippet_fr);
   // The French IS the body when we hold one, and the original is shown
   // BESIDE it on demand, never instead of it (owner, 03/09/2026: swapping one
@@ -71,6 +47,9 @@ function Bubble({
   const original = m.body || m.snippet || '';
   const { fresh, quoted } = splitQuoted(hasFr ? (m.snippet_fr ?? '') : original);
   const { fresh: originalFresh } = splitQuoted(original);
+  // L'objet suit la même règle : le français quand on le tient, l'original à côté.
+  const subject = subjectReading(m);
+  const subjectTranslated = !!m.subject && subject !== m.subject.trim();
 
   // splitQuoted cuts at the first quote marker, so a '>' inside genuinely new
   // text folds real content away. The toggle therefore states how many lines
@@ -134,17 +113,11 @@ function Bubble({
           ) : (
             <span className="italic">date inconnue</span>
           )}
-          {validLang && (
-            <span
-              className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[12px] text-violet-300"
-              title={hasFr ? 'Traduit automatiquement en français' : 'Langue détectée du message'}
-            >
-              🌐 {(m.lang && LANG_LABEL[m.lang]) || m.lang}
-              {hasFr ? ' · traduit' : ''}
-            </span>
-          )}
+          {/* La pastille commune (lang-badge.tsx) : la même dans la liste des
+              contacts, le journal et les brouillons. */}
+          <LangBadge lang={m.lang} translated={hasFr} />
         </div>
-        {m.subject && <p className="mb-0.5 font-medium text-[var(--fg-1)]">{m.subject}</p>}
+        {subject && <p className="mb-0.5 font-medium text-[var(--fg-1)]">{subject}</p>}
         {fresh && <p className="whitespace-pre-wrap">{fresh}</p>}
         {quoted && (
           <>
@@ -200,6 +173,7 @@ function Bubble({
               // composited tint, not picked by name), and the violet rule ties
               // it to the badge that says the message was translated.
               <p className="mt-1 whitespace-pre-wrap border-l-2 border-violet-400/40 pl-2 text-[14px] text-[var(--fg-2)]">
+                {subjectTranslated && <span className="mb-0.5 block font-medium">{m.subject}</span>}
                 {originalFresh}
               </p>
             )}

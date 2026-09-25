@@ -24,6 +24,9 @@ const ROWS = [
   "example",
   "freeTier",
   "bankData",
+  // The bank-code verdict of the national register, before the Swiss row:
+  // it is the check a checksum cannot make, in eight countries (25/09/2026).
+  "bankCode",
   "swiss",
   "compliance",
   "agents",
@@ -216,6 +219,8 @@ export default async function ComparePage({
         <p className="text-xs text-muted-foreground/70 mt-4" style={{ lineHeight: 1.6 }}>
           {t("footnoteExtra")}{" "}
           <a href="https://www.iban.de/preise.html" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban.de</a>{" "}·{" "}
+          {/* The free trial of iban.de is announced on its developer page, not its price page (24/09/2026). */}
+          <a href="https://www.iban.de/entwickler.html" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban.de/entwickler</a>{" "}·{" "}
           <a href="https://www.iban-test.eu/" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban-test.eu</a>{" "}·{" "}
           <a href="https://www.bankdataapi.com/" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">bankdataapi.com</a>{" "}·{" "}
           <a href="https://api-ninjas.com/pricing" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">api-ninjas.com</a>{" "}·{" "}
@@ -256,7 +261,7 @@ export default async function ComparePage({
           {t("forWho.heading")}
         </h2>
         <ul className="flex flex-col gap-4">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <li
               key={i}
               className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-5 flex gap-3 items-start"

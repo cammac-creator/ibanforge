@@ -71,6 +71,14 @@ data/
 - **Formatting** : prettier (voir .prettierrc)
 - **Linting** : eslint (voir eslint.config.js)
 - **Prenom** : Claude-Alain, jamais « Alain »
+- **Les « 25 » ne partagent jamais une phrase.** L'essai sans clé, c'est 25 validations
+  par semaine (semaine ISO, UTC), sur la seule `POST /v1/iban/validate`. L'accès sans clé du
+  transport `/mcp` est une allocation séparée (`MCP_WEEKLY_LIMIT`, `src/lib/mcp-limits.ts`) :
+  25 unités d'outil par semaine et par source, un lot comptant une unité par IBAN. La clé sans
+  e-mail, c'est 25 requêtes par mois, sur tous les endpoints. Nommer la porte, annoncer la clé
+  par ses 200 une fois réclamée ; `src/routes/free-doors-claims.test.ts` y veille. Le paquet npm
+  `ibanforge-mcp` n'écrit aucun de ces chiffres : figé jusqu'à sa prochaine version, il renvoie
+  à `rate-limits.yml` et à `GET /v1` (`mcp/src/published-text.test.ts`).
 
 ## 🚨 Ce dépôt est PUBLIC
 
@@ -199,6 +207,29 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 - Both use WAL mode for concurrent access.
 - Country names populated via `Intl.DisplayNames` API (no hardcoded list).
 - Swiss clearing data includes BC-Nummern, SIC/euroSIC participation, QR-IID allocations, and institution classification.
+
+### Surcouche privée des données sous conditions (depuis le 25.09.2026)
+
+Ce qui peut être servi mais pas redistribué (lignes EBA STEP2, NBP et OeNB de l'annuaire,
+registres AT, BE et SM, liste PRA, liste ONU, registres EPC) est listé UNE fois, dans
+`src/lib/restricted-family.ts`, avec la définition de chaque table et la façon de dater ses
+lignes. En production, il vient d'un fichier privé par base, désigné par
+`RESTRICTED_BIC_OVERLAY_PATH` et `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (chemins absolus sur
+le volume Railway, `/app/data/…`), fusionné au démarrage dans une copie de la base publique
+fraîche (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), membre par
+membre, la donnée la plus fraîche l'emportant : le public est gardé (`kept_public`) quand il
+est plus récent, ou non daté et différent. La dernière surcouche acceptée est gardée à côté
+(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé.
+Recharger : remplacer le fichier de façon atomique (voisin puis `mv`), l'API le contrôle en
+dix minutes au plus, ne refusionne que cette base, et garde ce qu'elle sert si le nouveau est
+refusé ou perdrait un membre servi. État : `GET /health` → `restricted_overlays`. Construire :
+`npm run overlay -- extract` (sans téléchargement) ou `npm run overlay:seed` (circuit privé
+seulement). Retirer : ôter la variable, redémarrer, vérifier `off`, puis effacer
+`restricted-*.merged-*`, `restricted-*.accepted.sqlite` et la surcouche dans l'ancien dossier ;
+effacer le seul fichier privé n'est PAS un retour arrière. **Jamais** commiter une surcouche
+ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script refuse ;
+`.gitignore` attrape `restricted-*.sqlite*` et `*.merged-*.sqlite*`), jamais ajouter une table
+ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
 
 ## MCP Integration
 

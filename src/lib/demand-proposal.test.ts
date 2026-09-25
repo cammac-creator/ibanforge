@@ -65,6 +65,21 @@ describe('proposeFromDemand', () => {
     expect(p?.action_fr).toContain('TCMB');
   });
 
+  it('never proposes plugging a register we already read in full', () => {
+    // Rows written before Czechia's register joined keep the outcome they had
+    // then, and the window still reads them: the ČNB must not come back as a
+    // register to plug, however often those old codes were asked.
+    const p = proposeFromDemand(
+      summary([
+        row('bank_code', 'CZ', '6600', 'not_in_register:absent_from_reference_data', 40),
+        row('bank_code', 'TR', '00205', 'not_in_register:absent_from_reference_data', 6),
+      ]),
+      '2026-09',
+    );
+    expect(p?.country).toBe('TR');
+    expect(REGISTER_HINTS.CZ).toBeUndefined();
+  });
+
   it('proposes the composite map when a BIC out-asks every register gap', () => {
     const p = proposeFromDemand(
       summary([

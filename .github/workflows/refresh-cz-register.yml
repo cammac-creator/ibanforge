@@ -1,0 +1,128 @@
+name: Refresh the Czech bank-code register (ČNB)
+
+# Why a daily run of its own
+#
+# Czechia is a register that settles a negative: a code absent from the edition
+# in force is answered `not_allocated` with `authoritative: true`. The Czech
+# National Bank publishes each edition of its číselník ahead of its effective
+# date, and not always for the 1st (edition 251 took effect on 16 March 2026),
+# while refresh-bic.yml runs on the 1st only. Read monthly, an edition published
+# after the 1st and in force before the next one would have every code it
+# creates refused, with authority, until the next month. Read daily, the
+# edition is loaded as soon as the ČNB publishes it; the API switches to it at
+# midnight in Prague on its effective date (see PENDING_TABLE in
+# src/lib/national-registers.ts).
+#
+# What this run may touch: the Czech rows of data/bic.sqlite, nothing else.
+# Only the Czech seeder runs (`seed-national.ts CZ` downloads from cnb.cz and
+# nowhere else), and scripts/cz-register-diff.ts refuses the commit if any
+# other table, country or schema differs from the committed database. It
+# commits only when the Czech CONTENT changed: SQLite rewrites its pages on
+# every run, so a byte change means nothing and would redeploy the API daily.
+#
+# The ČNB's terms allow reproducing its information with "Zdroj: ČNB"; that
+# credit travels in the rows themselves, and the run logs (public, like the
+# repository) carry only the edition number, its date and public URLs.
+
+on:
+  schedule:
+    # Every day at 05:17 UTC (07:17 in Prague in summer, 06:17 in winter).
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # Read the run's own jobs, so the alert names the step that failed.
+  actions: read
+
+# Same group as refresh-bic.yml: one writer of data/bic.sqlite at a time. On
+# the 1st the monthly refresh (03:00 UTC) and this run queue instead of racing
+# on the same binary file; neither cancels the other.
+concurrency:
+  group: bic-sqlite-writer
+  cancel-in-progress: false
+
+jobs:
+  refresh-cz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Exits 0 when cnb.cz cannot be read, contradicts itself or serves an
+      # older edition than the one in force: the tables stay, and the output
+      # `cz_register=not_loaded` raises the alarm at the end of the run. A
+      # change of FORMAT fails here, for a human to read.
+      - name: Read the Czech register (cnb.cz only)
+        id: seed_cz
+        run: npx tsx scripts/seed-national.ts CZ
+
+      # Czech rows only, compared by content with the committed database.
+      # Refuses (red step, alert) if anything else differs; writes
+      # `changed=true|false` otherwise.
+      - name: Czech rows only, and did they change?
+        id: diff_cz
+        run: npx tsx scripts/cz-register-diff.ts
+
+      # The same gate as the monthly refresh, on the Czech change: an edition
+      # that collapsed would be refused here before anything is committed.
+      - name: Quality diff against the committed database
+        if: steps.diff_cz.outputs.changed == 'true'
+        run: npx tsx scripts/refresh-diff.ts
+
+      - name: Run tests
+        if: steps.diff_cz.outputs.changed == 'true'
+        run: npm run test
+
+      - name: Commit the Czech register
+        if: steps.diff_cz.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/bic.sqlite
+          git commit -m "chore(data): registre tchèque de la ČNB, nouvelle édition (relecture quotidienne)"
+          git pull --rebase
+          git push
+
+      - name: Czech register not loaded (cnb.cz)
+        if: success() && steps.seed_cz.outputs.cz_register == 'not_loaded'
+        run: |
+          echo "::error title=Czech register not loaded::the ČNB register could not be re-read today; the Czech edition already loaded is still served"
+          exit 1
+
+      # Same alert as refresh-bic.yml, same secrets.
+      - name: Tell Telegram if anything above failed
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "::warning::secrets Telegram absents — alerte non envoyée"
+            exit 0
+          fi
+          STEP=""
+          if RAW=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+                     --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name' 2>/dev/null); then
+            STEP=$(printf '%s' "$RAW" | head -3 | paste -sd, -)
+          fi
+          [ -z "$STEP" ] && STEP="(étape inconnue — voir le run)"
+          CONSEQ="le registre tchèque (ČNB) n’a pas été rafraîchi ; l’édition déjà chargée reste servie."
+          case "$STEP" in
+            "Czech rows only"*) CONSEQ="la relecture a changé autre chose que les lignes tchèques : rien n’a été commité." ;;
+          esac
+          MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
+                  "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$CONSEQ" "$RUN_URL")
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" >/dev/null

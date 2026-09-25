@@ -21,6 +21,12 @@ import {
   FIRST_CALL_IBAN,
 } from '../lib/first-call.js';
 
+/**
+ * Le libellé du lien vers le compte : l'adresse lisible, sans le schéma. Tiré
+ * de `ACCOUNT_PAGE` pour qu'une seule valeur décide où mène le lien.
+ */
+const ACCOUNT_LABEL = ACCOUNT_PAGE.replace(/^https:\/\//, '');
+
 export const stripeSuccess = new Hono();
 
 stripeSuccess.get('/stripe/success', (c) => {
@@ -128,6 +134,21 @@ stripeSuccess.get('/stripe/success', (c) => {
       '  -d \\'{"iban":"${FIRST_CALL_IBAN}"}\\'';
   }
 
+  // Lot C3 (25.09.2026) : revoir cette clé plus tard, sans la coller. On se
+  // connecte au compte avec l'adresse saisie au paiement ; elle est rendue ici
+  // en texte, jamais dans le lien, qui reste la page nue. Le compte montre le
+  // solde et la consommation, jamais la clé entière, et la phrase le dit, pour
+  // que personne ne compte sur lui au lieu de garder la clé. Sans adresse (le
+  // repère stripe-buyer), aucune connexion promise : on propose de coller la clé.
+  function accountLine(email) {
+    const link = '<a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>';
+    if (typeof email === 'string' && email.indexOf('@') > 0) {
+      return 'Its balance and usage, any time: sign in at ' + link + ' with ' + escapeHtml(email) +
+        ', no key to paste. That page shows the first characters of the key, never the key itself.';
+    }
+    return 'Its balance and usage, any time: paste the key at ' + link + '.';
+  }
+
   function render(data) {
     const key = escapeHtml(data.api_key);
     const curl = curlFor(data.api_key);
@@ -160,7 +181,8 @@ stripeSuccess.get('/stripe/success', (c) => {
       '</div>' +
       '<div class="runout" id="runout" hidden></div>' +
       '<p class="small">${FIRST_CALL_EXPECTED_LINE_1}<br>${FIRST_CALL_EXPECTED_LINE_2}</p>' +
-      '<p class="small"><a href="${ACCOUNT_PAGE}">Everything this key does, on one page</a> &middot; Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
+      '<p class="small" id="accountline">' + accountLine(data.email) + '</p>' +
+      '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
 
     const btn = document.getElementById('copybtn');
     btn.addEventListener('click', function(){

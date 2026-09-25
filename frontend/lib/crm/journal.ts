@@ -3,6 +3,7 @@ import { dayLabel, isoDay, shiftDay } from './format';
 import { toZurich } from './zurich';
 import { fold } from './mail-rows';
 import type { Contact, Message } from './types';
+import { previewReading, subjectReading, type Reading } from './reading';
 
 /**
  * The mail journal: every message of every contact on one antichronological
@@ -89,6 +90,10 @@ export interface JournalRow {
   subject: string;
   /** One line of preview. */
   snippet: string;
+  /** Langue d'origine de la ligne, pour la pastille commune ; null quand elle est inconnue. */
+  lang: string | null;
+  /** `snippet` est la traduction française, et non le texte d'origine. */
+  translated: boolean;
   /** Folded haystack for the search box: contact, address, subject, preview. */
   search: string;
 }
@@ -136,8 +141,11 @@ function originOf(m: Message, direction: JournalDirection): SendOrigin | null {
  * in a language the reader does not have is a line that has to be opened to be
  * read, which is exactly what a journal is supposed to spare.
  */
-function previewOf(m: Message): string {
-  return (m.snippet_fr || m.snippet || '').replace(/\s+/g, ' ').trim();
+function previewOf(m: Message): Reading {
+  // La règle vit dans reading.ts, partagée avec le fil et la liste des
+  // contacts : la ligne dit maintenant aussi dans quelle langue le mail est né.
+  const reading = previewReading(m);
+  return { ...reading, text: reading.text.replace(/\s+/g, ' ').trim() };
 }
 
 /**
@@ -181,8 +189,9 @@ export function journalRows(contacts: Contact[]): JournalRow[] {
       const day = isoDay(local);
       if (!day || !m.msg_date) continue;
       const direction = directionOf(m);
-      const subject = (m.subject ?? '').trim();
-      const snippet = previewOf(m);
+      const subject = subjectReading(m);
+      const reading = previewOf(m);
+      const snippet = reading.text;
       rows.push({
         id: m.id || `${c.id}#${i}`,
         date: local,
@@ -193,7 +202,11 @@ export function journalRows(contacts: Contact[]): JournalRow[] {
         contact,
         subject,
         snippet,
-        search: fold(`${contact.label} ${contact.email} ${subject} ${snippet}`),
+        lang: reading.lang,
+        translated: reading.translated,
+        // L'original aussi : un mot cherché dans la langue du correspondant doit
+        // trouver sa ligne même quand la ligne se lit en français.
+        search: fold(`${contact.label} ${contact.email} ${subject} ${m.subject ?? ''} ${snippet} ${m.snippet ?? ''}`),
       });
     }
   }

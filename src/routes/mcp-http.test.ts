@@ -28,6 +28,7 @@ import { Hono } from 'hono';
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import type { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
+  MCP_ACCOUNTING_UNAVAILABLE,
   mcpHttp,
   mcpSessions,
   createMcpSessionStore,
@@ -35,9 +36,11 @@ import {
   MCP_SESSIONS_PER_IP_DAY,
 } from './mcp-http.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
-import { MCP_DAILY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { deviceGrant } from './device-grant.js';
 import { getStatsDB } from '../lib/db.js';
+import { ledgerBucket } from '../lib/ledger-bucket.js';
+import { trialWeekStart } from '../lib/trial.js';
 import { DAILY_KEY_CREATION_LIMIT, keyCreationSource } from '../lib/key-creation-guard.js';
 import type { HonoEnv } from '../types.js';
 
@@ -123,8 +126,8 @@ async function initialize(
 }
 
 /**
- * `clientIp` exists because the free tier is 10 tool calls per IP per day and
- * this file is at the cap. Unset, every test shares the 'unknown' bucket, so
+ * `clientIp` exists because the free tier is a handful of tool calls per source
+ * per week (ten a day until 24/09/2026) and this file is at the cap. Unset, every test shares the 'unknown' bucket, so
  * adding an eleventh `tools/call` anywhere makes a DIFFERENT test fail with a
  * rate-limit error — a confusing failure that says nothing about the code under
  * test. A documentation address (RFC 5737 TEST-NET-3) gives one test its own
@@ -585,13 +588,13 @@ describe('POST /mcp — JSON-RPC batch billing', () => {
     const app = makeApp();
     const sessionId = await initialize(app);
 
-    // One batch carrying more calls than a whole day's allowance.
+    // One batch carrying more calls than a whole week's allowance.
     const res = await postBatch(app, sessionId, '203.0.113.201', 40);
     const body = await parseStreamableHttp(res);
 
-    expect(body.error, 'a 40-call batch must not slip past the daily allowance').toBeDefined();
+    expect(body.error, 'a 40-call batch must not slip past the weekly allowance').toBeDefined();
     expect(body.error?.code).toBe(-32000);
-    expect(body.error?.message).toContain('Daily MCP free tier limit reached');
+    expect(body.error?.message).toContain('Weekly MCP free tier limit reached');
   });
 
   it('leaves a single tool call unaffected', async () => {
@@ -750,6 +753,187 @@ describe('POST /mcp — an expired session says what to do about it', () => {
 });
 
 /**
+ * No session, no debit (review of 24/09/2026, D1).
+ *
+ * The weekly allowance used to be charged BEFORE the session was looked up: a
+ * batch of IBANs sent on a session the last redeploy had wiped paid one unit
+ * per IBAN, then got its 404, and the units came back only on Monday. A
+ * tools/call with no session header paid a unit, spent a session opening and
+ * built a McpServer, for a 400.
+ */
+describe('POST /mcp — no text promises a key on a transport that reads none', () => {
+  it('sends a caller whose allowance cannot be counted to REST or the npm package', () => {
+    expect(MCP_ACCOUNTING_UNAVAILABLE).toMatch(/reads no key/);
+    expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('https://api.ibanforge.com/v1');
+    expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('IBANFORGE_API_KEY');
+    expect(MCP_ACCOUNTING_UNAVAILABLE).not.toMatch(/use an API key or x402 to continue/);
+  });
+});
+
+describe('POST /mcp — a call that no tool can serve costs nothing', () => {
+  const IBANS = Array.from({ length: 20 }, () => 'DE89370400440532013000');
+
+  function weekUnits(ip: string, prefix: '' | 'init:' = ''): number | null {
+    const row = getStatsDB()
+      .prepare('SELECT units FROM trial_weekly WHERE week = ? AND bucket = ?')
+      .get(trialWeekStart(), ledgerBucket(ip, prefix)) as { units: number } | undefined;
+    return row?.units ?? null;
+  }
+
+  function dayUnits(ip: string, prefix: '' | 'init:'): number | null {
+    const row = getStatsDB()
+      .prepare("SELECT units FROM trial_ledger WHERE day = date('now') AND bucket = ?")
+      .get(ledgerBucket(ip, prefix)) as { units: number } | undefined;
+    return row?.units ?? null;
+  }
+
+  function toolCallsToday(): number {
+    const row = getStatsDB()
+      .prepare("SELECT tool_calls FROM mcp_remote_daily WHERE day = date('now')")
+      .get() as { tool_calls: number } | undefined;
+    return row?.tool_calls ?? 0;
+  }
+
+  async function batchOn(
+    app: ReturnType<typeof makeApp>,
+    ip: string,
+    sessionId: string | null,
+  ): Promise<Response> {
+    return app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'x-real-ip': ip,
+        ...(sessionId ? { 'mcp-session-id': sessionId } : {}),
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 77,
+        method: 'tools/call',
+        params: { name: 'batch_validate_iban', arguments: { ibans: IBANS } },
+      }),
+    });
+  }
+
+  it('an unknown session answers 404 and debits nothing, a batch included', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.201';
+    const calls = toolCallsToday();
+    const res = await batchOn(app, ip, '00000000-0000-4000-8000-00000000d001');
+    expect(res.status).toBe(404);
+    expect(weekUnits(ip)).toBeNull();
+    expect(toolCallsToday(), 'a 404 is not a served tool call').toBe(calls);
+  });
+
+  it('a session taken by the idle sweep answers 404 and debits nothing', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.202';
+    const sessionId = await initialize(app, ip);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 31 * 60 * 1000);
+      expect(mcpSessions.sweep()).toBeGreaterThanOrEqual(1);
+      const res = await batchOn(app, ip, sessionId);
+      expect(res.status).toBe(404);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(weekUnits(ip)).toBeNull();
+  });
+
+  it('a tools/call with no session header answers 400, with no debit and no session opened', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.203';
+    const calls = toolCallsToday();
+    const res = await batchOn(app, ip, null);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: { message: string } };
+    expect(body.error?.message).toContain('initialize');
+    expect(res.headers.get('mcp-session-id')).toBeNull();
+    expect(weekUnits(ip)).toBeNull();
+    expect(dayUnits(ip, 'init:'), 'no session opening spent').toBeNull();
+    expect(toolCallsToday()).toBe(calls);
+  });
+
+  it('an unknown tool on a live session is neither charged nor counted', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.205';
+    const sessionId = await initialize(app, ip);
+    const calls = toolCallsToday();
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'x-real-ip': ip,
+        'mcp-session-id': sessionId,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 79,
+        method: 'tools/call',
+        params: { name: 'validate_ibanz', arguments: { iban: 'DE89370400440532013000' } },
+      }),
+    });
+    await res.text();
+    expect(weekUnits(ip)).toBeNull();
+    expect(toolCallsToday()).toBe(calls);
+  });
+
+  it('a call the transport refuses with 406 is neither charged nor counted', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.206';
+    const sessionId = await initialize(app, ip);
+    const calls = toolCallsToday();
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // No text/event-stream: the SDK answers 406.
+        Accept: 'application/json',
+        'x-real-ip': ip,
+        'mcp-session-id': sessionId,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 80,
+        method: 'tools/call',
+        params: { name: 'batch_validate_iban', arguments: { ibans: IBANS } },
+      }),
+    });
+    expect(res.status).toBe(406);
+    expect(weekUnits(ip)).toBeNull();
+    expect(toolCallsToday()).toBe(calls);
+  });
+
+  it('a live session is still billed, one unit per IBAN', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.204';
+    const sessionId = await initialize(app, ip);
+    await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'x-real-ip': ip,
+        'mcp-session-id': sessionId,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 78,
+        method: 'tools/call',
+        params: {
+          name: 'batch_validate_iban',
+          arguments: { ibans: IBANS.slice(0, 3) },
+        },
+      }),
+    });
+    expect(weekUnits(ip)).toBe(3);
+  });
+});
+
+/**
  * Opening a session is the expensive request, and nothing counted it (SEC-01).
  *
  * `initialize` is not a `tools/call`, so it escaped the daily allowance
@@ -799,6 +983,43 @@ describe('POST /mcp — opening a session is metered per address', () => {
       'no session should be opened past the cap',
     ).toBeNull();
   });
+
+  /**
+   * The session ceiling stays counted by the DAY, out of the weekly table
+   * (review of 24/09/2026, D13): only the tool calls moved to the week. The
+   * test above stays green if the ceiling were weekly, since the next opening
+   * is refused either way; this one reopens the next day.
+   */
+  it('counts session openings by the day, never in the weekly table', async () => {
+    const app = makeApp();
+    const ip = '192.0.2.210';
+    const open = async () =>
+      app.request('/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'x-real-ip': ip,
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: {} }),
+      });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-09-29T08:00:00Z'));
+      for (let i = 0; i < MCP_SESSIONS_PER_IP_DAY; i++) await open();
+      const refused = await open();
+      expect(refused.headers.get('X-MCP-Outcome')).toBe('session_rate_limited');
+      const initRows = getStatsDB()
+        .prepare("SELECT COUNT(*) AS n FROM trial_weekly WHERE bucket LIKE 'init:%'")
+        .get() as { n: number };
+      expect(initRows.n).toBe(0);
+      vi.setSystemTime(new Date('2026-09-30T08:00:00Z'));
+      const nextDay = await open();
+      expect(nextDay.headers.get('X-MCP-Outcome')).not.toBe('session_rate_limited');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 /**
@@ -810,7 +1031,7 @@ describe('POST /mcp — opening a session is metered per address', () => {
  * signed-up one. Every other surface already bills this tool per IBAN.
  */
 describe('POST /mcp — batch_validate_iban bills per IBAN', () => {
-  it('spends a whole day of allowance on one 100-IBAN batch', async () => {
+  it('spends a whole week of allowance on one 100-IBAN batch', async () => {
     const app = makeApp();
     const ip = '198.51.100.241';
     const sessionId = await initialize(app, ip);
@@ -1079,7 +1300,7 @@ describe('device grant — les deux outils sur le transport HTTP', () => {
     const sessionId = await initialize(app, ip);
 
     // Le plafond d'unités épuisé sur la même adresse, par le chemin normal.
-    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) {
       await rpc(
         app,
         sessionId,
@@ -1107,7 +1328,7 @@ describe('device grant — les deux outils sur le transport HTTP', () => {
     const app = makeApp();
     const ip = '198.51.100.202';
     const sessionId = await initialize(app, ip);
-    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) {
       await rpc(
         app,
         sessionId,
@@ -1348,7 +1569,7 @@ describe('le haut de l’entonnoir MCP distant, par jour', () => {
     const app = makeApp();
     const ip = freshIp();
     const sessionId = await initialize(app, ip);
-    for (let i = 0; i < MCP_DAILY_LIMIT; i++) {
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) {
       await rpc(
         app,
         sessionId,
@@ -1367,7 +1588,7 @@ describe('le haut de l’entonnoir MCP distant, par jour', () => {
       999,
       ip,
     );
-    expect(refused.error?.message).toContain('Daily MCP free tier limit reached');
+    expect(refused.error?.message).toContain('Weekly MCP free tier limit reached');
     expect(today()).toEqual(before);
   });
 });

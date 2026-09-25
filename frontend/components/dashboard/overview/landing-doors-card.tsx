@@ -126,10 +126,13 @@ export async function LandingDoorsCard({
             {t('fresh.doors.clicks', { week: week.ok ? clicks(week.data) : 0, month: clicks(month.data) })}
           </p>
 
-          {/* The API's own door, opened 06/09/2026: ten keyless validations a
-              day per address. A row is an address-day, not a call, and the
+          {/* The API's own door, opened 06/09/2026: a keyless allowance on
+              POST /v1/iban/validate, counted by the ISO week since 24/09/2026.
+              "Tried" is an address-day, "exhausted" a source-week (written on
+              the call that crosses the ceiling), neither is a call; the
               conversion is a key born with source=api-trial — the only figure
-              here that is money rather than curiosity. */}
+              here that is money rather than curiosity. No figure is written
+              here: the allowance lives in src/lib/trial.ts. */}
           <div className="mt-3 border-t border-[var(--border-1)] pt-3">
             <p className="mb-1 text-[12px] font-medium text-[var(--fg-2)]">{t('fresh.doors.trial.title')}</p>
             <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--fg-5)]">

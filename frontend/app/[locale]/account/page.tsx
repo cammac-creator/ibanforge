@@ -5,13 +5,18 @@ import { ClientMessages } from "@/components/client-messages"
 import { alternatesFor } from "@/lib/seo";
 
 /**
- * The customer-facing account page.
+ * La page du compte client (« Mon compte »).
  *
- * Deliberately outside the dashboard's protected group: it has no session, no
- * password and no server secret. The visitor's own API key is the credential,
- * and it is used from the browser against the API host directly — see the note
- * in `AccountApp`. That makes this the one operator-grade surface that renders
- * identically in a preview deployment.
+ * Volontairement hors du groupe protégé du tableau de bord : ni mot de passe,
+ * ni secret serveur. Deux façons d'y lire ses clés, toutes deux du navigateur
+ * vers l'hôte de l'API, sans route Next ni action serveur (voir l'en-tête
+ * d'`AccountApp`) :
+ * - par défaut, la connexion par adresse e-mail et code à six chiffres, dont
+ *   la session est un cookie posé par l'API sur son propre hôte ;
+ * - en repli, la clé collée, qui ne touche jamais nos serveurs.
+ *
+ * Le repli se rend à l'identique dans un déploiement de prévisualisation ; la
+ * connexion suppose le même site que l'API (ibanforge.com et api.ibanforge.com).
  */
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

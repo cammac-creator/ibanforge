@@ -14,7 +14,9 @@ Validieren Sie eine einzelne IBAN mit vollständiger Prüfsummenverifizierung, l
 POST https://api.ibanforge.com/v1/iban/validate
 ```
 
-**Kosten:** $0.005 USDC pro Anfrage
+**Kosten:** 0,005 $ in USDC pro Anfrage mit x402, oder eine Anfrage aus dem Kontingent oder Guthaben Ihres Schlüssels.
+
+**Ganz ohne Schlüssel:** bis zu 25 Prüfungen pro Woche und Quelladresse (IPv6 pro /64 gezählt), nur auf dieser Route, zum Ausprobieren. Die Woche ist die ISO-Woche in UTC und beginnt am Montag um 00:00 UTC neu. Senden Sie eine echte `iban` ohne Zugangsdaten: Die Antwort ist vollständig und trägt einen Block `trial` mit der Zahl der in dieser Woche verbleibenden Aufrufe und dem Zeitpunkt der Rücksetzung. Danach antwortet die Route bis Montag mit `402` und `cause.reason: "trial_exhausted"`. Für alle anderen Endpunkte nehmen Sie einen [Schlüssel ohne E-Mail](/docs/api-keys).
 
 ## Anfrage
 
@@ -23,8 +25,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | Header | Wert | Erforderlich |
 |---|---|---|
 | `Content-Type` | `application/json` | Ja |
-| `Authorization` | `Bearer ifk_...` (kostenloser API-Schlüssel) | Einer von beiden |
-| `X-PAYMENT` | x402-Zahlungstoken | Einer von beiden |
+| `Authorization` | `Bearer ifk_...` (API-Schlüssel, ohne E-Mail) | Nein: Ohne ihn bedient die Kostprobe ohne Schlüssel den Aufruf, solange sie reicht |
+| `PAYMENT-SIGNATURE` (x402 v2) oder `X-PAYMENT` (v1) | x402-Zahlungssignatur | Nein: bezahlt diesen einen Aufruf statt eines Schlüssels |
 
 ### Body
 
@@ -161,7 +163,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `redirected_from` | `string?` | Der angefragte Bankcode, wenn das Register für denjenigen geantwortet hat, der sein Clearing übernommen hat (CH und LI: SIX leitet eine konkatenierte IID um). Die IBAN bleibt gültig: eine Umleitung ist keine Stilllegung |
 | `bank_name` | `string \| null` | Name des Finanzinstituts |
 | `city` | `string \| null` | Stadt des Instituts |
-| `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, AT, BE und BG); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |
+| `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, AT, BE, SK, CZ, BG, CH, LI und SM); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |
 | `authoritative` | `boolean` | Ob dieser BIC gespeichert und zur Abwicklung verwendet werden darf. Aus `basis` abgeleitet, `true` nur bei `national_register`. Siehe den Abschnitt „Abwickeln oder nur als Hinweis behandeln?" unten |
 
 **`sepa`-Objekt:**
@@ -195,7 +197,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `register` | `string \| null` | Name des konsultierten Referenzbestands |
 | `authoritative` | `boolean` | `true` nur dort, wo der Referenzbestand das nationale Register IST — siehe unten |
 | `candidates` | `number?` | Bei `match: "prefix"`: Anzahl passender Institute. Mehr als 1 heißt: nur ein Hinweis |
-| `institution` | `object?` | Was das nationale Register über das Institut veröffentlicht: Name, Sitzadresse, LEI wo vorhanden. Nur bei autoritativen Antworten. Tiefe variiert: CH/LI und AT volle Adresse, DE nur PLZ + Ort (das Register führt keine Straße), BE nur der Name, BG nur der Name — in Kyrillisch, wie das Register ihn veröffentlicht —, SK nur der Name, mit slowakischen Diakritika wie veröffentlicht. Fehlende Felder sind `null`, nie geraten. Es ist das Institut, das den Bankcode hält — keine Filiale und kein Beleg für ein Konto |
+| `institution` | `object?` | Was das nationale Register über das Institut veröffentlicht: Name, Sitzadresse, LEI wo vorhanden. Nur bei autoritativen Antworten. Tiefe variiert: CH/LI und AT volle Adresse, DE nur PLZ + Ort (das Register führt keine Straße), BE nur der Name, BG nur der Name — in Kyrillisch, wie das Register ihn veröffentlicht —, SK nur der Name, mit slowakischen Diakritika wie veröffentlicht, CZ nur der Name, mit tschechischen Diakritika wie veröffentlicht. Fehlende Felder sind `null`, nie geraten. Es ist das Institut, das den Bankcode hält — keine Filiale und kein Beleg für ein Konto |
 | `as_of` | `string` | Monat der Referenzdaten |
 
 **`risk_indicators`-Objekt:**
@@ -213,7 +215,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 `bank_code_check.status: "verified"` bedeutet: Der Bankcode löst in den konsultierten Referenzdaten zu einem Institut auf, das wir benennen können. Wie viel das wert ist, sagt genau `authoritative`:
 
-- **`authoritative: true`** — der Referenzbestand ist das nationale Register selbst. Heute: **CH und LI** (SIX BankMaster), **DE** (Bankleitzahlendatei der Bundesbank), **FI** (Finance-Finland-Codes — an Bankengruppen vergeben, ein Treffer bestätigt die Gruppe), **AT** (OeNB-Verzeichnis), **BE** (Codeliste der Belgischen Nationalbank), **BG** (BAE-Register der Bulgarischen Nationalbank — das Urteil gilt dem Bankcode aus vier Buchstaben, IBAN-Positionen 5-8; Filialziffern werden nicht separat geprüft), **SK** (der *prevodník* der Identifikationscodes für den inländischen Zahlungsverkehr der Národná banka Slovenska). In diesen Ländern bedeutet `not_in_register`, dass der Code **nicht vergeben** ist — ein starker Grund, eine Zahlung zu stoppen. **San Marino steht dort bewusst nicht**: Die Liste der operativen Banken der Zentralbank nennt den Inhaber eines geführten Codes, ein Treffer ist also `verified` mit einem `institution`-Block, doch sie veröffentlicht nicht die Vergabe des ABI-Raums — ein Fehlen bleibt daher `absent_from_reference_data` und `authoritative` bleibt `false`. Siehe [san-marinesische Bankleitzahlen](/docs/sm-bank-codes).
+- **`authoritative: true`** — der Referenzbestand ist das nationale Register selbst. Heute: **CH und LI** (SIX BankMaster), **DE** (Bankleitzahlendatei der Bundesbank), **AT** (OeNB-Verzeichnis), **BE** (Codeliste der Belgischen Nationalbank), **BG** (BAE-Register der Bulgarischen Nationalbank — das Urteil gilt dem Bankcode aus vier Buchstaben, IBAN-Positionen 5-8; Filialziffern werden nicht separat geprüft), **SK** (der *prevodník* der Identifikationscodes für den inländischen Zahlungsverkehr der Národná banka Slovenska), **CZ** (der *číselník* der Zahlungsverkehrscodes der Česká národní banka: Das tschechische Recht macht ihn zur Vergabe der IBAN-Positionen 5-8, und jede Ausgabe gilt ab ihrem eigenen Gültigkeitsdatum, nicht ab dem Tag, an dem wir sie lesen). In diesen Ländern bedeutet `not_in_register`, dass der Code **nicht vergeben** ist — ein starker Grund, eine Zahlung zu stoppen. **San Marino steht dort bewusst nicht**: Die Liste der operativen Banken der Zentralbank nennt den Inhaber eines geführten Codes, ein Treffer ist also `verified` mit einem `institution`-Block, doch sie veröffentlicht nicht die Vergabe des ABI-Raums — ein Fehlen bleibt daher `absent_from_reference_data` und `authoritative` bleibt `false`. Siehe [san-marinesische Bankleitzahlen](/docs/sm-bank-codes). **Auch Finnland steht dort nicht** seit dem 16. September 2026: Die Finance-Finland-Codes sind eine abgeschriebene Liste mit Stand 2025-10, die nichts auffrischt, und sie sind an Bankengruppen vergeben, nicht an Institute; ein Treffer ist daher `verified` und nennt die Gruppe, ein Fehlen bleibt `absent_from_reference_data` mit `authoritative: false`. Siehe [finnische Bankcodes](/docs/fi-bank-codes).
 - **`authoritative: false`** — der Referenzbestand ist unsere zusammengesetzte Bankcode-Karte aus BIC-Verzeichnissen. Ein Treffer benennt den Inhaber des passenden BIC; er beweist **nicht**, dass dieses Institut IBANs ausgibt. Wo Bankcodes aus Buchstaben bestehen, heißt `match: "prefix"` mit `candidates > 1`: nur ein Hinweis.
 
 **Ein Fehler auf unserer Seite wird als `unavailable` gemeldet, nie als Verdikt.** Wenn die Referenzdaten nicht gelesen werden können — unlesbare Datenbank, nach einem fehlgeschlagenen Deploy fehlende Tabelle, Zeitüberschreitung einer Abfrage — lautet die Antwort `status: "unavailable"` mit `reason: "lookup_failed"` und `register: null`. Nie `not_in_register`: Dieses Verdikt bedeutet „kein Institut hält diesen Code", und eine Störung bei uns ist kein Beleg über Ihren Empfänger. `reason` trennt beide Situationen in einem einzigen Token: `lookup_failed` und `national_register_unavailable` liegen bei uns, alles andere ist eine Aussage über den Code. Alle werden gleich behandelt: weitermachen und einen Namensabgleich des Empfängers entscheiden lassen.
@@ -224,7 +226,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 Der BIC in der Antwort ist aus dem Bankcode der IBAN **abgeleitet**, und was diese Ableitung wert ist, hängt vollständig davon ab, was sie erzeugt hat. `bic.basis` sagt, welche Quelle es war, und `bic.authoritative` macht daraus den einen booleschen Wert, auf den eine Zahlungsverarbeitung verzweigen kann:
 
-- **`basis: "national_register"`, `authoritative: true`** — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode. Heute sind das **die Schweiz, Liechtenstein, Deutschland, Österreich, Belgien, Bulgarien, die Slowakei und San Marino**: Der SIX BankMaster führt für CH und LI den exakten 11-stelligen BIC je IID (BC-Nummer), die Bankleitzahlendatei der Bundesbank führt den exakten 11-stelligen BIC je BLZ, und die Register der OeNB, der Belgischen Nationalbank, das BAE-Register der Bulgarischen Nationalbank, der prevodník der Národná banka Slovenska sowie die Liste der Zentralbank von San Marino veröffentlichen den BIC des Instituts je Bankcode. San Marino ist die einzige Stelle, an der dieses Flag `true` ist, während `bank_code_check.authoritative` `false` ist: Die Liste der Zentralbank ordnet einem geführten Code einen BIC zu, veröffentlicht aber nicht die Vergabe des Coderaums. Das deutsche Register ist der Grund, weshalb eine Sparkasse zu ihrem eigenen BIC auflöst und nicht zum BIC8 der gemeinsamen Landesbank, und das Schweizer Register der Grund, weshalb die IID 30020 zu Crédit Mutuel de la Vallée SA (`RBABCH22180`) auflöst und nicht zu Entris Banking AG (`RBABCH22`) — das Feld benennt diese Zuordnung, es erzeugt sie nicht. **Vergleichen Sie einen gelieferten BIC auf `bic8`**: Der Filialcode ist informativ, und in einem Genossenschaftsverbund benennt er die lokale Bank, während die ersten acht Zeichen ihr Clearing-Institut benennen. Speicherbar und zur Abwicklung geeignet — mit einer Ausnahme: Ein Code, den das Register selbst als **zurückgezogen** führt, behält die Basis `national_register`, aber `authoritative` fällt auf `false`; lesen Sie `bank_code_check.retired` und `superseded_by`.
+- **`basis: "national_register"`, `authoritative: true`** — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode. Heute sind das **die Schweiz, Liechtenstein, Deutschland, Österreich, Belgien, Bulgarien, die Slowakei, Tschechien und San Marino**: Der SIX BankMaster führt für CH und LI den exakten 11-stelligen BIC je IID (BC-Nummer), die Bankleitzahlendatei der Bundesbank führt den exakten 11-stelligen BIC je BLZ, und die Register der OeNB, der Belgischen Nationalbank, das BAE-Register der Bulgarischen Nationalbank, der prevodník der Národná banka Slovenska, der číselník der Česká národní banka sowie die Liste der Zentralbank von San Marino veröffentlichen den BIC des Instituts je Bankcode. San Marino ist die einzige Stelle, an der dieses Flag `true` ist, während `bank_code_check.authoritative` `false` ist: Die Liste der Zentralbank ordnet einem geführten Code einen BIC zu, veröffentlicht aber nicht die Vergabe des Coderaums. Das deutsche Register ist der Grund, weshalb eine Sparkasse zu ihrem eigenen BIC auflöst und nicht zum BIC8 der gemeinsamen Landesbank, und das Schweizer Register der Grund, weshalb die IID 30020 zu Crédit Mutuel de la Vallée SA (`RBABCH22180`) auflöst und nicht zu Entris Banking AG (`RBABCH22`) — das Feld benennt diese Zuordnung, es erzeugt sie nicht. **Vergleichen Sie einen gelieferten BIC auf `bic8`**: Der Filialcode ist informativ, und in einem Genossenschaftsverbund benennt er die lokale Bank, während die ersten acht Zeichen ihr Clearing-Institut benennen. Speicherbar und zur Abwicklung geeignet — mit einer Ausnahme: Ein Code, den das Register selbst als **zurückgezogen** führt, behält die Basis `national_register`, aber `authoritative` fällt auf `false`; lesen Sie `bank_code_check.retired` und `superseded_by`.
 - **`basis: "curated_map"`, `authoritative: false`** — unsere eigene gepflegte Bankcode-Karte hat die Zuordnung über einen exakten Schlüssel hergestellt. Meistens richtig und kein Vergabeakt: Keine Behörde steht dahinter.
 - **`basis: "directory_prefix"`, `authoritative: false`** — der BIC-Präfix-Rückfall. Er kann mehrere Institute gleichzeitig treffen; `bank_code_check.candidates` sagt wie viele, und `next_steps` meldet `bic_is_advisory`, sobald es mehr als eines ist.
 
@@ -241,19 +243,25 @@ Wenn die IBAN ungültig ist, gibt die Antwort dennoch den Statuscode 200 zurück
   "iban": "CH5604835012345678000",
   "valid": false,
   "error": "checksum_failed",
-  "error_detail": "Modulo 97 check returned 42, expected 1.",
+  "error_detail": "Modulo 97 check returned 49, expected 1.",
   "cost_usdc": 0.005
 }
 ```
+
+`cost_usdc` zeigt den x402-Preis des Aufrufs; er ist `0`, wenn ein Schlüssel oder die Kostprobe ohne Schlüssel ihn bedient hat.
 
 ### Fehlercodes
 
 | Code | Beschreibung |
 |---|---|
-| `invalid_format` | IBAN enthält ungültige Zeichen oder ist zu kurz |
+| `invalid_format` | IBAN enthält andere Zeichen als Buchstaben, Ziffern, Leerzeichen und Bindestriche, oder ist zu kurz |
 | `unsupported_country` | Ländercode wird nicht erkannt |
 | `wrong_length` | IBAN-Länge stimmt nicht mit der erwarteten Länge für dieses Land überein |
+| `invalid_check_digits` | Die Zeichen 3 und 4 sind keine zwei Ziffern, oder sie lauten `00`, `01` oder `99` |
 | `checksum_failed` | MOD-97-Prüfsummenverifizierung fehlgeschlagen |
+| `invalid_bban_structure` | Länge und MOD-97 stimmen, aber der nationale Teil folgt nicht dem Aufbau des Landes |
+
+Jeder Code und die HTTP-Status einer abgelehnten Anfrage (`400`, `402`, `413`, `429`) stehen in der [Fehlerreferenz](/docs/errors).
 
 ## Codebeispiele
 

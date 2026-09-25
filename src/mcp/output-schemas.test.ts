@@ -1,8 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
+import { validateIBAN } from '../lib/iban.js';
+import { enrichResult } from '../lib/enrich.js';
+import { buildComplianceResponse } from '../lib/compliance-response.js';
+import { frozenSources } from '../lib/source-vintage.js';
+import { sourceName } from '../lib/bic-lookup.js';
 import { MCP_TOOLS } from './inventory.js';
+import { getComplianceMeta, type ComplianceMeta } from '../lib/compliance-db.js';
 
 /**
  * Both internal MCP transports must declare the SAME `outputSchema` per tool.
@@ -119,4 +126,88 @@ describe('output schema parity — stdio and HTTP declare the same shared schema
       );
     });
   }
+});
+
+// `ComplianceMeta` (src/lib/compliance-db.ts) types `sources` as `string | null`:
+// null whenever the compliance database carries no metadata row. The schema
+// declared `z.string().optional()`, which refuses null, so on that day every
+// `check_compliance` answer over /mcp would fail its own output validation — a
+// conformant client refuses a whole response whose structuredContent does not
+// match the advertised schema. The published package's copy of this schema was
+// fixed the same way (mcp/, PR 232).
+describe('check_compliance: meta accepts every value the API can put there', () => {
+  const metaSchema = TOOL_OUTPUT_SCHEMAS.check_compliance.meta;
+
+  it('accepts a meta whose dates and sources are unknown (null)', () => {
+    const meta: ComplianceMeta = {
+      ...getComplianceMeta(),
+      sanctions_as_of: null,
+      fatf_as_of: null,
+      sources: null,
+    };
+    expect(metaSchema.safeParse(meta).success).toBe(true);
+  });
+
+  it('still refuses a sources value of the wrong type', () => {
+    expect(metaSchema.safeParse({ ...getComplianceMeta(), sources: 42 }).success).toBe(false);
+  });
+});
+
+/**
+ * Les champs de vérité du 25/09/2026, déclarés dans chaque schéma qui les sert :
+ * Zod retire EN SILENCE une clé non déclarée, et le client officiel refuse un
+ * objet fermé qui en porte une. Rendus ici par le vrai enrichissement, puis
+ * passés au schéma : ce qui ressort doit être ce qui est entré.
+ */
+describe('the truth fields are declared, so the schema never strips them', () => {
+  function enriched(iban: string) {
+    const r = validateIBAN(iban);
+    enrichResult(r);
+    return { ...r, cost_usdc: 0 };
+  }
+
+  it('validate_iban and batch_validate_iban keep bank_code_holder, checks and the bank grain', () => {
+    const schema = z.object(TOOL_OUTPUT_SCHEMAS.validate_iban);
+    for (const iban of ['DE23999999990000000000', 'NL19BICK0123456789', 'DE89370400440532013000']) {
+      const r = enriched(iban);
+      const parsed = schema.parse(r);
+      expect(parsed.bank_code_holder, iban).toBe(r.bank_code_holder);
+      expect(parsed.checks, iban).toEqual(r.checks);
+      expect(parsed.sepa, iban).toEqual(r.sepa);
+      if (r.bic) {
+        expect(parsed.bic, iban).toHaveProperty('listed_in_current_source');
+        expect(parsed.bic?.listed_in_current_source, iban).toBe(r.bic.listed_in_current_source);
+      }
+      const batch = z
+        .object(TOOL_OUTPUT_SCHEMAS.batch_validate_iban)
+        .parse({ results: [r], count: 1 });
+      expect(batch.results[0]!.checks, iban).toEqual(r.checks);
+    }
+  });
+
+  it('check_compliance keeps the honest names inside its closed blocks', () => {
+    const schema = z.object(TOOL_OUTPUT_SCHEMAS.check_compliance);
+    for (const iban of ['DE23999999990000000000', 'DE89370400440532013000', 'not-an-iban']) {
+      const r = { ...buildComplianceResponse(iban), cost_usdc: 0 };
+      const parsed = schema.parse(r);
+      expect(parsed.compliance.sanctions, iban).toEqual(r.compliance.sanctions);
+      expect(parsed.compliance.reachability, iban).toEqual(r.compliance.reachability);
+      expect(parsed.compliance.vop, iban).toEqual(r.compliance.vop);
+      if (r.checks) expect(parsed.checks, iban).toEqual(r.checks);
+    }
+  });
+
+  it('lookup_bic keeps source, source_name, source_as_of and listed_in_current_source', () => {
+    const frozen = frozenSources()[0]!;
+    const payload = {
+      bic: 'XMPLNL2A',
+      found: true,
+      source: frozen.source,
+      source_name: sourceName(frozen.source),
+      source_as_of: frozen.as_of,
+      listed_in_current_source: null,
+    };
+    const parsed = z.object(TOOL_OUTPUT_SCHEMAS.lookup_bic).parse(payload);
+    expect(parsed).toMatchObject(payload);
+  });
 });

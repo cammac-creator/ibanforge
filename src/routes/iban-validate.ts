@@ -62,7 +62,7 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   }
 
   const postedPrice = result.cost_usdc;
-  // Nobody paid for this one: a key spent an allowance, or the keyless daily
+  // Nobody paid for this one: a key spent an allowance, or the keyless weekly
   // trial did. Leaving the posted price on a trial response would read to the
   // caller as "you were just charged $0.005", which is the opposite of the
   // message the trial exists to send.
@@ -77,10 +77,11 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   // without saying so. The trial is a single-IBAN, REST-only affair anyway.
   if (trial) {
     result.trial = {
-      calls_used_today: trial.used,
-      calls_left_today: trial.remaining,
-      daily_limit: trial.limit,
+      calls_used_this_week: trial.used,
+      calls_left_this_week: trial.remaining,
+      weekly_limit: trial.limit,
       resets: TRIAL_RESET,
+      resets_at: trial.resetsAt,
       free_key: TRIAL_FREE_KEY_HINT,
       docs: TRIAL_DOCS_URL,
     };

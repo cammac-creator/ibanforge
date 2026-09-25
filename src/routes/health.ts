@@ -11,6 +11,9 @@ import { getStatsDB, getStatsDbState } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
 import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
 import { verificationDelivery } from '../lib/key-creation-guard.js';
+import { servedAt } from '../lib/served-at.js';
+import { restrictedOverlayHealth } from '../lib/restricted-overlay-runtime.js';
+import { frozenTrace, type FrozenSourceTrace } from '../lib/bic-trace.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -105,6 +108,22 @@ function probeSourceFreshness(): SourceFreshness[] {
   }
 }
 
+/**
+ * Les lignes des sources figées qu'aucune source de ce cycle ne porte plus.
+ *
+ * Gardé comme probeSourceFreshness : une erreur rend un tableau vide, jamais un
+ * /health rouge. Mémorisé pour la vie du processus (src/lib/bic-trace.ts), donc
+ * recalculé à chaque déploiement, ce qui est le rythme des deux bases. Pas de
+ * ventilation par pays ici : cet endpoint est sondé toutes les 30 s.
+ */
+function probeFrozenTrace(): FrozenSourceTrace[] {
+  try {
+    return frozenTrace();
+  } catch {
+    return [];
+  }
+}
+
 function probeVerificationMail(): { window_hours: number; state: 'ok' | 'degraded' | 'unknown' } {
   try {
     const d = verificationDelivery(24);
@@ -151,6 +170,7 @@ function probeState(probe: () => void): 'ok' | 'error' {
 function statsDbUnavailable(error: string | undefined): {
   status: string;
   version: string;
+  served_at: string;
   uptime_seconds: number;
   databases: { bic: string; stats: string; compliance: string };
   message: string;
@@ -158,6 +178,7 @@ function statsDbUnavailable(error: string | undefined): {
   return {
     status: 'error',
     version: pkg.version,
+    served_at: servedAt(),
     uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
     databases: {
       bic: probeState(() => void getEntryCount()),
@@ -186,6 +207,11 @@ health.get('/health', (c) => {
     return c.json({
       status: 'ok',
       version: pkg.version,
+      // ADDED 24/09/2026 beside the contract, nothing renamed: the instant this
+      // answer left the server. ChatGPT quoted a July copy of this endpoint as
+      // "the current answer" two months later; the body had nothing that dated
+      // it. A copy now carries its own date (src/lib/served-at.ts).
+      served_at: servedAt(),
       uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
       bic_database_entries: db.bic,
       ch_clearing_entries: db.chClearing,
@@ -211,6 +237,22 @@ health.get('/health', (c) => {
       // Memoised — one scan per process, see getSourceFreshness. Never used
       // to fail the check: stale data is a degraded feature, not an outage.
       bic_sources: probeSourceFreshness(),
+      // AJOUTÉ le 25/09/2026 à côté du contrat, rien de renommé : pour chaque
+      // source figée (bic_sources.source_as_of), ses lignes et ses BIC8, et
+      // combien aucune source rafraîchie ce cycle ne porte plus. `complete:
+      // false` et des comptes nuls quand une source de trace n'a pas été lue.
+      // Des faits produit sur des registres publics, jamais une activité.
+      frozen_bic_sources: probeFrozenTrace(),
+      // AJOUTÉ le 25/09/2026 à côté du contrat, rien de renommé : la surcouche
+      // privée des données sous conditions est-elle servie sur chaque base
+      // (`off` sans sa variable, `applied`, `kept_public` quand le public plus
+      // récent est gardé, `partial`, `refused`, `pending` avant l'ouverture de
+      // la base), avec les douze premiers caractères du SHA-256 du fichier
+      // servi et `fallback: true` quand c'est la dernière surcouche acceptée,
+      // pour prouver un dépôt en ligne. Un état, jamais un compte ; jamais une
+      // raison d'échouer le contrôle (une surcouche absente répond « non
+      // consulté », pas une panne).
+      restricted_overlays: restrictedOverlayHealth(),
     });
   } catch {
     // The probe itself may be the first thing to touch a broken stats database
@@ -218,7 +260,7 @@ health.get('/health', (c) => {
     // again before falling back to the anonymous failure.
     const state = getStatsDbState();
     if (!state.ok) return c.json(statsDbUnavailable(state.error), 503);
-    return c.json({ status: 'error', message: 'health_check_failed' }, 503);
+    return c.json({ status: 'error', served_at: servedAt(), message: 'health_check_failed' }, 503);
   }
 });
 

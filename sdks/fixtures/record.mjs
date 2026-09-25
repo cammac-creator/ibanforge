@@ -53,6 +53,10 @@ export const FIXTURE_PATH = join(HERE, 'quickstart-api.json');
 const VOLATILE = new Set([
   'processing_ms',
   'uptime_seconds',
+  // The instant the answer left the server, on /health and /v1/demo since
+  // 24/09/2026: it changes on every call by design, so it is recorded (a reader
+  // sees the field) and never compared.
+  'served_at',
   'api_key',
   'key_prefix',
   'used',

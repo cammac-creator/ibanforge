@@ -76,9 +76,11 @@ export function parseWebEvent(raw: unknown): WebEvent | null {
  * The events the SERVER writes, which no browser may claim.
  *
  * `api:trial` = a developer called POST /v1/iban/validate with no key and was
- * served on the daily allowance; `api:trial-exhausted` = the same address hit
- * the ceiling. Both are written once per address per day by
- * src/middleware/anonymous-trial.ts, so a row is an address-day and not a call.
+ * served on the keyless trial; it is written once per address per day, so a
+ * row is an address-day and not a call. `api:trial-exhausted` = a source (IPv6
+ * per /64) used up the week's allowance; since the trial is counted by the
+ * ISO week (24/09/2026) it is written once per source and per WEEK, on the call
+ * that crosses the ceiling. Both by src/middleware/anonymous-trial.ts.
  *
  * 🚨 They are deliberately NOT in the `NAME` alternation above. That regex
  * guards the PUBLIC `POST /v1/web/events`, and it was narrowed on 2026-09-06

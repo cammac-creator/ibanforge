@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import {
   getStats,
   getStatsHistory,
+  getStatsPulse,
   getHourlyStats,
   getErrorStats,
   getPatternStats,
@@ -133,6 +134,34 @@ stats.get('/stats', (c) => {
     const overview = getStats();
     const bicEntries = getEntryCount();
     return c.json({ ...overview, bic_database_entries: bicEntries });
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+/**
+ * Le pouls : dernière écriture du collecteur, requêtes du jour, opérations
+ * d'aujourd'hui et d'hier. Pour les écrans qui n'ont besoin que de cela : la vue
+ * « growth » du tableau de bord lisait `/stats` et `/stats/history` entiers
+ * (plus d'une seconde de calcul sur tout l'historique) pour ces quelques champs.
+ */
+stats.get('/stats/pulse', (c) => {
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+
+  try {
+    const keys = Object.keys(c.req.query());
+    if (keys.length > 0) {
+      return c.json(
+        {
+          error: 'unknown_parameter',
+          message: `Unknown query parameter(s): ${keys.join(', ')}. This endpoint takes no parameters.`,
+        },
+        400,
+      );
+    }
+    return c.json(getStatsPulse());
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }

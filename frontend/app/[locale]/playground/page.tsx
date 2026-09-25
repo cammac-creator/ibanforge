@@ -15,6 +15,7 @@ import {
   CHIPS,
   DEFAULT_INPUT,
   DEFAULT_RESULT,
+  SAVED_ON,
   type PlaygroundMode,
   type Chip,
 } from "./examples"
@@ -208,7 +209,15 @@ export default function PlaygroundPage() {
         {isLoading ? (
           <SkeletonCard />
         ) : (
-          result && <ResultCard mode={activeTab} data={result} animateKey={seq} received={received[activeTab] === true} />
+          result && (
+            <ResultCard
+              mode={activeTab}
+              data={result}
+              animateKey={seq}
+              received={received[activeTab] === true}
+              savedOn={SAVED_ON[activeTab]}
+            />
+          )
         )}
       </section>
 

@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { TRIAL_FREE_KEY_HINT } from './trial.js';
+import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_FREE_KEY_HINT } from './trial.js';
+import { MCP_SESSIONS_PER_IP_DAY, MCP_WEEKLY_LIMIT } from './mcp-limits.js';
+import { DAILY_KEY_CREATION_LIMIT } from './key-creation-guard.js';
 
 /**
  * Le chiffre de l'essai dans la PROSE, celle qu'aucune constante n'alimente.
@@ -13,13 +15,19 @@ import { TRIAL_FREE_KEY_HINT } from './trial.js';
  * la main, en trois langues, parfois en toutes lettres et parfois en ordinal
  * (« le onzième appel »).
  *
- * 🚨 Écrit en PLAFOND de lignes encore à migrer, et pas en assertion d'absence,
- * pour une raison de fait : au 15/09/2026 ces fichiers disent encore dix. Les
- * réécrire appartient au lot des textes humains, et un garde rouge à l'arrivée
- * n'aurait laissé que deux issues — toucher au périmètre de quelqu'un d'autre,
- * ou se désarmer. Le plafond, lui, mesure la dette, empêche qu'elle grossisse,
- * et descend à zéro quand les textes passent. Même doctrine que
- * `src/routes/static-claims.test.ts`.
+ * Écrit d'abord en PLAFOND de lignes encore à migrer (15/09/2026 : ces fichiers
+ * disaient encore dix, et les réécrire appartenait au lot des textes humains).
+ * Le 24/09/2026 ce lot est passé : plus aucune ligne ne dit dix, en chiffres,
+ * en lettres ou en ordinal. Les plafonds sont donc descendus à ZÉRO et sont
+ * devenus des égalités, et le compte des lignes chiffrées, qui mesurait des
+ * copies à tenir, est remplacé par ce qu'il protégeait.
+ *
+ * Le même jour, Claude-Alain a passé l'essai de 25 par JOUR à 25 par SEMAINE.
+ * Deux gardes en découlent : aucune ligne sur l'essai ne relie plus un chiffre
+ * au jour (« a day », « par jour », « pro Tag »), hors les deux autres quotas
+ * du jour qui vivent dans les mêmes pages ; et chaque plafond de la semaine
+ * écrit à la main est celui que le code applique. Le jour où la constante ou
+ * l'unité change, chaque copie rougit ici et nomme sa ligne.
  *
  * ⚠️ Ce qui est interdit TOUT DE SUITE et sans plafond : « partagé par toutes
  * les instances », dans les trois langues. Cette phrase n'est ni prouvable
@@ -50,8 +58,23 @@ const FILES = [
       (name) => `frontend/content/${lang}/docs/${name}.mdx`,
     ),
   ),
-  ...['en', 'fr', 'de'].map(
-    (lang) => `frontend/content/${lang}/blog/2026-09-07-bankleitzahl-pruefen-per-api.mdx`,
+  // Ajoutés le 24/09/2026 : les pages qui citent l'essai et qu'aucun garde ne
+  // lisait. L'article suisse du 14.09 disait « dix par jour » depuis dix jours.
+  ...['en', 'fr', 'de'].flatMap((lang) =>
+    [
+      'errors',
+      'iban-validate',
+      'iban-batch',
+      'pay-as-an-agent',
+      'ch-clearing',
+      'compliance',
+      'recipes',
+    ].map((name) => `frontend/content/${lang}/docs/${name}.mdx`),
+  ),
+  ...['en', 'fr', 'de'].flatMap((lang) =>
+    ['2026-09-07-bankleitzahl-pruefen-per-api', '2026-09-14-schweizer-iban-pruefen'].map(
+      (slug) => `frontend/content/${lang}/blog/${slug}.mdx`,
+    ),
   ),
 ];
 
@@ -82,12 +105,68 @@ const ORDINALS = [
 ];
 
 /**
- * Le chiffre en chiffres, sur une ligne qui parle de l'essai.
+ * Un plafond DU JOUR écrit en chiffres : le nombre, puis, sans autre chiffre
+ * entre les deux, l'unité du jour dans l'une des trois langues.
  *
- * Volontairement large : il compte la dette plutôt que de la juger. 10 et 25
- * seulement, et jamais un nombre décimal ou un millier ($0.005, 200, 100).
+ * « Sans autre chiffre entre les deux » est ce qui empêche une phrase juste de
+ * rougir : « 25 par mois sur toutes les routes. Sans clé : 25 validations par
+ * jour » ne relie au jour que le second 25. Deux autres quotas du jour vivent
+ * dans les mêmes pages et gardent leur propre chiffre : l'ouverture de sessions
+ * MCP, reconnue à « session », et la création de clés (3 par réseau et par
+ * jour), reconnue à « per network ». Depuis le soir du 24/09/2026, l'accès MCP
+ * sans clé n'en fait plus partie : il se compte à la semaine (voir plus bas).
  */
-const NUMERIC = /(?<![.,\d])(10|25)(?![.,]?\d)/;
+const DAILY_FIGURE =
+  /(?<![.,\d$/])(\d+)(?![.,]?\d)(?![kK])[^\d\n]{0,40}?(?:\ba day\b|\bper day\b|\/day\b|par jour|pro Tag|am Tag)/gi;
+const ABOUT_MCP = /\bMCP\b|tool calls?|appels? d'outil|Tool-Aufrufe?/i;
+/**
+ * Un plafond DE LA SEMAINE écrit en chiffres, même construction : le nombre,
+ * puis l'unité de la semaine, sans autre chiffre entre les deux.
+ */
+const WEEKLY_FIGURE =
+  /(?<![.,\d$/])(\d+)(?![.,]?\d)(?![kK])[^\d\n]{0,40}?(?:\ba week\b|\bper week\b|\/week\b|\bin the week\b|\bof the week\b|par semaine|de la semaine|dans la semaine|pro Woche|der Woche|in der Woche)/gi;
+const ABOUT_SESSIONS = /\bsessions?\b|Sitzung/i;
+const OTHER_DAILY_QUOTAS: Array<{ about: RegExp; value: number }> = [
+  { about: ABOUT_SESSIONS, value: MCP_SESSIONS_PER_IP_DAY },
+  {
+    about: /keys? per network|clés? par réseau|Schlüssel pro Netz/i,
+    value: DAILY_KEY_CREATION_LIMIT,
+  },
+];
+
+/**
+ * L'essai quotidien dit SANS chiffre (relecture du 24/09/2026, D18).
+ *
+ * Les deux motifs chiffrés ci-dessus commencent par `(\d+)` : « on the keyless
+ * trial the counters are daily and that field reads `day` » et « the keyless
+ * daily allowance described above » leur ont échappé, dans trois langues, sur
+ * des pages que ce garde lit. Celui-ci lit les mots.
+ *
+ * « journalier » et non « journali » : « journalisé » et « journaux » vivent
+ * sur les mêmes pages. Les deux exemptions du motif chiffré valent ici aussi :
+ * une ligne du MCP hébergé (compté au jour, et c'est juste) et une ligne sur la
+ * création de clés par réseau (« … per network per day … today »).
+ */
+const DAILY_WORDS =
+  /\bdaily (allowance|trial|quota)\b|\bdaily\b[^.\n]{0,20}\b(allowance|trial)\b|counters are daily|reads `day`|vaut `day`|trägt `day`|journalier|quotidien|t[aä]glich|Zähler pro Tag|\btoday\b|midnight UTC|aujourd.hui|minuit|\bheute\b|Mitternacht/i;
+const PER_NETWORK = /per network|par réseau|pro Netz/i;
+
+/**
+ * Le plafond MCP dit au jour sans chiffre : « the daily limit », « la limite du
+ * jour », « Tageslimit ». Lu seulement sur une ligne qui parle du MCP.
+ */
+const MCP_DAILY_WORDS =
+  /\bdaily\b|\bper day\b|\ba day\b|par jour|quotidien|journali[eè]r|pro Tag|am Tag|und Tag\b|t[aä]glich|Tages(limit|kontingent)/i;
+
+/** Une ligne sur le MCP qui le compte encore au jour (sessions et clés à part). */
+function saysMcpDaily(line: string): boolean {
+  if (!ABOUT_MCP.test(line) || ABOUT_SESSIONS.test(line) || PER_NETWORK.test(line)) return false;
+  return (
+    [...line.matchAll(DAILY_FIGURE)].length > 0 ||
+    DAILY_WORDS.test(line) ||
+    MCP_DAILY_WORDS.test(line)
+  );
+}
 
 /**
  * « Compté en mémoire, par instance ».
@@ -115,7 +194,19 @@ const SECOND_PERSON = /vous avez utilisé|Sie haben .{0,40}(verbraucht|genutzt)/
 interface Tally {
   spelled: string[];
   ordinal: string[];
-  numeric: string[];
+  /** Every daily figure written by hand on a line about the trial. */
+  daily: Array<{ ref: string; value: number; other: boolean }>;
+  /** Every weekly figure written by hand on a line about the trial. */
+  weekly: Array<{ ref: string; value: number; mcp: boolean }>;
+  /**
+   * Since the evening of 24/09/2026 the keyless MCP allowance is weekly: on ANY
+   * line about MCP, trial words or not, a daily figure or a daily word is wrong,
+   * sessions aside. « 10 free tool calls per day » (pay-as-an-agent) said no
+   * « no key » and escaped the trial scan.
+   */
+  mcpDaily: string[];
+  /** A daily trial said in words, with no figure. */
+  dailyWords: string[];
   memory: string[];
   sharing: string[];
   secondPerson: string[];
@@ -125,7 +216,10 @@ function tally(): Tally {
   const out: Tally = {
     spelled: [],
     ordinal: [],
-    numeric: [],
+    daily: [],
+    weekly: [],
+    dailyWords: [],
+    mcpDaily: [],
     memory: [],
     sharing: [],
     secondPerson: [],
@@ -136,6 +230,11 @@ function tally(): Tally {
       const ref = `${file}:${i + 1}`;
       if (SHARING_CLAIM.test(line)) out.sharing.push(ref);
       if (SECOND_PERSON.test(line)) out.secondPerson.push(ref);
+      // Les ordinaux sont propres à l'essai : lus sur toutes les lignes. « Ab
+      // dem 11. Aufruf am Tag » a survécu dix jours sur une ligne qui ne disait
+      // ni « Kostprobe » ni « ohne Schlüssel ».
+      if (ORDINALS.some((p) => p.test(line))) out.ordinal.push(ref);
+      if (saysMcpDaily(line)) out.mcpDaily.push(`${ref}: ${line.trim().slice(0, 120)}`);
       // L'exemple de démarrage est désormais exporté depuis le contrat. Seule
       // la ligne EXACTE est exemptée ; onboarding-parity.test.ts contrôle le
       // bloc complet dans les trois langues. Le plafond de prose ne remonte pas.
@@ -148,8 +247,16 @@ function tally(): Tally {
         return;
       if (!ABOUT_THE_TRIAL.test(line)) return;
       if (SPELLED_OUT.some((p) => p.test(line))) out.spelled.push(ref);
-      if (ORDINALS.some((p) => p.test(line))) out.ordinal.push(ref);
-      if (NUMERIC.test(line)) out.numeric.push(ref);
+      for (const m of line.matchAll(DAILY_FIGURE)) {
+        const value = Number(m[1]);
+        const other = OTHER_DAILY_QUOTAS.some((q) => q.value === value && q.about.test(line));
+        out.daily.push({ ref, value, other });
+      }
+      for (const m of line.matchAll(WEEKLY_FIGURE))
+        out.weekly.push({ ref, value: Number(m[1]), mcp: ABOUT_MCP.test(line) });
+      if (DAILY_WORDS.test(line) && !ABOUT_MCP.test(line) && !PER_NETWORK.test(line)) {
+        out.dailyWords.push(ref);
+      }
       if (MEMORY_CLAIM.test(line)) out.memory.push(ref);
     });
   }
@@ -170,17 +277,52 @@ describe('la prose statique de l’essai', () => {
     expect(found, found.join('\n')).toEqual([]);
   });
 
-  it('ne laisse pas augmenter le nombre de lignes encore à migrer', () => {
+  it('n’écrit plus le plafond en toutes lettres, en ordinal, ni « en mémoire »', () => {
+    // Budgets du 15/09/2026 : 8, 1 et 6. Descendus à zéro le 24/09/2026 avec
+    // la réécriture des articles et des pages de doc ; ils ne remontent plus.
     const found = tally();
-    // Budgets mesurés sur cette branche le 15/09/2026, à l'état où le lot 4
-    // laisse les textes. Ces nombres ne remontent JAMAIS ; le lot des textes
-    // humains les fait descendre, jusqu'à zéro au raccordement.
-    const BUDGET = { spelled: 8, ordinal: 1, numeric: 23, memory: 6 } as const;
-    for (const key of ['spelled', 'ordinal', 'numeric', 'memory'] as const) {
-      expect(found[key].length, `${key}\n${found[key].join('\n')}`).toBeLessThanOrEqual(
-        BUDGET[key],
-      );
+    for (const key of ['spelled', 'ordinal', 'memory'] as const) {
+      expect(found[key], `${key}\n${found[key].join('\n')}`).toEqual([]);
     }
+  });
+
+  it('ne relie plus jamais le chiffre de l’essai au jour (a day, par jour, pro Tag)', () => {
+    // 🚨 Le garde du 24/09/2026 : l'essai se compte à la semaine. Sur une
+    // ligne qui parle de l'essai, le seul chiffre du jour permis est celui
+    // d'un AUTRE quota du jour (MCP hébergé, création de clés), reconnu à sa
+    // ligne et à sa valeur.
+    const { daily } = tally();
+    const wrong = daily
+      .filter(({ other }) => !other)
+      .map(({ ref, value }) => `${ref}: ${value} par jour`);
+    expect(wrong, wrong.join('\n')).toEqual([]);
+  });
+
+  it('ne compte jamais plus l’accès MCP au jour, en chiffres ni en mots (sessions à part)', () => {
+    const { mcpDaily } = tally();
+    expect(mcpDaily, mcpDaily.join('\n')).toEqual([]);
+  });
+
+  it('ne dit pas non plus l’essai quotidien en toutes lettres (daily, today, `day`)', () => {
+    const { dailyWords } = tally();
+    expect(dailyWords, dailyWords.join('\n')).toEqual([]);
+  });
+
+  it('écrit le plafond de la semaine que le code applique, sur chaque ligne qui le cite', () => {
+    const { weekly } = tally();
+    // Une ligne sur le MCP peut porter le chiffre de l'accès MCP sans clé ;
+    // toute autre ligne, celui de l'essai REST. Égaux aujourd'hui, séparés dans
+    // le code, et ce test rougira le jour où l'un bouge sans l'autre.
+    const wrong = weekly
+      .filter(
+        ({ value, mcp }) =>
+          value !== REST_TRIAL_WEEKLY_LIMIT && !(mcp && value === MCP_WEEKLY_LIMIT),
+      )
+      .map(({ ref, value }) => `${ref}: ${value}`);
+    expect(wrong, wrong.join('\n')).toEqual([]);
+    // Un balayage qui ne voit rien ne prouve rien : l'essai est cité, en
+    // chiffres, dans les trois langues de plusieurs pages.
+    expect(weekly.length).toBeGreaterThan(10);
   });
 });
 
@@ -238,12 +380,103 @@ describe('les motifs eux-mêmes', () => {
     },
   );
 
-  it.each(['$0.005 per call', '200 requests a month', '1,100+ Swiss entries', '100 req/min'])(
-    'ne compte pas un autre nombre comme le plafond : %s',
-    (line) => {
-      expect(NUMERIC.test(line)).toBe(false);
-    },
-  );
+  const dailyValues = (line: string): number[] =>
+    [...line.matchAll(DAILY_FIGURE)].map((m) => Number(m[1]));
+
+  it.each([
+    ['No key at all: up to 25 IBAN validations a day per address', [25]],
+    ['the keyless trial serves up to 10 calls a day per address', [10]],
+    ["l'essai sans clé sert jusqu'à 25 appels par jour et par adresse", [25]],
+    ['bis zu 25-mal pro Tag für die Adresse', [25]],
+    ['First 10/day per IP free, no key', [10]],
+  ] as const)('lit le plafond du jour écrit à la main : %s', (line, values) => {
+    expect(dailyValues(line)).toEqual(values);
+  });
+
+  it.each([
+    '$0.005 per call',
+    '200 requests a month',
+    '1,100+ Swiss entries',
+    '100 req/min',
+    // Le 25 du mois, puis le 25 du jour : seul le second est un plafond du jour.
+    'it starts at 25 a month, on every endpoint.',
+    '25k credits for $80, valid every day',
+    '(IPv6 counted per /64) are served in full',
+  ])('ne prend pas un autre nombre pour le plafond du jour : %s', (line) => {
+    expect(dailyValues(line)).toEqual([]);
+  });
+
+  it('ne relie au jour que le chiffre qui le précède directement', () => {
+    expect(
+      dailyValues('Unclaimed, it starts at 25 a month. No key at all: up to 25 validations a day.'),
+    ).toEqual([25]);
+  });
+
+  const weeklyValues = (line: string): number[] =>
+    [...line.matchAll(WEEKLY_FIGURE)].map((m) => Number(m[1]));
+
+  it.each([
+    ['No key at all: up to 25 IBAN validations a week per address', [25]],
+    ['Past 25 calls in the week the endpoint answers 402', [25]],
+    ["l'essai sans clé sert jusqu'à 25 appels par semaine et par adresse", [25]],
+    ['Au-delà des 25 appels de la semaine, prenez la clé', [25]],
+    ['bis zu 25-mal pro Woche für die Adresse', [25]],
+    ['Nach den 25 Aufrufen der Woche holen Sie sich den Schlüssel', [25]],
+  ] as const)('lit le plafond de la semaine écrit à la main : %s', (line, values) => {
+    expect(weeklyValues(line)).toEqual(values);
+  });
+
+  it.each([
+    'it starts at 25 a month, on every endpoint.',
+    'reset on Monday 00:00 UTC',
+    '10 MCP tool calls/day per source address',
+  ])('ne prend pas un autre nombre pour le plafond de la semaine : %s', (line) => {
+    expect(weeklyValues(line)).toEqual([]);
+  });
+
+  it.each([
+    // Les quatre lignes réelles qui ont échappé au motif chiffré.
+    '`month` is the calendar month (`YYYY-MM`); on the keyless trial the counters are daily and that field reads `day`.',
+    "sur l'essai sans clé, les compteurs sont journaliers et ce champ vaut `day`.",
+    'beim Test ohne Schlüssel zählen die Zähler pro Tag, und das Feld trägt `day`.',
+    'the same call still works within the keyless daily allowance described above: a `trial` block',
+  ])('repère l’essai quotidien dit sans chiffre : %s', (line) => {
+    expect(DAILY_WORDS.test(line)).toBe(true);
+  });
+
+  it.each([
+    // Justes, et laissées passer par les exemptions ou par le motif lui-même.
+    'At most 3 free keys per network per day — existing keys keep working. Need more capacity today? No key needed for x402.',
+    'The MCP taster keeps answering after its daily allowance, with no key at all.',
+    'Until 24 September 2026 the keyless trial was daily; it is counted by the week.',
+    'Il peut être journalisé sans risque, même sans clé.',
+  ])('laisse passer une phrase juste : %s', (line) => {
+    const caught = DAILY_WORDS.test(line) && !ABOUT_MCP.test(line) && !PER_NETWORK.test(line);
+    expect(caught).toBe(false);
+  });
+
+  it('reconnaît une ligne du MCP', () => {
+    expect(ABOUT_MCP.test('The MCP server gives 10 free tool calls per day')).toBe(true);
+    expect(ABOUT_MCP.test('the keyless trial serves up to 25 calls a day')).toBe(false);
+  });
+
+  it.each([
+    // Les trois lignes réelles d'avant le 24/09/2026 au soir.
+    '- The [MCP server](/docs/mcp) gives 10 free tool calls per day — enough to check the data quality on your own IBANs.',
+    "Transport HTTP streamable, **10 appels d'outils gratuits par IP et par jour**, sans aucune clé",
+    'Streamable-HTTP-Transport, **10 kostenlose Tool-Aufrufe pro IP und Tag**, ganz ohne Schlüssel',
+    'The HTTP MCP transport has its own allowance, counted by the day: 10 tool calls/day per source address',
+  ])('attrape l’accès MCP compté au jour : %s', (line) => {
+    expect(saysMcpDaily(line)).toBe(true);
+  });
+
+  it.each([
+    'Streamable HTTP transport, **25 free tool calls a week per source address**, no key at all',
+    'Daily MCP session limit reached (30 new sessions/day).',
+    'At most 3 free keys per network per day, whatever MCP client asks.',
+  ])('laisse passer l’accès MCP à la semaine, et les sessions : %s', (line) => {
+    expect(saysMcpDaily(line)).toBe(false);
+  });
 
   it.each([
     'Vous avez utilisé les 25 validations sans clé du jour',

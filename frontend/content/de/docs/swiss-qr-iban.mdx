@@ -44,7 +44,7 @@ curl "https://api.ibanforge.com/v1/iban/format?iban=CH5530024123000889012"
   "check_digits": "55",
   "country": { "code": "CH", "name": "Switzerland" },
   "bban": { "bank_code": "30024", "account_number": "123000889012" },
-  "upgrade_to_full_validation": "POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer."
+  "upgrade_to_full_validation": "valid: true here means the IBAN is well formed (length, structure, mod-97), nothing more. POST /v1/iban/validate ($0.005, or keyless for the first 25 calls a week per source address) names the bank and its BIC with the source of that answer, SEPA and VoP readiness, and, where it reads the national register (DE, AT, BE, SK, CZ, BG, CH, LI), whether the bank code is allocated at all. Real answers of that full validation, readable with a plain GET: https://api.ibanforge.com/v1/demo"
 }
 ```
 

@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { COUNTRY_RISK_AS_OF } from './countries.js';
+import { servedDatabasePath } from './restricted-overlay-runtime.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -14,7 +15,11 @@ let complianceDB: DatabaseType.Database | null = null;
 export function getComplianceDB(): DatabaseType.Database {
   if (!complianceDB) {
     const Database = require('better-sqlite3') as typeof DatabaseType;
-    complianceDB = new Database(COMPLIANCE_DB_PATH, { readonly: true });
+    // Sans RESTRICTED_COMPLIANCE_OVERLAY_PATH, COMPLIANCE_DB_PATH lui-même ;
+    // avec, la copie fusionnée construite à côté du fichier privé (ONU, EPC).
+    complianceDB = new Database(servedDatabasePath('compliance', COMPLIANCE_DB_PATH), {
+      readonly: true,
+    });
   }
   return complianceDB;
 }
@@ -25,6 +30,200 @@ export function closeComplianceDB(): void {
     complianceDB = null;
     _metaStmt = null;
   }
+  // Les mémos décrivent la connexion qui vient de fermer : un fichier rouvert
+  // peut porter des tables que le précédent n'avait pas.
+  _tableLoaded.clear();
+  _sourcesMemo = undefined;
+  _unscreenedMemo = undefined;
+}
+
+/**
+ * Les tables de conformité que le code sonde avant de les consulter.
+ *
+ * `sanctioned_entities` porte les listes de sanctions, `sepa_participants` et
+ * `vop_participants` les registres EPC des schémas SEPA et de la Verification
+ * of Payee : ce sont elles qui peuvent manquer (sortie du dépôt public décidée
+ * le 24/09/2026), et leur absence se lit « non consulté » dans le corps des
+ * réponses.
+ *
+ * `fatf_countries` n'est sondée que pour nommer FATF dans `meta.sources` et
+ * dater `meta.fatf_as_of`. C'est une table publique et statique, remplie à
+ * chaque rafraîchissement depuis src/lib/compliance-static.ts, qui ne fait pas
+ * partie des tables qui peuvent manquer : le corps (`fatf_status`) n'est pas
+ * protégé pour elle et répond `non_member` sur une table vide, comme avant.
+ */
+export type ComplianceTable =
+  'sanctioned_entities' | 'sepa_participants' | 'vop_participants' | 'fatf_countries';
+
+const _tableLoaded = new Map<ComplianceTable, boolean>();
+
+/** `meta.sources` de la connexion ouverte, figé une fois les trois sondes tranchées. */
+let _sourcesMemo: string | null | undefined;
+
+/**
+ * Une table peut-elle être consultée : existe-t-elle ET porte-t-elle au moins
+ * une ligne ?
+ *
+ * ## Pourquoi une table vide n'est pas une réponse
+ *
+ * Chacune de ces tables est un registre ou une liste publiés, jamais vides
+ * légitimement : les registres EPC portent des milliers de banques, les listes
+ * de sanctions des centaines de BIC. Une table vide ou absente veut donc dire
+ * que la donnée n'a pas été chargée, et une recherche qui n'y trouve rien n'a
+ * rien consulté. Jusqu'au 25/09/2026, `checkReachability` et `checkVop`
+ * répondaient encore `screened: true` sur une table vide : « non joignable »,
+ * « pas de VoP », et le score de risque payant d'une banque ordinaire passait
+ * de 0 à 10. Les tables sous licence restrictive quittent le dépôt public
+ * (décision du 24/09/2026) et arriveront en production par un fichier privé
+ * séparé : « cette table n'est pas là » est devenu un état que le code doit
+ * dire tout haut.
+ *
+ * ## Pourquoi la sonde peut échouer en silence et pas les recherches
+ *
+ * Une sonde qui ne peut pas tourner répond `false`, que chaque appelant traduit
+ * en « non consulté » : une phrase sur nous, jamais sur la banque. Les
+ * recherches elles-mêmes restent sans garde, si bien qu'une table présente mais
+ * illisible remonte jusqu'aux gardes de l'appelant : sur la conformité, la
+ * réponse `compliance_data_unavailable` ; sur les surfaces sans score
+ * (validation, lot, outil MCP validate_iban), `sepa.vop_participant: null`
+ * (voir enrich.ts).
+ *
+ * Mémorisé par connexion (les tables ne changent pas sous une connexion en
+ * lecture seule) et effacé par closeComplianceDB(). Une sonde qui a échoué
+ * n'est pas mémorisée : elle ne dit rien de la connexion suivante.
+ */
+export function complianceTableLoaded(table: ComplianceTable): boolean {
+  const memo = _tableLoaded.get(table);
+  if (memo !== undefined) return memo;
+  let loaded: boolean;
+  try {
+    const db = getComplianceDB();
+    const exists = db
+      .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(table);
+    // Le nom est l'un des quatre littéraux de ComplianceTable, jamais une entrée.
+    loaded = !!exists && !!db.prepare(`SELECT 1 AS ok FROM ${table} LIMIT 1`).get();
+  } catch {
+    return false;
+  }
+  _tableLoaded.set(table, loaded);
+  return loaded;
+}
+
+/**
+ * Les listes de sanctions que porte réellement la base chargée, par exemple
+ * ['EU', 'OFAC', 'UN'].
+ *
+ * Le seul endroit qui répond « quelles listes contrôlons-nous », lu dans les
+ * lignes. `meta.sources` de chaque réponse de conformité et la porte des
+ * affirmations (src/routes/sanctions-claims.test.ts) le lisent tous deux : une
+ * liste non chargée n'est jamais nommée, et une réponse ne dit jamais « aucune
+ * correspondance » sur une liste qu'elle n'a pas consultée.
+ */
+export function loadedSanctionsLists(): string[] {
+  if (!complianceTableLoaded('sanctioned_entities')) return [];
+  return (
+    getComplianceDB()
+      .prepare('SELECT DISTINCT source_list FROM sanctioned_entities ORDER BY source_list')
+      .all() as Array<{ source_list: string }>
+  ).map((r) => r.source_list);
+}
+
+/**
+ * Les listes de sanctions que chaque surface publique nomme (« OFAC, EU, UN » :
+ * README, documentation, serveur MCP, OpenAPI, pied de page). La porte des
+ * affirmations (src/routes/sanctions-claims.test.ts) vérifie que cette liste
+ * reste celle que les surfaces écrivent.
+ */
+export const PROMISED_SANCTIONS_LISTS: readonly string[] = ['EU', 'OFAC', 'UN'];
+
+/** Mémo par connexion, effacé par closeComplianceDB() comme les deux autres. */
+let _unscreenedMemo: string[] | undefined;
+
+/**
+ * Les listes promises que la base servie NE porte PAS, quand elle en porte au
+ * moins une (sans aucune liste, `sanctions_lists_unavailable` le dit déjà).
+ *
+ * ## Le faux « propre » que ceci empêche (25/09/2026)
+ *
+ * La liste de l'ONU quitte le dépôt public pour la surcouche privée. Surcouche
+ * absente ou refusée, l'UE et l'OFAC restent chargées : une banque inscrite par
+ * la SEULE ONU ressortait `bank_sanctioned: false`, `listed: false`, sans un mot,
+ * alors que personne n'avait consulté sa liste. Une réponse ne doit jamais dire
+ * « aucune correspondance » sur une liste qu'elle n'a pas lue : chaque liste
+ * manquante lève un drapeau sans poids qui la nomme
+ * (`sanctions_list_unavailable_un`), et l'examen par BIC répond `listed: null`
+ * quand rien ne correspond sur les listes lues.
+ *
+ * Une lecture qui échoue répond `[]` et n'est pas mémorisée : la table illisible
+ * a son propre repli (`compliance_data_unavailable`).
+ */
+export function unscreenedSanctionsLists(): string[] {
+  if (_unscreenedMemo !== undefined) return _unscreenedMemo;
+  if (!complianceTableLoaded('sanctioned_entities')) return [];
+  let loaded: string[];
+  try {
+    loaded = loadedSanctionsLists().map((l) => l.toUpperCase());
+  } catch {
+    return [];
+  }
+  _unscreenedMemo = PROMISED_SANCTIONS_LISTS.filter((l) => !loaded.includes(l));
+  return _unscreenedMemo;
+}
+
+/**
+ * La chaîne de provenance servie dans `meta.sources`, calculée sur ce qui est
+ * chargé.
+ *
+ * Même format et même ordre que ce qu'écrit scripts/refresh-compliance.ts dans
+ * la table `metadata` (les listes, puis FATF, puis un `EPC-<schéma>` par
+ * schéma) : sur une base complète, la chaîne servie ne change pas. Elle est
+ * calculée ici plutôt que relue dans cette clé, parce que la clé décrit la base
+ * que le rafraîchissement a construite, et que la base servie a pu perdre une
+ * table depuis : une chaîne qui nomme l'ONU ou l'EPC sur une base qui ne les
+ * porte pas, c'est exactement l'affirmation que ce champ doit empêcher. Nulle
+ * quand rien n'est chargé.
+ *
+ * Mémorisée par connexion : elle est servie dans chaque réponse de conformité
+ * (dont la démo gratuite), et la recalculer à chaque fois coûtait deux
+ * SELECT DISTINCT, dont un parcours complet de sepa_participants, soit un
+ * temps synchrone plusieurs fois supérieur à celui de la réponse sur une base
+ * complète. Elle n'est figée que lorsque les trois sondes qu'elle lit ont
+ * tranché : une sonde qui a échoué n'est pas mémorisée (voir
+ * complianceTableLoaded), et figer une chaîne amputée par un échec passager la
+ * servirait jusqu'au redémarrage. Effacée par closeComplianceDB().
+ */
+export function loadedComplianceSources(): string | null {
+  if (_sourcesMemo !== undefined) return _sourcesMemo;
+  // Chaque lecture dans son propre try : une table présente mais illisible
+  // (colonne manquante) faisait lever ici, et getComplianceMeta() mettait
+  // alors TOUT `meta` à null, `sanctions_as_of` compris. Une source qui ne se
+  // lit pas n'a pas été consultée : elle n'est pas nommée, et rien n'est
+  // mémorisé, pour relire à la réponse suivante.
+  let failed = false;
+  const parts: string[] = [];
+  try {
+    parts.push(...loadedSanctionsLists());
+  } catch {
+    failed = true;
+  }
+  if (complianceTableLoaded('fatf_countries')) parts.push('FATF');
+  if (complianceTableLoaded('sepa_participants')) {
+    try {
+      const schemes = getComplianceDB()
+        .prepare('SELECT DISTINCT scheme FROM sepa_participants ORDER BY scheme')
+        .all() as Array<{ scheme: string }>;
+      for (const r of schemes) parts.push(`EPC-${r.scheme}`);
+    } catch {
+      failed = true;
+    }
+  }
+  const sources = parts.length > 0 ? parts.join(',') : null;
+  const decided = (['sanctioned_entities', 'fatf_countries', 'sepa_participants'] as const).every(
+    (t) => _tableLoaded.has(t),
+  );
+  if (decided && !failed) _sourcesMemo = sources;
+  return sources;
 }
 
 export interface ComplianceMeta {
@@ -87,8 +286,11 @@ export function getComplianceMeta(): ComplianceMeta {
     return {
       ...base,
       sanctions_as_of: map.get('last_refresh') ?? null,
-      fatf_as_of: map.get('fatf_as_of') ?? null,
-      sources: map.get('sources') ?? null,
+      // Pas de date pour une liste GAFI que `sources` ne nomme pas.
+      fatf_as_of: complianceTableLoaded('fatf_countries') ? (map.get('fatf_as_of') ?? null) : null,
+      // Calculé sur les lignes, pas relu dans la clé `sources` : voir
+      // loadedComplianceSources().
+      sources: loadedComplianceSources(),
     };
   } catch {
     return base;

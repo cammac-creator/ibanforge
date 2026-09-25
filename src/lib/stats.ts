@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
+import { IBAN_LENGTHS } from './countries.js';
 import { getStatsDB } from './db.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 import { ANONYMOUS_CONTACT } from './tiers.js';
@@ -223,7 +224,7 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 // A submitted identifier must never reach `request_log`, which has twelve-month
 // retention — that is the signed DPA clause, and the malformed-identifier
 // traffic this instrumentation exists to measure is exactly the population that
-// used to leak. Three shapes had to be closed:
+// used to leak. The shapes that had to be closed:
 //
 //   /v1/bic/UBSW%20CHZH      → the old `[A-Za-z0-9]+` stopped at `%`, storing
 //                              `/v1/bic/:code%20CHZH` (tail of the BIC kept).
@@ -236,30 +237,189 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 //                              segment-shaped (it starts with `%`), and excused
 //                              by the template rule below — a COMPLETE IBAN at
 //                              rest, worse than the first case. See
-//                              `redactSegment` for why the fix belongs there.
+//                              `PATH_UNIT` for why the fix belongs there.
+//   /v1/iban/CH93%200076%20… → an IBAN written the way people write it, in
+//   /v1/iban/de89-3704-…       groups (24/09/2026). Only a value in ONE block
+//   /v1/iban/DE89/3704/…       was caught, so any separator — space, `+`, `-`,
+//                              `.`, `_`, a slash, raw or percent-encoded — put
+//                              the whole IBAN at rest. See `spreadIbanEnd`.
 
 /**
  * The one shape a submitted value can take on ANY route, including one we never
- * registered: two letters, two check digits, then alphanumerics.
+ * registered: two letters, two check digits, then alphanumerics. Tested on a
+ * run of letters and digits with nothing between them, uppercased first, so the
+ * case a caller typed changes nothing.
  *
  * Deliberately narrow. Checked against every path this API registers — `v1`,
  * `validate`, `clearing`, the `1k`/`5k`/`25k` bundle slugs, `cs_…` Stripe
  * session ids, 2-letter country codes — none has this shape, so the catch-all
- * cannot swallow a real endpoint and fragment the dashboard.
+ * cannot swallow a real endpoint and fragment the dashboard (the route sweep in
+ * `src/app.log-redaction.test.ts` checks every registered pattern).
  */
-const IBAN_SHAPED_TOKEN = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+const IBAN_SHAPED_TOKEN = /^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/;
 
 /**
- * What delimits an identifier inside a path segment, beyond `/`: a percent
- * escape or a brace.
+ * How a path is read before any identifier is looked for: one unit per
+ * character, where a percent escape counts as the character it encodes. This
+ * replaces `IDENTIFIER_BOUNDARY`, which split a segment on escapes and braces.
  *
- * Testing whole segments is not enough. In `%7BCH9300762011623852957%7D` the
- * `B` of `%7B` glues onto the `CH`, so the segment matches nothing
- * identifier-shaped while still containing a complete IBAN. Splitting here (the
- * capture group keeps the delimiters, so the wrapper is rebuilt verbatim)
- * isolates the core and lets it be redacted in place.
+ * Splitting was enough for a value written in one block, not for a value
+ * written the way people write IBANs: `CH93%200076%202011…`, `ch93-0076-…`,
+ * `CH93.0076.…`, `DE89/3704/…`. Reading `%20`, `%2D` or `%41` as the space, dash
+ * or letter they stand for is what lets one rule see all of those as the same
+ * IBAN. The three multi-byte escapes are the no-break, narrow no-break and thin
+ * spaces that a copy from a PDF or a French document puts between the groups.
+ *
+ * An escape stays ONE unit, so in `%7BCH9300762011623852957%7D` the `B` of
+ * `%7B` can never glue onto the `CH` (the trap `IDENTIFIER_BOUNDARY` was written
+ * for): the brace is a boundary, and the wrapper is rebuilt verbatim around the
+ * redacted core.
  */
-const IDENTIFIER_BOUNDARY = /(%[0-9A-Fa-f]{2}|[{}])/;
+const PATH_UNIT = /%e2%80%(?:af|89)|%c2%a0|%[0-9a-f]{2}|[\s\S]/giu;
+
+/** What people put between the groups of an IBAN. The slash is handled apart. */
+const GROUP_SEPARATORS = new Set([' ', '\t', '+', '-', '.', '_', ' ', ' ', ' ']);
+
+/** Letters and digits in an IBAN once its separators are dropped (ISO 13616). */
+const IBAN_MIN_LENGTH = 15;
+const IBAN_MAX_LENGTH = 34;
+
+interface PathUnit {
+  /** The unit as it was written, rebuilt verbatim when it is not redacted. */
+  raw: string;
+  kind: 'alnum' | 'separator' | 'slash' | 'other';
+  /** The uppercased character, for `alnum` units only. */
+  char: string;
+}
+
+function readPathUnit(raw: string): PathUnit {
+  // The multi-byte escapes PATH_UNIT matches whole are all spaces.
+  if (raw.length > 3) return { raw, kind: 'separator', char: '' };
+  let decoded = raw;
+  if (raw.length === 3 && raw.startsWith('%')) {
+    const code = Number.parseInt(raw.slice(1), 16);
+    if (code >= 0x80) return { raw, kind: 'other', char: '' };
+    decoded = String.fromCharCode(code);
+    // `%2F` sits INSIDE one segment: the router never split on it.
+    if (decoded === '/') return { raw, kind: 'separator', char: '' };
+  } else if (raw === '/') {
+    return { raw, kind: 'slash', char: '' };
+  }
+  if (/^[A-Za-z0-9]$/.test(decoded)) return { raw, kind: 'alnum', char: decoded.toUpperCase() };
+  if (GROUP_SEPARATORS.has(decoded)) return { raw, kind: 'separator', char: '' };
+  return { raw, kind: 'other', char: '' };
+}
+
+/** ISO 13616 check: the first four characters moved to the end, A = 10 … Z = 35, remainder 1. */
+function passesMod97(compact: string): boolean {
+  const rearranged = compact.slice(4) + compact.slice(0, 4);
+  let remainder = 0;
+  for (const char of rearranged) {
+    const digits = char >= 'A' ? String(char.charCodeAt(0) - 55) : char;
+    for (const digit of digits) remainder = (remainder * 10 + Number(digit)) % 97;
+  }
+  return remainder === 1;
+}
+
+/**
+ * Where an IBAN written across separators ends, when one starts at `start`: the
+ * index of its last unit, or -1.
+ *
+ * The letters and digits are read through spaces, `+`, `-`, `.`, `_` and `/`,
+ * raw or percent-encoded, then judged once separators are dropped and case is
+ * ignored: two letters, two digits, 15 to 34 characters in all, ending where a
+ * group ends. Where it ends: at the country's registered length when a group
+ * ends there (`/DE89370400440532013000/details` keeps `/details`); otherwise —
+ * an IBAN typed a character short or long — at the LAST group end that
+ * qualifies, because one group too many only costs a 404 path its tail, while
+ * one too few would leave account digits in clear.
+ *
+ * Which two letters qualify:
+ *   - a country code of the IBAN registry (`IBAN_LENGTHS`): the shape suffices,
+ *     mod 97 is NOT required. A mistyped IBAN is still an IBAN a person
+ *     submitted, and the privacy policy lets us keep at most its first twelve
+ *     characters (privacy.mdx §1, DPA clause 2). Requiring the checksum would
+ *     leave exactly the mistyped ones — the reason people check an IBAN at all —
+ *     in clear for twelve months.
+ *   - any other two letters: only when mod 97 holds, for an IBAN from a country
+ *     the table does not list yet. Without the checksum, a slug of that shape is
+ *     not an IBAN and keeps its own bucket.
+ * No route this API registers opens with a registry country code and two digits
+ * (route sweep in `src/app.log-redaction.test.ts`), so the rule without the
+ * checksum costs the dashboard nothing.
+ */
+function spreadIbanEnd(units: readonly PathUnit[], start: number): number {
+  let compact = '';
+  let end = -1;
+  for (let k = start; k < units.length; k += 1) {
+    const unit = units[k];
+    if (unit.kind === 'other') break;
+    if (unit.kind !== 'alnum') continue;
+    compact += unit.char;
+    const n = compact.length;
+    if (n <= 2 && !/[A-Z]/.test(unit.char)) return -1;
+    if (n > 2 && n <= 4 && !/\d/.test(unit.char)) return -1;
+    const groupEnds = k + 1 >= units.length || units[k + 1].kind !== 'alnum';
+    if (groupEnds && n >= IBAN_MIN_LENGTH) {
+      const country = compact.slice(0, 2);
+      if (Object.hasOwn(IBAN_LENGTHS, country)) {
+        if (n === IBAN_LENGTHS[country]) return k;
+        end = k;
+      } else if (passesMod97(compact)) {
+        end = k;
+      }
+    }
+    if (n >= IBAN_MAX_LENGTH) break;
+  }
+  return end;
+}
+
+/**
+ * Replace every IBAN, however it is written, and every IBAN-shaped value in
+ * `text` — a request path, or a request target with its query string — by
+ * `marker`, leaving everything around it as it was.
+ *
+ * Shared by the two journals that keep a path: `request_log` (twelve months,
+ * marker `:redacted`, via `normalizeRequestPath`) and the console log that
+ * Railway keeps (marker `***`, `src/app.ts`). One rule for both, so they can no
+ * longer disagree on what an IBAN looks like: the console used to mask only a
+ * block written in capitals.
+ *
+ * An IBAN spread over several segments (`/DE89/3704/…`) becomes TWO markers,
+ * `:redacted/:redacted`. The path keeps saying it had more than one segment, so
+ * a one-segment route label never absorbs it (`GET /v1/bic/a/b/c` is not a BIC
+ * lookup: measurement contract of 15/09, see `BILLABLE_RULES`), and every such
+ * path lands in one bucket whatever the grouping.
+ */
+export function redactIbanShapedValues(text: string, marker: string): string {
+  const units = (text.match(PATH_UNIT) ?? []).map(readPathUnit);
+  let out = '';
+  let i = 0;
+  while (i < units.length) {
+    const startsWord = units[i].kind === 'alnum' && (i === 0 || units[i - 1].kind !== 'alnum');
+    if (!startsWord) {
+      out += units[i].raw;
+      i += 1;
+      continue;
+    }
+    const end = spreadIbanEnd(units, i);
+    if (end >= 0) {
+      const spansSegments = units.slice(i, end + 1).some((unit) => unit.kind === 'slash');
+      out += spansSegments ? `${marker}/${marker}` : marker;
+      i = end + 1;
+      continue;
+    }
+    // Not spread over groups: the one-block rule, on this run of letters and digits.
+    let j = i;
+    while (j + 1 < units.length && units[j + 1].kind === 'alnum') j += 1;
+    const run = units.slice(i, j + 1);
+    out += IBAN_SHAPED_TOKEN.test(run.map((unit) => unit.char).join(''))
+      ? marker
+      : run.map((unit) => unit.raw).join('');
+    i = j + 1;
+  }
+  return out;
+}
 
 /**
  * OpenAPI template literals (`{code}`, `%7Bcode%7D`) are NOT submitted values —
@@ -271,8 +431,8 @@ const IDENTIFIER_BOUNDARY = /(%[0-9A-Fa-f]{2}|[{}])/;
  * start counting them as `bad_input` — the exact regression that exclusion was
  * added to fix.
  *
- * This rule is only safe because `redactSegment` runs first and reaches INSIDE
- * the wrapper. On its own it is far too coarse: it would happily excuse
+ * This rule is only safe because `redactIbanShapedValues` runs first and reaches
+ * INSIDE the wrapper. On its own it is far too coarse: it would happily excuse
  * `%7BCH9300762011623852957%7D`, whose braces contain a real IBAN rather than a
  * placeholder name. Narrowing this predicate is the wrong repair — it would
  * only cover the two named route families, leave `/%7BCH93…%7D` on an unmatched
@@ -285,18 +445,6 @@ const SPEC_TEMPLATE_SEGMENT = /\{|%7[Bb]/;
  *  trips the funnel's spec-template exclusion, and a wrapper redacted to
  *  `%7B:redacted%7D` still does. */
 const REDACTED_SEGMENT = ':redacted';
-
-/**
- * Strip any identifier out of one path segment, preserving everything around
- * it. `%7BCH9300762011623852957%7D` → `%7B:redacted%7D`: the wrapper survives
- * so the funnel keeps excluding the row, the identifier does not survive at all.
- */
-function redactSegment(segment: string): string {
-  return segment
-    .split(IDENTIFIER_BOUNDARY)
-    .map((token) => (IBAN_SHAPED_TOKEN.test(token) ? REDACTED_SEGMENT : token))
-    .join('');
-}
 
 /**
  * Collapse a request path to a storable label: no submitted identifier, and a
@@ -314,7 +462,7 @@ function redactSegment(segment: string): string {
  * today.
  */
 export function normalizeRequestPath(path: string): string {
-  const redacted = path.split('/').map(redactSegment).join('/');
+  const redacted = redactIbanShapedValues(path, REDACTED_SEGMENT);
   return (
     redacted
       .replace(/\/v1\/bic\/[^/?]+/, (match) =>
@@ -731,43 +879,10 @@ export interface TrafficTrendDay {
 }
 
 /**
- * Daily traffic split by caller nature — the shape of the door, day by day.
- *
- * One grouped query, not one per day: the window reaches 90 days and this
- * feeds a dashboard panel.
- *
- * The natures come out of a single CASE with a terminal ELSE rather than six
- * independent predicates, so the partition is exhaustive by construction. Six
- * separate SUM(...) conditions would let a future client_kind fall through
- * every branch and quietly break the sum == total invariant that makes the
- * table readable.
- *
- * `internal` uses is_internal_email(), the same rule as the funnel and the
- * weekly digest, exposed to SQLite as a function — see weekly-facts.ts: an
- * IN-list carries one bound parameter per internal key and blows past SQLite's
- * parameter ceiling exactly when a burst of automated signups makes the view
- * most worth reading.
+ * La requête de la tendance, sur une fenêtre [début, fin) de dates UTC.
+ * Mot pour mot celle d'avant le 25.09.2026, seule sa borne a changé.
  */
-export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
-  const db = getStatsDB();
-  registerInternalEmailFn(db);
-  // Clamped here too, not only in the route: this is also called directly.
-  // Math.trunc(NaN) stays NaN, which would sail through Math.max/min into the
-  // SQL window '-NaN days' and silently return nothing.
-  // 180 and not 90: the overview compares each window with the one before
-  // it, and its 90-day window needs the 90 days before. The request log
-  // keeps twelve months, so the rows exist; the scan is bounded either way.
-  const requested = Math.trunc(days);
-  const span = Number.isFinite(requested) ? Math.max(1, Math.min(180, requested)) : 30;
-
-  // `created_at >= date('now', ...)` and not datetime(): the bound must land on
-  // a calendar boundary, because the rows are grouped by calendar date. With a
-  // rolling instant, a 30-day period grows a 31st, partial column — the same
-  // off-by-one getStatsHistory carries a comment about, invisible until the
-  // database has rows on every date of the window.
-  const rows = db
-    .prepare(
-      `WITH classified AS (
+const TRAFFIC_TREND_SQL = `WITH classified AS (
          SELECT
            date(created_at) AS d,
            status,
@@ -789,7 +904,7 @@ export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
              ELSE 'anonymous_api'
            END AS nature
          FROM request_log
-         WHERE created_at >= date('now', ?)
+         WHERE created_at >= ? AND created_at < ?
        )
        SELECT d AS date,
               COUNT(*) AS total,
@@ -805,14 +920,112 @@ export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
               COUNT(DISTINCT ip_hash) AS distinct_ips
          FROM classified
         GROUP BY d
-        ORDER BY d ASC`,
-    )
-    // N days means N calendar dates, today included — hence N-1 days back.
-    .all(`-${span - 1} days`) as TrafficTrendDay[];
+        ORDER BY d ASC`;
 
-  // A day with no traffic is absent rather than zero-filled, like
-  // getStatsHistory: this table is driven by the data, not by a calendar
-  // spine, and its consumer knows it.
+/**
+ * L'empreinte de la liste des clés internes : la seule chose, hors des lignes du
+ * jour, dont dépend le classement d'une journée (« internal » contre
+ * « with_key »). Un jour rangé sous une autre empreinte se recalcule.
+ */
+function internalKeysSignature(db: Database.Database): string {
+  const prefixes = (
+    db
+      .prepare('SELECT key_prefix FROM api_keys WHERE is_internal_email(email) ORDER BY key_prefix')
+      .all() as Array<{ key_prefix: string }>
+  ).map((r) => r.key_prefix);
+  return createHash('sha256').update(prefixes.join('\n')).digest('hex').slice(0, 16);
+}
+
+/** Les dates UTC de [début, fin), une par jour. */
+function daysBetween(start: string, end: string): string[] {
+  const out: string[] = [];
+  for (let d = new Date(`${start}T00:00:00Z`); ; d.setUTCDate(d.getUTCDate() + 1)) {
+    const day = d.toISOString().slice(0, 10);
+    if (day >= end) return out;
+    out.push(day);
+  }
+}
+
+/**
+ * Daily traffic split by caller nature — the shape of the door, day by day.
+ *
+ * One grouped query, not one per day: the window reaches 90 days and this
+ * feeds a dashboard panel.
+ *
+ * The natures come out of a single CASE with a terminal ELSE rather than six
+ * independent predicates, so the partition is exhaustive by construction. Six
+ * separate SUM(...) conditions would let a future client_kind fall through
+ * every branch and quietly break the sum == total invariant that makes the
+ * table readable.
+ *
+ * `internal` uses is_internal_email(), the same rule as the funnel and the
+ * weekly digest, exposed to SQLite as a function — see weekly-facts.ts: an
+ * IN-list carries one bound parameter per internal key and blows past SQLite's
+ * parameter ceiling exactly when a burst of automated signups makes the view
+ * most worth reading.
+ */
+export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
+  const db = getStatsDB();
+  registerInternalEmailFn(db);
+  const requested = Math.trunc(days);
+  const span = Number.isFinite(requested) ? Math.max(1, Math.min(180, requested)) : 30;
+
+  /*
+   * Jours clos calculés une fois (25.09.2026). La requête classe et dédoublonne
+   * chaque ligne de `request_log` de la fenêtre : environ 900 ms sur 180 jours,
+   * à chaque ouverture de la vue « growth », et SQLite étant synchrone, autant de
+   * temps pendant lequel l'API ne répond à personne. Un jour clos ne change plus :
+   * il se calcule une fois et se range dans `traffic_trend_days` (une ligne vide
+   * pour un jour sans trafic, pour ne pas le redemander), et seul le jour en cours
+   * se lit en direct. Seule dérive connue : la purge DPA 4.7, qui efface
+   * `key_prefix` sur de vieilles lignes, ne reclasse pas un jour déjà rangé.
+   */
+  const { start, today } = db
+    .prepare("SELECT date('now', ?) AS start, date('now') AS today")
+    .get(`-${span - 1} days`) as { start: string; today: string };
+  const signature = internalKeysSignature(db);
+  const closed = daysBetween(start, today);
+  const stored = new Map(
+    (
+      db
+        .prepare(
+          'SELECT day, row FROM traffic_trend_days WHERE day >= ? AND day < ? AND internal_sig = ?',
+        )
+        .all(start, today, signature) as Array<{ day: string; row: string | null }>
+    ).map((r) => [r.day, r.row]),
+  );
+  const missing = closed.filter((d) => !stored.has(d));
+  if (missing.length > 0) {
+    // Une seule requête, du premier jour manquant à hier : après le premier
+    // remplissage, il n'en manque plus qu'un par jour.
+    const computed = new Map(
+      (db.prepare(TRAFFIC_TREND_SQL).all(missing[0], today) as TrafficTrendDay[]).map((r) => [
+        r.date,
+        r,
+      ]),
+    );
+    const upsert = db.prepare(
+      `INSERT INTO traffic_trend_days (day, internal_sig, row, computed_at)
+       VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(day) DO UPDATE SET internal_sig = excluded.internal_sig,
+         row = excluded.row, computed_at = excluded.computed_at`,
+    );
+    db.transaction(() => {
+      for (const day of daysBetween(missing[0], today)) {
+        const row = computed.get(day);
+        const json = row ? JSON.stringify(row) : null;
+        upsert.run(day, signature, json);
+        stored.set(day, json);
+      }
+    })();
+  }
+
+  const rows: TrafficTrendDay[] = [];
+  for (const day of closed) {
+    const json = stored.get(day);
+    if (json) rows.push(JSON.parse(json) as TrafficTrendDay);
+  }
+  rows.push(...(db.prepare(TRAFFIC_TREND_SQL).all(today, '9999-12-31') as TrafficTrendDay[]));
   return rows;
 }
 
@@ -1034,6 +1247,72 @@ export function getStats(): StatsOverview {
       'ATTEMPTED, NOT COLLECTED — total_revenue_usdc is a misnomer kept for contract stability: it and total_revenue_attempted_usdc are the SAME number, the SUM of revenue_usdc in daily_stats. A row is written when a call PASSED the payment middleware verify step; nothing here observes the chain, so a settle that failed AFTER verify still counts and can only inflate this figure — it structurally over-counts and never under-counts. Do not read it as earnings. The authoritative settled USDC is /admin/revenue (Bearer STATS_TOKEN), which reads Base mainnet Transfer events to the seller wallet. Scope: x402 pay-per-call AND prepaid credit packs bought with USDC (operation_type credits_purchase, added 2026-08-20 — before that date pack sales are missing from this sum entirely). Card purchases are NOT here: Stripe money never touches the wallet and is not USDC. Historical drift observed: ~0.226 USDC counted as attempted between 2026-04-08 and 2026-04-17 with no matching on-chain Transfer — likely facilitator settlement failures during the early x402 rollout; total_revenue_usdc_clean excludes that window.',
     top_countries: topCountries,
     last_7_days: last7,
+  };
+}
+
+/**
+ * Le pouls du service : le collecteur écrit-il, et combien d'opérations
+ * aujourd'hui et hier (jours UTC).
+ *
+ * Mesuré le 25.09.2026 : la vue « growth » du tableau de bord lisait `/stats`
+ * (environ 700 ms, des regroupements sur tout l'historique de `request_log`)
+ * pour n'en garder que `last_write_at`, et `/stats/history?period=30` (environ
+ * 600 ms) pour deux nombres. Mêmes définitions, lues sur des index : quelques
+ * millisecondes.
+ */
+export interface StatsPulse {
+  /** Comme `getStats().last_write_at` : le témoin d'un collecteur vivant. */
+  last_write_at: string | null;
+  requests_today: number;
+  total_requests: number;
+  /**
+   * Opérations du jour UTC, comme une ligne de `getStatsHistory` :
+   * iban_validate + iban_batch + bic_lookup, non refusées, clés internes exclues.
+   */
+  operations_today: number;
+  operations_yesterday: number;
+  /** Les sept derniers jours UTC, du plus ancien à aujourd'hui, jours vides compris. */
+  operations_by_day: Array<{ date: string; operations: number }>;
+}
+
+export function getStatsPulse(): StatsPulse {
+  const db = getStatsDB();
+  registerInternalEmailFn(db);
+  const total = db.prepare('SELECT COUNT(*) as total FROM request_log').get() as { total: number };
+  const today = db
+    .prepare(
+      "SELECT COUNT(*) as total FROM request_log WHERE created_at >= datetime('now', 'start of day')",
+    )
+    .get() as { total: number };
+  const last = db.prepare('SELECT MAX(created_at) as last FROM request_log').get() as {
+    last: string | null;
+  };
+  const ops = db
+    .prepare(
+      `SELECT date(created_at) AS date,
+         SUM(CASE WHEN operation_type IN ('iban_validate', 'iban_batch', 'bic_lookup') THEN 1 ELSE 0 END) AS n
+       FROM operations
+       WHERE created_at >= date('now', '-6 days')
+         AND reject_reason IS NULL
+         ${EXTERNAL_ONLY_SQL}
+       GROUP BY date(created_at)`,
+    )
+    .all() as Array<{ date: string; n: number }>;
+  const byDate = new Map(ops.map((r) => [r.date, r.n]));
+  const week = (
+    db
+      .prepare(
+        "SELECT date('now', '-' || value || ' days') AS date FROM json_each('[6,5,4,3,2,1,0]')",
+      )
+      .all() as Array<{ date: string }>
+  ).map((r) => ({ date: r.date, operations: byDate.get(r.date) ?? 0 }));
+  return {
+    last_write_at: last.last,
+    requests_today: today.total,
+    total_requests: total.total,
+    operations_today: week[6].operations,
+    operations_yesterday: week[5].operations,
+    operations_by_day: week,
   };
 }
 
@@ -2652,7 +2931,9 @@ export function getCohortFootprint(): CohortFootprint {
  * tool call precisely so the existing counters keep matching it, and a reader
  * that rebuilt the split from a path would be reading a string nothing writes.
  *
- * `refused` counts the calls the daily allowance turned away, which carry their
+ * `refused` counts the calls the free allowance turned away (counted by the
+ * week since 24/09/2026, so a source refused on Monday is refused all week),
+ * which carry their
  * own path — the same name can therefore appear with served calls at zero and
  * refusals above it, and that is the interesting case.
  */

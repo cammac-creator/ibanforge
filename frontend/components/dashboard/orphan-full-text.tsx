@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { langName, usableLang } from '@/lib/crm/reading';
+import { LangBadge } from '@/components/crm/lang-badge';
 
 /**
  * The whole mail: the original text as the sync stored it and its French
@@ -125,6 +127,10 @@ export function OrphanFullText({
         <div>
           <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-3)]">
             <span>Français</span>
+            {/* La pastille commune du CRM (lang-badge.tsx), comme dans le fil. */}
+            <span className="font-normal normal-case tracking-normal">
+              <LangBadge lang={lang} translated={!!fr} compact hideFrench />
+            </span>
             {busy && (
               <span className="font-normal normal-case tracking-normal text-amber-300">
                 traduction en cours…
@@ -147,7 +153,7 @@ export function OrphanFullText({
         </div>
         <div>
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-3)]">
-            Original{lang ? ` (${lang})` : ''}
+            Original{usableLang(lang) ? ` · ${langName(usableLang(lang) as string)}` : ''}
           </div>
           <div className={`${block} text-[12.5px] text-[var(--fg-2)]`}>{body}</div>
         </div>

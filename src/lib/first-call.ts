@@ -28,7 +28,25 @@ export const FIRST_CALL_IBAN = 'DE89370400440532013000';
 
 export const FIRST_CALL_ENDPOINT = 'https://api.ibanforge.com/v1/iban/validate';
 
-export const ACCOUNT_PAGE = 'https://ibanforge.com/en/account';
+/**
+ * La page du compte, à la racine : l'anglais y vit depuis le 05.09.2026, et
+ * `/en/…` n'y mène que par une redirection permanente (`frontend/next.config.ts`).
+ *
+ * 🚨 Aucun paramètre, jamais : ni adresse, ni clé, ni code. Un lien part dans
+ * un mail, un historique et un en-tête `Referer` ; ce qu'il porte n'est plus
+ * un secret. La connexion se fait sur la page, par un code reçu par mail.
+ */
+export const ACCOUNT_PAGE = 'https://ibanforge.com/account';
+
+/**
+ * La phrase de connexion des mails qui portent une clé (lot C3, 25.09.2026).
+ *
+ * Tous ces mails partent à l'adresse inscrite sur la clé, et c'est cette
+ * adresse qui ouvre la page du compte : un code à 6 chiffres y arrive, et
+ * aucune clé n'est à coller. D'où « this e-mail address » : le lecteur la lit
+ * dans le champ « À » du mail qu'il tient.
+ */
+export const ACCOUNT_SIGN_IN = 'Sign in with this e-mail address, no key to paste.';
 
 /**
  * What we print in the Authorization header when we do NOT hold the raw key.
@@ -90,7 +108,8 @@ export function buildFirstCallText(block: FirstCallBlock): string {
     hint +
     `${FIRST_CALL_EXPECTED_LINE_1}\n` +
     `${FIRST_CALL_EXPECTED_LINE_2}\n\n` +
-    `Everything this key does, on one page: ${ACCOUNT_PAGE}\n`
+    `Everything this key does, on one page: ${ACCOUNT_PAGE}\n` +
+    `${ACCOUNT_SIGN_IN}\n`
   );
 }
 
@@ -116,6 +135,6 @@ export function buildFirstCallHtml(block: FirstCallBlock): string {
     hint +
     `<p style="color:#a1a1aa;font-size:13px;margin:0 0 4px">${escapeHtml(FIRST_CALL_EXPECTED_LINE_1)}</p>` +
     `<p style="color:#71717a;font-size:12px;margin:0 0 18px">${escapeHtml(FIRST_CALL_EXPECTED_LINE_2)}</p>` +
-    `<p style="font-size:14px;margin:0 0 22px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Everything this key does, on one page &rarr;</a></p>`
+    `<p style="font-size:14px;margin:0 0 22px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Everything this key does, on one page &rarr;</a> <span style="color:#71717a">${escapeHtml(ACCOUNT_SIGN_IN)}</span></p>`
   );
 }

@@ -52,31 +52,449 @@ The full Apache License 2.0 text is available at:
   http://www.apache.org/licenses/LICENSE-2.0
 
 ================================================================================
-Data Sources
+Data Files and Their Sources
 ================================================================================
 
-BIC/SWIFT data, including registered/head-office addresses, is sourced from
-GLEIF (Global Legal Entity Identifier Foundation) reference data under
-CC0 1.0 Universal Public Domain Dedication:
-  https://www.gleif.org/en/about/open-data
+The MIT License in LICENSE covers the source code of this repository and its
+documentation. It does not cover the data files listed below, nor any other
+file of this repository that reproduces records from the sources below, such
+as exported API responses and test fixtures. Those records remain subject to
+their publishers' terms, described in this section.
 
-The BIC-to-LEI mapping used to key this data to BIC codes is published by GLEIF
-in collaboration with SWIFT and is provided under SWIFT's royalty-free,
-commercial-use terms, which require the following attribution:
-  "This service uses the BIC to LEI relationship file. The mapping table has
-   been developed by SWIFT. SWIFT and BIC are registered trademarks of S.W.I.F.T. SC."
+This section lists the third-party sources that have records in the data
+files of this repository, and the terms each publisher attaches to them. It
+describes the files as they stand in this revision. Row counts were read on
+24 September 2026 at commit 5094d72a; they change at every refresh (monthly
+for the BIC data, weekly for the sanctions and EPC data). This section is not
+legal advice: where a publisher's terms have not been established, it says so.
+
+Files concerned:
+  data/bic.sqlite
+  data/compliance.sqlite
+  frontend/data/registers/*.json, frontend/data/countries.json and
+    frontend/app/[locale]/playground/captured-iban.json (API responses
+    exported for the website; they repeat records from the sources below)
+  src/db/bic_data.json (composite map from national bank codes to BICs)
+  src/db/nl-psp.json
+  src/lib/fi-register.ts, for its list of bank codes
+  scripts/data/eu-emi-register-2026-05-22.json
+  scripts/data/iban-registry-2026-05-22.json
+  test fixtures and sample API responses elsewhere that repeat these records
+    (see group C)
+
+Earlier commits of this repository, and forks of it, keep copies of these
+files. The data in those copies remains subject to its publishers' terms.
+
+Each source is listed in one of three groups:
+  A. terms that permit reproduction, under the conditions stated;
+  B. terms not yet confirmed;
+  C. present today, not covered by the MIT License, not redistributable
+     here, and being moved out of the public repository.
+
+--------------------------------------------------------------------------------
+A. Sources whose terms permit reproduction, under the conditions stated
+--------------------------------------------------------------------------------
+
+GLEIF (Global Legal Entity Identifier Foundation), LEI reference data
+  Where: data/bic.sqlite, table bic_entries, source 'gleif' (39,297 rows),
+         including registered and head-office addresses.
+  Terms: CC0 1.0 Universal Public Domain Dedication.
+         https://www.gleif.org/en/about/open-data
+
+  The BIC-to-LEI relationship file ("Mapping Table") used to key this data to
+  BIC codes has been developed by SWIFT and is published by GLEIF. Its licence,
+  the BIC/LEI Mapping Table License Agreement (Annex II, 21 December 2017),
+  grants a royalty-free licence for any purpose, including commercial,
+  "provided always that any copy of the Mapping Table, in whole or in part,
+  includes the following notice":
+    "SWIFT © and database rights [insert date (i.e. month and year) of the Mapping Table version].
+    All rights reserved.
+    This Mapping Table has been developed by SWIFT. Any use of the Mapping Table, in whole or
+    in part, is subject to the BIC/LEI Mapping Table License Agreement as published with the
+    Mapping Table available on GLEIF’s website.
+    The Mapping Table is updated monthly. For the latest BIC information and updates, always
+    refer to www.swift.com/bic ."
+    https://www.gleif.org/lei-data/lei-mapping/download-bic-to-lei-relationship-files/2017-12-21_annex-2_bic-to-lei-mapping-table-license-agreement_final.pdf
+  For the copy in this repository, the date to insert is the version of the
+  Mapping Table loaded at the last monthly refresh. IBANforge does not yet
+  store that version: the 'gleif' rows of bic_entries carry the refresh date
+  (column updated_at), and the version is the latest file GLEIF had
+  published by then, as listed on
   https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files
+  At commit 5094d72a, the rows were loaded on 1 September 2026 from the
+  August 2026 version (LEI-BIC-20260828.zip), and the notice reads:
+    SWIFT © and database rights August 2026.
+    All rights reserved.
+    This Mapping Table has been developed by SWIFT. Any use of the Mapping Table, in whole or
+    in part, is subject to the BIC/LEI Mapping Table License Agreement as published with the
+    Mapping Table available on GLEIF’s website.
+    The Mapping Table is updated monthly. For the latest BIC information and updates, always
+    refer to www.swift.com/bic .
 
-Swiss BC-Nummer / clearing data is sourced from SIX Group AG BankMaster:
-  https://www.six-group.com/en/products-services/banking-services/payment-services/bc-bank-master.html
+Deutsche Bundesbank, Bankleitzahlendatei
+  Where: data/bic.sqlite, table bic_entries, source 'bundesbank' (143 rows),
+         and table de_blz (3,506 rows); frontend/data/registers/de-blz.json.
+  Attribution required by the Bundesbank:
+         Quelle: Deutsche Bundesbank
+  Terms: section 4.1 of the Bundesbank's terms of use: "Es steht Ihnen
+         frei, für Ihren persönlichen oder geschäftlichen Gebrauch von der
+         Deutschen Bundesbank erstellte Informationen in körperlicher oder
+         elektronischer Form zu speichern, weiterzugeben oder zu
+         vervielfältigen. Die Informationen dürfen nicht verändert oder
+         verfälscht werden." (storing, forwarding and reproducing for
+         personal or business use; no change or falsification). The records
+         here are reformatted for storage and lookup; whether that counts as
+         a change has not been confirmed with the Bundesbank.
+         https://www.bundesbank.de/de/startseite/benutzerhinweise/nutzungsbedingungen-fuer-den-allgemeinen-gebrauch-der-website-763554
 
-Bank-level (BIC8) sanctions indicators are built directly from the official,
-freely-redistributable consolidated sanctions lists published by:
-  - OFAC (U.S. Office of Foreign Assets Control) — SDN list, U.S. public domain
-  - European Union — consolidated financial sanctions list
-This file attributes data sources, so it lists only feeds that actually put
-rows in the database: OFAC accounts for all but one of them. No third-party
-aggregator is used, so there is no non-commercial (CC-BY-NC) data dependency.
+SIX Group AG, Bank Master
+  Where: data/bic.sqlite, table ch_clearing (1,164 rows);
+         frontend/data/registers/ch-iid.json.
+  Terms: "Information in the Download Bank Master may be used freely."
+         (Record description bank master V3.0, page 3)
+         https://www.six-group.com/dam/download/banking-services/interbank-clearing/en/bc_bank_master/bankmaster-v3-record-description-en.pdf
+         https://www.six-group.com/en/products-services/banking-services/payment-services/bc-bank-master.html
 
-Country risk indicators are derived from publicly available FATF
-(Financial Action Task Force) statements and the sanctions lists above.
+Bulgarian National Bank, BAE register
+  Where: data/bic.sqlite, table bg_bae (251 rows, edition of
+         4 February 2026).
+  Terms: written permission of 27 August 2026 to reuse the register
+         "respecting the Rights for using the BNB site": the source must be
+         cited and the data must not be altered or distorted. The source and
+         the register's effective date are stored with every row.
+
+European Central Bank, list of monetary financial institutions
+  Where: data/bic.sqlite, table ecb_mfi (5,373 rows, list of
+         31 August 2026).
+  Terms: "When such information is distributed or reproduced, it must appear
+         accurately and the ECB must be cited as the source." Where the
+         information is incorporated in documents that are sold, buyers must
+         be told, before they pay and each time they access it, that it may
+         be obtained free of charge from the ECB website.
+         https://www.ecb.europa.eu/services/disclaimer/html/index.en.html
+  Served with every API response that uses it:
+         European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)
+         This information may be obtained free of charge from the ECB website at ecb.europa.eu.
+
+Banco de España, list of monetary financial institutions
+  Where: data/bic.sqlite, table bde_mfi (238 rows, list dated
+         31 August 2026).
+  Attribution required by the Banco de España:
+         Own elaboration based on data from the Banco de España website (www.bde.es)
+  Terms: reproduction "faithfully, without any manipulation or alteration of
+         the content", citing the Banco de España as the source. Where the
+         information is sold, buyers must be told, before they pay and each
+         time it is made available to them, that it may be obtained free of
+         charge; served with every API response that uses it:
+         This information may be obtained free of charge from the Banco de España website at www.bde.es.
+         Codes are stored without their padding spaces, and codes that
+         designate money-market funds rather than banks are left out;
+         whether that counts as a manipulation has not been confirmed with
+         the Banco de España.
+         https://www.bde.es/wbe/en/pie/aviso-legal/
+
+European Banking Authority, payment institutions register (PSD2)
+  Where: data/bic.sqlite, table psd_entities (4,422 rows, 30 countries,
+         register of 1 September 2026); the entries of
+         scripts/data/eu-emi-register-2026-05-22.json taken from the same
+         register (the GB entries of that file are listed in group C).
+  Terms: "Reproduction of all EBA material on this site is authorised,
+         provided the source is acknowledged."
+         https://www.eba.europa.eu/legal-notice
+         The source (European Banking Authority, payment institutions
+         register) and the register date are stored with every row of
+         psd_entities.
+
+U.S. Department of the Treasury, Office of Foreign Assets Control (OFAC),
+Specially Designated Nationals and Blocked Persons (SDN) list
+  Where: data/compliance.sqlite, table sanctioned_entities, source_list
+         'OFAC' (285 rows).
+  Terms: a work of the United States Government: "Copyright protection
+         under this title is not available for any work of the United
+         States Government" (17 U.S.C. §105). No endorsement by the U.S.
+         Government is implied.
+         https://www.govinfo.gov/content/pkg/USCODE-2023-title17/html/USCODE-2023-title17-chap1-sec105.htm
+
+European Union, consolidated list of persons, groups and entities subject
+to EU financial sanctions
+  Where: data/compliance.sqlite, table sanctioned_entities, source_list
+         'EU' (2 rows).
+  Terms: Creative Commons Attribution 4.0 International (CC BY 4.0), under
+         the Commission Decision of 12 December 2011 on the reuse of
+         Commission documents.
+         https://creativecommons.org/licenses/by/4.0/
+         Source: European Union. Changes made: only entries that carry a bank
+         identifier are kept, reduced to the bank's BIC8.
+
+FATF (Financial Action Task Force), High-Risk and Other Monitored
+Jurisdictions, and FATF membership
+  Where: data/compliance.sqlite, table fatf_countries (62 rows), from the
+         lists kept by hand in src/lib/compliance-static.ts (plenary of
+         June 2026).
+  Terms: "you can extract from, download, copy, adapt, print, distribute,
+         share and embed data for any purpose, even for commercial use",
+         with credit in the FATF's citation format, "FATF (year), (dataset
+         name), (data source) DOI or URL (accessed on (date))":
+           FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
+         The year and the access date change with each plenary sync.
+         Reuse of these records carries the same attribution requirement.
+         No endorsement by the FATF is implied.
+
+Národná banka Slovenska, directory of identification codes for the domestic
+payment system
+  Where: data/bic.sqlite, table national_bank_codes, country SK (38 rows,
+         version 225, effective 18 May 2026);
+         frontend/data/registers/sk-bank.json.
+  Attribution:
+         Zdroj: Národná banka Slovenska
+         (with the version and effective date of the edition, stored with
+         every row)
+  Terms: the NBS terms of use allow storing, reproducing and further using
+         information published on its website without its prior consent;
+         the Národná banka Slovenska must be named as the source, and the
+         electronic file must not be altered in content or otherwise. On
+         9 September 2026 the NBS confirmed that the directory is available
+         for reuse, including processing, with the NBS cited as the source.
+         https://nbs.sk/disclaimer-sk/
+
+Česká národní banka, Číselník kódů platebního styku v České republice
+(directory of payment-system codes in the Czech Republic)
+  Where: data/bic.sqlite, table national_bank_codes, country CZ (46 rows,
+         edition 254, effective 1 September 2026), and table
+         national_bank_codes_pending, which holds an edition announced
+         before its effective date (none at this revision);
+         frontend/data/countries.json (the Czech example's answer).
+  Attribution:
+         Zdroj: ČNB
+         (with the edition and its effective date, stored with every row)
+  Terms: the ČNB terms of use of its website (section 3) allow storing,
+         passing on and reproducing the information published there, except
+         texts that name an author and images whose rights the ČNB does not
+         hold; the ČNB must always be named as the source ("Zdroj: ČNB"),
+         the file must not be altered, and an extract must not change the
+         facts or their sense.
+         https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/
+
+Betaalvereniging Nederland, BIC list
+  Where: src/db/nl-psp.json (94 entries).
+  Terms: may be used free of charge without a formal licence agreement,
+         with attribution to Betaalvereniging Nederland and a caution that a
+         BIC or bank code may be changed, withdrawn or added at any time.
+  Attribution and caution:
+         Source: Betaalvereniging Nederland. A BIC or bank code may be
+         changed, withdrawn or added at any time.
+
+IBANforge's own tables
+  data/compliance.sqlite, table sanctioned_countries (14 rows), a list of
+  country-level sanctions regimes compiled by IBANforge from public
+  information, and table metadata. Country risk indicators are derived from
+  the FATF lists and from the sanctions lists named in this file.
+
+--------------------------------------------------------------------------------
+B. Sources whose terms have not yet been confirmed
+--------------------------------------------------------------------------------
+
+PeterNotenboom/SwiftCodes
+  Where: data/bic.sqlite, table bic_entries, source 'swiftcodes'
+         (82,102 rows).
+  Terms: the repository is distributed under the MIT License by its author
+         (copyright notice at the end of this file) and states: "All the
+         info is grabbed from public websites." Its data was last updated in
+         January 2018. The licence is that author's, not SWIFT's: SWIFT's
+         rights in these records have not been established, and IBANforge
+         holds no licence to the SWIFT BIC directory.
+         https://github.com/PeterNotenboom/SwiftCodes
+
+SIX Group AG, BIC entries
+  Where: data/bic.sqlite, table bic_entries, source 'six_group' (20 rows).
+  Terms: taken from the same SIX publication as the Bank Master above;
+         whether its terms cover these rows has not been confirmed
+         separately.
+
+Composite bank-code map, apart from the Austrian, Belgian, Finnish,
+Luxembourg and Polish keys listed in group C
+  Where: src/db/bic_data.json (18,627 of its 24,081 keys, in 70 of its
+         75 countries).
+  Built from: the datasets of sigalor/iban-to-bic, which that project
+         generates from files published by national central banks and
+         banking associations; the bank registries of mdomke/schwifty,
+         compiled by that project from national sources; the SIX Bank
+         Master; keys derived from the BIC entries of data/bic.sqlite; and
+         manual additions.
+  Terms: both projects are distributed under the MIT License (copyright
+         notices at the end of this file). Those licences do not grant
+         rights that the national publishers have not granted, and the terms
+         of the national publications behind these keys have not all been
+         reviewed.
+         https://github.com/sigalor/iban-to-bic
+         https://github.com/mdomke/schwifty
+
+SWIFT, IBAN Registry
+  Where: scripts/data/iban-registry-2026-05-22.json (per country: IBAN
+         length and the positions of the bank, branch and account codes).
+  Terms: not reviewed.
+
+--------------------------------------------------------------------------------
+C. Present today, not covered by the MIT License, being moved out
+--------------------------------------------------------------------------------
+
+The records below are in this repository today. Their publishers reserve all
+rights, restrict use to non-commercial purposes, publish no terms, or have
+permitted use in the IBANforge API without permitting redistribution of the
+data. They remain subject to their publishers' terms. They are not covered by
+the MIT License in LICENSE, and this repository grants no right to reuse
+them. They are being moved out of the public repository: from every file
+listed for them below, and from test fixtures and sample API responses
+elsewhere in the repository, for example mcp/fixtures/api-answers.json and
+sdks/fixtures/quickstart-api.json (EPC "sepa" data), the sample response for
+DE89370400440532013000 in frontend/content/{en,fr,de}/docs/onboarding.mdx (an
+EPC "sepa" block), and the FI, LU and PL examples of
+frontend/data/countries.json (resolved by keys listed below).
+
+EBA CLEARING, STEP2 SCT reachable PSPs list
+  Where: data/bic.sqlite, table bic_entries, source 'eba_step2' (189 rows).
+  Terms: "All rights reserved by EBA CLEARING". No licence is published.
+         https://www.ebaclearing.eu/legal-and-disclaimer/
+
+United Nations, Security Council Consolidated List
+  Where: data/compliance.sqlite, table sanctioned_entities, source_list
+         'UN' (5 rows).
+  Terms: "None of the materials provided on this web site may be used,
+         reproduced or transmitted, in whole or in part, in any form or by
+         any means […] without permission in writing from the publisher."
+         Permission is granted only for the user's "personal,
+         non-commercial" use.
+         https://www.un.org/en/about-us/copyright
+         https://www.un.org/en/about-us/terms-of-use
+
+European Payments Council (EPC), registers of participants in the SEPA
+Credit Transfer, SEPA Instant Credit Transfer, SEPA Direct Debit Core and
+Verification of Payee schemes
+  Where: data/compliance.sqlite, table sepa_participants (4,463 rows:
+         1,954 SCT, 1,290 SCT Inst, 1,219 SDD Core) and table
+         vop_participants (1,288 rows); and the "sepa" blocks (schemes,
+         vop_participant, basis "epc_register") of the API responses
+         exported to frontend/data/registers/at-blz.json, be-bank.json,
+         de-blz.json, sk-bank.json and sm-bank.json,
+         frontend/data/countries.json and
+         frontend/app/[locale]/playground/captured-iban.json.
+  Terms: "In principle, the information contained in this website can be
+         reproduced, redistributed and transmitted for non-commercial
+         purposes, as long as the EPC as its source is acknowledged."
+         (Disclaimer, europeanpaymentscouncil.eu)
+         Source: European Payments Council.
+
+Narodowy Bank Polski (NBP)
+  Where: data/bic.sqlite, table bic_entries, source 'nbp' (21 rows); the
+         3,004 PL keys of src/db/bic_data.json, taken by mdomke/schwifty
+         from the NBP's EWIB file.
+  Terms: "Narodowy Bank Polski makes no objections to saving files, copying
+         pages in full or in part or making printouts for personal use,
+         provided that they do not serve commercial purposes."
+         (Terms of Use, § 1.6, nbp.pl)
+
+Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis
+  Where: data/bic.sqlite, table national_bank_codes, country AT
+         (873 rows), and table bic_entries, source 'oenb' (1 row);
+         frontend/data/registers/at-blz.json; the 870 AT keys of
+         src/db/bic_data.json, taken by sigalor/iban-to-bic and
+         mdomke/schwifty from the same OeNB file.
+  Terms: none stated on the directory page, which carries "Copyright ©
+         Oesterreichische Nationalbank". Not established.
+
+National Bank of Belgium (Banque nationale de Belgique), bank
+identification codes, Protocol Secretariat
+  Where: data/bic.sqlite, table national_bank_codes, country BE
+         (782 rows); frontend/data/registers/be-bank.json; the 781 BE keys
+         of src/db/bic_data.json, taken by sigalor/iban-to-bic from the
+         National Bank of Belgium's full list of codes.
+  Terms: none stated on the page. Not established.
+
+Central Bank of the Republic of San Marino, operating banks
+  Where: data/bic.sqlite, table national_bank_codes, country SM (4 rows);
+         frontend/data/registers/sm-bank.json.
+  Terms: none published, neither a licence nor a prohibition. Licence
+         unknown.
+  Credit given by choice, not by obligation:
+         Source: Central Bank of the Republic of San Marino, operating banks (read on <date>)
+
+Finance Finland (Finanssiala ry), Finnish monetary institution codes and
+BICs (list published 15 October 2025)
+  Where: src/lib/fi-register.ts (codes transcribed by hand); the 656 FI
+         keys of src/db/bic_data.json, taken by mdomke/schwifty from
+         Finance Finland's publications.
+  Terms: none stated on the site. Not established.
+
+ABBL, Luxembourg Register of IBAN-BIC Codes
+  Where: the 143 LU keys of src/db/bic_data.json; 135 of them come from
+         the sigalor/iban-to-bic dataset taken from the ABBL register, the
+         other 8 from mdomke/schwifty.
+  Terms: the ABBL's written confirmation of 15 September 2026 covers one
+         normalised entry per API response, credited
+           Source: ABBL, Luxembourg register of IBAN/BIC codes
+         with the publication date, without redistribution of the source
+         file. It does not cover redistribution of the register in this
+         repository.
+
+Bank of England, List of PRA-regulated Banks
+  Where: data/bic.sqlite, table pra_banks (281 rows).
+  Terms: written permission of 25 August 2026 for the monthly list as a
+         reference source in the IBANforge API service, with attribution to
+         the Bank of England and to the month of the list:
+           Bank of England (List of Banks, <month>)
+         The month is stored in pra_banks.list_month and served with every
+         pra_authorisation block. Use outside that description is not
+         covered by the permission. The Bank's general site terms allow
+         downloading "for personal use or internal use within an individual
+         organisation for non-commercial purposes".
+         https://www.bankofengland.co.uk/legal
+
+UK Financial Conduct Authority (FCA), Financial Services Register lists
+"E-Money Firms (CSV)" and "Firms with PSD Permissions (CSV)"
+  Where: the GB entries of scripts/data/eu-emi-register-2026-05-22.json
+         (1,195 of its 2,755 entries: name, country, type).
+  Terms: the FCA's website terms state: "3.3 You must not reproduce or
+         store any part of this site in any other website or include it in
+         any public or private electronic retrieval system or service
+         without our prior written permission. 3.4 You must not use data
+         from this site to provide a data feed to any comparison table or
+         any other website without our written permission." Their clause
+         2.2 applies the UK Open Government Licence to "charts, figures,
+         graphs, diagrams, tables and numerical datasets published within
+         the Data section of this site"; these lists are downloaded from the
+         Register (register.fca.org.uk), not from that section.
+         The FCA's written acceptance of 7 September 2026 covers its
+         Register API, queried one firm per request; it does not cover
+         these lists. That reply also refers to the Register's own terms
+         of use (https://register.fca.org.uk/s/legal-information), which
+         could not be read without a browser and may apply to these lists
+         as well.
+         https://www.fca.org.uk/legal
+
+--------------------------------------------------------------------------------
+MIT License notices for the data compilations named above
+--------------------------------------------------------------------------------
+
+PeterNotenboom/SwiftCodes    Copyright (c) 2015 Peter Notenboom
+sigalor/iban-to-bic          Copyright (c) 2021 sigalor
+mdomke/schwifty              Copyright (c) 2021 Martin Domke
+
+Each of these three repositories is distributed under the MIT License:
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.

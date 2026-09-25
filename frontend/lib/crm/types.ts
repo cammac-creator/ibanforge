@@ -6,6 +6,8 @@ export interface Message {
   subject: string | null;
   snippet: string | null;
   snippet_fr?: string | null;
+  /** L'objet traduit en français, pour la lecture ; une réponse garde `subject`. */
+  subject_fr?: string | null;
   lang?: string | null;
   body?: string | null;
   counterparty: string | null;

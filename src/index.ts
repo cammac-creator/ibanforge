@@ -8,11 +8,13 @@
  */
 import { serve, type ServerType } from '@hono/node-server';
 import { createRequire } from 'node:module';
-import { closeAll, initStatsDB, checkpointStatsWal } from './lib/db.js';
+import { closeAll, initStatsDB, checkpointStatsWal, getBicDB } from './lib/db.js';
+import { getComplianceDB } from './lib/compliance-db.js';
 import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
+import { purgeAccountTables } from './lib/account.js';
 import { purgeExpiredDeviceCodes } from './lib/device-grant.js';
 import { purgeExpiredAuditJobs } from './lib/audit-jobs.js';
 import { purgeLineageFacts } from './lib/lineage-facts.js';
@@ -25,7 +27,9 @@ import { startMonthlyDemandLoop } from './lib/demand-proposal-server.js';
 import { startActivationNudge } from './lib/activation-nudge-server.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
+import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
 import { recordEvent } from './lib/events.js';
+import { frozenTrace } from './lib/bic-trace.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -56,12 +60,54 @@ if (!statsState.ok) {
   );
 }
 
+// ─── Surcouche privée des données sous conditions (étape 3, 25/09/2026) ──────
+//
+// `entrypoint.sh` vient de recopier les deux bases publiques depuis l'image.
+// Ouvrir les deux connexions ICI, avant la première requête, fait la fusion au
+// démarrage (src/lib/restricted-overlay-runtime.ts) plutôt qu'au premier
+// client, et permet d'en dire le résultat : au journal, et par l'alerte
+// d'exploitation quand le fichier d'une variable n'est pas servi en entier
+// (src/lib/restricted-overlay-ops.ts). Sans variable, rien ne change : les bases
+// publiques s'ouvrent comme avant.
+//
+// Une base publique illisible ne fait pas tomber le démarrage ici : elle lève à
+// la première requête, exactement comme avant ce bloc.
+try {
+  getBicDB();
+  getComplianceDB();
+} catch (err) {
+  console.error(
+    'Reference database open failed at boot:',
+    err instanceof Error ? err.message : err,
+  );
+}
+reportBootOverlays();
+
+// Un fichier privé remplacé (dépôt manuel, puis tirage automatique à l'étape
+// suivante) est rechargé sans redémarrage : un `stat` par base toutes les dix
+// minutes, une fusion seulement pour la base dont le fichier a changé depuis le
+// dernier vu. Un fichier refusé n'est pas reconstruit au passage suivant.
+const OVERLAY_WATCH_MS = 10 * 60 * 1000;
+setInterval(overlayWatchTick, OVERLAY_WATCH_MS).unref();
+
 const app = buildApp();
 
 const port = parseInt(process.env.PORT ?? '3000', 10);
 
 const server: ServerType = serve({ fetch: app.fetch, port }, () => {
   console.log(`IBANforge running on http://localhost:${port}`);
+});
+
+// L'index des traces courantes (src/lib/bic-trace.ts) est chauffé juste après
+// l'ouverture du port, pour que le premier appel payant ne porte pas son calcul.
+// Jamais bloquant, jamais fatal : un échec laisse l'index se construire au
+// premier appel, qui répond « non consulté » s'il échoue encore.
+setImmediate(() => {
+  try {
+    frozenTrace();
+  } catch (err) {
+    console.error('Trace index not warmed:', err);
+  }
 });
 
 // Deploy marker for the dashboard charts. recordEvent dedups same-version
@@ -85,6 +131,10 @@ try {
       `Retention: purged ${purgedTerminated} request_log rows of terminated keys (DPA 4.7)`,
     );
   purgeExpiredVerifications();
+  // Les codes de connexion expirés et les sessions du compte client expirées
+  // ou révoquées depuis plus d'un jour (lot C1) : aux deux mêmes endroits que
+  // la purge des vérifications, pour la même raison qu'elle.
+  purgeAccountTables();
   // Les grants d'appareil et le journal de leurs tentatives, aux DEUX mêmes
   // endroits que la purge des vérifications. 🚨 L'étape qui révoque une clé
   // approuvée que personne n'est venu chercher est le point le plus facile à
@@ -113,6 +163,7 @@ setInterval(
       purgeOldRequestLog(12);
       purgeTerminatedKeyTelemetry(30);
       purgeExpiredVerifications();
+      purgeAccountTables();
       purgeExpiredDeviceCodes();
       purgeLineageFacts(12);
       checkpointStatsWal();

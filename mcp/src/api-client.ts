@@ -81,7 +81,7 @@ export function createApiClient(config: {
             typeof cause?.detail === 'string'
               ? cause.detail
               : res.status === 402
-                ? 'The API requires payment or an available key quota. Create a key without e-mail with POST https://api.ibanforge.com/v1/keys/generate (25 REST calls/month), then configure IBANFORGE_API_KEY. An existing key can be claimed for a larger allowance. This MCP package does not sign x402 payments; use an x402-capable HTTP client with the returned payment requirements, or prepaid credits. Do not recreate keys to evade a limit.'
+                ? 'The API requires payment or an available key quota. Create a key without e-mail with POST https://api.ibanforge.com/v1/keys/generate, then configure IBANFORGE_API_KEY. An existing key can be claimed for a larger allowance; the allowances in force are served at https://api.ibanforge.com/.well-known/rate-limits.yml. This MCP package does not sign x402 payments; use an x402-capable HTTP client with the returned payment requirements, or prepaid credits. Do not recreate keys to evade a limit.'
                 : res.status === 429
                   ? 'Rate limit reached. Follow retry_after when present; do not loop or recreate keys. No request was retried by this client.'
                   : res.status >= 500

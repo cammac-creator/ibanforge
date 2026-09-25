@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getComplianceDB } from '../lib/compliance-db.js';
+import { loadedSanctionsLists, PROMISED_SANCTIONS_LISTS } from '../lib/compliance-db.js';
+import { RESTRICTED_FAMILY } from '../lib/restricted-family.js';
 
 /**
  * No served surface may claim a sanctions list we do not screen.
@@ -78,17 +79,84 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** The authorities the shipped database actually carries. Ground truth for both directions. */
-const shipped = new Set(
-  (
-    getComplianceDB()
-      .prepare('SELECT DISTINCT source_list FROM sanctioned_entities')
-      .all() as Array<{ source_list: string }>
-  ).map((r) => r.source_list.toUpperCase()),
-);
+/**
+ * Les listes de sanctions que la production sert depuis la surcouche PRIVÉE, et
+ * non depuis la base de ce dépôt.
+ *
+ * Vide aujourd'hui, et c'est voulu : toutes les listes sont encore dans la base
+ * publique, la porte ci-dessous est donc exactement aussi stricte qu'avant. La
+ * liste de l'ONU quitte le dépôt public (décision du 24/09/2026 : tous droits
+ * réservés, gardée mais servie depuis un fichier privé). La modification qui
+ * retire ses lignes de la base publique ajoute 'UN' ici DANS LE MÊME COMMIT :
+ * le workflow hebdomadaire de rafraîchissement lance ce fichier sur la base
+ * publique, et sans cette ligne il lirait « l'ONU n'est pas contrôlée » et
+ * rougirait sur chaque surface qui dit, à juste titre, qu'elle l'est.
+ *
+ * Ajouter une liste ici, c'est affirmer que la production la sert sans que ce
+ * dépôt la porte. Cela n'excuse jamais la disparition d'une liste PUBLIQUE :
+ * voir REDISTRIBUTABLE ci-dessous.
+ */
+const SERVED_FROM_PRIVATE_OVERLAY: readonly string[] = [];
 
-describe('sanctions coverage claims match the shipped database', () => {
-  it('the database holds OFAC, EU and UN, and not SECO', () => {
+/**
+ * Les listes que ce dépôt a le droit de porter, et doit donc porter : OFAC
+ * (domaine public, CC0) et UE (CC BY 4.0). Le plancher qui empêche la
+ * déclaration ci-dessus de cacher une liste publique disparue.
+ */
+const REDISTRIBUTABLE: readonly string[] = ['EU', 'OFAC'];
+
+/**
+ * Les listes que porte la base chargée, lues par l'accesseur que l'API utilise
+ * elle-même pour `meta.sources` (src/lib/compliance-db.ts), pas par une requête
+ * propre à ce test : la porte et la réponse servie ne peuvent pas diverger sur
+ * ce qui est chargé.
+ */
+const loaded = new Set(loadedSanctionsLists().map((l) => l.toUpperCase()));
+
+/** Ce que la production contrôle : les listes chargées, plus celles que sert la surcouche privée. */
+const served = new Set([...loaded, ...SERVED_FROM_PRIVATE_OVERLAY.map((l) => l.toUpperCase())]);
+
+/**
+ * Every line of a served surface that names a sanctions authority outside
+ * `screened`. Only forms that assert screening: "SECONDARY", "UNITED KINGDOM"
+ * and the like must not trip it, so the pattern requires the authority to sit
+ * in a list of sanctions bodies rather than merely appear as letters.
+ *
+ * Fonction de l'ensemble contrôlé plutôt que de la base, pour que ce fichier
+ * puisse prouver que la porte mord encore sur un ensemble qu'il ne sert pas
+ * (voir le dernier bloc).
+ */
+function overClaims(screened: ReadonlySet<string>): string[] {
+  const CLAIM = /\b(OFAC|EU)\s*[/,]\s*(EU|UN|SECO)(\s*[/,]\s*(UN|SECO|EU))*/i;
+  const NAMED = /\b(UN|SECO)\b/;
+
+  const offenders: string[] = [];
+  for (const file of walk(ROOT)) {
+    const rel = relative(ROOT, file).split('\\').join('/');
+    if (ALLOWED.has(rel)) continue;
+    let text: string;
+    try {
+      text = readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+    for (const line of text.split('\n')) {
+      const m = CLAIM.exec(line);
+      if (!m) continue;
+      // The matched run lists authorities; flag any that is not shipped.
+      for (const authority of m[0].split(/[/,]/).map((s) => s.trim().toUpperCase())) {
+        if (NAMED.test(authority) && !screened.has(authority)) {
+          offenders.push(`${rel}: ${line.trim().slice(0, 140)}`);
+          break;
+        }
+      }
+    }
+  }
+  return offenders;
+}
+
+describe('sanctions coverage claims match what is served', () => {
+  it('serves OFAC, EU and UN, and not SECO', () => {
     // Pinned as ground truth so the rest of the file has something to compare
     // against. If a feed is genuinely added, this is the assertion to change
     // first, before any copy.
@@ -99,42 +167,38 @@ describe('sanctions coverage claims match the shipped database', () => {
     // fix for the EU list losing half its coverage the same way — made the UN
     // rows appear. The claim string is now derived from this table rather than
     // retyped, so the two cannot drift apart again.
-    expect([...shipped].sort()).toEqual(['EU', 'OFAC', 'UN']);
+    expect([...served].sort()).toEqual(['EU', 'OFAC', 'UN']);
+  });
+
+  it('la liste promise par les réponses est celle que les surfaces nomment', () => {
+    // `PROMISED_SANCTIONS_LISTS` décide quand une réponse dit « cette liste n'a
+    // pas été consultée » (drapeau sans poids, `listed: null`) : elle doit
+    // nommer exactement ce que chaque surface affirme contrôler.
+    expect([...PROMISED_SANCTIONS_LISTS].sort()).toEqual(['EU', 'OFAC', 'UN']);
+    // Et la surcouche privée n'emporte jamais une liste publique.
+    const privateLists = RESTRICTED_FAMILY.filter(
+      (m) => m.table === 'sanctioned_entities' && m.where,
+    ).map((m) => m.where!.value);
+    expect(privateLists).toEqual(['UN']);
+    for (const list of REDISTRIBUTABLE) expect(privateLists).not.toContain(list);
+  });
+
+  it('holds every redistributable list in the loaded database, never behind the overlay', () => {
+    // La déclaration de surcouche ne peut expliquer qu'une liste partie vers le
+    // fichier privé. Une liste publique absente de la base chargée, c'est un
+    // rafraîchissement cassé, et la déclaration ne doit pas pouvoir le cacher.
+    const overlay = new Set(SERVED_FROM_PRIVATE_OVERLAY.map((l) => l.toUpperCase()));
+    for (const list of REDISTRIBUTABLE) {
+      expect(loaded.has(list), `${list} missing from the loaded database`).toBe(true);
+      expect(overlay.has(list), `${list} is redistributable: it stays public`).toBe(false);
+    }
   });
 
   it('no served surface names a sanctions authority we do not screen', () => {
-    // Only forms that assert screening. "SECONDARY", "UNITED KINGDOM" and the
-    // like must not trip it, so the pattern requires the authority to sit in a
-    // list of sanctions bodies rather than merely appear as letters.
-    const CLAIM = /\b(OFAC|EU)\s*[/,]\s*(EU|UN|SECO)(\s*[/,]\s*(UN|SECO|EU))*/i;
-    const NAMED = /\b(UN|SECO)\b/;
-
-    const offenders: string[] = [];
-    for (const file of walk(ROOT)) {
-      const rel = relative(ROOT, file).split('\\').join('/');
-      if (ALLOWED.has(rel)) continue;
-      let text: string;
-      try {
-        text = readFileSync(file, 'utf8');
-      } catch {
-        continue;
-      }
-      for (const line of text.split('\n')) {
-        const m = CLAIM.exec(line);
-        if (!m) continue;
-        // The matched run lists authorities; flag any that is not shipped.
-        for (const authority of m[0].split(/[/,]/).map((s) => s.trim().toUpperCase())) {
-          if (NAMED.test(authority) && !shipped.has(authority)) {
-            offenders.push(`${rel}: ${line.trim().slice(0, 140)}`);
-            break;
-          }
-        }
-      }
-    }
-
+    const offenders = overClaims(served);
     expect(
       offenders,
-      `Surfaces claiming a sanctions list that is not in the database:\n${offenders.join('\n')}`,
+      `Surfaces claiming a sanctions list that is not served:\n${offenders.join('\n')}`,
     ).toEqual([]);
   });
 });
@@ -183,6 +247,46 @@ describe('served copy claims only what the product can prove', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * What makes a line a coverage claim. Case-sensitive on purpose: the French
+ * article "un" and the German conjunction "und" are not the Security Council,
+ * and "SECONDARY" is not the Swiss authority.
+ *
+ * A bare "EU" does not trigger a claim by itself, because in this codebase it
+ * is far more often the jurisdiction than the list ("EU high-risk third
+ * countries", "EU Instant Payments Regulation"). It still counts inside a run.
+ */
+const CLAIM_TRIGGER = /\b(OFAC|UN|SECO)\b/;
+
+/**
+ * A run of authorities written as a set, e.g. "OFAC, EU, UN" or "EU,OFAC,UN".
+ *
+ * The middle dot is in the separator list because it is the separator the
+ * site's own trust bar uses for every other value it shows. Without it, a
+ * claim written correctly in the house typography would be reported as an
+ * under-declaration, which is a false alarm the guard would eventually be
+ * silenced for.
+ */
+const RUN = /\b(OFAC|EU|UE|UN|SECO)\b(?:\s*[,/+·]\s*\b(?:OFAC|EU|UE|UN|SECO)\b)+/g;
+
+/**
+ * `UE` is how French writes the European Union, and the guard fired on the
+ * French footer for spelling it correctly — an under-declaration reported
+ * where none existed. Folded rather than added to `served`: the database
+ * ships one EU list, not two, so `UE` must satisfy the EU requirement and
+ * must not let a surface pass by naming both forms and no UN. Deliberately
+ * one-way and case-sensitive: no locale writes something else `UE`.
+ */
+const ALIASES: Record<string, string> = { UE: 'EU' };
+const canonical = (a: string) => ALIASES[a] ?? a;
+
+/**
+ * `matched_lists` shows what a single hit looks like, so `["OFAC"]` is a
+ * correct example and not a claim about coverage. It is the only exemption,
+ * and it is narrow on purpose.
+ */
+const EXAMPLE_FIELD = 'matched_lists';
 
 /**
  * The mirror image of the guard above: a surface must not name FEWER lists than
@@ -243,67 +347,72 @@ describe('no served surface names fewer sanctions lists than we screen', () => {
     'frontend/messages/fr.json',
   ];
 
-  /**
-   * What makes a line a coverage claim. Case-sensitive on purpose: the French
-   * article "un" and the German conjunction "und" are not the Security Council,
-   * and "SECONDARY" is not the Swiss authority.
-   *
-   * A bare "EU" does not trigger a claim by itself, because in this codebase it
-   * is far more often the jurisdiction than the list ("EU high-risk third
-   * countries", "EU Instant Payments Regulation"). It still counts inside a run.
-   */
-  const CLAIM_TRIGGER = /\b(OFAC|UN|SECO)\b/;
-
-  /**
-   * A run of authorities written as a set, e.g. "OFAC, EU, UN" or "EU,OFAC,UN".
-   *
-   * The middle dot is in the separator list because it is the separator the
-   * site's own trust bar uses for every other value it shows. Without it, a
-   * claim written correctly in the house typography would be reported as an
-   * under-declaration, which is a false alarm the guard would eventually be
-   * silenced for.
-   */
-  const RUN = /\b(OFAC|EU|UE|UN|SECO)\b(?:\s*[,/+·]\s*\b(?:OFAC|EU|UE|UN|SECO)\b)+/g;
-
-  /**
-   * `UE` is how French writes the European Union, and the guard fired on the
-   * French footer for spelling it correctly — an under-declaration reported
-   * where none existed. Folded rather than added to `shipped`: the database
-   * ships one EU list, not two, so `UE` must satisfy the EU requirement and
-   * must not let a surface pass by naming both forms and no UN. Deliberately
-   * one-way and case-sensitive: no locale writes something else `UE`.
-   */
-  const ALIASES: Record<string, string> = { UE: 'EU' };
-  const canonical = (a: string) => ALIASES[a] ?? a;
-
-  /**
-   * `matched_lists` shows what a single hit looks like, so `["OFAC"]` is a
-   * correct example and not a claim about coverage. It is the only exemption,
-   * and it is narrow on purpose.
-   */
-  const EXAMPLE_FIELD = 'matched_lists';
-
-  it.each(COVERAGE_SURFACES)('%s names every list the database holds', (rel) => {
-    const text = readFileSync(join(ROOT, rel), 'utf8');
-    const offenders: string[] = [];
-    let claims = 0;
-
-    text.split('\n').forEach((line, i) => {
-      if (!CLAIM_TRIGGER.test(line) || line.includes(EXAMPLE_FIELD)) return;
-      claims++;
-      const complete = [...line.matchAll(RUN)].some((m) => {
-        const named = new Set(m[0].split(/[,/+·]/).map((s) => canonical(s.trim())));
-        return named.size === shipped.size && [...shipped].every((a) => named.has(a));
-      });
-      if (!complete) offenders.push(`  line ${i + 1}: ${line.trim().slice(0, 140)}`);
-    });
-
+  it.each(COVERAGE_SURFACES)('%s names every list we serve', (rel) => {
+    const { claims, offenders } = underClaims(rel, served);
     // A surface that stopped claiming anything at all is the same failure with
     // the evidence removed, so silence does not pass either.
     expect(claims, `${rel} no longer states which sanctions lists are screened`).toBeGreaterThan(0);
     expect(
       offenders,
-      `${rel} names a sanctions list set smaller than the shipped ${[...shipped].sort().join(', ')}:\n${offenders.join('\n')}`,
+      `${rel} names a sanctions list set other than the served ${[...served].sort().join(', ')}:\n${offenders.join('\n')}`,
     ).toEqual([]);
+  });
+});
+
+/**
+ * Chaque ligne d'une surface de couverture qui énonce un ensemble autre que
+ * `screened`, et le nombre de lignes qui en énoncent un.
+ *
+ * Déclarée au niveau du module pour que la preuve ci-dessous puisse l'appeler
+ * sur un ensemble que nous ne servons pas ; les motifs et l'unique exemption
+ * sont ceux que documente le bloc au-dessus.
+ */
+function underClaims(
+  rel: string,
+  screened: ReadonlySet<string>,
+): { claims: number; offenders: string[] } {
+  const text = readFileSync(join(ROOT, rel), 'utf8');
+  const offenders: string[] = [];
+  let claims = 0;
+
+  text.split('\n').forEach((line, i) => {
+    if (!CLAIM_TRIGGER.test(line) || line.includes(EXAMPLE_FIELD)) return;
+    claims++;
+    const complete = [...line.matchAll(RUN)].some((m) => {
+      const named = new Set(m[0].split(/[,/+·]/).map((s) => canonical(s.trim())));
+      return named.size === screened.size && [...screened].every((a) => named.has(a));
+    });
+    if (!complete) offenders.push(`  line ${i + 1}: ${line.trim().slice(0, 140)}`);
+  });
+  return { claims, offenders };
+}
+
+/**
+ * La porte mord encore quand les listes ne sont plus lues dans ce dépôt.
+ *
+ * Lire l'ensemble servi par un accesseur et une déclaration, plutôt que dans un
+ * littéral épinglé, n'est sûr que si un ensemble privé d'une liste fait encore
+ * rougir les surfaces qui la nomment, et si un ensemble augmenté d'une liste
+ * fait rougir les surfaces de couverture. Vérifié ici sur des ensembles que
+ * nous ne servons pas, contre les vraies surfaces, pour qu'aucune des deux
+ * moitiés ne puisse cesser de fonctionner en silence.
+ */
+describe('the sanctions guard still bites on a set we do not serve', () => {
+  it('flags the surfaces naming UN when UN is not served', () => {
+    const withoutUn = new Set([...served].filter((l) => l !== 'UN'));
+    const offenders = overClaims(withoutUn);
+    expect(offenders.length).toBeGreaterThan(0);
+    expect(offenders.some((o) => o.startsWith('src/mcp/server.ts:'))).toBe(true);
+  });
+
+  it('flags the coverage surfaces when a list is served that none of them names', () => {
+    const withSeco = new Set([...served, 'SECO']);
+    for (const rel of [
+      'src/mcp/server.ts',
+      'src/routes/openapi.ts',
+      'frontend/content/en/docs/compliance.mdx',
+    ]) {
+      expect(underClaims(rel, withSeco).offenders.length, rel).toBeGreaterThan(0);
+    }
   });
 });

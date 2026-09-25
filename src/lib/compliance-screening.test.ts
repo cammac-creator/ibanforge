@@ -6,6 +6,7 @@ import {
   buildComplianceResult,
   calculateRiskScore,
 } from './compliance.js';
+import { complianceTableLoaded } from './compliance-db.js';
 import type { SanctionsCheck, ReachabilityCheck, VopCheck } from '../types.js';
 
 /**
@@ -64,9 +65,13 @@ describe('"nothing to screen" is reported as such, never as "screened and clean"
     expect(checkVop(null).screened).toBe(false);
   });
 
-  it('marks them screened when a BIC did resolve', () => {
-    expect(checkReachability('COBADEFF').screened).toBe(true);
-    expect(checkVop('COBADEFF').screened).toBe(true);
+  it('marks them screened when a BIC did resolve and the register is loaded', () => {
+    // Depuis le 25/09/2026, un registre non chargé n'a pas été consulté non
+    // plus : une banque résolue est contrôlée exactement quand son registre est
+    // là. Les deux branches sont prouvées sur données inventées dans
+    // restricted-data-absent.test.ts.
+    expect(checkReachability('COBADEFF').screened).toBe(complianceTableLoaded('sepa_participants'));
+    expect(checkVop('COBADEFF').screened).toBe(complianceTableLoaded('vop_participants'));
   });
 
   it('stops charging risk points for absences nobody verified', () => {

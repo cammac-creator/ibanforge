@@ -90,7 +90,7 @@ const TOOLS: Tool[] = [
     title: 'Validate IBAN',
     annotations: { title: 'Validate IBAN', ...READ_ONLY },
     description:
-      'Verify whether a European IBAN is valid AND enrich it with bank, compliance and routing data. ' +
+      'Verify whether an IBAN from any IBAN country is valid AND enrich it with bank, compliance and routing data. ' +
       'USE WHEN: the user mentions an IBAN, asks to validate an IBAN and identify the issuing bank, asks to detect a typo in an IBAN, ' +
       'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
       'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
@@ -111,13 +111,13 @@ const TOOLS: Tool[] = [
       'source and free_of_charge are licence conditions that must travel with the data — do not strip them when relaying the answer. ' +
       'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
       'is open, or belongs to any particular person. Verify the payee by name before sending funds. ' +
-      'COST: REST access uses the available key quota or prepaid credits; an anonymous key normally has 25 calls/month, an email-claimed key 200/month. The HTTP API also accepts x402 (0.005 USDC), but this package does not sign payments.',
+      'COST: REST access uses the available key quota or prepaid credits; the allowances in force are served at https://api.ibanforge.com/.well-known/rate-limits.yml. The HTTP API also accepts x402 (0.005 USDC per call), but this package does not sign payments.',
     inputSchema: {
       type: 'object',
       properties: {
         iban: {
           type: 'string',
-          description: 'IBAN to validate. Spaces and lowercase are accepted. Example: "CH10 0023 0000 0000 1234 5" or "de89370400440532013000".',
+          description: 'IBAN to validate. Spaces and lowercase are accepted. Example: "de89370400440532013000" or "CH10 0023 0000 0000 1234 5".',
         },
       },
       required: ['iban'],
@@ -145,15 +145,26 @@ const TOOLS: Tool[] = [
             account_number: { type: 'string' },
           },
         },
+        // 🚨 Every `null` below is a value the API really serves, and each one
+        // used to be declared as a plain string or object. The official MCP
+        // client validates structuredContent against this schema and THROWS on
+        // a mismatch, so the call failed on exactly the answers that matter
+        // most: an unallocated bank code (`bic: null`), a bank the EBA register
+        // names (`classification: "register"`). Found 24/09/2026 by replaying
+        // real answers of the routes: many were refused, such as any bank code
+        // that resolves no BIC, any BIC without an LEI, any compliance check on
+        // an invalid IBAN. The API's own types (src/types.ts) are the reference;
+        // mcp/src/output-schema.test.ts replays real answers through the
+        // official client.
         bic: {
-          type: 'object',
+          type: ['object', 'null'],
           description:
             'Resolved BIC/SWIFT (when BBAN→BIC mapping exists). null if unresolved. ' +
             'Read basis before storing it as a routing instruction: only a national_register pairing is settlement-grade.',
           properties: {
             code: { type: 'string' },
-            bank_name: { type: 'string' },
-            city: { type: 'string' },
+            bank_name: { type: ['string', 'null'] },
+            city: { type: ['string', 'null'] },
             basis: {
               type: 'string',
               enum: ['national_register', 'curated_map', 'directory_prefix'],
@@ -176,7 +187,12 @@ const TOOLS: Tool[] = [
             // exactly the answers that matter most.
             type: { type: ['string', 'null'], enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null] },
             name: { type: 'string' },
-            classification: { type: 'string', enum: ['curated', 'default'] },
+            classification: {
+              type: 'string',
+              enum: ['curated', 'register', 'default'],
+              description:
+                'curated = the BIC8 is in the issuer set; register = an official register (today the EBA PSD2 register) names the holder of this bank code, provenance in psd_registration; default = nothing on file, "bank" is a fallback. Count curated and register, never default, when sizing virtual-IBAN exposure.',
+            },
             iban_issuer: { type: 'string', enum: ['confirmed', 'not_listed'] },
           },
         },
@@ -253,17 +269,18 @@ const TOOLS: Tool[] = [
           },
         },
         clearing: {
-          type: 'object',
-          description: 'Swiss clearing data when country is CH or LI (null otherwise).',
+          type: ['object', 'null'],
+          description:
+            'Swiss clearing data when country is CH or LI. null when the SIX register holds no such IID (an unallocated Swiss bank code).',
           properties: {
             iid: { type: 'string' },
             name: { type: 'string' },
             type: { type: 'string' },
-            town: { type: 'string' },
+            town: { type: ['string', 'null'] },
             sic: { type: 'boolean' },
             instant_payments_chf: { type: 'boolean' },
             eurosic: { type: 'boolean' },
-            qr_iid: { type: 'string' },
+            qr_iid: { type: ['string', 'null'] },
           },
         },
       },
@@ -275,12 +292,12 @@ const TOOLS: Tool[] = [
     title: 'Batch Validate IBANs',
     annotations: { title: 'Batch Validate IBANs', ...READ_ONLY },
     description:
-      'Validate up to 100 IBANs in a single call at $0.002 per IBAN (60% cheaper than calling validate_iban repeatedly at $0.005). ' +
+      'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, an IBAN costs $0.002 here instead of $0.005 for validate_iban; on a key or prepaid credits, each IBAN uses one request or one credit either way. ' +
       'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
       'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
       'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
       'RETURNS: { results: [...same shape as validate_iban], count, valid_count, cost_usdc }. ' +
-      'COST: 0.002 USDC per IBAN (e.g. 10 IBANs = 0.02, 100 IBANs = 0.20).',
+      'COST: via x402, 0.002 USDC per IBAN (e.g. 10 IBANs = 0.02, 100 IBANs = 0.20); on a key or prepaid credits, one request or one credit per IBAN.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -307,7 +324,7 @@ const TOOLS: Tool[] = [
               iban: { type: 'string' },
               valid: { type: 'boolean' },
               country: { type: 'object' },
-              bic: { type: 'object' },
+              bic: { type: ['object', 'null'], description: 'null when the bank code resolves no BIC.' },
               issuer: { type: 'object' },
               sepa: { type: 'object' },
               error: { type: 'string', description: 'Set when valid=false.' },
@@ -326,11 +343,16 @@ const TOOLS: Tool[] = [
     title: 'Lookup BIC/SWIFT',
     annotations: { title: 'Lookup BIC/SWIFT', ...READ_ONLY },
     description:
-      'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, address. ' +
+      'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, and registered head-office address (where available). ' +
       'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
       'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
       'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-      'BACKED BY: 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly. ' +
+      // 25/09/2026 : la phrase de `bicDirectorySentence()` (src/lib/positioning.ts),
+      // sans ses chiffres : le paquet publié reste figé jusqu'à sa version suivante,
+      // les comptes vivent à llms.txt. « most of the rows » plutôt que « about two
+      // thirds » : la part bouge à chaque rafraîchissement, « most » reste vrai tant
+      // que la copie figée dépasse la moitié. scripts/mcp-parity.test.ts relie le mois.
+      'BACKED BY: a BIC directory of GLEIF and national registers, refreshed monthly, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up most of the rows; only the GLEIF rows carry an LEI. Live counts: https://api.ibanforge.com/llms.txt. ' +
       'RETURNS: bank_name, country, country_name, city, lei, address (if available). ' +
       'COST: 0.003 USDC.',
     inputSchema: {
@@ -345,14 +367,16 @@ const TOOLS: Tool[] = [
     },
     outputSchema: {
       type: 'object',
-      description: 'BIC/SWIFT lookup result from the GLEIF database.',
+      description: 'BIC/SWIFT lookup result from the BIC directory (GLEIF, national registers and a public copy of the SWIFT directory).',
       properties: {
         bic: { type: 'string', description: 'Echo of the input, normalized to uppercase.' },
         bic8: { type: 'string', description: '8-char form (institution-level).' },
         bic11: { type: 'string', description: '11-char form including branch.' },
         found: { type: 'boolean' },
         valid_format: { type: 'boolean' },
-        institution: { type: 'string', description: 'Bank legal name.' },
+        // null on `found: false`, and on a found BIC that carries no LEI: the
+        // two most common answers of this tool (see the note above validate_iban's bic).
+        institution: { type: ['string', 'null'], description: 'Bank legal name. null when the BIC is not found.' },
         country: {
           type: 'object',
           properties: {
@@ -360,20 +384,20 @@ const TOOLS: Tool[] = [
             name: { type: 'string' },
           },
         },
-        city: { type: 'string' },
-        lei: { type: 'string', description: 'Legal Entity Identifier (ISO 17442) if available.' },
+        city: { type: ['string', 'null'] },
+        lei: { type: ['string', 'null'], description: 'Legal Entity Identifier (ISO 17442); null when none is on file.' },
         address: {
-          type: 'object',
-          description: 'Registered head-office address object (present when available).',
+          type: ['object', 'null'],
+          description: 'Registered head-office address (GLEIF). null when the BIC carries no LEI or address.',
           properties: {
             type: { type: 'string' },
-            street: { type: 'string' },
-            post_code: { type: 'string' },
-            region: { type: 'string' },
-            city: { type: 'string' },
+            street: { type: ['string', 'null'] },
+            post_code: { type: ['string', 'null'] },
+            region: { type: ['string', 'null'] },
+            city: { type: ['string', 'null'] },
             country: { type: 'string' },
             source: { type: 'string' },
-            as_of: { type: 'string' },
+            as_of: { type: ['string', 'null'] },
           },
         },
         address_available: { type: 'boolean' },
@@ -390,8 +414,8 @@ const TOOLS: Tool[] = [
       'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
       'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
       'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
-      'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
-      'BACKED BY: 1,100+ SIX BankMaster entries (Swiss official source, refreshed monthly). ' +
+      'EVERY IID OF THE SIX BANKMASTER, with its full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
+      'BACKED BY: the SIX BankMaster (Swiss official source, refreshed monthly); live count at https://api.ibanforge.com/llms.txt. ' +
       'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
       'COST: 0.003 USDC. Only relevant for CH and LI accounts.',
     inputSchema: {
@@ -425,14 +449,14 @@ const TOOLS: Tool[] = [
         address: {
           type: 'object',
           properties: {
-            street: { type: 'string' },
-            building_number: { type: 'string' },
-            post_code: { type: 'string' },
-            town: { type: 'string' },
+            street: { type: ['string', 'null'] },
+            building_number: { type: ['string', 'null'] },
+            post_code: { type: ['string', 'null'] },
+            town: { type: ['string', 'null'] },
             country: { type: 'string' },
           },
         },
-        bic: { type: 'string', description: 'BIC if mapped.' },
+        bic: { type: ['string', 'null'], description: 'BIC if mapped, null otherwise.' },
         payment_services: {
           type: 'object',
           properties: {
@@ -444,8 +468,8 @@ const TOOLS: Tool[] = [
             lsv_bdd_eur: { type: 'boolean' },
           },
         },
-        sic_iid: { type: 'string' },
-        qr_iid: { type: 'string', description: 'QR-IID allocation, null when none.' },
+        sic_iid: { type: ['string', 'null'] },
+        qr_iid: { type: ['string', 'null'], description: 'QR-IID allocation, null when none.' },
         valid_on: { type: 'string' },
       },
       required: ['iid', 'found'],
@@ -493,13 +517,15 @@ const TOOLS: Tool[] = [
         'Reference verdict. Without an iban this is the free checksum answer; with one it is the reference_check block of a full IBAN validation.',
       properties: {
         reference: { type: 'string', description: 'Normalized: uppercase, separators removed.' },
+        // The three nulls the descriptions already promised were typed as
+        // non-null, so the client refused the very answers they describe.
         scheme: {
-          type: 'string',
-          enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr'],
+          type: ['string', 'null'],
+          enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr', null],
           description: 'Null when no supported scheme matches.',
         },
         valid: {
-          type: 'boolean',
+          type: ['boolean', 'null'],
           description:
             'null means recognised but uncheckable without the creditor bank configuration (KID, OCR). Never report null as false.',
         },
@@ -509,7 +535,10 @@ const TOOLS: Tool[] = [
           description: 'A STRING, so a two-digit value beginning with zero survives ("03", "97").',
         },
         also_valid_as: { type: 'object', description: 'The second reading of an ambiguous string, with its own verdict.' },
-        source: { type: 'string', description: 'The document publishing the rule. Relay it.' },
+        source: {
+          type: ['string', 'null'],
+          description: 'The document publishing the rule. Null only when no scheme matched. Relay it.',
+        },
         as_of: { type: 'string', description: 'YYYY-MM of that document.' },
         note: { type: 'string' },
         pairing: {
@@ -650,15 +679,15 @@ const TOOLS: Tool[] = [
     title: 'Compliance Check',
     annotations: { title: 'Compliance Check', ...READ_ONLY },
     description:
-      'Run a full pre-flight compliance check on an IBAN before sending a SEPA / cross-border payment. ' +
+      'Run a pre-flight compliance triage on an IBAN before sending a SEPA / cross-border payment. ' +
       'USE WHEN: the user is about to send a payment / payout / refund and wants to triage risk first, ' +
-      'asks "is this IBAN safe to pay?", asks for sanctions screening, asks whether the recipient bank is reachable for SEPA Instant, ' +
+      "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
       'or needs a numeric risk score for an internal payment-approval workflow. ' +
       'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
-      'SCOPE: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name. ' +
-      'CHECKS: IBAN validity + bank sanctions (OFAC) + FATF grey/black list + ' +
-      'SEPA Instant reachability + VoP (EU 2024/886) participant flag. ' +
-      'RETURNS: the validate_iban fields PLUS a nested compliance { sanctions, reachability, vop, risk_score (0-100), risk_level, flags[] }. ' +
+      // 25/09/2026 : copie de BANK_LEVEL_SANCTIONS (src/lib/positioning.ts), que ce
+      // paquet ne peut pas importer ; scripts/mcp-parity.test.ts compare les deux.
+      "CHECKS: IBAN validity + sanctions lists (OFAC, EU, UN) matched on the payee's bank (BIC8), the country checked against a fixed list of sanctioned jurisdictions, never the payee's name + FATF status + SEPA Instant reachability + whether the EPC Verification of Payee (VoP) register lists the bank as ready; the name check itself is done by the payee's bank, never here. " +
+      'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop). ' +
       'COST: 0.02 USDC.',
     inputSchema: {
       type: 'object',
@@ -677,7 +706,11 @@ const TOOLS: Tool[] = [
         iban: { type: 'string' },
         valid: { type: 'boolean' },
         country: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' } } },
-        bic: { type: 'object', properties: { code: { type: 'string' }, bank_name: { type: 'string' }, city: { type: 'string' } } },
+        bic: {
+          type: ['object', 'null'],
+          description: 'null when the bank code resolves no BIC; the bank-level sanctions check then has no bank to screen (compliance.sanctions.bank_screened: false).',
+          properties: { code: { type: 'string' }, bank_name: { type: ['string', 'null'] }, city: { type: ['string', 'null'] } },
+        },
         issuer: { type: 'object', properties: { type: { type: ['string', 'null'] }, name: { type: 'string' } } },
         sepa: {
           type: 'object',
@@ -698,7 +731,7 @@ const TOOLS: Tool[] = [
                 country_sanctioned: { type: 'boolean' },
                 bank_sanctioned: { type: 'boolean', description: 'Bank-BIC level only — NOT the beneficiary.' },
                 matched_lists: { type: 'array', items: { type: 'string' }, description: 'e.g. ["OFAC","EU"].' },
-                fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
+                fatf_status: { type: 'string', enum: ['member', 'suspended', 'grey_list', 'black_list', 'non_member'] },
               },
             },
             reachability: {
@@ -709,7 +742,12 @@ const TOOLS: Tool[] = [
               type: 'object',
               properties: { participant: { type: 'boolean' }, status: { type: 'string' } },
             },
-            risk_score: { type: 'number', minimum: 0, maximum: 100, description: '0 = safest, 100 = highest.' },
+            risk_score: {
+              type: ['number', 'null'],
+              minimum: 0,
+              maximum: 100,
+              description: '0 = safest, 100 = highest. null when the IBAN failed validation: there was nothing to score (risk_level: unassessable).',
+            },
             risk_level: {
               type: 'string',
               enum: ['low', 'medium', 'elevated', 'high', 'critical', 'unassessable'],
@@ -724,9 +762,12 @@ const TOOLS: Tool[] = [
           properties: {
             scope: { type: 'string', enum: ['bank_bic_only'], description: 'Sanctions are screened at the bank BIC, NOT the beneficiary name.' },
             disclaimer: { type: 'string' },
-            sanctions_as_of: { type: 'string', description: 'ISO timestamp of the last data refresh.' },
-            fatf_as_of: { type: 'string', description: 'YYYY-MM of the FATF plenary reflected.' },
-            sources: { type: 'string' },
+            // null when the compliance database has no metadata to read
+            // (getComplianceMeta in src/lib/compliance-db.ts): the answer is
+            // still served, with its dates unknown rather than invented.
+            sanctions_as_of: { type: ['string', 'null'], description: 'ISO timestamp of the last data refresh; null when unknown.' },
+            fatf_as_of: { type: ['string', 'null'], description: 'YYYY-MM of the FATF plenary reflected; null when unknown.' },
+            sources: { type: ['string', 'null'], description: 'Comma-separated data sources; null when unknown.' },
           },
         },
         cost_usdc: { type: 'number' },
@@ -869,7 +910,7 @@ const TOOLS: Tool[] = [
       'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
       'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
       'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
       'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
     inputSchema: {
       type: 'object',
@@ -919,12 +960,12 @@ const TOOLS: Tool[] = [
     annotations: { title: 'Request an IBANforge API key' },
     description:
       'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
-      'USE WHEN: you hit the daily free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+      'USE WHEN: you used up the free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
       'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
       'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
       'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
       'Then call poll_api_key. ' +
-      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached.',
+      'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -991,7 +1032,7 @@ const TOOLS: Tool[] = [
       '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
       '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
       '`invalid_grant` means this code can no longer be used at all — stop. ' +
-      'This tool is free and does NOT count against the daily free-tier limit.',
+      'This tool is free and does NOT count against the free allowance.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1134,12 +1175,16 @@ const INSTRUCTIONS =
   // le contexte du modèle AVANT `tools/list`, donc citer un outil absent
   // apprendrait à l'agent que la documentation mente. Un test vérifie que tout
   // nom d'outil cité est bien enregistré.
-  'Free tier: 10 tool calls/IP/day here, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
+  // 24/09/2026 : ce paragraphe d'accès (de « Free tier: » au prix des packs)
+  // n'est PAS servi par ce paquet : `stdioInstructions` le remplace par un texte
+  // sans chiffre ni période, qui renvoie à rate-limits.yml et à GET /v1. Un
+  // paquet publié reste figé jusqu'à la version suivante ; les quotas, non.
+  'Free tier: 25 tool calls a week per source address here (ISO week in UTC, reset on Monday 00:00 UTC), no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
   'POST https://api.ibanforge.com/v1/keys/claim lifts that same key to 200 REST calls/month — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. The mailed code gives 200 every month; a payment gives 200 once. ' +
   // 2026-09-15 : copie CARACTÈRE POUR CARACTÈRE de la phrase device grant de
   // src/mcp/instructions.ts. Ce paquet est publié séparément et ne peut pas
   // importer depuis src/ ; `src/mcp/instructions.test.ts` compare les deux.
-  'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the daily limit. ' +
+  'Or ask for a durable key with request_api_key then poll_api_key: a human approves in a browser, the agent never handles an address, and both tools keep answering after the free allowance is spent. ' +
   'Prepaid credit packs from $4 per 1,000 calls, no expiry. ' +
   'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
   'Paying as an agent (wallet, USDC on Base, prepaid packs): https://ibanforge.com/docs/pay-as-an-agent — ' +
@@ -1193,10 +1238,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const ANON_NOTE =
     'Anonymous mode — basic format validation only. For BIC, SEPA reachability, ' +
     'issuer classification, sanctions, Swiss BC-Nummer and risk score: take a key ' +
-    'with no e-mail at all — POST /v1/keys/generate with no body, 25 REST calls a ' +
-    'month — then POST /v1/keys/claim with the key in the Authorization header to ' +
-    'lift it to 200 a month, or pay per call via x402 ' +
-    '(see https://api.ibanforge.com/.well-known/x402).';
+    'with no e-mail at all — POST /v1/keys/generate with no body — then POST ' +
+    '/v1/keys/claim with the key in the Authorization header to raise its ' +
+    'allowance (figures in force: https://api.ibanforge.com/.well-known/rate-limits.yml), ' +
+    'or pay per call via x402 (see https://api.ibanforge.com/.well-known/x402).';
 
   // When the 402 carried a cause (exhausted quota/credits, invalid key), the
   // degraded fallback result must say so: the user HAS a key and would
