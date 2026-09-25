@@ -21,8 +21,11 @@ import {
   PRICING_PAGE,
   PRO_PAYMENT_LINK,
   PRO_PRICE_USD,
+  topupLinks,
 } from '../lib/payment-links.js';
 import { ACCOUNT_PAGE } from '../lib/first-call.js';
+import { ensureTopupRef } from '../lib/key-purchases.js';
+import { getKeyTier } from '../lib/api-keys.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -669,6 +672,44 @@ function accountPageField(keyPrefix: string | null | undefined): Record<string, 
 }
 
 /**
+ * Recharger la clé PRÉSENTÉE (lot B1, 25.09.2026) : servi seulement quand une
+ * clé valide s'est authentifiée, à côté des champs d'avant, qui gardent leur
+ * sens (« Added, not renamed » : `pay_by_card` reste un achat qui frappe une
+ * clé neuve, pour qui n'a pas de clé).
+ *
+ * Les liens portent la référence de recharge de la clé : ce 402 est une
+ * réponse faite au porteur authentifié, le seul endroit où elle se sert.
+ * Rien si la référence est indisponible (base qui refuse l'écriture) : le
+ * reste du corps suffit à sortir du mur.
+ *
+ * Une clé ANONYME est prévenue (ZG1, ZG7) : un achat la fait sortir du palier
+ * anonyme sans lui donner de gratuit, donc la réclamer par e-mail AVANT
+ * d'acheter est ce qui garde une allocation mensuelle.
+ */
+function topupThisKeyField(
+  keyHash: string | null | undefined,
+  tier: string | undefined,
+): Record<string, unknown> | null {
+  if (!keyHash) return null;
+  const ref = ensureTopupRef(keyHash);
+  if (!ref) return null;
+  const anonymous = (tier ?? getKeyTier(keyHash)?.tier) === 'anonymous';
+  return {
+    description:
+      'Recharge the key you presented: the credits land on this same key, nothing to change in your integration.',
+    by_card: topupLinks(ref),
+    by_usdc: 'POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it',
+    ...(anonymous
+      ? {
+          note:
+            'This key is anonymous: once it buys credits it leaves the anonymous tier for good and keeps no free ' +
+            'monthly allowance. Claim it by e-mail first (POST /v1/keys/claim) to keep one.',
+        }
+      : {}),
+  };
+}
+
+/**
  * Causes where the caller ALREADY holds a key and has simply run out of
  * allowance. For them the free tier is not an upgrade path, it is a way to
  * never pay: the 2026-07-25 funnel audit measured a client hit the quota wall,
@@ -829,6 +870,13 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
       },
       paywallCause,
     );
+    const topupThisKey = topupThisKeyField(c.get('apiKeyHash'), paywallCause?.tier);
+    if (topupThisKey && body.credit_packs && typeof body.credit_packs === 'object') {
+      body.credit_packs = {
+        ...(body.credit_packs as Record<string, unknown>),
+        topup_this_key: topupThisKey,
+      };
+    }
 
     c.res = new Response(JSON.stringify(body, null, 2), {
       status: 402,

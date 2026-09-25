@@ -536,7 +536,8 @@
         "title": "Prepaid credits",
         "body": "Buy in bulk, never expires: 1k = $4, 5k = $20, 25k = $80 (down to $0.0032/credit). One credit = one validation or lookup — a batch of N IBANs uses N credits.",
         "note": "Stripe checkout — API key delivered by email. Agents can buy in USDC: POST /v1/credits/buy/1k|5k|25k.",
-        "cardLabel": "Pay by card"
+        "cardLabel": "Pay by card",
+        "rechargeExisting": "Already have a key? Recharge it from <account>your account page</account>: the credits land on that same key, nothing to change in your integration."
       }
     },
     "oem": {
@@ -2320,7 +2321,12 @@
     "leaveFailed": "The key could not be revoked. Nothing changed and it still works.",
     "leaveDpa": "Read the data processing agreement",
     "noKeyYet": "No key yet? 25 calls a month without email; 200 a month after confirming your address. No card.",
-    "getKey": "Get a free key"
+    "getKey": "Get a free key",
+    "mixedNote": "Each call draws on the allowance first, then on the prepaid credits of this key.",
+    "topupTitle": "Recharge this key",
+    "topupHint": "Pay by card: the credits land on this same key. Nothing to change in your integration.",
+    "topupUnproven": "This key carries your address, but that address was not confirmed by a code when the key was created. Recharge it only if you recognise it as yours.",
+    "topupCredits": "{credits} credits"
   },
   "sources": {
     "meta": {

@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
   key_hash      TEXT UNIQUE NOT NULL,
   key_prefix    TEXT NOT NULL,
   email         TEXT NOT NULL,
-  monthly_limit INTEGER,              -- NULL = default (200), custom value for paid clients
+  monthly_limit INTEGER,              -- NULL = default of the tier (200, or 0 for tier 'paid'); 0 = no own allowance
   created_at    TEXT DEFAULT (datetime('now')),
   active        INTEGER DEFAULT 1
 );
@@ -131,6 +131,14 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_email ON api_keys(email);
 --   origin_prefix TEXT                   -- la lignée qui survit à /rotate
 --   shield_episode TEXT                  -- l'épisode du disjoncteur sous lequel la clé est née
 -- Tables neuves du même lot : key_claims, key_settlements (voir src/lib/db.ts).
+-- Chantier « clé unique », lot B1 (25.09.2026) :
+--   credits_notice_base INTEGER          -- le solde juste après la dernière recharge (alerte des 10 %)
+--   credits_total                        -- désormais le CUMUL acheté sur la clé, rotations comprises
+-- Tables neuves : key_purchases (une ligne par paiement, payment_ref unique, source de
+-- vérité de l'argent ; sur le rail USDC, payer_address, auth_nonce et tx_hash pour le
+-- rapprochement à la main, jamais la signature) et key_topup_refs (une référence de
+-- recharge ifr_ par lignée).
+-- Migration et rattrapage : migrateKeyPurchases dans src/lib/db.ts.
 
 CREATE TABLE IF NOT EXISTS api_usage (
   key_hash TEXT NOT NULL,

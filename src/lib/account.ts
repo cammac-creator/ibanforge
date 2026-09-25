@@ -43,6 +43,7 @@ import { getStatsDB } from './db.js';
 import {
   API_KEY_VALIDATION_COLUMNS,
   OEM_MONTHLY_LIMIT,
+  ownAllowanceDefault,
   validationFromRow,
   type ApiKeyValidation,
   type ApiKeyValidationRow,
@@ -419,7 +420,13 @@ export function purgeAccountTables(): number {
 
 // ─── La vue d'ensemble ───────────────────────────────────────────────────────
 
-export type AccountPlan = 'free' | 'custom' | 'pack' | 'pro' | 'editor';
+type AllowancePlan = 'free' | 'custom' | 'pro' | 'editor';
+
+/**
+ * La formule d'une clé. Une clé mixte (allocation ET crédits, lot B1) porte les
+ * deux parties, `free+pack` par exemple, que la page lit partie par partie.
+ */
+export type AccountPlan = AllowancePlan | 'pack' | `${AllowancePlan}+pack`;
 
 export interface OverviewKey {
   key_prefix: string;
@@ -431,8 +438,18 @@ export interface OverviewKey {
   calls_this_month: number;
   last_call_at: string | null;
   alerts: Array<{ kind: 'quota_80' | 'credits_low'; sent_at: string | null }>;
+  /**
+   * L'adresse de cette clé a-t-elle été PROUVÉE par un code (création avec
+   * code, réclamation, signature d'agent, geste admin) ? Relecture de sécurité
+   * du lot C1, point I1 : une clé peut porter l'adresse d'un tiers (première
+   * clé d'un réseau créée sans code, adresse saisie chez Stripe ou dans un
+   * achat USDC). La page n'offre alors la recharge qu'avec un avertissement,
+   * pour qu'on ne recharge pas la clé d'un autre en croyant recharger la sienne.
+   */
+  address_proven: boolean;
   actions: {
-    topup: string | null;
+    /** Les liens qui rechargent CETTE clé (lot B1). */
+    topup: Record<'1k' | '5k' | '25k', string> | null;
     subscribe_pro: string | null;
     manage_subscription: string | null;
   };
@@ -456,7 +473,12 @@ type KeyRow = ApiKeyValidationRow & {
   key_prefix: string;
   created_at: string | null;
   stripe_subscription_id: string | null;
+  claimed_at?: string | null;
+  claim_method?: string | null;
 };
+
+/** Les preuves d'une boîte : un code vérifié, une signature d'agent, un geste admin. */
+const MAILBOX_PROOFS = new Set(['email_code', 'agent_signature', 'admin']);
 
 type OverviewRow = KeyRow & { last_call_at: string | null };
 
@@ -467,13 +489,18 @@ type OverviewRow = KeyRow & { last_call_at: string | null };
  * allocation relevée sans abonnement est « sur mesure ».
  */
 function planOf(row: KeyRow): AccountPlan {
-  if (row.credits_remaining !== null) return 'pack';
-  if (row.stripe_subscription_id) {
-    return (row.monthly_limit ?? 0) >= OEM_MONTHLY_LIMIT ? 'editor' : 'pro';
-  }
-  return (row.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT) <= FREE_TIER_MONTHLY_LIMIT
-    ? 'free'
-    : 'custom';
+  const allowance = row.monthly_limit ?? ownAllowanceDefault(row.tier);
+  const hasCredits = row.credits_remaining !== null;
+  // Une clé à crédits sans allocation propre est un pack, et seulement cela.
+  if (hasCredits && allowance <= 0) return 'pack';
+  const base: AllowancePlan = row.stripe_subscription_id
+    ? allowance >= OEM_MONTHLY_LIMIT
+      ? 'editor'
+      : 'pro'
+    : allowance <= FREE_TIER_MONTHLY_LIMIT
+      ? 'free'
+      : 'custom';
+  return hasCredits ? `${base}+pack` : base;
 }
 
 /**
@@ -527,7 +554,8 @@ export function buildOverview(
 
   const rows = db
     .prepare(
-      `SELECT key_hash, key_prefix, created_at, stripe_subscription_id, ${API_KEY_VALIDATION_COLUMNS},
+      `SELECT key_hash, key_prefix, created_at, stripe_subscription_id, claimed_at, claim_method,
+              ${API_KEY_VALIDATION_COLUMNS},
               (SELECT r.created_at FROM request_log r
                 WHERE r.key_prefix = api_keys.key_prefix
                 ORDER BY r.id DESC LIMIT 1) AS last_call_at
@@ -572,7 +600,12 @@ export function buildOverview(
   const keys = rows.map((row): OverviewKey => {
     const plan = planOf(row);
     const block = usageOf(validationFromRow(row.key_hash, row));
-    const isCreditKey = row.credits_remaining !== null;
+    const hasCredits = row.credits_remaining !== null;
+    // Une clé à crédits SANS allocation propre : son `limit` n'est opposé à
+    // rien. Une clé mixte (lot B1) montre les deux blocs.
+    const isCreditKey = hasCredits && (row.monthly_limit ?? ownAllowanceDefault(row.tier)) <= 0;
+    const topup = (block.topup as { by_card?: Record<'1k' | '5k' | '25k', string> } | null)
+      ?.by_card;
     const subscription =
       plan === 'pro' || plan === 'editor'
         ? { plan, status: 'active' as const, manage_url: PRO_PORTAL_URL }
@@ -592,18 +625,21 @@ export function buildOverview(
             used: block.used,
             remaining: block.remaining,
           },
-      credits: isCreditKey
+      credits: hasCredits
         ? { remaining: row.credits_remaining as number, purchased_total: row.credits_total ?? 0 }
         : null,
       subscription,
       calls_this_month: monthCalls.get(row.key_hash) ?? 0,
       last_call_at: toIso(row.last_call_at),
       alerts: alerts.get(row.key_hash) ?? [],
-      // `topup` attend le lot B1 et `subscribe_pro` le lot B2 : null jusque-là.
-      // Le portail Stripe, lui, existe déjà : c'est une page de connexion par
-      // e-mail, sans secret.
+      address_proven:
+        !!row.claimed_at && !!row.claim_method && MAILBOX_PROOFS.has(row.claim_method),
+      // `topup` depuis le lot B1 : les liens portent la référence de la clé.
+      // `subscribe_pro` attend le lot B2 : le lien Pro d'aujourd'hui frappe
+      // une clé neuve. Le portail Stripe, lui, existe déjà : c'est une page de
+      // connexion par e-mail, sans secret.
       actions: {
-        topup: null,
+        topup: topup ?? null,
         subscribe_pro: null,
         manage_subscription: subscription ? PRO_PORTAL_URL : null,
       },

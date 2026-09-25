@@ -24,9 +24,27 @@ export const CONSENT_ASK = 'Use my address you@company.com to create a free IBAN
  */
 export const CONSENT_BOUNDARY =
   'Never send an address your human has not handed you for this purpose.';
+// La promotion « une fois » ne vise que le paiement À L'APPEL (chantier « clé
+// unique », lot B1, 25.09.2026) : un pack acheté en présentant la clé la
+// recharge, et un achat ne crée jamais de gratuit.
 const PAYMENT_CLAIM =
-  'Qualifying x402 payments settled while presenting the key ' +
-  `grant ${FREE_TIER_MONTHLY_LIMIT} requests ONCE, with no monthly renewal and no address.`;
+  'Qualifying x402 pay-per-call payments settled while presenting the key ' +
+  `grant ${FREE_TIER_MONTHLY_LIMIT} requests ONCE, with no monthly renewal and no address; ` +
+  'buying a credit pack with the key presented recharges it and grants nothing free.';
+
+/**
+ * Où atterrit un pack (lot B1) : sur la clé présentée, qui ne change pas ; une
+ * clé neuve seulement pour qui n'en présente aucune. Une clé ANONYME qui achète
+ * quitte le palier anonyme sans garder de gratuit (ZG1, ZG7) : la réclamer par
+ * e-mail d'abord est ce qui garde une allocation mensuelle.
+ */
+const PACK_LANDING =
+  'Prepaid credit packs land on the key you already hold, with credits that never expire: in USDC, ' +
+  'POST https://api.ibanforge.com/v1/credits/buy/1k (also 5k, 25k) with that key presented; by card, your human ' +
+  'opens the recharge link of that key (under `topup` in GET /v1/keys/usage, and in a 402 served to that key). ' +
+  'Nothing to change in your integration. An anonymous key that buys credits leaves the anonymous tier and keeps ' +
+  'no free monthly allowance: claim it by e-mail first to keep one. Without a key, a pack is a new key: by card on ' +
+  'https://ibanforge.com/pricing, delivered by e-mail, or in USDC with the same route and no key.';
 
 export const CONSENT_LONG = `Getting a key needs no e-mail. POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key: ${ANONYMOUS_MONTHLY_LIMIT} requests a month in normal operation, no address, no card, nothing to confirm. Nothing is mailed and no CRM or prospect record is opened. Protective limits can reduce the allowance during an alert.
 
@@ -36,7 +54,7 @@ Already paying? ${PAYMENT_CLAIM} The e-mail code is the recurring free rail. The
 
 Inside an MCP client there is a third door, and it is open: call request_api_key, show the short code and the link to your human, then call poll_api_key. A human approves in a browser, the agent never handles an address, and the key comes back once. Both tools are free and keep answering after the free allowance is spent.
 
-Prepaid credit packs are a SEPARATE key with credits that never expire, and do not change the key you already hold: your human buys one by card on https://ibanforge.com/pricing and receives the key by e-mail, or you buy one in USDC with POST https://api.ibanforge.com/v1/credits/buy/1k (also 5k, 25k). One further door is planned and NOT available yet: a card checkout opened from the API that returns the key against a secret nonce. Do not look for it until this text says it exists.`;
+${PACK_LANDING} One further door is planned and NOT available yet: a card checkout opened from the API that returns the key against a secret nonce. Do not look for it until this text says it exists.`;
 
 export const CONSENT_MEDIUM =
   `POST ${KEY_GENERATE_URL} with no body gives an ifk_ key with no e-mail: ${ANONYMOUS_MONTHLY_LIMIT} REST calls/month in normal operation (protective limits may apply). ` +
@@ -44,7 +62,7 @@ export const CONSENT_MEDIUM =
   `Ask: "${CONSENT_ASK}". ${CONSENT_BOUNDARY} ` +
   `An e-mailed 6-digit code grants ${FREE_TIER_MONTHLY_LIMIT} calls every month; ${PAYMENT_CLAIM} ` +
   `Inside an MCP client: call request_api_key, show the code and the link to your human, then poll_api_key — a human approves in a browser, the agent never handles an address, and both tools are free and keep answering once the free allowance is spent. ` +
-  `Prepaid credit packs are a SEPARATE key: by card on https://ibanforge.com/pricing (your human pays, the key arrives by e-mail) or in USDC with POST https://api.ibanforge.com/v1/credits/buy/1k. A card checkout opened from the API is planned, not available yet.`;
+  `${PACK_LANDING} A card checkout opened from the API is planned, not available yet.`;
 
 export const CONSENT_SHORT =
   `free: POST ${KEY_GENERATE_URL} with no body — no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST calls/month in normal operation (protective limits may apply); ` +
@@ -70,14 +88,15 @@ export const CONSENT_FIELDS = {
     by_payment: PAYMENT_CLAIM,
   },
   buy_credits_by_card: {
-    description: 'A separate purchase: it does not change the key you already hold',
+    description:
+      'A separate purchase that lands on the key you already hold: the credits recharge it, nothing to change in your integration. Without a key, the pack is a new key.',
     endpoint:
-      'https://ibanforge.com/pricing (card, paid by your human) — or POST https://api.ibanforge.com/v1/credits/buy/1k in USDC (also 5k, 25k)',
-    auth: 'No key and no e-mail on the pricing page. The USDC route is paid per call with x402. A card checkout opened from the API (POST /v1/keys/checkout) is planned, not available yet: do not call it.',
+      'The recharge links of your key (under `topup` in GET /v1/keys/usage, and in a 402 served to that key) — or https://ibanforge.com/pricing for a new key (card, paid by your human) — or POST https://api.ibanforge.com/v1/credits/buy/1k in USDC (also 5k, 25k)',
+    auth: 'No e-mail needed. A recharge link names the key by a reference, never by the key itself, so the key never enters a URL. The USDC route is paid per call with x402, the key presented as usual. A card checkout opened from the API (POST /v1/keys/checkout) is planned, not available yet: do not call it.',
     human_step:
-      'Show https://ibanforge.com/pricing to your human. They enter their own address on Stripe and receive the key by e-mail. Treat any key or secret you are handed as a secret: never put it in a URL.',
+      'Show your human the recharge link of your key, or https://ibanforge.com/pricing when you hold no key. They enter their own address on Stripe. Treat any key or secret you are handed as a secret: never put it in a URL.',
     collect:
-      'The pack is a SEPARATE key with credits that never expire, delivered after payment. Collecting it from the API with a secret nonce in the body is planned, not available yet.',
+      'A recharge adds credits that never expire to the same key once the payment settles. Without a key, the pack is a SEPARATE key delivered after payment. Collecting it from the API with a secret nonce in the body is planned, not available yet.',
   },
 } as const;
 

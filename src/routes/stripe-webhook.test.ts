@@ -745,7 +745,12 @@ describe('no_payment_required is a settlement, not a wait', () => {
   // trial. No async_payment_succeeded will EVER follow, so parking these as
   // "pending" was a legitimate transaction concluded with no key and no error
   // anywhere. Dormant until the first promo code exists.
-  it('mints on payment_status no_payment_required', () => {
+  //
+  // Since the security review of PR 259, a credit PACK settled at zero is not
+  // parked either, but it credits nothing: a human is alerted and decides.
+  // Checkout normally refuses a 100% code in payment mode; the guard does not
+  // depend on it. A subscription trial is untouched.
+  it('a pack settled at zero is not parked as pending, credits nothing, and alerts', () => {
     const run = Date.now();
     const result = processStripeEvent(
       mockEvent({
@@ -758,6 +763,8 @@ describe('no_payment_required is a settlement, not a wait', () => {
       }),
     );
     expect(result.body.pending).toBeUndefined();
-    expect(result.body.credits_minted).toBe(1000);
+    expect(result.body.credits_minted).toBeUndefined();
+    expect(result.body.error).toBe('unpaid_pack');
+    expect(result.alert?.key).toMatch(/^stripe:unpaid-pack:/);
   });
 });

@@ -167,6 +167,18 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <p className="text-xs text-muted-foreground/70 leading-relaxed border-t border-border pt-3">
               {t('rails.packs.note')}
             </p>
+            {/* Lot B1 (25.09.2026) : un pack acheté depuis la page du compte
+                atterrit sur la clé existante, rien ne change dans l'intégration.
+                Les liens de cette page-ci, sans référence, frappent une clé neuve. */}
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t.rich('rails.packs.rechargeExisting', {
+                account: (chunks) => (
+                  <Link href={localePath(locale, '/account')} className="underline underline-offset-2 hover:text-foreground">
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </p>
           </div>
           {/* 3. x402 */}
           <div className="card-surface rounded-xl border p-6 flex flex-col gap-3">

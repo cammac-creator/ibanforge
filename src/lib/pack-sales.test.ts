@@ -28,6 +28,7 @@ describe('Montants de packs depuis les métadonnées conservées', () => {
     expect(summarizePackSales([], now)).toEqual({
       version: 1,
       source: 'retained_api_keys_payment_metadata',
+      rows: 'key_purchases_registry',
       generated_at: now.toISOString(),
       scope: 'all_retained_credit_keys',
       stripe: {

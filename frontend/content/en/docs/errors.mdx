@@ -21,11 +21,11 @@ IBANforge uses standard HTTP status codes and returns structured JSON errors, `{
 | `402` | Payment Required | A paid route called without a usable way to pay: no key and no free allowance left, a key that is invalid or has spent its allowance or credits, or a payment that was refused. The x402 payment envelope, with a `cause` when one applies |
 | `404` | Not Found | Unknown endpoint. On `POST /v1/keys/revoke` and `POST /v1/keys/rotate`, `invalid_key`: the key is unknown or already revoked |
 | `405` | Method Not Allowed | Right path, wrong method (for example `GET /v1/keys/generate`); the `allow` field names the method to use |
-| `409` | Conflict | The key routes only. `already_claimed`: the key is already past the anonymous tier. `already_claimed_elsewhere`: that address already holds a claimed key, or claimed one in the last 24 hours. `verification_in_flight`: a code for that address was issued moments ago; use it, or try again in a few minutes |
+| `409` | Conflict | The key routes: `already_claimed`: the key is already past the anonymous tier. `already_claimed_elsewhere`: that address already holds a claimed key, or claimed one in the last 24 hours. `verification_in_flight`: a code for that address was issued moments ago; use it, or try again in a few minutes. The pack route (`POST /v1/credits/buy/…`), for a payment already seen whose purchase was not credited: `payment_pending` (its settlement is not confirmed yet, do not pay again), `payment_refused` (sign a new payment) or `payment_reversed`; nothing is settled again |
 | `413` | Payload Too Large | Request body over 256 KB |
 | `429` | Too Many Requests | More than 100 requests in one minute from the same IP address; wait for `Retry-After` |
 | `500` | Internal Server Error | Unexpected server error (please report it, see [Support](#support)) |
-| `502`, `503` | Bad Gateway, Service Unavailable | The x402 payment rail could not be reached or answered with an error. Retry later. On the key routes, `503 verification_unavailable`: the verification mail could not be sent (a key created with an address, a claim, a device approval); try again in a few minutes. The UK firms route has its own `502` and `503` codes, on [its page](/docs/gb-firms) |
+| `502`, `503` | Bad Gateway, Service Unavailable | The x402 payment rail could not be reached or answered with an error. Retry later. Except `502 settlement_unconfirmed`: the outcome of your payment is unknown and it may already be on-chain, so do not pay again before checking the transfer (`settlement.transaction` carries its hash when the facilitator returned one). On the key routes, `503 verification_unavailable`: the verification mail could not be sent (a key created with an address, a claim, a device approval); try again in a few minutes. The UK firms route has its own `502` and `503` codes, on [its page](/docs/gb-firms) |
 
 ## Validation error codes
 
@@ -97,7 +97,7 @@ Returned when a paid route is called without a usable way to pay: no key and no 
 | `trial_unavailable` | The keyless allowance cannot be counted right now, so the call falls back to payment |
 | `monthly_quota_exhausted` | The key's allowance for the month is used up |
 | `monthly_quota_insufficient` | A batch needs more requests than the key has left; nothing was consumed |
-| `credits_exhausted`, `credits_insufficient` | The same two cases for a prepaid credit key |
+| `credits_exhausted`, `credits_insufficient` | The same two cases for the key's prepaid credits: a key born of a purchase, or a key whose allowance is spent and whose credits no longer cover the call. `cause.credits.topup` and `X-Credits-Topup-Url` carry the link that recharges this same key |
 | `invalid_api_key` | A key was sent, but it is unknown or revoked |
 | `key_revoked_burst` | An anonymous key revoked with a burst of automated signups; the `message` says how to claim it back |
 
@@ -119,6 +119,8 @@ Returned when a paid route is called without a usable way to pay: no key and no 
 ```
 
 When a payment was sent and refused, the body also carries `payment_error` with the reason.
+
+On a valid key, the body also carries `credit_packs.topup_this_key`: the card links and the USDC route that recharge the key you presented, so the credits land on it and nothing changes in your integration. `pay_by_card` keeps its meaning, a pack bought without a key, delivered as a new key.
 
 See [x402 Payments](/docs/x402) for how to handle this, and [API keys](/docs/api-keys) for the free key.
 
@@ -142,7 +144,7 @@ An unknown code is not a 404: `GET /v1/bic/{code}` answers `200` with `found: fa
 
 `rate_limit_exceeded`: more than 100 requests in one minute from the same IP address. The answer carries a `Retry-After` header and a `retry_after` field, both in seconds. Every counted response carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` (seconds), plus the older `X-RateLimit-*` headers, whose reset is a Unix timestamp. `/health`, `/ping`, `/openapi.json` and `/v1/demo` are not counted. The same limit is published at [`/.well-known/rate-limits.yml`](https://api.ibanforge.com/.well-known/rate-limits.yml).
 
-Taking and claiming keys have their own daily limits, with their own `429` codes: see [API keys](/docs/api-keys). A key's monthly allowance is not a `429`: it ends in the `402` above. Every answer served on a monthly key (free or claimed) carries `X-Quota-Used`, `X-Quota-Limit` and `X-Quota-Remaining` (`GET /v1/keys/usage` returns the same count); a prepaid credit key carries `X-Credits-Remaining` and `X-Credits-Total` instead (`GET /v1/credits/balance`).
+Taking and claiming keys have their own daily limits, with their own `429` codes: see [API keys](/docs/api-keys). A key's monthly allowance is not a `429`: it ends in the `402` above. Every answer served on a monthly key (free or claimed) carries `X-Quota-Used`, `X-Quota-Limit` and `X-Quota-Remaining` (`GET /v1/keys/usage` returns the same count); a key with prepaid credits carries `X-Credits-Remaining` and `X-Credits-Total` (`GET /v1/credits/balance`), and a key that holds both carries both sets. Every billed answer on a key says which one paid it in `X-Charged-From`: `allowance`, `credits`, or `allowance+credits` for a batch split between the two.
 
 ### 500 Internal Server Error
 

@@ -556,6 +556,8 @@ describe('every 402 carries a card link a machine can follow', () => {
     expect(body.claim_to_200.auth).toMatch(/Authorization|Bearer/);
     expect(body.buy_credits_by_card?.auth).not.toMatch(/Authorization|Bearer/);
     expect(String(body.buy_credits_by_card?.description)).toMatch(/separate purchase/i);
+    // Lot B1 : la recharge nomme la clé par une référence, jamais par la clé.
+    expect(String(body.buy_credits_by_card?.description)).toMatch(/lands on the key/i);
   });
 
   /**

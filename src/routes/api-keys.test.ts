@@ -531,9 +531,12 @@ describe('/v1/admin/keys — a prepaid customer is not a dormant one', () => {
     const db = getStatsDB();
     db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(P);
     db.prepare('DELETE FROM request_log WHERE key_prefix = ?').run(P);
+    // Au palier payant, comme toute clé à crédits en production : depuis le lot
+    // B1, une clé à crédits au palier gratuit se lirait comme une clé gratuite
+    // RECHARGÉE, dont la consommation se lit sur le registre mensuel.
     db.prepare(
-      `INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total)
-       VALUES (?, ?, ?, NULL, ?, ?)`,
+      `INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, tier)
+       VALUES (?, ?, ?, NULL, ?, ?, 'paid')`,
     ).run(`hash-${P}`, P, 'acme@example.com', creditsRemaining, creditsTotal);
     const insert = db.prepare(
       "INSERT INTO request_log (method, path, status, key_prefix, created_at) VALUES ('POST', '/v1/iban/batch', 200, ?, datetime('now'))",

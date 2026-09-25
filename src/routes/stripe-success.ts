@@ -106,6 +106,8 @@ stripeSuccess.get('/stripe/success', (c) => {
       .then(function(res){
         if (res.status === 200 && res.body.api_key) {
           render(res.body);
+        } else if (res.status === 200 && res.body.recharged) {
+          renderRecharge(res.body);
         } else if (res.status === 404 && attempts < maxAttempts) {
           // Webhook may still be in flight — retry in 2s, up to maxAttempts
           setTimeout(fetchKey, 2000);
@@ -249,6 +251,19 @@ stripeSuccess.get('/stripe/success', (c) => {
           runBtn.textContent = 'Run this call now';
         });
     });
+  }
+
+  // Une recharge de la même clé (lot B1, 25.09.2026) : aucune clé à montrer,
+  // le porteur l'a déjà. Le préfixe et les crédits ajoutés, rien d'autre.
+  function renderRecharge(data) {
+    const prefix = escapeHtml(data.key_prefix || '');
+    const added = Number(data.credits_added || 0).toLocaleString('en-US');
+    content.innerHTML =
+      '<div class="check">✓</div>' +
+      '<h1>Payment confirmed</h1>' +
+      '<p class="sub">' + added + ' credits added to key <code>' + prefix + '</code>. Nothing to change in your integration.</p>' +
+      '<p class="small">Its balance and usage, any time: <a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>, or the X-Credits-Remaining header on every paid response.</p>' +
+      '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
   }
 
   function renderError(msg) {

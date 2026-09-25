@@ -35,9 +35,25 @@ export interface AccountUsage {
   credits_remaining?: number;
   credits_total?: number;
   note?: string;
+  /** `allowance_then_credits` sur une clé mixte (lot B1) : l'allocation d'abord. */
+  billing_order?: string;
+  /** Les liens qui rechargent CETTE clé (lot B1), servis au porteur de la clé. */
+  topup?: { by_card?: Record<string, unknown> } | null;
 }
 
 export type AccountBalance =
+  | {
+      /**
+       * Une clé MIXTE (lot B1, 25.09.2026) : une allocation propre ET des
+       * crédits prépayés, l'allocation passant d'abord. Les deux chiffres
+       * gouvernent, chacun à son tour : la page montre les deux.
+       */
+      kind: 'mixed';
+      used: number;
+      remaining: number;
+      creditsRemaining: number | null;
+      creditsTotal: number | null;
+    }
   | {
       kind: 'quota';
       /** Appels consommés sur la période que le plafond mesure. */
@@ -71,10 +87,34 @@ function finite(v: unknown): number | null {
  * réafficher le plafond mensuel qui ne s'applique pas.
  */
 export function isCreditKey(usage: AccountUsage): boolean {
+  if (isMixedKey(usage)) return false;
   return usage.basis === 'credits' || finite(usage.credits_remaining) !== null;
 }
 
+/**
+ * Une clé mixte (lot B1) : son `basis` nomme l'assiette d'une ALLOCATION
+ * (`monthly` ou `lifetime`) et un solde de crédits est servi à côté. Une API
+ * d'avant ce lot ne sert jamais les deux ensemble : aucune clé n'y est lue
+ * mixte, et l'affichage d'hier reste celui d'hier.
+ */
+export function isMixedKey(usage: AccountUsage): boolean {
+  return (
+    (usage.basis === 'monthly' || usage.basis === 'lifetime') &&
+    finite(usage.credits_remaining) !== null
+  );
+}
+
 export function readBalance(usage: AccountUsage): AccountBalance {
+  if (isMixedKey(usage)) {
+    const total = finite(usage.credits_total);
+    return {
+      kind: 'mixed',
+      used: finite(usage.used) ?? 0,
+      remaining: Math.max(0, finite(usage.remaining) ?? 0),
+      creditsRemaining: finite(usage.credits_remaining),
+      creditsTotal: total !== null && total > 0 ? total : null,
+    };
+  }
   if (!isCreditKey(usage)) {
     return {
       kind: 'quota',

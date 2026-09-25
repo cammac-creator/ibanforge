@@ -45,6 +45,8 @@ const PAIRS: Array<[keyof RestoreCounts, string]> = [
   ['key_creations', 'creations_inserted'],
   ['device_grant_daily', 'grant_days_inserted'],
   ['mcp_remote_daily', 'mcp_days_inserted'],
+  ['key_purchases', 'purchases_inserted'],
+  ['key_topup_refs', 'topup_refs_inserted'],
 ];
 
 let ok = false;

@@ -423,6 +423,44 @@ export function recordLineageSettlement(keyHash: string): void {
 }
 
 /**
+ * Une recharge de la clé ELLE-MÊME (chantier « clé unique », lot B1,
+ * 25.09.2026) : la lignée devient payante sans qu'aucune clé payée distincte ne
+ * soit frappée. Sans ce fait, `linkPaidKeyToLineage`, appelé seulement à la
+ * frappe, ne voyait rien, et les indicateurs 4 et 5 de l'entonnoir rataient
+ * exactement la conversion que ce lot crée.
+ *
+ * Mêmes colonnes que le rapprochement, en `COALESCE` : la clé payée est la clé
+ * elle-même, et la date est celle du PREMIER achat. Dans la transaction du
+ * crédit, et elle avale ses propres erreurs comme les autres écrivains de
+ * mesure : un défaut de télémétrie ne fait jamais échouer un paiement.
+ */
+export function markLineagePurchase(
+  db: DatabaseType.Database,
+  lineageHash: string,
+  keyHash: string,
+): void {
+  try {
+    db.prepare(
+      `INSERT INTO lineage_facts
+         (lineage_hash, birth_at, birth_tier, backfilled, paid_key_hash, paid_key_delivered_at,
+          updated_at)
+       SELECT ?,
+              (SELECT MIN(created_at) FROM api_keys o
+                WHERE COALESCE(o.lineage_hash, o.key_hash) = ?),
+              k.tier, 1, ?, datetime('now'), datetime('now')
+         FROM api_keys k
+        WHERE k.key_hash = ?
+       ON CONFLICT(lineage_hash) DO UPDATE SET
+         paid_key_hash         = COALESCE(paid_key_hash, excluded.paid_key_hash),
+         paid_key_delivered_at = COALESCE(paid_key_delivered_at, excluded.paid_key_delivered_at),
+         updated_at            = excluded.updated_at`,
+    ).run(lineageHash, lineageHash, keyHash, keyHash);
+  } catch (err) {
+    complain(err);
+  }
+}
+
+/**
  * Relier une clé PAYÉE à la lignée d'essai du même porteur, quand le
  * rapprochement est sans ambiguïté.
  *

@@ -28,7 +28,6 @@ import { createHash } from 'node:crypto';
 import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
 import {
-  generateStripeKey,
   generateOemKey,
   deactivateBySubscription,
   OEM_MONTHLY_LIMIT,
@@ -37,17 +36,27 @@ import {
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
-import { recordSubscriptionInvoice } from '../lib/subscription-payments.js';
+import { recordSubscriptionInvoice, stripeId } from '../lib/subscription-payments.js';
 import { notifyOps, opsFail } from '../lib/ops-alert.js';
+import { applyCardPackPaymentInTx, recordSubscriptionMintInTx } from '../lib/key-purchases.js';
+import { isReachableContact } from '../lib/quota-notice.js';
 import {
   sendApiKeyEmail,
   sendSubscriptionKeyEmail,
+  sendRechargeEmail,
   alertKeyDeliveryFailure,
   sendAuditReadyEmail,
 } from '../lib/email.js';
 
+/**
+ * Les packs vendus par carte. `price_usd` ne sert qu'au repli de la
+ * notification quand Stripe ne dit pas ce qu'il a encaissé : le montant réel
+ * vient de `amount_total`. Le pack d'entrée coûte 4 $ depuis le 16.09.2026
+ * (décision de Claude-Alain) ; la table disait encore 5, et la notification
+ * annonçait 5 $ pour un paiement de 4 (constat C3 du lot B1).
+ */
 export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number }> = {
-  '1k': { credits: 1000, price_usd: 5 },
+  '1k': { credits: 1000, price_usd: 4 },
   '5k': { credits: 5000, price_usd: 20 },
   '25k': { credits: 25000, price_usd: 80 },
 };
@@ -178,10 +187,37 @@ function recordAmountPaid(session: Stripe.Checkout.Session): {
   return { amount_paid_minor: minor, amount_paid_currency: currency };
 }
 
+/** Une recharge de la même clé, à annoncer hors de la transaction (lot B1). */
+export interface StripeRechargeNotify {
+  /** L'adresse joignable de la clé, sinon celle du payeur ; null si aucune. */
+  to: string | null;
+  keyPrefix: string;
+  creditsAdded: number;
+  balance: number;
+  bundle: string;
+  amountUsd: number;
+}
+
+/** Ce que le montant d'une session dit en dollars, ou le prix du pack à défaut. */
+function amountUsdOf(session: Stripe.Checkout.Session, fallbackUsd: number): number {
+  if (session.amount_total != null && (session.currency ?? '').toLowerCase() === 'usd') {
+    return Math.round(session.amount_total) / 100;
+  }
+  return fallbackUsd;
+}
+
+/** Une empreinte de la session, pour nommer une alerte sans y mettre la session. */
+function sessionTag(sessionId: string): string {
+  return createHash('sha256').update(sessionId).digest('hex').slice(0, 12);
+}
+
 export function processStripeEvent(event: Stripe.Event): {
   status: number;
   body: Record<string, unknown>;
   notify?: StripePurchaseNotify;
+  recharge?: StripeRechargeNotify;
+  /** Une alerte à lancer hors de la transaction ; sans adresse ni référence. */
+  alert?: { key: string; detail: string };
 } {
   const db = getStatsDB();
 
@@ -270,6 +306,9 @@ export function processStripeEvent(event: Stripe.Event): {
   // trap the MINTING_EVENTS comment describes: legitimate transaction
   // concluded, no key, no error anywhere. Dormant until the first promo
   // code or OEM trial exists, and silent the day one does.
+  // A credit PACK settled at zero is the exception, handled in the pack branch
+  // below: nothing is credited, and a human is alerted (security review of
+  // PR 259).
   if (
     session.payment_status &&
     session.payment_status !== 'paid' &&
@@ -396,14 +435,29 @@ export function processStripeEvent(event: Stripe.Event): {
         },
       };
     }
-    const mint = generateOemKey(email, planConfig.monthly_limit, session.id, subscriptionId);
-    // After the mint: the row must exist for the amount to land on it.
-    const paid = recordAmountPaid(session);
-
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
-      event.id,
-      event.type,
-    );
+    // Une transaction pour la frappe, le montant, la ligne du registre des
+    // achats (lot B1 : le registre distingue un premier paiement d'abonnement
+    // d'une recharge de pack) et l'évènement traité.
+    const { mint, paid } = db
+      .transaction(() => {
+        const minted = generateOemKey(email, planConfig.monthly_limit, session.id, subscriptionId);
+        // After the mint: the row must exist for the amount to land on it.
+        const amount = recordAmountPaid(session);
+        recordSubscriptionMintInTx(db, {
+          sessionId: session.id,
+          plan,
+          subscriptionId,
+          amountMinor: session.amount_total ?? null,
+          currency: session.currency ?? null,
+          paymentIntent: stripeId(session.payment_intent),
+          payerEmail: email,
+        });
+        db.prepare(
+          'INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
+        ).run(event.id, event.type);
+        return { mint: minted, paid: amount };
+      })
+      .immediate();
 
     const notify: StripePurchaseNotify | undefined = mint.api_key
       ? {
@@ -440,29 +494,131 @@ export function processStripeEvent(event: Stripe.Event): {
       event.id,
       event.type,
     );
-    return { status: 200, body: { received: true, error: 'unknown_bundle', bundle } };
+    // 🚨 Paiement encaissé, rien livré (constat C6 du lot B1) : la réponse ne
+    // change pas, mais un humain doit le savoir. Sans adresse ni session dans
+    // le texte : Telegram n'est pas un sous-traitant déclaré.
+    return {
+      status: 200,
+      body: { received: true, error: 'unknown_bundle', bundle },
+      alert: {
+        key: `stripe:unknown-bundle:${sessionTag(session.id)}`,
+        detail:
+          'Un paiement Stripe a été encaissé pour un pack que l’API ne connaît pas : aucune clé ' +
+          'n’a été créditée ni frappée. Session à relire dans les outils privés.',
+      },
+    };
+  }
+
+  // Par précaution (relecture de sécurité de la PR 259) : un pack réglé à ZÉRO
+  // ne crédite rien, ni la clé de sa référence, ni une clé neuve. Checkout
+  // refuse en principe un code promotionnel à 100 % en mode paiement, mais la
+  // garde n'en dépend pas : un humain est prévenu et décide. Sans adresse ni
+  // session dans le texte, comme l'alerte d'un pack inconnu.
+  if (session.payment_status === 'no_payment_required') {
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
+    return {
+      status: 200,
+      body: { received: true, error: 'unpaid_pack', bundle },
+      alert: {
+        key: `stripe:unpaid-pack:${sessionTag(session.id)}`,
+        detail:
+          'Un pack a été réglé à zéro chez Stripe (aucun paiement requis) : aucune clé n’a été ' +
+          'créditée ni frappée. Session à relire dans les outils privés.',
+      },
+    };
   }
 
   const email = session.customer_email ?? session.customer_details?.email ?? null;
-  const mintResult = generateStripeKey(email, bundleConfig.credits, session.id);
-  // After the mint: the row must exist for the amount to land on it.
-  const paid = recordAmountPaid(session);
+  const clientReferenceId =
+    typeof session.client_reference_id === 'string' ? session.client_reference_id : null;
+  // Le registre, le crédit ou la frappe, le montant et l'évènement traité : une
+  // transaction IMMEDIATE. Une session rejouée, ou `async_payment_succeeded`
+  // après `completed` (même session, autre évènement), trouve sa ligne au
+  // registre et ne crédite rien de plus.
+  const outcome = db
+    .transaction(() => {
+      const out = applyCardPackPaymentInTx(db, {
+        sessionId: session.id,
+        bundle,
+        credits: bundleConfig.credits,
+        amountMinor: session.amount_total ?? null,
+        currency: session.currency ?? null,
+        paymentIntent: stripeId(session.payment_intent),
+        payerEmail: email,
+        clientReferenceId,
+      });
+      db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+        event.id,
+        event.type,
+      );
+      return out;
+    })
+    .immediate();
+  const paid =
+    session.amount_total != null && session.currency != null
+      ? { amount_paid_minor: session.amount_total, amount_paid_currency: session.currency }
+      : null;
+  const amountUsd = amountUsdOf(session, bundleConfig.price_usd);
 
-  db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
-    event.id,
-    event.type,
-  );
+  if (outcome.kind === 'idempotent') {
+    return {
+      status: 200,
+      body: {
+        received: true,
+        idempotent: true,
+        event_id: event.id,
+        bundle,
+        key_prefix: outcome.purchase.key_prefix,
+        ...(paid ?? {}),
+      },
+    };
+  }
+
+  if (outcome.kind === 'credited') {
+    // T1 : la même clé, rechargée. Le contact de service est l'adresse de la
+    // clé quand elle est joignable, sinon celle du payeur (ZG8), sans que
+    // celle-ci devienne jamais l'identité de la clé.
+    const keyEmail = (
+      db.prepare('SELECT email FROM api_keys WHERE key_hash = ?').get(outcome.keyHash) as
+        { email: string } | undefined
+    )?.email;
+    return {
+      status: 200,
+      body: {
+        received: true,
+        event_id: event.id,
+        bundle,
+        topup: {
+          key_prefix: outcome.keyPrefix,
+          credits_added: outcome.creditsAdded,
+          outcome: 'credited',
+        },
+        ...(paid ?? {}),
+      },
+      recharge: {
+        to: isReachableContact(keyEmail) ? keyEmail : isReachableContact(email) ? email : null,
+        keyPrefix: outcome.keyPrefix,
+        creditsAdded: outcome.creditsAdded,
+        balance: outcome.balanceAfter,
+        bundle,
+        amountUsd,
+      },
+    };
+  }
 
   // Owner alert fires only on a FRESH mint (api_key non-null). On Stripe retries
   // the mint is idempotent → api_key is null → no notify → no duplicate alert.
-  const notify: StripePurchaseNotify | undefined = mintResult.api_key
+  const notify: StripePurchaseNotify | undefined = outcome.rawKey
     ? {
         email,
         bundle,
         credits: bundleConfig.credits,
-        priceUsd: bundleConfig.price_usd,
-        keyPrefix: mintResult.key_prefix,
-        rawKey: mintResult.api_key,
+        priceUsd: amountUsd,
+        keyPrefix: outcome.keyPrefix,
+        rawKey: outcome.rawKey,
       }
     : undefined;
 
@@ -473,10 +629,34 @@ export function processStripeEvent(event: Stripe.Event): {
       event_id: event.id,
       bundle,
       credits_minted: bundleConfig.credits,
-      key_prefix: mintResult.key_prefix,
+      key_prefix: outcome.keyPrefix,
+      ...(clientReferenceId
+        ? {
+            topup: {
+              key_prefix: outcome.keyPrefix,
+              credits_added: bundleConfig.credits,
+              outcome: outcome.fallback ? 'minted_fallback' : 'minted',
+              ...(outcome.fallback ? { fallback_reason: outcome.fallback } : {}),
+            },
+          }
+        : {}),
       ...(paid ?? {}),
     },
     notify,
+    // Une référence de recharge qui n'a pas pu servir : le paiement n'est pas
+    // perdu (clé neuve remise au payeur), mais le porteur attendait sa clé à
+    // lui. Un humain le sait, sans adresse ni référence dans le texte.
+    ...(outcome.fallback && outcome.rawKey
+      ? {
+          alert: {
+            key: `stripe:topup-fallback:${sessionTag(session.id)}`,
+            detail:
+              `Un pack payé par carte avec une référence de recharge n’a pas rechargé sa clé ` +
+              `(motif : ${outcome.fallback}) : une clé neuve a été frappée et remise au payeur. ` +
+              'À relire dans les outils privés.',
+          },
+        }
+      : {}),
   };
 }
 
@@ -523,6 +703,34 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
   }
 
   const result = processStripeEvent(event);
+
+  // Les alertes d'un paiement hors du chemin nominal (pack inconnu, référence
+  // de recharge qui n'a pas servi) : hors de la transaction, jamais bloquantes.
+  if (result.alert && !process.env.VITEST) {
+    void opsFail(result.alert.key, result.alert.detail, 1);
+  }
+
+  // Une recharge de la même clé (lot B1) : la notification et le mail de
+  // recharge, seulement quand le crédit a RÉELLEMENT eu lieu (jamais sur un
+  // rejeu, qui ne produit pas de `recharge`).
+  if (result.recharge) {
+    await notifyPurchaseTelegram({
+      amountUsd: result.recharge.amountUsd,
+      bundle: result.recharge.bundle,
+      credits: result.recharge.creditsAdded,
+      keyPrefix: result.recharge.keyPrefix,
+      recharge: true,
+    }).catch(() => {});
+    if (result.recharge.to && !process.env.VITEST) {
+      void sendRechargeEmail({
+        to: result.recharge.to,
+        keyPrefix: result.recharge.keyPrefix,
+        creditsAdded: result.recharge.creditsAdded,
+        balance: result.recharge.balance,
+        bundle: result.recharge.bundle,
+      }).catch(() => {});
+    }
+  }
 
   // Best-effort owner alert (Telegram). notifyPurchaseTelegram never throws and
   // returns a bool; we still .catch() defensively so a notify issue can never

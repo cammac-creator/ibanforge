@@ -8,7 +8,7 @@ order: 5
 
 Diese Seite richtet sich an autonome Agenten und die Menschen, die sie betreiben. Sie ist der praktische Begleiter zur [x402-Protokollreferenz](/docs/x402): nicht wie die Zahlung funktioniert, sondern wie man mit möglichst wenig Reibung von null zu einem zahlenden Agenten kommt.
 
-Eine Empfehlung vorweg: **Bei Volumen kaufen Sie Pakete.** Jedes Paket ist pro Aufruf günstiger als der Einzelpreis: 0,004 $ ab dem ersten Paket, 0,0032 $ bei 25.000, gegenüber 0,005 $ für eine einzelne Validierung. Und jede Pay-per-Call-Abrechnung ist eine eigene On-Chain-Transaktion: Der CDP-Facilitator, über den diese Zahlungen laufen, ist bis 1.000 On-Chain-Transaktionen pro Monat kostenlos und berechnet darüber hinaus 0,001 $ pro Transaktion (CDP-x402-Preise, gelesen am 2026-09-09), also 20 % einer Validierung zu 0,005 $ und 0,025 % eines 4-$-Pakets. Eine einzige Zahlung an `POST /v1/credits/buy/1k` liefert einen API-Schlüssel mit 1.000 vorgeladenen Credits, kein Verfall, kein Abo. Pay-per-Call funktioniert und braucht gar keinen Schlüssel; es ist bei echtem Volumen einfach die teure Form.
+Eine Empfehlung vorweg: **Bei Volumen kaufen Sie Pakete.** Jedes Paket ist pro Aufruf günstiger als der Einzelpreis: 0,004 $ ab dem ersten Paket, 0,0032 $ bei 25.000, gegenüber 0,005 $ für eine einzelne Validierung. Und jede Pay-per-Call-Abrechnung ist eine eigene On-Chain-Transaktion: Der CDP-Facilitator, über den diese Zahlungen laufen, ist bis 1.000 On-Chain-Transaktionen pro Monat kostenlos und berechnet darüber hinaus 0,001 $ pro Transaktion (CDP-x402-Preise, gelesen am 2026-09-09), also 20 % einer Validierung zu 0,005 $ und 0,025 % eines 4-$-Pakets. Eine einzige Zahlung an `POST /v1/credits/buy/1k` liefert einen API-Schlüssel mit 1.000 vorgeladenen Credits, kein Verfall, kein Abo; mit einem vorgelegten, bereits vorhandenen Schlüssel lädt sie stattdessen diesen Schlüssel auf. Pay-per-Call funktioniert und braucht gar keinen Schlüssel; es ist bei echtem Volumen einfach die teure Form.
 
 ## Schritt 1 — Geben Sie Ihrem Agenten ein Wallet mit Budget
 
@@ -38,6 +38,8 @@ POST https://api.ibanforge.com/v1/credits/buy/1k
 ```
 
 Pakete: `1k` = 4 $ · `5k` = 20 $ · `25k` = 80 $. Credits verfallen nie; Batch-Validierung kostet 1 Credit pro IBAN.
+
+**Sie haben schon einen Schlüssel?** Legen Sie ihn im selben Aufruf vor (`Authorization: Bearer ifk_…`): Das Guthaben landet auf diesem Schlüssel, die Antwort trägt `same_key: true`, und an Ihrer Integration ändert sich nichts. Das Vorlegen kostet keine Anfrage.
 
 **Pay-per-Call — ohne Schlüssel, ohne Zustand** (TypeScript, Pakete aus Schritt 1):
 
