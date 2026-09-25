@@ -83,20 +83,20 @@ function walk(dir: string, out: string[] = []): string[] {
  * Les listes de sanctions que la production sert depuis la surcouche PRIVÉE, et
  * non depuis la base de ce dépôt.
  *
- * Vide aujourd'hui, et c'est voulu : toutes les listes sont encore dans la base
- * publique, la porte ci-dessous est donc exactement aussi stricte qu'avant. La
- * liste de l'ONU quitte le dépôt public (décision du 24/09/2026 : tous droits
- * réservés, gardée mais servie depuis un fichier privé). La modification qui
- * retire ses lignes de la base publique ajoute 'UN' ici DANS LE MÊME COMMIT :
- * le workflow hebdomadaire de rafraîchissement lance ce fichier sur la base
- * publique, et sans cette ligne il lirait « l'ONU n'est pas contrôlée » et
- * rougirait sur chaque surface qui dit, à juste titre, qu'elle l'est.
+ * L'ONU depuis l'étape du retrait (25/09/2026) : tous droits réservés, la liste
+ * est gardée (décision du 24/09/2026) mais servie depuis un fichier privé
+ * (membre `un` de src/lib/restricted-family.ts). Ajoutée DANS LE MÊME COMMIT
+ * que la base publique qui ne la porte plus : le workflow hebdomadaire de
+ * rafraîchissement lance ce fichier sur la base publique, et sans cette ligne il
+ * lirait « l'ONU n'est pas contrôlée » et rougirait sur chaque surface qui dit,
+ * à juste titre, qu'elle l'est. Quand la surcouche manque, la réponse le dit
+ * elle-même (`unscreened_lists`, drapeau `sanctions_list_unavailable_un`).
  *
  * Ajouter une liste ici, c'est affirmer que la production la sert sans que ce
  * dépôt la porte. Cela n'excuse jamais la disparition d'une liste PUBLIQUE :
  * voir REDISTRIBUTABLE ci-dessous.
  */
-const SERVED_FROM_PRIVATE_OVERLAY: readonly string[] = [];
+const SERVED_FROM_PRIVATE_OVERLAY: readonly string[] = ['UN'];
 
 /**
  * Les listes que ce dépôt a le droit de porter, et doit donc porter : OFAC
