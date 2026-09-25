@@ -742,6 +742,52 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     expect(served('bic').sha256).toBe(acceptedBefore);
   });
 
+  it('échange puis redémarrage : un fichier qui perd un membre servi, même en en gagnant un autre, ne sert pas', async () => {
+    // Relecture de la PR 270, point 1 : au démarrage, ce sont les MEMBRES qui
+    // comptent. Copie acceptée A : tout sauf la liste finlandaise ; fichier posé V :
+    // tout sauf les clés polonaises. Jeu égal en nombre, mais V perdrait `map_pl`.
+    const dir = join(fixture.dir, 'echange');
+    mkdirSync(dir, { recursive: true });
+    const extractWithout = (name: string, absent: string[]): string =>
+      extractOverlay({
+        kind: 'bic',
+        sourcePath: fixture.bicPath,
+        outPath: join(dir, name),
+        generator: 'test',
+        absentMembers: absent,
+      }).path;
+    const a = extractWithout('sans-liste-fi.sqlite', ['register_fi']);
+    const v = extractWithout('sans-cles-pl.sqlite', ['map_pl']);
+    const accepted = acceptedCopyPath(live.bic);
+    const saved = { live: readFileSync(live.bic), accepted: readFileSync(accepted) };
+    db.closeAll();
+    copyFileSync(a, accepted);
+    copyFileSync(v, live.bic);
+    runtime.resetRestrictedOverlayStateForTests();
+    pull.resetOverlayPullForTests();
+    db.getBicDB();
+    complianceDb.getComplianceDB();
+    const s = served('bic');
+    expect(s.fallback).toBe(true);
+    expect(s.sha256).toBe(sha256File(a));
+    expect(s.error).toBe('variable_file_refused:members_lost:map_pl');
+    expect(s.members.find((m) => m.id === 'map_pl')?.state).toBe('applied');
+    expect(sha256File(accepted)).toBe(sha256File(a));
+    // Toujours dit : l'alerte du fichier de la variable, et ce qui manque à la copie servie.
+    expect((await health()).restricted_overlays.bic).toMatchObject({
+      state: 'applied',
+      fallback: true,
+      absent: ['register_fi'],
+    });
+    // Remise en place pour la suite.
+    db.closeAll();
+    writeFileSync(live.bic, saved.live);
+    writeFileSync(accepted, saved.accepted);
+    restart();
+    expect(served('bic').fallback).toBe(false);
+    expect(served('bic').members.filter((m) => m.state === 'absent')).toEqual([]);
+  });
+
   it('release trop vieille, ou fichier BIC absent : alerte, refermée par une release fraîche', async () => {
     publish('surcouche-essai-6', v1, {
       publishedAt: new Date(Date.now() - 10 * DAY).toISOString(),

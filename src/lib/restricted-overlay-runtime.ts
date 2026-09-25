@@ -20,9 +20,9 @@
  * surcouche courante servait est refusé de la même façon (relecture de la
  * PR 252, R2 et R3), qu'il refuse ce membre ou qu'il ne le porte plus du tout
  * (un membre tardif « absent », voir `mayBeAbsent`) : au rechargement, et au
- * redémarrage, où la copie acceptée qui sert plus de membres l'emporte et n'est
- * jamais écrasée par un fichier qui en sert moins (relecture de la PR 267,
- * défaut 1).
+ * redémarrage, où la copie acceptée l'emporte dès que le fichier perd un membre
+ * qu'elle sert, même s'il en gagne un autre, et n'est jamais écrasée par lui
+ * (relecture de la PR 267, défaut 1, et de la PR 270).
  *
  * La raison est gardée ici ; `src/lib/restricted-overlay-ops.ts` l'écrit au
  * journal et prévient par l'alerte d'exploitation. Ce module n'importe ni
@@ -304,11 +304,12 @@ function servedMerged(): Set<string> {
  *
  * Au démarrage, si le fichier de la variable ne sert pas chaque membre (refusé
  * entier ou en partie, ou membre tardif absent) et qu'une copie acceptée
- * différente existe, celle-ci est fusionnée avec la base publique fraîche ; la
- * version qui sert le plus de membres l'emporte, le fichier de la variable à
- * égalité. Et il ne devient la copie acceptée que s'il ne perd aucun membre
- * qu'elle servait : un fichier qui en sert moins ne l'écrase jamais (relecture de
- * la PR 267, défaut 1).
+ * différente existe, celle-ci est fusionnée avec la base publique fraîche. Comme
+ * au rechargement, ce sont les MEMBRES qui comptent, pas leur nombre : dès que le
+ * fichier de la variable perd un membre que la copie acceptée sert, elle
+ * l'emporte, même s'il en gagne un autre ou fait jeu égal, et elle reste la copie
+ * acceptée. Sinon le fichier de la variable sert, et la remplace (relecture de la
+ * PR 267, défaut 1, et de la PR 270, point 1).
  */
 export function servedDatabasePath(kind: OverlayKind, publicPath: string): string {
   const current = statuses.get(kind);
@@ -321,8 +322,6 @@ export function servedDatabasePath(kind: OverlayKind, publicPath: string): strin
   const built = build(kind, publicPath);
   let next = built.status;
   let frozen = built.frozen;
-  /** Le fichier de la variable perd un membre que la copie acceptée sert : il ne la remplace pas. */
-  let keepAccepted = false;
   recordSeen(next);
   if (validOverlayPath(next.overlay_path) && servesLess(next)) {
     const accepted = acceptedCopyPath(next.overlay_path);
@@ -330,7 +329,7 @@ export function servedDatabasePath(kind: OverlayKind, publicPath: string): strin
     if (existsSync(accepted) && (!next.sha256 || fileSha256(accepted) !== next.sha256)) {
       const alt = build(kind, publicPath, accepted).status;
       const lost = membersLost(next, alt);
-      if (servedMemberIds(alt).size > servedMemberIds(next).size) {
+      if (lost.length > 0) {
         const refused = next;
         const refusedFrozen = frozen;
         frozen = undefined;
@@ -347,22 +346,14 @@ export function servedDatabasePath(kind: OverlayKind, publicPath: string): strin
           dropMerged(refused);
           discardFrozenCopy(refusedFrozen);
         });
-      } else {
-        keepAccepted = lost.length > 0;
-        housekeep(next, () => dropMerged(alt));
-      }
+      } else housekeep(next, () => dropMerged(alt));
     }
   }
   statuses.set(kind, next);
   const served = next;
   housekeep(served, () => {
     if (frozen) {
-      if (
-        servesOverlay(served.state) &&
-        !served.fallback &&
-        !keepAccepted &&
-        validOverlayPath(served.overlay_path)
-      )
+      if (servesOverlay(served.state) && !served.fallback && validOverlayPath(served.overlay_path))
         promoteAcceptedCopy(frozen, acceptedCopyPath(served.overlay_path));
       else discardFrozenCopy(frozen);
     }

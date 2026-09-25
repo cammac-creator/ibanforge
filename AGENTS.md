@@ -120,8 +120,8 @@ npm run build             # next build
   member, the fresher data winning: the public rows are kept (`kept_public`) when they are
   newer, or undated and different. The last accepted file is kept beside the private one
   (`*.accepted.sqlite`) and served at start-up if the file named by the variable is refused
-  or serves fewer members (a late member absent included); a file serving fewer members
-  never replaces it.
+  or lacks a member it serves (a late member absent included), even when that file gains
+  another; such a file never replaces it.
   To reload, replace the file atomically (write a neighbour, then `mv`): the API checks it
   within ten minutes, rebuilds only that database, and keeps what it serves if the new file
   fails its checks or would drop a member served today. State: `GET /health` →

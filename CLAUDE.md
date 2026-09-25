@@ -219,9 +219,9 @@ le volume Railway, `/app/data/…`), fusionné au démarrage dans une copie de l
 fraîche (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), membre par
 membre, la donnée la plus fraîche l'emportant : le public est gardé (`kept_public`) quand il
 est plus récent, ou non daté et différent. La dernière surcouche acceptée est gardée à côté
-(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé ou sert
-moins de membres (un membre tardif absent compris) ; un fichier qui en sert moins ne la
-remplace jamais.
+(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé ou perd
+un membre qu'elle sert (un membre tardif absent compris), même s'il en gagne un autre ; un tel
+fichier ne la remplace jamais.
 Recharger : remplacer le fichier de façon atomique (voisin puis `mv`), l'API le contrôle en
 dix minutes au plus, ne refusionne que cette base, et garde ce qu'elle sert si le nouveau est
 refusé ou perdrait un membre servi. État : `GET /health` → `restricted_overlays`. Construire :
