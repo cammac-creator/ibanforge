@@ -6,7 +6,8 @@
  * clés qui ont appelé dans les sept jours suivant leur relance, clés qui ont
  * payé. Plus un nombre suivi à part : les utilisateurs gratuits actifs à 200 par
  * mois, face au seuil de 50 que Claude-Alain a fixé le 22.09.2026 pour
- * réévaluer le plafond gratuit.
+ * réévaluer le plafond gratuit. Celui-là compte des PERSONNES (la décision dit
+ * « utilisateurs »), avec le nombre de clés à côté.
  *
  * ## Une seule fonction pour la page et pour le résumé du lundi
  *
@@ -23,11 +24,14 @@
  *   parlent déjà en lignées (`lineage_hash`).
  * - **Chaque colonne compte à la semaine de l'ÉVÉNEMENT** : la création, le
  *   premier appel réussi, la relance, le premier paiement. Une semaine close ne
- *   bouge donc plus (seul « a appelé après la relance » se complète pendant les
- *   sept jours qui suivent), et les nombres reçus le lundi restent ceux de la
- *   page toute la semaine. Chaque clé compte au plus une fois par colonne, sur
- *   toute l'histoire : la colonne « créées », toutes lignes additionnées, vaut
- *   donc le parc externe du jour, et c'est le contrôle publié dans `control`.
+ *   bouge donc presque plus : « a appelé après la relance » se complète pendant
+ *   les sept jours qui suivent, et une clé qui change d'état après coup la fait
+ *   bouger (passage en payant, remboursement, ferme regroupée par le radar des
+ *   cohortes), comme des données arrivées en retard. Chaque clé compte au plus
+ *   une fois par colonne, sur toute l'histoire : la colonne « créées », toutes
+ *   lignes additionnées, vaut donc le parc externe du jour. C'est ce que dit
+ *   `control`, une COHÉRENCE INTERNE (même règle des deux côtés, vraie par
+ *   construction), pas une preuve : la preuve est le recoupement indépendant.
  * - **La porte d'une clé** est l'origine écrite à sa naissance (`api_keys.source`,
  *   voir `key-origins.ts`), pour toutes ses colonnes. Les clés d'avant le
  *   marquage (PR 220, 23.09.2026) n'en ont pas : elles vont dans « inconnue »,
@@ -42,6 +46,7 @@ import { getStatsDB } from './db.js';
 import { isInternalBuyer } from './pack-sales.js';
 import { KEY_ORIGIN_DOORS, KEY_ORIGIN_TAGS } from './key-origins.js';
 import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+import { normalizeEmail } from './email-norm.js';
 import {
   dayMonth,
   parseDbUtc,
@@ -71,9 +76,6 @@ export const FREE_ACTIVE_WINDOW_DAYS = 30;
 
 /** Le délai dans lequel une clé relancée « a appelé après la relance ». */
 export const NUDGE_FOLLOWUP_DAYS = 7;
-
-/** SQLite refuse plus de 999 paramètres liés sur les anciennes versions ; rester bien en dessous. */
-const IN_CHUNK = 400;
 
 // ─── Le parc externe, défini UNE fois ───────────────────────────────────────
 
@@ -215,15 +217,25 @@ export interface WeekRow {
 
 export interface FreeUsers {
   threshold: number;
+  /**
+   * Ce que le seuil compte : des personnes (adresses normalisées distinctes,
+   * `normalizeEmail`, la règle « une personne, une clé gratuite » du dépôt).
+   * Décision de la session principale du 25.09.2026, sur la lettre de celle de
+   * Claude-Alain du 22.09 (« 50 utilisateurs ») ; le nombre de clés est donné à
+   * côté, pour la comparaison avec la base de l'audit, qui comptait des clés.
+   */
+  threshold_counts: 'people';
   window_days: number;
   /** Dates civiles suisses, bornes incluses : les 30 jours qui finissent le dimanche. */
   window: { from: string; to: string };
-  /** Le nombre du résumé du lundi. */
-  active: number;
+  /** Personnes actives sur la fenêtre : le nombre du résumé du lundi, celui que lit le seuil. */
+  active_people: number;
+  /** Les clés derrière ces personnes (une personne peut en tenir plusieurs). */
+  active_keys: number;
   /** Le mois civil (UTC), définition du 22.09 : le mois passé, puis le mois en cours à ce jour. */
-  calendar: Array<{ month: string; active: number; to_date: boolean }>;
-  /** Ce qui a dépassé le seuil, s'il a été dépassé. Vide sinon. */
-  crossed_by: Array<{ basis: 'window' | 'month'; month: string | null; active: number }>;
+  calendar: Array<{ month: string; people: number; keys: number; to_date: boolean }>;
+  /** Ce qui a dépassé le seuil (en personnes), s'il a été dépassé. Vide sinon. */
+  crossed_by: Array<{ basis: 'window' | 'month'; month: string | null; people: number }>;
   crossed: boolean;
 }
 
@@ -232,8 +244,17 @@ export interface LastWeek {
   title: string;
   monday: string;
   sunday: string;
-  /** Les quatre nombres du résumé du lundi. */
-  numbers: { created: number; first_success: number; paid: number; free_active: number };
+  /**
+   * Les quatre nombres du résumé du lundi (`free_active` en personnes), et le
+   * nombre de clés qui accompagne le quatrième.
+   */
+  numbers: {
+    created: number;
+    first_success: number;
+    paid: number;
+    free_active: number;
+    free_active_keys: number;
+  };
   nudged: number;
   called_after_nudge: number;
   followup_pending: number;
@@ -243,10 +264,18 @@ export interface LastWeek {
   sentence: string;
 }
 
+/**
+ * Une COHÉRENCE INTERNE, pas une preuve : les deux côtés lisent la même règle
+ * (`isExternalKeyRow`) et le même regroupement, donc l'égalité est vraie par
+ * construction. Elle montre que le rangement dans les semaines ne perd ni ne
+ * double aucune clé ; elle ne dit pas que la règle est juste. La preuve du
+ * mandat (« le total des colonnes égale le parc externe du jour ») vient du
+ * recoupement indépendant joué sur la production.
+ */
 export interface DoorBoardControl {
   /** La colonne « créées », toutes lignes et toutes portes additionnées. */
   created_total: number;
-  /** Le parc externe du jour, compté à part par SQL : les lignées externes. */
+  /** Le parc externe du jour, compté par un regroupement SQL, avec la même règle. */
   external_fleet: number;
   equal: boolean;
   /** `created_total - external_fleet` ; 0 quand tout va bien. */
@@ -286,7 +315,9 @@ export const DOOR_BOARD_DEFINITIONS: Readonly<Record<string, string>> = {
     'ferme regroupée. Les acheteurs sans adresse restent des clients.',
   semaine:
     'Du lundi 00:00 au dimanche 23:59, heure suisse. Chaque colonne compte une clé à la semaine ' +
-    'où la chose lui est arrivée, une seule fois dans toute l’histoire.',
+    'où la chose lui est arrivée, une seule fois dans toute l’histoire. Une semaine close peut ' +
+    'encore bouger si une clé change d’état après coup (passage en payant, remboursement, ferme ' +
+    'regroupée) ou si des données arrivent en retard.',
   porte:
     'L’origine écrite à la création de la clé, depuis le 23.09.2026. « Inconnue » pour les clés ' +
     'd’avant, jamais devinée.',
@@ -299,13 +330,15 @@ export const DOOR_BOARD_DEFINITIONS: Readonly<Record<string, string>> = {
     'Le premier paiement de la clé : pack par carte, pack en USDC ou abonnement. Un paiement ' +
     'remboursé ou contesté ne compte pas ; le paiement à l’appel en USDC, sans clé, n’est pas ici.',
   gratuits:
-    'Clés externes au palier e-mail, avec l’allocation gratuite de 200 requêtes par mois (ni ' +
-    'abonnement ni plafond relevé), qui ont appelé au moins une fois sur les 30 jours qui ' +
-    'finissent le dimanche de la semaine passée. Le mois civil, définition du 22.09, est donné ' +
-    'à côté.',
+    'Utilisateurs gratuits actifs : les personnes (adresses distinctes, la règle « une personne, ' +
+    'une clé gratuite ») dont une clé externe au palier e-mail, avec l’allocation gratuite de ' +
+    '200 requêtes par mois (ni abonnement ni plafond relevé), a appelé au moins une fois sur les ' +
+    '30 jours qui finissent le dimanche de la semaine passée. Le seuil de 50 compte ces ' +
+    'personnes ; le nombre de clés est donné à côté. Le mois civil, définition du 22.09, aussi.',
   controle:
-    'La colonne « créées », toutes semaines et toutes portes additionnées, doit valoir le parc ' +
-    'externe du jour, compté à part.',
+    'Cohérence interne : la colonne « créées », toutes semaines et toutes portes additionnées, ' +
+    'égale le parc externe compté par la même règle. Elle montre que le tableau ne perd ni ne ' +
+    'double aucune clé ; elle ne dit pas que la règle elle-même est juste.',
 };
 
 // ─── Les issues de paiement ─────────────────────────────────────────────────
@@ -339,6 +372,7 @@ interface KeyRow {
   tier: string | null;
   monthly_limit: number | null;
   no_recredit: number | null;
+  email_norm: string | null;
 }
 
 interface Lineage {
@@ -349,6 +383,12 @@ interface Lineage {
   door: string;
   /** L'état COURANT de la clé (sa ligne la plus récente) porte l'allocation gratuite. */
   freeAllowance: boolean;
+  /**
+   * La personne derrière la clé : l'adresse normalisée de son état courant
+   * (`email_norm`, sinon `normalizeEmail`, la règle « une personne, une clé
+   * gratuite » du dépôt). Une clé sans adresse reste une personne à elle seule.
+   */
+  person: string;
 }
 
 function emptyCounts(): DoorCounts {
@@ -410,7 +450,8 @@ function loadLineages(db: DatabaseType.Database): Map<string, Lineage> {
   const rows = db
     .prepare(
       `SELECT id, key_hash, key_prefix, email, issued_by_us, created_at, source,
-              COALESCE(lineage_hash, key_hash) AS lineage, tier, monthly_limit, no_recredit
+              COALESCE(lineage_hash, key_hash) AS lineage, tier, monthly_limit, no_recredit,
+              email_norm
          FROM api_keys
         ORDER BY id`,
     )
@@ -445,12 +486,38 @@ function loadLineages(db: DatabaseType.Database): Map<string, Lineage> {
         (tier === 'email' || tier === 'claimed') &&
         (current.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT) === FREE_TIER_MONTHLY_LIMIT &&
         !current.no_recredit,
+      person: current.email_norm || normalizeEmail(current.email) || `sans-adresse:${id}`,
     });
   }
   return out;
 }
 
-/** Les préfixes qui ont au moins une ligne dans `request_log` sur la fenêtre, par lots. */
+/**
+ * Les préfixes qui ont au moins une ligne dans `request_log` sur la fenêtre.
+ *
+ * 🚨 BORNÉ À LA FENÊTRE, sans index nouveau (relecture du 25.09.2026, D3).
+ * `request_log` n'a que des index à une colonne ; un `key_prefix IN (…) AND
+ * created_at BETWEEN …` part de l'index des préfixes et relit TOUT l'historique
+ * conservé de chaque préfixe (jusqu'à douze mois) pour tester la date, et
+ * l'API entière attend pendant ce temps. Ici, la fenêtre devient deux bornes
+ * d'`id`, trouvées sur l'index de `created_at` (`ORDER BY created_at, id
+ * LIMIT 1`, jamais `MIN(id)`, que SQLite pourrait résoudre en relisant les
+ * lignes anciennes), puis chaque préfixe est cherché sur l'index des préfixes
+ * entre ces deux `id` : une recherche bornée, qui ne grandit pas avec
+ * l'historique. Suppose des `id` croissants avec l'heure, ce qui est le cas :
+ * chaque ligne est datée par `datetime('now')` à son insertion. La date reste
+ * testée, pour que la réponse soit exacte dans l'intervalle. Les trois requêtes
+ * sont exportées pour qu'un test tienne leur plan d'exécution.
+ */
+export const LOG_FIRST_ID_AT_OR_AFTER_SQL =
+  'SELECT id FROM request_log WHERE created_at >= ? ORDER BY created_at, id LIMIT 1';
+export const LOG_PREFIX_BETWEEN_IDS_SQL =
+  'SELECT 1 AS hit FROM request_log WHERE key_prefix = ? AND id >= ? AND id < ? ' +
+  'AND created_at >= ? AND created_at < ? LIMIT 1';
+export const LOG_PREFIX_FROM_ID_SQL =
+  'SELECT 1 AS hit FROM request_log WHERE key_prefix = ? AND id >= ? ' +
+  'AND created_at >= ? AND created_at < ? LIMIT 1';
+
 function prefixesSeen(
   db: DatabaseType.Database,
   prefixes: string[],
@@ -458,16 +525,22 @@ function prefixesSeen(
   toMs: number,
 ): Set<string> {
   const seen = new Set<string>();
-  for (let i = 0; i < prefixes.length; i += IN_CHUNK) {
-    const chunk = prefixes.slice(i, i + IN_CHUNK);
-    const rows = db
-      .prepare(
-        `SELECT DISTINCT key_prefix FROM request_log
-          WHERE key_prefix IN (${chunk.map(() => '?').join(',')})
-            AND created_at >= ? AND created_at < ?`,
-      )
-      .all(...chunk, sqliteUtc(fromMs), sqliteUtc(toMs)) as Array<{ key_prefix: string }>;
-    for (const r of rows) seen.add(r.key_prefix);
+  const unique = [...new Set(prefixes)];
+  if (unique.length === 0 || toMs <= fromMs) return seen;
+  const from = sqliteUtc(fromMs);
+  const to = sqliteUtc(toMs);
+  const firstFrom = db.prepare(LOG_FIRST_ID_AT_OR_AFTER_SQL);
+  const low = firstFrom.get(from) as { id: number } | undefined;
+  if (!low) return seen;
+  // Aucune ligne après la fin de la fenêtre (une relance de moins de sept
+  // jours, par exemple) : la borne haute reste ouverte.
+  const high = firstFrom.get(to) as { id: number } | undefined;
+  const probe = db.prepare(high ? LOG_PREFIX_BETWEEN_IDS_SQL : LOG_PREFIX_FROM_ID_SQL);
+  for (const prefix of unique) {
+    const hit = high
+      ? probe.get(prefix, low.id, high.id, from, to)
+      : probe.get(prefix, low.id, from, to);
+    if (hit) seen.add(prefix);
   }
   return seen;
 }
@@ -533,14 +606,15 @@ export function buildSentence(week: Omit<LastWeek, 'sentence'>, free: FreeUsers)
   let threshold = '';
   if (free.crossed) {
     const first = free.crossed_by[0];
-    let where = 'sur les 30 derniers jours';
+    let where = 'sur les 30 jours finissant dimanche';
     if (first.basis === 'month' && first.month) {
       const toDate = free.calendar.find((m) => m.month === first.month)?.to_date;
       where = `en ${monthNameFr(first.month)}${toDate ? ' à ce jour' : ''}`;
     }
     threshold =
-      ` ; seuil franchi : ${first.active} utilisateurs gratuits actifs à 200 par mois ${where},` +
-      ` plus de ${free.threshold}, le plafond gratuit est à réévaluer (décision du 22.09)`;
+      ` ; seuil franchi : ${first.people} utilisateurs gratuits actifs à 200 par mois` +
+      ` (des personnes, pas des clés) ${where}, plus de ${free.threshold} :` +
+      ' le plafond gratuit est à réévaluer (décision du 22.09)';
   }
   return `${head}${nudges}${threshold}.`;
 }
@@ -745,11 +819,21 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
     const lineage = lineageOfPrefix.get(p);
     if (lineage) activeInWindow.add(lineage);
   }
+  // Des clés aux personnes : une personne qui tient deux clés gratuites actives
+  // compte une fois pour le seuil (décision du 22.09 : « 50 utilisateurs »).
+  const peopleOf = (ids: Iterable<string>): number => {
+    const people = new Set<string>();
+    for (const id of ids) {
+      const l = lineages.get(id);
+      if (l) people.add(l.person);
+    }
+    return people.size;
+  };
 
   const freeIds = new Set(free.map((l) => l.id));
   const thisMonth = monthOf(nowMs);
   const lastMonth = previousMonth(thisMonth);
-  const activeInMonth = (month: string): number => {
+  const activeInMonth = (month: string): Set<string> => {
     const ids = new Set<string>();
     for (const r of db
       .prepare(`SELECT key_hash FROM api_usage WHERE month = ? AND count > 0`)
@@ -757,26 +841,29 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
       const lineage = lineageOfHash.get(r.key_hash);
       if (lineage && freeIds.has(lineage)) ids.add(lineage);
     }
-    return ids.size;
+    return ids;
   };
-  const calendar = [
-    { month: lastMonth, active: activeInMonth(lastMonth), to_date: false },
-    { month: thisMonth, active: activeInMonth(thisMonth), to_date: true },
-  ];
+  const calendar = [lastMonth, thisMonth].map((month) => {
+    const ids = activeInMonth(month);
+    return { month, people: peopleOf(ids), keys: ids.size, to_date: month === thisMonth };
+  });
+  const activePeople = peopleOf(activeInWindow);
   const crossedBy: FreeUsers['crossed_by'] = [];
-  if (activeInWindow.size > FREE_USERS_THRESHOLD) {
-    crossedBy.push({ basis: 'window', month: null, active: activeInWindow.size });
+  if (activePeople > FREE_USERS_THRESHOLD) {
+    crossedBy.push({ basis: 'window', month: null, people: activePeople });
   }
   for (const m of calendar) {
-    if (m.active > FREE_USERS_THRESHOLD) {
-      crossedBy.push({ basis: 'month', month: m.month, active: m.active });
+    if (m.people > FREE_USERS_THRESHOLD) {
+      crossedBy.push({ basis: 'month', month: m.month, people: m.people });
     }
   }
   const freeUsers: FreeUsers = {
     threshold: FREE_USERS_THRESHOLD,
+    threshold_counts: 'people',
     window_days: FREE_ACTIVE_WINDOW_DAYS,
     window: { from: fromDay.toISOString().slice(0, 10), to: previous.sunday },
-    active: activeInWindow.size,
+    active_people: activePeople,
+    active_keys: activeInWindow.size,
     calendar,
     crossed_by: crossedBy,
     crossed: crossedBy.length > 0,
@@ -800,7 +887,8 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
       created: lastRow.totals.created,
       first_success: lastRow.totals.first_success,
       paid: lastRow.totals.paid,
-      free_active: freeUsers.active,
+      free_active: freeUsers.active_people,
+      free_active_keys: freeUsers.active_keys,
     },
     nudged: lastRow.totals.nudged,
     called_after_nudge: lastRow.totals.called_after_nudge,

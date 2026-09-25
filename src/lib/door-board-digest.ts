@@ -23,10 +23,11 @@
  * - **Rien n'est réservé tant que le message ne peut pas partir** : interrupteur
  *   coupé, alertes d'exploitation coupées, jeton ou canal Telegram absent. La
  *   ligne garde la raison, la page l'affiche, et le lundi finit « sauté ».
- * - **Une nouvelle tentative seulement après un échec franc** : Telegram a
- *   répondu vite par un refus. Un envoi qui a attendu jusqu'à la limite de
- *   `notifyOps` a pu arriver quand même : il n'est jamais retenté, pour ne
- *   jamais envoyer deux fois. Trois tentatives au plus, toujours avant 17:00.
+ * - **Une nouvelle tentative seulement après un refus explicite** : Telegram a
+ *   RÉPONDU, par un statut d'erreur, donc rien n'est parti. Une erreur réseau
+ *   ou un délai dépassé ne dit pas si le message est arrivé (la coupure a pu
+ *   survenir après son départ) : jamais retenté, pour ne jamais envoyer deux
+ *   fois. Trois tentatives au plus, toujours avant 17:00.
  * - **Un envoi interrompu** (processus tué entre la réservation et la réponse)
  *   n'est jamais renvoyé : la ligne passe à `interrupted`, visible sur la page.
  *
@@ -38,7 +39,7 @@
  */
 import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
-import { notifyOps } from './ops-alert.js';
+import { sendOpsMessage, type OpsSendResult } from './ops-alert.js';
 import { getDoorBoard, type DoorBoard } from './door-board.js';
 import {
   parseDbUtc,
@@ -58,16 +59,15 @@ export const DIGEST_DEADLINE_HOUR = 17;
 export const DIGEST_MAX_ATTEMPTS = 3;
 /** Une réservation plus vieille que ça sans réponse : le processus est mort en route. */
 export const DIGEST_STUCK_MS = 10 * 60_000;
-/**
- * Au-delà de cette attente, un refus de `notifyOps` est AMBIGU : sa limite est
- * de quinze secondes, et un message a pu partir sans que la réponse revienne.
- */
-export const DIGEST_CLEAR_FAILURE_MS = 10_000;
 
 export const DOORS_PAGE_URL = 'https://ibanforge.com/dashboard/portes';
 
 const TICK_MS = 5 * 60_000;
-/** Décalé des autres radars (3', 4', 5', 6', 7') pour ne pas démarrer tous ensemble. */
+/**
+ * Le premier battement, huit minutes après le démarrage, puis toutes les cinq
+ * minutes à partir de lui (l'intervalle n'est armé qu'au premier battement :
+ * armé dès le démarrage, il battrait d'abord à cinq minutes).
+ */
 const BOOT_DELAY_MS = 8 * 60_000;
 
 export type DigestStatus =
@@ -80,7 +80,10 @@ export interface DigestNumbers {
   created: number;
   first_success: number;
   paid: number;
+  /** Utilisateurs gratuits actifs : des personnes, le nombre que lit le seuil. */
   free_active: number;
+  /** Les clés derrière ces personnes. */
+  free_active_keys: number;
 }
 
 interface DigestDbRow {
@@ -222,7 +225,10 @@ export function buildDigestMessage(board: DoorBoard): { text: string; numbers: D
     `Clés créées : ${n.created}`,
     `Premier appel réussi : ${n.first_success}`,
     `Ont payé : ${n.paid}`,
-    `Gratuits actifs à 200/mois sur 30 jours : ${n.free_active} (seuil ${board.free_users.threshold})`,
+    // Le seuil compte des personnes (décision du 22.09 : « utilisateurs ») ; le
+    // nombre de clés est donné à côté, pour la comparaison avec l'audit.
+    `Gratuits actifs à 200/mois sur 30 jours : ${n.free_active} ${n.free_active <= 1 ? 'personne' : 'personnes'}, ` +
+      `${n.free_active_keys} ${n.free_active_keys <= 1 ? 'clé' : 'clés'} (seuil : plus de ${board.free_users.threshold} personnes)`,
     week.sentence,
     DOORS_PAGE_URL,
   ].join('\n');
@@ -233,7 +239,8 @@ export function buildDigestMessage(board: DoorBoard): { text: string; numbers: D
 
 export interface DigestDeps {
   now: () => number;
-  send: (text: string) => Promise<boolean>;
+  /** L'envoi, et ce qu'il a constaté : `httpStatus` nul quand Telegram n'a pas répondu. */
+  send: (text: string) => Promise<OpsSendResult>;
   rng: () => number;
   env: NodeJS.ProcessEnv;
   board: (now: number) => DoorBoard;
@@ -242,7 +249,7 @@ export interface DigestDeps {
 function defaultDeps(): DigestDeps {
   return {
     now: () => Date.now(),
-    send: (text) => notifyOps(text),
+    send: (text) => sendOpsMessage(text),
     rng: Math.random,
     env: process.env,
     board: (now) => getDoorBoard({ now }),
@@ -425,17 +432,16 @@ export async function attemptDigest(
     return settleFailure(db, week, attempts, now, deadline, deps, errorText(err), true);
   }
 
-  const started = deps.now();
-  let ok: boolean;
-  let error = 'telegram_refused';
+  let result: OpsSendResult;
   try {
-    ok = await deps.send(text);
-  } catch (err) {
-    ok = false;
-    error = errorText(err);
+    result = await deps.send(text);
+  } catch {
+    // `sendOpsMessage` ne jette jamais ; un envoi qui jetterait quand même n'a
+    // rien dit de l'arrivée du message, donc il compte comme non confirmé.
+    result = { sent: false, httpStatus: null };
   }
   const ended = deps.now();
-  if (ok) {
+  if (result.sent) {
     db.prepare(
       `UPDATE door_board_digest
           SET status = 'sent', sent_at = ?, numbers_json = ?, message = ?, last_error = NULL,
@@ -444,8 +450,10 @@ export async function attemptDigest(
     ).run(sqliteUtc(ended), JSON.stringify(numbers), text, sqliteUtc(ended), week);
     return { result: 'sent', departedAt: now };
   }
-  // Un refus rapide est franc ; une attente jusqu'à la limite ne l'est pas.
-  const clear = ended - started < DIGEST_CLEAR_FAILURE_MS;
+  // Telegram a répondu par un refus : rien n'est parti, une nouvelle tentative
+  // ne peut rien doubler. Pas de réponse du tout (coupure, délai dépassé) : le
+  // message a pu arriver, donc jamais de second essai.
+  const refused = result.httpStatus !== null;
   return settleFailure(
     db,
     week,
@@ -453,8 +461,8 @@ export async function attemptDigest(
     ended,
     deadline,
     deps,
-    clear ? error : 'send_timeout_ambiguous',
-    clear,
+    refused ? `telegram_refused_${result.httpStatus}` : 'send_unconfirmed',
+    refused,
   );
 }
 
@@ -509,6 +517,12 @@ export interface DigestState {
   enabled: boolean;
   blocked: ChannelBlock | null;
   window: { first: string; last: string; deadline: string };
+  /**
+   * Le lundi de la semaine en cours, et s'il est déjà passé son heure limite.
+   * Sans ligne pour ce lundi et passé l'heure limite, l'API ne tournait pas ce
+   * lundi-là : la page le dit, au lieu d'annoncer un « prochain résumé ».
+   */
+  this_monday: { week: string; monday: string; deadline_passed: boolean };
   recent: DigestView[];
   /**
    * Les nombres du dernier résumé envoyé, comparés à ceux que la page calcule
@@ -559,6 +573,13 @@ export function readDigestState(
     (r) => r.status === 'sent' && r.summary_week === board.last_week.week,
   );
   const pad = (h: number) => `${String(h).padStart(2, '0')}:00`;
+  // La semaine en cours, à l'heure même où le tableau a été lu.
+  const observed = parseDbUtc(board.observed_at) ?? Date.now();
+  const current = swissWeekOf(observed);
+  const [y, m, d] = current.monday.split('-').map(Number);
+  const deadline = zurichLocalToUtcMs(y, m, d, DIGEST_DEADLINE_HOUR, 0, 0);
+  const sent = latestSent?.numbers;
+  const page = board.last_week.numbers;
   return {
     enabled: !isDigestDisabled(env),
     blocked: channelBlock(env),
@@ -567,12 +588,18 @@ export function readDigestState(
       last: `${String(DIGEST_LAST_HOUR - 1).padStart(2, '0')}:59`,
       deadline: pad(DIGEST_DEADLINE_HOUR),
     },
+    this_monday: {
+      week: current.label,
+      monday: current.monday,
+      deadline_passed: observed >= deadline,
+    },
     recent,
-    latest_matches_page: latestSent?.numbers
-      ? latestSent.numbers.created === board.last_week.numbers.created &&
-        latestSent.numbers.first_success === board.last_week.numbers.first_success &&
-        latestSent.numbers.paid === board.last_week.numbers.paid &&
-        latestSent.numbers.free_active === board.last_week.numbers.free_active
+    latest_matches_page: sent
+      ? sent.created === page.created &&
+        sent.first_success === page.first_success &&
+        sent.paid === page.paid &&
+        sent.free_active === page.free_active &&
+        sent.free_active_keys === page.free_active_keys
       : null,
   };
 }
@@ -614,8 +641,13 @@ function runTick(): void {
   }
 }
 
-/** Un battement toutes les cinq minutes ; le départ, lui, suit la minute tirée. */
+/**
+ * Le premier battement huit minutes après le démarrage, puis toutes les cinq
+ * minutes à partir de lui ; le départ, lui, suit la minute tirée.
+ */
 export function startDoorBoardDigest(): void {
-  setTimeout(runTick, BOOT_DELAY_MS).unref();
-  setInterval(runTick, TICK_MS).unref();
+  setTimeout(() => {
+    runTick();
+    setInterval(runTick, TICK_MS).unref();
+  }, BOOT_DELAY_MS).unref();
 }

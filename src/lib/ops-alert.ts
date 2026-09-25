@@ -112,6 +112,30 @@ function markSent(key: string): void {
  * Ne jette jamais et n'attend pas plus de 15 s.
  */
 export async function notifyOps(text: string): Promise<boolean> {
+  return (await sendOpsMessage(text)).sent;
+}
+
+/**
+ * Ce qu'un envoi sur le canal d'exploitation a pu constater.
+ *
+ * `httpStatus` vaut le statut de la réponse de Telegram quand une réponse est
+ * revenue, et `null` sinon : canal non configuré ou coupé, erreur réseau, délai
+ * dépassé. La nuance compte pour un envoi qui ne doit jamais partir deux fois
+ * (le résumé du lundi, `door-board-digest.ts`) : un refus HTTP dit que rien
+ * n'est parti, alors qu'une coupure après le départ de la requête a pu laisser
+ * arriver le message.
+ */
+export interface OpsSendResult {
+  sent: boolean;
+  httpStatus: number | null;
+}
+
+/**
+ * Le même envoi que `notifyOps`, qui dit en plus si Telegram a répondu. Mêmes
+ * gardes, mêmes journaux, même limite de 15 s : `notifyOps` n'en est que la
+ * forme booléenne. Ne jette jamais.
+ */
+export async function sendOpsMessage(text: string): Promise<OpsSendResult> {
   const token = process.env.TELEGRAM_BOT_TOKEN ?? '';
   const chat = process.env.TELEGRAM_CHAT_ID ?? '';
   if (!token || !chat) {
@@ -119,11 +143,11 @@ export async function notifyOps(text: string): Promise<boolean> {
       '[ops-alert] TELEGRAM_BOT_TOKEN/CHAT_ID absents — alerte non envoyée:',
       text.slice(0, 200),
     );
-    return false;
+    return { sent: false, httpStatus: null };
   }
   if (process.env.OPS_ALERTS_DISABLED === '1') {
     console.warn('[ops-alert] OPS_ALERTS_DISABLED=1 — alerte étouffée:', text.slice(0, 200));
-    return false;
+    return { sent: false, httpStatus: null };
   }
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -138,12 +162,12 @@ export async function notifyOps(text: string): Promise<boolean> {
     });
     if (!res.ok) {
       console.error('[ops-alert] telegram HTTP', res.status);
-      return false;
+      return { sent: false, httpStatus: res.status };
     }
-    return true;
+    return { sent: true, httpStatus: res.status };
   } catch (err) {
     console.error('[ops-alert] telegram error:', err instanceof Error ? err.message : err);
-    return false;
+    return { sent: false, httpStatus: null };
   }
 }
 

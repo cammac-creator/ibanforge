@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getStatsDB } from './db.js';
 import { getDoorBoard } from './door-board.js';
 import {
@@ -12,9 +12,16 @@ import {
   isRoundMinute,
   nextNonRoundDeparture,
   readDigestState,
+  startDoorBoardDigest,
   type DigestDeps,
 } from './door-board-digest.js';
+import type { OpsSendResult } from './ops-alert.js';
 import { zurichParts } from './swiss-week.js';
+
+/** Ce que l'envoi factice peut constater : accepté, refusé par Telegram, ou sans réponse. */
+const ACCEPTED: OpsSendResult = { sent: true, httpStatus: 200 };
+const refused = (status: number): OpsSendResult => ({ sent: false, httpStatus: status });
+const UNCONFIRMED: OpsSendResult = { sent: false, httpStatus: null };
 
 /**
  * Le résumé du lundi, sur une horloge et un tirage injectés, et un envoi
@@ -44,7 +51,7 @@ function harness(
     now?: number;
     env?: NodeJS.ProcessEnv;
     rng?: () => number;
-    send?: (text: string, clock: { now: number }) => Promise<boolean>;
+    send?: (text: string, clock: { now: number }) => Promise<OpsSendResult>;
   } = {},
 ): Harness {
   const clock = { now: opts.now ?? MONDAY_0800 };
@@ -56,13 +63,18 @@ function harness(
     board: (now) => getDoorBoard({ now }),
     send: async (text) => {
       sent.push(text);
-      return opts.send ? opts.send(text, clock) : true;
+      return opts.send ? opts.send(text, clock) : ACCEPTED;
     },
   };
   return { deps, sent, clock };
 }
 
 function row(week = '2026-W41') {
+  // La table n'existe qu'après le premier battement du module.
+  const exists = getStatsDB()
+    .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'door_board_digest'`)
+    .get();
+  if (!exists) return undefined;
   return getStatsDB().prepare('SELECT * FROM door_board_digest WHERE week = ?').get(week) as
     | {
         status: string;
@@ -244,8 +256,8 @@ describe('une fois par semaine ISO, jamais deux', () => {
 
   it('laisse partir un seul de deux processus qui tentent à la même minute', async () => {
     const release: Array<() => void> = [];
-    const slow = (): Promise<boolean> =>
-      new Promise((resolve) => release.push(() => resolve(true)));
+    const slow = (): Promise<OpsSendResult> =>
+      new Promise((resolve) => release.push(() => resolve(ACCEPTED)));
     const a = harness({ send: slow });
     const plan = digestTick(a.deps);
     const due = plan.action === 'arm' ? plan.dueMs : 0;
@@ -313,10 +325,10 @@ describe('rien n’est réservé tant que le message ne peut pas partir', () => 
   });
 });
 
-describe('un échec franc se retente, un échec ambigu jamais', () => {
-  it('retente après un refus rapide, à une minute non ronde, puis part', async () => {
+describe('un refus de Telegram se retente, un envoi sans réponse jamais', () => {
+  it('retente après un refus explicite, à une minute non ronde, puis part', async () => {
     let refuse = true;
-    const h = harness({ send: async () => !refuse });
+    const h = harness({ send: async () => (refuse ? refused(429) : ACCEPTED) });
     const plan = digestTick(h.deps);
     const due = plan.action === 'arm' ? plan.dueMs : 0;
     h.clock.now = due;
@@ -325,7 +337,11 @@ describe('un échec franc se retente, un échec ambigu jamais', () => {
     const next = failed.result === 'retry' ? failed.nextMs : 0;
     expect(next - due).toBeGreaterThanOrEqual(17 * MINUTE);
     expect(isRoundMinute(zurichParts(next).minute)).toBe(false);
-    expect(row()).toMatchObject({ status: 'planned', attempts: 1, last_error: 'telegram_refused' });
+    expect(row()).toMatchObject({
+      status: 'planned',
+      attempts: 1,
+      last_error: 'telegram_refused_429',
+    });
     refuse = false;
     h.clock.now = next;
     expect((await attemptDigest('2026-W41', next, h.deps)).result).toBe('sent');
@@ -334,7 +350,7 @@ describe('un échec franc se retente, un échec ambigu jamais', () => {
   });
 
   it(`s’arrête après ${DIGEST_MAX_ATTEMPTS} tentatives`, async () => {
-    const h = harness({ send: async () => false });
+    const h = harness({ send: async () => refused(500) });
     let plan = digestTick(h.deps);
     for (let i = 0; i < DIGEST_MAX_ATTEMPTS; i++) {
       const due = plan.action === 'arm' ? plan.dueMs : 0;
@@ -346,19 +362,16 @@ describe('un échec franc se retente, un échec ambigu jamais', () => {
     expect(h.sent).toHaveLength(DIGEST_MAX_ATTEMPTS);
   });
 
-  it('ne retente pas un envoi qui a attendu jusqu’à la limite : il a pu arriver', async () => {
-    const h = harness({
-      send: async (_text, clock) => {
-        clock.now += 15_000;
-        return false;
-      },
-    });
+  it('ne retente pas un envoi resté sans réponse de Telegram, même rapide : il a pu arriver', async () => {
+    // Une coupure juste après le départ de la requête revient vite, sans statut :
+    // le message a pu arriver. Jamais de second essai.
+    const h = harness({ send: async () => UNCONFIRMED });
     const plan = digestTick(h.deps);
     const due = plan.action === 'arm' ? plan.dueMs : 0;
     h.clock.now = due;
     expect(await attemptDigest('2026-W41', due, h.deps)).toEqual({
       result: 'failed',
-      error: 'send_timeout_ambiguous',
+      error: 'send_unconfirmed',
     });
     h.clock.now += 20 * MINUTE;
     expect(digestTick(h.deps)).toEqual({ action: 'idle', reason: 'done' });
@@ -400,7 +413,7 @@ describe('le message et la page disent les mêmes nombres', () => {
       'Clés créées : 2',
       'Premier appel réussi : 0',
       'Ont payé : 0',
-      'Gratuits actifs à 200/mois sur 30 jours : 0 (seuil 50)',
+      'Gratuits actifs à 200/mois sur 30 jours : 0 personne, 0 clé (seuil : plus de 50 personnes)',
       board.last_week.sentence,
       DOORS_PAGE_URL,
     ]);
@@ -419,6 +432,23 @@ describe('le message et la page disent les mêmes nombres', () => {
       numbers: { week: '2026-W40', ...board.last_week.numbers },
     });
     expect(state.window).toEqual({ first: '08:00', last: '10:59', deadline: '17:00' });
+    expect(state.this_monday).toEqual({
+      week: '2026-W41',
+      monday: '2026-10-05',
+      deadline_passed: false,
+    });
+  });
+
+  it('sait, le mardi, que le lundi de la semaine est passé', () => {
+    const state = readDigestState(getDoorBoard({ now: Date.parse('2026-10-06T08:00:00Z') }), 6, {
+      ...TELEGRAM,
+    });
+    expect(state.this_monday).toEqual({
+      week: '2026-W41',
+      monday: '2026-10-05',
+      deadline_passed: true,
+    });
+    expect(state.recent).toEqual([]);
   });
 
   it('dit un écart quand la page ne dit plus la même chose que le résumé envoyé', async () => {
@@ -440,8 +470,11 @@ describe('le message et la page disent les mêmes nombres', () => {
 });
 
 describe('la minuterie du processus', () => {
-  it('ne jette jamais vers le serveur', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('ne jette jamais vers le serveur, et ne retente pas un envoi qui a levé une erreur', async () => {
     const h = harness({
       send: async () => {
         throw new Error('réseau coupé');
@@ -450,10 +483,21 @@ describe('la minuterie du processus', () => {
     const plan = digestTick(h.deps);
     const due = plan.action === 'arm' ? plan.dueMs : 0;
     h.clock.now = due;
-    await expect(attemptDigest('2026-W41', due, h.deps)).resolves.toMatchObject({
-      result: 'retry',
+    await expect(attemptDigest('2026-W41', due, h.deps)).resolves.toEqual({
+      result: 'failed',
+      error: 'send_unconfirmed',
     });
-    expect(row()).toMatchObject({ status: 'planned', last_error: 'réseau coupé' });
-    spy.mockRestore();
+    expect(row()).toMatchObject({ status: 'failed', last_error: 'send_unconfirmed' });
+  });
+
+  it('bat pour la première fois huit minutes après le démarrage, pas cinq', () => {
+    // Lundi 07:00 heure suisse : le premier battement planifie le lundi.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'Date'] });
+    vi.setSystemTime(Date.parse('2026-10-05T05:00:00Z'));
+    startDoorBoardDigest();
+    vi.advanceTimersByTime(5 * MINUTE + 1000);
+    expect(row()).toBeUndefined();
+    vi.advanceTimersByTime(3 * MINUTE);
+    expect(row()).toMatchObject({ status: 'planned' });
   });
 });

@@ -3,6 +3,9 @@ import { getStatsDB } from './db.js';
 import {
   DOOR_LABELS_FR,
   FREE_USERS_THRESHOLD,
+  LOG_FIRST_ID_AT_OR_AFTER_SQL,
+  LOG_PREFIX_BETWEEN_IDS_SQL,
+  LOG_PREFIX_FROM_ID_SQL,
   OTHER_DOOR,
   PAID_OUTCOMES,
   UNKNOWN_DOOR,
@@ -11,6 +14,7 @@ import {
 } from './door-board.js';
 import { knownOrigins } from './key-origins.js';
 import { isSaleOutcome, type PurchaseOutcome } from './key-purchases.js';
+import { normalizeEmail } from './email-norm.js';
 
 /**
  * Le tableau des portes sur une base SYNTHÉTIQUE et une horloge fixée.
@@ -20,6 +24,10 @@ import { isSaleOutcome, type PurchaseOutcome } from './key-purchases.js';
  * Fixtures inventées, ce dépôt est public : adresses en `alpha.example.net`,
  * qui n'est interne pour aucune des deux règles du dépôt (au contraire de
  * `example.com`).
+ *
+ * `request_log` : chaque test insère ses appels dans l'ORDRE CHRONOLOGIQUE,
+ * comme la production, où chaque ligne est datée à son insertion. La recherche
+ * bornée du tableau traduit la fenêtre en bornes d'`id` et s'y appuie.
  */
 const NOW = Date.parse('2026-10-07T10:00:00Z');
 const DAY = 86_400_000;
@@ -41,6 +49,8 @@ interface KeyFixture {
   noRecredit?: number;
   /** Rattache la clé à une lignée existante (rotation). */
   lineage?: string;
+  /** L'adresse normalisée écrite ; par défaut celle de `normalizeEmail`, `null` pour la laisser vide. */
+  emailNorm?: string | null;
 }
 
 function key(f: KeyFixture): { hash: string; prefix: string; lineage: string } {
@@ -59,7 +69,7 @@ function key(f: KeyFixture): { hash: string; prefix: string; lineage: string } {
       hash,
       prefix,
       email,
-      email,
+      f.emailNorm === undefined ? normalizeEmail(email) : f.emailNorm,
       stamp(f.created),
       f.source === undefined ? 'site-signup' : f.source,
       f.tier ?? 'email',
@@ -353,30 +363,78 @@ describe('le contrôle du parc', () => {
 });
 
 describe('les utilisateurs gratuits actifs à 200 par mois', () => {
-  it('compte les clés à l’allocation gratuite qui ont appelé sur les 30 jours finissant dimanche', () => {
+  it('compte ceux à l’allocation gratuite qui ont appelé sur les 30 jours finissant dimanche', () => {
     const active = key({ created: '2026-08-01T08:00:00Z' });
-    call(active.prefix, '2026-09-10T08:00:00Z');
     const claimed = key({ created: '2026-08-01T08:00:00Z', tier: 'claimed', monthlyLimit: 200 });
-    call(claimed.prefix, '2026-10-04T21:00:00Z'); // dimanche 23:00, dernier jour de la fenêtre
     const afterSunday = key({ created: '2026-08-01T08:00:00Z' });
-    call(afterSunday.prefix, '2026-10-05T08:00:00Z');
     const beforeWindow = key({ created: '2026-08-01T08:00:00Z' });
-    call(beforeWindow.prefix, '2026-09-04T08:00:00Z');
     const pro = key({ created: '2026-08-01T08:00:00Z', monthlyLimit: 10_000 });
-    call(pro.prefix, '2026-09-20T08:00:00Z');
     const anon = key({ created: '2026-08-01T08:00:00Z', tier: 'anonymous', monthlyLimit: 25 });
-    call(anon.prefix, '2026-09-20T08:00:00Z');
     const ours = key({ created: '2026-08-01T08:00:00Z', issuedByUs: 1 });
+    // Dans l'ordre chronologique, comme la production.
+    call(beforeWindow.prefix, '2026-09-04T08:00:00Z');
+    call(active.prefix, '2026-09-10T08:00:00Z');
+    call(pro.prefix, '2026-09-20T08:00:00Z');
+    call(anon.prefix, '2026-09-20T08:00:00Z');
     call(ours.prefix, '2026-09-20T08:00:00Z');
+    call(claimed.prefix, '2026-10-04T21:00:00Z'); // dimanche 23:00, dernier jour de la fenêtre
+    call(afterSunday.prefix, '2026-10-05T08:00:00Z');
     const board = getDoorBoard({ now: NOW });
     expect(board.free_users).toMatchObject({
       threshold: FREE_USERS_THRESHOLD,
+      threshold_counts: 'people',
       window_days: 30,
       window: { from: '2026-09-05', to: '2026-10-04' },
-      active: 2,
+      active_people: 2,
+      active_keys: 2,
       crossed: false,
     });
-    expect(board.last_week.numbers.free_active).toBe(2);
+    expect(board.last_week.numbers).toMatchObject({ free_active: 2, free_active_keys: 2 });
+  });
+
+  it('compte une personne une fois, quelles que soient ses clés et l’écriture de son adresse', () => {
+    // Deux clés gratuites d'une même personne, l'une notée avec une étiquette
+    // « + » et sans adresse normalisée écrite : la règle du dépôt la retrouve.
+    const first = key({ created: '2026-08-01T08:00:00Z', email: 'jeanne@alpha.example.net' });
+    const second = key({
+      created: '2026-08-02T08:00:00Z',
+      email: 'Jeanne+veille@alpha.example.net',
+      emailNorm: null,
+    });
+    const other = key({ created: '2026-08-03T08:00:00Z', email: 'paul@beta.example.net' });
+    call(first.prefix, '2026-09-10T08:00:00Z');
+    call(second.prefix, '2026-09-11T08:00:00Z');
+    call(other.prefix, '2026-09-12T08:00:00Z');
+    usage(first.hash, '2026-09', 2);
+    usage(second.hash, '2026-09', 5);
+    const board = getDoorBoard({ now: NOW });
+    expect(board.free_users).toMatchObject({ active_people: 2, active_keys: 3 });
+    expect(board.free_users.calendar[0]).toEqual({
+      month: '2026-09',
+      people: 1,
+      keys: 2,
+      to_date: false,
+    });
+    expect(board.last_week.numbers).toMatchObject({ free_active: 2, free_active_keys: 3 });
+  });
+
+  it('ne franchit pas le seuil sur des clés : il compte des personnes', () => {
+    // 51 clés actives, tenues par 26 personnes.
+    for (let i = 0; i < FREE_USERS_THRESHOLD + 1; i++) {
+      const k = key({
+        created: '2026-08-01T08:00:00Z',
+        email: `duo${Math.floor(i / 2)}@alpha.example.net`,
+      });
+      call(k.prefix, '2026-09-20T08:00:00Z');
+      usage(k.hash, '2026-09', 3);
+    }
+    const board = getDoorBoard({ now: NOW });
+    expect(board.free_users).toMatchObject({
+      active_people: 26,
+      active_keys: 51,
+      crossed: false,
+    });
+    expect(board.last_week.sentence).not.toContain('seuil franchi');
   });
 
   it('donne le mois civil à côté, et dit quand le seuil est franchi', () => {
@@ -388,14 +446,50 @@ describe('les utilisateurs gratuits actifs à 200 par mois', () => {
     const quiet = key({ created: '2026-08-01T08:00:00Z' });
     usage(quiet.hash, '2026-10', 0);
     const board = getDoorBoard({ now: NOW });
-    expect(board.free_users.active).toBe(51);
+    expect(board.free_users).toMatchObject({ active_people: 51, active_keys: 51 });
     expect(board.free_users.calendar).toEqual([
-      { month: '2026-09', active: 51, to_date: false },
-      { month: '2026-10', active: 0, to_date: true },
+      { month: '2026-09', people: 51, keys: 51, to_date: false },
+      { month: '2026-10', people: 0, keys: 0, to_date: true },
     ]);
     expect(board.free_users.crossed).toBe(true);
-    expect(board.last_week.sentence).toContain('seuil franchi : 51 utilisateurs gratuits actifs');
-    expect(board.last_week.sentence).toContain('plus de 50');
+    expect(board.last_week.sentence).toContain(
+      'seuil franchi : 51 utilisateurs gratuits actifs à 200 par mois (des personnes, pas des clés)',
+    );
+    expect(board.last_week.sentence).toContain('sur les 30 jours finissant dimanche, plus de 50');
+  });
+});
+
+describe('la recherche dans le journal des appels, bornée à la fenêtre', () => {
+  it('passe par les index existants : dates pour les bornes, préfixes entre deux id', () => {
+    const plan = (sql: string, params: unknown[]): string =>
+      (
+        getStatsDB()
+          .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+          .all(...params) as Array<{ detail: string }>
+      )
+        .map((r) => r.detail)
+        .join(' | ');
+    const first = plan(LOG_FIRST_ID_AT_OR_AFTER_SQL, ['2026-09-01 00:00:00']);
+    expect(first).toContain('idx_request_log_date');
+    expect(first).not.toContain('TEMP B-TREE');
+    const between = plan(LOG_PREFIX_BETWEEN_IDS_SQL, ['p', 1, 9, 'a', 'b']);
+    expect(between).toContain('idx_request_log_key_prefix (key_prefix=? AND rowid>? AND rowid<?)');
+    const open = plan(LOG_PREFIX_FROM_ID_SQL, ['p', 1, 'a', 'b']);
+    expect(open).toContain('idx_request_log_key_prefix (key_prefix=? AND rowid>?)');
+  });
+
+  it('ne voit ni l’historique d’avant la fenêtre ni les appels d’après', () => {
+    const busy = key({ created: '2026-06-01T08:00:00Z' });
+    const quiet = key({ created: '2026-06-01T08:00:00Z' });
+    // Un long historique avant la fenêtre, puis des appels après elle.
+    for (let d = 1; d <= 30; d++) {
+      call(busy.prefix, `2026-07-${String(d).padStart(2, '0')}T08:00:00Z`);
+      call(quiet.prefix, `2026-07-${String(d).padStart(2, '0')}T09:00:00Z`);
+    }
+    call(busy.prefix, '2026-09-15T08:00:00Z');
+    call(quiet.prefix, '2026-10-06T08:00:00Z');
+    const board = getDoorBoard({ now: NOW });
+    expect(board.free_users).toMatchObject({ active_people: 1, active_keys: 1 });
   });
 });
 
@@ -418,7 +512,8 @@ describe('la semaine passée, telle que le résumé du lundi la dira', () => {
         created: row.totals.created,
         first_success: row.totals.first_success,
         paid: row.totals.paid,
-        free_active: board.free_users.active,
+        free_active: board.free_users.active_people,
+        free_active_keys: board.free_users.active_keys,
       },
       nudged: 1,
     });
@@ -427,6 +522,7 @@ describe('la semaine passée, telle que le résumé du lundi la dira', () => {
       first_success: 1,
       paid: 1,
       free_active: 0,
+      free_active_keys: 0,
     });
     expect(board.last_week.sentence).toBe(
       'La porte « Documentation » a donné le plus de clés (2 sur 3), 1 relance partie ' +
