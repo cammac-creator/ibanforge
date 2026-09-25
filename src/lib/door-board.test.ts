@@ -444,6 +444,10 @@ describe('la semaine passée, telle que le résumé du lundi la dira', () => {
     expect(getDoorBoard({ now: NOW }).last_week.sentence).toBe(
       'Les portes « Documentation » et « Glama » ont donné le plus de clés (1 chacune sur 2).',
     );
+    key({ created: '2026-09-30T09:00:00Z', source: 'n8n' });
+    expect(getDoorBoard({ now: NOW }).last_week.sentence).toBe(
+      '3 portes sont à égalité en tête, avec 1 clé chacune sur 3.',
+    );
   });
 });
 

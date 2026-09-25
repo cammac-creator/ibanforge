@@ -1,6 +1,7 @@
 import { overviewCard } from './overview/section';
 import {
   controlLine,
+  count,
   digestStatus,
   dayMonth,
   fmt,
@@ -32,7 +33,9 @@ const TONE_CLASS: Record<Tone, string> = {
 const COLUMNS: Array<{ key: keyof DoorCounts; label: string; hint: string }> = [
   { key: 'created', label: 'Créées', hint: 'Clés créées cette semaine-là' },
   { key: 'first_success', label: '1er appel', hint: 'Premier appel réussi cette semaine-là' },
-  { key: 'nudged', label: 'Relancées', hint: 'Relance d’activation remise cette semaine-là' },
+  // Césure douce : sur un téléphone, « Relan-cées » passe sur deux lignes plutôt
+  // que de pousser la colonne « Payé » hors du cadre.
+  { key: 'nudged', label: 'Relan­cées', hint: 'Relance d’activation remise cette semaine-là' },
   {
     key: 'called_after_nudge',
     label: 'Appel ≤ 7 j',
@@ -55,7 +58,7 @@ function Cell({ row, column }: { row: DoorCounts; column: keyof DoorCounts }) {
   const value = row[column];
   const pending = column === 'called_after_nudge' ? row.followup_pending : 0;
   return (
-    <td className="px-1.5 py-1.5 text-right tabular-nums">
+    <td className="px-1 py-1.5 text-right tabular-nums sm:px-1.5">
       <span className={value === 0 ? 'text-[var(--fg-5)]' : 'text-[var(--fg-1)]'}>{fmt(value)}</span>
       {pending > 0 && (
         <span className="ml-1 text-[10px] text-sky-300" title="Relancées dont les sept jours courent encore">
@@ -69,12 +72,17 @@ function Cell({ row, column }: { row: DoorCounts; column: keyof DoorCounts }) {
 function Head({ first }: { first: string }) {
   return (
     <thead>
-      <tr className="border-b border-[var(--ink-4)]/60 text-[11px] text-[var(--fg-4)]">
-        <th scope="col" className="py-1.5 pr-2 text-left font-medium">
+      <tr className="border-b border-[var(--ink-4)]/60 text-[10.5px] text-[var(--fg-4)] sm:text-[11px]">
+        <th scope="col" className="py-1.5 pr-2 text-left align-bottom font-medium">
           {first}
         </th>
         {COLUMNS.map((c) => (
-          <th key={c.key} scope="col" title={c.hint} className="px-1.5 py-1.5 text-right font-medium">
+          <th
+            key={c.key}
+            scope="col"
+            title={c.hint}
+            className="px-1 py-1.5 text-right align-bottom font-medium leading-tight sm:px-1.5"
+          >
             {c.label}
           </th>
         ))}
@@ -86,7 +94,7 @@ function Head({ first }: { first: string }) {
 function WeekTable({ weeks, totals }: { weeks: WeekRow[]; totals: DoorCounts }) {
   return (
     <div className="-mx-1 overflow-x-auto">
-      <table className="w-full min-w-[20rem] border-collapse text-[13px]">
+      <table className="w-full min-w-[20rem] border-collapse text-[12.5px] sm:text-[13px]">
         <Head first="Semaine" />
         <tbody>
           {weeks.map((w) => {
@@ -124,12 +132,15 @@ function WeekTable({ weeks, totals }: { weeks: WeekRow[]; totals: DoorCounts }) 
 function DoorTable({ doors }: { doors: DoorRow[] }) {
   return (
     <div className="-mx-1 overflow-x-auto">
-      <table className="w-full min-w-[20rem] border-collapse text-[13px]">
+      <table className="w-full min-w-[20rem] border-collapse text-[12.5px] sm:text-[13px]">
         <Head first="Porte" />
         <tbody>
           {doors.map((d) => (
             <tr key={d.door} className="border-b border-[var(--ink-4)]/30 align-top">
-              <th scope="row" className="py-1.5 pr-2 text-left font-normal text-[var(--fg-2)]">
+              <th
+                scope="row"
+                className="min-w-[5.5rem] py-1.5 pr-2 text-left font-normal leading-snug text-[var(--fg-2)]"
+              >
                 {d.label}
               </th>
               {COLUMNS.map((c) => (
@@ -177,8 +188,10 @@ export function DoorsBoard({ data }: { data: DoorsPayload }) {
         </p>
         {sent && (
           <p className="mt-2 text-[12px] text-[var(--fg-4)]">
-            Envoyé le lundi : {fmt(sent.created)} créées, {fmt(sent.first_success)} premiers appels,{' '}
-            {fmt(sent.paid)} paiements, {fmt(sent.free_active)} gratuits actifs.
+            Envoyé le lundi : {count(sent.created, 'clé créée', 'clés créées')},{' '}
+            {count(sent.first_success, 'premier appel', 'premiers appels')},{' '}
+            {count(sent.paid, 'paiement', 'paiements')},{' '}
+            {count(sent.free_active, 'gratuit actif', 'gratuits actifs')}.
           </p>
         )}
       </section>
@@ -243,8 +256,9 @@ export function DoorsBoard({ data }: { data: DoorsPayload }) {
             {detailWeeks.map((w) => (
               <details key={w.key} className="rounded-lg border border-[var(--ink-4)]/50 px-3 py-2">
                 <summary className="cursor-pointer text-[13px] text-[var(--fg-2)]">
-                  {w.title} : {fmt(w.totals.created)} créées, {fmt(w.totals.first_success)} premiers appels,{' '}
-                  {fmt(w.totals.paid)} paiements
+                  {w.title} : {count(w.totals.created, 'créée', 'créées')},{' '}
+                  {count(w.totals.first_success, 'premier appel', 'premiers appels')},{' '}
+                  {count(w.totals.paid, 'paiement', 'paiements')}
                 </summary>
                 <div className="mt-2">
                   <DoorTable doors={w.doors} />

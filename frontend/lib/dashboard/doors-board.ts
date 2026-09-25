@@ -114,6 +114,11 @@ export function fmt(n: number): string {
   return formatGrouped(n, 'fr');
 }
 
+/** Un nombre et son nom accordé : 0 et 1 au singulier, comme en français. */
+export function count(n: number, one: string, many: string): string {
+  return `${fmt(n)} ${n <= 1 ? one : many}`;
+}
+
 /** `JJ.MM` d'une date civile `AAAA-MM-JJ`. */
 export function dayMonth(civil: string): string {
   return `${civil.slice(8, 10)}.${civil.slice(5, 7)}`;

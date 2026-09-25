@@ -230,6 +230,10 @@ describe('la vue, rendue au serveur', () => {
     expect(html).toContain('Inconnue (clé d’avant le marquage)');
     expect(html).toContain('Parc externe du jour, compté à part : 1\u00a0276. Égal.');
     expect(html).toContain('+1');
+    // Les nombres s'accordent : 0 et 1 au singulier.
+    expect(html).toContain('0 premier appel');
+    expect(html).toContain('0 paiement');
+    expect(html).not.toContain('0 paiements');
     const text = html.replace(/<[^>]+>/g, ' ');
     expect(text).not.toMatch(/[—–]/);
   });

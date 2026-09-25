@@ -472,8 +472,9 @@ function prefixesSeen(
   return seen;
 }
 
+/** Un nombre et son nom accordé : 0 et 1 au singulier, comme en français. */
 function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
+  return `${n} ${n <= 1 ? one : many}`;
 }
 
 const MONTHS_FR = [
@@ -512,10 +513,13 @@ export function buildSentence(week: Omit<LastWeek, 'sentence'>, free: FreeUsers)
       top.created === total
         ? `Toutes les clés de la semaine passée viennent de la porte « ${top.label} »`
         : `La porte « ${top.label} » a donné le plus de clés (${top.created} sur ${total})`;
+  } else if (week.top_doors.length === 2) {
+    const [first, second] = week.top_doors;
+    head = `Les portes « ${first.label} » et « ${second.label} » ont donné le plus de clés (${first.created} chacune sur ${total})`;
   } else {
-    const names = week.top_doors.map((d) => `« ${d.label} »`);
-    const list = `${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`;
-    head = `Les portes ${list} ont donné le plus de clés (${week.top_doors[0].created} chacune sur ${total})`;
+    // Au-delà de deux, la liste des noms noierait la phrase : le tableau les donne.
+    const each = week.top_doors[0].created;
+    head = `${week.top_doors.length} portes sont à égalité en tête, avec ${plural(each, 'clé', 'clés')} chacune sur ${total}`;
   }
   let nudges = '';
   if (week.nudged > 0) {
