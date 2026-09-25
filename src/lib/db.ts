@@ -1625,6 +1625,17 @@ function openStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_account_sessions_email ON account_sessions(email_norm);
     `);
+    // Les jours clos de la tendance du trafic, calculés une fois (25.09.2026) :
+    // voir getTrafficTrend. Des comptes par jour, jamais une donnée personnelle ;
+    // table dérivée, qui se reconstruit seule si on la vide.
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS traffic_trend_days (
+        day          TEXT PRIMARY KEY,
+        internal_sig TEXT NOT NULL,
+        row          TEXT,
+        computed_at  TEXT NOT NULL
+      );
+    `);
   }
   return statsDB;
 }

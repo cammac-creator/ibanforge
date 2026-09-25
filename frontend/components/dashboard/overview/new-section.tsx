@@ -15,7 +15,7 @@ import { LandingDoorsCard } from './landing-doors-card';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
-import type { ActivationData, HistoryEntry } from './types';
+import type { ActivationData, StatsPulse } from './types';
 
 /**
  * Section 4 — what is new.
@@ -33,7 +33,7 @@ export async function NewSection({
   activationPromise,
   clientsPromise,
   crmPromise,
-  historyPromise,
+  pulsePromise,
   demandGapsPromise,
   feedbackPromise,
   sourcesPromise,
@@ -48,7 +48,12 @@ export async function NewSection({
   activationPromise: Promise<Fetched<ActivationData>>;
   clientsPromise: Promise<Fetched<ActivationClientRow[]>>;
   crmPromise: Promise<BuildInput | null>;
-  historyPromise: Promise<Fetched<HistoryEntry[]>>;
+  /**
+   * Les opérations d'aujourd'hui et d'hier, lues sur `/stats/pulse` (25.09.2026) :
+   * mêmes définitions que les deux dernières lignes de `/stats/history`, qui
+   * coûtait plus d'une demi-seconde de calcul pour ces deux nombres.
+   */
+  pulsePromise: Promise<Fetched<StatsPulse>>;
   demandGapsPromise: Promise<Fetched<DemandGapsPayload>>;
   feedbackPromise: Promise<Fetched<{ open: number; reports: FeedbackReport[] }>>;
   sourcesPromise: Promise<Fetched<SignupSources>>;
@@ -59,11 +64,11 @@ export async function NewSection({
   doorsMonthPromise: Promise<Fetched<WebEventsSummary>>;
 }) {
   const t = await getTranslations('dashboard.overview');
-  const [activationRes, clientsRes, crm, historyRes, gapsRes, feedbackRes] = await Promise.all([
+  const [activationRes, clientsRes, crm, pulseRes, gapsRes, feedbackRes] = await Promise.all([
     activationPromise,
     clientsPromise,
     crmPromise,
-    historyPromise,
+    pulsePromise,
     demandGapsPromise,
     feedbackPromise,
   ]);
@@ -82,11 +87,8 @@ export async function NewSection({
    * is counted on the Europe/Zurich calendar, so "today" meant two different
    * days on one page without either one being labelled.
    */
-  const ops = (d?: HistoryEntry) =>
-    d ? (d.iban_validate ?? 0) + (d.iban_batch ?? 0) + (d.bic_lookup ?? 0) : 0;
-  const hist = historyRes.data ?? [];
-  const todayOps = ops(hist[hist.length - 1]);
-  const yesterdayOps = ops(hist[hist.length - 2]);
+  const todayOps = pulseRes.data?.operations_today ?? 0;
+  const yesterdayOps = pulseRes.data?.operations_yesterday ?? 0;
   const opsTrendPct =
     yesterdayOps > 0
       ? `${Math.abs(Math.round(((todayOps - yesterdayOps) / yesterdayOps) * 100))}%`
@@ -105,13 +107,13 @@ export async function NewSection({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCardV2
           title={t('fresh.opsToday')}
-          value={historyRes.ok ? todayOps.toLocaleString(locale) : '—'}
+          value={pulseRes.ok ? todayOps.toLocaleString(locale) : '—'}
           trend={
             opsTrendPct
               ? { direction: opsTrend, label: t('money.vsYesterday', { percent: opsTrendPct }) }
               : undefined
           }
-          sparkline={hist.slice(-7).map(ops)}
+          sparkline={(pulseRes.data?.operations_by_day ?? []).map((d) => d.operations)}
           accentColor="#f59e0b"
           hint={t('fresh.opsTodayHint')}
         />

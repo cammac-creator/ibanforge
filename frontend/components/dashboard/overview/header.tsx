@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { LiveHealthStrip } from '../live-health-strip';
 import type { Fetched } from './fetching';
-import type { StatsResponse } from './types';
+import type { LastWrite } from './types';
 
 /**
  * The one line above the five sections.
@@ -41,7 +41,7 @@ export async function HealthStrip({
   statsPromise,
   compact = false,
 }: {
-  statsPromise: Promise<Fetched<StatsResponse>>;
+  statsPromise: Promise<Fetched<LastWrite>>;
   compact?: boolean;
 }) {
   const statsRes = await statsPromise;
@@ -59,7 +59,7 @@ export async function HealthStrip({
 export async function ApiDownBanner({
   statsPromise,
 }: {
-  statsPromise: Promise<Fetched<StatsResponse>>;
+  statsPromise: Promise<Fetched<LastWrite>>;
 }) {
   const statsRes = await statsPromise;
   if (statsRes.ok) return null;

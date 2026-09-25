@@ -879,43 +879,10 @@ export interface TrafficTrendDay {
 }
 
 /**
- * Daily traffic split by caller nature — the shape of the door, day by day.
- *
- * One grouped query, not one per day: the window reaches 90 days and this
- * feeds a dashboard panel.
- *
- * The natures come out of a single CASE with a terminal ELSE rather than six
- * independent predicates, so the partition is exhaustive by construction. Six
- * separate SUM(...) conditions would let a future client_kind fall through
- * every branch and quietly break the sum == total invariant that makes the
- * table readable.
- *
- * `internal` uses is_internal_email(), the same rule as the funnel and the
- * weekly digest, exposed to SQLite as a function — see weekly-facts.ts: an
- * IN-list carries one bound parameter per internal key and blows past SQLite's
- * parameter ceiling exactly when a burst of automated signups makes the view
- * most worth reading.
+ * La requête de la tendance, sur une fenêtre [début, fin) de dates UTC.
+ * Mot pour mot celle d'avant le 25.09.2026, seule sa borne a changé.
  */
-export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
-  const db = getStatsDB();
-  registerInternalEmailFn(db);
-  // Clamped here too, not only in the route: this is also called directly.
-  // Math.trunc(NaN) stays NaN, which would sail through Math.max/min into the
-  // SQL window '-NaN days' and silently return nothing.
-  // 180 and not 90: the overview compares each window with the one before
-  // it, and its 90-day window needs the 90 days before. The request log
-  // keeps twelve months, so the rows exist; the scan is bounded either way.
-  const requested = Math.trunc(days);
-  const span = Number.isFinite(requested) ? Math.max(1, Math.min(180, requested)) : 30;
-
-  // `created_at >= date('now', ...)` and not datetime(): the bound must land on
-  // a calendar boundary, because the rows are grouped by calendar date. With a
-  // rolling instant, a 30-day period grows a 31st, partial column — the same
-  // off-by-one getStatsHistory carries a comment about, invisible until the
-  // database has rows on every date of the window.
-  const rows = db
-    .prepare(
-      `WITH classified AS (
+const TRAFFIC_TREND_SQL = `WITH classified AS (
          SELECT
            date(created_at) AS d,
            status,
@@ -937,7 +904,7 @@ export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
              ELSE 'anonymous_api'
            END AS nature
          FROM request_log
-         WHERE created_at >= date('now', ?)
+         WHERE created_at >= ? AND created_at < ?
        )
        SELECT d AS date,
               COUNT(*) AS total,
@@ -953,14 +920,112 @@ export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
               COUNT(DISTINCT ip_hash) AS distinct_ips
          FROM classified
         GROUP BY d
-        ORDER BY d ASC`,
-    )
-    // N days means N calendar dates, today included — hence N-1 days back.
-    .all(`-${span - 1} days`) as TrafficTrendDay[];
+        ORDER BY d ASC`;
 
-  // A day with no traffic is absent rather than zero-filled, like
-  // getStatsHistory: this table is driven by the data, not by a calendar
-  // spine, and its consumer knows it.
+/**
+ * L'empreinte de la liste des clés internes : la seule chose, hors des lignes du
+ * jour, dont dépend le classement d'une journée (« internal » contre
+ * « with_key »). Un jour rangé sous une autre empreinte se recalcule.
+ */
+function internalKeysSignature(db: Database.Database): string {
+  const prefixes = (
+    db
+      .prepare('SELECT key_prefix FROM api_keys WHERE is_internal_email(email) ORDER BY key_prefix')
+      .all() as Array<{ key_prefix: string }>
+  ).map((r) => r.key_prefix);
+  return createHash('sha256').update(prefixes.join('\n')).digest('hex').slice(0, 16);
+}
+
+/** Les dates UTC de [début, fin), une par jour. */
+function daysBetween(start: string, end: string): string[] {
+  const out: string[] = [];
+  for (let d = new Date(`${start}T00:00:00Z`); ; d.setUTCDate(d.getUTCDate() + 1)) {
+    const day = d.toISOString().slice(0, 10);
+    if (day >= end) return out;
+    out.push(day);
+  }
+}
+
+/**
+ * Daily traffic split by caller nature — the shape of the door, day by day.
+ *
+ * One grouped query, not one per day: the window reaches 90 days and this
+ * feeds a dashboard panel.
+ *
+ * The natures come out of a single CASE with a terminal ELSE rather than six
+ * independent predicates, so the partition is exhaustive by construction. Six
+ * separate SUM(...) conditions would let a future client_kind fall through
+ * every branch and quietly break the sum == total invariant that makes the
+ * table readable.
+ *
+ * `internal` uses is_internal_email(), the same rule as the funnel and the
+ * weekly digest, exposed to SQLite as a function — see weekly-facts.ts: an
+ * IN-list carries one bound parameter per internal key and blows past SQLite's
+ * parameter ceiling exactly when a burst of automated signups makes the view
+ * most worth reading.
+ */
+export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
+  const db = getStatsDB();
+  registerInternalEmailFn(db);
+  const requested = Math.trunc(days);
+  const span = Number.isFinite(requested) ? Math.max(1, Math.min(180, requested)) : 30;
+
+  /*
+   * Jours clos calculés une fois (25.09.2026). La requête classe et dédoublonne
+   * chaque ligne de `request_log` de la fenêtre : environ 900 ms sur 180 jours,
+   * à chaque ouverture de la vue « growth », et SQLite étant synchrone, autant de
+   * temps pendant lequel l'API ne répond à personne. Un jour clos ne change plus :
+   * il se calcule une fois et se range dans `traffic_trend_days` (une ligne vide
+   * pour un jour sans trafic, pour ne pas le redemander), et seul le jour en cours
+   * se lit en direct. Seule dérive connue : la purge DPA 4.7, qui efface
+   * `key_prefix` sur de vieilles lignes, ne reclasse pas un jour déjà rangé.
+   */
+  const { start, today } = db
+    .prepare("SELECT date('now', ?) AS start, date('now') AS today")
+    .get(`-${span - 1} days`) as { start: string; today: string };
+  const signature = internalKeysSignature(db);
+  const closed = daysBetween(start, today);
+  const stored = new Map(
+    (
+      db
+        .prepare(
+          'SELECT day, row FROM traffic_trend_days WHERE day >= ? AND day < ? AND internal_sig = ?',
+        )
+        .all(start, today, signature) as Array<{ day: string; row: string | null }>
+    ).map((r) => [r.day, r.row]),
+  );
+  const missing = closed.filter((d) => !stored.has(d));
+  if (missing.length > 0) {
+    // Une seule requête, du premier jour manquant à hier : après le premier
+    // remplissage, il n'en manque plus qu'un par jour.
+    const computed = new Map(
+      (db.prepare(TRAFFIC_TREND_SQL).all(missing[0], today) as TrafficTrendDay[]).map((r) => [
+        r.date,
+        r,
+      ]),
+    );
+    const upsert = db.prepare(
+      `INSERT INTO traffic_trend_days (day, internal_sig, row, computed_at)
+       VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(day) DO UPDATE SET internal_sig = excluded.internal_sig,
+         row = excluded.row, computed_at = excluded.computed_at`,
+    );
+    db.transaction(() => {
+      for (const day of daysBetween(missing[0], today)) {
+        const row = computed.get(day);
+        const json = row ? JSON.stringify(row) : null;
+        upsert.run(day, signature, json);
+        stored.set(day, json);
+      }
+    })();
+  }
+
+  const rows: TrafficTrendDay[] = [];
+  for (const day of closed) {
+    const json = stored.get(day);
+    if (json) rows.push(JSON.parse(json) as TrafficTrendDay);
+  }
+  rows.push(...(db.prepare(TRAFFIC_TREND_SQL).all(today, '9999-12-31') as TrafficTrendDay[]));
   return rows;
 }
 
@@ -1182,6 +1247,72 @@ export function getStats(): StatsOverview {
       'ATTEMPTED, NOT COLLECTED — total_revenue_usdc is a misnomer kept for contract stability: it and total_revenue_attempted_usdc are the SAME number, the SUM of revenue_usdc in daily_stats. A row is written when a call PASSED the payment middleware verify step; nothing here observes the chain, so a settle that failed AFTER verify still counts and can only inflate this figure — it structurally over-counts and never under-counts. Do not read it as earnings. The authoritative settled USDC is /admin/revenue (Bearer STATS_TOKEN), which reads Base mainnet Transfer events to the seller wallet. Scope: x402 pay-per-call AND prepaid credit packs bought with USDC (operation_type credits_purchase, added 2026-08-20 — before that date pack sales are missing from this sum entirely). Card purchases are NOT here: Stripe money never touches the wallet and is not USDC. Historical drift observed: ~0.226 USDC counted as attempted between 2026-04-08 and 2026-04-17 with no matching on-chain Transfer — likely facilitator settlement failures during the early x402 rollout; total_revenue_usdc_clean excludes that window.',
     top_countries: topCountries,
     last_7_days: last7,
+  };
+}
+
+/**
+ * Le pouls du service : le collecteur écrit-il, et combien d'opérations
+ * aujourd'hui et hier (jours UTC).
+ *
+ * Mesuré le 25.09.2026 : la vue « growth » du tableau de bord lisait `/stats`
+ * (environ 700 ms, des regroupements sur tout l'historique de `request_log`)
+ * pour n'en garder que `last_write_at`, et `/stats/history?period=30` (environ
+ * 600 ms) pour deux nombres. Mêmes définitions, lues sur des index : quelques
+ * millisecondes.
+ */
+export interface StatsPulse {
+  /** Comme `getStats().last_write_at` : le témoin d'un collecteur vivant. */
+  last_write_at: string | null;
+  requests_today: number;
+  total_requests: number;
+  /**
+   * Opérations du jour UTC, comme une ligne de `getStatsHistory` :
+   * iban_validate + iban_batch + bic_lookup, non refusées, clés internes exclues.
+   */
+  operations_today: number;
+  operations_yesterday: number;
+  /** Les sept derniers jours UTC, du plus ancien à aujourd'hui, jours vides compris. */
+  operations_by_day: Array<{ date: string; operations: number }>;
+}
+
+export function getStatsPulse(): StatsPulse {
+  const db = getStatsDB();
+  registerInternalEmailFn(db);
+  const total = db.prepare('SELECT COUNT(*) as total FROM request_log').get() as { total: number };
+  const today = db
+    .prepare(
+      "SELECT COUNT(*) as total FROM request_log WHERE created_at >= datetime('now', 'start of day')",
+    )
+    .get() as { total: number };
+  const last = db.prepare('SELECT MAX(created_at) as last FROM request_log').get() as {
+    last: string | null;
+  };
+  const ops = db
+    .prepare(
+      `SELECT date(created_at) AS date,
+         SUM(CASE WHEN operation_type IN ('iban_validate', 'iban_batch', 'bic_lookup') THEN 1 ELSE 0 END) AS n
+       FROM operations
+       WHERE created_at >= date('now', '-6 days')
+         AND reject_reason IS NULL
+         ${EXTERNAL_ONLY_SQL}
+       GROUP BY date(created_at)`,
+    )
+    .all() as Array<{ date: string; n: number }>;
+  const byDate = new Map(ops.map((r) => [r.date, r.n]));
+  const week = (
+    db
+      .prepare(
+        "SELECT date('now', '-' || value || ' days') AS date FROM json_each('[6,5,4,3,2,1,0]')",
+      )
+      .all() as Array<{ date: string }>
+  ).map((r) => ({ date: r.date, operations: byDate.get(r.date) ?? 0 }));
+  return {
+    last_write_at: last.last,
+    requests_today: today.total,
+    total_requests: total.total,
+    operations_today: week[6].operations,
+    operations_yesterday: week[5].operations,
+    operations_by_day: week,
   };
 }
 
