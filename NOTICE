@@ -55,6 +55,12 @@ The full Apache License 2.0 text is available at:
 Data Files and Their Sources
 ================================================================================
 
+The MIT License in LICENSE covers the source code of this repository and its
+documentation. It does not cover the data files listed below, nor any other
+file of this repository that reproduces records from the sources below, such
+as exported API responses and test fixtures. Those records remain subject to
+their publishers' terms, described in this section.
+
 This section lists the third-party sources that have records in the data
 files of this repository, and the terms each publisher attaches to them. It
 describes the files as they stand in this revision. Row counts were read on
@@ -70,7 +76,7 @@ Files concerned:
     exported for the website; they repeat records from the sources below)
   src/db/bic_data.json (composite map from national bank codes to BICs)
   src/db/nl-psp.json
-  src/lib/fi-register.ts
+  src/lib/fi-register.ts, for its list of bank codes
   scripts/data/eu-emi-register-2026-05-22.json
   scripts/data/iban-registry-2026-05-22.json
   test fixtures and sample API responses elsewhere (see group C)
@@ -338,13 +344,11 @@ data. They remain subject to their publishers' terms. They are not covered by
 the MIT License in LICENSE, and this repository grants no right to reuse
 them. They are being moved out of the public repository: from every file
 listed for them below, and from test fixtures and sample API responses
-elsewhere in the repository, for example scripts/seed-national.test.ts (a
-copy of the San Marino page, with addresses and telephone numbers),
-mcp/fixtures/api-answers.json and sdks/fixtures/quickstart-api.json (EPC
-"sepa" data), the sample response for DE89370400440532013000 in
-frontend/content/{en,fr,de}/docs/onboarding.mdx (an EPC "sepa" block), and
-the FI, LU and PL examples of frontend/data/countries.json (resolved by
-keys listed below).
+elsewhere in the repository, for example mcp/fixtures/api-answers.json and
+sdks/fixtures/quickstart-api.json (EPC "sepa" data), the sample response for
+DE89370400440532013000 in frontend/content/{en,fr,de}/docs/onboarding.mdx (an
+EPC "sepa" block), and the FI, LU and PL examples of
+frontend/data/countries.json (resolved by keys listed below).
 
 EBA CLEARING, STEP2 SCT reachable PSPs list
   Where: data/bic.sqlite, table bic_entries, source 'eba_step2' (189 rows).
