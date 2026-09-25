@@ -350,10 +350,27 @@ export interface RegisterInstitution {
 }
 
 import type { NextStep } from './lib/next-steps.js';
+import type { BankCodeHolder, Checks } from './lib/checks.js';
+
+/**
+ * Whether the EPC scheme registers list the resolved BANK (never the country).
+ * See `sepa.bank_reachability`.
+ */
+export type SepaBankReachability = 'listed' | 'not_listed' | 'no_bank' | 'bank_code_not_allocated';
 
 export interface IBANValidationResult {
   iban: string;
   valid: boolean;
+  /**
+   * Who holds the bank code: `confirmed` (a register names the holder),
+   * `inferred` (a source that does not settle it names one), `not_allocated`
+   * (the national register says nobody holds it) or `unknown`. Present only on
+   * a valid IBAN whose bank code was checked. `valid` stays true in all four.
+   * See lib/checks.ts.
+   */
+  bank_code_holder?: BankCodeHolder;
+  /** One short status per check, including those IBANforge never makes. See lib/checks.ts. */
+  checks?: Checks;
   country?: {
     code: string;
     name: string;
@@ -556,6 +573,22 @@ export interface IBANValidationResult {
     vop_participant?: boolean | null;
     /** Where `schemes` comes from: the EPC registers (bank grain) or the country default. */
     basis?: 'country_default' | 'epc_register';
+    /**
+     * Whether the EPC scheme registers list the resolved BANK, never borrowed
+     * from the country: `listed`, `not_listed` (absence from the register is not
+     * exclusion from the scheme), `no_bank` (no institution resolved),
+     * `bank_code_not_allocated`, or null when the registers are not loaded on
+     * this deployment (not consulted). Absent outside SEPA.
+     */
+    bank_reachability?: SepaBankReachability | null;
+    /** The bank's own schemes from the EPC registers when `listed`; [] for an unallocated code; null otherwise. */
+    bank_schemes?: Array<'SCT' | 'SDD' | 'SCT_INST'> | null;
+    /**
+     * The bank's status in the EPC VoP register: `active` (same as
+     * `vop_participant: true`), `pending`, `inactive`, `not_listed`; null when
+     * no bank resolved or the register is not loaded. Absent outside SEPA.
+     */
+    vop_register_status?: 'active' | 'pending' | 'inactive' | 'not_listed' | null;
   };
   issuer?: {
     /**
@@ -951,6 +984,16 @@ export interface SanctionsCheck {
    * `sanctions_lists_unavailable` le dit, et le score ne descend pas sous 50.
    */
   bank_screened: boolean;
+  /**
+   * Whether the payee's BANK is on a sanctions list: `bank_sanctioned` when a
+   * bank was screened against every list this service names, null otherwise
+   * (no bank screened, or nothing matched while a named list is not loaded).
+   * Added 25/09/2026 beside `bank_sanctioned`, which answers false without a
+   * screen.
+   */
+  institution_listed?: boolean | null;
+  /** Always false: the payee (the account holder) is never screened. */
+  payee_screened?: false;
 }
 
 export interface ReachabilityCheck {
@@ -967,6 +1010,8 @@ export interface ReachabilityCheck {
    * vrai, et la réponse est celle d'une base complète.
    */
   screened: boolean;
+  /** At least one of the three schemes; null when the registers were not consulted. */
+  listed_in_epc_registers?: boolean | null;
 }
 
 export interface VopCheck {
@@ -979,6 +1024,8 @@ export interface VopCheck {
    * un pays hors de la zone SEPA, où le pays répond.
    */
   screened: boolean;
+  /** The VoP register status under its own name (`not_found` → `not_listed`); null when not consulted. */
+  register_status?: 'active' | 'pending' | 'inactive' | 'not_listed' | null;
 }
 
 /**

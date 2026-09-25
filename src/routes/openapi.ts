@@ -2,7 +2,15 @@ import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
 import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA, POSTAL_ADDRESS_SCHEMA } from '../lib/bank-code-schema.js';
-import { BIC_SOURCE_AS_OF_NOTE, LISTED_IN_CURRENT_SOURCE_NOTE } from '../lib/field-notes.js';
+import {
+  BANK_CODE_HOLDER_NOTE,
+  BANK_REACHABILITY_NOTE,
+  BIC_SOURCE_AS_OF_NOTE,
+  CHECKS_NOTE,
+  LISTED_IN_CURRENT_SOURCE_NOTE,
+  VOP_REGISTER_STATUS_NOTE,
+} from '../lib/field-notes.js';
+import { BANK_CODE_HOLDERS, CHECK_KEYS, CHECK_VALUES } from '../lib/checks.js';
 import { frozenSources } from '../lib/source-vintage.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 // Read from the route rather than retyped: the enum of error types and the
@@ -2671,7 +2679,25 @@ const buildRawSpec = () => ({
             },
           },
           iban: { type: 'string', description: 'The IBAN as provided (normalized)' },
-          valid: { type: 'boolean' },
+          valid: {
+            type: 'boolean',
+            description:
+              'ISO 13616 only: structure and mod-97. It says nothing about the bank: read bank_code_holder and checks before a payment.',
+          },
+          // Ajoutés le 25/09/2026 à côté de `valid`, qui ne change pas.
+          bank_code_holder: {
+            type: 'string',
+            enum: [...BANK_CODE_HOLDERS],
+            description: `${BANK_CODE_HOLDER_NOTE} Present ONLY when valid is true and the bank code was read from the BBAN.`,
+          },
+          checks: {
+            type: 'object',
+            description: CHECKS_NOTE,
+            required: [...CHECK_KEYS],
+            properties: Object.fromEntries(
+              CHECK_KEYS.map((k) => [k, { type: 'string', enum: [...CHECK_VALUES[k]] }]),
+            ),
+          },
           country: {
             type: 'object',
             properties: {
@@ -2841,7 +2867,7 @@ const buildRawSpec = () => ({
               schemes: {
                 type: 'array',
                 description:
-                  'SEPA schemes available for this account. When the resolved institution has rows in the EPC scheme registers these are ITS schemes (basis = "epc_register"); otherwise the country-level schemes (basis = "country_default"). SCT = Credit Transfer, SDD = Direct Debit, SCT_INST = Instant Credit Transfer.',
+                  'SEPA schemes available for this account. When the resolved institution has rows in the EPC scheme registers these are ITS schemes (basis = "epc_register"); otherwise the country-level schemes (basis = "country_default"), even for a bank code nobody holds: for the bank itself, read bank_schemes and bank_reachability. SCT = Credit Transfer, SDD = Direct Debit, SCT_INST = Instant Credit Transfer.',
                 items: {
                   type: 'string',
                   enum: ['SCT', 'SDD', 'SCT_INST'],
@@ -2850,12 +2876,28 @@ const buildRawSpec = () => ({
               vop_required: {
                 type: 'boolean',
                 description:
-                  'Whether Verification of Payee (VoP) is required under EU Instant Payments Regulation for this institution',
+                  "Whether Verification of Payee (VoP) is required under the EU Instant Payments Regulation in this COUNTRY. It says nothing about the bank: read vop_register_status for the payee's bank.",
               },
               vop_participant: {
                 type: ['boolean', 'null'],
                 description:
-                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved or when the VoP register is not loaded on this deployment (not consulted, which is not a "no"); a resolved bank outside the SEPA area is answered false from the country either way. Listing means the bank answers VoP requests — it does not run the name check for you.',
+                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved or when the VoP register is not loaded on this deployment (not consulted, which is not a "no"); a resolved bank outside the SEPA area is answered false from the country either way. Listing means the bank answers VoP requests — it does not run the name check for you. The same as vop_register_status === "active"; vop_register_status also says pending.',
+              },
+              bank_reachability: {
+                type: ['string', 'null'],
+                enum: ['listed', 'not_listed', 'no_bank', 'bank_code_not_allocated', null],
+                description: BANK_REACHABILITY_NOTE,
+              },
+              bank_schemes: {
+                type: ['array', 'null'],
+                items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] },
+                description:
+                  "The bank's own schemes from the EPC registers when bank_reachability is listed; [] for a bank code nobody holds; null otherwise. Absent outside SEPA.",
+              },
+              vop_register_status: {
+                type: ['string', 'null'],
+                enum: ['active', 'pending', 'inactive', 'not_listed', null],
+                description: `${VOP_REGISTER_STATUS_NOTE} Absent outside SEPA.`,
               },
               basis: {
                 type: 'string',
@@ -2965,7 +3007,7 @@ const buildRawSpec = () => ({
               vop_coverage: {
                 type: 'boolean',
                 description:
-                  'Whether the institution is covered by Verification of Payee, reducing payee impersonation risk',
+                  "The COUNTRY's Verification of Payee obligation, identical to sepa.vop_required. It says nothing about the institution: for the payee's bank, read sepa.vop_register_status.",
               },
             },
             required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
@@ -3345,9 +3387,26 @@ const buildRawSpec = () => ({
             type: 'object',
             properties: {
               country_sanctioned: { type: 'boolean' },
-              bank_sanctioned: { type: 'boolean' },
+              bank_sanctioned: {
+                type: 'boolean',
+                description: 'False also when no bank was screened (bank_screened false): read institution_listed, which is null then.',
+              },
               matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC'] },
               fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'suspended', 'non_member'] },
+              bank_screened: {
+                type: 'boolean',
+                description: 'Whether a bank was screened at all. When false, bank_sanctioned and matched_lists carry no information.',
+              },
+              institution_listed: {
+                type: ['boolean', 'null'],
+                description:
+                  "Whether the payee's BANK is on a sanctions list: bank_sanctioned when a bank was screened against every list this service names; null when no bank was screened, or when nothing matched while one of those lists is not loaded on this deployment. Never false without a screen.",
+              },
+              payee_screened: {
+                type: 'boolean',
+                enum: [false],
+                description: 'Always false: the payee (the account holder) is never screened here, only the bank and the country.',
+              },
             },
           },
           reachability: {
@@ -3361,6 +3420,11 @@ const buildRawSpec = () => ({
                 description:
                   'False when the EPC scheme registers were not consulted: no bank resolved, or the registers are not loaded on this deployment. The three booleans above are then defaults, not findings, and carry no risk weight (flag sepa_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the registers: screened stays true.',
               },
+              listed_in_epc_registers: {
+                type: ['boolean', 'null'],
+                description:
+                  'Whether at least one of the three scheme registers lists the bank; null when the registers were not consulted (screened false). The same answer as sepa.bank_reachability on the validation.',
+              },
             },
           },
           vop: {
@@ -3372,6 +3436,11 @@ const buildRawSpec = () => ({
                 type: 'boolean',
                 description:
                   'False when the EPC VoP register was not consulted: no bank resolved, or the register is not loaded on this deployment. `status: not_found` then describes the absence of a query, not of a registration (flag vop_register_unavailable when a bank was resolved). Outside the SEPA area the country answers instead of the register: screened stays true.',
+              },
+              register_status: {
+                type: ['string', 'null'],
+                enum: ['active', 'pending', 'inactive', 'not_listed', null],
+                description: `status under its own name (not_found becomes not_listed); null when the register was not consulted (screened false). ${VOP_REGISTER_STATUS_NOTE}`,
               },
             },
           },
@@ -3388,7 +3457,7 @@ const buildRawSpec = () => ({
             description:
               'unassessable means the IBAN itself failed validation, so no screening was possible. It is the absence of a verdict, never a favourable one: do not treat it as low.',
           },
-          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. Some flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable, vop_register_unavailable, and sanctions_list_unavailable_<list> (one per named sanctions list not loaded on this deployment, for example sanctions_list_unavailable_un: the bank was screened against the other lists, so bank_sanctioned false says nothing about that one). sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
+          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. bank_code_inferred carries no weight: the bank named is our inference from a source that does not settle the bank code (bank_code_holder inferred), and no score moves for it. Some flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable, vop_register_unavailable, and sanctions_list_unavailable_<list> (one per named sanctions list not loaded on this deployment, for example sanctions_list_unavailable_un: the bank was screened against the other lists, so bank_sanctioned false says nothing about that one). sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
         },
       },
       ChClearingResult: {

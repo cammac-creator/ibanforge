@@ -367,11 +367,100 @@ describe('the contract covers the routes and fields the server actually serves',
       'psd_registration',
       'official_identity',
       'modulus_check',
+      'bank_code_holder',
+      'checks',
     ]) {
       const description = properties[field]?.description ?? '';
       expect(description, `${field} does not say when it appears`).toMatch(
         /present|absent|only|when/i,
       );
     }
+  });
+});
+
+/**
+ * Les champs de vérité du 25/09/2026 : servis par l'API, donc déclarés au
+ * contrat, avec les valeurs possibles lues dans le code qui les produit.
+ */
+describe('the truth fields are in the contract', () => {
+  type Schema = {
+    properties?: Record<string, Schema>;
+    enum?: unknown[];
+    items?: Schema;
+    description?: string;
+  };
+  const schemas = (buildSpec() as unknown as { components: { schemas: Record<string, Schema> } })
+    .components.schemas;
+
+  it('declares bank_code_holder and every checks key with its possible values', () => {
+    const v = schemas.IBANValidationResult.properties!;
+    expect(v.bank_code_holder.enum).toEqual(['confirmed', 'inferred', 'not_allocated', 'unknown']);
+    const checks = v.checks.properties!;
+    expect(Object.keys(checks)).toEqual([
+      'iban_structure',
+      'iban_checksum',
+      'bank_code',
+      'bic',
+      'sepa_reachability',
+      'national_check_digits',
+      'account_exists',
+      'payee_name',
+      'institution_sanctions',
+      'country_sanctions',
+      'payee_sanctions',
+    ]);
+    for (const never of ['account_exists', 'payee_name', 'payee_sanctions']) {
+      expect(checks[never].enum, never).toEqual(['not_checked']);
+    }
+    expect(v.checks.description).toMatch(/payee_name: never checked/);
+  });
+
+  it('declares the bank grain of sepa and the trace of the bic block', () => {
+    const v = schemas.IBANValidationResult.properties!;
+    const sepa = v.sepa.properties!;
+    expect(sepa.bank_reachability.enum).toEqual([
+      'listed',
+      'not_listed',
+      'no_bank',
+      'bank_code_not_allocated',
+      null,
+    ]);
+    expect(sepa).toHaveProperty('bank_schemes');
+    expect(sepa).toHaveProperty('vop_register_status');
+    expect(v.bic.properties!).toHaveProperty('listed_in_current_source');
+    // Les descriptions qui disaient trop : l'obligation VoP est celle du pays.
+    expect(sepa.vop_required.description).toMatch(/COUNTRY/);
+    expect(v.risk_indicators.properties!.vop_coverage.description).toMatch(/vop_register_status/);
+  });
+
+  it('declares frozen_bic_sources on HealthResponse, beside bic_sources', () => {
+    const h = schemas.HealthResponse.properties!;
+    expect(h).toHaveProperty('bic_sources');
+    expect(Object.keys(h.frozen_bic_sources.items!.properties!)).toEqual([
+      'source',
+      'source_as_of',
+      'rows',
+      'bic8',
+      'rows_without_current_trace',
+      'bic8_without_current_trace',
+      'complete',
+    ]);
+  });
+
+  it('declares source_name, source_as_of and listed_in_current_source on BICLookupResult', () => {
+    const b = schemas.BICLookupResult.properties!;
+    for (const k of ['source_name', 'source_as_of', 'listed_in_current_source']) {
+      expect(b, k).toHaveProperty(k);
+    }
+    expect(b.found.description).toMatch(/names an institution/);
+  });
+
+  it('declares the honest compliance names', () => {
+    const c = schemas.ComplianceResult.properties!;
+    expect(c.sanctions.properties!).toHaveProperty('institution_listed');
+    expect(c.sanctions.properties!.payee_screened.enum).toEqual([false]);
+    expect(c.reachability.properties!).toHaveProperty('listed_in_epc_registers');
+    expect(c.vop.properties!).toHaveProperty('register_status');
+    expect(c.flags.description).toMatch(/bank_code_inferred carries no weight/);
   });
 });

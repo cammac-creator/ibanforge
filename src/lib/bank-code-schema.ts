@@ -29,7 +29,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
       type: 'string',
       enum: ['verified', 'not_in_register', 'unavailable'],
       description:
-        'verified: resolves to an institution we can name. not_in_register: it does not, in reference data we do hold for this country — actionable as non-existence ONLY when authoritative is true. unavailable: we hold no reference data for this country, so no opinion.',
+        'verified: resolves to an institution we can name. It means RESOLVED, not confirmed: whether a source settles it is bank_code_holder (confirmed or inferred). not_in_register: it does not, in reference data we do hold for this country — actionable as non-existence ONLY when authoritative is true. unavailable: we hold no reference data for this country, so no opinion.',
     },
     reason: {
       type: 'string',
@@ -55,7 +55,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
       type: ['string', 'null'],
       enum: ['register', 'prefix', null],
       description:
-        'register: exact key in the reference set, deterministic. prefix: the bic8 LIKE fallback, reachable only in the 30 countries whose bank code may open on a letter (a BIC8 always does) — check candidates.',
+        'register: an exact key in the reference set consulted, which may be our composite map rather than a national register (see register and authoritative), deterministic. prefix: the bic8 LIKE fallback, reachable only in the 30 countries whose bank code may open on a letter (a BIC8 always does) — check candidates.',
     },
     register: {
       type: ['string', 'null'],
@@ -125,7 +125,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     as_of: {
       type: 'string',
       description:
-        'Year-month the consulted reference set was last refreshed. Where the register publishes an effective date of its own it is that date, not ours: the Bulgarian BAE register is republished on request rather than on a calendar, and the Slovak prevodník and the Czech číselník are published as numbered editions carrying their own effective date, so dating any of them with our monthly refresh would misreport how current it is. The Czech National Bank publishes each edition ahead of its effective date: as_of is the effective date of the edition in force, never that of an edition announced but not yet in force.',
+        'Year-month the consulted reference set was last refreshed. For the composite map it is the refresh month of the BIC directory behind it, not the date of the pairing: the map itself is a static file. Where the register publishes an effective date of its own it is that date, not ours: the Bulgarian BAE register is republished on request rather than on a calendar, and the Slovak prevodník and the Czech číselník are published as numbered editions carrying their own effective date, so dating any of them with our monthly refresh would misreport how current it is. The Czech National Bank publishes each edition ahead of its effective date: as_of is the effective date of the edition in force, never that of an edition announced but not yet in force.',
     },
   },
   required: ['value', 'status', 'match', 'register', 'authoritative', 'as_of'],

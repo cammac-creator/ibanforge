@@ -251,3 +251,60 @@ describe('an unreadable reference set is reported, never ruled on', () => {
     expect(r.bank_code_check!.authoritative).toBe(true);
   });
 });
+
+/**
+ * `bank_code_holder` (25/09/2026) sort de la même branche que le verdict : une
+ * panne de notre côté ne se lit jamais comme un détenteur confirmé ni comme un
+ * code non attribué, et un pays dont le registre manque et qui retombe sur la
+ * carte ne nomme qu'un détenteur déduit.
+ */
+describe('bank_code_holder follows the verdict, failures included', () => {
+  const scenarios: Array<
+    [label: string, flag: keyof typeof failing, iban: string, holder: string]
+  > = [
+    ['the bank-code lookup raises', 'lookup', FABRICATED_FR, 'unknown'],
+    ['the reference-data fallback raises', 'referenceData', FABRICATED_FR, 'unknown'],
+    [
+      'the German register is missing on a composite miss',
+      'deRegister',
+      'DE44999999990532013000',
+      'unknown',
+    ],
+    ['no reference data for the country', 'noData', FABRICATED_FR, 'unknown'],
+    ['the Bulgarian register read breaks', 'bgRegister', 'BG80BNBG96611020345678', 'unknown'],
+    ['the Slovak register read breaks', 'nationalRegister', 'SK9811000000000000000001', 'unknown'],
+    [
+      'the Slovak register is missing, fabricated code',
+      'nationalRegisterMissing',
+      'SK4499990000000000000001',
+      'unknown',
+    ],
+    // Le registre manque, la carte nomme une banque : déduit, jamais confirmé.
+    [
+      'the Slovak register is missing, the map names the bank',
+      'nationalRegisterMissing',
+      'SK9811000000000000000001',
+      'inferred',
+    ],
+    // Le registre allemand a répondu malgré la panne de la carte : confirmé.
+    [
+      'the composite lookup fails beside a register that answered',
+      'lookup',
+      'DE89370400440532013000',
+      'confirmed',
+    ],
+  ];
+
+  for (const [label, flag, iban, holder] of scenarios) {
+    it(`${label}: ${holder}`, () => {
+      (failing as Record<string, boolean>)[flag] = true;
+      const r = check(iban);
+      expect(r.bank_code_holder).toBe(holder);
+      // Jamais « non attribué » sur une panne, et checks.bank_code le suit.
+      expect(r.bank_code_holder).not.toBe('not_allocated');
+      expect(r.checks?.bank_code).toBe(
+        holder === 'confirmed' ? 'pass' : holder === 'inferred' ? 'inferred' : 'unknown',
+      );
+    });
+  }
+});

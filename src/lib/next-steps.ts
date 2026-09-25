@@ -160,7 +160,12 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
       do:
         'Screen the institution against sanctions, FATF status and VoP reachability before the transfer. ' +
         'That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.',
-      because: 'bank_code_check.status is verified, so there is an institution to screen',
+      // La prose suit le détenteur (25/09/2026) ; `code` ne change pas, et c'est
+      // sur lui que la documentation dit de brancher.
+      because:
+        result.bank_code_holder === 'inferred'
+          ? 'bank_code_check.status is verified from a source that does not settle it (bank_code_holder is inferred): the institution named is our inference, screen it and confirm the payee by name'
+          : 'bank_code_check.status is verified, so there is an institution to screen',
       action: COMPLIANCE_ACTION,
     });
   }

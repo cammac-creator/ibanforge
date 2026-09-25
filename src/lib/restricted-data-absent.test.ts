@@ -92,11 +92,23 @@ describe('control: the invented datasets answer when they are loaded', () => {
       sct: true,
       sdd: true,
       screened: true,
+      // Nom honnête ajouté le 25/09/2026.
+      listed_in_epc_registers: true,
     });
-    expect(r.compliance.vop).toEqual({ participant: true, status: 'active', screened: true });
+    expect(r.compliance.vop).toEqual({
+      participant: true,
+      status: 'active',
+      screened: true,
+      register_status: 'active',
+    });
     expect(r.compliance.risk_score).toBe(0);
     expect(r.sepa?.vop_participant).toBe(true);
     expect((r.sepa as { basis?: string }).basis).toBe('epc_register');
+    // Le grain de la banque, sur les mêmes registres inventés.
+    expect(r.sepa?.bank_reachability).toBe('listed');
+    expect(r.sepa?.bank_schemes).toEqual(['SCT', 'SDD', 'SCT_INST']);
+    expect(r.sepa?.vop_register_status).toBe('active');
+    expect(r.checks?.sepa_reachability).toBe('pass');
   });
 
   it('serves the bank s own schemes, the same on validate and on compliance', () => {
@@ -107,8 +119,31 @@ describe('control: the invented datasets answer when they are loaded', () => {
     const validated = validate(mods(), iban);
     expect((validated.sepa as { basis?: string }).basis).toBe('epc_register');
     expect(validated.sepa?.schemes).toEqual(['SCT', 'SCT_INST']);
+    expect(validated.sepa?.bank_schemes).toEqual(['SCT', 'SCT_INST']);
     const reach = mods().response.buildComplianceResponse(iban).compliance.reachability;
-    expect(reach).toEqual({ sepa_instant: true, sct: true, sdd: false, screened: true });
+    expect(reach).toEqual({
+      sepa_instant: true,
+      sct: true,
+      sdd: false,
+      screened: true,
+      listed_in_epc_registers: true,
+    });
+  });
+
+  it('answers not_listed for a bank the EPC registers do not list, and keeps the country schemes', () => {
+    // Une banque publique de la carte composite, absente des registres EPC
+    // inventés : le registre a été lu, elle n'y figure pas. Une absence du
+    // registre n'est pas une exclusion du schéma : `schemes` garde le pays.
+    const r = validate(mods(), 'NL19BICK0123456789');
+    expect(r.bic?.code).toBeTruthy();
+    expect(r.sepa?.bank_reachability).toBe('not_listed');
+    expect(r.sepa?.bank_schemes).toBeNull();
+    expect(r.sepa?.vop_register_status).toBe('not_listed');
+    expect((r.sepa as { basis?: string }).basis).toBe('country_default');
+    expect(r.checks?.sepa_reachability).toBe('unknown');
+    const c = mods().response.buildComplianceResponse('NL19BICK0123456789');
+    expect(c.compliance.reachability.listed_in_epc_registers).toBe(false);
+    expect(c.compliance.vop.register_status).toBe('not_listed');
   });
 
   it('carries a pending VoP registration as pending, and not as a participant', () => {
@@ -118,6 +153,7 @@ describe('control: the invented datasets answer when they are loaded', () => {
       screened: true,
     });
     expect(validate(mods(), FX.BE.iban(FX.BE.bank.code)).sepa?.vop_participant).toBe(false);
+    expect(validate(mods(), FX.BE.iban(FX.BE.bank.code)).sepa?.vop_register_status).toBe('pending');
   });
 
   it('still scores a bank the loaded registers do not list', () => {
@@ -175,6 +211,17 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
     expect(r.compliance.flags).not.toContain('no_sepa_instant');
     expect(r.compliance.flags).not.toContain('no_vop');
     expect(r.compliance.flags).not.toContain('no_bank_resolved');
+    // Les champs ajoutés le 25/09/2026 disent la même chose : non consulté,
+    // jamais « absent du registre ».
+    expect(r.compliance.reachability.listed_in_epc_registers).toBeNull();
+    expect(r.compliance.vop.register_status).toBeNull();
+    expect(r.sepa?.bank_reachability).toBeNull();
+    expect(r.sepa?.bank_schemes).toBeNull();
+    expect(r.sepa?.vop_register_status).toBeNull();
+    expect(r.checks?.sepa_reachability).toBe('unknown');
+    // Les registres EPC manquent : l'index des traces courantes est incomplet,
+    // et un BIC qu'il ne trouve pas répond « non consulté », jamais `false`.
+    expect(r.bic?.listed_in_current_source).not.toBe(false);
   });
 
   it('keeps a Belarusian bank critical: outside the SEPA area the country answers', () => {
@@ -205,9 +252,18 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
       sct: false,
       sdd: false,
       screened: true,
+      listed_in_epc_registers: false,
     });
-    expect(r.compliance.vop).toEqual({ participant: false, status: 'not_found', screened: true });
+    expect(r.compliance.vop).toEqual({
+      participant: false,
+      status: 'not_found',
+      screened: true,
+      register_status: 'not_listed',
+    });
     expect(r.compliance.flags).toEqual(expect.arrayContaining(['no_sepa_instant', 'no_vop']));
+    // Hors SEPA, aucun champ du grain de la banque.
+    expect(r.sepa).not.toHaveProperty('bank_reachability');
+    expect(r.checks?.sepa_reachability).toBe('not_applicable');
     // Et la validation dit la même chose que la conformité : `false`, pas null.
     expect(validate(mods(), 'UA213223130000026007233566001').sepa?.vop_participant).toBe(false);
   });
@@ -325,6 +381,14 @@ describe.each(['DELETE FROM sanctioned_entities', 'DROP TABLE sanctioned_entitie
       });
     });
 
+    it('answers institution_listed null, never false, and says the institution was not screened', () => {
+      const r = mods().response.buildComplianceResponse(DE_ORDINARY);
+      expect(r.compliance.sanctions.bank_sanctioned).toBe(false);
+      expect(r.compliance.sanctions.institution_listed).toBeNull();
+      expect(r.compliance.sanctions.payee_screened).toBe(false);
+      expect(r.checks?.institution_sanctions).toBe('unknown');
+    });
+
     it('holds an ordinary bank at elevated, saying why, never at low', () => {
       const r = mods().response.buildComplianceResponse(DE_ORDINARY);
       expect(r.compliance.sanctions.bank_screened).toBe(false);
@@ -377,6 +441,24 @@ describe.each(['DELETE FROM sanctioned_entities', 'DROP TABLE sanctioned_entitie
 );
 
 /**
+ * La liste de l'ONU seule manque (sa surcouche privée n'est pas là) : une banque
+ * est bien criblée contre les autres listes, mais aucune correspondance n'y vaut
+ * plus « non ». `institution_listed` le dit (25/09/2026).
+ */
+describe('the UN list alone is missing', () => {
+  const mods = useDatabase({ missing: { datasets: ['UN'], as: 'absent' } });
+
+  it('answers institution_listed null for a bank no loaded list names', () => {
+    const r = mods().response.buildComplianceResponse(DE_ORDINARY);
+    expect(r.compliance.sanctions.bank_screened).toBe(true);
+    expect(r.compliance.flags).toContain('sanctions_list_unavailable_un');
+    expect(r.compliance.sanctions.bank_sanctioned).toBe(false);
+    expect(r.compliance.sanctions.institution_listed).toBeNull();
+    expect(r.checks?.institution_sanctions).toBe('unknown');
+  });
+});
+
+/**
  * Une table VoP présente mais illisible (schéma inattendu, une ligne) : la
  * sonde passe, la requête lève. La validation, le lot et l'outil MCP
  * validate_iban tombaient en 500 ; la validation répond désormais « non
@@ -400,6 +482,13 @@ describe('a VoP table present but unreadable', () => {
   it('answers compliance_data_unavailable on the paid screen', () => {
     const r = mods().response.buildComplianceResponse(DE_ORDINARY);
     expect(r.compliance.flags[0]).toBe('compliance_data_unavailable');
+    // Les noms honnêtes arrivent aussi sur ce repli (25/09/2026).
+    expect(r.compliance.vop.register_status).toBeNull();
+    expect(r.compliance.sanctions.payee_screened).toBe(false);
+    expect(r.compliance.sanctions).toHaveProperty('institution_listed');
+    expect(r.compliance.reachability).toHaveProperty('listed_in_epc_registers');
+    // L'axe pays a pu ne pas être lu : pas de « pass » sur un défaut.
+    expect(r.checks?.country_sanctions).toBe('unknown');
     // Le registre des schémas se lit (la banque n'y figure pas : constat) ; le
     // registre VoP ne se lit pas : ni `no_vop`, ni « non chargé ».
     expect(r.compliance.flags).toContain('no_sepa_instant');

@@ -12,8 +12,8 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 
-const { dbDir, previousPath } = await vi.hoisted(async () => {
-  const { copyFileSync, mkdtempSync } = await import('node:fs');
+const { dbDir, previousPath, blankedAbi } = await vi.hoisted(async () => {
+  const { copyFileSync, mkdtempSync, readFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join, resolve, dirname } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
@@ -33,10 +33,29 @@ const { dbDir, previousPath } = await vi.hoisted(async () => {
   // Une ligne qui ne nomme personne, et une ligne dont la ville est vide.
   insert.run('XMPLITN1', 'XMPLITN1XXX', '', 'Roma');
   insert.run('XMPLITC1', 'XMPLITC1XXX', 'BANCA DI ESEMPIO SPA', '');
+  // Le chemin de la validation : une clé italienne de la carte composite, sans
+  // ville dans la carte, dont la ligne de description est PUBLIQUE (copie
+  // figée du répertoire SWIFT). Dans cette copie seulement, sa ville est vidée,
+  // comme la liste STEP2 laisse les siennes.
+  const map = JSON.parse(readFileSync(resolve(here, '../db/bic_data.json'), 'utf8')) as Record<
+    string,
+    { bic: string; city?: string }
+  >;
+  const byBic11 = db.prepare(
+    "SELECT bic11 FROM bic_entries WHERE bic11 = ? AND source = 'swiftcodes' AND city != ''",
+  );
+  let abi: string | null = null;
+  for (const [key, entry] of Object.entries(map)) {
+    if (!/^IT:\d{5}$/.test(key) || entry.city || entry.bic.length !== 11) continue;
+    if (!byBic11.get(entry.bic)) continue;
+    db.prepare("UPDATE bic_entries SET city = '' WHERE bic11 = ?").run(entry.bic);
+    abi = key.slice(3);
+    break;
+  }
   db.close();
   const previous = process.env.BIC_DB_PATH;
   process.env.BIC_DB_PATH = path;
-  return { dbDir: dir, previousPath: previous };
+  return { dbDir: dir, previousPath: previous, blankedAbi: abi };
 });
 
 const { bicLookup } = await import('./bic-lookup.js');
@@ -44,6 +63,9 @@ const { closeAll } = await import('../lib/db.js');
 const { lookup } = await import('../lib/bic-lookup.js');
 const { frozenSources, sourceVintage } = await import('../lib/source-vintage.js');
 const { getBicDB } = await import('../lib/db.js');
+const { validateIBAN } = await import('../lib/iban.js');
+const { enrichResult } = await import('../lib/enrich.js');
+const { ibanFor } = await import('../test-support/restricted-fixtures.js');
 
 afterAll(async () => {
   closeAll();
@@ -134,5 +156,20 @@ describe('GET /v1/bic/:code — complete or not found', () => {
       expect(r.country.code).toBe(code.slice(4, 6));
       expect(r.country.name.length).toBeGreaterThan(2);
     }
+  });
+});
+
+describe('the validation bic block never serves an empty string', () => {
+  it('a curated-map answer whose directory row leaves the town blank is inferred and serves city null', () => {
+    expect(blankedAbi, 'no Italian curated key with a public description row').not.toBeNull();
+    const r = validateIBAN(ibanFor('IT', `X${blankedAbi}11101000000123456`));
+    enrichResult(r);
+    expect(r.valid).toBe(true);
+    expect(r.bic?.basis).toBe('curated_map');
+    expect(r.bic?.city).toBeNull();
+    expect(r.bank_code_holder).toBe('inferred');
+    expect(r.checks?.bic).toBe('inferred');
+    // La ligne vient de la copie figée : datée.
+    expect(r.bic?.source_as_of).toBe(frozenSources()[0]!.as_of);
   });
 });

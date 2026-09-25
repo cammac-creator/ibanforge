@@ -25,7 +25,11 @@ import {
 import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { bicDirectorySentence, serverDescription } from '../lib/positioning.js';
-import { bicSourceNote } from '../lib/field-notes.js';
+import {
+  COMPLIANCE_HONEST_NAMES,
+  VALIDATE_TRUTH_RETURNS,
+  bicSourceNote,
+} from '../lib/field-notes.js';
 import { authoritativeVerdictSentence, nationalRegisterBicCodes } from '../lib/register-lists.js';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
@@ -163,7 +167,7 @@ When NOT to use: for multiple IBANs, use batch_validate_iban instead (one call f
 
 Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, checks the bank code against the national register where one is read, resolves the BIC from a local directory and names the source of that answer, and classifies the issuer type. ${bicDirectorySentence({ withCount: true })} Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
 
-Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, lei, lei_status, address: { type: 'registered', street, post_code, region, city, country, romanized, romanization, source, language, as_of } | null } | null, sepa: { member, schemes, vop_required }, issuer: { type, name, classification: curated | register | default }, psd_registration: { registered, entity_type, name, country, competent_authority, source, as_of }, risk_indicators: { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope: 'country', vop_coverage }, bank_code_check { value, status: verified | not_in_register | unavailable, reason? (present whenever status is not verified: not_allocated | absent_from_reference_data | no_reference_data_for_country | register_names_no_holder | national_register_unavailable | lookup_failed — the last two describe IBANforge and never the beneficiary, and neither may be escalated into a refusal), match: register | prefix | null, register, authoritative, candidates?, retired?, superseded_by?, as_of }, modulus_check { checked, passed, source, table_fetched_on } (GB only), official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of, authoritative } (present only on a match), next_steps [{ code, do, because, action? }], clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }
+Returns: ${VALIDATE_TRUTH_RETURNS} { valid, bank_code_holder, checks, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, lei, lei_status, address: { type: 'registered', street, post_code, region, city, country, romanized, romanization, source, language, as_of } | null } | null, sepa: { member, schemes, vop_required, bank_reachability, bank_schemes, vop_register_status }, issuer: { type, name, classification: curated | register | default }, psd_registration: { registered, entity_type, name, country, competent_authority, source, as_of }, risk_indicators: { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope: 'country', vop_coverage }, bank_code_check { value, status: verified | not_in_register | unavailable, reason? (present whenever status is not verified: not_allocated | absent_from_reference_data | no_reference_data_for_country | register_names_no_holder | national_register_unavailable | lookup_failed — the last two describe IBANforge and never the beneficiary, and neither may be escalated into a refusal), match: register | prefix | null, register, authoritative, candidates?, retired?, superseded_by?, as_of }, modulus_check { checked, passed, source, table_fetched_on } (GB only), official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of, authoritative } (present only on a match), next_steps [{ code, do, because, action? }], clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }. bic also carries listed_in_current_source (does this BIC8 still appear in a list refreshed this cycle; null when a list could not be read) and, when its directory row comes from a frozen copy, source_as_of. sepa.bank_reachability, bank_schemes and vop_register_status describe the bank itself in the EPC registers, never the country; absent outside SEPA.
 
 psd_registration is the EBA's PSD2 register naming the holder of the bank code as an authorised payment or e-money institution, with its competent authority, the attribution the EBA licence requires, and the date of the golden copy. It is served ONLY for countries where that register's national reference code was measured to be the code an IBAN actually carries — today Spain alone: the file holds no BIC and no LEI, and in its other 29 countries it files authorisations under company or tax numbers from unrelated registers. Absent on a miss, never negative — the register's own disclaimer states that an omitted institution is authorised all the same. When it is present it can also identify issuer.type, which is what classification: register means.
 
@@ -222,7 +226,7 @@ Behavior: this tool is read-only with no side effects. It validates each IBAN in
 
 Input constraints: minimum 1 IBAN, maximum 100 IBANs per call. Exceeding 100 returns a validation error.
 
-Returns: Array of objects, each identical in structure to the validate_iban response: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps }
+Returns: Array of objects, each identical in structure to the validate_iban response: { valid, bank_code_holder, checks, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps }
 
 Example: input ['DE89370400440532013000', 'INVALID123'] → [{ valid: true, ... }, { valid: false, error: 'Invalid checksum' }]
 
@@ -393,7 +397,7 @@ Risk score weights, by the flag each one raises: sanctioned_country +50, sanctio
 
 Risk levels: low (0-19), medium (20-39), elevated (40-59), high (60-79), critical (80-100).
 
-Returns: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status }, reachability: { sepa_instant, sct, sdd }, vop: { participant, status }, risk_score, risk_level, flags } }
+Returns: { valid, bank_code_holder, checks, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status, bank_screened, institution_listed, payee_screened }, reachability: { sepa_instant, sct, sdd, screened, listed_in_epc_registers }, vop: { participant, status, screened, register_status }, risk_score, risk_level, flags } }. checks here also fills institution_sanctions and country_sanctions. ${COMPLIANCE_HONEST_NAMES}
 
 Example: input 'DE89370400440532013000' → { valid: true, compliance: { sanctions: { country_sanctioned: false, fatf_status: 'member' }, risk_score: 5, risk_level: 'low', flags: [] } }
 
