@@ -1,5 +1,4 @@
 import type { Context, MiddlewareHandler } from 'hono';
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
@@ -24,10 +23,25 @@ import { getIbansArray } from '../lib/request-helpers.js';
 // Read-only reuse: the SAME digest the purchase route derives a recovery ref
 // from, so an unconfirmed settlement can hand back the recovery URL its own
 // 502 would otherwise discard. Imported, never redefined: two hashes that had
-// to agree would eventually stop agreeing.
-import { settlementRef } from '../routes/credits-buy.js';
+// to agree would eventually stop agreeing. Since lot B1 (25.09.2026) both the
+// digest and the request-scoped slot live in src/lib/settlement-slot.ts, so
+// the purchase route can read the slot without importing this file.
+import {
+  newSettlementSlot,
+  runInSlot,
+  settlementRef,
+  currentSettlementSlot,
+  type SettleObservation,
+  type SettlementSlot,
+} from '../lib/settlement-slot.js';
 import { opsFail } from '../lib/ops-alert.js';
 import { settleAndMaybeClaim } from '../lib/key-settlements.js';
+import {
+  confirmPurchase,
+  failPurchase,
+  notePurchaseSettlement,
+  type ConfirmOutcome,
+} from '../lib/key-purchases.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -1144,19 +1158,9 @@ export function withFacilitatorTimeout<T>(
 //
 // The flag has to be request-scoped: the facilitator client is memoized for the
 // whole process, so a module-level boolean would leak one request's timeout
-// onto another's response under concurrency.
-export interface SettlementSlot {
-  unconfirmed: FacilitatorTimeoutError | null;
-  /**
-   * Le prix que le paywall a COTÉ pour cette requête, en dollars. null =
-   * inconnu, et le journal n'écrit alors RIEN : la référence de paiement est
-   * unique, donc une ligne à zéro consommerait la référence à jamais et
-   * rendrait silencieusement inopérante toute écriture correcte ultérieure.
-   * Une ligne absente se rattrape, une ligne fausse non.
-   */
-  quotedUsd: number | null;
-}
-const settlementSlot = new AsyncLocalStorage<SettlementSlot>();
+// onto another's response under concurrency. The slot itself (and its
+// AsyncLocalStorage) lives in src/lib/settlement-slot.ts since lot B1.
+export type { SettlementSlot };
 
 /**
  * Test seam for the one link that has no other observable effect: the
@@ -1167,9 +1171,36 @@ const settlementSlot = new AsyncLocalStorage<SettlementSlot>();
  * green. Exercised by x402.test.ts against a fake facilitator.
  */
 export function runInSettlementSlot<T>(fn: () => T): { slot: SettlementSlot; out: T } {
-  const slot: SettlementSlot = { unconfirmed: null, quotedUsd: null };
-  const out = settlementSlot.run(slot, fn);
+  const slot = newSettlementSlot();
+  const out = runInSlot(slot, fn);
   return { slot, out };
+}
+
+/**
+ * Why a settlement's outcome is unknown, as the 502 names it (security review
+ * of PR 259, D1): our own deadline, a transaction the facilitator broadcast but
+ * could not see confirmed, or any other answer that is not a refusal (a network
+ * error, a gateway page, a 5xx, an unreadable body).
+ */
+export type UnconfirmedCause = 'timeout' | 'settlement_pending' | 'facilitator_error';
+
+/**
+ * A settlement whose outcome is unknown for a reason other than our own
+ * deadline. The money may have moved: this is never read as a refusal.
+ */
+export class SettlementUnknownError extends Error {
+  readonly reason: string;
+  constructor(reason: string) {
+    super(`Facilitator settle outcome unknown: ${reason}`);
+    this.name = 'SettlementUnknownError';
+    this.reason = reason;
+  }
+}
+
+function unconfirmedCause(err: Error, settle?: SettleObservation | null): UnconfirmedCause {
+  if (err instanceof FacilitatorTimeoutError) return 'timeout';
+  const reason = err instanceof SettlementUnknownError ? err.reason : (settle?.reason ?? null);
+  return reason === 'settlement_pending' ? 'settlement_pending' : 'facilitator_error';
 }
 
 /**
@@ -1181,9 +1212,17 @@ export function runInSettlementSlot<T>(fn: () => T): { slot: SettlementSlot; out
  * exactly what we do not know.
  */
 export function unconfirmedSettlementBody(
-  err: FacilitatorTimeoutError,
+  err: Error,
   ms: number,
   recoveryRef?: string | null,
+  /**
+   * Ce que la route de vente a ouvert pendant ce règlement (lot B1) : une
+   * recharge de la clé présentée n'a rien à récupérer, et une clé neuve ne
+   * s'active qu'une fois le règlement confirmé.
+   */
+  purchase?: 'topup' | 'mint' | null,
+  /** Ce que le facilitateur a répondu, quand il a répondu (relecture de la PR 259). */
+  settle?: SettleObservation | null,
 ): {
   error: string;
   message: string;
@@ -1192,14 +1231,26 @@ export function unconfirmedSettlementBody(
     paid: null;
     authoritative: false;
     timeout_ms: number;
+    cause: UnconfirmedCause;
+    transaction?: string;
   };
   recovery_url?: string;
   recovery_note?: string;
 } {
+  const cause = unconfirmedCause(err, settle);
+  const what =
+    cause === 'timeout'
+      ? `The payment facilitator did not confirm settlement within ${ms}ms. `
+      : cause === 'settlement_pending'
+        ? 'The payment facilitator broadcast the transfer but could not see it confirmed yet. '
+        : 'The payment facilitator answered with an error, not with a refusal: the settlement could not be confirmed. ';
+  // The buyer's own transaction, when the facilitator returned one: the one
+  // thing that lets them check the chain themselves instead of paying twice.
+  const transaction = settle?.transaction ?? null;
   return {
     error: 'settlement_unconfirmed',
     message:
-      `The payment facilitator did not confirm settlement within ${ms}ms. ` +
+      what +
       'Your payment may or may not have settled on-chain: this is not a refusal, and it is not a receipt. ' +
       'Do NOT re-send the payment before checking whether the transfer reached the payTo address, ' +
       'or you may be charged twice.',
@@ -1210,23 +1261,155 @@ export function unconfirmedSettlementBody(
       paid: null,
       // Nothing on-chain was observed to back this answer.
       authoritative: false,
+      // The deadline we apply to a settle call, whatever the cause.
       timeout_ms: ms,
+      cause,
+      ...(transaction ? { transaction } : {}),
     },
-    // 🚨 On a route that SELLS a pack, the handler already minted the key before
-    // settle ran, and its response carried the one-time recovery URL. This 502
-    // replaces that response, so without the line below we would destroy the
-    // very recovery path the buyer needs precisely in the case where they may
-    // have paid. The ref is the same digest credits-buy.ts computes, so the
-    // recovery endpoint answers to it unchanged.
-    ...(recoveryRef
+    // 🚨 On a route that SELLS a pack, the handler already opened the purchase
+    // before settle ran, and its response carried the one-time recovery URL.
+    // This 502 replaces that response, so without the lines below we would
+    // destroy the very recovery path the buyer needs precisely in the case where
+    // they may have paid. The ref is the same digest credits-buy.ts computes, so
+    // the recovery endpoint answers to it unchanged.
+    //
+    // Depuis le lot B1 (25.09.2026) rien n'est crédité ni activé avant un
+    // règlement CONFIRMÉ : la note le dit, au lieu de promettre une clé qui
+    // n'existe pas encore. Le rapprochement se fait à la main, sur l'achat en
+    // attente, une fois la chaîne relue.
+    ...(purchase === 'topup'
       ? {
-          recovery_url: `https://api.ibanforge.com/v1/credits/recover/${recoveryRef}`,
           recovery_note:
-            'If your payment did settle, the key it bought already exists. Fetch it ONCE at recovery_url. ' +
-            'Buying again would pay a second time for a pack you may already own.',
+            'If your payment did settle, the credits are added to the key you presented once we have ' +
+            'confirmed the settlement on-chain; unconfirmed settlements are reconciled by hand. ' +
+            'Do NOT pay again: write to support@ibanforge.com with the transaction hash if the balance ' +
+            'has not moved within a day.',
         }
-      : {}),
+      : recoveryRef
+        ? {
+            recovery_url: `https://api.ibanforge.com/v1/credits/recover/${recoveryRef}`,
+            recovery_note:
+              'If your payment did settle, the key it bought exists and becomes active, and recoverable ONCE at ' +
+              'recovery_url, as soon as we have confirmed the settlement on-chain (unconfirmed settlements are ' +
+              'reconciled by hand). Buying again would pay a second time for a pack you may already own.',
+          }
+        : {}),
   };
+}
+
+// ─── What the facilitator answered to a settle call (security review, D1) ────
+
+/**
+ * Motifs qui ne sont JAMAIS un refus terminal : un règlement en attente (la
+ * transaction est diffusée) et toute erreur « inattendue » du facilitateur
+ * (elle a pu partir). Un motif absent n'en est pas un non plus.
+ */
+function isUnknownReason(reason: string | null): boolean {
+  return !reason || reason === 'settlement_pending' || /^unexpected/i.test(reason);
+}
+
+const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+/** Un nonce EIP-3009 (bytes32) ou Permit2 (entier) ; jamais une signature, bien plus longue. */
+const AUTH_NONCE = /^(0x[0-9a-fA-F]{1,64}|[0-9]{1,78})$/;
+const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
+
+function textOf(value: unknown, pattern: RegExp): string | null {
+  return typeof value === 'string' && pattern.test(value) ? value : null;
+}
+
+/**
+ * Le payeur et le nonce de l'autorisation signée, lus dans ce que le SDK remet
+ * au facilitateur (D10). Jamais la signature : seuls ces deux champs sont lus,
+ * et chacun doit avoir sa forme.
+ */
+function authorizationFacts(args: unknown[]): { payer: string | null; nonce: string | null } {
+  const payload = (args[0] as { payload?: Record<string, unknown> } | undefined)?.payload;
+  const auth = (payload?.authorization ?? payload?.permit2Authorization) as
+    { from?: unknown; nonce?: unknown } | undefined;
+  return { payer: textOf(auth?.from, EVM_ADDRESS), nonce: textOf(auth?.nonce, AUTH_NONCE) };
+}
+
+/** Une réponse du facilitateur (statut 2xx, ou un refus porté par une `SettleError` 4xx). */
+function classifySettleAnswer(answer: unknown): Omit<SettleObservation, 'nonce'> {
+  const r = (answer ?? {}) as {
+    success?: unknown;
+    errorReason?: unknown;
+    transaction?: unknown;
+    payer?: unknown;
+  };
+  const transaction = textOf(r.transaction, TX_HASH);
+  const payer = textOf(r.payer, EVM_ADDRESS);
+  if (r.success === true) return { state: 'settled', reason: null, transaction, payer };
+  const reason = typeof r.errorReason === 'string' ? r.errorReason.slice(0, 120) : null;
+  // 🚨 Un échec qui porte un hash de transaction a été DIFFUSÉ : annulé sur la
+  // chaîne ou non conforme, son sort se relit à la main, jamais en refus.
+  const broadcast = typeof r.transaction === 'string' && r.transaction.length > 0;
+  const refused = r.success === false && !isUnknownReason(reason) && !broadcast;
+  return { state: refused ? 'refused' : 'unknown', reason, transaction, payer };
+}
+
+/** Une erreur levée par l'appel de règlement : un refus 4xx, ou une issue inconnue. */
+function classifySettleError(err: unknown): Omit<SettleObservation, 'nonce'> {
+  if (err instanceof FacilitatorTimeoutError) {
+    return { state: 'unknown', reason: 'timeout', transaction: null, payer: null };
+  }
+  const settleError = err as {
+    name?: unknown;
+    statusCode?: unknown;
+    errorReason?: unknown;
+    transaction?: unknown;
+    payer?: unknown;
+  };
+  if (
+    err instanceof Error &&
+    settleError.name === 'SettleError' &&
+    typeof settleError.statusCode === 'number'
+  ) {
+    const answer = classifySettleAnswer({
+      success: false,
+      errorReason: settleError.errorReason,
+      transaction: settleError.transaction,
+      payer: settleError.payer,
+    });
+    // Un 5xx n'est jamais un refus, même avec `success: false` : la
+    // transaction a pu être diffusée.
+    return settleError.statusCode >= 500 ? { ...answer, state: 'unknown' } : answer;
+  }
+  // Erreur réseau, page d'une passerelle, 5xx sans `success`, réponse illisible.
+  const name = err instanceof Error ? err.name : 'error';
+  return {
+    state: 'unknown',
+    reason: `facilitator_${name}`.slice(0, 120),
+    transaction: null,
+    payer: null,
+  };
+}
+
+/**
+ * Inscrit un appel de règlement au créneau. La relance que le SDK fait d'un
+ * règlement en attente rappelle `settle` : un succès efface l'inconnu, mais un
+ * refus après une attente reste inconnu (la transaction du premier appel a été
+ * diffusée).
+ */
+function observeSettle(slot: SettlementSlot, next: SettleObservation, thrown: unknown): void {
+  const prev = slot.settle;
+  const keepsUnknown = next.state === 'refused' && prev?.state === 'unknown';
+  const state = next.state === 'settled' ? 'settled' : keepsUnknown ? 'unknown' : next.state;
+  slot.settle = {
+    state,
+    reason: keepsUnknown ? prev.reason : (next.reason ?? prev?.reason ?? null),
+    transaction: next.transaction ?? prev?.transaction ?? null,
+    payer: next.payer ?? prev?.payer ?? null,
+    nonce: next.nonce ?? prev?.nonce ?? null,
+  };
+  if (state === 'settled') {
+    slot.unconfirmed = null;
+  } else if (state === 'unknown') {
+    slot.unconfirmed =
+      thrown instanceof FacilitatorTimeoutError
+        ? thrown
+        : (slot.unconfirmed ?? new SettlementUnknownError(slot.settle.reason ?? 'unknown'));
+  }
 }
 
 /** The same client, with each of its three calls bounded in time. */
@@ -1240,16 +1423,37 @@ export function boundFacilitator<
   // reaches for that we did not wrap (createAuthHeaders, toJsonSafe, url…).
   return Object.assign(client, {
     verify: (...args: unknown[]) => withFacilitatorTimeout(verify.apply(client, args), 'verify'),
-    settle: (...args: unknown[]) =>
-      withFacilitatorTimeout(settle.apply(client, args), 'settle').catch((err: unknown) => {
-        // Record, then rethrow untouched: the SDK still runs its own failure
-        // path, we only remember WHY it is about to answer 402.
-        if (err instanceof FacilitatorTimeoutError) {
-          const slot = settlementSlot.getStore();
-          if (slot) slot.unconfirmed = err;
-        }
-        throw err;
-      }),
+    settle: (...args: unknown[]) => {
+      // Record, then hand back untouched: the SDK still runs its own paths, we
+      // only remember what the facilitator ANSWERED (security review of PR 259,
+      // D1): a terminal refusal, a settlement, or an outcome we do not know.
+      const slot = currentSettlementSlot();
+      const facts = authorizationFacts(args);
+      return withFacilitatorTimeout(settle.apply(client, args), 'settle').then(
+        (answer: unknown) => {
+          if (slot) {
+            const seen = classifySettleAnswer(answer);
+            observeSettle(
+              slot,
+              { ...seen, payer: seen.payer ?? facts.payer, nonce: facts.nonce },
+              null,
+            );
+          }
+          return answer;
+        },
+        (err: unknown) => {
+          if (slot) {
+            const seen = classifySettleError(err);
+            observeSettle(
+              slot,
+              { ...seen, payer: seen.payer ?? facts.payer, nonce: facts.nonce },
+              err,
+            );
+          }
+          throw err;
+        },
+      );
+    },
     getSupported: (...args: unknown[]) =>
       withFacilitatorTimeout(getSupported.apply(client, args), 'supported'),
   });
@@ -1296,11 +1500,22 @@ export function boundFacilitator<
  * payé en 500.
  */
 function recordSettlementForKey(c: Context<HonoEnv>, slot: SettlementSlot, outcome: unknown): void {
-  const settled = outcome === undefined;
+  // 🚨 `outcome === undefined` dit que le paiement a été VÉRIFIÉ, pas qu'il a
+  // été RÉGLÉ (constat C2 du lot B1, 25.09.2026) : le SDK rend `undefined` sur
+  // toute la branche vérifiée, règlement refusé compris, et remplace alors la
+  // réponse par un 402. Sur cette branche, `c.res` est TOUJOURS posé par le
+  // SDK : lire son statut y est sûr, et c'est la seconde moitié de la preuve.
+  // La mise en garde de la condition 2 ci-dessus vise l'autre branche, où
+  // `outcome !== undefined`, et cette conjonction ne l'atteint jamais.
+  const settled = outcome === undefined && c.res.status < 400;
   const keyHash = c.get('apiKeyHash');
   const ref = settlementRef(c);
   const usd = slot.quotedUsd;
   const route = `${c.req.method} ${new URL(c.req.url).pathname}`;
+  // Une route de VENTE n'écrit jamais ce journal (lot B1) : un pack acheté en
+  // présentant sa clé la recharge, il ne lui accorde plus « 200 une fois ».
+  // Un achat ne crée jamais de gratuit ; son argent vit au registre des achats.
+  if (isSellingRoute(c.req.method, new URL(c.req.url).pathname)) return;
   if (!settled || !keyHash || !ref) return;
   if (typeof usd !== 'number' || usd <= 0) {
     // Réglé, mais la cotation manque : on le DIT, on n'invente pas un montant.
@@ -1329,6 +1544,156 @@ function recordSettlementForKey(c: Context<HonoEnv>, slot: SettlementSlot, outco
       3,
     );
   }
+}
+
+/**
+ * Le second temps d'un achat en USDC (lot B1, 25.09.2026 ; relecture de
+ * sécurité de la PR 259, D1, D7, D9, D10).
+ *
+ * Le SDK exécute la route AVANT de régler : la route de vente n'ouvre donc
+ * qu'une ligne `pending` (recharge de la clé présentée, ou clé neuve inactive)
+ * et l'inscrit dans le créneau. Ici, on lit ce que le facilitateur a RÉPONDU
+ * (`slot.settle`, posé par l'enrobage) :
+ *
+ *  - RÉGLÉ, et la réponse reste un succès : `confirmPurchase` crédite la clé ou
+ *    active la clé neuve, une fois ;
+ *  - REFUS TERMINAL (motif explicite, rien de diffusé), ou AUCUN règlement tenté
+ *    parce que la route a répondu une erreur (le SDK ne règle jamais une
+ *    réponse d'erreur) : `failPurchase`, rien n'est crédité, la clé neuve reste
+ *    morte et sans clé brute ;
+ *  - tout le reste est INCONNU : la ligne reste en attente, la clé brute est
+ *    gardée, une alerte part, et la réponse devient un 502 qui dit de ne pas
+ *    payer deux fois. Un humain rapproche à la main (routes d'administration)
+ *    après avoir relu la chaîne.
+ *
+ * Sous try/catch : une écriture de confirmation qui échoue ne transforme pas
+ * un 201 payé en 500 ; la ligne reste en attente et l'alerte le dit.
+ */
+function settlePendingPurchase(c: Context<HonoEnv>, slot: SettlementSlot, outcome: unknown): void {
+  const purchase = slot.purchase;
+  if (!purchase) return;
+  notePurchaseFacts(slot);
+  const verdict = purchaseVerdict(c, slot, outcome);
+  try {
+    if (verdict === 'confirm') {
+      const result = confirmPurchase(purchase.id);
+      try {
+        slot.afterConfirm?.(result);
+      } catch (err) {
+        console.error(
+          '[x402] after-confirm hook failed:',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+      if (result.status === 'minted_fallback') {
+        void opsFail(
+          `x402:topup-fallback:${purchase.id}`,
+          `A USDC pack settled for a key that is no longer active: a new key was minted instead (purchase ${purchase.id}), recoverable once by its settlement reference.`,
+          1,
+        );
+        // D7 : la réponse de la route disait « crédité sur la clé présentée ».
+        if (purchase.kind === 'topup') answerFallback(c, result, purchase.paymentRef);
+      }
+      return;
+    }
+    if (verdict === 'fail') {
+      failPurchase(purchase.id);
+      return;
+    }
+  } catch (err) {
+    void opsFail(
+      `x402:purchase-confirm:${purchase.id}`,
+      `A settled USDC pack could not be recorded (purchase ${purchase.id}): it stays pending. ${err instanceof Error ? err.message : String(err)}`,
+      1,
+    );
+    return;
+  }
+  flagUnknownPurchase(c, slot, purchase.id);
+}
+
+/**
+ * Le verdict d'un achat ouvert, lu sur ce que le facilitateur a répondu et non
+ * sur le statut que le SDK a fabriqué : son 402 sert aussi bien un refus qu'une
+ * erreur réseau (D1).
+ */
+function purchaseVerdict(
+  c: Context<HonoEnv>,
+  slot: SettlementSlot,
+  outcome: unknown,
+): 'confirm' | 'fail' | 'unknown' {
+  // La route n'a pu ouvrir l'achat que sur la branche vérifiée, où le SDK rend
+  // `undefined`. Autre chose : on ne sait pas ce qui s'est passé.
+  if (outcome !== undefined) return 'unknown';
+  const seen = slot.settle;
+  // Aucun règlement tenté : la route a répondu une erreur (ou a levé, et Hono
+  // en a fait une), et le SDK ne règle jamais une réponse d'erreur (D9).
+  if (!seen) return c.res.status >= 400 ? 'fail' : 'unknown';
+  if (seen.state === 'settled') return c.res.status < 400 ? 'confirm' : 'unknown';
+  if (seen.state === 'refused') return 'fail';
+  return 'unknown';
+}
+
+/** D10 : de quoi rapprocher à la main, sur la ligne. Jamais la signature. */
+function notePurchaseFacts(slot: SettlementSlot): void {
+  const purchase = slot.purchase;
+  const seen = slot.settle;
+  if (!purchase || !seen) return;
+  try {
+    notePurchaseSettlement(purchase.id, {
+      payer: seen.payer,
+      nonce: seen.nonce,
+      transaction: seen.transaction,
+    });
+  } catch (err) {
+    console.error(
+      '[x402] could not note the settlement facts of a purchase:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/** L'issue est inconnue : la ligne reste en attente, un humain est prévenu, la réponse sera un 502. */
+function flagUnknownPurchase(c: Context<HonoEnv>, slot: SettlementSlot, purchaseId: number): void {
+  slot.unconfirmed ??= new SettlementUnknownError(slot.settle?.reason ?? `status ${c.res.status}`);
+  void opsFail(
+    `x402:purchase-unconfirmed:${purchaseId}`,
+    `A USDC pack settlement has an unknown outcome (purchase ${purchaseId}, status ${c.res.status}, ${slot.settle?.reason ?? 'no settle answer'}): the purchase stays pending until reconciled by hand (POST /v1/admin/purchases/${purchaseId}/confirm or /fail).`,
+    1,
+  );
+}
+
+/**
+ * D7 : la clé présentée n'était plus active au moment de la confirmation, et le
+ * pack a frappé une clé neuve. La réponse de la route disait le contraire ; on
+ * la réécrit, en gardant les en-têtes de règlement du SDK.
+ */
+function answerFallback(
+  c: Context<HonoEnv>,
+  result: Extract<ConfirmOutcome, { status: 'minted_fallback' }>,
+  paymentRef: string,
+): void {
+  const ref = paymentRef.startsWith('x402:') ? paymentRef.slice(5) : paymentRef;
+  const row = result.purchase;
+  const body = {
+    api_key: result.rawKey,
+    same_key: false,
+    recharged: false,
+    key_prefix: result.keyPrefix,
+    credits: row.credits,
+    bundle: row.bundle,
+    price_paid_usdc: row.quoted_amount_usd,
+    balance_endpoint: 'GET /v1/credits/balance',
+    recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}`,
+    recovery_note:
+      'Lost this response? GET the recovery_url once: it works a single time, then the key is gone from our side too (we store only its hash).',
+    note: 'The key you presented was no longer active when this payment settled: the credits are on a NEW key.',
+    message: 'Save this key: it will not be shown again.',
+  };
+  const headers = new Headers(c.res.headers);
+  headers.delete('content-length');
+  headers.set('content-type', 'application/json; charset=UTF-8');
+  c.res = undefined;
+  c.res = new Response(JSON.stringify(body), { status: 201, headers });
 }
 
 // The wallet is NOT baked in here: prices and payTo are resolved per request by
@@ -1467,6 +1832,11 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       return;
     }
 
+    // Le créneau de règlement de cette requête, visible du `catch` ci-dessous :
+    // une erreur qui sort du paywall après l'ouverture d'un achat ne doit pas
+    // laisser une ligne en attente sans que personne le sache (relecture de la
+    // PR 259, D9).
+    let slot: SettlementSlot | null = null;
     try {
       // Memoized: four dynamic imports, the facilitator client and the resource
       // server, built on the first request under /v1/* and reused after that.
@@ -1504,7 +1874,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             // getStore() rend undefined si le prix est évalué HORS du run() :
             // ce n'est pas une erreur, on rend le prix sans rien retenir. Une
             // exception ici tuerait le paywall.
-            const slot = settlementSlot.getStore();
+            const slot = currentSettlementSlot();
             if (slot) {
               const n = Number(String(priced).replace(/^\$/, ''));
               slot.quotedUsd = Number.isFinite(n) && n > 0 ? n : null;
@@ -1555,43 +1925,97 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
         false,
       );
 
-      // Run the paywall inside a request-scoped slot so a settle that timed out
-      // can be told apart from a settle that was refused. Both leave the SDK
-      // answering `402 {}`; only one of them means "we do not know".
-      const slot: SettlementSlot = { unconfirmed: null, quotedUsd: null };
-      const outcome = await settlementSlot.run(slot, () => middleware(c, next));
-      if (!slot.unconfirmed) {
-        recordSettlementForKey(c, slot, outcome);
+      // Run the paywall inside a request-scoped slot so the facilitator's
+      // actual answer can be told apart from the SDK's bare `402 {}`: a refusal,
+      // a settlement, or an outcome we do not know (security review of PR 259,
+      // D1: a network error or a 5xx is never a refusal).
+      const current = newSettlementSlot();
+      slot = current;
+      const outcome = await runInSlot(current, () => middleware(c, next));
+      // L'achat que la route de vente a ouvert (lot B1) : confirmé seulement
+      // sur un règlement CONFIRMÉ, échoué sur un refus terminal ou quand aucun
+      // règlement n'a été tenté, laissé en attente et signalé quand on ne sait
+      // pas.
+      settlePendingPurchase(c, current, outcome);
+      if (!current.unconfirmed) {
+        recordSettlementForKey(c, current, outcome);
         return outcome;
       }
-
-      // Replace the SDK's bare 402. Clearing c.res first is the SDK's own idiom
-      // and it matters: Hono's `res` setter copies headers from the response it
-      // replaces, and the 402 carries none we want to keep.
-      const ms = facilitatorTimeoutMs('settle');
-      console.error(
-        `[x402] Settlement outcome unknown after ${ms}ms. Answering 502, not 402. ` +
-          'The payment may have settled on-chain; it must not be re-requested blindly.',
-        slot.unconfirmed.message,
-      );
-      // Only a SELLING route mints something recoverable. On a per-call paid
-      // route nothing was created, so there is nothing to point the buyer at.
-      const recoveryRef = isSellingRoute(c.req.method, new URL(c.req.url).pathname)
-        ? settlementRef(c)
-        : null;
-      const body = JSON.stringify(unconfirmedSettlementBody(slot.unconfirmed, ms, recoveryRef));
-      c.res = undefined;
-      c.res = new Response(body, {
-        status: 502,
-        headers: { 'content-type': 'application/json; charset=UTF-8' },
-      });
+      answerUnconfirmed(c, current, current.unconfirmed);
       return;
     } catch (err) {
       console.error('[x402] Middleware error:', err);
+      // D9 : une erreur qui sort du paywall après l'ouverture d'un achat. Sans
+      // règlement tenté, rien n'a pu partir : l'achat échoue. Un règlement
+      // tenté dont on ignore l'issue reste en attente, signalé, et la réponse
+      // est le 502 qui dit de ne pas payer deux fois, jamais le 503 qui invite
+      // à réessayer.
+      if (slot) closeThrownPurchase(c, slot);
+      if (slot?.settle && slot.settle.state !== 'refused') {
+        answerUnconfirmed(
+          c,
+          slot,
+          slot.unconfirmed ?? new SettlementUnknownError(slot.settle.reason ?? 'paywall_error'),
+        );
+        return;
+      }
       if (process.env.NODE_ENV === 'production') {
         return c.json({ error: 'Payment system unavailable. Please try again later.' }, 503);
       }
       await next();
     }
   };
+}
+
+/**
+ * D9 : l'achat ouvert par la route quand une erreur sort du paywall. Aucun
+ * règlement tenté, ou un refus terminal : rien n'a pu partir, l'achat échoue.
+ * Sinon l'issue est inconnue : la ligne reste en attente et un humain est
+ * prévenu.
+ */
+function closeThrownPurchase(c: Context<HonoEnv>, slot: SettlementSlot): void {
+  const purchase = slot.purchase;
+  if (!purchase) return;
+  notePurchaseFacts(slot);
+  if (!slot.settle || slot.settle.state === 'refused') {
+    try {
+      failPurchase(purchase.id);
+    } catch (err) {
+      void opsFail(
+        `x402:purchase-unconfirmed:${purchase.id}`,
+        `A USDC pack purchase could not be closed after a paywall error (purchase ${purchase.id}): ${err instanceof Error ? err.message : String(err)}`,
+        1,
+      );
+    }
+    return;
+  }
+  flagUnknownPurchase(c, slot, purchase.id);
+}
+
+/**
+ * Replace the SDK's bare 402 with the 502 of an unknown outcome. Clearing
+ * c.res first is the SDK's own idiom and it matters: Hono's `res` setter copies
+ * headers from the response it replaces, and the 402 carries none we want to
+ * keep.
+ */
+function answerUnconfirmed(c: Context<HonoEnv>, slot: SettlementSlot, err: Error): void {
+  const ms = facilitatorTimeoutMs('settle');
+  console.error(
+    `[x402] Settlement outcome unknown (${slot.settle?.reason ?? err.name}). Answering 502, not 402. ` +
+      'The payment may have settled on-chain; it must not be re-requested blindly.',
+    err.message,
+  );
+  // Only a SELLING route mints something recoverable. On a per-call paid
+  // route nothing was created, so there is nothing to point the buyer at.
+  const recoveryRef = isSellingRoute(c.req.method, new URL(c.req.url).pathname)
+    ? settlementRef(c)
+    : null;
+  const body = JSON.stringify(
+    unconfirmedSettlementBody(err, ms, recoveryRef, slot.purchase?.kind ?? null, slot.settle),
+  );
+  c.res = undefined;
+  c.res = new Response(body, {
+    status: 502,
+    headers: { 'content-type': 'application/json; charset=UTF-8' },
+  });
 }

@@ -226,6 +226,14 @@ export interface SubscriptionKeyRow {
    * montant est celui d'un pack, déjà compté par la lecture des packs.
    */
   credits_total?: number | null;
+  /**
+   * Ce que le registre des achats dit de la session de la clé (lot B1) :
+   * `pack` ou `subscription`, NULL quand il n'en a pas de ligne. Depuis que la
+   * même clé peut être rechargée, une clé Pro porte des crédits ET la session
+   * de son abonnement : c'est la session, pas la présence de crédits, qui dit
+   * à qui appartient ce montant.
+   */
+  session_kind?: string | null;
   stripe_session_id: string | null;
   stripe_subscription_id: string | null;
   amount_paid_minor: number | null;
@@ -348,9 +356,13 @@ export function subscriptionsSold(
     }
     const session = k.stripe_session_id?.trim();
     if (!session || excludedSessions.has(session)) continue;
-    // Jamais deux fois le même argent : un montant porté par une clé à crédits
-    // appartient aux packs, même si la clé portait aussi un abonnement.
-    if ((k.credits_total ?? 0) > 0) continue;
+    // Jamais deux fois le même argent : le montant d'une session de PACK
+    // appartient aux packs. Le registre le dit (lot B1) ; à défaut de ligne, la
+    // règle d'avant (une clé à crédits est un pack). Une clé Pro RECHARGÉE porte
+    // des crédits, mais sa session reste celle de l'abonnement : sans cette
+    // lecture, son premier paiement disparaissait.
+    if (k.session_kind === 'pack') continue;
+    if (k.session_kind == null && (k.credits_total ?? 0) > 0) continue;
     const group = sessions.get(session) ?? [];
     group.push(k);
     sessions.set(session, group);
@@ -419,7 +431,9 @@ export function readSubscriptionRows(db: Db = getStatsDB()): {
   const keys = db
     .prepare(
       `SELECT email, credits_total, stripe_session_id, stripe_subscription_id, amount_paid_minor,
-              amount_paid_currency, issued_by_us, active, created_at
+              amount_paid_currency, issued_by_us, active, created_at,
+              (SELECT kp.kind FROM key_purchases kp
+                WHERE kp.payment_ref = 'stripe:' || api_keys.stripe_session_id) AS session_kind
          FROM api_keys
         WHERE (${SUBSCRIPTION_KEY_SQL})`,
     )

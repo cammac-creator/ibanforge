@@ -251,6 +251,23 @@ const PAID_KEYS = `
 `;
 
 /**
+ * Les lignées devenues payantes par une RECHARGE de leur propre clé, dans la
+ * fenêtre (chantier « clé unique », lot B1, 25.09.2026). Aucune clé payée
+ * distincte n'y est frappée : la « clé payée remise » est la clé elle-même, et
+ * `markLineagePurchase` la relie à sa lignée. Le premier achat d'une lignée se
+ * reconnaît à sa photo (`prev_tier`), prise une fois, à ce premier achat.
+ */
+const FIRST_RECHARGES = `
+  SELECT p.key_hash
+    FROM key_purchases p
+    LEFT JOIN api_keys k ON k.key_hash = p.key_hash
+   WHERE p.outcome = 'credited' AND p.prev_tier IS NOT NULL
+     AND p.created_at >= @from AND p.created_at < @to
+     AND is_internal_email(COALESCE(k.email, '')) = 0
+     AND MAX(p.issued_by_us, COALESCE(k.issued_by_us, 0)) = 0
+`;
+
+/**
  * Les clés payées remises et RELIÉES à une lignée d'essai, dans la fenêtre.
  *
  * La date de référence est celle de la remise, pas celle de la naissance de la
@@ -459,23 +476,25 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
   // sans aucune trace de règlement, qui n'aurait par définition pas de
   // référence à compter. Les règlements x402 à l'appel sont EXCLUS : le contrat
   // en fait une série distincte, et ils ne remettent aucune clé.
+  //
+  // Depuis le lot B1 (25.09.2026), les achats se lisent au REGISTRE : une ligne
+  // par paiement, `payment_ref` unique, packs et abonnements, carte et USDC,
+  // recharges de la même clé comprises (elles ne frappent aucune clé, et le
+  // journal des règlements ne les voit plus). Dénominateur : les achats réglés
+  // ou dont le règlement est encore en attente. Numérateur : ceux dont les
+  // crédits ou l'abonnement sont sur une clé. Une ligne `pending` est donc
+  // exactement l'écart que cet indicateur existe pour montrer.
   const purchaseRefs = db
     .prepare(
-      `SELECT ref, MAX(delivered) AS delivered FROM (
-         SELECT s.payment_ref AS ref,
-                (SELECT COUNT(*) FROM api_keys k
-                  WHERE k.tier = 'paid'
-                    AND (k.x402_payment_ref = s.payment_ref OR k.stripe_session_id = s.payment_ref)
-                ) AS delivered
-           FROM key_settlements s
-          WHERE s.created_at >= @from AND s.created_at < @to
-            AND s.route LIKE '%/v1/credits/buy/%'
-         UNION ALL
-         SELECT COALESCE(k.x402_payment_ref, k.stripe_session_id) AS ref, 1 AS delivered
-           FROM (${PAID_KEYS}) k
-          WHERE COALESCE(k.x402_payment_ref, k.stripe_session_id) IS NOT NULL
-       )
-       GROUP BY ref`,
+      `SELECT p.payment_ref AS ref,
+              CASE WHEN p.outcome IN ('credited', 'minted', 'minted_fallback', 'attached')
+                   THEN 1 ELSE 0 END AS delivered
+         FROM key_purchases p
+         LEFT JOIN api_keys k ON k.key_hash = p.key_hash
+        WHERE p.outcome IN ('credited', 'minted', 'minted_fallback', 'attached', 'pending')
+          AND p.created_at >= @from AND p.created_at < @to
+          AND is_internal_email(COALESCE(k.email, '')) = 0
+          AND MAX(p.issued_by_us, COALESCE(k.issued_by_us, 0)) = 0`,
     )
     .all({ from, to }) as Array<{ ref: string; delivered: number }>;
   const d5 = purchaseRefs.length;
@@ -510,7 +529,13 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
   const unknownContext = count(
     `SELECT COUNT(*) AS n FROM (${COHORT}) c WHERE c.first_success_context = 'unknown'`,
   );
-  const paidDelivered = count(`SELECT COUNT(*) AS n FROM (${PAID_KEYS}) k`);
+  // Les remises payées : les clés payées frappées dans la fenêtre, plus les
+  // lignées devenues payantes par une recharge de leur propre clé (lot B1), que
+  // `markLineagePurchase` relie comme une remise. Sans ce second terme, la
+  // couverture pourrait dépasser 1.
+  const paidDelivered =
+    count(`SELECT COUNT(*) AS n FROM (${PAID_KEYS}) k`) +
+    count(`SELECT COUNT(*) AS n FROM (${FIRST_RECHARGES}) r`);
   const paidLinked = count(`SELECT COUNT(*) AS n FROM (${LINKED}) l`);
 
   // ── Les trois indicateurs, sur un SOUS-ENSEMBLE de la cohorte ───────────

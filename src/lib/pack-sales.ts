@@ -1,10 +1,63 @@
 import { isInternal } from './lifecycle-radar.js';
 import { isInternalEmail } from './internal-accounts.js';
 import type { PackKeyRow } from './business-summary.js';
+import type DatabaseType from 'better-sqlite3';
+import { getStatsDB } from './db.js';
+import { SALE_OUTCOMES_SQL } from './key-purchases.js';
+
+/**
+ * Les lignes de vente de packs, une par ACHAT, lues au registre des achats
+ * (chantier « clé unique », lot B1, 25.09.2026), plus les clés à crédits dont la
+ * lignée n'a aucun achat inscrit (pack offert, clé d'avant toute référence).
+ *
+ * Pourquoi le registre : une recharge de la même clé ne frappe aucune clé, et
+ * ne laissait donc aucune trace sur `api_keys` qu'un lecteur par ligne de clé
+ * aurait pu compter ; une clé gratuite rechargée passait « sans référence », et
+ * une clé tournée recopiait le cumul sans la session. Le registre porte une
+ * ligne par paiement, `payment_ref` unique : une vente est comptée une fois,
+ * datée à son paiement, et une rotation ne double rien.
+ *
+ * La forme rendue est celle que les lecteurs lisaient déjà (`PackKeyRow`), pour
+ * que `summarizePackSales` et `packsSold` gardent leurs règles telles quelles :
+ * `credits_total` y porte les crédits de CET achat, `created_at` sa date.
+ */
+export function readPackSaleRows(db: DatabaseType.Database = getStatsDB()): PackKeyRow[] {
+  const sales = db
+    .prepare(
+      `SELECT COALESCE(k.email, 'stripe-buyer') AS email,
+              p.credits AS credits_total,
+              p.amount_minor AS amount_paid_minor,
+              p.currency AS amount_paid_currency,
+              CASE WHEN p.payment_ref LIKE 'stripe:%' THEN substr(p.payment_ref, 8) END
+                AS stripe_session_id,
+              CASE WHEN p.payment_ref LIKE 'x402:%' THEN substr(p.payment_ref, 6) END
+                AS x402_payment_ref,
+              MAX(p.issued_by_us, COALESCE(k.issued_by_us, 0)) AS issued_by_us,
+              p.created_at
+         FROM key_purchases p
+         LEFT JOIN api_keys k ON k.key_hash = p.key_hash
+        WHERE p.kind = 'pack' AND p.outcome IN ${SALE_OUTCOMES_SQL}
+          AND p.credits IS NOT NULL AND p.credits > 0`,
+    )
+    .all() as PackKeyRow[];
+  const unrecorded = db
+    .prepare(
+      `SELECT email, credits_total, amount_paid_minor, amount_paid_currency,
+              stripe_session_id, x402_payment_ref, issued_by_us, created_at
+         FROM api_keys k
+        WHERE credits_total IS NOT NULL AND credits_total > 0
+          AND NOT EXISTS (SELECT 1 FROM key_purchases p
+                           WHERE p.lineage_hash = COALESCE(k.lineage_hash, k.key_hash))`,
+    )
+    .all() as PackKeyRow[];
+  return [...sales, ...unrecorded];
+}
 
 export interface PackSalesSummary {
   version: 1;
   source: 'retained_api_keys_payment_metadata';
+  /** D'où viennent les lignes depuis le lot B1 : le registre des achats. */
+  rows: 'key_purchases_registry';
   generated_at: string;
   scope: 'all_retained_credit_keys';
   stripe: {
@@ -82,6 +135,13 @@ function firstCreatedAt(group: PackKeyRow[]): string | null {
  * Montants déclarés par Stripe dans les lignes conservées, jamais prix catalogue.
  * Les références x402 identifient des demandes, pas un règlement confirmé.
  * Sans référence, une clé peut être ancienne, offerte ou remplacée : aucune vente déduite.
+ *
+ * Depuis le lot B1, les lignes viennent de `readPackSaleRows` : une par achat
+ * inscrit au registre. `source` garde son jeton d'avant, parce que la garde du
+ * site le lit comme le nom du contrat (`frontend/lib/dashboard/pack-sales.ts`) ;
+ * `rows` dit d'où les lignes viennent réellement. `first_key_created_at` et
+ * `last_key_created_at` portent donc la date de l'ACHAT, qui est celle de la clé
+ * pour un pack qui l'a frappée.
  */
 export function summarizePackSales(rows: PackKeyRow[], now = new Date()): PackSalesSummary {
   const credits = rows.filter((row) => (row.credits_total ?? 0) > 0);
@@ -90,6 +150,7 @@ export function summarizePackSales(rows: PackKeyRow[], now = new Date()): PackSa
   const out: PackSalesSummary = {
     version: 1,
     source: 'retained_api_keys_payment_metadata',
+    rows: 'key_purchases_registry',
     generated_at: now.toISOString(),
     scope: 'all_retained_credit_keys',
     stripe: {

@@ -1539,15 +1539,22 @@ const buildRawSpec = () => ({
           'information only — nothing is enforced against `limit`/`remaining`, and the balance that can turn a ' +
           `call away is served alongside as \`credits_remaining\` / \`credits_total\`. An anonymous key also ` +
           `carries a "claim" block: where to raise it (${KEY_CLAIM_URL}), to what, by which methods, how much has ` +
-          'been settled on it so far and how much is needed.',
+          'been settled on it so far and how much is needed. ' +
+          'A key that holds an allowance AND prepaid credits (a free key recharged) keeps the basis of its ' +
+          'allowance and also carries credits_remaining, credits_total and billing_order: "allowance_then_credits": ' +
+          'each call draws on the allowance first, then on the credits, and every billed response says which one ' +
+          'paid it in X-Charged-From ("allowance", "credits" or "allowance+credits"). credits_total is everything ' +
+          'ever bought on the key, recharges included. `topup` carries the card links that recharge THIS key ' +
+          '(they name it by a recharge reference, never by the key) and the USDC route to call with the key presented.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
           '200': {
             description:
-              'Usage for the current month: used, limit, remaining, month, key_prefix, basis, tier — plus ' +
-              'credits_remaining, credits_total and an explanatory note when basis is "credits", a note when ' +
-              'basis is "lifetime", and a "claim" block on an anonymous key',
+              'Usage for the current month: used, limit, remaining, month, key_prefix, basis, tier, topup, plus ' +
+              'credits_remaining, credits_total and an explanatory note when basis is "credits", the same with ' +
+              'billing_order on a key that holds an allowance and credits, a note when basis is "lifetime", and a ' +
+              '"claim" block on an anonymous key',
           },
           '401': { description: 'Missing or invalid API key' },
         },
@@ -1972,13 +1979,13 @@ const buildRawSpec = () => ({
         operationId: 'getCreditBalance',
         summary: 'Read the remaining credits of the presented key',
         description:
-          'For a prepaid bundle key: credits_remaining, credits_total, credits_used and the top-up endpoints. For a monthly subscription key the answer is type: "subscription" with a pointer to GET /v1/keys/usage, because a subscription has no balance to report. Authentication is the key itself.',
+          'For a key with prepaid credits: credits_remaining, credits_total (everything ever bought on the key, recharges included), credits_used and the top-up endpoints. For a key without credits the answer is type: "subscription" with a pointer to GET /v1/keys/usage. On every key, `allowance` gives the allowance of the key (null on a key born of a purchase, which has none), `billing_order` is "allowance_then_credits" on a key that holds both, and `topup` carries the card links that recharge THIS key. When the credits of a key born of a purchase run out, billed routes answer 402 with cause.reason "credits_exhausted", the same links, and X-Credits-Topup-Url (the 1,000-credit one). Authentication is the key itself, in any of the three places every billed route accepts: Authorization: Bearer, X-API-Key, or ?api_key=.',
         tags: ['Credits'],
         security: [{ apiKey: [] }],
         responses: {
           '200': {
             description:
-              'type ("credit_bundle" or "subscription"), key_prefix, and — for a bundle — credits_remaining, credits_total, credits_used, topup_endpoints.',
+              'type ("credit_bundle" or "subscription"), key_prefix, allowance, topup, and, for a key with credits, credits_remaining, credits_total, credits_used, topup_endpoints and, when it also holds an allowance, billing_order.',
           },
           '401': { description: 'Missing or invalid API key ("missing_key" / "invalid_key")' },
         },
@@ -2123,7 +2130,7 @@ const buildRawSpec = () => ({
         operationId: 'buyCreditBundle',
         summary: 'Buy a prepaid credit bundle (x402, USDC)',
         description:
-          'Pay once via x402 (USDC on Base) and receive a fresh API key preloaded with the bundle credits. Bundles: 1k = $4, 5k = $20, 25k = $80. Credits never expire. Optionally pass {"email": "..."} in the body to attach the key to an email — anonymous keys are fully functional too. Check the balance with GET /v1/credits/balance.',
+          'Pay once via x402 (USDC on Base). Present the API key you already hold (as on any billed route) and the credits land on THAT key: the answer carries same_key: true, api_key echoes the key you presented, and nothing changes in your integration; presenting the key costs no request, and a purchase never grants a free allowance. Without a key (or with an invalid one), you receive a fresh API key preloaded with the bundle credits, recoverable once at recovery_url if the response is lost. Nothing is credited or activated before the payment settles. Bundles: 1k = $4, 5k = $20, 25k = $80. Credits never expire. Optionally pass {"email": "..."} in the body: it becomes the contact of a NEW key; on a recharge it is only kept as the payer\'s contact, never attached to the key. Check the balance with GET /v1/credits/balance.',
         tags: ['Credits'],
         security: [{ x402Payment: [] }],
         parameters: [
@@ -2150,29 +2157,44 @@ const buildRawSpec = () => ({
         },
         responses: {
           '201': {
-            description: 'Credit key minted (shown only once — save it)',
+            description:
+              'The key you presented was recharged (same_key: true), or a new credit key was minted (shown only once: save it)',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   required: ['api_key', 'credits', 'bundle'],
                   properties: {
-                    api_key: { type: 'string', description: 'Full API key — shown only once' },
+                    api_key: {
+                      type: 'string',
+                      description:
+                        'Full API key: the key you presented on a recharge, echoed as sent; a new key otherwise, shown only once',
+                    },
+                    same_key: { type: 'boolean', description: 'true when the credits landed on the key you presented' },
+                    recharged: { type: 'boolean' },
                     key_prefix: { type: 'string' },
-                    credits: { type: 'integer', example: 1000 },
+                    credits: { type: 'integer', example: 1000, description: 'The credits of this bundle' },
+                    credits_added: { type: 'integer', example: 1000, description: 'On a recharge: the credits added to the key' },
                     bundle: { type: 'string', example: '1k' },
-                    price_paid_usdc: { type: 'number', example: 5 },
-                    price_per_call_usdc: { type: 'number', example: 0.005 },
+                    price_paid_usdc: { type: 'number', example: 4 },
+                    price_per_call_usdc: { type: 'number', example: 0.004 },
+                    first_call: { type: 'string', description: 'On a new key: a curl command that works with it' },
                     usage_hint: { type: 'string' },
                     balance_endpoint: { type: 'string', example: 'GET /v1/credits/balance' },
+                    recovery_url: { type: 'string', format: 'uri', description: 'On a new key: fetch it once if this response is lost' },
+                    recovery_note: { type: 'string' },
+                    note: { type: 'string', description: 'Present when the key you sent was invalid or revoked: the pack is on a NEW key' },
                     message: { type: 'string' },
                   },
                 },
               },
             },
           },
-          '402': { description: 'Payment required (x402) — bundle price in USDC' },
+          '200': { description: 'This payment was already recorded and its purchase was credited or minted (a replayed request): idempotent: true, nothing credited or minted twice. recovery_url only while the key it minted is active and still recoverable' },
+          '402': { description: 'Payment required (x402): bundle price in USDC. A settlement the facilitator REFUSED ends here too (an explicit reason, nothing broadcast), and nothing is credited' },
           '404': { description: 'Unknown bundle slug — choose 1k, 5k or 25k' },
+          '409': { description: 'This payment was already seen and its purchase was not credited: "payment_pending" (its settlement is not confirmed yet: do NOT pay again), "payment_refused" (refused when it was settled: sign a new payment), "payment_reversed" (refunded or disputed) or "payment_already_used". Nothing is settled again' },
+          '502': { description: 'settlement_unconfirmed: the outcome of the settlement is unknown (settlement.cause: "timeout", "settlement_pending" when the transfer was broadcast but not confirmed yet, or "facilitator_error" for a network error or a 5xx). The payment may have settled: do NOT pay again. The purchase stays pending and is reconciled by hand once the transfer is confirmed on-chain; settlement.transaction carries the transaction hash when the facilitator returned one' },
         },
       },
     },
@@ -2617,14 +2639,18 @@ const buildRawSpec = () => ({
       },
       AccountKey: {
         type: 'object',
-        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'actions'],
+        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'address_proven', 'actions'],
         properties: {
           key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
           created_at: { type: ['string', 'null'], format: 'date-time' },
-          plan: { type: 'string', enum: ['free', 'custom', 'pack', 'pro', 'editor'] },
+          plan: {
+            type: 'string',
+            enum: ['free', 'custom', 'pack', 'pro', 'editor', 'free+pack', 'custom+pack', 'pro+pack', 'editor+pack'],
+            description: 'A key that holds an allowance AND prepaid credits carries both parts, such as free+pack: the allowance is drawn first, then the credits.',
+          },
           allowance: {
             type: ['object', 'null'],
-            description: 'The monthly allowance, with the figures of GET /v1/keys/usage. null on a credit key, whose balance is in credits.',
+            description: 'The allowance, with the figures of GET /v1/keys/usage. null on a key born of a purchase, which has no allowance of its own and whose balance is in credits.',
             properties: {
               basis: { type: 'string', enum: ['monthly', 'lifetime'] },
               limit: { type: 'integer' },
@@ -2634,7 +2660,7 @@ const buildRawSpec = () => ({
           },
           credits: {
             type: ['object', 'null'],
-            description: 'The prepaid balance of a credit key. null on any other key.',
+            description: 'The prepaid balance of a key that holds credits, alone or beside an allowance. purchased_total is the total ever bought on the key, recharges included. null on a key without credits.',
             properties: { remaining: { type: 'integer' }, purchased_total: { type: 'integer' } },
           },
           subscription: {
@@ -2658,11 +2684,22 @@ const buildRawSpec = () => ({
               },
             },
           },
+          address_proven: {
+            type: 'boolean',
+            description: 'True when the address of this key was proven by a code (created or claimed with a 6-digit code). An address typed at a checkout, or given to a first key without a code, is not: the page then asks you to recognise the key before recharging it.',
+          },
           actions: {
             type: 'object',
-            description: 'Links the page may offer. topup and subscribe_pro are null until those journeys exist; manage_subscription is the portal of a subscribed key.',
+            description: 'Links the page may offer. topup recharges THIS key by card (the links carry its recharge reference, never the key); subscribe_pro is null until that journey exists; manage_subscription is the portal of a subscribed key.',
             properties: {
-              topup: { type: ['string', 'null'] },
+              topup: {
+                type: ['object', 'null'],
+                properties: {
+                  '1k': { type: 'string', format: 'uri' },
+                  '5k': { type: 'string', format: 'uri' },
+                  '25k': { type: 'string', format: 'uri' },
+                },
+              },
               subscribe_pro: { type: ['string', 'null'] },
               manage_subscription: { type: ['string', 'null'] },
             },

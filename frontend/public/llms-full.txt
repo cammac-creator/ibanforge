@@ -83,6 +83,9 @@ nothing at all:
 **Credit packs (card or USDC, never expire):**
 - 1,000 calls = $4 · 5,000 = $20 · 25,000 = $80
 - By card: https://ibanforge.com/pricing · in USDC: POST /v1/credits/buy/1k | /5k | /25k
+- Already hold a key? The pack lands on it: present the key on POST /v1/credits/buy (the answer carries same_key: true), or pay by card with the links under `topup` in GET /v1/keys/usage, GET /v1/credits/balance, a 402 served to the key, or the account page. Nothing changes in your integration.
+- A pack never grants a free allowance: an anonymous key that buys credits leaves the anonymous tier and keeps no free monthly allowance. Claim it by e-mail BEFORE buying to keep one.
+- On a key that holds an allowance and credits, each call draws on the allowance first, then on the credits; X-Charged-From says which paid (allowance, credits, or allowance+credits for a split batch). When the credits run out the key stays valid: a free key goes back to its allowance, a key born of a purchase answers 402 with the links that recharge it (X-Credits-Topup-Url).
 
 **Pro subscription (card):**
 - $29 a month for 10,000 requests, resets on the 1st, cancel anytime: https://ibanforge.com/pricing

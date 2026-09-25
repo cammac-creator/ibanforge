@@ -100,7 +100,7 @@ passenden.
 |---|---|---|
 | Ein 6-stelliger Code per E-Mail | 200 Anfragen pro Monat | **ja, jeden Monat** |
 | Eine x402-Zahlung mit dem Schlüssel | 200 Anfragen | **nein — 200 einmalig, nicht 200 pro Monat** |
-| Ein Prepaid-Paket, mit dem Schlüssel gekauft | 200 Anfragen | **nein — 200 einmalig, nicht 200 pro Monat** |
+| Ein Prepaid-Paket, mit dem Schlüssel gekauft | sein Guthaben, auf genau diesem Schlüssel | **kein Gratiskontingent** (siehe unten) |
 
 ### 1. Ein 6-stelliger Code per E-Mail
 
@@ -162,12 +162,15 @@ in einem Aufruf zu begleichen.
 
 ### 3. Ein Prepaid-Paket, mit dem Schlüssel gekauft
 
-Wer ein Guthabenpaket in USDC kauft und dabei den Schlüssel vorlegt
-(`POST /v1/credits/buy/1k|5k|25k`), beansprucht ihn auf demselben Weg. Das Paket selbst ist ein
-eigener Schlüssel mit vorgeladenem Guthaben; die Beanspruchung ist eine Höflichkeit auf dem
-vorgelegten Schlüssel.
+Ein Paket, das mit vorgelegtem Schlüssel gekauft wird, lädt genau diesen Schlüssel auf und gewährt
+kein Gratiskontingent: Ein Kauf schafft nie eines. **Erst beanspruchen, dann kaufen.** Ein anonymer
+Schlüssel, der Guthaben kauft, verlässt die anonyme Stufe endgültig: Er behält sein Guthaben und
+kein monatliches Gratiskontingent, und `POST /v1/keys/claim` antwortet dann mit
+`409 already_claimed`. Zuerst per zugesandtem Code beansprucht, behält derselbe Schlüssel seine 200
+pro Monat und nutzt sein Guthaben, sobald der Monat verbraucht ist (siehe unten, «Einen Schlüssel
+aufladen»).
 
-**Diese beiden Wege gewähren 200 Anfragen einmalig, nicht 200 pro Monat.** `GET /v1/keys/usage`
+**Der x402-Weg gewährt 200 Anfragen einmalig, nicht 200 pro Monat.** `GET /v1/keys/usage`
 meldet dann `basis: "lifetime"`, und die Zähler laufen über die ganze Lebensdauer des Schlüssels
 statt über den Kalendermonat. Der zugesandte Code ist der wiederkehrende Weg, und er kostet nichts:
 Wer ein Postfach lesen kann, fährt damit besser.
@@ -294,8 +297,14 @@ curl https://api.ibanforge.com/v1/keys/usage \
 `limit` ist 25 bei einem anonymen und 200 bei einem beanspruchten Schlüssel; `tier` sagt, welcher
 vorliegt. `basis` sagt, welche Obergrenze wirklich gilt: `monthly` ist der Normalfall mit Reset am
 1., `lifetime` gehört zu einem per Zahlung beanspruchten Schlüssel — seine 200 zählen einmalig über
-alle Monate und werden nicht aufgefüllt — und `credits` ist ein Prepaid-Guthaben, gegen das `limit`
-nichts durchsetzt. Der `claim`-Block wird nur bei einem noch beanspruchbaren Schlüssel mitgeliefert.
+alle Monate und werden nicht aufgefüllt — und `credits` bezeichnet einen aus einem Kauf entstandenen
+Schlüssel, der nur sein Prepaid-Guthaben nutzt: gegen `limit` wird nichts durchgesetzt. Der
+`claim`-Block wird nur bei einem noch beanspruchbaren Schlüssel mitgeliefert.
+
+Ein Schlüssel mit Kontingent **und** Guthaben, etwa ein aufgeladener Gratisschlüssel, behält die
+`basis` seines Kontingents und trägt zusätzlich `credits_remaining`, `credits_total` und
+`billing_order: "allowance_then_credits"`. Bei jedem Schlüssel trägt `topup` die Kartenlinks, die
+genau diesen Schlüssel aufladen.
 
 `month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`). Die Kostprobe ohne Schlüssel hat hier keinen Schlüssel abzufragen: Ihre Zähler laufen pro Woche (ISO-Woche in UTC, Rücksetzung am Montag um 00:00 UTC), und in ihrem `402 trial_exhausted` trägt das Feld `cause.quota.month` den Wert `week`. Eine ohne Schlüssel bediente Antwort trägt `X-Trial-Period: week`; der 402 trägt keinen `X-Trial-*`-Header. Ohne Schlüssel antwortet dieser Endpunkt mit `401 missing_key`, mit einem unbekannten oder inaktiven Schlüssel mit `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` und `POST /v1/keys/claim` antworten ebenso (die Beanspruchung nimmt einen wegen einer Welle automatischer Anmeldungen gesperrten Schlüssel weiterhin an, denn sie holt ihn zurück). `POST /v1/keys/revoke` und `POST /v1/keys/rotate` antworten ohne Schlüssel mit `401 missing_key` und bei einem unbekannten oder bereits widerrufenen mit `404 invalid_key`. Dieser Endpunkt ist kostenlos
 und verbraucht kein Kontingent.
@@ -354,6 +363,40 @@ Aufruf wird erstattet, und diese Header berücksichtigen die Erstattung bereits.
 Wer lieber abfragt als Header liest: `GET /v1/keys/usage` liefert dieselben
 Zahlen, kostenlos.
 
+## Einen Schlüssel aufladen
+
+Ein Paket landet auf dem Schlüssel, den Sie schon haben: An Ihrer Integration ändert sich nichts,
+und das Guthaben verfällt nie.
+
+- **Per Karte**: Öffnen Sie einen der Links unter `topup.by_card` (in `GET /v1/keys/usage`,
+  `GET /v1/credits/balance` und `credit_packs.topup_this_key` in einem `402` für den Schlüssel) oder
+  die Schaltflächen *Diesen Schlüssel aufladen* auf Ihrer [Kontoseite](/account). Jeder Link trägt die
+  Aufladereferenz des Schlüssels, nie den Schlüssel selbst: Er erlaubt nur, für diesen Schlüssel zu
+  zahlen. Die Erfolgsseite nennt danach den aufgeladenen Schlüssel, und Sie erhalten eine
+  Bestätigung per E-Mail.
+- **In USDC**: `POST /v1/credits/buy/1k|5k|25k` mit wie gewohnt vorgelegtem Schlüssel. Das Vorlegen
+  kostet keine Anfrage, die Antwort trägt `same_key: true`, und das Guthaben wird gutgeschrieben,
+  sobald die Zahlung abgewickelt ist. Ohne Schlüssel verkauft dieselbe Route einen neuen Schlüssel,
+  wie die [Preisseite](/pricing).
+
+`credits_total` zählt alles, was je auf den Schlüssel gekauft wurde, Aufladungen inbegriffen, und
+`X-Credits-Total` sagt dasselbe.
+
+**Bei einem Schlüssel mit beidem** nutzt jeder Aufruf zuerst das Kontingent, dann das Guthaben; ein
+Batch, der vom einen ins andere übergeht, wird zwischen beiden aufgeteilt, ganz oder gar nicht. Jede
+abgerechnete Antwort sagt, was sie bezahlt hat:
+
+```
+X-Charged-From: allowance
+X-Charged-From: credits
+X-Charged-From: allowance+credits
+```
+
+**Ist das Guthaben aufgebraucht**, bleibt der Schlüssel gültig. Ein Gratisschlüssel kehrt zu seinem
+Monatskontingent zurück. Ein aus einem Kauf entstandener Schlüssel antwortet mit `402`,
+`cause.reason: "credits_exhausted"` und den Links, die ihn aufladen (`X-Credits-Topup-Url` trägt den
+für das Paket mit 1.000 Credits).
+
 ## Wenn Ihr Kontingent erschöpft ist
 
 Ihre Integration landet **nicht** in einer Sackgasse. Sind die Anfragen des Monats aufgebraucht, antwortet die API mit `402 Payment Required` (x402) statt einem harten 429 — mit Hinweis-Headern, die genau sagen, was passiert ist:
@@ -368,7 +411,7 @@ X-Quota-Month: 2026-09
 Der 402-Body listet Ihre Optionen maschinenlesbar auf:
 
 1. **Den Schlüssel beanspruchen** — ist er noch anonym, hebt ihn ein zugesandter Code an, und das kostet nichts.
-2. **Prepaid-Guthabenpaket kaufen** — per Karte auf der [Preisseite](/pricing) oder in USDC via `POST /v1/credits/buy/1k|5k|25k`. Guthaben verfällt nie und wird an Ihren bestehenden Schlüssel gebunden.
+2. **Diesen Schlüssel aufladen**: per Karte mit den Links, die der 402 trägt (`credit_packs.topup_this_key`, `X-Credits-Topup-Url`), oder über Ihre [Kontoseite](/account), oder in USDC via `POST /v1/credits/buy/1k|5k|25k` mit vorgelegtem Schlüssel. Das Guthaben landet auf genau diesem Schlüssel und verfällt nie. Siehe oben, «Einen Schlüssel aufladen».
 3. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/docs/x402).
 4. **Auf den monatlichen Reset warten** — auf Basis `monthly` setzt sich das Kontingent am 1. zurück; ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und tut es nicht.
 

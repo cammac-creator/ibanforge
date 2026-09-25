@@ -58,7 +58,12 @@ interface KeyView {
   calls_this_month: number;
   last_call_at: string | null;
   alerts: Array<{ kind: string; sent_at: string | null }>;
-  actions: Record<string, string | null>;
+  address_proven: boolean;
+  actions: {
+    topup: Record<string, string> | null;
+    subscribe_pro: string | null;
+    manage_subscription: string | null;
+  };
   created_at: string | null;
 }
 
@@ -244,6 +249,7 @@ describe('GET /v1/account/overview', () => {
     expect(Object.keys(body.keys[0]).sort()).toEqual(
       [
         'actions',
+        'address_proven',
         'alerts',
         'allowance',
         'calls_this_month',
@@ -327,7 +333,20 @@ describe('GET /v1/account/overview', () => {
     expect(view.allowance).toBeNull();
     expect(view.calls_this_month).toBe(45);
     expect(view.subscription).toBeNull();
-    expect(view.actions).toEqual({ topup: null, subscribe_pro: null, manage_subscription: null });
+    // Lot B1 : les trois liens rechargent CETTE clé (sa référence, jamais la clé).
+    const topup = view.actions.topup;
+    expect(Object.keys(topup ?? {}).sort()).toEqual(['1k', '25k', '5k']);
+    for (const link of Object.values(topup ?? {})) {
+      expect(link).toMatch(
+        /^https:\/\/buy\.stripe\.com\/[A-Za-z0-9]+\?client_reference_id=ifr_[0-9a-f]{32}$/,
+      );
+      expect(link).not.toContain(pack.api_key);
+    }
+    expect(view.actions.subscribe_pro).toBeNull();
+    expect(view.actions.manage_subscription).toBeNull();
+    // Une adresse saisie au paiement n'est pas une adresse PROUVÉE (relecture
+    // de sécurité, point I1) : la page avertit avant de proposer la recharge.
+    expect(view.address_proven).toBe(false);
   });
 
   it('abonné : lien du portail', async () => {
@@ -349,8 +368,9 @@ describe('GET /v1/account/overview', () => {
       manage_url: PRO_PORTAL_URL,
     });
     expect(proView.actions.manage_subscription).toBe(PRO_PORTAL_URL);
-    // « Recharger » attend le lot B1, « passer en Pro » le lot B2.
-    expect(proView.actions.topup).toBeNull();
+    // « Recharger » existe depuis le lot B1 (règle B : Pro d'abord, puis les
+    // crédits) ; « passer en Pro » attend le lot B2.
+    expect(Object.keys(proView.actions.topup ?? {}).sort()).toEqual(['1k', '25k', '5k']);
     expect(proView.actions.subscribe_pro).toBeNull();
     expect(byPrefix.get(editor.key_prefix)!.plan).toBe('editor');
     expect(byPrefix.get(editor.key_prefix)!.subscription?.plan).toBe('editor');

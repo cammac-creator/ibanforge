@@ -7,6 +7,8 @@ import {
 } from './api-keys.js';
 import { sendCreditsWarningEmail, sendQuotaWarningEmail } from './email.js';
 import { isUnroutableEmail } from './disposable-domains.js';
+import { ensureTopupRef, keyHasPurchase } from './key-purchases.js';
+import { getStatsDB } from './db.js';
 import { ANONYMOUS_CONTACT, CREDITS_NOTICE_RATIO } from './tiers.js';
 
 /**
@@ -50,6 +52,56 @@ function isReachable(email: string): boolean {
   return e.includes('@') && !PLACEHOLDER_CONTACTS.has(e);
 }
 
+/** Une adresse à laquelle un mail de service peut partir (ni repère, ni vide). */
+export function isReachableContact(email: string | null | undefined): email is string {
+  return typeof email === 'string' && isReachable(email);
+}
+
+/**
+ * Le contact de service d'une clé : son adresse quand elle est joignable, sinon
+ * la dernière adresse qu'un PAYEUR a saisie pour elle CHEZ STRIPE (chantier
+ * « clé unique », lot B1, ZG8). Cette adresse-là n'est jamais l'identité de la
+ * clé : elle ne sert qu'à prévenir la personne qui a payé, par exemple pour un
+ * pack rechargé sur une clé anonyme.
+ *
+ * Jamais l'adresse du corps d'un achat USDC (relecture de sécurité de la
+ * PR 259, D6) : personne ne l'a vérifiée, et la retenir laissait le porteur
+ * diriger nos mails (préfixe, solde, liens de recharge) vers n'importe qui.
+ */
+export function serviceContact(keyHash: string, keyEmail: string | undefined): string | null {
+  if (isReachableContact(keyEmail)) return keyEmail;
+  try {
+    const row = getStatsDB()
+      .prepare(
+        `SELECT p.payer_email FROM key_purchases p
+           JOIN api_keys k ON COALESCE(k.lineage_hash, k.key_hash) = p.lineage_hash
+          WHERE k.key_hash = ? AND p.payer_email IS NOT NULL
+            AND p.rail = 'card'
+            AND p.outcome IN ('credited', 'minted', 'minted_fallback')
+          ORDER BY p.id DESC LIMIT 1`,
+      )
+      .get(keyHash) as { payer_email: string } | undefined;
+    return isReachableContact(row?.payer_email) ? row.payer_email : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `no_recredit` lu comme le drapeau d'une FERME, seulement quand la lignée n'a
+ * rien acheté (lot B1). Le drapeau veut aussi dire « accordé une fois contre un
+ * paiement » ou « né sous bouclier » ; une clé qui a payé est joignable par
+ * définition, et la faire taire serait taire le seul client qui paie.
+ */
+function isFarmFlagged(keyHash: string): boolean {
+  if (!isNoRecredit(keyHash)) return false;
+  try {
+    return !keyHasPurchase(keyHash);
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Warn the key holder once, when their usage first crosses the notice
  * threshold. Called fire-and-forget from the api-key middleware, so it must
@@ -67,6 +119,11 @@ export async function maybeSendQuotaWarning(p: {
   used: number;
   limit: number;
   month: string;
+  /**
+   * Le solde de crédits d'une clé mixte (lot B1) : le mail dit alors que les
+   * crédits prennent le relais, au lieu de « calls stop until the 1st ».
+   */
+  creditsRemaining?: number;
 }): Promise<QuotaNoticeOutcome> {
   if (!isReachable(p.email)) return 'no_contact';
   // Disposable inboxes and unroutable TLDs: nobody reads them, every send
@@ -78,7 +135,8 @@ export async function maybeSendQuotaWarning(p: {
   // The domain filter above catches a cohort once it has been relabelled to
   // `@cohorte.invalid`; this catches one that has not been relabelled yet,
   // which is precisely the case the domain filter let through on 19/08.
-  if (isNoRecredit(p.keyHash)) return 'flagged_cohort';
+  // Depuis le lot B1 : sauf si la lignée a acheté (voir isFarmFlagged).
+  if (isFarmFlagged(p.keyHash)) return 'flagged_cohort';
   const ageHours = getKeyAgeHours(p.keyHash);
   if (ageHours != null && ageHours < MIN_KEY_AGE_HOURS) return 'too_new';
   if (!recordQuotaNotice(p.keyHash, p.month)) return 'already_notified';
@@ -89,6 +147,9 @@ export async function maybeSendQuotaWarning(p: {
     limit: p.limit,
     month: p.month,
     keyPrefix: p.keyPrefix,
+    creditsRemaining: p.creditsRemaining,
+    // Les liens de CETTE clé : un pack acheté depuis ce mail la recharge.
+    topupRef: ensureTopupRef(p.keyHash),
   });
 
   if (!sent) {
@@ -115,12 +176,16 @@ export async function maybeSendQuotaWarning(p: {
 
 /**
  * Le verrou réutilise `quota_notices` plutôt qu'une table à lui, sous la clé
- * `credits-<taille du pack>` dans la colonne où l'avertissement mensuel range
- * son mois. Une ligne par taille de pack, donc un avertissement par pack. Deux
- * conséquences, voulues : aucune migration de schéma ne voyage avec ce
- * changement, et tout lecteur qui prend `quota_notices` pour des mois doit
- * écarter les lignes à ce préfixe (la liste des profils de l'admin le fait,
- * voir `quota_warned_by_key`).
+ * `credits-<cumul acheté>` dans la colonne où l'avertissement mensuel range
+ * son mois. Deux conséquences, voulues : aucune migration de schéma ne voyage
+ * avec ce changement, et tout lecteur qui prend `quota_notices` pour des mois
+ * doit écarter les lignes à ce préfixe (la liste des profils de l'admin le
+ * fait, voir `quota_warned_by_key`).
+ *
+ * Depuis le lot B1, `credits_total` est le CUMUL acheté sur la clé. Pour une
+ * clé jamais rechargée il vaut la taille du pack : le verrou d'aujourd'hui,
+ * sans second mail pour un pack déjà averti. Chaque recharge change le cumul,
+ * donc ouvre un verrou neuf : l'alerte se réarme d'elle-même.
  */
 export const CREDITS_NOTICE_LOCK_PREFIX = 'credits-';
 
@@ -165,20 +230,29 @@ export async function maybeSendCreditsWarning(p: {
   email: string;
   keyPrefix: string;
   remaining: number;
+  /** Le cumul acheté sur la clé : le verrou. */
   total: number;
+  /**
+   * Le solde juste après la dernière recharge : l'assiette du seuil et le
+   * « sur N » du mail. Absent = le cumul, comme avant le lot B1.
+   */
+  base?: number;
 }): Promise<CreditsNoticeOutcome> {
-  if (!isReachable(p.email)) return 'no_contact';
-  if (isUnroutableEmail(p.email)) return 'unroutable_contact';
-  if (isNoRecredit(p.keyHash)) return 'flagged_cohort';
+  // L'adresse de la clé, ou celle de la personne qui a payé pour elle (ZG8).
+  const to = serviceContact(p.keyHash, p.email);
+  if (!to) return 'no_contact';
+  if (isUnroutableEmail(to)) return 'unroutable_contact';
+  if (isFarmFlagged(p.keyHash)) return 'flagged_cohort';
   const lock = creditsNoticeLock(p.total);
   if (!recordQuotaNotice(p.keyHash, lock)) return 'already_notified';
 
   const sent = await sendCreditsWarningEmail({
-    to: p.email,
+    to,
     keyPrefix: p.keyPrefix,
     remaining: p.remaining,
-    total: p.total,
+    total: p.base ?? p.total,
     proMonthlyLimit: PRO_MONTHLY_LIMIT,
+    topupRef: ensureTopupRef(p.keyHash),
   });
 
   if (!sent) {

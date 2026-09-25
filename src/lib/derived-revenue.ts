@@ -19,8 +19,12 @@
  * les clés », jamais comme la lecture de Stripe.
  */
 import { getStatsDB } from './db.js';
-import type { PackKeyRow } from './business-summary.js';
-import { isInternalBuyer, summarizePackSales, type PackSalesSummary } from './pack-sales.js';
+import {
+  isInternalBuyer,
+  readPackSaleRows,
+  summarizePackSales,
+  type PackSalesSummary,
+} from './pack-sales.js';
 import {
   readSubscriptionRows,
   subscriptionsSold,
@@ -132,16 +136,10 @@ export function readAuditLedger(db: Db = getStatsDB()): AuditLedgerTotals {
 }
 
 export function readDerivedRevenue(db: Db = getStatsDB(), now = new Date()): DerivedRevenue {
-  // Les mêmes lignes que /v1/admin/pack-sales : une rotation ne supprime pas l'achat.
-  const packRows = db
-    .prepare(
-      `SELECT email, credits_total, amount_paid_minor, amount_paid_currency,
-              stripe_session_id, x402_payment_ref, issued_by_us, created_at
-         FROM api_keys WHERE credits_total IS NOT NULL AND credits_total > 0`,
-    )
-    .all() as PackKeyRow[];
+  // Les mêmes lignes que /v1/admin/pack-sales : une par achat, au registre
+  // (lot B1) ; une recharge y est une vente, une rotation n'y double rien.
   return buildDerivedRevenue({
-    packs: summarizePackSales(packRows, now),
+    packs: summarizePackSales(readPackSaleRows(db), now),
     subscriptions: subscriptionsSold(readSubscriptionRows(db), isInternalBuyer),
     audits: readAuditLedger(db),
   });

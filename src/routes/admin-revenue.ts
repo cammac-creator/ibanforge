@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from '../lib/db.js';
-import { packsSold, type PackKeyRow, type PacksSold } from '../lib/business-summary.js';
+import { packsSold, type PacksSold } from '../lib/business-summary.js';
+import { readPackSaleRows } from '../lib/pack-sales.js';
 import { isInternal } from '../lib/lifecycle-radar.js';
 import {
   readSubscriptionRows,
@@ -182,15 +183,9 @@ function readCachedTxs(): CachedTx[] {
  * blind to it.
  */
 function packsSoldNow(): PacksSold {
-  const rows = getStatsDB()
-    .prepare(
-      `SELECT email, credits_total, amount_paid_minor, amount_paid_currency,
-              stripe_session_id, x402_payment_ref, issued_by_us, created_at
-         FROM api_keys
-        WHERE credits_total IS NOT NULL AND credits_total > 0`,
-    )
-    .all() as PackKeyRow[];
-  return packsSold(rows);
+  // Une ligne par achat, au registre (lot B1) : une recharge est une vente, et
+  // une clé tournée ne compte plus un second pack au rail « unknown » (C5).
+  return packsSold(readPackSaleRows());
 }
 
 /**

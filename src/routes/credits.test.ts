@@ -366,6 +366,12 @@ describe('a credit key is counted in its month, and never capped by it', () => {
  * can still fetch it once. The x402 rail stored nothing: settle succeeds, the
  * connection drops, and the buyer has paid for a key nobody can hand back —
  * we keep only its hash. Both rails now behave the same way.
+ *
+ * Depuis le lot B1 (25.09.2026), la récupération et l'idempotence d'un pack
+ * PAYÉ se prouvent à travers le vrai paywall, devant un facilitateur local
+ * (`credits-buy.topup.test.ts`) : la route seule, sans enrobage x402, ne voit
+ * plus de règlement, donc elle ne frappe plus rien de récupérable. Restent ici
+ * les cas qui ne demandent aucun règlement.
  */
 describe('a credit pack bought with USDC survives a lost response', () => {
   function appWithRecovery() {
@@ -374,76 +380,6 @@ describe('a credit pack bought with USDC survives a lost response', () => {
     app.route('/', creditsBuy);
     return app;
   }
-
-  // A payment header the way a v2 client sends it, and the reference the buyer
-  // can recompute from it without us.
-  function payment(seed: string): { header: string; ref: string } {
-    const header = Buffer.from(`payment-payload-${seed}`).toString('base64');
-    return { header, ref: createHash('sha256').update(header).digest('hex').slice(0, 32) };
-  }
-
-  it('hands the key back exactly once to whoever made the payment', async () => {
-    const { header, ref } = payment(`recover-${Date.now()}`);
-    const app = appWithRecovery();
-
-    const bought = (await (
-      await app.request('/v1/credits/buy/5k', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'payment-signature': header },
-        body: '{}',
-      })
-    ).json()) as { api_key: string; recovery_url: string };
-    expect(bought.api_key).toMatch(/^ifk_[a-f0-9]{64}$/);
-    expect(bought.recovery_url).toContain(`/v1/credits/recover/${ref}`);
-
-    // The buyer never saw that body. They hash the request they sent and ask.
-    const first = await app.request(`/v1/credits/recover/${ref}`);
-    expect(first.status).toBe(200);
-    const recovered = (await first.json()) as { api_key: string; credits_total: number };
-    expect(recovered.api_key).toBe(bought.api_key);
-    expect(recovered.credits_total).toBe(5000);
-    // …and the key it recovers actually works.
-    expect(validateApiKey(recovered.api_key).creditsRemaining).toBe(5000);
-
-    // Exactly once: the window closes behind them.
-    expect((await app.request(`/v1/credits/recover/${ref}`)).status).toBe(404);
-  });
-
-  /**
-   * The other half of the same loss: a buyer who retries the request whose
-   * response they lost must not be handed a SECOND pack for one payment.
-   */
-  it('never mints twice for one settlement', async () => {
-    const { header, ref } = payment(`once-${Date.now()}`);
-    const app = appWithRecovery();
-    const opts = {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'payment-signature': header },
-      body: '{}',
-    };
-
-    const first = (await (await app.request('/v1/credits/buy/25k', opts)).json()) as {
-      api_key: string;
-      key_prefix: string;
-    };
-    const replay = await app.request('/v1/credits/buy/25k', opts);
-    const second = (await replay.json()) as {
-      api_key?: string;
-      key_prefix: string;
-      idempotent: boolean;
-    };
-
-    expect(second.idempotent).toBe(true);
-    expect(second.api_key).toBeUndefined();
-    expect(second.key_prefix).toBe(first.key_prefix);
-    expect(
-      (
-        getStatsDB()
-          .prepare('SELECT COUNT(*) AS n FROM api_keys WHERE x402_payment_ref = ?')
-          .get(ref) as { n: number }
-      ).n,
-    ).toBe(1);
-  });
 
   it('refuses a reference that is not one of ours', async () => {
     const app = appWithRecovery();
@@ -467,6 +403,29 @@ describe('a credit pack bought with USDC survives a lost response', () => {
     expect(row.raw_key_one_time_view).toBeNull();
     expect(row.x402_payment_ref).toBeNull();
   });
+
+  /**
+   * Lot B1 : sans paywall devant elle, la route ne voit aucun règlement, même
+   * quand un en-tête de paiement est présent. Elle traite donc la demande comme
+   * le mode gratuit (hors production) : une clé active, rien de récupérable,
+   * aucune vente. C'est le paywall qui décide qu'un paiement a eu lieu, jamais
+   * la simple présence d'un en-tête.
+   */
+  it('a payment header without the paywall stores nothing recoverable', async () => {
+    const header = Buffer.from(`payment-payload-free-${Date.now()}`).toString('base64');
+    const ref = createHash('sha256').update(header).digest('hex').slice(0, 32);
+    const app = appWithRecovery();
+    const res = await app.request('/v1/credits/buy/5k', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'payment-signature': header },
+      body: '{}',
+    });
+    expect(res.status).toBe(201);
+    const bought = (await res.json()) as { api_key: string; recovery_url?: string };
+    expect(validateApiKey(bought.api_key).creditsRemaining).toBe(5000);
+    expect(bought.recovery_url).toBeUndefined();
+    expect((await app.request(`/v1/credits/recover/${ref}`)).status).toBe(404);
+  });
 });
 
 /**
@@ -474,6 +433,10 @@ describe('a credit pack bought with USDC survives a lost response', () => {
  * recorded what they collected; the routes that SELL recorded nothing, so the
  * largest ticket on the USDC rail left no trace in daily_stats and every
  * revenue reading understated the business by exactly the amount that mattered.
+ *
+ * Depuis le lot B1, la vente s'inscrit à la CONFIRMATION du règlement, par
+ * l'enrobage x402 : prouvé dans `credits-buy.topup.test.ts`. Restent ici les
+ * cas sans règlement, qui n'inscrivent rien.
  */
 describe('a pack sale is booked as revenue', () => {
   function revenueToday(): number {
@@ -484,19 +447,6 @@ describe('a pack sale is booked as revenue', () => {
       .get(CREDITS_PURCHASE_TYPE) as { r: number };
     return row.r;
   }
-
-  it('records what was actually collected when the pack was paid for', async () => {
-    const app = new Hono<HonoEnv>();
-    app.route('/', creditsBuy);
-    const before = revenueToday();
-    const header = Buffer.from(`paid-${Date.now()}`).toString('base64');
-    await app.request('/v1/credits/buy/25k', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'payment-signature': header },
-      body: '{}',
-    });
-    expect(revenueToday() - before).toBeCloseTo(80, 6);
-  });
 
   it('records zero when the pack was handed over for free', async () => {
     const app = new Hono<HonoEnv>();
@@ -517,9 +467,10 @@ describe('a pack sale is booked as revenue', () => {
    * nothing: the row still carried `total + 1` and `success_count + 1`, so
    * under IBANFORGE_FREE_MODE or with the x402 gate off in dev, every free pack
    * wrote a phantom sale next to the real ones. The revenue assertion above
-   * could never see it, which is why it survived.
+   * could never see it, which is why it survived. Depuis le lot B1, un en-tête
+   * de paiement sans paywall n'en inscrit pas davantage.
    */
-  it('books no sale at all when nothing was paid', async () => {
+  it('books no sale at all when nothing was settled', async () => {
     const app = new Hono<HonoEnv>();
     app.route('/', creditsBuy);
     const salesToday = (): number => {
@@ -536,9 +487,6 @@ describe('a pack sale is booked as revenue', () => {
       headers: { 'content-type': 'application/json' },
       body: '{}',
     });
-    expect(salesToday()).toBe(before);
-
-    // ...and a settled one still counts, so the fix did not silence the rail.
     await app.request('/v1/credits/buy/1k', {
       method: 'POST',
       headers: {
@@ -547,7 +495,7 @@ describe('a pack sale is booked as revenue', () => {
       },
       body: '{}',
     });
-    expect(salesToday()).toBe(before + 1);
+    expect(salesToday()).toBe(before);
   });
 });
 
@@ -607,23 +555,19 @@ describe('the USDC rail hands over a command that works', () => {
 
   /**
    * A purchase is not a validation. `getStats()` builds total_operations and
-   * by_type from the three named types in the `operations` table, so booking
-   * revenue here must not move a single usage counter.
+   * by_type from the three named types in the `operations` table, so selling a
+   * pack must not move a single usage counter. (The revenue half, booked at the
+   * confirmation of a settlement since lot B1, lives in credits-buy.topup.test.ts.)
    */
-  it('adds revenue without inflating any usage counter', async () => {
+  it('does not inflate any usage counter', async () => {
     const app = new Hono<HonoEnv>();
     app.route('/', creditsBuy);
     const opsBefore = getStats().total_operations;
-    const revenueBefore = getStats().total_revenue_usdc;
     await app.request('/v1/credits/buy/5k', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'payment-signature': Buffer.from(`ops-${Date.now()}`).toString('base64'),
-      },
+      headers: { 'content-type': 'application/json' },
       body: '{}',
     });
     expect(getStats().total_operations).toBe(opsBefore);
-    expect(getStats().total_revenue_usdc - revenueBefore).toBeCloseTo(20, 6);
   });
 });

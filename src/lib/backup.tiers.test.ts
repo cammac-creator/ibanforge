@@ -329,7 +329,9 @@ describe('sauvegarde du palier de clé', () => {
     // restauration sans elles rendrait des lignées vivantes avec un rail à zéro.
     expect(READABLE_FORMATS).toContain(6);
     expect(READABLE_FORMATS).toContain(7);
-    expect(BACKUP_FORMAT).toBe(7);
+    // Le format 7 a introduit ces deux tables ; le format 8 (registre des
+    // achats, lot B1) les porte toujours. Voir backup.purchases.test.ts.
+    expect(BACKUP_FORMAT).toBe(8);
     const db = getStatsDB();
     const day = `2026-09-${String((RUN % 28) + 1).padStart(2, '0')}`;
     db.prepare(

@@ -25,6 +25,11 @@ export async function notifyPurchaseTelegram(p: {
   /** Subscription (Editor/OEM or Pro) — recurring revenue, worded differently. */
   plan?: 'oem' | 'pro';
   monthlyLimit?: number;
+  /**
+   * Un pack arrivé sur une clé EXISTANTE par sa référence (lot B1, 25.09.2026) :
+   * aucune clé frappée, la même clé rechargée.
+   */
+  recharge?: boolean;
 }): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chat = process.env.TELEGRAM_CHAT_ID;
@@ -41,10 +46,15 @@ export async function notifyPurchaseTelegram(p: {
       `Montant : $${p.amountUsd}/mois (${(p.monthlyLimit ?? 0).toLocaleString('en-US')} req/mois)\n` +
       `Clé : ${p.keyPrefix}…\n` +
       `Client : https://ibanforge.com/dashboard/clients`
-    : `\u{1F4B0} IBANforge — nouvel achat Stripe\n` +
-      `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)\n` +
-      `Clé : ${p.keyPrefix}…\n` +
-      `Client : https://ibanforge.com/dashboard/clients`;
+    : p.recharge
+      ? `\u{1F504} IBANforge — recharge Stripe (même clé)\n` +
+        `Montant : $${p.amountUsd} (pack ${p.bundle}, +${p.credits.toLocaleString('en-US')} crédits)\n` +
+        `Clé : ${p.keyPrefix}…\n` +
+        `Client : https://ibanforge.com/dashboard/clients`
+      : `\u{1F4B0} IBANforge — nouvel achat Stripe\n` +
+        `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)\n` +
+        `Clé : ${p.keyPrefix}…\n` +
+        `Client : https://ibanforge.com/dashboard/clients`;
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

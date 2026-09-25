@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 
 import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
@@ -167,13 +168,25 @@ export function generateApiKey(
  * `paymentRef` stays optional so a caller with no payment header (free mode,
  * tests, dev bypass) still gets a key — just not a recoverable one, which is
  * correct: nothing was paid.
+ *
+ * Lot B1 du chantier « clé unique » (25.09.2026) :
+ *   - `monthly_limit = 0` ÉCRIT : une clé née d'un achat n'a aucune allocation
+ *     propre. Laissé NULL, il se relisait « 200 » par défaut, et un lecteur
+ *     de plus suffisait à plafonner un pack de 5 000 crédits à 200 appels.
+ *   - `pending: true` : la clé naît INACTIVE, et seule la confirmation du
+ *     règlement l'active (`activatePendingCreditKeyInTx`). Le SDK x402 exécute
+ *     la route AVANT de régler : sans cela, un règlement refusé laissait une
+ *     clé chargée, active, et récupérable par sa référence. Le rapprochement
+ *     avec une lignée d'essai (`linkPaidKeyToLineage`) attend alors la même
+ *     confirmation : un paiement refusé ne relie rien.
  */
 export function generateCreditKey(
   email: string | null,
   credits: number,
   paymentRef?: string | null,
   source: string = 'x402-pack',
-): { api_key: string; key_prefix: string; credits: number } {
+  opts: { pending?: boolean } = {},
+): { api_key: string; key_prefix: string; key_hash: string; credits: number } {
   const db = getStatsDB();
   const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
   const keyHash = hashKey(rawKey);
@@ -183,8 +196,9 @@ export function generateCreditKey(
   // bundle behind one.
   const storedEmail = email && email.includes('@') ? email : 'credits-buyer';
   const emailNorm = normalizeEmail(storedEmail);
+  const pending = opts.pending === true;
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view, tier, lineage_hash, source) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view, tier, lineage_hash, source, active) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
@@ -197,10 +211,45 @@ export function generateCreditKey(
     'paid',
     keyHash,
     source,
+    pending ? 0 : 1,
   );
   recordLineageBirth({ lineageHash: keyHash, tier: 'paid', source, keyPrefix });
-  linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
-  return { api_key: rawKey, key_prefix: keyPrefix, credits };
+  if (!pending) linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
+  return { api_key: rawKey, key_prefix: keyPrefix, key_hash: keyHash, credits };
+}
+
+/**
+ * Active la clé qu'un règlement USDC vient de confirmer. Idempotente : ne
+ * touche qu'une clé encore inactive et JAMAIS désactivée (`deactivated_at IS
+ * NULL`), donc jamais une clé révoquée ou tournée entre-temps. Rend vrai quand
+ * la clé a réellement été activée.
+ */
+export function activatePendingCreditKeyInTx(db: DatabaseType.Database, keyHash: string): boolean {
+  const res = db
+    .prepare(
+      'UPDATE api_keys SET active = 1 WHERE key_hash = ? AND active = 0 AND deactivated_at IS NULL',
+    )
+    .run(keyHash);
+  if (res.changes === 0) return false;
+  const row = db
+    .prepare('SELECT email, email_norm FROM api_keys WHERE key_hash = ?')
+    .get(keyHash) as { email: string; email_norm: string | null } | undefined;
+  if (row)
+    linkPaidKeyToLineage({ paidKeyHash: keyHash, email: row.email, emailNorm: row.email_norm });
+  return true;
+}
+
+/**
+ * Le règlement d'une clé frappée en attente a été refusé : la clé reste morte,
+ * datée comme telle, et sa clé brute est effacée. Une clé en clair pour un
+ * paiement qui n'a pas eu lieu serait un secret sans propriétaire.
+ */
+export function failPendingCreditKeyInTx(db: DatabaseType.Database, keyHash: string): void {
+  db.prepare(
+    `UPDATE api_keys SET raw_key_one_time_view = NULL,
+            deactivated_at = COALESCE(deactivated_at, datetime('now'))
+      WHERE key_hash = ? AND active = 0`,
+  ).run(keyHash);
 }
 
 /**
@@ -251,8 +300,10 @@ export function generateStripeKey(
   const storedEmail = email && email.includes('@') ? email : 'stripe-buyer';
   const emailNorm = normalizeEmail(storedEmail);
 
+  // monthly_limit = 0 ÉCRIT, pour la raison donnée sur generateCreditKey : une
+  // clé née d'un achat n'a aucune allocation propre (lot B1, 25.09.2026).
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view, tier, lineage_hash, source) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view, tier, lineage_hash, source) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
     keyHash,
     keyPrefix,
@@ -270,6 +321,176 @@ export function generateStripeKey(
   linkPaidKeyToLineage({ paidKeyHash: keyHash, email: storedEmail, emailNorm });
 
   return { api_key: rawKey, key_prefix: keyPrefix, credits, idempotent: false };
+}
+
+/** The key a Stripe session minted, by its session id, or null. */
+export function findKeyByStripeSession(
+  stripeSessionId: string,
+  db: DatabaseType.Database = getStatsDB(),
+): { key_hash: string; key_prefix: string; lineage_hash: string } | null {
+  const row = db
+    .prepare(
+      'SELECT key_hash, key_prefix, COALESCE(lineage_hash, key_hash) AS lineage_hash FROM api_keys WHERE stripe_session_id = ?',
+    )
+    .get(stripeSessionId) as
+    { key_hash: string; key_prefix: string; lineage_hash: string } | undefined;
+  return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Recharge de la même clé (chantier « clé unique », lot B1, 25.09.2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ajoute `credits` au solde d'une clé ACTIVE, dans la transaction de
+ * l'appelant (le registre des achats écrit sa ligne dans la même). Rend le
+ * nouveau solde, ou null quand aucune clé active ne porte ce hash — révoquée
+ * entre la lecture de la référence et le crédit : l'appelant se replie alors
+ * sur une clé neuve, jamais sur une réactivation.
+ *
+ * `credits_total` devient le CUMUL acheté sur la clé, rotations comprises :
+ * `refundCredit` plafonne à lui (un remboursement de 4xx après une recharge
+ * ne doit pas ramener un solde de 1 900 à 1 000), et « consommé = total −
+ * restant » reste juste pour tous les lecteurs qui le calculent.
+ *
+ * `credits_notice_base` = le solde juste après ce crédit : l'assiette de
+ * l'alerte des 10 %. Dans un UPDATE, SQLite évalue chaque expression sur les
+ * valeurs d'AVANT, d'où l'addition répétée plutôt qu'une lecture de la colonne
+ * voisine.
+ */
+export function creditKeyInTx(
+  db: DatabaseType.Database,
+  keyHash: string,
+  credits: number,
+): number | null {
+  const res = db
+    .prepare(
+      `UPDATE api_keys
+          SET credits_remaining   = COALESCE(credits_remaining, 0) + ?,
+              credits_total       = COALESCE(credits_total, 0) + ?,
+              credits_notice_base = COALESCE(credits_remaining, 0) + ?
+        WHERE key_hash = ? AND active = 1`,
+    )
+    .run(credits, credits, credits, keyHash);
+  if (res.changes === 0) return null;
+  const row = db
+    .prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?')
+    .get(keyHash) as { credits_remaining: number };
+  return row.credits_remaining;
+}
+
+/** Ce qu'une clé a sans payer, relevé à son premier achat (spec §1.2, ZG5). */
+export interface AllowancePhoto {
+  tier: KeyTier;
+  monthlyLimit: number;
+  noRecredit: number;
+}
+
+/**
+ * Le premier achat d'une clé EXISTANTE (recharge par carte ou en USDC), dans la
+ * transaction du crédit. Rend la photo de l'allocation propre que la règle A
+ * rendra quand le client cessera de payer.
+ *
+ * Trois cas, décision du 24.09.2026 (règles A et B, zones grises ZG1 et ZG5) :
+ *   - clé ANONYME : elle passe au palier payant avec une allocation propre à 0.
+ *     Son gratuit n'a été ouvert par aucune adresse vérifiée ; un achat ne crée
+ *     jamais de gratuit. La promotion se journalise comme une réclamation
+ *     (`key_claims`, fait de lignée) avec `claimed_at`, et la clé quitte ainsi
+ *     le seul palier que le radar coupe ;
+ *   - clé née SOUS BOUCLIER (plafond réduit, `shield_episode`) : elle en sort,
+ *     comme lors d'une réclamation, et retrouve l'allocation normale de son
+ *     palier ;
+ *   - toute autre clé garde son allocation telle quelle (gratuite, Pro, « 200
+ *     une fois » à vie, ou 0 pour une clé née d'un achat).
+ *
+ * 🚨 Pas `claimKey` : il écrit 200 et `no_recredit = 1`, c'est-à-dire la
+ * promotion « 200 une fois » que la décision retire à l'achat d'un pack.
+ */
+export function applyFirstPurchaseInTx(
+  db: DatabaseType.Database,
+  keyHash: string,
+  method: 'stripe' | 'credits',
+): AllowancePhoto | null {
+  const row = db
+    .prepare(
+      'SELECT tier, monthly_limit, no_recredit, shield_episode, key_prefix FROM api_keys WHERE key_hash = ?',
+    )
+    .get(keyHash) as
+    | {
+        tier: KeyTier;
+        monthly_limit: number | null;
+        no_recredit: number;
+        shield_episode: string | null;
+        key_prefix: string;
+      }
+    | undefined;
+  if (!row) return null;
+  if (row.tier === 'anonymous') {
+    const res = db
+      .prepare(
+        `UPDATE api_keys
+            SET tier = 'paid', monthly_limit = 0, no_recredit = 0, shield_episode = NULL,
+                claimed_at = datetime('now'), claim_method = ?
+          WHERE key_hash = ? AND tier = 'anonymous'`,
+      )
+      .run(method, keyHash);
+    if (res.changes > 0) {
+      recordKeyClaim({
+        event: 'claim',
+        emailNorm: null,
+        keyPrefix: row.key_prefix,
+        keyHash,
+        method,
+        ipHash: null,
+      });
+      recordLineageClaim(db, keyHash, method);
+    }
+    return { tier: 'paid', monthlyLimit: 0, noRecredit: 0 };
+  }
+  if (row.shield_episode !== null) {
+    db.prepare(
+      `UPDATE api_keys SET monthly_limit = ?, no_recredit = 0, shield_episode = NULL
+        WHERE key_hash = ?`,
+    ).run(CLAIMED_LIMIT, keyHash);
+    return { tier: row.tier, monthlyLimit: CLAIMED_LIMIT, noRecredit: 0 };
+  }
+  return {
+    tier: row.tier,
+    monthlyLimit: row.monthly_limit ?? ownAllowanceDefault(row.tier),
+    noRecredit: row.no_recredit,
+  };
+}
+
+/**
+ * Retire au plus `credits` du solde d'une clé (reprise sur remboursement ou
+ * litige, spec §9). Jamais sous zéro, jamais `active = 0`. Le cumul acheté
+ * baisse d'autant, pour que « consommé = total − restant » ne compte pas comme
+ * consommés des crédits qui ont été repris. Rend ce qui a réellement été
+ * retiré.
+ */
+export function clawbackCreditsInTx(
+  db: DatabaseType.Database,
+  keyHash: string,
+  credits: number,
+): number {
+  const row = db
+    .prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?')
+    .get(keyHash) as { credits_remaining: number | null } | undefined;
+  const balance = Math.max(0, row?.credits_remaining ?? 0);
+  const removed = Math.max(0, Math.min(balance, credits));
+  if (removed === 0) return 0;
+  // L'assiette de l'alerte des 10 % baisse d'autant (relecture de la PR 259) :
+  // elle se mesure sur ce qui reste vraiment acheté, pas sur un pack repris.
+  // NULL reste NULL : l'alerte lit alors `credits_total`, déjà baissé.
+  db.prepare(
+    `UPDATE api_keys
+        SET credits_remaining   = credits_remaining - ?,
+            credits_total       = MAX(COALESCE(credits_total, 0) - ?, 0),
+            credits_notice_base = CASE WHEN credits_notice_base IS NULL THEN NULL
+                                       ELSE MAX(credits_notice_base - ?, 0) END
+      WHERE key_hash = ?`,
+  ).run(removed, removed, removed, keyHash);
+  return removed;
 }
 
 /** Monthly request allowance attached to an Editor/OEM subscription key. */
@@ -453,6 +674,25 @@ export interface ApiKeyValidation {
    * stays spent. Set on keys regrouped as one automated cohort.
    */
   noRecredit?: boolean;
+  /**
+   * Le solde juste après la dernière recharge (lot B1) : l'assiette de l'alerte
+   * des 10 %. Absent = celle de `creditsTotal`, ce qui vaut pour toute clé qui
+   * n'a jamais été rechargée.
+   */
+  creditsNoticeBase?: number;
+}
+
+/**
+ * L'allocation propre d'une clé dont `monthly_limit` n'est pas écrit.
+ *
+ * 0 pour le palier payant : seules les frappes de pack produisaient une clé
+ * payante sans plafond écrit (relu depuis toutes les écritures sur la table),
+ * et une clé née d'un achat n'a aucune allocation propre. Le palier gratuit
+ * sinon, comme avant. Défense en profondeur derrière la migration, qui écrit ce
+ * 0 sur les clés d'avant (lot B1, 25.09.2026).
+ */
+export function ownAllowanceDefault(tier: KeyTier | undefined): number {
+  return tier === 'paid' ? 0 : DEFAULT_MONTHLY_LIMIT;
 }
 
 /**
@@ -495,7 +735,7 @@ export function rotateApiKey(oldKey: string): {
     .prepare(
       `SELECT key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, no_recredit,
               stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
-              shield_episode, origin_prefix, lineage_hash
+              shield_episode, origin_prefix, lineage_hash, credits_notice_base
          FROM api_keys WHERE key_hash = ? AND active = 1`,
     )
     .get(oldHash) as
@@ -516,6 +756,7 @@ export function rotateApiKey(oldKey: string): {
         shield_episode: string | null;
         origin_prefix: string | null;
         lineage_hash: string | null;
+        credits_notice_base: number | null;
       }
     | undefined;
   if (!row) return null;
@@ -546,11 +787,14 @@ export function rotateApiKey(oldKey: string): {
     // de premier résultat, de jours actifs et de règlements. Repli sur
     // l'ancienne key_hash pour une clé antérieure à la colonne : elle devient
     // alors sa propre origine, ce qui est juste.
+    // credits_notice_base (lot B1) voyage comme le solde qu'il accompagne : sans
+    // lui, une clé rechargée puis tournée retomberait sur l'assiette du cumul et
+    // l'alerte des 10 % partirait au mauvais seuil.
     db.prepare(
       `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total,
                              no_recredit, stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
-                             shield_episode, origin_prefix, lineage_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                             shield_episode, origin_prefix, lineage_hash, credits_notice_base)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       newHash,
       keyPrefix,
@@ -569,11 +813,16 @@ export function rotateApiKey(oldKey: string): {
       row.shield_episode,
       row.origin_prefix ?? row.key_prefix,
       row.lineage_hash ?? oldHash,
+      row.credits_notice_base,
     );
     // Move the usage ledger to the new key hash too. Otherwise the lifetime sum
     // (and the plain monthly count) restart at zero on rotation — which would
     // make rotation a one-call quota reset for anyone, flagged or not.
     db.prepare('UPDATE api_usage SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
+    // Et les verrous d'alerte (lot B1) : laissés sur l'ancienne clé, une
+    // rotation rouvrirait l'alerte des 80 % du mois et celle des 10 % d'un pack
+    // déjà averti, soit un second mail pour le même franchissement.
+    db.prepare('UPDATE quota_notices SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
     // Et le journal de paiement : sinon une clé tournée repart d'un cumul de 0
     // et peut racheter la promotion à 1 $ autant de fois qu'elle tourne.
     db.prepare('UPDATE key_settlements SET key_hash = ?, key_prefix = ? WHERE key_hash = ?').run(
@@ -609,11 +858,12 @@ export interface ApiKeyValidationRow {
   credits_total: number | null;
   no_recredit: number | null;
   tier: KeyTier;
+  credits_notice_base?: number | null;
 }
 
 /** La liste SQL de ces colonnes, pour la même raison : une seule lecture. */
 export const API_KEY_VALIDATION_COLUMNS =
-  'email, monthly_limit, credits_remaining, credits_total, no_recredit, tier';
+  'email, monthly_limit, credits_remaining, credits_total, no_recredit, tier, credits_notice_base';
 
 /**
  * Une validation construite depuis une ligne ACTIVE d'`api_keys`, sans la clé
@@ -632,10 +882,13 @@ export function validationFromRow(keyHash: string, row: ApiKeyValidationRow): Ap
     keyHash,
     email: row.email,
     tier: row.tier,
-    monthlyLimit: row.monthly_limit ?? DEFAULT_MONTHLY_LIMIT,
+    // Le défaut dépend du palier depuis le lot B1 : une clé payante sans plafond
+    // écrit est une clé de pack, sans allocation propre (voir ownAllowanceDefault).
+    monthlyLimit: row.monthly_limit ?? ownAllowanceDefault(row.tier),
     creditsRemaining: row.credits_remaining ?? undefined,
     creditsTotal: row.credits_total ?? undefined,
     noRecredit: row.no_recredit === 1,
+    creditsNoticeBase: row.credits_notice_base ?? undefined,
   };
 }
 
@@ -894,6 +1147,123 @@ export function recordMonthlyObservation(keyHash: string, units = 1): string {
     month,
   );
   return month;
+}
+
+/** Ce que rend la facturation d'une clé qui a une allocation ET des crédits. */
+export interface MixedCharge {
+  allowed: boolean;
+  /** Unités prises sur l'allocation du mois (ou de la vie, sur l'assiette `no_recredit`). */
+  fromAllowance: number;
+  /** Unités prises sur le solde prépayé. */
+  fromCredits: number;
+  /** Le mois où l'appel a été écrit, pour qu'un remboursement de 4xx y retombe. */
+  month: string;
+  /** Ce qui était compté contre l'allocation AVANT cet appel. */
+  measured: number;
+  /** Le solde de crédits après cet appel (ou tel quel sur un refus). */
+  creditsAfter: number;
+  /** Vrai sur le seul appel qui fait franchir 80 % à la part d'allocation. */
+  crossedNoticeThreshold: boolean;
+}
+
+/**
+ * La règle B (décision du 24.09.2026) : sur une clé qui a les deux,
+ * l'allocation du mois passe d'abord, puis les crédits payés. Un lot qui
+ * déborde est DÉCOUPÉ : 50 IBAN quand il reste 30 d'allocation font 30 sur
+ * l'allocation et 20 sur les crédits, dans une seule transaction, tout ou rien
+ * si les crédits ne couvrent pas les 20.
+ *
+ * `api_usage.count` reçoit toutes les unités servies (la part d'allocation ET
+ * l'observation de la part crédits) : il reste « tous les appels servis ce
+ * mois-ci », ce que lisent le CRM et les graphiques. La part crédits n'arrive
+ * qu'une fois l'allocation épuisée, donc l'observation ne peut plus manger
+ * d'allocation, ce qu'elle aurait fait sans découpe.
+ *
+ * IMMEDIATE, comme checkAndIncrementQuota : la lecture du compteur et les deux
+ * écritures ne font qu'un pour un second écrivain.
+ */
+export function chargeAllowanceThenCredits(
+  keyHash: string,
+  allowance: number,
+  units: number,
+  noRecredit = false,
+): MixedCharge {
+  const db = getStatsDB();
+  const month = new Date().toISOString().slice(0, 7);
+  const decide = db.transaction((): MixedCharge => {
+    db.prepare(
+      'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
+    ).run(keyHash, month);
+    const measured = noRecredit
+      ? (
+          db
+            .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
+            .get(keyHash) as { n: number }
+        ).n
+      : (
+          db
+            .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+            .get(keyHash, month) as { count: number }
+        ).count;
+    const fromAllowance = Math.max(0, Math.min(units, allowance - measured));
+    const fromCredits = units - fromAllowance;
+    const balance = () =>
+      (
+        db.prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?').get(keyHash) as
+          { credits_remaining: number | null } | undefined
+      )?.credits_remaining ?? 0;
+    if (fromCredits > 0) {
+      const debit = db
+        .prepare(
+          'UPDATE api_keys SET credits_remaining = credits_remaining - ? WHERE key_hash = ? AND active = 1 AND credits_remaining >= ?',
+        )
+        .run(fromCredits, keyHash, fromCredits);
+      if (debit.changes === 0) {
+        return {
+          allowed: false,
+          fromAllowance: 0,
+          fromCredits: 0,
+          month,
+          measured,
+          creditsAfter: Math.max(0, balance()),
+          crossedNoticeThreshold: false,
+        };
+      }
+    }
+    db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(
+      units,
+      keyHash,
+      month,
+    );
+    const threshold = Math.ceil(allowance * QUOTA_NOTICE_RATIO);
+    return {
+      allowed: true,
+      fromAllowance,
+      fromCredits,
+      month,
+      measured,
+      creditsAfter: Math.max(0, balance()),
+      crossedNoticeThreshold:
+        fromAllowance > 0 && measured < threshold && measured + fromAllowance >= threshold,
+    };
+  });
+  return decide.immediate();
+}
+
+/**
+ * Le remboursement d'un 4xx sur une clé mixte : les deux compteurs, sur le mois
+ * FACTURÉ (voir decrementQuota), dans une transaction. Le solde reste plafonné
+ * par le cumul acheté (refundCredit).
+ */
+export function refundMixed(
+  keyHash: string,
+  charge: Pick<MixedCharge, 'fromAllowance' | 'fromCredits' | 'month'>,
+): void {
+  const db = getStatsDB();
+  db.transaction(() => {
+    decrementQuota(keyHash, charge.fromAllowance + charge.fromCredits, charge.month);
+    if (charge.fromCredits > 0) refundCredit(keyHash, charge.fromCredits);
+  })();
 }
 
 export function getUsage(

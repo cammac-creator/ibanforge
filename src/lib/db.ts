@@ -1583,6 +1583,8 @@ function openStatsDB(): DatabaseType.Database {
       ) WITHOUT ROWID;
     `);
     migrateLineageFacts(statsDB);
+    // Après les lignées : le rattrapage du registre des achats lit lineage_hash.
+    migrateKeyPurchases(statsDB);
     // ─── Le compte client par e-mail (lot C1, 24/09/2026) ─────────────────
     //
     // Bloc autonome posé en DERNIER, après les faits de mesure, pour la même
@@ -1916,6 +1918,204 @@ function migrateLineageFacts(statsDB: DatabaseType.Database): void {
       err instanceof Error ? err.message : err,
     );
   }
+}
+
+/**
+ * Le registre des achats et la référence de recharge (chantier « clé unique »,
+ * lot B1, 25.09.2026).
+ *
+ * Posé APRÈS `migrateLineageFacts` : son rattrapage lit `lineage_hash`, que ce
+ * bloc-là ajoute. Même discipline que lui : `CREATE TABLE IF NOT EXISTS`, ALTER
+ * gardés par `PRAGMA table_info`, index après les ALTER.
+ *
+ * Une ligne de `key_purchases` par paiement, `payment_ref` unique
+ * (`stripe:<session>` ou `x402:<référence>`) : c'est l'idempotence de chaque
+ * crédit. Le registre devient la source de vérité de l'argent ; la ligne de la
+ * clé ne porte plus que son état (solde, cumul acheté, allocation).
+ *
+ * 🚨 Hors de la sauvegarde tant que `src/lib/backup.ts` ne les nomme pas : les
+ * tables neuves n'y entrent pas d'elles-mêmes (format 8).
+ */
+function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
+  statsDB.exec(`
+    -- Une ligne par paiement. Pas de contre-apostrophe ni de point
+    -- d'interrogation dans ces commentaires : ils vivent dans un gabarit JS.
+    -- outcome : pending, credited, minted, minted_fallback, attached, failed,
+    -- refunded, disputed. Le montant vient du processeur, jamais d'un tarif.
+    CREATE TABLE IF NOT EXISTS key_purchases (
+      id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+      payment_ref            TEXT    NOT NULL UNIQUE,
+      rail                   TEXT    NOT NULL,
+      kind                   TEXT    NOT NULL,
+      outcome                TEXT    NOT NULL,
+      -- La lignée, stable à travers les rotations, et la clé servie au moment
+      -- de l'achat (historique : une rotation ne la réécrit pas).
+      lineage_hash           TEXT    NOT NULL,
+      key_hash               TEXT    NOT NULL,
+      key_prefix             TEXT    NOT NULL,
+      bundle                 TEXT,
+      credits                INTEGER,
+      balance_after          INTEGER,
+      -- amount_total de Stripe, tel quel, en unités mineures ; NULL si inconnu.
+      amount_minor           INTEGER,
+      currency               TEXT,
+      -- La cotation du paywall x402 : pas un reçu.
+      quoted_amount_usd      REAL,
+      stripe_session_id      TEXT,
+      stripe_payment_intent  TEXT,
+      stripe_subscription_id TEXT,
+      topup_ref              TEXT,
+      -- L'adresse saisie par le payeur : un contact de service, jamais
+      -- recopiée dans api_keys.
+      payer_email            TEXT,
+      -- La photo de l'allocation propre au premier achat de la lignée.
+      prev_tier              TEXT,
+      prev_monthly_limit     INTEGER,
+      prev_no_recredit       INTEGER,
+      clawback_credits       INTEGER,
+      issued_by_us           INTEGER NOT NULL DEFAULT 0,
+      backfilled             INTEGER NOT NULL DEFAULT 0,
+      created_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+      settled_at             TEXT,
+      ended_at               TEXT,
+      -- Rail USDC : de quoi rapprocher un achat a la main. L'adresse qui paie,
+      -- le nonce de l'autorisation, le hash de transaction. Jamais la signature.
+      payer_address          TEXT,
+      auth_nonce             TEXT,
+      tx_hash                TEXT
+    );
+    -- Une référence de recharge par lignée, tirée au hasard, jamais dérivée
+    -- de la clé.
+    CREATE TABLE IF NOT EXISTS key_topup_refs (
+      ref          TEXT PRIMARY KEY,
+      lineage_hash TEXT NOT NULL UNIQUE,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  // Le solde juste après la dernière recharge : l'assiette de l'alerte des 10 %.
+  // NULL = utiliser credits_total, ce qui vaut pour toute clé d'avant B1.
+  const keyCols = (
+    statsDB.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
+  ).map((r) => r.name);
+  if (!keyCols.includes('credits_notice_base')) {
+    statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_notice_base INTEGER');
+  }
+  // Les trois faits de rapprochement du rail USDC (relecture de sécurité de la
+  // PR 259, D10), ajoutés en queue : même ordre de colonnes sur une base neuve
+  // et sur une base qui avait déjà le registre.
+  const purchaseCols = (
+    statsDB.prepare('PRAGMA table_info(key_purchases)').all() as Array<{ name: string }>
+  ).map((r) => r.name);
+  for (const col of ['payer_address', 'auth_nonce', 'tx_hash']) {
+    if (!purchaseCols.includes(col)) {
+      statsDB.exec(`ALTER TABLE key_purchases ADD COLUMN ${col} TEXT`);
+    }
+  }
+  statsDB.exec(`
+    CREATE INDEX IF NOT EXISTS idx_key_purchases_lineage ON key_purchases(lineage_hash, created_at);
+    CREATE INDEX IF NOT EXISTS idx_key_purchases_created ON key_purchases(created_at);
+    CREATE INDEX IF NOT EXISTS idx_key_purchases_pi ON key_purchases(stripe_payment_intent)
+      WHERE stripe_payment_intent IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_key_purchases_sub ON key_purchases(stripe_subscription_id)
+      WHERE stripe_subscription_id IS NOT NULL;
+  `);
+  backfillKeyPurchases(statsDB);
+  // L'allocation propre ÉCRITE d'une clé née d'un achat de pack : 0, et non plus
+  // NULL relu « 200 » par défaut. Rejouable : ne touche que les NULL, et les
+  // frappes de pack écrivent désormais 0 elles-mêmes. Sans effet sur ce que ces
+  // clés reçoivent : une clé à crédits prend la branche des crédits avant de
+  // lire son plafond, avant comme après ce lot.
+  statsDB
+    .prepare(
+      `UPDATE api_keys SET monthly_limit = 0
+        WHERE tier = 'paid' AND monthly_limit IS NULL AND credits_total IS NOT NULL`,
+    )
+    .run();
+}
+
+/**
+ * Le rattrapage du registre depuis `api_keys`, rejoué à chaque ouverture.
+ *
+ * Rejouable par construction : `INSERT OR IGNORE` sur `payment_ref`, et chaque
+ * frappe écrit sa ligne au registre dans sa propre transaction depuis ce lot.
+ * Il ne fait donc quelque chose que pour une clé qui porte une référence de
+ * paiement sans ligne au registre, c'est-à-dire une clé née avant ce lot (ou
+ * restaurée depuis une sauvegarde antérieure au format 8).
+ *
+ * Exact pour ces clés-là : avant ce lot, aucune recharge n'existait, donc le
+ * cumul `credits_total` d'une clé née d'un pack vaut la taille de ce pack.
+ *
+ * Seule la ligne qui a FRAPPÉ une clé porte la référence : une rotation ne
+ * recopie ni `stripe_session_id` ni `x402_payment_ref`, donc une clé tournée ne
+ * compte jamais un second achat. Aucun montant USDC n'est inventé : la clé n'en
+ * porte pas, et le déduire du barème serait fabriquer une mesure.
+ *
+ * Aucun fait de production n'est supposé ici : la condition vérifiée est celle
+ * des colonnes, pas l'état d'une base particulière.
+ */
+function backfillKeyPurchases(statsDB: DatabaseType.Database): void {
+  statsDB.transaction(() => {
+    // 1. Packs par carte : la clé que la session a frappée.
+    statsDB
+      .prepare(
+        `INSERT OR IGNORE INTO key_purchases
+           (payment_ref, rail, kind, outcome, lineage_hash, key_hash, key_prefix, bundle, credits,
+            amount_minor, currency, stripe_session_id, prev_tier, prev_monthly_limit,
+            prev_no_recredit, issued_by_us, backfilled, created_at, settled_at)
+         SELECT 'stripe:' || stripe_session_id, 'card', 'pack', 'minted',
+                COALESCE(lineage_hash, key_hash), key_hash, key_prefix, NULL, credits_total,
+                amount_paid_minor, amount_paid_currency, stripe_session_id, 'paid', 0, 0,
+                issued_by_us, 1, COALESCE(created_at, datetime('now')), created_at
+           FROM api_keys
+          WHERE stripe_session_id IS NOT NULL
+            AND stripe_subscription_id IS NULL
+            AND credits_total IS NOT NULL AND credits_total > 0`,
+      )
+      .run();
+    // 2. Abonnements : seulement la ligne qui a frappé la clé (session ET
+    //    abonnement). Une copie tournée porte l'abonnement sans la session.
+    //    La fin n'est posée que si la pierre tombale le dit (relecture de la
+    //    PR 259, D5) : une rotation faite avant la PR 177 ne recopiait pas
+    //    l'abonnement, donc « aucune clé active ne le porte » arrivait aussi à
+    //    un abonnement vivant. Jamais la date de désactivation d'une ligne
+    //    tournée. Sans pierre tombale, la fin reste inconnue (NULL) : le lot B2
+    //    tranchera avec ses propres données.
+    statsDB
+      .prepare(
+        `INSERT OR IGNORE INTO key_purchases
+           (payment_ref, rail, kind, outcome, lineage_hash, key_hash, key_prefix, bundle,
+            amount_minor, currency, stripe_session_id, stripe_subscription_id, prev_tier,
+            prev_monthly_limit, prev_no_recredit, issued_by_us, backfilled, created_at,
+            settled_at, ended_at)
+         SELECT 'stripe:' || k.stripe_session_id, 'card', 'subscription', 'minted',
+                COALESCE(k.lineage_hash, k.key_hash), k.key_hash, k.key_prefix,
+                CASE WHEN k.monthly_limit >= 50000 THEN 'oem' ELSE 'pro' END,
+                k.amount_paid_minor, k.amount_paid_currency, k.stripe_session_id,
+                k.stripe_subscription_id, 'paid', 0, 0, k.issued_by_us, 1,
+                COALESCE(k.created_at, datetime('now')), k.created_at,
+                (SELECT COALESCE(d.recorded_at, datetime('now')) FROM dead_subscriptions d
+                  WHERE d.subscription_id = k.stripe_subscription_id)
+           FROM api_keys k
+          WHERE k.stripe_session_id IS NOT NULL AND k.stripe_subscription_id IS NOT NULL`,
+      )
+      .run();
+    // 3. Packs USDC : la clé que le règlement a frappée, sans montant.
+    statsDB
+      .prepare(
+        `INSERT OR IGNORE INTO key_purchases
+           (payment_ref, rail, kind, outcome, lineage_hash, key_hash, key_prefix, bundle, credits,
+            prev_tier, prev_monthly_limit, prev_no_recredit, issued_by_us, backfilled, created_at,
+            settled_at)
+         SELECT 'x402:' || x402_payment_ref, 'usdc', 'pack', 'minted',
+                COALESCE(lineage_hash, key_hash), key_hash, key_prefix, NULL, credits_total,
+                'paid', 0, 0, issued_by_us, 1, COALESCE(created_at, datetime('now')), created_at
+           FROM api_keys
+          WHERE x402_payment_ref IS NOT NULL
+            AND stripe_session_id IS NULL
+            AND credits_total IS NOT NULL AND credits_total > 0`,
+      )
+      .run();
+  })();
 }
 
 /** Étape 5 de la migration ci-dessus, sortie pour que son échec soit borné. */

@@ -21,11 +21,11 @@ IBANforge utilise les codes de statut HTTP standards et renvoie des erreurs stru
 | `402` | Payment Required | Route payante appelée sans moyen de payer utilisable : ni clé ni franchise gratuite restante, une clé invalide ou dont la franchise ou les crédits sont épuisés, ou un paiement refusé. L'enveloppe de paiement x402, avec une `cause` quand elle s'applique |
 | `404` | Not Found | Endpoint inconnu. Sur `POST /v1/keys/revoke` et `POST /v1/keys/rotate`, `invalid_key` : la clé est inconnue ou déjà révoquée |
 | `405` | Method Not Allowed | Bon chemin, mauvaise méthode (par exemple `GET /v1/keys/generate`) ; le champ `allow` nomme la méthode à utiliser |
-| `409` | Conflict | Les routes des clés seulement. `already_claimed` : la clé a déjà quitté le palier anonyme. `already_claimed_elsewhere` : cette adresse porte déjà une clé réclamée, ou en a réclamé une dans les dernières 24 heures. `verification_in_flight` : un code pour cette adresse vient d'être émis ; utilisez-le, ou réessayez dans quelques minutes |
+| `409` | Conflict | Les routes des clés : `already_claimed` : la clé a déjà quitté le palier anonyme. `already_claimed_elsewhere` : cette adresse porte déjà une clé réclamée, ou en a réclamé une dans les dernières 24 heures. `verification_in_flight` : un code pour cette adresse vient d'être émis ; utilisez-le, ou réessayez dans quelques minutes. La route des packs (`POST /v1/credits/buy/…`), pour un paiement déjà vu dont l'achat n'a pas été crédité : `payment_pending` (son règlement n'est pas encore confirmé, ne payez pas une seconde fois), `payment_refused` (signez un nouveau paiement) ou `payment_reversed` ; rien n'est réglé à nouveau |
 | `413` | Payload Too Large | Corps de requête au-delà de 256 Ko |
 | `429` | Too Many Requests | Plus de 100 requêtes en une minute depuis la même adresse IP ; attendez `Retry-After` |
 | `500` | Internal Server Error | Erreur inattendue du serveur (merci de nous la signaler, voir [Support](#support)) |
-| `502`, `503` | Bad Gateway, Service Unavailable | Le rail de paiement x402 est injoignable ou a répondu par une erreur. Réessayez plus tard. Sur les routes des clés, `503 verification_unavailable` : le mail de vérification n'a pas pu partir (clé créée avec une adresse, réclamation, approbation par appareil) ; réessayez dans quelques minutes. La route des établissements britanniques a ses propres codes `502` et `503`, sur [sa page](/docs/gb-firms) |
+| `502`, `503` | Bad Gateway, Service Unavailable | Le rail de paiement x402 est injoignable ou a répondu par une erreur. Réessayez plus tard. Sauf `502 settlement_unconfirmed` : l'issue de votre paiement est inconnue et il est peut-être déjà sur la chaîne ; ne payez pas une seconde fois avant d'avoir vérifié le transfert (`settlement.transaction` porte son hash quand le facilitateur l'a rendu). Sur les routes des clés, `503 verification_unavailable` : le mail de vérification n'a pas pu partir (clé créée avec une adresse, réclamation, approbation par appareil) ; réessayez dans quelques minutes. La route des établissements britanniques a ses propres codes `502` et `503`, sur [sa page](/docs/gb-firms) |
 
 ## Codes d'erreur de validation
 
@@ -97,7 +97,7 @@ Renvoyé quand une route payante est appelée sans moyen de payer utilisable : n
 | `trial_unavailable` | La franchise sans clé ne peut pas être décomptée en ce moment : l'appel retombe sur le paiement |
 | `monthly_quota_exhausted` | Le quota du mois de la clé est épuisé |
 | `monthly_quota_insufficient` | Un lot demande plus de requêtes qu'il n'en reste à la clé ; rien n'a été consommé |
-| `credits_exhausted`, `credits_insufficient` | Les deux mêmes cas pour une clé à crédits prépayés |
+| `credits_exhausted`, `credits_insufficient` | Les deux mêmes cas pour les crédits prépayés de la clé : une clé née d'un achat, ou une clé dont l'allocation est épuisée et dont les crédits ne couvrent plus l'appel. `cause.credits.topup` et `X-Credits-Topup-Url` portent le lien qui recharge cette même clé |
 | `invalid_api_key` | Une clé a été envoyée, mais elle est inconnue ou révoquée |
 | `key_revoked_burst` | Une clé anonyme révoquée avec une rafale d'inscriptions automatiques ; le `message` dit comment la récupérer |
 
@@ -119,6 +119,8 @@ Renvoyé quand une route payante est appelée sans moyen de payer utilisable : n
 ```
 
 Quand un paiement a été envoyé et refusé, le corps porte aussi `payment_error` avec la raison.
+
+Sur une clé valide, le corps porte aussi `credit_packs.topup_this_key` : les liens de paiement par carte et la route USDC qui rechargent la clé présentée, pour que les crédits arrivent sur elle et que rien ne change dans votre intégration. `pay_by_card` garde son sens : un pack acheté sans clé, livré comme une clé neuve.
 
 Consultez [Paiements x402](/docs/x402) pour savoir comment gérer cela, et [Clés API](/docs/api-keys) pour la clé gratuite.
 
@@ -142,7 +144,7 @@ Un code inconnu n'est pas un 404 : `GET /v1/bic/{code}` répond `200` avec `foun
 
 `rate_limit_exceeded` : plus de 100 requêtes en une minute depuis la même adresse IP. La réponse porte un en-tête `Retry-After` et un champ `retry_after`, tous deux en secondes. Chaque réponse décomptée porte `RateLimit-Limit`, `RateLimit-Remaining` et `RateLimit-Reset` (en secondes), plus les anciens en-têtes `X-RateLimit-*`, dont la remise à zéro est un horodatage Unix. `/health`, `/ping`, `/openapi.json` et `/v1/demo` ne sont pas décomptés. La même limite est publiée dans [`/.well-known/rate-limits.yml`](https://api.ibanforge.com/.well-known/rate-limits.yml).
 
-Prendre et réclamer une clé ont leurs propres limites du jour, avec leurs propres codes `429` : voir [Clés API](/docs/api-keys). Le quota du mois d'une clé n'est pas un `429` : il se termine par le `402` ci-dessus. Chaque réponse servie sur une clé mensuelle (gratuite ou réclamée) porte `X-Quota-Used`, `X-Quota-Limit` et `X-Quota-Remaining` (`GET /v1/keys/usage` rend le même décompte) ; une clé à crédits prépayés porte à la place `X-Credits-Remaining` et `X-Credits-Total` (`GET /v1/credits/balance`).
+Prendre et réclamer une clé ont leurs propres limites du jour, avec leurs propres codes `429` : voir [Clés API](/docs/api-keys). Le quota du mois d'une clé n'est pas un `429` : il se termine par le `402` ci-dessus. Chaque réponse servie sur une clé mensuelle (gratuite ou réclamée) porte `X-Quota-Used`, `X-Quota-Limit` et `X-Quota-Remaining` (`GET /v1/keys/usage` rend le même décompte) ; une clé qui a des crédits prépayés porte `X-Credits-Remaining` et `X-Credits-Total` (`GET /v1/credits/balance`), et une clé qui a les deux porte les deux séries. Chaque réponse facturée sur une clé dit qui l'a payée dans `X-Charged-From` : `allowance`, `credits`, ou `allowance+credits` pour un lot partagé entre les deux.
 
 ### 500 Internal Server Error
 

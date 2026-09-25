@@ -62,11 +62,11 @@ const db = new Database(dbPath);
 console.log(`Database: ${dbPath}`);
 console.log(`Customer: ${email}`);
 console.log(`Account identity: ${emailNorm}`);
-console.log(execute ? 'MODE: EXECUTE (rows will be deleted)\n' : 'MODE: dry run (pass --execute to delete)\n');
+console.log(
+  execute ? 'MODE: EXECUTE (rows will be deleted)\n' : 'MODE: dry run (pass --execute to delete)\n',
+);
 
-const keys = db
-  .prepare('SELECT key_prefix, key_hash FROM api_keys WHERE email = ?')
-  .all(email);
+const keys = db.prepare('SELECT key_prefix, key_hash FROM api_keys WHERE email = ?').all(email);
 const prefixes = keys.map((k) => k.key_prefix);
 const hashes = keys.map((k) => k.key_hash);
 
@@ -78,17 +78,37 @@ const hasTable = (name) =>
 const targets = [];
 targets.push(['api_keys', 'FROM api_keys WHERE email = ?', [email]]);
 if (prefixes.length) {
-  targets.push(['request_log', `FROM request_log WHERE key_prefix IN (${inList(prefixes.length)})`, prefixes]);
-  targets.push(['operations', `FROM operations WHERE key_prefix IN (${inList(prefixes.length)})`, prefixes]);
+  targets.push([
+    'request_log',
+    `FROM request_log WHERE key_prefix IN (${inList(prefixes.length)})`,
+    prefixes,
+  ]);
+  targets.push([
+    'operations',
+    `FROM operations WHERE key_prefix IN (${inList(prefixes.length)})`,
+    prefixes,
+  ]);
 }
 if (hashes.length) {
-  targets.push(['api_usage', `FROM api_usage WHERE key_hash IN (${inList(hashes.length)})`, hashes]);
+  targets.push([
+    'api_usage',
+    `FROM api_usage WHERE key_hash IN (${inList(hashes.length)})`,
+    hashes,
+  ]);
   if (hasTable('quota_notices')) {
-    targets.push(['quota_notices', `FROM quota_notices WHERE key_hash IN (${inList(hashes.length)})`, hashes]);
+    targets.push([
+      'quota_notices',
+      `FROM quota_notices WHERE key_hash IN (${inList(hashes.length)})`,
+      hashes,
+    ]);
   }
 }
 if (hasTable('email_messages')) {
-  targets.push(['email_messages', 'FROM email_messages WHERE customer_email = ? OR counterparty = ?', [email, email]]);
+  targets.push([
+    'email_messages',
+    'FROM email_messages WHERE customer_email = ? OR counterparty = ?',
+    [email, email],
+  ]);
 }
 if (hasTable('email_summaries')) {
   targets.push(['email_summaries', 'FROM email_summaries WHERE email = ?', [email]]);
@@ -118,7 +138,11 @@ if (hasTable('key_claims')) {
   targets.push(['key_claims', 'FROM key_claims WHERE lower(email_norm) = ?', [email]]);
 }
 if (hasTable('cohort_relabels')) {
-  targets.push(['cohort_relabels', 'FROM cohort_relabels WHERE lower(old_email) = ? OR lower(address) = ?', [email, email]]);
+  targets.push([
+    'cohort_relabels',
+    'FROM cohort_relabels WHERE lower(old_email) = ? OR lower(address) = ?',
+    [email, email],
+  ]);
 }
 // Compte client par e-mail (lot C1, 25.09.2026) : les sessions de lecture et le
 // code de connexion en cours, par l'adresse NORMALISÉE, qui est l'identité du
@@ -128,11 +152,49 @@ if (hasTable('account_sessions')) {
   targets.push(['account_sessions', 'FROM account_sessions WHERE email_norm = ?', [emailNorm]]);
 }
 if (hasTable('account_login_codes')) {
-  targets.push(['account_login_codes', 'FROM account_login_codes WHERE email_norm = ?', [emailNorm]]);
+  targets.push([
+    'account_login_codes',
+    'FROM account_login_codes WHERE email_norm = ?',
+    [emailNorm],
+  ]);
 }
 if (hasTable('orphan_mail')) {
   // sender is either the bare address or "Name <address>".
-  targets.push(['orphan_mail', "FROM orphan_mail WHERE lower(sender) = ? OR lower(sender) LIKE '%<' || ? || '>%'", [email, email]]);
+  targets.push([
+    'orphan_mail',
+    "FROM orphan_mail WHERE lower(sender) = ? OR lower(sender) LIKE '%<' || ? || '>%'",
+    [email, email],
+  ]);
+}
+
+// Le registre des achats (lot B1, 25.09.2026) : l'adresse saisie par un payeur
+// est EFFACÉE de sa ligne, la ligne reste. C'est une pièce de l'argent (un
+// paiement, son montant, la clé créditée), que la comptabilité garde comme
+// Stripe garde la sienne ; l'adresse n'y servait que de contact de service.
+const anonymise = [];
+if (hasTable('key_purchases')) {
+  anonymise.push([
+    'key_purchases',
+    'FROM key_purchases WHERE lower(payer_email) = ?',
+    'UPDATE key_purchases SET payer_email = NULL WHERE lower(payer_email) = ?',
+    [email],
+  ]);
+  // L'adresse du portefeuille qui a payé en USDC (relecture de sécurité de la
+  // PR 259, D10) est une donnée personnelle pseudonyme : effacée elle aussi, sur
+  // les achats des clés de ce client. Le nonce et le hash de transaction restent
+  // la référence du paiement, comme son montant.
+  const purchaseCols = db
+    .prepare('PRAGMA table_info(key_purchases)')
+    .all()
+    .map((c) => c.name);
+  if (hashes.length && purchaseCols.includes('payer_address')) {
+    anonymise.push([
+      'key_purchases',
+      `FROM key_purchases WHERE key_hash IN (${inList(hashes.length)}) AND payer_address IS NOT NULL`,
+      `UPDATE key_purchases SET payer_address = NULL WHERE key_hash IN (${inList(hashes.length)})`,
+      hashes,
+    ]);
+  }
 }
 
 let total = 0;
@@ -140,6 +202,10 @@ for (const [label, where, params] of targets) {
   const n = db.prepare(`SELECT COUNT(*) AS n ${where}`).get(...params).n;
   total += n;
   console.log(`${label.padEnd(16)} ${n} row(s)`);
+}
+for (const [label, where, , params] of anonymise) {
+  const n = db.prepare(`SELECT COUNT(*) AS n ${where}`).get(...params).n;
+  console.log(`${label.padEnd(16)} ${n} row(s) keep their line, the payer address is erased`);
 }
 if (keys.length) {
   console.log(`\nKeys involved: ${prefixes.map((p) => `${p}…`).join(', ')}`);
@@ -154,6 +220,10 @@ const run = db.transaction(() => {
   for (const [label, where, params] of targets) {
     const res = db.prepare(`DELETE ${where}`).run(...params);
     console.log(`deleted ${String(res.changes).padStart(5)}  ${label}`);
+  }
+  for (const [label, , update, params] of anonymise) {
+    const res = db.prepare(update).run(...params);
+    console.log(`erased  ${String(res.changes).padStart(5)}  ${label} (payer address)`);
   }
 });
 run();

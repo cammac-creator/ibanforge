@@ -3,6 +3,9 @@ import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { isInternalEmail } from './internal-accounts.js';
 import { getServiceUsage, type ServiceUsage } from './service-usage.js';
 import { SUBSCRIPTION_KEY_SQL } from './subscription-payments.js';
+import { SALE_OUTCOMES_SQL } from './key-purchases.js';
+import { ownAllowanceDefault } from './api-keys.js';
+import type { KeyTier } from './tiers.js';
 
 /**
  * Per-EMAIL activation picture. The unit is deliberately the email, never the
@@ -114,6 +117,10 @@ interface KeyRow {
   tier: string;
   /** 1 for a Stripe subscription key — see the SELECT. */
   subscription: number;
+  /** La lignée de la clé : une rotation la garde, le registre des achats s'y rattache. */
+  lineage: string;
+  /** Les packs achetés par cette lignée, au registre des achats (lot B1). */
+  pack_purchases: number;
 }
 
 interface LogAgg {
@@ -172,7 +179,11 @@ export function getActivation(days = 30): ActivationResponse {
       // subscriber. The rule is written once, in subscription-payments.ts, and
       // the revenue readings use the same text: one population of subscribers.
       `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier,
-              CASE WHEN ${SUBSCRIPTION_KEY_SQL} THEN 1 ELSE 0 END AS subscription
+              CASE WHEN ${SUBSCRIPTION_KEY_SQL} THEN 1 ELSE 0 END AS subscription,
+              COALESCE(lineage_hash, key_hash) AS lineage,
+              (SELECT COUNT(*) FROM key_purchases kp
+                WHERE kp.lineage_hash = COALESCE(api_keys.lineage_hash, api_keys.key_hash)
+                  AND kp.kind = 'pack' AND kp.outcome IN ${SALE_OUTCOMES_SQL}) AS pack_purchases
        FROM api_keys ORDER BY email, created_at`,
     )
     .all() as KeyRow[];
@@ -232,8 +243,29 @@ export function getActivation(days = 30): ActivationResponse {
     // A subscription key is not a free key: its monthly allowance is bought,
     // and counting it here once turned a subscriber into a "pilot" (free quota
     // above 200) on the overview.
-    const freeKeys = list.filter((k) => k.credits_total == null && k.subscription !== 1);
+    // Une clé MIXTE (lot B1 : un gratuit rechargée) compte des deux côtés : son
+    // allocation propre reste un gratuit, ses crédits un achat. Le critère du
+    // gratuit est donc l'allocation propre (> 0, hors abonnement), et non plus
+    // l'absence de crédits ; la copie tournée, inactive, d'une clé mixte n'y
+    // compte pas une seconde fois.
+    const freeKeys = list.filter(
+      (k) =>
+        k.subscription !== 1 &&
+        (k.monthly_limit ?? ownAllowanceDefault(k.tier as KeyTier)) > 0 &&
+        (k.credits_total == null || k.active === 1),
+    );
     const paidKeys = list.filter((k) => k.credits_total != null);
+    // Les packs : les ACHATS de chaque lignée, au registre. Une clé à crédits
+    // dont la lignée n'a aucun achat inscrit (pack offert, clé d'avant toute
+    // référence) compte pour un, comme avant ; une rotation ne double plus rien.
+    const packsByLineage = new Map<string, number>();
+    for (const k of paidKeys) {
+      packsByLineage.set(
+        k.lineage,
+        Math.max(packsByLineage.get(k.lineage) ?? 0, k.pack_purchases > 0 ? k.pack_purchases : 1),
+      );
+    }
+    const packs = [...packsByLineage.values()].reduce((a, n) => a + n, 0);
     // Only a LIVE subscription makes a subscriber: a canceled one has its key
     // deactivated by the customer.subscription.deleted webhook.
     const subscriber = list.some((k) => k.subscription === 1 && k.active === 1);
@@ -301,7 +333,7 @@ export function getActivation(days = 30): ActivationResponse {
       limit_hits_window: limitHitsWindow,
       credits_total: creditsTotal,
       credits_remaining: creditsRemaining,
-      packs: paidKeys.length,
+      packs,
       subscriber,
       status,
     });

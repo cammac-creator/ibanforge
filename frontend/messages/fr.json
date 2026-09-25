@@ -536,7 +536,8 @@
         "title": "Crédits prépayés",
         "body": "Achat en volume, sans expiration : 1k = 4 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/crédit). Un crédit = une validation ou un lookup — un lot de N IBANs consomme N crédits.",
         "note": "Paiement Stripe — clé API livrée par email. Les agents peuvent acheter en USDC : POST /v1/credits/buy/1k|5k|25k.",
-        "cardLabel": "Payer par carte"
+        "cardLabel": "Payer par carte",
+        "rechargeExisting": "Vous avez déjà une clé ? Rechargez-la depuis <account>votre compte</account> : les crédits arrivent sur cette même clé, rien à changer dans votre intégration."
       }
     },
     "oem": {
@@ -2320,7 +2321,12 @@
     "leaveFailed": "La clé n'a pas pu être révoquée. Rien n'a changé, elle fonctionne toujours.",
     "leaveDpa": "Lire l'accord de traitement des données",
     "noKeyYet": "Pas encore de clé ? 25 appels par mois sans e-mail ; 200 par mois après confirmation de votre adresse. Sans carte.",
-    "getKey": "Obtenir une clé gratuite"
+    "getKey": "Obtenir une clé gratuite",
+    "mixedNote": "Chaque appel puise d’abord dans l’allocation, puis dans les crédits prépayés de cette clé.",
+    "topupTitle": "Recharger cette clé",
+    "topupHint": "Paiement par carte : les crédits arrivent sur cette même clé. Rien à changer dans votre intégration.",
+    "topupUnproven": "Cette clé porte votre adresse, mais celle-ci n’a pas été confirmée par un code à la création de la clé. Ne la rechargez que si vous la reconnaissez comme la vôtre.",
+    "topupCredits": "{credits} crédits"
   },
   "sources": {
     "meta": {
