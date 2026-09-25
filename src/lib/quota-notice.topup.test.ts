@@ -35,7 +35,7 @@ import {
   validateApiKey,
 } from './api-keys.js';
 import { ensureTopupRef } from './key-purchases.js';
-import { crossesCreditsNotice, maybeSendCreditsWarning } from './quota-notice.js';
+import { crossesCreditsNotice, maybeSendCreditsWarning, serviceContact } from './quota-notice.js';
 import { closeAll, getStatsDB } from './db.js';
 import type { HonoEnv } from '../types.js';
 
@@ -199,5 +199,44 @@ describe('l’alerte des 80 % d’une clé mixte', () => {
     });
     expect(plain.text).toContain('stops until the 1st of next month');
     expect(plain.text).not.toContain('client_reference_id');
+  });
+});
+
+/**
+ * D6 de la relecture de sécurité de la PR 259. Le contact de service d'une clé
+ * sans adresse joignable ne peut être que l'adresse saisie chez Stripe : celle
+ * du corps d'un achat USDC n'est jamais vérifiée, et en faire un contact
+ * laisserait n'importe qui diriger nos mails (préfixe, solde, liens de
+ * recharge) vers n'importe quelle adresse.
+ */
+describe('le contact de service d’une clé sans adresse', () => {
+  function purchaseRow(keyHash: string, keyPrefix: string, rail: 'card' | 'usdc', email: string) {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO key_purchases (payment_ref, rail, kind, outcome, lineage_hash, key_hash, key_prefix,
+                                    credits, payer_email)
+         VALUES (?, ?, 'pack', 'credited', ?, ?, ?, 1000, ?)`,
+      )
+      .run(
+        `${rail === 'card' ? 'stripe' : 'x402'}:${uniq(rail)}`,
+        rail,
+        keyHash,
+        keyHash,
+        keyPrefix,
+        email,
+      );
+  }
+
+  it('jamais l’adresse non vérifiée d’un corps USDC', () => {
+    const anon = generateApiKey(null)!;
+    purchaseRow(anon.key_hash, anon.key_prefix, 'usdc', `${uniq('usdc')}@alpha.example.net`);
+    expect(serviceContact(anon.key_hash, undefined)).toBeNull();
+  });
+
+  it('l’adresse saisie chez Stripe, oui', () => {
+    const anon = generateApiKey(null)!;
+    const email = `${uniq('card')}@alpha.example.net`;
+    purchaseRow(anon.key_hash, anon.key_prefix, 'card', email);
+    expect(serviceContact(anon.key_hash, undefined)).toBe(email);
   });
 });

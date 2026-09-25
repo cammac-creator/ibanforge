@@ -479,12 +479,17 @@ export function clawbackCreditsInTx(
   const balance = Math.max(0, row?.credits_remaining ?? 0);
   const removed = Math.max(0, Math.min(balance, credits));
   if (removed === 0) return 0;
+  // L'assiette de l'alerte des 10 % baisse d'autant (relecture de la PR 259) :
+  // elle se mesure sur ce qui reste vraiment acheté, pas sur un pack repris.
+  // NULL reste NULL : l'alerte lit alors `credits_total`, déjà baissé.
   db.prepare(
     `UPDATE api_keys
-        SET credits_remaining = credits_remaining - ?,
-            credits_total     = MAX(COALESCE(credits_total, 0) - ?, 0)
+        SET credits_remaining   = credits_remaining - ?,
+            credits_total       = MAX(COALESCE(credits_total, 0) - ?, 0),
+            credits_notice_base = CASE WHEN credits_notice_base IS NULL THEN NULL
+                                       ELSE MAX(credits_notice_base - ?, 0) END
       WHERE key_hash = ?`,
-  ).run(removed, removed, keyHash);
+  ).run(removed, removed, removed, keyHash);
   return removed;
 }
 

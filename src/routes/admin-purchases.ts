@@ -6,8 +6,10 @@
  *  - `GET  /v1/admin/purchases?outcome=pending` : les achats, les plus récents
  *    d'abord, filtrés par issue ;
  *  - `POST /v1/admin/purchases/:id/confirm` : le rapprochement d'un achat USDC
- *    resté en attente (délai du facilitateur), une fois le transfert relu sur
- *    la chaîne. Crédite la clé, ou active la clé neuve, une fois ;
+ *    resté en attente (issue de règlement inconnue : délai, erreur du
+ *    facilitateur, transaction diffusée non confirmée), une fois le transfert
+ *    relu sur la chaîne à partir de `payer_address`, `auth_nonce` et `tx_hash`.
+ *    Crédite la clé, ou active la clé neuve, une fois ;
  *  - `POST /v1/admin/purchases/:id/fail` : le même achat, quand le transfert
  *    n'a pas eu lieu. Rien n'est crédité, une clé neuve reste morte ;
  *  - `POST /v1/admin/purchases/:id/clawback` : la reprise d'un pack remboursé
@@ -59,6 +61,11 @@ function publicRow(row: PurchaseRow): Record<string, unknown> {
     quoted_amount_usd: row.quoted_amount_usd,
     stripe_payment_intent: row.stripe_payment_intent,
     payer_email: row.payer_email,
+    // De quoi relire la chaîne avant de confirmer ou d'échouer un achat USDC
+    // (relecture de la PR 259, D10). Jamais la signature.
+    payer_address: row.payer_address,
+    auth_nonce: row.auth_nonce,
+    tx_hash: row.tx_hash,
     clawback_credits: row.clawback_credits,
     backfilled: row.backfilled === 1,
     created_at: row.created_at,

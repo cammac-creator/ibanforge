@@ -254,6 +254,64 @@ describe('ouverture du schéma', () => {
     mod.closeAll();
   });
 
+  it('le rattrapage ne date jamais la fin d’un abonnement vivant (relecture de la PR 259, D5)', async () => {
+    // Une clé Pro tournée avant le 10.09 : l'ancienne rotation recopiait
+    // l'allocation, pas l'abonnement. Sa copie active ne porte donc pas
+    // `stripe_subscription_id`, alors que l'abonnement est toujours facturé.
+    // Un second abonnement, lui, a sa pierre tombale.
+    const path = freshPath();
+    const raw = new Database(path);
+    raw.exec(`
+      CREATE TABLE api_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT UNIQUE NOT NULL,
+        key_prefix TEXT NOT NULL,
+        email TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        active INTEGER DEFAULT 1,
+        monthly_limit INTEGER,
+        stripe_session_id TEXT,
+        stripe_subscription_id TEXT,
+        amount_paid_minor INTEGER,
+        amount_paid_currency TEXT,
+        lineage_hash TEXT,
+        origin_prefix TEXT
+      );
+      CREATE TABLE dead_subscriptions (
+        subscription_id TEXT PRIMARY KEY,
+        recorded_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, stripe_session_id,
+                            stripe_subscription_id, lineage_hash)
+        VALUES ('ho', 'ifk_000000ho', 'acme@example.com', 0, 10000, 'cs_test_rotated_pro',
+                'sub_test_rotated_pro', 'ho');
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, lineage_hash, origin_prefix)
+        VALUES ('hr', 'ifk_000000hr', 'acme@example.com', 1, 10000, 'ho', 'ifk_000000ho');
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, stripe_session_id,
+                            stripe_subscription_id, lineage_hash)
+        VALUES ('hd', 'ifk_000000hd', 'acme@example.com', 0, 10000, 'cs_test_dead_pro',
+                'sub_test_dead_pro', 'hd');
+      INSERT INTO dead_subscriptions (subscription_id) VALUES ('sub_test_dead_pro');
+    `);
+    raw.close();
+    const mod = await openAt(path);
+    const rows = mod
+      .getStatsDB()
+      .prepare(
+        `SELECT payment_ref, kind, ended_at FROM key_purchases
+          WHERE kind = 'subscription' ORDER BY payment_ref`,
+      )
+      .all() as Array<{ payment_ref: string; kind: string; ended_at: string | null }>;
+    expect(rows.map((r) => r.payment_ref)).toEqual([
+      'stripe:cs_test_dead_pro',
+      'stripe:cs_test_rotated_pro',
+    ]);
+    // La pierre tombale dit la fin ; son absence ne la dit pas.
+    expect(rows[0].ended_at).not.toBeNull();
+    expect(rows[1].ended_at).toBeNull();
+    mod.closeAll();
+  });
+
   it('avec deux key_prefix identiques, l’ouverture ne jette pas et l’index unique n’est PAS créé', async () => {
     const path = freshPath();
     const raw = new Database(path);

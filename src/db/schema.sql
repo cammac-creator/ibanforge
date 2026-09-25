@@ -135,7 +135,9 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_email ON api_keys(email);
 --   credits_notice_base INTEGER          -- le solde juste après la dernière recharge (alerte des 10 %)
 --   credits_total                        -- désormais le CUMUL acheté sur la clé, rotations comprises
 -- Tables neuves : key_purchases (une ligne par paiement, payment_ref unique, source de
--- vérité de l'argent) et key_topup_refs (une référence de recharge ifr_ par lignée).
+-- vérité de l'argent ; sur le rail USDC, payer_address, auth_nonce et tx_hash pour le
+-- rapprochement à la main, jamais la signature) et key_topup_refs (une référence de
+-- recharge ifr_ par lignée).
 -- Migration et rattrapage : migrateKeyPurchases dans src/lib/db.ts.
 
 CREATE TABLE IF NOT EXISTS api_usage (

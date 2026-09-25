@@ -75,7 +75,10 @@ export interface BurstRevocationInput {
  *  - le registre des achats (lot B1, 25.09.2026) : une clé dont la lignée a UN
  *    achat inscrit, quel que soit son solde et même en attente de règlement,
  *    n'est jamais coupée. Ceinture derrière le palier : une clé anonyme qui
- *    paie quitte déjà le palier anonyme, seul que ce rayon touche.
+ *    paie quitte déjà le palier anonyme, seul que ce rayon touche. Sauf un
+ *    achat en ÉCHEC (relecture de sécurité de la PR 259, D3) : aucun argent n'a
+ *    bougé, et un seul paiement signé, envoyé sous plusieurs encodages, en
+ *    laissait un par clé anonyme.
  *
  * 🚨 `ROUND(..., 6)` n'est pas de la coquetterie. `quoted_amount_usd` est un
  * REAL et le seuil vaut exactement deux cents règlements au tarif unitaire. La
@@ -97,7 +100,8 @@ const RADIUS_CLAUSES = `
      AND email NOT LIKE '%@cohorte.invalid'
      AND NOT EXISTS (
            SELECT 1 FROM key_purchases kp
-            WHERE kp.lineage_hash = COALESCE(api_keys.lineage_hash, api_keys.key_hash))
+            WHERE kp.lineage_hash = COALESCE(api_keys.lineage_hash, api_keys.key_hash)
+              AND kp.outcome <> 'failed')
      AND NOT EXISTS (
            SELECT 1 FROM key_settlements s
             WHERE s.key_hash = api_keys.key_hash

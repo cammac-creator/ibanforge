@@ -306,6 +306,9 @@ export function processStripeEvent(event: Stripe.Event): {
   // trap the MINTING_EVENTS comment describes: legitimate transaction
   // concluded, no key, no error anywhere. Dormant until the first promo
   // code or OEM trial exists, and silent the day one does.
+  // A credit PACK settled at zero is the exception, handled in the pack branch
+  // below: nothing is credited, and a human is alerted (security review of
+  // PR 259).
   if (
     session.payment_status &&
     session.payment_status !== 'paid' &&
@@ -502,6 +505,28 @@ export function processStripeEvent(event: Stripe.Event): {
         detail:
           'Un paiement Stripe a été encaissé pour un pack que l’API ne connaît pas : aucune clé ' +
           'n’a été créditée ni frappée. Session à relire dans les outils privés.',
+      },
+    };
+  }
+
+  // Par précaution (relecture de sécurité de la PR 259) : un pack réglé à ZÉRO
+  // ne crédite rien, ni la clé de sa référence, ni une clé neuve. Checkout
+  // refuse en principe un code promotionnel à 100 % en mode paiement, mais la
+  // garde n'en dépend pas : un humain est prévenu et décide. Sans adresse ni
+  // session dans le texte, comme l'alerte d'un pack inconnu.
+  if (session.payment_status === 'no_payment_required') {
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
+    return {
+      status: 200,
+      body: { received: true, error: 'unpaid_pack', bundle },
+      alert: {
+        key: `stripe:unpaid-pack:${sessionTag(session.id)}`,
+        detail:
+          'Un pack a été réglé à zéro chez Stripe (aucun paiement requis) : aucune clé n’a été ' +
+          'créditée ni frappée. Session à relire dans les outils privés.',
       },
     };
   }

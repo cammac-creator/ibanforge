@@ -23,12 +23,41 @@ export interface PendingPurchaseMark {
   kind: 'topup' | 'mint';
 }
 
+/**
+ * Ce que le facilitateur a répondu au règlement de CETTE requête, tel que
+ * l'enrobage (`boundFacilitator`, x402.ts) l'a lu (relecture de sécurité de la
+ * PR 259, D1). Trois issues, jamais deux :
+ *
+ *  - `settled` : `success: true` ;
+ *  - `refused` : un REFUS TERMINAL, une réponse `success: false` de statut
+ *    inférieur à 500, avec un motif explicite, sans transaction diffusée, et
+ *    dont le motif n'est ni `settlement_pending` ni `unexpected_*` ;
+ *  - `unknown` : tout le reste (délai, erreur réseau, page d'une passerelle,
+ *    5xx, réponse illisible, `settlement_pending`, échec qui porte un hash de
+ *    transaction). L'argent a pu partir.
+ */
+export interface SettleObservation {
+  state: 'settled' | 'refused' | 'unknown';
+  /** Le motif rendu (`errorReason`), ou la nature de l'erreur. */
+  reason: string | null;
+  /** Le hash de transaction rendu, réglé ou diffusé ; null s'il n'y en a pas. */
+  transaction: string | null;
+  /** L'adresse qui paie (réponse du facilitateur, sinon l'autorisation signée). */
+  payer: string | null;
+  /** Le nonce de l'autorisation signée. Jamais la signature. */
+  nonce: string | null;
+}
+
 export interface SettlementSlot {
   /**
-   * Le règlement dont on a cessé d'attendre la réponse. Posé par l'enrobage du
-   * facilitateur (`boundFacilitator`, x402.ts), avec son erreur de délai.
+   * Le règlement dont l'issue est INCONNUE : posé par l'enrobage du
+   * facilitateur (`boundFacilitator`, x402.ts) pour un délai dépassé comme pour
+   * toute issue `unknown` (D1), et effacé si la relance du SDK finit réglée.
+   * Non nul, la réponse devient un 502 qui dit de ne pas payer deux fois.
    */
   unconfirmed: Error | null;
+  /** Ce que le facilitateur a répondu au règlement ; null tant qu'il n'a pas été appelé. */
+  settle: SettleObservation | null;
   /**
    * Le prix que le paywall a COTÉ pour cette requête, en dollars. null =
    * inconnu, et le journal n'écrit alors RIEN : la référence de paiement est
@@ -50,7 +79,7 @@ export interface SettlementSlot {
 const store = new AsyncLocalStorage<SettlementSlot>();
 
 export function newSettlementSlot(): SettlementSlot {
-  return { unconfirmed: null, quotedUsd: null, purchase: null, afterConfirm: null };
+  return { unconfirmed: null, settle: null, quotedUsd: null, purchase: null, afterConfirm: null };
 }
 
 /** Exécute `fn` dans ce créneau : tout `await` en aval y lit le même objet. */

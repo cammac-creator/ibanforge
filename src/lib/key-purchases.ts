@@ -96,6 +96,17 @@ export interface PurchaseRow {
   created_at: string;
   settled_at: string | null;
   ended_at: string | null;
+  /** Rail USDC (relecture de la PR 259, D10) : l'adresse qui paie, jamais la signature. */
+  payer_address: string | null;
+  /** Le nonce de l'autorisation signée. */
+  auth_nonce: string | null;
+  /** Le hash de transaction rendu par le facilitateur, réglé ou diffusé. */
+  tx_hash: string | null;
+}
+
+/** Une ligne dont l'argent est arrivé et les crédits sont sur une clé. */
+export function isSaleOutcome(outcome: PurchaseOutcome): boolean {
+  return outcome === 'credited' || outcome === 'minted' || outcome === 'minted_fallback';
 }
 
 // ─── La lignée et la référence de recharge ───────────────────────────────────
@@ -391,7 +402,18 @@ export function applyCardPackPaymentInTx(db: Db, p: CardPackPayment): CardPackOu
   if (existing) return { kind: 'idempotent', purchase: existing };
 
   let fallback: Exclude<CardPackOutcome, { kind: 'idempotent' | 'credited' }>['fallback'] = null;
-  const ref = p.clientReferenceId?.trim() || null;
+  // Une référence qui n'a pas la forme d'une référence de recharge est traitée
+  // comme ABSENTE (spec §4.2 ; relecture de la PR 259, D8) : n'importe quel
+  // payeur peut retoucher l'URL d'un lien de paiement, et ce n'est pas un
+  // paiement perdu. Un journal, jamais une alerte ; la valeur n'est ni gardée
+  // ni journalisée.
+  const raw = p.clientReferenceId?.trim() || null;
+  const ref = raw && TOPUP_REF_PATTERN.test(raw) ? raw : null;
+  if (raw && !ref) {
+    console.warn(
+      `[key-purchases] a card pack carried a client_reference_id that is not a recharge reference (${raw.length} characters): treated as absent, a new key is minted.`,
+    );
+  }
   if (ref) {
     const target = resolveTopupRef(ref, db);
     if (target.ok) {
@@ -514,6 +536,29 @@ export function recordSubscriptionMintInTx(
 }
 
 // ─── Le rail USDC, en deux temps ─────────────────────────────────────────────
+
+/**
+ * Ce qu'il faut pour rapprocher un achat USDC à la main (relecture de sécurité
+ * de la PR 259, D10) : l'adresse qui paie, le nonce de l'autorisation et le
+ * hash de transaction que le facilitateur a rendu. Jamais la signature :
+ * l'enrobage x402 ne lit que ces trois champs, chacun à sa forme. Un champ déjà
+ * écrit n'est pas effacé ; le hash le plus récent l'emporte (une relance du
+ * SDK rend la même transaction).
+ */
+export function notePurchaseSettlement(
+  id: number,
+  facts: { payer: string | null; nonce: string | null; transaction: string | null },
+): void {
+  getStatsDB()
+    .prepare(
+      `UPDATE key_purchases
+          SET payer_address = COALESCE(payer_address, ?),
+              auth_nonce    = COALESCE(auth_nonce, ?),
+              tx_hash       = COALESCE(?, tx_hash)
+        WHERE id = ? AND rail = 'usdc'`,
+    )
+    .run(facts.payer, facts.nonce, facts.transaction, id);
+}
 
 export interface UsdcPackRequest {
   /** `x402:<référence>` */

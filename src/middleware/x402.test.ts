@@ -626,14 +626,102 @@ describe('a timed-out settle reaches the response builder', () => {
   });
 
   it('leaves the slot clean when the facilitator REFUSES', async () => {
-    const client = fakeClient(() => Promise.reject(new Error('insufficient funds')));
-    const { slot, out } = runInSettlementSlot(() =>
-      (client.settle as () => Promise<unknown>)().catch((e: unknown) => e),
-    );
+    // A refusal is an ANSWER: `success: false` with an explicit reason, nothing
+    // broadcast. Since the security review of PR 259 (D1), a thrown error is
+    // no longer read as one: see the next cases.
+    const client = fakeClient(async () => ({
+      success: false,
+      errorReason: 'insufficient_funds',
+      transaction: '',
+    }));
+    const { slot, out } = runInSettlementSlot(() => (client.settle as () => Promise<unknown>)());
     await out;
     // A refusal is a known outcome: the SDK's 402 is the honest answer there,
     // and dressing it as "unknown" would be the mirror-image lie.
     expect(slot.unconfirmed).toBeNull();
+    expect(slot.settle?.state).toBe('refused');
+  });
+
+  /**
+   * D1 of the security review of PR 259: only a TERMINAL refusal is a refusal.
+   * A network error, a gateway page, any 5xx, `settlement_pending`, or a failure
+   * that carries a broadcast transaction are UNKNOWN outcomes: the payment may
+   * be on-chain, and the SDK's 402 would invite the buyer to pay twice.
+   */
+  it('marks the slot when settle fails with a network error', async () => {
+    const client = fakeClient(() => Promise.reject(new TypeError('fetch failed')));
+    const { slot, out } = runInSettlementSlot(() =>
+      (client.settle as () => Promise<unknown>)().catch((e: unknown) => e),
+    );
+    await out;
+    expect(slot.unconfirmed).not.toBeNull();
+    expect(slot.settle?.state).toBe('unknown');
+  });
+
+  it('marks the slot when the facilitator answers 5xx, even with success: false', async () => {
+    const settleError = Object.assign(new Error('unexpected_settle_error'), {
+      name: 'SettleError',
+      statusCode: 500,
+      errorReason: 'unexpected_settle_error',
+      transaction: '',
+    });
+    const client = fakeClient(() => Promise.reject(settleError));
+    const { slot, out } = runInSettlementSlot(() =>
+      (client.settle as () => Promise<unknown>)().catch((e: unknown) => e),
+    );
+    await out;
+    expect(slot.settle?.state).toBe('unknown');
+    expect(slot.unconfirmed).not.toBeNull();
+  });
+
+  it('marks the slot when a failure carries a broadcast transaction', async () => {
+    const client = fakeClient(async () => ({
+      success: false,
+      errorReason: 'invalid_exact_evm_transaction_failed',
+      transaction: `0x${'12'.repeat(32)}`,
+    }));
+    const { slot, out } = runInSettlementSlot(() => (client.settle as () => Promise<unknown>)());
+    await out;
+    expect(slot.settle?.state).toBe('unknown');
+    expect(slot.settle?.transaction).toBe(`0x${'12'.repeat(32)}`);
+    expect(slot.unconfirmed).not.toBeNull();
+  });
+
+  it('clears the mark when the SDK retry of a pending settlement succeeds', async () => {
+    let calls = 0;
+    const client = fakeClient(async () => {
+      calls += 1;
+      return calls === 1
+        ? { success: false, errorReason: 'settlement_pending', transaction: `0x${'34'.repeat(32)}` }
+        : { success: true, transaction: `0x${'34'.repeat(32)}` };
+    });
+    const { slot, out } = runInSettlementSlot(async () => {
+      const settle = client.settle as () => Promise<unknown>;
+      await settle();
+      expect(slot.unconfirmed).not.toBeNull();
+      return settle();
+    });
+    await out;
+    expect(slot.settle?.state).toBe('settled');
+    expect(slot.unconfirmed).toBeNull();
+  });
+
+  it('never lets a refusal after a pending settlement read as a clean refusal', async () => {
+    let calls = 0;
+    const client = fakeClient(async () => {
+      calls += 1;
+      return calls === 1
+        ? { success: false, errorReason: 'settlement_pending', transaction: `0x${'56'.repeat(32)}` }
+        : { success: false, errorReason: 'nonce_already_used', transaction: '' };
+    });
+    const { slot, out } = runInSettlementSlot(async () => {
+      const settle = client.settle as () => Promise<unknown>;
+      await settle();
+      return settle();
+    });
+    await out;
+    expect(slot.settle?.state).toBe('unknown');
+    expect(slot.unconfirmed).not.toBeNull();
   });
 });
 

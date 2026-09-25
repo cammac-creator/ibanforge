@@ -27,6 +27,7 @@ function packEvent(opts: {
   email?: string | null;
   amountTotal?: number | null;
   currency?: string;
+  paymentStatus?: string;
 }): Stripe.Event {
   return {
     id: `evt_${uniq('topup')}`,
@@ -37,7 +38,7 @@ function packEvent(opts: {
         metadata: { bundle: opts.bundle ?? '1k' },
         customer_email: opts.email ?? null,
         customer_details: opts.email ? { email: opts.email } : null,
-        payment_status: 'paid',
+        payment_status: opts.paymentStatus ?? 'paid',
         amount_total: opts.amountTotal === undefined ? 400 : opts.amountTotal,
         currency: opts.currency ?? 'usd',
         client_reference_id: opts.ref ?? null,
@@ -178,6 +179,41 @@ describe('bundle inconnu : alerte (constat C6)', () => {
     expect(
       (getStatsDB().prepare('SELECT COUNT(*) AS n FROM api_keys').get() as { n: number }).n,
     ).toBe(before);
+  });
+});
+
+/**
+ * Par précaution (relecture de sécurité de la PR 259) : Checkout refuse en
+ * principe un code promotionnel à 100 % en mode paiement, mais la garde ne
+ * doit pas en dépendre. Un pack réglé à zéro ne crédite rien, ni une clé
+ * existante par sa référence, ni une clé neuve, et un humain est prévenu.
+ */
+describe('un pack réglé à zéro (no_payment_required)', () => {
+  it('ne crédite ni ne frappe rien, et lève une alerte', () => {
+    const key = generateApiKey(`${uniq('zero')}@alpha.example.net`)!;
+    const ref = ensureTopupRef(key.key_hash)!;
+    const session = `cs_test_${uniq('zero')}`;
+    const result = processStripeEvent(
+      packEvent({
+        sessionId: session,
+        ref,
+        amountTotal: 0,
+        paymentStatus: 'no_payment_required',
+      }),
+    );
+    expect(result.status).toBe(200);
+    expect(result.notify).toBeUndefined();
+    expect(result.recharge).toBeUndefined();
+    expect(result.alert?.key).toMatch(/^stripe:unpaid-pack:/);
+    expect(validateApiKey(key.api_key).creditsRemaining).toBeUndefined();
+    expect(findPurchaseByRef(`stripe:${session}`)).toBeNull();
+    expect(
+      (
+        getStatsDB()
+          .prepare('SELECT COUNT(*) AS n FROM api_keys WHERE stripe_session_id = ?')
+          .get(session) as { n: number }
+      ).n,
+    ).toBe(0);
   });
 });
 

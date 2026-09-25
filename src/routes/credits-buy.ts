@@ -21,11 +21,17 @@
  *    qu'un achat en attente, que l'enrobage x402 confirme ou échoue ensuite
  *    (`src/middleware/x402.ts`, `settlePendingPurchase`).
  */
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { HonoEnv } from '../types.js';
-import { creditKeyInTx, findCreditKeyByPaymentRef, generateCreditKey } from '../lib/api-keys.js';
+import { creditKeyInTx, generateCreditKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
-import { openUsdcMint, openUsdcTopup } from '../lib/key-purchases.js';
+import {
+  findPurchaseByRef,
+  isSaleOutcome,
+  openUsdcMint,
+  openUsdcTopup,
+  type PurchaseRow,
+} from '../lib/key-purchases.js';
 import { currentSettlementSlot, settlementRef } from '../lib/settlement-slot.js';
 import { isReachableContact } from '../lib/quota-notice.js';
 import { buildFirstCallCurl } from '../lib/first-call.js';
@@ -46,16 +52,85 @@ export { settlementRef };
 
 const creditsBuy = new Hono<HonoEnv>();
 
-/** Le corps d'une vente dont le règlement a déjà été vu (requête rejouée). */
-function idempotentBody(
+/** La clé que ce règlement a frappée : si elle est active, et si sa clé brute est encore récupérable. */
+function mintedBy(
+  ref: string,
+): { key_hash: string; key_prefix: string; active: boolean; recoverable: boolean } | null {
+  const row = getStatsDB()
+    .prepare(
+      `SELECT key_hash, key_prefix, active, raw_key_one_time_view IS NOT NULL AS has_raw
+         FROM api_keys WHERE x402_payment_ref = ?`,
+    )
+    .get(ref) as
+    { key_hash: string; key_prefix: string; active: number; has_raw: number } | undefined;
+  if (!row) return null;
+  return {
+    key_hash: row.key_hash,
+    key_prefix: row.key_prefix,
+    active: row.active === 1,
+    recoverable: row.active === 1 && row.has_raw === 1,
+  };
+}
+
+/**
+ * Un paiement déjà vu (requête rejouée), lu sur la ligne de son achat
+ * (relecture de sécurité de la PR 259, D2).
+ *
+ *  - achat CRÉDITÉ ou FRAPPÉ : 200 idempotent, rien de plus. Le lien de
+ *    récupération seulement pour une clé active dont la clé brute est encore
+ *    gardée : sinon il répondrait 404 ;
+ *  - TOUT LE RESTE (en attente, refusé, remboursé, disputé) : 409. Le SDK ne
+ *    règle jamais une réponse d'erreur, donc l'autorisation rejouée ne part
+ *    pas : un 200 ici la faisait régler sans rien livrer.
+ */
+function replayAnswer(
+  c: Context<HonoEnv>,
+  row: PurchaseRow,
   ref: string,
   bundle: { slug: string; credits: number },
-  keyPrefix: string,
-  topup: boolean,
-): Record<string, unknown> {
-  return topup
-    ? {
-        key_prefix: keyPrefix,
+): Response {
+  if (!isSaleOutcome(row.outcome)) {
+    if (row.outcome === 'pending') {
+      return c.json(
+        {
+          error: 'payment_pending',
+          purchase_status: 'pending',
+          message:
+            'This payment was already received and its settlement is not confirmed yet: do NOT pay again. ' +
+            'It is reconciled by hand once the transfer is confirmed on-chain; write to support@ibanforge.com ' +
+            'with the transaction hash if nothing has arrived within a day.',
+        },
+        409,
+      );
+    }
+    if (row.outcome === 'failed') {
+      return c.json(
+        {
+          error: 'payment_refused',
+          purchase_status: 'failed',
+          message:
+            'This payment was refused when it was settled: nothing was credited, and it will not be settled ' +
+            'again. Sign a new payment to buy this pack.',
+        },
+        409,
+      );
+    }
+    return c.json(
+      {
+        error: 'payment_reversed',
+        purchase_status: row.outcome,
+        message:
+          'This payment was refunded or disputed and its credits were taken back: it will not be settled ' +
+          'again. Sign a new payment to buy this pack.',
+      },
+      409,
+    );
+  }
+  const minted = mintedBy(ref);
+  if (!minted || minted.key_hash !== row.key_hash) {
+    return c.json(
+      {
+        key_prefix: row.key_prefix,
         credits: bundle.credits,
         bundle: bundle.slug,
         idempotent: true,
@@ -63,17 +138,66 @@ function idempotentBody(
         message:
           'This settlement was already recorded for this key: nothing was credited twice. ' +
           'Check the balance at GET /v1/credits/balance.',
-      }
-    : {
-        key_prefix: keyPrefix,
-        credits: bundle.credits,
-        bundle: bundle.slug,
-        idempotent: true,
+      },
+      200,
+    );
+  }
+  return c.json(
+    {
+      key_prefix: row.key_prefix,
+      credits: bundle.credits,
+      bundle: bundle.slug,
+      idempotent: true,
+      ...(minted.recoverable
+        ? {
+            message:
+              'This settlement already minted a key: it was not minted again. ' +
+              'If you never received it, fetch it once at the recovery URL below.',
+            recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}`,
+          }
+        : {
+            message:
+              'This settlement already minted a key: it was not minted again, and it can no longer be shown.',
+          }),
+    },
+    200,
+  );
+}
+
+/**
+ * Une clé frappée par ce règlement sans ligne au registre (rattrapage manqué) :
+ * 200 seulement si elle est active, jamais pour une clé morte.
+ */
+function legacyReplayAnswer(
+  c: Context<HonoEnv>,
+  minted: { key_prefix: string; active: boolean; recoverable: boolean },
+  ref: string,
+  bundle: { slug: string; credits: number },
+): Response {
+  if (!minted.active) {
+    return c.json(
+      {
+        error: 'payment_already_used',
         message:
-          'This settlement already minted a key — it was not minted again. ' +
-          'If you never received it, fetch it once at the recovery URL below.',
-        recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}`,
-      };
+          'This payment already bought a key, which is no longer active: it will not be settled again. ' +
+          'Sign a new payment to buy this pack.',
+      },
+      409,
+    );
+  }
+  return c.json(
+    {
+      key_prefix: minted.key_prefix,
+      credits: bundle.credits,
+      bundle: bundle.slug,
+      idempotent: true,
+      message: 'This settlement already minted a key: it was not minted again.',
+      ...(minted.recoverable
+        ? { recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}` }
+        : {}),
+    },
+    200,
+  );
 }
 
 creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
@@ -185,6 +309,15 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
 
   const paymentRef = `x402:${ref}`;
   const quotedUsd = slot.quotedUsd ?? bundle.price_usdc;
+  const pack = { slug, credits: bundle.credits };
+
+  // ─── Un paiement déjà vu (requête rejouée) ───────────────────────────────
+  //
+  // Avant toute ouverture : la ligne de son achat dit ce qu'on en répond (D2).
+  const seen = findPurchaseByRef(paymentRef);
+  if (seen) return replayAnswer(c, seen, ref, pack);
+  const legacy = mintedBy(ref);
+  if (legacy) return legacyReplayAnswer(c, legacy, ref, pack);
 
   // ─── Recharge de la clé présentée ────────────────────────────────────────
   if (presentedHash && presentedPrefix && presentedKey) {
@@ -192,13 +325,8 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
       { keyHash: presentedHash, keyPrefix: presentedPrefix },
       { paymentRef, bundle: slug, credits: bundle.credits, quotedUsd, payerEmail: email },
     );
-    if ('existing' in opened) {
-      const topup = opened.existing.key_hash !== findMintedKeyHash(ref);
-      return c.json(
-        idempotentBody(ref, { slug, credits: bundle.credits }, opened.existing.key_prefix, topup),
-        200,
-      );
-    }
+    // Une requête jumelle a ouvert la ligne entre la lecture et l'ouverture.
+    if ('existing' in opened) return replayAnswer(c, opened.existing, ref, pack);
     slot.purchase = { id: opened.opened, paymentRef, kind: 'topup' };
     // Le mail de recharge part à l'adresse JOIGNABLE de la clé, jamais à celle
     // du corps (ZG8), et seulement une fois le règlement confirmé : c'est
@@ -246,15 +374,9 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
 
   // ─── Clé neuve ────────────────────────────────────────────────────────────
   //
-  // A settlement we have already minted for. Nothing is minted again — that
-  // would be two packs for one payment — and the buyer is pointed at the
-  // one-time recovery, which is the whole reason the raw key was kept.
-  const already = findCreditKeyByPaymentRef(ref);
-  if (already) {
-    return c.json(
-      idempotentBody(ref, { slug, credits: bundle.credits }, already.key_prefix, false),
-    );
-  }
+  // Un règlement déjà vu a répondu plus haut : rien n'est frappé deux fois pour
+  // un paiement, et l'acheteur d'une clé active est renvoyé à la récupération
+  // unique, la raison même pour laquelle la clé brute est gardée.
   const opened = openUsdcMint(email, {
     paymentRef,
     ref,
@@ -263,12 +385,7 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
     quotedUsd,
     payerEmail: email,
   });
-  if ('existing' in opened) {
-    return c.json(
-      idempotentBody(ref, { slug, credits: bundle.credits }, opened.existing.key_prefix, false),
-      200,
-    );
-  }
+  if ('existing' in opened) return replayAnswer(c, opened.existing, ref, pack);
   const result = opened.mint;
   slot.purchase = { id: opened.opened, paymentRef, kind: 'mint' };
   // Mail delivery on the USDC rail, matching the card rail (BIZ-04, 2026-09-01),
@@ -323,13 +440,5 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
     201,
   );
 });
-
-/** La clé que ce règlement a frappée, par sa référence ; null s'il n'en a frappé aucune. */
-function findMintedKeyHash(ref: string): string | null {
-  const row = getStatsDB()
-    .prepare('SELECT key_hash FROM api_keys WHERE x402_payment_ref = ?')
-    .get(ref) as { key_hash: string } | undefined;
-  return row?.key_hash ?? null;
-}
 
 export { creditsBuy };

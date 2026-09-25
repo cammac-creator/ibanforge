@@ -194,3 +194,54 @@ describe('la règle B sur une clé mixte', () => {
     expect(res.headers.get('x-quota-remaining')).toBe('0');
   });
 });
+
+/**
+ * D4 de la relecture de sécurité de la PR 259. La règle B écrit dans le même
+ * compteur du mois les unités payées par l'allocation ET par les crédits. Une
+ * fois les crédits vidés, la clé repasse par l'allocation seule, et ce compteur
+ * dépasse alors l'allocation : les en-têtes et le texte du refus annonçaient
+ * « 1200/200 », et une route gratuite se disait épuisée.
+ */
+describe('une clé mixte dont les crédits sont vidés', () => {
+  function echoApp() {
+    const a = new Hono<HonoEnv>();
+    a.use('/v1/*', apiKeyMiddleware());
+    a.post('/v1/iban/validate', (c) => c.json({ cause: c.get('paywallCause') ?? null }));
+    a.get('/v1/demo', (c) => c.json({ ok: true }));
+    return a;
+  }
+
+  it('les compteurs ne dépassent jamais l’allocation, et une route gratuite n’est jamais épuisée', async () => {
+    const k = mixedKey(1000);
+    // Tout est consommé ce mois-ci : les 200 de l'allocation, puis les 1 000
+    // crédits, écrits dans le même compteur.
+    getStatsDB()
+      .prepare('UPDATE api_keys SET credits_remaining = 0 WHERE key_hash = ?')
+      .run(k.key_hash);
+    setUsage(k.key_hash, 1200);
+
+    const refused = await echoApp().request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+      body: JSON.stringify({ iban: VALID_IBAN }),
+    });
+    expect(refused.headers.get('x-quota-exhausted')).toBe('true');
+    expect(refused.headers.get('x-quota-used')).toBe('200');
+    expect(refused.headers.get('x-quota-limit')).toBe('200');
+    const cause = (
+      (await refused.json()) as {
+        cause: { detail: string; quota: { used: number; limit: number } };
+      }
+    ).cause;
+    expect(cause.quota).toMatchObject({ used: 200, limit: 200 });
+    expect(cause.detail).toContain('(200/200 requests used)');
+    expect(cause.detail).not.toContain('1200');
+
+    const free = await echoApp().request('/v1/demo', {
+      headers: { Authorization: `Bearer ${k.api_key}` },
+    });
+    expect(free.status).toBe(200);
+    expect(free.headers.get('x-quota-exhausted')).toBeNull();
+    expect(Number(free.headers.get('x-quota-used') ?? '0')).toBeLessThanOrEqual(200);
+  });
+});

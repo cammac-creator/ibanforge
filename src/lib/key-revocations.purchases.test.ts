@@ -58,4 +58,20 @@ describe('le rayon et le registre des achats', () => {
       .get(buyer.key_hash) as { active: number };
     expect(row.active).toBe(1);
   });
+
+  it('une ligne en échec ne protège rien : aucun argent n’a bougé (relecture de la PR 259, D3)', () => {
+    const refused = generateApiKey(null)!;
+    getStatsDB()
+      .prepare(
+        `INSERT INTO key_purchases (payment_ref, rail, kind, outcome, lineage_hash, key_hash, key_prefix, credits)
+         VALUES (?, 'usdc', 'pack', 'failed', ?, ?, ?, 1000)`,
+      )
+      .run(
+        `x402:${RUN.toString(16)}failed`,
+        refused.key_hash,
+        refused.key_hash,
+        refused.key_prefix,
+      );
+    expect(revokeForBurst(input(refused))).toBe(true);
+  });
 });

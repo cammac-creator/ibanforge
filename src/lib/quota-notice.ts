@@ -59,10 +59,14 @@ export function isReachableContact(email: string | null | undefined): email is s
 
 /**
  * Le contact de service d'une clé : son adresse quand elle est joignable, sinon
- * la dernière adresse qu'un PAYEUR a saisie pour elle (chantier « clé unique »,
- * lot B1, ZG8). Cette adresse-là n'est jamais l'identité de la clé : elle ne
- * sert qu'à prévenir la personne qui a payé, par exemple pour un pack rechargé
- * sur une clé anonyme.
+ * la dernière adresse qu'un PAYEUR a saisie pour elle CHEZ STRIPE (chantier
+ * « clé unique », lot B1, ZG8). Cette adresse-là n'est jamais l'identité de la
+ * clé : elle ne sert qu'à prévenir la personne qui a payé, par exemple pour un
+ * pack rechargé sur une clé anonyme.
+ *
+ * Jamais l'adresse du corps d'un achat USDC (relecture de sécurité de la
+ * PR 259, D6) : personne ne l'a vérifiée, et la retenir laissait le porteur
+ * diriger nos mails (préfixe, solde, liens de recharge) vers n'importe qui.
  */
 export function serviceContact(keyHash: string, keyEmail: string | undefined): string | null {
   if (isReachableContact(keyEmail)) return keyEmail;
@@ -72,6 +76,7 @@ export function serviceContact(keyHash: string, keyEmail: string | undefined): s
         `SELECT p.payer_email FROM key_purchases p
            JOIN api_keys k ON COALESCE(k.lineage_hash, k.key_hash) = p.lineage_hash
           WHERE k.key_hash = ? AND p.payer_email IS NOT NULL
+            AND p.rail = 'card'
             AND p.outcome IN ('credited', 'minted', 'minted_fallback')
           ORDER BY p.id DESC LIMIT 1`,
       )

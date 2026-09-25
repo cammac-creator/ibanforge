@@ -352,7 +352,21 @@ interface KeyContext {
 async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyContext): Promise<void> {
   const { keyHash, units, tier, allowance: monthlyLimit } = k;
   const noRecredit = k.noRecredit;
-  const quota = checkAndIncrementQuota(keyHash, monthlyLimit, units, noRecredit);
+  const measured = checkAndIncrementQuota(keyHash, monthlyLimit, units, noRecredit);
+  // 🚨 Une clé rechargée dont les crédits sont vidés (relecture de sécurité de
+  // la PR 259, D4). La règle B écrit dans le même compteur du mois les unités
+  // payées par l'allocation ET par les crédits : il dépasse alors l'allocation.
+  // Ce qu'on en montre (en-têtes, texte du refus) est plafonné à l'allocation,
+  // et une route gratuite, qui ne coûte rien, n'est jamais refusée. Une clé qui
+  // n'a jamais eu de crédits garde son affichage d'avant, à l'identique.
+  const drained = typeof k.creditsTotal === 'number';
+  const quota = drained
+    ? {
+        ...measured,
+        used: Math.min(measured.used, measured.limit),
+        allowed: measured.allowed || units === 0,
+      }
+    : measured;
 
   if (!quota.allowed) {
     // Quota exhausted — or too small for this batch (all-or-nothing, nothing

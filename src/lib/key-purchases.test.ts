@@ -180,6 +180,18 @@ describe('le webhook carte et le registre', () => {
     expect(findPurchaseByRef(`stripe:${session}`)?.outcome).toBe('minted_fallback');
   });
 
+  it('référence mal formée : traitée comme absente, une clé neuve et aucune alerte (relecture de la PR 259, D8)', () => {
+    const session = `cs_test_${uniq('malformed')}`;
+    // N'importe quel payeur peut retoucher l'URL du lien de paiement : ce n'est
+    // pas un paiement perdu, seulement une référence qui ne désigne rien.
+    const result = processStripeEvent(packEvent({ sessionId: session, ref: 'ifr_retouchee' }));
+    expect(result.alert).toBeUndefined();
+    expect(result.notify?.rawKey).toMatch(/^ifk_/);
+    const row = findPurchaseByRef(`stripe:${session}`)!;
+    expect(row.outcome).toBe('minted');
+    expect(row.topup_ref).toBeNull();
+  });
+
   it('clé révoquée : une clé neuve, et la révoquée n’est jamais réactivée', () => {
     const key = freeKey('revoked');
     const ref = ensureTopupRef(key.key_hash)!;
@@ -308,6 +320,21 @@ describe('la reprise d’un pack remboursé ou disputé', () => {
     });
     expect(validateApiKey(key.api_key).creditsRemaining).toBe(0);
     expect(validateApiKey(key.api_key).valid).toBe(true);
+  });
+
+  it('baisse aussi l’assiette de l’alerte des 10 % (relecture de la PR 259)', () => {
+    const key = freeKey('claw-base');
+    const ref = ensureTopupRef(key.key_hash)!;
+    const s1 = `cs_test_${uniq('claw-base1')}`;
+    const s2 = `cs_test_${uniq('claw-base2')}`;
+    processStripeEvent(packEvent({ sessionId: s1, ref, bundle: '1k' }));
+    processStripeEvent(packEvent({ sessionId: s2, ref, bundle: '5k', amountTotal: 2000 }));
+    expect(validateApiKey(key.api_key).creditsNoticeBase).toBe(6000);
+    clawbackPurchase(findPurchaseByRef(`stripe:${s2}`)!.id, 'refunded');
+    const v = validateApiKey(key.api_key);
+    expect(v.creditsRemaining).toBe(1000);
+    // L'alerte se mesure sur ce qui reste vraiment acheté, pas sur un pack repris.
+    expect(v.creditsNoticeBase).toBe(1000);
   });
 
   it('refuse un abonnement et un achat jamais réglé', () => {

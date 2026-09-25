@@ -1977,7 +1977,12 @@ function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
       backfilled             INTEGER NOT NULL DEFAULT 0,
       created_at             TEXT    NOT NULL DEFAULT (datetime('now')),
       settled_at             TEXT,
-      ended_at               TEXT
+      ended_at               TEXT,
+      -- Rail USDC : de quoi rapprocher un achat a la main. L'adresse qui paie,
+      -- le nonce de l'autorisation, le hash de transaction. Jamais la signature.
+      payer_address          TEXT,
+      auth_nonce             TEXT,
+      tx_hash                TEXT
     );
     -- Une référence de recharge par lignée, tirée au hasard, jamais dérivée
     -- de la clé.
@@ -1994,6 +1999,17 @@ function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
   ).map((r) => r.name);
   if (!keyCols.includes('credits_notice_base')) {
     statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_notice_base INTEGER');
+  }
+  // Les trois faits de rapprochement du rail USDC (relecture de sécurité de la
+  // PR 259, D10), ajoutés en queue : même ordre de colonnes sur une base neuve
+  // et sur une base qui avait déjà le registre.
+  const purchaseCols = (
+    statsDB.prepare('PRAGMA table_info(key_purchases)').all() as Array<{ name: string }>
+  ).map((r) => r.name);
+  for (const col of ['payer_address', 'auth_nonce', 'tx_hash']) {
+    if (!purchaseCols.includes(col)) {
+      statsDB.exec(`ALTER TABLE key_purchases ADD COLUMN ${col} TEXT`);
+    }
   }
   statsDB.exec(`
     CREATE INDEX IF NOT EXISTS idx_key_purchases_lineage ON key_purchases(lineage_hash, created_at);
@@ -2058,10 +2074,12 @@ function backfillKeyPurchases(statsDB: DatabaseType.Database): void {
       .run();
     // 2. Abonnements : seulement la ligne qui a frappé la clé (session ET
     //    abonnement). Une copie tournée porte l'abonnement sans la session.
-    //    La fin n'est posée que si aucune clé ACTIVE de la lignée ne porte cet
-    //    abonnement, ou si la pierre tombale le contient : jamais la date de
-    //    désactivation d'une ligne tournée, qui daterait au jour de la rotation
-    //    la fin d'un abonnement encore vivant.
+    //    La fin n'est posée que si la pierre tombale le dit (relecture de la
+    //    PR 259, D5) : une rotation faite avant la PR 177 ne recopiait pas
+    //    l'abonnement, donc « aucune clé active ne le porte » arrivait aussi à
+    //    un abonnement vivant. Jamais la date de désactivation d'une ligne
+    //    tournée. Sans pierre tombale, la fin reste inconnue (NULL) : le lot B2
+    //    tranchera avec ses propres données.
     statsDB
       .prepare(
         `INSERT OR IGNORE INTO key_purchases
@@ -2075,14 +2093,8 @@ function backfillKeyPurchases(statsDB: DatabaseType.Database): void {
                 k.amount_paid_minor, k.amount_paid_currency, k.stripe_session_id,
                 k.stripe_subscription_id, 'paid', 0, 0, k.issued_by_us, 1,
                 COALESCE(k.created_at, datetime('now')), k.created_at,
-                CASE WHEN EXISTS (SELECT 1 FROM dead_subscriptions d
-                                   WHERE d.subscription_id = k.stripe_subscription_id)
-                       OR NOT EXISTS (SELECT 1 FROM api_keys a
-                                       WHERE a.active = 1
-                                         AND a.stripe_subscription_id = k.stripe_subscription_id
-                                         AND COALESCE(a.lineage_hash, a.key_hash)
-                                             = COALESCE(k.lineage_hash, k.key_hash))
-                     THEN datetime('now') END
+                (SELECT COALESCE(d.recorded_at, datetime('now')) FROM dead_subscriptions d
+                  WHERE d.subscription_id = k.stripe_subscription_id)
            FROM api_keys k
           WHERE k.stripe_session_id IS NOT NULL AND k.stripe_subscription_id IS NOT NULL`,
       )
