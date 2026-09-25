@@ -26,6 +26,8 @@ import {
   type TrafficTotals,
 } from '../lib/business-summary.js';
 import { readSubscriptionRows, subscriptionsSold } from '../lib/subscription-payments.js';
+import { SALE_OUTCOMES_SQL } from '../lib/key-purchases.js';
+import { FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 export const adminBusiness = new Hono();
 
@@ -77,11 +79,29 @@ adminBusiness.get('/admin/business-summary', (c) => {
       `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit,
               k.credits_total, k.credits_remaining,
               k.amount_paid_minor, k.amount_paid_currency,
+              -- Ce que la lignée a payé en packs, en cents USD, lu au registre
+              -- (lot B1) : NULL dès qu'un de ses achats n'a pas de montant USD
+              -- connu, pour que le rapport retombe alors sur la déduction et le
+              -- dise, au lieu d'additionner un montant incomplet. Sans cela, une
+              -- clé rechargée (cumul de 2 000) se lisait comme un pack de 2 000
+              -- qui n'existe pas, ou comme son seul premier achat.
+              (SELECT CASE WHEN COUNT(*) > 0
+                            AND COUNT(*) = SUM(CASE WHEN kp.amount_minor IS NOT NULL
+                                                     AND lower(kp.currency) = 'usd'
+                                                    THEN 1 ELSE 0 END)
+                           THEN SUM(kp.amount_minor) END
+                 FROM key_purchases kp
+                WHERE kp.lineage_hash = COALESCE(k.lineage_hash, k.key_hash)
+                  AND kp.kind = 'pack' AND kp.outcome IN ${SALE_OUTCOMES_SQL}) AS lineage_pack_usd_minor,
               COALESCE(u.count, 0) AS used,
               -- One ledger per key kind, never the sum: since the credit path
               -- also writes api_usage (as an observation), adding the two
-              -- counted every prepaid unit twice. Same CASE as /v1/admin/keys.
+              -- counted every prepaid unit twice. Same CASE as /v1/admin/keys :
+              -- le delta des crédits seulement pour une clé sans allocation
+              -- propre ; une clé mixte (lot B1) se lit sur le registre mensuel.
               CASE WHEN k.credits_total IS NOT NULL
+                    AND COALESCE(k.monthly_limit,
+                                 CASE WHEN k.tier = 'paid' THEN 0 ELSE ${FREE_TIER_MONTHLY_LIMIT} END) <= 0
                    THEN MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
                    ELSE COALESCE(t.total, 0)
               END AS used_all_time
@@ -99,6 +119,7 @@ adminBusiness.get('/admin/business-summary', (c) => {
     credits_remaining: number | null;
     amount_paid_minor: number | null;
     amount_paid_currency: string | null;
+    lineage_pack_usd_minor: number | null;
     used: number;
     used_all_time: number;
   }>;
@@ -138,8 +159,9 @@ adminBusiness.get('/admin/business-summary', (c) => {
       monthly_limit: r.monthly_limit,
       credits_total: r.credits_total,
       credits_remaining: r.credits_remaining,
-      amount_paid_minor: r.amount_paid_minor,
-      amount_paid_currency: r.amount_paid_currency,
+      // Le montant réel de la lignée quand le registre le connaît en entier.
+      amount_paid_minor: r.lineage_pack_usd_minor ?? r.amount_paid_minor,
+      amount_paid_currency: r.lineage_pack_usd_minor != null ? 'usd' : r.amount_paid_currency,
       used: r.used,
       used_all_time: r.used_all_time,
       series: months.map((mo) => source?.get(mo) ?? 0),

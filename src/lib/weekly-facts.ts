@@ -3,6 +3,7 @@ import { getDemandGaps } from './demand-gaps.js';
 import { monthEndedBefore, proposeFromDemand, type DemandProposal } from './demand-proposal.js';
 import { buildBillableFilter } from './stats.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
+import { SALE_OUTCOMES_SQL } from './key-purchases.js';
 
 /**
  * Everything the Monday digest writer is allowed to say, computed HERE in
@@ -162,8 +163,25 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
   const signupsIn = (start: string, end: string) =>
     [...firstKeyByEmail.values()].filter((d) => inWindow(d, start, end)).length;
 
+  // Un achat, c'est une ligne du registre (lot B1, 25.09.2026), datée à son
+  // PAIEMENT : une recharge de la même clé ne crée aucune clé, et une clé
+  // tournée recopiait `credits_total` sans achat. Même exclusion interne que
+  // les inscriptions (l'adresse de la clé), et un pack offert n'est pas un
+  // achat.
+  const purchaseRows = db
+    .prepare(
+      `SELECT p.created_at, COALESCE(k.email, '') AS email,
+              MAX(p.issued_by_us, COALESCE(k.issued_by_us, 0)) AS issued_by_us
+         FROM key_purchases p
+         LEFT JOIN api_keys k ON k.key_hash = p.key_hash
+        WHERE p.kind = 'pack' AND p.outcome IN ${SALE_OUTCOMES_SQL}`,
+    )
+    .all() as Array<{ created_at: string; email: string; issued_by_us: number }>;
+  const externalPurchases = purchaseRows.filter(
+    (r) => !r.issued_by_us && !isInternalEmail(r.email),
+  );
   const purchasesIn = (start: string, end: string) =>
-    external.filter((k) => k.credits_total != null && inWindow(k.created_at, start, end)).length;
+    externalPurchases.filter((r) => inWindow(r.created_at, start, end)).length;
 
   // First calls: per external prefix, the earliest request_log row; the
   // client's first call is the earliest across their prefixes.

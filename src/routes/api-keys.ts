@@ -26,7 +26,7 @@ import {
   ownAllowanceDefault,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
-import { ensureTopupRef } from '../lib/key-purchases.js';
+import { ensureTopupRef, SALE_OUTCOMES_SQL } from '../lib/key-purchases.js';
 import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
 import { paidSoFarUsd } from '../lib/key-settlements.js';
 import { CREDITS_NOTICE_LOCK_PREFIX } from '../lib/quota-notice.js';
@@ -1686,10 +1686,23 @@ apiKeys.get('/v1/admin/keys', (c) => {
       `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
             k.tier, k.claimed_at, k.claim_method,
             k.credits_total, k.credits_remaining, k.amount_paid_minor, k.amount_paid_currency, k.issued_by_us, k.source,
-            CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
+            -- « Payée » : frappée par une session Stripe, ou une lignée qui a un
+            -- achat inscrit au registre (lot B1). Une clé gratuite rechargée par
+            -- carte ne porte aucune session : sans le registre, elle se lisait
+            -- gratuite au CRM alors qu'elle venait de payer.
+            CASE WHEN k.stripe_session_id IS NOT NULL
+                   OR EXISTS (SELECT 1 FROM key_purchases kp
+                               WHERE kp.lineage_hash = COALESCE(k.lineage_hash, k.key_hash)
+                                 AND kp.outcome IN ${SALE_OUTCOMES_SQL})
+                 THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,
+            -- Le delta des crédits seulement pour une clé SANS allocation propre
+            -- (née d'un achat) ; une clé mixte (lot B1) consomme aussi son
+            -- allocation, que seul le registre mensuel voit en entier.
             CASE WHEN k.credits_remaining IS NOT NULL
+                  AND COALESCE(k.monthly_limit,
+                               CASE WHEN k.tier = 'paid' THEN 0 ELSE ${FREE_TIER_MONTHLY_LIMIT} END) <= 0
                  THEN MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
                  ELSE COALESCE(t.total, 0)
             END AS used_all_time,

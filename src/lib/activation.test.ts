@@ -29,17 +29,21 @@ const month = new Date().toISOString().slice(0, 7);
 
 beforeAll(() => {
   const db = getStatsDB();
+  // Le palier suit les crédits, comme en production : toute clé à crédits est
+  // au palier payant (migration des paliers, puis chaque frappe de pack). Sans
+  // lui, une clé de pack à plafond NULL se lirait, depuis le lot B1, comme une
+  // clé gratuite rechargée, qui garde ses 200 par mois.
   const insKey = db.prepare(
-    `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, active, monthly_limit, credits_total, credits_remaining, source)
-     VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+    `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier)
+     VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, CASE WHEN ? IS NOT NULL THEN 'paid' ELSE 'email' END)`,
   );
   // BUYER: free key exhausted this month + paid pack key with used-counter at
   // zero by construction (credit keys never touch api_usage). The regression
   // this file exists for: this client must read as paying, never as unused.
-  insKey.run(`${PFX}_b_free`, `${PFX}_b_free`, BUYER, daysAgo(10), 200, null, null, 'payqr');
-  insKey.run(`${PFX}_b_paid`, `${PFX}_b_paid`, BUYER, daysAgo(2), null, 5000, 2400, null);
+  insKey.run(`${PFX}_b_free`, `${PFX}_b_free`, BUYER, daysAgo(10), 200, null, null, 'payqr', null);
+  insKey.run(`${PFX}_b_paid`, `${PFX}_b_paid`, BUYER, daysAgo(2), null, 5000, 2400, null, 5000);
   // SLEEPER: bought a pack 20 days ago, never called since day 18.
-  insKey.run(`${PFX}_s_paid`, `${PFX}_s_paid`, SLEEPER, daysAgo(20), null, 1000, 1000, null);
+  insKey.run(`${PFX}_s_paid`, `${PFX}_s_paid`, SLEEPER, daysAgo(20), null, 1000, 1000, null, 1000);
   // FRESH: signed up yesterday (Wednesday-independent), no call yet, no source.
   // created_at deliberately in FULL ISO form (T, millis, Z): production rows
   // written by application code carry this format while SQLite defaults write
@@ -54,9 +58,10 @@ beforeAll(() => {
     null,
     null,
     null,
+    null,
   );
   // INTERNAL: must never appear.
-  insKey.run(`${PFX}_i_free`, `${PFX}_i_free`, INTERNAL, daysAgo(5), 200, null, null, null);
+  insKey.run(`${PFX}_i_free`, `${PFX}_i_free`, INTERNAL, daysAgo(5), 200, null, null, null, null);
 
   db.prepare(`INSERT OR REPLACE INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)`).run(
     `${PFX}_b_free`,
