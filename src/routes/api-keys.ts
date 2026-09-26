@@ -24,6 +24,7 @@ import {
   findBurstRevokedKey,
   markShieldBirth,
   ownAllowanceDefault,
+  hasActiveSubscription,
   PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { ensureTopupRef, SALE_OUTCOMES_SQL } from '../lib/key-purchases.js';
@@ -35,6 +36,8 @@ import {
   PRO_PAYMENT_LINK,
   PRO_PORTAL_URL,
   PRO_PRICE_USD,
+  ANONYMOUS_TOPUP_NOTE,
+  proLink,
   topupLinks,
 } from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
@@ -705,8 +708,9 @@ apiKeys.get('/v1/credits/bundles', (c) => {
  * donne qu'un droit, payer pour cette clé. `null` si la base refuse l'écriture
  * de la référence : la lecture ne tombe jamais en 500 pour elle.
  *
- * Pro n'y figure pas : l'abonnement sur la clé existante est le lot B2, et le
- * lien Pro d'aujourd'hui frappe une clé neuve.
+ * `pro` (lot B2) : le lien Pro porteur de la même référence, qui pose
+ * l'abonnement sur CETTE clé. Absent quand la clé porte déjà un abonnement
+ * vivant : le webhook refuse d'en poser un second (ZG10).
  */
 function topupBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> | null {
   const ref = ensureTopupRef(v.keyHash);
@@ -714,12 +718,11 @@ function topupBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
   return {
     same_key: true,
     by_card: topupLinks(ref),
+    ...(hasActiveSubscription(v.keyHash) ? {} : { pro: proLink(ref) }),
     by_usdc: 'POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it',
     ...(v.tier === 'anonymous'
       ? {
-          note:
-            'This key is anonymous: once it buys credits it leaves the anonymous tier for good and keeps no ' +
-            'free monthly allowance. Claim it by e-mail first (POST /v1/keys/claim) to keep one.',
+          note: ANONYMOUS_TOPUP_NOTE,
         }
       : {}),
   };
@@ -1019,10 +1022,14 @@ apiKeys.post('/v1/keys/revoke', (c) => {
   // crédits restants sont perdus avec la clé, et un abonnement qui y est
   // attaché continue d'être facturé par Stripe. `/rotate` garde les deux.
   const before = validateApiKey(key);
+  // Un abonnement VIVANT seulement (lot B2) : une clé dont l'abonnement est
+  // terminé garde son identifiant, mais plus rien n'est facturé.
   const subscription = before.valid
     ? (
         getStatsDB()
-          .prepare('SELECT stripe_subscription_id FROM api_keys WHERE key_hash = ?')
+          .prepare(
+            'SELECT stripe_subscription_id FROM api_keys WHERE key_hash = ? AND subscription_ended_at IS NULL',
+          )
           .get(before.keyHash) as { stripe_subscription_id: string | null } | undefined
       )?.stripe_subscription_id
     : null;
@@ -1698,11 +1705,14 @@ apiKeys.get('/v1/admin/keys', (c) => {
             -- « Payée » : frappée par une session Stripe, ou une lignée qui a un
             -- achat inscrit au registre (lot B1). Une clé gratuite rechargée par
             -- carte ne porte aucune session : sans le registre, elle se lisait
-            -- gratuite au CRM alors qu'elle venait de payer.
+            -- gratuite au CRM alors qu'elle venait de payer. Un abonnement posé
+            -- sur une clé existante (issue attached, lot B2) aussi : sans lui,
+            -- une clé Pro rattachée se lisait « free » à 10 000 par mois.
             CASE WHEN k.stripe_session_id IS NOT NULL
                    OR EXISTS (SELECT 1 FROM key_purchases kp
                                WHERE kp.lineage_hash = COALESCE(k.lineage_hash, k.key_hash)
-                                 AND kp.outcome IN ${SALE_OUTCOMES_SQL})
+                                 AND (kp.outcome IN ${SALE_OUTCOMES_SQL}
+                                      OR (kp.kind = 'subscription' AND kp.outcome = 'attached')))
                  THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,

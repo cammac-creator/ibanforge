@@ -19,6 +19,7 @@ import {
   resendWaitSeconds,
   sheetFromReport,
   TOPUP_PACKS,
+  PRO_ON_KEY_REQUESTS,
   type AccountScreen,
   type ApiReply,
   type KeyReport,
@@ -677,6 +678,20 @@ function TopupLinks({ topup, locale }: { topup: NonNullable<KeySheet["topup"]>; 
           </a>
         ))}
       </div>
+      {/* Pro sur CETTE clé (lot B2) : absent pour une clé qui porte déjà un abonnement. */}
+      {topup.pro && (
+        <a
+          href={topup.pro}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center gap-0.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-center hover:border-amber-500/60 hover:bg-amber-500/10"
+        >
+          <span className="font-mono text-sm font-semibold text-amber-500">{t("topupProPrice")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("topupPro", { requests: formatGrouped(PRO_ON_KEY_REQUESTS, locale) })}
+          </span>
+        </a>
+      )}
     </section>
   );
 }

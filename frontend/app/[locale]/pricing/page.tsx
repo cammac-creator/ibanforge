@@ -41,7 +41,9 @@ const CREDIT_PACKS = [
 const PRO_PAYMENT_LINK = "https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04"
 
 // Stripe customer portal (16/09/2026): the Pro subscriber manages their card,
-// invoices and cancellation there; the key stays valid until the paid period ends.
+// invoices and cancellation there. Depuis le lot B2 (25.09.2026), la résiliation
+// ne désactive plus la clé : à la fin du mois payé, elle retrouve ce qu'elle
+// avait avant l'abonnement (CGU 1.9, §3).
 const PRO_PORTAL_LINK = "https://billing.stripe.com/p/login/3cI00c18lauh1i8bqO8so00"
 
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -230,6 +232,18 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <h2 className="text-xl font-semibold tracking-tight text-balance">{t('pro.title')}</h2>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{t('pro.text')}</p>
             <p className="text-xs text-muted-foreground/70 leading-relaxed">{t('pro.note')}</p>
+            {/* Lot B2 (25.09.2026) : Pro se pose aussi sur une clé existante, depuis
+                la page du compte (le lien y porte la référence de la clé). Le
+                bouton de cette page-ci, sans référence, frappe une clé neuve. */}
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t.rich('pro.existingKey', {
+                account: (chunks) => (
+                  <Link href={localePath(locale, '/account')} className="underline underline-offset-2 hover:text-foreground">
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </p>
           </div>
           <div className="flex flex-col items-start md:items-end gap-3 shrink-0">
             <p className="font-mono text-3xl font-bold text-amber-500 tabular-nums">

@@ -108,6 +108,8 @@ stripeSuccess.get('/stripe/success', (c) => {
           render(res.body);
         } else if (res.status === 200 && res.body.recharged) {
           renderRecharge(res.body);
+        } else if (res.status === 200 && res.body.subscription_attached) {
+          renderAttached(res.body);
         } else if (res.status === 404 && attempts < maxAttempts) {
           // Webhook may still be in flight — retry in 2s, up to maxAttempts
           setTimeout(fetchKey, 2000);
@@ -264,6 +266,20 @@ stripeSuccess.get('/stripe/success', (c) => {
       '<p class="sub">' + added + ' credits added to key <code>' + prefix + '</code>. Nothing to change in your integration.</p>' +
       '<p class="small">Its balance and usage, any time: <a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>, or the X-Credits-Remaining header on every paid response.</p>' +
       '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
+  }
+
+  // Un abonnement posé sur la clé que le porteur a déjà (lot B2, 25.09.2026) :
+  // aucune clé à montrer. La formule, son allocation et le préfixe, rien d'autre.
+  function renderAttached(data) {
+    const prefix = escapeHtml(data.key_prefix || '');
+    const planName = data.plan === 'oem' ? 'Editor / OEM' : 'Pro';
+    const limit = Number(data.monthly_limit || 0).toLocaleString('en-US');
+    content.innerHTML =
+      '<div class="check">✓</div>' +
+      '<h1>Payment confirmed</h1>' +
+      '<p class="sub">' + planName + ' active on key <code>' + prefix + '</code>: ' + limit + ' requests a month, resets on the 1st. Nothing to change in your integration.</p>' +
+      '<p class="small">Its usage and subscription, any time: <a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>.</p>' +
+      '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a></p>';
   }
 
   function renderError(msg) {

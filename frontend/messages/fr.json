@@ -555,6 +555,7 @@
       "title": "Vous préférez une facture mensuelle fixe ?",
       "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro le 1er, résiliable à tout moment depuis le portail client. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
       "note": "L’intégration dans votre produit est permise dans les limites et conditions de votre offre. Pour un SLA écrit, des engagements de support ou des volumes plus élevés, consultez l’offre éditeur/OEM.",
+      "existingKey": "Vous avez déjà une clé ? Prenez Pro dessus depuis <account>votre compte</account> : l’allocation arrive sur cette même clé, rien à changer dans votre intégration.",
       "price": "29 $",
       "per": "/ mois",
       "cta": "Souscrire à Pro",
@@ -1027,7 +1028,7 @@
         "method": "Ce que mesure ce bloc",
         "definition": "Réponses HTTP 2xx sur les routes de validation IBAN, batch, compliance, recherche BIC et clearing suisse, avec la méthode attendue. Un verdict négatif peut être une réponse utile : 2xx ne veut pas dire « IBAN valide ».",
         "accounts": "Un compte regroupe les clés conservées sous une même adresse e-mail, y compris les anciennes clés remplacées. Ce n’est pas un nombre de personnes. Comptes internes, adresses génériques de paiement et préfixes ambigus exclus.",
-        "retention": "« Première » signifie première réponse retrouvée dans les traces conservées, pas première utilisation à vie ni nouvelle inscription. Les traces sont purgées après douze mois et après résiliation selon la politique existante.",
+        "retention": "« Première » signifie première réponse retrouvée dans les traces conservées, pas première utilisation à vie ni nouvelle inscription. Les traces sont purgées après douze mois, et 30 jours après la désactivation de la dernière clé d’un client (la fin d’un abonnement ne la déclenche plus).",
         "days": "Deux jours UTC distincts suffisent, même autour de minuit. Ce n’est ni un retour après 24 heures ni une rétention à J+7.",
         "limits": "Essais possibles inclus. Appels sans clé rattachable et MCP hébergé hors périmètre. Aucun rapprochement avec les clics, les visites ou les achats ; les anciens indicateurs « Ont appelé » gardent leur définition."
       },
@@ -1982,7 +1983,7 @@
         },
         {
           "title": "Un dossier de confiance à transmettre aux achats",
-          "body": "DPA signable, conditions et politique de confidentialité publiées, page de statut en direct, changelog versionné. La validation ne stocke aucun IBAN : elle tourne en mémoire et seules les métadonnées pays + préfixe bancaire sont journalisées. L'audit de fichier, lui, est une prestation à part : il conserve son rapport — qui reprend les colonnes déposées — 2 heures sans paiement, 24 heures après, puis l'efface (voir la page Audit). Et quand un client part, sa télémétrie s'efface d'elle-même : supprimée par défaut 30 jours après la résiliation, contractuellement (clause 4.7 du DPA).",
+          "body": "DPA signable, conditions et politique de confidentialité publiées, page de statut en direct, changelog versionné. La validation ne stocke aucun IBAN : elle tourne en mémoire et seules les métadonnées pays + préfixe bancaire sont journalisées. L'audit de fichier, lui, est une prestation à part : il conserve son rapport — qui reprend les colonnes déposées — 2 heures sans paiement, 24 heures après, puis l'efface (voir la page Audit). Et quand un client part, sa télémétrie s'efface d'elle-même : supprimée par défaut 30 jours après la fin de la relation client, contractuellement (clause 4.7 du DPA).",
           "link": "Juridique et DPA"
         }
       ]
@@ -2112,7 +2113,7 @@
         },
         "trust": {
           "label": "Surface légale/ops publiée",
-          "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après résiliation (DPA 4.7)",
+          "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après la fin de la relation client (DPA 4.7)",
           "ibancom": "Conditions, politique de confidentialité, DPA et SLA publics ; modalités de redistribution à convenir avec le fournisseur.",
           "ibanapi": "Conditions et politique de confidentialité publiques ; engagements de service à vérifier auprès du fournisseur.",
           "libs": "Fichier de licence",
@@ -2242,6 +2243,7 @@
       "free": "Gratuit",
       "custom": "Sur mesure",
       "pack": "Pack de crédits",
+      "none": "Sans allocation",
       "pro": "Pro",
       "editor": "Éditeur / OEM"
     },
@@ -2327,7 +2329,9 @@
     "topupTitle": "Recharger cette clé",
     "topupHint": "Paiement par carte : les crédits arrivent sur cette même clé. Rien à changer dans votre intégration.",
     "topupUnproven": "Cette clé porte votre adresse, mais celle-ci n’a pas été confirmée par un code à la création de la clé. Ne la rechargez que si vous la reconnaissez comme la vôtre.",
-    "topupCredits": "{credits} crédits"
+    "topupCredits": "{credits} crédits",
+    "topupPro": "Pro sur cette clé : {requests} requêtes par mois",
+    "topupProPrice": "29 $ / mois"
   },
   "sources": {
     "meta": {

@@ -555,6 +555,7 @@
       "title": "Prefer a flat monthly bill?",
       "text": "Pro: 10,000 requests a month, every endpoint, resets on the 1st, cancel anytime from the customer portal. Card checkout through Stripe, your key arrives by e-mail right after payment and works within seconds.",
       "note": "Integration into your product is permitted within your plan’s limits and terms. For a written SLA, support commitments or higher volumes, see the Editor/OEM plan.",
+      "existingKey": "Already have a key? Take Pro on it from <account>your account page</account>: the allowance lands on that same key, nothing to change in your integration.",
       "price": "$29",
       "per": "/ month",
       "cta": "Subscribe to Pro",
@@ -1027,7 +1028,7 @@
         "method": "What this block measures",
         "definition": "HTTP 2xx responses on IBAN validation, batch, compliance, BIC lookup and Swiss clearing routes, with the expected method. A negative verdict can be useful: 2xx does not mean “valid IBAN”.",
         "accounts": "An account groups retained keys under the same email address, including replaced keys. This is not a count of people. Internal accounts, generic payment addresses and ambiguous prefixes are excluded.",
-        "retention": "“First” means the first response found in retained logs, not first-ever usage or a new signup. Logs are purged after twelve months and after cancellation under the existing policy.",
+        "retention": "“First” means the first response found in retained logs, not first-ever usage or a new signup. Logs are purged after twelve months, and 30 days after a customer's last key is deactivated (the end of a subscription no longer triggers it).",
         "days": "Two distinct UTC days suffice, even around midnight. This is neither a return after 24 hours nor day-seven retention.",
         "limits": "Trials may be included. Calls without an attributable key and hosted MCP are outside scope. No linkage to clicks, visits or purchases; the existing “Made a call” indicators keep their definition."
       },
@@ -2242,6 +2243,7 @@
       "free": "Free",
       "custom": "Custom",
       "pack": "Credit pack",
+      "none": "No allowance",
       "pro": "Pro",
       "editor": "Editor / OEM"
     },
@@ -2327,7 +2329,9 @@
     "topupTitle": "Recharge this key",
     "topupHint": "Pay by card: the credits land on this same key. Nothing to change in your integration.",
     "topupUnproven": "This key carries your address, but that address was not confirmed by a code when the key was created. Recharge it only if you recognise it as yours.",
-    "topupCredits": "{credits} credits"
+    "topupCredits": "{credits} credits",
+    "topupPro": "Pro on this key: {requests} requests a month",
+    "topupProPrice": "$29 / month"
   },
   "sources": {
     "meta": {

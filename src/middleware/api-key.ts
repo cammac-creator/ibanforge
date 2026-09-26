@@ -9,6 +9,7 @@ import {
   refundCredit,
   refundMixed,
   recordMonthlyObservation,
+  hasActiveSubscription,
   FREE_TIER_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
@@ -176,9 +177,11 @@ type Ctx = Parameters<MiddlewareHandler<HonoEnv>>[0];
  * retombe sur l'offre d'avant ce lot, qui frappe une clé neuve : un texte moins
  * bon, jamais un 500.
  */
-function payOptions(ref: string | null): string {
+function payOptions(ref: string | null, keyHash: string): string {
+  // Pro sur CETTE clé (lot B2), seulement sans abonnement vivant : lu ici, sur
+  // le chemin du refus, jamais sur celui d'un appel servi.
   return ref
-    ? `${topupHint(ref)}. Or pay per call via x402.`
+    ? `${topupHint(ref, { withPro: !hasActiveSubscription(keyHash) })}. Or pay per call via x402.`
     : `${CARD_CHECKOUT_HINT}. Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.`;
 }
 
@@ -232,9 +235,14 @@ async function serveFromCredits(c: Ctx, next: () => Promise<void>, k: KeyContext
       reason: shortfall ? 'credits_insufficient' : 'credits_exhausted',
       detail: shortfall
         ? `This batch of ${units} IBANs needs ${units} credits (1 credit per IBAN) but only ${remaining} remain on this key: nothing was debited. ` +
-          `Send a batch of ≤${remaining} IBANs, or top up now. ${payOptions(ref)}`
-        : `This key's prepaid credits are used up (${total.toLocaleString('en-US')} credits bought on it so far). ` +
-          `The key stays valid: ${payOptions(ref)}`,
+          `Send a batch of ≤${remaining} IBANs, or top up now. ${payOptions(ref, keyHash)}`
+        : creditsTotal == null
+          ? // Relecture de sécurité de la PR 264, D6 : une clé sans allocation
+            // ET sans aucun crédit acheté est une clé née d'un abonnement
+            // terminé (règle A). Lui parler de « crédits épuisés » serait faux.
+            `This key has no allowance since its subscription ended. The key stays valid: ${payOptions(ref, keyHash)}`
+          : `This key's prepaid credits are used up (${total.toLocaleString('en-US')} credits bought on it so far). ` +
+            `The key stays valid: ${payOptions(ref, keyHash)}`,
       credits: {
         required: units,
         remaining,
@@ -428,11 +436,11 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
     const paidOnceExhausted =
       `This key's allowance is spent: ${quota.used}/${quota.limit} requests counted over the whole life of ` +
       'the key, because it was granted against a payment — once, not every month, so nothing starts over on ' +
-      `the 1st. To keep going now: ${payOptions(ref)}`;
+      `the 1st. To keep going now: ${payOptions(ref, keyHash)}`;
 
     const monthlyExhausted =
       `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
-      `it resets on the 1st of next month. To keep going now: ${payOptions(ref)}`;
+      `it resets on the 1st of next month. To keep going now: ${payOptions(ref, keyHash)}`;
 
     const exhausted = shield
       ? shieldExhausted
@@ -454,7 +462,7 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
       detail: shortfall
         ? `This batch of ${units} IBANs needs ${units} requests from this key's allowance (1 per IBAN) but only ${quota.remaining} remain ${spentOn} ` +
           `(${quota.used}/${quota.limit} used) — nothing was consumed. Send a batch of ≤${quota.remaining} IBANs, ` +
-          `or lift the limit now. ${payOptions(ref)}`
+          `or lift the limit now. ${payOptions(ref, keyHash)}`
         : exhausted,
       quota: {
         used: quota.used,
@@ -581,7 +589,7 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
       detail:
         `This batch of ${units} IBANs needs ${units} units but this key has ${left} left on its allowance ` +
         `and ${credits} prepaid credits: nothing was consumed. Send a batch of ≤${left + credits} IBANs, or top up now. ` +
-        payOptions(ref),
+        payOptions(ref, keyHash),
       quota: {
         used: Math.min(charge.measured, allowance),
         limit: allowance,

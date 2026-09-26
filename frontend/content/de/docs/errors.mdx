@@ -120,7 +120,7 @@ Wird zurückgegeben, wenn eine kostenpflichtige Route ohne brauchbaren Zahlungsw
 
 Wurde eine Zahlung gesendet und abgelehnt, trägt der Body zusätzlich `payment_error` mit dem Grund.
 
-Bei einem gültigen Schlüssel trägt der Body außerdem `credit_packs.topup_this_key`: die Kartenlinks und die USDC-Route, die den vorgelegten Schlüssel aufladen, damit das Guthaben auf ihm landet und sich an Ihrer Integration nichts ändert. `pay_by_card` behält seine Bedeutung: ein ohne Schlüssel gekauftes Paket, geliefert als neuer Schlüssel.
+Bei einem gültigen Schlüssel trägt der Body außerdem `credit_packs.topup_this_key`: die Kartenlinks und die USDC-Route, die den vorgelegten Schlüssel aufladen, damit das Guthaben auf ihm landet und sich an Ihrer Integration nichts ändert, und bei einem Schlüssel ohne Abonnement `pro`: der Link, der Pro auf genau diesen Schlüssel legt. `pay_by_card` behält seine Bedeutung: ein ohne Schlüssel gekauftes Paket, geliefert als neuer Schlüssel.
 
 Wie Sie damit umgehen, steht unter [x402-Zahlungen](/docs/x402); den kostenlosen Schlüssel erklärt [API-Schlüssel](/docs/api-keys).
 

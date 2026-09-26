@@ -85,6 +85,25 @@ export function topupLink(slug: PackSlug, ref: string): string {
   return `${base}?client_reference_id=${ref}`;
 }
 
+/**
+ * Ce qu'un paiement fait à une clé ANONYME, servi à côté de ses liens de
+ * recharge et de Pro (bloc `topup` de l'usage et du solde, `topup_this_key` du
+ * 402). Écrit une fois, pour que les deux blocs disent la même chose.
+ *
+ * Deux cas, qui suivent l'ordre de la spec (§4 : photo, puis promotion ZG1) :
+ *  - un pack d'abord : la clé quitte le palier anonyme pour de bon, sans
+ *    allocation gratuite ensuite (un achat ne crée jamais de gratuit) ;
+ *  - Pro d'abord : elle quitte aussi le palier anonyme (plus de réclamation par
+ *    e-mail), et la fin de l'abonnement lui rend son allocation anonyme
+ *    (décision de la session principale du 25.09.2026, phrase Q11 publiée).
+ * Aucun chiffre ici : les « 25 » ne partagent jamais une phrase.
+ */
+export const ANONYMOUS_TOPUP_NOTE =
+  'This key is anonymous. Buying credits makes it leave the anonymous tier for good, with no free monthly ' +
+  'allowance afterwards. Taking Pro on it also ends the anonymous tier (it can no longer be claimed by e-mail); ' +
+  'when the subscription ends, it gets its anonymous monthly allowance back. Claim it by e-mail first ' +
+  '(POST /v1/keys/claim): a claimed key keeps its free monthly allowance through a pack or a subscription.';
+
 /** Les trois liens de recharge d'une clé. */
 export function topupLinks(ref: string): Record<PackSlug, string> {
   return {
@@ -95,20 +114,35 @@ export function topupLinks(ref: string): Record<PackSlug, string> {
 }
 
 /**
+ * Le lien Pro porteur de la référence de recharge d'une clé (lot B2,
+ * 25.09.2026) : l'abonnement se pose sur CETTE clé au lieu d'en frapper une
+ * neuve. Même règle que `topupLink` : une référence mal formée n'est jamais
+ * recopiée, le lien public est rendu tel quel. À ne proposer qu'à une clé qui
+ * n'a pas d'abonnement vivant : le webhook refuse d'en poser un second (ZG10).
+ */
+export function proLink(ref: string): string {
+  if (!TOPUP_REF_PATTERN.test(ref)) return PRO_PAYMENT_LINK;
+  return `${PRO_PAYMENT_LINK}?client_reference_id=${ref}`;
+}
+
+/**
  * La même offre que CARD_CHECKOUT_HINT, pour une clé VALIDE : les packs y
  * rechargent cette clé-ci, rien ne change dans l'intégration du porteur.
  *
- * Pro n'y est proposé que comme ce qu'il est aujourd'hui, une clé neuve :
- * l'abonnement sur la clé existante est le lot B2, et promettre « on this
- * key » avant lui serait écrire ce que la route ne fait pas.
+ * Pro se pose sur CETTE clé depuis le lot B2 (25.09.2026), par le lien porteur
+ * de sa référence. Il n'est proposé qu'à une clé qui n'a pas d'abonnement
+ * vivant (`withPro`) : le webhook refuse d'en poser un second (ZG10), et
+ * proposer Pro à un abonné Pro n'a pas de sens.
  */
-export function topupHint(ref: string): string {
+export function topupHint(ref: string, opts: { withPro?: boolean } = {}): string {
   const packs = PACK_OFFERS.map(
     (p) => `${p.credits.toLocaleString('en-US')} credits $${p.priceUsd}: ${topupLink(p.slug, ref)}`,
   ).join(' · ');
   return (
     `Recharge THIS key by card, nothing to change in your integration: ${packs}. ` +
-    'Prefer USDC? POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it. ' +
-    `Or Pro, a flat $${PRO_PRICE_USD}/month for 10,000 requests, delivered as a new key: ${PRO_PAYMENT_LINK}`
+    'Prefer USDC? POST /v1/credits/buy/1k|5k|25k with this key presented: the credits land on it' +
+    (opts.withPro === false
+      ? ''
+      : `. Or Pro on this same key, a flat $${PRO_PRICE_USD}/month for 10,000 requests: ${proLink(ref)}`)
   );
 }
