@@ -342,7 +342,11 @@ describe('GET /v1/account/overview', () => {
       );
       expect(link).not.toContain(pack.api_key);
     }
-    expect(view.actions.subscribe_pro).toBeNull();
+    // Lot B2 : Pro se pose sur CETTE clé, par le lien porteur de la même référence.
+    const ref = topup?.['1k']?.split('client_reference_id=')[1];
+    expect(view.actions.subscribe_pro).toBe(
+      `https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04?client_reference_id=${ref}`,
+    );
     expect(view.actions.manage_subscription).toBeNull();
     // Une adresse saisie au paiement n'est pas une adresse PROUVÉE (relecture
     // de sécurité, point I1) : la page avertit avant de proposer la recharge.
@@ -369,7 +373,8 @@ describe('GET /v1/account/overview', () => {
     });
     expect(proView.actions.manage_subscription).toBe(PRO_PORTAL_URL);
     // « Recharger » existe depuis le lot B1 (règle B : Pro d'abord, puis les
-    // crédits) ; « passer en Pro » attend le lot B2.
+    // crédits). « Passer en Pro » (lot B2) n'est jamais proposé à une clé qui
+    // porte déjà un abonnement vivant : le webhook en refuserait un second.
     expect(Object.keys(proView.actions.topup ?? {}).sort()).toEqual(['1k', '25k', '5k']);
     expect(proView.actions.subscribe_pro).toBeNull();
     expect(byPrefix.get(editor.key_prefix)!.plan).toBe('editor');
@@ -378,6 +383,30 @@ describe('GET /v1/account/overview', () => {
     expect(freeView.plan).toBe('free');
     expect(freeView.subscription).toBeNull();
     expect(freeView.actions.manage_subscription).toBeNull();
+    // Une clé gratuite, sans abonnement : Pro lui est proposé, sur elle-même.
+    expect(freeView.actions.subscribe_pro).toMatch(
+      /^https:\/\/buy\.stripe\.com\/aFacMYaIVeKx1i87ay8so04\?client_reference_id=ifr_[0-9a-f]{32}$/,
+    );
+  });
+
+  // Relecture de sécurité de la PR 264, D5 : une clé née d'un abonnement
+  // terminé n'a ni allocation ni crédits, et répond 402. Jamais « Free ».
+  it('clé née d’un abonnement terminé : formule none, jamais free', async () => {
+    const email = 'abonnement-fini@alpha.example.net';
+    const born = generateOemKey(email, PRO_MONTHLY_LIMIT, 'cs_test_none', 'sub_test_none');
+    getStatsDB()
+      .prepare(
+        `UPDATE api_keys SET monthly_limit = 0, subscription_ended_at = datetime('now')
+          WHERE key_prefix = ?`,
+      )
+      .run(born.key_prefix);
+    const { body } = await overviewOf(email);
+    const view = body.keys.find((k) => k.key_prefix === born.key_prefix)!;
+    expect(view.plan).toBe('none');
+    expect(view.subscription).toBeNull();
+    expect(view.actions.manage_subscription).toBeNull();
+    // Pro lui est de nouveau proposé, sur elle-même.
+    expect(view.actions.subscribe_pro).toMatch(/client_reference_id=ifr_[0-9a-f]{32}$/);
   });
 
   it('dernier appel et alertes reçues', async () => {

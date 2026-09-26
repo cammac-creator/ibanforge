@@ -499,7 +499,7 @@ export const OEM_MONTHLY_LIMIT = 50_000;
 /**
  * Pro subscription: the PUBLIC monthly tier (2026-09-02, market study of 02/09:
  * the category enters at $20 to $99 a month). Same mechanics as OEM, a monthly
- * allowance that resets on the 1st and a key that dies with its subscription,
+ * allowance that resets on the 1st (lot B2 : la clé survit à son abonnement),
  * for a fifth of the allowance, no SLA and no embedding rights. The price
  * lives in Stripe and in src/lib/payment-links.ts; only the allowance is
  * decided here.
@@ -511,7 +511,8 @@ export const PRO_MONTHLY_LIMIT = 10_000;
  * the subscription buys embedding rights + a high monthly allowance that
  * resets on the 1st, not a prepaid pool. Same one-time-view delivery as
  * generateStripeKey. Stores the Stripe subscription id so a
- * customer.subscription.deleted webhook can deactivate the key.
+ * customer.subscription.deleted webhook can end the subscription on the key
+ * (lot B2 : la clé reste active, son allocation repasse à 0, règle A).
  *
  * Idempotent per checkout session: Stripe retries webhooks and we must not
  * mint twice.
@@ -563,21 +564,86 @@ export function generateOemKey(
   return { api_key: rawKey, key_prefix: keyPrefix, monthly_limit: monthlyLimit, idempotent: false };
 }
 
+// ---------------------------------------------------------------------------
+// L'abonnement sur la même clé (chantier « clé unique », lot B2, 25.09.2026)
+// ---------------------------------------------------------------------------
+//
+// `deactivateBySubscription` n'existe plus : une résiliation ne désactive plus
+// la clé (décision de Claude-Alain du 24.09.2026, règle A). Elle lui rend ce
+// qu'elle avait avant l'abonnement ; une clé née de l'abonnement repasse à 0 et
+// répond 402 avec les liens qui la rechargent ou la réabonnent.
+
 /**
- * Deactivate the key tied to a canceled Stripe subscription. Returns the
- * key_prefix when an active key was deactivated, null when nothing matched
- * (already deactivated, or a subscription we never minted for). Idempotent.
+ * Vrai quand la clé porte un abonnement VIVANT : un identifiant Stripe et
+ * aucune fin posée. Une clé dont l'abonnement est terminé garde l'identifiant
+ * (il retrouve la clé d'un renouvellement et l'exclut du rayon du radar) : ce
+ * n'est donc pas l'identifiant seul qui dit « abonné aujourd'hui ».
  */
-export function deactivateBySubscription(stripeSubscriptionId: string): string | null {
-  const db = getStatsDB();
-  const row = db
-    .prepare('SELECT key_prefix FROM api_keys WHERE stripe_subscription_id = ? AND active = 1')
-    .get(stripeSubscriptionId) as { key_prefix: string } | undefined;
-  if (!row) return null;
-  db.prepare(
-    "UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE stripe_subscription_id = ?",
-  ).run(stripeSubscriptionId);
-  return row.key_prefix;
+export function hasActiveSubscription(
+  keyHash: string,
+  db: DatabaseType.Database = getStatsDB(),
+): boolean {
+  return !!db
+    .prepare(
+      `SELECT 1 AS one FROM api_keys
+        WHERE key_hash = ? AND stripe_subscription_id IS NOT NULL
+          AND subscription_ended_at IS NULL`,
+    )
+    .get(keyHash);
+}
+
+/**
+ * Pose un abonnement sur une clé ACTIVE existante, dans la transaction de
+ * l'appelant (qui a pris la photo de l'allocation propre juste avant). Pendant
+ * l'abonnement, l'allocation Pro REMPLACE l'allocation propre (spec, ZG5) et se
+ * compte au mois (`no_recredit = 0`) ; une clé née sous bouclier en sort, comme
+ * lors d'une réclamation. Les crédits ne bougent pas : ils passent après
+ * l'allocation (règle B). Rend faux si aucune clé active ne porte ce hash.
+ */
+export function attachSubscriptionInTx(
+  db: DatabaseType.Database,
+  keyHash: string,
+  stripeSubscriptionId: string,
+  monthlyLimit: number,
+): boolean {
+  const res = db
+    .prepare(
+      `UPDATE api_keys
+          SET stripe_subscription_id = ?, monthly_limit = ?, no_recredit = 0,
+              subscription_ended_at = NULL, shield_episode = NULL
+        WHERE key_hash = ? AND active = 1`,
+    )
+    .run(stripeSubscriptionId, monthlyLimit, keyHash);
+  return res.changes > 0;
+}
+
+/**
+ * La fin d'un abonnement sur sa clé, dans la transaction de l'appelant : la clé
+ * retrouve l'allocation propre photographiée au rattachement (0 pour une clé
+ * née de l'abonnement), `subscription_ended_at` est posé, l'identifiant est
+ * gardé (et écrit sur une copie tournée avant la PR 177 qui l'avait perdu), et
+ * `active` n'est jamais touché. Les crédits restent.
+ *
+ * Idempotente : une clé déjà terminée, ou qui porte aujourd'hui un AUTRE
+ * abonnement (un `deleted` tardif d'un ancien abonnement ne coupe jamais le
+ * nouveau), n'est pas touchée. Rend vrai quand la fin a réellement été posée.
+ */
+export function endSubscriptionOnKeyInTx(
+  db: DatabaseType.Database,
+  keyHash: string,
+  stripeSubscriptionId: string,
+  photo: { monthlyLimit: number; noRecredit: number },
+): boolean {
+  const res = db
+    .prepare(
+      `UPDATE api_keys
+          SET monthly_limit = ?, no_recredit = ?, subscription_ended_at = datetime('now'),
+              stripe_subscription_id = COALESCE(stripe_subscription_id, ?)
+        WHERE key_hash = ? AND active = 1 AND subscription_ended_at IS NULL
+          AND (stripe_subscription_id IS NULL OR stripe_subscription_id = ?)`,
+    )
+    .run(photo.monthlyLimit, photo.noRecredit, stripeSubscriptionId, keyHash, stripeSubscriptionId);
+  return res.changes > 0;
 }
 
 /**
@@ -735,7 +801,7 @@ export function rotateApiKey(oldKey: string): {
     .prepare(
       `SELECT key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total, no_recredit,
               stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
-              shield_episode, origin_prefix, lineage_hash, credits_notice_base
+              shield_episode, origin_prefix, lineage_hash, credits_notice_base, subscription_ended_at
          FROM api_keys WHERE key_hash = ? AND active = 1`,
     )
     .get(oldHash) as
@@ -757,6 +823,7 @@ export function rotateApiKey(oldKey: string): {
         origin_prefix: string | null;
         lineage_hash: string | null;
         credits_notice_base: number | null;
+        subscription_ended_at: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -768,7 +835,8 @@ export function rotateApiKey(oldKey: string): {
   const tx = db.transaction(() => {
     // Carry the opt-out flag across — without it, a key the cohort radar took
     // off the monthly reset would clear itself in one self-service /rotate call.
-    // Conserver le lien d'abonnement : sa résiliation doit révoquer la nouvelle clé.
+    // Conserver le lien d'abonnement : sa résiliation et ses renouvellements
+    // doivent retrouver la nouvelle clé (lot B2 : la résiliation la garde active).
     //
     // Le palier, la preuve (claimed_at, claim_method), l'adresse normalisée et
     // l'épisode de bouclier voyagent pour la même raison que no_recredit : une
@@ -790,11 +858,13 @@ export function rotateApiKey(oldKey: string): {
     // credits_notice_base (lot B1) voyage comme le solde qu'il accompagne : sans
     // lui, une clé rechargée puis tournée retomberait sur l'assiette du cumul et
     // l'alerte des 10 % partirait au mauvais seuil.
+    // subscription_ended_at (lot B2) voyage avec l'identifiant qu'il qualifie :
+    // sans lui, un abonnement terminé redeviendrait vivant par un /rotate.
     db.prepare(
       `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, credits_remaining, credits_total,
                              no_recredit, stripe_subscription_id, source, issued_by_us, tier, claimed_at, claim_method,
-                             shield_episode, origin_prefix, lineage_hash, credits_notice_base)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                             shield_episode, origin_prefix, lineage_hash, credits_notice_base, subscription_ended_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       newHash,
       keyPrefix,
@@ -814,6 +884,7 @@ export function rotateApiKey(oldKey: string): {
       row.origin_prefix ?? row.key_prefix,
       row.lineage_hash ?? oldHash,
       row.credits_notice_base,
+      row.subscription_ended_at,
     );
     // Move the usage ledger to the new key hash too. Otherwise the lifetime sum
     // (and the plain monthly count) restart at zero on rotation — which would

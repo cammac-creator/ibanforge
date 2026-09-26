@@ -3,6 +3,7 @@ import {
   clearQuotaNotice,
   getKeyAgeHours,
   isNoRecredit,
+  hasActiveSubscription,
   PRO_MONTHLY_LIMIT,
 } from './api-keys.js';
 import { sendCreditsWarningEmail, sendQuotaWarningEmail } from './email.js';
@@ -253,6 +254,9 @@ export async function maybeSendCreditsWarning(p: {
     total: p.base ?? p.total,
     proMonthlyLimit: PRO_MONTHLY_LIMIT,
     topupRef: ensureTopupRef(p.keyHash),
+    // Lot B2 : Pro se pose sur cette clé ; jamais proposé à une clé qui porte
+    // déjà un abonnement vivant.
+    offerPro: !hasActiveSubscription(p.keyHash),
   });
 
   if (!sent) {

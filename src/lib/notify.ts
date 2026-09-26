@@ -30,6 +30,11 @@ export async function notifyPurchaseTelegram(p: {
    * aucune clé frappée, la même clé rechargée.
    */
   recharge?: boolean;
+  /**
+   * Un abonnement posé sur une clé EXISTANTE par sa référence (lot B2,
+   * 25.09.2026) : aucune clé frappée, la clé du client passe au Pro.
+   */
+  attached?: boolean;
 }): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chat = process.env.TELEGRAM_CHAT_ID;
@@ -42,7 +47,8 @@ export async function notifyPurchaseTelegram(p: {
   // processors declared in the privacy policy / DPA, so no personal data may
   // transit it. The key prefix + dashboard answer "who" in two taps.
   const text = p.plan
-    ? `\u{1F389} IBANforge — ABONNEMENT ${p.plan === 'oem' ? 'Editor/OEM' : 'Pro'} (MRR !)\n` +
+    ? `\u{1F389} IBANforge — ABONNEMENT ${p.plan === 'oem' ? 'Editor/OEM' : 'Pro'} (MRR !)` +
+      `${p.attached ? ' sur une clé existante' : ''}\n` +
       `Montant : $${p.amountUsd}/mois (${(p.monthlyLimit ?? 0).toLocaleString('en-US')} req/mois)\n` +
       `Clé : ${p.keyPrefix}…\n` +
       `Client : https://ibanforge.com/dashboard/clients`

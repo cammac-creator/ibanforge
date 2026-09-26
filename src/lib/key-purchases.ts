@@ -32,14 +32,20 @@ import { TOPUP_REF_PATTERN } from './payment-links.js';
 import {
   activatePendingCreditKeyInTx,
   applyFirstPurchaseInTx,
+  attachSubscriptionInTx,
   clawbackCreditsInTx,
   creditKeyInTx,
+  endSubscriptionOnKeyInTx,
   failPendingCreditKeyInTx,
   findKeyByStripeSession,
   generateCreditKey,
+  generateOemKey,
   generateStripeKey,
+  hasActiveSubscription,
+  ownAllowanceDefault,
   type AllowancePhoto,
 } from './api-keys.js';
+import { ANONYMOUS_MONTHLY_LIMIT, type KeyTier } from './tiers.js';
 import { markLineagePurchase } from './lineage-facts.js';
 import { recordCreditsPurchase } from './stats.js';
 
@@ -497,10 +503,10 @@ export function applyCardPackPaymentInTx(db: Db, p: CardPackPayment): CardPackOu
 }
 
 /**
- * La ligne d'un abonnement frappé par le webhook (Pro, éditeur). Le lot B1 ne
- * change rien à l'abonnement lui-même (le rattachement à une clé existante est
- * le lot B2) : il l'inscrit au registre, pour que les lecteurs d'argent y
- * distinguent un premier paiement d'abonnement d'une recharge de pack.
+ * La ligne d'un abonnement frappé par le webhook (Pro, éditeur) sur une clé
+ * NEUVE : pas de référence de recharge, ou une référence qui n'a pas pu servir
+ * (`minted_fallback`). Née de l'abonnement, la clé n'a aucune allocation
+ * propre à rendre à sa fin (règle A) : sa photo est 0.
  */
 export function recordSubscriptionMintInTx(
   db: Db,
@@ -512,6 +518,8 @@ export function recordSubscriptionMintInTx(
     currency: string | null;
     paymentIntent: string | null;
     payerEmail: string | null;
+    outcome?: 'minted' | 'minted_fallback';
+    topupRef?: string | null;
   },
 ): number | null {
   const key = findKeyByStripeSession(p.sessionId, db);
@@ -520,7 +528,7 @@ export function recordSubscriptionMintInTx(
     paymentRef: `stripe:${p.sessionId}`,
     rail: 'card',
     kind: 'subscription',
-    outcome: 'minted',
+    outcome: p.outcome ?? 'minted',
     lineageHash: key.lineage_hash,
     keyHash: key.key_hash,
     keyPrefix: key.key_prefix,
@@ -530,9 +538,336 @@ export function recordSubscriptionMintInTx(
     stripeSessionId: p.sessionId,
     stripePaymentIntent: p.paymentIntent,
     stripeSubscriptionId: p.subscriptionId,
+    topupRef: p.topupRef ?? null,
     payerEmail: p.payerEmail,
     photo: { tier: 'paid', monthlyLimit: 0, noRecredit: 0 },
   });
+}
+
+// ─── L'abonnement sur la même clé (lot B2) ───────────────────────────────────
+
+export interface CardSubscriptionPayment {
+  sessionId: string;
+  plan: string;
+  /** L'allocation mensuelle de la formule (Pro, éditeur). */
+  monthlyLimit: number;
+  subscriptionId: string | null;
+  amountMinor: number | null;
+  currency: string | null;
+  paymentIntent: string | null;
+  /** L'adresse saisie chez Stripe : contact de service, jamais l'identité de la clé. */
+  payerEmail: string | null;
+  /** `client_reference_id` de la session, tel quel. */
+  clientReferenceId: string | null;
+}
+
+export type SubscriptionFallback =
+  | Exclude<RefResolution, { ok: true }>['reason']
+  | 'key_inactive'
+  /** La clé porte déjà un abonnement vivant (ZG10) : deux factures sur une clé. */
+  | 'double_subscription'
+  /** Une session sans abonnement : rien à terminer un jour, rien à rattacher. */
+  | 'no_subscription';
+
+export type CardSubscriptionOutcome =
+  | { kind: 'idempotent'; purchase: PurchaseRow }
+  | {
+      kind: 'attached';
+      purchaseId: number;
+      keyHash: string;
+      keyPrefix: string;
+      monthlyLimit: number;
+      /** Ce que la clé retrouvera à la fin de l'abonnement. */
+      photo: AllowancePhoto;
+    }
+  | {
+      kind: 'minted';
+      purchaseId: number | null;
+      keyPrefix: string;
+      /** La clé brute, seulement sur une frappe NEUVE (null sur un rejeu). */
+      rawKey: string | null;
+      monthlyLimit: number;
+      fallback: SubscriptionFallback | null;
+    };
+
+/**
+ * Pose l'abonnement sur la clé active de la référence. La photo de l'allocation
+ * propre est prise AVANT d'écrire le Pro, dans la même transaction : c'est elle
+ * que la fin de l'abonnement rendra (spec ZG5). Elle est écrite sur CHAQUE ligne
+ * d'abonnement, pas seulement au premier achat de la lignée. Au premier achat,
+ * une clé anonyme passe au palier payant à 0 et une clé née sous bouclier en
+ * sort (`applyFirstPurchaseInTx`, comme une recharge). Rend null si la clé n'est
+ * plus active : l'appelant se replie, rien n'a été écrit.
+ */
+function attachToExistingKeyInTx(
+  db: Db,
+  target: { keyHash: string; keyPrefix: string; lineageHash: string },
+  p: CardSubscriptionPayment & { subscriptionId: string },
+  ref: string,
+): { purchaseId: number; photo: AllowancePhoto } | null {
+  const row = db
+    .prepare(
+      'SELECT tier, monthly_limit, no_recredit, shield_episode FROM api_keys WHERE key_hash = ? AND active = 1',
+    )
+    .get(target.keyHash) as
+    | {
+        tier: KeyTier;
+        monthly_limit: number | null;
+        no_recredit: number | null;
+        shield_episode: string | null;
+      }
+    | undefined;
+  if (!row) return null;
+  const first = !lineageHasPurchase(target.lineageHash, db);
+  let photo: AllowancePhoto | null;
+  if (first && row.tier === 'anonymous') {
+    // 🚨 Une clé ANONYME dont le Pro est le PREMIER achat : la photo est prise
+    // AVANT la promotion ZG1 (spec §4 : « photo prev_* et promotion ZG1 », dans
+    // cet ordre ; décision de la session principale du 25.09.2026, qui fait
+    // suivre au code la phrase Q11 publiée : « it returns to what it had before
+    // the subscription (its free allowance if it had one…) »). La fin de son Pro
+    // lui rend son allocation anonyme ; la clé reste au palier payant, réclamée
+    // par paiement, donc hors du rayon du radar. Née sous bouclier, elle
+    // retrouve l'allocation normale de son palier, pas le plafond réduit (ZG5).
+    // Une clé anonyme qui a d'abord acheté un pack n'arrive pas ici : son
+    // premier achat l'a déjà passée à 0 (ZG1), et c'est ce 0 qu'elle avait
+    // avant l'abonnement.
+    const shielded = row.shield_episode !== null;
+    photo = {
+      tier: 'anonymous',
+      monthlyLimit: shielded
+        ? ANONYMOUS_MONTHLY_LIMIT
+        : (row.monthly_limit ?? ANONYMOUS_MONTHLY_LIMIT),
+      noRecredit: shielded ? 0 : (row.no_recredit ?? 0),
+    };
+    applyFirstPurchaseInTx(db, target.keyHash, 'stripe');
+  } else {
+    photo = first
+      ? applyFirstPurchaseInTx(db, target.keyHash, 'stripe')
+      : {
+          tier: row.tier,
+          monthlyLimit: row.monthly_limit ?? ownAllowanceDefault(row.tier),
+          noRecredit: row.no_recredit ?? 0,
+        };
+  }
+  if (!photo) return null;
+  // La clé vient d'être lue active dans cette transaction IMMEDIATE : aucun
+  // autre écrivain ne peut l'avoir désactivée entre-temps. Jeter annule tout,
+  // photo comprise, plutôt que d'écrire un abonnement à moitié.
+  if (!attachSubscriptionInTx(db, target.keyHash, p.subscriptionId, p.monthlyLimit)) {
+    throw new Error(`subscription ${p.sessionId}: the key turned inactive mid-transaction`);
+  }
+  const purchaseId = insertPurchase(db, {
+    paymentRef: `stripe:${p.sessionId}`,
+    rail: 'card',
+    kind: 'subscription',
+    outcome: 'attached',
+    lineageHash: target.lineageHash,
+    keyHash: target.keyHash,
+    keyPrefix: target.keyPrefix,
+    bundle: p.plan,
+    amountMinor: p.amountMinor,
+    currency: p.currency,
+    stripeSessionId: p.sessionId,
+    stripePaymentIntent: p.paymentIntent,
+    stripeSubscriptionId: p.subscriptionId,
+    topupRef: ref,
+    payerEmail: p.payerEmail,
+    photo,
+  });
+  if (purchaseId === null) {
+    throw new Error(`key purchase stripe:${p.sessionId} already recorded`);
+  }
+  markLineagePurchase(db, target.lineageHash, target.keyHash);
+  return { purchaseId, photo };
+}
+
+/**
+ * Un abonnement payé par carte (Pro, éditeur), à appeler DANS la transaction du
+ * webhook (qui y écrit aussi `processed_webhooks`, et a déjà écarté un
+ * abonnement mort par sa pierre tombale). Trois issues :
+ *
+ *  - `idempotent` : cette session a déjà sa ligne ; rien d'autre ne s'écrit ;
+ *  - `attached` : la référence mène à exactement une clé active, sans
+ *    abonnement vivant ; l'abonnement se pose sur CETTE clé (T4) ;
+ *  - `minted` : pas de référence (page publique, ancien lien), ou une référence
+ *    qui n'a pas pu servir : une clé NEUVE, comme avant ce lot. Une clé qui
+ *    porte déjà un abonnement vivant n'en reçoit jamais un second (ZG10 :
+ *    double facturation silencieuse) : `double_subscription`, et l'appelant
+ *    alerte pour qu'un humain rembourse ou résilie.
+ */
+export function applyCardSubscriptionPaymentInTx(
+  db: Db,
+  p: CardSubscriptionPayment,
+): CardSubscriptionOutcome {
+  const paymentRef = `stripe:${p.sessionId}`;
+  const existing = findPurchaseByRef(paymentRef, db);
+  if (existing) return { kind: 'idempotent', purchase: existing };
+
+  let fallback: SubscriptionFallback | null = null;
+  // Même règle que pour un pack (relecture de la PR 259, D8) : une référence
+  // qui n'a pas la forme d'une référence de recharge est ABSENTE. Un journal,
+  // jamais une alerte ; la valeur n'est ni gardée ni journalisée.
+  const raw = p.clientReferenceId?.trim() || null;
+  const ref = raw && TOPUP_REF_PATTERN.test(raw) ? raw : null;
+  if (raw && !ref) {
+    console.warn(
+      `[key-purchases] a subscription carried a client_reference_id that is not a recharge reference (${raw.length} characters): treated as absent, a new key is minted.`,
+    );
+  }
+  if (ref) {
+    const target = resolveTopupRef(ref, db);
+    if (!target.ok) {
+      fallback = target.reason;
+    } else if (!p.subscriptionId) {
+      fallback = 'no_subscription';
+    } else if (hasActiveSubscription(target.keyHash, db)) {
+      fallback = 'double_subscription';
+    } else {
+      const attached = attachToExistingKeyInTx(
+        db,
+        target,
+        { ...p, subscriptionId: p.subscriptionId },
+        ref,
+      );
+      if (attached) {
+        return {
+          kind: 'attached',
+          purchaseId: attached.purchaseId,
+          keyHash: target.keyHash,
+          keyPrefix: target.keyPrefix,
+          monthlyLimit: p.monthlyLimit,
+          photo: attached.photo,
+        };
+      }
+      fallback = 'key_inactive';
+    }
+  }
+
+  // Une clé neuve, par le chemin d'avant ce lot, idempotente sur la session.
+  const mint = generateOemKey(p.payerEmail, p.monthlyLimit, p.sessionId, p.subscriptionId);
+  const purchaseId = recordSubscriptionMintInTx(db, {
+    sessionId: p.sessionId,
+    plan: p.plan,
+    subscriptionId: p.subscriptionId,
+    amountMinor: p.amountMinor,
+    currency: p.currency,
+    paymentIntent: p.paymentIntent,
+    payerEmail: p.payerEmail,
+    outcome: fallback ? 'minted_fallback' : 'minted',
+    topupRef: ref,
+  });
+  return {
+    kind: 'minted',
+    purchaseId,
+    keyPrefix: mint.key_prefix,
+    rawKey: mint.api_key,
+    monthlyLimit: mint.monthly_limit,
+    fallback,
+  };
+}
+
+export type SubscriptionEndOutcome =
+  /** La fin est posée : la clé a retrouvé son allocation d'avant. */
+  | {
+      status: 'ended';
+      keyHash: string;
+      keyPrefix: string;
+      allowanceRestoredTo: number;
+      /** Vrai quand l'allocation rendue se compte sur la vie de la clé (« 200 une fois »). */
+      lifetime: boolean;
+      purchase: PurchaseRow | null;
+    }
+  /** Déjà terminé (rejeu sous un autre identifiant d'évènement) : rien de plus. */
+  | { status: 'already_ended'; keyPrefix: string; purchase: PurchaseRow | null }
+  /** La clé porte aujourd'hui un AUTRE abonnement : on n'y touche pas. */
+  | { status: 'moved_on'; keyPrefix: string; purchase: PurchaseRow | null }
+  /** Plus aucune clé active dans la lignée (révoquée), ou deux : rien de touché. */
+  | { status: 'no_active_key' | 'ambiguous'; purchase: PurchaseRow | null }
+  /** Rien de connu : la résiliation arrive avant la frappe (ordre non garanti). */
+  | { status: 'unknown' };
+
+/**
+ * La fin d'un abonnement (`customer.subscription.deleted`, T5), à appeler DANS
+ * la transaction du webhook.
+ *
+ *  - La pierre tombale est TOUJOURS posée : une frappe ou un rattachement de cet
+ *    abonnement arrivé après sa fin (Stripe ne garantit aucun ordre) refuse.
+ *  - L'achat est retrouvé au registre par l'abonnement, puis la clé ACTIVE de sa
+ *    lignée : une clé tournée est donc retrouvée même quand la rotation ne
+ *    recopiait pas l'abonnement (clés tournées avant la PR 177). Sans ligne au
+ *    registre, repli sur la clé active qui porte l'identifiant.
+ *  - La clé retrouve la photo prise au rattachement (0 pour une clé née de
+ *    l'abonnement), garde ses crédits, son identifiant, et reste active.
+ *  - La ligne du registre prend sa date de fin, une fois.
+ */
+export function endSubscriptionInTx(db: Db, subscriptionId: string): SubscriptionEndOutcome {
+  db.prepare('INSERT OR IGNORE INTO dead_subscriptions (subscription_id) VALUES (?)').run(
+    subscriptionId,
+  );
+  const purchase =
+    (db
+      .prepare(
+        `SELECT * FROM key_purchases
+          WHERE kind = 'subscription' AND stripe_subscription_id = ?
+          ORDER BY id DESC LIMIT 1`,
+      )
+      .get(subscriptionId) as PurchaseRow | undefined) ?? null;
+  if (purchase) {
+    db.prepare(
+      `UPDATE key_purchases SET ended_at = COALESCE(ended_at, datetime('now')) WHERE id = ?`,
+    ).run(purchase.id);
+  }
+  type KeyRow = {
+    key_hash: string;
+    key_prefix: string;
+    stripe_subscription_id: string | null;
+    subscription_ended_at: string | null;
+  };
+  const keys = (
+    purchase
+      ? db
+          .prepare(
+            `SELECT key_hash, key_prefix, stripe_subscription_id, subscription_ended_at
+               FROM api_keys
+              WHERE COALESCE(lineage_hash, key_hash) = ? AND active = 1 LIMIT 2`,
+          )
+          .all(purchase.lineage_hash)
+      : db
+          .prepare(
+            `SELECT key_hash, key_prefix, stripe_subscription_id, subscription_ended_at
+               FROM api_keys
+              WHERE stripe_subscription_id = ? AND active = 1 LIMIT 2`,
+          )
+          .all(subscriptionId)
+  ) as KeyRow[];
+  if (!purchase && keys.length === 0) return { status: 'unknown' };
+  if (keys.length === 0) return { status: 'no_active_key', purchase };
+  if (keys.length > 1) return { status: 'ambiguous', purchase };
+  const key = keys[0];
+  if (key.stripe_subscription_id && key.stripe_subscription_id !== subscriptionId) {
+    return { status: 'moved_on', keyPrefix: key.key_prefix, purchase };
+  }
+  if (key.subscription_ended_at) {
+    return { status: 'already_ended', keyPrefix: key.key_prefix, purchase };
+  }
+  // La photo de la ligne d'abonnement. Sans ligne (clé écrite hors du webhook),
+  // 0 : un abonnement ne crée jamais de gratuit.
+  const photo = {
+    monthlyLimit: purchase?.prev_monthly_limit ?? 0,
+    noRecredit: purchase?.prev_no_recredit ?? 0,
+  };
+  if (!endSubscriptionOnKeyInTx(db, key.key_hash, subscriptionId, photo)) {
+    return { status: 'already_ended', keyPrefix: key.key_prefix, purchase };
+  }
+  return {
+    status: 'ended',
+    keyHash: key.key_hash,
+    keyPrefix: key.key_prefix,
+    allowanceRestoredTo: photo.monthlyLimit,
+    lifetime: photo.noRecredit === 1,
+    purchase,
+  };
 }
 
 // ─── Le rail USDC, en deux temps ─────────────────────────────────────────────

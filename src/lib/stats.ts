@@ -2657,6 +2657,12 @@ const PLACEHOLDER_EMAILS = ['credits-buyer', 'stripe-buyer', 'oem-subscriber', A
  * deactivated, same email continues on a fresh key) from wiping the history
  * of a customer who never terminated. Placeholder emails skip that guard —
  * each of their keys is its own anonymous customer.
+ *
+ * Q12 (décision de Claude-Alain du 24.09.2026, DPA 4.7 et CGU 1.9) : la relation
+ * continue tant qu'une clé est active ; révoquer sa dernière clé, ou le demander,
+ * y met fin et fait courir le délai. Depuis le lot B2, la fin d'un abonnement ne
+ * désactive plus la clé : elle ne fait donc courir aucun délai, et c'est voulu.
+ * La demande d'effacement passe par `scripts/forget-customer.cjs`.
  */
 export function purgeTerminatedKeyTelemetry(days: number = 30): number {
   const db = getStatsDB();

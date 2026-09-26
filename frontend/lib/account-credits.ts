@@ -38,7 +38,8 @@ export interface AccountUsage {
   /** `allowance_then_credits` sur une clé mixte (lot B1) : l'allocation d'abord. */
   billing_order?: string;
   /** Les liens qui rechargent CETTE clé (lot B1), servis au porteur de la clé. */
-  topup?: { by_card?: Record<string, unknown> } | null;
+  /** `pro` (lot B2) : le lien Pro qui pose l'abonnement sur cette clé ; absent pour un abonné. */
+  topup?: { by_card?: Record<string, unknown>; pro?: unknown } | null;
 }
 
 export type AccountBalance =
