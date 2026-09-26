@@ -558,7 +558,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/validate \\
   -d '{"iban":"DE89370400440532013000"}'
 \`\`\`
 
-Response (real API output of 2026-09, trimmed to the fields agents typically need):
+Response (real API output of 2026-09, from a deployment where the EPC registers were not loaded, trimmed to the fields agents typically need):
 \`\`\`json
 {
   "iban": "DE89370400440532013000",
@@ -566,11 +566,13 @@ Response (real API output of 2026-09, trimmed to the fields agents typically nee
   "country": { "code": "DE", "name": "Germany" },
   "bic": { "code": "COBADEFFXXX", "bic8": "COBADEFF", "bank_name": "Commerzbank", "city": "Köln", "basis": "national_register", "authoritative": true, "source": "Deutsche Bundesbank Bankleitzahlendatei" },
   "issuer": { "type": "bank", "name": "Commerzbank", "classification": "default" },
-  "sepa": { "member": true, "schemes": ["SCT","SDD","SCT_INST"], "vop_required": true, "vop_participant": true, "basis": "epc_register" },
+  "sepa": { "member": true, "schemes": ["SCT","SDD","SCT_INST"], "vop_required": true, "vop_participant": null, "basis": "country_default" },
   "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "test_bic": false, "sepa_reachable": true, "sepa_reachable_scope": "country", "vop_coverage": true },
   "bank_code_check": { "value": "37040044", "status": "verified", "match": "register", "register": "Deutsche Bundesbank Bankleitzahlendatei", "authoritative": true, "as_of": "2026-09" }
 }
 \`\`\`
+
+\`sepa.vop_participant\` reads \`null\` in this example: that is the answer when the EPC Verification of Payee register was not consulted for the call. When it was, the field reads \`true\` or \`false\`, and \`sepa.basis\` turns to \`"epc_register"\` where the EPC scheme registers list the bank.
 
 The same call on \`CH9300762011623852957\`, the Swiss example of the SWIFT IBAN registry, passes mod-97 and comes back \`"valid": true\` with \`bank_code_check.status = "not_in_register"\`, \`reason = "not_allocated"\`, \`authoritative: true\`: the SIX BankMaster allocates that bank code to nobody. A Swiss IBAN whose code is allocated also carries a \`clearing\` block (SIC, euroSIC, CHF instant payments, QR-IID).
 

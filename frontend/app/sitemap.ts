@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { atBlzFile, beBankFile, chIidFile, deBlzFile, itBankFile, skBankFile, smBankFile } from "@/lib/registers";
+import { chIidFile, deBlzFile, itBankFile, skBankFile } from "@/lib/registers";
 import { allCountryCodes } from "@/lib/countries";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
@@ -44,17 +44,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   listRegister(Object.keys(de.entries), de.batch1, (c) => `/blz/${c}`, ["de"]);
   const ch = chIidFile();
   listRegister(Object.keys(ch.entries), ch.batch1, (c) => `/iid/${c}`, ["de", "fr"]);
-  // Austria reads German; Belgium reads French and, for its payments teams, English.
-  const at = atBlzFile();
-  listRegister(Object.keys(at.entries), at.batch1, (c) => `/at/${c}`, ["de"]);
-  const be = beBankFile();
-  // A Belgian page is the bank's page: only the canonical code of each block is listed.
-  listRegister(
-    Object.keys(be.entries).filter((c) => be.entries[c].register.canonical === c),
-    be.batch1,
-    (c) => `/be/${c}`,
-    ["fr", "en"],
-  );
+  // Austria, Belgium and San Marino list no code page since the withdrawal step
+  // (25/09/2026): their registers are served by the API from a private file, and
+  // listing every code here would republish the register this repository may
+  // not carry. Their pages still render on demand (lib/register-live.ts) and
+  // their index pages (/at, /be, /sm, below) stay listed.
   // Slovakia in English only. Slovak is not one of this site's three locales,
   // and the edition of the directory we actually read and cite is the English
   // one the NBS publishes — so listing these under de or fr would offer a
@@ -62,11 +56,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // first batch: the register is small enough to have no tail.
   const sk = skBankFile();
   listRegister(Object.keys(sk.entries), sk.batch1, (c) => `/sk/${c}`, ["en"]);
-  // San Marino in English and Italian? No — Italian is not a site locale, and
-  // the BCSM page we read and cite is the English edition. Four pages, one
-  // language, like Slovakia.
-  const sm = smBankFile();
-  listRegister(Object.keys(sm.entries), sm.batch1, (c) => `/sm/${c}`, ["en"]);
   // L'Italie en anglais seulement, comme Saint-Marin : l'italien n'est pas une
   // langue du site. Seuls les codes en vigueur sont listés ; les pages des codes
   // radiés existent pour qui tape un ancien code, elles ne se proposent pas.

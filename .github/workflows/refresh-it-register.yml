@@ -26,6 +26,12 @@ name: Refresh the Italian bank-code registers (Banca d'Italia)
 # Licence : open data CC BY 4.0 de la Banca d'Italia ; le crédit voyage dans les
 # lignes elles-mêmes, et les journaux (publics, comme le dépôt) ne portent que
 # l'édition, les décomptes et des adresses publiques.
+#
+# L'Italie est publique, hors de la famille sous conditions
+# (src/lib/restricted-family.ts) : le seeder tourne sans SEED_FAMILY, donc sur les
+# sources publiques seules, et la suite (src/lib/public-base-family-free.test.ts)
+# refuse une base qui porterait une ligne de cette famille avant tout commit.
+# L'export des pages italiennes ne porte aucun champ tiré des registres EPC.
 
 on:
   schedule:

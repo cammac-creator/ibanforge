@@ -325,7 +325,9 @@ describe('maps every bank_code_check shape to exactly one bank_code_holder', () 
       },
       'confirmed',
     ],
-    ['partial register, found (FI)', () => 'FI2112345600000785', 'confirmed'],
+    // La Finlande (liste Finance Finland transcrite) a quitté le dépôt à l'étape
+    // du retrait (25/09/2026) : sans aucune donnée, son verdict est `unknown`.
+    ['no reference data left for the country (FI)', () => 'FI2112345600000785', 'unknown'],
     // L'Italie (25/09/2026) : un code en vigueur est nommé par le registre ; un
     // code radié n'a plus de titulaire aujourd'hui, donc `inferred`, jamais un
     // refus ; Poste Italiane, hors du registre, garde la carte composite.

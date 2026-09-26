@@ -39,7 +39,7 @@ Les données tchèques sont reproduites au titre des conditions d'usage du site 
 | Pays | Registre | Rafraîchissement | Ce qu'il publie au-delà du code |
 |---|---|---|---|
 | **SM** | Banque centrale de la République de Saint-Marin, liste des banques opérationnelles | relu mensuellement (la page ne porte **ni édition ni date de révision** : `as_of` est le jour de notre lecture, et le crédit dit « read on ») | nom, BIC, et le siège social complet — plus profond que ce que publient BE, BG ou SK |
-| **FI** | Finance Finland, codes d'établissements monétaires (liste transcrite datée du 15.10.2025) | à chaque republication | les codes sont attribués à des **groupes bancaires**, pas à des établissements : un résultat confirme le groupe et son BIC, daté de la liste elle-même. Depuis le 16 septembre 2026, une absence de la liste n'est **pas** un refus : la liste est une transcription manuelle que rien ne rafraîchit, la Finlande répond donc comme avant la liste, `authoritative: false` |
+| **FI** | Finance Finland, codes d'établissements monétaires (liste transcrite datée du 16.03.2026) | à chaque republication | les codes sont attribués à des **groupes bancaires**, pas à des établissements : un résultat confirme le groupe et son BIC, daté de la liste elle-même. Depuis le 16 septembre 2026, une absence de la liste n'est **pas** un refus : la liste est une transcription manuelle que rien ne rafraîchit, la Finlande répond donc comme avant la liste, `authoritative: false` |
 
 Saint-Marin est à part parce qu'il rompt la règle sur laquelle le tableau ci-dessus est bâti. La Banque centrale publie les quatre banques qu'elle **supervise** ; elle ne publie pas l'attribution de l'espace des codes ABI. Saint-Marin agrée aussi des prestataires de paiement et de monnaie électronique qui ne sont pas des banques (l'un détient un BIC saint-marinais et règle via EBA STEP2), et l'IBAN d'exemple officiel de Saint-Marin porte un code ABI absent de la page. Donc :
 
@@ -60,7 +60,7 @@ Les Pays-Bas passent en plus par la liste des prestataires émetteurs d'IBAN de 
 
 ## Royaume-Uni — agrément PRA à recevoir des dépôts
 
-Source : **Bank of England (List of Banks, 2026-08)**, la liste mensuelle des établissements que la Prudential Regulation Authority agrée pour recevoir des dépôts. Utilisée avec la permission écrite de la Bank of England, dont la condition est l'attribution à la Bank **et au mois de publication de la liste** — c'est pourquoi chaque bloc `pra_authorisation` porte `list_month`, lu de la donnée chargée et jamais écrit à la main.
+Source : **Bank of England (List of Banks, 2026-09)**, la liste mensuelle des établissements que la Prudential Regulation Authority agrée pour recevoir des dépôts. Utilisée avec la permission écrite de la Bank of England, dont la condition est l'attribution à la Bank **et au mois de publication de la liste** — c'est pourquoi chaque bloc `pra_authorisation` porte `list_month`, lu de la donnée chargée et jamais écrit à la main.
 
 Elle ne figure délibérément **pas** dans le tableau des registres ci-dessus. C'est une liste d'établissements agréés (nom, FRN, LEI), pas une allocation de codes banque : elle ne peut donc jamais rendre un code banque GB `authoritative: true`. Elle répond à une autre question : l'établissement derrière cet IBAN est-il agréé par la PRA pour recevoir des dépôts ?
 

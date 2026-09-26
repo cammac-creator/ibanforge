@@ -23,7 +23,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     value: {
       type: 'string',
       description:
-        'The bank code that was actually checked. Normally identical to bban.bank_code. It differs in Finland, where the monetary institution code is 1 to 4 characters depending on its leading digits while bban.bank_code stays the fixed positional slice: a Nordea IBAN carries bban.bank_code "123" and value "1". When they differ, this field is the one the verdict is about.',
+        'The bank code that was actually checked. Normally identical to bban.bank_code. It differs in Finland, where the monetary institution code is 1 to 4 characters depending on its leading digits while bban.bank_code stays the fixed positional slice: an IBAN whose group holds a one-digit code carries bban.bank_code "123" and value "1". When they differ, this field is the one the verdict is about.',
     },
     status: {
       type: 'string',

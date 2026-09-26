@@ -43,9 +43,6 @@ import { completeRestrictedFamily } from '../test-support/restricted-overlay-fix
  */
 
 const REAL = process.env.OVERLAY_EQUIVALENCE_REAL === '1';
-
-/** Les membres venus après la première surcouche, qu'aucune vraie base ne porte. */
-const LATE = new Set(['bic.map_pl', 'bic.map_fi', 'bic.map_lu', 'bic.register_fi']);
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const DEV = { 'X-Dev-Skip': 'true' };
@@ -444,15 +441,11 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       stripped.status.find((st) => st.kind === 'compliance')!.served_path,
       merged.compliance,
     );
-    // Un membre absent du fichier (en vraies bases, les membres tardifs : aucune
-    // base publique ne porte leurs tables) n'a pas de jumeau à comparer.
     twins = stripped.status.flatMap((st) =>
-      st.members
-        .filter((m) => m.state !== 'absent')
-        .map((m): [string, boolean | null | undefined] => [
-          `${st.kind}.${m.id}`,
-          m.identical_to_public,
-        ]),
+      st.members.map((m): [string, boolean | null | undefined] => [
+        `${st.kind}.${m.id}`,
+        m.identical_to_public,
+      ]),
     );
 
     // Montage 3 : la base publique d'aujourd'hui, encore complète, + la surcouche
@@ -496,7 +489,7 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
 
   it('insère chaque membre depuis la surcouche, la base publique ne portant plus rien', () => {
     // identical_to_public: null = la base publique n'avait aucune ligne du membre.
-    expect(twins.length).toBe(REAL ? 10 : 14);
+    expect(twins.length).toBe(14);
     for (const [id, twin] of twins) expect(twin, id).toBeNull();
   });
 
@@ -533,32 +526,18 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
     expect(c.un_matched, "BIC nommé par la liste de l'ONU").toBeGreaterThanOrEqual(1);
     expect(c.gb_pra, 'BIC britannique avec son bloc PRA').toBeGreaterThanOrEqual(1);
     expect(c.family_bic_found, 'BIC EBA STEP2, NBP ou OeNB trouvé').toBeGreaterThanOrEqual(3);
-    if (!REAL)
+    if (!REAL) {
+      expect(
+        c.curated_map,
+        'clé PL ou LU de la carte servie par la surcouche',
+      ).toBeGreaterThanOrEqual(2);
       expect(c.fi_register, 'code finlandais au verdict de la liste').toBeGreaterThanOrEqual(1);
-  });
-
-  it('les clés PL et LU de la surcouche ne servent pas tant que la carte publique porte ces pays', () => {
-    // La règle de fraîcheur, pays par pays (addCuratedRows, src/lib/bic-lookup.ts) :
-    // src/db/bic_data.json porte encore la Pologne et le Luxembourg, ses clés ne
-    // sont pas datées, il est gardé ; les clés inventées de la surcouche n'y
-    // répondent pas, ni avec la surcouche ni sans elle.
-    if (REAL) return;
-    for (const iban of [
-      ibanFor('PL', '999000000000000000000001'),
-      ibanFor('LU', '8000000123456789'),
-    ]) {
-      for (const responses of [after, before]) {
-        const body = (responses.get(`validate ${iban}`) as { body: Record<string, any> }).body; // eslint-disable-line @typescript-eslint/no-explicit-any
-        expect(body.bic?.code ?? null, iban).toBeNull();
-        expect(body.bank_code_check?.status, iban).not.toBe('verified');
-      }
     }
-    expect(coverage(after).curated_map).toBe(coverage(before).curated_map);
   });
 
   it('cas (c) : base publique encore complète + surcouche extraite d’elle, mêmes réponses', () => {
     for (const [id, decision] of Object.entries(fullPublicDecisions))
-      expect(decision, id).toBe(REAL && LATE.has(id) ? 'absent:not_in_file' : 'applied:identical');
+      expect(decision, id).toBe('applied:identical');
     let identical = 0;
     for (const [key, value] of before) {
       expect(withFullPublic.get(key), key).toEqual(value);
@@ -581,9 +560,10 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       'compliance.un': 'kept_public:public_newer_or_undated',
       'compliance.epc_sepa': 'kept_public:public_newer_or_undated',
       'compliance.epc_vop': 'kept_public:public_newer_or_undated',
-      ...Object.fromEntries(
-        [...LATE].map((id) => [id, REAL ? 'absent:not_in_file' : 'applied:identical']),
-      ),
+      'bic.map_pl': 'applied:identical',
+      'bic.map_fi': 'applied:identical',
+      'bic.map_lu': 'applied:identical',
+      'bic.register_fi': 'applied:identical',
     });
     // Le montage doit mordre : la base plus récente répond autrement que la complète.
     const moved = [...before.keys()].filter(

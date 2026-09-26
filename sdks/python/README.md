@@ -199,12 +199,10 @@ from ibanforge import IBANforge
 with IBANforge(api_key="ifk_...") as client:
     out = client.check_compliance("GB29NWBK60161331926819")
 
-    print(out["compliance"]["risk_score"])                  # 10
+    print(type(out["compliance"]["risk_score"]).__name__)   # 'int'
     print(out["compliance"]["risk_level"])                  # 'low'
     print(out["compliance"]["sanctions"]["matched_lists"])  # []
     print(out["compliance"]["sanctions"]["fatf_status"])    # 'member'
-    print(out["compliance"]["reachability"]["sct"])         # True
-    print(out["compliance"]["vop"]["participant"])          # False
     print(out["meta"]["scope"])                             # 'bank_bic_only'
 ```
 

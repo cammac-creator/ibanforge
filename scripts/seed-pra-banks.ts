@@ -9,13 +9,19 @@
  * fall back to the wall clock for it: an attribution carrying the wrong month
  * is the one failure of this ingestion that cannot be walked back.
  *
- * Usage: npx tsx scripts/seed-pra-banks.ts
+ * 🔒 Depuis le 25/09/2026 (étape du retrait), chaîne privée seulement :
+ *   SEED_FAMILY=restricted BIC_DB_PATH=<copie hors du dépôt> npx tsx scripts/seed-pra-banks.ts
+ * Sans `SEED_FAMILY=restricted`, le script refuse avant tout téléchargement.
  */
 
 import { createRequire } from 'node:module';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { PRA_LIST_MONTHS_BACK, RESTRICTED_FLOORS } from '../src/lib/restricted-family.js';
+import {
+  PRA_LIST_MONTHS_BACK,
+  RESTRICTED_FLOORS,
+  seedFamilyFromEnv,
+} from '../src/lib/restricted-family.js';
 import { reportSeedMember } from './seed-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -354,6 +360,20 @@ export function createPraBanksTable(db: import('better-sqlite3').Database): void
 }
 
 async function main(): Promise<void> {
+  // La liste PRA appartient à la famille sous conditions (src/lib/restricted-family.ts,
+  // membre `pra`) : la permission de la Bank of England couvre l'usage dans l'API,
+  // pas la redistribution du fichier. Depuis l'étape du retrait (25/09/2026), elle
+  // n'est lue que par la chaîne privée (SEED_FAMILY=restricted, posée par
+  // `npm run overlay:seed`). Sans la variable, refus AVANT tout téléchargement :
+  // la base écrite serait celle de ce dépôt, d'où la liste serait commitée.
+  if (seedFamilyFromEnv() !== 'restricted') {
+    console.error(
+      '[pra] refusé : la liste PRA est reconstruite seulement par la chaîne privée ' +
+        '(SEED_FAMILY=restricted, npm run overlay:seed), jamais dans la base de ce dépôt.',
+    );
+    process.exitCode = 1;
+    return;
+  }
   let downloaded: Downloaded;
   try {
     downloaded = await downloadList();

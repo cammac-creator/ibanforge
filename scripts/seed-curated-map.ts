@@ -5,18 +5,16 @@
  *
  * ## Pourquoi ce fichier existe
  *
- * Ces clés vivent dans src/db/bic_data.json, importées le 08/04/2026 de la
- * compilation mdomke/schwifty (MIT) des sources nationales : le fichier EWIB de
- * la NBP pour la Pologne, Finance Finland pour la Finlande, et, pour le
- * Luxembourg, le registre de l'ABBL par la compilation sigalor/iban-to-bic
+ * Jusqu'au 25/09/2026, ces clés vivaient dans src/db/bic_data.json, importées le
+ * 08/04/2026 de la compilation mdomke/schwifty (MIT) des sources nationales : le
+ * fichier EWIB de la NBP pour la Pologne, Finance Finland pour la Finlande, et,
+ * pour le Luxembourg, le registre de l'ABBL par la compilation sigalor/iban-to-bic
  * complétée de quelques clés schwifty. Leurs conditions ne permettent pas la
- * redistribution : elles quittent le dépôt public à l'étape du retrait, et la
- * session principale a décidé le 25/09/2026 de les servir depuis le dépôt privé
+ * redistribution : elles ont quitté le dépôt public (étape du retrait), et la
+ * session principale a décidé le même jour de les servir depuis le dépôt privé
  * plutôt que de perdre le service. Ce seeder refait donc, à chaque passage
  * mensuel de la chaîne privée, ce que l'import avait fait une fois : il télécharge
- * la dernière publication de schwifty sur PyPI et en lit les registres. Tant que
- * le fichier public porte un pays, c'est lui qui répond (src/lib/bic-lookup.ts,
- * `addCuratedRows`).
+ * la dernière publication de schwifty sur PyPI et en lit les registres.
  *
  * ## La source, datée et vérifiée
  *
@@ -29,8 +27,8 @@
  * ## La liste finlandaise : aucune source à télécharger
  *
  * Finance Finland publie sa liste en PDF (plages écrites en prose, un groupe
- * réparti sur plusieurs lignes) ; celle de ce dépôt (src/lib/fi-register.ts) est
- * une transcription à la main, qu'aucun robot ne rafraîchit. La compilation
+ * réparti sur plusieurs lignes) ; la version servie jusqu'ici était une
+ * transcription à la main, qu'aucun robot ne rafraîchissait. La compilation
  * schwifty n'en est pas un substitut : elle date d'une publication ancienne et
  * garde des banques sorties du marché finlandais. Le membre `register_fi` est
  * donc une liste STATIQUE (`staticList`) : ce seeder ne l'écrit que si
@@ -251,7 +249,7 @@ export function parseRegistry(
       }
       // La carte servait les BIC finlandais sous leur forme à onze caractères
       // (import du 08/04/2026) ; les BIC polonais et luxembourgeois tels que la
-      // compilation les donne. Même forme, même réponse que la carte publique.
+      // compilation les donne. Même forme, même réponse qu'avant le retrait.
       const bic = cc === 'FI' && read.length === 8 ? `${read}XXX` : read;
       const primary = entry.primary === true;
       const name = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : null;

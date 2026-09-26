@@ -8,6 +8,32 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 25/09/2026 : la famille sous conditions a quitté le dépôt public
+
+Ce qui peut être servi mais pas redistribué (décision de Claude-Alain du
+24/09/2026, liste unique dans `src/lib/restricted-family.ts`) n'est plus dans
+aucun fichier de ce dépôt, hors historique git :
+
+| Retiré | D'où | Servi par l'API ? |
+|---|---|---|
+| lignes `eba_step2`, `nbp`, `oenb` de `bic_entries` ; registres AT, BE, SM de `national_bank_codes` ; `pra_banks` | `data/bic.sqlite` | oui, depuis le dépôt privé (surcouche) |
+| liste `UN` de `sanctioned_entities` ; `sepa_participants` ; `vop_participants` | `data/compliance.sqlite` | oui, depuis le dépôt privé (surcouche) |
+| clés AT, BE, LU, PL, FI (5 454 clés) | `src/db/bic_data.json` | AT, BE : par les registres de la surcouche ; **PL, FI, LU : par la surcouche** (membres `map_pl`, `map_fi`, `map_lu`, table `curated_bank_codes`, reconstruits chaque mois depuis la publication PyPI de schwifty) ; LU aussi par le registre de l'ABBL (fichier privé) |
+| liste transcrite de Finance Finland | `src/lib/fi-register.ts` (lit désormais la base servie) | oui, par la surcouche (membre `register_fi`, liste statique recopiée d'une surcouche à l'autre) |
+| exports AT, BE, SM ; blocs EPC des autres exports et des exemples | `frontend/data/`, fixtures MCP et SDK, documentation | les pages `/at`, `/be`, `/sm` lisent l'API à la demande |
+| entrées GB (FCA) | `scripts/data/eu-emi-register-2026-05-22.json` | non |
+
+Les robots publics tournent sans `SEED_FAMILY` (mode public ; la variable n'accepte
+que `restricted`, toute autre valeur est refusée) : ils ne téléchargent plus aucun
+membre et écrivent des bases sans la famille ;
+`src/lib/public-base-family-free.test.ts` échoue si une ligne revient. Les bases
+suivies se reconstruisent sans téléchargement par `npm run overlay -- strip`.
+Sans surcouche, chaque réponse qui dépend de la famille dit « non consulté »
+(`national_register_unavailable`, `screened: false`, drapeaux `*_unavailable`),
+jamais « non ». Dans les tableaux ci-dessous, les lignes de ces sources
+décrivent désormais ce que sert l'API, pas le contenu du dépôt ; leurs comptes
+datent d'avant le retrait.
+
 ## Ce qui alimente `bic.sqlite`
 
 Comptes relevés le 22/08/2026, à recompter après chaque rafraîchissement
@@ -23,7 +49,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | EBA Clearing STEP2 SCT | 189 | « All rights reserved by EBA CLEARING », aucune licence publiée | ⏳ **demande de permission envoyée le 16/09/2026** (lettre et précision d'usage à clearing@ebaclearing.eu) ; servi avec crédit en attendant la réponse, retrait sur leur mot — voir la section du 16/09 |
 | Oesterreichische Nationalbank — SEPA-Zahlungsverkehrs-Verzeichnis (`national_bank_codes`, pays AT) | 869 au 29/07/2026 | aucune condition sur la page du répertoire (pied « Copyright © Oesterreichische Nationalbank ») ; le jeu est listé sur data.gv.at, où l'usage est en règle générale CC BY 4.0 | ⏳ **lettre envoyée le 16/09/2026** à oenb.info@oenb.at (permission, licence data.gv.at, formule d'attribution) ; servi avec crédit « Source: Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis, read in <mois> » |
 | Banque nationale de Belgique — bank identification codes, Protocol Secretariat (`national_bank_codes`, pays BE) | 790 au 29/07/2026 | aucune condition sur la page (lue le 16/09/2026 : formulaire pour ajouter/modifier un code, renvoi « to the financial institution concerned or the SWIFT-website » pour un usage précis) | ⏳ **lettre envoyée le 16/09/2026** à info@nbb.be ; servi avec crédit et mois de lecture |
-| Finance Finland (Finanssiala ry) — Finnish monetary institution codes and BICs (table `src/lib/fi-register.ts`, pays FI) | 20 lignes, édition du 15.10.2025 | aucune condition sur le site (lu le 16/09/2026) ; document PDF transcrit à la main | ⏳ **lettre envoyée le 16/09/2026** à ffi@financefinland.fi (permission, attribution, notification des éditions). **Régime prudent depuis le 16/09/2026** : un résultat confirme, une absence ne refuse rien (`authoritative: false`) |
+| Finance Finland (Finanssiala ry) — Finnish monetary institution codes and BICs (table `src/lib/fi-register.ts`, pays FI) | 22 lignes, édition du 16.03.2026 | aucune condition sur le site (lu le 16/09/2026) ; document PDF transcrit à la main | ⏳ **lettre envoyée le 16/09/2026** à ffi@financefinland.fi (permission, attribution, notification des éditions). **Régime prudent depuis le 16/09/2026** : un résultat confirme, une absence ne refuse rien (`authoritative: false`) |
 | Bulgarian National Bank — registre BAE et BIC (`bg_bae`, pays BG) | par édition du registre | réponse écrite du service de presse le 27/08/2026 : réutilisation permise « respecting the Rights for using the BNB site » = citer la source, ne pas altérer ni déformer | ✅ **accordée sous conditions le 27/08/2026** ; `source` et `as_of` stockés et servis, noms en cyrillique tels que publiés |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
 | OFAC (sanctions) | — | domaine public, **17 U.S.C. §105** (le CC0 lu le 24/08/2026 dans l'inventaire du Treasury n'y figure plus le 24/09/2026) | ✅ §105 **vérifié le 24/08/2026** ; CC0 plus vérifiable depuis le 24/09/2026 |
@@ -264,7 +290,14 @@ reconstruction du fichier ou une nouvelle radiation les ramène.
 Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
 droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
 PL et FI sortent du dépôt public** (conditions non établies, non commerciales,
-ou permission limitée à l'API : ABBL, voir la section ABBL plus bas). Les
+ou permission limitée à l'API : ABBL, voir la section ABBL plus bas). **Fait le
+25/09/2026** : 5 454 clés retirées. Le même jour, décision de la session
+principale : pas de perte de service, les clés PL, FI et LU et la liste
+finlandaise sont servies par la surcouche (membres `map_pl`, `map_fi`, `map_lu`
+et `register_fi`, venus après la première surcouche : un fichier écrit avant eux
+les laisse « absents », sans refus ni alerte). Sans surcouche, un code polonais
+ou finlandais répond `unavailable` / `no_reference_data_for_country` (non
+consulté). Les
 autres pays tirés de schwifty restent à vérifier un par un. Détail et
 attributions : `NOTICE`.
 
@@ -295,16 +328,35 @@ liste des membres vit en UN endroit,
 | `bic.sqlite` | `pra` | `pra_banks` entière |
 | `compliance.sqlite` | `un` | `sanctioned_entities` de la liste `UN` |
 | `compliance.sqlite` | `epc_sepa`, `epc_vop` | `sepa_participants` et `vop_participants` entières |
+| `bic.sqlite` | `map_pl`, `map_fi`, `map_lu` (depuis le 25/09/2026) | `curated_bank_codes` : les clés PL, FI et LU de la carte composite |
+| `bic.sqlite` | `register_fi` (depuis le 25/09/2026, liste statique) | `fi_monetary_codes` entière : la liste de Finance Finland |
 
-Hors de cette constante, et à traiter à l'étape du retrait (règle de la décision
-du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C de `NOTICE`) :
-`six_group` (à vérifier), la carte composite `src/db/bic_data.json` (clés AT, BE,
-LU, PL, FI), `src/lib/fi-register.ts`, les exports du site
-`frontend/data/registers/*.json`, les blocs EPC des exports et des réponses
-d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
-`mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`,
-`frontend/content/{en,fr,de}/docs/onboarding.mdx`), et les entrées GB (FCA) de
-`scripts/data/eu-emi-register-2026-05-22.json`.
+Les quatre derniers membres sont venus après la première surcouche publiée
+(`mayBeAbsent`) : un fichier écrit avant eux ne les porte pas, et le chargeur les
+lit « absents » (ni servis ni refusés, sans alerte) au lieu de refuser le fichier.
+Un membre déjà servi qui deviendrait absent reste une perte, refusée partout : le
+tirage refuse le fichier (`members_lost`), le rechargement garde ce qu'il sert, le
+redémarrage préfère la copie acceptée dès qu'un de ses membres manque au fichier
+posé, et la porte du manifeste refuse la release (`lost_member`, même sous
+« accepter une baisse »). Les clés
+viennent chaque mois de la dernière publication de mdomke/schwifty sur PyPI
+(`scripts/seed-curated-map.ts`, empreinte SHA-256 de la roue vérifiée contre
+l'index) ; la liste finlandaise, statique (un PDF transcrit à la main), est
+recopiée telle quelle d'une surcouche à l'autre et ne change que par un geste
+manuel (`FI_LIST_PATH`).
+
+Hors de cette constante, retirés à l'étape du retrait (25/09/2026, règle de la
+décision du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C de
+`NOTICE`) : les clés AT, BE, LU, PL et FI de la carte composite
+`src/db/bic_data.json` et la liste transcrite de `src/lib/fi-register.ts` (les
+clés PL, FI et LU et la liste sont redevenues des membres le même jour, voir
+ci-dessus ; les clés AT et BE, non : les registres de la surcouche répondent), les
+exports AT, BE et SM du site,
+les blocs EPC des exports et des réponses d'exemple suivies (`frontend/data/countries.json`,
+`captured-iban.json`, `mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`,
+les fixtures des SDK .NET et Java, la documentation du site), et les entrées GB (FCA) de
+`scripts/data/eu-emi-register-2026-05-22.json`. `six_group` reste public : ses lignes
+viennent du fichier Bank Master de SIX (« may be used freely »).
 
 - **Deux fichiers privés**, un par base, désignés par `RESTRICTED_BIC_OVERLAY_PATH`
   et `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (chemins absolus, sur le disque du
@@ -366,8 +418,9 @@ d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
   être hors de tout dépôt (`$RUNNER_TEMP` en CI), et `overlay:seed` pose
   `SEED_TMP_DIR` dans son dossier de travail : les téléchargements et la base de
   conformité en construction ne passent plus par `.tmp-bic-enrich/` et
-  `.tmp-compliance/` du checkout (désormais ignorés par git). Sans ces variables, les workflows publics
-  écrivent exactement comme avant.
+  `.tmp-compliance/` du checkout (désormais ignorés par git). Sans ces variables
+  (sans `SEED_FAMILY`, le mode public, depuis le 25/09/2026), les workflows publics
+  écrivent des bases sans la famille et ne téléchargent aucun de ses membres.
 
 ## Ce que les surfaces publiques annoncent
 

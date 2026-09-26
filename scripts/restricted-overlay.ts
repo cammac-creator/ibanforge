@@ -19,6 +19,10 @@
  *       sont absents du fichier écrit.
  *   check --kind bic|compliance --overlay <fichier>
  *       Les contrôles du chargeur de l'API, sans rien écrire. Code 1 si refus.
+ *       Puis les contrôles de données qui ont quitté la suite publique avec la
+ *       famille (src/lib/restricted-data-audit.ts : mois des crédits PRA, exemples
+ *       de la démo, pays SEPA ajoutés à la main) : une annotation `::warning::`
+ *       par texte public en retard, jamais un refus.
  *   merge --kind bic|compliance --public <base> --overlay <fichier> --out <fichier>
  *       La fusion que fait l'API au démarrage, pour la vérifier en local.
  *   strip --kind bic|compliance --in <base> --out <fichier> [--drop-tables]
@@ -36,7 +40,9 @@
  *       Refus si aucun membre n'est frais, sans surcouche précédente, ou si une
  *       donnée reprise dépasse sa borne.
  *       Pour la conformité : la surcouche précédente au même chemin est fusionnée
- *       d'abord, pour que la reprise d'une liste en panne (ONU) la retrouve.
+ *       d'abord, pour que la reprise d'une liste en panne (ONU) la retrouve ;
+ *       refresh-compliance.ts y tourne avec SEED_FAMILY=restricted (sans elle,
+ *       il ne lit plus ni l'ONU ni l'EPC depuis l'étape du retrait).
  *   manifest --dir <dossier> --out <fichier> [--commit <sha>] [--previous <manifeste>] [--allow-shrink]
  *       Le manifeste d'une release du dépôt privé (étape 5) : chaque surcouche
  *       présente dans <dossier>, contrôlée comme le chargeur de l'API, avec son
@@ -72,6 +78,7 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { OverlayKind } from '../src/lib/restricted-family.js';
+import { auditOverlayData } from '../src/lib/restricted-data-audit.js';
 import {
   buildMergedDatabase,
   extractOverlay,
@@ -405,9 +412,14 @@ export function commandSeed(
       if (!merged.path) copyToScratch(publicBase, scratch, 'compliance.sqlite');
     } else copyToScratch(publicBase, scratch, 'compliance.sqlite');
     const bicDirectory = stringFlag(flags, 'bic-directory');
+    // SEED_FAMILY=restricted : depuis l'étape du retrait, refresh-compliance.ts
+    // sans variable ne lit plus ni l'ONU ni l'EPC (robot public). Ici, il refait
+    // tout, exactement comme avant, dans la copie de travail privée ; seule la
+    // famille en est extraite ensuite.
     runSeeder('refresh-compliance.ts', {
       COMPLIANCE_DB_PATH: work,
       SEED_TMP_DIR: join(scratch, 'tmp'),
+      SEED_FAMILY: 'restricted',
       ...(bicDirectory ? { BIC_DB_PATH: resolve(bicDirectory) } : {}),
     });
     return extractOverlay({
@@ -508,9 +520,17 @@ export function runCommand(argv: string[]): { code: number; output: unknown } {
     case 'extract':
       return { code: 0, output: commandExtract(flags) };
     case 'check': {
-      const report = inspectOverlay(required(flags, 'overlay'), kindFlag(flags));
+      const kind = kindFlag(flags);
+      const overlay = required(flags, 'overlay');
+      const report = inspectOverlay(overlay, kind);
       // Un membre absent (venu après la première surcouche) n'est pas un refus.
       const refused = !report.ok || report.members.some(memberRefused);
+      // Les contrôles qui ont suivi la famille dans la porte privée (étape du
+      // retrait, 25/09/2026) : un texte public en retard sur la donnée servie.
+      // Une annotation par écart, jamais un refus (src/lib/restricted-data-audit.ts).
+      if (report.ok)
+        for (const warning of auditOverlayData(kind, overlay, ROOT))
+          console.log(`::warning title=Surcouche ${kind} : texte public à revoir::${warning}`);
       return { code: refused ? 1 : 0, output: report };
     }
     case 'merge': {

@@ -9,6 +9,8 @@ import {
   namedRow,
   nonEmpty,
   registeredAddress,
+  RESTRICTED_DIRECTORY_NOTE,
+  restrictedDirectoryLoaded,
   sharedBic8Stats,
 } from '../lib/bic-lookup.js';
 import { frozenBicShare } from '../lib/positioning.js';
@@ -268,6 +270,11 @@ bicLookup.get('/v1/bic/:code', (c) => {
           'coverage may be partial, so an absence here does not mean the BIC is unallocated.',
       );
     }
+    // Depuis l'étape du retrait (25/09/2026), les listes STEP2, NBP et OeNB de
+    // l'annuaire ne sont servies que depuis la surcouche privée : sans elle, un
+    // BIC qu'elles seules portent n'est pas « absent », il n'a pas été cherché
+    // là. La phrase le dit, dans un champ que chaque client lit déjà.
+    if (!restrictedDirectoryLoaded()) parts.push(RESTRICTED_DIRECTORY_NOTE);
 
     result.note = parts.join(' ');
   }
