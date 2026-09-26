@@ -119,7 +119,9 @@ npm run build             # next build
   database (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), member by
   member, the fresher data winning: the public rows are kept (`kept_public`) when they are
   newer, or undated and different. The last accepted file is kept beside the private one
-  (`*.accepted.sqlite`) and served at start-up if the file named by the variable is refused.
+  (`*.accepted.sqlite`) and served at start-up if the file named by the variable is refused
+  or lacks a member it serves (a late member absent included), even when that file gains
+  another; such a file never replaces it.
   To reload, replace the file atomically (write a neighbour, then `mv`): the API checks it
   within ten minutes, rebuilds only that database, and keeps what it serves if the new file
   fails its checks or would drop a member served today. State: `GET /health` →
@@ -131,7 +133,14 @@ npm run build             # next build
   script refuses, and `.gitignore` catches `restricted-*.sqlite*` and `*.merged-*.sqlite*`),
   never add a table or a source to the family anywhere but that constant, and never let a
   public workflow download or commit the family: stopping them is the next step, not a
-  side effect.
+  side effect. The PL, FI and LU keys of the composite map and the Finnish list have
+  members too (`map_pl`, `map_fi`, `map_lu`, `register_fi`, 25 September 2026): marked
+  `mayBeAbsent` (an older overlay without them is accepted, `/health` lists them under
+  `restricted_overlays.bic.absent`), rebuilt by `scripts/seed-curated-map.ts`. While
+  `src/db/bic_data.json` and `src/lib/fi-register.ts` still carry that data, the public side
+  answers (the freshness rule, per country: `addCuratedRows` in `src/lib/bic-lookup.ts`;
+  the overlay's Finnish list only when strictly newer), so they change no answer before the
+  removal step.
 - `src/lib/restricted-overlay-pull.ts`: the API refreshes those files itself (step 5,
   since 25 September 2026). A private repository rebuilds the overlay weekly (compliance)
   and monthly (BIC), commits no data, and publishes a release: both files and a
@@ -150,7 +159,8 @@ npm run build             # next build
   alone), the ten-minute watcher pulls the latest release every four hours plus up to
   thirty minutes of jitter (one hour after a failure, never at start-up); a file whose
   hash is already served, in place or accepted is never downloaded again; otherwise the
-  download is capped, its hash checked, `inspectOverlay` must accept every member, a
+  download is capped, its hash checked, `inspectOverlay` must accept every member and none
+  served today may be missing (`members_lost`), a
   neighbour is written then renamed onto the file named by `RESTRICTED_*_OVERLAY_PATH`, and
   that database is reloaded at once. Any failure keeps what is served. Both variables
   unset: no network call, no alert, `GET /health` → `restricted_overlays.pull` is `off`;

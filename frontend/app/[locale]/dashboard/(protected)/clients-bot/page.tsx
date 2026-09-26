@@ -1,3 +1,4 @@
+import { requireDashboardSession } from '@/lib/auth';
 import { getLocale } from 'next-intl/server';
 import { BotsApp, type BridgeClient } from '@/components/crm/bots-app';
 import { buildBots, fetchBotProfiles, groupBots } from '@/lib/crm/bot-dossiers';
@@ -52,8 +53,9 @@ async function loadBridgeClients(): Promise<BridgeClient[]> {
 }
 
 export default async function ClientsBotPage() {
-  // Twenty, not five: the 231 agents between the two account for 1.4 % of the
-  // traffic and are almost all one-off visitors. It is also the floor the
+  await requireDashboardSession();
+  // Twenty, not five: the agents between the two account for a tiny share of
+  // the traffic and are almost all one-off visitors. It is also the floor the
   // `perdu` and `sonde` verdicts need before a ratio means anything.
   // The widest window the selector offers, fetched once: the card narrows to
   // 7 or 30 days in the browser, so the switch costs nothing here.

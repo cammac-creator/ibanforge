@@ -25,8 +25,10 @@
  *   ou de la copie acceptée, ni si ce même fichier a déjà été refusé ;
  * - sinon téléchargement plafonné, empreinte et taille vérifiées, puis
  *   `inspectOverlay` (les contrôles du chargeur : chaque membre doit y être
- *   accepté, sinon la surcouche servie perdrait un membre), et enfin écriture
- *   d'un voisin renommé de façon atomique sur le fichier de la variable.
+ *   accepté, et aucun membre que la base sert aujourd'hui ne doit y manquer, un
+ *   membre tardif absent compris : sinon la surcouche servie perdrait un membre),
+ *   et enfin écriture d'un voisin renommé de façon atomique sur le fichier de la
+ *   variable.
  * La veille (src/lib/restricted-overlay-ops.ts) recharge aussitôt la base
  * remplacée, avec son journal et ses alertes, et garde ce qu'elle sert si la
  * fusion refuse le fichier. Tout échec laisse en place ce qui est servi.
@@ -74,12 +76,14 @@ import {
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { kvGet, kvSet } from './forum-radar-server.js';
 import { opsFail, opsOk } from './ops-alert.js';
-import { OVERLAY_ENV, type OverlayKind } from './restricted-family.js';
+import { OVERLAY_ENV, RESTRICTED_FAMILY, type OverlayKind } from './restricted-family.js';
 import {
   acceptedCopyPath,
   inspectOverlay,
+  memberRefused,
   removeFileWithCompanions,
   sha256File,
+  type OverlayInspection,
 } from './restricted-overlay.js';
 import {
   MANIFEST_FILE_NAME,
@@ -89,7 +93,11 @@ import {
   type ManifestFile,
   type OverlayManifest,
 } from './restricted-overlay-manifest.js';
-import { restrictedOverlayStatus, servesOverlay } from './restricted-overlay-runtime.js';
+import {
+  restrictedOverlayStatus,
+  servedMemberIds,
+  servesOverlay,
+} from './restricted-overlay-runtime.js';
 
 /** Les deux variables du tirage : toutes deux absentes, rien ne se passe. */
 export const PULL_ENV = {
@@ -191,11 +199,26 @@ interface PullState {
   release: { tag: string; published_at: string | null } | null;
   /** Les derniers fichiers posés, pour dire d'où vient la surcouche servie. */
   delivered: DeliveredFile[];
-  /** Le dernier fichier refusé de chaque base : jamais retéléchargé. */
-  rejected: Partial<Record<OverlayKind, { sha256: string; error: string }>>;
+  /**
+   * Le dernier fichier refusé de chaque base : jamais retéléchargé, tant que le
+   * code qui l'a refusé connaît la même famille (`family`, voir FAMILY_SIGNATURE).
+   */
+  rejected: Partial<Record<OverlayKind, { sha256: string; error: string; family: string }>>;
   /** Ce qui était trop ancien à la dernière lecture de la release. */
   stale: string[];
 }
+
+/**
+ * La famille que ce code connaît (membres, bases, tables), en empreinte courte.
+ * Retenue avec chaque refus : une release refusée par un code plus ancien, qui
+ * ignorait un membre ajouté depuis, n'est pas refusée à jamais par le nouveau
+ * (étape du retrait, 25/09/2026 : la release qui porte les membres tardifs
+ * pourrait être tirée par l'ancien code avant le déploiement du nouveau).
+ */
+export const FAMILY_SIGNATURE = createHash('sha256')
+  .update(JSON.stringify(RESTRICTED_FAMILY.map((m) => [m.id, m.kind, m.table])))
+  .digest('hex')
+  .slice(0, 16);
 
 function emptyState(): PullState {
   return {
@@ -244,8 +267,17 @@ function reviveState(raw: unknown): PullState {
   if (isRecord(raw.rejected))
     for (const kind of KINDS) {
       const r = raw.rejected[kind];
-      if (isRecord(r) && typeof r.sha256 === 'string' && typeof r.error === 'string')
-        state.rejected[kind] = { sha256: r.sha256, error: r.error };
+      // Un refus retenu par un code qui connaissait une autre famille est oublié :
+      // le code d'aujourd'hui peut accepter ce que l'ancien refusait (un membre
+      // venu après lui, dont la table lui était inconnue). Il retente une fois ;
+      // s'il refuse à son tour, le refus est retenu sous sa propre famille.
+      if (
+        isRecord(r) &&
+        typeof r.sha256 === 'string' &&
+        typeof r.error === 'string' &&
+        r.family === FAMILY_SIGNATURE
+      )
+        state.rejected[kind] = { sha256: r.sha256, error: r.error, family: r.family };
     }
   if (Array.isArray(raw.stale))
     state.stale = raw.stale.filter((s): s is string => typeof s === 'string');
@@ -537,6 +569,36 @@ interface KindResult {
   rejectFile?: boolean;
 }
 
+/**
+ * Ce qui fait refuser un fichier tiré, en un code court, ou `null` : le fichier
+ * refusé par le contrôle du chargeur, un membre refusé, un membre que la base
+ * sert aujourd'hui (`served`) et que le fichier ne porte plus, ou un compte
+ * différent de celui que le manifeste annonce. Un membre ABSENT (venu après la
+ * première surcouche, que la release ne porte pas : voir `mayBeAbsent`,
+ * src/lib/restricted-family.ts) n'est pas un refus tant que la base ne le sert
+ * pas, et le manifeste ne doit pas l'annoncer : la release que la production
+ * tirait avant ces membres reste acceptée par le code qui les introduit. Servi,
+ * il serait perdu (`members_lost`) : le fichier posé aurait été servi au
+ * redémarrage suivant (relecture de la PR 267, défaut 1).
+ */
+export function pulledFileProblem(
+  kind: OverlayKind,
+  inspection: OverlayInspection,
+  entry: ManifestFile,
+  served: ReadonlySet<string> = new Set(),
+): string | null {
+  if (!inspection.ok) return `overlay_refused:${kind}:${inspection.error ?? '?'}`;
+  const refused = inspection.members.filter(memberRefused);
+  if (refused.length > 0)
+    return `members_refused:${kind}:${refused.map((m) => `${m.id}=${m.reason ?? '?'}`).join(',')}`;
+  const lost = inspection.members.filter((m) => m.state === 'absent' && served.has(m.id));
+  if (lost.length > 0) return `members_lost:${kind}:${lost.map((m) => m.id).join(',')}`;
+  const mismatch = inspection.members.find((m) =>
+    m.state === 'absent' ? entry.members[m.id] !== undefined : entry.members[m.id] !== m.rows,
+  );
+  return mismatch ? `manifest_mismatch:${kind}:${mismatch.id}` : null;
+}
+
 async function pullOne(
   api: GithubReleases,
   kind: OverlayKind,
@@ -576,27 +638,14 @@ async function pullOne(
     if (hash.digest('hex') !== entry.sha256)
       return { outcome: 'error', error: `sha256_mismatch:${kind}` };
     chmodSync(neighbour, 0o600);
-    const inspection = inspectOverlay(neighbour, kind);
-    if (!inspection.ok)
-      return {
-        outcome: 'error',
-        error: `overlay_refused:${kind}:${inspection.error ?? '?'}`,
-        rejectFile: true,
-      };
-    const refused = inspection.members.filter((m) => m.state !== 'applied');
-    if (refused.length > 0)
-      return {
-        outcome: 'error',
-        error: `members_refused:${kind}:${refused.map((m) => `${m.id}=${m.reason ?? '?'}`).join(',')}`,
-        rejectFile: true,
-      };
-    const mismatch = inspection.members.find((m) => entry.members[m.id] !== m.rows);
-    if (mismatch)
-      return {
-        outcome: 'error',
-        error: `manifest_mismatch:${kind}:${mismatch.id}`,
-        rejectFile: true,
-      };
+    const status = restrictedOverlayStatus().find((s) => s.kind === kind);
+    const problem = pulledFileProblem(
+      kind,
+      inspectOverlay(neighbour, kind),
+      entry,
+      status ? servedMemberIds(status) : new Set(),
+    );
+    if (problem) return { outcome: 'error', error: problem, rejectFile: true };
     // Le voisin devient le fichier de la variable d'un seul renommage : la veille
     // ne voit jamais un fichier à moitié écrit.
     renameSync(neighbour, target);
@@ -751,7 +800,11 @@ export async function runOverlayPull(options: PullOptions = {}): Promise<PullAtt
       kinds[kind] = result.outcome;
       if (result.error) errors.push(sanitize(result.error));
       if (result.rejectFile && result.error)
-        rejected[kind] = { sha256: entry.sha256, error: sanitize(result.error) };
+        rejected[kind] = {
+          sha256: entry.sha256,
+          error: sanitize(result.error),
+          family: FAMILY_SIGNATURE,
+        };
       // Un bon fichier arrivé depuis efface le souvenir d'un refus.
       if (result.outcome === 'installed' || result.outcome === 'up_to_date') delete rejected[kind];
       if (result.outcome === 'installed') installed.push(kind);

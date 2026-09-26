@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   buildUserPrompt,
   buildVerifiedFacts,
@@ -6,6 +6,7 @@ import {
   generateDraft,
   parseMarkedOutput,
   stripDashes,
+  translateToFr,
   DRAFT_SYSTEM,
 } from './forum-draft-gen.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
@@ -150,5 +151,56 @@ describe('DRAFT_SYSTEM — la doctrine tient ses invariants', () => {
   it('demande le format à marqueurs, pas du JSON', () => {
     expect(DRAFT_SYSTEM).toContain('===DRAFT===');
     expect(DRAFT_SYSTEM).toContain('===SUMMARY_FR===');
+  });
+});
+
+describe('compteur de dépense des brouillons de forum', () => {
+  function reply(text: string): Response {
+    return new Response(
+      JSON.stringify({
+        model: 'claude-sonnet-5',
+        content: [{ type: 'text', text }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 900, output_tokens: 300, cache_read_input_tokens: 40 },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  }
+  beforeEach(() => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'test-key-not-real');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('la génération et la traduction écrivent chacune leur ligne de jetons', async () => {
+    const marked =
+      '===DRAFT===\nHello there.\n===DRAFT_FR===\nBonjour.\n===SUMMARY_FR===\nRésumé.\n===END===';
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementationOnce(() => Promise.resolve(reply(marked)))
+        .mockImplementationOnce(() => Promise.resolve(reply('Bonjour.'))),
+    );
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await generateDraft({
+      title: 'IBAN validation fails for one country',
+      excerpt: 'Our library rejects a valid IBAN.',
+      url: 'https://forum.example.net/t/1',
+      lang: 'en',
+      source: 'forum',
+      notes: '',
+    });
+    await translateToFr('Hello there.');
+
+    const lines = info.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[usage]'));
+    expect(lines).toEqual([
+      '[usage] site=forum-draft model=claude-sonnet-5 input_tokens=900 output_tokens=300 cache_write=0 cache_read=40 web_search=0',
+      '[usage] site=forum-translate model=claude-sonnet-5 input_tokens=900 output_tokens=300 cache_write=0 cache_read=40 web_search=0',
+    ]);
   });
 });

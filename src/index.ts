@@ -25,6 +25,7 @@ import { startProspectRadar } from './lib/prospect-radar-server.js';
 import { startCohortRadar } from './lib/cohort-radar-server.js';
 import { startMonthlyDemandLoop } from './lib/demand-proposal-server.js';
 import { startActivationNudge } from './lib/activation-nudge-server.js';
+import { startDoorBoardDigest } from './lib/door-board-digest.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
 import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
@@ -236,6 +237,12 @@ startMonthlyDemandLoop();
 // The nudge is the only thing here that leaves on its own; the draft waits for
 // a human. Kill switch: ACTIVATION_NUDGE_DISABLED=1.
 startActivationNudge();
+
+// Le résumé du lundi du tableau des portes (plan d'audit, semaine 2) : quatre
+// nombres et une phrase sur le canal Telegram d'exploitation, une fois par
+// semaine ISO, à une minute non ronde tirée entre 08:00 et 10:59, heure suisse
+// (voir door-board-digest.ts). Interrupteur : DOOR_BOARD_DIGEST_DISABLED=1.
+startDoorBoardDigest();
 
 // Sondes OPS horaires : hommes morts (crons GitHub + les 4 radars, lus dans
 // kv_state sans jamais l'écrire), remplissage du volume, taux de 5xx, âge des

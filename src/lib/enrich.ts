@@ -7,6 +7,7 @@
 import {
   lookupByCountryBank,
   countryHasReferenceData,
+  curatedKeysMissing,
   getReferenceAsOf,
   lookup,
   registeredAddress,
@@ -16,7 +17,7 @@ import {
 } from './bic-lookup.js';
 import { listedInCurrentSource } from './bic-trace.js';
 import { classifyIssuer } from './issuers.js';
-import { FI_REGISTER_AS_OF, lookupFiInstitution } from './fi-register.js';
+import { fiRegisterAsOf, lookupFiInstitution } from './fi-register.js';
 import {
   lookupNationalCode,
   lookupRetiredNationalCode,
@@ -233,6 +234,9 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // own date. Back to NATIONAL_REGISTERS once the list is re-read against a
   // current publication. Finland allocates prefixes to banking GROUPS, not
   // institutions, so even a hit confirms the group rather than a bank.
+  // Depuis le 25/09/2026, la liste peut venir de la surcouche privée (membre
+  // `register_fi`), quand elle est plus récente que celle de ce dépôt
+  // (src/lib/fi-register.ts) : le verdict porte alors sa date à elle.
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)',
   SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
   // L'Italie (25/09/2026, décision de Claude-Alain du 24/09, point 5). Les
@@ -633,7 +637,7 @@ function decideBankCode(
         match: 'register',
         register: NON_EXHAUSTIVE_REGISTERS.FI,
         authoritative: false,
-        as_of: FI_REGISTER_AS_OF.slice(0, 7),
+        as_of: fiRegisterAsOf().slice(0, 7),
         ...(fi.institution
           ? {
               institution: {
@@ -797,7 +801,11 @@ function decideBankCode(
   // reference data" when the reference data that decides this country was
   // never read.
   const registerDown = !!national;
-  const hasData = countryHasReferenceData(cc);
+  // Les clés de la carte composite qui peuvent venir de la surcouche (PL, FI,
+  // LU), chargées ni par le fichier public ni par la surcouche : la carte n'a pas
+  // été consultée pour ce pays, une absence n'y prouve rien (« non consulté »).
+  // Jamais le cas tant que le fichier public porte le pays.
+  const hasData = !curatedKeysMissing(cc) && countryHasReferenceData(cc);
   // Absent de la carte, pas de données pour le pays, registre non consulté :
   // aucune conclusion sur le détenteur.
   return withHolder('unknown', {

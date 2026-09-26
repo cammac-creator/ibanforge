@@ -219,7 +219,9 @@ le volume Railway, `/app/data/…`), fusionné au démarrage dans une copie de l
 fraîche (`src/lib/restricted-overlay.ts`, `restricted-overlay-runtime.ts`), membre par
 membre, la donnée la plus fraîche l'emportant : le public est gardé (`kept_public`) quand il
 est plus récent, ou non daté et différent. La dernière surcouche acceptée est gardée à côté
-(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé.
+(`*.accepted.sqlite`) et servie au démarrage si le fichier de la variable est refusé ou perd
+un membre qu'elle sert (un membre tardif absent compris), même s'il en gagne un autre ; un tel
+fichier ne la remplace jamais.
 Recharger : remplacer le fichier de façon atomique (voisin puis `mv`), l'API le contrôle en
 dix minutes au plus, ne refusionne que cette base, et garde ce qu'elle sert si le nouveau est
 refusé ou perdrait un membre servi. État : `GET /health` → `restricted_overlays`. Construire :
@@ -230,6 +232,15 @@ effacer le seul fichier privé n'est PAS un retour arrière. **Jamais** commiter
 ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script refuse ;
 `.gitignore` attrape `restricted-*.sqlite*` et `*.merged-*.sqlite*`), jamais ajouter une table
 ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
+
+**Les membres venus après la première surcouche (25.09.2026)** : les clés PL, FI et LU de la
+carte composite et la liste finlandaise ont aussi leurs membres (`map_pl`, `map_fi`, `map_lu`,
+`register_fi`), marqués `mayBeAbsent` (une surcouche plus ancienne qui ne les porte pas reste
+acceptée, `/health` les nomme sous `restricted_overlays.bic.absent`) et reconstruits par
+`scripts/seed-curated-map.ts`. Tant que `src/db/bic_data.json` et `src/lib/fi-register.ts`
+portent encore ces données, le public répond (règle de fraîcheur pays par pays :
+`addCuratedRows` dans `src/lib/bic-lookup.ts` ; la liste finlandaise de la surcouche seulement
+si elle est strictement plus récente) : aucune réponse ne change avant l'étape du retrait.
 
 **Le tirage (étape 5, depuis le 25.09.2026)** : `src/lib/restricted-overlay-pull.ts`. Un dépôt
 privé reconstruit la surcouche chaque semaine (conformité) et chaque mois (BIC), ne commite
@@ -249,7 +260,8 @@ PRA sort de la fenêtre du seeder. Avec
 la veille de dix minutes tire la dernière release toutes les quatre heures plus une gigue d'au
 plus trente minutes (une heure après un échec, jamais au démarrage) ; un fichier dont
 l'empreinte est déjà servie, en place ou acceptée n'est jamais retéléchargé ; sinon
-téléchargement plafonné, empreinte vérifiée, `inspectOverlay` doit accepter chaque membre, un
+téléchargement plafonné, empreinte vérifiée, `inspectOverlay` doit accepter chaque membre et
+aucun membre servi ne doit y manquer (`members_lost`), un
 voisin est écrit puis renommé sur le fichier de `RESTRICTED_*_OVERLAY_PATH`, et la base est
 rechargée aussitôt. Tout échec garde ce qui est servi. Les deux variables absentes : aucun
 appel réseau, aucune alerte, `GET /health` → `restricted_overlays.pull` vaut `off` ; sinon il

@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import { OVERLAY_ENV, RESTRICTED_FAMILY, type OverlayKind } from './restricted-family.js';
 import {
   OVERLAY_MEMBERS_TABLE,
+  acceptedCopyPath,
   extractOverlay,
   memberContentSha256,
   sha256File,
@@ -594,6 +595,24 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     expect(again.kinds.bic).toBe('refused_before');
     expect(again.error).toBe(attempt.error);
     expect(fake.downloaded()).not.toContain('restricted-bic.sqlite');
+
+    // Le même refus, retenu par un code qui connaissait une autre famille (un
+    // déploiement plus ancien, qui ignorait un membre ajouté depuis) : oublié au
+    // redémarrage, le code d'aujourd'hui retente une fois, puis retient son refus.
+    const kept = JSON.parse(forum.kvGet('overlay:pull:state') ?? '{}');
+    expect(kept.rejected.bic.family).toBe(pull.FAMILY_SIGNATURE);
+    kept.rejected.bic.family = 'une-autre-famille';
+    forum.kvSet('overlay:pull:state', JSON.stringify(kept));
+    pull.resetOverlayPullForTests();
+    fake.requests = [];
+    const retried = await run();
+    expect(retried.kinds.bic).toBe('error');
+    expect(fake.downloaded()).toContain('restricted-bic.sqlite');
+    expect(JSON.parse(forum.kvGet('overlay:pull:state') ?? '{}').rejected.bic.family).toBe(
+      pull.FAMILY_SIGNATURE,
+    );
+    fake.requests = [];
+    expect((await run()).kinds.bic).toBe('refused_before');
   });
 
   it('surcouche qui perdrait un membre servi : refusée, la servie reste', async () => {
@@ -633,6 +652,140 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     expect(served('compliance').sha256).toBe(servedBefore.sha256);
     expect(sha256File(live.compliance)).not.toBe(sha256File(shrunk));
     expect(liveLeftovers()).toEqual([]);
+  });
+
+  /** Un redémarrage : connexions fermées, mémoires oubliées, fichiers et kv gardés. */
+  function restart(): void {
+    db.closeAll();
+    runtime.resetRestrictedOverlayStateForTests();
+    pull.resetOverlayPullForTests();
+    db.getBicDB();
+    complianceDb.getComplianceDB();
+  }
+
+  /** La famille complète, sans les tables des membres venus après la première surcouche. */
+  function withoutLateMembers(): string {
+    const dir = join(fixture.dir, 'sans-tardifs');
+    mkdirSync(dir, { recursive: true });
+    const source = join(dir, 'source.sqlite');
+    copyFileSync(fixture.bicPath, source);
+    const o = openDb(source);
+    o.exec('DROP TABLE curated_bank_codes');
+    o.exec('DROP TABLE fi_monetary_codes');
+    o.close();
+    const out = join(dir, 'restricted-bic.sqlite');
+    if (readdirSync(dir).includes('restricted-bic.sqlite')) return out;
+    return extractOverlay({ kind: 'bic', sourcePath: source, outPath: out, generator: 'test' })
+      .path;
+  }
+
+  const LATE = ['map_pl', 'map_fi', 'map_lu', 'register_fi'];
+
+  it('release sans les membres tardifs que la base sert : refusée au tirage, retenue, toujours servis au redémarrage', async () => {
+    // Relecture de la PR 267, défaut 1 : le fichier posé aurait été refusé au
+    // rechargement, puis servi au redémarrage suivant, et la copie acceptée écrasée.
+    const withoutLate = withoutLateMembers();
+    const servedBefore = served('bic');
+    for (const id of LATE)
+      expect(servedBefore.members.find((m) => m.id === id)?.state, id).toBe('applied');
+    const liveBefore = sha256File(live.bic);
+    publish('surcouche-essai-sans-tardifs', { bic: withoutLate, compliance: v1.compliance });
+    const attempt = await run();
+    expect(attempt.kinds.bic).toBe('error');
+    expect(attempt.error).toBe(`members_lost:bic:${LATE.join(',')}`);
+    expect(sha256File(live.bic)).toBe(liveBefore);
+    expect(liveLeftovers()).toEqual([]);
+    // Retenu : jamais retéléchargé.
+    fake.requests = [];
+    expect((await run()).kinds.bic).toBe('refused_before');
+    expect(fake.downloaded()).not.toContain('restricted-bic.sqlite');
+
+    // Au redémarrage, le fichier de la variable (resté celui d'avant le tirage) sert.
+    restart();
+    const after = served('bic');
+    expect(after.sha256).toBe(liveBefore);
+    expect(after.fallback).toBe(false);
+    expect(after.members.filter((m) => m.state === 'absent')).toEqual([]);
+    expect((await health()).restricted_overlays.bic.absent).toBeUndefined();
+  });
+
+  it('fichier de la variable sans eux au redémarrage : la copie acceptée sert, et reste la copie acceptée', async () => {
+    // Le même fichier, posé à la main (ou par un code plus ancien que ce correctif).
+    const withoutLate = withoutLateMembers();
+    const accepted = acceptedCopyPath(live.bic);
+    const acceptedBefore = sha256File(accepted);
+    const goodFile = readFileSync(live.bic);
+    db.closeAll();
+    copyFileSync(withoutLate, live.bic);
+    runtime.resetRestrictedOverlayStateForTests();
+    pull.resetOverlayPullForTests();
+    db.getBicDB();
+    complianceDb.getComplianceDB();
+    const s = served('bic');
+    expect(s.fallback).toBe(true);
+    expect(s.sha256).toBe(acceptedBefore);
+    expect(s.error).toBe(`variable_file_refused:members_lost:${LATE.join(',')}`);
+    expect(s.members.filter((m) => m.state === 'absent')).toEqual([]);
+    expect(sha256File(accepted)).toBe(acceptedBefore);
+    const h = (await health()).restricted_overlays.bic;
+    expect(h).toMatchObject({ state: 'applied', fallback: true });
+    expect(h.absent).toBeUndefined();
+    // Un second redémarrage, toujours sans écraser la copie acceptée.
+    restart();
+    expect(served('bic').fallback).toBe(true);
+    expect(sha256File(accepted)).toBe(acceptedBefore);
+    // Remise en place pour la suite : le bon fichier revient.
+    db.closeAll();
+    writeFileSync(live.bic, goodFile);
+    restart();
+    expect(served('bic').fallback).toBe(false);
+    expect(served('bic').sha256).toBe(acceptedBefore);
+  });
+
+  it('échange puis redémarrage : un fichier qui perd un membre servi, même en en gagnant un autre, ne sert pas', async () => {
+    // Relecture de la PR 270, point 1 : au démarrage, ce sont les MEMBRES qui
+    // comptent. Copie acceptée A : tout sauf la liste finlandaise ; fichier posé V :
+    // tout sauf les clés polonaises. Jeu égal en nombre, mais V perdrait `map_pl`.
+    const dir = join(fixture.dir, 'echange');
+    mkdirSync(dir, { recursive: true });
+    const extractWithout = (name: string, absent: string[]): string =>
+      extractOverlay({
+        kind: 'bic',
+        sourcePath: fixture.bicPath,
+        outPath: join(dir, name),
+        generator: 'test',
+        absentMembers: absent,
+      }).path;
+    const a = extractWithout('sans-liste-fi.sqlite', ['register_fi']);
+    const v = extractWithout('sans-cles-pl.sqlite', ['map_pl']);
+    const accepted = acceptedCopyPath(live.bic);
+    const saved = { live: readFileSync(live.bic), accepted: readFileSync(accepted) };
+    db.closeAll();
+    copyFileSync(a, accepted);
+    copyFileSync(v, live.bic);
+    runtime.resetRestrictedOverlayStateForTests();
+    pull.resetOverlayPullForTests();
+    db.getBicDB();
+    complianceDb.getComplianceDB();
+    const s = served('bic');
+    expect(s.fallback).toBe(true);
+    expect(s.sha256).toBe(sha256File(a));
+    expect(s.error).toBe('variable_file_refused:members_lost:map_pl');
+    expect(s.members.find((m) => m.id === 'map_pl')?.state).toBe('applied');
+    expect(sha256File(accepted)).toBe(sha256File(a));
+    // Toujours dit : l'alerte du fichier de la variable, et ce qui manque à la copie servie.
+    expect((await health()).restricted_overlays.bic).toMatchObject({
+      state: 'applied',
+      fallback: true,
+      absent: ['register_fi'],
+    });
+    // Remise en place pour la suite.
+    db.closeAll();
+    writeFileSync(live.bic, saved.live);
+    writeFileSync(accepted, saved.accepted);
+    restart();
+    expect(served('bic').fallback).toBe(false);
+    expect(served('bic').members.filter((m) => m.state === 'absent')).toEqual([]);
   });
 
   it('release trop vieille, ou fichier BIC absent : alerte, refermée par une release fraîche', async () => {

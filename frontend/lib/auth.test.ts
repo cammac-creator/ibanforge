@@ -21,7 +21,23 @@ vi.mock('next/headers', () => ({
   }),
 }));
 
-import { isAuthenticated, getSessionCookieConfig, passwordsMatch } from './auth';
+// `redirect` de Next lève pour interrompre le rendu : le simulacre fait de même,
+// et garde la destination pour que le test la lise.
+const nav = vi.hoisted(() => ({ to: undefined as string | undefined }));
+
+vi.mock('next/navigation', () => ({
+  redirect: (to: string) => {
+    nav.to = to;
+    throw new Error('NEXT_REDIRECT');
+  },
+}));
+
+import {
+  isAuthenticated,
+  getSessionCookieConfig,
+  passwordsMatch,
+  requireDashboardSession,
+} from './auth';
 
 const TEST_SECRET = 'test-only-secret-of-at-least-32-characters';
 
@@ -161,5 +177,29 @@ describe('passwordsMatch', () => {
   it('refuses non-strings rather than coercing them', () => {
     expect(passwordsMatch(undefined as unknown as string, 'x')).toBe(false);
     expect(passwordsMatch('x', null as unknown as string)).toBe(false);
+  });
+});
+
+describe('requireDashboardSession', () => {
+  beforeEach(() => {
+    nav.to = undefined;
+  });
+
+  it('renvoie vers la connexion sans cookie, avant que la page ne lise quoi que ce soit', async () => {
+    state.token = undefined;
+    await expect(requireDashboardSession()).rejects.toThrow('NEXT_REDIRECT');
+    expect(nav.to).toBe('/dashboard/login');
+  });
+
+  it('renvoie vers la connexion avec un jeton que personne n’a signé', async () => {
+    state.token = craft({ iat: nowSeconds(), v: 1 }, 'another-secret-of-at-least-32-chars!!');
+    await expect(requireDashboardSession()).rejects.toThrow('NEXT_REDIRECT');
+    expect(nav.to).toBe('/dashboard/login');
+  });
+
+  it('laisse passer la session qu’elle vient d’émettre', async () => {
+    state.token = getSessionCookieConfig().value;
+    await expect(requireDashboardSession()).resolves.toBeUndefined();
+    expect(nav.to).toBeUndefined();
   });
 });

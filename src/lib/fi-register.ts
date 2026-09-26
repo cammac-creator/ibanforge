@@ -23,7 +23,22 @@
  * A hit confirms the group and its BIC; it does not identify a specific bank
  * the way an allocated Swiss IID or German BLZ does. The negative direction is
  * the strong one: a prefix in no published range is held by nobody.
+ *
+ * LA LISTE DE LA SURCOUCHE PRIVÉE (25/09/2026)
+ *
+ * Les conditions de réutilisation de cette liste ne sont pas établies : elle
+ * quitte le dépôt public à l'étape du retrait, et la surcouche privée la porte
+ * déjà (membre `register_fi`, table `fi_monetary_codes`,
+ * src/lib/restricted-family.ts). Tant que ce fichier la porte aussi, la règle de
+ * fraîcheur de la fusion (src/lib/restricted-overlay.ts) choisit : la liste de
+ * la surcouche ne sert que si elle est STRICTEMENT plus récente que celle-ci ;
+ * à date égale ou plus ancienne, celle-ci est gardée. La copie chargée au départ
+ * dans la surcouche porte la même date : aucune réponse ne change. Le choix est
+ * mémorisé avec la connexion de la base : `resetFiRegister()` est appelé à
+ * chaque fermeture de la base BIC (src/lib/bic-lookup.ts, resetStatements), donc
+ * à chaque rechargement de la surcouche.
  */
+import { getBicDB } from './db.js';
 
 /** Publication date of the transcribed list, ISO. */
 export const FI_REGISTER_AS_OF = '2025-10-15';
@@ -102,6 +117,77 @@ for (const a of ALLOCATIONS) {
   }
 }
 
+/** Une liste lue : code -> titulaire, et sa date (AAAA-MM-JJ). */
+interface FiList {
+  byCode: ReadonlyMap<string, { bic: string; institution: string }>;
+  asOf: string;
+}
+
+/** La liste de ce fichier. */
+const PUBLIC_LIST: FiList = { byCode: BY_CODE, asOf: FI_REGISTER_AS_OF };
+
+/** `undefined` : pas encore choisie depuis l'ouverture de la base. */
+let served: FiList | undefined;
+
+/** Une date de liste : AAAA-MM-JJ, et un vrai jour du calendrier ; sinon null. */
+function listDay(value: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value
+    ? value
+    : null;
+}
+
+/**
+ * La liste de la surcouche privée, ou null : pas de table (base publique seule,
+ * surcouche qui ne la porte pas), aucune ligne lisible, ou une date qui n'est pas
+ * un jour AAAA-MM-JJ. Une seule date mal formée écarte toute la liste : comparée
+ * en texte, elle pourrait passer pour plus récente et finir dans
+ * `bank_code_check.as_of` (relecture de la PR 267, point 6).
+ */
+function overlayList(): FiList | null {
+  let rows: Array<{ code: string; bic: string; institution: string; as_of: string | null }>;
+  try {
+    rows = getBicDB()
+      .prepare('SELECT code, bic, institution, as_of FROM fi_monetary_codes ORDER BY code')
+      .all() as typeof rows;
+  } catch {
+    return null;
+  }
+  const byCode = new Map<string, { bic: string; institution: string }>();
+  let asOf: string | null = null;
+  for (const row of rows) {
+    if (!/^\d{1,4}$/.test(row.code)) continue;
+    const day = listDay(row.as_of);
+    if (!day) return null;
+    byCode.set(row.code, { bic: row.bic, institution: row.institution });
+    if (!asOf || day > asOf) asOf = day;
+  }
+  return byCode.size > 0 && asOf ? { byCode, asOf } : null;
+}
+
+/**
+ * La liste servie, choisie par la règle de fraîcheur de la fusion : celle de la
+ * surcouche si elle est strictement plus récente (b), sinon celle de ce fichier
+ * (d, date égale comprise). Jamais un mélange des deux.
+ */
+function servedList(): FiList {
+  if (served) return served;
+  const overlay = overlayList();
+  served = overlay && overlay.asOf > PUBLIC_LIST.asOf ? overlay : PUBLIC_LIST;
+  return served;
+}
+
+/** La date de la liste servie (AAAA-MM-JJ). */
+export function fiRegisterAsOf(): string {
+  return servedList().asOf;
+}
+
+/** Oublie le choix de la liste : appelé à chaque fermeture de la base BIC. */
+export function resetFiRegister(): void {
+  served = undefined;
+}
+
 /**
  * The band the document defines but populates with nobody.
  *
@@ -126,9 +212,10 @@ function inReservedBand(bban: string): boolean {
 export function lookupFiInstitution(bban: string): FiHit | null {
   if (!/^\d{4,}$/.test(bban)) return null;
 
+  const list = servedList();
   for (let len = 4; len >= 1; len--) {
     const candidate = bban.slice(0, len);
-    const hit = BY_CODE.get(candidate);
+    const hit = list.byCode.get(candidate);
     if (hit) {
       return { status: 'allocated', code: candidate, bic: hit.bic, institution: hit.institution };
     }
@@ -140,5 +227,5 @@ export function lookupFiInstitution(bban: string): FiHit | null {
 
 /** Every allocated code, for pruning curated keys that contradict the register. */
 export function allocatedFiCodes(): ReadonlySet<string> {
-  return new Set(BY_CODE.keys());
+  return new Set(servedList().byCode.keys());
 }

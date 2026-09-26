@@ -38,11 +38,12 @@
  * plus ancien ignore ce champ.
  */
 import { basename } from 'node:path';
-import type { OverlayKind } from './restricted-family.js';
+import { membersOf, type OverlayKind } from './restricted-family.js';
 import {
   SHRINK_GUARD_MIN_ROWS,
   carriedOverFromMeta,
   inspectOverlay,
+  memberRefused,
   parseCarriedOver,
   type CarriedOverMember,
 } from './restricted-overlay.js';
@@ -194,7 +195,7 @@ export function manifestEntryFor(options: {
 }): ManifestFile {
   const { kind, path } = options;
   const inspection = inspectOverlay(path, kind);
-  const refused = inspection.members.filter((m) => m.state !== 'applied');
+  const refused = inspection.members.filter(memberRefused);
   if (!inspection.ok || refused.length > 0)
     throw new Error(
       `Surcouche ${kind} refusée par le contrôle du chargeur : ` +
@@ -202,7 +203,13 @@ export function manifestEntryFor(options: {
     );
   const sha256 = inspection.sha256 as string;
   const bytes = inspection.bytes as number;
-  const members = Object.fromEntries(inspection.members.map((m) => [m.id, m.rows]));
+  // Un membre absent (venu après la première surcouche, que ce fichier ne porte
+  // pas) n'est pas listé : la release suivante qui le porte ne sera pas lue comme
+  // une hausse depuis zéro, et une release qui le perdrait après l'avoir porté
+  // est refusée (`lost_member`).
+  const members = Object.fromEntries(
+    inspection.members.filter((m) => m.state !== 'absent').map((m) => [m.id, m.rows]),
+  );
   const name = basename(path);
   // Toujours relu du fichier, même inchangé : un fichier BIC repris par le passage
   // hebdomadaire garde la liste de ses membres repris.
@@ -246,7 +253,9 @@ export function manifestEntryFor(options: {
  *
  * `allowShrink` (contrôle manuel, relance à la main) laisse passer les baisses
  * et les membres sortis de la famille par une modification du code, jamais un
- * fichier perdu.
+ * fichier perdu, ni un membre encore dans la famille (relecture de la PR 267,
+ * défaut 1 : une release qui perdrait un membre tardif servi, publiée sous
+ * « accepter une baisse », aurait fini servie au redémarrage suivant).
  */
 export function compareManifests(
   previous: OverlayManifest,
@@ -262,11 +271,14 @@ export function compareManifests(
       problems.push(`lost_file:${kind}`);
       continue;
     }
-    if (options.allowShrink) continue;
+    const family = new Set(membersOf(kind).map((m) => m.id));
     for (const [id, rows] of Object.entries(before.members)) {
       const now = after.members[id];
-      if (now === undefined) problems.push(`lost_member:${kind}:${id}`);
-      else if (rows >= SHRINK_GUARD_MIN_ROWS && now < rows * 0.9)
+      if (now === undefined) {
+        // Sorti de la famille par une modification du code : seul cas qu'un
+        // contrôle manuel peut laisser passer.
+        if (!options.allowShrink || family.has(id)) problems.push(`lost_member:${kind}:${id}`);
+      } else if (!options.allowShrink && rows >= SHRINK_GUARD_MIN_ROWS && now < rows * 0.9)
         problems.push(`shrunk:${kind}:${id}:${rows}->${now}`);
     }
   }

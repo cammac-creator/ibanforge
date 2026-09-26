@@ -23,7 +23,12 @@ import {
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TSX = join(ROOT, 'node_modules', '.bin', 'tsx');
-const SEEDERS = ['enrich-bic-database.ts', 'seed-national.ts', 'seed-pra-banks.ts'];
+const SEEDERS = [
+  'enrich-bic-database.ts',
+  'seed-national.ts',
+  'seed-pra-banks.ts',
+  'seed-curated-map.ts',
+];
 
 const OFFLINE_FETCH = `
 import { appendFileSync } from 'node:fs';
@@ -109,6 +114,11 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       register_be: 'failed:http_503',
       register_sm: 'failed:http_503',
       pra: 'failed:download_failed',
+      map_pl: 'failed:http_503',
+      map_fi: 'failed:http_503',
+      map_lu: 'failed:http_503',
+      // La liste finlandaise est statique : jamais téléchargée, recopiée par `seed`.
+      register_fi: 'failed:static_list',
     });
     expect(Object.keys(states).sort()).toEqual(
       membersOf('bic')
@@ -127,6 +137,7 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       'nbb.be',
       'bcsm.sm',
       'bankofengland.co.uk',
+      'pypi.org',
     ])
       expect(
         urls.some((u) => u.includes(host)),
@@ -144,10 +155,37 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
         count("SELECT COUNT(*) AS n FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SM')"),
       ).toBe(0);
       expect(count('SELECT COUNT(*) AS n FROM pra_banks')).toBe(0);
+      // Les membres tardifs : aucune table créée pour rien quand la source est en panne.
+      expect(
+        count(
+          "SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('curated_bank_codes', 'fi_monetary_codes')",
+        ),
+      ).toBe(0);
     } finally {
       db.close();
     }
   }, 240_000);
+
+  it('FI_LIST_PATH désigné mais illisible : le seeder de la carte sort en erreur, le passage s’arrête', () => {
+    // Relecture de la PR 267, point 5. Le code 1 fait lever `runSeeder`
+    // (scripts/restricted-overlay.ts) : `overlay seed` s'arrête avant l'extraction,
+    // rien n'est publié, et l'ancienne liste n'est jamais reprise.
+    const work = workCopy('liste-fi-illisible');
+    const report = join(dir, 'rapport-liste-fi.jsonl');
+    const result = run(
+      'seed-curated-map.ts',
+      childEnv({
+        BIC_DB_PATH: work,
+        SEED_FAMILY: 'restricted',
+        [SEED_REPORT_ENV]: report,
+        FI_LIST_PATH: join(dir, 'liste-fi-absente.json'),
+      }),
+    );
+    expect(result.status, result.stderr).toBe(1);
+    const reported = [...readSeedReport(report).values()].map((r) => r.member);
+    expect(reported).not.toContain('register_fi');
+    expect(reported).toContain('map_pl');
+  }, 120_000);
 
   it('sans SEED_REPORT_PATH, le seeder national s’arrête au premier pays en panne, comme avant', () => {
     const work = workCopy('sans-rapport');
