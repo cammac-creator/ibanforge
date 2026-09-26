@@ -62,6 +62,7 @@ export type FindingCode =
   | 'iban_invalid'
   | 'bank_code_not_allocated'
   | 'modulus_check_failed'
+  | 'national_check_digits_failed'
   | 'sepa_not_reachable'
   | 'test_bic'
   | 'bic_mismatch'
@@ -80,6 +81,9 @@ const ERROR_CODES: ReadonlySet<FindingCode> = new Set([
   'iban_invalid',
   'bank_code_not_allocated',
   'modulus_check_failed',
+  // 26/09/2026 : même pied que le contrôle britannique, comme l'étape
+  // `national_check_digits_failed` de next_steps.
+  'national_check_digits_failed',
 ]);
 
 export interface AuditFinding {
@@ -464,6 +468,16 @@ export function auditTable(
             detail: 'The account number fails the UK modulus check.',
           });
         }
+        // La clé nationale du BBAN (FR, MC, BE, IT, SM, ES) : le détail du module
+        // dit quels chiffres ne concordent pas, sans jamais donner la bonne clé.
+        if (result.national_check_digits?.status === 'fail') {
+          findings.push({
+            code: 'national_check_digits_failed',
+            detail:
+              result.national_check_digits.detail ??
+              'The national check key inside the BBAN does not match: this account number cannot have been issued as written.',
+          });
+        }
         if (row.sepa_reachable === false) {
           findings.push({
             code: 'sepa_not_reachable',
@@ -608,6 +622,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     iban_invalid: 'IBAN invalid',
     bank_code_not_allocated: 'Bank code not in the national register',
     modulus_check_failed: 'UK account checksum fails',
+    national_check_digits_failed: 'National check key fails',
     sepa_not_reachable: 'Not reachable by SEPA transfer',
     test_bic: 'Test BIC',
     bic_mismatch: 'BIC in file differs from the register',
@@ -623,6 +638,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     iban_invalid: 'IBAN invalide',
     bank_code_not_allocated: 'Code banque absent du registre national',
     modulus_check_failed: 'Contrôle de compte britannique en échec',
+    national_check_digits_failed: 'Clé de contrôle nationale en échec',
     sepa_not_reachable: "Hors de portée d'un virement SEPA",
     test_bic: 'BIC de test',
     bic_mismatch: 'BIC du fichier différent du registre',
@@ -638,6 +654,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     iban_invalid: 'IBAN ungültig',
     bank_code_not_allocated: 'Bankleitzahl nicht im nationalen Register',
     modulus_check_failed: 'Britische Kontoprüfziffer fehlgeschlagen',
+    national_check_digits_failed: 'Nationale Prüfziffer fehlgeschlagen',
     sepa_not_reachable: 'Per SEPA-Überweisung nicht erreichbar',
     test_bic: 'Test-BIC',
     bic_mismatch: 'BIC in der Datei weicht vom Register ab',

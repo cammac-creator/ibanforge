@@ -1,7 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { nextSteps } from './next-steps.js';
 import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
+import { NEXT_STEPS_SCHEMA } from './bank-code-schema.js';
+import type { IBANValidationResult } from '../types.js';
+import type { NationalCheck, NationalCheckScheme } from './national-check/index.js';
 
 function steps(iban: string) {
   const r = validateIBAN(iban);
@@ -114,6 +118,240 @@ describe('nextSteps', () => {
         expect(s.code, iban).toMatch(/^[a-z_]+$/);
         expect(s.do.length, iban).toBeGreaterThan(10);
         expect(s.because.length, iban).toBeGreaterThan(10);
+      }
+    }
+  });
+});
+
+/**
+ * `national_check_digits_failed` (26/09/2026) : une clé nationale fausse devient
+ * une étape bloquante, au même rang que le contrôle britannique.
+ *
+ * Sur des résultats construits à la main, pour que le rang ne dépende d'aucune
+ * donnée : le seul pays qui puisse à la fois refuser un code banque et porter une
+ * clé nationale est la Belgique, dont le registre quitte la base publique avec le
+ * retrait des données sous conditions. Le bout en bout, pays par pays, avec de
+ * vrais exemples du registre IBAN dont la clé est faussée, est dans
+ * `national-check/wiring.test.ts`.
+ */
+describe('national_check_digits_failed', () => {
+  const COUNTRY_OF: Record<NationalCheckScheme, string> = {
+    fr_rib_key: 'FR',
+    be_mod97: 'BE',
+    it_cin: 'IT',
+    es_dc: 'ES',
+  };
+  const SCHEMES = Object.keys(COUNTRY_OF) as NationalCheckScheme[];
+
+  function base(overrides: Partial<IBANValidationResult> = {}): IBANValidationResult {
+    return {
+      iban: 'XX00TEST',
+      valid: true,
+      country: { code: 'FR', name: 'France' },
+      sepa: { member: true, schemes: ['SCT'], vop_required: true },
+      cost_usdc: 0,
+      ...overrides,
+    };
+  }
+  function national(
+    status: NationalCheck['status'],
+    scheme: NationalCheckScheme = 'fr_rib_key',
+  ): NationalCheck {
+    return {
+      country: COUNTRY_OF[scheme],
+      scheme,
+      status,
+      ...(status === 'pass'
+        ? {}
+        : {
+            detail:
+              'The key does not match: this account number cannot have been issued as written.',
+          }),
+    };
+  }
+  const verified = {
+    value: '30004',
+    status: 'verified' as const,
+    match: 'register' as const,
+    register: 'Example register',
+    authoritative: false,
+    as_of: '2026-09',
+  };
+  const codesOf = (r: IBANValidationResult) => nextSteps(r).map((s) => s.code);
+
+  it.each(SCHEMES)('%s: says stop, and names the field and the scheme', (scheme) => {
+    const hits = nextSteps(base({ national_check_digits: national('fail', scheme) })).filter(
+      (s) => s.code === 'national_check_digits_failed',
+    );
+    expect(hits).toHaveLength(1);
+    const step = hits[0]!;
+    expect(step.because).toBe(`national_check_digits.status is fail (${scheme})`);
+    expect(step.do).toMatch(/^Do not send\. /);
+    expect(step.do).toMatch(/cannot have been issued as written/);
+    expect(step.do).toMatch(/Ask the beneficiary to confirm the account number\.$/);
+    // Rien à appeler : c'est au bénéficiaire de confirmer, pas à une autre route.
+    expect(step.action).toBeUndefined();
+    expect(`${step.do} ${step.because}`).not.toContain('—');
+  });
+
+  it('changes nothing on pass, on not_applicable, or without the block', () => {
+    for (const around of [base(), base({ bank_code_check: verified })]) {
+      const without = nextSteps(around);
+      expect(nextSteps({ ...around, national_check_digits: national('pass') })).toEqual(without);
+      expect(nextSteps({ ...around, national_check_digits: national('not_applicable') })).toEqual(
+        without,
+      );
+    }
+  });
+
+  it('comes right after a bank code the register denies', () => {
+    const r = base({
+      country: { code: 'BE', name: 'Belgium' },
+      bank_code_check: {
+        value: '999',
+        status: 'not_in_register',
+        match: null,
+        reason: 'not_allocated',
+        register: 'Example national register',
+        authoritative: true,
+        as_of: '2026-09',
+      },
+      national_check_digits: national('fail', 'be_mod97'),
+    });
+    expect(codesOf(r)).toEqual(['bank_code_not_allocated', 'national_check_digits_failed']);
+  });
+
+  it('comes after verify_payee_name, exactly as the UK check does', () => {
+    const r = base({
+      bank_code_check: {
+        value: '99999',
+        status: 'not_in_register',
+        match: null,
+        reason: 'absent_from_reference_data',
+        register: null,
+        authoritative: false,
+        as_of: '2026-09',
+      },
+      national_check_digits: national('fail'),
+    });
+    expect(codesOf(r)).toEqual(['verify_payee_name', 'national_check_digits_failed']);
+  });
+
+  it('follows the UK check when both are set (never together in a real answer)', () => {
+    const r = base({
+      modulus_check: {
+        checked: true,
+        passed: false,
+        source: 'Vocalink modulus weight table',
+        table_fetched_on: '2026-09-01',
+      },
+      national_check_digits: national('fail'),
+    });
+    expect(codesOf(r)).toEqual(['modulus_check_failed', 'national_check_digits_failed']);
+  });
+
+  it('comes before every step that does not block, keeps them, and withholds the offers', () => {
+    // Le criblage (`screen_compliance`) suivait le « Do not send » jusqu'au
+    // 26/09/2026 : plus rien à offrir sur un compte qui ne peut pas exister.
+    const r = base({
+      bank_code_check: {
+        ...verified,
+        match: 'prefix',
+        candidates: 3,
+        retired: true,
+        superseded_by: '30003',
+      },
+      issuer: {
+        type: 'emi',
+        name: 'Société Alpha',
+        classification: 'curated',
+        iban_issuer: 'not_listed',
+      },
+      risk_indicators: {
+        issuer_type: 'emi',
+        country_risk: 'standard',
+        test_bic: true,
+        sepa_reachable: true,
+        sepa_reachable_scope: 'country',
+        vop_coverage: true,
+      },
+      national_check_digits: national('fail'),
+    });
+    expect(codesOf(r)).toEqual([
+      'national_check_digits_failed',
+      'bank_code_retired',
+      'bic_is_advisory',
+      'test_bic',
+      'expect_virtual_iban',
+      'issuer_not_a_known_iban_issuer',
+    ]);
+  });
+
+  describe('no offer after a step that says do not send', () => {
+    afterEach(() => {
+      delete process.env.PARTNER_PAYQR;
+    });
+    const modulusFailed = {
+      checked: true,
+      passed: false,
+      source: 'Vocalink modulus weight table',
+      table_fetched_on: '2026-09-01',
+    };
+
+    it.each([
+      ['a wrong national key', { national_check_digits: national('fail') }],
+      ['a failed UK modulus check', { modulus_check: modulusFailed }],
+    ] as const)('%s: neither screening nor a payment QR', (_label, blocking) => {
+      process.env.PARTNER_PAYQR = '1';
+      const around = base({ bank_code_check: verified });
+      // Le témoin : le même résultat sans le blocage porte bien les deux offres.
+      expect(codesOf(around)).toEqual(['screen_compliance', 'generate_payment_qr']);
+      const codes = codesOf({ ...around, ...blocking });
+      expect(codes).toHaveLength(1);
+      expect(codes[0]).toMatch(/_failed$/);
+    });
+  });
+
+  it('never fires on an IBAN that failed validation', () => {
+    expect(nextSteps(base({ valid: false, national_check_digits: national('fail') }))).toEqual([]);
+  });
+});
+
+/**
+ * La liste publiée des codes (OpenAPI, découverte x402) oubliait déjà
+ * `modulus_check_failed`, sans que rien ne le voie. Chaque code que ce module
+ * peut produire doit y être nommé : un code ajouté ici sans elle fait échouer ce
+ * test.
+ */
+describe('the published list of step codes', () => {
+  it('names every code this module can emit', () => {
+    const src = readFileSync(new URL('./next-steps.ts', import.meta.url), 'utf8');
+    const emitted = [...src.matchAll(/code: '([a-z_]+)'/g)].map((m) => m[1]!);
+    expect(emitted).toContain('modulus_check_failed');
+    expect(emitted).toContain('national_check_digits_failed');
+    expect(new Set(emitted).size).toBe(emitted.length);
+    const published = NEXT_STEPS_SCHEMA.items.properties.code.description;
+    for (const code of emitted) expect(published, code).toContain(code);
+  });
+
+  it('names every blocking code where the texts say which codes mean stop', () => {
+    // La description de validate_iban (MCP stdio) et la documentation MCP du site,
+    // dans les trois langues, disent « bank_code_not_allocated means stop » : les
+    // deux contrôles de compte qui arrêtent aussi un paiement y sont nommés.
+    const root = new URL('../../', import.meta.url);
+    for (const file of [
+      'src/mcp/server.ts',
+      'frontend/content/en/docs/mcp.mdx',
+      'frontend/content/fr/docs/mcp.mdx',
+      'frontend/content/de/docs/mcp.mdx',
+    ]) {
+      const text = readFileSync(new URL(file, root), 'utf8');
+      for (const code of [
+        'bank_code_not_allocated',
+        'modulus_check_failed',
+        'national_check_digits_failed',
+      ]) {
+        expect(text, `${file}: ${code}`).toContain(code);
       }
     }
   });
