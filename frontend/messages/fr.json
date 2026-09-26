@@ -2491,6 +2491,7 @@
       "iban_invalid": "IBAN invalide",
       "bank_code_not_allocated": "Code banque absent du registre national",
       "modulus_check_failed": "Contrôle de compte britannique en échec",
+      "national_check_digits_failed": "Clé de contrôle nationale en échec",
       "sepa_not_reachable": "Hors de portée d'un virement SEPA",
       "test_bic": "BIC de test",
       "bic_mismatch": "BIC du fichier différent du registre",

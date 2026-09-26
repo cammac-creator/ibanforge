@@ -2491,6 +2491,7 @@
       "iban_invalid": "IBAN invalid",
       "bank_code_not_allocated": "Bank code not in the national register",
       "modulus_check_failed": "UK account checksum fails",
+      "national_check_digits_failed": "National check key fails",
       "sepa_not_reachable": "Not reachable by SEPA transfer",
       "test_bic": "Test BIC",
       "bic_mismatch": "BIC in file differs from the register",

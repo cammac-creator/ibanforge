@@ -307,4 +307,26 @@ describe('the published list of step codes', () => {
     const published = NEXT_STEPS_SCHEMA.items.properties.code.description;
     for (const code of emitted) expect(published, code).toContain(code);
   });
+
+  it('names every blocking code where the texts say which codes mean stop', () => {
+    // La description de validate_iban (MCP stdio) et la documentation MCP du site,
+    // dans les trois langues, disent « bank_code_not_allocated means stop » : les
+    // deux contrôles de compte qui arrêtent aussi un paiement y sont nommés.
+    const root = new URL('../../', import.meta.url);
+    for (const file of [
+      'src/mcp/server.ts',
+      'frontend/content/en/docs/mcp.mdx',
+      'frontend/content/fr/docs/mcp.mdx',
+      'frontend/content/de/docs/mcp.mdx',
+    ]) {
+      const text = readFileSync(new URL(file, root), 'utf8');
+      for (const code of [
+        'bank_code_not_allocated',
+        'modulus_check_failed',
+        'national_check_digits_failed',
+      ]) {
+        expect(text, `${file}: ${code}`).toContain(code);
+      }
+    }
+  });
 });

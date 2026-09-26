@@ -2491,6 +2491,7 @@
       "iban_invalid": "IBAN ungültig",
       "bank_code_not_allocated": "Bankleitzahl nicht im nationalen Register",
       "modulus_check_failed": "Britische Kontoprüfziffer fehlgeschlagen",
+      "national_check_digits_failed": "Nationale Prüfziffer fehlgeschlagen",
       "sepa_not_reachable": "Per SEPA-Überweisung nicht erreichbar",
       "test_bic": "Test-BIC",
       "bic_mismatch": "BIC in der Datei weicht vom Register ab",

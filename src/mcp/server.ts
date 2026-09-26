@@ -175,7 +175,7 @@ When valid is false the object carries { valid: false, error, error_detail } and
 
 Supports ${F.claim.countries} countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
 
-next_steps is ordered advice derived from the result: what blocks a payment first, what merely enriches it after. Branch on the code field, not on the prose, and relay the do field to the user. bank_code_not_allocated means stop; verify_payee_name means carry on and let a beneficiary name check decide.
+next_steps is ordered advice derived from the result: what blocks a payment first, what merely enriches it after. Branch on the code field, not on the prose, and relay the do field to the user. bank_code_not_allocated, modulus_check_failed and national_check_digits_failed mean stop; verify_payee_name means carry on and let a beneficiary name check decide.
 
 bic.lei and bic.address come from the same directory row /v1/bic/:code reads, so validating an IBAN no longer needs a second lookup to obtain them. Both are null when GLEIF publishes nothing for that BIC — which is common outside the countries it covers densely — and null there means "no LEI on file", never "this institution has none". IMPORTANT — bic.address is the LEGAL ENTITY seat, not the branch, and bic.address.city may differ from bic.city: bic.city is where the consulted register places this bank CODE, bic.address.city is where the entity is registered. Both are true and answer different questions. bic.address.as_of is when the entity last filed that address and is usually much older than bic.as_of, which dates the BIC reference set; do not read the address as being as fresh as the bank name beside it.
 
