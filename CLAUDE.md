@@ -185,6 +185,12 @@ npm run mcp          # Start MCP server for AI agents
   Preview n'a ni `SESSION_SECRET` ni `ADMIN_SECRET` (Production seulement) :
   pas de session, pas de données. Faire relire une UI de dashboard passe donc
   par un déploiement de production, jamais par un preview de branche.
+- **Vercel ne construit plus les branches `codex/**`** (`frontend/vercel.json`, 26.09.2026,
+  décision de Claude-Alain sur le coût des constructions : 110 versions d'essai sur 152
+  constructions les 24 et 25.09, jamais regardées). Même jour, dans les réglages du projet
+  (hors dépôt) : machine de construction fixée sur « standard » (Vercel l'avait passée seule
+  sur « turbo », 30 processeurs facturés à la minute) et commentaires du robot Vercel coupés.
+  Ne pas les rétablir sans lui en parler ; coûts lisibles par `/v1/billing/charges`.
 - Docker multi-stage build (builder for tsc, slim for runtime)
 - Health check on /health with 30s timeout
 - Pre-built SQLite databases included in Docker image
