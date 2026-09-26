@@ -201,7 +201,10 @@ describe('remboursement total d’un pack', () => {
       outcome: 'unchanged',
       removed_credits: 0,
     });
-    expect(dispute.alert?.key).toBe(`stripe:dispute:${purchaseOf(sessionId).id}`);
+    // Une clé d'alerte par litige (26.09.2026) : elle porte l'empreinte du litige.
+    expect(dispute.alert?.key).toMatch(
+      new RegExp(`^stripe:dispute:${purchaseOf(sessionId).id}:[0-9a-f]{12}$`),
+    );
     expect(dispute.alert?.detail).toContain('déjà repris');
     expect(validateApiKey(key.api_key).creditsRemaining).toBe(1000);
     expect(purchaseOf(sessionId).outcome).toBe('refunded');
@@ -274,7 +277,9 @@ describe('litige', () => {
       expect.stringContaining('(dispute status warning_needs_response)'),
     );
     // Une clé à part : si la demande devient un litige, son alerte peut partir.
-    expect(result.alert?.key).toBe(`stripe:dispute-inquiry:${purchase.id}`);
+    expect(result.alert?.key).toMatch(
+      new RegExp(`^stripe:dispute-inquiry:${purchase.id}:[0-9a-f]{12}$`),
+    );
     const detail = result.alert?.detail ?? '';
     expect(detail).toContain('Demande de renseignements');
     expect(detail).toContain('les fonds ne sont PAS retirés');
@@ -301,7 +306,7 @@ describe('litige', () => {
       outcome: 'clawed_back',
       removed_credits: 1000,
     });
-    expect(result.alert?.key).toBe(`stripe:dispute:${purchase.id}`);
+    expect(result.alert?.key).toMatch(new RegExp(`^stripe:dispute:${purchase.id}:[0-9a-f]{12}$`));
     expect(result.alert?.detail).toContain('contesté (litige)');
     expect(result.alert?.detail).toContain('Litige gagné');
     expect(result.alert?.detail).not.toContain('Demande de renseignements');

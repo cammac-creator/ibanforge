@@ -389,6 +389,29 @@ describe('ouverture du schéma', () => {
     again.closeAll();
   });
 
+  it('les colonnes du litige (26.09.2026) se posent sur une base neuve et sur un registre d’avant', async () => {
+    const path = freshPath();
+    const fresh = await openAt(path);
+    expect(columns(fresh.getStatsDB(), 'key_purchases')).toEqual(
+      expect.arrayContaining(['dispute_id', 'reinstate_blocked']),
+    );
+    fresh.closeAll();
+    // Le registre d'avant ce lot : la même table, sans les deux colonnes.
+    const raw = new Database(path);
+    raw.exec(
+      'ALTER TABLE key_purchases DROP COLUMN dispute_id; ' +
+        'ALTER TABLE key_purchases DROP COLUMN reinstate_blocked;',
+    );
+    expect(columns(raw, 'key_purchases')).not.toContain('dispute_id');
+    raw.close();
+    const again = await openAt(path);
+    const cols = columns(again.getStatsDB(), 'key_purchases');
+    expect(cols).toEqual(expect.arrayContaining(['dispute_id', 'reinstate_blocked']));
+    // Ajoutées en queue, comme les colonnes du rail USDC.
+    expect(cols.slice(-2)).toEqual(['dispute_id', 'reinstate_blocked']);
+    again.closeAll();
+  });
+
   it('avec deux key_prefix identiques, l’ouverture ne jette pas et l’index unique n’est PAS créé', async () => {
     const path = freshPath();
     const raw = new Database(path);
