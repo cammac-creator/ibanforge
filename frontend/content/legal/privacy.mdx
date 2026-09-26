@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-09-24"
+updated: "2026-09-26"
 ---
 
 # Privacy Policy
 
-**Last updated: September 24, 2026 · Version 1.3**
+**Last updated: September 26, 2026 · Version 1.4**
+
+*Revision 1.4 (September 26, 2026): section 1 now says that, for a USDC purchase, we store the paying wallet address and the on-chain transaction hash, to reconcile a payment whose settlement could not be confirmed.*
 
 *Revision 1.3 (September 24, 2026): section 6 now describes the sign-in cookie and the sign-in codes of the account page.*
 
@@ -25,7 +27,7 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 | **Email address** (free key signup) | Issuing your key, quota notifications, service messages | Yes, while your key exists. |
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
 | **Aggregated statistics** (daily counts by endpoint/country — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
-| **Payment data** | Processing card or USDC payments | Handled by Stripe / the x402 facilitator. We never see card numbers; we store the transaction reference. |
+| **Payment data** | Processing card or USDC payments | Handled by Stripe / the x402 facilitator. We never see card numbers; we store the transaction reference and, for a USDC purchase, the paying wallet address and the on-chain transaction hash, to reconcile a payment whose settlement could not be confirmed. |
 | **Feedback reports** (free-form report, optional contact address) | Investigating data-quality issues, x402 refund decisions | Yes, **12 months**, then automatically deleted. |
 
 **IP addresses** are pseudonymised before storage: we keep only a salted hash, never the raw address.
