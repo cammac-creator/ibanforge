@@ -89,6 +89,24 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
     });
   }
 
+  // La clé de contrôle nationale du BBAN est fausse (FR, MC, BE, IT, SM, ES ;
+  // 26/09/2026, suite prévue du branchement du 25/09). Même pied que le contrôle
+  // britannique juste au-dessus : les chiffres ISO de l'IBAN passent, mais la clé
+  // que le pays garde DANS le BBAN (clé RIB, chiffres belges, CIN, DC) ne
+  // correspond pas, donc ce numéro de compte ne peut pas avoir été émis tel qu'il
+  // est écrit. Seulement sur `fail` : ni `pass`, ni `not_applicable`, ni un bloc
+  // absent. « Key » et non « digits » dans la phrase : le CIN est une lettre.
+  // Les étapes d'offre plus bas restent, comme après le contrôle britannique :
+  // les retirer derrière un « Do not send » serait une autre décision, pour les deux.
+  const national = result.national_check_digits;
+  if (national?.status === 'fail') {
+    steps.push({
+      code: 'national_check_digits_failed',
+      do: 'Do not send. The national check key inside this IBAN does not match the bank and account numbers it carries, so the account number cannot have been issued as written, even though the IBAN check digits are correct. Ask the beneficiary to confirm the account number.',
+      because: `national_check_digits.status is fail (${national.scheme})`,
+    });
+  }
+
   // The code is allocated and being withdrawn. Not a reason to stop, a reason to
   // update the beneficiary before the transition period ends. This is the
   // merged-bank case, which only a national register can answer.
