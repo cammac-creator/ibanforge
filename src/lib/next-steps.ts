@@ -39,6 +39,13 @@ export interface NextStep {
 
 const COMPLIANCE_ACTION = 'POST /v1/iban/compliance';
 
+/** Les étapes qui disent « Do not send » : le compte ne peut pas exister tel qu'il est écrit. */
+const BLOCKING_STEPS: ReadonlySet<string> = new Set([
+  'bank_code_not_allocated',
+  'modulus_check_failed',
+  'national_check_digits_failed',
+]);
+
 export function nextSteps(result: IBANValidationResult): NextStep[] {
   if (!result.valid) return [];
 
@@ -96,8 +103,8 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   // correspond pas, donc ce numéro de compte ne peut pas avoir été émis tel qu'il
   // est écrit. Seulement sur `fail` : ni `pass`, ni `not_applicable`, ni un bloc
   // absent. « Key » et non « digits » dans la phrase : le CIN est une lettre.
-  // Les étapes d'offre plus bas restent, comme après le contrôle britannique :
-  // les retirer derrière un « Do not send » serait une autre décision, pour les deux.
+  // Comme après le contrôle britannique, les étapes d'offre plus bas ne suivent
+  // plus (voir `accountInDoubt`).
   const national = result.national_check_digits;
   if (national?.status === 'fail') {
     steps.push({
@@ -106,6 +113,15 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
       because: `national_check_digits.status is fail (${national.scheme})`,
     });
   }
+
+  // Après un « Do not send », le compte ne peut pas exister tel qu'il est écrit :
+  // les étapes d'offre (4 et 5 : criblage, QR de paiement) ne suivent plus, il
+  // n'y a rien à cribler ni à payer avant que le bénéficiaire l'ait corrigé
+  // (26/09/2026). Le code banque non attribué n'y arrivait déjà pas, son statut
+  // n'étant pas `verified` ; le contrôle britannique et la clé nationale, si. Les
+  // étapes qui qualifient la réponse (code radié, BIC incertain, BIC de test,
+  // émetteur) restent : elles disent encore quelque chose d'utile.
+  const accountInDoubt = steps.some((s) => BLOCKING_STEPS.has(s.code));
 
   // The code is allocated and being withdrawn. Not a reason to stop, a reason to
   // update the beneficiary before the transition period ends. This is the
@@ -185,7 +201,7 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   // Pas sur un code déjà radié (`retired_on`) : le registre dit que son
   // titulaire n'existe plus, aucun BIC ne lui est servi, et il n'y a pas de
   // banque à cribler avant que le bénéficiaire ait donné ses coordonnées à jour.
-  if (check?.status === 'verified' && !check.retired_on) {
+  if (check?.status === 'verified' && !check.retired_on && !accountInDoubt) {
     steps.push({
       code: 'screen_compliance',
       do:
@@ -211,8 +227,10 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   if (
     process.env.PARTNER_PAYQR === '1' &&
     check?.status === 'verified' &&
-    // Même garde que l'étape 4 : pas de QR de paiement vers un code déjà radié.
+    // Mêmes gardes que l'étape 4 : pas de QR de paiement vers un code déjà radié,
+    // ni vers un compte qu'une étape a déclaré impossible.
     !check.retired_on &&
+    !accountInDoubt &&
     result.sepa?.member &&
     country !== 'CH' &&
     country !== 'LI'
