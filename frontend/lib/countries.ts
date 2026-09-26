@@ -27,7 +27,16 @@ export interface CountryEntry {
   sepa: { member: boolean; schemes: string[]; vop_required: boolean };
   /** The national register the API verified the example's bank code against, when it holds one. */
   register: string | null;
-  api: Record<string, unknown>;
+  /**
+   * The countries whose register the API serves from a PRIVATE file (Austria,
+   * Belgium, San Marino, Luxembourg; withdrawal step of 25/09/2026): the export
+   * names the register and what it settles, and prints no answer, because the
+   * public database it runs on does not hold the register.
+   */
+  private_register?: boolean;
+  register_basis?: 'authoritative' | 'partial';
+  /** The validate route's own answer to the example; null for a private register. */
+  api: Record<string, unknown> | null;
 }
 
 interface CountriesFile {
@@ -100,7 +109,8 @@ export function apiJson(api: Record<string, unknown>): string {
  * pas dire « carte composite » d'une réponse qui n'en vient pas.
  */
 export function isPartialRegister(entry: CountryEntry): boolean {
-  const check = entry.api.bank_code_check as { authoritative?: boolean; register?: string } | null | undefined;
+  if (entry.register_basis) return Boolean(entry.register) && entry.register_basis === 'partial';
+  const check = entry.api?.bank_code_check as { authoritative?: boolean; register?: string } | null | undefined;
   return (
     Boolean(entry.register) &&
     check?.authoritative === false &&
@@ -111,6 +121,7 @@ export function isPartialRegister(entry: CountryEntry): boolean {
 
 /** Whether the register the API used is a national one (authoritative) rather than our composite map. */
 export function isNationalRegister(entry: CountryEntry): boolean {
-  const check = entry.api.bank_code_check as { authoritative?: boolean } | null | undefined;
+  if (entry.register_basis) return Boolean(entry.register) && entry.register_basis === 'authoritative';
+  const check = entry.api?.bank_code_check as { authoritative?: boolean } | null | undefined;
   return Boolean(entry.register) && check?.authoritative === true;
 }

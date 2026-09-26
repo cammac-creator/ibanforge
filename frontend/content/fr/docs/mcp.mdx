@@ -182,7 +182,7 @@ Récupérer la clé après son approbation, avec le `device_code` reçu de `requ
 
 ## Des résultats qui disent quoi faire ensuite
 
-Chaque résultat de validation porte un champ `next_steps` ordonné : ce qui bloque un paiement d'abord, ce qui l'enrichit ensuite. Chaque entrée a un `code` stable sur lequel brancher, une phrase `do` que l'agent peut relayer, et un `because` qui nomme le champ de la réponse qui l'a produite — le conseil est auditable au lieu d'être cru sur parole. `bank_code_not_allocated` veut dire stop ; `verify_payee_name` veut dire continuer et laisser trancher un contrôle du nom du bénéficiaire.
+Chaque résultat de validation porte un champ `next_steps` ordonné : ce qui bloque un paiement d'abord, ce qui l'enrichit ensuite. Chaque entrée a un `code` stable sur lequel brancher, une phrase `do` que l'agent peut relayer, et un `because` qui nomme le champ de la réponse qui l'a produite — le conseil est auditable au lieu d'être cru sur parole. `bank_code_not_allocated` veut dire stop, tout comme `modulus_check_failed` (un sort code et un numéro de compte britanniques qui ne peuvent pas former une vraie paire) et `national_check_digits_failed` (la clé de contrôle nationale de l'IBAN ne correspond pas : le numéro de compte n'a pas pu être émis tel qu'il est écrit) ; `verify_payee_name` veut dire continuer et laisser trancher un contrôle du nom du bénéficiaire.
 
 ## Exemple de conversation avec un agent
 

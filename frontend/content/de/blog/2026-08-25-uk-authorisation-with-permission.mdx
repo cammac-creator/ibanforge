@@ -12,13 +12,13 @@ Diese Bedingung ist jetzt Teil des Produkts.
 
 ## Was ein britischer Lookup jetzt antwortet
 
-Jeder `GET /v1/bic/:code` auf einen britischen BIC — und jede validierte GB-IBAN, deren Bank aufgelöst wird — trägt einen `pra_authorisation`-Block, wenn das Institut auf der aktuellen Liste steht. Aus der ausgelieferten Datenbank erfasst:
+Jeder `GET /v1/bic/:code` auf einen britischen BIC — und jede validierte GB-IBAN, deren Bank aufgelöst wird — trägt einen `pra_authorisation`-Block, wenn das Institut auf der aktuellen Liste steht. Seine Form (Name und FRN des Instituts sind hier ausgelassen):
 
 ```json
 "pra_authorisation": {
   "authorised": true,
-  "firm_name": "HSBC UK Bank Plc",
-  "frn": "765112",
+  "firm_name": "…",
+  "frn": "…",
   "section": "uk_incorporated",
   "basis": "lei",
   "source": "Bank of England, List of Banks",
@@ -31,9 +31,9 @@ Vier Designentscheidungen, offen benannt:
 - **Die Verknüpfung läuft über den LEI, nie über Namensähnlichkeit.** Die Liste veröffentlicht den Legal Entity Identifier jeder Firma, unsere GLEIF-Daten ebenso. Namensabgleich zwischen Registern ist die Geburtsstätte von Phantomtreffern; eine Verknüpfung über einen Identifikator hält oder hält nicht.
 - **Der Block ist auf GB- und GI-BICs begrenzt.** Für Zweigstellen nennt die Liste den LEI des *Hauptsitzes* — und ein Hauptsitz-LEI hängt an den BICs der ganzen Gruppe, weltweit. Ohne die Begrenzung hätte die Verknüpfung auf über tausend nicht-britischen BICs eine britische Zulassung behauptet — vor der Auslieferung an den echten Daten gemessen, dann begrenzt.
 - **Er antwortet nie `authorised: false`.** Die Präambel der Liste sagt selbst, dass sie das Financial Services Register nicht ersetzt. Das Fehlen einer Firma in unserer Kopie eines Monats-Schnappschusses ist das Fehlen einer Aussage, kein Befund.
-- **Die Quellenangabe trägt den Monat, und ein Test erzwingt das.** „Bank of England (List of Banks, 2026-08)" steht im Footer, in den Docs und auf den maschinenlesbaren Oberflächen, wobei der Monat aus den geladenen Daten gelesen wird. Lädt ein künftiger Refresh eine neue Liste und eine Oberfläche zeigt noch den alten Monat, schlägt der Build fehl. Die Erlaubnis kam mit einer Bedingung; die Bedingung ist jetzt Infrastruktur.
+- **Die Quellenangabe trägt den Monat, und eine Prüfung wacht darüber.** „Bank of England (List of Banks, 2026-08)" steht im Footer, in den Docs und auf den maschinenlesbaren Oberflächen. Die Antworten der API tragen den Monat der Liste, die sie ausliefern. Lädt ein monatlicher Refresh eine neue Liste, nennt eine Warnung jede statische Oberfläche, die noch den alten Monat zeigt, damit wir sie aktualisieren. Die Erlaubnis kam mit einer Bedingung; die Bedingung ist jetzt Infrastruktur.
 
-Die Liste wird monatlich über denselben Workflow aufgefrischt wie unsere übrigen Register.
+Die Liste wird monatlich aufgefrischt, wie unsere übrigen Register.
 
 ## Ebenfalls diese Woche ausgeliefert
 

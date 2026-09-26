@@ -15,6 +15,15 @@ permissions:
 # One writer of data/bic.sqlite at a time. refresh-cz-register.yml commits the
 # same file daily; sharing the group makes the two queue rather than race on
 # the 1st, and cancel-in-progress stays false so neither kills the other.
+#
+# 🔒 Public sources only, since the withdrawal step (25/09/2026). The rows whose
+# licence does not allow redistribution (EBA STEP2, OeNB and NBP directory rows,
+# the Austrian, Belgian and San Marino registers, the Bank of England PRA list)
+# are listed once in src/lib/restricted-family.ts and rebuilt by a PRIVATE
+# repository, whose overlay the API pulls and merges at start-up. Every seeder
+# below runs without SEED_FAMILY, which means "public sources only": none of them
+# downloads a member of that family, and the PRA seeder refuses to run at all.
+# The run logs and the commit are public, so this workflow must never read one.
 concurrency:
   group: bic-sqlite-writer
   cancel-in-progress: false
@@ -36,7 +45,7 @@ jobs:
       - name: Seed BIC database from GLEIF
         run: npm run db:seed
 
-      - name: Enrich BIC database from public sources (SwiftCodes, Bundesbank, SIX, OeNB, NBP, EBA Step2)
+      - name: Enrich BIC database from public sources (SwiftCodes, Bundesbank, SIX)
         run: npm run bic:enrich
 
       - name: Enrich country names
@@ -58,6 +67,10 @@ jobs:
       - name: Seed German Bankleitzahlen (Bundesbank)
         run: npm run db:seed-blz
 
+      # Slovakia and Czechia only: the Austrian, Belgian and San Marino registers
+      # belong to the restricted family and are not read here any more (the
+      # seeder refuses them without SEED_FAMILY=restricted).
+      #
       # The Czech register rides the same step, last. It exits 0 and leaves both
       # Czech tables as they were when cnb.cz cannot be read, contradicts
       # itself or serves an older edition than the one already in force (a
@@ -67,7 +80,7 @@ jobs:
       # `cz_register` (loaded / not_loaded), and the step « Czech register not
       # loaded » at the end turns not_loaded into a red run and the Telegram
       # alert, once every other source has been committed.
-      - name: Refresh Austrian, Belgian, Slovak, San Marino and Czech registers
+      - name: Refresh the Slovak and Czech registers
         id: seed_national
         run: npm run db:seed-national
 
@@ -86,25 +99,16 @@ jobs:
       - name: Refresh the Bulgarian BAE register
         run: npm run db:seed-bg
 
-      # Bank of England, "List of PRA-regulated Banks". Used under a written
-      # permission whose condition is attribution to the Bank TOGETHER WITH the
-      # month of the list, so the month has to be re-read every month — a stale
-      # `list_month` is a licence breach, not a freshness bug.
-      #
-      # This one does NOT fail the job. The list is published a few days into
-      # the month while this cron runs on the 1st, so a miss on the newest file
-      # is the normal state here; the seeder walks back two months, and if
-      # nothing parses it logs and exits 0 with the previous table untouched —
-      # the same doctrine the Dockerfile applies to Vocalink. It never drops the
-      # table before it holds a complete parse.
-      - name: Refresh the Bank of England PRA List of Banks
-        run: npm run db:seed-pra
+      # The Bank of England "List of PRA-regulated Banks" is not refreshed here
+      # any more: its permission covers use inside the API, not redistribution,
+      # so since the withdrawal step (25/09/2026) it lives in the private overlay
+      # (member `pra`), rebuilt monthly with its month by the private repository.
+      # scripts/seed-pra-banks.ts refuses to run without SEED_FAMILY=restricted.
 
       # ECB daily MFI list + Banco de España MFI list — the official identity
       # (name, LEI, registered address) behind a resolved code.
       #
-      # Also does NOT fail the job, and for a sharper reason than the PRA step:
-      # the ECB file exists on BUSINESS DAYS ONLY and is date-stamped in its own
+      # Does NOT fail the job either, for a sharp reason: the ECB file exists on BUSINESS DAYS ONLY and is date-stamped in its own
       # URL, so a cron landing on a weekend or a Frankfurt holiday finds nothing
       # at the newest name. The seeder walks back four days and, if none answers,
       # leaves the table exactly as it was — dated with the day the list was
@@ -143,12 +147,17 @@ jobs:
       - name: Quality diff against the committed database
         run: npx tsx scripts/refresh-diff.ts
 
+      # The suite includes src/lib/public-base-family-free.test.ts: a seeder that
+      # ever wrote a row of the restricted family into data/bic.sqlite turns the
+      # run red here, before anything is committed to this public repository.
       - name: Run tests
         run: npm run test
 
-      # The public register pages (/blz, /iid on ibanforge.com) read a JSON
-      # exported from this very database through the API in-process, so a
-      # refreshed register reaches the pages in the same commit.
+      # The public register pages (/blz, /iid, /sk, /it on ibanforge.com) read a
+      # JSON exported from this very database through the API in-process, so a
+      # refreshed register reaches the pages in the same commit. The export
+      # carries no EPC-derived field and writes no Austrian, Belgian or San
+      # Marino file: those pages are rendered on demand from the API.
       - name: Export register pages
         run: npm run pages:export
 
@@ -169,7 +178,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to BIC database"
           else
-            git commit -m "chore: refresh BIC + Swiss clearing databases (GLEIF, public sources, SIX BankMaster — monthly cron)"
+            git commit -m "chore: refresh BIC + Swiss clearing databases (GLEIF, public sources, SIX BankMaster; monthly cron)"
             git pull --rebase
             git push
           fi

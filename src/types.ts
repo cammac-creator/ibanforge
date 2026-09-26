@@ -599,7 +599,8 @@ export interface IBANValidationResult {
      * from the country: `listed`, `not_listed` (absence from the register is not
      * exclusion from the scheme), `no_bank` (no BIC resolved: a register may still name the holder),
      * `bank_code_not_allocated`, or null when the registers are not loaded on
-     * this deployment (not consulted). Absent outside SEPA.
+     * this deployment, or when no bank was resolved because the bank-code
+     * verdict itself is `unavailable` (not consulted). Absent outside SEPA.
      */
     bank_reachability?: SepaBankReachability | null;
     /** The bank's own schemes from the EPC registers when `listed`; [] for an unallocated code; null otherwise. */
@@ -915,6 +916,12 @@ export interface BicComplianceResponse {
   institution: string | null;
   country: { code: string; name: string };
   compliance: ComplianceResult;
+  /**
+   * Present only when `found` is false and the part of the directory served
+   * from the private overlay (EBA STEP2, NBP and OeNB records) is not loaded on
+   * this deployment: the absence was not looked up there. Added 25/09/2026.
+   */
+  note?: string;
   cost_usdc: number;
   processing_ms?: number;
 }

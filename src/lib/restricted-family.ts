@@ -21,44 +21,31 @@
  * - La Tchéquie aussi : les conditions de la ČNB permettent de stocker, transmettre
  *   et reproduire avec « Zdroj: ČNB » (docs/data-sources.md). Ni ses lignes ni la
  *   table de ses éditions annoncées (`national_bank_codes_pending`) ne sont membres.
- * - `bic_entries` de source `six_group` : à vérifier, faible enjeu, hors de cette étape.
- * - Les données hors des deux bases, à traiter à l'étape du retrait (règle de la
- *   décision du 24/09/2026 « tout ce qui n'est pas redistribuable sort », groupe C
- *   de NOTICE) : la carte composite `src/db/bic_data.json` (clés AT, BE, LU, PL,
- *   FI), `src/lib/fi-register.ts`, les exports du site
- *   `frontend/data/registers/*.json`, les blocs EPC des exports et des réponses
- *   d'exemple suivies (`frontend/data/countries.json`, `captured-iban.json`,
- *   `mcp/fixtures/api-answers.json`, `sdks/fixtures/quickstart-api.json`, l'exemple
- *   de validation du llms.txt de l'API (`src/app.ts`) et sa copie du site
- *   (`frontend/public/llms-full.txt`),
- *   `frontend/content/{en,fr,de}/docs/onboarding.mdx`), et les entrées GB (FCA)
- *   de `scripts/data/eu-emi-register-2026-05-22.json`. Les clés PL, FI et LU et la
- *   liste finlandaise ont déjà leurs membres (ci-dessous) ; les clés AT et BE n'en
- *   auront pas, les registres autrichien et belge de la surcouche répondant pour
- *   ces pays.
+ *   L'Italie non plus (open data CC BY 4.0 de la Banca d'Italia).
+ * - `bic_entries` de source `six_group` : vérifié le 25/09/2026, ces lignes viennent
+ *   du MÊME fichier que le registre suisse (`bankmaster_V3.csv`, lu par
+ *   scripts/enrich-bic-database.ts et scripts/seed-bc-nummer.ts), dont la
+ *   description dit « may be used freely ». Publiques.
+ * - Les clés AT et BE de la carte composite `src/db/bic_data.json`, retirées du
+ *   dépôt public à l'étape du retrait (25/09/2026, décision du 24/09/2026 « tout
+ *   ce qui n'est pas redistribuable sort ») sans devenir des membres : les
+ *   registres autrichien et belge de la surcouche répondent pour ces pays (preuve
+ *   centrale du 25/09/2026 : réponses identiques). De même les exports du site
+ *   pour AT, BE et SM (les pages sont rendues à la demande depuis l'API) et les
+ *   blocs EPC des réponses d'exemple suivies.
  *
  * ## Les membres venus après la première surcouche
  *
  * Les clés PL, FI et LU de la carte composite, et la liste finlandaise des codes
- * d'établissement (src/lib/fi-register.ts), ont un membre depuis le 25/09/2026
- * (décision de la session principale : les servir depuis le dépôt privé, aucune
- * perte de service) : tables `curated_bank_codes` et `fi_monetary_codes`, lues par
- * la carte composite (src/lib/bic-lookup.ts) et par src/lib/fi-register.ts.
- *
- * Tant que ce dépôt porte encore ces données, la règle de fraîcheur de la fusion
- * (src/lib/restricted-overlay.ts, cas (a) à (d)) décide, pays par pays et liste
- * par liste : les clés de la carte publique ne sont pas datées, elles restent
- * servies tant que le fichier porte le pays (d) ; la liste finlandaise de la
- * surcouche ne remplace la liste publique que si elle est strictement plus
- * récente (b). La liste chargée au départ dans la surcouche est la copie de celle
- * de ce dépôt, à la même date : aucune réponse ne change avant l'étape du retrait,
- * qui enlève la donnée publique. La surcouche sert alors seule (a).
- *
- * Une surcouche écrite avant eux ne les porte pas : ils sont marqués
- * `mayBeAbsent`, et un fichier qui ne les porte pas du tout (ni table, ni ligne,
- * ni compte) les laisse « absents » au lieu d'être refusé. La donnée publique sert
- * alors comme avant ; une fois retirée, la réponse dit « non consulté »
- * (`curatedKeysMissing` dans src/lib/bic-lookup.ts).
+ * d'établissement (ancien `src/lib/fi-register.ts`), sont devenues des membres le
+ * 25/09/2026 (décision de la session principale : servir ces clés depuis le dépôt
+ * privé, aucune perte de service) : tables `curated_bank_codes` et
+ * `fi_monetary_codes`, lues par la carte composite (src/lib/bic-lookup.ts) et par
+ * src/lib/fi-register.ts. Une surcouche écrite avant eux ne les porte pas : ils
+ * sont marqués `mayBeAbsent`, et un fichier qui ne les porte pas du tout (ni
+ * table, ni ligne, ni compte) les laisse « absents » au lieu d'être refusé. Sans
+ * eux, une réponse polonaise ou finlandaise dit « non consulté »
+ * (`WITHDRAWN_BANK_CODE_COUNTRIES` dans src/lib/bic-lookup.ts).
  *
  * ## Les minimums
  *
@@ -590,14 +577,23 @@ export const OVERLAY_ENV: Readonly<Record<OverlayKind, string>> = {
 };
 
 /**
- * Ce qu'un seeder écrit : `all` sans variable (le comportement d'avant, inchangé),
- * `restricted` avec `SEED_FAMILY=restricted` (la famille seule, pour la chaîne
- * privée : `npm run overlay:seed`). Une autre valeur est une faute de frappe qui
- * ne doit pas passer pour « tout ».
+ * Ce qu'un seeder écrit.
+ *
+ * - `public` sans variable : les sources publiques SEULES, jamais un membre de la
+ *   famille. Depuis l'étape du retrait (25/09/2026), c'est le mode des robots
+ *   publics (refresh-bic.yml, refresh-compliance.yml, les relectures tchèque et
+ *   italienne) et de toute copie d'un contributeur : aucun ne télécharge ni
+ *   n'écrit plus la famille dans `data/`, d'où elle serait commitée.
+ * - `restricted` avec `SEED_FAMILY=restricted` : la famille seule, pour la chaîne
+ *   privée (`npm run overlay:seed`, qui pose la variable elle-même).
+ *
+ * Le défaut est le mode sûr exprès : un workflow qui oublierait la variable ne
+ * peut pas retélécharger la famille dans le dépôt public. Une autre valeur est
+ * une faute de frappe qui ne doit passer pour aucun des deux.
  */
-export function seedFamilyFromEnv(): 'all' | 'restricted' {
+export function seedFamilyFromEnv(): 'public' | 'restricted' {
   const value = process.env.SEED_FAMILY ?? '';
-  if (value === '') return 'all';
+  if (value === '') return 'public';
   if (value === 'restricted') return 'restricted';
   throw new Error(`SEED_FAMILY inconnu : « ${value} » (seule valeur admise : restricted)`);
 }

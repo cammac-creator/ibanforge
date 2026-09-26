@@ -95,11 +95,12 @@ describe('la famille « sous conditions », une seule constante', () => {
     expect([...restrictedBicSources()].sort()).toEqual(['eba_step2', 'nbp', 'oenb']);
   });
 
-  it('SEED_FAMILY : rien = tout, « restricted » = la famille, le reste est refusé', () => {
+  it('SEED_FAMILY : rien = le public seul, « restricted » = la famille, le reste est refusé', () => {
     const saved = process.env.SEED_FAMILY;
     try {
+      // Depuis l'étape du retrait (25/09/2026) : sans variable, jamais la famille.
       delete process.env.SEED_FAMILY;
-      expect(seedFamilyFromEnv()).toBe('all');
+      expect(seedFamilyFromEnv()).toBe('public');
       process.env.SEED_FAMILY = 'restricted';
       expect(seedFamilyFromEnv()).toBe('restricted');
       process.env.SEED_FAMILY = 'restreint';

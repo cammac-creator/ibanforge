@@ -65,22 +65,22 @@ This section lists the third-party sources that have records in the data
 files of this repository, and the terms each publisher attaches to them. It
 describes the files as they stand in this revision. Row counts were read on
 24 September 2026 at commit 5094d72a; they change at every refresh (monthly
-for the BIC data, weekly for the sanctions and EPC data). This section is not
-legal advice: where a publisher's terms have not been established, it says so.
+for the BIC data, weekly for the sanctions data). On 25 September 2026 the
+records of group C were removed from these files. This section is not legal
+advice: where a publisher's terms have not been established, it says so.
 
 Files concerned:
   data/bic.sqlite
   data/compliance.sqlite
-  frontend/data/registers/*.json, frontend/data/countries.json and
+  frontend/data/registers/*.json (Germany, Switzerland, Slovakia and Italy),
+    frontend/data/countries.json and
     frontend/app/[locale]/playground/captured-iban.json (API responses
     exported for the website; they repeat records from the sources below)
   src/db/bic_data.json (composite map from national bank codes to BICs)
   src/db/nl-psp.json
-  src/lib/fi-register.ts, for its list of bank codes
   scripts/data/eu-emi-register-2026-05-22.json
   scripts/data/iban-registry-2026-05-22.json
   test fixtures and sample API responses elsewhere that repeat these records
-    (see group C)
 
 Earlier commits of this repository, and forks of it, keep copies of these
 files. The data in those copies remains subject to its publishers' terms.
@@ -88,8 +88,9 @@ files. The data in those copies remains subject to its publishers' terms.
 Each source is listed in one of three groups:
   A. terms that permit reproduction, under the conditions stated;
   B. terms not yet confirmed;
-  C. present today, not covered by the MIT License, not redistributable
-     here, and being moved out of the public repository.
+  C. not redistributable here, and removed from the files of this
+     repository on 25 September 2026; the IBANforge API serves the database
+     records among them from a private repository.
 
 --------------------------------------------------------------------------------
 A. Sources whose terms permit reproduction, under the conditions stated
@@ -196,8 +197,9 @@ Banco de España, list of monetary financial institutions
 European Banking Authority, payment institutions register (PSD2)
   Where: data/bic.sqlite, table psd_entities (4,422 rows, 30 countries,
          register of 1 September 2026); the entries of
-         scripts/data/eu-emi-register-2026-05-22.json taken from the same
-         register (the GB entries of that file are listed in group C).
+         scripts/data/eu-emi-register-2026-05-22.json, taken from the same
+         register (the GB entries this file held until 25 September 2026
+         came from the FCA and are listed in group C).
   Terms: "Reproduction of all EBA material on this site is authorised,
          provided the source is acknowledged."
          https://www.eba.europa.eu/legal-notice
@@ -338,10 +340,10 @@ SIX Group AG, BIC entries
          whether its terms cover these rows has not been confirmed
          separately.
 
-Composite bank-code map, apart from the Austrian, Belgian, Finnish,
-Luxembourg and Polish keys listed in group C
-  Where: src/db/bic_data.json (18,627 of its 24,081 keys, in 70 of its
-         75 countries).
+Composite bank-code map
+  Where: src/db/bic_data.json (18,467 keys in 70 countries at this
+         revision; its Austrian, Belgian, Finnish, Luxembourg and Polish
+         keys were removed on 25 September 2026, see group C).
   Built from: the datasets of sigalor/iban-to-bic, which that project
          generates from files published by national central banks and
          banking associations; the bank registries of mdomke/schwifty,
@@ -362,29 +364,31 @@ SWIFT, IBAN Registry
   Terms: not reviewed.
 
 --------------------------------------------------------------------------------
-C. Present today, not covered by the MIT License, being moved out
+C. Removed from this repository on 25 September 2026
 --------------------------------------------------------------------------------
 
-The records below are in this repository today. Their publishers reserve all
-rights, restrict use to non-commercial purposes, publish no terms, or have
-permitted use in the IBANforge API without permitting redistribution of the
-data. They remain subject to their publishers' terms. They are not covered by
-the MIT License in LICENSE, and this repository grants no right to reuse
-them. They are being moved out of the public repository: from every file
-listed for them below, and from test fixtures and sample API responses
-elsewhere in the repository, for example mcp/fixtures/api-answers.json and
-sdks/fixtures/quickstart-api.json (EPC "sepa" data), the sample response for
-DE89370400440532013000 in frontend/content/{en,fr,de}/docs/onboarding.mdx (an
-EPC "sepa" block), and the FI, LU and PL examples of
-frontend/data/countries.json (resolved by keys listed below).
+The records below were in this repository until 25 September 2026. Their
+publishers reserve all rights, restrict use to non-commercial purposes,
+publish no terms, or have permitted use in the IBANforge API without
+permitting redistribution of the data. They were removed that day from
+data/bic.sqlite and data/compliance.sqlite, from the composite map
+src/db/bic_data.json, from the website exports, and from the test fixtures,
+sample API responses and documentation examples of the repository. The
+IBANforge API loads the database records among them from a private
+repository and serves them under the permissions described below; where it
+has not loaded them, its answers say that the source was not consulted.
+Earlier commits of this repository, and forks of it, keep copies of these
+records: they are not covered by the MIT License in LICENSE, they remain
+subject to their publishers' terms, and this repository grants no right to
+reuse them. "Formerly in" names the files that held them.
 
 EBA CLEARING, STEP2 SCT reachable PSPs list
-  Where: data/bic.sqlite, table bic_entries, source 'eba_step2' (189 rows).
+  Formerly in: data/bic.sqlite, table bic_entries, source 'eba_step2' (189 rows).
   Terms: "All rights reserved by EBA CLEARING". No licence is published.
          https://www.ebaclearing.eu/legal-and-disclaimer/
 
 United Nations, Security Council Consolidated List
-  Where: data/compliance.sqlite, table sanctioned_entities, source_list
+  Formerly in: data/compliance.sqlite, table sanctioned_entities, source_list
          'UN' (5 rows).
   Terms: "None of the materials provided on this web site may be used,
          reproduced or transmitted, in whole or in part, in any form or by
@@ -397,7 +401,7 @@ United Nations, Security Council Consolidated List
 European Payments Council (EPC), registers of participants in the SEPA
 Credit Transfer, SEPA Instant Credit Transfer, SEPA Direct Debit Core and
 Verification of Payee schemes
-  Where: data/compliance.sqlite, table sepa_participants (4,463 rows:
+  Formerly in: data/compliance.sqlite, table sepa_participants (4,463 rows:
          1,954 SCT, 1,290 SCT Inst, 1,219 SDD Core) and table
          vop_participants (1,288 rows); and the "sepa" blocks (schemes,
          vop_participant, basis "epc_register") of the API responses
@@ -412,16 +416,17 @@ Verification of Payee schemes
          Source: European Payments Council.
 
 Narodowy Bank Polski (NBP)
-  Where: data/bic.sqlite, table bic_entries, source 'nbp' (21 rows); the
+  Formerly in: data/bic.sqlite, table bic_entries, source 'nbp' (21 rows); the
          3,004 PL keys of src/db/bic_data.json, taken by mdomke/schwifty
-         from the NBP's EWIB file.
+         from the NBP's EWIB file. The API serves the bic_entries rows and
+         the PL keys from its private repository.
   Terms: "Narodowy Bank Polski makes no objections to saving files, copying
          pages in full or in part or making printouts for personal use,
          provided that they do not serve commercial purposes."
          (Terms of Use, § 1.6, nbp.pl)
 
 Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis
-  Where: data/bic.sqlite, table national_bank_codes, country AT
+  Formerly in: data/bic.sqlite, table national_bank_codes, country AT
          (873 rows), and table bic_entries, source 'oenb' (1 row);
          frontend/data/registers/at-blz.json; the 870 AT keys of
          src/db/bic_data.json, taken by sigalor/iban-to-bic and
@@ -431,14 +436,14 @@ Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis
 
 National Bank of Belgium (Banque nationale de Belgique), bank
 identification codes, Protocol Secretariat
-  Where: data/bic.sqlite, table national_bank_codes, country BE
+  Formerly in: data/bic.sqlite, table national_bank_codes, country BE
          (782 rows); frontend/data/registers/be-bank.json; the 781 BE keys
          of src/db/bic_data.json, taken by sigalor/iban-to-bic from the
          National Bank of Belgium's full list of codes.
   Terms: none stated on the page. Not established.
 
 Central Bank of the Republic of San Marino, operating banks
-  Where: data/bic.sqlite, table national_bank_codes, country SM (4 rows);
+  Formerly in: data/bic.sqlite, table national_bank_codes, country SM (4 rows);
          frontend/data/registers/sm-bank.json.
   Terms: none published, neither a licence nor a prohibition. Licence
          unknown.
@@ -446,16 +451,18 @@ Central Bank of the Republic of San Marino, operating banks
          Source: Central Bank of the Republic of San Marino, operating banks (read on <date>)
 
 Finance Finland (Finanssiala ry), Finnish monetary institution codes and
-BICs (list published 15 October 2025)
-  Where: src/lib/fi-register.ts (codes transcribed by hand); the 656 FI
+BICs (list published 16 March 2026)
+  Formerly in: src/lib/fi-register.ts (codes transcribed by hand); the 656 FI
          keys of src/db/bic_data.json, taken by mdomke/schwifty from
-         Finance Finland's publications.
+         Finance Finland's publications. The API serves the list and the
+         keys from its private repository.
   Terms: none stated on the site. Not established.
 
 ABBL, Luxembourg Register of IBAN-BIC Codes
-  Where: the 143 LU keys of src/db/bic_data.json; 135 of them come from
+  Formerly in: the 143 LU keys of src/db/bic_data.json; 135 of them come from
          the sigalor/iban-to-bic dataset taken from the ABBL register, the
-         other 8 from mdomke/schwifty.
+         other 8 from mdomke/schwifty. The API reads the register itself
+         from a private file, and the keys from its private repository.
   Terms: the ABBL's written confirmation of 15 September 2026 covers one
          normalised entry per API response, credited
            Source: ABBL, Luxembourg register of IBAN/BIC codes
@@ -464,7 +471,7 @@ ABBL, Luxembourg Register of IBAN-BIC Codes
          repository.
 
 Bank of England, List of PRA-regulated Banks
-  Where: data/bic.sqlite, table pra_banks (281 rows).
+  Formerly in: data/bic.sqlite, table pra_banks (281 rows).
   Terms: written permission of 25 August 2026 for the monthly list as a
          reference source in the IBANforge API service, with attribution to
          the Bank of England and to the month of the list:
@@ -478,8 +485,9 @@ Bank of England, List of PRA-regulated Banks
 
 UK Financial Conduct Authority (FCA), Financial Services Register lists
 "E-Money Firms (CSV)" and "Firms with PSD Permissions (CSV)"
-  Where: the GB entries of scripts/data/eu-emi-register-2026-05-22.json
-         (1,195 of its 2,755 entries: name, country, type).
+  Formerly in: the GB entries of scripts/data/eu-emi-register-2026-05-22.json
+         (1,195 of its 2,755 entries: name, country, type). Not used by the
+         API.
   Terms: the FCA's website terms state: "3.3 You must not reproduce or
          store any part of this site in any other website or include it in
          any public or private electronic retrieval system or service

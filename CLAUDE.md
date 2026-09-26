@@ -185,6 +185,12 @@ npm run mcp          # Start MCP server for AI agents
   Preview n'a ni `SESSION_SECRET` ni `ADMIN_SECRET` (Production seulement) :
   pas de session, pas de données. Faire relire une UI de dashboard passe donc
   par un déploiement de production, jamais par un preview de branche.
+- **Vercel ne construit plus les branches `codex/**`** (`frontend/vercel.json`, 26.09.2026,
+  décision de Claude-Alain sur le coût des constructions : 110 versions d'essai sur 152
+  constructions les 24 et 25.09, jamais regardées). Même jour, dans les réglages du projet
+  (hors dépôt) : machine de construction fixée sur « standard » (Vercel l'avait passée seule
+  sur « turbo », 30 processeurs facturés à la minute) et commentaires du robot Vercel coupés.
+  Ne pas les rétablir sans lui en parler ; coûts lisibles par `/v1/billing/charges`.
 - Docker multi-stage build (builder for tsc, slim for runtime)
 - Health check on /health with 30s timeout
 - Pre-built SQLite databases included in Docker image
@@ -233,14 +239,17 @@ ni une copie fusionnée, jamais en écrire une dans un dépôt git (le script re
 `.gitignore` attrape `restricted-*.sqlite*` et `*.merged-*.sqlite*`), jamais ajouter une table
 ou une source à la famille ailleurs que dans cette constante. Même règle dans `AGENTS.md`.
 
-**Les membres venus après la première surcouche (25.09.2026)** : les clés PL, FI et LU de la
-carte composite et la liste finlandaise ont aussi leurs membres (`map_pl`, `map_fi`, `map_lu`,
-`register_fi`), marqués `mayBeAbsent` (une surcouche plus ancienne qui ne les porte pas reste
-acceptée, `/health` les nomme sous `restricted_overlays.bic.absent`) et reconstruits par
-`scripts/seed-curated-map.ts`. Tant que `src/db/bic_data.json` et `src/lib/fi-register.ts`
-portent encore ces données, le public répond (règle de fraîcheur pays par pays :
-`addCuratedRows` dans `src/lib/bic-lookup.ts` ; la liste finlandaise de la surcouche seulement
-si elle est strictement plus récente) : aucune réponse ne change avant l'étape du retrait.
+**Le retrait (étape 6, 25.09.2026)** : plus rien de la famille dans ce dépôt, hors historique
+git. Les seeders publics tournent sans `SEED_FAMILY` (mode public ; seule la valeur `restricted`
+est admise) et ne téléchargent aucun membre ; les bases suivies se reconstruisent sans la famille (`npm run overlay -- strip`, sans
+téléchargement) et `src/lib/public-base-family-free.test.ts` échoue si une ligne revient ; la
+carte composite n'a plus les clés AT, BE, LU, PL et FI (les clés PL, FI et LU et la liste
+finlandaise reviennent par la surcouche : membres `map_pl`, `map_fi`, `map_lu` et
+`register_fi`, marqués `mayBeAbsent`, reconstruits par `scripts/seed-curated-map.ts` ;
+`/health` nomme sous `restricted_overlays.bic.absent` ceux que la surcouche servie ne porte
+pas) ; les
+pages /at, /be et /sm lisent l'API à la demande. Sans surcouche,
+chaque réponse qui dépend de la famille dit « non consulté », jamais « non ».
 
 **Le tirage (étape 5, depuis le 25.09.2026)** : `src/lib/restricted-overlay-pull.ts`. Un dépôt
 privé reconstruit la surcouche chaque semaine (conformité) et chaque mois (BIC), ne commite

@@ -210,13 +210,18 @@ describe('GET /v1/bic/:code — sanctions warning', () => {
     expect(body.note).not.toContain('coverage may be partial');
   });
 
-  it('reports a clean bank as screened and clean', async () => {
+  it('reports a clean bank as screened and clean on every list it read', async () => {
     const res = await app.request('/v1/bic/COBADEFF', { headers: { 'X-Dev-Skip': 'true' } });
     const body = (await res.json()) as Record<string, unknown>;
     const s = body.sanctions as Record<string, unknown>;
     expect(s.screened).toBe(true);
-    expect(s.listed).toBe(false);
     expect(s.matched_lists).toEqual([]);
+    // « Propre » seulement quand chaque liste promise a été lue. La base de ce
+    // dépôt ne porte plus la liste de l'ONU (surcouche privée depuis l'étape du
+    // retrait, 25/09/2026) : sans elle, la réponse la nomme et ne dit pas `false`.
+    // Le cas « toutes les listes chargées » : src/lib/restricted-data-absent.test.ts.
+    const unscreened = (s.unscreened_lists as string[] | undefined) ?? [];
+    expect(s.listed).toBe(unscreened.length > 0 ? null : false);
   });
 
   it('keeps the ordinary not-found wording for a BIC nobody has designated', async () => {

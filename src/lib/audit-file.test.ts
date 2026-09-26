@@ -8,6 +8,7 @@ import {
   auditFile,
   previewRows,
   buildWorkbook,
+  findingLabel,
   maskIban,
   tierFor,
   AuditFileError,
@@ -317,5 +318,73 @@ describe('readTable — the cap is enforced before the parse', () => {
     expect(countLines(Buffer.from('a\n'))).toBe(1);
     expect(countLines(Buffer.from('a\nb'))).toBe(2);
     expect(countLines(Buffer.from('a\r\nb\r\n'))).toBe(2);
+  });
+});
+
+/**
+ * La clé de contrôle nationale (26/09/2026) : une ligne dont la clé RIB, les
+ * chiffres belges, le CIN ou le DC ne concordent pas est un constat bloquant,
+ * comme le contrôle britannique : la ligne passe à « Ne pas payer ».
+ *
+ * Les IBAN en échec sont ceux des tests du module (`national-check/*.test.ts`) :
+ * les exemples officiels du registre IBAN, un chiffre du compte ou du code agence
+ * altéré, chiffres ISO recalculés, calculés hors du code testé. Ils passent donc
+ * le modulo 97 : c'est exactement le cas que la clé nationale attrape.
+ */
+describe('a failed national check key stops the row, like the UK check', () => {
+  const GOOD_FR = 'FR1420041010050500013M02606';
+  const FAILED: Array<[string, string]> = [
+    ['FR', 'FR9620041010050500014M02606'],
+    ['MC', 'MC7411222000010123456789130'],
+    ['BE', 'BE34539007548034'],
+    ['IT', 'IT68X0542811102000000123456'],
+    ['SM', 'SM59U0322509800000000270101'],
+    ['ES', 'ES6421000418450200051333'],
+  ];
+
+  it('flags each country as an error, with the detail of the module, and counts it once', () => {
+    const res = auditTable(['IBAN'], [[GOOD_FR], ...FAILED.map(([, iban]) => [iban])]);
+    const good = res.rows[0]!;
+    expect(good.findings.map((f) => f.code)).not.toContain('national_check_digits_failed');
+    expect(good.status).not.toBe('error');
+
+    FAILED.forEach(([cc, iban], i) => {
+      const row = res.rows[i + 1]!;
+      expect(row.iban, cc).toBe(iban);
+      const hits = row.findings.filter((f) => f.code === 'national_check_digits_failed');
+      expect(hits, cc).toHaveLength(1);
+      expect(hits[0]!.detail, cc).toMatch(/cannot have been issued as written/);
+      expect(row.status, cc).toBe('error');
+      // La colonne next_steps du classeur porte l'étape de l'API, telle quelle.
+      expect(row.next_steps, cc).toContain('national_check_digits_failed');
+    });
+    expect(res.summary.by_code.national_check_digits_failed).toBe(FAILED.length);
+    expect(res.summary.error).toBe(FAILED.length);
+  });
+
+  it('names the finding in the three languages, in the workbook and in the free preview', () => {
+    expect(findingLabel('national_check_digits_failed', 'en')).toBe('National check key fails');
+    expect(findingLabel('national_check_digits_failed', 'fr')).toBe(
+      'Clé de contrôle nationale en échec',
+    );
+    expect(findingLabel('national_check_digits_failed', 'de')).toBe(
+      'Nationale Prüfziffer fehlgeschlagen',
+    );
+
+    const res = auditFile(csv(['Nom;IBAN', `Alpha;${GOOD_FR}`, `Beta;${FAILED[0]![1]}`]), 'x.csv');
+    const wb = XLSX.read(buildWorkbook(res, 'fr'), { type: 'buffer' });
+    const aoa = XLSX.utils.sheet_to_json<string[]>(wb.Sheets['Audit']!, { header: 1 });
+    expect(aoa[2]![2]).toBe('Ne pas payer');
+    expect(aoa[2]![3]).toContain('Clé de contrôle nationale en échec');
+    const summary = XLSX.utils
+      .sheet_to_json<Array<string | number>>(wb.Sheets['Synthèse']!, { header: 1 })
+      .map((r) => r.join(' | '))
+      .join('\n');
+    expect(summary).toContain('Clé de contrôle nationale en échec | 1');
+
+    const preview = previewRows(res, 20);
+    expect(preview[0]!.line).toBe(2);
+    expect(preview[0]!.status).toBe('error');
+    expect(preview[0]!.findings).toContain('national_check_digits_failed');
   });
 });

@@ -26,7 +26,7 @@ import {
   withRegisterClock,
 } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
-import { lookupLuCode } from './lu-register.js';
+import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
@@ -234,9 +234,12 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // own date. Back to NATIONAL_REGISTERS once the list is re-read against a
   // current publication. Finland allocates prefixes to banking GROUPS, not
   // institutions, so even a hit confirms the group rather than a bank.
-  // Depuis le 25/09/2026, la liste peut venir de la surcouche privée (membre
-  // `register_fi`), quand elle est plus récente que celle de ce dépôt
-  // (src/lib/fi-register.ts) : le verdict porte alors sa date à elle.
+  // Depuis l'étape du retrait (25/09/2026), la liste est servie par la
+  // surcouche privée (membre `register_fi`, src/lib/fi-register.ts) : sans elle,
+  // aucun code finlandais n'est lu et la réponse dit « non consulté ».
+  // 26/09/2026 : la liste servie est relue contre l'édition du 16.03.2026 (deux
+  // codes ajoutés, aucun retiré) ; toujours rechargée à la main. Le retour parmi
+  // les registres qui refusent reste une décision de Claude-Alain.
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)',
   SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
   // L'Italie (25/09/2026, décision de Claude-Alain du 24/09, point 5). Les
@@ -450,7 +453,7 @@ function askNationalRegister(
  * issue. The provenance belongs in the documentation, where it cannot be mistaken
  * for a claim of exhaustiveness. `source='bundesbank'` is 144 rows.
  */
-const COMPOSITE_REGISTER =
+export const COMPOSITE_REGISTER =
   'IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)';
 
 /**
@@ -621,14 +624,17 @@ function decideBankCode(
   // Finland (16/09/2026): the transcribed Finance Finland list confirms what it
   // knows and says nothing about the rest. It needs the whole BBAN, not the
   // 3-digit slice: institution codes run 1 to 4 characters and only the longest
-  // allocated prefix is the real one — asking about the slice would read
-  // Nordea's '1' as '123'. A hit is served with the list's own date (a reader
-  // acting on it must know how old the list is); a code the list does not
-  // carry, or its unpopulated 72-78 band, falls through to the composite
-  // answer this country got before the list existed — never `not_allocated`.
+  // allocated prefix is the real one — asking about the slice would read a
+  // one-digit allocation as a three-digit one. A hit is served with the list's
+  // own date (a reader acting on it must know how old the list is); a code the
+  // list does not carry, or its unpopulated 72-78 band, falls through to the
+  // composite answer this country got before the list existed — never
+  // `not_allocated`.
   if (cc === 'FI' && bban) {
     const fi = lookupFiInstitution(bban);
-    if (fi?.status === 'allocated' && fi.code) {
+    // La date de la liste servie : toujours là quand la liste l'est (colonne NOT NULL).
+    const listAsOf = fiRegisterAsOf();
+    if (fi?.status === 'allocated' && fi.code && listAsOf) {
       // La liste nomme le groupe détenteur : `confirmed`, même si cette liste
       // transcrite n'entre pas dans les traces courantes (bic-trace.ts).
       return withHolder('confirmed', {
@@ -637,7 +643,7 @@ function decideBankCode(
         match: 'register',
         register: NON_EXHAUSTIVE_REGISTERS.FI,
         authoritative: false,
-        as_of: fiRegisterAsOf().slice(0, 7),
+        as_of: listAsOf.slice(0, 7),
         ...(fi.institution
           ? {
               institution: {
@@ -800,12 +806,23 @@ function decideBankCode(
   // `authoritative: false`), but the reason must not say "absent from our
   // reference data" when the reference data that decides this country was
   // never read.
-  const registerDown = !!national;
-  // Les clés de la carte composite qui peuvent venir de la surcouche (PL, FI,
-  // LU), chargées ni par le fichier public ni par la surcouche : la carte n'a pas
-  // été consultée pour ce pays, une absence n'y prouve rien (« non consulté »).
-  // Jamais le cas tant que le fichier public porte le pays.
-  const hasData = !curatedKeysMissing(cc) && countryHasReferenceData(cc);
+  //
+  // Même chose, depuis l'étape du retrait (25/09/2026), pour un registre PRIVÉ
+  // qui n'est pas chargé : Saint-Marin (surcouche privée) et le Luxembourg
+  // (fichier privé). Seulement quand il n'est PAS chargé : un registre partiel
+  // chargé qui ne porte pas le code n'a rien de « non consulté », il tombe comme
+  // avant jusqu'ici avec `absent_from_reference_data` (le piège documenté sur
+  // NON_EXHAUSTIVE_REGISTERS). Et le statut devient `unavailable` : la seule
+  // donnée qui tranche ce pays n'a pas été lue, la carte composite ne peut pas
+  // parler à sa place d'un code qu'elle ne porte pas.
+  const privateDown = privateRegisterNotLoaded(cc);
+  const registerDown = !!national || privateDown;
+  // Les clés de la carte composite que la surcouche apporte (PL, FI, LU), non
+  // chargées : la carte n'a pas été consultée pour ce pays, une absence n'y prouve
+  // rien. Le Luxembourg garde son registre de l'ABBL (fichier privé), mais un code
+  // qu'il ne porte pas tombait ici sur les clés de la carte : sans elles, la
+  // réponse est « non consultée » (`unavailable`), jamais « absent de nos données ».
+  const hasData = !privateDown && !curatedKeysMissing(cc) && countryHasReferenceData(cc);
   // Absent de la carte, pas de données pour le pays, registre non consulté :
   // aucune conclusion sur le détenteur.
   return withHolder('unknown', {
@@ -821,6 +838,19 @@ function decideBankCode(
     authoritative: false,
     as_of,
   });
+}
+
+/**
+ * Un registre servi depuis un fichier PRIVÉ, absent de ce déploiement : la
+ * liste saint-marinaise de la surcouche (src/lib/restricted-family.ts) ou le
+ * registre luxembourgeois (src/lib/lu-register.ts). Les registres autrichien et
+ * belge, eux aussi privés, sont dans NATIONAL_REGISTERS : leur absence est déjà
+ * « non consulté » par `registerDown`.
+ */
+function privateRegisterNotLoaded(cc: string): boolean {
+  if (cc === 'SM') return !nationalRegisterAvailable('SM');
+  if (cc === 'LU') return !luRegisterConfigured();
+  return false;
 }
 
 /**
@@ -1537,7 +1567,11 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
       sepa.bank_reachability = 'bank_code_not_allocated';
       sepa.bank_schemes = [];
     } else if (!result.bic?.code) {
-      sepa.bank_reachability = 'no_bank';
+      // Aucune banque résolue. Quand le verdict du code est lui-même
+      // `unavailable` (le registre qui la nommerait n'a pas été consulté, ou le
+      // pays n'a plus de données : étape du retrait, 25/09/2026), la joignabilité
+      // n'est pas « pas de banque » mais « non consultée » : null.
+      sepa.bank_reachability = verdict.check.status === 'unavailable' ? null : 'no_bank';
       sepa.bank_schemes = null;
     } else if (!reach?.screened) {
       // Registres EPC non chargés ou illisibles : non consulté, jamais

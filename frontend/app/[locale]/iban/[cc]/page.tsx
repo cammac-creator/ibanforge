@@ -149,7 +149,7 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
           ))}
         </ul>
         <p className="text-xs text-muted-foreground">{t("anatomyNote")}</p>
-        {national && (entry.api.bank_code_check as { status?: string } | null)?.status === "not_in_register" && (
+        {national && (entry.api?.bank_code_check as { status?: string } | null | undefined)?.status === "not_in_register" && (
           <p className="text-xs text-muted-foreground">{t("exampleNotAllocated", { register: entry.register ?? "" })}</p>
         )}
         {/* A country with register pages whose example still answers from the
@@ -189,8 +189,20 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
 
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">{tr("common.apiTitle")}</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">{tr("common.apiText")}</p>
-        <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
+        {entry.api ? (
+          <>
+            <p className="text-sm text-muted-foreground leading-relaxed">{tr("common.apiText")}</p>
+            <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
+          </>
+        ) : (
+          // A register the API serves from a private file (Austria, Belgium, San
+          // Marino, Luxembourg): its answer is not copied into this site, it is
+          // computed live. The page says so and sends the reader to the API.
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {t("examplePrivateRegister", { register: entry.register ?? "" })}{" "}
+            <Link href={localePath(locale, "/playground")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("examplePrivateRegisterLink")}</Link>
+          </p>
+        )}
       </section>
 
       <JourneyActions locale={locale} path={`/iban/${cc}`} />

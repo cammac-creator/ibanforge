@@ -392,12 +392,19 @@ describe('structural bank-code rules (LV, GI)', () => {
  * 07/09/2026 — see docs/data-sources.md, "Deux contradictions tranchées".
  */
 describe('bank_code_check — Poland and Greenland', () => {
+  // Depuis l'étape du retrait (25/09/2026), la carte composite ne porte plus
+  // aucune clé polonaise (tirées de l'annuaire de la NBP, dont les conditions ne
+  // permettent pas la redistribution) : aucune donnée ne tranche un code
+  // polonais, et la réponse le dit (`unavailable`, `no_reference_data_for_country`).
+  // La clé de contrôle du numéro de règlement, elle, est un fait de structure que
+  // rien ne retire : elle accompagne toujours le verdict.
   it('serves the eight-digit Polish settlement number with its own check-digit verdict', () => {
     // The canonical Polish example IBAN: settlement number 10901014, whose
     // eighth digit is the one NBP's algorithm produces.
     const r = check('PL61109010140000071219812874');
     expect(r.bank_code_check!.value).toBe('10901014');
-    expect(r.bank_code_check!.status).toBe('verified');
+    expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('no_reference_data_for_country');
     expect(r.bank_code_check!.authoritative).toBe(false);
     expect(r.bank_code_check!.check_digit).toEqual({
       valid: true,
@@ -408,13 +415,13 @@ describe('bank_code_check — Poland and Greenland', () => {
   it('flags a Polish settlement number NBP could not have issued, without calling it not_allocated', () => {
     // Same account, settlement number 10901015: mod-97 recomputed so the IBAN
     // itself is valid, but the eighth digit is not the check digit of the
-    // first seven. The composite map has no such code, and the check-digit
-    // block says why a caller should read that miss as a typo.
+    // first seven. No reference data decides the code, and the check-digit
+    // block says why a caller should read the IBAN as a typo.
     const r = check('PL36109010150000071219812874');
     expect(r.valid).toBe(true);
     expect(r.bank_code_check!.check_digit?.valid).toBe(false);
-    expect(r.bank_code_check!.status).toBe('not_in_register');
-    expect(r.bank_code_check!.reason).toBe('absent_from_reference_data');
+    expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('no_reference_data_for_country');
     expect(r.bank_code_check!.authoritative).toBe(false);
   });
 

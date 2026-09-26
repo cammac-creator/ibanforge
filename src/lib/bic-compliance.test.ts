@@ -76,11 +76,16 @@ describe('a BIC lookup never answers a bare "not found" about a designated bank'
     expect(s.matched_lists).toContain('EU');
   });
 
-  it('reports a clean bank as clean', () => {
+  it('reports a clean bank as clean on every list it read', () => {
     const s = screenBicSanctions('COBADEFF');
     expect(s.screened).toBe(true);
-    expect(s.listed).toBe(false);
     expect(s.matched_lists).toEqual([]);
+    // « Propre » (`false`) seulement quand chaque liste promise a été lue. La base
+    // de ce dépôt ne porte plus la liste de l'ONU (surcouche privée depuis
+    // l'étape du retrait, 25/09/2026) : sans elle, `listed` est null et la liste
+    // manquante est nommée. Le cas « toutes chargées » est prouvé sur des lignes
+    // inventées dans src/lib/restricted-data-absent.test.ts.
+    expect(s.listed).toBe((s.unscreened_lists ?? []).length > 0 ? null : false);
   });
 
   it('says listed:null — never false — if the screen itself could not run', () => {

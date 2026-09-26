@@ -62,6 +62,19 @@ function BoolMark({ on }: { on: unknown }) {
   </span>
 }
 
+/**
+ * Registre non consulté pour cette réponse (`screened: false`) : ni oui ni non.
+ * Un `false` servi sans le registre ne prouve rien (famille sous conditions,
+ * src/lib/restricted-family.ts), la ligne le dit au lieu d'afficher « Non ».
+ */
+function NotChecked() {
+  const t = useTranslations("playground.verdict")
+  return <span className="inline-flex items-center gap-1.5">
+    <Minus aria-hidden className="size-3.5" />
+    {t("notChecked")}
+  </span>
+}
+
 /** Sanctions row marker: red "sanctioned" when hit, green "clear" otherwise. */
 function SanctionMark({ hit }: { hit: unknown }) {
   const t = useTranslations("playground.verdict")
@@ -445,6 +458,9 @@ function ComplianceSections({ data, t }: SecProps) {
   const sanctions = rec(c.sanctions)
   const reach = rec(c.reachability)
   const vop = rec(c.vop)
+  // `screened: false` : registre EPC non consulté pour cette réponse.
+  const reachChecked = reach.screened !== false
+  const vopChecked = vop.screened !== false
   const meta = rec(data.meta)
   const flags = arr(c.flags).map(String)
   const level = complianceLevel(str(c.risk_level))
@@ -466,13 +482,13 @@ function ComplianceSections({ data, t }: SecProps) {
         <Row k="Lists">{arr(sanctions.matched_lists).map(String).join(", ") || "none"}</Row>
       </Section>
       <Section title={t("section.reachability")}>
-        <Row k="SEPA Instant"><BoolMark on={reach.sepa_instant} /></Row>
-        <Row k="SCT"><BoolMark on={reach.sct} /></Row>
-        <Row k="SDD"><BoolMark on={reach.sdd} /></Row>
+        <Row k="SEPA Instant">{reachChecked ? <BoolMark on={reach.sepa_instant} /> : <NotChecked />}</Row>
+        <Row k="SCT">{reachChecked ? <BoolMark on={reach.sct} /> : <NotChecked />}</Row>
+        <Row k="SDD">{reachChecked ? <BoolMark on={reach.sdd} /> : <NotChecked />}</Row>
       </Section>
       <Section title={t("section.vop")}>
-        <Row k="Participant"><BoolMark on={vop.participant} /></Row>
-        <Row k="Status">{str(vop.status)}</Row>
+        <Row k="Participant">{vopChecked ? <BoolMark on={vop.participant} /> : <NotChecked />}</Row>
+        <Row k="Status">{vopChecked ? str(vop.status) : <NotChecked />}</Row>
       </Section>
       <div className="sm:col-span-2 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-2)]/40 p-4">
         <div className="eyebrow mb-2">{t("section.scope")}</div>

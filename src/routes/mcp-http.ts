@@ -30,7 +30,15 @@ import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { createEnrichCache, enrichResult } from '../lib/enrich.js';
 import { recordFeedbackRow, FEEDBACK_ERROR_TYPES } from './feedback.js';
-import { bicCountryName, bicSourceFields, lookup, namedRow, nonEmpty } from '../lib/bic-lookup.js';
+import {
+  RESTRICTED_DIRECTORY_NOTE,
+  bicCountryName,
+  bicSourceFields,
+  lookup,
+  namedRow,
+  nonEmpty,
+  restrictedDirectoryLoaded,
+} from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
@@ -643,6 +651,11 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         // trace du BIC8 dans une liste de ce cycle : mêmes champs que REST.
         source: row?.source ?? null,
         ...bicSourceFields(row, validation.bic8!),
+        // Même phrase que GET /v1/bic/:code (étape du retrait, 25/09/2026) : sans
+        // la surcouche privée, l'absence n'a pas été cherchée dans STEP2, NBP, OeNB.
+        ...(row === null && !restrictedDirectoryLoaded()
+          ? { note: RESTRICTED_DIRECTORY_NOTE }
+          : {}),
       };
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

@@ -182,7 +182,7 @@ Den genehmigten Schlüssel mit dem `device_code` von `request_api_key` abholen. 
 
 ## Ergebnisse, die sagen, was als Nächstes zu tun ist
 
-Jedes Validierungsergebnis trägt ein geordnetes Feld `next_steps`: Was eine Zahlung blockiert, kommt zuerst, was sie nur anreichert, danach. Jeder Eintrag hat einen stabilen `code` zum Verzweigen, einen `do`-Satz, den der Agent weitergeben kann, und ein `because`, das das Antwortfeld nennt, aus dem der Rat entstand — der Rat ist prüfbar statt geglaubt. `bank_code_not_allocated` heißt Stopp; `verify_payee_name` heißt weitermachen und eine Empfängernamen-Prüfung entscheiden lassen.
+Jedes Validierungsergebnis trägt ein geordnetes Feld `next_steps`: Was eine Zahlung blockiert, kommt zuerst, was sie nur anreichert, danach. Jeder Eintrag hat einen stabilen `code` zum Verzweigen, einen `do`-Satz, den der Agent weitergeben kann, und ein `because`, das das Antwortfeld nennt, aus dem der Rat entstand — der Rat ist prüfbar statt geglaubt. `bank_code_not_allocated` heißt Stopp, ebenso `modulus_check_failed` (britischer Sort Code und Kontonummer, die kein echtes Paar sein können) und `national_check_digits_failed` (die nationale Prüfziffer in der IBAN stimmt nicht, die Kontonummer kann so, wie sie geschrieben ist, nicht vergeben worden sein); `verify_payee_name` heißt weitermachen und eine Empfängernamen-Prüfung entscheiden lassen.
 
 ## Beispielkonversation mit einem Agenten
 

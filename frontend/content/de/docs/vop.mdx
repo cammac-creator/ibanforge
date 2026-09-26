@@ -42,10 +42,12 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
     "member": true,
     "schemes": ["SCT", "SDD", "SCT_INST"],
     "vop_required": true,
-    "vop_participant": true
+    "vop_participant": null
   }
 }
 ```
+
+`vop_participant` steht auf `true`, wenn das EPC-Register die aufgelöste Bank als bereit listet, und auf `false`, wenn es sie nicht listet. Das Feld ist `null`, wenn keine Bank aufgelöst wurde oder das Register für den Aufruf nicht abgefragt wurde, wie in diesem Beispiel.
 
 Eine Schweizer Gegenpartei liefert dagegen typischerweise `"vop_required": false, "vop_participant": false` — die Schweiz ist SEPA-erreichbar, fällt aber nicht unter die IPR, und die meisten Schweizer Institute nehmen nicht am VoP-Scheme teil.
 

@@ -1,5 +1,5 @@
 {
-  "_provenance": "Real answers of the API code at revision 1115c180, produced by mounting each route alone in a Hono app (as its own tests do) against the tracked data/bic.sqlite: no network, no key. Public example IBANs and public bank codes only; the Spanish IBAN pairs the bank code of an e-money institution listed in the EBA PSD2 register with an invented account number. Regenerate them when the API changes the shape of an answer. compliance_meta_unknown is the same route answering with a copy of data/compliance.sqlite whose metadata table was emptied, the case where getComplianceMeta() serves sanctions_as_of, fatf_as_of and sources as null.",
+  "_provenance": "Real answers of the API code at revision 1115c180, produced by mounting each route alone in a Hono app (as its own tests do) against the tracked data/bic.sqlite: no network, no key. Public example IBANs and public bank codes only; the Spanish IBAN pairs the bank code of an e-money institution listed in the EBA PSD2 register with an invented account number. Regenerate them when the API changes the shape of an answer. compliance_meta_unknown is the same route answering with a copy of data/compliance.sqlite whose metadata table was emptied, the case where getComplianceMeta() serves sanctions_as_of, fatf_as_of and sources as null. On 25/09/2026 the values read from the restricted family (the EPC scheme and VoP registers, the UN list), which this public repository no longer carries, were replaced in place by the answer of the same code without them (not consulted): vop_participant null, basis country_default, reachability and vop screened false, the *_register_unavailable and sanctions_list_unavailable_un flags, meta.sources without UN and EPC. The name of the Italian example's bank, read from the EBA STEP2 list, was replaced by the spelling of the public BIC directory. Nothing else was regenerated.",
   "es_emi_iban": "ES4067020001011234567890",
   "answers": {
     "validate_de89": {
@@ -22,8 +22,8 @@
           "SCT_INST"
         ],
         "vop_required": true,
-        "vop_participant": true,
-        "basis": "epc_register"
+        "vop_participant": null,
+        "basis": "country_default"
       },
       "formatted": "DE89 3704 0044 0532 0130 00",
       "cost_usdc": 0.005,
@@ -258,14 +258,14 @@
           "SCT_INST"
         ],
         "vop_required": true,
-        "vop_participant": false,
+        "vop_participant": null,
         "basis": "country_default"
       },
       "formatted": "IT60 X054 2811 1010 0000 0123 456",
       "cost_usdc": 0.005,
       "bic": {
         "code": "BLOPIT22XXX",
-        "bank_name": "UBI BANCA SCPA",
+        "bank_name": "UBI BANCA S.P.A.",
         "city": "",
         "source": "IBANforge curated bank-code map",
         "as_of": "2026-09",
@@ -278,7 +278,7 @@
       },
       "issuer": {
         "type": "bank",
-        "name": "UBI BANCA SCPA",
+        "name": "UBI BANCA S.P.A.",
         "classification": "default"
       },
       "risk_indicators": {
@@ -380,8 +380,8 @@
               "SCT_INST"
             ],
             "vop_required": true,
-            "vop_participant": true,
-            "basis": "epc_register"
+            "vop_participant": null,
+            "basis": "country_default"
           },
           "formatted": "DE89 3704 0044 0532 0130 00",
           "cost_usdc": 0.002,
@@ -628,7 +628,7 @@
         "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
         "sanctions_as_of": "2026-09-20T08:29:02.651Z",
         "fatf_as_of": "2026-06",
-        "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+        "sources": "EU,OFAC,FATF",
         "country_risk_as_of": "2026-07",
         "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
       },
@@ -670,7 +670,7 @@
         "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
         "sanctions_as_of": "2026-09-20T08:29:02.651Z",
         "fatf_as_of": "2026-06",
-        "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+        "sources": "EU,OFAC,FATF",
         "country_risk_as_of": "2026-07",
         "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
       },
@@ -757,7 +757,7 @@
         "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
         "sanctions_as_of": "2026-09-20T08:29:02.651Z",
         "fatf_as_of": "2026-06",
-        "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+        "sources": "EU,OFAC,FATF",
         "country_risk_as_of": "2026-07",
         "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
       },
@@ -920,8 +920,8 @@
           "SCT_INST"
         ],
         "vop_required": true,
-        "vop_participant": true,
-        "basis": "epc_register"
+        "vop_participant": null,
+        "basis": "country_default"
       },
       "formatted": "DE89 3704 0044 0532 0130 00",
       "cost_usdc": 0.02,
@@ -1006,19 +1006,23 @@
           "bank_screened": true
         },
         "reachability": {
-          "sepa_instant": true,
-          "sct": true,
-          "sdd": true,
-          "screened": true
+          "sepa_instant": false,
+          "sct": false,
+          "sdd": false,
+          "screened": false
         },
         "vop": {
-          "participant": true,
-          "status": "active",
-          "screened": true
+          "participant": false,
+          "status": "not_found",
+          "screened": false
         },
         "risk_score": 0,
         "risk_level": "low",
-        "flags": []
+        "flags": [
+          "sepa_register_unavailable",
+          "vop_register_unavailable",
+          "sanctions_list_unavailable_un"
+        ]
       },
       "meta": {
         "scope": "bank_bic_only",

@@ -80,16 +80,16 @@ const EXPECTED_PATH: Record<(typeof PAGES_WITH_OWN_ALTERNATES)[number], string> 
   "iban/page.tsx": '"/iban"',
   "iban/[cc]/page.tsx": "`/iban/${cc}`",
   "at/page.tsx": '"/at"',
-  "at/[code]/page.tsx": "`/at/${r.code}`",
+  "at/[code]/page.tsx": "`/at/${entry.code}`",
   "be/page.tsx": '"/be"',
-  // Belgium canonicalises onto the first code of the block the NBB allocated to
-  // the institution, so its own path is not the code in the URL. That is the
-  // whole reason this map is written out by hand rather than derived.
-  "be/[code]/page.tsx": "`/be/${r.canonical}`",
+  // Belgium canonicalised onto the first code of the block the NBB allocated to
+  // the institution. Depuis le retrait (25/09/2026), la page lit un seul code à
+  // l'API et ne connaît plus les blocs : elle nomme son propre code.
+  "be/[code]/page.tsx": "`/be/${entry.code}`",
   "sk/page.tsx": '"/sk"',
   "sk/[code]/page.tsx": "`/sk/${r.code}`",
   "sm/page.tsx": '"/sm"',
-  "sm/[code]/page.tsx": "`/sm/${r.code}`",
+  "sm/[code]/page.tsx": "`/sm/${entry.code}`",
   "it/page.tsx": '"/it"',
   "it/[code]/page.tsx": "`/it/${r.code}`",
 };

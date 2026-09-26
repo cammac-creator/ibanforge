@@ -438,6 +438,20 @@ describe('the truth fields are in the contract', () => {
     expect(v.checks.description).toMatch(/FR and MC \(RIB key\)/);
   });
 
+  it('names the blocking next steps, the failed national key included (26/09/2026)', () => {
+    // La liste servie oubliait modulus_check_failed ; `next-steps.test.ts` tient
+    // désormais chaque code émis, ce test tient ce que le contrat publie.
+    const code = schemas.IBANValidationResult.properties!.next_steps.items!.properties!.code;
+    for (const blocking of [
+      'bank_code_not_allocated',
+      'modulus_check_failed',
+      'national_check_digits_failed',
+    ]) {
+      expect(code.description, blocking).toContain(blocking);
+    }
+    expect(code.description).not.toContain('—');
+  });
+
   it('declares the bank grain of sepa and the trace of the bic block', () => {
     const v = schemas.IBANValidationResult.properties!;
     const sepa = v.sepa.properties!;

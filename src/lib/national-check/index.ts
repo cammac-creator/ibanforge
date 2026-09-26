@@ -17,7 +17,10 @@ export { NATIONAL_CHECK_STATUSES } from './types.js';
  * `national_check_digits`, sur tout IBAN valide de ces pays, et
  * `checks.national_check_digits` reprend son statut (`src/lib/checks.ts`).
  * Strictement additif : ni `valid`, ni `bank_code_holder`, ni le score de
- * risque, ni `next_steps` ne le lisent.
+ * risque ne le lisent. Depuis le 26/09/2026, `next_steps` le lit, sur `fail`
+ * seulement : l'étape bloquante `national_check_digits_failed`
+ * (`src/lib/next-steps.ts`), et l'audit de fichier en fait un constat bloquant
+ * (`src/lib/audit-file.ts`).
  *
  * ## Ce que la fonction attend
  *

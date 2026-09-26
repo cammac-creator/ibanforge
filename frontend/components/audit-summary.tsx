@@ -177,6 +177,7 @@ const KNOWN = new Set([
   "iban_invalid",
   "bank_code_not_allocated",
   "modulus_check_failed",
+  "national_check_digits_failed",
   "sepa_not_reachable",
   "test_bic",
   "bic_mismatch",

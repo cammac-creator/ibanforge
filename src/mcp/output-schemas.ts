@@ -492,6 +492,12 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .boolean()
     .optional()
     .describe('True only when the row names an institution: a record is complete or not found.'),
+  note: z
+    .string()
+    .optional()
+    .describe(
+      'Present only when found is false and the part of the directory served from a private file (EBA STEP2, NBP and OeNB records) is not loaded on this deployment: the absence was not looked up there.',
+    ),
   institution: z.string().nullable().optional().describe('Bank legal name.'),
   country_code: z
     .string()

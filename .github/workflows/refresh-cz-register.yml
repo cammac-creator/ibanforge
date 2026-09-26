@@ -23,6 +23,11 @@ name: Refresh the Czech bank-code register (ČNB)
 # The ČNB's terms allow reproducing its information with "Zdroj: ČNB"; that
 # credit travels in the rows themselves, and the run logs (public, like the
 # repository) carry only the edition number, its date and public URLs.
+#
+# Czechia is public data, outside the restricted family (src/lib/restricted-family.ts).
+# The seeder runs without SEED_FAMILY, i.e. public sources only, and the test
+# suite (src/lib/public-base-family-free.test.ts) refuses a database that would
+# carry a row of that family before anything is committed.
 
 on:
   schedule:

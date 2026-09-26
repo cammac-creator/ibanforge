@@ -29,7 +29,15 @@ describe('data/countries.json', () => {
     expect(entry.example.length).toBe(entry.length);
     expect(entry.example.slice(0, 2)).toBe(cc);
     expect(mod97(entry.example)).toBe(1);
-    expect(entry.api.valid).toBe(true);
+    // A register the API serves from a private file prints no exported answer
+    // (withdrawal step, 25/09/2026): it names the register instead.
+    if (entry.private_register) {
+      expect(entry.api).toBeNull();
+      expect(entry.register).toBeTruthy();
+      expect(['authoritative', 'partial']).toContain(entry.register_basis);
+    } else {
+      expect(entry.api?.valid).toBe(true);
+    }
     // Ordered, never overlapping, inside the IBAN. Not necessarily tiling it:
     // fourteen countries keep national check digits, a currency code or an
     // account type between or after the three fields (IT's CIN, BE's last
@@ -43,6 +51,25 @@ describe('data/countries.json', () => {
     }
     expect(entry.fields.map((f) => f.name)).toContain('bank_code');
     expect(entry.fields.map((f) => f.name)).toContain('account_number');
+  });
+
+  it('copies no EPC-derived field into the exported answers', () => {
+    // The bank-level SEPA fields come from the EPC scheme and VoP registers,
+    // restricted since the withdrawal step: the file keeps the country's facts.
+    for (const cc of allCountryCodes()) {
+      const sepa = (getCountry(cc)!.api?.sepa ?? {}) as Record<string, unknown>;
+      expect(Object.keys(sepa).sort(), cc).toEqual(
+        Object.keys(sepa).length ? ['member', 'vop_required'] : [],
+      );
+    }
+  });
+
+  it('names the private registers without copying their answer', () => {
+    for (const cc of ['AT', 'BE', 'SM', 'LU']) {
+      const entry = getCountry(cc)!;
+      expect(entry.private_register, cc).toBe(true);
+      expect(entry.api, cc).toBeNull();
+    }
   });
 
   it('refuses what is not a two-letter code', () => {
