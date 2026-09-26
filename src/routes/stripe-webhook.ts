@@ -446,7 +446,7 @@ function reversalAnswer(
       alert: {
         key: `stripe:refund-partial:${p.id}:${sessionTag(event.id)}`,
         detail:
-          `Remboursement PARTIEL chez Stripe d’un pack déjà repris par un litige encore ouvert (achat ${p.id}, ` +
+          `Remboursement PARTIEL chez Stripe d’un pack déjà repris par un litige (achat ${p.id}, ` +
           `clé ${p.key_prefix}…) : rien de plus n’a été repris. Une part de l’argent est repartie : si le ` +
           'litige se referme sans perte, ses crédits ne seront PAS rendus d’eux-mêmes. À décider à la main.',
       },
@@ -633,10 +633,12 @@ function disputeClosedAnswer(
     // Rien n'est écrit. On ne dit quelque chose que d'un pack encore repris.
     if (p.kind !== 'pack' || p.outcome !== 'disputed') return { status: 200, body };
     if (closure.ownDispute && disputeStatus === 'lost') {
+      const later = p.reinstate_blocked
+        ? 'Le rendu automatique est bloqué : s’il est gagné plus tard, à décider à la main.'
+        : 'Si Stripe annonce plus tard qu’il est gagné, ils seront rendus d’eux-mêmes.';
       return alert(
         `Litige perdu chez Stripe sur l’achat ${p.id} (clé ${p.key_prefix}…) : l’argent est reparti au ` +
-          `payeur, les ${taken} crédits repris le restent. Rien à faire ; s’il est gagné plus tard, ` +
-          'ils seront rendus d’eux-mêmes.',
+          `payeur, les ${taken} crédits repris le restent. Rien à faire. ${later}`,
       );
     }
     return alert(
@@ -674,9 +676,15 @@ function disputeClosedAnswer(
     );
   }
   if (out.status === 'other_dispute') {
+    // Une reprise sans litige enregistré (faite par la route d'administration)
+    // n'est pas forcément celle d'un autre litige : ne pas l'affirmer.
     return alert(
-      `Litige refermé sans perte chez Stripe (${shown}) sur l’achat ${p.id} (clé ${p.key_prefix}…), ` +
-        'mais ce n’est pas le litige qui avait repris les crédits : rien n’a été rendu. À relire.',
+      p.dispute_id === null
+        ? `Litige refermé sans perte chez Stripe (${shown}) sur l’achat ${p.id} (clé ${p.key_prefix}…), ` +
+            'dont la reprise ne porte aucun litige enregistré (faite à la main) : rien n’a été rendu. ' +
+            `Vérifier dans Stripe ; s’il n’y a qu’un litige, rendre les ${taken} crédits à la main.`
+        : `Litige refermé sans perte chez Stripe (${shown}) sur l’achat ${p.id} (clé ${p.key_prefix}…), ` +
+            'mais ce n’est pas le litige qui avait repris les crédits : rien n’a été rendu. À relire.',
     );
   }
   // `unchanged` (déjà rendu, remboursé entre-temps, jamais repris) ou

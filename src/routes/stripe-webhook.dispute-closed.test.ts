@@ -12,7 +12,12 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import Stripe from 'stripe';
 import { processStripeEvent, resetStripeClient } from './stripe-webhook.js';
 import { generateApiKey, revokeApiKey, rotateApiKey, validateApiKey } from '../lib/api-keys.js';
-import { ensureTopupRef, findPurchaseByRef, type PurchaseRow } from '../lib/key-purchases.js';
+import {
+  clawbackPurchase,
+  ensureTopupRef,
+  findPurchaseByRef,
+  type PurchaseRow,
+} from '../lib/key-purchases.js';
 import { serviceContact } from '../lib/quota-notice.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 
@@ -354,7 +359,37 @@ describe('litige refermé sans rendu', () => {
     expect(purchase).toMatchObject({ outcome: 'disputed', clawback_credits: 1000 });
     expect(creditsOf(key.key_hash).remaining).toBe(0);
     expect(result.alert?.detail).toContain('reparti au payeur');
+    // Le gain tardif n'est promis que si Stripe l'annonce.
+    expect(result.alert?.detail).toContain('Si Stripe annonce plus tard');
     expect(result.alert?.detail).not.toContain('@');
+  });
+
+  it('un litige perdu sur un rendu bloqué ne promet aucun rendu', () => {
+    const { paymentIntent } = rechargedFreeKey('lost_blocked');
+    const d = disputeOn(paymentIntent);
+    d.open('warning_needs_response');
+    processStripeEvent(refundEvent(paymentIntent, 100));
+    const result = d.close('lost');
+    expect(result.body.dispute_closed).toMatchObject({ outcome: 'kept' });
+    expect(result.alert?.detail).toContain('bloqué');
+    expect(result.alert?.detail).not.toContain('Si Stripe annonce plus tard');
+  });
+
+  it('une reprise faite à la main, sans litige enregistré : rien rendu, et l’alerte ne l’impute à aucun autre litige', () => {
+    const { key, sessionId, paymentIntent } = rechargedFreeKey('manual_clawback');
+    expect(clawbackPurchase(purchaseOf(sessionId).id, 'disputed')).toMatchObject({
+      status: 'clawed_back',
+      removed: 1000,
+    });
+    expect(purchaseOf(sessionId)).toMatchObject({ outcome: 'disputed', dispute_id: null });
+    const result = disputeOn(paymentIntent).close('won');
+    expect(result.body.dispute_closed).toMatchObject({
+      outcome: 'other_dispute',
+      restored_credits: 0,
+    });
+    expect(creditsOf(key.key_hash).remaining).toBe(0);
+    expect(result.alert?.detail).toContain('aucun litige enregistré');
+    expect(result.alert?.detail).not.toContain('ce n’est pas le litige');
   });
 
   it('prevented, ou un statut inconnu : rien rendu, et l’alerte demande de relire sans rien affirmer', () => {
@@ -414,6 +449,7 @@ describe('litige refermé sans rendu', () => {
       removed_credits: 0,
     });
     expect(partial.alert?.detail).toContain('ne seront PAS rendus');
+    expect(partial.alert?.detail).not.toContain('encore ouvert');
     expect(purchaseOf(sessionId)).toMatchObject({
       outcome: 'disputed',
       reinstate_blocked: 'partial_refund',

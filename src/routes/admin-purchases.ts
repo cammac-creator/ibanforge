@@ -71,6 +71,10 @@ function publicRow(row: PurchaseRow): Record<string, unknown> {
     auth_nonce: row.auth_nonce,
     tx_hash: row.tx_hash,
     clawback_credits: row.clawback_credits,
+    // Le litige qui a repris les crédits, et ce qui bloque leur rendu
+    // automatique (26.09.2026) : de quoi décider d'un rendu à la main.
+    dispute_id: row.dispute_id,
+    reinstate_blocked: row.reinstate_blocked,
     backfilled: row.backfilled === 1,
     created_at: row.created_at,
     settled_at: row.settled_at,
