@@ -6,10 +6,12 @@
  *
  * 1. Le bloc `national_check_digits` est servi tel quel sur un IBAN valide des
  *    six pays, et `checks.national_check_digits` en reprend le statut.
- * 2. Strictement additif : une clé nationale faussée (chiffres ISO recalculés,
- *    donc toujours `valid: true`) ne change ni `bank_code_holder`, ni
- *    `bank_code_check`, ni `next_steps`, ni le score de risque. Le témoin est
- *    le même compte avec la bonne clé, même code banque.
+ * 2. Une clé nationale faussée (chiffres ISO recalculés, donc toujours
+ *    `valid: true`) ne change ni `bank_code_holder`, ni `bank_code_check`, ni le
+ *    score de risque. Depuis le 26/09/2026, `next_steps` gagne exactement une
+ *    étape, `national_check_digits_failed`, à son rang (après les étapes
+ *    bloquantes du code banque et du contrôle britannique), et rien d'autre.
+ *    Le témoin est le même compte avec la bonne clé, même code banque.
  * 3. Aucun bloc ailleurs, aucun sur un IBAN invalide.
  * 4. Sur un IBAN valide, le statut n'est jamais `not_applicable` : iban-core
  *    refuse d'abord tout BBAN qui n'a pas la forme nationale.
@@ -67,6 +69,16 @@ function withWrongKey(iban: string): string {
 
 const EXAMPLES = NATIONAL_CHECK_COUNTRIES.map((cc) => EXAMPLE_IBANS[cc] as string);
 
+const STEP = 'national_check_digits_failed';
+/** Les étapes que `nextSteps` place AVANT celle de la clé nationale. */
+const BLOCKING_BEFORE = new Set([
+  'bank_code_not_allocated',
+  'verify_payee_name',
+  'modulus_check_failed',
+]);
+const hasStep = (r: { next_steps?: Array<{ code: string }> }) =>
+  (r.next_steps ?? []).some((s) => s.code === STEP);
+
 describe('the national_check_digits block, served on every validation path', () => {
   it.each(EXAMPLES)('%s: the registry example passes, block and checks agree', (iban) => {
     const r = enriched(iban);
@@ -80,55 +92,76 @@ describe('the national_check_digits block, served on every validation path', () 
     expect(r.checks?.national_check_digits).toBe('pass');
   });
 
-  it.each(EXAMPLES)('%s: a wrong national key fails, and nothing else moves', (example) => {
-    const good = enriched(example);
-    const badIban = withWrongKey(example);
-    const bad = enriched(badIban);
+  it.each(EXAMPLES)(
+    '%s: a wrong national key fails, next_steps gains the blocking step, nothing else moves',
+    (example) => {
+      const cc = example.slice(0, 2);
+      const good = enriched(example);
+      const badIban = withWrongKey(example);
+      const bad = enriched(badIban);
 
-    expect(bad.valid, badIban).toBe(true);
-    expect(bad.national_check_digits?.status).toBe('fail');
-    expect(bad.national_check_digits?.detail).toMatch(/cannot have been issued as written/);
-    expect(bad.checks?.national_check_digits).toBe('fail');
+      expect(bad.valid, badIban).toBe(true);
+      expect(bad.national_check_digits?.status).toBe('fail');
+      expect(bad.national_check_digits?.detail).toMatch(/cannot have been issued as written/);
+      expect(bad.checks?.national_check_digits).toBe('fail');
 
-    // Même code banque, même compte hors clé : tout le reste est identique.
-    for (const field of [
-      'bank_code_holder',
-      'bank_code_check',
-      'bic',
-      'sepa',
-      'issuer',
-      'risk_indicators',
-      'official_identity',
-      'psd_registration',
-      'next_steps',
-    ] as const) {
-      expect(bad[field], `${badIban} ${field}`).toEqual(good[field]);
-    }
-    expect({ ...bad.checks, national_check_digits: 'x' }).toEqual({
-      ...good.checks,
-      national_check_digits: 'x',
-    });
-    // Aucune étape nouvelle (décision du 24/09/2026 : ajout strictement additif) ;
-    // l'égalité ci-dessus le prouve déjà, ce test le dit en clair.
-    for (const step of bad.next_steps ?? []) {
-      expect(step.code, badIban).not.toMatch(/national_check|check_digits/);
-    }
+      // Même code banque, même compte hors clé : tout le reste est identique.
+      for (const field of [
+        'bank_code_holder',
+        'bank_code_check',
+        'bic',
+        'sepa',
+        'issuer',
+        'risk_indicators',
+        'official_identity',
+        'psd_registration',
+      ] as const) {
+        expect(bad[field], `${badIban} ${field}`).toEqual(good[field]);
+      }
+      expect({ ...bad.checks, national_check_digits: 'x' }).toEqual({
+        ...good.checks,
+        national_check_digits: 'x',
+      });
 
-    const goodCompliance = buildComplianceResponse(example);
-    const badCompliance = buildComplianceResponse(badIban);
-    if (!('compliance' in goodCompliance) || !('compliance' in badCompliance)) {
-      throw new Error('compliance answer expected');
-    }
-    expect(badCompliance.compliance, badIban).toEqual(goodCompliance.compliance);
-    expect(badCompliance.national_check_digits?.status).toBe('fail');
-    expect(badCompliance.checks?.national_check_digits).toBe('fail');
-  });
+      // next_steps (26/09/2026) : exactement une étape de plus, bloquante, qui nomme
+      // le champ et l'algorithme, placée après les étapes bloquantes du code banque ;
+      // les autres étapes sont celles du témoin, dans le même ordre.
+      expect(hasStep(good), example).toBe(false);
+      const extra = (bad.next_steps ?? []).filter((s) => s.code === STEP);
+      expect(extra, badIban).toHaveLength(1);
+      expect(extra[0]!.because).toBe(
+        `national_check_digits.status is fail (${NATIONAL_CHECK_SCHEMES[cc]})`,
+      );
+      expect(extra[0]!.do).toMatch(/^Do not send\. /);
+      expect(
+        (bad.next_steps ?? []).filter((s) => s.code !== STEP),
+        badIban,
+      ).toEqual(good.next_steps ?? []);
+      const rank = (good.next_steps ?? []).filter((s) => BLOCKING_BEFORE.has(s.code)).length;
+      expect(
+        (bad.next_steps ?? []).findIndex((s) => s.code === STEP),
+        badIban,
+      ).toBe(rank);
+
+      const goodCompliance = buildComplianceResponse(example);
+      const badCompliance = buildComplianceResponse(badIban);
+      if (!('compliance' in goodCompliance) || !('compliance' in badCompliance)) {
+        throw new Error('compliance answer expected');
+      }
+      expect(badCompliance.compliance, badIban).toEqual(goodCompliance.compliance);
+      expect(badCompliance.national_check_digits?.status).toBe('fail');
+      expect(badCompliance.checks?.national_check_digits).toBe('fail');
+      expect(badCompliance.next_steps, badIban).toEqual(bad.next_steps);
+      expect(hasStep(goodCompliance), example).toBe(false);
+    },
+  );
 
   it('serves no block where no algorithm is coded, and none on an invalid IBAN', () => {
     for (const cc of ['DE', 'CH', 'AT', 'NL', 'PL', 'LI', 'LU', 'PT', 'GB']) {
       const r = enriched(EXAMPLE_IBANS[cc] as string);
       expect(r.valid, cc).toBe(true);
       expect(r, cc).not.toHaveProperty('national_check_digits');
+      expect(hasStep(r), cc).toBe(false);
       if (cc === 'GB') {
         // Toujours dérivé de modulus_check, présent ou non selon la table chargée.
         const m = r.modulus_check;
@@ -149,6 +182,7 @@ describe('the national_check_digits block, served on every validation path', () 
       expect(r.valid, iban).toBe(false);
       expect(r, iban).not.toHaveProperty('national_check_digits');
       expect(r, iban).not.toHaveProperty('checks');
+      expect(hasStep(r), iban).toBe(false);
     }
   });
 });
@@ -189,11 +223,13 @@ describe('a valid IBAN never gets not_applicable', () => {
   );
 
   it.each(NATIONAL_CHECK_COUNTRIES)(
-    '%s: through the enrichment, the block and checks never disagree',
+    '%s: through the enrichment, the block, checks and next_steps never disagree',
     (cc) => {
       for (let i = 0; i < 25; i++) {
         const r = enriched(iso(cc, randomBban(BBAN_SPECS[cc] as string)));
         expect(r.national_check_digits?.status).toBe(r.checks?.national_check_digits);
+        // L'étape bloquante si et seulement si la clé échoue (26/09/2026).
+        expect(hasStep(r), r.iban).toBe(r.national_check_digits?.status === 'fail');
       }
     },
   );
