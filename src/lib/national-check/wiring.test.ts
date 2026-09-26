@@ -10,7 +10,8 @@
  *    `valid: true`) ne change ni `bank_code_holder`, ni `bank_code_check`, ni le
  *    score de risque. Depuis le 26/09/2026, `next_steps` gagne exactement une
  *    étape, `national_check_digits_failed`, à son rang (après les étapes
- *    bloquantes du code banque et du contrôle britannique), et rien d'autre.
+ *    bloquantes du code banque et du contrôle britannique), et perd les étapes
+ *    d'offre, qui ne suivent jamais un « Do not send ». Rien d'autre ne bouge.
  *    Le témoin est le même compte avec la bonne clé, même code banque.
  * 3. Aucun bloc ailleurs, aucun sur un IBAN invalide.
  * 4. Sur un IBAN valide, le statut n'est jamais `not_applicable` : iban-core
@@ -70,6 +71,8 @@ function withWrongKey(iban: string): string {
 const EXAMPLES = NATIONAL_CHECK_COUNTRIES.map((cc) => EXAMPLE_IBANS[cc] as string);
 
 const STEP = 'national_check_digits_failed';
+/** Les étapes d'offre, retirées après un « Do not send » (26/09/2026). */
+const OFFERS = new Set(['screen_compliance', 'generate_payment_qr']);
 /** Les étapes que `nextSteps` place AVANT celle de la clé nationale. */
 const BLOCKING_BEFORE = new Set([
   'bank_code_not_allocated',
@@ -125,7 +128,8 @@ describe('the national_check_digits block, served on every validation path', () 
 
       // next_steps (26/09/2026) : exactement une étape de plus, bloquante, qui nomme
       // le champ et l'algorithme, placée après les étapes bloquantes du code banque ;
-      // les autres étapes sont celles du témoin, dans le même ordre.
+      // les autres étapes sont celles du témoin, dans le même ordre, moins les
+      // étapes d'offre (criblage, QR de paiement).
       expect(hasStep(good), example).toBe(false);
       const extra = (bad.next_steps ?? []).filter((s) => s.code === STEP);
       expect(extra, badIban).toHaveLength(1);
@@ -136,7 +140,7 @@ describe('the national_check_digits block, served on every validation path', () 
       expect(
         (bad.next_steps ?? []).filter((s) => s.code !== STEP),
         badIban,
-      ).toEqual(good.next_steps ?? []);
+      ).toEqual((good.next_steps ?? []).filter((s) => !OFFERS.has(s.code)));
       const rank = (good.next_steps ?? []).filter((s) => BLOCKING_BEFORE.has(s.code)).length;
       expect(
         (bad.next_steps ?? []).findIndex((s) => s.code === STEP),

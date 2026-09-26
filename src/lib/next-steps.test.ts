@@ -250,7 +250,9 @@ describe('national_check_digits_failed', () => {
     expect(codesOf(r)).toEqual(['modulus_check_failed', 'national_check_digits_failed']);
   });
 
-  it('comes before every step that does not block, and removes none of them', () => {
+  it('comes before every step that does not block, keeps them, and withholds the offers', () => {
+    // Le criblage (`screen_compliance`) suivait le « Do not send » jusqu'au
+    // 26/09/2026 : plus rien à offrir sur un compte qui ne peut pas exister.
     const r = base({
       bank_code_check: {
         ...verified,
@@ -282,8 +284,32 @@ describe('national_check_digits_failed', () => {
       'test_bic',
       'expect_virtual_iban',
       'issuer_not_a_known_iban_issuer',
-      'screen_compliance',
     ]);
+  });
+
+  describe('no offer after a step that says do not send', () => {
+    afterEach(() => {
+      delete process.env.PARTNER_PAYQR;
+    });
+    const modulusFailed = {
+      checked: true,
+      passed: false,
+      source: 'Vocalink modulus weight table',
+      table_fetched_on: '2026-09-01',
+    };
+
+    it.each([
+      ['a wrong national key', { national_check_digits: national('fail') }],
+      ['a failed UK modulus check', { modulus_check: modulusFailed }],
+    ] as const)('%s: neither screening nor a payment QR', (_label, blocking) => {
+      process.env.PARTNER_PAYQR = '1';
+      const around = base({ bank_code_check: verified });
+      // Le témoin : le même résultat sans le blocage porte bien les deux offres.
+      expect(codesOf(around)).toEqual(['screen_compliance', 'generate_payment_qr']);
+      const codes = codesOf({ ...around, ...blocking });
+      expect(codes).toHaveLength(1);
+      expect(codes[0]).toMatch(/_failed$/);
+    });
   });
 
   it('never fires on an IBAN that failed validation', () => {
