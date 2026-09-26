@@ -52,6 +52,9 @@ merged. Same for `package-lock.json`: never commit a rewrite that changes no dep
 **7. Never deploy, publish, or touch infrastructure.** No `vercel`, no `railway`, no
 `npm publish`, no `gh release`, no DNS. Releases follow `RELEASING.md` and are run by a
 human. Never print a secret; the repository holds none, and none should ever enter it.
+Vercel does not build `codex/**` branches (`frontend/vercel.json`, 26.09.2026, to cut build
+costs): your pull request gets no preview deployment. Check the site locally (`next build`,
+`next start`); what goes online is proven after publication.
 
 **8. No `Intl`, `toLocaleString` or `toLocaleDateString` in a client component.** WebKit
 formats differently from Node, React blows up on the hydration mismatch and wipes the
