@@ -53,7 +53,7 @@
       "countries": "IBAN by country"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monthly · OFAC · UN · EU · EPC — weekly"
+    "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-09) — monthly · OFAC · UN · EU · EPC — weekly"
   },
   "home": {
     "metadata": {
@@ -175,7 +175,7 @@
     },
     "trust": {
       "dataLabel": "Data sources",
-      "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP · Bank of England (List of Banks, 2026-08)",
+      "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP · Bank of England (List of Banks, 2026-09)",
       "dataNote": "Refreshed monthly",
       "dataNoteDated": "Refreshed monthly · last refresh {date}",
       "sanctionsLabel": "Sanctions screening",

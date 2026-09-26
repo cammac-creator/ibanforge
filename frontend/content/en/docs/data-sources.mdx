@@ -60,7 +60,7 @@ The Netherlands additionally checks the Betaalvereniging list of IBAN-issuing pr
 
 ## United Kingdom — PRA deposit-taking authorisation
 
-Source: **Bank of England (List of Banks, 2026-08)**, the monthly list of firms the Prudential Regulation Authority authorises to accept deposits. Used with the Bank of England's written permission, whose condition is attribution to the Bank **together with the month of the list** — which is why every `pra_authorisation` block carries `list_month`, read from the loaded data rather than written by hand.
+Source: **Bank of England (List of Banks, 2026-09)**, the monthly list of firms the Prudential Regulation Authority authorises to accept deposits. Used with the Bank of England's written permission, whose condition is attribution to the Bank **together with the month of the list** — which is why every `pra_authorisation` block carries `list_month`, read from the loaded data rather than written by hand.
 
 This is deliberately **not** in the register table above. It is a list of authorised firms (name, FRN, LEI), not an allocation of bank codes, so it can never make a GB bank code `authoritative: true`. What it answers is a different question: is the institution behind this IBAN one the PRA lets take deposits?
 
