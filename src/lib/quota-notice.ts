@@ -8,7 +8,7 @@ import {
 } from './api-keys.js';
 import { sendCreditsWarningEmail, sendQuotaWarningEmail } from './email.js';
 import { isUnroutableEmail } from './disposable-domains.js';
-import { ensureTopupRef, keyHasPurchase } from './key-purchases.js';
+import { ensureTopupRef, keyHasPurchase, SALE_OUTCOMES_SQL } from './key-purchases.js';
 import { getStatsDB } from './db.js';
 import { ANONYMOUS_CONTACT, CREDITS_NOTICE_RATIO } from './tiers.js';
 
@@ -78,7 +78,7 @@ export function serviceContact(keyHash: string, keyEmail: string | undefined): s
            JOIN api_keys k ON COALESCE(k.lineage_hash, k.key_hash) = p.lineage_hash
           WHERE k.key_hash = ? AND p.payer_email IS NOT NULL
             AND p.rail = 'card'
-            AND p.outcome IN ('credited', 'minted', 'minted_fallback')
+            AND p.outcome IN ${SALE_OUTCOMES_SQL}
           ORDER BY p.id DESC LIMIT 1`,
       )
       .get(keyHash) as { payer_email: string } | undefined;

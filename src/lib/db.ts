@@ -1944,7 +1944,7 @@ function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
     -- Une ligne par paiement. Pas de contre-apostrophe ni de point
     -- d'interrogation dans ces commentaires : ils vivent dans un gabarit JS.
     -- outcome : pending, credited, minted, minted_fallback, attached, failed,
-    -- refunded, disputed. Le montant vient du processeur, jamais d'un tarif.
+    -- refunded, disputed, reinstated. Le montant vient du processeur, jamais d'un tarif.
     CREATE TABLE IF NOT EXISTS key_purchases (
       id                     INTEGER PRIMARY KEY AUTOINCREMENT,
       payment_ref            TEXT    NOT NULL UNIQUE,
@@ -1985,7 +1985,11 @@ function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
       -- le nonce de l'autorisation, le hash de transaction. Jamais la signature.
       payer_address          TEXT,
       auth_nonce             TEXT,
-      tx_hash                TEXT
+      tx_hash                TEXT,
+      -- Le litige Stripe qui a repris les credits, et ce qui bloque leur rendu
+      -- automatique a sa fermeture (second_dispute, partial_refund).
+      dispute_id             TEXT,
+      reinstate_blocked      TEXT
     );
     -- Une référence de recharge par lignée, tirée au hasard, jamais dérivée
     -- de la clé.
@@ -2009,7 +2013,9 @@ function migrateKeyPurchases(statsDB: DatabaseType.Database): void {
   const purchaseCols = (
     statsDB.prepare('PRAGMA table_info(key_purchases)').all() as Array<{ name: string }>
   ).map((r) => r.name);
-  for (const col of ['payer_address', 'auth_nonce', 'tx_hash']) {
+  // Le litige qui a repris les crédits et le blocage de leur rendu (26.09.2026,
+  // rendu après un litige refermé sans perte), eux aussi en queue.
+  for (const col of ['payer_address', 'auth_nonce', 'tx_hash', 'dispute_id', 'reinstate_blocked']) {
     if (!purchaseCols.includes(col)) {
       statsDB.exec(`ALTER TABLE key_purchases ADD COLUMN ${col} TEXT`);
     }

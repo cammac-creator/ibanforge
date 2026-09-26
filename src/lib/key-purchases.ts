@@ -43,6 +43,7 @@ import {
   generateStripeKey,
   hasActiveSubscription,
   ownAllowanceDefault,
+  reinstateCreditsInTx,
   type AllowancePhoto,
 } from './api-keys.js';
 import { ANONYMOUS_MONTHLY_LIMIT, type KeyTier } from './tiers.js';
@@ -61,17 +62,20 @@ export type PurchaseOutcome =
   | 'attached'
   | 'failed'
   | 'refunded'
-  | 'disputed';
+  | 'disputed'
+  | 'reinstated';
 
 /**
  * Les issues qui font d'une ligne une VENTE d'un pack : l'argent est arrivé et
  * les crédits sont sur une clé. `pending` et `failed` n'en sont pas, un pack
- * remboursé ou disputé non plus. Fragment SQL, à mettre derrière `outcome IN`.
+ * remboursé ou disputé non plus. `reinstated` en est une : un pack disputé dont
+ * le litige s'est refermé sans perte, ses crédits rendus (décision de
+ * Claude-Alain du 26.09.2026). Fragment SQL, à mettre derrière `outcome IN`.
  */
-export const SALE_OUTCOMES_SQL = "('credited', 'minted', 'minted_fallback')";
+export const SALE_OUTCOMES_SQL = "('credited', 'minted', 'minted_fallback', 'reinstated')";
 
 /** Les issues qui disent qu'une lignée a payé au moins une fois. */
-const PAID_OUTCOMES_SQL = "('credited', 'minted', 'minted_fallback', 'attached')";
+const PAID_OUTCOMES_SQL = "('credited', 'minted', 'minted_fallback', 'reinstated', 'attached')";
 
 export interface PurchaseRow {
   id: number;
@@ -108,11 +112,25 @@ export interface PurchaseRow {
   auth_nonce: string | null;
   /** Le hash de transaction rendu par le facilitateur, réglé ou diffusé. */
   tx_hash: string | null;
+  /** Le litige Stripe qui a repris les crédits (26.09.2026) ; NULL sinon. */
+  dispute_id: string | null;
+  /**
+   * Pourquoi la fermeture sans perte de ce litige ne rendra PAS les crédits
+   * d'elle-même : `second_dispute` (un autre litige ouvert sur le même paiement
+   * pendant celui-ci) ou `partial_refund` (un remboursement partiel pendant le
+   * litige). NULL : le rendu automatique reste possible.
+   */
+  reinstate_blocked: string | null;
 }
 
 /** Une ligne dont l'argent est arrivé et les crédits sont sur une clé. */
 export function isSaleOutcome(outcome: PurchaseOutcome): boolean {
-  return outcome === 'credited' || outcome === 'minted' || outcome === 'minted_fallback';
+  return (
+    outcome === 'credited' ||
+    outcome === 'minted' ||
+    outcome === 'minted_fallback' ||
+    outcome === 'reinstated'
+  );
 }
 
 // ─── La lignée et la référence de recharge ───────────────────────────────────
@@ -1161,10 +1179,44 @@ export type ClawbackOutcome =
  * sa raison. Un remboursement PARTIEL n'est pas une reprise : il se négocie
  * et se consigne à la main, aucun des deux appelants ne le fait.
  */
-export function clawbackPurchaseInTx(db: Db, id: number, reason: ReversalReason): ClawbackOutcome {
+export function clawbackPurchaseInTx(
+  db: Db,
+  id: number,
+  reason: ReversalReason,
+  disputeId: string | null = null,
+): ClawbackOutcome {
   const row = findPurchaseById(id, db);
   if (!row) return { status: 'not_found' };
   if (row.outcome === 'refunded' || row.outcome === 'disputed') {
+    // Un remboursement TOTAL d'un pack qu'un litige a déjà repris : rien de plus
+    // n'est repris, mais l'issue dit désormais que l'argent est reparti par le
+    // remboursement. Sans cela, la fermeture du litige (`warning_closed`, une
+    // demande de renseignements réglée par ce remboursement) rendrait les
+    // crédits d'un argent rendu au payeur (décision du 26.09.2026 : rendre
+    // seulement quand l'argent reste).
+    if (reason === 'refunded' && row.outcome === 'disputed') {
+      db.prepare(
+        `UPDATE key_purchases SET outcome = 'refunded' WHERE id = ? AND outcome = 'disputed'`,
+      ).run(id);
+      return { status: 'unchanged', purchase: findPurchaseById(id, db) as PurchaseRow };
+    }
+    // Un second litige sur un paiement qu'un premier litige, encore ouvert, a
+    // déjà repris : rien de plus n'est repris, mais le rendu automatique est
+    // bloqué. Stripe peut ouvrir plusieurs litiges sur un même paiement, chacun
+    // pour une part : la fermeture gagnée de l'un ne dit pas que l'argent de
+    // l'autre est resté (relecture du 26.09.2026).
+    if (
+      reason === 'disputed' &&
+      row.outcome === 'disputed' &&
+      disputeId !== null &&
+      row.dispute_id !== disputeId
+    ) {
+      db.prepare(
+        `UPDATE key_purchases SET reinstate_blocked = 'second_dispute'
+          WHERE id = ? AND outcome = 'disputed'`,
+      ).run(id);
+      return { status: 'unchanged', purchase: findPurchaseById(id, db) as PurchaseRow };
+    }
     return { status: 'unchanged', purchase: row };
   }
   if (row.kind !== 'pack') return { status: 'not_a_pack', purchase: row };
@@ -1177,10 +1229,13 @@ export function clawbackPurchaseInTx(db: Db, id: number, reason: ReversalReason)
     .all(row.lineage_hash) as Array<{ key_hash: string; key_prefix: string }>;
   const target = active.length === 1 ? active[0] : null;
   const removed = target ? clawbackCreditsInTx(db, target.key_hash, row.credits ?? 0) : 0;
+  // Le litige qui reprend est mémorisé : seule SA fermeture sans perte pourra
+  // rendre. Une nouvelle reprise repart d'un rendu non bloqué.
   db.prepare(
-    `UPDATE key_purchases SET outcome = ?, clawback_credits = ?, ended_at = datetime('now')
+    `UPDATE key_purchases SET outcome = ?, clawback_credits = ?, ended_at = datetime('now'),
+                              dispute_id = ?, reinstate_blocked = NULL
       WHERE id = ?`,
-  ).run(reason, removed, id);
+  ).run(reason, removed, reason === 'disputed' ? disputeId : null, id);
   return {
     status: 'clawed_back',
     removed,
@@ -1219,6 +1274,7 @@ export type CardReversal =
   | { kind: 'unknown' }
   | { kind: 'ambiguous'; purchases: PurchaseRow[] }
   | { kind: 'partial_refund'; purchase: PurchaseRow }
+  | { kind: 'partial_refund_on_dispute'; purchase: PurchaseRow }
   | { kind: 'reversed'; outcome: Exclude<ClawbackOutcome, { status: 'not_found' }> };
 
 /**
@@ -1236,11 +1292,19 @@ export type CardReversal =
  *    ordre) ou après une reprise par la route d'administration rend
  *    `unchanged`, et un partiel sur une ligne qui n'est pas un pack rend
  *    `not_a_pack`, sans jamais rien écrire ;
- *  - sinon la reprise commune (`clawbackPurchaseInTx`).
+ *  - remboursement partiel d'un pack repris par un litige encore ouvert :
+ *    `partial_refund_on_dispute`, rien de plus n'est repris, mais le rendu
+ *    automatique de ce litige est bloqué (une part de l'argent est repartie) ;
+ *  - sinon la reprise commune (`clawbackPurchaseInTx`), qui mémorise le litige.
  */
 export function reverseCardPurchaseInTx(
   db: Db,
-  p: { paymentIntent: string | null; reason: ReversalReason; partial: boolean },
+  p: {
+    paymentIntent: string | null;
+    reason: ReversalReason;
+    partial: boolean;
+    disputeId?: string | null;
+  },
 ): CardReversal {
   if (!p.paymentIntent) return { kind: 'no_payment_intent' };
   const purchases = findPurchasesByPaymentIntent(p.paymentIntent, db);
@@ -1251,6 +1315,16 @@ export function reverseCardPurchaseInTx(
     // La barrière de l'issue et la nature de l'achat d'abord : l'alerte d'un
     // partiel propose de reprendre le pack entier, ce qui serait faux sur un
     // pack déjà repris ou sur un abonnement. Aucune écriture sur un partiel.
+    if (purchase.outcome === 'disputed' && purchase.kind === 'pack') {
+      db.prepare(
+        `UPDATE key_purchases SET reinstate_blocked = 'partial_refund'
+          WHERE id = ? AND outcome = 'disputed'`,
+      ).run(purchase.id);
+      return {
+        kind: 'partial_refund_on_dispute',
+        purchase: findPurchaseById(purchase.id, db) as PurchaseRow,
+      };
+    }
     if (purchase.outcome === 'refunded' || purchase.outcome === 'disputed') {
       return { kind: 'reversed', outcome: { status: 'unchanged', purchase } };
     }
@@ -1259,8 +1333,135 @@ export function reverseCardPurchaseInTx(
     }
     return { kind: 'partial_refund', purchase };
   }
-  const outcome = clawbackPurchaseInTx(db, purchase.id, p.reason);
+  const outcome = clawbackPurchaseInTx(db, purchase.id, p.reason, p.disputeId ?? null);
   // La ligne vient d'être lue dans cette transaction : elle existe.
   if (outcome.status === 'not_found') return { kind: 'unknown' };
   return { kind: 'reversed', outcome };
+}
+
+// ─── Le rendu, quand un litige se referme sans perte ─────────────────────────
+
+/**
+ * Les statuts d'un litige refermé qui laissent l'argent au vendeur : `won`
+ * (litige gagné, les fonds reviennent) et `warning_closed` (demande de
+ * renseignements refermée sans devenir un litige, les fonds n'ont jamais quitté
+ * le compte). `lost`, et tout autre statut, ne rendent rien.
+ */
+export const DISPUTE_CLOSED_WITHOUT_LOSS: ReadonlySet<string> = new Set(['won', 'warning_closed']);
+
+export type ReinstateOutcome =
+  | { status: 'reinstated'; restored: number; keyPrefix: string; purchase: PurchaseRow }
+  | { status: 'no_single_active_key'; purchase: PurchaseRow }
+  | { status: 'other_dispute'; purchase: PurchaseRow }
+  | { status: 'blocked'; reason: string; purchase: PurchaseRow }
+  | { status: 'unchanged'; purchase: PurchaseRow }
+  | { status: 'not_a_pack'; purchase: PurchaseRow }
+  | { status: 'not_found' };
+
+/**
+ * Rend les crédits qu'un litige avait repris, quand il se referme sans perte
+ * (décision de Claude-Alain du 26.09.2026, choix 4 du bilan : « rendre les
+ * crédits tout seuls quand je garde l'argent »), dans la transaction de
+ * l'appelant.
+ *
+ *  - Exactement ce que la reprise avait retiré (`clawback_credits`), jamais
+ *    plus : un pack repris sur un solde déjà entamé ne rend que ce solde.
+ *  - À la clé active de la lignée, comme la reprise ; aucune, ou plusieurs :
+ *    rien n'est rendu, l'issue reste `disputed` et un humain le sait. Un
+ *    litige qui n'avait rien repris redevient une vente sans rien rendre.
+ *  - Une seule fois : seule l'issue `disputed` se rend, et elle devient
+ *    `reinstated`. Un pack remboursé entre-temps (`refunded`) ne rend rien :
+ *    l'argent est reparti au payeur.
+ *  - Seulement la fermeture du litige qui a repris (`dispute_id`) : celle d'un
+ *    autre litige, ou d'une reprise faite avant ce mécanisme (sans litige
+ *    mémorisé), rend `other_dispute` sans rien écrire.
+ *  - Jamais quand le rendu est bloqué (`reinstate_blocked` : second litige,
+ *    remboursement partiel) : un humain décide.
+ */
+export function reinstateDisputedPurchaseInTx(
+  db: Db,
+  id: number,
+  disputeId: string | null,
+): ReinstateOutcome {
+  const row = findPurchaseById(id, db);
+  if (!row) return { status: 'not_found' };
+  if (row.kind !== 'pack') return { status: 'not_a_pack', purchase: row };
+  if (row.outcome !== 'disputed') return { status: 'unchanged', purchase: row };
+  if (row.dispute_id === null || row.dispute_id !== disputeId) {
+    return { status: 'other_dispute', purchase: row };
+  }
+  if (row.reinstate_blocked) {
+    return { status: 'blocked', reason: row.reinstate_blocked, purchase: row };
+  }
+  const taken = Math.max(0, row.clawback_credits ?? 0);
+  if (taken === 0) {
+    // Le litige n'avait rien repris (aucune clé active, ou un solde à zéro) :
+    // rien à rendre, l'argent reste, la ligne redevient une vente.
+    db.prepare(
+      `UPDATE key_purchases SET outcome = 'reinstated' WHERE id = ? AND outcome = 'disputed'`,
+    ).run(id);
+    return {
+      status: 'reinstated',
+      restored: 0,
+      keyPrefix: row.key_prefix,
+      purchase: findPurchaseById(id, db) as PurchaseRow,
+    };
+  }
+  const active = db
+    .prepare(
+      `SELECT key_hash, key_prefix FROM api_keys
+        WHERE COALESCE(lineage_hash, key_hash) = ? AND active = 1 LIMIT 2`,
+    )
+    .all(row.lineage_hash) as Array<{ key_hash: string; key_prefix: string }>;
+  if (active.length !== 1) return { status: 'no_single_active_key', purchase: row };
+  const restored = reinstateCreditsInTx(db, active[0].key_hash, taken);
+  db.prepare(
+    `UPDATE key_purchases SET outcome = 'reinstated' WHERE id = ? AND outcome = 'disputed'`,
+  ).run(id);
+  return {
+    status: 'reinstated',
+    restored,
+    keyPrefix: active[0].key_prefix,
+    purchase: findPurchaseById(id, db) as PurchaseRow,
+  };
+}
+
+export type DisputeClosure =
+  | { kind: 'no_payment_intent' }
+  | { kind: 'unknown' }
+  | { kind: 'ambiguous'; purchases: PurchaseRow[] }
+  | { kind: 'kept'; purchase: PurchaseRow; ownDispute: boolean }
+  | { kind: 'closed'; outcome: Exclude<ReinstateOutcome, { status: 'not_found' }> };
+
+/**
+ * La fermeture d'un litige Stripe (`charge.dispute.closed`), à appeler DANS la
+ * transaction du webhook, comme `reverseCardPurchaseInTx`. Rien n'y alerte ni
+ * n'y journalise.
+ *
+ *  - pas d'intention de paiement, aucune ligne, deux lignes : comme la reprise ;
+ *  - un statut qui ne laisse pas l'argent (`lost`, ou inconnu) : `kept`, rien
+ *    d'écrit, les crédits repris le restent ; un litige perdu peut encore être
+ *    gagné plus tard (Stripe le documente), et la ligne reste alors prête ;
+ *  - sinon le rendu commun (`reinstateDisputedPurchaseInTx`).
+ */
+export function closeCardDisputeInTx(
+  db: Db,
+  p: { paymentIntent: string | null; status: string | null; disputeId: string | null },
+): DisputeClosure {
+  if (!p.paymentIntent) return { kind: 'no_payment_intent' };
+  const purchases = findPurchasesByPaymentIntent(p.paymentIntent, db);
+  if (purchases.length === 0) return { kind: 'unknown' };
+  if (purchases.length > 1) return { kind: 'ambiguous', purchases };
+  const purchase = purchases[0];
+  if (p.status === null || !DISPUTE_CLOSED_WITHOUT_LOSS.has(p.status)) {
+    const ownDispute =
+      purchase.outcome === 'disputed' &&
+      purchase.dispute_id !== null &&
+      purchase.dispute_id === p.disputeId;
+    return { kind: 'kept', purchase, ownDispute };
+  }
+  const outcome = reinstateDisputedPurchaseInTx(db, purchase.id, p.disputeId);
+  // La ligne vient d'être lue dans cette transaction : elle existe.
+  if (outcome.status === 'not_found') return { kind: 'unknown' };
+  return { kind: 'closed', outcome };
 }

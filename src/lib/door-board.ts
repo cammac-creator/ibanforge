@@ -345,8 +345,9 @@ export const DOOR_BOARD_DEFINITIONS: Readonly<Record<string, string>> = {
 
 /**
  * Les issues qui disent qu'une lignée a payé : un pack par carte ou en USDC
- * crédité (`credited`, `minted`, `minted_fallback`), ou un abonnement posé sur
- * une clé existante (`attached`, lot B2). C'est la liste privée
+ * crédité (`credited`, `minted`, `minted_fallback`), un pack dont le litige
+ * s'est refermé sans perte (`reinstated`, 26.09.2026), ou un abonnement posé
+ * sur une clé existante (`attached`, lot B2). C'est la liste privée
  * `PAID_OUTCOMES_SQL` de `key-purchases.ts` ; un test la tient alignée sur
  * `isSaleOutcome`. Un pack remboursé ou contesté change d'issue
  * (`refunded`, `disputed`) et sort de lui-même.
@@ -355,6 +356,7 @@ export const PAID_OUTCOMES: readonly string[] = [
   'credited',
   'minted',
   'minted_fallback',
+  'reinstated',
   'attached',
 ];
 

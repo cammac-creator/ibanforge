@@ -487,11 +487,11 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
   const purchaseRefs = db
     .prepare(
       `SELECT p.payment_ref AS ref,
-              CASE WHEN p.outcome IN ('credited', 'minted', 'minted_fallback', 'attached')
+              CASE WHEN p.outcome IN ('credited', 'minted', 'minted_fallback', 'reinstated', 'attached')
                    THEN 1 ELSE 0 END AS delivered
          FROM key_purchases p
          LEFT JOIN api_keys k ON k.key_hash = p.key_hash
-        WHERE p.outcome IN ('credited', 'minted', 'minted_fallback', 'attached', 'pending')
+        WHERE p.outcome IN ('credited', 'minted', 'minted_fallback', 'reinstated', 'attached', 'pending')
           AND p.created_at >= @from AND p.created_at < @to
           AND is_internal_email(COALESCE(k.email, '')) = 0
           AND MAX(p.issued_by_us, COALESCE(k.issued_by_us, 0)) = 0`,

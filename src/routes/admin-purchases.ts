@@ -45,6 +45,7 @@ const OUTCOMES: ReadonlySet<string> = new Set<PurchaseOutcome>([
   'failed',
   'refunded',
   'disputed',
+  'reinstated',
 ]);
 
 /** Une ligne telle que l'administration la lit : jamais le hash de la clé ni de la lignée. */
