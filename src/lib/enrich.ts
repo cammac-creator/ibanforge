@@ -237,6 +237,9 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // Depuis l'étape du retrait (25/09/2026), la liste est servie par la
   // surcouche privée (membre `register_fi`, src/lib/fi-register.ts) : sans elle,
   // aucun code finlandais n'est lu et la réponse dit « non consulté ».
+  // 26/09/2026 : la liste servie est relue contre l'édition du 16.03.2026 (deux
+  // codes ajoutés, aucun retiré) ; toujours rechargée à la main. Le retour parmi
+  // les registres qui refusent reste une décision de Claude-Alain.
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)',
   SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
   // L'Italie (25/09/2026, décision de Claude-Alain du 24/09, point 5). Les

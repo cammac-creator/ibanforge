@@ -12,7 +12,7 @@ First, the code is not a fixed slice of the IBAN: Finnish institution codes run 
 
 Second, **Finnish codes are allocated to banking groups, not to individual institutions.**
 
-Third, and this is the one to design around, **the list we hold is partial.** It is a transcription of the Finance Finland publication dated 15 October 2025, and nothing refreshes it automatically. Since 16 September 2026 the API therefore treats it as a list that names holders without refusing anyone: a hit is served, a miss is not a denial.
+Third, and this is the one to design around, **the list we hold is partial.** It is a transcription of the Finance Finland publication dated 16 March 2026, and nothing refreshes it automatically. Since 16 September 2026 the API therefore treats it as a list that names holders without refusing anyone: a hit is served, a miss is not a denial.
 
 The publisher has never confirmed the terms for reusing the list, so since 25 September 2026 the API reads it from a private file, not from its public repository. An answer served without that file says the list was not consulted (`status: "unavailable"`), never that a code is refused.
 

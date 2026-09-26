@@ -451,7 +451,7 @@ Central Bank of the Republic of San Marino, operating banks
          Source: Central Bank of the Republic of San Marino, operating banks (read on <date>)
 
 Finance Finland (Finanssiala ry), Finnish monetary institution codes and
-BICs (list published 15 October 2025)
+BICs (list published 16 March 2026)
   Formerly in: src/lib/fi-register.ts (codes transcribed by hand); the 656 FI
          keys of src/db/bic_data.json, taken by mdomke/schwifty from
          Finance Finland's publications. The API serves the list and the
