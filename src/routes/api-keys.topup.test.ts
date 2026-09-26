@@ -169,6 +169,8 @@ describe('les routes d’administration du registre', () => {
     ).json()) as { purchases: Array<Record<string, unknown>> };
     const row = list.purchases.find((p) => p.id === opened.opened);
     expect(row).toMatchObject({ outcome: 'pending', key_prefix: k.key_prefix });
+    // Le litige et le blocage du rendu se lisent ici (26.09.2026), vides hors litige.
+    expect(row).toMatchObject({ dispute_id: null, reinstate_blocked: null });
     // Jamais le hash de la clé ni de la lignée.
     expect(JSON.stringify(list)).not.toContain(k.key_hash);
 
