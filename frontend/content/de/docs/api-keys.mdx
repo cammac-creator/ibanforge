@@ -397,6 +397,19 @@ Monatskontingent zurück. Ein aus einem Kauf entstandener Schlüssel antwortet m
 `cause.reason: "credits_exhausted"` und den Links, die ihn aufladen (`X-Credits-Topup-Url` trägt den
 für das Paket mit 1.000 Credits).
 
+**Pro auf dem Schlüssel, den Sie schon haben.** Dieselben Stellen tragen einen Pro-Link, der das
+Abonnement auf DIESEN Schlüssel legt: `topup.pro` in `GET /v1/keys/usage` und
+`GET /v1/credits/balance`, `credit_packs.topup_this_key.pro` in einem `402` an den Schlüssel, und die
+Kontoseite. Der Schlüssel hat dann 10.000 Anfragen pro Monat, die vor seinem restlichen Guthaben
+genutzt werden. Einem Schlüssel, der schon ein Abonnement trägt, wird der Link nicht angeboten. Eine
+Kündigung deaktiviert den Schlüssel nicht: Am Ende des bereits bezahlten Monats erhält er zurück, was
+er vor dem Abonnement hatte, sein Gratiskontingent, falls er eines hatte, und sein restliches
+Guthaben. Ein durch das Abonnement selbst entstandener Schlüssel antwortet dann mit `402` und den
+Links, die ihn aufladen oder erneut abonnieren, ohne ersetzt zu werden. Ein anonymer Schlüssel, der Pro
+nimmt, verlässt die anonyme Stufe und kann daher nicht mehr per E-Mail beansprucht werden; am Ende des
+Abonnements erhält er sein anonymes Monatskontingent zurück. Einer, der zuerst Guthaben gekauft hat,
+hatte sie schon endgültig verlassen, ohne Gratiskontingent.
+
 ## Wenn Ihr Kontingent erschöpft ist
 
 Ihre Integration landet **nicht** in einer Sackgasse. Sind die Anfragen des Monats aufgebraucht, antwortet die API mit `402 Payment Required` (x402) statt einem harten 429 — mit Hinweis-Headern, die genau sagen, was passiert ist:

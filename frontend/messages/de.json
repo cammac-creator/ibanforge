@@ -185,7 +185,7 @@
       "madeNote": "Schweizer Clearingdaten direkt von SIX",
       "privacyLabel": "Privacy als Standard",
       "privacyValue": "IBANs nie gespeichert · selbstlöschende Telemetrie",
-      "privacyNote": "Gelöscht 30 Tage nach Kündigung — DPA Klausel 4.7",
+      "privacyNote": "Gelöscht 30 Tage nach Ende der Kundenbeziehung — DPA Klausel 4.7",
       "ariaLabel": "Datenquellen und Herkunft",
       "madeValue": "Aus der Schweiz"
     },
@@ -555,6 +555,7 @@
       "title": "Lieber eine feste Monatsrechnung?",
       "text": "Pro: 10'000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit im Kundenportal kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
       "note": "Die Integration in Ihr Produkt ist innerhalb der Grenzen und Bedingungen Ihres Tarifs erlaubt. Für ein schriftliches SLA, Supportzusagen oder höhere Volumen nutzen Sie das Editor/OEM-Angebot.",
+      "existingKey": "Sie haben schon einen Schlüssel? Buchen Sie Pro darauf über <account>Ihr Konto</account>: Das Kontingent landet auf genau diesem Schlüssel, an Ihrer Integration ändert sich nichts.",
       "price": "29 $",
       "per": "/ Monat",
       "cta": "Pro abonnieren",
@@ -1027,7 +1028,7 @@
         "method": "Was dieser Block misst",
         "definition": "HTTP-2xx-Antworten auf den Routen für IBAN-Validierung, Batch, Compliance, BIC-Suche und Schweizer Clearing mit der erwarteten Methode. Auch ein negatives Ergebnis kann nützlich sein: 2xx bedeutet nicht „gültige IBAN“.",
         "accounts": "Ein Konto fasst gespeicherte Schlüssel derselben E-Mail-Adresse zusammen, einschließlich ersetzter Schlüssel. Dies ist keine Personenzahl. Interne Konten, generische Zahlungsadressen und mehrdeutige Präfixe sind ausgeschlossen.",
-        "retention": "„Erste“ bedeutet die erste in den aufbewahrten Protokollen gefundene Antwort, nicht die erste Nutzung überhaupt oder eine Neuanmeldung. Protokolle werden nach zwölf Monaten und nach Kündigung gemäß der bestehenden Regelung gelöscht.",
+        "retention": "„Erste“ bedeutet die erste in den aufbewahrten Protokollen gefundene Antwort, nicht die erste Nutzung überhaupt oder eine Neuanmeldung. Protokolle werden nach zwölf Monaten gelöscht, und 30 Tage nach der Deaktivierung des letzten Schlüssels eines Kunden (das Ende eines Abonnements löst das nicht mehr aus).",
         "days": "Zwei verschiedene UTC-Tage reichen aus, auch rund um Mitternacht. Dies ist weder eine Rückkehr nach 24 Stunden noch eine Bindungsrate am siebten Tag.",
         "limits": "Testnutzung kann enthalten sein. Aufrufe ohne zuordenbaren Schlüssel und gehostetes MCP sind nicht erfasst. Keine Verknüpfung mit Klicks, Besuchen oder Käufen; die bisherigen Aufrufkennzahlen behalten ihre Definition."
       },
@@ -1982,7 +1983,7 @@
         },
         {
           "title": "Ein Vertrauenspaket für Ihren Einkauf",
-          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. Die Validierung speichert keine IBAN: Sie läuft im Arbeitsspeicher, protokolliert werden nur Land und Bankpräfix. Die Dateiprüfung ist eine eigene Leistung: Sie bewahrt ihren Bericht — der die hochgeladenen Spalten übernimmt — 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf und löscht ihn dann (siehe die Seite Prüfung). Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich (DPA Klausel 4.7).",
+          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. Die Validierung speichert keine IBAN: Sie läuft im Arbeitsspeicher, protokolliert werden nur Land und Bankpräfix. Die Dateiprüfung ist eine eigene Leistung: Sie bewahrt ihren Bericht — der die hochgeladenen Spalten übernimmt — 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf und löscht ihn dann (siehe die Seite Prüfung). Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Ende der Kundenbeziehung, vertraglich (DPA Klausel 4.7).",
           "link": "Rechtliches und DPA"
         }
       ]
@@ -2112,7 +2113,7 @@
         },
         "trust": {
           "label": "Veröffentlichte Rechts-/Ops-Unterlagen",
-          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich. Telemetrie löscht sich 30 Tage nach Kündigung selbst (DPA 4.7)",
+          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich. Telemetrie löscht sich 30 Tage nach Ende der Kundenbeziehung selbst (DPA 4.7)",
           "ibancom": "Öffentliche Bedingungen, Datenschutzerklärung, DPA und SLA; Weitervertriebsrechte werden mit dem Anbieter vereinbart.",
           "ibanapi": "Öffentliche Bedingungen und Datenschutzerklärung; Betriebszusagen beim Anbieter prüfen.",
           "libs": "Lizenzdatei",
@@ -2242,6 +2243,7 @@
       "free": "Gratis",
       "custom": "Individuell",
       "pack": "Guthabenpaket",
+      "none": "Ohne Kontingent",
       "pro": "Pro",
       "editor": "Editor / OEM"
     },
@@ -2327,7 +2329,9 @@
     "topupTitle": "Diesen Schlüssel aufladen",
     "topupHint": "Zahlung per Karte: Die Credits landen auf genau diesem Schlüssel. An Ihrer Integration ändert sich nichts.",
     "topupUnproven": "Dieser Schlüssel trägt Ihre Adresse, sie wurde bei seiner Erstellung aber nicht mit einem Code bestätigt. Laden Sie ihn nur auf, wenn Sie ihn als Ihren erkennen.",
-    "topupCredits": "{credits} Credits"
+    "topupCredits": "{credits} Credits",
+    "topupPro": "Pro auf diesem Schlüssel: {requests} Anfragen pro Monat",
+    "topupProPrice": "29 $ / Monat"
   },
   "sources": {
     "meta": {

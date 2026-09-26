@@ -139,6 +139,10 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_email ON api_keys(email);
 -- rapprochement à la main, jamais la signature) et key_topup_refs (une référence de
 -- recharge ifr_ par lignée).
 -- Migration et rattrapage : migrateKeyPurchases dans src/lib/db.ts.
+-- Lot B2 (25.09.2026), l'abonnement sur la même clé :
+--   subscription_ended_at TEXT           -- la fin de l'abonnement ; la clé reste active,
+--                                        -- stripe_subscription_id n'est jamais effacé
+-- Migration et rattrapage (pierre tombale seulement) : migrateSubscriptionEnd.
 
 CREATE TABLE IF NOT EXISTS api_usage (
   key_hash TEXT NOT NULL,

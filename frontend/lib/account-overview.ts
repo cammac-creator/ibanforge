@@ -112,9 +112,10 @@ export function noticeFor(reply: ApiReply): Notice {
 
 // ─── La fiche d'une clé ──────────────────────────────────────────────────────
 
-export type PlanPart = 'free' | 'custom' | 'pack' | 'pro' | 'editor';
+/** `none` (lot B2) : ni allocation ni crédits, une clé née d'un abonnement terminé. */
+export type PlanPart = 'free' | 'custom' | 'pack' | 'none' | 'pro' | 'editor';
 
-const PLAN_PARTS: readonly PlanPart[] = ['free', 'custom', 'pack', 'pro', 'editor'];
+const PLAN_PARTS: readonly PlanPart[] = ['free', 'custom', 'pack', 'none', 'pro', 'editor'];
 
 export type AlertKind = 'quota_80' | 'credits_low';
 
@@ -146,7 +147,11 @@ export interface KeySheet {
    * clé à l'adresse non prouvée qu'avec un avertissement (relecture de sécurité
    * du lot C1, point I1).
    */
-  topup: { links: Record<TopupSlug, string>; proven: boolean | null } | null;
+  /**
+   * `pro` (lot B2) : le lien Pro porteur de la référence de la clé, qui pose
+   * l'abonnement sur ELLE ; null pour une clé qui porte déjà un abonnement.
+   */
+  topup: { links: Record<TopupSlug, string>; proven: boolean | null; pro: string | null } | null;
 }
 
 export type TopupSlug = '1k' | '5k' | '25k';
@@ -161,6 +166,13 @@ export const TOPUP_PACKS: ReadonlyArray<{ slug: TopupSlug; credits: number; pric
   { slug: '5k', credits: 5000, price: '$20' },
   { slug: '25k', credits: 25000, price: '$80' },
 ];
+
+/**
+ * Pro sur la clé (lot B2) : l'allocation que le bouton annonce. Comme le prix
+ * des packs, un libellé : ce que Pro donne est fixé par l'API, et le montant
+ * payé est celui du lien Stripe.
+ */
+export const PRO_ON_KEY_REQUESTS = 10_000;
 
 /** Les trois liens, tous en https, ou rien : une recharge à moitié servie ne s'affiche pas. */
 function readTopupLinks(raw: unknown): Record<TopupSlug, string> | null {
@@ -234,6 +246,8 @@ interface SheetInput {
   alerts: unknown;
   manageUrl: unknown;
   topup: unknown;
+  /** Le lien Pro de la clé (lot B2), ou rien. */
+  pro: unknown;
   proven: unknown;
 }
 
@@ -294,7 +308,13 @@ function buildSheet(input: SheetInput): KeySheet | null {
     lastCall: input.lastCall ? { at: text(input.lastCall.at) } : null,
     alerts: readAlerts(input.alerts),
     manageUrl: safeHttpsUrl(input.manageUrl),
-    topup: links ? { links, proven: typeof input.proven === 'boolean' ? input.proven : null } : null,
+    topup: links
+      ? {
+          links,
+          proven: typeof input.proven === 'boolean' ? input.proven : null,
+          pro: safeHttpsUrl(input.pro),
+        }
+      : null,
   };
 }
 
@@ -323,6 +343,7 @@ export function sheetFromOverviewKey(raw: unknown, month: unknown): KeySheet | n
     alerts: key.alerts,
     manageUrl: actions?.manage_subscription ?? subscription?.manage_url ?? null,
     topup: actions?.topup ?? null,
+    pro: actions?.subscribe_pro ?? null,
     // Absent d'une API d'avant le lot B1 : lu comme « non prouvée », pour que
     // la page avertisse plutôt que de taire le doute.
     proven: key.address_proven === true,
@@ -354,6 +375,7 @@ export function sheetFromReport(payload: KeyReportPayload): KeySheet | null {
     alerts: null,
     manageUrl: null,
     topup: usage.topup?.by_card ?? null,
+    pro: usage.topup?.pro ?? null,
     // Le porteur a collé la clé : il la tient, aucun doute à lever.
     proven: null,
   });

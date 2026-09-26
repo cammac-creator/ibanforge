@@ -120,7 +120,7 @@ Returned when a paid route is called without a usable way to pay: no key and no 
 
 When a payment was sent and refused, the body also carries `payment_error` with the reason.
 
-On a valid key, the body also carries `credit_packs.topup_this_key`: the card links and the USDC route that recharge the key you presented, so the credits land on it and nothing changes in your integration. `pay_by_card` keeps its meaning, a pack bought without a key, delivered as a new key.
+On a valid key, the body also carries `credit_packs.topup_this_key`: the card links and the USDC route that recharge the key you presented, so the credits land on it and nothing changes in your integration, and, on a key without a subscription, `pro`: the link that puts Pro on this same key. `pay_by_card` keeps its meaning, a pack bought without a key, delivered as a new key.
 
 See [x402 Payments](/docs/x402) for how to handle this, and [API keys](/docs/api-keys) for the free key.
 

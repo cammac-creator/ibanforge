@@ -130,6 +130,49 @@ describe('cohort radar, end to end', () => {
     expect(after.email).toBe(`paying-${RUN}@alpha.example.net`);
     expect(after.noRecredit).toBe(false);
   });
+
+  // Lot B2 (25.09.2026) : un abonnement se pose sur une clé EXISTANTE, qui
+  // garde son palier « email ». Regroupée, elle serait relabellisée et passerait
+  // `no_recredit = 1` : un abonné payant perdrait son adresse et son mois. Un
+  // vrai lot machine de sept clés, dont l'une porte un Pro et une autre un achat
+  // au registre : sans l'exclusion, le radar regrouperait les sept.
+  it('une clé email avec Pro, ou dont la lignée a payé, n’est jamais relabellisée', async () => {
+    const batchUA = `test-b2-burst-client/${RUN}`;
+    const shapes = [
+      'zxqvbnmkjhgf',
+      'qwrtplkjhgfd',
+      'mnbvcxzlkjhg',
+      'plkjhgfdsqwr',
+      'trwqzxcvbnmk',
+      'bnmkjhgfdsxz',
+      'ghjklzxcvbnm',
+    ];
+    const keys = shapes.map((lp) => signup(lp, batchUA));
+    const [pro, buyer] = keys;
+    const db = getStatsDB();
+    db.prepare(
+      'UPDATE api_keys SET stripe_subscription_id = ?, monthly_limit = 10000 WHERE key_prefix = ?',
+    ).run(`sub_test_cohort_${RUN}`, pro.prefix);
+    const buyerHash = validateApiKey(buyer.key).keyHash;
+    db.prepare(
+      `INSERT INTO key_purchases (payment_ref, rail, kind, outcome, lineage_hash, key_hash, key_prefix)
+       VALUES (?, 'card', 'subscription', 'attached', ?, ?, ?)`,
+    ).run(`stripe:cs_test_cohort_${RUN}`, buyerHash, buyerHash, buyer.prefix);
+
+    await runCohortScan();
+    const proAfter = validateApiKey(pro.key);
+    expect(proAfter.email).toBe(`${shapes[0]}@alpha.example.net`);
+    expect(proAfter.noRecredit).toBe(false);
+    expect(proAfter.monthlyLimit).toBe(10000);
+    const buyerAfter = validateApiKey(buyer.key);
+    expect(buyerAfter.email).toBe(`${shapes[1]}@alpha.example.net`);
+    expect(buyerAfter.noRecredit).toBe(false);
+    // Les cinq autres, sans achat ni abonnement, sont bien regroupés : le lot
+    // était un vrai lot, c'est l'exclusion qui a épargné les deux payants.
+    for (const k of keys.slice(2)) {
+      expect(validateApiKey(k.key).email).toContain('@cohorte.invalid');
+    }
+  });
 });
 
 describe('la passe e-mail charge sur le PALIER, pas sur les colonnes de quota (revue du 15/09, R1)', () => {

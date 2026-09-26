@@ -120,7 +120,7 @@ Renvoyé quand une route payante est appelée sans moyen de payer utilisable : n
 
 Quand un paiement a été envoyé et refusé, le corps porte aussi `payment_error` avec la raison.
 
-Sur une clé valide, le corps porte aussi `credit_packs.topup_this_key` : les liens de paiement par carte et la route USDC qui rechargent la clé présentée, pour que les crédits arrivent sur elle et que rien ne change dans votre intégration. `pay_by_card` garde son sens : un pack acheté sans clé, livré comme une clé neuve.
+Sur une clé valide, le corps porte aussi `credit_packs.topup_this_key` : les liens de paiement par carte et la route USDC qui rechargent la clé présentée, pour que les crédits arrivent sur elle et que rien ne change dans votre intégration, et, sur une clé sans abonnement, `pro` : le lien qui pose Pro sur cette même clé. `pay_by_card` garde son sens : un pack acheté sans clé, livré comme une clé neuve.
 
 Consultez [Paiements x402](/docs/x402) pour savoir comment gérer cela, et [Clés API](/docs/api-keys) pour la clé gratuite.
 

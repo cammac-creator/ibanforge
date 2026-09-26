@@ -1,0 +1,907 @@
+/**
+ * L'abonnement sur la même clé (chantier « clé unique », lot B2, 25.09.2026 ;
+ * décisions de Claude-Alain du 24.09.2026, règle A et phrases Q11) :
+ *
+ *  - le lien Pro porteur de la référence de recharge d'une clé pose
+ *    l'abonnement sur CETTE clé (T4), l'allocation Pro remplace l'allocation
+ *    propre pendant l'abonnement, puis viennent les crédits (règle B) ;
+ *  - la fin de l'abonnement ne désactive plus la clé (T5) : elle retrouve ce
+ *    qu'elle avait avant (0 pour une clé née de lui, qui répond alors 402 avec
+ *    ses liens), garde ses crédits et son identifiant d'abonnement ;
+ *  - jamais deux abonnements vivants sur une clé (ZG10), la pierre tombale
+ *    tient l'ordre des évènements, une clé tournée est retrouvée par sa lignée.
+ *
+ * Adresses inventées, sur alpha.example.net (example.com est rangé parmi les
+ * comptes internes, exclus des revenus).
+ */
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type Stripe from 'stripe';
+import { processStripeEvent } from './stripe-webhook.js';
+import { buildApp } from '../app.js';
+import { resetX402Paywall } from '../middleware/x402.js';
+import {
+  generateApiKey,
+  markShieldBirth,
+  PRO_MONTHLY_LIMIT,
+  revokeApiKey,
+  rotateApiKey,
+  validateApiKey,
+} from '../lib/api-keys.js';
+import { ANONYMOUS_MONTHLY_LIMIT } from '../lib/tiers.js';
+import { ensureTopupRef, findPurchaseByRef } from '../lib/key-purchases.js';
+import {
+  buildCreditsWarningEmail,
+  buildSubscriptionAttachedEmail,
+  buildSubscriptionEndedEmail,
+  buildProKeyEmail,
+  PRO_CANCELLATION_SENTENCE,
+} from '../lib/email.js';
+import { Hono } from 'hono';
+import { stripeRetrieve } from './stripe-retrieve.js';
+import { closeAll, getStatsDB } from '../lib/db.js';
+import { startFakeFacilitator, type FakeFacilitator } from '../test-support/fake-facilitator.js';
+
+const VALID_IBAN = 'CH9300762011623852957';
+const MONTH = () => new Date().toISOString().slice(0, 7);
+let facilitator: FakeFacilitator;
+const originalEnv = { ...process.env };
+let ip = 0;
+let seq = 0;
+
+beforeAll(async () => {
+  facilitator = await startFakeFacilitator();
+});
+
+afterAll(async () => {
+  await facilitator.close();
+  process.env = originalEnv;
+  closeAll();
+});
+
+beforeEach(() => {
+  process.env = { ...originalEnv };
+  process.env.NODE_ENV = 'test';
+  process.env.X402_ENABLED = 'true';
+  process.env.WALLET_ADDRESS = '0x00000000000000000000000000000000000000A1';
+  process.env.FACILITATOR_URL = facilitator.url;
+  delete process.env.CDP_API_KEY_ID;
+  delete process.env.CDP_API_KEY_SECRET;
+  delete process.env.IBANFORGE_FREE_MODE;
+  resetX402Paywall();
+});
+
+function uniq(tag: string): string {
+  seq += 1;
+  return `${tag}_${Date.now()}_${seq}`;
+}
+
+function keyCount(): number {
+  return (getStatsDB().prepare('SELECT COUNT(*) AS n FROM api_keys').get() as { n: number }).n;
+}
+
+function freeKey(tag: string) {
+  const key = generateApiKey(`${uniq(tag)}@alpha.example.net`);
+  if (!key) throw new Error('frappe impossible');
+  return key;
+}
+
+/** Un abonnement payé au Checkout, réduit à ce que le webhook lit. */
+function proCheckout(opts: {
+  sessionId: string;
+  subscriptionId: string | null;
+  ref?: string | null;
+  email?: string | null;
+  plan?: 'pro' | 'oem';
+  paymentIntent?: string | null;
+  paymentStatus?: 'paid' | 'no_payment_required';
+}): Stripe.Event {
+  return {
+    id: `evt_${uniq('sub')}`,
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: opts.sessionId,
+        metadata: { plan: opts.plan ?? 'pro' },
+        customer_email: opts.email ?? null,
+        customer_details: opts.email ? { email: opts.email } : null,
+        payment_status: opts.paymentStatus ?? 'paid',
+        mode: 'subscription',
+        subscription: opts.subscriptionId,
+        amount_total: opts.plan === 'oem' ? 14900 : 2900,
+        currency: 'usd',
+        client_reference_id: opts.ref ?? null,
+        // Une session d'abonnement n'a pas d'intention de paiement : c'est la
+        // facture qui en porte une.
+        payment_intent: opts.paymentIntent ?? null,
+      },
+    },
+  } as unknown as Stripe.Event;
+}
+
+function packCheckout(opts: { sessionId: string; ref: string }): Stripe.Event {
+  return {
+    id: `evt_${uniq('pack')}`,
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: opts.sessionId,
+        metadata: { bundle: '1k' },
+        customer_email: null,
+        customer_details: null,
+        payment_status: 'paid',
+        amount_total: 400,
+        currency: 'usd',
+        client_reference_id: opts.ref,
+        payment_intent: `pi_${opts.sessionId}`,
+      },
+    },
+  } as unknown as Stripe.Event;
+}
+
+function subscriptionDeleted(subscriptionId: string): Stripe.Event {
+  return {
+    id: `evt_${uniq('deleted')}`,
+    type: 'customer.subscription.deleted',
+    data: { object: { id: subscriptionId } },
+  } as unknown as Stripe.Event;
+}
+
+function renewalPaid(subscriptionId: string): Stripe.Event {
+  return {
+    id: `evt_${uniq('invoice')}`,
+    type: 'invoice.paid',
+    created: 1893456000,
+    data: {
+      object: {
+        id: `in_${uniq('invoice')}`,
+        object: 'invoice',
+        billing_reason: 'subscription_cycle',
+        amount_paid: 2900,
+        currency: 'usd',
+        status: 'paid',
+        status_transitions: { paid_at: 1893459600 },
+        parent: {
+          type: 'subscription_details',
+          subscription_details: { subscription: subscriptionId, metadata: {} },
+          quote_details: null,
+        },
+      },
+    },
+  } as unknown as Stripe.Event;
+}
+
+function keyRow(keyHash: string) {
+  return getStatsDB()
+    .prepare(
+      `SELECT active, monthly_limit, no_recredit, tier, stripe_subscription_id,
+              subscription_ended_at, credits_remaining
+         FROM api_keys WHERE key_hash = ?`,
+    )
+    .get(keyHash) as {
+    active: number;
+    monthly_limit: number | null;
+    no_recredit: number;
+    tier: string;
+    stripe_subscription_id: string | null;
+    subscription_ended_at: string | null;
+    credits_remaining: number | null;
+  };
+}
+
+async function usageOf(key: string) {
+  ip += 1;
+  const res = await buildApp().request('https://api.ibanforge.com/v1/keys/usage', {
+    headers: { Authorization: `Bearer ${key}`, 'x-real-ip': `198.51.100.${(ip % 250) + 1}` },
+  });
+  return (await res.json()) as { topup?: { by_card?: Record<string, string>; pro?: string } };
+}
+
+const PRO_LINK = 'https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04';
+
+async function call(key: string) {
+  ip += 1;
+  return buildApp().request('https://api.ibanforge.com/v1/iban/validate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+      'x-real-ip': `198.51.100.${(ip % 250) + 1}`,
+    },
+    body: JSON.stringify({ iban: VALID_IBAN }),
+  });
+}
+
+/** Une clé gratuite (200 par mois), rechargée d'un pack de 1 000 crédits, puis Pro par sa référence. */
+function freeKeyWithPackThenPro(tag: string) {
+  const key = freeKey(tag);
+  const ref = ensureTopupRef(key.key_hash)!;
+  processStripeEvent(packCheckout({ sessionId: `cs_test_${uniq(`${tag}-pack`)}`, ref }));
+  // Des soulignés, jamais un tiret : la page de succès n'accepte que `cs_test_[A-Za-z0-9_]+`.
+  const sessionId = `cs_test_${uniq(`${tag}_pro`).replace(/-/g, '_')}`;
+  const subscriptionId = `sub_test_${uniq(tag)}`;
+  const keysBeforePro = keyCount();
+  const attached = processStripeEvent(proCheckout({ sessionId, subscriptionId, ref }));
+  return { key, ref, sessionId, subscriptionId, attached, keysBeforePro };
+}
+
+describe('Pro sur une clé existante (T4)', () => {
+  it('Pro sur clé gratuite : 10 000 puis crédits', async () => {
+    const { key, ref, sessionId, subscriptionId, attached, keysBeforePro } =
+      freeKeyWithPackThenPro('attach');
+    expect(attached.status).toBe(200);
+    expect(attached.body.attached).toEqual({ key_prefix: key.key_prefix, outcome: 'attached' });
+    expect(attached.body.monthly_limit).toBe(PRO_MONTHLY_LIMIT);
+    // Aucune clé frappée, aucune clé brute à remettre.
+    expect(attached.notify).toBeUndefined();
+    expect(keyCount()).toBe(keysBeforePro);
+    expect(attached.subscription).toMatchObject({
+      kind: 'attached',
+      keyPrefix: key.key_prefix,
+      plan: 'pro',
+      monthlyLimit: PRO_MONTHLY_LIMIT,
+      amountUsd: 29,
+    });
+    expect(attached.subscription?.to).toContain('@alpha.example.net');
+
+    const v = validateApiKey(key.api_key);
+    expect(v.monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+    expect(v.creditsRemaining).toBe(1000);
+    expect(keyRow(key.key_hash)).toMatchObject({
+      stripe_subscription_id: subscriptionId,
+      subscription_ended_at: null,
+      no_recredit: 0,
+      active: 1,
+    });
+    // La photo : ce que la clé avait AVANT l'abonnement, que la fin rendra.
+    expect(findPurchaseByRef(`stripe:${sessionId}`)).toMatchObject({
+      kind: 'subscription',
+      outcome: 'attached',
+      prev_monthly_limit: 200,
+      prev_no_recredit: 0,
+      stripe_subscription_id: subscriptionId,
+      topup_ref: ref,
+      amount_minor: 2900,
+    });
+
+    // Règle B : l'allocation Pro d'abord, puis les crédits.
+    const first = await call(key.api_key);
+    expect(first.status).toBe(200);
+    expect(first.headers.get('x-charged-from')).toBe('allowance');
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)
+         ON CONFLICT (key_hash, month) DO UPDATE SET count = excluded.count`,
+      )
+      .run(key.key_hash, MONTH(), PRO_MONTHLY_LIMIT);
+    const second = await call(key.api_key);
+    expect(second.status).toBe(200);
+    expect(second.headers.get('x-charged-from')).toBe('credits');
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(999);
+  });
+
+  it('un rejeu de la même session ne pose rien de plus et n’annonce rien', () => {
+    const { key, sessionId, subscriptionId } = freeKeyWithPackThenPro('attach-replay');
+    const again = processStripeEvent(
+      proCheckout({ sessionId, subscriptionId, ref: ensureTopupRef(key.key_hash) }),
+    );
+    expect(again.body.idempotent).toBe(true);
+    expect(again.subscription).toBeUndefined();
+    expect(again.notify).toBeUndefined();
+  });
+
+  // Relecture de sécurité de la PR 264, D1 (décision de la session principale,
+  // conforme à la phrase Q11 publiée) : la photo d'une clé anonyme dont le Pro
+  // est le premier achat est prise AVANT la promotion ZG1.
+  it('clé anonyme, Pro d’abord : palier payant et réclamée par paiement, sa fin lui rend son allocation anonyme', () => {
+    const key = generateApiKey(null)!;
+    const ref = ensureTopupRef(key.key_hash)!;
+    const subscriptionId = `sub_test_${uniq('anon')}`;
+    const sessionId = `cs_test_${uniq('anon')}`;
+    const attached = processStripeEvent(proCheckout({ sessionId, subscriptionId, ref }));
+    expect(attached.body.attached).toMatchObject({ outcome: 'attached' });
+    expect(keyRow(key.key_hash)).toMatchObject({
+      tier: 'paid',
+      monthly_limit: PRO_MONTHLY_LIMIT,
+    });
+    expect(findPurchaseByRef(`stripe:${sessionId}`)).toMatchObject({
+      prev_tier: 'anonymous',
+      prev_monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
+      prev_no_recredit: 0,
+    });
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({
+      outcome: 'ended',
+      allowance_restored_to: ANONYMOUS_MONTHLY_LIMIT,
+    });
+    expect(validateApiKey(key.api_key)).toMatchObject({
+      valid: true,
+      monthlyLimit: ANONYMOUS_MONTHLY_LIMIT,
+      tier: 'paid',
+    });
+    // Réclamée par paiement : hors du rayon du radar, et plus de réclamation par e-mail.
+    const claim = getStatsDB()
+      .prepare('SELECT claimed_at, claim_method FROM api_keys WHERE key_hash = ?')
+      .get(key.key_hash) as { claimed_at: string | null; claim_method: string | null };
+    expect(claim.claimed_at).not.toBeNull();
+    expect(claim.claim_method).toBe('stripe');
+  });
+
+  it('clé anonyme, pack d’abord puis Pro : ZG1 tient, sa fin la laisse à 0 avec ses crédits', () => {
+    const key = generateApiKey(null)!;
+    const ref = ensureTopupRef(key.key_hash)!;
+    processStripeEvent(packCheckout({ sessionId: `cs_test_${uniq('anon_pack')}`, ref }));
+    expect(validateApiKey(key.api_key)).toMatchObject({ monthlyLimit: 0, creditsRemaining: 1000 });
+    const subscriptionId = `sub_test_${uniq('anon_pack')}`;
+    processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('anon_pack_pro')}`, subscriptionId, ref }),
+    );
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({ outcome: 'ended', allowance_restored_to: 0 });
+    expect(validateApiKey(key.api_key)).toMatchObject({
+      valid: true,
+      monthlyLimit: 0,
+      creditsRemaining: 1000,
+    });
+  });
+
+  it('clé anonyme née sous bouclier, Pro d’abord : sa fin lui rend l’allocation normale de son palier (ZG5)', () => {
+    const key = generateApiKey(null, 5)!;
+    markShieldBirth({ keyHash: key.key_hash, episodeId: `episode_${uniq('shield')}` });
+    const ref = ensureTopupRef(key.key_hash)!;
+    const subscriptionId = `sub_test_${uniq('shield')}`;
+    processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('shield')}`, subscriptionId, ref }),
+    );
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({
+      outcome: 'ended',
+      allowance_restored_to: ANONYMOUS_MONTHLY_LIMIT,
+    });
+    expect(keyRow(key.key_hash)).toMatchObject({
+      monthly_limit: ANONYMOUS_MONTHLY_LIMIT,
+      no_recredit: 0,
+    });
+  });
+
+  it('référence mal formée : traitée comme absente, une clé neuve et aucune alerte', () => {
+    const result = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('malformed')}`,
+        subscriptionId: `sub_test_${uniq('malformed')}`,
+        ref: 'pas-une-reference',
+      }),
+    );
+    expect(result.notify?.rawKey).toMatch(/^ifk_/);
+    expect(result.alert).toBeUndefined();
+    expect(result.body.attached).toBeUndefined();
+  });
+
+  it('clé révoquée : une clé neuve et une alerte, jamais une réactivation', () => {
+    const key = freeKey('revoked');
+    const ref = ensureTopupRef(key.key_hash)!;
+    expect(revokeApiKey(key.api_key)).toBe(true);
+    const result = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('revoked')}`,
+        subscriptionId: `sub_test_${uniq('revoked')}`,
+        ref,
+      }),
+    );
+    expect(result.notify?.rawKey).toMatch(/^ifk_/);
+    expect(result.body.attached).toMatchObject({
+      outcome: 'minted_fallback',
+      fallback_reason: 'no_active_key',
+    });
+    expect(result.alert?.key).toMatch(/^stripe:subscription-fallback:/);
+    expect(validateApiKey(key.api_key).valid).toBe(false);
+  });
+});
+
+describe('double abonnement (ZG10)', () => {
+  it('double abonnement : clé neuve et alerte', () => {
+    const { key, ref, subscriptionId } = freeKeyWithPackThenPro('double');
+    const second = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('double2')}`,
+        subscriptionId: `sub_test_${uniq('double2')}`,
+        ref,
+      }),
+    );
+    expect(second.notify?.rawKey).toMatch(/^ifk_/);
+    expect(second.body.attached).toMatchObject({
+      outcome: 'minted_fallback',
+      fallback_reason: 'double_subscription',
+    });
+    expect(second.alert?.key).toMatch(/^stripe:subscription-double:/);
+    expect(second.alert?.detail).toContain('Deux abonnements sont facturés');
+    expect(second.alert?.detail).not.toContain('@');
+    // La clé d'origine garde SON abonnement.
+    expect(keyRow(key.key_hash).stripe_subscription_id).toBe(subscriptionId);
+  });
+});
+
+describe('la fin de l’abonnement (T5)', () => {
+  it('résiliation : clé active, allocation d’avant rendue', () => {
+    const { key, sessionId, subscriptionId } = freeKeyWithPackThenPro('end');
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.status).toBe(200);
+    expect(ended.body).toMatchObject({
+      subscription: subscriptionId,
+      outcome: 'ended',
+      key_prefix: key.key_prefix,
+      allowance_restored_to: 200,
+      key_deactivated: false,
+    });
+    expect(ended.subscription).toMatchObject({
+      kind: 'ended',
+      keyPrefix: key.key_prefix,
+      allowance: 200,
+      lifetime: false,
+      creditsRemaining: 1000,
+    });
+    expect(ended.subscription?.to).toContain('@alpha.example.net');
+    const v = validateApiKey(key.api_key);
+    expect(v.valid).toBe(true);
+    expect(v.monthlyLimit).toBe(200);
+    expect(v.creditsRemaining).toBe(1000);
+    const row = keyRow(key.key_hash);
+    // L'identifiant reste : il retrouve la clé d'un renouvellement et la garde
+    // hors du rayon du radar.
+    expect(row.stripe_subscription_id).toBe(subscriptionId);
+    expect(row.subscription_ended_at).not.toBeNull();
+    expect(findPurchaseByRef(`stripe:${sessionId}`)?.ended_at).not.toBeNull();
+
+    // Un rejeu sous un autre identifiant d'évènement : rien de plus, aucun mail.
+    const again = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(again.body.outcome).toBe('already_ended');
+    expect(again.subscription).toBeUndefined();
+  });
+
+  it('clé née de l’abonnement : 0 puis 402 avec liens', async () => {
+    const sessionId = `cs_test_${uniq('born')}`;
+    const subscriptionId = `sub_test_${uniq('born')}`;
+    const minted = processStripeEvent(proCheckout({ sessionId, subscriptionId }));
+    const rawKey = minted.notify!.rawKey;
+    expect(validateApiKey(rawKey).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({ outcome: 'ended', allowance_restored_to: 0 });
+    const v = validateApiKey(rawKey);
+    expect(v.valid).toBe(true);
+    expect(v.monthlyLimit).toBe(0);
+
+    const res = await call(rawKey);
+    expect(res.status).toBe(402);
+    const ref = ensureTopupRef(v.keyHash)!;
+    expect(res.headers.get('x-credits-exhausted')).toBe('true');
+    expect(res.headers.get('x-credits-topup-url')).toBe(
+      `https://buy.stripe.com/bJe3coeZb31P6CsamK8so05?client_reference_id=${ref}`,
+    );
+    // Relecture de sécurité, D6 : jamais « crédits épuisés » à une clé qui n'en a jamais eu.
+    const text = JSON.stringify(await res.json());
+    expect(text).toContain('This key has no allowance since its subscription ended.');
+    expect(text).not.toContain('prepaid credits are used up');
+  });
+
+  it('résiliation avant rattachement : pierre tombale respectée', () => {
+    const key = freeKey('tomb');
+    const ref = ensureTopupRef(key.key_hash)!;
+    const subscriptionId = `sub_test_${uniq('tomb')}`;
+    const first = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(first.body).toMatchObject({ outcome: 'unknown', key_deactivated: false });
+    const before = keyCount();
+    const late = processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('tomb')}`, subscriptionId, ref }),
+    );
+    expect(late.body.skipped).toBe('subscription_already_canceled');
+    expect(keyCount()).toBe(before);
+    expect(keyRow(key.key_hash).stripe_subscription_id).toBeNull();
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(200);
+  });
+
+  it('rotation puis résiliation : la clé tournée est retrouvée par la lignée', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('rotated');
+    const rotated = rotateApiKey(key.api_key)!;
+    expect(validateApiKey(rotated.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({ outcome: 'ended', key_prefix: rotated.key_prefix });
+    expect(validateApiKey(rotated.api_key)).toMatchObject({ valid: true, monthlyLimit: 200 });
+    expect(validateApiKey(key.api_key).valid).toBe(false);
+  });
+
+  it('une copie tournée qui avait perdu l’abonnement (avant la PR 177) est retrouvée et terminée', () => {
+    const sessionId = `cs_test_${uniq('pr177')}`;
+    const subscriptionId = `sub_test_${uniq('pr177')}`;
+    const minted = processStripeEvent(proCheckout({ sessionId, subscriptionId }));
+    const rotated = rotateApiKey(minted.notify!.rawKey)!;
+    // L'ancienne rotation ne recopiait pas l'identifiant d'abonnement.
+    getStatsDB()
+      .prepare('UPDATE api_keys SET stripe_subscription_id = NULL WHERE key_hash = ?')
+      .run(rotated.key_hash);
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body).toMatchObject({ outcome: 'ended', key_prefix: rotated.key_prefix });
+    expect(keyRow(rotated.key_hash)).toMatchObject({
+      active: 1,
+      monthly_limit: 0,
+      stripe_subscription_id: subscriptionId,
+    });
+  });
+
+  it('un deleted tardif d’un ancien abonnement ne coupe jamais le nouveau', () => {
+    const { key, ref, subscriptionId: oldSub } = freeKeyWithPackThenPro('moved');
+    expect(processStripeEvent(subscriptionDeleted(oldSub)).body.outcome).toBe('ended');
+    const newSub = `sub_test_${uniq('moved-new')}`;
+    const again = processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('moved-new')}`, subscriptionId: newSub, ref }),
+    );
+    expect(again.body.attached).toMatchObject({ outcome: 'attached' });
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+    // Stripe renvoie la fin de l'ANCIEN abonnement sous un autre identifiant.
+    const late = processStripeEvent(subscriptionDeleted(oldSub));
+    expect(late.body.outcome).toBe('moved_on');
+    expect(late.subscription).toBeUndefined();
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+    expect(keyRow(key.key_hash).stripe_subscription_id).toBe(newSub);
+    // Et la fin du NOUVEAU rend l'allocation d'avant lui : le gratuit.
+    expect(processStripeEvent(subscriptionDeleted(newSub)).body).toMatchObject({
+      outcome: 'ended',
+      allowance_restored_to: 200,
+    });
+  });
+
+  it('une clé révoquée pendant l’abonnement n’est jamais réactivée par sa fin', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('revoked-end');
+    expect(revokeApiKey(key.api_key)).toBe(true);
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body.outcome).toBe('no_active_key');
+    expect(ended.subscription).toBeUndefined();
+    expect(keyRow(key.key_hash).active).toBe(0);
+  });
+});
+
+describe('Q11 telle quelle : un renouvellement échoué ne change rien, la fin rend l’allocation d’avant', () => {
+  // « If a renewal payment fails, the key keeps its Pro allowance while the
+  // payment is retried; if the subscription ends, the key returns to what it had
+  // before the subscription. » Le point d'écoute ne reçoit aujourd'hui ni
+  // invoice.payment_failed ni customer.subscription.updated ; s'ils arrivaient,
+  // ils ne toucheraient pas la clé. Seul customer.subscription.deleted la change.
+  it('invoice.payment_failed et un abonnement passé past_due laissent le Pro à la clé', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('q11');
+    for (const type of ['invoice.payment_failed', 'customer.subscription.updated']) {
+      const result = processStripeEvent({
+        id: `evt_${uniq('q11')}`,
+        type,
+        data: {
+          object:
+            type === 'invoice.payment_failed'
+              ? { id: `in_${uniq('q11')}`, object: 'invoice', billing_reason: 'subscription_cycle' }
+              : { id: subscriptionId, object: 'subscription', status: 'past_due' },
+        },
+      } as unknown as Stripe.Event);
+      expect(result.body.ignored_event_type).toBe(type);
+      expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+    }
+    processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(200);
+  });
+});
+
+describe('renouvellement et contestation', () => {
+  it('renouvellement invoice.paid attribué à la clé existante', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('renewal');
+    const result = processStripeEvent(renewalPaid(subscriptionId));
+    expect(result.body).toMatchObject({ recorded: true, key_resolved: true });
+    const row = getStatsDB()
+      .prepare('SELECT key_hash FROM subscription_payments WHERE subscription_id = ?')
+      .get(subscriptionId) as { key_hash: string | null };
+    expect(row.key_hash).toBe(key.key_hash);
+  });
+
+  it('une contestation d’un paiement d’abonnement ne trouve aucun pack et ne reprend rien', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('dispute');
+    void subscriptionId;
+    const dispute = processStripeEvent({
+      id: `evt_${uniq('dispute')}`,
+      type: 'charge.dispute.created',
+      data: {
+        object: {
+          id: `du_${uniq('dispute')}`,
+          object: 'dispute',
+          amount: 2900,
+          currency: 'usd',
+          // L'intention de la FACTURE : la session d'abonnement n'en a pas.
+          payment_intent: `pi_${uniq('invoice')}`,
+          status: 'needs_response',
+        },
+      },
+    } as unknown as Stripe.Event);
+    expect(dispute.body).toMatchObject({ ignored: 'no_matching_purchase' });
+    expect(validateApiKey(key.api_key).creditsRemaining).toBe(1000);
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+  });
+});
+
+describe('les surfaces : Pro sur CETTE clé, jamais à un abonné', () => {
+  it('le 402 d’une clé née d’un abonnement terminé propose Pro sur elle-même', async () => {
+    const subscriptionId = `sub_test_${uniq('wall')}`;
+    const minted = processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('wall')}`, subscriptionId }),
+    );
+    const rawKey = minted.notify!.rawKey;
+    processStripeEvent(subscriptionDeleted(subscriptionId));
+    const res = await call(rawKey);
+    expect(res.status).toBe(402);
+    const ref = ensureTopupRef(validateApiKey(rawKey).keyHash)!;
+    const body = (await res.json()) as {
+      cause?: { detail?: string };
+      credit_packs?: { topup_this_key?: { pro?: { by_card?: string } } };
+    };
+    expect(body.credit_packs?.topup_this_key?.pro?.by_card).toBe(
+      `${PRO_LINK}?client_reference_id=${ref}`,
+    );
+    expect(JSON.stringify(body)).toContain(
+      `Or Pro on this same key, a flat $29/month for 10,000 requests: ${PRO_LINK}?client_reference_id=${ref}`,
+    );
+  });
+
+  it('usage : le lien Pro de la clé sans abonnement vivant, aucun avec', async () => {
+    const key = freeKey('usage');
+    const ref = ensureTopupRef(key.key_hash)!;
+    expect((await usageOf(key.api_key)).topup?.pro).toBe(`${PRO_LINK}?client_reference_id=${ref}`);
+    processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('usage')}`,
+        subscriptionId: `sub_test_${uniq('usage')}`,
+        ref,
+      }),
+    );
+    const during = await usageOf(key.api_key);
+    expect(during.topup?.by_card?.['1k']).toContain(ref);
+    expect(during.topup?.pro).toBeUndefined();
+  });
+
+  it('la page de succès reçoit subscription_attached, sans clé ni secret', async () => {
+    const { key, sessionId } = freeKeyWithPackThenPro('success');
+    const app = new Hono();
+    app.route('/', stripeRetrieve);
+    const res = await app.request(`/v1/stripe/key/${sessionId}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      subscription_attached: true,
+      plan: 'pro',
+      key_prefix: key.key_prefix,
+      monthly_limit: PRO_MONTHLY_LIMIT,
+    });
+    expect(body.api_key).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain(key.api_key);
+    // Relisible : aucun secret n'y est.
+    expect((await app.request(`/v1/stripe/key/${sessionId}`)).status).toBe(200);
+  });
+
+  it('le mail des 10 % : Pro sur la clé, ou aucun Pro pour un abonné', () => {
+    const ref = `ifr_${'b'.repeat(32)}`;
+    const offer = buildCreditsWarningEmail({
+      keyPrefix: 'ifk_0123abcd',
+      remaining: 100,
+      total: 1000,
+      proMonthlyLimit: PRO_MONTHLY_LIMIT,
+      topupRef: ref,
+    });
+    expect(offer.text).toContain(`${PRO_LINK}?client_reference_id=${ref}`);
+    expect(offer.text).toContain('A pack or Pro bought from these links lands on this same key');
+    expect(offer.text).not.toContain('delivered as a new key');
+    const subscriber = buildCreditsWarningEmail({
+      keyPrefix: 'ifk_0123abcd',
+      remaining: 100,
+      total: 1000,
+      proMonthlyLimit: PRO_MONTHLY_LIMIT,
+      topupRef: ref,
+      offerPro: false,
+    });
+    expect(subscriber.text).not.toContain(PRO_LINK);
+    expect(subscriber.html).not.toContain(PRO_LINK);
+    expect(subscriber.text).toContain('A pack bought from these links lands on this same key');
+  });
+});
+
+describe('après la relecture de sécurité (D2, D3, D4, D7)', () => {
+  it('un abonnement réglé à zéro n’est pas refusé, mais alerte (D2)', () => {
+    const key = freeKey('unpaid');
+    const ref = ensureTopupRef(key.key_hash)!;
+    const attached = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('unpaid')}`,
+        subscriptionId: `sub_test_${uniq('unpaid')}`,
+        ref,
+        paymentStatus: 'no_payment_required',
+      }),
+    );
+    expect(attached.body.attached).toMatchObject({ outcome: 'attached' });
+    expect(attached.alert?.key).toMatch(/^stripe:unpaid-subscription:/);
+    expect(attached.alert?.detail).toContain('réglé à zéro');
+    expect(attached.alert?.detail).not.toContain('@');
+    // Sans référence : une clé neuve, et la même alerte.
+    const minted = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('unpaid_new')}`,
+        subscriptionId: `sub_test_${uniq('unpaid_new')}`,
+        paymentStatus: 'no_payment_required',
+      }),
+    );
+    expect(minted.notify?.rawKey).toMatch(/^ifk_/);
+    expect(minted.alert?.key).toMatch(/^stripe:unpaid-subscription:/);
+    // Payé normalement : aucune alerte.
+    const paid = processStripeEvent(
+      proCheckout({
+        sessionId: `cs_test_${uniq('paid_ok')}`,
+        subscriptionId: `sub_test_${uniq('paid_ok')}`,
+      }),
+    );
+    expect(paid.alert).toBeUndefined();
+  });
+
+  it('un paiement arrivé après sa pierre tombale alerte ; le rejeu d’une session livrée, non (D3)', () => {
+    const key = freeKey('skipped');
+    const ref = ensureTopupRef(key.key_hash)!;
+    const lateSub = `sub_test_${uniq('skipped')}`;
+    processStripeEvent(subscriptionDeleted(lateSub));
+    const late = processStripeEvent(
+      proCheckout({ sessionId: `cs_test_${uniq('skipped')}`, subscriptionId: lateSub, ref }),
+    );
+    expect(late.body.skipped).toBe('subscription_already_canceled');
+    expect(late.alert?.key).toMatch(/^stripe:subscription-skipped:/);
+    expect(late.alert?.detail).toContain('Le client a payé sans rien recevoir');
+    expect(late.alert?.detail).not.toContain('@');
+
+    // Une session déjà livrée, rejouée après la fin normale : rien de nouveau.
+    const sessionId = `cs_test_${uniq('replayed')}`;
+    const liveSub = `sub_test_${uniq('replayed')}`;
+    processStripeEvent(proCheckout({ sessionId, subscriptionId: liveSub }));
+    processStripeEvent(subscriptionDeleted(liveSub));
+    const replay = processStripeEvent(proCheckout({ sessionId, subscriptionId: liveSub }));
+    expect(replay.body.skipped).toBe('subscription_already_canceled');
+    expect(replay.alert).toBeUndefined();
+  });
+
+  it('le mail de fin dit ce qui reste ce mois-ci (D4)', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('d4_month');
+    // Le mois compte déjà 3 000 appels payés en Pro.
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 3000)
+         ON CONFLICT (key_hash, month) DO UPDATE SET count = excluded.count`,
+      )
+      .run(key.key_hash, MONTH());
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.subscription).toMatchObject({
+      kind: 'ended',
+      allowance: 200,
+      lifetime: false,
+      remaining: 0,
+    });
+  });
+
+  it('une clé « 200 une fois » : rattachée, puis sa fin dit qu’il ne reste rien (D4)', () => {
+    const key = freeKey('d4_once');
+    // La promotion par paiement à l'appel : 200 une fois, sur la vie de la clé.
+    getStatsDB()
+      .prepare('UPDATE api_keys SET monthly_limit = 200, no_recredit = 1 WHERE key_hash = ?')
+      .run(key.key_hash);
+    const ref = ensureTopupRef(key.key_hash)!;
+    const subscriptionId = `sub_test_${uniq('d4_once')}`;
+    const sessionId = `cs_test_${uniq('d4_once')}`;
+    processStripeEvent(proCheckout({ sessionId, subscriptionId, ref }));
+    expect(findPurchaseByRef(`stripe:${sessionId}`)).toMatchObject({
+      prev_monthly_limit: 200,
+      prev_no_recredit: 1,
+    });
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 4000)
+         ON CONFLICT (key_hash, month) DO UPDATE SET count = excluded.count`,
+      )
+      .run(key.key_hash, MONTH());
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.subscription).toMatchObject({
+      kind: 'ended',
+      allowance: 200,
+      lifetime: true,
+      remaining: 0,
+    });
+    expect(keyRow(key.key_hash)).toMatchObject({ monthly_limit: 200, no_recredit: 1 });
+  });
+
+  it('une fin ambiguë (deux clés actives dans la lignée) alerte, sans rien rendre (D7)', () => {
+    const { key, subscriptionId } = freeKeyWithPackThenPro('d7');
+    // Une anomalie fabriquée : une seconde clé active dans la même lignée.
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_keys (key_hash, key_prefix, email, email_norm, monthly_limit, tier, lineage_hash, active)
+         VALUES (?, ?, 'acme@example.com', 'acme@example.com', 10000, 'email', ?, 1)`,
+      )
+      .run(`hash_${uniq('d7')}`, 'ifk_d7twin00', key.key_hash);
+    const ended = processStripeEvent(subscriptionDeleted(subscriptionId));
+    expect(ended.body.outcome).toBe('ambiguous');
+    expect(ended.alert?.key).toMatch(/^stripe:subscription-end-ambiguous:/);
+    expect(ended.alert?.detail).not.toContain('@');
+    expect(ended.subscription).toBeUndefined();
+    expect(validateApiKey(key.api_key).monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+  });
+});
+
+describe('les mails', () => {
+  it('Pro rattaché : court, sans clé brute, sans tiret long', () => {
+    const mail = buildSubscriptionAttachedEmail({
+      keyPrefix: 'ifk_0123abcd',
+      plan: 'pro',
+      monthlyLimit: PRO_MONTHLY_LIMIT,
+    });
+    expect(mail.subject).toBe('IBANforge Pro active on key ifk_0123abcd');
+    expect(mail.text).toContain('Nothing to change in your integration');
+    expect(mail.text).toContain('Cancelling stops the next renewal. The key is not deactivated');
+    for (const part of [mail.subject, mail.text, mail.html]) expect(part).not.toContain('—');
+  });
+
+  it('fin d’abonnement : la clé reste active, et une clé sans rien a ses liens', () => {
+    const ref = `ifr_${'a'.repeat(32)}`;
+    const empty = buildSubscriptionEndedEmail({
+      keyPrefix: 'ifk_0123abcd',
+      plan: 'pro',
+      allowance: 0,
+      creditsRemaining: null,
+      topupRef: ref,
+    });
+    expect(empty.text).toContain('The key stays active');
+    expect(empty.text).toContain('HTTP 402');
+    expect(empty.text).toContain(`?client_reference_id=${ref}`);
+    expect(empty.text).toContain(
+      `https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04?client_reference_id=${ref}`,
+    );
+    const free = buildSubscriptionEndedEmail({
+      keyPrefix: 'ifk_0123abcd',
+      plan: 'pro',
+      allowance: 200,
+      remaining: 150,
+      creditsRemaining: 1000,
+      topupRef: ref,
+    });
+    expect(free.text).toContain('200 requests a month, 150 left this month.');
+    expect(free.text).toContain('Then the 1,000 prepaid credits left on it.');
+    // D4 : un mois déjà consommé par les appels payés en Pro.
+    const spent = buildSubscriptionEndedEmail({
+      keyPrefix: 'ifk_0123abcd',
+      plan: 'pro',
+      allowance: 200,
+      remaining: 0,
+      creditsRemaining: null,
+      topupRef: ref,
+    });
+    expect(spent.text).toContain('none left this month');
+    expect(spent.text).toContain('200 again from the 1st');
+    expect(spent.text).not.toContain('It has its own allowance back: 200 requests a month.');
+    // D4 : une clé « 200 une fois » dont la somme de vie dépasse l'allocation.
+    const once = buildSubscriptionEndedEmail({
+      keyPrefix: 'ifk_0123abcd',
+      plan: 'pro',
+      allowance: 200,
+      lifetime: true,
+      remaining: 0,
+      creditsRemaining: null,
+      topupRef: ref,
+    });
+    expect(once.text).toContain('is used up');
+    expect(once.text).toContain('nothing is left of it');
+    expect(once.text).toContain('HTTP 402');
+    expect(once.text).not.toContain('allowance back');
+    for (const part of [empty.subject, empty.text, empty.html, free.text, spent.text, once.text]) {
+      expect(part).not.toContain('—');
+    }
+  });
+
+  it('le mail d’une clé Pro neuve dit la résiliation des conditions 1.9, mot pour mot', () => {
+    const mail = buildProKeyEmail({ rawKey: 'ifk_test', monthlyLimit: PRO_MONTHLY_LIMIT });
+    expect(mail.text).toContain(PRO_CANCELLATION_SENTENCE);
+    expect(mail.text).not.toContain('keeps working until the end of the paid month');
+  });
+});

@@ -312,6 +312,83 @@ describe('ouverture du schéma', () => {
     mod.closeAll();
   });
 
+  it('la fin d’un abonnement sur la clé (lot B2) : posée par la seule pierre tombale, rejouable', async () => {
+    // Même base d'avant : une clé Pro tournée avant le 10.09 (copie active sans
+    // l'abonnement, toujours facturé), et une clé Pro dont l'abonnement a sa
+    // pierre tombale (résiliée avant B2, donc désactivée par l'ancien code).
+    const path = freshPath();
+    const raw = new Database(path);
+    raw.exec(`
+      CREATE TABLE api_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT UNIQUE NOT NULL,
+        key_prefix TEXT NOT NULL,
+        email TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        active INTEGER DEFAULT 1,
+        monthly_limit INTEGER,
+        stripe_session_id TEXT,
+        stripe_subscription_id TEXT,
+        lineage_hash TEXT,
+        origin_prefix TEXT
+      );
+      CREATE TABLE dead_subscriptions (
+        subscription_id TEXT PRIMARY KEY,
+        recorded_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, stripe_session_id,
+                            stripe_subscription_id, lineage_hash)
+        VALUES ('ho', 'ifk_000000ho', 'acme@example.com', 0, 10000, 'cs_test_live_pro',
+                'sub_test_live_pro', 'ho');
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, lineage_hash, origin_prefix)
+        VALUES ('hr', 'ifk_000000hr', 'acme@example.com', 1, 10000, 'ho', 'ifk_000000ho');
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, stripe_session_id,
+                            stripe_subscription_id, lineage_hash)
+        VALUES ('hd', 'ifk_000000hd', 'acme@example.com', 0, 10000, 'cs_test_gone_pro',
+                'sub_test_gone_pro', 'hd');
+      INSERT INTO dead_subscriptions (subscription_id, recorded_at)
+        VALUES ('sub_test_gone_pro', '2026-09-01 10:00:00');
+      -- Relecture de la PR 264, D7 : une clé ACTIVE dont l'abonnement a une
+      -- pierre tombale n'a pas reçu sa photo ; le rattrapage ne la date pas.
+      INSERT INTO api_keys (key_hash, key_prefix, email, active, monthly_limit, stripe_session_id,
+                            stripe_subscription_id, lineage_hash)
+        VALUES ('hx', 'ifk_000000hx', 'acme@example.com', 1, 10000, 'cs_test_orphan_pro',
+                'sub_test_orphan_pro', 'hx');
+      INSERT INTO dead_subscriptions (subscription_id, recorded_at)
+        VALUES ('sub_test_orphan_pro', '2026-09-02 10:00:00');
+    `);
+    raw.close();
+    const mod = await openAt(path);
+    const db = mod.getStatsDB();
+    expect(columns(db, 'api_keys')).toContain('subscription_ended_at');
+    const ended = () =>
+      db
+        .prepare('SELECT key_hash, active, subscription_ended_at FROM api_keys ORDER BY key_hash')
+        .all() as Array<{ key_hash: string; active: number; subscription_ended_at: string | null }>;
+    expect(ended()).toEqual([
+      // La résiliée d'avant B2 : datée par sa pierre tombale, et TOUJOURS
+      // désactivée (Q13 : aucune réactivation automatique).
+      { key_hash: 'hd', active: 0, subscription_ended_at: '2026-09-01 10:00:00' },
+      { key_hash: 'ho', active: 0, subscription_ended_at: null },
+      // La copie active d'un abonnement vivant : jamais datée.
+      { key_hash: 'hr', active: 1, subscription_ended_at: null },
+      // Active avec une pierre tombale : jamais datée par le rattrapage (D7).
+      { key_hash: 'hx', active: 1, subscription_ended_at: null },
+    ]);
+    mod.closeAll();
+    // Rejouée à la réouverture : rien ne bouge.
+    const again = await openAt(path);
+    const db2 = again.getStatsDB();
+    expect(
+      (
+        db2.prepare('SELECT subscription_ended_at FROM api_keys WHERE key_hash = ?').get('hd') as {
+          subscription_ended_at: string;
+        }
+      ).subscription_ended_at,
+    ).toBe('2026-09-01 10:00:00');
+    again.closeAll();
+  });
+
   it('avec deux key_prefix identiques, l’ouverture ne jette pas et l’index unique n’est PAS créé', async () => {
     const path = freshPath();
     const raw = new Database(path);

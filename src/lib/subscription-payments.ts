@@ -52,6 +52,21 @@ type Db = ReturnType<typeof getStatsDB>;
 export const SUBSCRIPTION_KEY_SQL =
   'stripe_subscription_id IS NOT NULL OR (stripe_session_id IS NOT NULL AND credits_total IS NULL)';
 
+/**
+ * « Abonné AUJOURD'HUI » (chantier « clé unique », lot B2, 25.09.2026). Depuis
+ * ce lot, une résiliation ne désactive plus la clé : elle pose
+ * `subscription_ended_at` et garde l'identifiant (qui retrouve la clé d'un
+ * renouvellement et la garde hors du rayon du radar). SUBSCRIPTION_KEY_SQL dit
+ * donc « abonné un jour », et cette règle-ci « abonnement vivant » : la même
+ * population, moins les abonnements terminés. Le drapeau `subscriber`, la
+ * formule d'une clé du compte, l'avertissement de `/revoke` et le compte des
+ * abonnements actifs la lisent ; l'argent lit l'autre, un paiement passé ne
+ * disparaît pas avec l'abonnement.
+ *
+ * Fragment SQL sur `api_keys`, à mettre entre parenthèses dans un WHERE.
+ */
+export const ACTIVE_SUBSCRIPTION_SQL = `(${SUBSCRIPTION_KEY_SQL}) AND subscription_ended_at IS NULL`;
+
 /** L'identifiant d'un objet Stripe, qu'il arrive en chaîne ou développé. */
 export function stripeId(value: unknown): string | null {
   if (typeof value === 'string') return value || null;
@@ -241,6 +256,28 @@ export interface SubscriptionKeyRow {
   issued_by_us: number | null;
   active: number | null;
   created_at: string | null;
+  /**
+   * La fin de l'abonnement sur cette clé (lot B2) ; NULL tant qu'il vit. Une clé
+   * active dont l'abonnement est terminé ne compte plus comme abonnement actif.
+   */
+  subscription_ended_at?: string | null;
+}
+
+/**
+ * Le premier paiement d'un abonnement posé sur une clé EXISTANTE (lot B2) : la
+ * clé ne porte pas la session de cet abonnement (elle garde « l'achat qui l'a
+ * frappée »), donc ce paiement ne vit qu'au registre des achats, en ligne
+ * `attached`. Lu là, et seulement là : jamais compté deux fois.
+ */
+export interface AttachedSubscriptionRow {
+  payment_ref: string;
+  stripe_subscription_id: string | null;
+  amount_minor: number | null;
+  currency: string | null;
+  created_at: string | null;
+  /** L'adresse de la clé servie à l'achat, pour la règle « compte interne ». */
+  email: string | null;
+  issued_by_us: number | null;
 }
 
 /** Une ligne de `subscription_payments`, avec l'adresse de la clé de son abonnement. */
@@ -308,7 +345,12 @@ function later(a: string | null, b: string | null): string | null {
  * deux fois un même paiement (même règle que pack-sales.ts).
  */
 export function subscriptionsSold(
-  input: { keys: SubscriptionKeyRow[]; payments: SubscriptionPaymentRow[] },
+  input: {
+    keys: SubscriptionKeyRow[];
+    payments: SubscriptionPaymentRow[];
+    /** Les premiers paiements des abonnements posés sur une clé existante (lot B2). */
+    attached?: AttachedSubscriptionRow[];
+  },
   isExcluded: (email: string) => boolean,
 ): SubscriptionsSold {
   const out: SubscriptionsSold = {
@@ -345,6 +387,15 @@ export function subscriptionsSold(
     }
   }
 
+  // Un abonnement posé sur une clé existante (lot B2) est écarté comme les
+  // autres quand la clé servie à l'achat est interne ou offerte.
+  for (const a of input.attached ?? []) {
+    if (!a.stripe_subscription_id) continue;
+    if ((a.email && isExcluded(a.email)) || a.issued_by_us) {
+      excludedSubs.add(a.stripe_subscription_id);
+    }
+  }
+
   const seen = new Set<string>();
   const active = new Set<string>();
   const sessions = new Map<string, SubscriptionKeyRow[]>();
@@ -352,7 +403,9 @@ export function subscriptionsSold(
     const sub = k.stripe_subscription_id;
     if (sub && !excludedSubs.has(sub)) {
       seen.add(sub);
-      if (k.active) active.add(sub);
+      // Actif = une clé active ET un abonnement qui n'est pas terminé (lot B2 :
+      // la clé survit à son abonnement, l'identifiant reste sur elle).
+      if (k.active && !k.subscription_ended_at) active.add(sub);
     }
     const session = k.stripe_session_id?.trim();
     if (!session || excludedSessions.has(session)) continue;
@@ -387,6 +440,25 @@ export function subscriptionsSold(
       continue;
     }
     out.first_payments_usd_minor += priced.amount_paid_minor as number;
+  }
+
+  // Les premiers paiements des abonnements posés sur une clé existante : au
+  // registre seulement (la clé ne porte pas leur session), une ligne chacun.
+  for (const a of input.attached ?? []) {
+    if (a.stripe_subscription_id && excludedSubs.has(a.stripe_subscription_id)) continue;
+    if (a.stripe_subscription_id) seen.add(a.stripe_subscription_id);
+    out.first_payments++;
+    out.last_payment_at = later(out.last_payment_at, a.created_at);
+    const currency = currencyOf(a.currency);
+    if (!usableAmount(a.amount_minor) || !currency) {
+      out.first_payments_amount_missing++;
+      continue;
+    }
+    if (currency !== 'usd') {
+      out.other_currency_payments++;
+      continue;
+    }
+    out.first_payments_usd_minor += a.amount_minor;
   }
 
   for (const p of input.payments) {
@@ -425,13 +497,14 @@ export function subscriptionsSold(
 export function readSubscriptionRows(db: Db = getStatsDB()): {
   keys: SubscriptionKeyRow[];
   payments: SubscriptionPaymentRow[];
+  attached: AttachedSubscriptionRow[];
 } {
   // La règle partagée avec activation.ts ; les clés inactives restent (une
   // rotation ou une résiliation n'efface pas le paiement d'origine).
   const keys = db
     .prepare(
       `SELECT email, credits_total, stripe_session_id, stripe_subscription_id, amount_paid_minor,
-              amount_paid_currency, issued_by_us, active, created_at,
+              amount_paid_currency, issued_by_us, active, created_at, subscription_ended_at,
               (SELECT kp.kind FROM key_purchases kp
                 WHERE kp.payment_ref = 'stripe:' || api_keys.stripe_session_id) AS session_kind
          FROM api_keys
@@ -448,5 +521,16 @@ export function readSubscriptionRows(db: Db = getStatsDB()): {
          FROM subscription_payments p`,
     )
     .all() as SubscriptionPaymentRow[];
-  return { keys, payments };
+  // Seulement `attached` : une frappe (`minted`, `minted_fallback`) porte déjà
+  // son premier paiement sur la clé qu'elle a frappée, lu plus haut.
+  const attached = db
+    .prepare(
+      `SELECT p.payment_ref, p.stripe_subscription_id, p.amount_minor, p.currency, p.created_at,
+              k.email, MAX(p.issued_by_us, COALESCE(k.issued_by_us, 0)) AS issued_by_us
+         FROM key_purchases p
+         LEFT JOIN api_keys k ON k.key_hash = p.key_hash
+        WHERE p.kind = 'subscription' AND p.outcome = 'attached'`,
+    )
+    .all() as AttachedSubscriptionRow[];
+  return { keys, payments, attached };
 }

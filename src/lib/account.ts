@@ -425,8 +425,10 @@ type AllowancePlan = 'free' | 'custom' | 'pro' | 'editor';
 /**
  * La formule d'une clé. Une clé mixte (allocation ET crédits, lot B1) porte les
  * deux parties, `free+pack` par exemple, que la page lit partie par partie.
+ * `none` (relecture de la PR 264, D5) : ni allocation ni crédits, une clé née
+ * d'un abonnement terminé ; elle répond 402 avec les liens qui la rechargent.
  */
-export type AccountPlan = AllowancePlan | 'pack' | `${AllowancePlan}+pack`;
+export type AccountPlan = AllowancePlan | 'pack' | 'none' | `${AllowancePlan}+pack`;
 
 export interface OverviewKey {
   key_prefix: string;
@@ -473,6 +475,8 @@ type KeyRow = ApiKeyValidationRow & {
   key_prefix: string;
   created_at: string | null;
   stripe_subscription_id: string | null;
+  /** La fin de l'abonnement (lot B2) : la clé reste active et garde l'identifiant. */
+  subscription_ended_at?: string | null;
   claimed_at?: string | null;
   claim_method?: string | null;
 };
@@ -493,13 +497,20 @@ function planOf(row: KeyRow): AccountPlan {
   const hasCredits = row.credits_remaining !== null;
   // Une clé à crédits sans allocation propre est un pack, et seulement cela.
   if (hasCredits && allowance <= 0) return 'pack';
-  const base: AllowancePlan = row.stripe_subscription_id
-    ? allowance >= OEM_MONTHLY_LIMIT
-      ? 'editor'
-      : 'pro'
-    : allowance <= FREE_TIER_MONTHLY_LIMIT
-      ? 'free'
-      : 'custom';
+  // Ni allocation ni crédits (une clé née d'un abonnement terminé) : jamais
+  // « free », qui ferait lire une allocation gratuite à une clé qui répond 402
+  // (relecture de la PR 264, D5).
+  if (!hasCredits && allowance <= 0) return 'none';
+  // Un abonnement VIVANT (lot B2) : une clé dont l'abonnement est terminé garde
+  // l'identifiant mais a retrouvé son allocation d'avant.
+  const base: AllowancePlan =
+    row.stripe_subscription_id && !row.subscription_ended_at
+      ? allowance >= OEM_MONTHLY_LIMIT
+        ? 'editor'
+        : 'pro'
+      : allowance <= FREE_TIER_MONTHLY_LIMIT
+        ? 'free'
+        : 'custom';
   return hasCredits ? `${base}+pack` : base;
 }
 
@@ -554,7 +565,8 @@ export function buildOverview(
 
   const rows = db
     .prepare(
-      `SELECT key_hash, key_prefix, created_at, stripe_subscription_id, claimed_at, claim_method,
+      `SELECT key_hash, key_prefix, created_at, stripe_subscription_id, subscription_ended_at,
+              claimed_at, claim_method,
               ${API_KEY_VALIDATION_COLUMNS},
               (SELECT r.created_at FROM request_log r
                 WHERE r.key_prefix = api_keys.key_prefix
@@ -604,8 +616,11 @@ export function buildOverview(
     // Une clé à crédits SANS allocation propre : son `limit` n'est opposé à
     // rien. Une clé mixte (lot B1) montre les deux blocs.
     const isCreditKey = hasCredits && (row.monthly_limit ?? ownAllowanceDefault(row.tier)) <= 0;
-    const topup = (block.topup as { by_card?: Record<'1k' | '5k' | '25k', string> } | null)
-      ?.by_card;
+    const topupBlock = block.topup as {
+      by_card?: Record<'1k' | '5k' | '25k', string>;
+      pro?: string;
+    } | null;
+    const topup = topupBlock?.by_card;
     const subscription =
       plan === 'pro' || plan === 'editor'
         ? { plan, status: 'active' as const, manage_url: PRO_PORTAL_URL }
@@ -635,12 +650,14 @@ export function buildOverview(
       address_proven:
         !!row.claimed_at && !!row.claim_method && MAILBOX_PROOFS.has(row.claim_method),
       // `topup` depuis le lot B1 : les liens portent la référence de la clé.
-      // `subscribe_pro` attend le lot B2 : le lien Pro d'aujourd'hui frappe
-      // une clé neuve. Le portail Stripe, lui, existe déjà : c'est une page de
-      // connexion par e-mail, sans secret.
+      // `subscribe_pro` depuis le lot B2 : le lien Pro porteur de la même
+      // référence pose l'abonnement sur CETTE clé ; absent quand elle en porte
+      // déjà un vivant (le bloc `topup` ne le donne alors pas). Même mise en
+      // garde qu'une recharge quand l'adresse n'est pas prouvée (I1). Le
+      // portail Stripe est une page de connexion par e-mail, sans secret.
       actions: {
         topup: topup ?? null,
-        subscribe_pro: null,
+        subscribe_pro: topupBlock?.pro ?? null,
         manage_subscription: subscription ? PRO_PORTAL_URL : null,
       },
     };
