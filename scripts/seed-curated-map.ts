@@ -68,11 +68,22 @@ export const SCHWIFTY_INDEX_URL = 'https://pypi.org/pypi/schwifty/json';
 /** Une roue de schwifty pèse quelques centaines de Ko ; au-delà, ce n'est pas elle. */
 export const MAX_WHEEL_BYTES = 32 * 1024 * 1024;
 
-/** Les registres de la roue, par pays, dans l'ordre de préférence. */
+/**
+ * Les registres de la roue, par pays, dans l'ordre de préférence. Depuis sa
+ * version 2026.03.0, schwifty publie les registres polonais et finlandais au
+ * format v2, sous un autre nom (`generated_pl.v2.json`, voir `registryEntries`) ;
+ * sans ce nom, le passage du 26/09/2026 n'a trouvé aucun registre PL ni FI dans la
+ * roue. Le nom v2 passe en premier, l'ancien reste lu pour une roue plus ancienne,
+ * et le nom v2 du registre luxembourgeois est lu d'avance.
+ */
 export const REGISTRY_FILES: Readonly<Record<'PL' | 'FI' | 'LU', readonly string[]>> = {
-  PL: ['schwifty/bank_registry/generated_pl.json'],
-  FI: ['schwifty/bank_registry/generated_fi.json'],
-  LU: ['schwifty/bank_registry/generated_lu.json', 'schwifty/bank_registry/manual_lu.json'],
+  PL: ['schwifty/bank_registry/generated_pl.v2.json', 'schwifty/bank_registry/generated_pl.json'],
+  FI: ['schwifty/bank_registry/generated_fi.v2.json', 'schwifty/bank_registry/generated_fi.json'],
+  LU: [
+    'schwifty/bank_registry/generated_lu.v2.json',
+    'schwifty/bank_registry/generated_lu.json',
+    'schwifty/bank_registry/manual_lu.json',
+  ],
 };
 
 /** La forme d'un code bancaire de l'IBAN, par pays. */
@@ -182,6 +193,33 @@ export function readWheel(wheel: Buffer): Map<string, string> {
 }
 
 /**
+ * Les lignes d'un registre, une par code. Deux formats : une liste (v1, une ligne
+ * par code), ou un objet v2, une entrée par banque dont le champ `expand_from`
+ * porte la liste de ses codes, dépliée en une ligne par code sous le nom
+ * `expand_into`, comme schwifty le fait lui-même (`parse_v2` de son registry.py).
+ * La forme décide, pas le nom du fichier. Une entrée sans liste de codes reste une
+ * ligne sans code : écartée et comptée plus loin. Toute autre forme est une Error.
+ */
+function registryEntries(cc: 'PL' | 'FI' | 'LU', text: string): unknown[] {
+  const parsed: unknown = JSON.parse(text);
+  if (Array.isArray(parsed)) return parsed;
+  const v2 = parsed as { entries?: unknown; expand_from?: unknown; expand_into?: unknown } | null;
+  const from = v2?.expand_from;
+  const into = v2?.expand_into;
+  if (!v2 || !Array.isArray(v2.entries) || typeof from !== 'string' || typeof into !== 'string')
+    throw new Error(`schwifty ${cc} : un registre n’est ni une liste ni au format v2`);
+  const rows: unknown[] = [];
+  for (const raw of v2.entries) {
+    const entry = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+    const values = entry[from];
+    const rest = Object.fromEntries(Object.entries(entry).filter(([key]) => key !== from));
+    if (!Array.isArray(values)) rows.push(rest);
+    else for (const value of values) rows.push({ ...rest, [into]: value });
+  }
+  return rows;
+}
+
+/**
  * Les clés d'un pays, lues dans ses registres : une par code, la première
  * entrée « primaire » l'emporte, puis la première tout court. Un code ou un BIC
  * qui n'a pas la forme attendue est écarté (et compté), jamais corrigé.
@@ -193,9 +231,7 @@ export function parseRegistry(
   const byCode = new Map<string, CuratedRow & { name: string | null; primary: boolean }>();
   let skipped = 0;
   for (const text of texts) {
-    const parsed: unknown = JSON.parse(text);
-    if (!Array.isArray(parsed)) throw new Error(`schwifty ${cc} : un registre n’est pas une liste`);
-    for (const raw of parsed) {
+    for (const raw of registryEntries(cc, text)) {
       const entry = raw as {
         country_code?: unknown;
         bank_code?: unknown;

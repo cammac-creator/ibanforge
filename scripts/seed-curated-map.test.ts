@@ -77,6 +77,25 @@ function registry(cc: 'PL' | 'FI' | 'LU', n: number): string {
   return JSON.stringify(entries);
 }
 
+/**
+ * Le même registre au format v2 (schwifty 2026.03.0 et suivantes) : une entrée
+ * par banque, avec la liste de ses codes.
+ */
+function registryV2(cc: 'PL' | 'FI' | 'LU', n: number, perBank = 4): string {
+  const rows = JSON.parse(registry(cc, n)) as Array<{ bic: string; bank_code: string }>;
+  const entries = [];
+  for (let i = 0; i < rows.length; i += perBank)
+    entries.push({
+      country_code: cc,
+      primary: true,
+      bic: rows[i]!.bic,
+      name: `Remplissage ${cc} ${i}`,
+      short_name: `Remplissage ${cc}`,
+      bank_codes: rows.slice(i, i + perBank).map((r) => r.bank_code),
+    });
+  return JSON.stringify({ entries, expand_from: 'bank_codes', expand_into: 'bank_code' });
+}
+
 const WHEEL_URL = 'https://files.example.invalid/schwifty-2099.1.0-py3-none-any.whl';
 
 function fakeNetwork(
@@ -205,6 +224,44 @@ describe('seed-curated-map : clés PL, FI, LU et liste finlandaise, sans réseau
       db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'fi_monetary_codes'").get(),
     ).toBeUndefined();
     expect(net.urls).toEqual([SCHWIFTY_INDEX_URL, WHEEL_URL]);
+  });
+
+  it('roue de schwifty 2026.03 et suivantes (PL et FI au format v2, LU dans manual_lu.json) : les trois membres écrits', async () => {
+    // Le passage privé du 26/09/2026 n'avait trouvé aucun registre PL ni FI :
+    // ils avaient changé de nom et de forme dans la roue. Les vrais noms, écrits ici
+    // en toutes lettres, pour qu'un réordonnancement de REGISTRY_FILES ne masque rien.
+    const wheel = buildZip({
+      'schwifty/bank_registry/generated_pl.v2.json': registryV2('PL', RESTRICTED_FLOORS.map_pl + 3),
+      'schwifty/bank_registry/generated_fi.v2.json': registryV2('FI', RESTRICTED_FLOORS.map_fi + 3),
+      'schwifty/bank_registry/manual_lu.json': registry('LU', RESTRICTED_FLOORS.map_lu + 3),
+    });
+    await seedCuratedMap({ db, fetchImpl: fakeNetwork(wheel).fetchImpl, log: () => {} });
+    expect(states()).toMatchObject({
+      map_pl: `loaded:${RESTRICTED_FLOORS.map_pl + 3}`,
+      map_fi: `loaded:${RESTRICTED_FLOORS.map_fi + 3}`,
+      map_lu: `loaded:${RESTRICTED_FLOORS.map_lu + 3}`,
+    });
+    expect(
+      db
+        .prepare("SELECT DISTINCT length(bic) AS n FROM curated_bank_codes WHERE country = 'FI'")
+        .all(),
+    ).toEqual([{ n: 11 }]);
+  });
+
+  it('roue portant l’ancien et le nouveau nom : le registre v2 l’emporte sur un code commun', async () => {
+    const old = JSON.parse(registry('PL', RESTRICTED_FLOORS.map_pl)) as Array<{ bic: string }>;
+    const v2Bic = old[0]!.bic;
+    old[0]!.bic = 'XMPZPLPW';
+    const wheel = buildZip({
+      'schwifty/bank_registry/generated_pl.json': JSON.stringify(old),
+      'schwifty/bank_registry/generated_pl.v2.json': registryV2('PL', RESTRICTED_FLOORS.map_pl),
+    });
+    await seedCuratedMap({ db, fetchImpl: fakeNetwork(wheel).fetchImpl, log: () => {} });
+    expect(
+      db
+        .prepare("SELECT bic FROM curated_bank_codes WHERE country = 'PL' AND code = '99900000'")
+        .get(),
+    ).toEqual({ bic: v2Bic });
   });
 
   it('empreinte différente de celle de l’index : rien n’est écrit, chaque membre en panne', async () => {
@@ -385,6 +442,33 @@ describe('seed-curated-map : lectures', () => {
     const parsed = parseRegistry('LU', [text]);
     expect(parsed.rows.map((r) => [r.code, r.bic])).toEqual([['001', 'XMPALULL']]);
     expect(parsed.skipped).toBe(3);
+  });
+
+  it('parseRegistry lit le format v2 : une ligne par code, « primary » absent vaut faux, formes fausses écartées', () => {
+    const text = JSON.stringify({
+      expand_from: 'bank_codes',
+      expand_into: 'bank_code',
+      entries: [
+        { country_code: 'FI', bic: 'XMPAFIHH', bank_codes: ['101', '102'] },
+        { country_code: 'FI', primary: true, bic: 'XMPBFIHH', bank_codes: ['102', '1030', '104'] },
+        { country_code: 'FI', primary: true, bic: 'XMPCFIHH' },
+        { country_code: 'SE', primary: true, bic: 'XMPDSESS', bank_codes: ['105'] },
+      ],
+    });
+    const parsed = parseRegistry('FI', [text]);
+    expect(parsed.rows.map((r) => [r.code, r.bic])).toEqual([
+      ['101', 'XMPAFIHHXXX'],
+      ['102', 'XMPBFIHHXXX'],
+      ['104', 'XMPBFIHHXXX'],
+    ]);
+    // Le code à quatre chiffres, l'entrée sans liste de codes, la ligne suédoise.
+    expect(parsed.skipped).toBe(3);
+    expect(() => parseRegistry('FI', [JSON.stringify({ entries: [] })])).toThrow(/format v2/);
+    expect(() =>
+      parseRegistry('FI', [
+        JSON.stringify({ expand_from: 'bank_codes', expand_into: 'bank_code' }),
+      ]),
+    ).toThrow(/format v2/);
   });
 
   it('curatedRowsFromMap : seules les clés PL, FI, LU, dans leur forme', () => {
