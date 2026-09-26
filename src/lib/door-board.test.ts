@@ -190,6 +190,7 @@ describe('la définition du parc externe', () => {
       'failed',
       'refunded',
       'disputed',
+      'reinstated',
     ];
     for (const o of all) {
       expect(PAID_OUTCOMES.includes(o), o).toBe(isSaleOutcome(o) || o === 'attached');

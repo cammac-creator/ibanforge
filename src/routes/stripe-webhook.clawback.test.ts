@@ -279,7 +279,7 @@ describe('litige', () => {
     expect(detail).toContain('Demande de renseignements');
     expect(detail).toContain('les fonds ne sont PAS retirés');
     expect(detail).toContain('Répondre à la demande dans Stripe');
-    expect(detail).toContain('les 1000 crédits sont à restituer à la main');
+    expect(detail).toContain('les 1000 crédits seront rendus d’eux-mêmes');
     expect(detail).not.toContain('Litige gagné');
     expect(detail).not.toContain('@');
     // Jamais une clé désactivée : elle reste valable, à zéro (règle A : 402 avec ses liens).
@@ -523,7 +523,9 @@ describe('après la relecture de sécurité (D3, D5)', () => {
     );
     expect(refund.body.reversal).toMatchObject({ outcome: 'unchanged', removed_credits: 0 });
     expect(refund.alert).toBeUndefined();
-    expect(purchaseOf(sessionId)).toMatchObject({ outcome: 'disputed', clawback_credits: 1000 });
+    // Rien de plus n'est repris, mais l'issue dit que l'argent est reparti par le
+    // remboursement (26.09.2026) : un litige refermé ensuite ne rendra rien.
+    expect(purchaseOf(sessionId)).toMatchObject({ outcome: 'refunded', clawback_credits: 1000 });
     expect(validateApiKey(key.api_key).creditsRemaining).toBe(1000);
   });
 

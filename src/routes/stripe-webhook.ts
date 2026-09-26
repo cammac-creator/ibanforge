@@ -28,6 +28,11 @@
  * et `charge.dispute.created` reprennent les crédits du pack payé, par le même
  * code que la route d'administration (src/lib/key-purchases.ts). Voir
  * REVERSAL_EVENTS ci-dessous.
+ *
+ * Litige refermé (26/09/2026, décision de Claude-Alain : rendre les crédits
+ * tout seuls quand il garde l'argent) : `charge.dispute.closed` rend ce que le
+ * litige avait repris quand il se referme sans perte. Voir
+ * DISPUTE_CLOSED_EVENT ci-dessous.
  */
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
@@ -44,9 +49,11 @@ import {
   applyCardSubscriptionPaymentInTx,
   endSubscriptionInTx,
   ensureTopupRef,
+  closeCardDisputeInTx,
   findPurchaseByRef,
   reverseCardPurchaseInTx,
   type CardReversal,
+  type DisputeClosure,
   type ReversalReason,
 } from '../lib/key-purchases.js';
 import { isReachableContact } from '../lib/quota-notice.js';
@@ -135,8 +142,9 @@ const MINTING_EVENTS: ReadonlySet<string> = new Set([
  *    Des remboursements partiels qui s'additionnent deviennent totaux au
  *    dernier évènement, qui reprend une fois.
  *  - `charge.dispute.created` : tout litige reprend, quels que soient son statut
- *    et son montant, c'est la lettre de la décision. Un litige gagné ensuite ne
- *    rend rien de lui-même : un humain restitue depuis le registre.
+ *    et son montant, c'est la lettre de la décision. S'il se referme ensuite
+ *    sans perte, `charge.dispute.closed` rend ce qu'il avait repris
+ *    (DISPUTE_CLOSED_EVENT ci-dessous).
  *
  * L'achat se retrouve par l'intention de paiement que le webhook écrit sur sa
  * ligne depuis le lot B1. Jamais plus que les crédits du pack, jamais sous
@@ -149,6 +157,20 @@ const MINTING_EVENTS: ReadonlySet<string> = new Set([
  * n'arrive ici, et la route d'administration reste le seul moyen de reprendre.
  */
 const REVERSAL_EVENTS: ReadonlySet<string> = new Set(['charge.refunded', 'charge.dispute.created']);
+
+/**
+ * La fermeture d'un litige (décision de Claude-Alain du 26.09.2026, choix 4 du
+ * bilan : « rendre les crédits tout seuls quand je garde l'argent »). Quand il
+ * se referme sans perte (`won` : litige gagné ; `warning_closed` : demande de
+ * renseignements refermée), les crédits que `charge.dispute.created` avait
+ * repris reviennent à la clé active de la lignée : exactement ce qui avait été
+ * repris, jamais plus, une seule fois. Un litige perdu (`lost`) ne rend rien :
+ * l'argent est reparti au payeur. Un pack remboursé entre-temps non plus.
+ *
+ * 🚨 Le point d'écoute Stripe doit être abonné à cet évènement : sans lui, rien
+ * n'arrive ici, et les crédits d'un litige gagné restent repris.
+ */
+const DISPUTE_CLOSED_EVENT = 'charge.dispute.closed';
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -460,7 +482,7 @@ function reversalAnswer(
               `(achat ${p.id}, clé ${prefix}…) : ce n’est pas encore un litige, les fonds ne sont PAS retirés. ` +
               `${out.removed} crédits ont quand même été repris (décision du 25.09.2026), jamais sous zéro, ` +
               `clé toujours active.${why} Répondre à la demande dans Stripe. Si elle se referme sans litige, ` +
-              `les ${out.removed} crédits sont à restituer à la main (aucune route ne les remet encore).`,
+              `les ${out.removed} crédits seront rendus d’eux-mêmes.`,
           }
         : {
             key: alertKey,
@@ -468,7 +490,7 @@ function reversalAnswer(
               `Un pack payé par carte a été ${what} chez Stripe : ${out.removed} crédits repris sur ` +
               `la clé ${prefix}… (achat ${p.id}), jamais sous zéro, clé toujours active.${why}` +
               (reason === 'disputed'
-                ? ' Litige gagné : rien n’est rendu de lui-même, restituer à la main depuis le registre.'
+                ? ' Litige gagné : les crédits repris seront rendus d’eux-mêmes.'
                 : ''),
           },
     };
@@ -497,6 +519,132 @@ function reversalAnswer(
         ? `Un paiement d’abonnement a été ${what} chez Stripe (achat ${p.id}, clé ${p.key_prefix}…) : rien n’a été repris ; l’abonnement se gère dans Stripe.`
         : `Un achat jamais réglé (${p.outcome}) est ${what} chez Stripe (achat ${p.id}) : rien n’a été repris. À relire.`;
   return { status: 200, body, alert: { key: alertKey, detail } };
+}
+
+/**
+ * La réponse à Stripe, le journal et l'alerte de la fermeture d'un litige. Mêmes
+ * règles que `reversalAnswer` : des identifiants Stripe et de l'achat au
+ * journal, le préfixe de la clé et le numéro de l'achat dans l'alerte, jamais
+ * une adresse. Une alerte par achat : un évènement rejoué sous un autre
+ * identifiant ne la relance pas.
+ */
+function disputeClosedAnswer(
+  event: Stripe.Event,
+  disputeStatus: string | null,
+  closure: DisputeClosure,
+): { status: number; body: Record<string, unknown>; alert?: { key: string; detail: string } } {
+  const base = { received: true, event_id: event.id };
+  const statusNote = ` (dispute status ${disputeStatus ?? 'unknown'})`;
+  if (closure.kind === 'no_payment_intent' || closure.kind === 'unknown') {
+    const ignored = closure.kind === 'unknown' ? 'no_matching_purchase' : 'no_payment_intent';
+    console.info(
+      `[stripe-webhook] ${event.type}${statusNote} ignored (${ignored}), event ${event.id}`,
+    );
+    return { status: 200, body: { ...base, ignored } };
+  }
+  if (closure.kind === 'ambiguous') {
+    const ids = closure.purchases.map((p) => p.id).join(', ');
+    console.warn(
+      `[stripe-webhook] ${event.type}${statusNote}: several purchases (${ids}), nothing given back`,
+    );
+    return {
+      status: 200,
+      body: { ...base, ignored: 'ambiguous_payment_intent' },
+      alert: {
+        key: `stripe:dispute-closed-ambiguous:${closure.purchases[0].id}`,
+        detail:
+          `Un litige refermé chez Stripe (${disputeStatus ?? 'statut inconnu'}) mène à plusieurs achats ` +
+          `du registre (${ids}) : rien n’a été rendu. À relire dans les outils privés.`,
+      },
+    };
+  }
+  const p = closure.kind === 'kept' ? closure.purchase : closure.outcome.purchase;
+  const outcome =
+    closure.kind === 'kept'
+      ? 'kept'
+      : closure.outcome.status === 'reinstated'
+        ? 'reinstated'
+        : closure.outcome.status;
+  const restored =
+    closure.kind === 'closed' && closure.outcome.status === 'reinstated'
+      ? closure.outcome.restored
+      : 0;
+  const prefix =
+    closure.kind === 'closed' && closure.outcome.status === 'reinstated'
+      ? closure.outcome.keyPrefix
+      : p.key_prefix;
+  console.info(
+    `[stripe-webhook] ${event.type}${statusNote}: purchase ${p.id} ${outcome}, ${restored} credits given back`,
+  );
+  const body = {
+    ...base,
+    dispute_closed: {
+      dispute_status: disputeStatus,
+      outcome,
+      purchase_id: p.id,
+      key_prefix: prefix,
+      restored_credits: restored,
+    },
+  };
+  const alertKey = `stripe:dispute-closed:${p.id}`;
+  if (closure.kind === 'kept') {
+    // Un litige perdu sur un pack qu'il avait repris : l'argent est parti, les
+    // crédits le restent. Sur toute autre ligne, rien à dire.
+    if (p.kind !== 'pack' || p.outcome !== 'disputed') return { status: 200, body };
+    return {
+      status: 200,
+      body,
+      alert: {
+        key: alertKey,
+        detail:
+          `Litige refermé chez Stripe sans être gagné (${disputeStatus ?? 'statut inconnu'}) sur l’achat ${p.id} ` +
+          `(clé ${p.key_prefix}…) : l’argent est reparti au payeur, les ${p.clawback_credits ?? 0} crédits ` +
+          'repris le restent. Rien à faire.',
+      },
+    };
+  }
+  const out = closure.outcome;
+  if (out.status === 'reinstated') {
+    return {
+      status: 200,
+      body,
+      alert: {
+        key: alertKey,
+        detail:
+          `Litige refermé sans perte chez Stripe (${disputeStatus}) sur l’achat ${p.id} : ` +
+          `${out.restored} crédits rendus à la clé ${out.keyPrefix}…, exactement ce que le litige avait repris ` +
+          '(décision du 26.09.2026). Rien à faire.',
+      },
+    };
+  }
+  if (out.status === 'no_single_active_key') {
+    return {
+      status: 200,
+      body,
+      alert: {
+        key: alertKey,
+        detail:
+          `Litige refermé sans perte chez Stripe (${disputeStatus}) sur l’achat ${p.id} (clé ${p.key_prefix}…), ` +
+          `mais pas exactement une clé active dans la lignée (aucune, ou plusieurs) : les ` +
+          `${p.clawback_credits ?? 0} crédits repris n’ont pas été rendus. À rendre à la main.`,
+      },
+    };
+  }
+  // `unchanged` (déjà rendu, remboursé entre-temps, jamais repris) ou
+  // `not_a_pack` : rien n'est rendu. Seul un pack remboursé mérite d'être dit.
+  if (out.status === 'unchanged' && p.outcome === 'refunded') {
+    return {
+      status: 200,
+      body,
+      alert: {
+        key: alertKey,
+        detail:
+          `Litige refermé sans perte chez Stripe (${disputeStatus}) sur l’achat ${p.id}, remboursé entre-temps : ` +
+          'l’argent est reparti par le remboursement, rien n’a été rendu. Rien à faire.',
+      },
+    };
+  }
+  return { status: 200, body };
 }
 
 export function processStripeEvent(event: Stripe.Event): {
@@ -629,6 +777,27 @@ export function processStripeEvent(event: Stripe.Event): {
       })
       .immediate();
     return reversalAnswer(event, reversal.reason, outcome, reversal.disputeStatus);
+  }
+
+  // Litige refermé : le rendu et l'évènement traité dans UNE transaction
+  // IMMEDIATE, pour les mêmes raisons que la reprise.
+  if (event.type === DISPUTE_CLOSED_EVENT) {
+    const dispute = event.data.object as Stripe.Dispute;
+    const disputeStatus =
+      typeof dispute.status === 'string' && dispute.status ? dispute.status : null;
+    const closure = db
+      .transaction(() => {
+        const out = closeCardDisputeInTx(db, {
+          paymentIntent: stripeId(dispute.payment_intent),
+          status: disputeStatus,
+        });
+        db.prepare(
+          'INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)',
+        ).run(event.id, event.type);
+        return out;
+      })
+      .immediate();
+    return disputeClosedAnswer(event, disputeStatus, closure);
   }
 
   if (!MINTING_EVENTS.has(event.type)) {

@@ -493,6 +493,31 @@ export function clawbackCreditsInTx(
   return removed;
 }
 
+/**
+ * L'inverse exact de `clawbackCreditsInTx` : rend `credits` crédits à la clé
+ * (solde, cumul acheté, assiette de l'alerte des 10 %). Seul appelant : le rendu
+ * d'un pack dont le litige s'est refermé sans perte (décision de Claude-Alain du
+ * 26.09.2026), qui ne rend jamais que ce que la reprise avait retiré. Ne touche
+ * ni `active` ni l'allocation.
+ */
+export function reinstateCreditsInTx(
+  db: DatabaseType.Database,
+  keyHash: string,
+  credits: number,
+): number {
+  const restored = Math.max(0, Math.floor(credits));
+  if (restored === 0) return 0;
+  db.prepare(
+    `UPDATE api_keys
+        SET credits_remaining   = COALESCE(credits_remaining, 0) + ?,
+            credits_total       = COALESCE(credits_total, 0) + ?,
+            credits_notice_base = CASE WHEN credits_notice_base IS NULL THEN NULL
+                                       ELSE credits_notice_base + ? END
+      WHERE key_hash = ?`,
+  ).run(restored, restored, restored, keyHash);
+  return restored;
+}
+
 /** Monthly request allowance attached to an Editor/OEM subscription key. */
 export const OEM_MONTHLY_LIMIT = 50_000;
 
