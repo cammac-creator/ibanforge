@@ -194,9 +194,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <div className="home-wrap home-hero-grid">
           <div>
             <span className="home-eyebrow">
-              {/* Green only when a measure stands behind it: the 30-day share of
-                  answers without a 5xx, read at each hourly render. */}
-              {liveStats.successRate30 !== null && <StatusDot kind="live" />}
+              {/* Green only when a measure stands behind it: at least 99 % of
+                  answers without a 5xx over 30 days, read at each hourly render. */}
+              {liveStats.successRate30 !== null && liveStats.successRate30 >= 99 && <StatusDot kind="live" />}
               {t("hero.eyebrow")}
             </span>
             <h1 id="home-title">

@@ -73,7 +73,7 @@
         "mcp": "MCP-Server · Claude, Cursor, Cline",
         "n8n": "n8n-Node 0.1.1 · selbst gehostet",
         "odoo": "Odoo-18-Modul · eigene Module erforderlich",
-        "sheets": "Google-Sheets-Add-on · manuelle Installation, Google-Prüfung läuft",
+        "sheets": "Google-Sheets-Add-on · manuelle Installation",
         "postman": "Postman-Sammlung"
       },
       "pause": "Liste anhalten",
