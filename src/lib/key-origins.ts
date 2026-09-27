@@ -59,6 +59,7 @@ export const ORIGIN_SHAPE = /^[a-z0-9_-]{1,40}$/;
  * it labels.
  */
 export const KEY_ORIGIN_DOORS = {
+  'site-home': 'The key dialog opened from the home page.',
   'site-signup': 'The key dialog on the website, opened from a page with no door of its own.',
   'site-pricing': 'The key dialog opened from the pricing page.',
   'site-docs': 'The key dialog opened from the documentation.',

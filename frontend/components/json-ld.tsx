@@ -33,11 +33,15 @@
  * and the free-key figures come from the catalogue the API exports, not from
  * a literal: "200 free requests/month" stayed here after the key that needs no
  * e-mail started at a smaller allowance.
+ *
+ * 27/09/2026: "with no e-mail" no longer stands beside the 200. The 200 come
+ * with the claim, and the claim is made with an e-mail (or an x402 payment);
+ * the home page says the same since its redesign.
  */
 
 import catalogue from "@/data/onboarding.json";
 
-const FREE_KEY = `a free API key with no e-mail (${catalogue.claimedMonthly} requests a month once claimed, ${catalogue.anonymousMonthly} a month before that)`;
+const FREE_KEY = `a free API key (${catalogue.claimedMonthly} requests a month once claimed with an e-mail, ${catalogue.anonymousMonthly} a month before that, with no e-mail)`;
 
 const SOFTWARE_APPLICATION = {
   '@context': 'https://schema.org',
@@ -97,7 +101,7 @@ const SOFTWARE_APPLICATION = {
     {
       '@type': 'Offer',
       name: 'Free API key',
-      description: `No e-mail required: ${catalogue.claimedMonthly} requests a month once the key is claimed, ${catalogue.anonymousMonthly} a month before that`,
+      description: `${catalogue.claimedMonthly} requests a month once the key is claimed with an e-mail, ${catalogue.anonymousMonthly} a month before that, with no e-mail`,
       price: '0',
       priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: catalogue.anonymousMonthly, unitText: 'requests/month' },

@@ -10,7 +10,9 @@
  * system sans on black, in English whatever the page's language, with nothing
  * of the forge in it. It now carries the mark, the lockup, the fold's own
  * headline in the page's language, in the same Bebas the site sets its
- * titles in, and the tagline with the free tier.
+ * titles in, and a tagline naming the ways in (API, SDKs, MCP). Since
+ * 27/09/2026 it quotes no quota: the monthly 25 it used to show is the key
+ * before its claim, and the rule is to announce the key by its 200.
  *
  * Bebas ships no lowercase, so everything here is capitals by design. The
  * mark is inlined as a data URI: satori fetches nothing at build time.
@@ -41,15 +43,13 @@ const AMBER = '#f59e0b';
 const HOT = '#fff7ed';
 const MUTED = '#a8a29e';
 
-function splitAccent(raw: string): [string, string, string] {
-  const m = /^([\s\S]*?)<accent>([\s\S]*?)<\/accent>([\s\S]*)$/.exec(raw);
-  return m ? [m[1], m[2], m[3]] : [raw.replace(/<\/?accent>/g, ''), '', ''];
-}
-
 export async function GET(_req: Request, { params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'home' });
-  const [before, accent, after] = splitAccent(t.raw('hero.title') as string);
+  // The title of the home since its redesign (27/09/2026), its accent in amber.
+  const before = t('hero.titleLead');
+  const accent = t('hero.titleAccent');
+  const after = '';
   const [bebas, mark] = await Promise.all([
     readFile(join(process.cwd(), 'assets', 'bebas-neue.ttf')),
     readFile(join(process.cwd(), 'assets', 'anvil-mark.png')),

@@ -3,12 +3,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { doorForPath, originForSignup, type SiteDoor } from './key-origin';
 
-const DOORS: SiteDoor[] = ['site-pricing', 'site-docs', 'site-dashboard', 'site-signup'];
+const DOORS: SiteDoor[] = ['site-home', 'site-pricing', 'site-docs', 'site-dashboard', 'site-signup'];
 
 describe('la porte par laquelle une clé est prise', () => {
   it.each([
-    ['/', 'site-signup'],
-    ['/fr', 'site-signup'],
+    ['/', 'site-home'],
+    ['/fr', 'site-home'],
+    ['/de/', 'site-home'],
     ['/pricing', 'site-pricing'],
     ['/de/pricing', 'site-pricing'],
     ['/docs', 'site-docs'],
@@ -24,7 +25,8 @@ describe('la porte par laquelle une clé est prise', () => {
     expect(originForSignup('npm-mcp', '/pricing')).toBe('npm-mcp');
     expect(originForSignup(null, '/pricing')).toBe('site-pricing');
     expect(originForSignup('', '/docs')).toBe('site-docs');
-    expect(originForSignup(undefined, '/')).toBe('site-signup');
+    expect(originForSignup(undefined, '/')).toBe('site-home');
+    expect(originForSignup(undefined, '/blog')).toBe('site-signup');
   });
 
   it('chaque porte du site existe dans le vocabulaire de l’API', () => {

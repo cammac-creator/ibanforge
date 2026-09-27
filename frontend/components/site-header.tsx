@@ -32,7 +32,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-sm">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 max-[359px]:px-3 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link
           href={localePath(locale)}
@@ -79,11 +79,15 @@ export function SiteHeader() {
           >
             {t("nav.account")}
           </Link>
+          {/* Visible on every width since 27/09/2026: on a phone the only way to
+              a key used to be the menu or the last screen of the home. Under
+              360 px the bar and the button tighten, or "Gratis-Schlüssel"
+              pushes the menu button off a 320 px screen. */}
           <button
             type="button"
             onClick={openKeyDialog}
             data-evt="nav:key"
-            className="hidden lg:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+            className="inline-flex items-center h-8 px-2.5 max-[359px]:px-2 sm:px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm max-[359px]:text-xs font-medium whitespace-nowrap hover:bg-primary/20 transition-colors"
           >
             {t("nav.freeKey")}
           </button>

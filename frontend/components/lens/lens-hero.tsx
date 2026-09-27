@@ -8,11 +8,38 @@ import { lensResponse, record } from './response';
 import type { LensEngine, Projection } from './engine';
 
 export type LensCopy = Record<string, string>;
+// A confirmed Swiss bank, a confirmed German bank, a German bank code the
+// Bundesbank allocates to nobody (the mod-97 check passes), and a typo.
 const examples = [
   'CH10 0023 0000 0000 1234 5',
   'DE89 3704 0044 0532 0130 00',
+  'DE65 1234 5678 0532 0130 00',
   'CH11 0023 0000 0000 1234 5',
 ];
+
+/**
+ * Whether this device starts the 3D by itself. Since the redesign of
+ * 27/09/2026 the lens sits below the fold, and a phone of middle range spent
+ * seconds of main thread building the scene: there the still image stays and
+ * a button offers the 3D. Data saver and reduced motion never start it alone.
+ */
+function autoStart(): boolean {
+  const saveData =
+    (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const phone = matchMedia('(max-width: 820px)').matches;
+  const cores = navigator.hardwareConcurrency || 4;
+  return !saveData && !reduce && (!phone || cores >= 8);
+}
+
+/** Run once the browser is idle, so the scene never competes with a first paint. */
+function whenIdle(run: () => void): void {
+  const w = window as Window & {
+    requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+  };
+  if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 2500 });
+  else window.setTimeout(run, 400);
+}
 
 export function LensHero({
   copy: t,
@@ -34,6 +61,8 @@ export function LensHero({
   const engine = useRef<LensEngine | null>(null);
   const detailEngine = useRef<LensEngine | null>(null);
   const layout = useRef<() => void>(() => {});
+  const startRef = useRef<() => void>(() => {});
+  const [offer3d, setOffer3d] = useState(false);
   const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const pausedRef = useRef(true);
@@ -125,14 +154,19 @@ export function LensHero({
         if (!disposed) fallback();
       }
     }
+    startRef.current = () => {
+      setOffer3d(false);
+      void start();
+    };
     const visible = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           visible.disconnect();
-          void start();
+          if (autoStart()) whenIdle(() => void start());
+          else setOffer3d(true);
         }
       },
-      { rootMargin: '120px' },
+      { rootMargin: '200px' },
     );
     visible.observe(el);
     void Promise.resolve().then(() => {
@@ -306,11 +340,16 @@ export function LensHero({
     >
       <div className="lens-heading">
         <p className="lens-eyebrow">{t.eyebrow}</p>
-        <h1 id="lens-heading">
+        {/* A section title since 27/09/2026: the home carries its own h1. */}
+        <h2 id="lens-heading">
           {t.title}
-          <br />
-          <em>{t.titleAccent}</em>
-        </h1>
+          {t.titleAccent && (
+            <>
+              <br />
+              <em>{t.titleAccent}</em>
+            </>
+          )}
+        </h2>
         <p className="lens-promise">{t.promise}</p>
         <div className="lens-heading-actions">
           <Link href={auditHref} data-evt="cta:journey-audit">
@@ -333,11 +372,15 @@ export function LensHero({
             alt={t.sceneAlt}
             width={1707}
             height={769}
-            priority
             sizes="100vw"
             className="lens-poster"
           />
           <div className="lens-canvas" ref={host} aria-hidden="true" />
+          {offer3d && visual === 'poster' && (
+            <button type="button" className="lens-view3d" onClick={() => startRef.current()}>
+              {t.view3d}
+            </button>
+          )}
         </div>
         <div className="lens-signature" aria-hidden="true">
           <span>
@@ -353,7 +396,7 @@ export function LensHero({
           }}
         >
           <p className="lens-eyebrow">01 · {t.inputEyebrow}</p>
-          <h2>{t.inputTitle}</h2>
+          <h3>{t.inputTitle}</h3>
           <label htmlFor="lens-iban">{t.inputLabel}</label>
           <input
             id="lens-iban"
@@ -375,7 +418,7 @@ export function LensHero({
             {phase === 'loading' ? t.loading : t.submit} <span aria-hidden="true">→</span>
           </button>
           <div className="lens-examples" role="group" aria-label={t.examples}>
-            {[t.switzerland, t.germany, t.errorExample].map((label, i) => (
+            {[t.switzerland, t.germany, t.unallocated, t.errorExample].map((label, i) => (
               <button
                 type="button"
                 key={label}

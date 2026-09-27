@@ -53,213 +53,14 @@
       "countries": "IBAN nach Land"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-09) — monatlich · OFAC · UN · EU · EPC — wöchentlich"
+    "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · Bank of England (List of Banks, 2026-09) — monatlich · SwiftCodes/MIT — eingefrorene Kopie, 2018 · OFAC · UN · EU · EPC — wöchentlich"
   },
   "home": {
     "metadata": {
-      "description": "IBAN-Validierung, BIC/SWIFT-Suche, Schweizer Clearingdaten und Compliance-Risiko für Entwickler und KI-Agenten. Ein Schlüssel ganz ohne E-Mail: 25 Anfragen pro Monat, 200 pro Monat nach Beanspruchung. MCP-nativ, x402-Mikrozahlungen."
+      "description": "Prüfen Sie die Bank hinter einer IBAN, bevor Sie zahlen: Validierung, Bank und BIC mit Quelle und, wo es gelesen wird, das Urteil des nationalen Registers zur Bankleitzahl. API, SDKs, MCP."
     },
-    "badge": "Online · {rate} % fehlerfrei über 30 Tage",
-    "hero": {
-      "title": "IBANs prüfen. BICs finden. <accent>Für Ihre Software.</accent>",
-      "description": "Für ERP-, Rechnungs- und Lohnsoftware in der Schweiz und international. Prüfen Sie IBANs und finden Sie Banken und BICs unter <b>{bic}</b> Einträgen, mit dokumentierter Abdeckung je Land.",
-      "demo": {
-        "calling": "Aufruf läuft…",
-        "live": "{server} ms Server · {rtt} ms Umlauf, auf diesem Aufruf gemessen",
-        "captured": "unter einer Millisekunde serverseitig · Antwort aufgezeichnet am {date}",
-        "replay": "erneut",
-        "replayAria": "Anfrage erneut abspielen",
-        "inputAria": "Gesendete IBAN",
-        "bodyAria": "API-Antwort"
-      },
-      "cta": {
-        "tryFree": "API testen",
-        "getKey": "Kostenlosen Key holen",
-        "audit": "Lieferantendatei prüfen"
-      },
-      "altDoor": "Kein Entwickler? Prüfen Sie Ihre Kreditorendatei →",
-      "trialNote": "API ohne Anmeldung testen. Kostenlose Vorschau für Lieferantendateien."
-    },
-    "features": {
-      "0": {
-        "badge": "Schweizer Clearing — exklusiv",
-        "title": "BC-Nummer / QR-IID",
-        "description": "Jede BC-Nummer aus dem SIX BankMaster mit ihrer Teilnahme an SIC, euroSIC und CHF-Instant, der QR-IID und dem Institutstyp. Die tiefsten Schweizer Clearingdaten aller öffentlichen APIs."
-      },
-      "1": {
-        "badge": "MCP-nativ — agentenbereit",
-        "title": "MCP-Tools, ohne Anmeldung",
-        "description": "Nativer Model-Context-Protocol-Server (stdio + HTTP). Claude, Cursor und jeder MCP-Agent installieren in einer Zeile: npx -y ibanforge-mcp."
-      },
-      "2": {
-        "badge": "{countries} Länder · {bicK} BICs",
-        "title": "IBAN-Validierung & BIC-Lookup",
-        "description": "ISO-13616-Mod-97 und BBAN-Analyse in {countries} Ländern, gestützt auf {bic} BIC-Einträge aus GLEIF, SwiftCodes, Bundesbank, SIX, NBP und EBA STEP2."
-      },
-      "3": {
-        "badge": "EMI / vIBAN",
-        "title": "Emittenten-Klassifizierung",
-        "description": "Erkennt virtuelle IBANs und EMIs (Wise, Revolut, N26, Mercury…) — ein echtes Compliance-Signal, das eine Mod-97-Prüfung nie liefert."
-      },
-      "4": {
-        "badge": "Sanktionen + FATF",
-        "title": "Compliance-Risikoscore",
-        "description": "Sanktions-Screening auf Bank-BIC-Ebene (OFAC, EU, UN) + FATF + SEPA + VoP, destilliert zu einem 0-100-Risikoscore."
-      },
-      "5": {
-        "badge": "x402 — Agenten-Zahlungen",
-        "title": "Agenten zahlen pro Aufruf",
-        "description": "Autonome Agenten zahlen pro Anfrage in USDC über x402, ohne Konto und ohne Checkout. Menschen behalten den Gratis-Key oder das Kartenguthaben."
-      },
-      "heading": "Was eine Mod-97-Prüfung Ihnen nie verrät"
-    },
-    "endpoints": {
-      "0": {
-        "method": "POST",
-        "path": "/v1/iban/validate",
-        "cost": "$0.005",
-        "description": "Eine einzelne IBAN validieren"
-      },
-      "1": {
-        "method": "POST",
-        "path": "/v1/iban/batch",
-        "cost": "$0.002/IBAN",
-        "description": "Bis zu 100 IBAN validieren"
-      },
-      "2": {
-        "method": "GET",
-        "path": "/v1/bic/:code",
-        "cost": "$0.003",
-        "description": "BIC/SWIFT-Code nachschlagen"
-      },
-      "3": {
-        "method": "POST",
-        "path": "/v1/iban/compliance",
-        "cost": "$0.02",
-        "description": "Vollständiger Compliance-Check: Sanktionen, SEPA Instant, VoP, Risiko-Score"
-      },
-      "4": {
-        "method": "GET",
-        "path": "/v1/ch/clearing/:iid",
-        "cost": "$0.003",
-        "description": "Schweizer BC-Nummer-Suche (SIX BankMaster)"
-      },
-      "5": {
-        "method": "GET",
-        "path": "/v1/reference/validate",
-        "cost": "Kostenlos",
-        "description": "Zahlungsreferenz-Prüfung: RF/ISO 11649, Schweizer QRR, belgische OGM, finnische viitenumero — belegte Verdikte"
-      },
-      "6": {
-        "method": "POST",
-        "path": "/v1/address/check",
-        "cost": "Kostenlos",
-        "description": "ISO-20022-Adressregeln (SPS, T2, Fedwire) vor den Umstellungen im November 2026"
-      },
-      "heading": "Endpoints und Preise",
-      "subtitle": "Starten Sie gratis mit 25 Anfragen pro Monat, ohne E-Mail. Beanspruchen Sie denselben Schlüssel für 200 pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC. Die Preise unten gelten pro Aufruf in USDC über x402; mit einem Schlüssel oder einem Guthabenpaket zählt jeder Aufruf und jede IBAN eines Stapels als eine Anfrage oder ein Guthaben.",
-      "plans": "Gratis: 25 Anfragen pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung · Pro: 29 $ pro Monat für 10 000 Anfragen · Guthabenpakete ab 4 $ · Herstellerlizenz ab 149 $ pro Monat · Dateiprüfung 149 $.",
-      "plansLink": "Preise ansehen"
-    },
-    "cta": {
-      "heading": "Bereit loszulegen?",
-      "description": "Starten Sie mit einem kostenlosen Key — 25 Anfragen pro Monat, ohne E-Mail und ohne Karte. Wer denselben Schlüssel beansprucht, hat 200 pro Monat. Skalieren Sie mit Prepaid-Guthaben per Karte oder zahlen Sie pro Aufruf in USDC.",
-      "button": "Jetzt starten",
-      "getKeyButton": "Kostenlosen Key holen"
-    },
-    "stats": {
-      "bic": "BIC-Einträge",
-      "countries": "abgedeckte Länder",
-      "clearing": "Schweizer Clearing-Einträge · SIX",
-      "latency": "p50 Server-Verarbeitung"
-    },
-    "trust": {
-      "dataLabel": "Datenquellen",
-      "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP · Bank of England (List of Banks, 2026-09)",
-      "dataNote": "Monatlich aktualisiert",
-      "dataNoteDated": "Monatlich aktualisiert · zuletzt am {date}",
-      "sanctionsLabel": "Sanktionsprüfung",
-      "sanctionsValue": "OFAC · EU · UN + FATF",
-      "sanctionsNote": "Auf Bankebene (BIC8)",
-      "madeLabel": "Herkunft",
-      "madeNote": "Schweizer Clearingdaten direkt von SIX",
-      "privacyLabel": "Privacy als Standard",
-      "privacyValue": "IBANs nie gespeichert · selbstlöschende Telemetrie",
-      "privacyNote": "Gelöscht 30 Tage nach Ende der Kundenbeziehung — DPA Klausel 4.7",
-      "ariaLabel": "Datenquellen und Herkunft",
-      "madeValue": "Aus der Schweiz"
-    },
-    "reviewed": {
-      "label": "Unabhängig geprüft",
-      "quote": "The most artifact-complete submission the inbox has had.",
-      "context": "Kin Lane hat IBANforges API-Evangelist-Profil im August 2026 aus abgerufenen Artefakten neu aufgebaut — unser x402 erwies sich dabei als das erste unter den 3.767 MCP-Servern seines Katalogs.",
-      "linkReview": "Das öffentliche Review lesen",
-      "linkStory": "Die ganze Geschichte",
-      "quoteTranslation": "„Die artefaktvollständigste Einreichung, die der Posteingang je hatte.“"
-    },
-    "film": {
-      "heading": "Was die API aus einer IBAN macht, in vier Schritten",
-      "heat": {
-        "eyebrow": "Glut",
-        "title": "Rohdaten betreten die Schmiede.",
-        "copy": "Ein POST an /v1/iban/validate: die Zeichenkette wird nach der Struktur ihres Landes gelesen, dann mit Mod-97 geschlagen.",
-        "country": "Land",
-        "check": "Prüfziffern",
-        "bank": "Bank",
-        "account": "Konto"
-      },
-      "strike": {
-        "eyebrow": "Schlag",
-        "title": "Der Mod-97-Schlag.",
-        "valid": "✓ mod 97 = 1 · gültig"
-      },
-      "quench": {
-        "eyebrow": "Abschrecken",
-        "title": "In Compliance abgeschreckt.",
-        "noMatch": "kein Treffer ✓",
-        "lists": "OFAC · EU · UN",
-        "fatf": "FATF · Mitglied",
-        "sepa": "SEPA erreichbar ✓",
-        "risk": "risk_level: low",
-        "copy": "Der BIC der Bank durchläuft die Sanktionslisten, den FATF-Status und die SEPA-Erreichbarkeit: ein Risikoscore von 0 bis 100."
-      },
-      "stamp": {
-        "eyebrow": "Prägung",
-        "title": "Mit Identität geprägt.",
-        "iid": "IID",
-        "sic": "SIC",
-        "eurosic": "euroSIC",
-        "instant": "CHF Instant",
-        "copy": "Die Institution hinter der Nummer – und für die Schweiz jede BC-Nummer aus dem SIX BankMaster mit ihrer Teilnahme an den Schienen."
-      },
-      "ship": {
-        "eyebrow": "Versand",
-        "title": "Geliefert in {ms} ms.",
-        "head": "application/json · {ms} ms Server",
-        "tryLive": "Live im Playground testen",
-        "copy": "Eine Anfrage, eine Antwort: geschmiedet, abgeschreckt, geprägt."
-      }
-    },
-    "agentsRail": {
-      "heading": "Agenten bekommen ihre eigene Schiene",
-      "sub": "Diese Seite spricht auch Roboter — jede Aussage oben ist maschinenlesbar, und jeder Endpoint ist ohne Menschen in der Schleife bezahlbar.",
-      "mcpTitle": "MCP-nativ",
-      "mcpBody": "MCP-Tools, keine Anmeldung. Claude, Cursor und jeder MCP-Agent installieren in einer Zeile:",
-      "x402Title": "x402-Mikrozahlungen",
-      "x402Body": "Autonome Agenten zahlen pro Anfrage in USDC — kein Konto, kein Checkout, Settlement on-chain.",
-      "docsTitle": "Maschinenlesbare Doku",
-      "docsBody": "OpenAPI-Spezifikation, strukturierte Daten und eine Klartext-Zusammenfassung für Crawler und Agenten."
-    },
-    "deadline": {
-      "eyebrow": "Stichtag",
-      "heading": "Mitte November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
-      "text": "POST /v1/address/check sagt gratis, ob eine Adresse die Schweizer, HVPS+- oder Fedwire-Regeln besteht, und nennt das Dokument; die Dateiprüfung nimmt eine ganze Arbeitsmappe.",
-      "cta": "Die Regeln lesen, Schiene für Schiene",
-      "line1": "Ab Mitte November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die geltenden Adressanforderungen erfüllen, wenn eine Adresse verwendet wird. SIX nennt den 14. November; einen Countdown zeigen wir nicht mehr, weil sich die Zeitpläne der anderen Systeme bereits verschoben haben.",
-      "line2": "Der EPC hat seine Frist vom 15. November am 9. September 2026 verschoben; ein neues Datum soll im Oktober festgelegt werden.",
-      "line3": "Auch Swift hat seine Frist am 27. August 2026 verschoben. SIX veröffentlicht den Schweizer Zeitplan weiterhin separat.",
-      "window": "Mitte November 2026",
-      "windowLabel": "strukturierte Adressen · Schweizer Zeitplan"
+    "share": {
+      "tagline": "ibanforge.com · REST-API · SDKs · MCP"
     },
     "integrations": {
       "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
@@ -272,27 +73,184 @@
         "mcp": "MCP-Server · Claude, Cursor, Cline",
         "n8n": "n8n-Node 0.1.1 · selbst gehostet",
         "odoo": "Odoo-18-Modul · eigene Module erforderlich",
-        "sheets": "Google-Sheets-Add-on",
+        "sheets": "Google-Sheets-Add-on · manuelle Installation",
         "postman": "Postman-Sammlung"
-      }
+      },
+      "pause": "Liste anhalten",
+      "play": "Liste fortsetzen"
     },
-    "audit": {
-      "heading": "Prüfen Sie Ihre Lieferantendatei vor dem nächsten Zahlungslauf",
-      "text": "Laden Sie eine CSV- oder Excel-Datei hoch und sehen Sie die Ergebnisse kostenlos. Die kommentierte Arbeitsmappe kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
-      "cta": "Lieferantendatei prüfen"
+    "reviewed": {
+      "label": "Unabhängig geprüft",
+      "quote": "The most artifact-complete submission the inbox has had.",
+      "context": "Kin Lane hat IBANforges API-Evangelist-Profil im August 2026 aus abgerufenen Artefakten neu aufgebaut — unser x402 erwies sich dabei als das erste unter den 3.767 MCP-Servern seines Katalogs.",
+      "linkReview": "Das öffentliche Review lesen",
+      "linkStory": "Die ganze Geschichte",
+      "quoteTranslation": "„Die artefaktvollständigste Einreichung, die der Posteingang je hatte.“"
     },
-    "badgeFallback": "API online · Live-Status",
-    "share": {
-      "tagline": "ibanforge.com · REST · SDK · MCP · 25 kostenlose Anfragen pro Monat, ohne E-Mail"
+    "hero": {
+      "demo": {
+        "calling": "Aufruf läuft…",
+        "live": "{server} ms Server · {rtt} ms Umlauf, auf diesem Aufruf gemessen",
+        "captured": "unter einer Millisekunde serverseitig · Antwort aufgezeichnet am {date}",
+        "replay": "erneut",
+        "replayAria": "Anfrage erneut abspielen",
+        "inputAria": "Gesendete IBAN",
+        "bodyAria": "API-Antwort"
+      },
+      "eyebrow": "IBAN- und BIC-API",
+      "titleLead": "Prüfen Sie die Bank hinter einer IBAN,",
+      "titleAccent": "bevor Sie zahlen",
+      "description": "IBANforge validiert IBANs aus {countries} Ländern, nennt die Bank und ihren BIC mit Quelle und sagt dort, wo es das nationale Register liest, ob die Bankleitzahl überhaupt vergeben ist. Ihre Software erhält einen klaren nächsten Schritt, bevor Geld fließt.",
+      "ctaKey": "Kostenlosen Schlüssel holen",
+      "ctaTry": "Jetzt testen",
+      "note1": "Keine Karte",
+      "note2": "Keine E-Mail zum Start",
+      "note3": "API, SDKs, Tabellen und KI-Agenten",
+      "alt": "Kein Entwickler? Prüfen Sie eine Lieferantendatei ohne Code"
+    },
+    "demo": {
+      "aria": "Drei Antworten, die die API wirklich gegeben hat, nacheinander abgespielt",
+      "request": "POST /v1/iban/validate",
+      "caption": "Antworten der Live-API, aufgezeichnet am 26. September 2026.",
+      "pause": "Demo anhalten",
+      "play": "Demo abspielen",
+      "scenarios": "Beispiele",
+      "ibanLabel": "IBAN",
+      "format": "Format und Prüfziffern",
+      "register": "Bankleitzahl im nationalen Register",
+      "bank": "Bank und BIC",
+      "valid": "Gültig",
+      "checksum": "Die Prüfziffern stimmen nicht",
+      "confirmed": "Code {code} bestätigt",
+      "notAllocated": "Code {code} nicht vergeben",
+      "registerName": "Register der Deutschen Bundesbank",
+      "noBank": "Keine Bank führt diesen Code",
+      "skipped": "Nicht gelesen",
+      "tab0": "Eine echte Bank",
+      "tab1": "Ein Code ohne Bank",
+      "tab2": "Ein Tippfehler",
+      "verdictOk": "Bank bestätigt",
+      "verdictStop": "Nicht senden",
+      "verdictFix": "Eingabe prüfen",
+      "noteOk": "Nächster Schritt: die Bank vor der Überweisung prüfen, wenn Ihr Ablauf es verlangt.",
+      "noteStop": "Die Mod-97-Prüfung besteht, doch keine Bank führt diesen Code. Die API antwortet: „Do not send“.",
+      "noteFix": "Ein Zeichen ist falsch. Fragen Sie die IBAN erneut an."
+    },
+    "problem": {
+      "eyebrow": "Warum eine Prüfsumme nicht reicht",
+      "title": "Eine gültige IBAN kann zu keiner Bank führen",
+      "lead": "Die Mod-97-Prüfung beweist nur, dass die Ziffern aufgehen. Eine IBAN kann sie bestehen, mit einer Bankleitzahl, die keine Bank führt, oder einer, die nach einer Fusion aufgehoben wurde. IBANforge liest jeden Teil der IBAN und sagt, welche Prüfungen es machen konnte.",
+      "anatomyCaption": "Dieselbe IBAN, Teil für Teil gelesen.",
+      "country": "Land",
+      "countryWhat": "Länge und Aufbau, {countries} Länder",
+      "check": "Prüfziffern",
+      "checkWhat": "ISO 13616, Modulo 97",
+      "bank": "Bankleitzahl",
+      "bankWhat": "Das nationale Register in DE, AT, BE, SK, CZ, BG, CH, LI",
+      "account": "Kontonummer",
+      "accountWhat": "Der nationale Prüfschlüssel in FR, MC, BE, IT, SM, ES",
+      "checksumTitle": "Was eine Prüfsumme sagt",
+      "checksumItems": [
+        "Die Prüfziffern gehen auf",
+        "Die Länge passt zum Land",
+        "Nichts über die Bank"
+      ],
+      "addsTitle": "Was IBANforge hinzufügt",
+      "addsItems": [
+        "Ob die Bankleitzahl vergeben ist, aus dem nationalen Register (DE, AT, BE, SK, CZ, BG, CH, LI)",
+        "Die Bank und ihr BIC, jeweils mit Quelle und, wenn bekannt, mit Datum",
+        "Den nationalen Prüfschlüssel in der Kontonummer, wo einer veröffentlicht ist und geprüft wird",
+        "SEPA-Erreichbarkeit und Bereitschaft für die Empfängerüberprüfung, aus den EPC-Registern, wo sie die Bank führen",
+        "Sanktionsprüfung auf Bankebene (OFAC, EU, UN)",
+        "Einen nächsten Schritt, den Ihr Code umsetzen kann, bis zu einem klaren „Do not send“"
+      ]
+    },
+    "audiences": {
+      "eyebrow": "Für Ihre Arbeitsweise",
+      "title": "Für Entwickler, Finanzteams und KI-Agenten",
+      "lead": "Dieselbe Antwort, dort wo Sie sie brauchen.",
+      "devTitle": "Entwickler",
+      "devText": "Ein REST-Aufruf oder ein SDK in TypeScript, Python, Java oder .NET. Die Antwort ist JSON, mit einem dokumentierten nächsten Schritt.",
+      "devLink": "Dokumentation lesen",
+      "financeTitle": "Finanzteams",
+      "financeText": "Laden Sie eine CSV- oder Excel-Datei mit Lieferanten hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen, IBANs maskiert. Die kommentierte Arbeitsmappe mit allen Zeilen kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
+      "financeLink": "Lieferantendatei prüfen",
+      "agentsTitle": "KI-Agenten",
+      "agentsText": "Ein MCP-Server für Claude, Cursor und jeden MCP-Client, in einer Zeile installiert. Agenten ohne Konto können pro Aufruf in USDC mit x402 zahlen.",
+      "agentsLink": "Agent verbinden"
+    },
+    "coverage": {
+      "eyebrow": "Abdeckung und Vertrauen",
+      "title": "An der Quelle gelesen, mit ihren Grenzen",
+      "lead": "Jede Antwort sagt, woher sie kommt und was sie nicht prüfen konnte.",
+      "figCountries": "validierte IBAN-Länder",
+      "figRegisters": "Länder, deren nationales Register vollständig gelesen wird",
+      "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
+      "figKeys": "Länder, deren nationaler Prüfschlüssel geprüft wird, dazu die britische Modulus-Prüfung",
+      "keyCodes": "FR, MC, BE, IT, SM, ES",
+      "figLatency": "mittlere Verarbeitung auf dem Server",
+      "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
+      "fact0Text": "IBANforge wird aus der Schweiz betrieben; die API selbst läuft in einer Region der Europäischen Union.",
+      "fact1Title": "Die Validierung speichert keine IBAN",
+      "fact1Text": "Eine geprüfte IBAN wird im Speicher validiert, nie abgelegt. Die Dateiprüfung bewahrt ihren Bericht 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf. Telemetrie wird 30 Tage nach Ihrem Austritt gelöscht (DPA-Klausel 4.7).",
+      "fact2Title": "Sanktionen auf Bankebene",
+      "fact2Text": "Die Bank hinter der IBAN wird gegen die Listen OFAC, EU, UN geprüft (BIC8). Der Kontoinhaber nie.",
+      "fact3Title": "Offen über seine Grenzen",
+      "fact3Text": "Es prüft nicht, wer Inhaber des Kontos ist: Dieser Namensabgleich gehört der Bank des Empfängers, über die Empfängerüberprüfung (VoP).",
+      "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-09), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht. Jede Antwort nennt ihre Quelle.",
+      "sourcesDated": "Zuletzt aktualisiert am {date}.",
+      "sourcesLink": "Jede Quelle und ihre Lizenz"
+    },
+    "pricing": {
+      "eyebrow": "Preise",
+      "title": "Kostenlos starten, nach Bedarf zahlen",
+      "lead": "Jeder bezahlte Tarif gilt für den Schlüssel, den Sie schon haben.",
+      "tryName": "Test",
+      "tryPrice": "Gratis",
+      "tryText": "Bis zu {trialWeekly} Validierungen pro Woche auf POST /v1/iban/validate, ganz ohne Schlüssel.",
+      "tryCta": "Jetzt testen",
+      "keyName": "Gratis-Schlüssel",
+      "keyPrice": "Gratis",
+      "keyText": "Alle Endpunkte, {claimed} Anfragen pro Monat, sobald Sie den Schlüssel mit einer E-Mail beanspruchen. Keine Karte.",
+      "keyCta": "Kostenlosen Schlüssel holen",
+      "proName": "Pro",
+      "proPrice": "29 $",
+      "proUnit": "/ Monat",
+      "proText": "10.000 Anfragen pro Monat auf demselben Schlüssel. Jederzeit kündbar: Der Schlüssel bleibt.",
+      "proCta": "Pro ansehen",
+      "packsName": "Guthabenpakete",
+      "packsPrice": "ab 4 $",
+      "packsText": "Vorausbezahltes Guthaben auf demselben Schlüssel, per Karte oder in USDC.",
+      "packsCta": "Pakete ansehen",
+      "agents": "KI-Agenten können auch pro Aufruf in USDC mit x402 zahlen: ohne Konto, ohne Checkout.",
+      "link": "Alle Preise ansehen"
+    },
+    "faq": {
+      "title": "Fragen",
+      "q0": "Prüft IBANforge, wer Inhaber des Kontos ist?",
+      "a0": "Nein. Es prüft die IBAN und die Bank dahinter. Der Abgleich des Kontoinhabernamens ist die Empfängerüberprüfung (VoP), die die Bank des Empfängers durchführt.",
+      "q1": "Welche Länder erhalten ein Urteil aus dem nationalen Register?",
+      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: Dort entscheidet das nationale Register, ob eine Bankleitzahl vergeben ist. In den übrigen Ländern nennt die Antwort die Bank aus einem Teilregister oder einer zusammengesetzten Karte und sagt, dass sie einen Code nicht ausschließen kann.",
+      "q2": "Kann ich es ohne Anmeldung testen?",
+      "a2": "Ja. Ganz ohne Schlüssel beantwortet POST /v1/iban/validate bis zu {trialWeekly} Validierungen pro Woche je Adresse, vollständig.",
+      "q3": "Was bringt ein kostenloser Schlüssel?",
+      "a3": "Alle Endpunkte, mit {claimed} Anfragen pro Monat, sobald Sie den Schlüssel mit einer E-Mail-Adresse beanspruchen. Das Erstellen braucht weder Karte noch E-Mail.",
+      "q4": "Werden die gesendeten IBANs gespeichert?",
+      "a4": "Nicht bei der Validierung: Jede IBAN wird im Speicher geprüft und nie abgelegt. Die Dateiprüfung bewahrt ihren Bericht, der Ihre Spalten übernimmt, 2 Stunden ohne Zahlung oder 24 Stunden nach der Zahlung auf und löscht ihn dann. Die Datenschutzerklärung beschreibt die Anfrage-Metadaten, die höchstens 12 Monate aufbewahrt werden."
+    },
+    "cta": {
+      "title": "Prüfen Sie Ihre erste IBAN in zwei Minuten",
+      "text": "Erstellen Sie einen Schlüssel ohne Karte, oder starten Sie sofort eine Prüfung, ganz ohne Schlüssel.",
+      "getKey": "Kostenlosen Schlüssel holen",
+      "docs": "Dokumentation lesen"
     },
     "lens": {
       "hero": {
-        "eyebrow": "VON DER IBAN ZUR NÜTZLICHEN INFORMATION",
-        "title": "Ihre IBAN kommt an.",
-        "titleAccent": "Die Daten nehmen Gestalt an.",
-        "promise": "IBANforge ist die Linse, die Format, Bank und BIC sichtbar macht.",
+        "eyebrow": "Jetzt testen",
+        "title": "Eine echte Prüfung, ohne Anmeldung",
+        "promise": "Geben Sie eine IBAN ein oder wählen Sie ein Beispiel: Die Linse sendet sie an die Live-API und teilt die Antwort in Format, Bank und BIC.",
         "auditLink": "Lieferantendatei prüfen",
-        "observe": "Glas und Metall näher betrachten",
+        "observe": "Die Linse in 3D ansehen",
         "sceneAlt": "Eine kupfergefasste Glaslinse verwandelt einfallendes Licht in drei ausgehende Strahlen.",
         "signature": "Die Linse für Ihre Daten",
         "inputEyebrow": "IHRE IBAN",
@@ -333,51 +291,60 @@
         "detailTitle": "Glas, Metall und Licht.",
         "detailCaption": "Gewölbtes Glas · gebürstetes Metall · Studioreflexe",
         "detailUnavailable": "Die Nahansicht ist in diesem Browser nicht verfügbar.",
-        "close": "Schließen"
+        "close": "Schließen",
+        "view3d": "In 3D ansehen",
+        "unallocated": "Code ohne Bank"
       },
       "gallery": {
-        "eyebrow": "EIN LICHT, DREI ANWENDUNGEN",
-        "title": "Von Rohdaten zu nützlichen Informationen.",
-        "intro": "Eine IBAN lesen, eine Datei prüfen, Ihre Werkzeuge versorgen.",
+        "eyebrow": "Drei Wege, es zu nutzen",
+        "title": "Eine IBAN, eine ganze Datei oder in Ihren Werkzeugen",
+        "intro": "Prüfen Sie eine einzelne IBAN in einem Formular, jede Zeile einer Lieferantendatei vor einem Zahlungslauf, oder rufen Sie die API aus Ihrer Software und Ihren Agenten auf.",
         "items": [
           {
-            "eyebrow": "01 · EINE IBAN LESEN",
-            "title": "Jede Information findet ihren Platz.",
-            "text": "Format, Bank, BIC: klar getrennte Daten mit ihrer Herkunft und ihren Grenzen.",
+            "eyebrow": "01 · Eine IBAN",
+            "title": "Eine Nummer in Sekunden prüfen",
+            "text": "Geben Sie eine IBAN ein oder rufen Sie POST /v1/iban/validate auf: Format, Bank, BIC und das Urteil des Registers kommen zusammen zurück, jeweils mit Quelle.",
             "tags": [
               "Format",
               "Bank",
-              "Quellen"
+              "BIC"
             ],
-            "link": "Zurück zum Tester",
+            "link": "Unten testen",
             "alt": "Ein Lichtstrahl durchquert eine metallgefasste Linse und beleuchtet drei getrennte Datenfelder."
           },
           {
-            "eyebrow": "02 · EINE DATEI PRÜFEN",
-            "title": "Ein präziser Blick auf jede Zeile.",
-            "text": "Bankverbindungen in einer Datei werden zu strukturierten Ergebnissen, die Sie lesen und nutzen können.",
+            "eyebrow": "02 · Eine ganze Datei",
+            "title": "Eine Lieferantendatei prüfen",
+            "text": "Laden Sie eine CSV- oder Excel-Datei hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen. Die kommentierte Arbeitsmappe bewertet jede Zeile vor dem nächsten Zahlungslauf.",
             "tags": [
-              "Dateien",
-              "Prüfungen",
-              "Ergebnisse"
+              "CSV",
+              "Excel",
+              "Bericht"
             ],
-            "link": "Dateiprüfung entdecken",
+            "link": "Lieferantendatei prüfen",
             "alt": "Tabellenblätter werden vom Licht einer Linse durchquert und zu einer geordneten Datei."
           },
           {
-            "eyebrow": "03 · WERKZEUGE VERBINDEN",
-            "title": "Die Antwort setzt ihren Weg fort.",
-            "text": "APIs, Agenten und Automatisierungen können eine strukturierte Antwort in ihren eigenen Abläufen weiterverwenden.",
+            "eyebrow": "03 · Ihre Werkzeuge",
+            "title": "In Ihre Software einbauen",
+            "text": "SDKs für TypeScript, Python, Java und .NET, eine Google-Sheets-Funktion und ein MCP-Server für KI-Agenten.",
             "tags": [
               "API",
-              "Agenten",
-              "Automatisierungen"
+              "SDK",
+              "MCP"
             ],
             "link": "Dokumentation lesen",
             "alt": "Die Strahlen der Linse erreichen drei Module für eine API, einen automatischen Ablauf und eine Tabelle."
           }
         ]
       }
+    },
+    "deadline": {
+      "heading": "Mitte November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
+      "band": "Ab Mitte November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die Adressanforderungen erfüllen, wenn eine Adresse verwendet wird; SIX nennt den 14. November. POST /v1/address/check sagt kostenlos, ob eine Adresse besteht.",
+      "cta": "Die Regeln lesen, Schiene für Schiene",
+      "window": "Mitte November 2026",
+      "windowLabel": "strukturierte Adressen · Schweizer Zeitplan"
     }
   },
   "pricing": {
@@ -2341,7 +2308,7 @@
     "eyebrow": "Provenienz",
     "hero": {
       "title": "Jede Antwort nennt ihre Quelle",
-      "description": "Bankdaten sind genau so viel wert wie das Register, aus dem sie stammen. Deshalb trägt jede IBANforge-Antwort den Namen und das Datum des Referenzbestands, der sie erzeugt hat — und wo ein Herausgeber Bedingungen stellt, werden sie im Produkt eingehalten: die meisten reisen in der Antwort selbst mit, der Rest lebt in der Dokumentation, die sie beschreibt."
+      "description": "Bankdaten sind genau so viel wert wie das Register, aus dem sie stammen. Deshalb nennt jede IBANforge-Antwort den Referenzbestand, der sie erzeugt hat, mit seinem Datum, wenn es bekannt ist — und wo ein Herausgeber Bedingungen stellt, werden sie im Produkt eingehalten: die meisten reisen in der Antwort selbst mit, der Rest lebt in der Dokumentation, die sie beschreibt."
     },
     "principle": {
       "title": "Drei Gewohnheiten, durch Tests gesichert",

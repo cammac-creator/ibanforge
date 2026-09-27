@@ -137,6 +137,7 @@ export const OTHER_DOOR = '(autre)';
  * test y veille, pour qu'une porte ajoutée là-bas ne s'affiche pas en code brut.
  */
 export const DOOR_LABELS_FR: Readonly<Record<string, string>> = {
+  'site-home': 'Accueil du site',
   'site-signup': 'Site, formulaire de clé',
   'site-pricing': 'Page des tarifs',
   'site-docs': 'Documentation',

@@ -27,7 +27,7 @@
  */
 
 /** A door the API knows. Kept in step with `KEY_ORIGIN_DOORS` by the test beside this file. */
-export type SiteDoor = 'site-pricing' | 'site-docs' | 'site-dashboard' | 'site-signup';
+export type SiteDoor = 'site-home' | 'site-pricing' | 'site-docs' | 'site-dashboard' | 'site-signup';
 
 /**
  * The door for a page path, locale prefix included or not.
@@ -40,6 +40,8 @@ export type SiteDoor = 'site-pricing' | 'site-docs' | 'site-dashboard' | 'site-s
 export function doorForPath(pathname: string): SiteDoor {
   // Strip a two-letter locale segment so /de/pricing and /pricing are one door.
   const path = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '') || '/';
+  // The home has its own door since 27/09/2026, to measure what its redesign changes.
+  if (path === '/') return 'site-home';
   if (path === '/pricing' || path.startsWith('/pricing/')) return 'site-pricing';
   if (path === '/docs' || path.startsWith('/docs/')) return 'site-docs';
   if (path.startsWith('/dashboard') || path.startsWith('/account')) return 'site-dashboard';

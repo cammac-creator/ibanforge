@@ -1,25 +1,48 @@
+import Image from "next/image"
 import Link from "next/link"
 import { hasLocale } from "next-intl"
 import { getTranslations, setRequestLocale } from "next-intl/server"
 import { notFound } from "next/navigation"
+import { Bot, CodeXml, FileSpreadsheet, Globe, Info, Lock, ShieldCheck } from "lucide-react"
 import { routing } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
+import { StatusDot } from "@/components/ui/status-dot"
 import { GetKeyButton } from "@/components/api-key-dialog"
 import { Reveal } from "@/components/reveal"
-import { StatsBar } from "@/components/stats-bar"
 import { LensHero, type LensCopy } from "@/components/lens/lens-hero"
 import { LensGallery, type GalleryCopy } from "@/components/lens/lens-gallery"
+import { lensAssets } from "@/components/lens/assets"
+import { VerdictDemo, type DemoScenario } from "@/components/home/verdict-demo"
+import { IbanAnatomy } from "@/components/home/iban-anatomy"
+import { IntegrationRibbon } from "@/components/home/integration-ribbon"
 import "@/components/lens/lens.css"
-import {
-  getLandingStats,
-  P50_PROCESSING_MS,
-  SUPPORTED_COUNTRIES,
-} from "@/lib/landing-stats"
+import "@/components/home/home.css"
+import { getLandingStats, P50_PROCESSING_MS, SUPPORTED_COUNTRIES } from "@/lib/landing-stats"
 import { alternatesFor, urlFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
+import { formatGrouped } from "@/lib/format-grouped"
 // Quotas read from what the API exports (scripts/export-onboarding.ts), never
 // retyped: the layout's JSON-LD does the same (components/json-ld.tsx).
 import catalogue from "@/data/onboarding.json"
+
+/*
+ * The home, redesigned on 27/09/2026 (Claude-Alain: « une landing fresh qui
+ * explique simplement le produit », in the style of the rest of the site).
+ *
+ * What it keeps from the audits of September: the figures read live, the
+ * locale guard before any Intl call, one JSON-LD graph, the dated trigger of
+ * mid-November without a countdown, the file audit as the door for those who
+ * do not code, the agents' rail, the public review, the data-evt names.
+ *
+ * What changed: the title says what the product is and for whom, in the words
+ * of positioning.ts ("checks the bank behind an IBAN before you pay"); the
+ * first screen shows three answers the API really gave, the second the one
+ * thing a checksum cannot say. The lens chosen on 16/09 stays, with its input
+ * on the left and its answer on the right, one section lower, where the 3D no
+ * longer delays the first paint (components/lens/lens-hero.tsx). The type and
+ * colours are the site's own: Bebas Neue titles as on the other landings,
+ * Inter, JetBrains Mono, amber.
+ */
 
 // Title and description are generated per-locale by app/[locale]/layout.tsx —
 // do NOT define a static `metadata` here, it would override the locale-aware
@@ -34,325 +57,489 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
 /**
  * Rendered once per locale and refreshed every hour by the CDN (audit
- * 2026-09-05, n° 1): the figures of /health and /stats/history change by
- * the day at most, and the fold's real call happens in the browser anyway.
+ * 2026-09-05, n° 1): the figures of /health change by the day at most, and the
+ * checker's real call happens in the browser anyway.
  */
 export const revalidate = 3600
 
-const FEATURE_COUNT = 6
-const ENDPOINT_COUNT = 7
-
-/* Chaque intégration pointe vers son paquet ou son code disponible.
-   Le SDK .NET est disponible sur NuGet. */
+/* Every integration points to its package or its published code. */
 const INTEGRATIONS = [
-  { key: 'ts', cmd: 'npm install @ibanforge/sdk', href: 'https://www.npmjs.com/package/@ibanforge/sdk' },
-  { key: 'py', cmd: 'pip install ibanforge', href: 'https://pypi.org/project/ibanforge/' },
-  { key: 'java', cmd: 'com.ibanforge:ibanforge-sdk', href: 'https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk' },
-  { key: 'dotnet', cmd: 'dotnet add package IBANforge.Sdk', href: 'https://www.nuget.org/packages/IBANforge.Sdk' },
-  { key: 'mcp', cmd: 'npx -y ibanforge-mcp', href: 'https://www.npmjs.com/package/ibanforge-mcp' },
-  { key: 'n8n', cmd: 'npm install n8n-nodes-ibanforge', href: 'https://www.npmjs.com/package/n8n-nodes-ibanforge' },
-  { key: 'odoo', cmd: 'ibanforge_bank_autofill', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/odoo' },
-  { key: 'sheets', cmd: '=IBAN_CONTROLE(A2)', href: '/sheets' },
-  { key: 'postman', cmd: 'ibanforge.postman_collection.json', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman' },
+  { key: "ts", cmd: "npm install @ibanforge/sdk", href: "https://www.npmjs.com/package/@ibanforge/sdk" },
+  { key: "py", cmd: "pip install ibanforge", href: "https://pypi.org/project/ibanforge/" },
+  { key: "java", cmd: "com.ibanforge:ibanforge-sdk", href: "https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk" },
+  { key: "dotnet", cmd: "dotnet add package IBANforge.Sdk", href: "https://www.nuget.org/packages/IBANforge.Sdk" },
+  { key: "mcp", cmd: "npx -y ibanforge-mcp", href: "https://www.npmjs.com/package/ibanforge-mcp" },
+  { key: "n8n", cmd: "npm install n8n-nodes-ibanforge", href: "https://www.npmjs.com/package/n8n-nodes-ibanforge" },
+  { key: "odoo", cmd: "ibanforge_bank_autofill", href: "https://github.com/cammac-creator/ibanforge/tree/main/integrations/odoo" },
+  { key: "sheets", cmd: "=IBAN_CONTROLE(A2)", href: "/sheets" },
+  { key: "postman", cmd: "ibanforge.postman_collection.json", href: "https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman" },
 ] as const
 
+/* The add-on answers to one formula name per language (integrations/sheets/Code.gs). */
+const SHEETS_FORMULA: Record<string, string> = {
+  en: "=IBAN_CHECK(A2)",
+  fr: "=IBAN_CONTROLE(A2)",
+  de: "=IBAN_PRUEFUNG(A2)",
+}
+
+/* The three answers of the fold, recorded from the live API on 26/09/2026.
+   Values that are data, not language: the IBAN, the codes, the bank. */
+const DEMO_BANK = "Commerzbank · COBADEFFXXX"
+const FIRST_CALL = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
+  -H "Content-Type: application/json" \\
+  -d '{"iban":"DE89370400440532013000"}'`
+
+const FAQ_COUNT = 5
+
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params;
+  const { locale } = await params
   // The home is the one page a bogus first segment lands on: `/icon-512.png`
-  // for a file that does not exist is routed here with locale "icon-512.png".
-  // The locale layout refuses it with notFound(), but Next renders layout and
-  // page concurrently, and `new Intl.NumberFormat("icon-512.png")` below throws
-  // RangeError before the layout's refusal lands — a 500 where a 404 is owed
-  // (measured 2026-09-05 live, 2026-09-06 under `next start` once the layout
-  // stopped hiding it behind dynamicParams = false). Same guard, this side.
+  // for a file that does not exist is routed here with locale "icon-512.png",
+  // and `Intl.DateTimeFormat("icon-512.png")` below would throw before the
+  // layout's refusal lands, a 500 where a 404 is owed (2026-09-05). Same
+  // guard as the layout, this side.
   if (!hasLocale(routing.locales, locale)) notFound()
   setRequestLocale(locale)
-  const t = await getTranslations('home');
-  const verdict = await getTranslations('playground');
-  const liveStats = await getLandingStats();
+  const t = await getTranslations("home")
+  const verdict = await getTranslations("playground")
+  const liveStats = await getLandingStats()
 
-  // One figure for the BIC base, the live one: the plaque used to say
-  // "121 000+" 350 px away from the band's live "121 773" (audit 2026-09-04, S5).
-  // The narrow no-break space Intl emits for fr/de is ~3 px at 17 px in Inter:
-  // "121773" to the eye. A regular no-break space keeps the group readable.
-  const nf = new Intl.NumberFormat(locale)
-  const grouped = (n: number) => nf.format(n).replace(/\u202f/g, '\u00a0')
-  const figures = {
-    bic: grouped(liveStats.bicEntries),
-    bicK: `${Math.floor(liveStats.bicEntries / 1000)}K`,
-    ch: grouped(liveStats.chClearingEntries),
-    countries: String(SUPPORTED_COUNTRIES),
-  }
-  const FEATURES = Array.from({ length: FEATURE_COUNT }, (_, i) => ({
-    badge: t(`features.${i}.badge`, figures),
-    title: t(`features.${i}.title`),
-    description: t(`features.${i}.description`, figures),
-  }))
-  // The refresh date /health already reports and the page used to throw away:
-  // "refreshed monthly" becomes a dated fact, never typed by hand (S4).
-  //
-  // 🚨 The day counter that used to stand here was REMOVED on 22/09/2026, on
-  // Claude-Alain's decision. It counted down to 14.11.2026, the day SIX
-  // publishes for customer-to-bank payment orders (the 21 November date that
-  // circulates is the 2025 removal of type K addresses, not a 2026 deadline).
-  // Swift deferred its own November changes on 27.08.2026 and the EPC
-  // postponed on 09.09.2026. A countdown is a precision claim about what
-  // happens to a payment on that day, and that claim is not ours to make. The
-  // band now says "mid-November 2026", cites SIX's day in its body, and keeps
-  // the dated facts below it.
+  const countries = String(SUPPORTED_COUNTRIES)
+  const registerCodes = t("coverage.registerCodes")
+  const keyCodes = t("coverage.keyCodes")
+  const registerCount = registerCodes.split(",").length
+  const keyCount = keyCodes.split(",").length
+  // "0,4" in French and German, the site's one number format.
+  const latency = formatGrouped(P50_PROCESSING_MS, locale, 1)
+
+  // The refresh date /health reports, never typed by hand (S4 of 2026-09-04).
   const refreshedOn = liveStats.bicDataLastUpdated
-    ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-        .format(new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`))
+    ? new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(
+        new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`),
+      )
     : null
 
-  const ENDPOINTS = Array.from({ length: ENDPOINT_COUNT }, (_, i) => ({
-    method: t(`endpoints.${i}.method`),
-    path: t(`endpoints.${i}.path`),
-    cost: t(`endpoints.${i}.cost`),
-    description: t(`endpoints.${i}.description`),
-  }))
-
-  const STATS = [
-    { value: liveStats.bicEntries, label: t('stats.bic') },
-    { value: SUPPORTED_COUNTRIES, label: t('stats.countries') },
-    { value: liveStats.chClearingEntries, label: t('stats.clearing') },
-    { value: P50_PROCESSING_MS, label: t('stats.latency'), decimals: 1, suffix: 'ms' },
+  const scenarios: DemoScenario[] = [
+    {
+      tab: t("demo.tab0"),
+      iban: "DE89 3704 0044 0532 0130 00",
+      tone: "ok",
+      rows: [
+        { label: t("demo.format"), value: t("demo.valid"), state: "ok" },
+        { label: t("demo.register"), value: t("demo.confirmed", { code: "37040044" }), detail: t("demo.registerName"), state: "ok" },
+        { label: t("demo.bank"), value: DEMO_BANK, state: "ok" },
+      ],
+      verdict: t("demo.verdictOk"),
+      note: t("demo.noteOk"),
+    },
+    {
+      tab: t("demo.tab1"),
+      iban: "DE65 1234 5678 0532 0130 00",
+      tone: "stop",
+      rows: [
+        { label: t("demo.format"), value: t("demo.valid"), state: "ok" },
+        { label: t("demo.register"), value: t("demo.notAllocated", { code: "12345678" }), detail: t("demo.registerName"), state: "bad" },
+        { label: t("demo.bank"), value: t("demo.noBank"), state: "off" },
+      ],
+      verdict: t("demo.verdictStop"),
+      note: t("demo.noteStop"),
+    },
+    {
+      tab: t("demo.tab2"),
+      iban: "DE89 3704 0044 0532 0130 01",
+      tone: "fix",
+      rows: [
+        { label: t("demo.format"), value: t("demo.checksum"), state: "bad" },
+        { label: t("demo.register"), value: t("demo.skipped"), state: "off" },
+        { label: t("demo.bank"), value: t("demo.skipped"), state: "off" },
+      ],
+      verdict: t("demo.verdictFix"),
+      note: t("demo.noteFix"),
+    },
   ]
 
-  const quoteTr = t('reviewed.quoteTranslation')
+  const anatomy = [
+    { code: "DE", label: t("problem.country"), what: t("problem.countryWhat", { countries }) },
+    { code: "89", label: t("problem.check"), what: t("problem.checkWhat") },
+    { code: "37040044", label: t("problem.bank"), what: t("problem.bankWhat") },
+    { code: "0532013000", label: t("problem.account"), what: t("problem.accountWhat") },
+  ]
+
+  const checksumItems = t.raw("problem.checksumItems") as string[]
+  const addsItems = t.raw("problem.addsItems") as string[]
+
+  const faq = Array.from({ length: FAQ_COUNT }, (_, i) => ({
+    q: t(`faq.q${i}`),
+    a: t(`faq.a${i}`, { trialWeekly: catalogue.restTrialWeekly, claimed: catalogue.claimedMonthly }),
+  }))
+
+  const plans = [
+    { key: "try", featured: false },
+    { key: "key", featured: false },
+    { key: "pro", featured: true },
+    { key: "packs", featured: false },
+  ] as const
+
+  const integrationItems = INTEGRATIONS.map((item) => {
+    const external = item.href.startsWith("http")
+    const cmd = item.key === "sheets" ? (SHEETS_FORMULA[locale] ?? item.cmd) : item.cmd
+    return { ...item, cmd, href: external ? item.href : localePath(locale, item.href), external }
+  })
 
   return (
-    <div className="forge lens-landing" data-landing="lens-v1">
-      <LensHero copy={t.raw('lens.hero') as LensCopy} verdictCopy={verdict.raw('verdict') as LensCopy}
-        playgroundHref={localePath(locale, '/playground')} auditHref={localePath(locale, '/audit')} />
-
-      {/* ── Trust band: sources, sanctions lists, Swiss provenance ────────── */}
-      {/* Audit 2026-09-04 (M6): the only honest "logo band" this product has
-          is its registers; it used to arrive at 88 % of the page. */}
-      <section className="trust-band" aria-label={t('trust.ariaLabel')}>
-        <div className="wrap trust-grid">
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.dataLabel')}</span>
-            <p className="trust-v">
-              {/* nbsp inside names and before each dot: lines only break after a separator */}
-              {t('trust.dataValue')
-                .split(' · ')
-                .map((source) => source.replace(/ /g, ' '))
-                .join(' · ')}
-            </p>
-            <span className="trust-n">
-              {refreshedOn ? t('trust.dataNoteDated', { date: refreshedOn }) : t('trust.dataNote')}
+    <div className="home" data-landing="home-v2">
+      {/* ── 1. The fold: what it is, for whom, and three real answers ──────── */}
+      <section className="home-hero" aria-labelledby="home-title">
+        <div className="home-aurora" aria-hidden="true" />
+        <div className="home-wrap home-hero-grid">
+          <div>
+            <span className="home-eyebrow">
+              {/* Green only when a measure stands behind it: at least 99 % of
+                  answers without a 5xx over 30 days, read at each hourly render. */}
+              {liveStats.successRate30 !== null && liveStats.successRate30 >= 99 && <StatusDot kind="live" />}
+              {t("hero.eyebrow")}
             </span>
-          </div>
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.sanctionsLabel')}</span>
-            <p className="trust-v">{t('trust.sanctionsValue')}</p>
-            <span className="trust-n">{t('trust.sanctionsNote')}</span>
-          </div>
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.madeLabel')}</span>
-            <p className="trust-v"><span className="swiss-sq" aria-hidden="true"></span>{t('trust.madeValue')}</p>
-            <span className="trust-n">{t('trust.madeNote')}</span>
-          </div>
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.privacyLabel')}</span>
-            <p className="trust-v">{t('trust.privacyValue')}</p>
-            <Link href={localePath(locale, '/legal/dpa')} className="trust-n" style={{ textDecoration: 'underline', textUnderlineOffset: 4 }}>
-              {t('trust.privacyNote')}
+            <h1 id="home-title">
+              {t("hero.titleLead")} <em>{t("hero.titleAccent")}</em>
+            </h1>
+            <p className="home-hero-desc">{t("hero.description", { countries })}</p>
+            <div className="home-hero-cta">
+              <GetKeyButton variant="amber" className="px-7" evt="cta:key-hero">
+                {t("hero.ctaKey")}
+              </GetKeyButton>
+              <Button size="lg" variant="outline" className="px-7" nativeButton={false} render={<a href="#try" data-evt="cta:try-hero" />}>
+                {t("hero.ctaTry")}
+              </Button>
+            </div>
+            <ul className="home-hero-note">
+              <li>{t("hero.note1")}</li>
+              <li>{t("hero.note2")}</li>
+              <li>{t("hero.note3")}</li>
+            </ul>
+            <Link href={localePath(locale, "/audit")} className="home-hero-alt" data-evt="cta:journey-audit">
+              {t("hero.alt")} →
             </Link>
+          </div>
+          <VerdictDemo
+            scenarios={scenarios}
+            copy={{
+              aria: t("demo.aria"),
+              request: t("demo.request"),
+              caption: t("demo.caption"),
+              pause: t("demo.pause"),
+              play: t("demo.play"),
+              scenarios: t("demo.scenarios"),
+              ibanLabel: t("demo.ibanLabel"),
+            }}
+          />
+        </div>
+      </section>
+
+      {/* ── 2. Why a checksum is not enough: the anatomy of an IBAN ────────── */}
+      <section className="home-section" aria-labelledby="home-problem">
+        <div className="home-wrap">
+          <div className="home-center">
+            <span className="home-eyebrow">{t("problem.eyebrow")}</span>
+            <h2 className="home-h2" id="home-problem">
+              {t("problem.title")}
+            </h2>
+            <p className="home-lead">{t("problem.lead")}</p>
+          </div>
+          <IbanAnatomy parts={anatomy} caption={t("problem.anatomyCaption")} />
+          <div className="home-versus">
+            <Reveal className="home-card muted">
+              <h3>{t("problem.checksumTitle")}</h3>
+              <ul>
+                {checksumItems.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </Reveal>
+            <Reveal delay={80} className="home-card">
+              <h3>{t("problem.addsTitle")}</h3>
+              <ul>
+                {addsItems.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </Reveal>
           </div>
         </div>
       </section>
 
-      {/* ── Sourced stats, counting up on scroll ─────────────────────────── */}
-      <section className="stats-band">
-        <StatsBar stats={STATS} locale={locale} />
+      {/* ── 3. Three ways to use it: the brand illustrations of 16/09 ─────── */}
+      <LensGallery copy={t.raw("lens.gallery") as GalleryCopy} locale={locale} />
+
+      {/* ── 4. Try it: the lens, input on the left, answer on the right ───── */}
+      {/* A plain block: the lens renders its own labelled section inside. */}
+      <div className="home-section home-try" id="try">
+        <div className="lens-frame">
+          <LensHero
+            copy={t.raw("lens.hero") as LensCopy}
+            verdictCopy={verdict.raw("verdict") as LensCopy}
+            playgroundHref={localePath(locale, "/playground")}
+            auditHref={localePath(locale, "/audit")}
+          />
+        </div>
+      </div>
+
+      {/* ── 5. For whom: developers, finance teams, AI agents ──────────────── */}
+      <section className="home-section" aria-labelledby="home-audiences">
+        <div className="home-wrap">
+          <div className="home-center">
+            <span className="home-eyebrow">{t("audiences.eyebrow")}</span>
+            <h2 className="home-h2" id="home-audiences">
+              {t("audiences.title")}
+            </h2>
+            <p className="home-lead">{t("audiences.lead")}</p>
+          </div>
+          <div className="home-cards">
+            <Reveal className="home-card">
+              <span className="home-card-icon">
+                <CodeXml aria-hidden="true" />
+              </span>
+              <h3>{t("audiences.devTitle")}</h3>
+              <p>{t("audiences.devText")}</p>
+              <code className="home-code">{FIRST_CALL}</code>
+              <Link href={localePath(locale, "/docs")} className="home-card-link" data-evt="cta:docs">
+                {t("audiences.devLink")}
+              </Link>
+            </Reveal>
+            <Reveal delay={70} className="home-card">
+              <span className="home-card-icon">
+                <FileSpreadsheet aria-hidden="true" />
+              </span>
+              <h3>{t("audiences.financeTitle")}</h3>
+              <p>{t("audiences.financeText")}</p>
+              <Link href={localePath(locale, "/audit")} className="home-card-link" data-evt="cta:audit">
+                {t("audiences.financeLink")}
+              </Link>
+            </Reveal>
+            <Reveal delay={140} className="home-card">
+              <span className="home-card-icon">
+                <Bot aria-hidden="true" />
+              </span>
+              <h3>{t("audiences.agentsTitle")}</h3>
+              <p>{t("audiences.agentsText")}</p>
+              <code className="home-code">npx -y ibanforge-mcp</code>
+              <Link href={localePath(locale, "/agents")} className="home-card-link" data-evt="cta:agents">
+                {t("audiences.agentsLink")}
+              </Link>
+            </Reveal>
+          </div>
+
+          {/* What installs today, as a slow ribbon (a plain list without motion). */}
+          <IntegrationRibbon
+            label={t("integrations.heading")}
+            description={t("integrations.sub")}
+            pause={t("integrations.pause")}
+            play={t("integrations.play")}
+          >
+            {[0, 1].map((copy) =>
+              integrationItems.map((item) => (
+                <a
+                  key={`${copy}-${item.key}`}
+                  href={item.href}
+                  className="home-integ"
+                  aria-hidden={copy === 1 ? true : undefined}
+                  tabIndex={copy === 1 ? -1 : undefined}
+                  {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                >
+                  <span>{t(`integrations.items.${item.key}`)}</span>
+                  <code>{item.cmd}</code>
+                </a>
+              )),
+            )}
+          </IntegrationRibbon>
+        </div>
       </section>
 
-      <LensGallery copy={t.raw('lens.gallery') as GalleryCopy} locale={locale} />
-
-      {/* ── What a mod-97 check will never tell you: the plaques ───────────── */}
-      <section className="sect" aria-labelledby="h-features">
-        <div className="wrap">
-          <h2 className="sect-h" id="h-features">{t('features.heading')}</h2>
-          <div className="plaques">
-            {FEATURES.map((feature, i) => (
-              <Reveal key={feature.badge} delay={i * 60} className="plaque">
-                <span className="plaque-badge">{feature.badge}</span>
-                <h3>{feature.title}</h3>
-                <p>{feature.description}</p>
+      {/* ── 6. Coverage and trust: figures read from the code, facts ───────── */}
+      <section className="home-section" aria-labelledby="home-coverage">
+        <div className="home-wrap">
+          <div className="home-center">
+            <span className="home-eyebrow">{t("coverage.eyebrow")}</span>
+            <h2 className="home-h2" id="home-coverage">
+              {t("coverage.title")}
+            </h2>
+            <p className="home-lead">{t("coverage.lead")}</p>
+          </div>
+          <Reveal className="home-figures">
+            <div className="home-figure">
+              <b>{countries}</b>
+              <span>{t("coverage.figCountries")}</span>
+            </div>
+            <div className="home-figure">
+              <b>{registerCount}</b>
+              <span>{t("coverage.figRegisters")}</span>
+              <code>{registerCodes}</code>
+            </div>
+            <div className="home-figure">
+              <b>{keyCount}</b>
+              <span>{t("coverage.figKeys")}</span>
+              <code>{keyCodes}</code>
+            </div>
+            <div className="home-figure">
+              <b>
+                {latency}
+                <small>ms</small>
+              </b>
+              <span>{t("coverage.figLatency")}</span>
+            </div>
+          </Reveal>
+          <div className="home-cards home-cards-4">
+            {[Globe, Lock, ShieldCheck, Info].map((Icon, i) => (
+              <Reveal key={i} delay={i * 60} className="home-card">
+                <span className="home-card-icon">
+                  <Icon aria-hidden="true" />
+                </span>
+                <h3>{t(`coverage.fact${i}Title`)}</h3>
+                <p>{t(`coverage.fact${i}Text`)}</p>
+                {i === 1 && (
+                  <Link href={localePath(locale, "/legal/dpa")} className="home-card-link">
+                    DPA 4.7
+                  </Link>
+                )}
               </Reveal>
             ))}
           </div>
+          <p className="home-sources">
+            {t("coverage.sources")} {refreshedOn ? t("coverage.sourcesDated", { date: refreshedOn }) : null}{" "}
+            <Link href={localePath(locale, "/sources")}>{t("coverage.sourcesLink")}</Link>
+          </p>
         </div>
       </section>
 
-      {/* ── The dated trigger: mid-November 2026 (audit 2026-09-04, M3) ─────
-          It was the seventh line of the endpoint list, at 80 % of the page.
-          The dates below are the ones our own doc and the 2026-09-02 post cite,
-          source by source; Swift's suspension of 27 August 2026 is named. The
-          heading names the month and the body cites SIX's day (14 November),
-          without a countdown — see the note beside `refreshedOn`. */}
-      <section className="deadline" aria-labelledby="h-deadline">
-        <div className="wrap deadline-grid">
-          <div>
-            <span className="eyebrow">{t('deadline.eyebrow')}</span>
-            {/* Audit 2026-09-05 (n° 17): the "why now" needed an anchor for
-                the eye. It is a month, not a running day count — the anchor
-                stays, the false precision does not. */}
-            <p className="deadline-days">
-              <b>{t('deadline.window')}</b>
-              <span>{t('deadline.windowLabel')}</span>
-            </p>
-            <h2 className="sect-h sect-h-left" id="h-deadline">{t('deadline.heading')}</h2>
+      {/* ── 7. Pricing: the plans people pay first, x402 in one line ───────── */}
+      <section className="home-section" aria-labelledby="home-pricing">
+        <div className="home-wrap">
+          <div className="home-center">
+            <span className="home-eyebrow">{t("pricing.eyebrow")}</span>
+            <h2 className="home-h2" id="home-pricing">
+              {t("pricing.title")}
+            </h2>
+            <p className="home-lead">{t("pricing.lead")}</p>
           </div>
-          <div>
-            <ul className="deadline-lines">
-              <li>{t('deadline.line1')}</li>
-              <li>{t('deadline.line2')}</li>
-              <li>{t('deadline.line3')}</li>
-            </ul>
-            <p className="deadline-text">{t('deadline.text')}</p>
-            <div className="hero-cta">
-              <Button size="lg" variant="amber" className="px-6" nativeButton={false} render={<Link href={localePath(locale, '/docs/structured-addresses')} data-evt="cta:rules" />}>
-                {t('deadline.cta')}
-              </Button>
-              <Link href={localePath(locale, '/audit')} className="btn-ghost-link" data-evt="cta:audit-deadline">
-                {t('audit.cta')}
-              </Link>
-            </div>
+          <div className="home-cards home-cards-4">
+            {plans.map((plan, i) => (
+              <Reveal key={plan.key} delay={i * 60} className={`home-card home-plan${plan.featured ? " featured" : ""}`}>
+                <span className={`home-tag${plan.featured ? " amber" : ""}`}>{t(`pricing.${plan.key}Name`)}</span>
+                <p className="home-price">
+                  {t(`pricing.${plan.key}Price`)}
+                  {plan.key === "pro" && <small>{t("pricing.proUnit")}</small>}
+                </p>
+                <p>
+                  {t(`pricing.${plan.key}Text`, {
+                    trialWeekly: catalogue.restTrialWeekly,
+                    claimed: catalogue.claimedMonthly,
+                  })}
+                </p>
+                {plan.key === "try" ? (
+                  <a href="#try" className="home-card-link" data-evt="cta:try-pricing">
+                    {t("pricing.tryCta")}
+                  </a>
+                ) : plan.key === "key" ? (
+                  <GetKeyButton variant="amber" size="default" className="mt-auto w-full" evt="cta:key-pricing">
+                    {t("pricing.keyCta")}
+                  </GetKeyButton>
+                ) : (
+                  <Link href={localePath(locale, "/pricing")} className="home-card-link" data-evt={`cta:pricing-${plan.key}`}>
+                    {t(`pricing.${plan.key}Cta`)}
+                  </Link>
+                )}
+              </Reveal>
+            ))}
           </div>
+          <p className="home-plans-foot">
+            {t("pricing.agents")}{" "}
+            <Link href={localePath(locale, "/pricing")} data-evt="cta:pricing">
+              {t("pricing.link")}
+            </Link>
+          </p>
         </div>
       </section>
 
-      {/* ── The non-developer door, right after the deadline it answers
-          (02/09/2026; moved up on 2026-09-05, audit n° 20) ── */}
-      <section className="sect audit-door" aria-labelledby="h-audit">
-        <div className="wrap">
-          <h2 className="sect-h" id="h-audit">{t('audit.heading')}</h2>
-          <p className="sect-sub">{t('audit.text')}</p>
-          {/* Audit 2026-09-04 (M4): the only CHF price and the only no-code
-              offer of the page were announced by a negation and a ghost
-              button. A full button, centred like the section. */}
-          <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
-            <Button size="lg" variant="amber" className="px-8" nativeButton={false} render={<Link href={localePath(locale, '/audit')} data-evt="cta:audit" />}>
-              {t('audit.cta')}
+      {/* ── 8. The dated trigger: mid-November 2026, never a countdown ────────
+          Claude-Alain's decision of 22/09/2026: the month in the title, SIX's
+          day in the body, no day count (a precision claim about what happens
+          to a payment on that day is not ours to make). */}
+      <section className="home-deadline" aria-labelledby="home-deadline">
+        <div className="home-wrap home-deadline-inner">
+          <p className="home-deadline-when">
+            {t("deadline.window")}
+            <small>{t("deadline.windowLabel")}</small>
+          </p>
+          <div>
+            <h2 className="sr-only" id="home-deadline">
+              {t("deadline.heading")}
+            </h2>
+            <p>{t("deadline.band")}</p>
+          </div>
+          <div className="home-deadline-links">
+            <Button size="sm" variant="amber" nativeButton={false} render={<Link href={localePath(locale, "/docs/structured-addresses")} data-evt="cta:rules" />}>
+              {t("deadline.cta")}
+            </Button>
+            <Button size="sm" variant="outline" nativeButton={false} render={<Link href={localePath(locale, "/audit")} data-evt="cta:audit-deadline" />}>
+              {t("audiences.financeLink")}
             </Button>
           </div>
         </div>
       </section>
 
-      {/* ── Endpoints, price-stamped ──────────────────────────────────────── */}
-      <section className="sect" aria-labelledby="h-endpoints" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <h2 className="sect-h" id="h-endpoints">{t('endpoints.heading')}</h2>
-          <p className="sect-sub">{t('endpoints.subtitle')}</p>
-          <div className="ep-list">
-            {ENDPOINTS.map((endpoint, i) => (
-              <Reveal key={endpoint.path} delay={i * 50} className="ep">
-                <span className={`ep-m ${endpoint.method === 'GET' ? 'get' : 'post'}`}>{endpoint.method}</span>
-                <span className="ep-p">{endpoint.path}</span>
-                <span className="ep-d">{endpoint.description}</span>
-                <span className="ep-cost">{endpoint.cost}</span>
-              </Reveal>
-            ))}
-          </div>
-          {/* The subscription, the only recurring line, was absent from the
-              home (audit 2026-09-05, n° 15): one line, every plan, one link. */}
-          <p className="ep-plans">
-            {t('endpoints.plans')}{' '}
-            <Link href={localePath(locale, '/pricing')} data-evt="cta:pricing">{t('endpoints.plansLink')}</Link>
-          </p>
-        </div>
-      </section>
-
-      {/* ── Integrations: the distribution, visible (audit 2026-09-04, M5) ── */}
-      <section className="sect integrations" aria-labelledby="h-integrations">
-        <div className="wrap">
-          <h2 className="sect-h" id="h-integrations">{t('integrations.heading')}</h2>
-          <p className="sect-sub">{t('integrations.sub')}</p>
-          <ul className="integ-grid">
-            {INTEGRATIONS.map((item) => {
-              const external = item.href.startsWith('http')
-              const href = external ? item.href : localePath(locale, `${item.href}`)
-              return (
-                <li key={item.key} className="integ">
-                  <a
-                    href={href}
-                    className="integ-link"
-                    {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                  >
-                    <span className="integ-name">{t(`integrations.items.${item.key}`)}</span>
-                    <code className="integ-cmd">{item.cmd}</code>
-                  </a>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      </section>
-
-      {/* ── Agents get their own rail ─────────────────────────────────────── */}
-      <section className="agents-rail sect" aria-labelledby="h-agents">
-        <div className="wrap">
-          <h2 className="sect-h" id="h-agents">{t('agentsRail.heading')}</h2>
-          <p className="sect-sub">{t('agentsRail.sub')}</p>
-          <div className="agent-grid">
-            <Reveal className="agent-card">
-              <h3>{t('agentsRail.mcpTitle')}</h3>
-              <p>{t('agentsRail.mcpBody')}</p>
-              <p className="agent-code">npx -y ibanforge-mcp</p>
-            </Reveal>
-            <Reveal delay={60} className="agent-card">
-              <h3>{t('agentsRail.x402Title')}</h3>
-              <p>{t('agentsRail.x402Body')}</p>
-              <p className="agent-code">402 → pay → 200 OK</p>
-            </Reveal>
-            <Reveal delay={120} className="agent-card">
-              <h3>{t('agentsRail.docsTitle')}</h3>
-              <p>{t('agentsRail.docsBody')}</p>
-              <p className="agent-code"><a className="agent-link" href="https://ibanforge.com/llms.txt">GET /llms.txt</a></p>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Independently reviewed ────────────────────────────────────────── */}
-      <section className="reviewed" aria-labelledby="h-reviewed">
-        <div className="wrap">
-          <span className="eyebrow" id="h-reviewed">{t('reviewed.label')}</span>
-          <blockquote>“{t('reviewed.quote')}”</blockquote>
-          {quoteTr && <p className="ctx quote-tr">{quoteTr}</p>}
-          <p className="ctx">{t('reviewed.context')}</p>
+      {/* ── 9. Independently reviewed ──────────────────────────────────────── */}
+      <section className="home-section" aria-labelledby="home-reviewed">
+        <div className="home-wrap home-quote">
+          <span className="home-eyebrow" id="home-reviewed">
+            {t("reviewed.label")}
+          </span>
+          <blockquote>“{t("reviewed.quote")}”</blockquote>
+          {t("reviewed.quoteTranslation") && <p>{t("reviewed.quoteTranslation")}</p>}
+          <p>{t("reviewed.context")}</p>
           <p className="links">
             <a href="https://github.com/api-search/inbox/issues/3" target="_blank" rel="noopener noreferrer">
-              {t('reviewed.linkReview')}
+              {t("reviewed.linkReview")}
             </a>
-            <Link href={localePath(locale, '/blog/2026-08-11-graded-by-a-catalog-that-never-read-us')}>
-              {t('reviewed.linkStory')}
+            <Link href={localePath(locale, "/blog/2026-08-11-graded-by-a-catalog-that-never-read-us")}>
+              {t("reviewed.linkStory")}
             </Link>
           </p>
         </div>
       </section>
 
-      {/* Un dernier reflet de verre accompagne l’appel à l’action. */}
-      <section className="cta-final" aria-labelledby="h-cta">
-        <div className="wrap">
-          <h2 id="h-cta">{t('cta.heading')}</h2>
-          <p>{t('cta.description')}</p>
-          {/* Audit 2026-09-05 (n° 7): centred like the heading above it. */}
-          <div className="hero-cta hero-cta-center">
+      {/* ── 10. Questions ─────────────────────────────────────────────────── */}
+      <section className="home-section" aria-labelledby="home-faq">
+        <div className="home-wrap">
+          <div className="home-center">
+            <h2 className="home-h2" id="home-faq">
+              {t("faq.title")}
+            </h2>
+          </div>
+          <div className="home-faq">
+            {faq.map((item) => (
+              <details key={item.q}>
+                <summary>{item.q}</summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 11. The last call, over a discreet reflection of the lens (his
+          request of 16/09 for this block) ─────────────────────────────── */}
+      <section className="home-final" aria-labelledby="home-final">
+        <div className="home-final-bg" aria-hidden="true">
+          <Image src={lensAssets.poster} alt="" width={1707} height={769} sizes="100vw" loading="lazy" />
+        </div>
+        <div className="home-wrap">
+          <h2 id="home-final">{t("cta.title")}</h2>
+          <p>{t("cta.text")}</p>
+          <div className="home-hero-cta">
             <GetKeyButton variant="amber" className="px-8" evt="cta:key-final">
-              {t('cta.getKeyButton')}
+              {t("cta.getKey")}
             </GetKeyButton>
-            <Button
-              size="lg"
-              variant="outline"
-              className="px-8"
-              nativeButton={false}
-              render={<Link href={localePath(locale, '/docs')} data-evt="cta:docs" />}
-            >
-              {t('cta.button')}
+            <Button size="lg" variant="outline" className="px-8" nativeButton={false} render={<Link href={localePath(locale, "/docs")} data-evt="cta:docs-final" />}>
+              {t("cta.docs")}
             </Button>
           </div>
         </div>
@@ -361,30 +548,44 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          // Audit 2026-09-04 (S11): this block used to describe a second,
-          // unrelated "IBANforge" next to the layout's SoftwareApplication,
-          // in hard English on /fr and /de, with a root URL that answers 307.
-          // One graph now: ids relate the entities, URLs carry the locale.
+          // One graph (audit 2026-09-04, S11): ids relate the entities, URLs
+          // carry the locale. The FAQ repeats the visible answers word for word.
           __html: JSON.stringify({
             "@context": "https://schema.org",
-            "@type": "WebAPI",
-            "@id": `${urlFor(locale)}#api`,
-            name: "IBANforge",
-            url: urlFor(locale),
-            inLanguage: locale,
-            description: t('metadata.description'),
-            documentation: urlFor(locale, '/docs'),
-            termsOfService: urlFor(locale, '/legal'),
-            provider: { "@id": "https://ibanforge.com/#organization" },
-            isPartOf: { "@id": "https://ibanforge.com/#software" },
-            offers: {
-              "@type": "Offer",
-              price: "0",
-              priceCurrency: "USD",
-              // Until 24/09/2026: "Free tier — 200 requests per month", on every
-              // locale of the home page, as if 200 came with no step at all.
-              description: `Free API key, no e-mail: ${catalogue.claimedMonthly} requests a month once claimed, ${catalogue.anonymousMonthly} a month before that`,
-            },
+            "@graph": [
+              {
+                "@type": "WebAPI",
+                "@id": `${urlFor(locale)}#api`,
+                name: "IBANforge",
+                url: urlFor(locale),
+                inLanguage: locale,
+                description: t("metadata.description"),
+                documentation: urlFor(locale, "/docs"),
+                termsOfService: urlFor(locale, "/legal"),
+                provider: { "@id": "https://ibanforge.com/#organization" },
+                isPartOf: { "@id": "https://ibanforge.com/#software" },
+                offers: {
+                  "@type": "Offer",
+                  price: "0",
+                  priceCurrency: "USD",
+                  // Until 24/09/2026: "Free tier — 200 requests per month", on
+                  // every locale, as if 200 came with no step at all. Until
+                  // 27/09/2026: "no e-mail" beside the 200, which the claim
+                  // with an e-mail unlocks.
+                  description: `Free API key: ${catalogue.claimedMonthly} requests a month once claimed with an e-mail, ${catalogue.anonymousMonthly} a month before that, with no e-mail`,
+                },
+              },
+              {
+                "@type": "FAQPage",
+                "@id": `${urlFor(locale)}#faq`,
+                inLanguage: locale,
+                mainEntity: faq.map((item) => ({
+                  "@type": "Question",
+                  name: item.q,
+                  acceptedAnswer: { "@type": "Answer", text: item.a },
+                })),
+              },
+            ],
           }),
         }}
       />

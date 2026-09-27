@@ -15,6 +15,7 @@ import {
   shareInWords,
 } from './positioning.js';
 import { buildRouteTable } from '../middleware/x402.js';
+import { NATIONAL_CHECK_COUNTRIES } from './national-check/index.js';
 
 /**
  * The first lines machines read, held to the code that decides the verdict.
@@ -50,6 +51,12 @@ const BIC_TRUTH_SURFACES = [
   'glama.json',
   'frontend/components/json-ld.tsx',
 ];
+
+/** The home page, one subtree per language (redesigned on 27/09/2026). */
+function homeText(lang: 'en' | 'fr' | 'de'): string {
+  const messages = JSON.parse(read(`frontend/messages/${lang}.json`)) as { home: unknown };
+  return JSON.stringify(messages.home);
+}
 
 /** The comparison page, one subtree per language, never the home page keys. */
 function compareText(lang: 'en' | 'fr' | 'de'): string {
@@ -144,6 +151,78 @@ describe('the static surfaces say what the code says', () => {
       expect(text).toContain(f.words);
     },
   );
+
+  it('the home page names the same register codes and national keys, in three languages', () => {
+    const codes = codesOf(registerCountries().authoritative);
+    const keys = NATIONAL_CHECK_COUNTRIES.join(', ');
+    for (const lang of ['en', 'fr', 'de'] as const) {
+      expect(homeText(lang), `${lang}: register codes`).toContain(codes);
+      expect(homeText(lang), `${lang}: national keys`).toContain(keys);
+    }
+  });
+
+  // The sources line said "re-read at least every month" over a directory two
+  // thirds of which is a copy frozen in 2018 (review of 27/09/2026). Its French
+  // and German words are held here too: a share that stops being "about two
+  // thirds" has no translation below and turns this test red.
+  it('the home page dates the frozen copy of the SWIFT directory, in three languages', () => {
+    const f = frozenBicShare();
+    const [month = '', year = ''] = (f.month ?? '').split(' ');
+    const MONTHS_FR: Record<string, string> = {
+      January: 'janvier',
+      February: 'février',
+      March: 'mars',
+      April: 'avril',
+      May: 'mai',
+      June: 'juin',
+      July: 'juillet',
+      August: 'août',
+      September: 'septembre',
+      October: 'octobre',
+      November: 'novembre',
+      December: 'décembre',
+    };
+    const MONTHS_DE: Record<string, string> = {
+      January: 'Januar',
+      February: 'Februar',
+      March: 'März',
+      April: 'April',
+      May: 'Mai',
+      June: 'Juni',
+      July: 'Juli',
+      August: 'August',
+      September: 'September',
+      October: 'Oktober',
+      November: 'November',
+      December: 'Dezember',
+    };
+    const WORDS_FR: Record<string, string> = {
+      'about two thirds': 'environ deux tiers',
+      'about half': 'environ la moitié',
+      'about a third': 'environ un tiers',
+    };
+    const WORDS_DE: Record<string, string> = {
+      'about two thirds': 'etwa zwei Drittel',
+      'about half': 'etwa die Hälfte',
+      'about a third': 'etwa ein Drittel',
+    };
+    // A month or a share with no translation here must fail by name, not
+    // through a sentence that reads "undefined".
+    expect(MONTHS_FR[month], `no French month for ${f.month}`).toBeDefined();
+    expect(MONTHS_DE[month], `no German month for ${f.month}`).toBeDefined();
+    expect(WORDS_FR[f.words], `no French words for "${f.words}"`).toBeDefined();
+    expect(WORDS_DE[f.words], `no German words for "${f.words}"`).toBeDefined();
+    const said: Record<'en' | 'fr' | 'de', string[]> = {
+      en: [`frozen in ${f.month}`, f.words],
+      fr: [`figée en ${MONTHS_FR[month]} ${year}`, WORDS_FR[f.words]!],
+      de: [`Stand ${MONTHS_DE[month]} ${year}`, WORDS_DE[f.words]!],
+    };
+    for (const lang of ['en', 'fr', 'de'] as const) {
+      for (const piece of said[lang]) {
+        expect(homeText(lang), `${lang}: ${piece}`).toContain(piece);
+      }
+    }
+  });
 
   it('the comparison page names the same register codes, in three languages', () => {
     const codes = codesOf(registerCountries().authoritative);
@@ -286,6 +365,32 @@ describe('the retired sentences stay retired', () => {
         }
       });
     expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  // The home page keys waited for a visual review; it came with the redesign of 27/09/2026.
+  it.each(['en', 'fr', 'de'] as const)('the home page (%s)', (lang) => {
+    const text = homeText(lang);
+    for (const [pattern, instead] of RETIRED) {
+      expect(text, instead).not.toMatch(pattern);
+    }
+    expect(text).not.toMatch(/deepest|plus profondes|tiefsten/i);
+    expect(text).not.toMatch(/Made in Switzerland|Conçu en Suisse/);
+    // Promises the page could not keep (review of 27/09/2026): not every answer
+    // carries a date, the free audit preview shows the first flagged lines, not
+    // every finding, and "wer das Konto führt" names the bank, not the holder.
+    expect(text).not.toMatch(/each answer dates|que chaque réponse date|die jede Antwort datiert/);
+    expect(text).not.toMatch(/its source and its date|sa source et sa date|mit Quelle und Datum/);
+    expect(text).not.toMatch(
+      /preview every finding|gratuitement chaque constat|jeden Befund kostenlos/,
+    );
+    expect(text).not.toMatch(/wer das Konto führt/);
+    // The file audit keeps its report for hours: only the validation stores no
+    // IBAN (second review of 27/09/2026). And the frozen SWIFT copy is not
+    // "re-read every month".
+    expect(text).not.toMatch(/IBANs are never stored|jamais stockés|nie gespeichert/);
+    expect(text).not.toMatch(
+      /Re-read at least every month, last refresh|Relues au moins chaque mois, dernière|Mindestens monatlich neu gelesen, zuletzt/,
+    );
   });
 
   it.each(['en', 'fr', 'de'] as const)('the comparison page (%s)', (lang) => {
