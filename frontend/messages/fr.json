@@ -2671,7 +2671,7 @@
     },
     "install": {
       "title": "Installer",
-      "status": "L'add-on est en cours de dépôt sur le Google Workspace Marketplace ; tant que la revue de Google n'est pas terminée, il n'y a pas de bouton de boutique. Le script est open source et s'installe à la main en cinq minutes :",
+      "status": "L'add-on n'est pas encore sur le Google Workspace Marketplace : il n'y a donc pas de bouton de boutique. Le script est open source et s'installe à la main en cinq minutes :",
       "steps": {
         "0": "Dans votre feuille : Extensions, puis Apps Script.",
         "1": "Collez Code.gs et Sidebar.html depuis le dossier GitHub, ainsi que le manifeste appsscript.json (Paramètres du projet, afficher le manifeste).",

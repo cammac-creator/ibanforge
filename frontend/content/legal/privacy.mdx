@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-09-26"
+updated: "2026-09-27"
 ---
 
 # Privacy Policy
 
-**Last updated: September 26, 2026 · Version 1.4**
+**Last updated: September 27, 2026 · Version 1.5**
+
+*Revision 1.5 (September 27, 2026): section 1 and the retention summary now describe the file audit: the annotated report it produces, which reproduces the columns of the uploaded file, is kept 2 hours if unpaid and 24 hours after payment, then deleted. It describes the file audit as it already works; nothing new is collected.*
 
 *Revision 1.4 (September 26, 2026): section 1 now says that, for a USDC purchase, we store the paying wallet address and the on-chain transaction hash, to reconcile a payment whose settlement could not be confirmed.*
 
@@ -17,13 +19,14 @@ updated: "2026-09-26"
 
 *Revision 1.1 (August 5, 2026): corrected the hosting region — the API runs in Railway's Amsterdam (EU) region, not Zurich; only Railway's network edge sits in Zurich. Completed the processor list (AI drafting assistance, CI infrastructure, dashboard traffic), added the feedback-reports row and the business-contacts section.*
 
-This policy explains what personal data **IBANforge** (see [Legal Notice](/legal/imprint)) processes when you use `ibanforge.com` and `api.ibanforge.com`, under the Swiss Federal Act on Data Protection (FADP) and, where applicable, the EU GDPR. The short version: **IBANs you submit are validated in memory and are not stored.**
+This policy explains what personal data **IBANforge** (see [Legal Notice](/legal/imprint)) processes when you use `ibanforge.com` and `api.ibanforge.com`, under the Swiss Federal Act on Data Protection (FADP) and, where applicable, the EU GDPR. The short version: **IBANs you submit for validation are processed in memory and are not stored.** A file you upload to the file audit is kept only as its annotated report, 2 hours if unpaid and 24 hours after payment.
 
 ## 1. What we process, and why
 
 | Data | Purpose | Stored? |
 |---|---|---|
-| **IBANs submitted to the API** | Validation and enrichment (performance of the service) | **No.** Processed in memory, never written to storage. One exception: for *invalid* IBANs, at most the **first 12 characters** (country + bank identifier — never the account part) may be retained for data-quality diagnostics. |
+| **IBANs submitted for validation** | Validation and enrichment (performance of the service) | **No.** Processed in memory, never written to storage. One exception: for *invalid* IBANs, at most the **first 12 characters** (country + bank identifier — never the account part) may be retained for data-quality diagnostics. |
+| **Files uploaded to the file audit** (for example payee names, IBANs and addresses) | Producing the annotated report you order (performance of the service) | **Yes, briefly.** The report reproduces the columns of the uploaded file. It is kept **2 hours** if unpaid and **24 hours after payment**, then automatically deleted. |
 | **Email address** (free key signup) | Issuing your key, quota notifications, service messages | Yes, while your key exists. |
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
 | **Aggregated statistics** (daily counts by endpoint/country — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
@@ -52,7 +55,8 @@ Where processors are outside Switzerland/EEA, transfers rely on adequacy decisio
 
 ## 4. Retention summary
 
-- Submitted IBANs: **not stored** (invalid-IBAN prefixes ≤12 characters: up to 12 months as request metadata).
+- IBANs submitted for validation: **not stored** (invalid-IBAN prefixes ≤12 characters: up to 12 months as request metadata).
+- File audit: the annotated report is deleted **2 hours** after the upload if unpaid, and **24 hours after payment** otherwise.
 - Request metadata: **12 months**, purged automatically. For API customers who terminate, metadata attributable to their keys is deleted **by default 30 days after termination** ([DPA clause 4.7](/legal/dpa)).
 - Key account (email): lifetime of the key; deleted on request.
 - Anonymous aggregates: kept indefinitely.
