@@ -53,7 +53,7 @@
       "countries": "IBAN par pays"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-09) — mensuel · OFAC · UN · UE · EPC — hebdomadaire"
+    "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · Bank of England (List of Banks, 2026-09) — mensuel · SwiftCodes/MIT — copie figée, 2018 · OFAC · UN · UE · EPC — hebdomadaire"
   },
   "home": {
     "metadata": {
@@ -73,7 +73,7 @@
         "mcp": "Serveur MCP · Claude, Cursor, Cline",
         "n8n": "Nœud n8n 0.1.1 · auto-hébergé",
         "odoo": "Module Odoo 18 · modules personnalisés requis",
-        "sheets": "Complément Google Sheets",
+        "sheets": "Complément Google Sheets · installation manuelle, revue Google en cours",
         "postman": "Collection Postman"
       },
       "pause": "Mettre la liste en pause",
@@ -2308,7 +2308,7 @@
     "eyebrow": "Provenance",
     "hero": {
       "title": "Chaque réponse cite sa source",
-      "description": "Une donnée bancaire vaut exactement ce que vaut le registre dont elle sort. C'est pourquoi chaque réponse d'IBANforge porte le nom et la date du jeu de référence qui l'a produite — et quand un éditeur attache des conditions, elles sont honorées dans le produit : la plupart voyagent dans la réponse elle-même, le reste vit dans la documentation qui la décrit."
+      "description": "Une donnée bancaire vaut exactement ce que vaut le registre dont elle sort. C'est pourquoi chaque réponse d'IBANforge nomme le jeu de référence qui l'a produite, avec sa date quand elle est connue — et quand un éditeur attache des conditions, elles sont honorées dans le produit : la plupart voyagent dans la réponse elle-même, le reste vit dans la documentation qui la décrit."
     },
     "principle": {
       "title": "Trois habitudes, verrouillées par des tests",

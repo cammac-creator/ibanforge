@@ -53,7 +53,7 @@
       "countries": "IBAN by country"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-09) — monthly · OFAC · UN · EU · EPC — weekly"
+    "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · Bank of England (List of Banks, 2026-09) — monthly · SwiftCodes/MIT — frozen copy, 2018 · OFAC · UN · EU · EPC — weekly"
   },
   "home": {
     "metadata": {
@@ -73,7 +73,7 @@
         "mcp": "MCP server · Claude, Cursor, Cline",
         "n8n": "n8n node 0.1.1 · self-hosted",
         "odoo": "Odoo 18 module · custom modules required",
-        "sheets": "Google Sheets add-on",
+        "sheets": "Google Sheets add-on · manual install, Google review pending",
         "postman": "Postman collection"
       },
       "pause": "Pause the list",
@@ -2308,7 +2308,7 @@
     "eyebrow": "Provenance",
     "hero": {
       "title": "Every answer names its source",
-      "description": "Bank data is worth exactly as much as the register it comes from. That is why every IBANforge response carries the name and the date of the reference set that produced it — and where a publisher attaches conditions, they are honoured in the product: most travel inside the response itself, the rest live in the documentation that describes it."
+      "description": "Bank data is worth exactly as much as the register it comes from. That is why every IBANforge response names the reference set that produced it, with its date when known — and where a publisher attaches conditions, they are honoured in the product: most travel inside the response itself, the rest live in the documentation that describes it."
     },
     "principle": {
       "title": "Three habits, enforced by tests",

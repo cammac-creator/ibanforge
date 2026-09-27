@@ -75,6 +75,13 @@ const INTEGRATIONS = [
   { key: "postman", cmd: "ibanforge.postman_collection.json", href: "https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman" },
 ] as const
 
+/* The add-on answers to one formula name per language (integrations/sheets/Code.gs). */
+const SHEETS_FORMULA: Record<string, string> = {
+  en: "=IBAN_CHECK(A2)",
+  fr: "=IBAN_CONTROLE(A2)",
+  de: "=IBAN_PRUEFUNG(A2)",
+}
+
 /* The three answers of the fold, recorded from the live API on 26/09/2026.
    Values that are data, not language: the IBAN, the codes, the bank. */
 const DEMO_BANK = "Commerzbank · COBADEFFXXX"
@@ -175,7 +182,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
   const integrationItems = INTEGRATIONS.map((item) => {
     const external = item.href.startsWith("http")
-    return { ...item, href: external ? item.href : localePath(locale, item.href), external }
+    const cmd = item.key === "sheets" ? (SHEETS_FORMULA[locale] ?? item.cmd) : item.cmd
+    return { ...item, cmd, href: external ? item.href : localePath(locale, item.href), external }
   })
 
   return (
@@ -186,7 +194,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <div className="home-wrap home-hero-grid">
           <div>
             <span className="home-eyebrow">
-              <StatusDot kind="live" />
+              {/* Green only when a measure stands behind it: the 30-day share of
+                  answers without a 5xx, read at each hourly render. */}
+              {liveStats.successRate30 !== null && <StatusDot kind="live" />}
               {t("hero.eyebrow")}
             </span>
             <h1 id="home-title">

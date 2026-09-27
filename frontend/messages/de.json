@@ -53,7 +53,7 @@
       "countries": "IBAN nach Land"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-09) — monatlich · OFAC · UN · EU · EPC — wöchentlich"
+    "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · Bank of England (List of Banks, 2026-09) — monatlich · SwiftCodes/MIT — eingefrorene Kopie, 2018 · OFAC · UN · EU · EPC — wöchentlich"
   },
   "home": {
     "metadata": {
@@ -73,7 +73,7 @@
         "mcp": "MCP-Server · Claude, Cursor, Cline",
         "n8n": "n8n-Node 0.1.1 · selbst gehostet",
         "odoo": "Odoo-18-Modul · eigene Module erforderlich",
-        "sheets": "Google-Sheets-Add-on",
+        "sheets": "Google-Sheets-Add-on · manuelle Installation, Google-Prüfung läuft",
         "postman": "Postman-Sammlung"
       },
       "pause": "Liste anhalten",
@@ -2308,7 +2308,7 @@
     "eyebrow": "Provenienz",
     "hero": {
       "title": "Jede Antwort nennt ihre Quelle",
-      "description": "Bankdaten sind genau so viel wert wie das Register, aus dem sie stammen. Deshalb trägt jede IBANforge-Antwort den Namen und das Datum des Referenzbestands, der sie erzeugt hat — und wo ein Herausgeber Bedingungen stellt, werden sie im Produkt eingehalten: die meisten reisen in der Antwort selbst mit, der Rest lebt in der Dokumentation, die sie beschreibt."
+      "description": "Bankdaten sind genau so viel wert wie das Register, aus dem sie stammen. Deshalb nennt jede IBANforge-Antwort den Referenzbestand, der sie erzeugt hat, mit seinem Datum, wenn es bekannt ist — und wo ein Herausgeber Bedingungen stellt, werden sie im Produkt eingehalten: die meisten reisen in der Antwort selbst mit, der Rest lebt in der Dokumentation, die sie beschreibt."
     },
     "principle": {
       "title": "Drei Gewohnheiten, durch Tests gesichert",

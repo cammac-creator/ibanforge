@@ -934,12 +934,15 @@
 
 /* Under the keyboard focus the loop is taken off: the list sits at its start
    and the browser scrolls the focused link into view, never under the fade.
-   Scoped to the links: focusing the pause button leaves the loop alone. */
-.home-ribbon-viewport:focus-within .home-ribbon-track {
+   Keyboard only (:focus-visible): Chrome, Edge and Firefox also focus a link
+   clicked with the mouse, and the list jumping back under the pointer between
+   press and release swallowed the click. Scoped to the links: focusing the
+   pause button leaves the loop alone. */
+.home-ribbon-viewport:has(:focus-visible) .home-ribbon-track {
   animation: none;
 }
 
-.home-ribbon-viewport:focus-within {
+.home-ribbon-viewport:has(:focus-visible) {
   mask-image: none;
   -webkit-mask-image: none;
 }
