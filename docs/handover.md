@@ -824,7 +824,44 @@ l’accès aux actions et le rendu des nombres dans les trois langues. La public
 recette finale sur le domaine authentifié restent à l’intégrateur principal. L’ancienne
 boucle de redirection anglaise du serveur Next local (section 9) reste hors de ce chantier.
 
-## 13. Accueil autour de la lentille
+## 13. Accueil : le titre, la démonstration, puis la lentille
+
+Depuis le 27 septembre 2026, `frontend/app/[locale]/page.tsx` (marque `data-landing="home-v2"`)
+suit cet ordre : le titre de `positioning.ts` et la démonstration
+(`components/home/verdict-demo.tsx`), « pourquoi le mod-97 ne suffit pas »
+(`components/home/iban-anatomy.tsx`), trois usages, l'essai dans la lentille (`#try`), les
+publics et les intégrations, la couverture, les prix, l'échéance suisse, l'avis indépendant, la
+FAQ (avec son JSON-LD `FAQPage`) et l'appel final. Le style vit dans
+`components/home/home.css`, sur les jetons de `globals.css` : Bebas Neue pour les titres, Inter,
+JetBrains Mono et l'ambre du site.
+
+- La démonstration rejoue trois réponses réellement rendues par l'API le 26 septembre 2026 ;
+  elle n'appelle pas l'API. Si le verdict ou les libellés de l'API changent, mettre à jour ses
+  scénarios et la date de sa légende (`home.demo.caption`). Elle s'arrête au survol, au focus,
+  hors écran et quand l'onglet est caché ; sous mouvement réduit, elle reste immobile. Sa
+  boucle part du verdict de la première réponse, jamais vidée sous la souris, et un exemple
+  choisi s'affiche en entier sans annuler une pause.
+- Les codes de registres et de clés nationales que la page écrit (`home.coverage.registerCodes`,
+  `home.coverage.keyCodes`, la FAQ) sont comparés au code par `src/lib/positioning.test.ts`,
+  dans les trois langues : changer la couverture sans changer ces textes fait échouer la suite.
+- Les promesses publiques de la page sont tenues par la garde « the home page » de
+  `positioning.test.ts`. La copie SWIFT est figée depuis janvier 2018 et ne se dit jamais
+  « relue chaque mois ». Seule la validation « ne stocke aucun IBAN » : l'audit de fichier garde
+  son rapport 2 h sans paiement et 24 h après paiement. L'aperçu gratuit de l'audit montre les
+  premières lignes signalées, jamais « chaque constat ». Ne pas écrire qu'un paquet ou un
+  complément est publié ou en revue sans preuve : le complément Sheets s'en tient à
+  « installation manuelle ».
+- Le ruban des intégrations (`components/home/integration-ribbon.tsx`) a un bouton pause. Sous
+  le focus CLAVIER seulement (`:has(:focus-visible)`), il retire sa boucle et revient au début.
+  Jamais `:focus-within` : sous Chrome, Edge et Firefox, un clic de souris donne aussi le focus
+  au lien, la liste sautait sous le pointeur et le clic se perdait. WebKit ne le montre pas,
+  puisque Safari ne donne pas le focus à un lien cliqué : contrôler le ruban aussi dans
+  Chromium.
+- La porte `site-home` compte à part les clés prises depuis l'accueil. Une porte se déclare à
+  trois endroits qui doivent rester en phase : `frontend/lib/key-origin.ts` (`doorForPath`),
+  `src/lib/key-origins.ts` (`KEY_ORIGIN_DOORS`) et `src/lib/door-board.ts` (son libellé).
+- `globals.css` garde les styles `.forge` de l'ancien accueil. Ils ne servent plus et partiront
+  dans un changement à part.
 
 `frontend/components/lens/` réunit le testeur, la scène 3D chargée à la demande et les
 illustrations. Le testeur appelle le relais existant `/api/playground` uniquement à la
@@ -833,12 +870,19 @@ dès une modification. `response.ts` reprend le verdict partagé du playground :
 format valide ne confirme pas une banque et une absence dans une source partielle ne
 devient pas un refus. Les sources, dates, crédits et réserves reçus accompagnent la réponse.
 
+La lentille n'a plus de polices propres : elle prend `--font-sans` et `--font-mono` du site.
+Sa 3D démarre seule seulement quand la section approche de l'écran, quand le navigateur est
+au repos, et sur un appareil capable : un ordinateur, ou un téléphone de huit cœurs ou plus,
+sans économiseur de données ni mouvement réduit (`autoStart()` dans `lens-hero.tsx`). Ailleurs,
+l'image fixe s'affiche avec un bouton « View in 3D ». C'est la construction de la scène dès
+l'arrivée qui rendait l'ancien accueil lent sur téléphone : ne pas la rapprocher du premier
+écran sans mesurer.
+
 Le moteur conserve une image fixe de secours, la pause, la réduction des mouvements et
 l’arrêt hors écran. Le gros plan crée son moteur à l’ouverture et le détruit à la
-fermeture. Les images et polices de `public/brand/lens/` portent une empreinte dans leur
-nom ; si leur contenu change, renommer le fichier et actualiser `assets.ts` ou le CSS.
-Les licences des polices restent à côté des fichiers. Aucun secret ou dépendance de
-base de données ne doit entrer dans cette partie cliente.
+fermeture. Les images de `public/brand/lens/` portent une empreinte dans leur nom ; si leur
+contenu change, renommer le fichier et actualiser `assets.ts` ou le CSS. Aucun secret ou
+dépendance de base de données ne doit entrer dans cette partie cliente.
 
 Deux choses relevées à l'intégration, à savoir avant de chercher une panne ailleurs :
 
