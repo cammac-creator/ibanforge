@@ -11,7 +11,8 @@ import { useEffect, useRef, useState } from "react"
  * JavaScript, a crawler and the first paint all read a complete answer; the
  * loop only starts once the page has settled. It pauses on hover, on focus,
  * off screen and on demand (WCAG 2.2.2), and never moves under
- * prefers-reduced-motion, where the tabs still switch the scenario.
+ * prefers-reduced-motion. Choosing an example shows its whole answer at once
+ * and never undoes a pause the visitor asked for.
  */
 
 export interface DemoRow {
@@ -94,6 +95,7 @@ export function VerdictDemo({ scenarios, copy }: { scenarios: DemoScenario[]; co
     }, START_DELAY_MS)
     const onChange = () => {
       if (reduce.matches) {
+        window.clearTimeout(start)
         setAnimated(false)
         setTyped(Number.MAX_SAFE_INTEGER)
         setRows(Number.MAX_SAFE_INTEGER)
@@ -144,17 +146,14 @@ export function VerdictDemo({ scenarios, copy }: { scenarios: DemoScenario[]; co
     return () => window.clearTimeout(timer)
   }, [running, phase, typed, rows, scenario, scenarios.length])
 
+  // A chosen example is read at once, in full: the pointer and the focus are on
+  // the button, so a replay from the first character would wait there, empty.
+  // The loop resumes from its verdict once the visitor moves on; a pause stays.
   function choose(i: number) {
     setIndex(i)
-    if (animated) {
-      setTyped(0)
-      setRows(0)
-      setPhase("typing")
-      setPlaying(true)
-    } else {
-      setTyped(Number.MAX_SAFE_INTEGER)
-      setRows(Number.MAX_SAFE_INTEGER)
-    }
+    setTyped(Number.MAX_SAFE_INTEGER)
+    setRows(Number.MAX_SAFE_INTEGER)
+    setPhase(animated ? "verdict" : "hold")
   }
 
   const verdictShown = !animated || phase === "verdict" || phase === "hold"
@@ -165,6 +164,7 @@ export function VerdictDemo({ scenarios, copy }: { scenarios: DemoScenario[]; co
       ref={root}
       className="vdemo"
       data-tone={verdictShown ? scenario.tone : "wait"}
+      data-running={running}
       role="group"
       aria-label={copy.aria}
       onPointerEnter={() => setHeld(true)}
@@ -184,7 +184,6 @@ export function VerdictDemo({ scenarios, copy }: { scenarios: DemoScenario[]; co
             type="button"
             className="vdemo-toggle"
             onClick={() => setPlaying((p) => !p)}
-            aria-pressed={!playing}
             aria-label={playing ? copy.pause : copy.play}
           >
             {playing ? (
@@ -229,13 +228,12 @@ export function VerdictDemo({ scenarios, copy }: { scenarios: DemoScenario[]; co
         <p>{scenario.note}</p>
       </div>
 
-      <div className="vdemo-tabs" role="tablist" aria-label={copy.scenarios}>
+      <div className="vdemo-tabs" role="group" aria-label={copy.scenarios}>
         {scenarios.map((s, k) => (
           <button
             key={s.tab}
             type="button"
-            role="tab"
-            aria-selected={k === index}
+            aria-pressed={k === index}
             data-tone={s.tone}
             onClick={() => choose(k)}
           >

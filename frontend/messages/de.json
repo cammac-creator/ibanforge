@@ -57,10 +57,10 @@
   },
   "home": {
     "metadata": {
-      "description": "IBAN-Validierung, BIC/SWIFT-Suche, Schweizer Clearingdaten und Compliance-Risiko für Entwickler und KI-Agenten. Ein Schlüssel ganz ohne E-Mail: 25 Anfragen pro Monat, 200 pro Monat nach Beanspruchung. MCP-nativ, x402-Mikrozahlungen."
+      "description": "Prüfen Sie die Bank hinter einer IBAN, bevor Sie zahlen: Validierung, Bank und BIC mit Quelle und, wo es gelesen wird, das Urteil des nationalen Registers zur Bankleitzahl. API, SDKs, MCP."
     },
     "share": {
-      "tagline": "ibanforge.com · REST · SDK · MCP · 25 kostenlose Anfragen pro Monat, ohne E-Mail"
+      "tagline": "ibanforge.com · REST-API · SDKs · MCP"
     },
     "integrations": {
       "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
@@ -75,7 +75,9 @@
         "odoo": "Odoo-18-Modul · eigene Module erforderlich",
         "sheets": "Google-Sheets-Add-on",
         "postman": "Postman-Sammlung"
-      }
+      },
+      "pause": "Liste anhalten",
+      "play": "Liste fortsetzen"
     },
     "reviewed": {
       "label": "Unabhängig geprüft",
@@ -96,7 +98,7 @@
         "bodyAria": "API-Antwort"
       },
       "eyebrow": "IBAN- und BIC-API",
-      "titleLead": "Prüfen Sie die Bank hinter einer IBAN",
+      "titleLead": "Prüfen Sie die Bank hinter einer IBAN,",
       "titleAccent": "bevor Sie zahlen",
       "description": "IBANforge validiert IBANs aus {countries} Ländern, nennt die Bank und ihren BIC mit Quelle und sagt dort, wo es das nationale Register liest, ob die Bankleitzahl überhaupt vergeben ist. Ihre Software erhält einen klaren nächsten Schritt, bevor Geld fließt.",
       "ctaKey": "Kostenlosen Schlüssel holen",
@@ -156,7 +158,7 @@
       "addsTitle": "Was IBANforge hinzufügt",
       "addsItems": [
         "Ob die Bankleitzahl vergeben ist, aus dem nationalen Register (DE, AT, BE, SK, CZ, BG, CH, LI)",
-        "Die Bank und ihr BIC, jeweils mit Quelle und Datum",
+        "Die Bank und ihr BIC, jeweils mit Quelle und, wenn bekannt, mit Datum",
         "Den nationalen Prüfschlüssel in der Kontonummer, wo einer veröffentlicht ist und geprüft wird",
         "SEPA-Erreichbarkeit und Bereitschaft für die Empfängerüberprüfung, aus den EPC-Registern, wo sie die Bank führen",
         "Sanktionsprüfung auf Bankebene (OFAC, EU, UN)",
@@ -171,7 +173,7 @@
       "devText": "Ein REST-Aufruf oder ein SDK in TypeScript, Python, Java oder .NET. Die Antwort ist JSON, mit einem dokumentierten nächsten Schritt.",
       "devLink": "Dokumentation lesen",
       "financeTitle": "Finanzteams",
-      "financeText": "Laden Sie eine CSV- oder Excel-Datei mit Lieferanten hoch und sehen Sie jeden Befund kostenlos. Die kommentierte Arbeitsmappe kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
+      "financeText": "Laden Sie eine CSV- oder Excel-Datei mit Lieferanten hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen, IBANs maskiert. Die kommentierte Arbeitsmappe mit jeder Zeile vollständig kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
       "financeLink": "Lieferantendatei prüfen",
       "agentsTitle": "KI-Agenten",
       "agentsText": "Ein MCP-Server für Claude, Cursor und jeden MCP-Client, in einer Zeile installiert. Agenten ohne Konto können pro Aufruf in USDC mit x402 zahlen.",
@@ -182,9 +184,9 @@
       "title": "An der Quelle gelesen, mit ihren Grenzen",
       "lead": "Jede Antwort sagt, woher sie kommt und was sie nicht prüfen konnte.",
       "figCountries": "validierte IBAN-Länder",
-      "figRegisters": "vollständig gelesene nationale Register",
+      "figRegisters": "Länder, deren nationales Register vollständig gelesen wird",
       "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
-      "figKeys": "nationale Prüfschlüssel, dazu die britische Modulus-Prüfung",
+      "figKeys": "Länder, deren nationaler Prüfschlüssel geprüft wird, dazu die britische Modulus-Prüfung",
       "keyCodes": "FR, MC, BE, IT, SM, ES",
       "figLatency": "mittlere Verarbeitung auf dem Server",
       "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
@@ -194,9 +196,9 @@
       "fact2Title": "Sanktionen auf Bankebene",
       "fact2Text": "Die Bank hinter der IBAN wird gegen die Listen OFAC, EU, UN geprüft (BIC8). Der Kontoinhaber nie.",
       "fact3Title": "Offen über seine Grenzen",
-      "fact3Text": "Es prüft nicht, wer das Konto führt: Dieser Namensabgleich gehört der Bank des Empfängers, über die Empfängerüberprüfung (VoP).",
-      "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP, Bank of England (List of Banks, 2026-09) und eine öffentliche Kopie des SWIFT-Verzeichnisses, die jede Antwort datiert.",
-      "sourcesDated": "Mindestens monatlich neu gelesen, zuletzt am {date}.",
+      "fact3Text": "Es prüft nicht, wer Inhaber des Kontos ist: Dieser Namensabgleich gehört der Bank des Empfängers, über die Empfängerüberprüfung (VoP).",
+      "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-09), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht. Jede Antwort nennt ihre Quelle.",
+      "sourcesDated": "Zuletzt aktualisiert am {date}.",
       "sourcesLink": "Jede Quelle und ihre Lizenz"
     },
     "pricing": {
@@ -212,12 +214,12 @@
       "keyText": "Alle Endpunkte, {claimed} Anfragen pro Monat, sobald Sie den Schlüssel mit einer E-Mail beanspruchen. Keine Karte.",
       "keyCta": "Kostenlosen Schlüssel holen",
       "proName": "Pro",
-      "proPrice": "29 $",
+      "proPrice": "29 $",
       "proUnit": "/ Monat",
       "proText": "10.000 Anfragen pro Monat auf demselben Schlüssel. Jederzeit kündbar: Der Schlüssel bleibt.",
       "proCta": "Pro ansehen",
       "packsName": "Guthabenpakete",
-      "packsPrice": "ab 4 $",
+      "packsPrice": "ab 4 $",
       "packsText": "Vorausbezahltes Guthaben auf demselben Schlüssel, per Karte oder in USDC.",
       "packsCta": "Pakete ansehen",
       "agents": "KI-Agenten können auch pro Aufruf in USDC mit x402 zahlen: ohne Konto, ohne Checkout.",
@@ -225,7 +227,7 @@
     },
     "faq": {
       "title": "Fragen",
-      "q0": "Prüft IBANforge, wer das Konto führt?",
+      "q0": "Prüft IBANforge, wer Inhaber des Kontos ist?",
       "a0": "Nein. Es prüft die IBAN und die Bank dahinter. Der Abgleich des Kontoinhabernamens ist die Empfängerüberprüfung (VoP), die die Bank des Empfängers durchführt.",
       "q1": "Welche Länder erhalten ein Urteil aus dem nationalen Register?",
       "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: Dort entscheidet das nationale Register, ob eine Bankleitzahl vergeben ist. In den übrigen Ländern nennt die Antwort die Bank aus einem Teilregister oder einer zusammengesetzten Karte und sagt, dass sie einen Code nicht ausschließen kann.",
@@ -313,7 +315,7 @@
           {
             "eyebrow": "02 · Eine ganze Datei",
             "title": "Eine Lieferantendatei prüfen",
-            "text": "Laden Sie eine CSV- oder Excel-Datei hoch und sehen Sie jede auffällige Zeile vor dem nächsten Zahlungslauf. Die Vorschau ist kostenlos.",
+            "text": "Laden Sie eine CSV- oder Excel-Datei hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen. Die kommentierte Arbeitsmappe markiert jede Zeile vor dem nächsten Zahlungslauf.",
             "tags": [
               "CSV",
               "Excel",

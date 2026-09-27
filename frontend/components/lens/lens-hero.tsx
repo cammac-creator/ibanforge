@@ -372,7 +372,6 @@ export function LensHero({
             alt={t.sceneAlt}
             width={1707}
             height={769}
-            priority
             sizes="100vw"
             className="lens-poster"
           />
@@ -397,7 +396,7 @@ export function LensHero({
           }}
         >
           <p className="lens-eyebrow">01 · {t.inputEyebrow}</p>
-          <h2>{t.inputTitle}</h2>
+          <h3>{t.inputTitle}</h3>
           <label htmlFor="lens-iban">{t.inputLabel}</label>
           <input
             id="lens-iban"

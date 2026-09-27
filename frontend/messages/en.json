@@ -57,10 +57,10 @@
   },
   "home": {
     "metadata": {
-      "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing data and compliance risk for developers and AI agents. A key with no e-mail at all: 25 requests a month, 200 a month once claimed. MCP-native, x402 micropayments."
+      "description": "Check the bank behind an IBAN before you pay: validation, the bank and its BIC with their source, and the national register's verdict on the bank code where it is read. API, SDKs, MCP."
     },
     "share": {
-      "tagline": "ibanforge.com · REST · SDK · MCP · 25 free requests a month, no e-mail"
+      "tagline": "ibanforge.com · REST API · SDKs · MCP"
     },
     "integrations": {
       "heading": "In your language, your ERP, your spreadsheet",
@@ -75,7 +75,9 @@
         "odoo": "Odoo 18 module · custom modules required",
         "sheets": "Google Sheets add-on",
         "postman": "Postman collection"
-      }
+      },
+      "pause": "Pause the list",
+      "play": "Play the list"
     },
     "reviewed": {
       "label": "Independently reviewed",
@@ -156,7 +158,7 @@
       "addsTitle": "What IBANforge adds",
       "addsItems": [
         "Whether the bank code is allocated, from the national register (DE, AT, BE, SK, CZ, BG, CH, LI)",
-        "The bank and its BIC, each with its source and its date",
+        "The bank and its BIC, each with its source, and its date when known",
         "The national check key inside the account number, where one is published and checked",
         "SEPA reachability and Verification of Payee readiness, from the EPC registers where they list the bank",
         "Sanctions screening at bank level (OFAC, EU, UN)",
@@ -171,7 +173,7 @@
       "devText": "One REST call, or an SDK in TypeScript, Python, Java or .NET. The answer is JSON, with a documented next step.",
       "devLink": "Read the docs",
       "financeTitle": "Finance teams",
-      "financeText": "Upload a CSV or Excel file of suppliers and preview every finding for free. The annotated workbook costs $149 for up to 5,000 rows, or $349 for up to 20,000 rows.",
+      "financeText": "Upload a CSV or Excel file of suppliers: the free preview counts what needs fixing and shows the first flagged lines, IBANs masked. The annotated workbook, every line in full, costs $149 for up to 5,000 rows, or $349 for up to 20,000 rows.",
       "financeLink": "Check a supplier file",
       "agentsTitle": "AI agents",
       "agentsText": "An MCP server for Claude, Cursor and any MCP client, installed in one line. Agents without an account can pay per call in USDC with x402.",
@@ -182,9 +184,9 @@
       "title": "Read from the source, with its limits",
       "lead": "Every answer says where it comes from and what it could not check.",
       "figCountries": "IBAN countries validated",
-      "figRegisters": "national registers read in full",
+      "figRegisters": "countries whose national register is read in full",
       "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
-      "figKeys": "national check keys, plus the UK modulus check",
+      "figKeys": "countries whose national check key is verified, plus the UK modulus check",
       "keyCodes": "FR, MC, BE, IT, SM, ES",
       "figLatency": "median server processing",
       "fact0Title": "Operated from Switzerland, API hosted in the EU",
@@ -195,8 +197,8 @@
       "fact2Text": "The bank behind the IBAN is screened against the OFAC, EU, UN lists (BIC8). The account holder never is.",
       "fact3Title": "Honest about its limits",
       "fact3Text": "It does not check who holds the account: that name check belongs to the payee’s bank, through Verification of Payee.",
-      "sources": "Sources: the national registers, SIX BankMaster, GLEIF, EBA STEP2, NBP, Bank of England (List of Banks, 2026-09) and a public copy of the SWIFT directory that each answer dates.",
-      "sourcesDated": "Re-read at least every month, last refresh {date}.",
+      "sources": "Sources: the national registers, SIX BankMaster, GLEIF, EBA STEP2, NBP and Bank of England (List of Banks, 2026-09), re-read at least every month, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the BIC directory. Each answer names its source.",
+      "sourcesDated": "Last refresh {date}.",
       "sourcesLink": "Every source and its licence"
     },
     "pricing": {
@@ -313,7 +315,7 @@
           {
             "eyebrow": "02 · A whole file",
             "title": "Audit a supplier file",
-            "text": "Upload a CSV or Excel file and see every line flagged before the next payment run. The preview is free.",
+            "text": "Upload a CSV or Excel file: the free preview counts what needs fixing and shows the first flagged lines. The annotated workbook flags every line before the next payment run.",
             "tags": [
               "CSV",
               "Excel",

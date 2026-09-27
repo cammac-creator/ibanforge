@@ -252,6 +252,11 @@
   transition: background 0.4s;
 }
 
+/* The rim stops with the demo: paused, hovered, focused or off screen. */
+.vdemo[data-running="false"]::before {
+  animation-play-state: paused;
+}
+
 .vdemo::after {
   content: "";
   position: absolute;
@@ -542,7 +547,7 @@
   color: var(--fg-1);
 }
 
-.vdemo-tabs button[aria-selected="true"] {
+.vdemo-tabs button[aria-pressed="true"] {
   color: var(--fg-1);
   border-color: rgba(245, 158, 11, 0.55);
   background: rgba(245, 158, 11, 0.1);
@@ -866,7 +871,50 @@
 .home-ribbon {
   position: relative;
   margin-top: 40px;
+}
+
+.home-ribbon-head {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+/* The pause the keyboard and the finger need (WCAG 2.2.2), styled like the demo's. */
+.home-ribbon-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--ink-5);
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+}
+
+.home-ribbon-toggle:hover {
+  color: var(--fg-1);
+  border-color: var(--amber-500);
+}
+
+.home-ribbon-toggle svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-ribbon-toggle svg path[d^="M5.5 3.5"] {
+  fill: currentColor;
+}
+
+.home-ribbon-viewport {
   overflow: hidden;
+  padding-block: 4px;
   mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
@@ -878,8 +926,17 @@
   animation: home-ribbon 46s linear infinite;
 }
 
-.home-ribbon:hover .home-ribbon-track {
+/* Stopped under the mouse, under the keyboard focus, and on demand. */
+.home-ribbon:hover .home-ribbon-track,
+.home-ribbon:focus-within .home-ribbon-track,
+.home-ribbon[data-paused="true"] .home-ribbon-track {
   animation-play-state: paused;
+}
+
+/* A link reached with the keyboard is never half hidden under the fade. */
+.home-ribbon:focus-within .home-ribbon-viewport {
+  mask-image: none;
+  -webkit-mask-image: none;
 }
 
 @keyframes home-ribbon {
@@ -902,6 +959,12 @@
 
 .home-integ:hover {
   border-color: rgba(245, 158, 11, 0.5);
+}
+
+/* Drawn inside the card: the ribbon's overflow would cut an outline drawn outside. */
+.home-integ:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: -2px;
 }
 
 .home-integ span {
@@ -1320,9 +1383,14 @@
     width: auto;
     justify-content: center;
   }
-  .home-ribbon {
+  .home-ribbon-viewport {
     mask-image: none;
     -webkit-mask-image: none;
+  }
+  /* Without motion there is no loop to stitch: the second copy and the pause go. */
+  .home-integ[aria-hidden="true"],
+  .home-ribbon-head {
+    display: none;
   }
   .anatomy-code,
   .anatomy-line,

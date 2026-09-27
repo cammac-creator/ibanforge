@@ -180,7 +180,7 @@
 .lens-input .lens-eyebrow {
   margin-bottom: 12px;
 }
-.lens-input h2 {
+.lens-input h3 {
   font:
     500 25px/1.2 var(--font-sans);
   letter-spacing: -0.035em;
@@ -617,7 +617,7 @@
   .lens-input {
     padding: 16px;
   }
-  .lens-input h2 {
+  .lens-input h3 {
     font-size: 20px;
   }
   .lens-field {
@@ -675,7 +675,7 @@
     border: 1px solid var(--ink-5);
     border-radius: 8px;
   }
-  .lens-input h2 {
+  .lens-input h3 {
     display: none;
   }
   .lens-input .lens-eyebrow {

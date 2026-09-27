@@ -57,10 +57,10 @@
   },
   "home": {
     "metadata": {
-      "description": "Validation IBAN, recherche BIC/SWIFT, données de clearing suisses et risque de conformité pour développeurs et agents IA. Une clé sans aucun e-mail : 25 requêtes par mois, 200 par mois une fois réclamée. Native MCP, micropaiements x402."
+      "description": "Vérifiez la banque derrière un IBAN avant de payer : validation, banque et BIC avec leur source, et le verdict du registre national sur le code banque là où il est lu. API, SDK, MCP."
     },
     "share": {
-      "tagline": "ibanforge.com · REST · SDK · MCP · 25 requêtes gratuites par mois, sans e-mail"
+      "tagline": "ibanforge.com · API REST · SDK · MCP"
     },
     "integrations": {
       "heading": "Dans votre langage, votre ERP, votre tableur",
@@ -75,12 +75,14 @@
         "odoo": "Module Odoo 18 · modules personnalisés requis",
         "sheets": "Complément Google Sheets",
         "postman": "Collection Postman"
-      }
+      },
+      "pause": "Mettre la liste en pause",
+      "play": "Relancer la liste"
     },
     "reviewed": {
       "label": "Relu indépendamment",
       "quote": "The most artifact-complete submission the inbox has had.",
-      "context": "Kin Lane a reconstruit la fiche API Evangelist d'IBANforge à partir des artefacts consultés, en août 2026 — et notre x402 s'est révélé le premier parmi les 3 767 serveurs MCP de son catalogue.",
+      "context": "Kin Lane a reconstruit la fiche API Evangelist d'IBANforge à partir des artefacts consultés, en août 2026 — et notre x402 s'est révélé le premier parmi les 3 767 serveurs MCP de son catalogue.",
       "linkReview": "Lire la revue publique",
       "linkStory": "L'histoire complète",
       "quoteTranslation": "« La candidature la plus complète en artefacts que la boîte de réception ait reçue. »"
@@ -156,7 +158,7 @@
       "addsTitle": "Ce qu’IBANforge ajoute",
       "addsItems": [
         "Si le code banque est attribué, selon le registre national (DE, AT, BE, SK, CZ, BG, CH, LI)",
-        "La banque et son BIC, chacun avec sa source et sa date",
+        "La banque et son BIC, chacun avec sa source, et sa date quand elle est connue",
         "La clé nationale du numéro de compte, là où elle est publiée et contrôlée",
         "L’accessibilité SEPA et la préparation à la vérification du bénéficiaire, d’après les registres de l’EPC quand ils listent la banque",
         "Le contrôle des sanctions au niveau de la banque (OFAC, EU, UN)",
@@ -171,7 +173,7 @@
       "devText": "Un appel REST, ou un SDK TypeScript, Python, Java ou .NET. La réponse est un JSON, avec une étape suivante documentée.",
       "devLink": "Lire la documentation",
       "financeTitle": "Équipes finance",
-      "financeText": "Déposez un fichier CSV ou Excel de fournisseurs et consultez gratuitement chaque constat. Le classeur annoté coûte 149 $ jusqu’à 5 000 lignes, ou 349 $ jusqu’à 20 000 lignes.",
+      "financeText": "Déposez un fichier CSV ou Excel de fournisseurs : l’aperçu gratuit compte ce qu’il faut corriger et montre les premières lignes signalées, IBAN masqués. Le classeur annoté, chaque ligne en entier, coûte 149 $ jusqu’à 5 000 lignes, ou 349 $ jusqu’à 20 000 lignes.",
       "financeLink": "Vérifier un fichier fournisseurs",
       "agentsTitle": "Agents IA",
       "agentsText": "Un serveur MCP pour Claude, Cursor et tout client MCP, installé en une ligne. Les agents sans compte peuvent payer à l’appel en USDC avec x402.",
@@ -182,9 +184,9 @@
       "title": "Lu à la source, avec ses limites",
       "lead": "Chaque réponse dit d’où elle vient et ce qu’elle n’a pas pu vérifier.",
       "figCountries": "pays IBAN validés",
-      "figRegisters": "registres nationaux lus en entier",
+      "figRegisters": "pays dont le registre national est lu en entier",
       "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
-      "figKeys": "clés nationales, plus le contrôle modulus britannique",
+      "figKeys": "pays dont la clé nationale est contrôlée, plus le contrôle modulus britannique",
       "keyCodes": "FR, MC, BE, IT, SM, ES",
       "figLatency": "traitement médian côté serveur",
       "fact0Title": "Exploité depuis la Suisse, API hébergée dans l’UE",
@@ -195,8 +197,8 @@
       "fact2Text": "La banque derrière l’IBAN est contrôlée sur les listes OFAC, EU, UN (BIC8). Le titulaire du compte ne l’est jamais.",
       "fact3Title": "Franc sur ses limites",
       "fact3Text": "Il ne vérifie pas qui détient le compte : ce contrôle du nom revient à la banque du bénéficiaire, par la vérification du bénéficiaire (VoP).",
-      "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP, Bank of England (List of Banks, 2026-09) et une copie publique de l’annuaire SWIFT que chaque réponse date.",
-      "sourcesDated": "Relues au moins chaque mois, dernière mise à jour le {date}.",
+      "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP et Bank of England (List of Banks, 2026-09), relus au moins chaque mois, plus une copie publique de l’annuaire SWIFT figée en janvier 2018, qui fait encore environ deux tiers de l’annuaire BIC. Chaque réponse nomme sa source.",
+      "sourcesDated": "Dernière mise à jour le {date}.",
       "sourcesLink": "Chaque source et sa licence"
     },
     "pricing": {
@@ -212,12 +214,12 @@
       "keyText": "Tous les endpoints, {claimed} requêtes par mois une fois la clé réclamée avec un e-mail. Sans carte.",
       "keyCta": "Obtenir une clé gratuite",
       "proName": "Pro",
-      "proPrice": "29 $",
+      "proPrice": "29 $",
       "proUnit": "/ mois",
-      "proText": "10 000 requêtes par mois sur la même clé. Résiliable à tout moment : la clé reste.",
+      "proText": "10 000 requêtes par mois sur la même clé. Résiliable à tout moment : la clé reste.",
       "proCta": "Voir Pro",
       "packsName": "Packs de crédits",
-      "packsPrice": "dès 4 $",
+      "packsPrice": "dès 4 $",
       "packsText": "Des crédits prépayés sur la même clé, par carte ou en USDC.",
       "packsCta": "Voir les packs",
       "agents": "Les agents IA peuvent aussi payer à l’appel en USDC avec x402 : sans compte, sans passage en caisse.",
@@ -313,7 +315,7 @@
           {
             "eyebrow": "02 · Un fichier entier",
             "title": "Contrôler un fichier fournisseurs",
-            "text": "Déposez un fichier CSV ou Excel et voyez chaque ligne signalée avant le prochain paiement. L’aperçu est gratuit.",
+            "text": "Déposez un fichier CSV ou Excel : l’aperçu gratuit compte ce qu’il faut corriger et montre les premières lignes signalées. Le classeur annoté signale chaque ligne avant le prochain paiement.",
             "tags": [
               "CSV",
               "Excel",

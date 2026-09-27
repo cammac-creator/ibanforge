@@ -161,6 +161,64 @@ describe('the static surfaces say what the code says', () => {
     }
   });
 
+  // The sources line said "re-read at least every month" over a directory two
+  // thirds of which is a copy frozen in 2018 (review of 27/09/2026). Its French
+  // and German words are held here too: a share that stops being "about two
+  // thirds" has no translation below and turns this test red.
+  it('the home page dates the frozen copy of the SWIFT directory, in three languages', () => {
+    const f = frozenBicShare();
+    const [month = '', year = ''] = (f.month ?? '').split(' ');
+    const MONTHS_FR: Record<string, string> = {
+      January: 'janvier',
+      February: 'février',
+      March: 'mars',
+      April: 'avril',
+      May: 'mai',
+      June: 'juin',
+      July: 'juillet',
+      August: 'août',
+      September: 'septembre',
+      October: 'octobre',
+      November: 'novembre',
+      December: 'décembre',
+    };
+    const MONTHS_DE: Record<string, string> = {
+      January: 'Januar',
+      February: 'Februar',
+      March: 'März',
+      April: 'April',
+      May: 'Mai',
+      June: 'Juni',
+      July: 'Juli',
+      August: 'August',
+      September: 'September',
+      October: 'Oktober',
+      November: 'November',
+      December: 'Dezember',
+    };
+    const WORDS_FR: Record<string, string> = {
+      'about two thirds': 'environ deux tiers',
+      'about half': 'environ la moitié',
+      'about a third': 'environ un tiers',
+    };
+    const WORDS_DE: Record<string, string> = {
+      'about two thirds': 'etwa zwei Drittel',
+      'about half': 'etwa die Hälfte',
+      'about a third': 'etwa ein Drittel',
+    };
+    const said: Record<'en' | 'fr' | 'de', Array<string | undefined>> = {
+      en: [`frozen in ${f.month}`, f.words],
+      fr: [`figée en ${MONTHS_FR[month]} ${year}`, WORDS_FR[f.words]],
+      de: [`Stand ${MONTHS_DE[month]} ${year}`, WORDS_DE[f.words]],
+    };
+    for (const lang of ['en', 'fr', 'de'] as const) {
+      for (const piece of said[lang]) {
+        expect(piece, `${lang}: no words for "${f.words}" in ${f.month}`).toBeDefined();
+        expect(homeText(lang), `${lang}: ${piece}`).toContain(piece);
+      }
+    }
+  });
+
   it('the comparison page names the same register codes, in three languages', () => {
     const codes = codesOf(registerCountries().authoritative);
     for (const lang of ['en', 'fr', 'de'] as const) {
@@ -312,6 +370,15 @@ describe('the retired sentences stay retired', () => {
     }
     expect(text).not.toMatch(/deepest|plus profondes|tiefsten/i);
     expect(text).not.toMatch(/Made in Switzerland|Conçu en Suisse/);
+    // Promises the page could not keep (review of 27/09/2026): not every answer
+    // carries a date, the free audit preview shows the first flagged lines, not
+    // every finding, and "wer das Konto führt" names the bank, not the holder.
+    expect(text).not.toMatch(/each answer dates|que chaque réponse date|die jede Antwort datiert/);
+    expect(text).not.toMatch(/its source and its date|sa source et sa date|mit Quelle und Datum/);
+    expect(text).not.toMatch(
+      /preview every finding|gratuitement chaque constat|jeden Befund kostenlos/,
+    );
+    expect(text).not.toMatch(/wer das Konto führt/);
   });
 
   it.each(['en', 'fr', 'de'] as const)('the comparison page (%s)', (lang) => {

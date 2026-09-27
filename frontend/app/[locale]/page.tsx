@@ -14,11 +14,13 @@ import { LensGallery, type GalleryCopy } from "@/components/lens/lens-gallery"
 import { lensAssets } from "@/components/lens/assets"
 import { VerdictDemo, type DemoScenario } from "@/components/home/verdict-demo"
 import { IbanAnatomy } from "@/components/home/iban-anatomy"
+import { IntegrationRibbon } from "@/components/home/integration-ribbon"
 import "@/components/lens/lens.css"
 import "@/components/home/home.css"
 import { getLandingStats, P50_PROCESSING_MS, SUPPORTED_COUNTRIES } from "@/lib/landing-stats"
 import { alternatesFor, urlFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
+import { formatGrouped } from "@/lib/format-grouped"
 // Quotas read from what the API exports (scripts/export-onboarding.ts), never
 // retyped: the layout's JSON-LD does the same (components/json-ld.tsx).
 import catalogue from "@/data/onboarding.json"
@@ -100,6 +102,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const keyCodes = t("coverage.keyCodes")
   const registerCount = registerCodes.split(",").length
   const keyCount = keyCodes.split(",").length
+  // "0,4" in French and German, the site's one number format.
+  const latency = formatGrouped(P50_PROCESSING_MS, locale, 1)
 
   // The refresh date /health reports, never typed by hand (S4 of 2026-09-04).
   const refreshedOn = liveStats.bicDataLastUpdated
@@ -257,7 +261,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <LensGallery copy={t.raw("lens.gallery") as GalleryCopy} locale={locale} />
 
       {/* ── 4. Try it: the lens, input on the left, answer on the right ───── */}
-      <section className="home-section home-try" id="try" aria-label={t("lens.hero.eyebrow")}>
+      {/* A plain block: the lens renders its own labelled section inside. */}
+      <div className="home-section home-try" id="try">
         <div className="lens-frame">
           <LensHero
             copy={t.raw("lens.hero") as LensCopy}
@@ -266,7 +271,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             auditHref={localePath(locale, "/audit")}
           />
         </div>
-      </section>
+      </div>
 
       {/* ── 5. For whom: developers, finance teams, AI agents ──────────────── */}
       <section className="home-section" aria-labelledby="home-audiences">
@@ -314,26 +319,28 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           </div>
 
           {/* What installs today, as a slow ribbon (a plain list without motion). */}
-          <div className="home-ribbon" aria-label={t("integrations.heading")}>
-            <p className="sr-only">{t("integrations.sub")}</p>
-            <div className="home-ribbon-track">
-              {[0, 1].map((copy) =>
-                integrationItems.map((item) => (
-                  <a
-                    key={`${copy}-${item.key}`}
-                    href={item.href}
-                    className="home-integ"
-                    aria-hidden={copy === 1 ? true : undefined}
-                    tabIndex={copy === 1 ? -1 : undefined}
-                    {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                  >
-                    <span>{t(`integrations.items.${item.key}`)}</span>
-                    <code>{item.cmd}</code>
-                  </a>
-                )),
-              )}
-            </div>
-          </div>
+          <IntegrationRibbon
+            label={t("integrations.heading")}
+            description={t("integrations.sub")}
+            pause={t("integrations.pause")}
+            play={t("integrations.play")}
+          >
+            {[0, 1].map((copy) =>
+              integrationItems.map((item) => (
+                <a
+                  key={`${copy}-${item.key}`}
+                  href={item.href}
+                  className="home-integ"
+                  aria-hidden={copy === 1 ? true : undefined}
+                  tabIndex={copy === 1 ? -1 : undefined}
+                  {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                >
+                  <span>{t(`integrations.items.${item.key}`)}</span>
+                  <code>{item.cmd}</code>
+                </a>
+              )),
+            )}
+          </IntegrationRibbon>
         </div>
       </section>
 
@@ -364,7 +371,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             </div>
             <div className="home-figure">
               <b>
-                {P50_PROCESSING_MS}
+                {latency}
                 <small>ms</small>
               </b>
               <span>{t("coverage.figLatency")}</span>
