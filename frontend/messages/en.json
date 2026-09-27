@@ -2671,7 +2671,7 @@
     },
     "install": {
       "title": "Install",
-      "status": "The add-on is being submitted to the Google Workspace Marketplace; until Google's review completes there is no store button. The script is open source and installs by hand in five minutes:",
+      "status": "The add-on is not on the Google Workspace Marketplace yet, so there is no store button. The script is open source and installs by hand in five minutes:",
       "steps": {
         "0": "In your spreadsheet: Extensions, then Apps Script.",
         "1": "Paste Code.gs and Sidebar.html from the GitHub folder, and the manifest appsscript.json (Project settings, show the manifest).",
