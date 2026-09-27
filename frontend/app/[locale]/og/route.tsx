@@ -10,7 +10,9 @@
  * system sans on black, in English whatever the page's language, with nothing
  * of the forge in it. It now carries the mark, the lockup, the fold's own
  * headline in the page's language, in the same Bebas the site sets its
- * titles in, and the tagline with the free tier.
+ * titles in, and a tagline naming the ways in (API, SDKs, MCP). Since
+ * 27/09/2026 it quotes no quota: the monthly 25 it used to show is the key
+ * before its claim, and the rule is to announce the key by its 200.
  *
  * Bebas ships no lowercase, so everything here is capitals by design. The
  * mark is inlined as a data URI: satori fetches nothing at build time.

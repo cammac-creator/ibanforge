@@ -926,15 +926,20 @@
   animation: home-ribbon 46s linear infinite;
 }
 
-/* Stopped under the mouse, under the keyboard focus, and on demand. */
+/* Stopped under the mouse and on demand. */
 .home-ribbon:hover .home-ribbon-track,
-.home-ribbon:focus-within .home-ribbon-track,
 .home-ribbon[data-paused="true"] .home-ribbon-track {
   animation-play-state: paused;
 }
 
-/* A link reached with the keyboard is never half hidden under the fade. */
-.home-ribbon:focus-within .home-ribbon-viewport {
+/* Under the keyboard focus the loop is taken off: the list sits at its start
+   and the browser scrolls the focused link into view, never under the fade.
+   Scoped to the links: focusing the pause button leaves the loop alone. */
+.home-ribbon-viewport:focus-within .home-ribbon-track {
+  animation: none;
+}
+
+.home-ribbon-viewport:focus-within {
   mask-image: none;
   -webkit-mask-image: none;
 }

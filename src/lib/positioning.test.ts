@@ -206,14 +206,19 @@ describe('the static surfaces say what the code says', () => {
       'about half': 'etwa die Hälfte',
       'about a third': 'etwa ein Drittel',
     };
-    const said: Record<'en' | 'fr' | 'de', Array<string | undefined>> = {
+    // A month or a share with no translation here must fail by name, not
+    // through a sentence that reads "undefined".
+    expect(MONTHS_FR[month], `no French month for ${f.month}`).toBeDefined();
+    expect(MONTHS_DE[month], `no German month for ${f.month}`).toBeDefined();
+    expect(WORDS_FR[f.words], `no French words for "${f.words}"`).toBeDefined();
+    expect(WORDS_DE[f.words], `no German words for "${f.words}"`).toBeDefined();
+    const said: Record<'en' | 'fr' | 'de', string[]> = {
       en: [`frozen in ${f.month}`, f.words],
-      fr: [`figée en ${MONTHS_FR[month]} ${year}`, WORDS_FR[f.words]],
-      de: [`Stand ${MONTHS_DE[month]} ${year}`, WORDS_DE[f.words]],
+      fr: [`figée en ${MONTHS_FR[month]} ${year}`, WORDS_FR[f.words]!],
+      de: [`Stand ${MONTHS_DE[month]} ${year}`, WORDS_DE[f.words]!],
     };
     for (const lang of ['en', 'fr', 'de'] as const) {
       for (const piece of said[lang]) {
-        expect(piece, `${lang}: no words for "${f.words}" in ${f.month}`).toBeDefined();
         expect(homeText(lang), `${lang}: ${piece}`).toContain(piece);
       }
     }
@@ -379,6 +384,13 @@ describe('the retired sentences stay retired', () => {
       /preview every finding|gratuitement chaque constat|jeden Befund kostenlos/,
     );
     expect(text).not.toMatch(/wer das Konto führt/);
+    // The file audit keeps its report for hours: only the validation stores no
+    // IBAN (second review of 27/09/2026). And the frozen SWIFT copy is not
+    // "re-read every month".
+    expect(text).not.toMatch(/IBANs are never stored|jamais stockés|nie gespeichert/);
+    expect(text).not.toMatch(
+      /Re-read at least every month, last refresh|Relues au moins chaque mois, dernière|Mindestens monatlich neu gelesen, zuletzt/,
+    );
   });
 
   it.each(['en', 'fr', 'de'] as const)('the comparison page (%s)', (lang) => {

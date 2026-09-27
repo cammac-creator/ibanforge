@@ -191,8 +191,8 @@
       "figLatency": "median server processing",
       "fact0Title": "Operated from Switzerland, API hosted in the EU",
       "fact0Text": "IBANforge is run from Switzerland; the API itself runs in a European Union region.",
-      "fact1Title": "IBANs are never stored",
-      "fact1Text": "Submitted IBANs are validated in memory, never written to storage. Telemetry is erased 30 days after you leave (DPA clause 4.7).",
+      "fact1Title": "Validation stores no IBAN",
+      "fact1Text": "An IBAN you check is validated in memory, never written to storage. The file audit keeps its report 2 hours unpaid, 24 hours after payment. Telemetry is erased 30 days after you leave (DPA clause 4.7).",
       "fact2Title": "Sanctions at bank level",
       "fact2Text": "The bank behind the IBAN is screened against the OFAC, EU, UN lists (BIC8). The account holder never is.",
       "fact3Title": "Honest about its limits",
@@ -236,7 +236,7 @@
       "q3": "What does a free key give me?",
       "a3": "Every endpoint, with {claimed} requests a month once you claim the key with an e-mail address. Creating it needs no card and no e-mail.",
       "q4": "Are the IBANs I send stored?",
-      "a4": "No. Submitted IBANs are validated in memory and never written to storage. The privacy policy details the request metadata kept for up to 12 months."
+      "a4": "Not by the validation: each IBAN is checked in memory and never written to storage. The file audit keeps its report, which carries your columns, 2 hours unpaid or 24 hours after payment, then deletes it. The privacy policy details the request metadata kept for up to 12 months."
     },
     "cta": {
       "title": "Check your first IBAN in two minutes",
@@ -315,7 +315,7 @@
           {
             "eyebrow": "02 · A whole file",
             "title": "Audit a supplier file",
-            "text": "Upload a CSV or Excel file: the free preview counts what needs fixing and shows the first flagged lines. The annotated workbook flags every line before the next payment run.",
+            "text": "Upload a CSV or Excel file: the free preview counts what needs fixing and shows the first flagged lines. The annotated workbook gives every line its status before the next payment run.",
             "tags": [
               "CSV",
               "Excel",

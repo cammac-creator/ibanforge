@@ -191,8 +191,8 @@
       "figLatency": "traitement médian côté serveur",
       "fact0Title": "Exploité depuis la Suisse, API hébergée dans l’UE",
       "fact0Text": "IBANforge est exploité depuis la Suisse ; l’API elle-même tourne dans une région de l’Union européenne.",
-      "fact1Title": "Les IBAN ne sont jamais stockés",
-      "fact1Text": "Les IBAN soumis sont validés en mémoire, jamais écrits. La télémétrie est effacée 30 jours après votre départ (clause 4.7 du DPA).",
+      "fact1Title": "La validation ne stocke aucun IBAN",
+      "fact1Text": "Un IBAN contrôlé est validé en mémoire, jamais écrit. L’audit de fichier garde son rapport 2 heures sans paiement, 24 heures après paiement. La télémétrie est effacée 30 jours après votre départ (clause 4.7 du DPA).",
       "fact2Title": "Sanctions au niveau de la banque",
       "fact2Text": "La banque derrière l’IBAN est contrôlée sur les listes OFAC, EU, UN (BIC8). Le titulaire du compte ne l’est jamais.",
       "fact3Title": "Franc sur ses limites",
@@ -236,7 +236,7 @@
       "q3": "Que donne une clé gratuite ?",
       "a3": "Tous les endpoints, avec {claimed} requêtes par mois une fois la clé réclamée avec une adresse e-mail. La créer ne demande ni carte ni e-mail.",
       "q4": "Les IBAN envoyés sont-ils stockés ?",
-      "a4": "Non. Les IBAN soumis sont validés en mémoire et jamais écrits. La politique de confidentialité détaille les métadonnées de requête gardées au plus 12 mois."
+      "a4": "Pas par la validation : chaque IBAN est contrôlé en mémoire et jamais écrit. L’audit de fichier garde son rapport, qui reprend vos colonnes, 2 heures sans paiement ou 24 heures après paiement, puis l’efface. La politique de confidentialité détaille les métadonnées de requête gardées au plus 12 mois."
     },
     "cta": {
       "title": "Vérifiez votre premier IBAN en deux minutes",
@@ -315,7 +315,7 @@
           {
             "eyebrow": "02 · Un fichier entier",
             "title": "Contrôler un fichier fournisseurs",
-            "text": "Déposez un fichier CSV ou Excel : l’aperçu gratuit compte ce qu’il faut corriger et montre les premières lignes signalées. Le classeur annoté signale chaque ligne avant le prochain paiement.",
+            "text": "Déposez un fichier CSV ou Excel : l’aperçu gratuit compte ce qu’il faut corriger et montre les premières lignes signalées. Le classeur annoté donne à chaque ligne son statut avant le prochain paiement.",
             "tags": [
               "CSV",
               "Excel",

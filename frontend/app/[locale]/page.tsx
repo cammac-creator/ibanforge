@@ -559,8 +559,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                   price: "0",
                   priceCurrency: "USD",
                   // Until 24/09/2026: "Free tier — 200 requests per month", on
-                  // every locale, as if 200 came with no step at all.
-                  description: `Free API key, no e-mail: ${catalogue.claimedMonthly} requests a month once claimed, ${catalogue.anonymousMonthly} a month before that`,
+                  // every locale, as if 200 came with no step at all. Until
+                  // 27/09/2026: "no e-mail" beside the 200, which the claim
+                  // with an e-mail unlocks.
+                  description: `Free API key: ${catalogue.claimedMonthly} requests a month once claimed with an e-mail, ${catalogue.anonymousMonthly} a month before that, with no e-mail`,
                 },
               },
               {

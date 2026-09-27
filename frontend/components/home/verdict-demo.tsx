@@ -87,11 +87,12 @@ export function VerdictDemo({ scenarios, copy }: { scenarios: DemoScenario[]; co
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)")
     if (reduce.matches) return
+    // The first answer stays whole: the loop takes over from its verdict, so a
+    // visitor already on the demo, or one who has just picked an example, never
+    // sees it emptied under the pointer. The next example types itself.
     const start = window.setTimeout(() => {
       setAnimated(true)
-      setTyped(0)
-      setRows(0)
-      setPhase("typing")
+      setPhase("verdict")
     }, START_DELAY_MS)
     const onChange = () => {
       if (reduce.matches) {

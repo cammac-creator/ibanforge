@@ -173,7 +173,7 @@
       "devText": "Ein REST-Aufruf oder ein SDK in TypeScript, Python, Java oder .NET. Die Antwort ist JSON, mit einem dokumentierten nächsten Schritt.",
       "devLink": "Dokumentation lesen",
       "financeTitle": "Finanzteams",
-      "financeText": "Laden Sie eine CSV- oder Excel-Datei mit Lieferanten hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen, IBANs maskiert. Die kommentierte Arbeitsmappe mit jeder Zeile vollständig kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
+      "financeText": "Laden Sie eine CSV- oder Excel-Datei mit Lieferanten hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen, IBANs maskiert. Die kommentierte Arbeitsmappe mit allen Zeilen kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
       "financeLink": "Lieferantendatei prüfen",
       "agentsTitle": "KI-Agenten",
       "agentsText": "Ein MCP-Server für Claude, Cursor und jeden MCP-Client, in einer Zeile installiert. Agenten ohne Konto können pro Aufruf in USDC mit x402 zahlen.",
@@ -191,8 +191,8 @@
       "figLatency": "mittlere Verarbeitung auf dem Server",
       "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
       "fact0Text": "IBANforge wird aus der Schweiz betrieben; die API selbst läuft in einer Region der Europäischen Union.",
-      "fact1Title": "IBANs werden nie gespeichert",
-      "fact1Text": "Übermittelte IBANs werden im Speicher validiert, nie abgelegt. Telemetrie wird 30 Tage nach Ihrem Austritt gelöscht (DPA-Klausel 4.7).",
+      "fact1Title": "Die Validierung speichert keine IBAN",
+      "fact1Text": "Eine geprüfte IBAN wird im Speicher validiert, nie abgelegt. Die Dateiprüfung bewahrt ihren Bericht 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf. Telemetrie wird 30 Tage nach Ihrem Austritt gelöscht (DPA-Klausel 4.7).",
       "fact2Title": "Sanktionen auf Bankebene",
       "fact2Text": "Die Bank hinter der IBAN wird gegen die Listen OFAC, EU, UN geprüft (BIC8). Der Kontoinhaber nie.",
       "fact3Title": "Offen über seine Grenzen",
@@ -236,7 +236,7 @@
       "q3": "Was bringt ein kostenloser Schlüssel?",
       "a3": "Alle Endpunkte, mit {claimed} Anfragen pro Monat, sobald Sie den Schlüssel mit einer E-Mail-Adresse beanspruchen. Das Erstellen braucht weder Karte noch E-Mail.",
       "q4": "Werden die gesendeten IBANs gespeichert?",
-      "a4": "Nein. Übermittelte IBANs werden im Speicher validiert und nie abgelegt. Die Datenschutzerklärung beschreibt die Anfrage-Metadaten, die höchstens 12 Monate aufbewahrt werden."
+      "a4": "Nicht bei der Validierung: Jede IBAN wird im Speicher geprüft und nie abgelegt. Die Dateiprüfung bewahrt ihren Bericht, der Ihre Spalten übernimmt, 2 Stunden ohne Zahlung oder 24 Stunden nach der Zahlung auf und löscht ihn dann. Die Datenschutzerklärung beschreibt die Anfrage-Metadaten, die höchstens 12 Monate aufbewahrt werden."
     },
     "cta": {
       "title": "Prüfen Sie Ihre erste IBAN in zwei Minuten",
@@ -315,7 +315,7 @@
           {
             "eyebrow": "02 · Eine ganze Datei",
             "title": "Eine Lieferantendatei prüfen",
-            "text": "Laden Sie eine CSV- oder Excel-Datei hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen. Die kommentierte Arbeitsmappe markiert jede Zeile vor dem nächsten Zahlungslauf.",
+            "text": "Laden Sie eine CSV- oder Excel-Datei hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen. Die kommentierte Arbeitsmappe bewertet jede Zeile vor dem nächsten Zahlungslauf.",
             "tags": [
               "CSV",
               "Excel",

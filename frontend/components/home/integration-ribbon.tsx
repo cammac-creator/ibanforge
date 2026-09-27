@@ -8,9 +8,12 @@ import { useState, type ReactNode } from "react"
  * technology and from the keyboard, and disappears under reduced motion,
  * where the list simply wraps.
  *
- * The ribbon stops on hover, while a link inside it has the keyboard focus,
- * and on demand with the button (WCAG 2.2.2): a moving list that only a mouse
- * could stop left keyboard and touch visitors chasing their link.
+ * The ribbon stops on hover and on demand with the button (WCAG 2.2.2): a
+ * moving list that only a mouse could stop left keyboard and touch visitors
+ * chasing their link. While a link inside it has the keyboard focus, the loop
+ * is taken off and the list sits at its start, so the browser can scroll any
+ * link into view; paused, a link already slid past the left edge could never
+ * come back. When the focus leaves, the list returns to its start.
  */
 export function IntegrationRibbon({
   label,
@@ -48,7 +51,12 @@ export function IntegrationRibbon({
           )}
         </button>
       </div>
-      <div className="home-ribbon-viewport">
+      <div
+        className="home-ribbon-viewport"
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.scrollLeft = 0
+        }}
+      >
         <div className="home-ribbon-track">{children}</div>
       </div>
     </div>
