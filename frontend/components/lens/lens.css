@@ -1,30 +1,31 @@
-@font-face {
-  font-family: LensManrope;
-  src: url('/brand/lens/manrope-d0639be45d0a.ttf') format('truetype');
-  font-display: swap;
+/* Since 27/09/2026 the lens wears the site's own type and colours: Inter for
+   text, JetBrains Mono for labels, the amber of every other page for actions.
+   Only the scene keeps its warm light, framed like the site's cards. */
+.lens-frame {
+  width: min(1600px, calc(100% - 32px));
+  margin: 0 auto;
+  border: 1px solid var(--ink-4);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 40px 120px -40px rgba(245, 158, 11, 0.18);
 }
-@font-face {
-  font-family: LensSpace;
-  src: url('/brand/lens/space-acad6de1fc93.ttf') format('truetype');
-  font-display: swap;
+.lens-view3d {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(9, 9, 11, 0.78);
+  color: var(--amber-300) !important;
+  font-size: 13px;
+  backdrop-filter: blur(8px);
 }
-/* La palette et les caractères de la lentille restent limités à l’accueil. */
-.forge.lens-landing {
-  background: #0c0d0e;
-  color: #f4efe6;
-  font-family: LensManrope, system-ui, sans-serif;
-  --copper: #e6b884;
-  --amber: #e6b884;
-  --f-amber: #e6b884;
-  --f-bg: #0c0d0e;
-}
-.lens-landing .sect-h,
-.lens-landing .plaque h3,
-.lens-landing .agent-card h3,
-.lens-landing .fin-h {
-  font-family: LensSpace, system-ui, sans-serif;
-  text-transform: none;
-  letter-spacing: -0.035em;
+.lens-view3d:hover {
+  background: rgba(245, 158, 11, 0.14);
 }
 .lens-hero {
   --input-width: 27%;
@@ -34,8 +35,8 @@
   max-width: 1600px;
   margin: auto;
   background: #120f0d;
-  color: #f4efe6;
-  border-bottom: 1px solid #4b3e30;
+  color: var(--fg-1);
+  border-bottom: 1px solid var(--ink-4);
   isolation: isolate;
 }
 .lens-hero button,
@@ -53,16 +54,14 @@
 }
 .lens-hero :focus-visible,
 .lens-gallery a:focus-visible {
-  outline: 2px solid #f3cda1;
+  outline: 2px solid var(--amber-400);
   outline-offset: 5px;
 }
 .lens-eyebrow {
   font:
-    600 10px/1.5 LensManrope,
-    system-ui,
-    sans-serif;
+    600 10px/1.5 var(--font-mono);
   letter-spacing: 0.17em;
-  color: #caa377;
+  color: var(--amber-400);
   text-transform: uppercase;
   margin: 0 0 18px;
 }
@@ -70,22 +69,20 @@
   text-align: center;
   padding: 55px 20px 0;
 }
-.lens-heading h1 {
+.lens-heading h2 {
   font:
-    500 clamp(37px, 4.4vw, 66px)/1.06 LensSpace,
-    system-ui,
-    sans-serif;
-  letter-spacing: -0.055em;
+    600 clamp(30px, 3.4vw, 46px)/1.1 var(--font-sans);
+  letter-spacing: -0.03em;
   margin: 0;
 }
-.lens-heading h1 em {
+.lens-heading h2 em {
   font-style: normal;
-  color: #e6b884;
+  color: var(--amber-400);
 }
 .lens-promise {
   font-size: 16px;
   line-height: 1.7;
-  color: #c5b9a9;
+  color: var(--fg-3);
   max-width: 700px;
   margin: 24px auto 0;
 }
@@ -103,13 +100,13 @@
   align-items: center;
   min-height: 42px;
   font-size: 12px;
-  color: #dfb88c;
+  color: var(--amber-300);
   background: none;
   border: 0;
   padding: 0;
 }
 .lens-heading-actions a {
-  border-bottom: 1px solid #6c5138;
+  border-bottom: 1px solid var(--ink-5);
 }
 .lens-experience {
   height: 540px;
@@ -153,18 +150,16 @@
 }
 .lens-signature > span {
   font:
-    500 31px/1 LensSpace,
-    system-ui,
-    sans-serif;
+    500 31px/1 var(--font-sans);
   letter-spacing: -0.07em;
 }
 .lens-signature > span > span {
-  color: #e6b884;
+  color: var(--amber-400);
 }
 .lens-signature small {
   display: block;
   font-size: 9px;
-  color: #bea17f;
+  color: var(--fg-4);
   letter-spacing: 0.09em;
   margin-top: 12px;
 }
@@ -176,36 +171,35 @@
   transform: translateY(-50%);
   z-index: 3;
   padding: 24px;
-  border: 1px solid #685039;
+  border: 1px solid var(--ink-5);
   border-radius: 12px;
-  background: linear-gradient(125deg, #241d16f5, #18130ef7);
-  box-shadow: 0 15px 55px #0004;
+  background: linear-gradient(135deg, rgba(22, 22, 27, 0.94), rgba(15, 15, 19, 0.96));
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
 }
 .lens-input .lens-eyebrow {
   margin-bottom: 12px;
 }
 .lens-input h2 {
   font:
-    500 25px/1.2 LensSpace,
-    system-ui,
-    sans-serif;
+    500 25px/1.2 var(--font-sans);
   letter-spacing: -0.035em;
   margin: 0 0 22px;
 }
 .lens-input label {
   display: block;
   font-size: 11px;
-  color: #d0b99c;
+  color: var(--fg-3);
   margin-bottom: 7px;
 }
 .lens-input input {
   width: 100%;
   min-height: 46px;
   padding: 10px 11px;
-  border: 1px solid #6e553a;
+  border: 1px solid var(--ink-5);
   border-radius: 5px;
-  background: #100e0c;
-  color: #f5e2c5;
+  background: var(--ink-0);
+  color: var(--fg-1);
   font-size: 13px;
   letter-spacing: 0.035em;
   box-sizing: border-box;
@@ -215,15 +209,20 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  border: 1px solid #e5bc8b;
-  border-radius: 5px;
-  background: linear-gradient(120deg, #ebc396, #c78f54);
-  color: #271a0e !important;
+  border: 0;
+  border-radius: 8px;
+  background: var(--amber-500);
+  color: var(--ink-0) !important;
   min-height: 44px;
-  padding: 10px 13px;
+  padding: 10px 14px;
   margin-top: 10px;
-  font-size: 12px !important;
-  font-weight: 650 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.lens-submit:hover:not(:disabled) {
+  background: var(--amber-400);
+  box-shadow: var(--glow-amber);
 }
 .lens-examples {
   display: flex;
@@ -232,22 +231,22 @@
   margin-top: 12px;
 }
 .lens-examples button {
-  border: 1px solid #6b5138;
+  border: 1px solid var(--ink-5);
   border-radius: 30px;
   padding: 4px 8px;
   background: transparent;
-  color: #d9bd9b;
+  color: var(--fg-2);
   font-size: 10px;
   min-height: 32px;
 }
 .lens-examples button[aria-pressed='true'] {
-  background: #42301e;
-  border-color: #c49159;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--amber-500);
 }
 #lens-input-note {
   font-size: 10px;
   line-height: 1.6;
-  color: #b6a48e;
+  color: var(--fg-4);
   margin: 12px 0 0;
 }
 .lens-input-port {
@@ -257,8 +256,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #e6b884;
-  box-shadow: 0 0 12px #d99d62;
+  background: var(--amber-400);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
   transform: translateY(-50%);
 }
 .lens-field {
@@ -268,13 +267,15 @@
   transform: translateY(-50%);
   width: var(--result-width);
   min-height: 88px;
-  border: 1px solid #745639;
+  border: 1px solid var(--ink-5);
   border-radius: 8px;
-  background: linear-gradient(110deg, #302316f7, #20180ff7);
+  background: linear-gradient(120deg, rgba(22, 22, 27, 0.9), rgba(15, 15, 19, 0.92));
   padding: 13px 15px 13px 20px;
   text-align: left;
   z-index: 3;
-  box-shadow: 0 8px 30px #0003;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .lens-field:nth-child(2) {
   top: 51%;
@@ -283,8 +284,8 @@
   top: 71%;
 }
 .lens-field[aria-pressed='true'] {
-  border-color: #efc18c;
-  box-shadow: 0 0 30px #cf975133;
+  border-color: var(--amber-400);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 0 30px rgba(245, 158, 11, 0.18);
 }
 .lens-field-title {
   display: block;
@@ -292,14 +293,12 @@
   line-height: 1.3;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #c6a580;
+  color: var(--amber-400);
 }
 .lens-field strong {
   font:
-    500 19px/1.2 LensSpace,
-    system-ui,
-    sans-serif;
-  color: #f2d6b4;
+    500 19px/1.2 var(--font-sans);
+  color: var(--fg-1);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -314,14 +313,14 @@
   overflow: hidden;
   font-size: 10px;
   line-height: 1.5;
-  color: #c5b198;
+  color: var(--fg-3);
 }
 .lens-field[data-state='attente'] strong,
 .lens-field[data-state='absent'] strong {
-  color: #bcb1a3;
+  color: var(--fg-4);
 }
 .lens-field[data-state='erreur'] strong {
-  color: #f5bf94;
+  color: #fca5a5;
 }
 .lens-port {
   position: absolute;
@@ -330,10 +329,10 @@
   transform: translateY(-50%);
   width: 7px;
   height: 7px;
-  border: 1px solid #ffe9c3;
+  border: 1px solid var(--amber-200);
   border-radius: 50%;
-  background: #d7a575;
-  box-shadow: 0 0 12px #ebb56b90;
+  background: var(--amber-500);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
 }
 .lens-caption {
   position: absolute;
@@ -342,7 +341,7 @@
   transform: translateX(-50%);
   width: 38%;
   text-align: center;
-  color: #baa185;
+  color: var(--fg-4);
   font-size: 11px;
   z-index: 2;
 }
@@ -351,8 +350,8 @@
   z-index: 4;
   right: 3%;
   bottom: 18px;
-  background: #17120deb;
-  border: 1px solid #795b3c;
+  background: rgba(15, 15, 19, 0.9);
+  border: 1px solid var(--ink-5);
   border-radius: 30px;
   padding: 8px 14px;
   font-size: 11px !important;
@@ -368,8 +367,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 25px;
-  border-top: 1px solid #4a382b;
-  color: #d7c5ad;
+  border-top: 1px solid var(--ink-4);
+  color: var(--fg-2);
   font-size: 12px;
   line-height: 1.7;
 }
@@ -387,7 +386,7 @@
   background: transparent;
   font-size: 11px;
   min-height: 38px;
-  color: #dab894;
+  color: var(--amber-300);
   padding: 3px;
 }
 .lens-source-details {
@@ -396,7 +395,7 @@
   gap: 14px;
   padding: 5px 3% 20px;
   font-size: 11px;
-  color: #c8b9a7;
+  color: var(--fg-3);
   line-height: 1.6;
 }
 .lens-source-details p {
@@ -408,7 +407,7 @@
   display: block;
 }
 .lens-source-details b {
-  color: #d9b990;
+  color: var(--amber-400);
   font-size: 10px;
   letter-spacing: 0.06em;
   margin-bottom: 5px;
@@ -419,19 +418,19 @@
   white-space: pre-wrap;
 }
 .lens-warning {
-  color: #edba86;
+  color: #fca5a5;
 }
 #lens-json {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 360px;
   overflow: auto;
-  background: #0c0b0a;
+  background: var(--ink-0);
   margin: 0 3% 12px;
   padding: 18px;
-  border: 1px solid #4a382b;
+  border: 1px solid var(--ink-4);
   border-radius: 7px;
-  color: #d7c5ad;
+  color: var(--fg-2);
   font:
     12px/1.7 ui-monospace,
     monospace;
@@ -442,25 +441,25 @@
 .lens-copy-status {
   font-size: 12px;
   margin: 10px 3%;
-  color: #efc18c;
+  color: var(--amber-400);
 }
 .lens-scope {
   display: flex;
   justify-content: space-between;
   gap: 30px;
   padding: 17px 3%;
-  background: #0e0c0a;
-  color: #b9ad9e;
+  background: var(--ink-1);
+  color: var(--fg-3);
   font-size: 11px;
   line-height: 1.7;
-  border-top: 1px solid #31291f;
+  border-top: 1px solid var(--ink-4);
 }
 .lens-scope p {
   max-width: 880px;
   margin: 0;
 }
 .lens-scope a {
-  color: #dabb94;
+  color: var(--amber-300);
   white-space: nowrap;
   align-self: center;
   min-height: 36px;
@@ -469,7 +468,7 @@
 }
 .lens-nojs {
   padding: 15px 3%;
-  color: #c6b9a7;
+  color: var(--fg-3);
   font-size: 12px;
 }
 .lens-gallery {
@@ -484,14 +483,12 @@
 }
 .lens-gallery h2 {
   font:
-    500 clamp(32px, 3.4vw, 50px)/1.09 LensSpace,
-    system-ui,
-    sans-serif;
+    500 clamp(32px, 3.4vw, 50px)/1.09 var(--font-sans);
   letter-spacing: -0.045em;
   margin: 0;
 }
 .lens-gallery > header > p:last-child {
-  color: #bcb5aa;
+  color: var(--fg-3);
   margin: 24px auto 0;
   font-size: 15px;
   line-height: 1.7;
@@ -507,8 +504,8 @@
   margin: 0;
   border-radius: 16px;
   overflow: hidden;
-  background: #100e0c;
-  border: 1px solid #443426;
+  background: var(--ink-0);
+  border: 1px solid var(--ink-4);
 }
 .lens-usage img {
   display: block;
@@ -519,15 +516,13 @@
 }
 .lens-usage h3 {
   font:
-    500 clamp(28px, 3vw, 43px)/1.13 LensSpace,
-    system-ui,
-    sans-serif;
+    500 clamp(28px, 3vw, 43px)/1.13 var(--font-sans);
   letter-spacing: -0.04em;
   margin: 0;
 }
 .lens-usage > div > p:not(.lens-eyebrow) {
   font-size: 15px;
-  color: #bcb5aa;
+  color: var(--fg-3);
   margin: 22px 0 0;
   max-width: 460px;
   line-height: 1.8;
@@ -535,7 +530,7 @@
 .lens-usage a {
   display: inline-flex;
   gap: 20px;
-  color: #e9bc8a;
+  color: var(--amber-400);
   margin-top: 30px;
   font-size: 13px;
   min-height: 44px;
@@ -549,8 +544,8 @@
 }
 .lens-tags span {
   font-size: 10px;
-  color: #c5ad91;
-  border: 1px solid #574533;
+  color: var(--fg-3);
+  border: 1px solid var(--ink-5);
   border-radius: 100px;
   padding: 6px 12px;
   letter-spacing: 0.03em;
@@ -567,10 +562,10 @@
   max-width: 96vw;
   max-height: 95dvh;
   padding: 0;
-  border: 1px solid #7d6245;
+  border: 1px solid var(--ink-5);
   border-radius: 16px;
   background: #120f0d;
-  color: #f4eade;
+  color: var(--fg-1);
   overflow: auto;
   box-shadow: 0 30px 150px #000b;
 }
@@ -588,18 +583,18 @@
   font-size: 13px;
 }
 .lens-detail-header {
-  border-bottom: 1px solid #51402f;
+  border-bottom: 1px solid var(--ink-4);
 }
 .lens-detail-footer {
-  border-top: 1px solid #51402f;
-  color: #bba890;
+  border-top: 1px solid var(--ink-4);
+  color: var(--fg-3);
   font-size: 11px;
 }
 .lens-detail button {
   min-height: 38px;
   padding: 6px 16px;
   background: transparent;
-  border: 1px solid #70573e;
+  border: 1px solid var(--ink-5);
   border-radius: 30px;
   font-size: 12px;
 }
@@ -642,7 +637,7 @@
     text-align: left;
     padding: 35px 20px 14px;
   }
-  .lens-heading h1 {
+  .lens-heading h2 {
     font-size: clamp(33px, 7vw, 49px);
   }
   .lens-promise {
@@ -676,8 +671,8 @@
     transform: none;
     margin: 10px 16px 0;
     padding: 18px;
-    background: #201a14;
-    border: 1px solid #634b33;
+    background: var(--ink-2);
+    border: 1px solid var(--ink-5);
     border-radius: 8px;
   }
   .lens-input h2 {
@@ -714,7 +709,7 @@
     left: 3px;
     height: 28px;
     width: 1px;
-    background: linear-gradient(#e5b984, transparent);
+    background: linear-gradient(var(--amber-400), transparent);
   }
   .lens-scene {
     position: relative;
@@ -745,7 +740,7 @@
     width: 100%;
     padding: 13px 18px;
     min-height: 85px;
-    background: #211911;
+    background: var(--ink-2);
   }
   .lens-field strong {
     font-size: 20px;
@@ -769,9 +764,9 @@
   .lens-mobile-labels span {
     position: absolute;
     padding: 2px 5px;
-    color: #d8b487;
+    color: var(--amber-300);
     background: linear-gradient(90deg, #130f0aee, #130f0a00);
-    border-left: 1px solid #d9ac75;
+    border-left: 1px solid var(--amber-500);
     font-size: 10px;
     line-height: 1.3;
     transform: translateY(-50%);

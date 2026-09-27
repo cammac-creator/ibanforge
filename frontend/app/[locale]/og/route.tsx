@@ -41,15 +41,13 @@ const AMBER = '#f59e0b';
 const HOT = '#fff7ed';
 const MUTED = '#a8a29e';
 
-function splitAccent(raw: string): [string, string, string] {
-  const m = /^([\s\S]*?)<accent>([\s\S]*?)<\/accent>([\s\S]*)$/.exec(raw);
-  return m ? [m[1], m[2], m[3]] : [raw.replace(/<\/?accent>/g, ''), '', ''];
-}
-
 export async function GET(_req: Request, { params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'home' });
-  const [before, accent, after] = splitAccent(t.raw('hero.title') as string);
+  // The title of the home since its redesign (27/09/2026), its accent in amber.
+  const before = t('hero.titleLead');
+  const accent = t('hero.titleAccent');
+  const after = '';
   const [bebas, mark] = await Promise.all([
     readFile(join(process.cwd(), 'assets', 'bebas-neue.ttf')),
     readFile(join(process.cwd(), 'assets', 'anvil-mark.png')),

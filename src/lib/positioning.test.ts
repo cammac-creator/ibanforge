@@ -15,6 +15,7 @@ import {
   shareInWords,
 } from './positioning.js';
 import { buildRouteTable } from '../middleware/x402.js';
+import { NATIONAL_CHECK_COUNTRIES } from './national-check/index.js';
 
 /**
  * The first lines machines read, held to the code that decides the verdict.
@@ -50,6 +51,12 @@ const BIC_TRUTH_SURFACES = [
   'glama.json',
   'frontend/components/json-ld.tsx',
 ];
+
+/** The home page, one subtree per language (redesigned on 27/09/2026). */
+function homeText(lang: 'en' | 'fr' | 'de'): string {
+  const messages = JSON.parse(read(`frontend/messages/${lang}.json`)) as { home: unknown };
+  return JSON.stringify(messages.home);
+}
 
 /** The comparison page, one subtree per language, never the home page keys. */
 function compareText(lang: 'en' | 'fr' | 'de'): string {
@@ -144,6 +151,15 @@ describe('the static surfaces say what the code says', () => {
       expect(text).toContain(f.words);
     },
   );
+
+  it('the home page names the same register codes and national keys, in three languages', () => {
+    const codes = codesOf(registerCountries().authoritative);
+    const keys = NATIONAL_CHECK_COUNTRIES.join(', ');
+    for (const lang of ['en', 'fr', 'de'] as const) {
+      expect(homeText(lang), `${lang}: register codes`).toContain(codes);
+      expect(homeText(lang), `${lang}: national keys`).toContain(keys);
+    }
+  });
 
   it('the comparison page names the same register codes, in three languages', () => {
     const codes = codesOf(registerCountries().authoritative);
@@ -286,6 +302,16 @@ describe('the retired sentences stay retired', () => {
         }
       });
     expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  // The home page keys waited for a visual review; it came with the redesign of 27/09/2026.
+  it.each(['en', 'fr', 'de'] as const)('the home page (%s)', (lang) => {
+    const text = homeText(lang);
+    for (const [pattern, instead] of RETIRED) {
+      expect(text, instead).not.toMatch(pattern);
+    }
+    expect(text).not.toMatch(/deepest|plus profondes|tiefsten/i);
+    expect(text).not.toMatch(/Made in Switzerland|Conçu en Suisse/);
   });
 
   it.each(['en', 'fr', 'de'] as const)('the comparison page (%s)', (lang) => {

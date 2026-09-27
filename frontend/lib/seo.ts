@@ -82,6 +82,7 @@ export function alternatesFor(locale: string, path: string = '/'): Alternates {
 export function ogImageFor(locale: string): { url: string; width: number; height: number; alt: string } {
   const known = (SEO_LOCALES as readonly string[]).includes(locale) ? locale : 'en';
   // the query changes when the card is redrawn, so a crawler that cached
-  // the old one fetches the new (2026-09-05: the card was redrawn that day)
-  return { url: `${urlFor(known, '/og')}?v=20260905`, width: 1200, height: 630, alt: 'IBANforge — IBAN, BIC & Swiss clearing API' };
+  // the old one fetches the new (redrawn on 2026-09-05, then on 2026-09-27
+  // with the title of the redesigned home)
+  return { url: `${urlFor(known, '/og')}?v=20260927`, width: 1200, height: 630, alt: 'IBANforge: check the bank behind an IBAN before you pay' };
 }
