@@ -824,23 +824,55 @@ l’accès aux actions et le rendu des nombres dans les trois langues. La public
 recette finale sur le domaine authentifié restent à l’intégrateur principal. L’ancienne
 boucle de redirection anglaise du serveur Next local (section 9) reste hors de ce chantier.
 
-## 13. Accueil : le titre, la démonstration, puis la lentille
+## 13. Accueil : la revue (couverture, lentille, film), puis les sections de septembre
 
-Depuis le 27 septembre 2026, `frontend/app/[locale]/page.tsx` (marque `data-landing="home-v2"`)
-suit cet ordre : le titre de `positioning.ts` et la démonstration
-(`components/home/verdict-demo.tsx`), « pourquoi le mod-97 ne suffit pas »
-(`components/home/iban-anatomy.tsx`), trois usages, l'essai dans la lentille (`#try`), les
-publics et les intégrations, la couverture, les prix, l'échéance suisse, l'avis indépendant, la
-FAQ (avec son JSON-LD `FAQPage`) et l'appel final. Le style vit dans
-`components/home/home.css`, sur les jetons de `globals.css` : Bebas Neue pour les titres, Inter,
-JetBrains Mono et l'ambre du site.
+Le 28 septembre 2026, Claude-Alain a choisi pour l'accueil la maquette « La revue » (direction D,
+l'éditorial : une seule chose géante à la fois, l'ambre sur le détail en cours, le vert et le rouge
+aux seuls verdicts), avec deux scènes reprises de l'autre maquette. Elle se pose chapitre par
+chapitre. Étape 1, en place : `frontend/app/[locale]/page.tsx` (marque `data-landing="home-v3"`)
+suit cet ordre : la couverture, la lentille (`#try`), le chapitre 01 et son film, « le même IBAN,
+lu partie par partie » (l'anatomie), puis les sections du 27 septembre, qui attendent leur tour :
+trois usages, publics et intégrations, couverture, prix, échéance suisse, avis indépendant, FAQ
+(avec son JSON-LD `FAQPage`) et appel final. Le style de la revue vit dans
+`components/home/revue.css` (préfixe `rv-`), celui des sections restantes dans `home.css`.
 
-- La démonstration rejoue trois réponses réellement rendues par l'API le 26 septembre 2026 ;
-  elle n'appelle pas l'API. Si le verdict ou les libellés de l'API changent, mettre à jour ses
-  scénarios et la date de sa légende (`home.demo.caption`). Elle s'arrête au survol, au focus,
-  hors écran et quand l'onglet est caché ; sous mouvement réduit, elle reste immobile. Sa
-  boucle part du verdict de la première réponse, jamais vidée sous la souris, et un exemple
-  choisi s'affiche en entier sans annuler une pause.
+- **Le titre de la couverture remplit sa colonne ligne par ligne.** La largeur de chaque ligne en
+  Bebas Neue, à 1 em, est mesurée une fois dans le navigateur (`frontend/scripts/measure-cover-fit.mjs`,
+  avec `PLAYWRIGHT_MODULE`) et écrite dans `components/home/revue-cover-fit.ts` ; le CSS divise la
+  colonne par ce nombre. Pas de mesure au chargement : le titre est ce que le premier écran
+  peint, il ne bouge pas. `revue-cover-fit.test.ts` compare les lignes au titre des messages dans
+  les trois langues : changer `hero.titleLead` ou `hero.titleAccent` sans remesurer fait échouer
+  la suite. Pendant le chargement de la police, une ligne ne passe jamais à la ligne : la police
+  de secours est 30 % plus large, et un titre coupé puis refermé à l'arrivée de Bebas faisait
+  sauter tout le premier écran (décalage de 0,14 à 0,23, police retardée de 2,5 s, le 28/09).
+  Seulement une fois tous les chargements terminés, si une ligne dépasse encore sa colonne, la
+  police a échoué : `CoverTitleGuard` (`revue-motion.tsx`) laisse alors les lignes se couper,
+  plutôt que de passer sous la colonne voisine.
+- **Le film** (`components/home/revue-film.tsx`) remplace la carte de démonstration. Il rejoue les
+  trois réponses réellement rendues par l'API le 26 septembre 2026 ; il n'appelle pas l'API. Si
+  le verdict ou les libellés de l'API changent, mettre à jour `home.film.*`, les verdicts et
+  onglets de `home.demo.*` et la date de `home.demo.caption`. Tout son texte est rendu côté
+  serveur, chiffres déjà formatés (règle 8). Le mouvement (`revue-film-engine.ts`, GSAP) n'est
+  chargé qu'à l'approche du film : une boucle de 20,6 s (le montant, l'IBAN lu partie par
+  partie, Commerzbank, le second IBAN, « Ne pas envoyer ») et, à la demande, la faute de frappe
+  (9,6 s, jusqu'à « Vérifier la saisie »). Il s'arrête hors écran, onglet caché et sur pause ;
+  sous mouvement réduit, chaque exemple montre son image fixe (`data-fixe`), sans GSAP.
+- **Ses grandes lignes se calent dans la police chargée** (`revue-fit.ts`) : trois langues, donc
+  une mesure au chargement, sans effet sur la mise en page (les plans sont posés en absolu dans
+  une scène de hauteur fixe), et le crénage perdu entre les boîtes de lettres rendu en marge
+  (`--k`). Piège payé le 28/09 : sous mouvement réduit, `globals.css` donne à chaque propriété
+  une transition de 0,01 ms ; un gabarit de mesure restylé après son premier calcul de style
+  rendait encore son ancienne taille (17 px au lieu de 100), et les lignes sortaient six fois
+  trop grandes. Un gabarit se construit entièrement avant d'entrer dans la page.
+- **Une requête de conteneur ne style jamais son propre conteneur.** `.rv-couv` et `.rv-chap`
+  sont des conteneurs (`rv`) : ce qui change avec la largeur (marges, gouttières, air au-dessus
+  d'un chapitre) se règle sur les éléments intérieurs (`.rv-grille`, `.rv-ouv`, `.rv-couv__haut`).
+  Jamais sur `.home` : le confinement de taille ferait de la page le bloc conteneur de tout
+  élément fixe qu'elle contient.
+- **Mesure** : le film émet `forge:station` 0 (il démarre) et 3 (il atteint « Ne pas envoyer »),
+  que `cta-beacon.tsx` envoie comme `film:start` et `film:end`. Ces deux lignes du tableau de bord
+  étaient à zéro depuis le retrait de l'ancien film le 27/09 ; elles reprennent, avec ce sens-là.
+  Les trois exemples portent `film:example-a`, `-b` et `-c`.
 - Les codes de registres et de clés nationales que la page écrit (`home.coverage.registerCodes`,
   `home.coverage.keyCodes`, la FAQ) sont comparés au code par `src/lib/positioning.test.ts`,
   dans les trois langues : changer la couverture sans changer ces textes fait échouer la suite.
@@ -876,7 +908,9 @@ au repos, et sur un appareil capable : un ordinateur, ou un téléphone de huit 
 sans économiseur de données ni mouvement réduit (`autoStart()` dans `lens-hero.tsx`). Ailleurs,
 l'image fixe s'affiche avec un bouton « View in 3D ». C'est la construction de la scène dès
 l'arrivée qui rendait l'ancien accueil lent sur téléphone : ne pas la rapprocher du premier
-écran sans mesurer.
+écran sans mesurer. Depuis le 28/09 elle est remontée juste sous la couverture, d'un bloc,
+sans rien changer à l'intérieur : mesure avant et après dans la section « Vitesse » de
+`docs/internal/accueil-revue-2026-09-28/PASSATION.md`.
 
 Le moteur conserve une image fixe de secours, la pause, la réduction des mouvements et
 l’arrêt hors écran. Le gros plan crée son moteur à l’ouverture et le détruit à la
@@ -891,6 +925,7 @@ Deux choses relevées à l'intégration, à savoir avant de chercher une panne a
   sortait vert sans lui. `components/**/*.test.ts` a été ajouté à l'`include` de
   `frontend/vitest.config.ts` ; un test placé ailleurs que dans ces trois dossiers ne
   tourne toujours pas, et son absence ressemble à un succès.
-- Les deux mesures du film (`film:start`, `film:end`) du tableau de bord affichent
-  désormais zéro en permanence : le film qui les émettait a été retiré de l'accueil avec
-  ce chantier. Ce n'est pas une panne de collecte.
+- Les deux mesures du film (`film:start`, `film:end`) du tableau de bord ont affiché zéro
+  du 27 au 28 septembre 2026 : le film qui les émettait avait été retiré. Le film de la
+  revue les émet de nouveau (voir plus haut) ; un zéro de cette période n'est pas une
+  panne de collecte.

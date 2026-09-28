@@ -1,0 +1,1190 @@
+/* The home as a magazine (« La revue », chosen by Claude-Alain on 28/09/2026,
+   direction D of 27/09/2026): a cover whose title fills its column line by
+   line, numbered chapters opened by a hairline, a hollow numeral and a Bebas
+   title, and the film of the first chapter. One giant thing at a time; amber
+   only on the detail being read, green and red only at the verdicts.
+
+   Step 1 of the move: the cover and the first chapter. The chapters below keep
+   home.css until their turn. Every block here is its own query container
+   (`rv`), never the page root: size containment on `.home` would make it the
+   containing block of anything fixed inside the page. A container query never
+   styles its own container, so what changes with the width (margins, gutters,
+   the air above a chapter) is set on the elements inside. */
+
+.rv-couv,
+.rv-chap {
+  --rv-fond: var(--ink-0);
+  --rv-b1: #27272a;
+  --rv-b2: #3f3f46;
+  --rv-t1: #f5f3ef;
+  --rv-t2: #d4d4d8;
+  --rv-t3: #a1a1aa;
+  --rv-t4: #8a8a94;
+  --rv-ambre: #f59e0b;
+  --rv-ambre-c: #fbbf24;
+  --rv-vert: #34d399;
+  --rv-rouge: #f87171;
+  --rv-bebas: var(--font-bebas), "Arial Narrow", Impact, sans-serif;
+  --rv-sans: var(--font-sans);
+  --rv-mono: var(--font-mono);
+  --rv-courbe: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --rv-marge: 24px;
+  --rv-gout: 16px;
+  --rv-air: 104px;
+  position: relative;
+  container: rv / inline-size;
+  background: var(--rv-fond);
+  color: var(--rv-t2);
+  font-family: var(--rv-sans);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+/* The grid of the magazine: 4 columns on a phone, 12 from 760 px, capped on
+   very wide screens so a title line never outgrows a reading distance. */
+.rv-grille {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--rv-gout);
+  width: min(100%, 1760px);
+  margin-inline: auto;
+  padding-inline: var(--rv-marge);
+}
+
+.rv-grille > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.rv-kicker {
+  margin: 0;
+  font-family: var(--rv-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rv-t4);
+}
+
+.rv-bebas {
+  font-family: var(--rv-bebas);
+  font-weight: 400;
+  color: var(--rv-t1);
+  text-transform: uppercase;
+}
+
+.rv-figcap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-family: var(--rv-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--rv-t4);
+}
+
+.rv-figcap__num {
+  color: var(--rv-t2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── The cover ─────────────────────────────────────────────────────────── */
+
+.rv-couv__haut {
+  align-items: end;
+  padding-top: 26px;
+  padding-bottom: 40px;
+}
+
+.rv-couv__titre {
+  container-type: inline-size;
+}
+
+.rv-surtitre {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 22px;
+  white-space: nowrap;
+}
+
+/* Each line fills its column (revue-cover-fit.ts): the size of a line is the
+   width of the column divided by the width of the line at 1em, less 1 % of
+   air. The title never moves on arrival: it is what the first screen paints.
+
+   A line never wraps while the font is on its way: the fallback is 30 % wider,
+   and a title that wrapped then closed up when Bebas arrived moved the whole
+   first screen (layout shift 0.14 to 0.23, measured with the font 2.5 s late,
+   28/09/2026). Only when every load has settled and a line still runs past
+   its column, the font has failed: then the lines may wrap
+   (`.rv-h1--souple`, revue-motion.tsx), rather than run under the column
+   beside them. */
+.rv-h1 {
+  margin: 0;
+  line-height: 0.96;
+  letter-spacing: 0;
+}
+
+.rv-h1 .rv-ligne {
+  display: block;
+  white-space: nowrap;
+  font-size: calc(100cqi * 0.99 / var(--em));
+}
+
+.rv-h1--souple .rv-ligne {
+  white-space: normal;
+}
+
+.rv-h1 .rv-ligne:first-child {
+  margin-top: -0.08em;
+}
+
+.rv-h1 .rv-ligne:last-child {
+  margin-bottom: -0.18em;
+}
+
+.rv-couv__action {
+  margin-top: 26px;
+}
+
+.rv-couv__chapeau {
+  max-width: 34em;
+  margin: 0;
+  font-size: 16.5px;
+  line-height: 1.55;
+  color: var(--rv-t2);
+}
+
+.rv-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.rv-boutons > * {
+  flex: 1 1 100%;
+}
+
+.rv-reass {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--rv-t3);
+}
+
+.rv-reass li {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.rv-reass li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rv-ambre);
+  opacity: 0.85;
+}
+
+.rv-alt {
+  display: inline-block;
+  margin-top: 18px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--rv-t1);
+  text-decoration: underline;
+  text-decoration-color: var(--rv-b2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+  transition: text-decoration-color 0.3s var(--rv-courbe);
+}
+
+.rv-alt:hover {
+  text-decoration-color: var(--rv-t1);
+}
+
+/* The real lens under the cover, as one block: its own layout places the
+   input and the answers along its rays. */
+.rv-lentille {
+  position: relative;
+  scroll-margin-top: 72px;
+  padding: 8px 0 0;
+  background: var(--ink-0);
+}
+
+/* ── A chapter: hairline, hollow numeral, kicker, title, standfirst ─────── */
+
+.rv-chap {
+  scroll-margin-top: 72px;
+}
+
+.rv-ouv {
+  padding-top: var(--rv-air);
+}
+
+.rv-filet {
+  display: block;
+  height: 1px;
+  background: var(--rv-b1);
+  transform-origin: 0 50%;
+}
+
+.rv-num {
+  margin: 26px 0 0;
+  font-family: var(--rv-bebas);
+  font-size: 84px;
+  line-height: 0.8;
+  letter-spacing: 0.01em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(161, 161, 170, 0.55);
+  user-select: none;
+}
+
+.rv-ouv__texte {
+  margin-top: 20px;
+}
+
+.rv-h2 {
+  margin: calc(18px - 0.07em) 0 -0.17em;
+  font-size: clamp(42px, 12.3cqi, 56px);
+  line-height: 0.95;
+  letter-spacing: 0.004em;
+  text-wrap: balance;
+}
+
+.rv-mot {
+  display: inline-block;
+  clip-path: inset(-0.34em -0.12em -0.1em -0.12em);
+}
+
+.rv-mot > span {
+  display: inline-block;
+}
+
+.rv-chapeau {
+  max-width: 30em;
+  margin: 30px 0 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--rv-t1);
+  text-wrap: pretty;
+}
+
+/* ── Chapter 01: the film, then its caption and the three examples ────── */
+
+.rv-film {
+  position: relative;
+  margin-top: 36px;
+}
+
+.rv-film__legende {
+  row-gap: 22px;
+  align-items: start;
+}
+
+.rv-film__legende .rv-figcap {
+  padding-top: 18px;
+}
+
+.rv-exemples {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--rv-b1);
+}
+
+.rv-exemples__titre {
+  padding: 14px 0 6px;
+}
+
+.rv-ex {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 50px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--rv-b1);
+  background: none;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--rv-t2);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.3s var(--rv-courbe);
+}
+
+.rv-ex:hover,
+.rv-ex[aria-current="true"] {
+  color: var(--rv-t1);
+}
+
+.rv-ex:focus-visible {
+  outline: 2px solid var(--rv-ambre);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.rv-ex__lettre {
+  min-width: 1.2em;
+  font-family: var(--rv-mono);
+  font-size: 13px;
+  color: var(--rv-t4);
+}
+
+.rv-ex[aria-current="true"] .rv-ex__lettre {
+  color: var(--rv-ambre-c);
+}
+
+/* The amber hairline that runs under the example being played. */
+.rv-ex__barre {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--rv-ambre);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--rv-p, 0));
+}
+
+/* ── The film (direction D): five shots of a loop, two of the typo ─────── */
+
+.rv-d {
+  --rvd-t1: #f5f3ef;
+  --rvd-t2: #d4d4d8;
+  --rvd-t3: #a1a1aa;
+  --rvd-t4: #8a8a94;
+  --rvd-b2: #3f3f46;
+  --rvd-ambre: #f59e0b;
+  --rvd-ambre-c: #fbbf24;
+  --rvd-vert: #34d399;
+  --rvd-rouge: #f87171;
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  background: var(--ink-0);
+  color: var(--rvd-t1);
+  font-family: var(--rv-sans);
+  overflow: hidden;
+  isolation: isolate;
+  container: rvd / inline-size;
+}
+
+.rv-d p {
+  margin: 0;
+}
+
+/* A portrait poster on a phone, a 16:9 shot on a computer. */
+.rv-d__scene {
+  --rvd-marge: 24px;
+  --rvd-base: 57%;
+  --rvd-gap-sur: 22px;
+  --rvd-gap-leg: 28px;
+  --rvd-leg: 16px;
+  --rvd-h: clamp(600px, 175cqi, 740px);
+  position: relative;
+  height: var(--rvd-h);
+  overflow: hidden;
+}
+
+/* The rim of the lying lens, as a floor of light. */
+.rv-d__fond {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.rv-d__img {
+  position: absolute;
+  right: calc(var(--rvd-h) * -0.446);
+  bottom: -13%;
+  width: auto;
+  height: 100%;
+  max-width: none;
+  opacity: 0.42;
+  transform-origin: 70% 85%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 22%);
+}
+
+.rv-d__voile {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, var(--ink-0) 0%, rgba(9, 9, 11, 0.9) 34%, rgba(9, 9, 11, 0.35) 66%, rgba(9, 9, 11, 0) 84%),
+    linear-gradient(90deg, rgba(9, 9, 11, 0.55) 0%, rgba(9, 9, 11, 0) 60%);
+}
+
+/* The column: the one measure of every shot. */
+.rv-d__col {
+  --rvd-w: calc(100vw - 2 * var(--rvd-marge));
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--rvd-marge);
+  right: var(--rvd-marge);
+  z-index: 1;
+  container-type: inline-size;
+}
+
+@supports (width: 1cqi) {
+  .rv-d__col {
+    --rvd-w: 100cqi;
+  }
+}
+
+.rv-d__plan {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+
+/* Still frames: the verdict of the loop by default, the bank or the typo
+   when an example is chosen without motion. */
+.rv-d__plan--5 {
+  visibility: visible;
+}
+
+.rv-d[data-fixe="3"] .rv-d__plan--5,
+.rv-d[data-fixe="7"] .rv-d__plan--5 {
+  visibility: hidden;
+}
+
+.rv-d[data-fixe="3"] .rv-d__plan--3,
+.rv-d[data-fixe="7"] .rv-d__plan--7 {
+  visibility: visible;
+}
+
+/* While the fonts and the engine load, nothing gives the end away (4 s at most). */
+.rv-d.rv-d--attente .rv-d__plan--5 {
+  visibility: hidden;
+}
+
+.rv-d__haut {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% - var(--rvd-base));
+}
+
+.rv-d__bas {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--rvd-base);
+}
+
+/* Masks: the text rises from an invisible line. */
+.rv-d__m {
+  display: block;
+  clip-path: inset(0 -1em 0 -1em);
+}
+
+.rv-d__mi {
+  display: inline-block;
+}
+
+/* One box per letter, the font's kerning given back as a margin (revue-fit.ts). */
+.rv-d__l {
+  display: inline-block;
+  margin-right: var(--k, 0);
+}
+
+.rv-d__fine {
+  display: inline-block;
+  width: 0.08em;
+  height: 0;
+}
+
+.rv-d__sur {
+  margin-bottom: calc(var(--rvd-gap-sur) - 0.285em);
+  font-family: var(--rv-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--rvd-t4);
+}
+
+.rv-d__point {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 12px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.rv-d__point--ambre {
+  color: var(--rvd-ambre);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.55);
+}
+
+.rv-d__point--vert {
+  color: var(--rvd-vert);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+}
+
+.rv-d__pouls {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+}
+
+.rv-d__sur--vert {
+  color: var(--rvd-vert);
+}
+
+/* The giant lines: each fills the measure exactly, trimmed to the cap height
+   and the baseline. `--fit` is the width of the line at 1em, measured in the
+   loaded font (revue-fit.ts); the values below hold until then. */
+.rv-d__geant {
+  display: block;
+  white-space: nowrap;
+}
+
+.rv-d__bebas {
+  margin-top: -0.1em;
+  margin-bottom: -0.2em;
+  font-family: var(--rv-bebas);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: calc(var(--rvap, 0) * 1em);
+  text-transform: uppercase;
+  color: var(--rvd-t1);
+}
+
+.rv-d__montant {
+  font-size: calc(var(--rvd-w) * 0.995 / var(--fit, 3.628));
+}
+
+.rv-d__montant .rv-d__m {
+  display: inline-block;
+  clip-path: inset(0 -0.3em 0 -0.3em);
+}
+
+.rv-d__banque {
+  margin-top: -0.136em;
+  margin-bottom: -0.137em;
+  font-family: var(--rv-sans);
+  font-weight: 600;
+  font-size: calc(var(--rvd-w) * 0.995 / var(--fit, 6.928));
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--rvd-t1);
+  transform-origin: 0 80%;
+}
+
+.rv-d__verdict {
+  font-size: min(calc(var(--rvd-w) * 0.995 / var(--fit-t, 2.905)), 200px);
+}
+
+.rv-d__verdict .rv-d__vl {
+  display: block;
+  clip-path: inset(0 -0.3em 0 -0.3em);
+}
+
+.rv-d__verdict .rv-d__vl + .rv-d__vl {
+  margin-top: -0.1em;
+}
+
+/* The IBAN: monospace, fitted to the measure; three lines of meaning on a
+   phone. Its widths do not depend on the language. */
+.rv-d__iban {
+  margin-top: -0.12em;
+  margin-bottom: -0.14em;
+  font-family: var(--rv-mono);
+  font-weight: 400;
+  font-size: min(calc(var(--rvd-w) * 0.995 / 6.52), 86px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  word-spacing: -0.22em;
+  white-space: nowrap;
+  color: rgba(138, 138, 148, 0.6);
+  font-variant-ligatures: none;
+}
+
+.rv-d__ibl {
+  display: block;
+}
+
+.rv-d__ibl + .rv-d__ibl {
+  margin-top: 44px;
+}
+
+.rv-d__part {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+}
+
+.rv-d__pm {
+  display: inline-block;
+  clip-path: inset(0 -0.2em 0 -0.2em);
+}
+
+.rv-d__halo {
+  position: absolute;
+  left: -0.5em;
+  right: -0.5em;
+  top: -0.35em;
+  bottom: -0.35em;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.06) 55%, rgba(245, 158, 11, 0));
+  opacity: 0;
+}
+
+.rv-d__halo--rouge {
+  background: radial-gradient(closest-side, rgba(248, 113, 113, 0.2), rgba(248, 113, 113, 0.06) 55%, rgba(248, 113, 113, 0));
+}
+
+.rv-d__cote {
+  position: absolute;
+  left: 0.07em;
+  right: 0.07em;
+  top: calc(100% + 0.06em);
+  height: 0;
+}
+
+.rv-d__filet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: var(--rvd-b2);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+.rv-d__lgw {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  display: flex;
+  justify-content: flex-start;
+  clip-path: inset(0 -30em 0 -30em);
+}
+
+.rv-d__lg {
+  display: block;
+  font-family: var(--rv-sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0;
+  word-spacing: normal;
+  white-space: nowrap;
+  color: var(--rvd-t3);
+}
+
+.rv-d__lg--rouge {
+  color: var(--rvd-rouge);
+}
+
+.rv-d__barre {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0.475em;
+  height: max(2px, 0.03em);
+  border-radius: 1px;
+  background: var(--rvd-rouge);
+  box-shadow: 0 0 14px rgba(248, 113, 113, 0.45);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+/* Captions: light, under the baseline, at a fixed distance. */
+.rv-d__leg {
+  max-width: 36em;
+  margin-top: calc(var(--rvd-gap-leg) - 0.3625em);
+  font-family: var(--rv-sans);
+  font-size: var(--rvd-leg);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--rvd-t3);
+  text-wrap: balance;
+}
+
+.rv-d__leg--rouge {
+  color: var(--rvd-rouge);
+}
+
+.rv-d__leg b {
+  font-weight: 500;
+  color: var(--rvd-t1);
+}
+
+.rv-d__leg code,
+.rv-d__code {
+  font-family: var(--rv-mono);
+  font-size: 0.9em;
+  letter-spacing: 0;
+  color: var(--rvd-t2);
+  font-variant-ligatures: none;
+}
+
+.rv-d__code--ambre {
+  color: var(--rvd-ambre-c);
+}
+
+.rv-d__bic {
+  margin-top: 6px;
+  font-size: var(--rvd-leg);
+  line-height: 1.45;
+  color: var(--rvd-t4);
+}
+
+.rv-d__bic-lib {
+  margin-right: 0.5em;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+/* The verdicts. */
+.rv-d__preuve {
+  font-family: var(--rv-mono);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.rv-d__raye {
+  position: relative;
+  color: rgba(138, 138, 148, 0.55);
+}
+
+.rv-d__raye::after {
+  content: "";
+  position: absolute;
+  left: -0.1em;
+  right: -0.1em;
+  top: 50%;
+  height: 1.5px;
+  margin-top: -1px;
+  background: var(--rvd-rouge);
+}
+
+.rv-d__regle {
+  display: block;
+  height: 1px;
+  margin-top: 26px;
+  background: var(--rvd-rouge);
+  box-shadow: 0 0 16px rgba(248, 113, 113, 0.35);
+  transform-origin: 0 50%;
+}
+
+.rv-d__raison {
+  margin-top: calc(22px - 0.3625em);
+}
+
+.rv-d__saisie {
+  margin-top: 0.07em;
+}
+
+.rv-d__saisie .rv-d__vl {
+  clip-path: inset(-0.3em -0.3em 0 -0.3em);
+}
+
+/* The pause button, like the films of the other landings: discreet, keyboard-reachable. */
+.rv-d__pause {
+  position: absolute;
+  right: calc(var(--rvd-marge) - 8px);
+  bottom: 16px;
+  z-index: 3;
+  display: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--rvd-t3);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.rv-d.rv-d--anime .rv-d__pause {
+  display: grid;
+  place-items: center;
+}
+
+.rv-d__pause:hover {
+  color: var(--rvd-t1);
+}
+
+.rv-d__pause:focus-visible {
+  outline: 2px solid var(--rvd-ambre);
+  outline-offset: 2px;
+}
+
+.rv-d__pause svg {
+  display: block;
+  width: 34px;
+  height: 34px;
+  overflow: visible;
+}
+
+.rv-d__anneau-fond {
+  fill: rgba(9, 9, 11, 0.4);
+  stroke: rgba(245, 243, 239, 0.14);
+  stroke-width: 1.25;
+}
+
+.rv-d__anneau {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+
+.rv-d__ic-lire {
+  display: none;
+}
+
+.rv-d.rv-d--pause .rv-d__ic-lire {
+  display: inline;
+}
+
+.rv-d.rv-d--pause .rv-d__ic-pause {
+  display: none;
+}
+
+/* A computer: the same grid, wider; the IBAN and the verdict hold on one line. */
+@container rvd (min-width: 760px) {
+  .rv-d__scene {
+    --rvd-marge: clamp(40px, 6.25cqi, 112px);
+    --rvd-base: 60%;
+    --rvd-gap-sur: 30px;
+    --rvd-gap-leg: 38px;
+    --rvd-leg: 18px;
+    --rvd-h: clamp(560px, 56.25cqi, 820px);
+  }
+
+  .rv-d__img {
+    right: -4%;
+    bottom: -31%;
+    width: auto;
+    height: 129%;
+    opacity: 0.38;
+  }
+
+  .rv-d__plan--2,
+  .rv-d__plan--4,
+  .rv-d__plan--6 {
+    --rvd-base: 52%;
+  }
+
+  .rv-d__sur {
+    font-size: 13px;
+  }
+
+  .rv-d__preuve {
+    font-size: 15px;
+  }
+
+  .rv-d__iban {
+    font-size: calc(var(--rvd-w) * 0.995 / 14.56);
+  }
+
+  .rv-d__ibl {
+    display: inline;
+  }
+
+  .rv-d__ibl + .rv-d__ibl {
+    margin-top: 0;
+  }
+
+  .rv-d__lgw {
+    justify-content: center;
+  }
+
+  .rv-d__verdict {
+    font-size: calc(var(--rvd-w) * 0.995 / var(--fit-o, 5.136));
+  }
+
+  .rv-d__verdict .rv-d__vl {
+    display: inline-block;
+  }
+
+  .rv-d__verdict .rv-d__vl + .rv-d__vl {
+    margin-top: 0;
+  }
+
+  .rv-d__bas--banque {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 32px;
+  }
+
+  .rv-d__bic {
+    margin-top: 0;
+    white-space: nowrap;
+  }
+
+  .rv-d__regle {
+    margin-top: 30px;
+  }
+
+  .rv-d__raison {
+    margin-top: calc(26px - 0.3625em);
+  }
+
+  .rv-d__pause {
+    bottom: 22px;
+  }
+}
+
+/* ── From 760 px: twelve columns ───────────────────────────────────────── */
+
+@container rv (min-width: 760px) {
+  .rv-grille {
+    --rv-marge: clamp(40px, 6.25cqi, 112px);
+    --rv-gout: 24px;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .rv-ouv {
+    padding-top: clamp(112px, 10cqi, 190px);
+  }
+
+  .rv-kicker,
+  .rv-figcap {
+    font-size: 13px;
+  }
+
+  .rv-couv__haut {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .rv-couv__titre {
+    grid-column: 1 / span 11;
+  }
+
+  .rv-surtitre {
+    margin-bottom: 34px;
+  }
+
+  .rv-couv__action {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--rv-gout);
+    align-items: end;
+    margin-top: 40px;
+  }
+
+  .rv-couv__chapeau {
+    grid-column: 1 / span 7;
+    font-size: 18px;
+  }
+
+  .rv-couv__action .rv-boutons {
+    grid-column: 8 / -1;
+    margin-top: 0;
+  }
+
+  .rv-reass,
+  .rv-couv__action .rv-alt {
+    grid-column: 1 / -1;
+  }
+
+  .rv-num {
+    grid-column: 1 / span 3;
+    margin-top: 44px;
+    font-size: clamp(150px, 15cqi, 260px);
+  }
+
+  .rv-ouv__texte {
+    grid-column: 4 / -1;
+    margin-top: 50px;
+  }
+
+  .rv-h2 {
+    margin-top: calc(22px - 0.06em);
+    font-size: clamp(62px, 6.9cqi, 124px);
+  }
+
+  .rv-chapeau {
+    margin-top: 38px;
+    font-size: clamp(22px, 1.9cqi, 27px);
+    line-height: 1.42;
+  }
+
+  .rv-film {
+    margin-top: 40px;
+  }
+
+  .rv-film__legende .rv-figcap {
+    grid-column: 1 / span 4;
+    padding-top: 20px;
+  }
+
+  .rv-exemples {
+    grid-column: 5 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    border-top: 0;
+  }
+
+  .rv-exemples__titre {
+    width: 100%;
+    padding: 0 0 4px;
+    text-align: right;
+  }
+
+  .rv-ex {
+    width: auto;
+    min-height: 46px;
+    padding: 0 16px;
+    border: 1px solid var(--rv-b1);
+    border-radius: 2px;
+    font-size: 15px;
+    overflow: hidden;
+  }
+
+  .rv-ex[aria-current="true"] {
+    border-color: var(--rv-b2);
+  }
+}
+
+/* A large screen: the cover in two columns. */
+@container rv (min-width: 1100px) {
+  .rv-couv__titre {
+    grid-column: 1 / span 8;
+  }
+
+  .rv-couv__action {
+    grid-column: 9 / -1;
+    display: block;
+    margin-top: 0;
+    padding-bottom: 0.4em;
+  }
+
+  .rv-couv__chapeau {
+    font-size: 17px;
+  }
+
+  .rv-couv__action .rv-boutons {
+    margin-top: 26px;
+  }
+}
+
+@container rv (min-width: 1500px) {
+  .rv-couv__chapeau {
+    font-size: 18px;
+  }
+}
+
+/* ── Safari before 16 knows no container units ─────────────────────────
+   Without them the title would fall to 17px, the chapter titles too, and the
+   film would lose its height (a custom property that holds an unknown unit
+   leaves `height` with nothing). Those browsers also skip every @container
+   rule, so the page keeps its phone layout: one column, the window's width. */
+@supports not (width: 1cqi) {
+  .rv-h1 .rv-ligne {
+    font-size: calc((100vw - 48px) * 0.99 / var(--em));
+  }
+
+  .rv-h2 {
+    font-size: 48px;
+  }
+
+  .rv-d__scene {
+    --rvd-h: 680px;
+  }
+}
+
+/* ── Arrival: only when the script runs and motion is allowed ──────────── */
+
+.rv-anim [data-rv="titre"] .rv-mot > span {
+  transform: translateY(112%);
+  transition: transform 1s var(--rv-courbe);
+  transition-delay: calc(var(--rv-d, 0s) + var(--rv-i, 0) * 55ms);
+}
+
+.rv-anim [data-rv="texte"] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.9s var(--rv-courbe),
+    transform 0.9s var(--rv-courbe);
+  transition-delay: var(--rv-d, 0s);
+}
+
+.rv-anim [data-rv="num"] {
+  opacity: 0;
+  filter: blur(12px);
+  transition:
+    opacity 1.3s var(--rv-courbe),
+    filter 1.3s var(--rv-courbe);
+  transition-delay: var(--rv-d, 0s);
+}
+
+.rv-anim [data-rv="filet"] {
+  transform: scaleX(0);
+  transition: transform 1.1s var(--rv-courbe);
+  transition-delay: var(--rv-d, 0s);
+}
+
+.rv-anim .rv-vu[data-rv="titre"] .rv-mot > span {
+  transform: none;
+}
+
+.rv-anim .rv-vu[data-rv="texte"],
+.rv-anim .rv-vu[data-rv="num"] {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+.rv-anim .rv-vu[data-rv="filet"] {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-anim [data-rv],
+  .rv-anim [data-rv] .rv-mot > span {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .rv-d .rv-d__pause {
+    display: none;
+  }
+}
