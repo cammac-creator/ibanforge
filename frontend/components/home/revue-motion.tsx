@@ -48,21 +48,38 @@ export function RevueMotion() {
 }
 
 /**
- * The cover title keeps each line on one line while its font loads (a line
- * that wrapped, then closed up when Bebas arrived, moved the whole first
- * screen). Once every load has settled, a line that still runs past its
- * column means the font never came: only then may the lines wrap.
+ * The fitted lines keep to one line while their font loads: a line that
+ * wrapped, then closed up when Bebas arrived, moved the whole first screen.
+ * Once every load has settled, a line or a group that still runs past its
+ * column means the font never came (the fallback faces are wider): only then
+ * does it give way (`.rv-souple`). The lines of the cover and of the ending
+ * wrap, the word groups of a title break, the counter of chapter 04 shrinks, a
+ * link keeps its arrow no more, a path of the API breaks. Read from the layout
+ * itself: WebKit does not report a blocked font as failed.
  */
 export function CoverTitleGuard() {
   useEffect(() => {
-    const title = document.querySelector<HTMLElement>(".rv-h1")
     const fonts = document.fonts
-    if (!title || !fonts?.ready) return
+    if (!fonts?.ready) return
     let cancelled = false
     void fonts.ready.then(() => {
       if (cancelled) return
-      const lines = Array.from(title.querySelectorAll<HTMLElement>(".rv-ligne"))
-      if (lines.some((line) => line.scrollWidth > line.clientWidth + 1)) title.classList.add("rv-h1--souple")
+      const title = document.querySelector<HTMLElement>(".rv-h1")
+      const lines = title ? Array.from(title.querySelectorAll<HTMLElement>(".rv-ligne")) : []
+      if (title && lines.some((line) => line.scrollWidth > line.clientWidth + 1)) title.classList.add("rv-h1--souple")
+      const past = (el: Element, box: Element) => el.getBoundingClientRect().right > box.getBoundingClientRect().right + 1
+      for (const box of document.querySelectorAll<HTMLElement>(".rv-h2, .rv-fin__titre")) {
+        if (Array.from(box.querySelectorAll(".rv-mot")).some((word) => past(word, box))) box.classList.add("rv-souple")
+      }
+      for (const figure of document.querySelectorAll<HTMLElement>(".rv-f__nombre")) {
+        if (figure.scrollWidth > figure.clientWidth + 1) figure.classList.add("rv-souple")
+      }
+      // A paragraph wider than itself: its unbreakable pieces (and the
+      // punctuation that clings to them) give way.
+      for (const box of document.querySelectorAll<HTMLElement>(".rv-page p, .rv-page li, .rv-page dd")) {
+        if (box.scrollWidth <= box.clientWidth + 1) continue
+        box.querySelectorAll<HTMLElement>(".rv-nw, code").forEach((piece) => piece.classList.add("rv-souple"))
+      }
     })
     return () => {
       cancelled = true
@@ -70,4 +87,3 @@ export function CoverTitleGuard() {
   }, [])
   return null
 }
-

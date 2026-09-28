@@ -879,7 +879,14 @@ le ruban des intégrations et l'anatomie de septembre sont retirés. `components
   chargement de la police, une ligne du titre ne passe jamais à la ligne (la police de secours
   est 30 % plus large ; un titre coupé puis refermé à l'arrivée de Bebas faisait sauter tout le
   premier écran) ; seulement si une ligne dépasse encore une fois tout chargé, `CoverTitleGuard`
-  (`revue-motion.tsx`) la laisse se couper.
+  (`revue-motion.tsx`) la laisse se couper. La même garde relâche, dans ce seul cas, le titre de
+  la fin, les groupes insécables des titres de chapitre, le compteur (qui rétrécit) et les liens ou
+  chemins d'API insécables d'un paragraphe qui déborde (`.rv-souple`). Elle lit la mise en page,
+  pas l'état des polices : WebKit ne signale pas une police bloquée comme échouée. Contrôle payé le
+  28/09 : toutes polices bloquées, fr, en, de, 390 et 1 280 px, deux moteurs, plus aucun texte hors
+  de sa colonne ; polices retardées de 2,5 s, décalage de 0 à 0,016 au téléphone (la tête du
+  chapitre 01, au ras du premier écran, se rééquilibre à l'arrivée de Bebas), 0,0002 au plus à
+  1 280 px.
 - **Le film** (`revue-film.tsx`) rejoue les trois réponses réellement rendues par l'API le 26
   septembre 2026 ; il n'appelle pas l'API. Si le verdict ou les libellés de l'API changent, mettre
   à jour `home.film.*` et les clés de `home.demo.*` qu'il lit (`verdictOk`, `tab0` à `tab2`,
