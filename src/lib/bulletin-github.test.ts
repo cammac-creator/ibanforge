@@ -63,10 +63,13 @@ beforeEach(() => {
   resetMergedPullsCache();
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
+  // Sans le jeton facultatif du radar des forums, sauf dans le test qui le pose.
+  vi.stubEnv('GITHUB_TOKEN', '');
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('les PR fusionnées de la semaine', () => {
@@ -118,6 +121,14 @@ describe('les PR fusionnées de la semaine', () => {
     // Sans jeton, et sans adresse de personne dans aucun en-tête.
     expect(Object.keys(headers).map((h) => h.toLowerCase())).not.toContain('authorization');
     expect(JSON.stringify(headers)).not.toMatch(/@/);
+  });
+
+  it('envoie le jeton facultatif du radar des forums quand il existe', async () => {
+    vi.stubEnv('GITHUB_TOKEN', 'jeton-factice');
+    fetchMock.mockResolvedValueOnce(page([]));
+    await mergedPullsOfWeek(WEEK, NOW);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jeton-factice');
   });
 
   it('lit la page suivante tant que la liste n’est pas repassée avant le lundi', async () => {

@@ -114,6 +114,24 @@ function githubPage(): Response {
   return new Response(JSON.stringify([]), { status: 200 });
 }
 
+/** Pose la date du dernier échec des alertes (toutes, ou une seule). */
+function setAlertUpdatedAt(stamp: string, alertKey?: string): void {
+  const db = getStatsDB();
+  if (alertKey) {
+    db.prepare(`UPDATE kv_state SET updated_at = ? WHERE key = ?`).run(
+      stamp,
+      `ops:state:${alertKey}`,
+    );
+  } else {
+    db.prepare(`UPDATE kv_state SET updated_at = ? WHERE key LIKE 'ops:state:%'`).run(stamp);
+  }
+}
+
+/** Efface les états et les envois d'alerte des tests précédents du fichier. */
+function clearAlertStates(): void {
+  getStatsDB().exec(`DELETE FROM kv_state WHERE key LIKE 'ops:state:%' OR key LIKE 'ops:sent:%'`);
+}
+
 beforeAll(() => {
   process.env.TELEGRAM_BOT_TOKEN = 'jeton-factice';
   process.env.TELEGRAM_CHAT_ID = 'canal-factice';
@@ -195,7 +213,7 @@ describe('la semaine du bulletin', () => {
 describe('une base où rien n’a encore été écrit', () => {
   it('ne montre aucune alerte et aucun battement, sans rien inventer', async () => {
     const b = await getBulletin({ now: NOW });
-    expect(b.moved.alerts).toEqual({ state: 'read', open: [], failing: [] });
+    expect(b.moved.alerts).toEqual({ state: 'read', open: [], failing: [], stale: [] });
     expect(b.moved.heartbeats.state).toBe('read');
     if (b.moved.heartbeats.state !== 'read') return;
     expect(b.moved.heartbeats.items.every((i) => i.state === 'never')).toBe(true);
@@ -281,6 +299,8 @@ describe('ce qu’on cherche sans trouver : les BIC introuvables par pays', () =
     bicLookup({ iso: '2026-09-28T08:00:00Z', code: 'ALPHITMMXXX', prefix: external.prefix });
     bicLookup({ iso: '2026-09-29T08:00:00Z', code: 'ALPHITMMXXX', prefix: external.prefix });
     bicLookup({ iso: '2026-09-30T08:00:00Z', code: 'BETAITMM', prefix: external.prefix });
+    // La même banque en 11 caractères : une recherche de plus, pas un code de plus.
+    bicLookup({ iso: '2026-09-30T09:00:00Z', code: 'BETAITMMXXX', prefix: external.prefix });
     bicLookup({ iso: '2026-10-01T08:00:00Z', code: 'GAMMDEFF' });
     bicLookup({ iso: '2026-10-01T09:00:00Z', code: 'GAMMDEFF' });
     // Pays illisible dans la colonne : les 5e et 6e lettres du BIC le donnent.
@@ -308,10 +328,10 @@ describe('ce qu’on cherche sans trouver : les BIC introuvables par pays', () =
     expect(b.needs.missing_bics).toEqual({
       state: 'read',
       source: 'operations',
-      total_lookups: 10,
+      total_lookups: 11,
       total_countries: 7,
       top: [
-        { country: 'IT', lookups: 3, distinct_codes: 2 },
+        { country: 'IT', lookups: 4, distinct_codes: 2 },
         { country: 'DE', lookups: 2, distinct_codes: 1 },
         { country: 'BE', lookups: 1, distinct_codes: 1 },
         { country: 'ES', lookups: 1, distinct_codes: 1 },
@@ -418,33 +438,98 @@ describe('les signes de vie et les alertes, lus dans les clés d’ops-alert', (
     await opsFail('trial:sweep', 'lenteur inventée', 3);
     await opsFail('db:stats', 'refermée ensuite');
     await opsOk('db:stats');
+    // `updated_at` est écrit par l'horloge de SQLite, que les faux minuteurs ne
+    // déplacent pas : on le pose, pour que l'âge des alertes suive l'horloge du test.
+    setAlertUpdatedAt('2026-10-07 10:05:00');
     const later = NOW + 10 * 60_000;
     const b = await getBulletin({ now: later });
     if (b.moved.alerts.state !== 'read') throw new Error('alerts unread');
-    // `updated_at` is written by SQLite's own clock, which the fake timers do not move.
-    const sqliteStamp = expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     expect(b.moved.alerts.open).toEqual([
       {
-        key: 'heartbeat:weekly-reco-baseline',
+        name: 'heartbeat:weekly-reco-baseline',
         label: 'baseline reco-IA',
+        cases: 1,
         fails: 1,
         opened_at: '2026-10-07 10:05:00',
-        last_failure_at: sqliteStamp,
+        last_failure_at: '2026-10-07 10:05:00',
       },
       {
-        key: 'x402:facilitator',
+        name: 'x402:facilitator',
         label: null,
+        cases: 1,
         fails: 1,
         opened_at: '2026-10-07 10:00:00',
-        last_failure_at: sqliteStamp,
+        last_failure_at: '2026-10-07 10:05:00',
       },
     ]);
     expect(b.moved.alerts.failing).toEqual([
-      { key: 'trial:sweep', label: null, fails: 1, opened_at: null, last_failure_at: sqliteStamp },
+      {
+        name: 'trial:sweep',
+        label: null,
+        cases: 1,
+        fails: 1,
+        opened_at: null,
+        last_failure_at: '2026-10-07 10:05:00',
+      },
     ]);
+    expect(b.moved.alerts.stale).toEqual([]);
     if (b.moved.heartbeats.state !== 'read') throw new Error('heartbeats unread');
     const reco = b.moved.heartbeats.items.find((i) => i.name === 'weekly-reco-baseline');
     expect(reco?.alert_open).toBe(true);
+  });
+
+  it('range à part une alerte que rien n’a réécrite depuis plus de 7 jours', async () => {
+    clearAlertStates();
+    // Un mois avant l'horloge du test : l'alerte part, puis plus rien ne l'écrit.
+    vi.setSystemTime(Date.parse('2026-09-07T10:00:00Z'));
+    await opsFail('x402:facilitator', 'rejet inventé, jamais revenu');
+    await opsFail('trial:sweep', 'échec inventé, jamais revenu', 3);
+    setAlertUpdatedAt('2026-09-07 10:00:00');
+    vi.setSystemTime(NOW);
+    const b = await getBulletin({ now: NOW });
+    if (b.moved.alerts.state !== 'read') throw new Error('alerts unread');
+    expect(b.moved.alerts.open).toEqual([]);
+    expect(b.moved.alerts.failing).toEqual([]);
+    expect(b.moved.alerts.stale.map((a) => [a.name, a.last_failure_at])).toEqual([
+      ['trial:sweep', '2026-09-07 10:00:00'],
+      ['x402:facilitator', '2026-09-07 10:00:00'],
+    ]);
+    // Une panne qui dure réécrit son état à chaque passage : elle reste ouverte.
+    setAlertUpdatedAt('2026-10-06 10:00:00', 'x402:facilitator');
+    const again = await getBulletin({ now: NOW });
+    if (again.moved.alerts.state !== 'read') throw new Error('alerts unread');
+    expect(again.moved.alerts.open.map((a) => a.name)).toEqual(['x402:facilitator']);
+    expect(again.moved.alerts.stale.map((a) => a.name)).toEqual(['trial:sweep']);
+  });
+
+  it('compte les alertes d’achat sous leur nom, sans leur identifiant', async () => {
+    clearAlertStates();
+    await opsFail('x402:purchase-unconfirmed:achat-invente-1', 'issue inconnue');
+    vi.setSystemTime(NOW + 60_000);
+    await opsFail('x402:purchase-unconfirmed:achat-invente-2', 'issue inconnue');
+    await opsFail('audit:mismatch:hachage-invente', 'à examiner');
+    setAlertUpdatedAt('2026-10-07 10:01:00');
+    const b = await getBulletin({ now: NOW + 2 * 60_000 });
+    if (b.moved.alerts.state !== 'read') throw new Error('alerts unread');
+    expect(b.moved.alerts.open).toEqual([
+      {
+        name: 'audit:mismatch',
+        label: null,
+        cases: 1,
+        fails: 1,
+        opened_at: '2026-10-07 10:01:00',
+        last_failure_at: '2026-10-07 10:01:00',
+      },
+      {
+        name: 'x402:purchase-unconfirmed',
+        label: null,
+        cases: 2,
+        fails: 2,
+        opened_at: '2026-10-07 10:01:00',
+        last_failure_at: '2026-10-07 10:01:00',
+      },
+    ]);
+    expect(JSON.stringify(b)).not.toMatch(/achat-invente|hachage-invente/);
   });
 });
 
@@ -465,5 +550,33 @@ describe('un bloc illisible ne fait pas tomber les autres', () => {
   it('ne met aucune adresse, aucune clé ni aucun hachage dans la réponse', async () => {
     const text = JSON.stringify(await getBulletin({ now: NOW }));
     expect(text).not.toMatch(/example\.(net|com)|ifk_|bulletin-hash/);
+  });
+
+  it('dit « non lu » pour les signes de vie et les alertes quand kv_state est illisible', async () => {
+    const db = getStatsDB();
+    db.exec('ALTER TABLE kv_state RENAME TO kv_state_hors_champ');
+    db.exec('CREATE TABLE kv_state (key TEXT PRIMARY KEY)');
+    try {
+      const b = await getBulletin({ now: NOW });
+      expect(b.moved.heartbeats).toEqual({ state: 'unread', reason: 'read_failed' });
+      expect(b.moved.alerts).toEqual({ state: 'unread', reason: 'read_failed' });
+      expect(b.moved.sources.state).toBe('read');
+    } finally {
+      db.exec('DROP TABLE kv_state');
+      db.exec('ALTER TABLE kv_state_hors_champ RENAME TO kv_state');
+    }
+  });
+});
+
+describe('une lecture, jamais une écriture', () => {
+  it('ne change aucune ligne de la base', async () => {
+    await opsFail('trial:sweep', 'échec inventé');
+    const db = getStatsDB();
+    const changes = (): number =>
+      (db.prepare('SELECT total_changes() AS n').get() as { n: number }).n;
+    const before = changes();
+    await getBulletin({ now: NOW });
+    await getBulletin({ now: NOW, week: '2026-W39' });
+    expect(changes()).toBe(before);
   });
 });

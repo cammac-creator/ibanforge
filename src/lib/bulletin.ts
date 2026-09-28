@@ -70,6 +70,13 @@ export const SITE_HOME_DOOR_SINCE = '2026-09-27 08:49:01';
 /** How many countries the "searched without finding" block names. */
 export const MISSING_BICS_TOP = 5;
 
+/**
+ * An alert whose last failure is older than this is set apart (`stale`): nothing
+ * has written it since, and no success will close it. The slowest check that
+ * rewrites a lasting failure is the hourly probe, far inside a week.
+ */
+export const ALERT_STALE_DAYS = 7;
+
 // ─── The week ─────────────────────────────────────────────────────────────────
 
 const WEEK_LABEL = /^(\d{4})-W(\d{2})$/;
@@ -209,11 +216,18 @@ export interface BulletinHeartbeats {
 }
 
 export interface AlertView {
-  key: string;
+  /**
+   * The alert key without the identifier some keys carry (`x402:purchase-confirm:<id>`,
+   * `audit:<status>:<session hash>`): the two first segments. Keys of the same name
+   * in the same state are counted together (`cases`).
+   */
+  name: string;
   /** The heartbeat's label when the alert is a heartbeat's, null otherwise. */
   label: string | null;
+  /** How many keys of that name are in that state (one per purchase for the per-purchase keys). */
+  cases: number;
   fails: number;
-  /** When the alert message left, UTC; null when it has not left. */
+  /** When the alert message left, UTC; the latest of the name; null when none has left. */
   opened_at: string | null;
   /** The last write of the alert's state, which is its last failure seen, UTC. */
   last_failure_at: string | null;
@@ -225,6 +239,13 @@ export interface BulletinAlerts {
   open: AlertView[];
   /** Failing keys whose message has not left (below the threshold, storm gate, channel down). */
   failing: AlertView[];
+  /**
+   * Open or failing states whose last failure is older than `ALERT_STALE_DAYS`. A
+   * failure that lasts rewrites its state at every pass; an event that never came
+   * back (a payment rejection, a purchase since settled) leaves its key as it was,
+   * and no success ever closes it. Shown apart, never in the machinery's colour.
+   */
+  stale: AlertView[];
 }
 
 export interface SourceView {
@@ -361,16 +382,20 @@ export const BULLETIN_DEFINITIONS: Readonly<Record<string, string>> = {
     'date peut être le début de la surveillance, pas une exécution.',
   alertes:
     'L’état courant des alertes d’exploitation : ouvertes (le message est parti, aucun succès ' +
-    'ne les a refermées) ou en échec sans message parti. L’historique n’est pas encore gardé.',
+    'ne les a refermées) ou en échec sans message parti. Une alerte sans nouvel échec depuis ' +
+    'plus de 7 jours est rangée à part : rien ne la referme toute seule. Les alertes propres à ' +
+    'un achat ou à une session sont comptées sous leur nom, sans leur identifiant. ' +
+    'L’historique n’est pas encore gardé.',
   sources: 'L’âge des sources de l’annuaire BIC, celui que sert /health, en ce moment.',
   bic_introuvables:
     'Les recherches de BIC bien formés sans réponse dans l’annuaire, par pays (5e et 6e ' +
     'lettres du BIC). Lu dans le registre des opérations : le journal des requêtes ne garde ' +
     'pas le code cherché. Nos clés internes, de test ou de sonde sont écartées ; les appels ' +
-    'payés sans clé comptent.',
+    'payés sans clé comptent. Un BIC à 8 et à 11 caractères de la même banque compte pour un ' +
+    'seul code.',
   forums:
-    'Les fils entrés dans le radar des forums pendant la semaine, hors ajouts à la main, et ' +
-    'ceux qui n’ont pas encore été regardés.',
+    'Les fils entrés dans le radar des forums pendant la semaine, et ceux qui n’ont pas ' +
+    'encore été regardés. Un fil ajouté à la main sans source ne compte pas.',
 };
 
 // ─── The blocks ──────────────────────────────────────────────────────────────
@@ -595,27 +620,66 @@ function heartbeatLabel(alertKey: string): string | null {
   );
 }
 
-function readAlerts(kv: OpsKv): BulletinAlerts {
-  const open: AlertView[] = [];
-  const failing: AlertView[] = [];
+/** The alert key without its identifier, if it carries one: its two first segments. */
+export function alertName(key: string): string {
+  return key.split(':').slice(0, 2).join(':');
+}
+
+/** The later of two UTC stamps (`AAAA-MM-JJ HH:MM:SS` sorts as it reads). */
+function later(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a >= b ? a : b;
+}
+
+function readAlerts(kv: OpsKv, nowMs: number): BulletinAlerts {
+  const buckets = {
+    open: new Map<string, AlertView>(),
+    failing: new Map<string, AlertView>(),
+    stale: new Map<string, AlertView>(),
+  };
   for (const [key, s] of kv.states) {
     if (!s.firing && s.fails <= 0) continue;
     const sentMs = kv.sent.get(key);
     const updated = parseDbUtc(s.updated_at);
-    const item: AlertView = {
-      key,
-      label: heartbeatLabel(key),
-      fails: s.fails,
-      opened_at: s.firing && sentMs !== undefined ? sqliteUtc(sentMs) : null,
-      last_failure_at: updated !== null ? sqliteUtc(updated) : null,
-    };
-    (s.firing ? open : failing).push(item);
+    const openedAt = s.firing && sentMs !== undefined ? sqliteUtc(sentMs) : null;
+    const lastFailureAt = updated !== null ? sqliteUtc(updated) : null;
+    // A state without a readable date cannot be judged old: it stays where it is.
+    const bucket =
+      updated !== null && nowMs - updated > ALERT_STALE_DAYS * DAY_MS
+        ? buckets.stale
+        : s.firing
+          ? buckets.open
+          : buckets.failing;
+    const name = alertName(key);
+    const seen = bucket.get(name);
+    if (seen) {
+      seen.cases += 1;
+      seen.fails += s.fails;
+      seen.opened_at = later(seen.opened_at, openedAt);
+      seen.last_failure_at = later(seen.last_failure_at, lastFailureAt);
+    } else {
+      bucket.set(name, {
+        name,
+        label: heartbeatLabel(key),
+        cases: 1,
+        fails: s.fails,
+        opened_at: openedAt,
+        last_failure_at: lastFailureAt,
+      });
+    }
   }
   const newestFirst = (a: AlertView, b: AlertView): number =>
     (b.opened_at ?? b.last_failure_at ?? '').localeCompare(
       a.opened_at ?? a.last_failure_at ?? '',
-    ) || a.key.localeCompare(b.key);
-  return { state: 'read', open: open.sort(newestFirst), failing: failing.sort(newestFirst) };
+    ) || a.name.localeCompare(b.name);
+  const sorted = (m: Map<string, AlertView>): AlertView[] => [...m.values()].sort(newestFirst);
+  return {
+    state: 'read',
+    open: sorted(buckets.open),
+    failing: sorted(buckets.failing),
+    stale: sorted(buckets.stale),
+  };
 }
 
 function readSources(nowMs: number): BulletinSources {
@@ -707,7 +771,8 @@ function readMissingBics(week: SwissWeek): BulletinMissingBics {
       byCountry.set(country, entry);
     }
     entry.lookups += r.lookups;
-    if (r.code) entry.codes.add(r.code.toUpperCase());
+    // A BIC of 8 and of 11 characters of the same bank name one bank: counted once.
+    if (r.code) entry.codes.add(r.code.toUpperCase().slice(0, 8));
     total += r.lookups;
   }
   const ranked = [...byCountry.entries()]
@@ -763,9 +828,19 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
   const resolved = resolveBulletinWeek(opts.week, nowMs);
   const { week, weeksBack } = resolved;
 
+  // GitHub first: its wait (up to 12 s when the cache is cold) runs while the
+  // database is read below, instead of after it.
+  const mergedPulls = mergedPullsOfWeek(week, nowMs);
+
   // One read of `kv_state` feeds the signs of life and the alerts; when it fails,
   // both blocks say so rather than showing "no alert" and "never beat".
   const kv = guarded('kv_state', () => readOpsKv());
+  const numbers = guarded('numbers', () => readNumbers(resolved, nowMs));
+  const heartbeats = 'beats' in kv ? guarded('heartbeats', () => readHeartbeats(nowMs, kv)) : kv;
+  const alerts = 'beats' in kv ? guarded('alerts', () => readAlerts(kv, nowMs)) : kv;
+  const sources = guarded('sources', () => readSources(nowMs));
+  const missingBics = guarded('missing_bics', () => readMissingBics(week));
+  const forumThreads = guarded('forum_threads', () => readForumThreads(week));
 
   return {
     version: BULLETIN_VERSION,
@@ -783,17 +858,9 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
       next: weeksBack > 1 ? swissWeekShift(week, -1).label : null,
     },
     requested: { week: opts.week ?? null },
-    numbers: guarded('numbers', () => readNumbers(resolved, nowMs)),
-    moved: {
-      merged_pulls: await mergedPullsOfWeek(week, nowMs),
-      heartbeats: 'beats' in kv ? guarded('heartbeats', () => readHeartbeats(nowMs, kv)) : kv,
-      alerts: 'beats' in kv ? guarded('alerts', () => readAlerts(kv)) : kv,
-      sources: guarded('sources', () => readSources(nowMs)),
-    },
-    needs: {
-      missing_bics: guarded('missing_bics', () => readMissingBics(week)),
-      forum_threads: guarded('forum_threads', () => readForumThreads(week)),
-    },
+    numbers,
+    moved: { merged_pulls: await mergedPulls, heartbeats, alerts, sources },
+    needs: { missing_bics: missingBics, forum_threads: forumThreads },
     not_yet: BULLETIN_NOT_YET.map((b) => ({ ...b })),
     definitions: { ...BULLETIN_DEFINITIONS },
   };

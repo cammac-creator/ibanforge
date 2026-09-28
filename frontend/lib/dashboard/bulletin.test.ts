@@ -114,14 +114,16 @@ function sample(): BulletinPayload {
         state: 'read',
         open: [
           {
-            key: 'heartbeat:forum_radar_last_scan_at',
+            name: 'heartbeat:forum_radar_last_scan_at',
             label: 'radar forums',
+            cases: 1,
             fails: 2,
             opened_at: '2026-10-06 16:00:00',
             last_failure_at: '2026-10-07 09:00:00',
           },
         ],
         failing: [],
+        stale: [],
       },
       sources: {
         state: 'read',
@@ -182,7 +184,7 @@ describe('la garde de forme', () => {
     expect(readBulletin(sample())).not.toBeNull();
   });
 
-  it('refuse une autre version, un bloc manquant, un état inconnu ou un lien hors du dépôt', () => {
+  it('refuse une autre version, un bloc manquant ou un état inconnu', () => {
     const elsewhere = {
       state: 'read',
       source: 'github',
@@ -195,7 +197,6 @@ describe('la garde de forme', () => {
       ['pas de bloc des besoins', (p) => ({ ...p, needs: undefined })],
       ['un état inconnu', (p) => ({ ...p, moved: { ...p.moved, alerts: { state: 'peut-être' } } })],
       ['non lu sans raison', (p) => ({ ...p, numbers: { state: 'unread' } })],
-      ['un lien ailleurs', (p) => ({ ...p, moved: { ...p.moved, merged_pulls: elsewhere } })],
       ['une semaine mal écrite', (p) => ({ ...p, week: { ...p.week, label: '2026-40' } })],
     ];
     for (const [name, spoil] of cases) {
@@ -203,6 +204,25 @@ describe('la garde de forme', () => {
     }
     expect(readBulletin(null)).toBeNull();
     expect(readBulletin('{}')).toBeNull();
+
+    // Un lien hors du dépôt ne gâte que la liste des PR : le reste de la semaine s'affiche.
+    const spoiled = readBulletin({ ...sample(), moved: { ...sample().moved, merged_pulls: elsewhere } });
+    expect(spoiled?.moved.merged_pulls).toEqual({
+      state: 'unread',
+      source: 'github',
+      repo: 'cammac-creator/ibanforge',
+      fetched_at: '2026-10-07 09:58:00',
+      reason: 'foreign_link',
+    });
+    expect(spoiled?.moved.alerts.state).toBe('read');
+    expect(render(spoiled as BulletinPayload)).not.toContain('alpha.example.net');
+  });
+
+  it('accepte des alertes sans liste « à part », et la lit comme vide', () => {
+    const p = sample() as unknown as { moved: { alerts: Record<string, unknown> } };
+    delete p.moved.alerts.stale;
+    const read = readBulletin(p);
+    expect(read?.moved.alerts).toMatchObject({ state: 'read', stale: [] });
   });
 });
 
@@ -286,6 +306,32 @@ describe('les phrases, sans Intl', () => {
     expect(heartbeatsTone((calm().moved.heartbeats as BulletinHeartbeats))).toBe('ok');
   });
 
+  it('ne compte jamais une alerte rangée à part dans la pastille, mais la montre', () => {
+    const data = sample();
+    if (data.moved.heartbeats.state !== 'read' || data.moved.alerts.state !== 'read') {
+      throw new Error('sample');
+    }
+    data.moved.alerts.open = [];
+    data.moved.heartbeats.items = data.moved.heartbeats.items.map((i) => ({ ...i, state: 'on_time' }));
+    data.moved.heartbeats.on_time = data.moved.heartbeats.items.length;
+    data.moved.heartbeats.late = 0;
+    data.moved.alerts.stale = [
+      {
+        name: 'x402:purchase-unconfirmed',
+        label: null,
+        cases: 2,
+        fails: 2,
+        opened_at: '2026-09-01 08:00:00',
+        last_failure_at: '2026-09-01 08:00:00',
+      },
+    ];
+    expect(machineState(data)).toEqual({ tone: 'ok', text: 'Tout tourne en ce moment' });
+    const html = render(data);
+    expect(html).toContain('Aucune alerte ouverte en ce moment.');
+    expect(html).toContain('Sans nouvel échec depuis plus de 7 jours, jamais refermées');
+    expect(html).toContain('x402:purchase-unconfirmed (2 cas)');
+  });
+
   it('ne peint pas en vert une ligne de signes de vie incomplète', () => {
     const data = sample();
     if (data.moved.heartbeats.state !== 'read' || data.moved.alerts.state !== 'read') {
@@ -309,7 +355,7 @@ describe('le rendu de la vue', () => {
     expect(html).toContain('Semaine 40 · du 28 septembre au 4 octobre');
     expect(html).toMatch(/text-amber-300">1 clé prise depuis l’accueil</);
     expect(html).toContain('La porte « Documentation » a donné le plus de clés (3 sur 4).');
-    expect(html).toContain('BIC de Italie (IT) absents : 3 recherches');
+    expect(html).toContain('Italie (IT) : 3 recherches de BIC sans réponse');
     expect(html).toContain('2 fils trouvés par le radar des forums, dont 1 pas encore regardé.');
     expect(html).toContain('https://github.com/cammac-creator/ibanforge/pull/41');
     expect(html).toContain('À toi de décider');
@@ -340,7 +386,7 @@ describe('le rendu de la vue', () => {
     const data = sample();
     data.numbers = { state: 'unread', reason: 'read_failed' };
     const html = render(data);
-    expect(html).toContain('Les chiffres : non lu, la lecture a échoué côté API.');
+    expect(html).toContain('Les chiffres : non lus, la lecture a échoué côté API.');
     expect(html).not.toContain('nouvelles clés');
   });
 

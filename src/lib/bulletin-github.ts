@@ -22,8 +22,10 @@
  * page ceiling all answer `state: 'unread'`: never an empty list, which would say
  * "nothing went live" without having read it, and never a truncated one.
  *
- * No token is sent, and no address of anyone: the only identifying header is a
- * neutral `User-Agent`.
+ * The only token sent is the optional read-only `GITHUB_TOKEN` the forum radar
+ * already reads, when it exists (5 000 calls an hour instead of 60 shared); never
+ * the private overlay's token, and no address of anyone: the other identifying
+ * header is a neutral `User-Agent`.
  */
 import { sqliteUtc, type SwissWeek } from './swiss-week.js';
 
@@ -133,6 +135,12 @@ async function readFromGitHub(week: SwissWeek, at: number): Promise<MergedPullsR
           Accept: 'application/vnd.github+json',
           'User-Agent': 'ibanforge-bulletin',
           'X-GitHub-Api-Version': '2022-11-28',
+          // The optional read-only token the forum radar already reads: without it,
+          // the 60 calls an hour are shared with that radar and with every service
+          // behind the same Railway address.
+          ...(process.env.GITHUB_TOKEN
+            ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+            : {}),
         },
         signal: AbortSignal.timeout(Math.min(CALL_TIMEOUT_MS, left)),
       });

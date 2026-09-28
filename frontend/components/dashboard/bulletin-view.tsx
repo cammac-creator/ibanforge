@@ -17,6 +17,7 @@ import {
   swissDayTime,
   unreadText,
   weekSpan,
+  type AlertView,
   type BulletinPayload,
   type Tone,
 } from '@/lib/dashboard/bulletin';
@@ -56,7 +57,7 @@ function Line({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
     <li className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5 border-t border-[var(--ink-4)]/50 py-2.5 first:border-t-0 first:pt-0.5">
       <span aria-hidden className={`mt-1.5 h-2 w-2 rounded-full ${DOT[tone]}`} />
-      <div className="min-w-0 text-[13.5px] leading-relaxed text-[var(--fg-2)]">{children}</div>
+      <div className="min-w-0 text-[13.5px] leading-relaxed text-[var(--fg-2)] [overflow-wrap:anywhere]">{children}</div>
     </li>
   );
 }
@@ -73,10 +74,10 @@ function SectionTitle({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
-function Unread({ what, reason }: { what: string; reason: string }) {
+function Unread({ what, plural, reason }: { what: string; plural?: boolean; reason: string }) {
   return (
     <p className="mt-2 rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-1)]/40 px-3 py-2 text-[13px] text-[var(--fg-3)]">
-      {what} : non lu, {unreadText(reason)}. Rien n’est affirmé, aucun zéro n’est déduit.
+      {what} : {plural ? 'non lus' : 'non lu'}, {unreadText(reason)}. Rien n’est affirmé, aucun zéro n’est déduit.
     </p>
   );
 }
@@ -110,13 +111,19 @@ function countryLabel(code: string): string {
   return name === code ? code : `${name} (${code})`;
 }
 
+/** An alert by its label or its name, and how many keys it counts when more than one. */
+function alertTitle(a: AlertView): string {
+  const title = a.label ?? a.name;
+  return a.cases > 1 ? `${title} (${a.cases} cas)` : title;
+}
+
 function Numbers({ data, locale }: { data: BulletinPayload; locale: string }) {
   const n = data.numbers;
   return (
     <section className={overviewCard} aria-labelledby="bulletin-numbers">
       <SectionTitle id="bulletin-numbers">Les chiffres de la semaine</SectionTitle>
       {n.state !== 'read' ? (
-        <Unread what="Les chiffres" reason={n.reason} />
+        <Unread what="Les chiffres" plural reason={n.reason} />
       ) : (
         <>
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -268,15 +275,24 @@ function Moved({ data }: { data: BulletinPayload }) {
               ? 'Aucune alerte ouverte en ce moment.'
               : `${count(alerts.open.length, 'alerte ouverte', 'alertes ouvertes')} en ce moment.`}
             {alerts.open.map((a) => (
-              <Small key={a.key}>
-                {a.label ?? a.key}
+              <Small key={a.name}>
+                {alertTitle(a)}
                 {a.opened_at ? `, ouverte le ${swissDayTime(a.opened_at)}` : ''}
                 {a.last_failure_at ? `, dernier échec vu le ${swissDayTime(a.last_failure_at)}` : ''}
               </Small>
             ))}
             {alerts.failing.length > 0 && (
+              <Small>En échec sans message parti : {alerts.failing.map(alertTitle).join(', ')}.</Small>
+            )}
+            {alerts.stale.length > 0 && (
               <Small>
-                En échec sans message parti : {alerts.failing.map((a) => a.label ?? a.key).join(', ')}.
+                Sans nouvel échec depuis plus de 7 jours, jamais refermées :{' '}
+                {alerts.stale
+                  .map((a) =>
+                    a.last_failure_at ? `${alertTitle(a)}, dernier échec le ${swissDay(a.last_failure_at)}` : alertTitle(a),
+                  )
+                  .join(' ; ')}
+                .
               </Small>
             )}
           </Line>
@@ -331,7 +347,7 @@ function Needs({ data, locale }: { data: BulletinPayload; locale: string }) {
             <>
               {bics.top.map((c) => (
                 <Line key={c.country} tone="neutral">
-                  BIC de {countryLabel(c.country)} absents : {count(c.lookups, 'recherche', 'recherches')}
+                  {countryLabel(c.country)} : {count(c.lookups, 'recherche', 'recherches')} de BIC sans réponse
                   <Small>{count(c.distinct_codes, 'code différent', 'codes différents')}</Small>
                 </Line>
               ))}

@@ -83,8 +83,11 @@ export interface BulletinHeartbeats {
 }
 
 export interface AlertView {
-  key: string;
+  /** The alert key without the identifier some keys carry (a purchase, a session). */
+  name: string;
   label: string | null;
+  /** How many keys of that name are in that state. */
+  cases: number;
   fails: number;
   opened_at: string | null;
   last_failure_at: string | null;
@@ -94,6 +97,8 @@ export interface BulletinAlerts {
   state: 'read';
   open: AlertView[];
   failing: AlertView[];
+  /** No failure written for more than 7 days, and nothing closes them: shown apart, never in the pill. */
+  stale: AlertView[];
 }
 
 export interface SourceView {
@@ -193,15 +198,36 @@ export function readBulletin(payload: unknown): BulletinPayload | null {
   for (const block of ['missing_bics', 'forum_threads']) {
     if (!isBlock(needs[block])) return null;
   }
+  if (!Array.isArray(not_yet) || !isObj(definitions)) return null;
+  let blocks: Obj = moved;
+  // A link that leaves this repository spoils its own block only: the list of
+  // pull requests says "unread", every other block of the week still shows.
   const pulls = moved.merged_pulls as Obj;
   if (pulls.state === 'read') {
-    if (!Array.isArray(pulls.pulls)) return null;
-    for (const p of pulls.pulls) {
-      if (!isObj(p) || typeof p.url !== 'string' || !PULL_URL.test(p.url)) return null;
+    const clean =
+      Array.isArray(pulls.pulls) &&
+      pulls.pulls.every((p) => isObj(p) && typeof p.url === 'string' && PULL_URL.test(p.url));
+    if (!clean) {
+      blocks = {
+        ...blocks,
+        merged_pulls: {
+          state: 'unread',
+          source: 'github',
+          repo: typeof pulls.repo === 'string' ? pulls.repo : '',
+          fetched_at:
+            typeof pulls.fetched_at === 'string' ? pulls.fetched_at : payload.observed_at,
+          reason: 'foreign_link',
+        },
+      };
     }
   }
-  if (!Array.isArray(not_yet) || !isObj(definitions)) return null;
-  return payload as unknown as BulletinPayload;
+  const alerts = moved.alerts as Obj;
+  if (alerts.state === 'read') {
+    if (!Array.isArray(alerts.open) || !Array.isArray(alerts.failing)) return null;
+    if (alerts.stale !== undefined && !Array.isArray(alerts.stale)) return null;
+    blocks = { ...blocks, alerts: { ...alerts, stale: alerts.stale ?? [] } };
+  }
+  return { ...payload, moved: blocks } as unknown as BulletinPayload;
 }
 
 // ─── Numbers and words ───────────────────────────────────────────────────────
@@ -300,6 +326,7 @@ export function unreadText(reason: string): string {
   if (reason === 'network') return 'GitHub était injoignable';
   if (reason === 'too_many_pages') return 'la semaine est trop ancienne pour la lecture de GitHub';
   if (reason === 'invalid_body') return 'la réponse de GitHub était illisible';
+  if (reason === 'foreign_link') return 'une PR menait hors du dépôt';
   if (reason === 'http_403' || reason === 'http_429') {
     return 'GitHub a refusé la lecture (sans doute la limite de 60 appels par heure)';
   }
