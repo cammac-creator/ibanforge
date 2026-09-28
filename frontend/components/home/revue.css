@@ -805,8 +805,10 @@
   margin-top: calc(22px - 0.3625em);
 }
 
-/* 0.2em of air: at 1280px the accent of the É of « VÉRIFIER » touched the IBAN line above. */
-.rv-d__saisie {
+/* 0.2em of air: the accent of the É of « VÉRIFIER » touched the IBAN line above. Two
+   classes, because the verdict is a paragraph and `.rv-d p { margin: 0 }` outranks a single
+   class: a plain `.rv-d__saisie` margin never applied (measured 0px online on 28.09). */
+.rv-d .rv-d__saisie {
   margin-top: 0.2em;
 }
 
