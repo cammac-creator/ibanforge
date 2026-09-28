@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { isAdminAuthorized } from './api-keys.js';
 import { getLineageFunnel } from '../lib/lineage-funnel.js';
 import { adminDoors } from './admin-doors.js';
+import { adminBulletin } from './admin-bulletin.js';
 
 /**
  * Le tableau de cohortes de l'essai (lot M, contrat de mesure du 15/09/2026).
@@ -46,3 +47,4 @@ adminFunnel.get('/v1/admin/funnel', (c) => {
 // de la clé unique. `app.route('/', adminFunnel)` le recopie avec cette route,
 // et le test des routes d'administration le découvre comme les autres.
 adminFunnel.route('/', adminDoors);
+adminFunnel.route('/', adminBulletin);
