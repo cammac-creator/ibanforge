@@ -13,6 +13,7 @@ import {
   Mail,
   MessagesSquare,
   MoreHorizontal,
+  Newspaper,
   Search,
   Users,
   ContactRound,
@@ -31,6 +32,9 @@ const DESTINATIONS = [
   { key: 'forums', path: '/dashboard/forums', icon: MessagesSquare },
   // Le tableau des portes du lundi (plan d'audit, semaine 2).
   { key: 'doors', path: '/dashboard/portes', icon: DoorOpen },
+  // The Monday bulletin (28.09.2026). Its label is written here rather than in
+  // the message catalogues: the word is the same in the three languages.
+  { key: 'bulletin', path: '/dashboard/bulletin', icon: Newspaper, label: 'Bulletin' },
 ] as const;
 
 export function TopNav() {
@@ -55,7 +59,7 @@ export function TopNav() {
         }}
       >
         <item.icon size={19} strokeWidth={1.7} aria-hidden />
-        <span>{t(item.key)}</span>
+        <span>{'label' in item ? item.label : t(item.key)}</span>
         {!mobile && current.key === item.key && (
           <ChevronRight size={14} className={styles.navArrow} aria-hidden />
         )}
@@ -116,7 +120,10 @@ export function TopNav() {
             className={styles.mobileLink}
             aria-label={t('more')}
             data-active={
-              current.key === 'bots' || current.key === 'forums' || current.key === 'doors'
+              current.key === 'bots' ||
+              current.key === 'forums' ||
+              current.key === 'doors' ||
+              current.key === 'bulletin'
             }
           >
             <MoreHorizontal size={21} aria-hidden />
