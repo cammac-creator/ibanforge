@@ -751,6 +751,21 @@ EBA CLEARING (`docs/data-sources.md`, section of 16/09). And the backup is final
 compares what came back to what the file announces; a launchd job on the operator's Mac runs
 it on the first of each month and reports on Telegram.
 
+**Le bulletin du lundi, première étape (28 septembre 2026, PR 288).** `GET /v1/admin/bulletin?week=`
+(secret d'administration, jamais en cache) et la page `/dashboard/bulletin` relisent en lecture
+seule ce qui tourne déjà, bloc par bloc, chacun avec sa source : la ligne de la semaine du
+tableau des portes, les PR fusionnées dans `main` (API publique de GitHub, jeton facultatif
+`GITHUB_TOKEN` du radar des forums, cache d'une heure), les battements et les alertes
+d'`ops-alert`, l'âge des sources de l'annuaire, les BIC introuvables (lus dans `operations` :
+`request_log` ne garde pas le code cherché) et le radar des forums. Un bloc illisible dit
+« non lu », jamais zéro. **Piège :** plusieurs clés d'`ops-alert` ne se referment jamais, faute
+d'`opsOk` (`x402:facilitator`, `stripe:refund:<achat>` et les autres clés par achat ou par
+session) ; le bulletin range à part celles qu'aucun échec n'a réécrites depuis 7 jours
+(`ALERT_STALE_DAYS`), sinon sa pastille resterait rouge à vie, et il les affiche sans leur
+identifiant (`alertName`). Suite prévue dans la passation privée : historique des alertes
+(`ops_alert_log`), propositions et réponses, dépôt des veilles, puis le message Telegram du lundi
+réduit à une ligne et au lien.
+
 ---
 
 ## 10. Known debts, by weight
@@ -876,7 +891,17 @@ trois usages, publics et intégrations, couverture, prix, échéance suisse, avi
   (`--k`). Piège payé le 28/09 : sous mouvement réduit, `globals.css` donne à chaque propriété
   une transition de 0,01 ms ; un gabarit de mesure restylé après son premier calcul de style
   rendait encore son ancienne taille (17 px au lieu de 100), et les lignes sortaient six fois
-  trop grandes. Un gabarit se construit entièrement avant d'entrer dans la page.
+  trop grandes. Un gabarit se construit entièrement avant d'entrer dans la page. Et la mesure se
+  fait au repos : les lettres géantes montent en se resserrant (`--rvap`, d'une valeur négative
+  à zéro) ; une mesure tombée pendant ce resserrement (une police tardive déclenche
+  `loadingdone`) calait le verdict trop grand, 31 px hors de sa colonne à 1280 px (reproduit en
+  ligne le 28/09, PR 289). `probeLike` retire la part animée de l'espacement qu'il recopie.
+- **Une marge posée sur une seule classe ne s'applique pas aux paragraphes du film.** Le verdict,
+  le montant et la banque sont des `<p>`, et `.rv-d p { margin: 0 }` l'emporte sur `.rv-d__…` :
+  les rognages de `.rv-d__bebas` et de `.rv-d__banque` et l'ancienne marge de `.rv-d__saisie`
+  ne sont pas appliqués (marge du verdict mesurée à 0 px en ligne le 28/09). L'air sous l'IBAN
+  de « Vérifier la saisie » passe donc par deux classes, `.rv-d .rv-d__saisie` (PR 290). Pour
+  toucher la marge d'un de ces paragraphes, mesurer la valeur calculée en ligne avant et après.
 - **Une requête de conteneur ne style jamais son propre conteneur.** `.rv-couv` et `.rv-chap`
   sont des conteneurs (`rv`) : ce qui change avec la largeur (marges, gouttières, air au-dessus
   d'un chapitre) se règle sur les éléments intérieurs (`.rv-grille`, `.rv-ouv`, `.rv-couv__haut`).
