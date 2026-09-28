@@ -9,7 +9,8 @@
  *   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright \
  *     node frontend/scripts/measure-cover-fit.mjs [https://ibanforge.com/fr]
  *
- * It prints the new `em` arrays; paste them into the table.
+ * It prints each entry whole (lines, widths, and the text they were measured
+ * on); paste them into the table.
  */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -54,5 +55,12 @@ await (async () => {
   }, COVER_LINES);
   await browser.close();
   if (!result.loaded) throw new Error('Bebas Neue did not load on ' + url);
-  for (const [locale, em] of Object.entries(result.out)) console.log(`${locale}: em: [${em.join(', ')}]`);
+  for (const [locale, em] of Object.entries(result.out)) {
+    const lines = COVER_LINES[locale];
+    console.log(`  ${locale}: {`);
+    console.log(`    lines: [${lines.map((l) => JSON.stringify(l)).join(', ')}],`);
+    console.log(`    em: [${em.join(', ')}],`);
+    console.log(`    measured: ${JSON.stringify(lines.join('|'))},`);
+    console.log('  },');
+  }
 })();

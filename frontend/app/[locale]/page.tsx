@@ -149,7 +149,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
     }),
     sameInvoice: t("film.sameInvoice"),
     checkValid: t("film.checkValid"),
-    unallocated: t("film.unallocated"),
+    unallocated: t("demo.noBank"),
     stopLines: t.raw("film.stopLines") as string[],
     stopReason: t.rich("film.stopReason", { code }),
     typo: t("demo.tab2"),

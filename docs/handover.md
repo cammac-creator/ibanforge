@@ -840,9 +840,11 @@ trois usages, publics et intégrations, couverture, prix, échéance suisse, avi
   Bebas Neue, à 1 em, est mesurée une fois dans le navigateur (`frontend/scripts/measure-cover-fit.mjs`,
   avec `PLAYWRIGHT_MODULE`) et écrite dans `components/home/revue-cover-fit.ts` ; le CSS divise la
   colonne par ce nombre. Pas de mesure au chargement : le titre est ce que le premier écran
-  peint, il ne bouge pas. `revue-cover-fit.test.ts` compare les lignes au titre des messages dans
-  les trois langues : changer `hero.titleLead` ou `hero.titleAccent` sans remesurer fait échouer
-  la suite. Pendant le chargement de la police, une ligne ne passe jamais à la ligne : la police
+  peint, il ne bouge pas. La table garde aussi le texte sur lequel ses largeurs ont été mesurées
+  (`measured`, écrit par le script) ; `revue-cover-fit.test.ts` compare les lignes au titre des
+  messages ET à ce texte, dans les trois langues : un titre changé dans les messages, ou des
+  lignes retapées dans la table sans relancer le script, font échouer la suite. Le script imprime
+  les entrées entières, à coller telles quelles. Pendant le chargement de la police, une ligne ne passe jamais à la ligne : la police
   de secours est 30 % plus large, et un titre coupé puis refermé à l'arrivée de Bebas faisait
   sauter tout le premier écran (décalage de 0,14 à 0,23, police retardée de 2,5 s, le 28/09).
   Seulement une fois tous les chargements terminés, si une ligne dépasse encore sa colonne, la
@@ -850,8 +852,10 @@ trois usages, publics et intégrations, couverture, prix, échéance suisse, avi
   plutôt que de passer sous la colonne voisine.
 - **Le film** (`components/home/revue-film.tsx`) remplace la carte de démonstration. Il rejoue les
   trois réponses réellement rendues par l'API le 26 septembre 2026 ; il n'appelle pas l'API. Si
-  le verdict ou les libellés de l'API changent, mettre à jour `home.film.*`, les verdicts et
-  onglets de `home.demo.*` et la date de `home.demo.caption`. Tout son texte est rendu côté
+  le verdict ou les libellés de l'API changent, mettre à jour `home.film.*` (dont `stopLines` et
+  `fixLines`, les verdicts géants) et les clés de `home.demo.*` que le film lit encore :
+  `verdictOk`, `tab0` à `tab2`, `checksum`, `noteFix`, `noBank`, `pause`, `play` et `caption`
+  (la date). Les autres clés de `home.demo.*` ne servent plus (voir la passation privée). Tout son texte est rendu côté
   serveur, chiffres déjà formatés (règle 8). Le mouvement (`revue-film-engine.ts`, GSAP) n'est
   chargé qu'à l'approche du film : une boucle de 20,6 s (le montant, l'IBAN lu partie par
   partie, Commerzbank, le second IBAN, « Ne pas envoyer ») et, à la demande, la faute de frappe
@@ -872,7 +876,11 @@ trois usages, publics et intégrations, couverture, prix, échéance suisse, avi
 - **Mesure** : le film émet `forge:station` 0 (il démarre) et 3 (il atteint « Ne pas envoyer »),
   que `cta-beacon.tsx` envoie comme `film:start` et `film:end`. Ces deux lignes du tableau de bord
   étaient à zéro depuis le retrait de l'ancien film le 27/09 ; elles reprennent, avec ce sens-là.
-  Les trois exemples portent `film:example-a`, `-b` et `-c`.
+  Aller à la faute de frappe cale la boucle dans le noir de fin SANS événements (`seek(NOIR)`) :
+  avec eux, `film:end` partait sans que le verdict ait été vu. Les trois exemples portent
+  `film:example-a`, `-b` et `-c` ; le tableau de bord range tout `film:*` avec les lectures du
+  film, hors du total des clics (`frontend/lib/dashboard/audience-model.ts`), et c'est voulu : ce
+  ne sont pas des portes de conversion.
 - Les codes de registres et de clés nationales que la page écrit (`home.coverage.registerCodes`,
   `home.coverage.keyCodes`, la FAQ) sont comparés au code par `src/lib/positioning.test.ts`,
   dans les trois langues : changer la couverture sans changer ces textes fait échouer la suite.

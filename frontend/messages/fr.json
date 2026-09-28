@@ -113,7 +113,7 @@
       "request": "POST /v1/iban/validate",
       "caption": "Réponses enregistrées sur l’API en ligne le 26 septembre 2026.",
       "pause": "Mettre la démonstration en pause",
-      "play": "Relancer la démonstration",
+      "play": "Reprendre la démonstration",
       "scenarios": "Exemples",
       "ibanLabel": "IBAN",
       "format": "Format et chiffres de contrôle",
@@ -149,7 +149,6 @@
       "confirmedBy": "Code <code>37040044</code> confirmé par le registre de la Deutsche Bundesbank",
       "sameInvoice": "Même facture, autre IBAN",
       "checkValid": "Chiffres de contrôle valides",
-      "unallocated": "Attribué à aucune banque",
       "stopLines": [
         "Ne pas",
         "envoyer."
@@ -161,7 +160,7 @@
       ],
       "examples": "Trois exemples",
       "figure": "Fig. 1",
-      "figPayment": "Un paiement de {amount} à Société Alpha SA, facture 2026-0412."
+      "figPayment": "Exemple : un paiement de {amount} à Société Alpha SA, facture 2026-0412."
     },
     "problem": {
       "eyebrow": "Pourquoi le mod-97 ne suffit pas",

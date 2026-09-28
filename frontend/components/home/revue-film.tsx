@@ -139,6 +139,8 @@ export function RevueFilm({ copy }: { copy: RevueFilmCopy }) {
     let loading = false
     let near = false
     let shown = 1
+    // An example picked while the engine loads is played once it arrives.
+    let chosen = false
 
     // Before the fonts and the engine, the end of the story stays hidden (4 s at most).
     let waiting = 0
@@ -164,6 +166,11 @@ export function RevueFilm({ copy }: { copy: RevueFilmCopy }) {
     const fonts = filmFontsReady(el).then(() => {
       if (!disposed) fitFilm(el)
     })
+    // A font that arrives after the three seconds of filmFontsReady: measure again.
+    const refit = () => {
+      if (!disposed) fitFilm(el)
+    }
+    document.fonts?.addEventListener?.("loadingdone", refit)
 
     const start = () => {
       if (film || loading || disposed || reduce.matches || !near) return
@@ -181,6 +188,7 @@ export function RevueFilm({ copy }: { copy: RevueFilmCopy }) {
               shown = n
             },
           })
+          if (chosen) film.select(shown, false)
           stopWaiting()
         })
         .catch(() => {
@@ -217,13 +225,17 @@ export function RevueFilm({ copy }: { copy: RevueFilmCopy }) {
       const n = button ? buttons.indexOf(button) : -1
       if (n < 0) return
       if (film) film.select(n)
-      else still(n)
+      else {
+        chosen = true
+        still(n)
+      }
     }
     box.addEventListener("click", onClick)
 
     return () => {
       disposed = true
       window.clearTimeout(waiting)
+      document.fonts?.removeEventListener?.("loadingdone", refit)
       io.disconnect()
       reduce.removeEventListener("change", onReduce)
       box.removeEventListener("click", onClick)

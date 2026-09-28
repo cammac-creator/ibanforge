@@ -16,8 +16,9 @@ import { gsap } from "gsap"
  */
 
 export type FilmHandle = {
-  /** 0: the real bank, 1: the code no bank holds, 2: the typo. */
-  select(example: number): void
+  /** 0: the real bank, 1: the code no bank holds, 2: the typo. `scroll`
+   * (default true) brings the film back on screen when it is off it. */
+  select(example: number, scroll?: boolean): void
   destroy(): void
 }
 
@@ -347,7 +348,10 @@ export function createFilm(root: HTMLElement, options: FilmOptions): FilmHandle 
     mark(n)
     if (n === 2) {
       tl.pause()
-      tl.seek(NOIR, false)
+      // Without events: at 20.58 s the loop is past its verdict, and an
+      // onUpdate here would count « Do not send » as seen (film:end) when the
+      // visitor went straight to the typo.
+      tl.seek(NOIR)
       tlS.pause(0)
       if (pausedByUser) tlS.seek(CLE_S, false)
       fill(2, tlS.time() / DUREE_S)
@@ -373,7 +377,7 @@ export function createFilm(root: HTMLElement, options: FilmOptions): FilmHandle 
     clear()
     build()
     if (wasTypo) {
-      tl?.seek(NOIR, false)
+      tl?.seek(NOIR)
       tlS?.seek(typoTime, false)
     } else {
       tl?.seek(loopTime, false)

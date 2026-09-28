@@ -9,8 +9,9 @@ const messages = { en, fr, de } as const
 
 /*
  * The widths of the title lines are measured once, in the font, and written
- * down (revue-cover-fit.ts). A title rewritten in the messages without a new
- * measure would keep the old widths and overflow, or leave a gap, in its
+ * down with the text they were measured on (revue-cover-fit.ts). A title
+ * rewritten in the messages, or lines retyped in the table without a new
+ * measure, would keep the old widths and overflow, or leave a gap, in its
  * column: these tests turn red first.
  */
 describe("the lines of the home title", () => {
@@ -21,6 +22,14 @@ describe("the lines of the home title", () => {
   it.each(routing.locales)("say the title of the messages, word for word (%s)", (locale) => {
     const hero = messages[locale].home.hero
     expect(COVER_LINES[locale].lines.join(" ")).toBe(`${hero.titleLead} ${hero.titleAccent}`)
+  })
+
+  it.each(routing.locales)("were measured on the text they show (%s)", (locale) => {
+    const { lines, measured } = COVER_LINES[locale]
+    expect(
+      measured,
+      "the lines changed since their widths were measured: run frontend/scripts/measure-cover-fit.mjs and paste its output",
+    ).toBe(lines.join("|"))
   })
 
   it.each(routing.locales)("each carry a measured width (%s)", (locale) => {

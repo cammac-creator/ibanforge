@@ -113,7 +113,7 @@
       "request": "POST /v1/iban/validate",
       "caption": "Antworten der Live-API, aufgezeichnet am 26. September 2026.",
       "pause": "Demo anhalten",
-      "play": "Demo abspielen",
+      "play": "Demo fortsetzen",
       "scenarios": "Beispiele",
       "ibanLabel": "IBAN",
       "format": "Format und Prüfziffern",
@@ -149,19 +149,18 @@
       "confirmedBy": "Bankleitzahl <code>37040044</code>, bestätigt durch das Register der Deutschen Bundesbank",
       "sameInvoice": "Gleiche Rechnung, andere IBAN",
       "checkValid": "Prüfziffern gültig",
-      "unallocated": "An keine Bank vergeben",
       "stopLines": [
         "Nicht",
         "senden."
       ],
-      "stopReason": "Die Prüfung besteht. Doch die Bankleitzahl <code>12345678</code> ist an keine Bank vergeben.",
+      "stopReason": "Die Prüfziffern stimmen. Doch die Bankleitzahl <code>12345678</code> ist an keine Bank vergeben.",
       "fixLines": [
         "Eingabe",
         "prüfen."
       ],
       "examples": "Drei Beispiele",
       "figure": "Abb. 1",
-      "figPayment": "Eine Zahlung von {amount} an Société Alpha SA, Rechnung 2026-0412."
+      "figPayment": "Beispiel: eine Zahlung von {amount} an Société Alpha SA, Rechnung 2026-0412."
     },
     "problem": {
       "eyebrow": "Warum eine Prüfsumme nicht reicht",
