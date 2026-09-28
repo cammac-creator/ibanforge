@@ -337,6 +337,15 @@ purged repeatedly and comes back through test fixtures and through directories t
 sweep did not look at. A commit message cannot be rewritten once pushed, and the message
 that *repairs* such a leak must not describe what it removed.
 
+**Railway can miss a push.** It normally creates its deployment within a second of the push
+to `main`, without waiting for CI. On 28.09.2026 it created none for a merge whose checks were
+all green: the site went live, the API kept serving the previous commit, and `preuves`
+reported `redemarrage_observe: false` with an uptime older than the push. `railway.toml` has
+no watch patterns, so this is a lost trigger, not a filter. Do not `railway redeploy` (it
+replays the *previous* deployment: the uptime resets, the code stays old) and do not
+`railway up` (a second delivery circuit from the local tree). Push the next commit to `main`
+(a handover note is enough), then rerun `preuves` on that commit.
+
 ---
 
 ## 9. Work in flight
