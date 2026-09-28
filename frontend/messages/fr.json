@@ -113,7 +113,7 @@
       "request": "POST /v1/iban/validate",
       "caption": "Réponses enregistrées sur l’API en ligne le 26 septembre 2026.",
       "pause": "Mettre la démonstration en pause",
-      "play": "Relancer la démonstration",
+      "play": "Reprendre la démonstration",
       "scenarios": "Exemples",
       "ibanLabel": "IBAN",
       "format": "Format et chiffres de contrôle",
@@ -136,10 +136,38 @@
       "noteStop": "Le contrôle mod-97 passe, mais aucune banque ne détient ce code. L’API répond : « Do not send ».",
       "noteFix": "Un caractère est faux. Redemandez l’IBAN."
     },
+    "film": {
+      "aria": "Démonstration IBANforge. Un paiement de 12 480,00 € à Société Alpha SA, facture 2026-0412. IBANforge lit l’IBAN DE89 3704 0044 0532 0130 00 : pays, chiffres de contrôle, code banque, compte. Le code 37040044 est confirmé par le registre de la Deutsche Bundesbank : Commerzbank, BIC COBADEFFXXX. Même facture, autre IBAN : DE65 1234 5678 0532 0130 00. Les chiffres de contrôle sont valides, mais le code banque 12345678 n’est attribué à aucune banque. Verdict : ne pas envoyer. Troisième exemple, une faute de frappe : DE89 3704 0044 0532 0130 01. Les chiffres de contrôle ne correspondent pas. Verdict : vérifier la saisie. Un caractère est faux. Redemandez l’IBAN.",
+      "ready": "Paiement prêt à partir",
+      "amount": "12 480,00 €",
+      "payee": "à <b>Société Alpha SA</b> · facture <code>2026-0412</code>",
+      "reading": "Lecture de l’IBAN",
+      "partCountry": "Pays",
+      "partCheck": "Contrôle",
+      "partBank": "Code banque",
+      "partAccount": "Compte",
+      "confirmedBy": "Code <code>37040044</code> confirmé par le registre de la Deutsche Bundesbank",
+      "sameInvoice": "Même facture, autre IBAN",
+      "checkValid": "Chiffres de contrôle valides",
+      "stopLines": [
+        "Ne pas",
+        "envoyer."
+      ],
+      "stopReason": "Le contrôle passe. Mais le code banque <code>12345678</code> n’est attribué à aucune banque.",
+      "fixLines": [
+        "Vérifier",
+        "la saisie."
+      ],
+      "examples": "Trois exemples",
+      "figure": "Fig. 1",
+      "figPayment": "Exemple : un paiement de {amount} à Société Alpha SA, facture 2026-0412."
+    },
     "problem": {
       "eyebrow": "Pourquoi le mod-97 ne suffit pas",
       "title": "Un IBAN valide peut ne mener à aucune banque",
-      "lead": "Le contrôle mod-97 prouve seulement que les chiffres s’additionnent. Un IBAN peut le réussir avec un code banque qu’aucune banque ne détient, ou retiré après une fusion. IBANforge lit chaque partie de l’IBAN et dit quels contrôles il a pu faire.",
+      "lead": "Le contrôle mod-97 prouve seulement que les chiffres s’additionnent. Un IBAN peut le réussir avec un code banque qu’aucune banque ne détient, ou retiré après une fusion.",
+      "readTitle": "Le même IBAN, lu partie par partie",
+      "readLead": "IBANforge lit chaque partie de l’IBAN et dit quels contrôles il a pu faire.",
       "anatomyCaption": "Le même IBAN, lu partie par partie.",
       "country": "Pays",
       "countryWhat": "Longueur et structure, {countries} pays",

@@ -3,4 +3,5 @@ export const lensAssets = {
   fichiers: '/brand/lens/fichiers-788d42b72538.webp',
   integrations: '/brand/lens/integrations-7c33bbdabbd1.webp',
   poster: '/brand/lens/poster-01f557202d94.webp',
+  finale: '/brand/lens/finale-27218f7967cc.webp',
 } as const;

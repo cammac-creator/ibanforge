@@ -113,7 +113,7 @@
       "request": "POST /v1/iban/validate",
       "caption": "Answers recorded from the live API on 26 September 2026.",
       "pause": "Pause the demo",
-      "play": "Play the demo",
+      "play": "Resume the demo",
       "scenarios": "Examples",
       "ibanLabel": "IBAN",
       "format": "Format and check digits",
@@ -136,10 +136,38 @@
       "noteStop": "The mod-97 check passes, yet no bank holds this code. The API answers: do not send.",
       "noteFix": "One character is wrong. Ask for the IBAN again."
     },
+    "film": {
+      "aria": "IBANforge demo. A payment of €12,480.00 to Société Alpha SA, invoice 2026-0412. IBANforge reads the IBAN DE89 3704 0044 0532 0130 00: country, check digits, bank code, account. Code 37040044 is confirmed by the Deutsche Bundesbank register: Commerzbank, BIC COBADEFFXXX. Same invoice, another IBAN: DE65 1234 5678 0532 0130 00. The check digits are valid, but bank code 12345678 is allocated to no bank. Verdict: do not send. Third example, a typo: DE89 3704 0044 0532 0130 01. The check digits do not match. Verdict: check the entry. One character is wrong. Ask for the IBAN again.",
+      "ready": "Payment ready to go",
+      "amount": "€12,480.00",
+      "payee": "to <b>Société Alpha SA</b> · invoice <code>2026-0412</code>",
+      "reading": "Reading the IBAN",
+      "partCountry": "Country",
+      "partCheck": "Check digits",
+      "partBank": "Bank code",
+      "partAccount": "Account",
+      "confirmedBy": "Code <code>37040044</code> confirmed by the Deutsche Bundesbank register",
+      "sameInvoice": "Same invoice, another IBAN",
+      "checkValid": "Check digits valid",
+      "stopLines": [
+        "Do not",
+        "send."
+      ],
+      "stopReason": "The check passes. But bank code <code>12345678</code> is allocated to no bank.",
+      "fixLines": [
+        "Check",
+        "the entry."
+      ],
+      "examples": "Three examples",
+      "figure": "Fig. 1",
+      "figPayment": "Example: a payment of {amount} to Société Alpha SA, invoice 2026-0412."
+    },
     "problem": {
       "eyebrow": "Why a checksum is not enough",
       "title": "A valid IBAN can still lead to no bank",
-      "lead": "The mod-97 check only proves that the digits add up. An IBAN can pass it with a bank code no bank holds, or one retired after a merger. IBANforge reads each part of the IBAN and tells you which checks it could make.",
+      "lead": "The mod-97 check only proves that the digits add up. An IBAN can pass it with a bank code no bank holds, or one retired after a merger.",
+      "readTitle": "The same IBAN, read part by part",
+      "readLead": "IBANforge reads each part of the IBAN and tells you which checks it could make.",
       "anatomyCaption": "The same IBAN, read part by part.",
       "country": "Country",
       "countryWhat": "Length and structure, {countries} countries",

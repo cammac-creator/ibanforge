@@ -1,4 +1,5 @@
 import Image from "next/image"
+import type { CSSProperties, ReactNode } from "react"
 import Link from "next/link"
 import { hasLocale } from "next-intl"
 import { getTranslations, setRequestLocale } from "next-intl/server"
@@ -12,11 +13,14 @@ import { Reveal } from "@/components/reveal"
 import { LensHero, type LensCopy } from "@/components/lens/lens-hero"
 import { LensGallery, type GalleryCopy } from "@/components/lens/lens-gallery"
 import { lensAssets } from "@/components/lens/assets"
-import { VerdictDemo, type DemoScenario } from "@/components/home/verdict-demo"
+import { RevueFilm, type RevueFilmCopy } from "@/components/home/revue-film"
+import { CoverTitleGuard, RevueMotion } from "@/components/home/revue-motion"
+import { CoverTitle, MaskedWords } from "@/components/home/revue-parts"
 import { IbanAnatomy } from "@/components/home/iban-anatomy"
 import { IntegrationRibbon } from "@/components/home/integration-ribbon"
 import "@/components/lens/lens.css"
 import "@/components/home/home.css"
+import "@/components/home/revue.css"
 import { getLandingStats, P50_PROCESSING_MS, SUPPORTED_COUNTRIES } from "@/lib/landing-stats"
 import { alternatesFor, urlFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
@@ -37,11 +41,15 @@ import catalogue from "@/data/onboarding.json"
  * What changed: the title says what the product is and for whom, in the words
  * of positioning.ts ("checks the bank behind an IBAN before you pay"); the
  * first screen shows three answers the API really gave, the second the one
- * thing a checksum cannot say. The lens chosen on 16/09 stays, with its input
- * on the left and its answer on the right, one section lower, where the 3D no
- * longer delays the first paint (components/lens/lens-hero.tsx). The type and
- * colours are the site's own: Bebas Neue titles as on the other landings,
- * Inter, JetBrains Mono, amber.
+ * thing a checksum cannot say. The type and colours are the site's own: Bebas
+ * Neue titles as on the other landings, Inter, JetBrains Mono, amber.
+ *
+ * Since 28/09/2026 the page turns into a magazine, « La revue », the layout
+ * Claude-Alain chose among two mockups of direction D, chapter by chapter
+ * (components/home/revue.css). Step 1: the cover, whose title fills its column
+ * line by line; the lens chosen on 16/09, back under the cover with its input
+ * on the left and its answer on the right; and chapter 01, where the film of
+ * the three answers replaces the demo card (components/home/revue-film.tsx).
  */
 
 // Title and description are generated per-locale by app/[locale]/layout.tsx —
@@ -82,14 +90,14 @@ const SHEETS_FORMULA: Record<string, string> = {
   de: "=IBAN_PRUEFUNG(A2)",
 }
 
-/* The three answers of the fold, recorded from the live API on 26/09/2026.
-   Values that are data, not language: the IBAN, the codes, the bank. */
-const DEMO_BANK = "Commerzbank · COBADEFFXXX"
 const FIRST_CALL = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
   -H "Content-Type: application/json" \\
   -d '{"iban":"DE89370400440532013000"}'`
 
 const FAQ_COUNT = 5
+
+/* The two doors of the cover: the magazine's square buttons, full width of their column. */
+const COVER_BUTTON = "h-[52px] w-full rounded-[2px] px-[22px] text-base font-semibold"
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -119,44 +127,42 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       )
     : null
 
-  const scenarios: DemoScenario[] = [
-    {
-      tab: t("demo.tab0"),
-      iban: "DE89 3704 0044 0532 0130 00",
-      tone: "ok",
-      rows: [
-        { label: t("demo.format"), value: t("demo.valid"), state: "ok" },
-        { label: t("demo.register"), value: t("demo.confirmed", { code: "37040044" }), detail: t("demo.registerName"), state: "ok" },
-        { label: t("demo.bank"), value: DEMO_BANK, state: "ok" },
-      ],
-      verdict: t("demo.verdictOk"),
-      note: t("demo.noteOk"),
+  /* The film tells the three answers the live API gave on 26/09/2026: its
+     figures and codes are data (the IBANs, 37040044, COBADEFFXXX), its words
+     come from the messages, every one formatted here, on the server. */
+  const code = (chunks: ReactNode) => <code className="rv-d__code">{chunks}</code>
+  const film: RevueFilmCopy = {
+    aria: t("film.aria"),
+    ready: t("film.ready"),
+    amount: t("film.amount"),
+    payee: t.rich("film.payee", { b: (chunks) => <b>{chunks}</b>, code }),
+    reading: t("film.reading"),
+    parts: {
+      country: t("film.partCountry"),
+      check: t("film.partCheck"),
+      bank: t("film.partBank"),
+      account: t("film.partAccount"),
     },
-    {
-      tab: t("demo.tab1"),
-      iban: "DE65 1234 5678 0532 0130 00",
-      tone: "stop",
-      rows: [
-        { label: t("demo.format"), value: t("demo.valid"), state: "ok" },
-        { label: t("demo.register"), value: t("demo.notAllocated", { code: "12345678" }), detail: t("demo.registerName"), state: "bad" },
-        { label: t("demo.bank"), value: t("demo.noBank"), state: "off" },
-      ],
-      verdict: t("demo.verdictStop"),
-      note: t("demo.noteStop"),
-    },
-    {
-      tab: t("demo.tab2"),
-      iban: "DE89 3704 0044 0532 0130 01",
-      tone: "fix",
-      rows: [
-        { label: t("demo.format"), value: t("demo.checksum"), state: "bad" },
-        { label: t("demo.register"), value: t("demo.skipped"), state: "off" },
-        { label: t("demo.bank"), value: t("demo.skipped"), state: "off" },
-      ],
-      verdict: t("demo.verdictFix"),
-      note: t("demo.noteFix"),
-    },
-  ]
+    confirmed: t("demo.verdictOk"),
+    confirmedBy: t.rich("film.confirmedBy", {
+      code: (chunks) => <code className="rv-d__code rv-d__code--ambre">{chunks}</code>,
+    }),
+    sameInvoice: t("film.sameInvoice"),
+    checkValid: t("film.checkValid"),
+    unallocated: t("demo.noBank"),
+    stopLines: t.raw("film.stopLines") as string[],
+    stopReason: t.rich("film.stopReason", { code }),
+    typo: t("demo.tab2"),
+    checksum: t("demo.checksum"),
+    fixLines: t.raw("film.fixLines") as string[],
+    fixNote: t("demo.noteFix"),
+    pause: t("demo.pause"),
+    play: t("demo.play"),
+    examples: t("film.examples"),
+    tabs: [t("demo.tab0"), t("demo.tab1"), t("demo.tab2")],
+    figure: t("film.figure"),
+    caption: `${t("film.figPayment", { amount: t("film.amount") })} ${t("demo.caption")}`,
+  }
 
   const anatomy = [
     { code: "DE", label: t("problem.country"), what: t("problem.countryWhat", { countries }) },
@@ -187,63 +193,93 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   })
 
   return (
-    <div className="home" data-landing="home-v2">
-      {/* ── 1. The fold: what it is, for whom, and three real answers ──────── */}
-      <section className="home-hero" aria-labelledby="home-title">
-        <div className="home-aurora" aria-hidden="true" />
-        <div className="home-wrap home-hero-grid">
-          <div>
-            <span className="home-eyebrow">
+    <div className="home" data-landing="home-v3">
+      {/* ── 1. The cover: what it is, for whom, the two doors ───────────────
+          Its title never moves: it is what the first screen paints. */}
+      <section className="rv-couv" aria-labelledby="home-title">
+        <div className="rv-grille rv-couv__haut">
+          <div className="rv-couv__titre">
+            <p className="rv-kicker rv-surtitre">
               {/* Green only when a measure stands behind it: at least 99 % of
                   answers without a 5xx over 30 days, read at each hourly render. */}
               {liveStats.successRate30 !== null && liveStats.successRate30 >= 99 && <StatusDot kind="live" />}
               {t("hero.eyebrow")}
-            </span>
-            <h1 id="home-title">
-              {t("hero.titleLead")} <em>{t("hero.titleAccent")}</em>
-            </h1>
-            <p className="home-hero-desc">{t("hero.description", { countries })}</p>
-            <div className="home-hero-cta">
-              <GetKeyButton variant="amber" className="px-7" evt="cta:key-hero">
+            </p>
+            <CoverTitle locale={locale} id="home-title" />
+          </div>
+          <div className="rv-couv__action">
+            <p className="rv-couv__chapeau">{t("hero.description", { countries })}</p>
+            <div className="rv-boutons">
+              <GetKeyButton variant="amber" className={COVER_BUTTON} evt="cta:key-hero">
                 {t("hero.ctaKey")}
               </GetKeyButton>
-              <Button size="lg" variant="outline" className="px-7" nativeButton={false} render={<a href="#try" data-evt="cta:try-hero" />}>
+              <Button
+                size="lg"
+                variant="outline"
+                className={COVER_BUTTON}
+                nativeButton={false}
+                render={<a href="#try" data-evt="cta:try-hero" />}
+              >
                 {t("hero.ctaTry")}
               </Button>
             </div>
-            <ul className="home-hero-note">
+            <ul className="rv-reass">
               <li>{t("hero.note1")}</li>
               <li>{t("hero.note2")}</li>
               <li>{t("hero.note3")}</li>
             </ul>
-            <Link href={localePath(locale, "/audit")} className="home-hero-alt" data-evt="cta:journey-audit">
+            <Link href={localePath(locale, "/audit")} className="rv-alt" data-evt="cta:journey-audit">
               {t("hero.alt")} →
             </Link>
           </div>
-          <VerdictDemo
-            scenarios={scenarios}
-            copy={{
-              aria: t("demo.aria"),
-              request: t("demo.request"),
-              caption: t("demo.caption"),
-              pause: t("demo.pause"),
-              play: t("demo.play"),
-              scenarios: t("demo.scenarios"),
-              ibanLabel: t("demo.ibanLabel"),
-            }}
-          />
         </div>
       </section>
 
-      {/* ── 2. Why a checksum is not enough: the anatomy of an IBAN ────────── */}
-      <section className="home-section" aria-labelledby="home-problem">
+      {/* ── 2. The lens chosen on 16/09, under the cover, as one block: its
+          input on the left, its answer on the right, a real call to the API.
+          Its 3D starts by itself only on a capable device (lens-hero.tsx). */}
+      <div className="rv-lentille" id="try">
+        <div className="lens-frame">
+          <LensHero
+            copy={t.raw("lens.hero") as LensCopy}
+            verdictCopy={verdict.raw("verdict") as LensCopy}
+            playgroundHref={localePath(locale, "/playground")}
+            auditHref={localePath(locale, "/audit")}
+          />
+        </div>
+      </div>
+
+      {/* ── 3. Chapter 01: why a checksum is not enough, told by the film ─── */}
+      <section className="rv-chap" aria-labelledby="home-problem">
+        <header className="rv-grille rv-ouv">
+          <i className="rv-filet" data-rv="filet" aria-hidden="true" />
+          <p className="rv-num" aria-hidden="true" data-rv="num">
+            01
+          </p>
+          <div className="rv-ouv__texte">
+            <p className="rv-kicker" data-rv="texte">
+              {t("problem.eyebrow")}
+            </p>
+            <h2 className="rv-h2 rv-bebas" id="home-problem" data-rv="titre" style={{ "--rv-d": ".08s" } as CSSProperties}>
+              <MaskedWords text={t("problem.title")} />
+            </h2>
+            <p className="rv-chapeau" data-rv="texte" style={{ "--rv-d": ".35s" } as CSSProperties}>
+              {t("problem.lead")}
+            </p>
+          </div>
+        </header>
+        <RevueFilm copy={film} />
+      </section>
+
+      {/* ── 4. The same IBAN, read part by part: the anatomy of an IBAN ───── */}
+      <section className="home-section" aria-labelledby="home-reading">
         <div className="home-wrap">
           <div className="home-center">
-            <span className="home-eyebrow">{t("problem.eyebrow")}</span>
-            <h2 className="home-h2" id="home-problem">
-              {t("problem.title")}
+            <span className="home-eyebrow">{t("film.reading")}</span>
+            <h2 className="home-h2" id="home-reading">
+              {t("problem.readTitle")}
             </h2>
-            <p className="home-lead">{t("problem.lead")}</p>
+            <p className="home-lead">{t("problem.readLead")}</p>
           </div>
           <IbanAnatomy parts={anatomy} caption={t("problem.anatomyCaption")} />
           <div className="home-versus">
@@ -267,23 +303,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── 3. Three ways to use it: the brand illustrations of 16/09 ─────── */}
+      {/* ── 5. Three ways to use it: the brand illustrations of 16/09 ─────── */}
       <LensGallery copy={t.raw("lens.gallery") as GalleryCopy} locale={locale} />
 
-      {/* ── 4. Try it: the lens, input on the left, answer on the right ───── */}
-      {/* A plain block: the lens renders its own labelled section inside. */}
-      <div className="home-section home-try" id="try">
-        <div className="lens-frame">
-          <LensHero
-            copy={t.raw("lens.hero") as LensCopy}
-            verdictCopy={verdict.raw("verdict") as LensCopy}
-            playgroundHref={localePath(locale, "/playground")}
-            auditHref={localePath(locale, "/audit")}
-          />
-        </div>
-      </div>
-
-      {/* ── 5. For whom: developers, finance teams, AI agents ──────────────── */}
+      {/* ── 6. For whom: developers, finance teams, AI agents ──────────────── */}
       <section className="home-section" aria-labelledby="home-audiences">
         <div className="home-wrap">
           <div className="home-center">
@@ -354,7 +377,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── 6. Coverage and trust: figures read from the code, facts ───────── */}
+      {/* ── 7. Coverage and trust: figures read from the code, facts ───────── */}
       <section className="home-section" aria-labelledby="home-coverage">
         <div className="home-wrap">
           <div className="home-center">
@@ -410,7 +433,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── 7. Pricing: the plans people pay first, x402 in one line ───────── */}
+      {/* ── 8. Pricing: the plans people pay first, x402 in one line ───────── */}
       <section className="home-section" aria-labelledby="home-pricing">
         <div className="home-wrap">
           <div className="home-center">
@@ -459,7 +482,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── 8. The dated trigger: mid-November 2026, never a countdown ────────
+      {/* ── 9. The dated trigger: mid-November 2026, never a countdown ────────
           Claude-Alain's decision of 22/09/2026: the month in the title, SIX's
           day in the body, no day count (a precision claim about what happens
           to a payment on that day is not ours to make). */}
@@ -486,7 +509,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── 9. Independently reviewed ──────────────────────────────────────── */}
+      {/* ── 10. Independently reviewed ──────────────────────────────────────── */}
       <section className="home-section" aria-labelledby="home-reviewed">
         <div className="home-wrap home-quote">
           <span className="home-eyebrow" id="home-reviewed">
@@ -506,7 +529,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── 10. Questions ─────────────────────────────────────────────────── */}
+      {/* ── 11. Questions ─────────────────────────────────────────────────── */}
       <section className="home-section" aria-labelledby="home-faq">
         <div className="home-wrap">
           <div className="home-center">
@@ -525,7 +548,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── 11. The last call, over a discreet reflection of the lens (his
+      {/* ── 12. The last call, over a discreet reflection of the lens (his
           request of 16/09 for this block) ─────────────────────────────── */}
       <section className="home-final" aria-labelledby="home-final">
         <div className="home-final-bg" aria-hidden="true">
@@ -589,6 +612,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           }),
         }}
       />
+      <CoverTitleGuard />
+      <RevueMotion />
     </div>
   )
 }

@@ -113,7 +113,7 @@
       "request": "POST /v1/iban/validate",
       "caption": "Antworten der Live-API, aufgezeichnet am 26. September 2026.",
       "pause": "Demo anhalten",
-      "play": "Demo abspielen",
+      "play": "Demo fortsetzen",
       "scenarios": "Beispiele",
       "ibanLabel": "IBAN",
       "format": "Format und Prüfziffern",
@@ -136,10 +136,38 @@
       "noteStop": "Die Mod-97-Prüfung besteht, doch keine Bank führt diesen Code. Die API antwortet: „Do not send“.",
       "noteFix": "Ein Zeichen ist falsch. Fragen Sie die IBAN erneut an."
     },
+    "film": {
+      "aria": "IBANforge-Demo. Eine Zahlung von 12.480,00 € an Société Alpha SA, Rechnung 2026-0412. IBANforge liest die IBAN DE89 3704 0044 0532 0130 00: Land, Prüfziffern, Bankleitzahl, Konto. Die Bankleitzahl 37040044 ist im Register der Deutschen Bundesbank bestätigt: Commerzbank, BIC COBADEFFXXX. Gleiche Rechnung, andere IBAN: DE65 1234 5678 0532 0130 00. Die Prüfziffern sind gültig, doch die Bankleitzahl 12345678 ist an keine Bank vergeben. Urteil: nicht senden. Drittes Beispiel, ein Tippfehler: DE89 3704 0044 0532 0130 01. Die Prüfziffern stimmen nicht. Urteil: Eingabe prüfen. Ein Zeichen ist falsch. Fragen Sie die IBAN erneut an.",
+      "ready": "Zahlung bereit zur Freigabe",
+      "amount": "12.480,00 €",
+      "payee": "an <b>Société Alpha SA</b> · Rechnung <code>2026-0412</code>",
+      "reading": "Die IBAN wird gelesen",
+      "partCountry": "Land",
+      "partCheck": "Prüfziffern",
+      "partBank": "Bankleitzahl",
+      "partAccount": "Konto",
+      "confirmedBy": "Bankleitzahl <code>37040044</code>, bestätigt durch das Register der Deutschen Bundesbank",
+      "sameInvoice": "Gleiche Rechnung, andere IBAN",
+      "checkValid": "Prüfziffern gültig",
+      "stopLines": [
+        "Nicht",
+        "senden."
+      ],
+      "stopReason": "Die Prüfziffern stimmen. Doch die Bankleitzahl <code>12345678</code> ist an keine Bank vergeben.",
+      "fixLines": [
+        "Eingabe",
+        "prüfen."
+      ],
+      "examples": "Drei Beispiele",
+      "figure": "Abb. 1",
+      "figPayment": "Beispiel: eine Zahlung von {amount} an Société Alpha SA, Rechnung 2026-0412."
+    },
     "problem": {
       "eyebrow": "Warum eine Prüfsumme nicht reicht",
       "title": "Eine gültige IBAN kann zu keiner Bank führen",
-      "lead": "Die Mod-97-Prüfung beweist nur, dass die Ziffern aufgehen. Eine IBAN kann sie bestehen, mit einer Bankleitzahl, die keine Bank führt, oder einer, die nach einer Fusion aufgehoben wurde. IBANforge liest jeden Teil der IBAN und sagt, welche Prüfungen es machen konnte.",
+      "lead": "Die Mod-97-Prüfung beweist nur, dass die Ziffern aufgehen. Eine IBAN kann sie bestehen, mit einer Bankleitzahl, die keine Bank führt, oder einer, die nach einer Fusion aufgehoben wurde.",
+      "readTitle": "Dieselbe IBAN, Teil für Teil gelesen",
+      "readLead": "IBANforge liest jeden Teil der IBAN und sagt, welche Prüfungen es machen konnte.",
       "anatomyCaption": "Dieselbe IBAN, Teil für Teil gelesen.",
       "country": "Land",
       "countryWhat": "Länge und Aufbau, {countries} Länder",
