@@ -4,6 +4,7 @@ import Image from "next/image"
 import { Fragment, useEffect, useRef, type ReactNode } from "react"
 import { lensAssets } from "@/components/lens/assets"
 import { filmFontsReady, fitFilm } from "./revue-fit"
+import { afterLoadIdle } from "./revue-idle"
 import type { FilmHandle } from "./revue-film-engine"
 
 /*
@@ -15,7 +16,8 @@ import type { FilmHandle } from "./revue-film-engine"
  * Everything the film says is rendered here, on the server, in the page's
  * language; every figure arrives formatted (no Intl in a client component).
  * The motion (revue-film-engine.ts, with GSAP) loads only when the film comes
- * near the screen. Without it, under reduced motion, or while the fonts are on
+ * near the screen, once the page has loaded and the browser is idle
+ * (revue-idle.ts). Without it, under reduced motion, or while the fonts are on
  * their way, each example shows its still frame, complete and readable.
  */
 
@@ -175,7 +177,9 @@ export function RevueFilm({ copy }: { copy: RevueFilmCopy }) {
     const start = () => {
       if (film || loading || disposed || reduce.matches || !near) return
       loading = true
-      Promise.all([fonts, import("./revue-film-engine")])
+      // After the page has loaded and the browser is idle: the film follows the
+      // cover, and its engine must not come before the first screen's paint.
+      Promise.all([fonts, afterLoadIdle().then(() => import("./revue-film-engine"))])
         .then(([, engine]) => {
           loading = false
           if (disposed || film || reduce.matches) return
