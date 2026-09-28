@@ -805,8 +805,9 @@
   margin-top: calc(22px - 0.3625em);
 }
 
+/* 0.2em of air: at 1280px the accent of the É of « VÉRIFIER » touched the IBAN line above. */
 .rv-d__saisie {
-  margin-top: 0.07em;
+  margin-top: 0.2em;
 }
 
 .rv-d__saisie .rv-d__vl {

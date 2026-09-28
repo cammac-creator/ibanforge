@@ -42,7 +42,12 @@ export function filmFontsReady(root: HTMLElement): Promise<void> {
 function probeLike(host: HTMLElement, from: Element): HTMLSpanElement {
   const cs = getComputedStyle(from)
   const size = parseFloat(cs.fontSize) || 16
-  const spacing = cs.letterSpacing === "normal" ? 0 : parseFloat(cs.letterSpacing) / size
+  // The giant lines tighten from a negative spacing to none as they rise
+  // (`--rvap`, revue.css). Measured mid-tightening, when a late font fires
+  // `loadingdone`, a line would be fitted too large and leave its column once it
+  // settles: the animated part is taken out, the line is measured at rest.
+  const approach = parseFloat(cs.getPropertyValue("--rvap")) || 0
+  const spacing = (cs.letterSpacing === "normal" ? 0 : parseFloat(cs.letterSpacing) / size) - approach
   const probe = document.createElement("span")
   probe.setAttribute("aria-hidden", "true")
   probe.style.cssText =
