@@ -151,6 +151,12 @@
 
 .rv-mot > span {
   display: inline-block;
+  white-space: nowrap;
+}
+
+/* The font never came: a group of words may break (revue-motion.tsx). */
+.rv-souple .rv-mot > span {
+  white-space: normal;
 }
 
 .rv-corps {
@@ -1101,6 +1107,7 @@
 
 .rv-anat__val {
   margin: 0;
+  overflow-wrap: anywhere;
   font-family: var(--rv-mono);
   font-size: 19px;
   line-height: 1.2;
@@ -1111,6 +1118,7 @@
 
 .rv-anat__lab {
   margin-top: 8px;
+  overflow-wrap: anywhere;
 }
 
 .rv-anat__txt {
@@ -1601,6 +1609,17 @@
 
 .rv-f--anime .rv-f__fixe {
   visibility: hidden;
+}
+
+/* The font never came: the fallback figures are wider, the counter shrinks. */
+.rv-f__nombre.rv-souple {
+  font-size: min(calc(100cqi * 0.995 / (var(--em) * 1.25)), 210px);
+}
+
+/* The font never came: a link parts from its arrow, a path of the API breaks. */
+.rv-page .rv-nw.rv-souple,
+.rv-page code.rv-souple {
+  white-space: normal;
 }
 
 .rv-f__unite {
@@ -2318,6 +2337,10 @@
   line-height: 0.92;
   letter-spacing: 0;
   white-space: nowrap;
+}
+
+.rv-fin__titre.rv-souple {
+  white-space: normal;
 }
 
 .rv-br-o {

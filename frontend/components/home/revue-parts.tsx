@@ -25,7 +25,9 @@ export function CoverTitle({ locale, id }: { locale: string; id: string }) {
  * A title set word by word, each word in its own mask, so it can rise from an
  * invisible line (revue.css). The text stays one heading for readers and
  * robots: the words are separated by real spaces. Words joined by a no-break
- * space in the messages rise together and never part at a line end.
+ * space in the messages rise together in one mask and never part at a line
+ * end; the mask keeps real spaces between them, so that the group may break
+ * after all when the font never came (`.rv-souple`, revue-motion.tsx).
  */
 export function MaskedWords({ text }: { text: string }) {
   return (
@@ -34,7 +36,7 @@ export function MaskedWords({ text }: { text: string }) {
         <Fragment key={i}>
           {i > 0 && " "}
           <span className="rv-mot">
-            <span>{word}</span>
+            <span>{word.replace(/\u00a0/g, " ")}</span>
           </span>
         </Fragment>
       ))}
