@@ -101,6 +101,27 @@ jobs:
         if: steps.diff_it.outputs.changed == 'true'
         run: npm run pages:export -- IT
 
+      # Homme mort : dire à l'API que ce cron est passé (src/lib/ops-alert.ts,
+      # HEARTBEATS). Avant le commit : sa
+      # poussée redémarre l'API sur Railway, et un battement envoyé après tomberait
+      # sur une API en plein redémarrage (même raison que refresh-compliance.yml).
+      - name: Heartbeat
+        if: success()
+        env:
+          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+        run: |
+          if [ -z "$HEARTBEAT_TOKEN" ]; then
+            echo "::warning::HEARTBEAT_TOKEN absent, battement non envoyé"
+            exit 0
+          fi
+          for i in 1 2 3; do
+            curl -fsS -X POST \
+              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
+              "https://api.ibanforge.com/internal/heartbeat/refresh-it-register" && exit 0
+            sleep 20
+          done
+          echo "::warning::battement KO après 3 tentatives (non bloquant)"
+
       - name: Commit the Italian registers
         if: steps.diff_it.outputs.changed == 'true'
         run: |

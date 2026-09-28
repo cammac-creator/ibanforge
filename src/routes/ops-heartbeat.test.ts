@@ -19,6 +19,8 @@
  *    `checkHeartbeats()` ne regarde jamais : un homme mort qu'on croit posé et
  *    qui ne surveille rien est pire que pas d'homme mort.
  */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { buildApp } from '../app.js';
 import { HEARTBEATS } from '../lib/ops-alert.js';
@@ -97,12 +99,15 @@ describe('POST /internal/heartbeat/:name — la porte', () => {
 });
 
 describe('POST /internal/heartbeat/:name — le battement', () => {
-  it('accepte les quatre crons déclarés et écrit leur battement dans kv_state', async () => {
+  it('accepte les sept crons déclarés et écrit leur battement dans kv_state', async () => {
     // La liste blanche EST le contrat : les noms des étapes YAML doivent lui
     // correspondre exactement, sinon le cron pointe dans le vide.
     expect(HEARTBEATS.map((h) => h.name).sort()).toEqual([
+      'indexnow',
       'refresh-bic',
       'refresh-compliance',
+      'refresh-cz-register',
+      'refresh-it-register',
       'weekly-reco-baseline',
       'weekly-veille',
     ]);
@@ -130,5 +135,22 @@ describe('POST /internal/heartbeat/:name — le battement', () => {
     expect(byName.get('refresh-compliance')).toBeGreaterThanOrEqual(8 * DAY);
     // Mensuel : il faut couvrir un mois long ET un runner en retard.
     expect(byName.get('refresh-bic')).toBeGreaterThanOrEqual(32 * DAY);
+    // Hebdomadaires ajoutés le 28/09/2026.
+    expect(byName.get('refresh-it-register')).toBeGreaterThanOrEqual(8 * DAY);
+    expect(byName.get('indexnow')).toBeGreaterThanOrEqual(8 * DAY);
+    // Quotidien : au moins deux jours de marge.
+    expect(byName.get('refresh-cz-register')).toBeGreaterThanOrEqual(2 * DAY);
+  });
+
+  it('chaque workflow qui pointe est dans la liste, et chaque nom de la liste a son workflow', () => {
+    // Un nom tapé de travers dans un YAML pointe dans le vide (404) ; un nom de
+    // la liste sans workflow finit en fausse alerte. Les deux se lisent ici.
+    const dir = join(process.cwd(), '.github', 'workflows');
+    const pointent = new Set<string>();
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
+      const text = readFileSync(join(dir, file), 'utf8');
+      for (const m of text.matchAll(/internal\/heartbeat\/([a-z0-9-]+)/g)) pointent.add(m[1]);
+    }
+    expect([...pointent].sort()).toEqual(HEARTBEATS.map((h) => h.name).sort());
   });
 });
