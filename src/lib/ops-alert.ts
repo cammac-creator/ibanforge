@@ -265,6 +265,17 @@ export const HEARTBEATS: ReadonlyArray<{ name: string; maxAgeMs: number; label: 
   { name: 'refresh-compliance', maxAgeMs: 9 * 24 * 3600_000, label: 'refresh compliance' },
   // Mensuel : 35 j couvre un mois long + un runner en retard.
   { name: 'refresh-bic', maxAgeMs: 35 * 24 * 3600_000, label: 'refresh BIC + clearing CH' },
+  // Les trois crons qui tournaient sans filet (inventaire des veilles du
+  // 28/09/2026) : le relevé italien n'avait jamais tourné, et rien ne l'aurait
+  // dit s'il ne tournait jamais. Quotidien : trois jours couvrent un runner
+  // GitHub en retard sans laisser un registre muet une semaine.
+  { name: 'refresh-cz-register', maxAgeMs: 3 * 24 * 3600_000, label: 'registre tchèque (ČNB)' },
+  {
+    name: 'refresh-it-register',
+    maxAgeMs: 9 * 24 * 3600_000,
+    label: 'registres italiens (Banca d’Italia)',
+  },
+  { name: 'indexnow', maxAgeMs: 9 * 24 * 3600_000, label: 'envoi IndexNow du plan du site' },
 ];
 
 /**
