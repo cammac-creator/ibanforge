@@ -62,6 +62,7 @@
     "share": {
       "tagline": "ibanforge.com · REST API · SDKs · MCP"
     },
+    "contents": "In this issue",
     "integrations": {
       "heading": "In your language, your ERP, your spreadsheet",
       "sub": "Every package below exists and installs today. What is not published yet says so.",
@@ -166,7 +167,7 @@
       "eyebrow": "Why a checksum is not enough",
       "title": "A valid IBAN can still lead to no bank",
       "lead": "The mod-97 check only proves that the digits add up. An IBAN can pass it with a bank code no bank holds, or one retired after a merger.",
-      "readTitle": "The same IBAN, read part by part",
+      "readTitle": "The same IBAN, read part by part",
       "readLead": "IBANforge reads each part of the IBAN and tells you which checks it could make.",
       "anatomyCaption": "The same IBAN, read part by part.",
       "country": "Country",
@@ -185,7 +186,7 @@
       ],
       "addsTitle": "What IBANforge adds",
       "addsItems": [
-        "Whether the bank code is allocated, from the national register (DE, AT, BE, SK, CZ, BG, CH, LI)",
+        "Whether the bank code is allocated, from the national register",
         "The bank and its BIC, each with its source, and its date when known",
         "The national check key inside the account number, where one is published and checked",
         "SEPA reachability and Verification of Payee readiness, from the EPC registers where they list the bank",
@@ -201,11 +202,19 @@
       "devText": "One REST call, or an SDK in TypeScript, Python, Java or .NET. The answer is JSON, with a documented next step.",
       "devLink": "Read the docs",
       "financeTitle": "Finance teams",
-      "financeText": "Upload a CSV or Excel file of suppliers: the free preview counts what needs fixing and shows the first flagged lines, IBANs masked. The annotated workbook, every line in full, costs $149 for up to 5,000 rows, or $349 for up to 20,000 rows.",
+      "financeText": "Upload a CSV or Excel file of suppliers: the free preview counts what needs fixing and shows the first flagged lines, IBANs masked.",
       "financeLink": "Check a supplier file",
       "agentsTitle": "AI agents",
       "agentsText": "An MCP server for Claude, Cursor and any MCP client, installed in one line. Agents without an account can pay per call in USDC with x402.",
       "agentsLink": "Connect an agent"
+    },
+    "ways": {
+      "sheet": "Spreadsheet",
+      "agent": "AI agent",
+      "unit": "rows",
+      "flagged": "Flagged rows",
+      "figure": "Fig. 2",
+      "caption": "Illustration: IBANs masked, except the flagged rows."
     },
     "coverage": {
       "eyebrow": "Coverage and trust",
@@ -225,13 +234,13 @@
       "fact2Text": "The bank behind the IBAN is screened against the OFAC, EU, UN lists (BIC8). The account holder never is.",
       "fact3Title": "Honest about its limits",
       "fact3Text": "It does not check who holds the account: that name check belongs to the payee’s bank, through Verification of Payee.",
-      "sources": "Sources: the national registers, SIX BankMaster, GLEIF, EBA STEP2, NBP and Bank of England (List of Banks, 2026-09), re-read at least every month, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the BIC directory. Each answer names its source.",
+      "sources": "Sources: the national registers, SIX BankMaster, GLEIF, EBA STEP2, NBP and Bank of England (List of Banks, 2026-09), re-read at least every month, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the BIC directory.",
       "sourcesDated": "Last refresh {date}.",
       "sourcesLink": "Every source and its licence"
     },
     "pricing": {
       "eyebrow": "Pricing",
-      "title": "Start free, pay as you grow",
+      "title": "Start free, pay as you grow",
       "lead": "Every paid plan works on the key you already hold.",
       "tryName": "Try",
       "tryPrice": "Free",
@@ -250,6 +259,9 @@
       "packsPrice": "from $4",
       "packsText": "Prepaid credits on the same key, by card or in USDC.",
       "packsCta": "See the packs",
+      "auditName": "File audit",
+      "auditText": "The free preview counts what needs fixing. The annotated workbook, every line in full:",
+      "auditUpTo": "up to {rows} rows",
       "agents": "AI agents can also pay per call in USDC with x402: no account, no checkout.",
       "link": "See all prices"
     },
@@ -275,7 +287,7 @@
     "lens": {
       "hero": {
         "eyebrow": "Try it now",
-        "title": "Run a real check, no sign-up",
+        "title": "Run a real check, no sign-up",
         "promise": "Type an IBAN or pick an example: the lens sends it to the live API and splits the answer into format, bank and BIC.",
         "auditLink": "Check a supplier file",
         "observe": "See the lens in 3D",
@@ -325,7 +337,7 @@
       },
       "gallery": {
         "eyebrow": "Three ways to use it",
-        "title": "One IBAN, a whole file, or inside your tools",
+        "title": "One IBAN, a whole file, or inside your tools",
         "intro": "Check a single IBAN in a form, audit every line of a supplier file before a payment run, or call the API from your own software and agents.",
         "items": [
           {
@@ -371,6 +383,7 @@
       "heading": "Mid-November 2026: Switzerland stops processing unstructured addresses",
       "band": "From mid-November 2026, payment orders under the Swiss Payment Standards must meet the address requirements when an address is used; SIX publishes 14 November. POST /v1/address/check says for free whether an address passes.",
       "cta": "Read the rules, rail by rail",
+      "check": "POST /v1/address/check says for free whether an address passes.",
       "window": "mid-November 2026",
       "windowLabel": "structured addresses · Swiss timetable"
     }

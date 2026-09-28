@@ -1,19 +1,21 @@
-/* The home as a magazine (« La revue », chosen by Claude-Alain on 28/09/2026,
-   direction D of 27/09/2026): a cover whose title fills its column line by
-   line, numbered chapters opened by a hairline, a hollow numeral and a Bebas
-   title, and the film of the first chapter. One giant thing at a time; amber
-   only on the detail being read, green and red only at the verdicts.
+/* The home as a short magazine, « la revue resserrée » (mockup M3, approved by
+   Claude-Alain on 28/09/2026): a cover whose title fills its column line by
+   line, seven numbered chapters that share one head (hairline, hollow numeral,
+   kicker, title, standfirst) and one figure each, then an ending. No lens any
+   more: the only reflection left is the floor of light of the film. One giant
+   thing at a time; amber only on the detail being read, green and red only at
+   the verdicts.
 
-   Step 1 of the move: the cover and the first chapter. The chapters below keep
-   home.css until their turn. Every block here is its own query container
-   (`rv`), never the page root: size containment on `.home` would make it the
-   containing block of anything fixed inside the page. A container query never
-   styles its own container, so what changes with the width (margins, gutters,
-   the air above a chapter) is set on the elements inside. */
+   Every section is its own query container (`rv`), never the page root: size
+   containment on the root would make it the containing block of anything fixed
+   inside the page. A container query never styles its own container, so what
+   changes with the width (margins, gutters, the air above a chapter) is set on
+   the elements inside. */
 
-.rv-couv,
-.rv-chap {
+.rv-page {
   --rv-fond: var(--ink-0);
+  --rv-s1: #0f0f13;
+  --rv-s2: #16161b;
   --rv-b1: #27272a;
   --rv-b2: #3f3f46;
   --rv-t1: #f5f3ef;
@@ -28,21 +30,48 @@
   --rv-sans: var(--font-sans);
   --rv-mono: var(--font-mono);
   --rv-courbe: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --rv-marge: 24px;
-  --rv-gout: 16px;
-  --rv-air: 104px;
   position: relative;
-  container: rv / inline-size;
   background: var(--rv-fond);
   color: var(--rv-t2);
   font-family: var(--rv-sans);
   font-size: 17px;
   line-height: 1.6;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.rv-couv,
+.rv-chap,
+.rv-fin {
+  position: relative;
+  container: rv / inline-size;
+}
+
+.rv-page a:focus-visible,
+.rv-page button:focus-visible,
+.rv-page summary:focus-visible {
+  outline: 2px solid var(--rv-ambre);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.rv-page code {
+  font-family: var(--rv-mono);
+  font-size: 0.9em;
+  font-variant-ligatures: none;
 }
 
 /* The grid of the magazine: 4 columns on a phone, 12 from 760 px, capped on
    very wide screens so a title line never outgrows a reading distance. */
 .rv-grille {
+  --rv-marge: 24px;
+  --rv-gout: 16px;
+  /* The air above a chapter. Tighter than the mockup's 40 px on a phone and
+     its 7cqi on a computer: the site's own footer is taller than the mockup's,
+     and the page keeps under 9,500 px on a phone, 7,000 px on a computer
+     (French, reduced motion, header and footer included). */
+  --rv-air: 36px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: var(--rv-gout);
@@ -56,6 +85,8 @@
   min-width: 0;
 }
 
+/* ── Small capitals, captions, titles ───────────────────────────────────── */
+
 .rv-kicker {
   margin: 0;
   font-family: var(--rv-mono);
@@ -67,18 +98,20 @@
   color: var(--rv-t4);
 }
 
-.rv-bebas {
-  font-family: var(--rv-bebas);
-  font-weight: 400;
-  color: var(--rv-t1);
-  text-transform: uppercase;
+.rv-point {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rv-ambre);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.55);
 }
 
 .rv-figcap {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 0;
+  gap: 2px 14px;
+  margin: 14px 0 0;
   font-family: var(--rv-mono);
   font-size: 12.5px;
   line-height: 1.6;
@@ -92,12 +125,80 @@
   white-space: nowrap;
 }
 
-/* ── The cover ─────────────────────────────────────────────────────────── */
+.rv-bebas {
+  font-family: var(--rv-bebas);
+  font-weight: 400;
+  color: var(--rv-t1);
+  text-transform: uppercase;
+}
+
+/* Bebas Neue has no narrow no-break space: the thin spaces of figures become
+   fixed spacers. */
+.rv-fine {
+  display: inline-block;
+  width: 0.08em;
+  height: 0;
+}
+
+.rv-fine--devise {
+  width: 0.14em;
+}
+
+.rv-mot {
+  display: inline-block;
+  clip-path: inset(-0.34em -0.12em -0.1em -0.12em);
+}
+
+.rv-mot > span {
+  display: inline-block;
+}
+
+.rv-corps {
+  max-width: 36em;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--rv-t2);
+  text-wrap: pretty;
+}
+
+.rv-corps code {
+  color: var(--rv-t1);
+}
+
+/* ── Links ──────────────────────────────────────────────────────────────── */
+
+.rv-lien {
+  font-weight: 500;
+  color: var(--rv-t1);
+  text-decoration: underline;
+  text-decoration-color: var(--rv-b2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+  transition: text-decoration-color 0.3s var(--rv-courbe);
+}
+
+.rv-lien:hover {
+  text-decoration-color: var(--rv-t1);
+}
+
+/* The arrow after a link: never alone on a line, never underlined. */
+.rv-fl {
+  display: inline-block;
+  margin-left: 0.35em;
+  color: var(--rv-t4);
+  text-decoration: none;
+}
+
+.rv-nw {
+  white-space: nowrap;
+}
+
+/* ── The cover ──────────────────────────────────────────────────────────── */
 
 .rv-couv__haut {
   align-items: end;
   padding-top: 26px;
-  padding-bottom: 40px;
 }
 
 .rv-couv__titre {
@@ -174,7 +275,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 22px;
-  margin: 20px 0 0;
+  margin: 18px 0 0;
   padding: 0;
   list-style: none;
   font-size: 14.5px;
@@ -199,9 +300,10 @@
 
 .rv-alt {
   display: inline-block;
-  margin-top: 18px;
+  margin-top: 16px;
   font-size: 15px;
   font-weight: 500;
+  line-height: 1.5;
   color: var(--rv-t1);
   text-decoration: underline;
   text-decoration-color: var(--rv-b2);
@@ -214,114 +316,132 @@
   text-decoration-color: var(--rv-t1);
 }
 
-/* The real lens under the cover, as one block: its own layout places the
-   input and the answers along its rays. */
-.rv-lentille {
-  position: relative;
-  scroll-margin-top: 72px;
-  padding: 8px 0 0;
-  background: var(--ink-0);
+/* The contents of the issue: on a large screen only (a phone reaches the
+   chapters by scrolling, and the site menu is the header's). */
+.rv-sommaire {
+  display: none;
 }
 
-/* ── A chapter: hairline, hollow numeral, kicker, title, standfirst ─────── */
+.rv-sommaire__liste {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── A chapter: hairline, hollow numeral, kicker, title, standfirst, one figure ── */
 
 .rv-chap {
-  scroll-margin-top: 72px;
+  scroll-margin-top: 64px;
 }
 
-.rv-ouv {
+.rv-chap__corps {
+  align-items: start;
   padding-top: var(--rv-air);
 }
 
 .rv-filet {
   display: block;
   height: 1px;
-  background: var(--rv-b1);
+  background: var(--rv-b2);
   transform-origin: 0 50%;
 }
 
+.rv-tete {
+  padding-top: 16px;
+}
+
+.rv-tete__rang {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 0;
+}
+
 .rv-num {
-  margin: 26px 0 0;
+  display: block;
+  flex: none;
   font-family: var(--rv-bebas);
-  font-size: 84px;
+  font-size: 52px;
   line-height: 0.8;
   letter-spacing: 0.01em;
   color: transparent;
-  -webkit-text-stroke: 1px rgba(161, 161, 170, 0.55);
+  -webkit-text-stroke: 1px rgba(161, 161, 170, 0.6);
   user-select: none;
 }
 
-.rv-ouv__texte {
-  margin-top: 20px;
+.rv-tete__rang .rv-kicker {
+  padding-bottom: 1px;
+  text-wrap: balance;
 }
 
 .rv-h2 {
-  margin: calc(18px - 0.07em) 0 -0.17em;
-  font-size: clamp(42px, 12.3cqi, 56px);
+  margin: calc(14px - 0.07em) 0 -0.17em;
+  font-size: clamp(36px, 10.8cqi, 48px);
   line-height: 0.95;
   letter-spacing: 0.004em;
   text-wrap: balance;
 }
 
-.rv-mot {
-  display: inline-block;
-  clip-path: inset(-0.34em -0.12em -0.1em -0.12em);
-}
-
-.rv-mot > span {
-  display: inline-block;
-}
-
 .rv-chapeau {
   max-width: 30em;
-  margin: 30px 0 0;
-  font-size: 20px;
+  margin: 16px 0 0;
+  font-size: 17px;
   line-height: 1.45;
   color: var(--rv-t1);
   text-wrap: pretty;
 }
 
-/* ── Chapter 01: the film, then its caption and the three examples ────── */
+.rv-fig {
+  position: relative;
+  margin: 20px 0 0;
+}
+
+/* ── 01: the film, then its caption and the three examples ────────────── */
 
 .rv-film {
   position: relative;
-  margin-top: 36px;
+  margin-top: 8px;
 }
 
 .rv-film__legende {
-  row-gap: 22px;
+  row-gap: 18px;
   align-items: start;
 }
 
 .rv-film__legende .rv-figcap {
-  padding-top: 18px;
+  margin-top: 0;
+  padding-top: 16px;
 }
 
 .rv-exemples {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 12px;
   border-top: 1px solid var(--rv-b1);
 }
 
 .rv-exemples__titre {
-  padding: 14px 0 6px;
+  grid-column: 1 / -1;
+  padding: 13px 0 4px;
 }
 
 .rv-ex {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   width: 100%;
-  min-height: 50px;
+  min-height: 64px;
   margin: 0;
-  padding: 0;
+  padding: 8px 0 12px;
   border: 0;
   border-bottom: 1px solid var(--rv-b1);
   background: none;
   font: inherit;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
+  line-height: 1.3;
   color: var(--rv-t2);
   text-align: left;
   cursor: pointer;
@@ -332,12 +452,6 @@
 .rv-ex:hover,
 .rv-ex[aria-current="true"] {
   color: var(--rv-t1);
-}
-
-.rv-ex:focus-visible {
-  outline: 2px solid var(--rv-ambre);
-  outline-offset: 3px;
-  border-radius: 2px;
 }
 
 .rv-ex__lettre {
@@ -398,7 +512,8 @@
   --rvd-gap-sur: 22px;
   --rvd-gap-leg: 28px;
   --rvd-leg: 16px;
-  --rvd-h: clamp(600px, 175cqi, 740px);
+  /* 150cqi on a phone (585 px at 390): the same shots, less black. */
+  --rvd-h: clamp(560px, 150cqi, 740px);
   position: relative;
   height: var(--rvd-h);
   overflow: hidden;
@@ -967,17 +1082,1277 @@
   }
 }
 
-/* ── From 760 px: twelve columns ───────────────────────────────────────── */
+/* ── 02: the IBAN read part by part, then what mod-97 says and what IBANforge adds ── */
+
+.rv-anat {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--rv-gout);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rv-b2);
+}
+
+.rv-anat__part {
+  padding: 12px 0 13px;
+  border-bottom: 1px solid var(--rv-b1);
+}
+
+.rv-anat__val {
+  margin: 0;
+  font-family: var(--rv-mono);
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--rv-t1);
+  font-variant-ligatures: none;
+}
+
+.rv-anat__lab {
+  margin-top: 8px;
+}
+
+.rv-anat__txt {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--rv-t2);
+  text-wrap: balance;
+}
+
+.rv-comp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 22px;
+  margin-top: 24px;
+}
+
+.rv-comp__tete {
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--rv-b2);
+}
+
+.rv-comp__col--ibf .rv-comp__tete {
+  color: var(--rv-t1);
+}
+
+.rv-comp__liste {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-comp__liste li {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr);
+  padding: 8px 0 9px;
+  border-bottom: 1px solid var(--rv-b1);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--rv-t2);
+  text-wrap: pretty;
+}
+
+.rv-comp__col--m97 li {
+  color: var(--rv-t3);
+}
+
+.rv-comp__col--m97 li:last-child {
+  color: var(--rv-t1);
+  font-weight: 500;
+}
+
+.rv-comp__num {
+  font-family: var(--rv-mono);
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--rv-t4);
+}
+
+/* ── 03: the trial, a real answer in three lines ──────────────────────────── */
+
+.rv-essai__lab {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.rv-essai__ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.rv-essai__champ {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--rv-b2);
+  border-radius: 2px;
+  background: var(--rv-s1);
+  font-family: var(--rv-mono);
+  font-size: 16.5px;
+  letter-spacing: 0.01em;
+  color: var(--rv-t1);
+  font-variant-ligatures: none;
+  outline: none;
+  transition:
+    border-color 0.4s var(--rv-courbe),
+    box-shadow 0.4s var(--rv-courbe);
+}
+
+.rv-essai__champ:focus-visible,
+.rv-essai__champ:focus {
+  border-color: rgba(245, 158, 11, 0.55);
+}
+
+.rv-essai[data-phase="loading"] .rv-essai__champ {
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.rv-essai__envoi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  margin: 0;
+  padding: 0 22px;
+  border: 1px solid var(--rv-ambre);
+  border-radius: 2px;
+  background: var(--rv-ambre);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  color: #09090b;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.3s var(--rv-courbe),
+    background-color 0.3s var(--rv-courbe);
+}
+
+.rv-essai__envoi:hover {
+  border-color: var(--rv-ambre-c);
+  background: var(--rv-ambre-c);
+}
+
+.rv-essai__envoi:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.rv-essai__envoi .rv-fl {
+  margin-left: 0;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.rv-essai__ex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.rv-essai__ex button {
+  position: relative;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--rv-b1);
+  border-radius: 2px;
+  background: none;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--rv-t3);
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color 0.3s var(--rv-courbe),
+    border-color 0.3s var(--rv-courbe);
+}
+
+.rv-essai__ex button:hover {
+  color: var(--rv-t1);
+}
+
+.rv-essai__ex button[aria-pressed="true"] {
+  border-color: var(--rv-b2);
+  color: var(--rv-t1);
+}
+
+.rv-essai__ex i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--rv-ambre);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  transition: transform 0.5s var(--rv-courbe);
+}
+
+.rv-essai__ex button[aria-pressed="true"] i {
+  transform: scaleX(1);
+}
+
+.rv-essai__note {
+  margin: 12px 0 0;
+  font-family: var(--rv-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--rv-t4);
+}
+
+.rv-essai__res {
+  margin: 20px 0 0;
+  border-top: 1px solid var(--rv-b2);
+}
+
+.rv-essai__r {
+  display: grid;
+  grid-template-columns: 8.6em minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: baseline;
+  padding: 11px 0 12px;
+  border-bottom: 1px solid var(--rv-b1);
+}
+
+.rv-essai__r dt {
+  transition: color 0.25s linear;
+}
+
+.rv-essai__r[data-lu] dt {
+  color: var(--rv-ambre-c);
+}
+
+.rv-essai__r dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.rv-essai__vm {
+  display: block;
+  clip-path: inset(-0.2em -1em 0 -1em);
+}
+
+.rv-essai__v {
+  display: block;
+  font-size: 17.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--rv-t1);
+  overflow-wrap: anywhere;
+}
+
+.rv-essai__v--mono {
+  font-family: var(--rv-mono);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.rv-essai__v--gris {
+  color: var(--rv-t3);
+  font-weight: 500;
+}
+
+.rv-essai__v--rouge {
+  color: var(--rv-rouge);
+}
+
+.rv-essai__v--attente {
+  color: var(--rv-t4);
+  font-weight: 500;
+}
+
+.rv-essai__src {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--rv-t3);
+  overflow-wrap: anywhere;
+}
+
+.rv-essai__src code {
+  font-size: 0.95em;
+  color: var(--rv-t2);
+}
+
+.rv-essai__verdict {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+  margin: 0;
+  padding: 14px 0 0;
+}
+
+.rv-essai__vd {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rv-vert);
+}
+
+.rv-essai__vd::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.rv-essai__verdict[data-ton="stop"] .rv-essai__vd {
+  color: var(--rv-rouge);
+}
+
+.rv-essai__verdict[data-ton="neutre"] .rv-essai__vd {
+  color: var(--rv-ambre-c);
+}
+
+.rv-essai__vn {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--rv-t2);
+}
+
+/* The credits and reservations a source imposes travel with the answer, in full. */
+.rv-essai__notices {
+  display: grid;
+  row-gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rv-t4);
+}
+
+.rv-essai__pied {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--rv-b1);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ── 04: three ways, one scene and three switches (like the film's examples) ── */
+
+.rv-scene4 {
+  position: relative;
+  display: grid;
+  padding-top: 20px;
+  border-top: 1px solid var(--rv-b1);
+}
+
+.rv-plan4 {
+  grid-area: 1 / 1;
+  min-width: 0;
+  visibility: hidden;
+}
+
+.rv-plan4--fichier {
+  align-self: center;
+}
+
+/* The still frame is the file; the other two ways are shown by their switch. */
+.rv-scene4[data-voie="1"] .rv-plan4--fichier,
+.rv-scene4[data-voie="0"] .rv-plan4--outils,
+.rv-scene4[data-voie="2"] .rv-plan4--outils {
+  visibility: visible;
+}
+
+.rv-scene4[data-voie="0"] .rv-o__cadre:not(.rv-o__cadre--api) {
+  opacity: 0.3;
+}
+
+.rv-voies__liste {
+  margin-top: 20px;
+  border-top: 1px solid var(--rv-b2);
+}
+
+.rv-voie {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rv-b1);
+}
+
+.rv-voie__b {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 13px 0 11px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--rv-t2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.3s var(--rv-courbe);
+}
+
+.rv-voie__b:hover,
+.rv-voie__b[aria-current="true"] {
+  color: var(--rv-t1);
+}
+
+.rv-voie__num {
+  font-family: var(--rv-mono);
+  font-size: 13px;
+  color: var(--rv-t4);
+}
+
+.rv-voie__b[aria-current="true"] .rv-voie__num {
+  color: var(--rv-ambre-c);
+}
+
+.rv-voie__nom {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+}
+
+.rv-voie__pub {
+  margin-left: auto;
+  font-family: var(--rv-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rv-t4);
+  white-space: nowrap;
+}
+
+.rv-voie__barre {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--rv-ambre);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--rv-p, 0));
+}
+
+.rv-voie .rv-corps {
+  margin-top: 8px;
+  font-size: 15.5px;
+}
+
+/* Way 02: the file, the giant counter, the column read line by line, the flagged lines. */
+.rv-f__corps {
+  display: grid;
+  row-gap: 18px;
+}
+
+.rv-f__compte {
+  container-type: inline-size;
+}
+
+.rv-f__nombre {
+  position: relative;
+  display: block;
+  margin: -0.05em 0 -0.15em;
+  font-family: var(--rv-bebas);
+  font-weight: 400;
+  font-size: min(calc(100cqi * 0.995 / var(--em)), 210px);
+  line-height: 0.9;
+  white-space: nowrap;
+  color: var(--rv-t1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A comma hangs below the baseline, where the unit sits: the English figure
+   keeps its descent. */
+.rv-f__nombre--virgule {
+  margin-bottom: 0;
+}
+
+/* While the counter rolls, the engine writes into its own layer: the digits
+   React rendered stay as they are, and come back at the end. */
+.rv-f__roule {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.rv-f--anime .rv-f__fixe {
+  visibility: hidden;
+}
+
+.rv-f__unite {
+  margin: 10px 0 0;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--rv-t3);
+}
+
+.rv-f__scene {
+  position: relative;
+  min-height: 164px;
+}
+
+.rv-f__fenetre {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 24%, #000 76%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 24%, #000 76%, transparent 100%);
+}
+
+.rv-f__liste {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-f__liste li {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  font-family: var(--rv-mono);
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: rgba(138, 138, 148, 0.5);
+  font-variant-ligatures: none;
+}
+
+.rv-f__ib {
+  position: relative;
+  display: inline-block;
+}
+
+.rv-f__lecteur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  margin-top: -1px;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.7), rgba(245, 158, 11, 0.2) 70%, rgba(245, 158, 11, 0));
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+}
+
+.rv-f__arretees {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  min-height: 164px;
+}
+
+.rv-f--anime .rv-f__arretees {
+  position: absolute;
+  inset: 0;
+}
+
+.rv-f__sur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rv-rouge);
+}
+
+.rv-f__pt {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+}
+
+.rv-f__arr {
+  margin: 0;
+}
+
+.rv-f__arr-iban {
+  position: relative;
+  display: inline-block;
+  font-family: var(--rv-mono);
+  font-size: 16px;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: var(--rv-t1);
+  white-space: nowrap;
+  font-variant-ligatures: none;
+}
+
+.rv-f__code {
+  position: relative;
+  display: inline-block;
+}
+
+.rv-f__arr-iban .rv-f__code {
+  color: var(--rv-t3);
+}
+
+.rv-f__barre {
+  position: absolute;
+  left: -0.12em;
+  right: -0.12em;
+  top: 52%;
+  height: 1.5px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--rv-rouge);
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.45);
+  transform-origin: 0 50%;
+}
+
+.rv-f__raison {
+  display: block;
+  margin-top: 3px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--rv-rouge);
+  text-wrap: pretty;
+}
+
+.rv-f .rv-figcap {
+  margin-top: 16px;
+}
+
+/* Ways 01 and 03: the same answer in an API, a spreadsheet and an agent. */
+.rv-o__haut {
+  container-type: inline-size;
+}
+
+.rv-o__sur {
+  display: block;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rv-vert);
+  white-space: nowrap;
+  clip-path: inset(0 -1em 0 -1em);
+}
+
+.rv-o__si {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rv-o__pt {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rv-vert);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+}
+
+.rv-o__geant {
+  margin: calc(16px - 0.136em) 0 -0.137em;
+  font-family: var(--rv-sans);
+  font-weight: 600;
+  font-size: calc(100cqi * 0.995 / var(--em));
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--rv-t1);
+  white-space: nowrap;
+  transform-origin: 0 80%;
+}
+
+.rv-o__leg {
+  margin: 12px 0 0;
+  font-family: var(--rv-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--rv-t4);
+}
+
+.rv-o__cadres {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.rv-o__cadre {
+  min-width: 0;
+  border: 1px solid var(--rv-b1);
+  border-radius: 3px;
+  background: var(--rv-s1);
+}
+
+.rv-o__tete {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 13px 7px;
+  border-bottom: 1px solid var(--rv-b1);
+}
+
+.rv-o__tete span:last-child {
+  color: var(--rv-t3);
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.rv-o__code {
+  margin: 0;
+  padding: 11px 13px 12px;
+  font-family: var(--rv-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--rv-t2);
+  white-space: pre;
+  overflow: hidden;
+  font-variant-ligatures: none;
+}
+
+.rv-o__verbe {
+  color: var(--rv-t1);
+  font-weight: 500;
+}
+
+.rv-o__invite {
+  color: var(--rv-t4);
+}
+
+.rv-o__arg {
+  color: var(--rv-t1);
+}
+
+.rv-o__note {
+  margin: 0;
+  padding: 0 13px 11px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rv-t4);
+}
+
+.rv-o__feuille {
+  padding: 10px 13px 11px;
+  font-family: var(--rv-mono);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--rv-t2);
+  font-variant-ligatures: none;
+}
+
+.rv-o__fx {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 9px;
+  border: 1px solid var(--rv-b1);
+  background: var(--rv-fond);
+}
+
+.rv-o__ref {
+  padding-right: 10px;
+  border-right: 1px solid var(--rv-b1);
+  color: var(--rv-t4);
+}
+
+.rv-o__fxl {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--rv-t4);
+}
+
+/* On a phone the spreadsheet keeps its formula bar only: the grid of cells
+   comes back from 760 px. */
+.rv-o__grille {
+  display: none;
+  grid-template-columns: 1.9em minmax(0, 1fr) auto;
+  margin-top: 8px;
+  border-top: 1px solid var(--rv-b1);
+  border-left: 1px solid var(--rv-b1);
+}
+
+.rv-o__c {
+  min-width: 0;
+  padding: 5px 7px;
+  border-right: 1px solid var(--rv-b1);
+  border-bottom: 1px solid var(--rv-b1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv-o__c--t {
+  color: var(--rv-t4);
+  text-align: center;
+  background: var(--rv-s2);
+}
+
+.rv-o__c--actif {
+  position: relative;
+  color: var(--rv-t1);
+  outline: 2px solid var(--rv-ambre);
+  outline-offset: -2px;
+}
+
+/* ── 05: coverage and trust ─────────────────────────────────────────────── */
+
+.rv-chiffres {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--rv-gout);
+  margin: 0;
+  border-top: 1px solid var(--rv-b2);
+}
+
+.rv-chiffre {
+  padding: 14px 0 16px;
+  border-bottom: 1px solid var(--rv-b1);
+}
+
+.rv-chiffre__val {
+  display: block;
+  margin: -0.1em 0 -0.2em;
+  font-family: var(--rv-bebas);
+  font-size: 66px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--rv-t1);
+  white-space: nowrap;
+  clip-path: inset(-0.1em -0.2em 0 -0.2em);
+}
+
+.rv-chiffre__vi {
+  display: inline-block;
+}
+
+.rv-chiffre__unite {
+  margin-left: 0.16em;
+  font-family: var(--rv-sans);
+  font-size: 0.26em;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--rv-t3);
+}
+
+.rv-chiffre dd {
+  margin: 0;
+}
+
+.rv-chiffre__lab {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--rv-t2);
+}
+
+.rv-chiffre__pays {
+  margin: 6px 0 0;
+  font-family: var(--rv-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--rv-t4);
+}
+
+.rv-colophon {
+  display: grid;
+  row-gap: 8px;
+  margin-top: 18px;
+}
+
+.rv-colophon__sources {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--rv-t3);
+}
+
+.rv-integ {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rv-b1);
+}
+
+/* One wrapping row: each package keeps its mention, the lines break between packages. */
+.rv-integ__liste {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5em;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--rv-t1);
+}
+
+.rv-integ__liste li {
+  white-space: nowrap;
+}
+
+.rv-integ__liste li:not(:last-child)::after {
+  content: "·";
+  margin-left: 0.5em;
+  color: var(--rv-t4);
+}
+
+/* 24 px high: the smallest touch target (WCAG 2.5.8), rows set edge to edge. */
+.rv-integ__liste a {
+  display: inline-block;
+  min-height: 24px;
+  vertical-align: top;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+  transition: text-decoration-color 0.3s var(--rv-courbe);
+}
+
+.rv-integ__liste a:hover {
+  text-decoration-color: var(--rv-b2);
+}
+
+.rv-integ__liste small {
+  font-size: 13px;
+  color: var(--rv-t4);
+}
+
+/* ── 06: the prices, one table ──────────────────────────────────────────── */
+
+.rv-prix {
+  border-top: 1px solid var(--rv-b2);
+}
+
+.rv-formule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  align-items: baseline;
+  padding: 13px 0 14px;
+  border-bottom: 1px solid var(--rv-b1);
+}
+
+.rv-formule__nom {
+  grid-column: 1;
+}
+
+.rv-formule--cle .rv-formule__nom {
+  color: var(--rv-ambre-c);
+}
+
+.rv-formule__prix {
+  grid-column: 2;
+  grid-row: 1;
+  margin: -0.1em 0 -0.2em;
+  font-family: var(--rv-bebas);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--rv-t1);
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.rv-formule__prix small {
+  margin-left: 0.3em;
+  font-family: var(--rv-sans);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--rv-t3);
+}
+
+.rv-formule__prix .rv-formule__des {
+  margin: 0 0.35em 0 0;
+}
+
+.rv-formule__txt {
+  grid-column: 1 / -1;
+  margin: 6px 0 0;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--rv-t2);
+}
+
+.rv-formule__txt code {
+  color: var(--rv-t1);
+  white-space: nowrap;
+}
+
+.rv-formule__montants {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  margin: 8px 0 0;
+}
+
+.rv-formule__montant {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.rv-formule__montant b {
+  font-family: var(--rv-bebas);
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--rv-t1);
+}
+
+.rv-formule__montant span {
+  font-size: 14px;
+  color: var(--rv-t3);
+}
+
+.rv-formule__cta {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: 10px 0 0;
+  font-size: 15.5px;
+}
+
+.rv-prix__note {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--rv-t3);
+}
+
+.rv-echeance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rv-ambre);
+}
+
+.rv-echeance__date {
+  margin: 0;
+  font-family: var(--rv-bebas);
+  font-size: 30px;
+  line-height: 0.95;
+  color: var(--rv-t1);
+  text-transform: uppercase;
+}
+
+.rv-echeance__lab {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--rv-t3);
+}
+
+.rv-echeance__lab::first-letter {
+  text-transform: uppercase;
+}
+
+.rv-echeance__txt {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--rv-t2);
+}
+
+.rv-echeance__txt code {
+  color: var(--rv-t1);
+  white-space: nowrap;
+}
+
+/* ── 07: the questions, folded ──────────────────────────────────────────── */
+
+.rv-faq {
+  border-top: 1px solid var(--rv-b2);
+}
+
+.rv-faq__item {
+  border-bottom: 1px solid var(--rv-b1);
+}
+
+.rv-faq__q {
+  position: relative;
+  display: block;
+  padding: 15px 36px 15px 0;
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--rv-t1);
+  cursor: pointer;
+  list-style: none;
+  text-wrap: pretty;
+}
+
+.rv-faq__q::-webkit-details-marker {
+  display: none;
+}
+
+.rv-faq__q::after {
+  content: "+";
+  position: absolute;
+  right: 2px;
+  top: 13px;
+  font-family: var(--rv-mono);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--rv-t4);
+  transition: color 0.3s var(--rv-courbe);
+}
+
+.rv-faq__item[open] .rv-faq__q::after {
+  content: "\2212";
+  color: var(--rv-ambre-c);
+}
+
+.rv-faq__r {
+  padding: 0 0 18px;
+}
+
+.rv-faq__r p {
+  max-width: 38em;
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--rv-t2);
+}
+
+.rv-faq__r code {
+  color: var(--rv-t1);
+}
+
+/* ── The ending: the verdict again, then the free key ─────────────────── */
+
+.rv-fin__grille {
+  align-items: end;
+  padding-top: var(--rv-air);
+  padding-bottom: 40px;
+}
+
+.rv-fin__titre-bloc {
+  container-type: inline-size;
+  padding-top: 22px;
+}
+
+.rv-fin__preuve {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.rv-fin__iban {
+  font-family: var(--rv-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--rv-t4);
+  white-space: nowrap;
+}
+
+.rv-fin__raye {
+  position: relative;
+  color: rgba(138, 138, 148, 0.55);
+}
+
+.rv-fin__raye::after {
+  content: "";
+  position: absolute;
+  left: -0.1em;
+  right: -0.1em;
+  top: 50%;
+  height: 1.5px;
+  margin-top: -1px;
+  background: var(--rv-rouge);
+  transform-origin: 0 50%;
+}
+
+.rv-fin__verdict {
+  font-family: var(--rv-bebas);
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--rv-rouge);
+  text-transform: uppercase;
+}
+
+/* The widest line of the layout fills the column (revue-cover-fit.ts,
+   FIN_LINES); three lines on a phone, two from 760 px. */
+.rv-fin__titre {
+  margin: calc(22px - 0.05em) 0 -0.15em;
+  font-size: calc(100cqi * 0.995 / var(--em-t));
+  line-height: 0.92;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.rv-br-o {
+  display: none;
+}
+
+.rv-fin__action {
+  margin-top: 22px;
+}
+
+.rv-fin__chapeau {
+  max-width: 26em;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--rv-t1);
+}
+
+.rv-fin .rv-boutons {
+  margin-top: 18px;
+}
+
+.rv-fin__doc {
+  margin: 14px 0 0;
+  font-size: 15px;
+}
+
+/* ── Tablet and computer: twelve columns ─────────────────────────────── */
 
 @container rv (min-width: 760px) {
   .rv-grille {
     --rv-marge: clamp(40px, 6.25cqi, 112px);
     --rv-gout: 24px;
+    --rv-air: clamp(76px, 6.5cqi, 120px);
     grid-template-columns: repeat(12, minmax(0, 1fr));
-  }
-
-  .rv-ouv {
-    padding-top: clamp(112px, 10cqi, 190px);
   }
 
   .rv-kicker,
@@ -985,9 +2360,12 @@
     font-size: 13px;
   }
 
+  .rv-corps {
+    font-size: 16.5px;
+  }
+
   .rv-couv__haut {
-    padding-top: 56px;
-    padding-bottom: 56px;
+    padding-top: 52px;
   }
 
   .rv-couv__titre {
@@ -995,7 +2373,7 @@
   }
 
   .rv-surtitre {
-    margin-bottom: 34px;
+    margin-bottom: 32px;
   }
 
   .rv-couv__action {
@@ -1004,7 +2382,7 @@
     grid-template-columns: repeat(12, minmax(0, 1fr));
     column-gap: var(--rv-gout);
     align-items: end;
-    margin-top: 40px;
+    margin-top: 38px;
   }
 
   .rv-couv__chapeau {
@@ -1022,44 +2400,71 @@
     grid-column: 1 / -1;
   }
 
-  .rv-num {
-    grid-column: 1 / span 3;
-    margin-top: 44px;
-    font-size: clamp(150px, 15cqi, 260px);
+  .rv-sommaire__liste {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    column-gap: var(--rv-gout);
+    border-top: 1px solid var(--rv-b1);
+    border-bottom: 1px solid var(--rv-b1);
   }
 
-  .rv-ouv__texte {
-    grid-column: 4 / -1;
-    margin-top: 50px;
+  .rv-sommaire__liste a {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+    padding: 14px 0 15px;
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--rv-t2);
+    transition: color 0.3s var(--rv-courbe);
+  }
+
+  .rv-sommaire__liste a:hover {
+    color: var(--rv-t1);
+  }
+
+  .rv-sommaire__num {
+    font-family: var(--rv-mono);
+    font-size: 12.5px;
+    color: var(--rv-t4);
+  }
+
+  .rv-tete {
+    padding-top: 26px;
+  }
+
+  .rv-num {
+    font-size: 76px;
   }
 
   .rv-h2 {
-    margin-top: calc(22px - 0.06em);
-    font-size: clamp(62px, 6.9cqi, 124px);
+    margin-top: calc(20px - 0.06em);
+    font-size: clamp(52px, 4.6cqi, 84px);
   }
 
   .rv-chapeau {
-    margin-top: 38px;
-    font-size: clamp(22px, 1.9cqi, 27px);
+    margin-top: 26px;
+    font-size: clamp(19px, 1.6cqi, 24px);
     line-height: 1.42;
   }
 
-  .rv-film {
-    margin-top: 40px;
+  .rv-fig {
+    margin-top: 36px;
   }
 
   .rv-film__legende .rv-figcap {
     grid-column: 1 / span 4;
-    padding-top: 20px;
+    padding-top: 18px;
   }
 
   .rv-exemples {
     grid-column: 5 / -1;
-    flex-direction: row;
+    display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 16px;
+    margin-top: 14px;
     border-top: 0;
   }
 
@@ -1070,21 +2475,219 @@
   }
 
   .rv-ex {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
     width: auto;
     min-height: 46px;
     padding: 0 16px;
     border: 1px solid var(--rv-b1);
     border-radius: 2px;
-    font-size: 15px;
     overflow: hidden;
   }
 
   .rv-ex[aria-current="true"] {
     border-color: var(--rv-b2);
   }
+
+  .rv-anat {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rv-anat__part {
+    border-bottom: 0;
+    padding-bottom: 20px;
+  }
+
+  .rv-anat__val {
+    font-size: clamp(19px, 1.7cqi, 30px);
+  }
+
+  .rv-comp {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
+    column-gap: var(--rv-gout);
+    margin-top: 26px;
+  }
+
+  .rv-essai__ligne {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .rv-essai__verdict {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 18px;
+    align-items: baseline;
+  }
+
+  .rv-f__corps {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: 32px;
+    align-items: center;
+  }
+
+  .rv-f__scene,
+  .rv-f__arretees {
+    min-height: 236px;
+  }
+
+  .rv-f__liste li {
+    height: 30px;
+    font-size: 14px;
+  }
+
+  .rv-o__cadres {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rv-o__cadre--api {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .rv-o__cadre--agent {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .rv-o__cadre--tableur {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .rv-o__grille {
+    display: grid;
+  }
+
+  .rv-voies__liste {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--rv-gout);
+    margin-top: 32px;
+    border-top: 0;
+  }
+
+  .rv-voie {
+    border-top: 1px solid var(--rv-b2);
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .rv-voie__nom {
+    font-size: 18.5px;
+  }
+
+  .rv-chiffres {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-bottom: 1px solid var(--rv-b1);
+  }
+
+  .rv-chiffre {
+    border-bottom: 0;
+  }
+
+  .rv-chiffre + .rv-chiffre {
+    margin-left: calc(-1 * var(--rv-gout));
+    padding-left: var(--rv-gout);
+    border-left: 1px solid var(--rv-b1);
+  }
+
+  .rv-formule {
+    grid-template-columns: minmax(0, 11.5em) minmax(0, 1fr);
+    column-gap: var(--rv-gout);
+    align-items: start;
+    padding: 16px 0 17px;
+  }
+
+  .rv-formule__nom {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .rv-formule__prix {
+    grid-column: 1;
+    grid-row: 2 / span 3;
+    margin-top: calc(8px - 0.1em);
+    text-align: left;
+  }
+
+  .rv-formule__txt {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin-top: 0;
+  }
+
+  .rv-formule__montants {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .rv-formule__cta {
+    grid-column: 2;
+    grid-row: 3;
+    margin-top: 10px;
+  }
+
+  .rv-formule--audit .rv-formule__cta {
+    grid-row: 4;
+    margin-top: 8px;
+  }
+
+  .rv-echeance {
+    grid-template-columns: minmax(0, 11.5em) minmax(0, 1fr);
+    column-gap: var(--rv-gout);
+    align-items: baseline;
+  }
+
+  .rv-echeance__date {
+    grid-row: 1 / span 2;
+  }
+
+  .rv-faq__q {
+    padding-top: 17px;
+    padding-bottom: 17px;
+    font-size: 17px;
+  }
+
+  .rv-faq__q::after {
+    top: 15px;
+  }
+
+  .rv-fin__titre {
+    font-size: calc(100cqi * 0.995 / var(--em-o));
+  }
+
+  .rv-br-t {
+    display: none;
+  }
+
+  .rv-br-o {
+    display: inline;
+  }
+
+  .rv-fin__action {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--rv-gout);
+    align-items: end;
+  }
+
+  .rv-fin__chapeau {
+    grid-column: 1 / span 6;
+    font-size: clamp(19px, 1.6cqi, 24px);
+  }
+
+  .rv-fin__action .rv-boutons,
+  .rv-fin__action .rv-fin__doc {
+    grid-column: 8 / -1;
+  }
+
+  .rv-fin__action .rv-boutons {
+    margin-top: 0;
+  }
 }
 
-/* A large screen: the cover in two columns. */
+/* A large screen: the cover in two columns with its contents, the chapters
+   with their head on the left and their figure on the right. */
 @container rv (min-width: 1100px) {
   .rv-couv__titre {
     grid-column: 1 / span 8;
@@ -1098,40 +2701,185 @@
   }
 
   .rv-couv__chapeau {
-    font-size: 17px;
+    font-size: 16.5px;
   }
 
   .rv-couv__action .rv-boutons {
-    margin-top: 26px;
+    margin-top: 24px;
+  }
+
+  .rv-sommaire {
+    display: grid;
+    margin-top: 46px;
+  }
+
+  .rv-tete {
+    grid-column: 1 / span 5;
+    padding-top: 30px;
+  }
+
+  .rv-tete__rang {
+    display: block;
+  }
+
+  .rv-num {
+    margin-bottom: 22px;
+    font-size: clamp(120px, 10.5cqi, 190px);
+  }
+
+  .rv-h2 {
+    font-size: clamp(50px, 4.5cqi, 84px);
+  }
+
+  .rv-chap__corps > .rv-fig {
+    grid-column: 6 / -1;
+    margin-top: 0;
+    padding-top: 34px;
+  }
+
+  /* 01: the standfirst beside the title, the film full width below. */
+  .rv-tete--large {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--rv-gout);
+    align-items: end;
+  }
+
+  .rv-tete--large .rv-tete__rang,
+  .rv-tete--large .rv-h2 {
+    grid-column: 1 / span 7;
+  }
+
+  .rv-tete--large .rv-chapeau {
+    grid-column: 9 / -1;
+    grid-row: 2;
+    margin-top: 0;
+    font-size: 17.5px;
+  }
+
+  .rv-film {
+    margin-top: 18px;
+  }
+
+  /* 04: the file composed in height, the giant counter above its flagged lines. */
+  .rv-f__corps {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 16px;
+  }
+
+  .rv-f__scene,
+  .rv-f__arretees {
+    min-height: 200px;
+  }
+
+  .rv-essai__verdict {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rv-fin__titre-bloc {
+    grid-column: 1 / span 8;
+  }
+
+  .rv-fin__action {
+    grid-column: 9 / -1;
+    display: block;
+    margin-top: 0;
+    padding-bottom: 0.2em;
+  }
+
+  .rv-fin__chapeau {
+    font-size: 17px;
+  }
+
+  .rv-fin__action .rv-boutons {
+    margin-top: 22px;
   }
 }
 
 @container rv (min-width: 1500px) {
+  .rv-corps {
+    font-size: 17.5px;
+  }
+
   .rv-couv__chapeau {
     font-size: 18px;
   }
 }
 
+/* The narrowest phones. */
+@container rv (max-width: 374px) {
+  .rv-anat__val {
+    font-size: 17px;
+  }
+
+  .rv-o__code,
+  .rv-o__feuille {
+    font-size: 12px;
+  }
+
+  .rv-voie__pub {
+    display: none;
+  }
+
+  .rv-integ__liste li {
+    white-space: normal;
+  }
+
+  .rv-integ__liste span,
+  .rv-integ__liste small {
+    white-space: nowrap;
+  }
+
+  .rv-essai__champ {
+    padding: 0 12px;
+    font-size: 15px;
+  }
+
+  .rv-f__arr-iban {
+    font-size: 14.5px;
+  }
+
+  .rv-f__liste li {
+    font-size: 13px;
+  }
+}
+
 /* ── Safari before 16 knows no container units ─────────────────────────
-   Without them the title would fall to 17px, the chapter titles too, and the
-   film would lose its height (a custom property that holds an unknown unit
-   leaves `height` with nothing). Those browsers also skip every @container
-   rule, so the page keeps its phone layout: one column, the window's width. */
+   Without them the titles would fall to 17px and the film would lose its
+   height (a custom property that holds an unknown unit leaves `height` with
+   nothing). Those browsers also skip every @container rule, so the page keeps
+   its phone layout: one column, the window's width. */
 @supports not (width: 1cqi) {
   .rv-h1 .rv-ligne {
     font-size: calc((100vw - 48px) * 0.99 / var(--em));
   }
 
   .rv-h2 {
-    font-size: 48px;
+    font-size: 44px;
   }
 
   .rv-d__scene {
-    --rvd-h: 680px;
+    --rvd-h: 620px;
+  }
+
+  .rv-f__nombre {
+    font-size: calc((100vw - 48px) * 0.995 / var(--em));
+  }
+
+  .rv-o__geant {
+    font-size: calc((100vw - 48px) * 0.995 / var(--em));
+  }
+
+  .rv-fin__titre {
+    font-size: calc((100vw - 48px) * 0.995 / var(--em-t));
   }
 }
 
-/* ── Arrival: only when the script runs and motion is allowed ──────────── */
+/* ── Arrival: only when the script runs and motion is allowed ────────────
+   Two gestures, on one curve: the rise from a mask and the pull into focus.
+   Nothing is hidden before the script adds `.rv-anim`, nor under reduced
+   motion; what is already on screen when it runs is left as it is. */
 
 .rv-anim [data-rv="titre"] .rv-mot > span {
   transform: translateY(112%);
@@ -1141,10 +2889,10 @@
 
 .rv-anim [data-rv="texte"] {
   opacity: 0;
-  transform: translateY(16px);
+  filter: blur(6px);
   transition:
     opacity 0.9s var(--rv-courbe),
-    transform 0.9s var(--rv-courbe);
+    filter 0.9s var(--rv-courbe);
   transition-delay: var(--rv-d, 0s);
 }
 
@@ -1171,20 +2919,85 @@
 .rv-anim .rv-vu[data-rv="num"] {
   opacity: 1;
   filter: none;
-  transform: none;
 }
 
 .rv-anim .rv-vu[data-rv="filet"] {
   transform: none;
 }
 
+/* 05: each figure rises and settles, the countries read light up one by one. */
+.rv-anim [data-rv="chiffres"] .rv-chiffre__vi {
+  transform: translateY(108%);
+  transition: transform 1.05s var(--rv-courbe);
+  transition-delay: calc(var(--i, 0) * 0.12s);
+}
+
+.rv-anim [data-rv="chiffres"] .rv-chiffre__lab {
+  opacity: 0;
+  filter: blur(6px);
+  transition:
+    opacity 0.9s var(--rv-courbe),
+    filter 0.9s var(--rv-courbe);
+  transition-delay: calc(0.3s + var(--i, 0) * 0.12s);
+}
+
+.rv-anim [data-rv="chiffres"] .rv-chiffre__pays span {
+  opacity: 0;
+}
+
+.rv-anim .rv-vu[data-rv="chiffres"] .rv-chiffre__vi {
+  transform: none;
+}
+
+.rv-anim .rv-vu[data-rv="chiffres"] .rv-chiffre__lab {
+  opacity: 1;
+  filter: none;
+}
+
+.rv-anim .rv-vu[data-rv="chiffres"] .rv-chiffre__pays span {
+  animation: rv-code 0.8s linear both;
+  animation-delay: calc(0.7s + var(--j, 0) * 0.2s + var(--k, 0) * 0.09s);
+}
+
+@keyframes rv-code {
+  0% {
+    opacity: 0;
+    color: var(--rv-ambre-c);
+  }
+  28% {
+    opacity: 1;
+    color: var(--rv-ambre-c);
+  }
+  38% {
+    color: var(--rv-ambre-c);
+  }
+  100% {
+    opacity: 1;
+    color: var(--rv-t4);
+  }
+}
+
+/* The ending: the red line crosses out the code no bank holds. */
+.rv-anim .rv-fin__preuve:not(.rv-vu) .rv-fin__raye::after {
+  transform: scaleX(0);
+}
+
+.rv-anim .rv-fin__preuve .rv-fin__raye::after {
+  transition: transform 0.8s var(--rv-courbe) 0.45s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rv-anim [data-rv],
-  .rv-anim [data-rv] .rv-mot > span {
+  .rv-anim [data-rv] .rv-mot > span,
+  .rv-anim [data-rv] .rv-chiffre__vi,
+  .rv-anim [data-rv] .rv-chiffre__lab,
+  .rv-anim [data-rv] .rv-chiffre__pays span,
+  .rv-fin__raye::after {
     opacity: 1 !important;
     filter: none !important;
     transform: none !important;
     transition: none !important;
+    animation: none !important;
   }
 
   .rv-d .rv-d__pause {

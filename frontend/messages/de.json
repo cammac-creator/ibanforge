@@ -62,6 +62,7 @@
     "share": {
       "tagline": "ibanforge.com · REST-API · SDKs · MCP"
     },
+    "contents": "In dieser Ausgabe",
     "integrations": {
       "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
       "sub": "Jedes Paket unten existiert und lässt sich heute installieren. Was noch nicht veröffentlicht ist, sagt es.",
@@ -166,7 +167,7 @@
       "eyebrow": "Warum eine Prüfsumme nicht reicht",
       "title": "Eine gültige IBAN kann zu keiner Bank führen",
       "lead": "Die Mod-97-Prüfung beweist nur, dass die Ziffern aufgehen. Eine IBAN kann sie bestehen, mit einer Bankleitzahl, die keine Bank führt, oder einer, die nach einer Fusion aufgehoben wurde.",
-      "readTitle": "Dieselbe IBAN, Teil für Teil gelesen",
+      "readTitle": "Dieselbe IBAN, Teil für Teil gelesen",
       "readLead": "IBANforge liest jeden Teil der IBAN und sagt, welche Prüfungen es machen konnte.",
       "anatomyCaption": "Dieselbe IBAN, Teil für Teil gelesen.",
       "country": "Land",
@@ -185,7 +186,7 @@
       ],
       "addsTitle": "Was IBANforge hinzufügt",
       "addsItems": [
-        "Ob die Bankleitzahl vergeben ist, aus dem nationalen Register (DE, AT, BE, SK, CZ, BG, CH, LI)",
+        "Ob die Bankleitzahl vergeben ist, aus dem nationalen Register",
         "Die Bank und ihr BIC, jeweils mit Quelle und, wenn bekannt, mit Datum",
         "Den nationalen Prüfschlüssel in der Kontonummer, wo einer veröffentlicht ist und geprüft wird",
         "SEPA-Erreichbarkeit und Bereitschaft für die Empfängerüberprüfung, aus den EPC-Registern, wo sie die Bank führen",
@@ -201,11 +202,19 @@
       "devText": "Ein REST-Aufruf oder ein SDK in TypeScript, Python, Java oder .NET. Die Antwort ist JSON, mit einem dokumentierten nächsten Schritt.",
       "devLink": "Dokumentation lesen",
       "financeTitle": "Finanzteams",
-      "financeText": "Laden Sie eine CSV- oder Excel-Datei mit Lieferanten hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen, IBANs maskiert. Die kommentierte Arbeitsmappe mit allen Zeilen kostet 149 $ bis 5.000 Zeilen oder 349 $ bis 20.000 Zeilen.",
+      "financeText": "Laden Sie eine CSV- oder Excel-Datei mit Lieferanten hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen, IBANs maskiert.",
       "financeLink": "Lieferantendatei prüfen",
       "agentsTitle": "KI-Agenten",
       "agentsText": "Ein MCP-Server für Claude, Cursor und jeden MCP-Client, in einer Zeile installiert. Agenten ohne Konto können pro Aufruf in USDC mit x402 zahlen.",
       "agentsLink": "Agent verbinden"
+    },
+    "ways": {
+      "sheet": "Tabelle",
+      "agent": "KI-Agent",
+      "unit": "Zeilen",
+      "flagged": "Markierte Zeilen",
+      "figure": "Abb. 2",
+      "caption": "Illustration: IBANs maskiert, außer den markierten Zeilen."
     },
     "coverage": {
       "eyebrow": "Abdeckung und Vertrauen",
@@ -225,7 +234,7 @@
       "fact2Text": "Die Bank hinter der IBAN wird gegen die Listen OFAC, EU, UN geprüft (BIC8). Der Kontoinhaber nie.",
       "fact3Title": "Offen über seine Grenzen",
       "fact3Text": "Es prüft nicht, wer Inhaber des Kontos ist: Dieser Namensabgleich gehört der Bank des Empfängers, über die Empfängerüberprüfung (VoP).",
-      "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-09), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht. Jede Antwort nennt ihre Quelle.",
+      "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-09), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht.",
       "sourcesDated": "Zuletzt aktualisiert am {date}.",
       "sourcesLink": "Jede Quelle und ihre Lizenz"
     },
@@ -250,6 +259,9 @@
       "packsPrice": "ab 4 $",
       "packsText": "Vorausbezahltes Guthaben auf demselben Schlüssel, per Karte oder in USDC.",
       "packsCta": "Pakete ansehen",
+      "auditName": "Dateiprüfung",
+      "auditText": "Die kostenlose Vorschau zählt, was zu korrigieren ist. Die kommentierte Arbeitsmappe mit allen Zeilen:",
+      "auditUpTo": "bis {rows} Zeilen",
       "agents": "KI-Agenten können auch pro Aufruf in USDC mit x402 zahlen: ohne Konto, ohne Checkout.",
       "link": "Alle Preise ansehen"
     },
@@ -325,7 +337,7 @@
       },
       "gallery": {
         "eyebrow": "Drei Wege, es zu nutzen",
-        "title": "Eine IBAN, eine ganze Datei oder in Ihren Werkzeugen",
+        "title": "Eine IBAN, eine ganze Datei oder in Ihren Werkzeugen",
         "intro": "Prüfen Sie eine einzelne IBAN in einem Formular, jede Zeile einer Lieferantendatei vor einem Zahlungslauf, oder rufen Sie die API aus Ihrer Software und Ihren Agenten auf.",
         "items": [
           {
@@ -371,6 +383,7 @@
       "heading": "Mitte November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
       "band": "Ab Mitte November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die Adressanforderungen erfüllen, wenn eine Adresse verwendet wird; SIX nennt den 14. November. POST /v1/address/check sagt kostenlos, ob eine Adresse besteht.",
       "cta": "Die Regeln lesen, Schiene für Schiene",
+      "check": "POST /v1/address/check sagt kostenlos, ob eine Adresse besteht.",
       "window": "Mitte November 2026",
       "windowLabel": "strukturierte Adressen · Schweizer Zeitplan"
     }

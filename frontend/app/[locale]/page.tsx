@@ -1,27 +1,32 @@
-import Image from "next/image"
 import type { CSSProperties, ReactNode } from "react"
+import { Fragment } from "react"
 import Link from "next/link"
 import { hasLocale } from "next-intl"
 import { getTranslations, setRequestLocale } from "next-intl/server"
 import { notFound } from "next/navigation"
-import { Bot, CodeXml, FileSpreadsheet, Globe, Info, Lock, ShieldCheck } from "lucide-react"
 import { routing } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
 import { StatusDot } from "@/components/ui/status-dot"
 import { GetKeyButton } from "@/components/api-key-dialog"
-import { Reveal } from "@/components/reveal"
-import { LensHero, type LensCopy } from "@/components/lens/lens-hero"
-import { LensGallery, type GalleryCopy } from "@/components/lens/lens-gallery"
-import { lensAssets } from "@/components/lens/assets"
 import { RevueFilm, type RevueFilmCopy } from "@/components/home/revue-film"
+import { RevueEssai } from "@/components/home/revue-essai"
+import { essaiCopy } from "@/components/home/revue-essai-model"
+import { RevueVoies, type VoiesCopy } from "@/components/home/revue-voies"
 import { CoverTitleGuard, RevueMotion } from "@/components/home/revue-motion"
-import { CoverTitle, MaskedWords } from "@/components/home/revue-parts"
-import { IbanAnatomy } from "@/components/home/iban-anatomy"
-import { IntegrationRibbon } from "@/components/home/integration-ribbon"
-import "@/components/lens/lens.css"
-import "@/components/home/home.css"
+import {
+  ApiText,
+  BebasFigure,
+  ChapterHead,
+  CoverTitle,
+  FinTitle,
+  splitFrom,
+  splitMention,
+  splitNumbered,
+} from "@/components/home/revue-parts"
+import { BANK_FIT, counterFit } from "@/components/home/revue-cover-fit"
 import "@/components/home/revue.css"
 import { getLandingStats, P50_PROCESSING_MS, SUPPORTED_COUNTRIES } from "@/lib/landing-stats"
+import { AUDIT_TIERS, formatUsd } from "@/lib/audit-tiers"
 import { alternatesFor, urlFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
 import { formatGrouped } from "@/lib/format-grouped"
@@ -30,26 +35,24 @@ import { formatGrouped } from "@/lib/format-grouped"
 import catalogue from "@/data/onboarding.json"
 
 /*
- * The home, redesigned on 27/09/2026 (Claude-Alain: « une landing fresh qui
- * explique simplement le produit », in the style of the rest of the site).
+ * The home, « la revue resserrée »: the whole page as one short issue of a
+ * magazine, approved by Claude-Alain on 28/09/2026 (mockup M3) after he found
+ * the page too long and the lens illustrations redundant. A cover, seven
+ * numbered chapters with one head each and one figure that shows the product
+ * at work, an ending. No lens any more.
+ *
+ *   01 why mod-97 is not enough: the film (revue-film.tsx)
+ *   02 the IBAN read part by part, what mod-97 says and what IBANforge adds
+ *   03 a real check, no sign-up (revue-essai.tsx, the tester's real call)
+ *   04 three ways to use it, in one scene with three switches (revue-voies.tsx)
+ *   05 coverage and trust: the figures, the sources, the integrations
+ *   06 prices, the x402 line, the Swiss deadline of mid-November
+ *   07 questions, with their structured data
  *
  * What it keeps from the audits of September: the figures read live, the
  * locale guard before any Intl call, one JSON-LD graph, the dated trigger of
  * mid-November without a countdown, the file audit as the door for those who
- * do not code, the agents' rail, the public review, the data-evt names.
- *
- * What changed: the title says what the product is and for whom, in the words
- * of positioning.ts ("checks the bank behind an IBAN before you pay"); the
- * first screen shows three answers the API really gave, the second the one
- * thing a checksum cannot say. The type and colours are the site's own: Bebas
- * Neue titles as on the other landings, Inter, JetBrains Mono, amber.
- *
- * Since 28/09/2026 the page turns into a magazine, « La revue », the layout
- * Claude-Alain chose among two mockups of direction D, chapter by chapter
- * (components/home/revue.css). Step 1: the cover, whose title fills its column
- * line by line; the lens chosen on 16/09, back under the cover with its input
- * on the left and its answer on the right; and chapter 01, where the film of
- * the three answers replaces the demo card (components/home/revue-film.tsx).
+ * do not code, the data-evt names. The site's own header and footer frame it.
  */
 
 // Title and description are generated per-locale by app/[locale]/layout.tsx —
@@ -66,21 +69,21 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 /**
  * Rendered once per locale and refreshed every hour by the CDN (audit
  * 2026-09-05, n° 1): the figures of /health change by the day at most, and the
- * checker's real call happens in the browser anyway.
+ * trial's real call happens in the browser anyway.
  */
 export const revalidate = 3600
 
 /* Every integration points to its package or its published code. */
 const INTEGRATIONS = [
-  { key: "ts", cmd: "npm install @ibanforge/sdk", href: "https://www.npmjs.com/package/@ibanforge/sdk" },
-  { key: "py", cmd: "pip install ibanforge", href: "https://pypi.org/project/ibanforge/" },
-  { key: "java", cmd: "com.ibanforge:ibanforge-sdk", href: "https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk" },
-  { key: "dotnet", cmd: "dotnet add package IBANforge.Sdk", href: "https://www.nuget.org/packages/IBANforge.Sdk" },
-  { key: "mcp", cmd: "npx -y ibanforge-mcp", href: "https://www.npmjs.com/package/ibanforge-mcp" },
-  { key: "n8n", cmd: "npm install n8n-nodes-ibanforge", href: "https://www.npmjs.com/package/n8n-nodes-ibanforge" },
-  { key: "odoo", cmd: "ibanforge_bank_autofill", href: "https://github.com/cammac-creator/ibanforge/tree/main/integrations/odoo" },
-  { key: "sheets", cmd: "=IBAN_CONTROLE(A2)", href: "/sheets" },
-  { key: "postman", cmd: "ibanforge.postman_collection.json", href: "https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman" },
+  { key: "ts", href: "https://www.npmjs.com/package/@ibanforge/sdk" },
+  { key: "py", href: "https://pypi.org/project/ibanforge/" },
+  { key: "java", href: "https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk" },
+  { key: "dotnet", href: "https://www.nuget.org/packages/IBANforge.Sdk" },
+  { key: "mcp", href: "https://www.npmjs.com/package/ibanforge-mcp" },
+  { key: "n8n", href: "https://www.npmjs.com/package/n8n-nodes-ibanforge" },
+  { key: "odoo", href: "https://github.com/cammac-creator/ibanforge/tree/main/integrations/odoo" },
+  { key: "sheets", href: "/sheets" },
+  { key: "postman", href: "https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman" },
 ] as const
 
 /* The add-on answers to one formula name per language (integrations/sheets/Code.gs). */
@@ -90,14 +93,24 @@ const SHEETS_FORMULA: Record<string, string> = {
   de: "=IBAN_PRUEFUNG(A2)",
 }
 
-const FIRST_CALL = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
-  -H "Content-Type: application/json" \\
-  -d '{"iban":"DE89370400440532013000"}'`
-
 const FAQ_COUNT = 5
 
-/* The two doors of the cover: the magazine's square buttons, full width of their column. */
-const COVER_BUTTON = "h-[52px] w-full rounded-[2px] px-[22px] text-base font-semibold"
+/* The magazine's square buttons: the two doors of the cover, the key of the ending. */
+const DOOR_BUTTON = "h-[52px] w-full rounded-[2px] px-[22px] text-base font-semibold"
+/* The key of the price table, a size smaller. */
+const PRICE_BUTTON = "h-[46px] rounded-[2px] px-[22px] text-[15.5px] font-semibold"
+
+/** A link inside a sentence: never parted from its arrow. */
+function Arrow({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {children}
+      <span className="rv-fl" aria-hidden="true">
+        {"↗"}
+      </span>
+    </>
+  )
+}
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -109,14 +122,12 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   if (!hasLocale(routing.locales, locale)) notFound()
   setRequestLocale(locale)
   const t = await getTranslations("home")
-  const verdict = await getTranslations("playground")
+  const playground = await getTranslations("playground")
   const liveStats = await getLandingStats()
 
   const countries = String(SUPPORTED_COUNTRIES)
   const registerCodes = t("coverage.registerCodes")
   const keyCodes = t("coverage.keyCodes")
-  const registerCount = registerCodes.split(",").length
-  const keyCount = keyCodes.split(",").length
   // "0,4" in French and German, the site's one number format.
   const latency = formatGrouped(P50_PROCESSING_MS, locale, 1)
 
@@ -126,6 +137,17 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`),
       )
     : null
+
+  /* The chapters, in the order of the issue: their anchor, number and kicker. */
+  const chapters = [
+    { id: "mod97", num: "01", kicker: t("problem.eyebrow") },
+    { id: "anatomy", num: "02", kicker: t("film.reading") },
+    { id: "try", num: "03", kicker: t("lens.hero.eyebrow") },
+    { id: "ways", num: "04", kicker: t("lens.gallery.eyebrow") },
+    { id: "coverage", num: "05", kicker: t("coverage.eyebrow") },
+    { id: "pricing", num: "06", kicker: t("pricing.eyebrow") },
+    { id: "faq", num: "07", kicker: t("faq.title") },
+  ]
 
   /* The film tells the three answers the live API gave on 26/09/2026: its
      figures and codes are data (the IBANs, 37040044, COBADEFFXXX), its words
@@ -170,31 +192,91 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
     { code: "37040044", label: t("problem.bank"), what: t("problem.bankWhat") },
     { code: "0532013000", label: t("problem.account"), what: t("problem.accountWhat") },
   ]
-
   const checksumItems = t.raw("problem.checksumItems") as string[]
   const addsItems = t.raw("problem.addsItems") as string[]
+
+  /* The trial: the tester's own words (home.lens.hero), the film's verdicts
+     (home.demo) and the verdict the playground shares (playground.verdict). */
+  const lens = t.raw("lens.hero") as Record<string, string>
+  const essai = essaiCopy(lens, t.raw("demo") as Record<string, string>, playground.raw("verdict") as Record<string, string>)
+
+  /* The three ways: the names of the gallery, the texts of the audiences. */
+  const gallery = t.raw("lens.gallery") as { eyebrow: string; title: string; items: { eyebrow: string }[] }
+  const wayNames = gallery.items.map((item) => splitNumbered(item.eyebrow))
+  const counter = counterFit(locale)
+  const voies: VoiesCopy = {
+    group: gallery.eyebrow,
+    ways: [
+      {
+        ...wayNames[0],
+        audience: t("audiences.devTitle"),
+        text: t("audiences.devText"),
+        link: { label: t("audiences.devLink"), href: localePath(locale, "/docs"), evt: "cta:docs" },
+      },
+      {
+        ...wayNames[1],
+        audience: t("audiences.financeTitle"),
+        text: t("audiences.financeText"),
+        link: { label: t("audiences.financeLink"), href: localePath(locale, "/audit"), evt: "cta:audit" },
+      },
+      {
+        ...wayNames[2],
+        audience: t("audiences.agentsTitle"),
+        text: t("audiences.agentsText"),
+        link: { label: t("audiences.agentsLink"), href: localePath(locale, "/agents"), evt: "cta:agents" },
+      },
+    ],
+    verdictOk: t("demo.verdictOk"),
+    frames: {
+      api: "API",
+      apiTag: t("audiences.devTitle"),
+      sheet: t("ways.sheet"),
+      sheetTag: "Google Sheets",
+      agent: t("ways.agent"),
+      agentTag: "MCP",
+    },
+    sheetNote: t("integrations.items.sheets"),
+    mcpNote: t("integrations.items.mcp"),
+    formula: SHEETS_FORMULA[locale] ?? SHEETS_FORMULA.en,
+    unit: t("ways.unit"),
+    flagged: t("ways.flagged"),
+    figure: t("ways.figure"),
+    caption: t("ways.caption"),
+    reasons: [t("demo.notAllocated", { code: "12345678" }), t("demo.checksum")],
+    counter: { total: AUDIT_TIERS[0].rows, sep: counter.sep, em: counter.em },
+    bankEm: BANK_FIT.em,
+  }
+
+  /* The four big figures: each read from the code or the messages. */
+  const figures: { value: string; unit?: string; label: string; codes: string | null }[] = [
+    { value: countries, label: t("coverage.figCountries"), codes: null },
+    { value: String(registerCodes.split(",").length), label: t("coverage.figRegisters"), codes: registerCodes },
+    { value: String(keyCodes.split(",").length), label: t("coverage.figKeys"), codes: keyCodes },
+    { value: latency, unit: "ms", label: t("coverage.figLatency"), codes: null },
+  ]
+
+  const integrationItems = INTEGRATIONS.map((item) => {
+    const external = item.href.startsWith("http")
+    return {
+      key: item.key,
+      ...splitMention(t(`integrations.items.${item.key}`)),
+      href: external ? item.href : localePath(locale, item.href),
+      external,
+    }
+  })
+
+  const packs = splitFrom(t("pricing.packsPrice"))
 
   const faq = Array.from({ length: FAQ_COUNT }, (_, i) => ({
     q: t(`faq.q${i}`),
     a: t(`faq.a${i}`, { trialWeekly: catalogue.restTrialWeekly, claimed: catalogue.claimedMonthly }),
   }))
 
-  const plans = [
-    { key: "try", featured: false },
-    { key: "key", featured: false },
-    { key: "pro", featured: true },
-    { key: "packs", featured: false },
-  ] as const
-
-  const integrationItems = INTEGRATIONS.map((item) => {
-    const external = item.href.startsWith("http")
-    const cmd = item.key === "sheets" ? (SHEETS_FORMULA[locale] ?? item.cmd) : item.cmd
-    return { ...item, cmd, href: external ? item.href : localePath(locale, item.href), external }
-  })
+  const fade = (delay: string) => ({ "--rv-d": delay }) as CSSProperties
 
   return (
-    <div className="home" data-landing="home-v3">
-      {/* ── 1. The cover: what it is, for whom, the two doors ───────────────
+    <div className="rv-page" data-landing="home-v4">
+      {/* ── The cover: what it is, for whom, the two doors, the contents ────
           Its title never moves: it is what the first screen paints. */}
       <section className="rv-couv" aria-labelledby="home-title">
         <div className="rv-grille rv-couv__haut">
@@ -210,13 +292,13 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           <div className="rv-couv__action">
             <p className="rv-couv__chapeau">{t("hero.description", { countries })}</p>
             <div className="rv-boutons">
-              <GetKeyButton variant="amber" className={COVER_BUTTON} evt="cta:key-hero">
+              <GetKeyButton variant="amber" className={DOOR_BUTTON} evt="cta:key-hero">
                 {t("hero.ctaKey")}
               </GetKeyButton>
               <Button
                 size="lg"
                 variant="outline"
-                className={COVER_BUTTON}
+                className={DOOR_BUTTON}
                 nativeButton={false}
                 render={<a href="#try" data-evt="cta:try-hero" />}
               >
@@ -233,337 +315,328 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             </Link>
           </div>
         </div>
+        <nav className="rv-grille rv-sommaire" aria-label={t("contents")}>
+          <ol className="rv-sommaire__liste">
+            {chapters.map((chapter) => (
+              <li key={chapter.id}>
+                <a href={`#${chapter.id}`}>
+                  <span className="rv-sommaire__num">{chapter.num}</span>
+                  {chapter.kicker}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
       </section>
 
-      {/* ── 2. The lens chosen on 16/09, under the cover, as one block: its
-          input on the left, its answer on the right, a real call to the API.
-          Its 3D starts by itself only on a capable device (lens-hero.tsx). */}
-      <div className="rv-lentille" id="try">
-        <div className="lens-frame">
-          <LensHero
-            copy={t.raw("lens.hero") as LensCopy}
-            verdictCopy={verdict.raw("verdict") as LensCopy}
-            playgroundHref={localePath(locale, "/playground")}
-            auditHref={localePath(locale, "/audit")}
+      {/* ── 01. Why a checksum is not enough, told by the film ────────────── */}
+      <section className="rv-chap" id="mod97" aria-labelledby="home-problem">
+        <div className="rv-grille rv-chap__corps">
+          <ChapterHead
+            num="01"
+            kicker={t("problem.eyebrow")}
+            title={t("problem.title")}
+            lead={t("problem.lead")}
+            id="home-problem"
+            large
           />
         </div>
-      </div>
-
-      {/* ── 3. Chapter 01: why a checksum is not enough, told by the film ─── */}
-      <section className="rv-chap" aria-labelledby="home-problem">
-        <header className="rv-grille rv-ouv">
-          <i className="rv-filet" data-rv="filet" aria-hidden="true" />
-          <p className="rv-num" aria-hidden="true" data-rv="num">
-            01
-          </p>
-          <div className="rv-ouv__texte">
-            <p className="rv-kicker" data-rv="texte">
-              {t("problem.eyebrow")}
-            </p>
-            <h2 className="rv-h2 rv-bebas" id="home-problem" data-rv="titre" style={{ "--rv-d": ".08s" } as CSSProperties}>
-              <MaskedWords text={t("problem.title")} />
-            </h2>
-            <p className="rv-chapeau" data-rv="texte" style={{ "--rv-d": ".35s" } as CSSProperties}>
-              {t("problem.lead")}
-            </p>
-          </div>
-        </header>
         <RevueFilm copy={film} />
       </section>
 
-      {/* ── 4. The same IBAN, read part by part: the anatomy of an IBAN ───── */}
-      <section className="home-section" aria-labelledby="home-reading">
-        <div className="home-wrap">
-          <div className="home-center">
-            <span className="home-eyebrow">{t("film.reading")}</span>
-            <h2 className="home-h2" id="home-reading">
-              {t("problem.readTitle")}
-            </h2>
-            <p className="home-lead">{t("problem.readLead")}</p>
-          </div>
-          <IbanAnatomy parts={anatomy} caption={t("problem.anatomyCaption")} />
-          <div className="home-versus">
-            <Reveal className="home-card muted">
-              <h3>{t("problem.checksumTitle")}</h3>
-              <ul>
-                {checksumItems.map((item) => (
-                  <li key={item}>{item}</li>
+      {/* ── 02. The same IBAN, read part by part ─────────────────────────── */}
+      <section className="rv-chap" id="anatomy" aria-labelledby="home-reading">
+        <div className="rv-grille rv-chap__corps">
+          <ChapterHead
+            num="02"
+            kicker={t("film.reading")}
+            title={t("problem.readTitle")}
+            lead={t("problem.readLead")}
+            id="home-reading"
+          />
+          <figure className="rv-fig" data-rv="texte" style={fade(".2s")}>
+            <ol className="rv-anat">
+              {anatomy.map((part) => (
+                <li className="rv-anat__part" key={part.code}>
+                  <p className="rv-anat__val">{part.code}</p>
+                  <p className="rv-kicker rv-anat__lab">{part.label}</p>
+                  <p className="rv-anat__txt">{part.what}</p>
+                </li>
+              ))}
+            </ol>
+            <div className="rv-comp">
+              <div className="rv-comp__col rv-comp__col--m97">
+                <p className="rv-kicker rv-comp__tete">{t("problem.checksumTitle")}</p>
+                <ul className="rv-comp__liste">
+                  {checksumItems.map((item, i) => (
+                    <li key={item}>
+                      <span className="rv-comp__num" aria-hidden="true">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rv-comp__col rv-comp__col--ibf">
+                <p className="rv-kicker rv-comp__tete">{t("problem.addsTitle")}</p>
+                <ul className="rv-comp__liste">
+                  {addsItems.map((item, i) => (
+                    <li key={item}>
+                      <span className="rv-comp__num" aria-hidden="true">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      {/* ── 03. A real check, no sign-up ─────────────────────────────────── */}
+      <section className="rv-chap" id="try" aria-labelledby="home-try">
+        <div className="rv-grille rv-chap__corps">
+          <ChapterHead num="03" kicker={lens.eyebrow} title={lens.title} id="home-try" />
+          <figure className="rv-fig">
+            <RevueEssai copy={essai} playgroundHref={localePath(locale, "/playground")} />
+          </figure>
+        </div>
+      </section>
+
+      {/* ── 04. Three ways to use it, one scene ──────────────────────────── */}
+      <section className="rv-chap" id="ways" aria-labelledby="home-ways">
+        <div className="rv-grille rv-chap__corps">
+          <ChapterHead
+            num="04"
+            kicker={gallery.eyebrow}
+            title={gallery.title}
+            lead={t("audiences.lead")}
+            id="home-ways"
+          />
+          <RevueVoies copy={voies} />
+        </div>
+      </section>
+
+      {/* ── 05. Coverage and trust: figures read from the code ────────────── */}
+      <section className="rv-chap" id="coverage" aria-labelledby="home-coverage">
+        <div className="rv-grille rv-chap__corps">
+          <ChapterHead
+            num="05"
+            kicker={t("coverage.eyebrow")}
+            title={t("coverage.title")}
+            lead={t("coverage.lead")}
+            id="home-coverage"
+          />
+          <figure className="rv-fig">
+            <dl className="rv-chiffres" data-rv="chiffres">
+              {figures.map((figure, i) => (
+                <div className="rv-chiffre" key={figure.label} style={{ "--i": i } as CSSProperties}>
+                  <dt className="rv-chiffre__val">
+                    <span className="rv-chiffre__vi">
+                      {figure.value}
+                      {figure.unit && <span className="rv-chiffre__unite">{figure.unit}</span>}
+                    </span>
+                  </dt>
+                  <dd>
+                    <p className="rv-chiffre__lab">{figure.label}</p>
+                    {figure.codes && (
+                      <p className="rv-chiffre__pays" style={{ "--j": i === 1 ? 0 : 1 } as CSSProperties}>
+                        {figure.codes.split(", ").map((country, k) => (
+                          <Fragment key={country}>
+                            {k > 0 && ", "}
+                            <span style={{ "--k": k } as CSSProperties}>{country}</span>
+                          </Fragment>
+                        ))}
+                      </p>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div className="rv-colophon">
+              <p className="rv-kicker">{t("coverage.fact0Title")}</p>
+              <p className="rv-colophon__sources">
+                {t("coverage.sources")} {refreshedOn ? t("coverage.sourcesDated", { date: refreshedOn }) : null}{" "}
+                <Link className="rv-lien rv-nw" href={localePath(locale, "/sources")}>
+                  <Arrow>{t("coverage.sourcesLink")}</Arrow>
+                </Link>
+              </p>
+            </div>
+            <div className="rv-integ">
+              <p className="rv-kicker">{t("integrations.heading")}</p>
+              <ul className="rv-integ__liste">
+                {integrationItems.map((item) => (
+                  <li key={item.key}>
+                    <a href={item.href} {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+                      <span>{item.name}</span>
+                      {item.mention && (
+                        <>
+                          {" "}
+                          <small>({item.mention})</small>
+                        </>
+                      )}
+                    </a>
+                  </li>
                 ))}
               </ul>
-            </Reveal>
-            <Reveal delay={80} className="home-card">
-              <h3>{t("problem.addsTitle")}</h3>
-              <ul>
-                {addsItems.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </Reveal>
-          </div>
+            </div>
+          </figure>
         </div>
       </section>
 
-      {/* ── 5. Three ways to use it: the brand illustrations of 16/09 ─────── */}
-      <LensGallery copy={t.raw("lens.gallery") as GalleryCopy} locale={locale} />
-
-      {/* ── 6. For whom: developers, finance teams, AI agents ──────────────── */}
-      <section className="home-section" aria-labelledby="home-audiences">
-        <div className="home-wrap">
-          <div className="home-center">
-            <span className="home-eyebrow">{t("audiences.eyebrow")}</span>
-            <h2 className="home-h2" id="home-audiences">
-              {t("audiences.title")}
-            </h2>
-            <p className="home-lead">{t("audiences.lead")}</p>
-          </div>
-          <div className="home-cards">
-            <Reveal className="home-card">
-              <span className="home-card-icon">
-                <CodeXml aria-hidden="true" />
-              </span>
-              <h3>{t("audiences.devTitle")}</h3>
-              <p>{t("audiences.devText")}</p>
-              <code className="home-code">{FIRST_CALL}</code>
-              <Link href={localePath(locale, "/docs")} className="home-card-link" data-evt="cta:docs">
-                {t("audiences.devLink")}
-              </Link>
-            </Reveal>
-            <Reveal delay={70} className="home-card">
-              <span className="home-card-icon">
-                <FileSpreadsheet aria-hidden="true" />
-              </span>
-              <h3>{t("audiences.financeTitle")}</h3>
-              <p>{t("audiences.financeText")}</p>
-              <Link href={localePath(locale, "/audit")} className="home-card-link" data-evt="cta:audit">
-                {t("audiences.financeLink")}
-              </Link>
-            </Reveal>
-            <Reveal delay={140} className="home-card">
-              <span className="home-card-icon">
-                <Bot aria-hidden="true" />
-              </span>
-              <h3>{t("audiences.agentsTitle")}</h3>
-              <p>{t("audiences.agentsText")}</p>
-              <code className="home-code">npx -y ibanforge-mcp</code>
-              <Link href={localePath(locale, "/agents")} className="home-card-link" data-evt="cta:agents">
-                {t("audiences.agentsLink")}
-              </Link>
-            </Reveal>
-          </div>
-
-          {/* What installs today, as a slow ribbon (a plain list without motion). */}
-          <IntegrationRibbon
-            label={t("integrations.heading")}
-            description={t("integrations.sub")}
-            pause={t("integrations.pause")}
-            play={t("integrations.play")}
-          >
-            {[0, 1].map((copy) =>
-              integrationItems.map((item) => (
-                <a
-                  key={`${copy}-${item.key}`}
-                  href={item.href}
-                  className="home-integ"
-                  aria-hidden={copy === 1 ? true : undefined}
-                  tabIndex={copy === 1 ? -1 : undefined}
-                  {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                >
-                  <span>{t(`integrations.items.${item.key}`)}</span>
-                  <code>{item.cmd}</code>
-                </a>
-              )),
-            )}
-          </IntegrationRibbon>
-        </div>
-      </section>
-
-      {/* ── 7. Coverage and trust: figures read from the code, facts ───────── */}
-      <section className="home-section" aria-labelledby="home-coverage">
-        <div className="home-wrap">
-          <div className="home-center">
-            <span className="home-eyebrow">{t("coverage.eyebrow")}</span>
-            <h2 className="home-h2" id="home-coverage">
-              {t("coverage.title")}
-            </h2>
-            <p className="home-lead">{t("coverage.lead")}</p>
-          </div>
-          <Reveal className="home-figures">
-            <div className="home-figure">
-              <b>{countries}</b>
-              <span>{t("coverage.figCountries")}</span>
-            </div>
-            <div className="home-figure">
-              <b>{registerCount}</b>
-              <span>{t("coverage.figRegisters")}</span>
-              <code>{registerCodes}</code>
-            </div>
-            <div className="home-figure">
-              <b>{keyCount}</b>
-              <span>{t("coverage.figKeys")}</span>
-              <code>{keyCodes}</code>
-            </div>
-            <div className="home-figure">
-              <b>
-                {latency}
-                <small>ms</small>
-              </b>
-              <span>{t("coverage.figLatency")}</span>
-            </div>
-          </Reveal>
-          <div className="home-cards home-cards-4">
-            {[Globe, Lock, ShieldCheck, Info].map((Icon, i) => (
-              <Reveal key={i} delay={i * 60} className="home-card">
-                <span className="home-card-icon">
-                  <Icon aria-hidden="true" />
-                </span>
-                <h3>{t(`coverage.fact${i}Title`)}</h3>
-                <p>{t(`coverage.fact${i}Text`)}</p>
-                {i === 1 && (
-                  <Link href={localePath(locale, "/legal/dpa")} className="home-card-link">
-                    DPA 4.7
-                  </Link>
-                )}
-              </Reveal>
-            ))}
-          </div>
-          <p className="home-sources">
-            {t("coverage.sources")} {refreshedOn ? t("coverage.sourcesDated", { date: refreshedOn }) : null}{" "}
-            <Link href={localePath(locale, "/sources")}>{t("coverage.sourcesLink")}</Link>
-          </p>
-        </div>
-      </section>
-
-      {/* ── 8. Pricing: the plans people pay first, x402 in one line ───────── */}
-      <section className="home-section" aria-labelledby="home-pricing">
-        <div className="home-wrap">
-          <div className="home-center">
-            <span className="home-eyebrow">{t("pricing.eyebrow")}</span>
-            <h2 className="home-h2" id="home-pricing">
-              {t("pricing.title")}
-            </h2>
-            <p className="home-lead">{t("pricing.lead")}</p>
-          </div>
-          <div className="home-cards home-cards-4">
-            {plans.map((plan, i) => (
-              <Reveal key={plan.key} delay={i * 60} className={`home-card home-plan${plan.featured ? " featured" : ""}`}>
-                <span className={`home-tag${plan.featured ? " amber" : ""}`}>{t(`pricing.${plan.key}Name`)}</span>
-                <p className="home-price">
-                  {t(`pricing.${plan.key}Price`)}
-                  {plan.key === "pro" && <small>{t("pricing.proUnit")}</small>}
-                </p>
-                <p>
-                  {t(`pricing.${plan.key}Text`, {
-                    trialWeekly: catalogue.restTrialWeekly,
-                    claimed: catalogue.claimedMonthly,
-                  })}
-                </p>
-                {plan.key === "try" ? (
-                  <a href="#try" className="home-card-link" data-evt="cta:try-pricing">
+      {/* ── 06. Prices, the x402 line, the dated Swiss deadline ──────────────
+          Claude-Alain's decision of 22/09/2026: the month in large, never a
+          countdown (a precision claim about what happens to a payment on that
+          day is not ours to make). */}
+      <section className="rv-chap" id="pricing" aria-labelledby="home-pricing">
+        <div className="rv-grille rv-chap__corps">
+          <ChapterHead
+            num="06"
+            kicker={t("pricing.eyebrow")}
+            title={t("pricing.title")}
+            lead={t("pricing.lead")}
+            id="home-pricing"
+          />
+          <figure className="rv-fig" data-rv="texte" style={fade(".2s")}>
+            <div className="rv-prix">
+              <div className="rv-formule">
+                <p className="rv-kicker rv-formule__nom">{t("pricing.tryName")}</p>
+                <p className="rv-formule__prix">{t("pricing.tryPrice")}</p>
+                <p className="rv-formule__txt">
+                  <ApiText text={t("pricing.tryText", { trialWeekly: catalogue.restTrialWeekly })} />{" "}
+                  <a className="rv-lien rv-nw" href="#try" data-evt="cta:try-pricing">
                     {t("pricing.tryCta")}
+                    <span className="rv-fl" aria-hidden="true">
+                      {"↑"}
+                    </span>
                   </a>
-                ) : plan.key === "key" ? (
-                  <GetKeyButton variant="amber" size="default" className="mt-auto w-full" evt="cta:key-pricing">
-                    {t("pricing.keyCta")}
-                  </GetKeyButton>
-                ) : (
-                  <Link href={localePath(locale, "/pricing")} className="home-card-link" data-evt={`cta:pricing-${plan.key}`}>
-                    {t(`pricing.${plan.key}Cta`)}
+                </p>
+              </div>
+              <div className="rv-formule rv-formule--cle">
+                <p className="rv-kicker rv-formule__nom">{t("pricing.keyName")}</p>
+                <p className="rv-formule__prix">{t("pricing.keyPrice")}</p>
+                <p className="rv-formule__txt">{t("pricing.keyText", { claimed: catalogue.claimedMonthly })}</p>
+                <GetKeyButton variant="amber" size="default" className={`rv-formule__cta ${PRICE_BUTTON}`} evt="cta:key-pricing">
+                  {t("pricing.keyCta")}
+                </GetKeyButton>
+              </div>
+              <div className="rv-formule">
+                <p className="rv-kicker rv-formule__nom">{t("pricing.proName")}</p>
+                <p className="rv-formule__prix">
+                  <BebasFigure text={t("pricing.proPrice")} />
+                  <small>{t("pricing.proUnit")}</small>
+                </p>
+                <p className="rv-formule__txt">
+                  {t("pricing.proText")}{" "}
+                  <Link className="rv-lien rv-nw" href={localePath(locale, "/pricing")} data-evt="cta:pricing-pro">
+                    <Arrow>{t("pricing.proCta")}</Arrow>
                   </Link>
-                )}
-              </Reveal>
-            ))}
-          </div>
-          <p className="home-plans-foot">
-            {t("pricing.agents")}{" "}
-            <Link href={localePath(locale, "/pricing")} data-evt="cta:pricing">
-              {t("pricing.link")}
-            </Link>
-          </p>
+                </p>
+              </div>
+              <div className="rv-formule">
+                <p className="rv-kicker rv-formule__nom">{t("pricing.packsName")}</p>
+                <p className="rv-formule__prix">
+                  {packs.from && <small className="rv-formule__des">{packs.from}</small>}
+                  <BebasFigure text={packs.amount} />
+                </p>
+                <p className="rv-formule__txt">
+                  {t("pricing.packsText")}{" "}
+                  <Link className="rv-lien rv-nw" href={localePath(locale, "/pricing")} data-evt="cta:pricing-packs">
+                    <Arrow>{t("pricing.packsCta")}</Arrow>
+                  </Link>
+                </p>
+              </div>
+              <div className="rv-formule rv-formule--audit">
+                <p className="rv-kicker rv-formule__nom">{t("pricing.auditName")}</p>
+                <p className="rv-formule__txt">{t("pricing.auditText")}</p>
+                <p className="rv-formule__montants">
+                  {AUDIT_TIERS.map((tier) => (
+                    <span className="rv-formule__montant" key={tier.price}>
+                      <b>
+                        <BebasFigure text={formatUsd(tier.price, locale)} />
+                      </b>
+                      <span>{t("pricing.auditUpTo", { rows: formatGrouped(tier.rows, locale) })}</span>
+                    </span>
+                  ))}
+                </p>
+                <p className="rv-formule__cta">
+                  <Link className="rv-lien" href={localePath(locale, "/audit")} data-evt="cta:audit-pricing">
+                    <Arrow>{t("audiences.financeLink")}</Arrow>
+                  </Link>
+                </p>
+              </div>
+            </div>
+            <p className="rv-prix__note">
+              {t("pricing.agents")}{" "}
+              <Link className="rv-lien rv-nw" href={localePath(locale, "/pricing")} data-evt="cta:pricing">
+                {t("pricing.link")}
+              </Link>
+            </p>
+            <div className="rv-echeance">
+              <p className="rv-echeance__date">{t("deadline.window")}</p>
+              <p className="rv-echeance__lab">{t("deadline.windowLabel")}</p>
+              <p className="rv-echeance__txt">
+                <ApiText text={t("deadline.check")} />{" "}
+                <Link
+                  className="rv-lien rv-nw"
+                  href={localePath(locale, "/docs/structured-addresses")}
+                  data-evt="cta:rules"
+                >
+                  <Arrow>{t("deadline.cta")}</Arrow>
+                </Link>
+              </p>
+            </div>
+          </figure>
         </div>
       </section>
 
-      {/* ── 9. The dated trigger: mid-November 2026, never a countdown ────────
-          Claude-Alain's decision of 22/09/2026: the month in the title, SIX's
-          day in the body, no day count (a precision claim about what happens
-          to a payment on that day is not ours to make). */}
-      <section className="home-deadline" aria-labelledby="home-deadline">
-        <div className="home-wrap home-deadline-inner">
-          <p className="home-deadline-when">
-            {t("deadline.window")}
-            <small>{t("deadline.windowLabel")}</small>
-          </p>
-          <div>
-            <h2 className="sr-only" id="home-deadline">
-              {t("deadline.heading")}
-            </h2>
-            <p>{t("deadline.band")}</p>
-          </div>
-          <div className="home-deadline-links">
-            <Button size="sm" variant="amber" nativeButton={false} render={<Link href={localePath(locale, "/docs/structured-addresses")} data-evt="cta:rules" />}>
-              {t("deadline.cta")}
-            </Button>
-            <Button size="sm" variant="outline" nativeButton={false} render={<Link href={localePath(locale, "/audit")} data-evt="cta:audit-deadline" />}>
-              {t("audiences.financeLink")}
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 10. Independently reviewed ──────────────────────────────────────── */}
-      <section className="home-section" aria-labelledby="home-reviewed">
-        <div className="home-wrap home-quote">
-          <span className="home-eyebrow" id="home-reviewed">
-            {t("reviewed.label")}
-          </span>
-          <blockquote>“{t("reviewed.quote")}”</blockquote>
-          {t("reviewed.quoteTranslation") && <p>{t("reviewed.quoteTranslation")}</p>}
-          <p>{t("reviewed.context")}</p>
-          <p className="links">
-            <a href="https://github.com/api-search/inbox/issues/3" target="_blank" rel="noopener noreferrer">
-              {t("reviewed.linkReview")}
-            </a>
-            <Link href={localePath(locale, "/blog/2026-08-11-graded-by-a-catalog-that-never-read-us")}>
-              {t("reviewed.linkStory")}
-            </Link>
-          </p>
-        </div>
-      </section>
-
-      {/* ── 11. Questions ─────────────────────────────────────────────────── */}
-      <section className="home-section" aria-labelledby="home-faq">
-        <div className="home-wrap">
-          <div className="home-center">
-            <h2 className="home-h2" id="home-faq">
-              {t("faq.title")}
-            </h2>
-          </div>
-          <div className="home-faq">
+      {/* ── 07. Questions ────────────────────────────────────────────────── */}
+      <section className="rv-chap" id="faq" aria-labelledby="home-faq">
+        <div className="rv-grille rv-chap__corps">
+          <ChapterHead num="07" title={t("faq.title")} id="home-faq" />
+          <div className="rv-fig rv-faq" data-rv="texte" style={fade(".2s")}>
             {faq.map((item) => (
-              <details key={item.q}>
-                <summary>{item.q}</summary>
-                <p>{item.a}</p>
+              <details className="rv-faq__item" key={item.q}>
+                <summary className="rv-faq__q">{item.q}</summary>
+                <div className="rv-faq__r">
+                  <p>
+                    <ApiText text={item.a} />
+                  </p>
+                </div>
               </details>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── 12. The last call, over a discreet reflection of the lens (his
-          request of 16/09 for this block) ─────────────────────────────── */}
-      <section className="home-final" aria-labelledby="home-final">
-        <div className="home-final-bg" aria-hidden="true">
-          <Image src={lensAssets.poster} alt="" width={1707} height={769} sizes="100vw" loading="lazy" />
-        </div>
-        <div className="home-wrap">
-          <h2 id="home-final">{t("cta.title")}</h2>
-          <p>{t("cta.text")}</p>
-          <div className="home-hero-cta">
-            <GetKeyButton variant="amber" className="px-8" evt="cta:key-final">
-              {t("cta.getKey")}
-            </GetKeyButton>
-            <Button size="lg" variant="outline" className="px-8" nativeButton={false} render={<Link href={localePath(locale, "/docs")} data-evt="cta:docs-final" />}>
-              {t("cta.docs")}
-            </Button>
+      {/* ── The ending: the verdict again, then the free key ─────────────── */}
+      <section className="rv-fin" aria-labelledby="home-final">
+        <div className="rv-grille rv-fin__grille">
+          <i className="rv-filet" data-rv="filet" aria-hidden="true" />
+          <div className="rv-fin__titre-bloc">
+            <p className="rv-fin__preuve" data-rv="texte">
+              <span className="rv-fin__iban">
+                DE65 <span className="rv-fin__raye">1234 5678</span> 0532 0130 00
+              </span>
+              <span className="rv-fin__verdict">{film.stopLines.join(" ")}</span>
+            </p>
+            <FinTitle locale={locale} text={t("cta.title")} id="home-final" />
+          </div>
+          <div className="rv-fin__action" data-rv="texte" style={fade(".4s")}>
+            <p className="rv-fin__chapeau">{t("cta.text")}</p>
+            <div className="rv-boutons">
+              <GetKeyButton variant="amber" className={DOOR_BUTTON} evt="cta:key-final">
+                {t("cta.getKey")}
+              </GetKeyButton>
+            </div>
+            <p className="rv-fin__doc">
+              <Link className="rv-lien" href={localePath(locale, "/docs")} data-evt="cta:docs-final">
+                <Arrow>{t("cta.docs")}</Arrow>
+              </Link>
+            </p>
           </div>
         </div>
       </section>

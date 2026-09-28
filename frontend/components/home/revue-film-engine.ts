@@ -1,4 +1,5 @@
 import { gsap } from "gsap"
+import { DOUX, E } from "./revue-ease"
 
 /*
  * The motion of the home film, loaded when the film comes near the screen
@@ -51,43 +52,6 @@ const LIGNE = "#3f3f46"
 const S = "power3.in"
 const L = "sine.inOut"
 
-/* A cubic Bézier, as in CSS: the signature curve and a softer one for the focus. */
-function bezier(x1: number, y1: number, x2: number, y2: number): (x: number) => number {
-  const cx = 3 * x1
-  const bx = 3 * (x2 - x1) - cx
-  const ax = 1 - cx - bx
-  const cy = 3 * y1
-  const by = 3 * (y2 - y1) - cy
-  const ay = 1 - cy - by
-  const sx = (t: number) => ((ax * t + bx) * t + cx) * t
-  const sy = (t: number) => ((ay * t + by) * t + cy) * t
-  const dx = (t: number) => (3 * ax * t + 2 * bx) * t + cx
-  const solve = (x: number) => {
-    let t = x
-    for (let i = 0; i < 8; i++) {
-      const e = sx(t) - x
-      if (Math.abs(e) < 1e-6) return t
-      const d = dx(t)
-      if (Math.abs(d) < 1e-6) break
-      t -= e / d
-    }
-    let lo = 0
-    let hi = 1
-    t = x
-    for (let i = 0; i < 40; i++) {
-      const e = sx(t)
-      if (Math.abs(e - x) < 1e-6) return t
-      if (x > e) lo = t
-      else hi = t
-      t = (lo + hi) / 2
-    }
-    return t
-  }
-  return (x) => (x <= 0 ? 0 : x >= 1 ? 1 : sy(solve(x)))
-}
-
-const E = bezier(0.2, 0.8, 0.2, 1)
-const DOUX = bezier(0.16, 1, 0.3, 1)
 const CLEARED = "transform,opacity,visibility,filter,color,backgroundColor,--rvap"
 
 export function createFilm(root: HTMLElement, options: FilmOptions): FilmHandle {

@@ -62,6 +62,7 @@
     "share": {
       "tagline": "ibanforge.com · API REST · SDK · MCP"
     },
+    "contents": "Au sommaire",
     "integrations": {
       "heading": "Dans votre langage, votre ERP, votre tableur",
       "sub": "Chaque paquet ci-dessous existe et s’installe aujourd’hui. Ce qui n’est pas encore publié le dit.",
@@ -106,7 +107,7 @@
       "note1": "Sans carte",
       "note2": "Sans e-mail pour commencer",
       "note3": "API, SDK, tableurs et agents IA",
-      "alt": "Pas développeur ? Vérifiez un fichier fournisseurs sans écrire de code"
+      "alt": "Pas développeur ? Vérifiez un fichier fournisseurs sans écrire de code"
     },
     "demo": {
       "aria": "Trois réponses réellement données par l’API, jouées l’une après l’autre",
@@ -132,8 +133,8 @@
       "verdictOk": "Banque confirmée",
       "verdictStop": "Ne pas envoyer",
       "verdictFix": "Vérifier la saisie",
-      "noteOk": "Étape suivante : contrôler la banque avant le virement si votre procédure le demande.",
-      "noteStop": "Le contrôle mod-97 passe, mais aucune banque ne détient ce code. L’API répond : « Do not send ».",
+      "noteOk": "Étape suivante : contrôler la banque avant le virement si votre procédure le demande.",
+      "noteStop": "Le contrôle mod-97 passe, mais aucune banque ne détient ce code. L’API répond : « Do not send ».",
       "noteFix": "Un caractère est faux. Redemandez l’IBAN."
     },
     "film": {
@@ -166,7 +167,7 @@
       "eyebrow": "Pourquoi le mod-97 ne suffit pas",
       "title": "Un IBAN valide peut ne mener à aucune banque",
       "lead": "Le contrôle mod-97 prouve seulement que les chiffres s’additionnent. Un IBAN peut le réussir avec un code banque qu’aucune banque ne détient, ou retiré après une fusion.",
-      "readTitle": "Le même IBAN, lu partie par partie",
+      "readTitle": "Le même IBAN, lu partie par partie",
       "readLead": "IBANforge lit chaque partie de l’IBAN et dit quels contrôles il a pu faire.",
       "anatomyCaption": "Le même IBAN, lu partie par partie.",
       "country": "Pays",
@@ -185,7 +186,7 @@
       ],
       "addsTitle": "Ce qu’IBANforge ajoute",
       "addsItems": [
-        "Si le code banque est attribué, selon le registre national (DE, AT, BE, SK, CZ, BG, CH, LI)",
+        "Si le code banque est attribué, selon le registre national",
         "La banque et son BIC, chacun avec sa source, et sa date quand elle est connue",
         "La clé nationale du numéro de compte, là où elle est publiée et contrôlée",
         "L’accessibilité SEPA et la préparation à la vérification du bénéficiaire, d’après les registres de l’EPC quand ils listent la banque",
@@ -201,11 +202,19 @@
       "devText": "Un appel REST, ou un SDK TypeScript, Python, Java ou .NET. La réponse est un JSON, avec une étape suivante documentée.",
       "devLink": "Lire la documentation",
       "financeTitle": "Équipes finance",
-      "financeText": "Déposez un fichier CSV ou Excel de fournisseurs : l’aperçu gratuit compte ce qu’il faut corriger et montre les premières lignes signalées, IBAN masqués. Le classeur annoté, chaque ligne en entier, coûte 149 $ jusqu’à 5 000 lignes, ou 349 $ jusqu’à 20 000 lignes.",
+      "financeText": "Déposez un fichier CSV ou Excel de fournisseurs : l’aperçu gratuit compte ce qu’il faut corriger et montre les premières lignes signalées, IBAN masqués.",
       "financeLink": "Vérifier un fichier fournisseurs",
       "agentsTitle": "Agents IA",
       "agentsText": "Un serveur MCP pour Claude, Cursor et tout client MCP, installé en une ligne. Les agents sans compte peuvent payer à l’appel en USDC avec x402.",
       "agentsLink": "Connecter un agent"
+    },
+    "ways": {
+      "sheet": "Tableur",
+      "agent": "Agent IA",
+      "unit": "lignes",
+      "flagged": "Lignes signalées",
+      "figure": "Fig. 2",
+      "caption": "Illustration : IBAN masqués, sauf les lignes signalées."
     },
     "coverage": {
       "eyebrow": "Couverture et confiance",
@@ -225,7 +234,7 @@
       "fact2Text": "La banque derrière l’IBAN est contrôlée sur les listes OFAC, EU, UN (BIC8). Le titulaire du compte ne l’est jamais.",
       "fact3Title": "Franc sur ses limites",
       "fact3Text": "Il ne vérifie pas qui détient le compte : ce contrôle du nom revient à la banque du bénéficiaire, par la vérification du bénéficiaire (VoP).",
-      "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP et Bank of England (List of Banks, 2026-09), relus au moins chaque mois, plus une copie publique de l’annuaire SWIFT figée en janvier 2018, qui fait encore environ deux tiers de l’annuaire BIC. Chaque réponse nomme sa source.",
+      "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP et Bank of England (List of Banks, 2026-09), relus au moins chaque mois, plus une copie publique de l’annuaire SWIFT figée en janvier 2018, qui fait encore environ deux tiers de l’annuaire BIC.",
       "sourcesDated": "Dernière mise à jour le {date}.",
       "sourcesLink": "Chaque source et sa licence"
     },
@@ -244,27 +253,30 @@
       "proName": "Pro",
       "proPrice": "29 $",
       "proUnit": "/ mois",
-      "proText": "10 000 requêtes par mois sur la même clé. Résiliable à tout moment : la clé reste.",
+      "proText": "10 000 requêtes par mois sur la même clé. Résiliable à tout moment : la clé reste.",
       "proCta": "Voir Pro",
       "packsName": "Packs de crédits",
       "packsPrice": "dès 4 $",
       "packsText": "Des crédits prépayés sur la même clé, par carte ou en USDC.",
       "packsCta": "Voir les packs",
-      "agents": "Les agents IA peuvent aussi payer à l’appel en USDC avec x402 : sans compte, sans passage en caisse.",
+      "auditName": "Audit de fichier",
+      "auditText": "L’aperçu gratuit compte ce qu’il faut corriger. Le classeur annoté, chaque ligne en entier :",
+      "auditUpTo": "jusqu’à {rows} lignes",
+      "agents": "Les agents IA peuvent aussi payer à l’appel en USDC avec x402 : sans compte, sans passage en caisse.",
       "link": "Voir tous les tarifs"
     },
     "faq": {
       "title": "Questions",
-      "q0": "IBANforge vérifie-t-il qui détient le compte ?",
+      "q0": "IBANforge vérifie-t-il qui détient le compte ?",
       "a0": "Non. Il vérifie l’IBAN et la banque qui se trouve derrière. Le rapprochement du nom du titulaire est la vérification du bénéficiaire (VoP), faite par la banque du bénéficiaire.",
-      "q1": "Quels pays reçoivent un verdict du registre national ?",
-      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI : là, le registre national tranche si un code banque est attribué. Dans les autres pays, la réponse nomme la banque d’après un registre partiel ou une carte composite, et dit qu’elle ne peut pas exclure un code.",
-      "q2": "Puis-je essayer sans m’inscrire ?",
+      "q1": "Quels pays reçoivent un verdict du registre national ?",
+      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI : là, le registre national tranche si un code banque est attribué. Dans les autres pays, la réponse nomme la banque d’après un registre partiel ou une carte composite, et dit qu’elle ne peut pas exclure un code.",
+      "q2": "Puis-je essayer sans m’inscrire ?",
       "a2": "Oui. Sans aucune clé, POST /v1/iban/validate répond jusqu’à {trialWeekly} validations par semaine depuis chaque adresse, en entier.",
-      "q3": "Que donne une clé gratuite ?",
+      "q3": "Que donne une clé gratuite ?",
       "a3": "Tous les endpoints, avec {claimed} requêtes par mois une fois la clé réclamée avec une adresse e-mail. La créer ne demande ni carte ni e-mail.",
-      "q4": "Les IBAN envoyés sont-ils stockés ?",
-      "a4": "Pas par la validation : chaque IBAN est contrôlé en mémoire et jamais écrit. L’audit de fichier garde son rapport, qui reprend vos colonnes, 2 heures sans paiement ou 24 heures après paiement, puis l’efface. La politique de confidentialité détaille les métadonnées de requête gardées au plus 12 mois."
+      "q4": "Les IBAN envoyés sont-ils stockés ?",
+      "a4": "Pas par la validation : chaque IBAN est contrôlé en mémoire et jamais écrit. L’audit de fichier garde son rapport, qui reprend vos colonnes, 2 heures sans paiement ou 24 heures après paiement, puis l’efface. La politique de confidentialité détaille les métadonnées de requête gardées au plus 12 mois."
     },
     "cta": {
       "title": "Vérifiez votre premier IBAN en deux minutes",
@@ -325,7 +337,7 @@
       },
       "gallery": {
         "eyebrow": "Trois façons de l’utiliser",
-        "title": "Un IBAN, un fichier entier, ou dans vos outils",
+        "title": "Un IBAN, un fichier entier, ou dans vos outils",
         "intro": "Vérifiez un IBAN dans un formulaire, contrôlez chaque ligne d’un fichier fournisseurs avant un paiement, ou appelez l’API depuis vos logiciels et vos agents.",
         "items": [
           {
@@ -371,6 +383,7 @@
       "heading": "Mi-novembre 2026 : la Suisse cesse de traiter les adresses non structurées",
       "band": "À partir de la mi-novembre 2026, les ordres de paiement relevant des Swiss Payment Standards doivent respecter les exigences d’adresse lorsqu’une adresse est utilisée ; SIX publie le 14 novembre. POST /v1/address/check dit gratuitement si une adresse passe.",
       "cta": "Lire les règles, rail par rail",
+      "check": "POST /v1/address/check dit gratuitement si une adresse passe.",
       "window": "mi-novembre 2026",
       "windowLabel": "adresses structurées · calendrier suisse"
     }

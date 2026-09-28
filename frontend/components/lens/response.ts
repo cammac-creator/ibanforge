@@ -1,5 +1,7 @@
 import { playgroundVerdict } from '@/lib/playground-verdict';
-import type { RayState } from './engine';
+
+/** What each of the three lines of an answer shows: waiting, a finding, nothing, an error. */
+export type RayState = 'attente' | 'ok' | 'absent' | 'erreur';
 
 export const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
