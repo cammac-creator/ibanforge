@@ -315,6 +315,13 @@ address holds a key, so the page never tells anyone which addresses do.
 It lives in a sign-in cookie used for nothing else. *Sign out* ends it in this browser, *Sign out
 everywhere* ends every session of your address.
 
+**Receipts.** Below your keys, *Receipts* lists the credit packs and subscriptions paid with your
+address, the most recent first. A card payment shows under the address given at checkout, whatever
+key it landed on; a USDC payment shows under the address of its key. For a pack paid by card, *Receipt* opens its receipt on
+Stripe, our payment processor. For a Pro subscription,
+*Invoices* opens the Stripe customer portal, where its invoices live. An invoice made out to your
+company, with its VAT number, is issued on request to support@ibanforge.com.
+
 **A key with no address**, taken or bought without one, belongs to no account: paste it on the same
 page instead. It goes straight from your browser to the API and nowhere else. You can always paste
 a key rather than sign in.
@@ -323,8 +330,9 @@ a key rather than sign in.
 `POST /v1/keys/rotate` or `POST /v1/keys/revoke`. The session only reads: it changes no key, and it
 cannot give back a key you lost.
 
-The page calls five public routes, `POST /v1/account/code`, `POST /v1/account/session`,
-`GET /v1/account/overview`, `GET /v1/account/keys/report` and `POST /v1/account/logout`, described
+The page calls seven public routes, `POST /v1/account/code`, `POST /v1/account/session`,
+`GET /v1/account/overview`, `GET /v1/account/keys/report`, `GET /v1/account/receipts`,
+`GET /v1/account/receipt` and `POST /v1/account/logout`, described
 in the [OpenAPI contract](https://api.ibanforge.com/openapi.json). They are made for a person in a
 browser: with a key in hand, `GET /v1/keys/usage` and `GET /v1/keys/report` give the same figures.
 

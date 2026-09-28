@@ -6,6 +6,9 @@
  *   GET  /v1/account/overview      les clés actives de l'adresse (cookie)
  *   GET  /v1/account/keys/report   ?prefix=ifk_…&days=N : le rapport d'UNE de ces clés,
  *                                  30 jours par défaut, 90 au plus (cookie)
+ *   GET  /v1/account/receipts      les achats payés par l'adresse, pour leurs reçus (cookie)
+ *   GET  /v1/account/receipt       ?ref=rcpt_… : le lien du reçu Stripe d'UN de ces achats,
+ *                                  demandé à Stripe au clic (cookie)
  *   POST /v1/account/logout        se déconnecter, ici ou partout (cookie)
  *   POST /v1/admin/account/revoke  couper toutes les sessions d'une adresse (support)
  *
@@ -52,6 +55,7 @@ import {
   createSession,
   drawLoginCode,
   findOwnedKey,
+  findOwnedPurchase,
   forgetLoginCode,
   issueLoginCode,
   noteAccountCodeRefused,
@@ -62,6 +66,7 @@ import {
   type AccountSession,
   type UsageBuilder,
 } from '../lib/account.js';
+import { buildReceipts, hasCardReceipt, receiptLinkFor } from '../lib/account-receipts.js';
 import { isAllowedOrigin } from '../lib/cors-origins.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
 import { deliverAccountCodeEmail } from '../lib/email.js';
@@ -128,6 +133,9 @@ const TEXTS = {
     'This code cannot be used: it is wrong, it has expired, or it was tried too many times. Ask for a new code.',
   signed_out: 'You are not signed in, or your session has ended. Please sign in again.',
   not_found: 'No such key in this account.',
+  receipt_not_found: 'No such receipt in this account.',
+  receipt_unavailable:
+    'The receipt could not be fetched from Stripe right now. Try again in a minute; if it keeps failing, write to support@ibanforge.com and we will send it to you.',
   unauthorized: 'unauthorized',
 } as const;
 
@@ -440,7 +448,42 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     });
   });
 
-  // ── 5. POST /v1/account/logout ───────────────────────────────────────────
+  // ── 5. GET /v1/account/receipts ──────────────────────────────────────────
+  //
+  // Les achats payés par l'adresse, pour que le reçu d'un paiement se trouve là
+  // où l'on cherche déjà son solde (28.09.2026). Aucun appel à Stripe ici : la
+  // liste ne porte que le CHEMIN qui donne un reçu, jamais le lien lui-même.
+  account.get('/v1/account/receipts', (c) => {
+    const session = sessionOf(c);
+    if (!session) return signedOut(c);
+    return c.json(buildReceipts(session.emailNorm));
+  });
+
+  // ── 6. GET /v1/account/receipt?ref=rcpt_… ────────────────────────────────
+  //
+  // Le lien du reçu Stripe d'UN achat de l'adresse, demandé à Stripe au clic
+  // (un lien de reçu expire 30 jours après avoir été donné : voir
+  // `src/lib/account-receipts.ts`). L'achat est désigné par sa référence
+  // opaque, jamais par le compteur des ventes, et elle voyage en paramètre,
+  // comme le préfixe du rapport. 404 UNIFORME : une référence inconnue, celle
+  // d'un achat d'une autre adresse et celle d'un achat sans reçu de carte
+  // rendent le même corps, par la même requête unique (`findOwnedPurchase`).
+  account.get('/v1/account/receipt', async (c) => {
+    const session = sessionOf(c);
+    if (!session) return signedOut(c);
+    const ref = (c.req.query('ref') ?? '').trim().slice(0, 64);
+    const purchase = findOwnedPurchase(session.emailNorm, ref);
+    if (!purchase || !hasCardReceipt(purchase)) {
+      return c.json({ error: 'receipt_not_found', message: TEXTS.receipt_not_found }, 404);
+    }
+    const link = await receiptLinkFor(purchase);
+    if (link.kind !== 'ok') {
+      return c.json({ error: 'receipt_unavailable', message: TEXTS.receipt_unavailable }, 503);
+    }
+    return c.json({ ref: purchase.ref, url: link.url }, 200);
+  });
+
+  // ── 7. POST /v1/account/logout ───────────────────────────────────────────
   //
   // 204 dans tous les cas, cookie effacé : se déconnecter sans session vivante
   // n'est pas une erreur. `{"all": true}` révoque toutes les sessions de
@@ -462,7 +505,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     return c.body(null, 204);
   });
 
-  // ── 6. POST /v1/admin/account/revoke ─────────────────────────────────────
+  // ── 8. POST /v1/admin/account/revoke ─────────────────────────────────────
   //
   // Le geste du support (« on m'a pris mon téléphone ») : toutes les sessions
   // vivantes de l'adresse, et le code en cours s'il y en a un. Rend le nombre

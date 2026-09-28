@@ -2218,7 +2218,7 @@
   },
   "account": {
     "title": "Your account",
-    "subtitle": "Your API keys: their balance, this month's usage, what failed and why, and where they are called from.",
+    "subtitle": "Your API keys: their balance, this month's usage, what failed and why, where they are called from, and the receipts of your credit packs and subscriptions.",
     "signInIntro": "Sign in with the e-mail address attached to your keys. We send you a 6-digit code: no password, no link.",
     "emailLabel": "E-mail address",
     "sendCode": "Send me a code",
@@ -2326,7 +2326,23 @@
     "topupUnproven": "This key carries your address, but that address was not confirmed by a code when the key was created. Recharge it only if you recognise it as yours.",
     "topupCredits": "{credits} credits",
     "topupPro": "Pro on this key: {requests} requests a month",
-    "topupProPrice": "$29 / month"
+    "topupProPrice": "$29 / month",
+    "receiptsTitle": "Receipts",
+    "receiptsHint": "The credit packs and subscriptions paid with this address. Each receipt opens on Stripe, our payment processor.",
+    "receiptPack": "{credits} credits",
+    "receiptSubscription": "Pro subscription",
+    "receiptSubscriptionEditor": "Editor / OEM subscription",
+    "receiptUsdc": "Paid in USDC",
+    "receiptOpen": "Receipt",
+    "receiptOpening": "Opening…",
+    "receiptInvoices": "Invoices",
+    "receiptKey": "Key {prefix}",
+    "receiptStatus": {
+      "refunded": "Refunded",
+      "disputed": "Disputed"
+    },
+    "receiptFailed": "This receipt could not be opened just now. Try again in a minute, or write to support@ibanforge.com and we will send it to you.",
+    "receiptsInvoice": "Need an invoice made out to your company, with its VAT number? Write to support@ibanforge.com."
   },
   "sources": {
     "meta": {

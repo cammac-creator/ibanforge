@@ -15,8 +15,9 @@
  *     non, et la session se crée de la même façon. Rien ne peut donc trahir
  *     l'existence d'un compte, ni par le statut, ni par le corps, ni par la
  *     durée. Seul le propriétaire de la boîte découvre la réponse, une fois
- *     connecté. `buildOverview` et `findOwnedKey` sont les SEULES fonctions
- *     d'ici qui lisent les clés, et elles exigent une session.
+ *     connecté. `buildOverview`, `findOwnedKey`, `listOwnedPurchases` et
+ *     `findOwnedPurchase` sont les SEULES fonctions d'ici qui lisent les clés
+ *     (les deux dernières par une sous-requête), et elles exigent une session.
  *  2. UNE TABLE DE CODES À PART de `pending_verifications`, dont la clé
  *     primaire est l'adresse seule : un code de connexion ne peut ni créer ni
  *     réclamer une clé, et une demande de connexion n'écrase jamais un défi de
@@ -114,6 +115,9 @@ function accountDB(): ReturnType<typeof getStatsDB> {
   if (!SQL_FNS_REGISTERED.has(db)) {
     db.function('account_email_norm', { deterministic: true }, (email: unknown) =>
       typeof email === 'string' ? normalizeEmail(email) : null,
+    );
+    db.function('account_receipt_ref', { deterministic: true }, (paymentRef: unknown) =>
+      typeof paymentRef === 'string' ? receiptRefOf(paymentRef) : null,
     );
     SQL_FNS_REGISTERED.add(db);
   }
@@ -697,4 +701,152 @@ export function findOwnedKey(
     (ApiKeyValidationRow & { key_hash: string; key_prefix: string }) | undefined;
   if (!row) return null;
   return { keyPrefix: row.key_prefix, validation: validationFromRow(row.key_hash, row) };
+}
+
+// ─── Les achats de l'adresse, pour ses reçus (28.09.2026) ────────────────────
+
+/** Achats au plus dans la liste des reçus, les plus récents d'abord. */
+export const RECEIPTS_LIMIT = 100;
+
+/**
+ * Les issues d'un achat dont l'argent est passé, remboursés et disputés
+ * compris : le reçu d'un paiement existe dès l'encaissement, et Stripe le tient
+ * à jour d'un remboursement. `pending` et `failed` n'ont rien encaissé.
+ */
+const RECEIPT_OUTCOMES_SQL =
+  "('credited', 'minted', 'minted_fallback', 'attached', 'reinstated', 'refunded', 'disputed')";
+
+/**
+ * La référence d'un achat servie à la page : `rcpt_` et 24 caractères
+ * hexadécimaux, tirés de l'empreinte de sa référence de paiement.
+ *
+ * Pourquoi pas l'identifiant de la ligne : c'est le compteur global des achats,
+ * et deux achats d'un même client à un mois d'écart lui donneraient le nombre
+ * de ventes entre les deux (relecture de sécurité du 28.09.2026, M5). La
+ * référence de paiement (`stripe:<session>` ou `x402:<référence>`) n'est jamais
+ * servie : une session Stripe ouvre la vue unique d'une clé brute. Son empreinte
+ * ne se remonte pas, et une référence ne donne rien à qui ne possède pas l'achat.
+ */
+export const RECEIPT_REF_PATTERN = /^rcpt_[0-9a-f]{24}$/;
+
+export function receiptRefOf(paymentRef: string): string {
+  return 'rcpt_' + sha256(`ibanforge-receipt\n${paymentRef}`).slice(0, 24);
+}
+
+/**
+ * QUI VOIT QUEL ACHAT, en un seul fragment SQL (deux paramètres : l'adresse
+ * normalisée de la session, deux fois). Éprouvé par la relecture de sécurité du
+ * 28.09.2026 (I1, M1, M2), sur base jetable, avant d'être repris ici tel quel.
+ *
+ *  - Un achat PAR CARTE qui porte l'adresse du PAYEUR (`payer_email`, celle que
+ *    Checkout a recueillie) appartient à cette adresse, et à elle seule. C'est
+ *    l'adresse à laquelle Stripe adresse son reçu : la personne qui prouve
+ *    qu'elle lit cette boîte voit ce que Stripe lui aurait envoyé. Le
+ *    propriétaire d'une clé rechargée par un tiers ne voit donc pas le reçu du
+ *    tiers.
+ *  - Un achat par carte SANS payeur n'appartient à l'adresse de sa clé que s'il
+ *    a été rattrapé (`backfilled`, écrit avant le registre). Une ligne carte
+ *    écrite par le webhook porte toujours l'adresse de Checkout : sans elle,
+ *    c'est un payeur effacé par l'outil d'oubli (`scripts/forget-customer.cjs`
+ *    met l'adresse à NULL) ou une anomalie, et la ligne n'est à personne. Sans
+ *    cette garde, l'effacement d'un payeur tiers donnait son reçu au
+ *    propriétaire de la clé (I1).
+ *  - Un achat USDC appartient à l'adresse de sa clé, jamais à l'adresse libre
+ *    de son corps, que personne n'a vérifiée (relecture de la PR 259, D6 ; M2).
+ *    Une clé frappée par un achat USDC porte d'ailleurs cette adresse.
+ *  - « L'adresse de sa clé » : celle de la clé SERVIE à l'achat (`p.key_hash`),
+ *    active ou non, jamais celle d'une autre clé de la lignée (M1 : après une
+ *    rotation puis le réétiquetage de la clé active, l'ancienne adresse voyait
+ *    les achats de la nouvelle). Avec les filtres de la vue d'ensemble, écrits
+ *    ici sur l'alias `k` : ni cohorte, ni clé réétiquetée vers une autre
+ *    adresse. `key_hash` existe dans les deux tables : toujours qualifié.
+ *
+ * Un pack que nous avons offert (`issued_by_us`) n'a rien encaissé : jamais
+ * listé comme un achat.
+ *
+ * Coût (M4) : la table des achats est parcourue en entier (le `CASE` et la
+ * normalisation en JS empêchent tout index), une lecture synchrone de l'ordre
+ * de 5 ms à 10 000 lignes et 50 ms à 100 000, mesurée sur base jetable. Au-delà
+ * de 10 000 lignes, écrire une colonne
+ * `payer_email_norm` indexée et réunir deux lectures indexées.
+ */
+const OWNED_PURCHASE_SQL = `p.outcome IN ${RECEIPT_OUTCOMES_SQL}
+   AND p.issued_by_us = 0
+   AND (CASE WHEN p.rail = 'card' AND NULLIF(TRIM(p.payer_email), '') IS NOT NULL
+             THEN account_email_norm(p.payer_email) = ?
+             ELSE (p.rail <> 'card' OR p.backfilled = 1)
+                  AND EXISTS (SELECT 1 FROM api_keys k
+                               WHERE k.key_hash = p.key_hash AND k.email_norm = ?
+                                 AND k.email NOT LIKE '%@cohorte.invalid'
+                                 AND (k.email = k.email_norm OR account_email_norm(k.email) = k.email_norm))
+        END)`;
+
+export interface OwnedPurchase {
+  id: number;
+  /** La référence servie à la page (`receiptRefOf`), jamais l'identifiant de la ligne. */
+  ref: string;
+  rail: 'card' | 'usdc';
+  kind: 'pack' | 'subscription';
+  outcome: string;
+  key_prefix: string;
+  credits: number | null;
+  /** `bundle` de la ligne : la taille d'un pack, la formule d'un abonnement (`pro`, `oem`). */
+  bundle: string | null;
+  amount_minor: number | null;
+  currency: string | null;
+  /** ISO 8601, UTC : le règlement quand il est connu, sinon l'écriture de la ligne. */
+  paid_at: string | null;
+  stripe_session_id: string | null;
+}
+
+type OwnedPurchaseRow = Omit<OwnedPurchase, 'paid_at'> & {
+  created_at: string | null;
+  settled_at: string | null;
+};
+
+const OWNED_PURCHASE_COLUMNS = `p.id, account_receipt_ref(p.payment_ref) AS ref, p.rail, p.kind,
+       p.outcome, p.key_prefix, p.credits, p.bundle, p.amount_minor, p.currency, p.created_at,
+       p.settled_at, p.stripe_session_id`;
+
+function toOwnedPurchase(row: OwnedPurchaseRow): OwnedPurchase {
+  const { created_at, settled_at, ...rest } = row;
+  return { ...rest, paid_at: toIso(settled_at ?? created_at) };
+}
+
+/**
+ * Les achats de l'adresse de la session, les plus récents d'abord,
+ * `RECEIPTS_LIMIT` au plus. Ne sélectionne ni le payeur, ni la lignée, ni la
+ * référence de recharge, ni l'adresse d'un portefeuille.
+ */
+export function listOwnedPurchases(emailNorm: string): OwnedPurchase[] {
+  const rows = accountDB()
+    .prepare(
+      `SELECT ${OWNED_PURCHASE_COLUMNS}
+         FROM key_purchases p
+        WHERE ${OWNED_PURCHASE_SQL}
+        ORDER BY COALESCE(p.settled_at, p.created_at) DESC, p.id DESC
+        LIMIT ?`,
+    )
+    .all(emailNorm, emailNorm, RECEIPTS_LIMIT) as OwnedPurchaseRow[];
+  return rows.map(toOwnedPurchase);
+}
+
+/**
+ * L'achat de cette référence (`receiptRefOf`), s'il appartient à l'adresse de
+ * la session ; null sinon, qu'il n'existe pas, qu'il soit à une autre adresse ou
+ * qu'il n'ait rien encaissé. Une seule requête dans tous les cas, comme
+ * `findOwnedKey` : le même parcours, donc le même temps, pour une référence
+ * inconnue et pour celle d'un autre.
+ */
+export function findOwnedPurchase(emailNorm: string, ref: string): OwnedPurchase | null {
+  if (!RECEIPT_REF_PATTERN.test(ref)) return null;
+  const row = accountDB()
+    .prepare(
+      `SELECT ${OWNED_PURCHASE_COLUMNS}
+         FROM key_purchases p
+        WHERE account_receipt_ref(p.payment_ref) = ? AND ${OWNED_PURCHASE_SQL}
+        LIMIT 1`,
+    )
+    .get(ref, emailNorm, emailNorm) as OwnedPurchaseRow | undefined;
+  return row ? toOwnedPurchase(row) : null;
 }

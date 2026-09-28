@@ -2218,7 +2218,7 @@
   },
   "account": {
     "title": "Ihr Konto",
-    "subtitle": "Ihre API-Schlüssel: ihr Guthaben, ihr Verbrauch in diesem Monat, was fehlgeschlagen ist und warum, und von wo sie aufgerufen werden.",
+    "subtitle": "Ihre API-Schlüssel: ihr Guthaben, ihr Verbrauch in diesem Monat, was fehlgeschlagen ist und warum, von wo sie aufgerufen werden, und die Belege Ihrer Guthabenpakete und Abos.",
     "signInIntro": "Melden Sie sich mit der E-Mail-Adresse an, die mit Ihren Schlüsseln verknüpft ist. Wir senden Ihnen einen 6-stelligen Code, ohne Passwort und ohne Link.",
     "emailLabel": "E-Mail-Adresse",
     "sendCode": "Code senden",
@@ -2326,7 +2326,23 @@
     "topupUnproven": "Dieser Schlüssel trägt Ihre Adresse, sie wurde bei seiner Erstellung aber nicht mit einem Code bestätigt. Laden Sie ihn nur auf, wenn Sie ihn als Ihren erkennen.",
     "topupCredits": "{credits} Credits",
     "topupPro": "Pro auf diesem Schlüssel: {requests} Anfragen pro Monat",
-    "topupProPrice": "29 $ / Monat"
+    "topupProPrice": "29 $ / Monat",
+    "receiptsTitle": "Zahlungsbelege",
+    "receiptsHint": "Die mit dieser Adresse bezahlten Guthabenpakete und Abos. Jeder Beleg öffnet sich bei Stripe, unserem Zahlungsdienstleister.",
+    "receiptPack": "{credits} Credits",
+    "receiptSubscription": "Pro-Abo",
+    "receiptSubscriptionEditor": "Editor-/OEM-Abo",
+    "receiptUsdc": "In USDC bezahlt",
+    "receiptOpen": "Beleg",
+    "receiptOpening": "Wird geöffnet…",
+    "receiptInvoices": "Rechnungen",
+    "receiptKey": "Schlüssel {prefix}",
+    "receiptStatus": {
+      "refunded": "Erstattet",
+      "disputed": "Angefochten"
+    },
+    "receiptFailed": "Dieser Beleg ließ sich gerade nicht öffnen. Versuchen Sie es in einer Minute noch einmal, oder schreiben Sie an support@ibanforge.com, dann senden wir ihn Ihnen.",
+    "receiptsInvoice": "Brauchen Sie eine Rechnung auf Ihr Unternehmen, mit seiner Mehrwertsteuernummer? Schreiben Sie an support@ibanforge.com."
   },
   "sources": {
     "meta": {

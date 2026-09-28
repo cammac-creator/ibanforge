@@ -5,7 +5,8 @@ import { buildSpec } from './openapi.js';
 import { ACCOUNT_REPORT_MAX_DAYS } from '../lib/account.js';
 
 /**
- * Les cinq routes publiques du compte dans le contrat (lot C3, 25.09.2026).
+ * Les sept routes publiques du compte dans le contrat (lot C3, 25.09.2026 ;
+ * les deux routes des reçus, 28.09.2026).
  *
  * Un contrat qui tait une route est un contrat qu'un générateur de client ne
  * peut pas suivre, et une page que personne ne trouve. Même principe que
@@ -22,12 +23,14 @@ import { ACCOUNT_REPORT_MAX_DAYS } from '../lib/account.js';
 const ROOT = join(import.meta.dirname, '..', '..');
 const SRC = readFileSync(join(ROOT, 'src/routes/account.ts'), 'utf8');
 
-/** [méthode, chemin, statut de succès] des cinq routes publiques. */
+/** [méthode, chemin, statut de succès] des sept routes publiques. */
 const ROUTES = [
   ['post', '/v1/account/code', '202'],
   ['post', '/v1/account/session', '200'],
   ['get', '/v1/account/overview', '200'],
   ['get', '/v1/account/keys/report', '200'],
+  ['get', '/v1/account/receipts', '200'],
+  ['get', '/v1/account/receipt', '200'],
   ['post', '/v1/account/logout', '204'],
 ] as const;
 
@@ -91,7 +94,7 @@ const statusesOf = (src: string): string[] =>
 const errorsOf = (src: string): string[] =>
   [...new Set([...src.matchAll(/error:\s*'([a-z_]+)'/g)].map((m) => m[1]))].sort();
 
-describe('the five public account routes are in the contract', () => {
+describe('the seven public account routes are in the contract', () => {
   it('reads real statuses and error tokens (guards the extraction itself)', () => {
     // Un extracteur qui ne trouve rien ferait passer les tests ci-dessous à vide.
     expect(statusesOf(answering('post', '/v1/account/code'))).toEqual(
@@ -132,12 +135,14 @@ describe('the five public account routes are in the contract', () => {
     }
   });
 
-  it('the two sign-in steps need nothing; the three others need the session cookie', () => {
+  it('the two sign-in steps need nothing; the five others need the session cookie', () => {
     expect(spec.paths['/v1/account/code'].post.security).toEqual([]);
     expect(spec.paths['/v1/account/session'].post.security).toEqual([]);
     for (const [method, path] of [
       ['get', '/v1/account/overview'],
       ['get', '/v1/account/keys/report'],
+      ['get', '/v1/account/receipts'],
+      ['get', '/v1/account/receipt'],
       ['post', '/v1/account/logout'],
     ] as const) {
       expect(spec.paths[path][method].security, path).toEqual([{ accountSession: [] }]);
@@ -174,6 +179,32 @@ describe('the five public account routes are in the contract', () => {
     expect(Object.keys(overview.properties ?? {}).sort()).toEqual(fields('AccountOverview'));
     expect(Object.keys(key.properties ?? {}).sort()).toEqual(fields('OverviewKey'));
     expect(fields('OverviewKey')).toContain('key_prefix');
+  });
+
+  it('the receipts schema names every field the list serves, and the link of one takes its id in the query', () => {
+    const lib = readFileSync(join(ROOT, 'src/lib/account-receipts.ts'), 'utf8');
+    const start = lib.indexOf('export interface AccountReceipt {');
+    expect(start).toBeGreaterThan(-1);
+    const body = lib.slice(start, lib.indexOf('\n}\n', start));
+    const fields = [...body.matchAll(/^ {2}([a-z_]+)\??:/gm)].map((m) => m[1]).sort();
+    expect(fields).toContain('receipt');
+    expect(Object.keys(spec.components.schemas.AccountReceipt.properties ?? {}).sort()).toEqual(
+      fields,
+    );
+    expect(Object.keys(spec.components.schemas.AccountReceipts.properties ?? {})).toEqual([
+      'receipts',
+    ]);
+    const ref = (spec.paths['/v1/account/receipt'].get.parameters ?? []).find(
+      (p) => p.name === 'ref',
+    );
+    expect(ref).toEqual(expect.objectContaining({ in: 'query', required: true }));
+    // Jamais le compteur des ventes : aucun paramètre `id` sur la route d'un reçu.
+    expect((spec.paths['/v1/account/receipt'].get.parameters ?? []).map((p) => p.name)).toEqual([
+      'ref',
+    ]);
+    expect(
+      Object.keys(spec.paths).filter((p) => p.includes('{id}') && p.includes('account')),
+    ).toEqual([]);
   });
 
   it('never documents the admin route', () => {
