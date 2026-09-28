@@ -344,6 +344,7 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
         creditsAdded: bundle.credits,
         balance: confirmed.balanceAfter,
         bundle: slug,
+        rail: 'usdc',
       }).catch(() => {});
     };
     return c.json(

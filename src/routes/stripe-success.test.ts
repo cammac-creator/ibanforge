@@ -161,12 +161,12 @@ describe('the account line: sign in with the checkout address, never in a link',
     return src.slice(start, src.indexOf('\n  }', start) + 4);
   }
 
-  async function accountLine(): Promise<(email: unknown) => string> {
+  async function accountLine(): Promise<(email: unknown, isSubscription?: boolean) => string> {
     const html = await render();
     const src = /<script>([\s\S]*?)<\/script>/.exec(html)![1];
     return new Function(
       `${lift(src, 'escapeHtml')}\n${lift(src, 'accountLine')}\nreturn accountLine;`,
-    )() as (email: unknown) => string;
+    )() as (email: unknown, isSubscription?: boolean) => string;
   }
 
   const hrefs = (s: string): string[] => [...s.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
@@ -196,10 +196,25 @@ describe('the account line: sign in with the checkout address, never in a link',
     }
   });
 
+  it('a pack points to its receipt, a subscription to its invoices', async () => {
+    const fn = await accountLine();
+    const pack = fn('acme@example.com', false);
+    expect(pack).toContain('the receipt of this payment');
+    expect(pack).not.toContain('invoices');
+    const subscription = fn('acme@example.com', true);
+    expect(subscription).toContain('the invoices of this subscription');
+    expect(subscription).not.toContain('receipt');
+    // Même connexion, même lien nu, dans les deux cas.
+    for (const line of [pack, subscription]) {
+      expect(line).toContain(`sign in at <a href="${ACCOUNT_URL}">`);
+      expect(hrefs(line)).toEqual([ACCOUNT_URL]);
+    }
+  });
+
   it('is wired into the page, and no link of the page is built from data', async () => {
     const html = await render();
     expect(html).toContain(
-      '\'<p class="small" id="accountline">\' + accountLine(data.email) + \'</p>\'',
+      '\'<p class="small" id="accountline">\' + accountLine(data.email, isOem) + \'</p>\'',
     );
     // Un href assemblé par concaténation est la seule façon de glisser une
     // adresse, une clé ou un identifiant de session dans un lien de cette page.

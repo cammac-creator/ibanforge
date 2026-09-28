@@ -144,10 +144,15 @@ stripeSuccess.get('/stripe/success', (c) => {
   // solde et la consommation, jamais la clé entière, et la phrase le dit, pour
   // que personne ne compte sur lui au lieu de garder la clé. Sans adresse (le
   // repère stripe-buyer), aucune connexion promise : on propose de coller la clé.
-  function accountLine(email) {
+  // Un pack a son reçu ; un abonnement n'a pas de bouton « Reçu », ses factures
+  // vivent dans le portail que la page du compte ouvre.
+  function accountLine(email, isSubscription) {
     const link = '<a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>';
     if (typeof email === 'string' && email.indexOf('@') > 0) {
-      return 'Its balance and usage, any time: sign in at ' + link + ' with ' + escapeHtml(email) +
+      const what = isSubscription
+        ? 'Its usage and the invoices of this subscription, any time: sign in at '
+        : 'Its balance, its usage and the receipt of this payment, any time: sign in at ';
+      return what + link + ' with ' + escapeHtml(email) +
         ', no key to paste. That page shows the first characters of the key, never the key itself.';
     }
     return 'Its balance and usage, any time: paste the key at ' + link + '.';
@@ -185,7 +190,7 @@ stripeSuccess.get('/stripe/success', (c) => {
       '</div>' +
       '<div class="runout" id="runout" hidden></div>' +
       '<p class="small">${FIRST_CALL_EXPECTED_LINE_1}<br>${FIRST_CALL_EXPECTED_LINE_2}</p>' +
-      '<p class="small" id="accountline">' + accountLine(data.email) + '</p>' +
+      '<p class="small" id="accountline">' + accountLine(data.email, isOem) + '</p>' +
       '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
 
     const btn = document.getElementById('copybtn');
@@ -264,7 +269,7 @@ stripeSuccess.get('/stripe/success', (c) => {
       '<div class="check">✓</div>' +
       '<h1>Payment confirmed</h1>' +
       '<p class="sub">' + added + ' credits added to key <code>' + prefix + '</code>. Nothing to change in your integration.</p>' +
-      '<p class="small">Its balance and usage, any time: <a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>, or the X-Credits-Remaining header on every paid response.</p>' +
+      '<p class="small">Its balance and usage, any time: <a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>, or the X-Credits-Remaining header on every paid response. The receipt of this payment is there too, under Receipts, for the address you paid with.</p>' +
       '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
   }
 

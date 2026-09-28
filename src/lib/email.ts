@@ -168,6 +168,7 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): {
     `  - the X-Credits-Remaining header on every paid response\n` +
     `  - curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n` +
     `We e-mail you once when ${noticePct}% of the pack is left.\n\n` +
+    `Your purchases are listed on that account page too, under "Receipts": a card payment opens its Stripe receipt.\n\n` +
     `Docs: https://ibanforge.com/docs\n` +
     `Terms: https://ibanforge.com/legal/terms (unused card-paid packs: 14-day refund)\n` +
     `Keep this key safe. It will not be shown again.\n\nIBANforge`;
@@ -186,7 +187,8 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): {
     <div style="font-size:13px;color:#a1a1aa;margin:0 0 6px">Your balance any time</div>
     <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
-    <p style="color:#71717a;font-size:13px;margin:0 0 22px">We e-mail you once when ${noticePct}% of the pack is left.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 6px">We e-mail you once when ${noticePct}% of the pack is left.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 22px">Your purchases are listed on your account page, under <b style="color:#d4d4d8">Receipts</b>: a card payment opens its Stripe receipt.</p>
     <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <!-- BIZ-05 (2026-09-01), third surface: the machine-facing copy still said
@@ -542,6 +544,12 @@ export interface RechargeEmailInput {
   /** Le solde de la clé juste après la recharge. */
   balance: number;
   bundle: string;
+  /**
+   * Le moyen de paiement (28.09.2026) : un paiement par carte a son reçu Stripe,
+   * listé pour l'adresse qui a payé ; un paiement USDC n'en a pas, et il est
+   * listé pour l'adresse de la clé. Par défaut, la carte.
+   */
+  rail?: 'card' | 'usdc';
 }
 
 /**
@@ -561,6 +569,13 @@ export function buildRechargeEmail(p: RechargeEmailInput): {
   const added = p.creditsAdded.toLocaleString('en-US');
   const balance = p.balance.toLocaleString('en-US');
   const noticePct = Math.round(CREDITS_NOTICE_RATIO * 100);
+  const usdc = p.rail === 'usdc';
+  const receiptText = usdc
+    ? `This payment is listed on your account page, under "Receipts".\n\n`
+    : `The receipt of this payment: sign in at ${ACCOUNT_PAGE} with the address you paid with, under "Receipts".\n\n`;
+  const receiptHtml = usdc
+    ? 'This payment is listed on your account page, under <b style="color:#d4d4d8">Receipts</b>.'
+    : 'The receipt of this payment: on your account page, signed in with the address you paid with, under <b style="color:#d4d4d8">Receipts</b>.';
   const text =
     `Key ${p.keyPrefix} recharged: +${added} credits (pack ${p.bundle}). Balance: ${balance}.\n` +
     `Nothing to change in your integration: keep calling with the same key.\n\n` +
@@ -569,6 +584,7 @@ export function buildRechargeEmail(p: RechargeEmailInput): {
     `  - the X-Credits-Remaining header on every paid response\n` +
     `  - GET https://api.ibanforge.com/v1/credits/balance\n` +
     `We e-mail you once when ${noticePct}% of the balance is left.\n\n` +
+    receiptText +
     `Terms: https://ibanforge.com/legal/terms (unused card-paid packs: 14-day refund)\n\nIBANforge`;
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
@@ -579,7 +595,8 @@ export function buildRechargeEmail(p: RechargeEmailInput): {
     <div style="font-size:13px;color:#a1a1aa;margin:0 0 6px">Your balance any time</div>
     <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Credits left, on your account page &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Every paid response also carries <code style="color:#d4d4d8">X-Credits-Remaining</code>, and <code style="color:#d4d4d8">GET /v1/credits/balance</code> answers on demand.</p>
-    <p style="color:#71717a;font-size:13px;margin:0 0 22px">We e-mail you once when ${noticePct}% of the balance is left.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 6px">We e-mail you once when ${noticePct}% of the balance is left.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 22px">${receiptHtml}</p>
     <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>

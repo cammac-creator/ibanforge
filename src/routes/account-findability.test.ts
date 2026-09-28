@@ -22,6 +22,8 @@ const ROUTES = [
   'POST /v1/account/session',
   'GET /v1/account/overview',
   'GET /v1/account/keys/report',
+  'GET /v1/account/receipts',
+  'GET /v1/account/receipt',
   'POST /v1/account/logout',
 ];
 const STATIC = ['frontend/public/llms.txt', 'frontend/public/llms-full.txt'];
@@ -29,7 +31,7 @@ const STATIC = ['frontend/public/llms.txt', 'frontend/public/llms-full.txt'];
 const app = buildApp();
 
 describe('the API surfaces name the account page and its routes', () => {
-  it('/llms.txt lists the five routes and the page, and no longer says "no account"', async () => {
+  it('/llms.txt lists the seven routes and the page, and no longer says "no account"', async () => {
     const text = await (await app.request('/llms.txt')).text();
     for (const route of ROUTES) expect(text, route).toContain(route);
     expect(text).toContain(ACCOUNT_URL);
@@ -53,6 +55,8 @@ describe('the static llms files of the site list them too', () => {
     // `keys/report` porte son paramètre, sans lequel la route répond 404.
     for (const route of ROUTES) expect(text, `${rel}: ${route}`).toContain(route.split(' ')[1]);
     expect(text).toContain('/v1/account/keys/report?prefix=');
+    // Le lien d'un reçu aussi, avec son paramètre (sans lui, la route répond 404).
+    expect(text).toContain('/v1/account/receipt?ref=');
     expect(text).toContain(ACCOUNT_URL);
     expect(text).not.toContain('ibanforge.com/en/account');
   });

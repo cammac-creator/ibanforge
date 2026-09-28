@@ -74,7 +74,9 @@ import {
   ACCOUNT_REPORT_MAX_DAYS,
   ACCOUNT_SESSION_DAYS,
   OVERVIEW_PAGE_SIZE,
+  RECEIPTS_LIMIT,
 } from '../lib/account.js';
+import { RECEIPT_URL_PREFIX } from '../lib/account-receipts.js';
 import { ACCOUNT_PAGE } from '../lib/first-call.js';
 import { CONSENT_BOUNDARY } from '../lib/consent.js';
 
@@ -1944,6 +1946,77 @@ const buildRawSpec = () => ({
         },
       },
     },
+    '/v1/account/receipts': {
+      get: {
+        operationId: 'getAccountReceipts',
+        summary: 'The purchases paid by the signed-in address, to find their receipts',
+        description:
+          `The credit packs and subscriptions paid by the signed-in address, the most recent first, ${RECEIPTS_LIMIT} at most. A card payment belongs to the address its payer gave at checkout, and to that address alone; a USDC payment, and a card payment recorded before the purchase register existed, belong to the address of the key they landed on (a rotated or deactivated key included). ` +
+          'Only money that was actually taken: nothing pending or failed; a refunded or disputed purchase stays, with its status. Each purchase is named by an opaque `ref`, never by a sequential number. ' +
+          'For a pack paid by card, `receipt` is the path of GET /v1/account/receipt that gives its Stripe receipt; for a card subscription, `invoices` is the Stripe customer portal where its invoices live; a USDC purchase has neither. ' +
+          'No call to Stripe is made here, and no receipt link is served in this list. Authentication is the session cookie. Never cached (Cache-Control: no-store).',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        responses: {
+          '200': {
+            description: 'The purchases of the signed-in address.',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/AccountReceipts' } } },
+          },
+          '401': {
+            description:
+              '"signed_out": no session, an expired or revoked one, or the account cookie sent twice. A cookie that leads to no live session is cleared.',
+          },
+        },
+      },
+    },
+    '/v1/account/receipt': {
+      get: {
+        operationId: 'getAccountReceiptLink',
+        summary: 'The Stripe receipt of one purchase of the signed-in address',
+        description:
+          'Asks Stripe for the receipt of one pack paid by card, named by the `ref` GET /v1/account/receipts lists, and answers its link (`url`, which always starts with ' +
+          `${RECEIPT_URL_PREFIX}): the receipt opens on Stripe. ` +
+          'Stripe makes a receipt link expire 30 days after giving it, never the receipt itself: open the link, do not store it; ask this route again for a fresh one. ' +
+          'The link opens the receipt for whoever holds it. The ref travels as a query parameter. A ref that is unknown, belongs to another address or names a purchase without a card receipt (a subscription, a USDC payment) gets the same 404. Never cached (Cache-Control: no-store).',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        parameters: [
+          {
+            name: 'ref',
+            in: 'query',
+            required: true,
+            description: 'The ref of the purchase, as GET /v1/account/receipts lists it.',
+            schema: { type: 'string', pattern: '^rcpt_[0-9a-f]{24}$', example: 'rcpt_3f9c1a7e5b2d4c6e8a0b1c2d' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'The link of the Stripe receipt.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['ref', 'url'],
+                  properties: {
+                    ref: { type: 'string' },
+                    url: { type: 'string', format: 'uri', description: `The Stripe receipt, valid 30 days. Always starts with ${RECEIPT_URL_PREFIX}` },
+                  },
+                },
+              },
+            },
+          },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '404': {
+            description:
+              '"receipt_not_found": no such receipt in this account. The same answer for an unknown ref, the ref of another address, and a purchase without a card receipt.',
+          },
+          '503': {
+            description:
+              '"receipt_unavailable": Stripe did not give the receipt just now. Try again in a minute; support@ibanforge.com sends it otherwise.',
+          },
+        },
+      },
+    },
     '/v1/account/logout': {
       post: {
         operationId: 'closeAccountSession',
@@ -2704,6 +2777,49 @@ const buildRawSpec = () => ({
               subscribe_pro: { type: ['string', 'null'] },
               manage_subscription: { type: ['string', 'null'] },
             },
+          },
+        },
+      },
+      // Les reçus du compte (28.09.2026), tels que `src/lib/account-receipts.ts`
+      // les construit. Jamais servis : le lien d'un reçu (seule la route d'un
+      // achat le donne), l'adresse du payeur, la lignée, la session Stripe.
+      AccountReceipts: {
+        type: 'object',
+        required: ['receipts'],
+        properties: {
+          receipts: { type: 'array', items: { $ref: '#/components/schemas/AccountReceipt' } },
+        },
+      },
+      AccountReceipt: {
+        type: 'object',
+        required: ['ref', 'paid_at', 'kind', 'plan', 'rail', 'credits', 'amount', 'status', 'key_prefix', 'receipt', 'invoices'],
+        properties: {
+          ref: { type: 'string', example: 'rcpt_3f9c1a7e5b2d4c6e8a0b1c2d', description: 'The opaque reference of the purchase, for GET /v1/account/receipt.' },
+          paid_at: { type: ['string', 'null'], format: 'date-time', description: 'When the payment settled, else when it was recorded (UTC).' },
+          kind: { type: 'string', enum: ['pack', 'subscription'] },
+          plan: { type: ['string', 'null'], enum: ['pro', 'editor', null], description: 'The plan of a subscription; null for a pack, or when unknown.' },
+          rail: { type: 'string', enum: ['card', 'usdc'] },
+          credits: { type: ['integer', 'null'], description: 'The credits of a pack; null for a subscription.' },
+          amount: {
+            type: ['object', 'null'],
+            description: 'The amount taken, in minor units of its currency (400 and "usd" is 4.00 USD); null when unknown.',
+            required: ['minor', 'currency'],
+            properties: {
+              minor: { type: 'integer' },
+              currency: { type: 'string', example: 'usd' },
+            },
+          },
+          status: { type: 'string', enum: ['paid', 'refunded', 'disputed'] },
+          key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The key the purchase landed on. The key itself is never served.' },
+          receipt: {
+            type: ['string', 'null'],
+            example: '/v1/account/receipt?ref=rcpt_3f9c1a7e5b2d4c6e8a0b1c2d',
+            description: 'For a pack paid by card: the path, on the API host, that gives its Stripe receipt. Null otherwise.',
+          },
+          invoices: {
+            type: ['string', 'null'],
+            format: 'uri',
+            description: 'For a subscription paid by card: the Stripe customer portal, where its invoices live. Null otherwise.',
           },
         },
       },

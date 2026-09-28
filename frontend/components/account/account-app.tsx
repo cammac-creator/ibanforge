@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, ExternalLink, Loader2 } from "lucide-react";
+import { ChevronDown, ExternalLink, Loader2, ReceiptText } from "lucide-react";
 import { localePath } from "@/lib/locale-path";
 import { formatGrouped } from "@/lib/format-grouped";
 import {
@@ -27,6 +27,7 @@ import {
   type KeySheet,
   type Notice,
 } from "@/lib/account-overview";
+import { formatMinorAmount, readReceiptLink, readReceipts, type ReceiptRow } from "@/lib/account-receipts";
 
 /**
  * La page du compte client, en deux modes.
@@ -766,6 +767,157 @@ function ConnectedKey({
   );
 }
 
+type ReceiptsState = { kind: "loading" } | { kind: "ready"; rows: ReceiptRow[] } | { kind: "failed" };
+
+/**
+ * Les reçus de l'adresse (28.09.2026) : la page ne montrait que le solde,
+ * jamais la preuve d'un paiement. La liste se charge une fois, sous les clés (`GET /v1/account/receipts`, aucun
+ * appel à Stripe). Le lien d'un reçu est demandé au clic
+ * (`GET /v1/account/receipt?ref=rcpt_…`), parce que Stripe le fait expirer
+ * 30 jours après l'avoir donné, puis la page y va, dans le même onglet : aucune
+ * fenêtre ouverte après un appel réseau, que Safari bloquerait. Au retour
+ * arrière depuis Stripe, Safari rend la page telle qu'il l'avait gardée : les
+ * boutons sont alors débloqués (`pageshow`, relecture de sécurité, M7).
+ *
+ * Rien ne s'affiche tant que la liste n'est pas là, ni quand elle est vide :
+ * une adresse qui n'a rien payé n'a pas de reçu à chercher.
+ */
+function Receipts({ locale, onSessionEnded }: { locale: string; onSessionEnded: () => void }) {
+  const t = useTranslations("account");
+  const [state, setState] = useState<ReceiptsState>({ kind: "loading" });
+  const [opening, setOpening] = useState<string | null>(null);
+  const [failedRef, setFailedRef] = useState<string | null>(null);
+  // Le rappel du parent change à chaque rendu : gardé à part, pour que la liste
+  // ne se recharge pas à chaque fois.
+  const ended = useRef(onSessionEnded);
+  useEffect(() => {
+    ended.current = onSessionEnded;
+  });
+
+  useEffect(() => {
+    let live = true;
+    void callAccount("/v1/account/receipts").then((reply) => {
+      if (!live) return;
+      const outcome = readReceipts(reply);
+      if (outcome.kind === "session_ended") ended.current();
+      else setState(outcome);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Une page rendue depuis le cache avant/arrière garde son état React : sans
+  // ceci, tous les boutons resteraient désactivés sur « Ouverture… ».
+  useEffect(() => {
+    const onShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setOpening(null);
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
+
+  async function open(row: ReceiptRow) {
+    if (!row.receiptPath || opening !== null) return;
+    setOpening(row.ref);
+    setFailedRef(null);
+    const outcome = readReceiptLink(await callAccount(row.receiptPath));
+    if (outcome.kind === "session_ended") {
+      ended.current();
+      return;
+    }
+    if (outcome.kind === "ready") {
+      window.location.assign(outcome.url);
+      return;
+    }
+    setOpening(null);
+    setFailedRef(row.ref);
+  }
+
+  if (state.kind === "loading" || (state.kind === "ready" && state.rows.length === 0)) return null;
+
+  return (
+    <section aria-labelledby="account-receipts" className="rounded-xl border bg-card">
+      <header className="border-b px-4 py-3 sm:px-5">
+        <h2 id="account-receipts" className="font-heading text-base font-semibold">
+          {t("receiptsTitle")}
+        </h2>
+      </header>
+      <div className="space-y-3 px-4 py-4 sm:px-5">
+        <p className="text-sm text-muted-foreground">{t("receiptsHint")}</p>
+        {state.kind === "failed" ? (
+          <NoticeBox notice="load_failed" />
+        ) : (
+          <ul className="divide-y rounded-lg border">
+            {state.rows.map((row) => (
+              <li key={row.ref} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5">
+                <div className="min-w-0 space-y-0.5 text-sm">
+                  <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    {row.day && <span className="font-mono tabular-nums">{row.day}</span>}
+                    <span className="font-medium">
+                      {row.kind === "subscription"
+                        ? row.plan === "editor"
+                          ? t("receiptSubscriptionEditor")
+                          : t("receiptSubscription")
+                        : row.credits !== null
+                          ? t("receiptPack", { credits: formatGrouped(row.credits, locale) })
+                          : t("plans.pack")}
+                    </span>
+                    {row.amount && (
+                      <span className="font-mono tabular-nums">{formatMinorAmount(row.amount, locale)}</span>
+                    )}
+                    {row.status !== "paid" && (
+                      <span className="rounded border border-amber-500/40 px-1.5 text-xs">
+                        {t(`receiptStatus.${row.status}`)}
+                      </span>
+                    )}
+                  </p>
+                  {row.keyPrefix && (
+                    <p className="font-mono text-xs text-muted-foreground">{t("receiptKey", { prefix: row.keyPrefix })}</p>
+                  )}
+                  {failedRef === row.ref && (
+                    <p role="alert" className="text-xs text-amber-600 dark:text-amber-400">
+                      {t("receiptFailed")}
+                    </p>
+                  )}
+                </div>
+                {row.receiptPath ? (
+                  <button
+                    type="button"
+                    onClick={() => void open(row)}
+                    disabled={opening !== null}
+                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted/50 disabled:opacity-60"
+                  >
+                    {opening === row.ref ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <ReceiptText className="size-3.5" aria-hidden />
+                    )}
+                    {opening === row.ref ? t("receiptOpening") : t("receiptOpen")}
+                  </button>
+                ) : row.invoicesUrl ? (
+                  <a
+                    href={row.invoicesUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted/50"
+                  >
+                    {t("receiptInvoices")}
+                    <ExternalLink className="size-3.5" aria-hidden />
+                  </a>
+                ) : row.rail === "usdc" ? (
+                  <span className="text-xs text-muted-foreground">{t("receiptUsdc")}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-sm text-muted-foreground">{t("receiptsInvoice")}</p>
+      </div>
+    </section>
+  );
+}
+
 /** Le temps de lire la vue : le même rendu au serveur et au navigateur. */
 function Checking() {
   const t = useTranslations("account");
@@ -1016,6 +1168,9 @@ function EmailMode({
             {t("pasteInstead")}
           </button>
         </section>
+        {/* Une adresse peut avoir payé sans porter de clé active (clé révoquée,
+            ou recharge de la clé d'un autre) : ses reçus restent à elle. */}
+        <Receipts locale={locale} onSessionEnded={sessionEnded} />
       </div>
     );
   }
@@ -1052,6 +1207,7 @@ function EmailMode({
           </button>
         </div>
       )}
+      <Receipts locale={locale} onSessionEnded={sessionEnded} />
       <button type="button" onClick={onPaste} className={QUIET_LINK}>
         {t("rotateNeedsKey")}
       </button>

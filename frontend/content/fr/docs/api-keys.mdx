@@ -323,6 +323,15 @@ portent.
 vit dans un cookie de connexion qui ne sert à rien d'autre. *Se déconnecter* la termine dans ce
 navigateur, *Se déconnecter partout* termine toutes les sessions de votre adresse.
 
+**Les reçus.** Sous vos clés, *Reçus* liste les packs de crédits et abonnements payés avec votre
+adresse, les plus récents d'abord. Un paiement par carte figure sous l'adresse donnée au paiement,
+quelle que soit la clé sur laquelle il est arrivé ; un paiement en USDC figure sous l'adresse de sa
+clé. Pour un pack payé par carte, *Reçu*
+ouvre son reçu chez Stripe, notre prestataire de paiement.
+Pour un abonnement Pro, *Factures* ouvre le portail client de Stripe, où se trouvent ses factures.
+Une facture au nom de votre entreprise, avec son numéro de TVA, est émise sur demande à
+support@ibanforge.com.
+
 **Une clé sans adresse**, prise ou achetée sans en donner une, n'appartient à aucun compte : sur la
 même page, collez-la plutôt. Elle part directement de votre navigateur vers l'API, et nulle part
 ailleurs. Vous pouvez toujours coller une clé plutôt que vous connecter.
@@ -331,8 +340,9 @@ ailleurs. Vous pouvez toujours coller une clé plutôt que vous connecter.
 envoyez-la à `POST /v1/keys/rotate` ou `POST /v1/keys/revoke`. La session ne fait que lire : elle ne
 change aucune clé, et ne peut pas vous rendre une clé perdue.
 
-La page appelle cinq routes publiques, `POST /v1/account/code`, `POST /v1/account/session`,
-`GET /v1/account/overview`, `GET /v1/account/keys/report` et `POST /v1/account/logout`, décrites
+La page appelle sept routes publiques, `POST /v1/account/code`, `POST /v1/account/session`,
+`GET /v1/account/overview`, `GET /v1/account/keys/report`, `GET /v1/account/receipts`,
+`GET /v1/account/receipt` et `POST /v1/account/logout`, décrites
 dans le [contrat OpenAPI](https://api.ibanforge.com/openapi.json). Elles sont faites pour une
 personne dans un navigateur : avec une clé en main, `GET /v1/keys/usage` et `GET /v1/keys/report`
 donnent les mêmes chiffres.

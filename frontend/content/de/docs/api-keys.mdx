@@ -329,6 +329,14 @@ Schlüssel trägt oder nicht: Die Seite verrät also niemandem, welche Adressen 
 liegt in einem Anmelde-Cookie, das zu nichts anderem dient. *Abmelden* beendet sie in diesem
 Browser, *Überall abmelden* beendet alle Sitzungen Ihrer Adresse.
 
+**Zahlungsbelege.** Unter Ihren Schlüsseln listet *Zahlungsbelege* die mit Ihrer Adresse bezahlten
+Guthabenpakete und Abos auf, die neuesten zuerst. Eine Kartenzahlung erscheint unter der beim
+Bezahlen angegebenen Adresse, gleich auf welchem Schlüssel sie gelandet ist; eine USDC-Zahlung unter
+der Adresse ihres Schlüssels. Bei einem per Karte
+bezahlten Paket öffnet *Beleg* den Zahlungsbeleg bei Stripe, unserem Zahlungsdienstleister. Bei einem Pro-Abo öffnet *Rechnungen* das Kundenportal von
+Stripe, in dem seine Rechnungen liegen. Eine Rechnung auf Ihr Unternehmen, mit seiner
+Mehrwertsteuernummer, stellen wir auf Anfrage an support@ibanforge.com aus.
+
 **Ein Schlüssel ohne Adresse**, ohne Adresse erstellt oder gekauft, gehört zu keinem Konto: Fügen
 Sie ihn stattdessen auf derselben Seite ein. Er geht direkt von Ihrem Browser an die API und
 nirgendwohin sonst. Sie können auch jederzeit einen Schlüssel einfügen, statt sich anzumelden.
@@ -338,8 +346,9 @@ auf dieser Seite ein oder senden Sie ihn an `POST /v1/keys/rotate` bzw. `POST /v
 Sitzung liest nur; sie ändert keinen Schlüssel und kann einen verlorenen Schlüssel nicht
 zurückgeben.
 
-Die Seite ruft fünf öffentliche Routen auf, `POST /v1/account/code`, `POST /v1/account/session`,
-`GET /v1/account/overview`, `GET /v1/account/keys/report` und `POST /v1/account/logout`,
+Die Seite ruft sieben öffentliche Routen auf, `POST /v1/account/code`, `POST /v1/account/session`,
+`GET /v1/account/overview`, `GET /v1/account/keys/report`, `GET /v1/account/receipts`,
+`GET /v1/account/receipt` und `POST /v1/account/logout`,
 beschrieben im [OpenAPI-Vertrag](https://api.ibanforge.com/openapi.json). Sie sind für eine Person
 im Browser gedacht: Mit einem Schlüssel in der Hand liefern `GET /v1/keys/usage` und
 `GET /v1/keys/report` dieselben Zahlen.

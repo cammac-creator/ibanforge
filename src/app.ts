@@ -545,7 +545,7 @@ ${cannotCallLines().join('\n')}
 - GET /v1/credits/bundles — free, list prepaid credit bundles
 - POST /v1/credits/buy/:bundle — buy credits via x402 (${packList}); with a key presented, the credits land on that key; the same packs are sold by card at https://ibanforge.com/pricing
 - POST /v1/feedback — free, report incorrect data or claim x402 refunds (MCP tool: \`send_feedback\`, the only one that writes)
-- POST /v1/account/code, POST /v1/account/session, GET /v1/account/overview, GET /v1/account/keys/report?prefix=ifk_..., POST /v1/account/logout: free, the sign-in of the account page ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a session cookie (${ACCOUNT_SESSION_DAYS} days) that reads every key of that address and changes none. An agent holding a key reads the same figures with GET /v1/keys/usage and GET /v1/keys/report. ${CONSENT_BOUNDARY}
+- POST /v1/account/code, POST /v1/account/session, GET /v1/account/overview, GET /v1/account/keys/report?prefix=ifk_..., GET /v1/account/receipts, GET /v1/account/receipt?ref=..., POST /v1/account/logout: free, the sign-in of the account page ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a session cookie (${ACCOUNT_SESSION_DAYS} days) that reads every key of that address and changes none, and lists the credit packs and subscriptions that address paid, each card pack with its Stripe receipt. An agent holding a key reads the same figures with GET /v1/keys/usage and GET /v1/keys/report. ${CONSENT_BOUNDARY}
 
 ## Concrete examples (copy-paste curls)
 
@@ -1139,6 +1139,8 @@ export function buildApp(): Hono<HonoEnv> {
           'POST /v1/account/session',
           'GET /v1/account/overview',
           'GET /v1/account/keys/report',
+          'GET /v1/account/receipts',
+          'GET /v1/account/receipt',
           'POST /v1/account/logout',
         ],
       },
