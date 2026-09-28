@@ -186,7 +186,7 @@
       ],
       "addsTitle": "Ce qu’IBANforge ajoute",
       "addsItems": [
-        "Si le code banque est attribué, selon le registre national",
+        "Si le code banque est attribué, là où le registre national est lu",
         "La banque et son BIC, chacun avec sa source, et sa date quand elle est connue",
         "La clé nationale du numéro de compte, là où elle est publiée et contrôlée",
         "L’accessibilité SEPA et la préparation à la vérification du bénéficiaire, d’après les registres de l’EPC quand ils listent la banque",
@@ -241,7 +241,7 @@
     "pricing": {
       "eyebrow": "Tarifs",
       "title": "Commencez gratuitement, payez selon l’usage",
-      "lead": "Chaque formule payante s’applique à la clé que vous avez déjà.",
+      "lead": "Pro et les packs de crédits s’appliquent à la clé que vous avez déjà ; l’audit de fichier se paie à part, sans clé.",
       "tryName": "Essai",
       "tryPrice": "Gratuit",
       "tryText": "Jusqu’à {trialWeekly} validations par semaine sur POST /v1/iban/validate, sans aucune clé.",

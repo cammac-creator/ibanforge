@@ -186,7 +186,7 @@
       ],
       "addsTitle": "What IBANforge adds",
       "addsItems": [
-        "Whether the bank code is allocated, from the national register",
+        "Whether the bank code is allocated, where the national register is read",
         "The bank and its BIC, each with its source, and its date when known",
         "The national check key inside the account number, where one is published and checked",
         "SEPA reachability and Verification of Payee readiness, from the EPC registers where they list the bank",
@@ -241,7 +241,7 @@
     "pricing": {
       "eyebrow": "Pricing",
       "title": "Start free, pay as you grow",
-      "lead": "Every paid plan works on the key you already hold.",
+      "lead": "Pro and credit packs work on the key you already hold; the file audit is paid separately, with no key.",
       "tryName": "Try",
       "tryPrice": "Free",
       "tryText": "Up to {trialWeekly} validations a week on POST /v1/iban/validate, with no key at all.",

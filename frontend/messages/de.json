@@ -186,7 +186,7 @@
       ],
       "addsTitle": "Was IBANforge hinzufügt",
       "addsItems": [
-        "Ob die Bankleitzahl vergeben ist, aus dem nationalen Register",
+        "Ob die Bankleitzahl vergeben ist, wo das nationale Register gelesen wird",
         "Die Bank und ihr BIC, jeweils mit Quelle und, wenn bekannt, mit Datum",
         "Den nationalen Prüfschlüssel in der Kontonummer, wo einer veröffentlicht ist und geprüft wird",
         "SEPA-Erreichbarkeit und Bereitschaft für die Empfängerüberprüfung, aus den EPC-Registern, wo sie die Bank führen",
@@ -241,7 +241,7 @@
     "pricing": {
       "eyebrow": "Preise",
       "title": "Kostenlos starten, nach Bedarf zahlen",
-      "lead": "Jeder bezahlte Tarif gilt für den Schlüssel, den Sie schon haben.",
+      "lead": "Pro und die Guthabenpakete gelten für den Schlüssel, den Sie schon haben; die Dateiprüfung zahlen Sie separat, ohne Schlüssel.",
       "tryName": "Test",
       "tryPrice": "Gratis",
       "tryText": "Bis zu {trialWeekly} Validierungen pro Woche auf POST /v1/iban/validate, ganz ohne Schlüssel.",

@@ -488,9 +488,12 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       </section>
 
       {/* ── 06. Prices, the x402 line, the dated Swiss deadline ──────────────
-          Claude-Alain's decision of 22/09/2026: the month in large, never a
-          countdown (a precision claim about what happens to a payment on that
-          day is not ours to make). */}
+          The deadline gives the month, never a countdown nor a day: an audit
+          recommendation Claude-Alain let us follow on 22/09/2026 (a precision
+          claim about what happens to a payment on that day is not ours to
+          make), set large as in the mockup he approved on 28/09/2026. The lead
+          names what applies to a key: Pro and the packs; the file audit is a
+          one-off payment without a key (src/routes/audit.ts). */}
       <section className="rv-chap" id="pricing" aria-labelledby="home-pricing">
         <div className="rv-grille rv-chap__corps">
           <ChapterHead
