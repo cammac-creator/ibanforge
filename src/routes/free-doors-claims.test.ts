@@ -137,6 +137,8 @@ const STATIC = [
     ...['2026-09-07-bankleitzahl-pruefen-per-api', '2026-09-14-schweizer-iban-pruefen'].map(
       (slug) => `frontend/content/${lang}/blog/${slug}.mdx`,
     ),
+    // The IBAN validation API page (29/09/2026) keeps its copy beside its route.
+    `frontend/app/[locale]/iban-validation-api/copy-${lang}.ts`,
   ]),
 ];
 

@@ -27,6 +27,7 @@
       "docs": "Documentation",
       "playground": "Playground",
       "pricing": "Tarifs",
+      "ibanApi": "API de validation IBAN",
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "État de l'API",

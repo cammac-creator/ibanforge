@@ -27,6 +27,7 @@
       "docs": "Dokumentation",
       "playground": "Playground",
       "pricing": "Preise",
+      "ibanApi": "IBAN prüfen per API",
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "API-Status",

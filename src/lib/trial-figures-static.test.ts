@@ -76,6 +76,9 @@ const FILES = [
       (slug) => `frontend/content/${lang}/blog/${slug}.mdx`,
     ),
   ),
+  // Ajoutée le 29/09/2026 : la page « API de validation IBAN » cite l'essai
+  // dans ses trois langues, depuis ses propres fichiers de texte.
+  ...['en', 'fr', 'de'].map((lang) => `frontend/app/[locale]/iban-validation-api/copy-${lang}.ts`),
 ];
 
 /** Une ligne qui parle de l'essai. Les autres ne regardent pas ce garde. */
