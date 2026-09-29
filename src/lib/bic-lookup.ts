@@ -35,9 +35,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // published account details agree on; see docs/data-sources.md.
 // 25/09/2026 : 18 467 clés dans 70 pays, après le retrait des clés AT, BE, LU,
 // PL et FI (famille sous conditions, NOTICE groupe C).
-// 29/09/2026: 17,920 keys in 62 countries, after the withdrawal of the keys no
+// 29/09/2026: 17,909 keys in 62 countries, after the withdrawal of the keys no
 // publisher granted us (see UNLICENSED_MAP_COUNTRIES below; Italian and
-// Romanian keys rebuilt from open data by scripts/derive-map-keys.ts).
+// Romanian keys rebuilt from the Banca d'Italia and GLEIF by
+// scripts/derive-map-keys.ts).
 // Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
 // ---------------------------------------------------------------------------
 

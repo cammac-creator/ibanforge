@@ -1,12 +1,6 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  deriveBulgarian,
-  deriveItalian,
-  deriveKey,
-  derivePrefix,
-  rebuild,
-} from './derive-map-keys.js';
+import { deriveItalian, deriveKey, derivePrefix, rebuild } from './derive-map-keys.js';
 
 /**
  * The derivations that rebuild map keys from open data. Every row below is
@@ -23,7 +17,6 @@ beforeEach(() => {
       PRIMARY KEY (country, code));
     CREATE TABLE bic_entries (bic8 TEXT, bic11 TEXT UNIQUE, country_code TEXT, lei TEXT,
       source TEXT);
-    CREATE TABLE bg_bae (bae TEXT PRIMARY KEY, bank_code TEXT, branch_code TEXT, bic TEXT);
   `);
   const code = db.prepare(
     "INSERT INTO national_bank_codes VALUES ('IT', ?, 'Banca di Esempio', ?)",
@@ -43,16 +36,15 @@ beforeEach(() => {
   bic.run('XMPLFRP6', 'XMPLFRP6XXX', 'FR', 'LEI00000000000000006', 'gleif');
   // A swiftcodes row carrying the LEI: the derivation reads GLEIF's pairing only.
   bic.run('XMPSITM5', 'XMPSITM5XXX', 'IT', 'LEI00000000000000005', 'swiftcodes');
-  // Prefix countries.
-  bic.run('XMPLRO22', 'XMPLRO22XXX', 'RO', null, 'gleif');
+  // Romania: GLEIF rows decide, SwiftCodes rows never do.
+  bic.run('XMPLRO22', 'XMPLRO22XXX', 'RO', 'LEI0000000000000RO01', 'gleif');
   bic.run('XMPLRO22', 'XMPLRO22BR1', 'RO', null, 'swiftcodes');
-  bic.run('XMPDRO21', 'XMPDRO21XXX', 'RO', null, 'gleif');
-  bic.run('XMPDRO22', 'XMPDRO22XXX', 'RO', null, 'swiftcodes');
-  bic.run('XMPLBGSF', 'XMPLBGSFXXX', 'BG', null, 'swiftcodes');
-  const bae = db.prepare('INSERT INTO bg_bae VALUES (?, ?, ?, ?)');
-  bae.run('XMPB0001', 'XMPB', '0001', 'XMPBBGSF');
-  bae.run('XMPB0002', 'XMPB', '0002', null);
-  bae.run('XMPL0001', 'XMPL', '0001', null);
+  bic.run('XMPDRO21', 'XMPDRO21XXX', 'RO', 'LEI0000000000000RO02', 'gleif');
+  bic.run('XMPDRO22', 'XMPDRO22XXX', 'RO', 'LEI0000000000000RO03', 'gleif');
+  bic.run('XMPSRO22', 'XMPSRO22XXX', 'RO', null, 'swiftcodes');
+  bic.run('XMPMRO21', 'XMPMRO21XXX', 'RO', 'LEI0000000000000RO04', 'gleif');
+  bic.run('XMPMRO22', 'XMPMRO22XXX', 'RO', null, 'swiftcodes');
+  bic.run('XMPLIE2D', 'XMPLIE2DXXX', 'IE', 'LEI0000000000000IE01', 'gleif');
 });
 
 describe('it-lei: ABI code -> LEI (Banca d’Italia) -> BIC (GLEIF)', () => {
@@ -73,33 +65,30 @@ describe('it-lei: ABI code -> LEI (Banca d’Italia) -> BIC (GLEIF)', () => {
   });
 });
 
-describe('bic-prefix: the bank code is the first four letters of the BIC', () => {
-  it('serves the one BIC8 that begins with the code, as its head office', () => {
+describe('gleif-prefix: the bank code is the first four letters of the BIC, read in GLEIF', () => {
+  it('serves the one GLEIF BIC8 that begins with the code, as its head office', () => {
     expect(derivePrefix(db, 'RO', 'XMPL')).toEqual({ bic: 'XMPLRO22XXX' });
+  });
+
+  it('never reads the SwiftCodes copy, not even to break a tie or fill a gap', () => {
+    // Only SwiftCodes carries it: nothing.
+    expect(derivePrefix(db, 'RO', 'XMPS')).toEqual({ bic: null, reason: 'absent' });
+    // GLEIF names one, SwiftCodes another: GLEIF's, and no ambiguity.
+    expect(derivePrefix(db, 'RO', 'XMPM')).toEqual({ bic: 'XMPMRO21XXX' });
   });
 
   it('leaves an ambiguous or unknown prefix, and a code that is not four letters, alone', () => {
     expect(derivePrefix(db, 'RO', 'XMPD')).toEqual({ bic: null, reason: 'ambiguous' });
     expect(derivePrefix(db, 'RO', 'XMPZ')).toEqual({ bic: null, reason: 'absent' });
     expect(derivePrefix(db, 'RO', '1234')).toEqual({ bic: null, reason: 'not_a_bic_prefix' });
-    // Another country's BIC never answers.
-    expect(derivePrefix(db, 'IE', 'XMPL')).toEqual({ bic: null, reason: 'absent' });
-  });
-});
-
-describe('bg-bae: the BIC the BNB register gives the code, else the prefix rule', () => {
-  it('reads the register first', () => {
-    expect(deriveBulgarian(db, 'XMPB')).toEqual({ bic: 'XMPBBGSFXXX' });
-  });
-
-  it('falls back to the directory when the register gives no BIC', () => {
-    expect(deriveBulgarian(db, 'XMPL')).toEqual({ bic: 'XMPLBGSFXXX' });
+    // Another country's BIC never answers: XMPD exists in Romania only.
+    expect(derivePrefix(db, 'IE', 'XMPD')).toEqual({ bic: null, reason: 'absent' });
   });
 });
 
 describe('deriveKey', () => {
   it('withdraws every country without a derivation', () => {
-    for (const key of ['TR:99999', 'ES:9999', 'GE:XM', 'AE:999']) {
+    for (const key of ['TR:99999', 'ES:9999', 'GE:XM', 'AE:999', 'IE:XMPL', 'BG:XMPL']) {
       expect(deriveKey(db, key), key).toEqual({ bic: null, reason: 'no_derivation' });
     }
   });

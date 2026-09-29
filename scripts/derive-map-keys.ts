@@ -17,24 +17,21 @@
  * map): part of the map had been imported from a third-party compilation whose
  * national files turned out to come, for eleven countries, from commercial
  * sites or from publishers that reserve commercial use. Those keys leave the
- * repository and the service. Italy and Romania are rebuilt from open data, and
- * the Irish, Latvian, Bulgarian and British keys of the same import (sources
- * not named) are re-derived the way the rest of those countries already are.
+ * repository and the service. The Italian and Romanian ones are rebuilt from
+ * open data where it names one BIC.
  *
- * The derivations:
+ * The derivations, both read in GLEIF (bic_entries, source 'gleif': the BIC
+ * directory rows whose BIC the SWIFT BIC-to-LEI Mapping Table pairs with an
+ * LEI, whose notice NOTICE reproduces), never in the SwiftCodes copy, whose
+ * rights are not established:
  *  - IT, `it-lei`: the ABI code's LEI as the Banca d'Italia publishes it
  *    (national_bank_codes, CC BY 4.0), then the BIC GLEIF pairs with that LEI in
- *    Italy (bic_entries, source 'gleif', from the SWIFT BIC-to-LEI Mapping
- *    Table, whose notice NOTICE reproduces). Several BICs for one LEI: the one
- *    head-office BIC (ending XXX) if there is exactly one, else nothing.
- *  - RO, IE, LV, GB, `bic-prefix`: in these countries the IBAN bank code is the
- *    first four letters of the BIC. The one BIC8 of bic_entries that begins with
- *    the code, as BIC8 + XXX, the rule the map already applies to its other
- *    Irish and British keys. Several BIC8: nothing here, and the lookup's own
- *    prefix search answers with the number of candidates.
- *  - BG, `bg-bae`: the BIC the Bulgarian National Bank's BAE register gives the
- *    code (bg_bae, served with the BNB's written permission), when it gives one;
- *    otherwise the `bic-prefix` rule.
+ *    Italy. Several BICs for one LEI: the one head-office BIC (ending XXX) if
+ *    there is exactly one, else nothing.
+ *  - RO, `gleif-prefix`: in Romania the IBAN bank code is the first four
+ *    letters of the BIC. The one Romanian BIC8 of GLEIF that begins with the
+ *    code, as BIC8 + XXX. Several, or none: nothing here (the lookup's own
+ *    prefix search still answers, naming its source and its candidates).
  *  - Every other country: no derivation, the key is withdrawn.
  *
  * The file is rewritten with the same serialisation (compact JSON, no final
@@ -47,16 +44,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 type Db = InstanceType<typeof Database>;
 
-export type Derivation = 'it-lei' | 'bic-prefix' | 'bg-bae';
+export type Derivation = 'it-lei' | 'gleif-prefix';
 
 /** The derivation each country's keys are rebuilt with; absent means withdrawn. */
 export const DERIVATION: Readonly<Record<string, Derivation>> = {
   IT: 'it-lei',
-  RO: 'bic-prefix',
-  IE: 'bic-prefix',
-  LV: 'bic-prefix',
-  GB: 'bic-prefix',
-  BG: 'bg-bae',
+  RO: 'gleif-prefix',
 };
 
 export type Outcome =
@@ -102,22 +95,12 @@ export function derivePrefix(db: Db, cc: string, code: string): Outcome {
   if (!/^[A-Z]{4}$/.test(code)) return { bic: null, reason: 'not_a_bic_prefix' };
   const rows = db
     .prepare(
-      'SELECT DISTINCT bic8 FROM bic_entries WHERE country_code = ? AND substr(bic8, 1, 4) = ?',
+      "SELECT DISTINCT bic8 FROM bic_entries WHERE country_code = ? AND source = 'gleif' AND substr(bic8, 1, 4) = ?",
     )
     .all(cc, code) as Array<{ bic8: string }>;
   if (rows.length === 0) return { bic: null, reason: 'absent' };
   if (rows.length > 1) return { bic: null, reason: 'ambiguous' };
   return { bic: toBic11(rows[0]!.bic8) };
-}
-
-export function deriveBulgarian(db: Db, code: string): Outcome {
-  const rows = db
-    .prepare('SELECT DISTINCT bic FROM bg_bae WHERE bank_code = ? AND bic IS NOT NULL')
-    .all(code) as Array<{ bic: string }>;
-  const bics = [...new Set(rows.map((r) => toBic11(r.bic)))];
-  if (bics.length === 1) return { bic: bics[0]! };
-  if (bics.length > 1) return { bic: null, reason: 'ambiguous' };
-  return derivePrefix(db, 'BG', code);
 }
 
 export function deriveKey(db: Db, key: string): Outcome {
@@ -126,10 +109,8 @@ export function deriveKey(db: Db, key: string): Outcome {
   switch (DERIVATION[cc]) {
     case 'it-lei':
       return deriveItalian(db, code);
-    case 'bic-prefix':
+    case 'gleif-prefix':
       return derivePrefix(db, cc, code);
-    case 'bg-bae':
-      return deriveBulgarian(db, code);
     default:
       return { bic: null, reason: 'no_derivation' };
   }
