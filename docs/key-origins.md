@@ -34,6 +34,7 @@ surface the key was actually minted on. It is always true and never specific.
 | `site-pricing` | in the key dialog, from the pricing page |
 | `site-docs` | in the key dialog, from the documentation |
 | `site-dashboard` | in the key dialog, from the dashboard or the account area |
+| `site-api-page` | in the key dialog, from the IBAN validation API page (`/iban-validation-api`, every language) |
 | `web-device` | on the device-grant page, approved by a human in a browser |
 | `mcp-device` | through `request_api_key` on the remote MCP server |
 | `mcp-stdio-device` | through `request_api_key` on `npx ibanforge-mcp` |

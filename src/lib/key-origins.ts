@@ -64,6 +64,8 @@ export const KEY_ORIGIN_DOORS = {
   'site-pricing': 'The key dialog opened from the pricing page.',
   'site-docs': 'The key dialog opened from the documentation.',
   'site-dashboard': 'The key dialog opened from the dashboard or the account area.',
+  'site-api-page':
+    'The key dialog opened from the IBAN validation API page (/iban-validation-api).',
   'web-device': 'The device-grant page approved by a human in a browser.',
   'mcp-device': 'The device grant opened by the remote MCP tool request_api_key.',
   'mcp-stdio-device': 'The device grant opened by the stdio MCP server (npx ibanforge-mcp).',
