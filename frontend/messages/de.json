@@ -2527,7 +2527,8 @@
       "duplicate": "Doppelte IBAN",
       "issuer_not_bank": "Konto bei einem Zahlungsinstitut, nicht bei einer Bank",
       "country_risk": "Erhöhtes Länderrisiko",
-      "address_not_structured": "Adresse nicht strukturiert (ISO 20022)"
+      "address_not_structured": "Adresse nicht strukturiert (ISO 20022)",
+      "bank_not_consulted": "Bank nicht geprüft"
     },
     "pay": {
       "title": "Kommentierte Arbeitsmappe erhalten: {price} $ für {rows} Zeilen",

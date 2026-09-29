@@ -155,6 +155,17 @@ describe('auditTable', () => {
     const res = auditTable(['IBAN'], [[VALID_GB]]);
     expect(res.rows[0]!.status).not.toBe('error');
   });
+
+  it('never leaves a line OK when its bank could not be consulted (29/09/2026)', () => {
+    // Estonia is in the euro area and SEPA: no other finding would fire. Since
+    // its bank-code data was withdrawn, nothing identifies the bank, and the
+    // line must say so rather than read as a checked bank.
+    const res = auditTable(['IBAN'], [['EE382200221020145685']]);
+    const row = res.rows[0]!;
+    expect(row.findings.map((f) => f.code)).toEqual(['bank_not_consulted']);
+    expect(row.status).toBe('warning');
+    expect(findingLabel('bank_not_consulted', 'fr')).toBe('Banque non consultée');
+  });
 });
 
 describe('rendering', () => {

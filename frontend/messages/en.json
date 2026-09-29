@@ -2527,7 +2527,8 @@
       "duplicate": "Duplicate IBAN",
       "issuer_not_bank": "Held at a payment institution, not a bank",
       "country_risk": "Elevated country risk",
-      "address_not_structured": "Address not structured (ISO 20022)"
+      "address_not_structured": "Address not structured (ISO 20022)",
+      "bank_not_consulted": "Bank not consulted"
     },
     "pay": {
       "title": "Get the annotated workbook: ${price} for {rows} rows",

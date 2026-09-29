@@ -186,6 +186,7 @@ const KNOWN = new Set([
   "issuer_not_bank",
   "country_risk",
   "address_not_structured",
+  "bank_not_consulted",
 ]);
 
 function findingLabel(t: ReturnType<typeof useTranslations>, code: string): string {

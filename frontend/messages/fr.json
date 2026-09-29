@@ -2527,7 +2527,8 @@
       "duplicate": "IBAN en doublon",
       "issuer_not_bank": "Compte chez un établissement de paiement, pas une banque",
       "country_risk": "Risque pays élevé",
-      "address_not_structured": "Adresse non structurée (ISO 20022)"
+      "address_not_structured": "Adresse non structurée (ISO 20022)",
+      "bank_not_consulted": "Banque non consultée"
     },
     "pay": {
       "title": "Obtenir le classeur annoté : {price} $ pour {rows} lignes",
