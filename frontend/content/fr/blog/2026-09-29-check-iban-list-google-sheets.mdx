@@ -1,0 +1,73 @@
+---
+title: "Vérifier une liste d'IBAN dans Google Sheets : banque, BIC et verdict du registre, sans code"
+description: "=IBAN_CHECK(A2:A200) à côté d'une liste de fournisseurs donne la banque, le BIC et ce que dit le registre national de chaque IBAN. Comment installer le script open source en cinq minutes, ce qu'il coûte, ce qu'il envoie, et de vrais résultats."
+date: "2026-09-29"
+---
+
+Les coordonnées des fournisseurs vivent souvent dans un tableur bien avant d'arriver dans un système comptable : une liste exportée d'un ancien ERP, un formulaire rempli par les nouveaux fournisseurs, un fichier qu'un collègue tient à jour. Avant une campagne de paiements, la question utile sur chaque ligne n'est pas seulement « cet IBAN est-il bien formé ? », mais « désigne-t-il une banque qui existe, et laquelle ? ».
+
+Les fonctions IBANforge pour Google Sheets y répondent depuis une formule. Vous tapez `=IBAN_CHECK(A2:A200)` à côté d'une colonne d'IBAN, et cinq colonnes se remplissent : valide, la banque, le BIC, ce que dit le registre du code banque, et SEPA. Aucun code à écrire, aucun script à maintenir.
+
+## Les quatre fonctions
+
+| Formule | Renvoie |
+|---|---|
+| `=IBAN_VALID(A2:A200)` | TRUE ou FALSE, une ligne par cellule |
+| `=IBAN_BANK(A2:A200)` | l'établissement que le registre national nomme pour le code banque |
+| `=IBAN_BIC(A2:A200)` | le BIC que le registre associe au code banque, vide s'il n'y en a pas |
+| `=IBAN_CHECK(A2:A200)` | cinq colonnes : valide, banque, BIC, verdict du code banque, SEPA |
+
+Des alias français et allemands appellent le même code : `IBAN_VALIDE`, `IBAN_BANQUE`, `IBAN_CONTROLE` et `IBAN_GUELTIG`, `IBAN_BANKNAME`, `IBAN_PRUEFUNG`.
+
+## L'installer en cinq minutes
+
+Les fonctions sont un script Apps Script open source, installé à la main : elles ne figurent pas sur le Google Workspace Marketplace, il n'y a donc pas de bouton d'installation dans une boutique.
+
+1. [Téléchargez les trois fichiers Apps Script](/integrations/ibanforge-sheets-6e5f9116f305.zip) et décompressez-les. Dans votre classeur, ouvrez **Extensions → Apps Script**.
+2. Remplacez `Code.gs`, ajoutez un fichier HTML nommé `Sidebar` et collez-y `Sidebar.html`. Dans les paramètres du projet, affichez `appsscript.json` et remplacez son contenu par le manifeste fourni. Enregistrez.
+3. Exécutez une fois `ibfShowSidebar` dans l'éditeur et autorisez le script. De retour dans le classeur, collez votre clé dans la barre latérale, jamais dans une cellule.
+4. Tapez `=IBAN_CHECK(A2:A200)` à côté de votre colonne d'IBAN, et laissez vides les cinq colonnes à sa droite.
+
+Les mêmes étapes, avec deux IBAN de test à importer, sont dans les [recettes](/fr/docs/recipes#integration-sheets). Le code source est sur [GitHub](https://github.com/cammac-creator/ibanforge/tree/main/integrations/sheets).
+
+## La clé
+
+Les fonctions envoient vos IBAN à la route par lot de l'API, qui exige une clé. Une clé ne demande ni e-mail ni carte pour démarrer, et elle donne 200 requêtes par mois une fois réclamée avec une adresse que vous consultez ; les étapes sont dans [Clés API](/fr/docs/api-keys). Un IBAN vaut une requête, quelle que soit la taille du lot dans lequel il voyage. Au-delà du quota gratuit, les crédits prépayés n'expirent jamais et le plan Pro couvre les fichiers plus volumineux : voir la [page des tarifs](/fr/pricing).
+
+## Ce que ça donne sur une vraie liste
+
+Six lignes : la Deutsche Bank à Berlin, une Sparkasse, un code banque allemand que la Bundesbank est en train de retirer, un code allemand qu'elle n'a jamais attribué, le premier IBAN avec ses deux derniers chiffres inversés, et un IBAN suisse de PostFinance.
+
+| IBAN | Valide | Banque | BIC | Verdict du code banque |
+|---|---|---|---|---|
+| DE65 1007 0000 0123 4567 89 | TRUE | Deutsche Bank | DEUTDEBBXXX | verified |
+| DE94 1405 1000 0123 4567 89 | TRUE | Sparkasse Mecklenburg-Nordwest | NOLADE21WIS | verified |
+| DE22 1306 1088 0123 4567 89 | TRUE | Raiffeisenbank Wismar -alt- | GENODEF1HWR | verified, retired |
+| DE58 1234 5678 0123 4567 89 | TRUE | | | not_in_register (not_allocated) |
+| DE65 1007 0000 0123 4567 98 | FALSE | | | checksum_failed |
+| CH31 3000 0000 0000 0000 1 | TRUE | PostFinance AG | POFICHBEXXX | verified |
+
+Ce sont les quatre premières colonnes de `=IBAN_CHECK`, calculées par le code même du module complémentaire (`Code.gs`, exécuté tel quel) à partir des réponses que l'API a données le 29 septembre 2026. L'API tournait en local depuis le dépôt public, avec le fichier de la Bundesbank de septembre 2026 et le BankMaster de SIX valable depuis le 1er septembre 2026. Les numéros de compte sont inventés ; le verdict sur le code banque n'en dépend pas. La cinquième colonne, SEPA, est omise ici : elle liste les schémas SEPA qui atteignent la banque, et une partie de cette information vient de registres que cette exécution locale n'a pas lus.
+
+## Lire la colonne du verdict
+
+- **verified** : le registre liste le code banque et nomme la banque.
+- **verified, retired** : le code existe, mais la Bundesbank a annoncé sa suppression. Le paiement peut encore passer aujourd'hui ; demandez de nouvelles coordonnées au fournisseur avant qu'il ne passe plus. La réponse complète de l'API nomme le code successeur (ici 13061078).
+- **not_in_register (not_allocated)** : les chiffres de contrôle sont justes, et pourtant aucune banque ne détient ce code. Ne payez pas ; l'IBAN a été inventé ou mal recopié quelque part en amont.
+- **checksum_failed**, avec FALSE dans la première colonne : une faute de frappe. Redemandez l'IBAN.
+
+Une nuance que la colonne ne peut pas montrer. Dans les pays où l'API lit le registre national en entier (Allemagne, Autriche, Belgique, Slovaquie, République tchèque, Bulgarie, Suisse et Liechtenstein), « verified » et « not_allocated » sont la parole du registre. Ailleurs, la banque est nommée à partir d'une carte composite construite depuis des annuaires de BIC, et un code qui y manque ne prouve rien ; le champ `authoritative` de l'API dit quel cas s'applique, et la [page de l'API](/fr/iban-validation-api) le montre.
+
+## Ce qu'il envoie, et ce qu'il coûte
+
+- Rien ne quitte la feuille hormis les chaînes d'IBAN que reçoivent les fonctions. La clé reste dans les propriétés de votre propre script, jamais dans le classeur.
+- Les IBAN partent par lots de 100 vers `POST /v1/iban/batch`, une requête par IBAN.
+- Les résultats peuvent être mis en cache six heures par utilisateur, si bien que recalculer la feuille peut éviter de payer deux fois ; rien ne garantit que ce cache tienne.
+
+## Ce qu'il ne vous dit pas
+
+Si un compte existe, et à quel nom il est ouvert. Le registre connaît la banque, pas le compte. Le nom du bénéficiaire est vérifié par les banques au moment du paiement (la vérification du bénéficiaire, ou Verification of Payee) ; les fonctions ne prétendent jamais le faire.
+
+## D'autres voies sans code
+
+La même vérification trouve sa place dans d'autres outils que vous utilisez peut-être déjà. Dans **n8n**, un workflow à deux nœuds importé depuis un fichier appelle l'API, et un nœud communautaire couvre n8n auto-hébergé ([recette n8n](/fr/docs/recipes#integration-n8n)). Dans **Odoo 18**, sur votre propre serveur ou sur Odoo.sh, un module open source remplit le BIC et le nom de la banque du compte bancaire d'un partenaire quand l'API peut les résoudre ([recette Odoo](/fr/docs/recipes#integration-odoo)). Et pour un seul IBAN, la page [À quelle banque appartient cet IBAN ?](/fr/iban-welche-bank) lit le code banque dans votre navigateur, sans aucune clé.

@@ -79,6 +79,15 @@ const FILES = [
   // Ajoutée le 29/09/2026 : la page « API de validation IBAN » cite l'essai
   // dans ses trois langues, depuis ses propres fichiers de texte.
   ...['en', 'fr', 'de'].map((lang) => `frontend/app/[locale]/iban-validation-api/copy-${lang}.ts`),
+  // Ajoutés le 29/09/2026 : les pages « alternative » et « Welche Bank » gardent
+  // leur texte à côté de leur route, et les deux articles du même jour citent
+  // l'essai sans clé.
+  ...['en', 'fr', 'de'].flatMap((lang) => [
+    `frontend/app/[locale]/alternatives/copy-${lang}.ts`,
+    `frontend/app/[locale]/iban-welche-bank/copy-${lang}.ts`,
+    `frontend/content/${lang}/blog/2026-09-29-german-iban-bic-python-javascript.mdx`,
+    `frontend/content/${lang}/blog/2026-09-29-check-iban-list-google-sheets.mdx`,
+  ]),
 ];
 
 /** Une ligne qui parle de l'essai. Les autres ne regardent pas ce garde. */

@@ -152,3 +152,5 @@ An allocated code is not an existing account. The register knows that bank code 
 And the register has a date. An answer with `as_of: 2026-09` holds for the September file; in October a code allocated today may be marked for deletion. Whoever maintains master data therefore checks not once but at every renewal of the file, reading exactly the fields this post walked through: `retired` first, then `authoritative`, then everything else.
 
 How the IBAN check as a whole runs against this register, from the check digit to the BIC, is in the post [German IBAN validation against the Bundesbank register](/blog/2026-09-02-german-iban-validation-bundesbank-blz).
+
+And if all you need is the bank behind one IBAN, without a line of code, the page [Which bank does this IBAN belong to?](/iban-welche-bank) reads the Bankleitzahl in your browser and opens its page.

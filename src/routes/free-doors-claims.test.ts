@@ -139,6 +139,12 @@ const STATIC = [
     ),
     // The IBAN validation API page (29/09/2026) keeps its copy beside its route.
     `frontend/app/[locale]/iban-validation-api/copy-${lang}.ts`,
+    // So do the "alternative" and "Welche Bank" pages (29/09/2026); the two
+    // articles of the same day quote the keyless trial and the key.
+    `frontend/app/[locale]/alternatives/copy-${lang}.ts`,
+    `frontend/app/[locale]/iban-welche-bank/copy-${lang}.ts`,
+    `frontend/content/${lang}/blog/2026-09-29-german-iban-bic-python-javascript.mdx`,
+    `frontend/content/${lang}/blog/2026-09-29-check-iban-list-google-sheets.mdx`,
   ]),
 ];
 
