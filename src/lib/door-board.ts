@@ -798,6 +798,79 @@ function findAutomated(
   return found;
 }
 
+interface AutomatedDetection {
+  lineages: Map<string, Lineage>;
+  external: Lineage[];
+  lineageOfPrefix: Map<string, string>;
+  firstSuccess: Map<string, number>;
+  firstPaid: Map<string, number>;
+  automatedIds: Set<string>;
+}
+
+/**
+ * La préparation commune entre `getDoorBoard` et `getAutomatedKeyPrefixes` :
+ * les lignées, le parc externe, les deux événements que `findAutomated` doit
+ * connaître et les créations automatiques elles-mêmes. Un seul appel de ce
+ * module fait ce calcul, pour que les deux fonctions ne puissent jamais
+ * diverger sur qui est un robot, et pour qu'aucune des deux requêtes SQL
+ * qu'il ouvre ne soit écrite deux fois dans ce fichier.
+ */
+function detectAutomated(db: DatabaseType.Database, nowMs: number): AutomatedDetection {
+  const lineages = loadLineages(db);
+  const external = [...lineages.values()].filter((l) => l.external);
+  const lineageOfPrefix = new Map<string, string>();
+  for (const l of lineages.values()) {
+    for (const r of l.rows) lineageOfPrefix.set(r.key_prefix, l.id);
+  }
+
+  const firstSuccess = new Map<string, number>();
+  for (const r of db
+    .prepare(
+      `SELECT lineage_hash, first_success_at FROM lineage_facts WHERE first_success_at IS NOT NULL`,
+    )
+    .all() as Array<{ lineage_hash: string; first_success_at: string }>) {
+    const ms = parseDbUtc(r.first_success_at);
+    if (ms !== null) firstSuccess.set(r.lineage_hash, ms);
+  }
+
+  const paidOutcomes = PAID_OUTCOMES.map(() => '?').join(', ');
+  const firstPaid = new Map<string, number>();
+  for (const r of db
+    .prepare(
+      `SELECT lineage_hash, MIN(created_at) AS first_at FROM key_purchases
+        WHERE outcome IN (${paidOutcomes}) AND COALESCE(issued_by_us, 0) = 0
+        GROUP BY lineage_hash`,
+    )
+    .all(...PAID_OUTCOMES) as Array<{ lineage_hash: string; first_at: string }>) {
+    const ms = parseDbUtc(r.first_at);
+    if (ms !== null) firstPaid.set(r.lineage_hash, ms);
+  }
+
+  const automatedIds = findAutomated(db, external, lineageOfPrefix, firstSuccess, firstPaid, nowMs);
+  return { lineages, external, lineageOfPrefix, firstSuccess, firstPaid, automatedIds };
+}
+
+/**
+ * Les préfixes de clé des lignées classées « création automatique » (robot
+ * d'exploration, jamais servies, cf. `findAutomated` ci-dessus), pour un
+ * appelant qui doit les écarter d'un classement par porte ou par source sans
+ * avoir besoin du tableau entier — voir `weekly-facts.ts`, `top_sources`.
+ *
+ * Sert au calcul, jamais à une réponse HTTP : l'en-tête de ce module promet
+ * qu'aucune sortie du tableau des portes ne porte un préfixe de clé, et cette
+ * fonction reste hors de `DoorBoard`.
+ */
+export function getAutomatedKeyPrefixes(opts: DoorBoardOptions = {}): Set<string> {
+  const db = getStatsDB();
+  const nowMs = opts.now ?? Date.now();
+  const { lineages, automatedIds } = detectAutomated(db, nowMs);
+  const prefixes = new Set<string>();
+  for (const id of automatedIds) {
+    for (const r of lineages.get(id)?.rows ?? []) prefixes.add(r.key_prefix);
+  }
+  return prefixes;
+}
+
 /** Un nombre et son nom accordé : 0 et 1 au singulier, comme en français. */
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n <= 1 ? one : many}`;
@@ -903,27 +976,16 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
   const oldest = shown[shown.length - 1];
   const previous = shown[1];
 
-  // ── Les clés, en lignées, et le parc externe ──────────────────────────────
-  const lineages = loadLineages(db);
-  const external = [...lineages.values()].filter((l) => l.external);
-  const lineageOfPrefix = new Map<string, string>();
+  // ── Les clés, en lignées, le parc externe et les créations automatiques ───
+  // Même préparation que `getAutomatedKeyPrefixes` : voir `detectAutomated`,
+  // qui rend aussi les deux événements datés dont la relance et les personnes
+  // ont encore besoin plus bas (`firstSuccess`, `firstPaid`), pour qu'aucune
+  // des deux requêtes ne soit écrite deux fois dans ce fichier.
+  const { lineages, external, lineageOfPrefix, firstSuccess, firstPaid, automatedIds } =
+    detectAutomated(db, nowMs);
   const lineageOfHash = new Map<string, string>();
   for (const l of lineages.values()) {
-    for (const r of l.rows) {
-      lineageOfPrefix.set(r.key_prefix, l.id);
-      lineageOfHash.set(r.key_hash, l.id);
-    }
-  }
-
-  // ── Les quatre événements, datés, par lignée ──────────────────────────────
-  const firstSuccess = new Map<string, number>();
-  for (const r of db
-    .prepare(
-      `SELECT lineage_hash, first_success_at FROM lineage_facts WHERE first_success_at IS NOT NULL`,
-    )
-    .all() as Array<{ lineage_hash: string; first_success_at: string }>) {
-    const ms = parseDbUtc(r.first_success_at);
-    if (ms !== null) firstSuccess.set(r.lineage_hash, ms);
+    for (const r of l.rows) lineageOfHash.set(r.key_hash, l.id);
   }
 
   // La relance remise, la plus ancienne par lignée. `delivered = 0` est une
@@ -939,21 +1001,7 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
     if (seen === undefined || ms < seen) nudgedAt.set(lineage, ms);
   }
 
-  const paidOutcomes = PAID_OUTCOMES.map(() => '?').join(', ');
-  const firstPaid = new Map<string, number>();
-  for (const r of db
-    .prepare(
-      `SELECT lineage_hash, MIN(created_at) AS first_at FROM key_purchases
-        WHERE outcome IN (${paidOutcomes}) AND COALESCE(issued_by_us, 0) = 0
-        GROUP BY lineage_hash`,
-    )
-    .all(...PAID_OUTCOMES) as Array<{ lineage_hash: string; first_at: string }>) {
-    const ms = parseDbUtc(r.first_at);
-    if (ms !== null) firstPaid.set(r.lineage_hash, ms);
-  }
-
   // ── Les créations automatiques, sorties des personnes, gardées à part ─────
-  const automatedIds = findAutomated(db, external, lineageOfPrefix, firstSuccess, firstPaid, nowMs);
   const people = external.filter((l) => !automatedIds.has(l.id));
 
   // ── Le rangement : une ligne par semaine montrée, puis « avant » et « sans date »

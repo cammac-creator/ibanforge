@@ -115,3 +115,69 @@ describe('getWeeklyFacts — WoW deltas computed in tested TS, never by the writ
     }
   });
 });
+
+describe('getWeeklyFacts — top_sources leaves the exploration robot out (PR 305 keeps it out of the door board; this ranking read api_keys on its own)', () => {
+  const BOT_PFX = `${PFX}_bot`;
+  const SOLO_PFX = `${PFX}_solo`;
+
+  afterAll(() => {
+    const db = getStatsDB();
+    db.prepare(
+      `DELETE FROM key_creations WHERE key_prefix LIKE '${BOT_PFX}%' OR key_prefix LIKE '${SOLO_PFX}%'`,
+    ).run();
+    db.prepare(
+      `DELETE FROM api_keys WHERE key_hash LIKE '${BOT_PFX}%' OR key_hash LIKE '${SOLO_PFX}%'`,
+    ).run();
+    // The automated-detection memo (door-board.ts): if the table does not
+    // exist yet (no earlier test created it), there is nothing to clear.
+    if (
+      db
+        .prepare(
+          `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'door_board_automated'`,
+        )
+        .get()
+    ) {
+      db.prepare(
+        `DELETE FROM door_board_automated WHERE lineage_hash LIKE '${BOT_PFX}%' OR lineage_hash LIKE '${SOLO_PFX}%'`,
+      ).run();
+    }
+  });
+
+  it('does not rank the robot burst as api-direct signups, but keeps the lone person', () => {
+    const db = getStatsDB();
+    // The `anonymous` sentinel (tiers.ts, ANONYMOUS_CONTACT): no anonymous
+    // key carries an address, robot or person.
+    const insKey = db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, active, monthly_limit,
+                             source, tier)
+       VALUES (?, ?, 'anonymous', ?, 1, 25, 'api-direct', 'anonymous')`,
+    );
+    const insBirth = db.prepare(
+      `INSERT INTO key_creations (ip_hash, created_at, user_agent, key_prefix)
+       VALUES (?, ?, 'invented-crawler/1.0', ?)`,
+    );
+
+    // The robot: three anonymous keys from the same network inside seven
+    // days, none ever served (no row in request_log) — the rule in
+    // `findAutomated`, door-board.ts.
+    for (let i = 0; i < 3; i++) {
+      const prefix = `${BOT_PFX}${i}`;
+      const at = `2026-08-05 09:0${i}:00`;
+      insKey.run(`${prefix}_hash`, prefix, at);
+      insBirth.run('net-robot-alpha', at, prefix);
+    }
+
+    // The person: a single anonymous key through api-direct, on a DIFFERENT
+    // network. Same shape as the robot (anonymous, never served) — the lone
+    // network is what must keep it under the three-creation threshold.
+    insKey.run(`${SOLO_PFX}_hash`, SOLO_PFX, '2026-08-05 09:30:00');
+    insBirth.run('net-solo-alpha', '2026-08-05 09:30:00', SOLO_PFX);
+
+    const f = getWeeklyFacts(NOW);
+    const apiDirect = f.top_sources.find((s) => s.source === 'api-direct');
+    // Without the fix, the "api-direct" door counted all four keys in this
+    // window (the robot's three plus the person). With the fix, only the
+    // person counts here.
+    expect(apiDirect?.signups).toBe(1);
+  });
+});

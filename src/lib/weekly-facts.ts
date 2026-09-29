@@ -1,9 +1,11 @@
+import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { getDemandGaps } from './demand-gaps.js';
 import { monthEndedBefore, proposeFromDemand, type DemandProposal } from './demand-proposal.js';
 import { buildBillableFilter } from './stats.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 import { SALE_OUTCOMES_SQL } from './key-purchases.js';
+import { getAutomatedKeyPrefixes } from './door-board.js';
 
 /**
  * Everything the Monday digest writer is allowed to say, computed HERE in
@@ -77,6 +79,32 @@ function metric(current: number, previous: number): WeeklyMetric {
   };
 }
 
+/**
+ * `top_sources` must not rank the exploration-bot lineages that
+ * `door-board.ts` keeps out of the door board (PR 305, 29.09.2026) — this
+ * ranking reads `api_keys` on its own and, unlike the board, had no notion of
+ * them, so the robot showed up as a door people walked through.
+ *
+ * Exposed to SQLite as a function, not a bound `NOT IN (?, ?, …)` list: the
+ * `notInternal` filter inside `getWeeklyFacts` already carries the lesson
+ * that one parameter per excluded key runs past SQLite's parameter ceiling on
+ * a big table, and a crawler burst is exactly the kind of table that gets
+ * big. The set is refreshed in this module-level box before every call —
+ * `deterministic: false` because its answer for the same prefix can change
+ * between two calls of `getWeeklyFacts`, even though it never changes within
+ * one.
+ */
+const automatedPrefixBox: { current: ReadonlySet<string> } = { current: new Set() };
+const AUTOMATED_FN_REGISTERED = new WeakSet<object>();
+
+function registerAutomatedPrefixFn(db: DatabaseType.Database): void {
+  if (AUTOMATED_FN_REGISTERED.has(db)) return;
+  db.function('weekly_facts_is_automated', { deterministic: false }, (prefix: unknown) =>
+    typeof prefix === 'string' && automatedPrefixBox.current.has(prefix) ? 1 : 0,
+  );
+  AUTOMATED_FN_REGISTERED.add(db);
+}
+
 export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
   const db = getStatsDB();
 
@@ -117,6 +145,11 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
     'AND (key_prefix IS NULL OR key_prefix NOT IN ' +
     '(SELECT key_prefix FROM api_keys WHERE is_internal_email(email)))';
 
+  // The exploration robot that `door-board.ts` keeps out of the door board —
+  // see the comment on `registerAutomatedPrefixFn` above.
+  automatedPrefixBox.current = getAutomatedKeyPrefixes({ now: now.getTime() });
+  registerAutomatedPrefixFn(db);
+
   const reqWindow = (start: string, end: string) =>
     db
       .prepare(
@@ -146,7 +179,14 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
     created_at: string;
     credits_total: number | null;
   }>;
-  const external = keys.filter((k) => !isInternalEmail(k.email));
+  // A robot's anonymous keys never appear here as a real signup total: their
+  // shared sentinel email already collapses them to at most one row in
+  // `firstKeyByEmail` below, but that one phantom row would still be a person
+  // who does not exist. Simplest fix, per the same rule as `top_sources`:
+  // leave them out of `external` altogether.
+  const external = keys.filter(
+    (k) => !isInternalEmail(k.email) && !automatedPrefixBox.current.has(k.key_prefix),
+  );
 
   const inWindow = (sql: string, start: string, end: string) => {
     const day = sql.slice(0, 10);
@@ -219,7 +259,7 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
   const topSources = db
     .prepare(
       `SELECT COALESCE(source, 'direct') AS source, COUNT(*) AS signups FROM api_keys
-       WHERE created_at >= ? AND created_at < ?
+       WHERE created_at >= ? AND created_at < ? AND weekly_facts_is_automated(key_prefix) = 0
        GROUP BY COALESCE(source, 'direct') ORDER BY signups DESC LIMIT 5`,
     )
     .all(curStart, curEnd) as Array<{ source: string; signups: number }>;
