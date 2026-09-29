@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
-import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA, POSTAL_ADDRESS_SCHEMA } from '../lib/bank-code-schema.js';
+import {
+  BANK_CODE_CHECK_SCHEMA,
+  NEXT_STEPS_SCHEMA,
+  OFFICIAL_IDENTITY_SCHEMA,
+  POSTAL_ADDRESS_SCHEMA,
+} from '../lib/bank-code-schema.js';
 import {
   BANK_CODE_HOLDER_NOTE,
   BANK_REACHABILITY_NOTE,
@@ -33,7 +38,12 @@ import { RATE_LIMIT } from '../middleware/rate-limit.js';
 import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 // The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
-import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
+import {
+  NOT_WHAT_IT_IS,
+  frozenBicShare,
+  packSummary,
+  positioningLong,
+} from '../lib/positioning.js';
 import { nationalRegisterBicNames } from '../lib/register-lists.js';
 import { BUNDLES } from './api-keys.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
@@ -106,7 +116,10 @@ const IBAN_ERROR_CODES = [
   'checksum_failed',
   'invalid_bban_structure',
 ] as const satisfies readonly IbanErrorCode[];
-const IBAN_ERROR_CODES_COMPLETE: Exclude<IbanErrorCode, (typeof IBAN_ERROR_CODES)[number]> extends never
+const IBAN_ERROR_CODES_COMPLETE: Exclude<
+  IbanErrorCode,
+  (typeof IBAN_ERROR_CODES)[number]
+> extends never
   ? true
   : never = true;
 void IBAN_ERROR_CODES_COMPLETE;
@@ -190,7 +203,13 @@ const VALIDATE_EXAMPLES = {
         match: 'register',
         register: 'Deutsche Bundesbank Bankleitzahlendatei',
         authoritative: true,
-        institution: { name: 'Commerzbank', street: null, post_code: '50447', town: 'Köln', country: 'DE' },
+        institution: {
+          name: 'Commerzbank',
+          street: null,
+          post_code: '50447',
+          town: 'Köln',
+          country: 'DE',
+        },
         as_of: '2026-09',
       },
     },
@@ -319,7 +338,9 @@ const buildRawSpec = () => ({
           },
           '402': {
             description:
-              'Payment required (x402). Also returned when the keyless weekly trial is used up for this source address — `cause.reason = "trial_exhausted"`, with the count served this week, the reset (' + TRIAL_RESET + ') and the free-key route — and when a key has used its allowance (`monthly_quota_exhausted`, `credits_exhausted`). Without a key, an empty `{}` body gets this 402 and spends nothing of the trial: that is the discovery probe x402 indexers send. With a key, the same empty body is a 400.',
+              'Payment required (x402). Also returned when the keyless weekly trial is used up for this source address — `cause.reason = "trial_exhausted"`, with the count served this week, the reset (' +
+              TRIAL_RESET +
+              ') and the free-key route — and when a key has used its allowance (`monthly_quota_exhausted`, `credits_exhausted`). Without a key, an empty `{}` body gets this 402 and spends nothing of the trial: that is the discovery probe x402 indexers send. With a key, the same empty body is a 400.',
           },
           '400': {
             description:
@@ -451,7 +472,8 @@ const buildRawSpec = () => ({
             name: 'frn',
             in: 'path',
             required: true,
-            description: 'Firm Reference Number, 6 or 7 digits, as printed on the Financial Services Register.',
+            description:
+              'Firm Reference Number, 6 or 7 digits, as printed on the Financial Services Register.',
             schema: { type: 'string', pattern: '^[0-9]{6,7}$', example: '123456' },
           },
         ],
@@ -523,61 +545,82 @@ const buildRawSpec = () => ({
         },
         responses: {
           '200': {
-            description: 'Compliance check result: on an `iban`, the full IBAN validation plus the compliance layer; on a `bic`, BicComplianceResponse.',
+            description:
+              'Compliance check result: on an `iban`, the full IBAN validation plus the compliance layer; on a `bic`, BicComplianceResponse.',
             content: {
               'application/json': {
                 schema: {
                   oneOf: [
-                  {
-                  allOf: [
-                    { $ref: '#/components/schemas/IBANValidationResult' },
                     {
-                      type: 'object',
-                      required: ['compliance', 'meta'],
-                      properties: {
-                        compliance: { $ref: '#/components/schemas/ComplianceResult' },
-                        // Served on every compliance answer and declared
-                        // nowhere until the audit of 2026-09-01 (DX-06). It is
-                        // the block that says what the verdict does NOT cover,
-                        // which is the half a caller most needs to read.
-                        meta: {
+                      allOf: [
+                        { $ref: '#/components/schemas/IBANValidationResult' },
+                        {
                           type: 'object',
-                          description:
-                            'Provenance and scope of the verdict. Read it before acting on `compliance`: it names what was screened and, more importantly, what was not.',
-                          required: ['scope', 'disclaimer'],
+                          required: ['compliance', 'meta'],
                           properties: {
-                            scope: {
-                              type: 'string',
-                              example: 'bank_bic_only',
-                              description: 'What the screen covered. "bank_bic_only" means the holding institution, never the beneficiary name.',
-                            },
-                            disclaimer: {
-                              type: 'string',
-                              description: 'The limits of the answer in plain words. Informational triage, not a regulated AML/CFT product.',
-                            },
-                            sanctions_as_of: { type: 'string', description: 'When the sanctions data was last refreshed.' },
-                            fatf_as_of: { type: 'string', example: '2026-06', description: 'The FATF plenary the jurisdiction flag comes from.' },
-                            sources: { type: 'string', example: 'EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD', description: 'The lists and registers consulted.' },
-                            country_risk_as_of: { type: 'string', example: '2026-07', description: 'Review date of the editorial country-risk axis.' },
-                            country_risk_scope: {
-                              type: 'string',
+                            compliance: { $ref: '#/components/schemas/ComplianceResult' },
+                            // Served on every compliance answer and declared
+                            // nowhere until the audit of 2026-09-01 (DX-06). It is
+                            // the block that says what the verdict does NOT cover,
+                            // which is the half a caller most needs to read.
+                            meta: {
+                              type: 'object',
                               description:
-                                'Why `risk_indicators.country_risk` and `compliance.sanctions.fatf_status` may disagree: they are two separate axes, each with its own review date, not two spellings of one.',
+                                'Provenance and scope of the verdict. Read it before acting on `compliance`: it names what was screened and, more importantly, what was not.',
+                              required: ['scope', 'disclaimer'],
+                              properties: {
+                                scope: {
+                                  type: 'string',
+                                  example: 'bank_bic_only',
+                                  description:
+                                    'What the screen covered. "bank_bic_only" means the holding institution, never the beneficiary name.',
+                                },
+                                disclaimer: {
+                                  type: 'string',
+                                  description:
+                                    'The limits of the answer in plain words. Informational triage, not a regulated AML/CFT product.',
+                                },
+                                sanctions_as_of: {
+                                  type: 'string',
+                                  description: 'When the sanctions data was last refreshed.',
+                                },
+                                fatf_as_of: {
+                                  type: 'string',
+                                  example: '2026-06',
+                                  description: 'The FATF plenary the jurisdiction flag comes from.',
+                                },
+                                sources: {
+                                  type: 'string',
+                                  example: 'EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD',
+                                  description: 'The lists and registers consulted.',
+                                },
+                                country_risk_as_of: {
+                                  type: 'string',
+                                  example: '2026-07',
+                                  description: 'Review date of the editorial country-risk axis.',
+                                },
+                                country_risk_scope: {
+                                  type: 'string',
+                                  description:
+                                    'Why `risk_indicators.country_risk` and `compliance.sanctions.fatf_status` may disagree: they are two separate axes, each with its own review date, not two spellings of one.',
+                                },
+                              },
                             },
                           },
                         },
-                      },
+                      ],
                     },
-                  ],
-                  },
-                  { $ref: '#/components/schemas/BicComplianceResponse' },
+                    { $ref: '#/components/schemas/BicComplianceResponse' },
                   ],
                 },
               },
             },
           },
           '402': { description: 'Payment required (x402) — $0.02 USDC' },
-          '400': { description: 'Missing or malformed request body, a malformed BIC, or both `iban` and `bic` in one body' },
+          '400': {
+            description:
+              'Missing or malformed request body, a malformed BIC, or both `iban` and `bic` in one body',
+          },
         },
       },
     },
@@ -678,7 +721,8 @@ const buildRawSpec = () => ({
                   payload: {
                     type: 'string',
                     maxLength: 4000,
-                    description: 'The Swiss QR Code text with real line breaks (SPC ... EPD, then optional billing information and up to two alternative schemes).',
+                    description:
+                      'The Swiss QR Code text with real line breaks (SPC ... EPD, then optional billing information and up to two alternative schemes).',
                   },
                 },
               },
@@ -691,14 +735,18 @@ const buildRawSpec = () => ({
         },
         responses: {
           '200': {
-            description: 'The verdict: valid, ready_for_2026_11_14, creditor_iban, creditor, ultimate_debtor, reference, findings (code, severity, field, detail, source), next_steps, source.',
+            description:
+              'The verdict: valid, ready_for_2026_11_14, creditor_iban, creditor, ultimate_debtor, reference, findings (code, severity, field, detail, source), next_steps, source.',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
                     valid: { type: 'boolean' },
-                    ready_for_2026_11_14: { type: 'boolean', description: 'valid and every present address is structured (type S).' },
+                    ready_for_2026_11_14: {
+                      type: 'boolean',
+                      description: 'valid and every present address is structured (type S).',
+                    },
                     creditor_iban: { type: 'object', additionalProperties: true },
                     creditor: { type: 'object', additionalProperties: true },
                     ultimate_debtor: { type: 'object', additionalProperties: true },
@@ -724,7 +772,9 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '400': { description: 'invalid_json or invalid_payload, with an example payload in the body.' },
+          '400': {
+            description: 'invalid_json or invalid_payload, with an example payload in the body.',
+          },
         },
       },
     },
@@ -767,7 +817,10 @@ const buildRawSpec = () => ({
                       pst_cd: { type: 'string', example: '8001' },
                       strt_nm: { type: 'string', example: 'Bahnhofstrasse' },
                       bldg_nb: { type: 'string', example: '45' },
-                      adr_tp: { type: 'string', description: 'Address Type. Forbidden by SPS ("N — Must not be sent").' },
+                      adr_tp: {
+                        type: 'string',
+                        description: 'Address Type. Forbidden by SPS ("N — Must not be sent").',
+                      },
                       adr_line: { type: 'array', items: { type: 'string' } },
                     },
                   },
@@ -813,7 +866,10 @@ const buildRawSpec = () => ({
                         },
                       },
                     },
-                    note: { type: 'string', description: 'Why no cbpr+ scheme is offered. Served on every answer.' },
+                    note: {
+                      type: 'string',
+                      description: 'Why no cbpr+ scheme is offered. Served on every answer.',
+                    },
                   },
                 },
               },
@@ -842,7 +898,8 @@ const buildRawSpec = () => ({
             name: 'reference',
             in: 'query',
             required: true,
-            description: 'Reference as printed. Spaces, slashes and the Belgian +++…+++ wrapper are stripped.',
+            description:
+              'Reference as printed. Spaces, slashes and the Belgian +++…+++ wrapper are stripped.',
             schema: { type: 'string', minLength: 4, maxLength: 64, example: 'RF18539007547034' },
           },
           {
@@ -867,7 +924,10 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '400': { description: 'Missing ?reference= query parameter, or shorter than 4 / longer than 64 characters' },
+          '400': {
+            description:
+              'Missing ?reference= query parameter, or shorter than 4 / longer than 64 characters',
+          },
         },
       },
       post: {
@@ -885,7 +945,12 @@ const buildRawSpec = () => ({
                 type: 'object',
                 required: ['reference'],
                 properties: {
-                  reference: { type: 'string', minLength: 4, maxLength: 64, example: '+++010/8068/17183+++' },
+                  reference: {
+                    type: 'string',
+                    minLength: 4,
+                    maxLength: 64,
+                    example: '+++010/8068/17183+++',
+                  },
                   reference_type: {
                     type: 'string',
                     enum: ['rf', 'scor', 'qrr', 'ogm', 'vcs', 'viitenumero', 'kid', 'ocr'],
@@ -943,14 +1008,20 @@ const buildRawSpec = () => ({
                         },
                       },
                     },
-                    endpoint_per_country: { type: 'string', example: 'GET /v1/iban/structure/:country' },
+                    endpoint_per_country: {
+                      type: 'string',
+                      example: 'GET /v1/iban/structure/:country',
+                    },
                     cost_usdc: { type: 'number', example: 0 },
                   },
                 },
               },
             },
           },
-          '429': { description: 'Rate limit exceeded. Honour the Retry-After header; see https://api.ibanforge.com/rate-limits.yml' },
+          '429': {
+            description:
+              'Rate limit exceeded. Honour the Retry-After header; see https://api.ibanforge.com/rate-limits.yml',
+          },
         },
       },
     },
@@ -994,32 +1065,49 @@ const buildRawSpec = () => ({
                     bban_length: { type: 'integer', example: 17 },
                     bban: {
                       type: ['object', 'null'],
-                      description: 'BBAN field positions, 0-indexed within the BBAN. null when no structure is declared for the country. charset uses SWIFT registry notation (n=digits, a=uppercase letters, c=alphanumeric, e.g. "5!n").',
+                      description:
+                        'BBAN field positions, 0-indexed within the BBAN. null when no structure is declared for the country. charset uses SWIFT registry notation (n=digits, a=uppercase letters, c=alphanumeric, e.g. "5!n").',
                       properties: {
                         bank_code: {
                           type: 'object',
-                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: ['string', 'null'] } },
+                          properties: {
+                            start: { type: 'integer' },
+                            length: { type: 'integer' },
+                            charset: { type: ['string', 'null'] },
+                          },
                         },
                         branch_code: {
                           type: 'object',
-                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: ['string', 'null'] } },
+                          properties: {
+                            start: { type: 'integer' },
+                            length: { type: 'integer' },
+                            charset: { type: ['string', 'null'] },
+                          },
                         },
                         account_number: {
                           type: 'object',
-                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: ['string', 'null'] } },
+                          properties: {
+                            start: { type: 'integer' },
+                            length: { type: 'integer' },
+                            charset: { type: ['string', 'null'] },
+                          },
                         },
                       },
                     },
                     bban_pattern: {
                       type: ['string', 'null'],
-                      description: 'Full BBAN pattern in SWIFT IBAN Registry notation (e.g. "5!n12!c") — what /v1/iban/validate enforces structurally on top of length + mod-97.',
+                      description:
+                        'Full BBAN pattern in SWIFT IBAN Registry notation (e.g. "5!n12!c") — what /v1/iban/validate enforces structurally on top of length + mod-97.',
                       example: '5!n12!c',
                     },
                     sepa: {
                       type: 'object',
                       properties: {
                         member: { type: 'boolean' },
-                        schemes: { type: 'array', items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] } },
+                        schemes: {
+                          type: 'array',
+                          items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] },
+                        },
                         vop_required: { type: 'boolean' },
                       },
                     },
@@ -1037,8 +1125,13 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '400': { description: 'Invalid country code (must be 2 letters), or literal {country} placeholder sent unsubstituted' },
-          '404': { description: 'Country not covered — see GET /v1/iban/structure for the full list' },
+          '400': {
+            description:
+              'Invalid country code (must be 2 letters), or literal {country} placeholder sent unsubstituted',
+          },
+          '404': {
+            description: 'Country not covered — see GET /v1/iban/structure for the full list',
+          },
         },
       },
     },
@@ -1279,7 +1372,8 @@ const buildRawSpec = () => ({
                   grant_type: {
                     type: 'string',
                     enum: ['urn:ietf:params:oauth:grant-type:device_code'],
-                    description: 'Optional. Any other value is refused as "unsupported_grant_type".',
+                    description:
+                      'Optional. Any other value is refused as "unsupported_grant_type".',
                   },
                 },
               },
@@ -1522,7 +1616,9 @@ const buildRawSpec = () => ({
             description:
               '"invalid_or_expired": unknown, expired, or already decided. Same body and same delay as the lookup 404.',
           },
-          '415': { description: '"unsupported_media_type": send this request as application/json.' },
+          '415': {
+            description: '"unsupported_media_type": send this request as application/json.',
+          },
         },
       },
     },
@@ -1584,7 +1680,9 @@ const buildRawSpec = () => ({
           },
         ],
         responses: {
-          '200': { description: 'Usage, traffic shape, failures with their cause, and network footprint' },
+          '200': {
+            description: 'Usage, traffic shape, failures with their cause, and network footprint',
+          },
           '401': { description: 'Missing or invalid API key' },
         },
       },
@@ -1791,7 +1889,11 @@ const buildRawSpec = () => ({
                   required: ['status', 'expires_in'],
                   properties: {
                     status: { type: 'string', enum: ['code_sent'] },
-                    expires_in: { type: 'integer', example: VERIFICATION_TTL_MINUTES * 60, description: 'Seconds the code stays valid.' },
+                    expires_in: {
+                      type: 'integer',
+                      example: VERIFICATION_TTL_MINUTES * 60,
+                      description: 'Seconds the code stays valid.',
+                    },
                   },
                 },
               },
@@ -1801,7 +1903,10 @@ const buildRawSpec = () => ({
             description:
               '"invalid_json": the body is not a JSON object. "invalid_email": not one plain address, or its normalized form is not one. "disposable_email": a throwaway or placeholder domain. "undeliverable_email": the domain has no mail server, or the mail server refused the address.',
           },
-          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared.' },
+          '401': {
+            description:
+              '"signed_out": the request carried the account cookie twice. The cookie is cleared.',
+          },
           '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
           '415': { description: '"unsupported_media_type": send the request as application/json.' },
           '429': {
@@ -1839,9 +1944,15 @@ const buildRawSpec = () => ({
                     format: 'email',
                     maxLength: 254,
                     example: 'you@example.com',
-                    description: 'The address the code was asked for, written as the person typed it.',
+                    description:
+                      'The address the code was asked for, written as the person typed it.',
                   },
-                  code: { type: 'string', pattern: '^[0-9]{6}$', example: '123456', description: 'The 6-digit code of the most recent mail.' },
+                  code: {
+                    type: 'string',
+                    pattern: '^[0-9]{6}$',
+                    example: '123456',
+                    description: 'The 6-digit code of the most recent mail.',
+                  },
                 },
               },
             },
@@ -1849,7 +1960,8 @@ const buildRawSpec = () => ({
         },
         responses: {
           '200': {
-            description: 'Signed in. Set-Cookie carries the session; the body only says so, with the end of the session.',
+            description:
+              'Signed in. Set-Cookie carries the session; the body only says so, with the end of the session.',
             headers: {
               'Set-Cookie': {
                 description: `${ACCOUNT_COOKIE}=…; Max-Age=${ACCOUNT_SESSION_DAYS * 24 * 60 * 60}; Path=/v1/account; HttpOnly; Secure; SameSite=Strict`,
@@ -1873,7 +1985,10 @@ const buildRawSpec = () => ({
             description:
               '"invalid_json", "invalid_email", or "invalid_code": one answer for every code that cannot be used. Ask for a new code with POST /v1/account/code.',
           },
-          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared.' },
+          '401': {
+            description:
+              '"signed_out": the request carried the account cookie twice. The cookie is cleared.',
+          },
           '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
           '415': { description: '"unsupported_media_type": send the request as application/json.' },
         },
@@ -1901,7 +2016,9 @@ const buildRawSpec = () => ({
         responses: {
           '200': {
             description: 'The overview of the signed-in address.',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/AccountOverview' } } },
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/AccountOverview' } },
+            },
           },
           '401': {
             description:
@@ -1937,8 +2054,13 @@ const buildRawSpec = () => ({
           },
         ],
         responses: {
-          '200': { description: 'key_prefix, usage (as GET /v1/keys/usage serves it) and report (as GET /v1/keys/report serves it).' },
-          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '200': {
+            description:
+              'key_prefix, usage (as GET /v1/keys/usage serves it) and report (as GET /v1/keys/report serves it).',
+          },
+          '401': {
+            description: '"signed_out": no live session, or the account cookie sent twice.',
+          },
           '404': {
             description:
               '"not_found": no such key in this account. The same answer for an unknown prefix and for the prefix of another address.',
@@ -1960,7 +2082,9 @@ const buildRawSpec = () => ({
         responses: {
           '200': {
             description: 'The purchases of the signed-in address.',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/AccountReceipts' } } },
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/AccountReceipts' } },
+            },
           },
           '401': {
             description:
@@ -1986,7 +2110,11 @@ const buildRawSpec = () => ({
             in: 'query',
             required: true,
             description: 'The ref of the purchase, as GET /v1/account/receipts lists it.',
-            schema: { type: 'string', pattern: '^rcpt_[0-9a-f]{24}$', example: 'rcpt_3f9c1a7e5b2d4c6e8a0b1c2d' },
+            schema: {
+              type: 'string',
+              pattern: '^rcpt_[0-9a-f]{24}$',
+              example: 'rcpt_3f9c1a7e5b2d4c6e8a0b1c2d',
+            },
           },
         ],
         responses: {
@@ -1999,13 +2127,19 @@ const buildRawSpec = () => ({
                   required: ['ref', 'url'],
                   properties: {
                     ref: { type: 'string' },
-                    url: { type: 'string', format: 'uri', description: `The Stripe receipt, valid 30 days. Always starts with ${RECEIPT_URL_PREFIX}` },
+                    url: {
+                      type: 'string',
+                      format: 'uri',
+                      description: `The Stripe receipt, valid 30 days. Always starts with ${RECEIPT_URL_PREFIX}`,
+                    },
                   },
                 },
               },
             },
           },
-          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '401': {
+            description: '"signed_out": no live session, or the account cookie sent twice.',
+          },
           '404': {
             description:
               '"receipt_not_found": no such receipt in this account. The same answer for an unknown ref, the ref of another address, and a purchase without a card receipt.',
@@ -2033,7 +2167,11 @@ const buildRawSpec = () => ({
               schema: {
                 type: 'object',
                 properties: {
-                  all: { type: 'boolean', default: false, description: 'true ends every session of the address, in every browser.' },
+                  all: {
+                    type: 'boolean',
+                    default: false,
+                    description: 'true ends every session of the address, in every browser.',
+                  },
                 },
               },
             },
@@ -2042,7 +2180,10 @@ const buildRawSpec = () => ({
         responses: {
           '204': { description: 'Signed out. The cookie is cleared.' },
           '400': { description: '"invalid_json": the body is present and is not a JSON object.' },
-          '401': { description: '"signed_out": the request carried the account cookie twice. The cookie is cleared and nothing is revoked.' },
+          '401': {
+            description:
+              '"signed_out": the request carried the account cookie twice. The cookie is cleared and nothing is revoked.',
+          },
           '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
           '415': { description: '"unsupported_media_type": send the request as application/json.' },
         },
@@ -2086,8 +2227,14 @@ const buildRawSpec = () => ({
                     default: 'other',
                     description: 'What kind of problem is being reported.',
                   },
-                  endpoint: { type: 'string', description: 'The endpoint that answered wrongly, e.g. /v1/bic/UBSWCHZH80A' },
-                  tx_hash: { type: 'string', description: 'The x402 transaction hash, when claiming a refund.' },
+                  endpoint: {
+                    type: 'string',
+                    description: 'The endpoint that answered wrongly, e.g. /v1/bic/UBSWCHZH80A',
+                  },
+                  tx_hash: {
+                    type: 'string',
+                    description: 'The x402 transaction hash, when claiming a refund.',
+                  },
                   expected: { type: 'string', description: 'What the answer should have been.' },
                   got: { type: 'string', description: 'What the answer actually was.' },
                   notes: { type: 'string', description: 'Anything else that helps reproduce it.' },
@@ -2195,7 +2342,10 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '429': { description: 'Rate limit exceeded. Honour the Retry-After header; see https://api.ibanforge.com/rate-limits.yml' },
+          '429': {
+            description:
+              'Rate limit exceeded. Honour the Retry-After header; see https://api.ibanforge.com/rate-limits.yml',
+          },
         },
       },
     },
@@ -2223,7 +2373,11 @@ const buildRawSpec = () => ({
               schema: {
                 type: 'object',
                 properties: {
-                  email: { type: 'string', format: 'email', description: 'Optional — attach the key to an email address' },
+                  email: {
+                    type: 'string',
+                    format: 'email',
+                    description: 'Optional — attach the key to an email address',
+                  },
                 },
               },
             },
@@ -2244,31 +2398,65 @@ const buildRawSpec = () => ({
                       description:
                         'Full API key: the key you presented on a recharge, echoed as sent; a new key otherwise, shown only once',
                     },
-                    same_key: { type: 'boolean', description: 'true when the credits landed on the key you presented' },
+                    same_key: {
+                      type: 'boolean',
+                      description: 'true when the credits landed on the key you presented',
+                    },
                     recharged: { type: 'boolean' },
                     key_prefix: { type: 'string' },
-                    credits: { type: 'integer', example: 1000, description: 'The credits of this bundle' },
-                    credits_added: { type: 'integer', example: 1000, description: 'On a recharge: the credits added to the key' },
+                    credits: {
+                      type: 'integer',
+                      example: 1000,
+                      description: 'The credits of this bundle',
+                    },
+                    credits_added: {
+                      type: 'integer',
+                      example: 1000,
+                      description: 'On a recharge: the credits added to the key',
+                    },
                     bundle: { type: 'string', example: '1k' },
                     price_paid_usdc: { type: 'number', example: 4 },
                     price_per_call_usdc: { type: 'number', example: 0.004 },
-                    first_call: { type: 'string', description: 'On a new key: a curl command that works with it' },
+                    first_call: {
+                      type: 'string',
+                      description: 'On a new key: a curl command that works with it',
+                    },
                     usage_hint: { type: 'string' },
                     balance_endpoint: { type: 'string', example: 'GET /v1/credits/balance' },
-                    recovery_url: { type: 'string', format: 'uri', description: 'On a new key: fetch it once if this response is lost' },
+                    recovery_url: {
+                      type: 'string',
+                      format: 'uri',
+                      description: 'On a new key: fetch it once if this response is lost',
+                    },
                     recovery_note: { type: 'string' },
-                    note: { type: 'string', description: 'Present when the key you sent was invalid or revoked: the pack is on a NEW key' },
+                    note: {
+                      type: 'string',
+                      description:
+                        'Present when the key you sent was invalid or revoked: the pack is on a NEW key',
+                    },
                     message: { type: 'string' },
                   },
                 },
               },
             },
           },
-          '200': { description: 'This payment was already recorded and its purchase was credited or minted (a replayed request): idempotent: true, nothing credited or minted twice. recovery_url only while the key it minted is active and still recoverable' },
-          '402': { description: 'Payment required (x402): bundle price in USDC. A settlement the facilitator REFUSED ends here too (an explicit reason, nothing broadcast), and nothing is credited' },
+          '200': {
+            description:
+              'This payment was already recorded and its purchase was credited or minted (a replayed request): idempotent: true, nothing credited or minted twice. recovery_url only while the key it minted is active and still recoverable',
+          },
+          '402': {
+            description:
+              'Payment required (x402): bundle price in USDC. A settlement the facilitator REFUSED ends here too (an explicit reason, nothing broadcast), and nothing is credited',
+          },
           '404': { description: 'Unknown bundle slug — choose 1k, 5k or 25k' },
-          '409': { description: 'This payment was already seen and its purchase was not credited: "payment_pending" (its settlement is not confirmed yet: do NOT pay again), "payment_refused" (refused when it was settled: sign a new payment), "payment_reversed" (refunded or disputed) or "payment_already_used". Nothing is settled again' },
-          '502': { description: 'settlement_unconfirmed: the outcome of the settlement is unknown (settlement.cause: "timeout", "settlement_pending" when the transfer was broadcast but not confirmed yet, or "facilitator_error" for a network error or a 5xx). The payment may have settled: do NOT pay again. The purchase stays pending and is reconciled by hand once the transfer is confirmed on-chain; settlement.transaction carries the transaction hash when the facilitator returned one' },
+          '409': {
+            description:
+              'This payment was already seen and its purchase was not credited: "payment_pending" (its settlement is not confirmed yet: do NOT pay again), "payment_refused" (refused when it was settled: sign a new payment), "payment_reversed" (refunded or disputed) or "payment_already_used". Nothing is settled again',
+          },
+          '502': {
+            description:
+              'settlement_unconfirmed: the outcome of the settlement is unknown (settlement.cause: "timeout", "settlement_pending" when the transfer was broadcast but not confirmed yet, or "facilitator_error" for a network error or a 5xx). The payment may have settled: do NOT pay again. The purchase stays pending and is reconciled by hand once the transfer is confirmed on-chain; settlement.transaction carries the transaction hash when the facilitator returned one',
+          },
         },
       },
     },
@@ -2377,7 +2565,8 @@ const buildRawSpec = () => ({
                             properties: {
                               label: {
                                 type: 'string',
-                                description: 'Names the example: its bank, or its provenance for an official example IBAN.',
+                                description:
+                                  'Names the example: its bank, or its provenance for an official example IBAN.',
                               },
                             },
                           },
@@ -2386,7 +2575,8 @@ const buildRawSpec = () => ({
                     },
                     bic_examples: {
                       type: 'array',
-                      description: 'A summary of the directory row of two BICs, not the full answer of GET /v1/bic/{code}.',
+                      description:
+                        'A summary of the directory row of two BICs, not the full answer of GET /v1/bic/{code}.',
                       items: {
                         type: 'object',
                         properties: {
@@ -2398,17 +2588,24 @@ const buildRawSpec = () => ({
                           institution: { type: ['string', 'null'] },
                           country: {
                             type: 'object',
-                            properties: { code: { type: 'string' }, name: { type: ['string', 'null'] } },
+                            properties: {
+                              code: { type: 'string' },
+                              name: { type: ['string', 'null'] },
+                            },
                           },
                           city: { type: ['string', 'null'] },
                           lei: { type: ['string', 'null'] },
-                          cost_usdc: { type: 'number', description: 'The list price of a BIC lookup; the demo itself is free.' },
+                          cost_usdc: {
+                            type: 'number',
+                            description: 'The list price of a BIC lookup; the demo itself is free.',
+                          },
                         },
                       },
                     },
                     compliance_example: {
                       type: 'object',
-                      description: 'One compliance check, assembled like the answer of POST /v1/iban/compliance.',
+                      description:
+                        'One compliance check, assembled like the answer of POST /v1/iban/compliance.',
                       required: ['description', 'endpoint', 'cost', 'result'],
                       properties: {
                         description: { type: 'string' },
@@ -2426,7 +2623,8 @@ const buildRawSpec = () => ({
                                     compliance: { $ref: '#/components/schemas/ComplianceResult' },
                                     meta: {
                                       type: 'object',
-                                      description: 'Provenance and scope of the verdict, as in POST /v1/iban/compliance.',
+                                      description:
+                                        'Provenance and scope of the verdict, as in POST /v1/iban/compliance.',
                                     },
                                   },
                                 },
@@ -2435,7 +2633,9 @@ const buildRawSpec = () => ({
                             {
                               type: 'object',
                               required: ['error'],
-                              properties: { error: { type: 'string', example: 'Compliance data unavailable' } },
+                              properties: {
+                                error: { type: 'string', example: 'Compliance data unavailable' },
+                              },
                             },
                           ],
                         },
@@ -2446,7 +2646,10 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '500': { description: 'Internal error. Safe to retry: this endpoint is read-only and changes nothing.' },
+          '500': {
+            description:
+              'Internal error. Safe to retry: this endpoint is read-only and changes nothing.',
+          },
         },
       },
     },
@@ -2469,7 +2672,10 @@ const buildRawSpec = () => ({
               },
             },
           },
-          '500': { description: 'Internal error. Safe to retry: this endpoint is read-only and changes nothing.' },
+          '500': {
+            description:
+              'Internal error. Safe to retry: this endpoint is read-only and changes nothing.',
+          },
         },
       },
     },
@@ -2540,7 +2746,8 @@ const buildRawSpec = () => ({
                       },
                       p95_ms: {
                         type: ['integer', 'null'],
-                        description: '95th percentile of served latency. Same 20-sample floor as p50_ms.',
+                        description:
+                          '95th percentile of served latency. Same 20-sample floor as p50_ms.',
                       },
                       p99_ms: {
                         type: ['integer', 'null'],
@@ -2599,7 +2806,8 @@ const buildRawSpec = () => ({
             'application/json': {
               schema: {
                 type: 'object',
-                description: 'JSON-RPC 2.0 request (initialize, tools/list, tools/call, ...) per the MCP specification',
+                description:
+                  'JSON-RPC 2.0 request (initialize, tools/list, tools/call, ...) per the MCP specification',
                 required: ['jsonrpc', 'method'],
                 properties: {
                   jsonrpc: { type: 'string', enum: ['2.0'] },
@@ -2612,7 +2820,10 @@ const buildRawSpec = () => ({
           },
         },
         responses: {
-          '200': { description: 'JSON-RPC 2.0 response (application/json or text/event-stream, depending on Accept header)' },
+          '200': {
+            description:
+              'JSON-RPC 2.0 response (application/json or text/event-stream, depending on Accept header)',
+          },
           '400': { description: 'Malformed JSON-RPC request' },
         },
       },
@@ -2621,7 +2832,8 @@ const buildRawSpec = () => ({
   components: {
     responses: {
       UnknownParameterOrWindow: {
-        description: 'Unknown query parameter, or a window past 90 days (audit 2026-09-01, PERF-13).',
+        description:
+          'Unknown query parameter, or a window past 90 days (audit 2026-09-01, PERF-13).',
         content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
       },
     },
@@ -2690,7 +2902,8 @@ const buildRawSpec = () => ({
           },
           message: {
             type: 'string',
-            description: 'Human-readable sentence explaining the failure. Wording may change; the token above will not.',
+            description:
+              'Human-readable sentence explaining the failure. Wording may change; the token above will not.',
             example: 'Maximum 100 IBANs per batch request',
           },
         },
@@ -2700,31 +2913,84 @@ const buildRawSpec = () => ({
       // son empreinte, sa lignée, une empreinte d'adresse IP.
       AccountOverview: {
         type: 'object',
-        required: ['email', 'session_expires_at', 'month', 'page', 'pages', 'keys', 'inactive_keys'],
+        required: [
+          'email',
+          'session_expires_at',
+          'month',
+          'page',
+          'pages',
+          'keys',
+          'inactive_keys',
+        ],
         properties: {
-          email: { type: 'string', description: 'The address typed at sign-in, in lower case.', example: 'you@example.com' },
-          session_expires_at: { type: 'string', format: 'date-time', description: 'When the session ends; sign in again after it.' },
-          month: { type: 'string', example: '2026-09', description: 'The calendar month (UTC) that calls_this_month counts.' },
+          email: {
+            type: 'string',
+            description: 'The address typed at sign-in, in lower case.',
+            example: 'you@example.com',
+          },
+          session_expires_at: {
+            type: 'string',
+            format: 'date-time',
+            description: 'When the session ends; sign in again after it.',
+          },
+          month: {
+            type: 'string',
+            example: '2026-09',
+            description: 'The calendar month (UTC) that calls_this_month counts.',
+          },
           page: { type: 'integer', minimum: 1 },
           pages: { type: 'integer', minimum: 1 },
           keys: { type: 'array', items: { $ref: '#/components/schemas/AccountKey' } },
-          inactive_keys: { type: 'integer', description: 'Deactivated keys of the address (revoked or rotated), counted without detail.' },
+          inactive_keys: {
+            type: 'integer',
+            description:
+              'Deactivated keys of the address (revoked or rotated), counted without detail.',
+          },
         },
       },
       AccountKey: {
         type: 'object',
-        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'address_proven', 'actions'],
+        required: [
+          'key_prefix',
+          'created_at',
+          'plan',
+          'allowance',
+          'credits',
+          'subscription',
+          'calls_this_month',
+          'last_call_at',
+          'alerts',
+          'address_proven',
+          'actions',
+        ],
         properties: {
-          key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
+          key_prefix: {
+            type: 'string',
+            example: 'ifk_3f9c1a7e',
+            description: 'The prefix of the key. The key itself is never served.',
+          },
           created_at: { type: ['string', 'null'], format: 'date-time' },
           plan: {
             type: 'string',
-            enum: ['free', 'custom', 'pack', 'none', 'pro', 'editor', 'free+pack', 'custom+pack', 'pro+pack', 'editor+pack'],
-            description: 'A key that holds an allowance AND prepaid credits carries both parts, such as free+pack: the allowance is drawn first, then the credits.',
+            enum: [
+              'free',
+              'custom',
+              'pack',
+              'none',
+              'pro',
+              'editor',
+              'free+pack',
+              'custom+pack',
+              'pro+pack',
+              'editor+pack',
+            ],
+            description:
+              'A key that holds an allowance AND prepaid credits carries both parts, such as free+pack: the allowance is drawn first, then the credits.',
           },
           allowance: {
             type: ['object', 'null'],
-            description: 'The allowance, with the figures of GET /v1/keys/usage. null on a key born of a purchase, which has no allowance of its own and whose balance is in credits.',
+            description:
+              'The allowance, with the figures of GET /v1/keys/usage. null on a key born of a purchase, which has no allowance of its own and whose balance is in credits.',
             properties: {
               basis: { type: 'string', enum: ['monthly', 'lifetime'] },
               limit: { type: 'integer' },
@@ -2734,7 +3000,8 @@ const buildRawSpec = () => ({
           },
           credits: {
             type: ['object', 'null'],
-            description: 'The prepaid balance of a key that holds credits, alone or beside an allowance. purchased_total is the total ever bought on the key, recharges included. null on a key without credits.',
+            description:
+              'The prepaid balance of a key that holds credits, alone or beside an allowance. purchased_total is the total ever bought on the key, recharges included. null on a key without credits.',
             properties: { remaining: { type: 'integer' }, purchased_total: { type: 'integer' } },
           },
           subscription: {
@@ -2742,10 +3009,17 @@ const buildRawSpec = () => ({
             properties: {
               plan: { type: 'string', enum: ['pro', 'editor'] },
               status: { type: 'string', enum: ['active'] },
-              manage_url: { type: 'string', format: 'uri', description: 'The customer portal: card, invoices, cancellation.' },
+              manage_url: {
+                type: 'string',
+                format: 'uri',
+                description: 'The customer portal: card, invoices, cancellation.',
+              },
             },
           },
-          calls_this_month: { type: 'integer', description: 'Calls billed to the key this month, credit calls included.' },
+          calls_this_month: {
+            type: 'integer',
+            description: 'Calls billed to the key this month, credit calls included.',
+          },
           last_call_at: { type: ['string', 'null'], format: 'date-time' },
           alerts: {
             type: 'array',
@@ -2760,11 +3034,13 @@ const buildRawSpec = () => ({
           },
           address_proven: {
             type: 'boolean',
-            description: 'True when the address of this key was proven by a code (created or claimed with a 6-digit code). An address typed at a checkout, or given to a first key without a code, is not: the page then asks you to recognise the key before recharging it.',
+            description:
+              'True when the address of this key was proven by a code (created or claimed with a 6-digit code). An address typed at a checkout, or given to a first key without a code, is not: the page then asks you to recognise the key before recharging it.',
           },
           actions: {
             type: 'object',
-            description: 'Links the page may offer. topup recharges THIS key by card (the links carry its recharge reference, never the key); subscribe_pro is the Pro link that puts the subscription on THIS key, null on a key that already carries one; manage_subscription is the portal of a subscribed key.',
+            description:
+              'Links the page may offer. topup recharges THIS key by card (the links carry its recharge reference, never the key); subscribe_pro is the Pro link that puts the subscription on THIS key, null on a key that already carries one; manage_subscription is the portal of a subscribed key.',
             properties: {
               topup: {
                 type: ['object', 'null'],
@@ -2792,17 +3068,45 @@ const buildRawSpec = () => ({
       },
       AccountReceipt: {
         type: 'object',
-        required: ['ref', 'paid_at', 'kind', 'plan', 'rail', 'credits', 'amount', 'status', 'key_prefix', 'receipt', 'invoices'],
+        required: [
+          'ref',
+          'paid_at',
+          'kind',
+          'plan',
+          'rail',
+          'credits',
+          'amount',
+          'status',
+          'key_prefix',
+          'receipt',
+          'invoices',
+        ],
         properties: {
-          ref: { type: 'string', example: 'rcpt_3f9c1a7e5b2d4c6e8a0b1c2d', description: 'The opaque reference of the purchase, for GET /v1/account/receipt.' },
-          paid_at: { type: ['string', 'null'], format: 'date-time', description: 'When the payment settled, else when it was recorded (UTC).' },
+          ref: {
+            type: 'string',
+            example: 'rcpt_3f9c1a7e5b2d4c6e8a0b1c2d',
+            description: 'The opaque reference of the purchase, for GET /v1/account/receipt.',
+          },
+          paid_at: {
+            type: ['string', 'null'],
+            format: 'date-time',
+            description: 'When the payment settled, else when it was recorded (UTC).',
+          },
           kind: { type: 'string', enum: ['pack', 'subscription'] },
-          plan: { type: ['string', 'null'], enum: ['pro', 'editor', null], description: 'The plan of a subscription; null for a pack, or when unknown.' },
+          plan: {
+            type: ['string', 'null'],
+            enum: ['pro', 'editor', null],
+            description: 'The plan of a subscription; null for a pack, or when unknown.',
+          },
           rail: { type: 'string', enum: ['card', 'usdc'] },
-          credits: { type: ['integer', 'null'], description: 'The credits of a pack; null for a subscription.' },
+          credits: {
+            type: ['integer', 'null'],
+            description: 'The credits of a pack; null for a subscription.',
+          },
           amount: {
             type: ['object', 'null'],
-            description: 'The amount taken, in minor units of its currency (400 and "usd" is 4.00 USD); null when unknown.',
+            description:
+              'The amount taken, in minor units of its currency (400 and "usd" is 4.00 USD); null when unknown.',
             required: ['minor', 'currency'],
             properties: {
               minor: { type: 'integer' },
@@ -2810,16 +3114,22 @@ const buildRawSpec = () => ({
             },
           },
           status: { type: 'string', enum: ['paid', 'refunded', 'disputed'] },
-          key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The key the purchase landed on. The key itself is never served.' },
+          key_prefix: {
+            type: 'string',
+            example: 'ifk_3f9c1a7e',
+            description: 'The key the purchase landed on. The key itself is never served.',
+          },
           receipt: {
             type: ['string', 'null'],
             example: '/v1/account/receipt?ref=rcpt_3f9c1a7e5b2d4c6e8a0b1c2d',
-            description: 'For a pack paid by card: the path, on the API host, that gives its Stripe receipt. Null otherwise.',
+            description:
+              'For a pack paid by card: the path, on the API host, that gives its Stripe receipt. Null otherwise.',
           },
           invoices: {
             type: ['string', 'null'],
             format: 'uri',
-            description: 'For a subscription paid by card: the Stripe customer portal, where its invoices live. Null otherwise.',
+            description:
+              'For a subscription paid by card: the Stripe customer portal, where its invoices live. Null otherwise.',
           },
         },
       },
@@ -2852,7 +3162,8 @@ const buildRawSpec = () => ({
               resets_at: {
                 type: 'string',
                 format: 'date-time',
-                description: 'Next Monday 00:00:00 UTC: the instant the weekly count goes back to zero.',
+                description:
+                  'Next Monday 00:00:00 UTC: the instant the weekly count goes back to zero.',
                 example: trialResetsAt(new Date('2026-09-24T12:00:00Z')),
               },
               free_key: {
@@ -2964,14 +3275,24 @@ const buildRawSpec = () => ({
                 description:
                   'The bank code you asked about, when the register answered for the one that took over its clearing. CH and LI only today: SIX marks an IID concatenated and publishes its successor. The IBAN stays valid and the account payable — a redirect is not a retirement.',
               },
-              bank_name: { type: ['string', 'null'], description: 'Null, never an empty string, when no source names the institution.' },
+              bank_name: {
+                type: ['string', 'null'],
+                description: 'Null, never an empty string, when no source names the institution.',
+              },
               city: {
                 type: ['string', 'null'],
                 description:
                   'Where the consulted register places THIS bank code. May differ from address.city, which is the legal seat — both true, different questions. Null, never an empty string, when the source leaves the town blank.',
               },
-              source: { type: ['string', 'null'], description: 'Which dataset named this institution.' },
-              as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed. This dates the IMPORT, which for one source is not the date of the data — see source_as_of.' },
+              source: {
+                type: ['string', 'null'],
+                description: 'Which dataset named this institution.',
+              },
+              as_of: {
+                type: ['string', 'null'],
+                description:
+                  'Year-month that dataset was last refreshed. This dates the IMPORT, which for one source is not the date of the data — see source_as_of.',
+              },
               source_as_of: {
                 type: 'string',
                 description: BIC_SOURCE_AS_OF_NOTE,
@@ -2994,7 +3315,7 @@ const buildRawSpec = () => ({
                 type: 'boolean',
                 description:
                   'Whether this BIC may be stored and settled against. Derived from `basis` by a single table, so the two cannot disagree. ' +
-                  'NOT the same claim as bank_code_check.authoritative, which is about the BANK CODE — whether a national register was consulted about its existence. San Marino is where they part: the pairing is the supervisor\'s, while the code space is not its to settle.',
+                  "NOT the same claim as bank_code_check.authoritative, which is about the BANK CODE — whether a national register was consulted about its existence. San Marino is where they part: the pairing is the supervisor's, while the code space is not its to settle.",
               },
               lei: {
                 type: ['string', 'null'],
@@ -3034,7 +3355,11 @@ const buildRawSpec = () => ({
             },
             required: ['code', 'bank_name', 'city'],
           },
-          formatted: { type: 'string', description: 'IBAN formatted in groups of 4', example: 'GB29 NWBK 6016 1331 9268 19' },
+          formatted: {
+            type: 'string',
+            description: 'IBAN formatted in groups of 4',
+            example: 'GB29 NWBK 6016 1331 9268 19',
+          },
           // Shipped by the endpoint since 1.x but absent from this schema until
           // 2026-07-25: agents reading the spec could not see that validating a
           // CH/LI IBAN already returns the Swiss rail data, and paid a second
@@ -3045,19 +3370,34 @@ const buildRawSpec = () => ({
               'Swiss clearing enrichment from the SIX BankMaster directory — present for CH and LI IBANs only, ' +
               'and included at no extra cost in the 0.005 USDC validation. Full rail participation, not just a name lookup.',
             properties: {
-              iid: { type: 'string', description: 'Zero-padded 5-digit IID / BC-Nummer', example: '00230' },
+              iid: {
+                type: 'string',
+                description: 'Zero-padded 5-digit IID / BC-Nummer',
+                example: '00230',
+              },
               name: { type: 'string', example: 'UBS Switzerland AG' },
               type: {
                 type: 'string',
-                enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'],
+                enum: [
+                  'bank',
+                  'cantonal_bank',
+                  'postfinance',
+                  'raiffeisen',
+                  'central_bank',
+                  'foreign_participant',
+                ],
               },
               town: { type: 'string', example: 'Zürich' },
               sic: { type: 'boolean', description: 'SIC (Swiss Interbank Clearing) participation' },
-              instant_payments_chf: { type: 'boolean', description: 'Instant Payments CHF participation' },
+              instant_payments_chf: {
+                type: 'boolean',
+                description: 'Instant Payments CHF participation',
+              },
               eurosic: { type: 'boolean', description: 'euroSIC participation' },
               qr_iid: {
                 type: ['string', 'null'],
-                description: 'QR-IID allocation for QR-bill reference, null when the institution has none',
+                description:
+                  'QR-IID allocation for QR-bill reference, null when the institution has none',
               },
             },
           },
@@ -3074,7 +3414,8 @@ const buildRawSpec = () => ({
           },
           error_detail: {
             type: 'string',
-            description: 'Present ONLY when `error` is, and explains it in one sentence (e.g. "Modulo 97 check returned 28, expected 1.").',
+            description:
+              'Present ONLY when `error` is, and explains it in one sentence (e.g. "Modulo 97 check returned 28, expected 1.").',
           },
           reference_check: {
             allOf: [{ $ref: '#/components/schemas/ReferenceCheckBlock' }],
@@ -3176,15 +3517,28 @@ const buildRawSpec = () => ({
               },
               entity_type: {
                 type: 'string',
-                enum: ['payment_institution', 'emi', 'aisp', 'exempted_emi', 'exempted_payment_institution'],
+                enum: [
+                  'payment_institution',
+                  'emi',
+                  'aisp',
+                  'exempted_emi',
+                  'exempted_payment_institution',
+                ],
                 description:
                   "The register's own category. emi = electronic money institution, payment_institution = authorised PI, aisp = account information service provider (reads accounts, issues nothing), exempted_emi / exempted_payment_institution = small operators waived FROM authorisation, which is not a licence. Only emi and payment_institution move issuer.type.",
               },
-              name: { type: 'string', description: 'Institution name as the register publishes it.' },
-              country: { type: 'string', description: 'ISO country of residence, as the register publishes it.' },
+              name: {
+                type: 'string',
+                description: 'Institution name as the register publishes it.',
+              },
+              country: {
+                type: 'string',
+                description: 'ISO country of residence, as the register publishes it.',
+              },
               competent_authority: {
                 type: 'string',
-                description: "The national authority that filed the authorisation, e.g. 'ES_BE' for Banco de España.",
+                description:
+                  "The national authority that filed the authorisation, e.g. 'ES_BE' for Banco de España.",
               },
               source: {
                 type: 'string',
@@ -3197,7 +3551,15 @@ const buildRawSpec = () => ({
                   'Date of the golden copy this row came from (YYYY-MM-DD), read from the EBA manifest and never from a clock. Always present.',
               },
             },
-            required: ['registered', 'entity_type', 'name', 'country', 'competent_authority', 'source', 'as_of'],
+            required: [
+              'registered',
+              'entity_type',
+              'name',
+              'country',
+              'competent_authority',
+              'source',
+              'as_of',
+            ],
           },
           risk_indicators: {
             type: 'object',
@@ -3237,7 +3599,14 @@ const buildRawSpec = () => ({
                   "The COUNTRY's Verification of Payee obligation, identical to sepa.vop_required. It says nothing about the institution: for the payee's bank, read sepa.vop_register_status.",
               },
             },
-            required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
+            required: [
+              'issuer_type',
+              'country_risk',
+              'test_bic',
+              'sepa_reachable',
+              'sepa_reachable_scope',
+              'vop_coverage',
+            ],
           },
           bank_code_check: BANK_CODE_CHECK_SCHEMA,
           official_identity: {
@@ -3264,7 +3633,10 @@ const buildRawSpec = () => ({
                 description:
                   'True when the pair satisfies the checksum for that sorting code, false when it cannot be a real account, null when checked is false.',
               },
-              source: { type: 'string', example: 'Vocalink modulus weight table (published for Pay.UK)' },
+              source: {
+                type: 'string',
+                example: 'Vocalink modulus weight table (published for Pay.UK)',
+              },
               table_fetched_on: {
                 type: 'string',
                 format: 'date',
@@ -3327,7 +3699,8 @@ const buildRawSpec = () => ({
           },
           as_of: {
             type: 'string',
-            description: 'YYYY-MM of that document — the date it carries, never a future validity date',
+            description:
+              'YYYY-MM of that document — the date it carries, never a future validity date',
             example: '2023-10',
           },
           note: { type: 'string', description: 'What was checked, and what was not' },
@@ -3344,7 +3717,11 @@ const buildRawSpec = () => ({
         required: ['reference', 'scheme', 'valid', 'status', 'source', 'pairing', 'note'],
         properties: {
           reference: { type: 'string', example: '210000000003139471430009017' },
-          scheme: { type: 'string', nullable: true, enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr'] },
+          scheme: {
+            type: 'string',
+            nullable: true,
+            enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr'],
+          },
           valid: { type: 'boolean', nullable: true },
           status: {
             type: 'string',
@@ -3352,7 +3729,11 @@ const buildRawSpec = () => ({
           },
           check_digit_expected: { type: 'string' },
           also_valid_as: { type: 'object' },
-          source: { type: 'string', nullable: true, description: 'Provenance of the CHECKSUM verdict' },
+          source: {
+            type: 'string',
+            nullable: true,
+            description: 'Provenance of the CHECKSUM verdict',
+          },
           as_of: { type: 'string', example: '2026-02' },
           pairing: {
             type: 'string',
@@ -3372,9 +3753,17 @@ const buildRawSpec = () => ({
         type: 'object',
         required: ['iban', 'valid', 'upgrade_to_full_validation'],
         properties: {
-          iban: { type: 'string', description: 'The IBAN as provided (normalized)', example: 'CH1000230000000012345' },
+          iban: {
+            type: 'string',
+            description: 'The IBAN as provided (normalized)',
+            example: 'CH1000230000000012345',
+          },
           valid: { type: 'boolean', description: 'mod-97 checksum + country structure result' },
-          formatted: { type: 'string', description: 'IBAN formatted in groups of 4 (only when valid)', example: 'CH10 0023 0000 0000 1234 5' },
+          formatted: {
+            type: 'string',
+            description: 'IBAN formatted in groups of 4 (only when valid)',
+            example: 'CH10 0023 0000 0000 1234 5',
+          },
           country: {
             type: 'object',
             description: 'Only present when valid',
@@ -3386,7 +3775,8 @@ const buildRawSpec = () => ({
           check_digits: { type: 'string', example: '10' },
           bban: {
             type: 'object',
-            description: 'Parsed BBAN components (only when valid and the country declares a structure)',
+            description:
+              'Parsed BBAN components (only when valid and the country declares a structure)',
             properties: {
               bank_code: { type: 'string', example: '00230' },
               branch_code: { type: 'string' },
@@ -3410,22 +3800,34 @@ const buildRawSpec = () => ({
         type: 'object',
         description:
           'One entry of the FCA Financial Services Register. Field values are the register’s own strings, never folded into an enum: the FCA adds statuses without notice. Strings are null when the register publishes nothing under that key.',
-        required: ['frn', 'found', 'source', 'source_url', 'retrieved_at', 'cache', 'disclaimer', 'cost_usdc'],
+        required: [
+          'frn',
+          'found',
+          'source',
+          'source_url',
+          'retrieved_at',
+          'cache',
+          'disclaimer',
+          'cost_usdc',
+        ],
         properties: {
           frn: { type: 'string', example: '123456' },
           found: {
             type: 'boolean',
-            description: 'False when no firm carries the number: an absence in the register, not a finding about anyone.',
+            description:
+              'False when no firm carries the number: an absence in the register, not a finding about anyone.',
           },
           name: { type: ['string', 'null'], example: 'Alpha Bank Example Ltd' },
           status: {
             type: ['string', 'null'],
-            description: 'Register status verbatim, e.g. "Authorised", "No longer authorised", "Appointed representative", "Registered".',
+            description:
+              'Register status verbatim, e.g. "Authorised", "No longer authorised", "Appointed representative", "Registered".',
             example: 'Authorised',
           },
           status_effective_date: {
             type: ['string', 'null'],
-            description: 'YYYY-MM-DD when the register’s dd/mm/yyyy could be read; the register’s own string otherwise.',
+            description:
+              'YYYY-MM-DD when the register’s dd/mm/yyyy could be read; the register’s own string otherwise.',
             example: '2004-09-01',
           },
           business_type: { type: ['string', 'null'], example: 'Regulated' },
@@ -3433,9 +3835,15 @@ const buildRawSpec = () => ({
           client_money_permission: { type: ['string', 'null'] },
           sub_status: { type: ['string', 'null'] },
           sub_status_effective_from: { type: ['string', 'null'] },
-          mlrs_status: { type: ['string', 'null'], description: 'Money Laundering Regulations registration status.' },
+          mlrs_status: {
+            type: ['string', 'null'],
+            description: 'Money Laundering Regulations registration status.',
+          },
           mlrs_status_effective_date: { type: ['string', 'null'] },
-          psd_emd_status: { type: ['string', 'null'], description: 'Payment Services / E-Money Regulations status.' },
+          psd_emd_status: {
+            type: ['string', 'null'],
+            description: 'Payment Services / E-Money Regulations status.',
+          },
           psd_emd_effective_date: { type: ['string', 'null'] },
           psd_agent_status: { type: ['string', 'null'] },
           e_money_agent_status: { type: ['string', 'null'] },
@@ -3451,11 +3859,20 @@ const buildRawSpec = () => ({
           },
           register_timestamp: {
             type: ['string', 'null'],
-            description: 'When the FCA last touched the entry, in the register’s local time (no zone published, none invented).',
+            description:
+              'When the FCA last touched the entry, in the register’s local time (no zone published, none invented).',
           },
           source: { type: 'string', enum: ['FCA Financial Services Register'] },
-          source_url: { type: 'string', format: 'uri', description: 'The firm on the public register (a search by FRN).' },
-          retrieved_at: { type: 'string', format: 'date-time', description: 'When the register was asked, UTC.' },
+          source_url: {
+            type: 'string',
+            format: 'uri',
+            description: 'The firm on the public register (a search by FRN).',
+          },
+          retrieved_at: {
+            type: 'string',
+            format: 'date-time',
+            description: 'When the register was asked, UTC.',
+          },
           cache: {
             type: 'object',
             required: ['hit', 'stale', 'expires_at'],
@@ -3463,16 +3880,21 @@ const buildRawSpec = () => ({
               hit: { type: 'boolean', description: 'Served from the one-day cache.' },
               stale: {
                 type: 'boolean',
-                description: 'True when the register was down and an expired copy (under thirty hours old) was served.',
+                description:
+                  'True when the register was down and an expired copy (under thirty hours old) was served.',
               },
               expires_at: { type: 'string', format: 'date-time' },
             },
           },
-          disclaimer: { type: 'string', description: 'The FCA’s exclusion of liability; the register prevails.' },
+          disclaimer: {
+            type: 'string',
+            description: 'The FCA’s exclusion of liability; the register prevails.',
+          },
           note: { type: 'string', description: 'Present on a miss only.' },
           attribution: {
             type: 'object',
-            description: 'Free tier only: display `text` with a link to `url` when the result is shown to people.',
+            description:
+              'Free tier only: display `text` with a link to `url` when the result is shown to people.',
             properties: {
               required: { type: 'boolean', enum: [true] },
               text: { type: 'string' },
@@ -3486,7 +3908,23 @@ const buildRawSpec = () => ({
       },
       BICLookupResult: {
         type: 'object',
-        required: ['bic', 'bic8', 'bic11', 'found', 'valid_format', 'institution', 'country', 'city', 'branch_code', 'branch_info', 'lei', 'lei_status', 'is_test_bic', 'source', 'cost_usdc'],
+        required: [
+          'bic',
+          'bic8',
+          'bic11',
+          'found',
+          'valid_format',
+          'institution',
+          'country',
+          'city',
+          'branch_code',
+          'branch_info',
+          'lei',
+          'lei_status',
+          'is_test_bic',
+          'source',
+          'cost_usdc',
+        ],
         properties: {
           attribution: {
             type: 'object',
@@ -3505,7 +3943,8 @@ const buildRawSpec = () => ({
           bic11: { type: 'string', example: 'UBSWCHZHXXX' },
           found: {
             type: 'boolean',
-            description: 'True only when the directory row names an institution: a record is complete or not found.',
+            description:
+              'True only when the directory row names an institution: a record is complete or not found.',
           },
           valid_format: { type: 'boolean' },
           institution: { type: ['string', 'null'], example: 'UBS AG' },
@@ -3513,7 +3952,11 @@ const buildRawSpec = () => ({
             type: 'object',
             required: ['code', 'name'],
             properties: {
-              code: { type: 'string', example: 'CH', description: 'Always characters 5-6 of the BIC.' },
+              code: {
+                type: 'string',
+                example: 'CH',
+                description: 'Always characters 5-6 of the BIC.',
+              },
               name: {
                 type: 'string',
                 example: 'Switzerland',
@@ -3522,13 +3965,17 @@ const buildRawSpec = () => ({
               },
             },
           },
-          city: { type: ['string', 'null'], description: 'Null, never an empty string, when the source leaves the town blank.' },
+          city: {
+            type: ['string', 'null'],
+            description: 'Null, never an empty string, when the source leaves the town blank.',
+          },
           address: {
             // Nullable depuis le 25/09/2026 (relecture de la PR 254, R5) : la
             // route sert toujours la clé, à `null` sans adresse enregistrée,
             // trouvé ou non. Le bloc jumeau de la validation l'était déjà.
             type: ['object', 'null'],
-            description: 'Registered head-office address (present when available, GLEIF or directory sourced). null when no registered address is on file, found or not; address_available says the same.',
+            description:
+              'Registered head-office address (present when available, GLEIF or directory sourced). null when no registered address is on file, found or not; address_available says the same.',
             properties: {
               type: { type: 'string', example: 'registered' },
               street: { type: ['string', 'null'], example: 'Bahnhofstrasse 45' },
@@ -3550,11 +3997,15 @@ const buildRawSpec = () => ({
           lei: { type: ['string', 'null'] },
           lei_status: { type: ['string', 'null'] },
           is_test_bic: { type: 'boolean' },
-          source: { type: ['string', 'null'], description: 'Code of the dataset this row comes from; source_name spells it out.' },
+          source: {
+            type: ['string', 'null'],
+            description: 'Code of the dataset this row comes from; source_name spells it out.',
+          },
           source_name: {
             type: ['string', 'null'],
             example: 'GLEIF LEI-to-BIC mapping',
-            description: 'Human name of the dataset this row comes from. Null when nothing was found.',
+            description:
+              'Human name of the dataset this row comes from. Null when nothing was found.',
           },
           source_as_of: {
             type: 'string',
@@ -3590,19 +4041,26 @@ const buildRawSpec = () => ({
               screened: { type: 'boolean', description: 'Whether the screen ran.' },
               listed: {
                 type: ['boolean', 'null'],
-                description: 'true when the institution appears on a screened list, false when it does not, null when the screen could not run, or when nothing matched while one of the lists this service names is not loaded on this deployment (see unscreened_lists): a no on the lists read is not a no on the missing one.',
+                description:
+                  'true when the institution appears on a screened list, false when it does not, null when the screen could not run, or when nothing matched while one of the lists this service names is not loaded on this deployment (see unscreened_lists): a no on the lists read is not a no on the missing one.',
               },
               unscreened_lists: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Present only when one of the lists this service names is not loaded on this deployment: those lists were not consulted. Absent when every named list was read.',
+                description:
+                  'Present only when one of the lists this service names is not loaded on this deployment: those lists were not consulted. Absent when every named list was read.',
               },
               // On one line, like its twin in ComplianceResult: the
               // sanctions-claims guard exempts a `matched_lists` declaration
               // from the "name every list you screen" rule, and it matches on
               // the line, so splitting the field would make an example of one
               // authority read as a coverage claim of one authority.
-              matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC'], description: 'The lists that matched. Empty when none did.' },
+              matched_lists: {
+                type: 'array',
+                items: { type: 'string' },
+                example: ['OFAC'],
+                description: 'The lists that matched. Empty when none did.',
+              },
             },
           },
           cost_usdc: { type: 'number', example: 0.003 },
@@ -3615,7 +4073,17 @@ const buildRawSpec = () => ({
         type: 'object',
         description:
           'The answer to POST /v1/iban/compliance with a `bic`: the bank screened directly, without an IBAN. `found` says whether our directory names the institution, independently of the screen: found false with bank_sanctioned true is a real combination.',
-        required: ['bic', 'bic8', 'valid_format', 'found', 'institution', 'country', 'compliance', 'meta', 'cost_usdc'],
+        required: [
+          'bic',
+          'bic8',
+          'valid_format',
+          'found',
+          'institution',
+          'country',
+          'compliance',
+          'meta',
+          'cost_usdc',
+        ],
         properties: {
           bic: { type: 'string', example: 'COBADEFF' },
           bic8: { type: 'string', example: 'COBADEFF' },
@@ -3630,7 +4098,11 @@ const buildRawSpec = () => ({
             required: ['code', 'name'],
             properties: {
               code: { type: 'string', description: 'Always characters 5-6 of the BIC.' },
-              name: { type: 'string', description: "The row's country name, then the ISO name, and the code only when neither exists." },
+              name: {
+                type: 'string',
+                description:
+                  "The row's country name, then the ISO name, and the code only when neither exists.",
+              },
             },
           },
           compliance: { $ref: '#/components/schemas/ComplianceResult' },
@@ -3641,7 +4113,8 @@ const buildRawSpec = () => ({
           },
           meta: {
             type: 'object',
-            description: 'The same provenance and scope block as on the IBAN form (scope, disclaimer, sanctions_as_of, fatf_as_of, sources).',
+            description:
+              'The same provenance and scope block as on the IBAN form (scope, disclaimer, sanctions_as_of, fatf_as_of, sources).',
             required: ['scope', 'disclaimer'],
           },
           cost_usdc: { type: 'number' },
@@ -3658,13 +4131,18 @@ const buildRawSpec = () => ({
               country_sanctioned: { type: 'boolean' },
               bank_sanctioned: {
                 type: 'boolean',
-                description: 'False also when no bank was screened (bank_screened false): read institution_listed, which is null then.',
+                description:
+                  'False also when no bank was screened (bank_screened false): read institution_listed, which is null then.',
               },
               matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC'] },
-              fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'suspended', 'non_member'] },
+              fatf_status: {
+                type: 'string',
+                enum: ['member', 'grey_list', 'black_list', 'suspended', 'non_member'],
+              },
               bank_screened: {
                 type: 'boolean',
-                description: 'Whether a bank was screened at all. When false, bank_sanctioned and matched_lists carry no information.',
+                description:
+                  'Whether a bank was screened at all. When false, bank_sanctioned and matched_lists carry no information.',
               },
               institution_listed: {
                 type: ['boolean', 'null'],
@@ -3674,14 +4152,18 @@ const buildRawSpec = () => ({
               payee_screened: {
                 type: 'boolean',
                 enum: [false],
-                description: 'Always false: the payee (the account holder) is never screened here, only the bank and the country.',
+                description:
+                  'Always false: the payee (the account holder) is never screened here, only the bank and the country.',
               },
             },
           },
           reachability: {
             type: 'object',
             properties: {
-              sepa_instant: { type: 'boolean', description: 'Whether the bank supports SEPA Instant Credit Transfer' },
+              sepa_instant: {
+                type: 'boolean',
+                description: 'Whether the bank supports SEPA Instant Credit Transfer',
+              },
               sct: { type: 'boolean', description: 'SEPA Credit Transfer participant' },
               sdd: { type: 'boolean', description: 'SEPA Direct Debit participant' },
               screened: {
@@ -3699,7 +4181,10 @@ const buildRawSpec = () => ({
           vop: {
             type: 'object',
             properties: {
-              participant: { type: 'boolean', description: 'Whether the bank participates in Verification of Payee' },
+              participant: {
+                type: 'boolean',
+                description: 'Whether the bank participates in Verification of Payee',
+              },
               status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
               screened: {
                 type: 'boolean',
@@ -3726,7 +4211,13 @@ const buildRawSpec = () => ({
             description:
               'unassessable means the IBAN itself failed validation, so no screening was possible. It is the absence of a verdict, never a favourable one: do not treat it as low.',
           },
-          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected. bank_code_inferred carries no weight: the bank named is our inference from a source that does not settle the bank code (bank_code_holder inferred), and no score moves for it. Some flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable, vop_register_unavailable, and sanctions_list_unavailable_<list> (one per named sanctions list not loaded on this deployment, for example sanctions_list_unavailable_un: the bank was screened against the other lists, so bank_sanctioned false says nothing about that one). sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least.', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
+          flags: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'List of specific risk flags detected. bank_code_inferred carries no weight: the bank named is our inference from a source that does not settle the bank code (bank_code_holder inferred), and no score moves for it. Some flags carry no weight and name a check that did not happen: no_bank_resolved, sepa_register_unavailable, vop_register_unavailable, and sanctions_list_unavailable_<list> (one per named sanctions list not loaded on this deployment, for example sanctions_list_unavailable_un: the bank was screened against the other lists, so bank_sanctioned false says nothing about that one). sanctions_lists_unavailable (a bank was resolved but no sanctions list is loaded on this deployment) holds the score at 50 at least. bank_code_data_unavailable (no bank resolved because we hold no bank-code data we may reuse for the country of the IBAN: bank_code_check.reason no_reference_data_for_country, bank_screened false) holds it at 50 at least too.',
+            example: ['fatf_grey_list', 'emi_issuer', 'no_vop'],
+          },
         },
       },
       ChClearingResult: {
@@ -3751,7 +4242,17 @@ const buildRawSpec = () => ({
             type: 'object',
             properties: {
               name: { type: 'string', example: 'UBS Switzerland AG' },
-              type: { type: 'string', enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'] },
+              type: {
+                type: 'string',
+                enum: [
+                  'bank',
+                  'cantonal_bank',
+                  'postfinance',
+                  'raiffeisen',
+                  'central_bank',
+                  'foreign_participant',
+                ],
+              },
               iid_type: { type: 'string', enum: ['headquarters', 'branch', 'other'] },
               headquarters_iid: { type: ['string', 'null'] },
             },
@@ -3821,7 +4322,10 @@ const buildRawSpec = () => ({
             description: `Number of BIC entries currently loaded: GLEIF and national registers are refreshed monthly; the SwiftCodes rows are a public copy of the SWIFT directory frozen in ${frozenBicShare().month ?? 'an earlier year'}, re-imported unchanged. Each source's own data date is its source_as_of in bic_sources.`,
             example: getEntryCount(),
           },
-          bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },
+          bic_data_last_updated: {
+            type: 'string',
+            description: 'Last update timestamp of BIC data',
+          },
           // Served since 01/09/2026 and declared only now (25/09/2026), with
           // its new neighbour below.
           bic_sources: {
@@ -3830,14 +4334,24 @@ const buildRawSpec = () => ({
               'Per-source freshness of the BIC directory. last_updated dates the IMPORT; source_as_of dates the upstream DATA where the two differ (a frozen public copy), null when no gap has been established. stale is true when the import is overdue or the source itself is frozen, and stale_reason says which.',
             items: {
               type: 'object',
-              required: ['source', 'entries', 'last_updated', 'source_as_of', 'stale', 'stale_reason'],
+              required: [
+                'source',
+                'entries',
+                'last_updated',
+                'source_as_of',
+                'stale',
+                'stale_reason',
+              ],
               properties: {
                 source: { type: 'string' },
                 entries: { type: 'integer' },
                 last_updated: { type: ['string', 'null'] },
                 source_as_of: { type: ['string', 'null'] },
                 stale: { type: 'boolean' },
-                stale_reason: { type: ['string', 'null'], enum: ['import_overdue', 'source_frozen', null] },
+                stale_reason: {
+                  type: ['string', 'null'],
+                  enum: ['import_overdue', 'source_frozen', null],
+                },
               },
             },
           },
@@ -3858,7 +4372,10 @@ const buildRawSpec = () => ({
               ],
               properties: {
                 source: { type: 'string' },
-                source_as_of: { type: 'string', description: 'Year-month the source DATA is from.' },
+                source_as_of: {
+                  type: 'string',
+                  description: 'Year-month the source DATA is from.',
+                },
                 rows: { type: 'integer' },
                 bic8: { type: 'integer' },
                 rows_without_current_trace: { type: ['integer', 'null'] },
@@ -3871,7 +4388,13 @@ const buildRawSpec = () => ({
       },
       StatsOverview: {
         type: 'object',
-        required: ['total_operations', 'by_type', 'total_revenue_usdc', 'top_countries', 'last_7_days'],
+        required: [
+          'total_operations',
+          'by_type',
+          'total_revenue_usdc',
+          'top_countries',
+          'last_7_days',
+        ],
         properties: {
           total_operations: { type: 'integer' },
           by_type: {
@@ -3906,11 +4429,13 @@ const buildRawSpec = () => ({
           total_revenue_usdc: {
             type: 'number',
             deprecated: true,
-            description: 'Deprecated alias for total_revenue_attempted_usdc. Use /admin/revenue for on-chain settled USDC.',
+            description:
+              'Deprecated alias for total_revenue_attempted_usdc. Use /admin/revenue for on-chain settled USDC.',
           },
           total_revenue_attempted_usdc: {
             type: 'number',
-            description: 'SUM of revenue_usdc in daily_stats. Reflects x402 calls that PASSED the payment middleware verify step, NOT a confirmation of on-chain settlement. For settled USDC see /admin/revenue.',
+            description:
+              'SUM of revenue_usdc in daily_stats. Reflects x402 calls that PASSED the payment middleware verify step, NOT a confirmation of on-chain settlement. For settled USDC see /admin/revenue.',
           },
           revenue_note: { type: 'string' },
           top_countries: {
@@ -3946,8 +4471,15 @@ const buildRawSpec = () => ({
       description:
         'One UK-regulated firm per request from the FCA Financial Services Register, under its written permission (paid via x402 or an API key)',
     },
-    { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
-    { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)' },
+    {
+      name: 'Compliance',
+      description:
+        'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)',
+    },
+    {
+      name: 'Swiss Clearing',
+      description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)',
+    },
     {
       name: 'API Keys',
       description:
@@ -3957,7 +4489,11 @@ const buildRawSpec = () => ({
       name: 'Account',
       description: `The account page, ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a read-only session cookie that shows every key of that address. Rotating or revoking a key still takes the key itself.`,
     },
-    { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N credits; batch validation debits 1 credit per IBAN' },
+    {
+      name: 'Credits',
+      description:
+        'Prepaid credit bundles — pay once in USDC (x402), get an API key with N credits; batch validation debits 1 credit per IBAN',
+    },
     { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },
     { name: 'Free', description: 'Free endpoints — no payment required' },
   ],

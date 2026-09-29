@@ -10,6 +10,8 @@ import {
 import { EXAMPLE_IBANS } from './countries.js';
 import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
+import { buildComplianceResponse } from './compliance-response.js';
+import { BANK_CODE_DATA_UNAVAILABLE_FLOOR, calculateRiskScore } from './compliance.js';
 
 /**
  * The map keys no publisher granted, out of the repository AND out of the
@@ -66,6 +68,89 @@ describe('the countries whose every map key was withdrawn', () => {
       if (!row) continue;
       expect(lookupByCountryBank(cc, row.p), `${cc}:${row.p}`).toBeNull();
     }
+  });
+});
+
+describe('the compliance score of an IBAN whose bank-code data was withdrawn', () => {
+  // Until the withdrawal these IBANs named a bank, which the sanctions lists
+  // screened, and a handful of them named a listed bank. Without a bank the
+  // bank axis is silent, and a silence must not add up to `low`.
+  it.each([...UNLICENSED_MAP_COUNTRIES].sort())(
+    '%s: no bank screened, and the score held at elevated at least',
+    (cc) => {
+      const r = buildComplianceResponse(EXAMPLE_IBANS[cc]!);
+      expect(r.valid).toBe(true);
+      const c = r.compliance;
+      expect(c.sanctions.bank_screened).toBe(false);
+      expect(c.sanctions.institution_listed).toBeNull();
+      expect(c.sanctions.matched_lists).toEqual([]);
+      expect(c.flags).toContain('no_bank_resolved');
+      expect(c.flags).toContain('bank_code_data_unavailable');
+      expect(c.risk_score).toBeGreaterThanOrEqual(BANK_CODE_DATA_UNAVAILABLE_FLOOR);
+      expect(['elevated', 'high', 'critical']).toContain(c.risk_level);
+    },
+  );
+
+  it('a country that keeps its data does not raise the flag when a code misses', () => {
+    // A French code absent from the map: no bank either, but the map was
+    // consulted and simply does not carry it.
+    const r = buildComplianceResponse('FR1499999000010123456789A42');
+    expect(r.bic ?? null).toBeNull();
+    expect(r.compliance.flags).not.toContain('bank_code_data_unavailable');
+  });
+
+  it('is a floor, never a weight: an established risk is not lowered, a resolved bank never raises it', () => {
+    const noBank = {
+      country_sanctioned: false,
+      bank_sanctioned: false,
+      matched_lists: [],
+      fatf_status: 'non_member' as const,
+      bank_screened: false,
+    };
+    const reach = { sepa_instant: false, sct: false, sdd: false, screened: false };
+    const vop = { participant: false, status: 'not_found' as const, screened: false };
+    const floored = calculateRiskScore(
+      noBank,
+      reach,
+      vop,
+      'bank',
+      'standard',
+      false,
+      'unverified',
+      false,
+      [],
+      true,
+    );
+    expect(floored.risk_score).toBe(BANK_CODE_DATA_UNAVAILABLE_FLOOR);
+    expect(floored.risk_level).toBe('elevated');
+    // A sanctioned country already scores above the floor: it stays there.
+    const sanctionedCountry = calculateRiskScore(
+      { ...noBank, country_sanctioned: true, fatf_status: 'black_list' },
+      reach,
+      vop,
+      'bank',
+      'high',
+      false,
+      'unverified',
+      false,
+      [],
+      true,
+    );
+    expect(sanctionedCountry.risk_score).toBeGreaterThan(BANK_CODE_DATA_UNAVAILABLE_FLOOR);
+    // A resolved bank is screened: the flag belongs to the no-bank case only.
+    const screened = calculateRiskScore(
+      { ...noBank, bank_screened: true },
+      { ...reach, screened: true },
+      { ...vop, screened: true },
+      'bank',
+      'standard',
+      false,
+      'confirmed',
+      true,
+      [],
+      true,
+    );
+    expect(screened.flags).not.toContain('bank_code_data_unavailable');
   });
 });
 
