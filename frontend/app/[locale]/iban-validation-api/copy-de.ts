@@ -38,7 +38,7 @@ export const COPY_DE: ApiPageCopy = {
       {
         title: "Nationale Prüfziffern",
         field: "checks.national_check_digits",
-        body: "Wo ein Land seinen eigenen Schlüssel in der Kontonummer versteckt: Frankreich und Monaco (RIB-Schlüssel), Belgien, Italien und San Marino (CIN), Spanien (DC), das Vereinigte Königreich (Modulus-Prüfung) und die polnische Abrechnungsnummer. Ein falscher Schlüssel steht in diesem Feld und macht valid nie falsch.",
+        body: "Wo ein Land seinen eigenen Schlüssel in der Kontonummer versteckt: Frankreich und Monaco (RIB-Schlüssel), Belgien, Italien und San Marino (CIN), Spanien (DC) und das Vereinigte Königreich (Modulus-Prüfung). Ein falscher Schlüssel steht in diesem Feld und macht valid nie falsch. In Polen kommt die Prüfziffer der Abrechnungsnummer mit der Bankleitzahl, in bank_code_check.check_digit.",
       },
       {
         title: "Die Bank und ihr BIC",
@@ -76,7 +76,7 @@ export const COPY_DE: ApiPageCopy = {
     tabsLabel: "Derselbe Aufruf in drei Sprachen",
     answerHeading: "Die Antwort, wie die API sie gegeben hat",
     answerCaption:
-      "Auszug aus der Antwort der API auf diese IBAN vom {date}: die Felder, die sagen, was geprüft wurde und in welchem Register. Die vollständige Antwort enthält außerdem den Herausgeber, die Schweizer Clearing-Daten, Risikoindikatoren und den empfohlenen nächsten Schritt. Ohne Schlüssel aufgerufen, endet sie mit einem trial-Block, der sagt, wie viele Aufrufe in dieser Woche bleiben und wann der Zähler neu beginnt.",
+      "Auszug aus der Antwort der API auf diese IBAN vom {date}: die Felder, die sagen, was geprüft wurde und in welchem Register. Die vollständige Antwort enthält außerdem den Herausgeber, die Schweizer Clearing-Daten, Risikoindikatoren und den empfohlenen nächsten Schritt. Ohne Schlüssel aufgerufen, enthält sie zusätzlich einen trial-Block, der sagt, wie viele Aufrufe in dieser Woche bleiben und wann der Zähler neu beginnt.",
     withKey:
       "Nach der Kostprobe ohne Schlüssel senden Sie dieselbe Anfrage mit dem Header Authorization: Bearer ifk_… und Ihrem Schlüssel.",
   },

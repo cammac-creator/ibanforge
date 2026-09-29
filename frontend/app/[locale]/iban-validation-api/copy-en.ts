@@ -38,7 +38,7 @@ export const COPY_EN: ApiPageCopy = {
       {
         title: "National check digits",
         field: "checks.national_check_digits",
-        body: "Where a country hides its own key inside the account number: France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC), the United Kingdom (modulus check) and the Polish settlement number. A wrong key shows in this field and never turns valid to false.",
+        body: "Where a country hides its own key inside the account number: France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC) and the United Kingdom (modulus check). A wrong key shows in this field and never turns valid to false. In Poland, the check digit of the settlement number comes with the bank code, in bank_code_check.check_digit.",
       },
       {
         title: "The bank and its BIC",
@@ -76,7 +76,7 @@ export const COPY_EN: ApiPageCopy = {
     tabsLabel: "The same call in three languages",
     answerHeading: "The answer, as the API gave it",
     answerCaption:
-      "Extract of the answer the API returned for this IBAN on {date}: the fields that say what was checked, and against which register. The full answer also carries the issuer, the Swiss clearing data, risk indicators and the next step to take. Called with no key, it ends with a trial block that says how many calls are left this week and when the count resets.",
+      "Extract of the answer the API returned for this IBAN on {date}: the fields that say what was checked, and against which register. The full answer also carries the issuer, the Swiss clearing data, risk indicators and the next step to take. Called with no key, it also carries a trial block that says how many calls are left this week and when the count resets.",
     withKey:
       "Past the keyless trial, send the same request with the header Authorization: Bearer ifk_… and your key.",
   },

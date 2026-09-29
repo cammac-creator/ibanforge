@@ -38,7 +38,7 @@ export const COPY_FR: ApiPageCopy = {
       {
         title: "Clés nationales",
         field: "checks.national_check_digits",
-        body: "Là où un pays place sa propre clé dans le numéro de compte : France et Monaco (clé RIB), Belgique, Italie et Saint-Marin (CIN), Espagne (DC), Royaume-Uni (modulus check) et numéro de règlement polonais. Une clé fausse apparaît dans ce champ et ne rend jamais valid faux.",
+        body: "Là où un pays place sa propre clé dans le numéro de compte : France et Monaco (clé RIB), Belgique, Italie et Saint-Marin (CIN), Espagne (DC) et Royaume-Uni (modulus check). Une clé fausse apparaît dans ce champ et ne rend jamais valid faux. En Pologne, le chiffre de contrôle du numéro de règlement accompagne le code banque, dans bank_code_check.check_digit.",
       },
       {
         title: "La banque et son BIC",
@@ -76,7 +76,7 @@ export const COPY_FR: ApiPageCopy = {
     tabsLabel: "Le même appel dans trois langages",
     answerHeading: "La réponse, telle que l'API l'a rendue",
     answerCaption:
-      "Extrait de la réponse de l'API pour cet IBAN, le {date} : les champs qui disent ce qui a été contrôlé, et dans quel registre. La réponse complète porte aussi l'émetteur, les données de clearing suisses, les indicateurs de risque et l'étape suivante conseillée. Appelée sans clé, elle se termine par un bloc trial qui indique combien d'appels restent cette semaine et quand le compteur repart.",
+      "Extrait de la réponse de l'API pour cet IBAN, le {date} : les champs qui disent ce qui a été contrôlé, et dans quel registre. La réponse complète porte aussi l'émetteur, les données de clearing suisses, les indicateurs de risque et l'étape suivante conseillée. Appelée sans clé, elle porte aussi un bloc trial qui indique combien d'appels restent cette semaine et quand le compteur repart.",
     withKey:
       "Au-delà de l'essai sans clé, envoyez la même requête avec l'en-tête Authorization: Bearer ifk_… et votre clé.",
   },
