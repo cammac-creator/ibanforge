@@ -1,0 +1,73 @@
+---
+title: "Check a list of IBANs in Google Sheets: bank, BIC and the register's verdict, without code"
+description: "=IBAN_CHECK(A2:A200) next to a supplier list gives the bank, the BIC and what the national register says about each IBAN. How to install the open-source script in five minutes, what it costs, what it sends, and real results."
+date: "2026-09-29"
+---
+
+Supplier details often live in a spreadsheet long before they reach an accounting system: a list exported from an old ERP, a form filled in by new suppliers, a file a colleague keeps up to date. Before a payment run, the useful question about each row is not only "is this IBAN well formed?" but "does it point to a bank that exists, and which one?".
+
+The IBANforge functions for Google Sheets answer that from a formula. You type `=IBAN_CHECK(A2:A200)` next to a column of IBANs, and five columns fill in: valid, the bank, the BIC, what the register says about the bank code, and SEPA. No code to write, no script to maintain.
+
+## The four functions
+
+| Formula | Returns |
+|---|---|
+| `=IBAN_VALID(A2:A200)` | TRUE or FALSE, one row per cell |
+| `=IBAN_BANK(A2:A200)` | the institution the national register names for the bank code |
+| `=IBAN_BIC(A2:A200)` | the BIC the register pairs with the bank code, empty when none |
+| `=IBAN_CHECK(A2:A200)` | five columns: valid, bank, BIC, bank-code verdict, SEPA |
+
+French and German aliases call the same code: `IBAN_VALIDE`, `IBAN_BANQUE`, `IBAN_CONTROLE` and `IBAN_GUELTIG`, `IBAN_BANKNAME`, `IBAN_PRUEFUNG`.
+
+## Install it in five minutes
+
+The functions are an open-source Apps Script, installed by hand: they are not listed on the Google Workspace Marketplace, so there is no store button.
+
+1. [Download the three Apps Script files](/integrations/ibanforge-sheets-6e5f9116f305.zip) and unzip them. In your spreadsheet, open **Extensions → Apps Script**.
+2. Replace `Code.gs`, add an HTML file named `Sidebar` and paste `Sidebar.html`. In the project settings, show `appsscript.json` and replace its content with the supplied manifest. Save.
+3. Run `ibfShowSidebar` once in the editor and authorise the script. Back in the spreadsheet, paste your key in the sidebar, never in a cell.
+4. Type `=IBAN_CHECK(A2:A200)` next to your column of IBANs, and leave the five columns to its right empty.
+
+The same steps, with two test IBANs to import, are in the [recipes](/docs/recipes#integration-sheets). The source is on [GitHub](https://github.com/cammac-creator/ibanforge/tree/main/integrations/sheets).
+
+## The key
+
+The functions send your IBANs to the batch route of the API, which needs a key. A key needs no e-mail and no card to start, and it gives 200 requests a month once you claim it with an address you read; the steps are in [API keys](/docs/api-keys). One IBAN is one request, whatever the size of the batch it travels in. Past the free allowance, prepaid credits never expire and the Pro plan covers larger files: see the [pricing page](/pricing).
+
+## What it looks like on a real list
+
+Six rows: Deutsche Bank in Berlin, a Sparkasse, a German bank code the Bundesbank is retiring, a German code it never allocated, the first IBAN with its last two digits swapped, and a Swiss IBAN of PostFinance.
+
+| IBAN | Valid | Bank | BIC | Bank-code verdict |
+|---|---|---|---|---|
+| DE65 1007 0000 0123 4567 89 | TRUE | Deutsche Bank | DEUTDEBBXXX | verified |
+| DE94 1405 1000 0123 4567 89 | TRUE | Sparkasse Mecklenburg-Nordwest | NOLADE21WIS | verified |
+| DE22 1306 1088 0123 4567 89 | TRUE | Raiffeisenbank Wismar -alt- | GENODEF1HWR | verified, retired |
+| DE58 1234 5678 0123 4567 89 | TRUE | | | not_in_register (not_allocated) |
+| DE65 1007 0000 0123 4567 98 | FALSE | | | checksum_failed |
+| CH31 3000 0000 0000 0000 1 | TRUE | PostFinance AG | POFICHBEXXX | verified |
+
+These are the first four columns of `=IBAN_CHECK`, computed by the add-on's own code (`Code.gs`, run as it is) from the answers the API gave on 29 September 2026. The API ran locally from the public repository, with the Bundesbank file of September 2026 and the SIX BankMaster valid from 1 September 2026. The account numbers are invented; the bank-code verdict does not depend on them. The fifth column, SEPA, is left out here: it lists the SEPA schemes that reach the bank, and part of that comes from registers this local run did not read.
+
+## Reading the verdict column
+
+- **verified**: the register lists the bank code and names the bank.
+- **verified, retired**: the code exists, but the Bundesbank has announced its deletion. The payment may still go through today; ask the supplier for new details before it stops. The API's full answer names the successor code (here 13061078).
+- **not_in_register (not_allocated)**: the check digits are right, yet no bank holds this code. Do not pay; the IBAN was invented or badly copied somewhere upstream.
+- **checksum_failed**, with FALSE in the first column: a typo. Ask for the IBAN again.
+
+One nuance the column cannot show. In the countries where the API reads the national register in full (Germany, Austria, Belgium, Slovakia, the Czech Republic, Bulgaria, Switzerland and Liechtenstein), "verified" and "not_allocated" are the register's word. Elsewhere the bank is named from a composite map built from BIC directories, and a code missing from it proves nothing; the API's `authoritative` field says which case applies, and the [API page](/iban-validation-api) shows it.
+
+## What it sends, and what it costs
+
+- Nothing leaves the sheet except the IBAN strings the functions receive. The key stays in your own script properties, never in the spreadsheet.
+- IBANs go out in batches of 100 to `POST /v1/iban/batch`, one request per IBAN.
+- Results may be cached for six hours per user, so recalculating the sheet can avoid paying twice; that cache is not guaranteed to hold.
+
+## What it does not tell you
+
+Whether an account exists, and whose name is on it. The register knows the bank, not the account. The payee's name is checked by the banks when you pay (Verification of Payee); the functions never claim it.
+
+## Other ways without code
+
+The same check fits in other tools you may already run. In **n8n**, a two-node workflow imported from a file calls the API, and a community node covers self-hosted n8n ([n8n recipe](/docs/recipes#integration-n8n)). In **Odoo 18** on your own server or Odoo.sh, an open-source module fills the BIC and the bank name of a partner's bank account when the API can resolve them ([Odoo recipe](/docs/recipes#integration-odoo)). And for a single IBAN, the page [Which bank does this IBAN belong to?](/iban-welche-bank) reads the bank code in your browser, with no key at all.

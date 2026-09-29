@@ -124,6 +124,7 @@ export const COPY_DE: ApiPageCopy = {
       { href: "https://pypi.org/project/ibanforge/", title: "PyPI: ibanforge", body: "Das Python-SDK, synchroner und asynchroner Client." },
       { href: "/docs/mcp", title: "MCP-Server", body: "ibanforge-mcp für Claude, Cursor und andere MCP-Clients, oder der gehostete Endpunkt." },
       { href: "https://www.npmjs.com/package/n8n-nodes-ibanforge", title: "n8n", body: "Der Community-Node für selbst gehostetes n8n." },
+      { href: "/alternatives", title: "Alternativen", body: "IBANAPI, iban.com und AbstractAPI neben IBANforge, mit Preisen und Datum." },
     ],
   },
   closing: {

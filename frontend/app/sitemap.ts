@@ -6,6 +6,7 @@ import { getAllPosts } from "@/lib/blog";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
 import { urlFor } from "@/lib/seo";
+import { VENDOR_SLUGS } from "./[locale]/alternatives/vendors";
 
 const BASE_URL = "https://ibanforge.com";
 
@@ -89,6 +90,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
       // The page for developers searching for an IBAN validation API
       // (29/09/2026), one per language, each titled with its language's query.
       { url: `${prefix}/iban-validation-api`, changeFrequency: "monthly", priority: 0.9 },
+      // "Welche Bank gehört zu dieser IBAN?" (29/09/2026): the reader who holds
+      // an IBAN and wants its bank, in the three languages.
+      { url: `${prefix}/iban-welche-bank`, changeFrequency: "monthly", priority: 0.8 },
+      // One page per provider people search with "alternative" (29/09/2026),
+      // and their index.
+      { url: `${prefix}/alternatives`, changeFrequency: "monthly", priority: 0.7 },
+      ...VENDOR_SLUGS.map((slug) => ({
+        url: `${prefix}/alternatives/${slug}`,
+        changeFrequency: "monthly" as const,
+        priority: 0.7,
+      })),
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/qr-bill`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/sheets`, changeFrequency: "monthly", priority: 0.8 },

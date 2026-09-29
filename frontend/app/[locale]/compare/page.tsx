@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { Check, Scale, X } from "lucide-react";
 import { alternatesFor } from "@/lib/seo";
+import Link from "next/link";
+import { localePath } from "@/lib/locale-path";
+import { alternativesCopy, vendorPath } from "../alternatives/page-data";
+import { VENDOR_SLUGS } from "../alternatives/vendors";
 
 export async function generateMetadata({
   params,
@@ -44,6 +48,9 @@ export default async function ComparePage({
 }) {
   const { locale } = await params;
   const t = await getTranslations("compare");
+  // The per-provider pages keep their words beside their route (they would
+  // otherwise churn the shared catalogues); the links here read them there.
+  const perVendor = alternativesCopy(locale);
 
   return (
     <div className="flex flex-col">
@@ -156,6 +163,36 @@ export default async function ComparePage({
             abstractapi.com
           </a>
         </p>
+      </section>
+
+      {/* ── One page per provider (29/09/2026) ───────────────────────────── */}
+      <section aria-labelledby="compare-per-vendor" className="px-4 pb-20 max-w-5xl mx-auto w-full">
+        <h2
+          id="compare-per-vendor"
+          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3 text-center"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {perVendor.fromCompare.heading}
+        </h2>
+        <p className="text-sm text-muted-foreground text-center mb-8" style={{ lineHeight: 1.65 }}>
+          {perVendor.fromCompare.body}
+        </p>
+        <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {VENDOR_SLUGS.map((slug) => (
+            <li key={slug}>
+              <Link
+                href={localePath(locale, vendorPath(slug))}
+                className="flex h-full flex-col gap-1.5 rounded-xl border p-4 hover:border-amber-500/60"
+                style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
+              >
+                <span className="text-sm font-semibold text-foreground">{perVendor.vendors[slug].h1}</span>
+                <span className="text-xs text-muted-foreground" style={{ lineHeight: 1.6 }}>
+                  {perVendor.vendors[slug].summary}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* ── Where we lose ─────────────────────────────────────────────────── */}

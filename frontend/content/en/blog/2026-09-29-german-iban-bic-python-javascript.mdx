@@ -1,0 +1,229 @@
+---
+title: "Validate a German IBAN and get its BIC from the Bundesbank register, in Python and JavaScript"
+description: "The code, not the theory: one Python function and one JavaScript function that check a German IBAN against the Bundesbank register, return the BIC with its source, and decide accept, update, block or reject. Real outputs, a batch loop, and the 402 and 429 cases."
+date: "2026-09-29"
+---
+
+Two earlier posts explained what the Bundesbank register answers, field by field: [German IBAN validation against the Bundesbank register](/blog/2026-09-02-german-iban-validation-bundesbank-blz) and [checking a Bankleitzahl by API](/blog/2026-09-07-bankleitzahl-pruefen-per-api). This one is the code you paste. One function in Python and one in JavaScript turn the answer of `POST /v1/iban/validate` into a decision a payment run can act on, and a short loop checks a whole file.
+
+## Five outcomes, one function
+
+A German IBAN carries its bank code in positions 5 to 12, and the Deutsche Bundesbank publishes the register that allocates those codes, with the BIC paired to each. The API reads that register, so for Germany every answer lands in one of five cases:
+
+| Decision | What the answer says | What your code does |
+|---|---|---|
+| `accept` | `bank_code_check.status` is `verified` and `authoritative` is `true` | Store the bank, the BIC, `bic.basis` and `as_of` |
+| `update` | `bank_code_check.retired` is `true` | Ask the payee for new details; `superseded_by` names the successor code |
+| `block` | `reason` is `not_allocated` and `authoritative` is `true` | Do not pay: no bank holds this code |
+| `reject` | `valid` is `false` | A typo: ask for the IBAN again (`error` says what failed) |
+| `review` | anything else | Not expected for Germany; in countries without a full register, a person decides |
+
+An invalid IBAN is not an HTTP error: the API answers `200` with `valid: false`. The HTTP errors are the ones in the next sections, 402 and 429.
+
+## Python
+
+```python
+import os
+import requests
+
+API = os.environ.get("IBANFORGE_API", "https://api.ibanforge.com")
+KEY = os.environ.get("IBANFORGE_KEY")  # optional for one IBAN, required for a batch
+
+
+def headers() -> dict:
+    h = {"Content-Type": "application/json"}
+    if KEY:
+        h["Authorization"] = f"Bearer {KEY}"
+    return h
+
+
+def raise_for_quota(r: requests.Response) -> None:
+    if r.status_code == 429:
+        raise RuntimeError(f"Too many requests: retry in {r.headers.get('Retry-After', '60')} s")
+    if r.status_code == 402:
+        raise RuntimeError("No allowance left: take a key, claim it, or add credits")
+    r.raise_for_status()
+
+
+def decide(a: dict) -> dict:
+    """Turn one answer of the API into what the payment run does next."""
+    if not a.get("valid"):
+        return {"iban": a.get("iban"), "decision": "reject", "why": a.get("error")}
+    check = a.get("bank_code_check") or {}
+    bic = a.get("bic") or {}
+    if check.get("reason") == "not_allocated" and check.get("authoritative"):
+        return {"iban": a["iban"], "decision": "block",
+                "why": f"{check['value']} is not in {check['register']} ({check['as_of']})"}
+    if check.get("retired"):
+        return {"iban": a["iban"], "decision": "update",
+                "why": f"{check['value']} is being retired", "successor": check.get("superseded_by")}
+    if check.get("status") == "verified" and check.get("authoritative"):
+        return {"iban": a["iban"], "decision": "accept",
+                "bank": check["institution"]["name"], "bic": bic.get("code"),
+                "bic_basis": bic.get("basis"), "as_of": check.get("as_of")}
+    return {"iban": a["iban"], "decision": "review", "why": check.get("status")}
+
+
+def check_german_iban(iban: str) -> dict:
+    r = requests.post(f"{API}/v1/iban/validate", json={"iban": iban}, headers=headers(), timeout=10)
+    raise_for_quota(r)
+    return decide(r.json())
+
+
+def check_many(ibans: list) -> list:
+    """Up to 100 IBANs per call; one request per IBAN is billed to the key."""
+    out = []
+    for i in range(0, len(ibans), 100):
+        r = requests.post(f"{API}/v1/iban/batch", json={"ibans": ibans[i:i + 100]},
+                          headers=headers(), timeout=30)
+        raise_for_quota(r)
+        out.extend(decide(a) for a in r.json()["results"])
+    return out
+```
+
+The order of the tests in `decide` matters. A retired code is still an allocated code, so its `status` is `verified`: test `retired` before you accept.
+
+## JavaScript (Node 18 or later, no dependency)
+
+```javascript
+const API = process.env.IBANFORGE_API ?? "https://api.ibanforge.com";
+const KEY = process.env.IBANFORGE_KEY; // optional for one IBAN, required for a batch
+
+function headers() {
+  const h = { "Content-Type": "application/json" };
+  if (KEY) h.Authorization = `Bearer ${KEY}`;
+  return h;
+}
+
+async function readOrThrow(res) {
+  if (res.status === 429) throw new Error(`Too many requests: retry in ${res.headers.get("Retry-After") ?? 60} s`);
+  if (res.status === 402) throw new Error("No allowance left: take a key, claim it, or add credits");
+  if (!res.ok) throw new Error(`IBANforge answered ${res.status}`);
+  return res.json();
+}
+
+/** Turn one answer of the API into what the payment run does next. */
+export function decide(a) {
+  if (!a.valid) return { iban: a.iban, decision: "reject", why: a.error };
+  const check = a.bank_code_check ?? {};
+  const bic = a.bic ?? {};
+  if (check.reason === "not_allocated" && check.authoritative) {
+    return { iban: a.iban, decision: "block", why: `${check.value} is not in ${check.register} (${check.as_of})` };
+  }
+  if (check.retired) {
+    return { iban: a.iban, decision: "update", why: `${check.value} is being retired`, successor: check.superseded_by };
+  }
+  if (check.status === "verified" && check.authoritative) {
+    return { iban: a.iban, decision: "accept", bank: check.institution.name, bic: bic.code, bic_basis: bic.basis, as_of: check.as_of };
+  }
+  return { iban: a.iban, decision: "review", why: check.status };
+}
+
+export async function checkGermanIban(iban) {
+  const res = await fetch(`${API}/v1/iban/validate`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ iban }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  return decide(await readOrThrow(res));
+}
+
+/** Up to 100 IBANs per call; one request per IBAN is billed to the key. */
+export async function checkMany(ibans) {
+  const out = [];
+  for (let i = 0; i < ibans.length; i += 100) {
+    const res = await fetch(`${API}/v1/iban/batch`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ ibans: ibans.slice(i, i + 100) }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const { results } = await readOrThrow(res);
+    out.push(...results.map(decide));
+  }
+  return out;
+}
+```
+
+## What the two functions return
+
+Five IBANs with an invented account number (the bank-code verdict does not depend on it): Deutsche Bank in Berlin, a Sparkasse, a code the Bundesbank is retiring, a code it never allocated, and the first IBAN with its last two digits swapped.
+
+```json
+{"iban": "DE65100700000123456789", "decision": "accept", "bank": "Deutsche Bank", "bic": "DEUTDEBBXXX", "bic_basis": "national_register", "as_of": "2026-09"}
+{"iban": "DE94140510000123456789", "decision": "accept", "bank": "Sparkasse Mecklenburg-Nordwest", "bic": "NOLADE21WIS", "bic_basis": "national_register", "as_of": "2026-09"}
+{"iban": "DE22130610880123456789", "decision": "update", "why": "13061088 is being retired", "successor": "13061078"}
+{"iban": "DE58123456780123456789", "decision": "block", "why": "12345678 is not in Deutsche Bundesbank Bankleitzahlendatei (2026-09)"}
+{"iban": "DE65100700000123456798", "decision": "reject", "why": "checksum_failed"}
+```
+
+Both versions returned these same five decisions (printed here by the Python one). They ran on 29 September 2026 against the API's own code, built from the public repository with the Bundesbank file of September 2026.
+
+The Sparkasse line is the reason to read the BIC from the register rather than from a generic BIC list: the Bundesbank pairs this code with the Sparkasse's own eleven-character BIC, and `bic_basis: "national_register"` says so.
+
+## The answer behind the first line
+
+Here is what the API returned for the Deutsche Bank IBAN, called without a key, cut to the fields the functions read (only whole fields are left out):
+
+```json
+{
+  "iban": "DE65100700000123456789",
+  "valid": true,
+  "bank_code_check": {
+    "value": "10070000",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "institution": {
+      "name": "Deutsche Bank",
+      "street": null,
+      "post_code": "10883",
+      "town": "Berlin",
+      "country": "DE"
+    },
+    "as_of": "2026-09"
+  },
+  "bic": {
+    "code": "DEUTDEBBXXX",
+    "bank_name": "Deutsche Bank",
+    "source": "Deutsche Bundesbank Bankleitzahlendatei",
+    "as_of": "2026-09",
+    "basis": "national_register",
+    "authoritative": true
+  },
+  "trial": {
+    "calls_used_this_week": 9,
+    "calls_left_this_week": 16,
+    "weekly_limit": 25,
+    "resets": "Monday 00:00 UTC",
+    "resets_at": "2026-10-05T00:00:00Z"
+  }
+}
+```
+
+For the retired code, `bank_code_check` adds `"retired": true` and `"superseded_by": "13061078"`, and `bic.authoritative` turns to `false`: the BIC is still printed, but the register no longer stands behind this code. The full answer also carries a `next_steps` list; for the retired code its first entry is `bank_code_retired`, with a sentence you can show to a person.
+
+## 402 and 429, the two errors to plan for
+
+- **429 Too Many Requests**: more than 100 requests in one minute from the same IP address. Wait for the number of seconds in the `Retry-After` header, then try again. A batch call counts as one request here, which is one more reason to use it for files.
+- **402 Payment Required**: there is no allowance left to pay for the call. Without a key, the keyless trial is spent; with a key, its allowance or its credits are. The body says which in `cause.reason` when a precise reason applies, and names the way out.
+
+Both functions raise on these two and let `raise_for_status` or `res.ok` handle the rest. Retrying a 402 in a loop only repeats it.
+
+## Keys, and what each door covers
+
+Without a key, `POST /v1/iban/validate` answers under the keyless trial: 25 validations a week for the address the call comes from, reset on Monday 00:00 UTC, with the `trial` block above saying what is left.
+
+The batch route needs a key. A key needs no e-mail and no card to start, and it gives 200 requests a month once you claim it with an address you read; the steps are in [API keys](/docs/api-keys). Past that, prepaid credits and the Pro plan are on the [pricing page](/pricing).
+
+## What to store, and when to check again
+
+Store the BIC together with `bic.basis` and `as_of`. `national_register` means the Bundesbank itself wrote that BIC next to that code, which is the pairing to settle against. `as_of` tells you which edition of the register answered, so you know when a stored verdict is older than the current file and a creditor record deserves a new check.
+
+What no function can store is whether the account exists or whose it is. The register knows the bank, not the account; the payee's name is checked by the banks at payment time, through Verification of Payee.
+
+## Where to go next
+
+The [IBAN validation API page](/iban-validation-api) has the same first call in curl, and the [sandbox](/playground) runs it in the browser. If you only need to know which bank an IBAN belongs to, without writing code, the page [Which bank does this IBAN belong to?](/iban-welche-bank) reads the Bankleitzahl in your browser. Each code also has its own page, for instance [Bankleitzahl 10070000](/blz/10070000).
