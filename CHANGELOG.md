@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **Terms of Service 1.10: what a Pro subscriber is owed if the Service stops (29 September 2026).** §3 now says that if IBANforge is ever discontinued, every Pro subscriber is told at least 30 days before it stops, by e-mail and on the Terms page, and that no renewal is charged for the month in which it stops. The version only adds an obligation on our side and applies immediately to every customer.
+
 ## [1.8.1] — 2026-09-29
 
 ### Added
