@@ -416,7 +416,7 @@ SIX Group AG, BIC entries
          separately.
 
 Composite bank-code map
-  Where: src/db/bic_data.json (17,899 keys in 62 countries at this
+  Where: src/db/bic_data.json (17,920 keys in 62 countries at this
          revision; its Austrian, Belgian, Finnish, Luxembourg and Polish
          keys were removed on 25 September 2026, and the keys taken from
          commercial sites or from publishers reserving commercial use on
@@ -432,11 +432,8 @@ Composite bank-code map
          Dutch keys were added the same day as the schwifty import without
          coming from it); the Italian keys rebuilt on 29 September 2026 from
          the Banca d'Italia's LEI and the GLEIF Mapping Table, and the
-         Romanian keys rebuilt the same day from the BIC entries, as were the
-         Irish, Latvian, Bulgarian and British keys of the schwifty import
-         (the Bulgarian ones from the BIC the Bulgarian National Bank's BAE
-         register gives the code) (scripts/derive-map-keys.ts); and manual
-         additions.
+         Romanian keys rebuilt the same day from the BIC entries
+         (scripts/derive-map-keys.ts); and manual additions.
   Terms: both projects are distributed under the MIT License (copyright
          notices at the end of this file). Those licences do not grant
          rights that the national publishers have not granted, and the terms

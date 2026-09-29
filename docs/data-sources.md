@@ -67,21 +67,9 @@ carte ne change. Attributions et citations : `NOTICE` (groupe A pour la Banca
 d'Italia et GLEIF, groupe C pour les sources retirées).
 
 Hors de ce retrait, et inchangé : les pays dont l'inventaire n'a trouvé aucune
-condition publiée (NO, SE, et les listes manuelles de schwifty sans source
-nommée : FR, PT, IT, CR, GR, ME, CY, AD, ES, IS, IL, MC) restent dans la carte,
-en attendant la réponse des éditeurs à qui écrire là où il y en a un.
-
-**Même jour, lot séparé : IE, LV, BG et GB.** Dans ces quatre pays, le code
-bancaire de l'IBAN est le début du BIC, et la carte dérivait déjà de
-`bic_entries` toutes leurs autres clés. Les 95 clés que l'import schwifty y
-avait ajoutées (listes manuelles sans source nommée pour IE, BG et GB, fichier
-de 2020 de la Latvijas Banka pour LV) sont remplacées par la même dérivation :
-74 retrouvent leur clé, dont 72 au même BIC (IE 20 dont 19, LV 25 dont 24,
-BG 22 par le registre BAE, GB 7). Les 21 autres partent : 18 préfixes que
-plusieurs BIC8 partagent répondent désormais par la recherche par préfixe, avec
-`candidates` (GB 13, IE 5), et 3 codes appariés à un BIC étranger n'ont plus de
-BIC (IE 1 ; BG 2, où le registre BAE écartait déjà ces codes). Aucune autre
-réponse ne change. SI, LT, HU et HR, dont les
+condition publiée (NO, SE, LV, et les listes manuelles de schwifty sans source
+nommée : FR, PT, IT, IE, BG, GB, CR, GR, ME, CY, AD, ES, IS, IL, MC) restent dans
+la carte, en attendant la réponse des éditeurs à qui écrire là où il y en a un. SI, LT, HU et HR, dont les
 éditeurs autorisent la reproduction avec mention, entrent au groupe A de
 `NOTICE`.
 
@@ -318,7 +306,7 @@ Origines, relevées dans l'historique git et dans les scripts des projets amont 
 | schwifty (MIT), import du 08/04/2026 (`9e8e34a8`) | après les retraits du 25/09 et du 29/09 : NO, SI, CH, LT, HU, FR, PT, IT, SK, SE, CZ, IE, LV, BG, CR, GR, HR, GB, LI, DE, ME, CY, NL, AD, ES, IS, IL, MC | **pas seulement des registres nationaux** : fichiers de banques centrales pour une partie des pays (SI, LT, HU, HR, CZ, SK, DE, CH, LI, NL…), contributions manuelles sans source nommée pour d'autres (FR, PT, IT, IE, BG, GB…) ; les fichiers tirés de sites commerciaux (ibancalculator.com, iban.es) ou d'éditeurs qui réservent l'usage commercial (TBB, comparateur roumain) sont retirés le 29/09/2026, voir plus haut |
 | SIX BankMaster | CH | voir plus haut |
 | clés dérivées de `bic_entries` (`51f86e96`) | GB, IE, **SM**, **la plupart des clés NL** et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` (GLEIF, et SwiftCodes du groupe B). Les 11 clés SM sont des préfixes de BIC tirés de là, pas une donnée de la BCSM ni de schwifty (le code bancaire d'un IBAN saint-marinais compte six caractères, ces clés de quatre lettres ne servent probablement jamais) ; 729 des 735 clés NL ajoutées le jour de l'import schwifty viennent de ce mécanisme, pas de schwifty |
-| reconstruction du 29/09/2026 (`scripts/derive-map-keys.ts`) | IT (175 clés), RO (34 clés) ; IE (20), LV (25), BG (22), GB (7) | IT : LEI publié par la Banca d'Italia pour le code, puis BIC que GLEIF associe à ce LEI ; RO, IE, LV, GB : le BIC8 unique de `bic_entries` qui commence par le code ; BG : le BIC que le registre BAE de la BNB donne au code |
+| reconstruction du 29/09/2026 (`scripts/derive-map-keys.ts`) | IT (175 clés), RO (34 clés) | IT : LEI publié par la Banca d'Italia pour le code, puis BIC que GLEIF associe à ce LEI ; RO : le BIC8 unique de `bic_entries` qui commence par le code |
 | ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
 
 **Clés CZ, 25/09/2026** : les 36 clés tchèques ont été confrontées au číselník
