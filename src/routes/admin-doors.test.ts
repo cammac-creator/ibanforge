@@ -110,4 +110,92 @@ describe('GET /v1/admin/doors', () => {
     expect(body.weeks_shown).toBe(10);
     expect(body.requested.weeks).toBe('beaucoup');
   });
+
+  it('rend à part les créations automatiques d’un robot, et le contrôle reste égal', async () => {
+    // Trois clés anonymes prises sans navigateur depuis un même réseau inventé,
+    // en semaine 40, jamais servies.
+    const db = getStatsDB();
+    for (let i = 1; i <= 3; i++) {
+      const created = `2026-10-0${i} 05:00:00`;
+      db.prepare(
+        `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, source, tier, monthly_limit)
+         VALUES (?, ?, 'anonymous', ?, 'api-direct', 'anonymous', 25)`,
+      ).run(`rt-robot-${i}`, `ifk_rtr0000${i}`, created);
+      db.prepare(
+        `INSERT INTO key_creations (ip_hash, created_at, user_agent, key_prefix) VALUES (?, ?, ?, ?)`,
+      ).run('reseau-robot-invente', created, 'robot-invente/1.0', `ifk_rtr0000${i}`);
+    }
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    const res = await app.request('/v1/admin/doors?weeks=4', { headers: headers(SECRET) });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ReturnType<typeof getDoorBoard>;
+    const w40 = body.weeks.find((w) => w.key === '2026-W40');
+    expect(w40?.totals.created).toBe(2);
+    expect(w40?.automated).toEqual({
+      label: 'Robot d’exploration, créations sans suite',
+      created: 3,
+    });
+    expect(body.automated.created).toBe(3);
+    expect(body.last_week.numbers).toMatchObject({ created: 2, automated: 3 });
+    expect(body.last_week.sentence).toContain('robot d’exploration, créations sans suite : 3');
+    expect(body.control).toMatchObject({
+      created_total: 6,
+      people_created: 3,
+      automated: 3,
+      external_fleet: 6,
+      equal: true,
+    });
+    expect(JSON.stringify(body)).not.toMatch(/reseau-robot|ifk_|rt-robot/);
+  });
+
+  it('classe à part trois clés frappées par la vraie route, sans corps, depuis un même réseau', async () => {
+    // Le disjoncteur global dégraderait le plafond, pas la porte ni le palier ;
+    // coupé ici pour que le test ne dépende pas de son seuil.
+    const breaker = process.env.IBANFORGE_BREAKER_DISABLED;
+    process.env.IBANFORGE_BREAKER_DISABLED = '1';
+    try {
+      const before = getDoorBoard({ now: Date.now() });
+      const prefixes: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const res = await app.request('/v1/keys/generate', {
+          method: 'POST',
+          // Une adresse de documentation fixe (RFC 5737), un agent inventé.
+          headers: { 'x-forwarded-for': '203.0.113.77', 'user-agent': 'robot-invente/1.0' },
+        });
+        expect(res.status).toBe(201);
+        prefixes.push(((await res.json()) as { key_prefix: string }).key_prefix);
+      }
+      const db = getStatsDB();
+      // Ce que la route écrit est ce que la règle lit : la porte, le palier et
+      // la ligne de naissance, sur un seul réseau.
+      for (const prefix of prefixes) {
+        expect(
+          db.prepare('SELECT source, tier FROM api_keys WHERE key_prefix = ?').get(prefix),
+        ).toEqual({ source: 'api-direct', tier: 'anonymous' });
+      }
+      expect(
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n, COUNT(DISTINCT ip_hash) AS networks FROM key_creations
+              WHERE key_prefix IN (?, ?, ?) AND ip_hash <> 'unknown'`,
+          )
+          .get(...prefixes),
+      ).toEqual({ n: 3, networks: 1 });
+      // L'appel de création ne porte aucun préfixe au journal : il ne « sert »
+      // pas la clé qu'il frappe.
+      const logged = db
+        .prepare(`SELECT key_prefix, status FROM request_log WHERE path = '/v1/keys/generate'`)
+        .all() as Array<{ key_prefix: string | null; status: number }>;
+      expect(logged.filter((r) => r.status === 201)).toHaveLength(3);
+      expect(logged.every((r) => r.key_prefix === null)).toBe(true);
+      const after = getDoorBoard({ now: Date.now() });
+      expect(after.automated.created - before.automated.created).toBe(3);
+      expect(after.totals.created).toBe(before.totals.created);
+      expect(after.control.equal).toBe(true);
+    } finally {
+      if (breaker === undefined) delete process.env.IBANFORGE_BREAKER_DISABLED;
+      else process.env.IBANFORGE_BREAKER_DISABLED = breaker;
+    }
+  });
 });

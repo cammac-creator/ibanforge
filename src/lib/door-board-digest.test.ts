@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getStatsDB } from './db.js';
-import { getDoorBoard } from './door-board.js';
+import { AUTOMATED_LABEL_FR, getDoorBoard } from './door-board.js';
 import {
   DIGEST_MAX_ATTEMPTS,
   DOORS_PAGE_URL,
@@ -117,10 +117,33 @@ function seedKeys(): void {
   );
 }
 
+/**
+ * Trois clés anonymes prises sans navigateur depuis un même réseau inventé, en
+ * semaine 40, jamais servies : les créations automatiques d'un robot.
+ */
+function seedRobot(): void {
+  const db = getStatsDB();
+  for (let i = 1; i <= 3; i++) {
+    const created = `2026-10-0${i} 03:00:00`;
+    db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, source, tier, monthly_limit)
+       VALUES (?, ?, 'anonymous', ?, 'api-direct', 'anonymous', 25)`,
+    ).run(`dg-robot-${i}`, `ifk_dgr0000${i}`, created);
+    db.prepare(
+      `INSERT INTO key_creations (ip_hash, created_at, user_agent, key_prefix) VALUES (?, ?, ?, ?)`,
+    ).run('reseau-robot-invente', created, 'robot-invente/1.0', `ifk_dgr0000${i}`);
+  }
+}
+
 beforeEach(() => {
   const db = getStatsDB();
   db.prepare('DELETE FROM api_keys').run();
   db.prepare('DELETE FROM request_log').run();
+  db.prepare('DELETE FROM key_creations').run();
+  const memo = db
+    .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'door_board_automated'`)
+    .get();
+  if (memo) db.prepare('DELETE FROM door_board_automated').run();
   // La table du résumé est créée par le module au premier battement.
   const exists = db
     .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'door_board_digest'`)
@@ -449,6 +472,48 @@ describe('le message et la page disent les mêmes nombres', () => {
       deadline_passed: true,
     });
     expect(state.recent).toEqual([]);
+  });
+
+  it('nomme les créations automatiques sur leur propre ligne, hors des clés créées', async () => {
+    seedRobot();
+    const h = harness();
+    const plan = digestTick(h.deps);
+    const due = plan.action === 'arm' ? plan.dueMs : 0;
+    h.clock.now = due;
+    await attemptDigest('2026-W41', due, h.deps);
+    const text = h.sent[0];
+    const lines = text.split('\n');
+    expect(lines.slice(1, 4)).toEqual([
+      'Clés créées : 2',
+      `${AUTOMATED_LABEL_FR} : 3`,
+      'Premier appel réussi : 0',
+    ]);
+    expect(lines).toContain('Robot d’exploration, créations sans suite : 3');
+    expect(text).not.toMatch(/reseau-robot|ifk_|dg-robot/);
+    expect(JSON.parse(row()?.numbers_json ?? '{}')).toMatchObject({ created: 2, automated: 3 });
+    const board = getDoorBoard({ now: due });
+    expect(readDigestState(board, 6, { ...TELEGRAM }).latest_matches_page).toBe(true);
+  });
+
+  it('reconnaît un résumé envoyé avant la ligne à part, qui comptait le robot dans les clés créées', async () => {
+    seedRobot();
+    const h = harness();
+    const plan = digestTick(h.deps);
+    const due = plan.action === 'arm' ? plan.dueMs : 0;
+    h.clock.now = due;
+    await attemptDigest('2026-W41', due, h.deps);
+    const sent = JSON.parse(row()?.numbers_json ?? '{}') as Record<string, number>;
+    const { automated, ...before } = sent;
+    const legacy = { ...before, created: sent.created + automated };
+    getStatsDB()
+      .prepare(`UPDATE door_board_digest SET numbers_json = ? WHERE week = '2026-W41'`)
+      .run(JSON.stringify(legacy));
+    const board = getDoorBoard({ now: due + MINUTE });
+    expect(readDigestState(board, 6, { ...TELEGRAM }).latest_matches_page).toBe(true);
+    getStatsDB()
+      .prepare(`UPDATE door_board_digest SET numbers_json = ? WHERE week = '2026-W41'`)
+      .run(JSON.stringify({ ...legacy, created: sent.created }));
+    expect(readDigestState(board, 6, { ...TELEGRAM }).latest_matches_page).toBe(false);
   });
 
   it('dit un écart quand la page ne dit plus la même chose que le résumé envoyé', async () => {

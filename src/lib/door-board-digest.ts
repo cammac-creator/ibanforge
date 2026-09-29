@@ -40,7 +40,7 @@
 import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { sendOpsMessage, type OpsSendResult } from './ops-alert.js';
-import { getDoorBoard, type DoorBoard } from './door-board.js';
+import { AUTOMATED_LABEL_FR, getDoorBoard, type DoorBoard } from './door-board.js';
 import {
   parseDbUtc,
   sqliteUtc,
@@ -84,6 +84,11 @@ export interface DigestNumbers {
   free_active: number;
   /** Les clés derrière ces personnes. */
   free_active_keys: number;
+  /**
+   * Les créations automatiques de la semaine, hors de `created` (29.09.2026).
+   * Absent des résumés envoyés avant : leur `created` les comptait encore.
+   */
+  automated?: number;
 }
 
 interface DigestDbRow {
@@ -216,6 +221,8 @@ function readRow(db: DatabaseType.Database, week: string): DigestDbRow | undefin
  * Le message, depuis le tableau calculé par la MÊME fonction que la page.
  * Un titre qui ne se confond pas avec « Le point de la semaine » (le résumé
  * rédigé du lundi, qui compte autrement), quatre nombres, la phrase, le lien.
+ * Les créations automatiques ont leur ligne, juste sous les clés créées, les
+ * semaines où il y en a eu : nommées à part, jamais dans le premier nombre.
  */
 export function buildDigestMessage(board: DoorBoard): { text: string; numbers: DigestNumbers } {
   const week = board.last_week;
@@ -223,6 +230,7 @@ export function buildDigestMessage(board: DoorBoard): { text: string; numbers: D
   const text = [
     `IBANforge · Portes du lundi · ${week.title.replace(/^Semaine/, 'semaine')}`,
     `Clés créées : ${n.created}`,
+    ...(n.automated > 0 ? [`${AUTOMATED_LABEL_FR} : ${n.automated}`] : []),
     `Premier appel réussi : ${n.first_success}`,
     `Ont payé : ${n.paid}`,
     // Le seuil compte des personnes (décision du 22.09 : « utilisateurs ») ; le
@@ -580,6 +588,13 @@ export function readDigestState(
   const deadline = zurichLocalToUtcMs(y, m, d, DIGEST_DEADLINE_HOUR, 0, 0);
   const sent = latestSent?.numbers;
   const page = board.last_week.numbers;
+  // Un résumé envoyé avant la ligne à part comptait les créations automatiques
+  // dans `created` : il se compare à la somme, pas à la seule colonne.
+  const createdMatches = sent
+    ? sent.automated === undefined
+      ? sent.created === page.created + page.automated
+      : sent.created === page.created && sent.automated === page.automated
+    : false;
   return {
     enabled: !isDigestDisabled(env),
     blocked: channelBlock(env),
@@ -595,7 +610,7 @@ export function readDigestState(
     },
     recent,
     latest_matches_page: sent
-      ? sent.created === page.created &&
+      ? createdMatches &&
         sent.first_success === page.first_success &&
         sent.paid === page.paid &&
         sent.free_active === page.free_active &&

@@ -254,6 +254,7 @@ describe('les chiffres, pris dans le tableau des portes', () => {
       created: 1,
       first_success: 0,
       paid: 0,
+      automated: 0,
     });
     expect(b.numbers.free_active).toMatchObject({ threshold: 50, window: { to: '2026-10-04' } });
     expect(b.numbers.site_home).toEqual({
@@ -288,6 +289,41 @@ describe('les chiffres, pris dans le tableau des portes', () => {
     const w38 = await getBulletin({ now: NOW, week: '2026-W38' });
     if (w38.numbers.state !== 'read') throw new Error('numbers unread');
     expect(w38.numbers.site_home).toMatchObject({ coverage: 'none', created: null });
+  });
+});
+
+describe('les créations automatiques, à part des chiffres', () => {
+  beforeAll(() => {
+    // Semaine 38 : trois clés anonymes prises sans navigateur depuis un même
+    // réseau inventé, jamais servies. Les semaines 39 et 40 n'en ont aucune.
+    const db = getStatsDB();
+    for (let i = 1; i <= 3; i++) {
+      const created = `2026-09-1${4 + i} 04:00:00`;
+      db.prepare(
+        `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, source, tier, monthly_limit,
+                               lineage_hash)
+         VALUES (?, ?, 'anonymous', ?, 'api-direct', 'anonymous', 25, ?)`,
+      ).run(`bulletin-robot-${i}`, `ifk_blr0000${i}`, created, `bulletin-robot-${i}`);
+      db.prepare(
+        `INSERT INTO key_creations (ip_hash, created_at, user_agent, key_prefix) VALUES (?, ?, ?, ?)`,
+      ).run('reseau-robot-invente', created, 'robot-invente/1.0', `ifk_blr0000${i}`);
+    }
+  });
+
+  it('les sort des totaux de la semaine et les nomme sur leur ligne', async () => {
+    const w38 = await getBulletin({ now: NOW, week: '2026-W38' });
+    if (w38.numbers.state !== 'read') throw new Error('numbers unread');
+    expect(w38.numbers.totals.created).toBe(0);
+    expect(w38.numbers.doors).toEqual([]);
+    expect(w38.numbers.automated).toEqual({
+      label: 'Robot d’exploration, créations sans suite',
+      created: 3,
+    });
+    const w39 = await getBulletin({ now: NOW, week: '2026-W39' });
+    if (w39.numbers.state !== 'read') throw new Error('numbers unread');
+    expect(w39.numbers.automated.created).toBe(0);
+    expect(w39.numbers.previous).toMatchObject({ week: '2026-W38', created: 0, automated: 3 });
+    expect(JSON.stringify(w38)).not.toMatch(/reseau-robot|ifk_blr/);
   });
 });
 

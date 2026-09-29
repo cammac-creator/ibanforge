@@ -34,7 +34,13 @@
 import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { getSourceFreshness, type SourceFreshness } from './bic-lookup.js';
-import { DOOR_BOARD_MAX_WEEKS, getDoorBoard, isExternalKeyRow, weekTitle } from './door-board.js';
+import {
+  DOOR_BOARD_MAX_WEEKS,
+  getDoorBoard,
+  isExternalKeyRow,
+  weekTitle,
+  type AutomatedLine,
+} from './door-board.js';
 import { HEARTBEATS, RADAR_BEATS } from './ops-alert.js';
 import { mergedPullsOfWeek, type MergedPullsRead } from './bulletin-github.js';
 import {
@@ -153,9 +159,21 @@ export interface WeekTotals {
 
 export interface BulletinNumbers {
   state: 'read';
+  /** People only: the automated creations are never in these totals. */
   totals: WeekTotals;
+  /**
+   * The week's automated creations (a crawler's keys that never served), the
+   * door board's separate line, named in full and never dropped.
+   */
+  automated: AutomatedLine;
   /** The week before, for the comparison; null when the door board does not show it. */
-  previous: { week: string; created: number; first_success: number; paid: number } | null;
+  previous: {
+    week: string;
+    created: number;
+    first_success: number;
+    paid: number;
+    automated: number;
+  } | null;
   /**
    * Free users active at 200 a month, in PEOPLE, over the 30 days ending on the
    * Sunday. The door board counts them for the last complete week only; any other
@@ -369,7 +387,9 @@ export const BULLETIN_DEFINITIONS: Readonly<Record<string, string>> = {
   chiffres:
     'La ligne de la semaine dans le tableau des portes, calculée par la même fonction que le ' +
     'résumé du lundi : des clés externes, jamais des requêtes. Les utilisateurs gratuits actifs ' +
-    'ne sont comptés que pour la dernière semaine close.',
+    'ne sont comptés que pour la dernière semaine close. Les créations automatiques d’un robot ' +
+    'd’exploration (clés anonymes sans navigateur, jamais servies, prises à trois ou plus depuis ' +
+    'un même réseau en sept jours) n’y sont pas : elles ont leur ligne à part.',
   accueil:
     'La porte « Accueil du site » compte les clés prises depuis la page d’accueil. Elle est ' +
     'écrite depuis la mise en ligne de l’accueil neuf, le 27.09.2026 à 10:49.',
@@ -431,6 +451,7 @@ function readNumbers(resolved: ResolvedWeek, nowMs: number): BulletinNumbers {
       followup_pending: row.totals.followup_pending,
       paid: row.totals.paid,
     },
+    automated: { label: row.automated.label, created: row.automated.created },
     previous:
       before && before.kind === 'complete'
         ? {
@@ -438,6 +459,7 @@ function readNumbers(resolved: ResolvedWeek, nowMs: number): BulletinNumbers {
             created: before.totals.created,
             first_success: before.totals.first_success,
             paid: before.totals.paid,
+            automated: before.automated.created,
           }
         : null,
     free_active: isLast
