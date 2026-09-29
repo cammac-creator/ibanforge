@@ -2364,22 +2364,23 @@
      "name": "Ireland"
     },
     "bic": {
-     "code": "AIBKIE2DXXX",
+     "code": "AIBKIE2D",
      "bic8": "AIBKIE2D",
      "bank_name": "ALLIED IRISH BANKS PUBLIC LIMITED COMPANY",
      "city": "Dublin",
-     "source": "IBANforge curated bank-code map",
+     "source": "GLEIF LEI-to-BIC mapping",
      "as_of": "2026-09",
-     "basis": "curated_map",
+     "basis": "directory_prefix",
      "authoritative": false,
      "lei": "3U8WV1YX2VMUHH7Z1Q21"
     },
     "bank_code_check": {
      "value": "AIBK",
      "status": "verified",
-     "match": "register",
+     "match": "prefix",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
+     "candidates": 3,
      "as_of": "2026-09"
     },
     "sepa": {

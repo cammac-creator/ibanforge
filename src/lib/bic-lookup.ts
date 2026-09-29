@@ -37,7 +37,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // PL et FI (famille sous conditions, NOTICE groupe C).
 // 29/09/2026: 17,920 keys in 62 countries, after the withdrawal of the keys no
 // publisher granted us (see UNLICENSED_MAP_COUNTRIES below; Italian and
-// Romanian keys rebuilt from open data by scripts/derive-map-keys.ts).
+// Romanian keys rebuilt from open data by scripts/derive-map-keys.ts); 17,899
+// once the Irish, Latvian, Bulgarian and British keys of the same import were
+// re-derived the same way.
 // Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
 // ---------------------------------------------------------------------------
 

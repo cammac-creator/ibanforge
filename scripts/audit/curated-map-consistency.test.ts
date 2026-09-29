@@ -67,7 +67,8 @@ describe('curated bank-code map', () => {
     // en conséquence, toujours assez haut pour qu'une perte massive se voie.
     // 29/09/2026: 17,920 keys in 62 countries after the withdrawal of the keys
     // no publisher granted (UNLICENSED_MAP_COUNTRIES, part of IT and ES; IT and
-    // RO rebuilt from open data by scripts/derive-map-keys.ts). Floor lowered
+    // RO rebuilt from open data by scripts/derive-map-keys.ts; 17,899 once the
+    // IE, LV, BG and GB keys of the same import were re-derived). Floor lowered
     // again, for the same reason.
     expect(audit.total).toBeGreaterThan(17_500);
     expect(audit.countries).toBeGreaterThanOrEqual(62);
