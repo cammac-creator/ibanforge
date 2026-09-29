@@ -32,6 +32,7 @@ surface the key was actually minted on. It is always true and never specific.
 |---|---|
 | `site-signup` | in the key dialog, on a page with no door of its own |
 | `site-pricing` | in the key dialog, from the pricing page |
+| `site-register` | in the key dialog, from a bank-code page (`/blz`, `/iid`, `/it`, `/sk`) |
 | `site-docs` | in the key dialog, from the documentation |
 | `site-dashboard` | in the key dialog, from the dashboard or the account area |
 | `site-api-page` | in the key dialog, from the IBAN validation API page (`/iban-validation-api`, every language) |

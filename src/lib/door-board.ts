@@ -145,6 +145,7 @@ export const DOOR_LABELS_FR: Readonly<Record<string, string>> = {
   'site-home': 'Accueil du site',
   'site-signup': 'Site, formulaire de clé',
   'site-pricing': 'Page des tarifs',
+  'site-register': 'Pages des codes bancaires',
   'site-docs': 'Documentation',
   'site-dashboard': 'Espace compte du site',
   'site-api-page': 'Page « API de validation IBAN »',
