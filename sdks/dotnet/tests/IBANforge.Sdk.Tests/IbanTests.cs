@@ -50,7 +50,7 @@ public sealed class IbanTests
         Assert.Equal("/v1/iban/format", request.RequestUri!.AbsolutePath);
         Assert.Equal("iban=CH1000230000000012345", request.RequestUri!.Query.TrimStart('?'));
         Assert.Null(request.Headers.Authorization);
-        Assert.Contains("ibanforge-dotnet/1.5.0", request.Headers.UserAgent.ToString());
+        Assert.Contains("ibanforge-dotnet/1.8.1", request.Headers.UserAgent.ToString());
 
         Assert.True(result.Valid);
         Assert.Equal("CH10 0023 0000 0000 1234 5", result.Formatted);

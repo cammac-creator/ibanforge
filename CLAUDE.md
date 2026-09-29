@@ -178,6 +178,12 @@ npm run mcp          # Start MCP server for AI agents
   et il se ré-arme à chaque fois qu'on l'applique.
   → En attendant de le retirer : `vercel alias set <url-du-déploiement>
   ibanforge.com` **et** `www.ibanforge.com`. Retour arrière : `vercel rollback`.
+  🚨 **Jamais de retour arrière, de promotion ni d'alias vers un déploiement d'avant la
+  fusion `75bba7df` (26.09.2026, retrait des données sous conditions)** : ces anciens
+  déploiements servent encore les registres retirés (AT, BE, SM…). Depuis le 29.09.2026, la
+  protection des déploiements de Vercel (`all_except_custom_domains`) ferme toutes les adresses
+  `*.vercel.app` et laisse seuls les domaines de production publics ; ne pas la relâcher
+  (décision de Claude-Alain du 29.09.2026).
   → Pour en finir : retirer l'épinglage pour que les domaines suivent la
   production nativement. C'est la décision de Claude-Alain, elle supprime le banc
   d'essai avant publication.

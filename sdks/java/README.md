@@ -10,7 +10,7 @@ Published on [Maven Central](https://central.sonatype.com/artifact/com.ibanforge
 <dependency>
   <groupId>com.ibanforge</groupId>
   <artifactId>ibanforge-sdk</artifactId>
-  <version>1.5.0</version>
+  <version>1.8.1</version>
 </dependency>
 ```
 

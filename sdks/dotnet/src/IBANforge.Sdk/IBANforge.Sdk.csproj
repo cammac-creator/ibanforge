@@ -10,7 +10,7 @@
 
   <PropertyGroup>
     <PackageId>IBANforge.Sdk</PackageId>
-    <Version>1.5.0</Version>
+    <Version>1.8.1</Version>
     <Authors>IBANforge</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://ibanforge.com?src=sdk-dotnet</PackageProjectUrl>

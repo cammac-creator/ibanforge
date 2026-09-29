@@ -197,7 +197,7 @@ quotas:
       402 discovery envelope. Past the ceiling the route answers 402 with
       cause.reason = trial_exhausted until the reset. Counted in the service
       database, so it survives a redeploy. The MCP taster above is a separate
-      allowance, counted by the day.
+      allowance, counted by the week.
   prepaid_credits:
     note: One credit per validation or lookup; batch validation debits one credit
       per IBAN. No expiry.

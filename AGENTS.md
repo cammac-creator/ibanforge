@@ -55,6 +55,9 @@ human. Never print a secret; the repository holds none, and none should ever ent
 Vercel does not build `codex/**` branches (`frontend/vercel.json`, 26.09.2026, to cut build
 costs): your pull request gets no preview deployment. Check the site locally (`next build`,
 `next start`); what goes online is proven after publication.
+Deployment protection is on for every `*.vercel.app` address (only the production domains stay
+public, 29.09.2026): old deployments from before the data withdrawal of 26.09.2026 still carry
+the withdrawn registers, so never roll back, promote or alias below the merge `75bba7df`.
 
 **8. No `Intl`, `toLocaleString` or `toLocaleDateString` in a client component.** WebKit
 formats differently from Node, React blows up on the hydration mismatch and wipes the
