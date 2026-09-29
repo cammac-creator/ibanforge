@@ -27,7 +27,13 @@
  */
 
 /** A door the API knows. Kept in step with `KEY_ORIGIN_DOORS` by the test beside this file. */
-export type SiteDoor = 'site-home' | 'site-pricing' | 'site-docs' | 'site-dashboard' | 'site-signup';
+export type SiteDoor =
+  | 'site-home'
+  | 'site-pricing'
+  | 'site-docs'
+  | 'site-dashboard'
+  | 'site-api-page'
+  | 'site-signup';
 
 /**
  * The door for a page path, locale prefix included or not.
@@ -45,6 +51,9 @@ export function doorForPath(pathname: string): SiteDoor {
   if (path === '/pricing' || path.startsWith('/pricing/')) return 'site-pricing';
   if (path === '/docs' || path.startsWith('/docs/')) return 'site-docs';
   if (path.startsWith('/dashboard') || path.startsWith('/account')) return 'site-dashboard';
+  // The page written for developers who search for an IBAN validation API
+  // (29/09/2026): its own door, to tell whether that page brings keys at all.
+  if (path === '/iban-validation-api' || path.startsWith('/iban-validation-api/')) return 'site-api-page';
   return 'site-signup';
 }
 

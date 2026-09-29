@@ -86,6 +86,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/audit`, changeFrequency: "monthly", priority: 0.85 },
       { url: `${prefix}/sources`, changeFrequency: "monthly", priority: 0.75 },
       { url: `${prefix}/compare`, changeFrequency: "monthly", priority: 0.8 },
+      // The page for developers searching for an IBAN validation API
+      // (29/09/2026), one per language, each titled with its language's query.
+      { url: `${prefix}/iban-validation-api`, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/qr-bill`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/sheets`, changeFrequency: "monthly", priority: 0.8 },

@@ -147,6 +147,7 @@ export const DOOR_LABELS_FR: Readonly<Record<string, string>> = {
   'site-pricing': 'Page des tarifs',
   'site-docs': 'Documentation',
   'site-dashboard': 'Espace compte du site',
+  'site-api-page': 'Page « API de validation IBAN »',
   'web-device': 'Agent validé dans un navigateur',
   'mcp-device': 'Agent MCP distant',
   'mcp-stdio-device': 'Agent MCP local (npx)',

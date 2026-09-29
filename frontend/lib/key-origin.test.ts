@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { doorForPath, originForSignup, type SiteDoor } from './key-origin';
 
-const DOORS: SiteDoor[] = ['site-home', 'site-pricing', 'site-docs', 'site-dashboard', 'site-signup'];
+const DOORS: SiteDoor[] = ['site-home', 'site-pricing', 'site-docs', 'site-dashboard', 'site-api-page', 'site-signup'];
 
 describe('la porte par laquelle une clé est prise', () => {
   it.each([
@@ -16,6 +16,9 @@ describe('la porte par laquelle une clé est prise', () => {
     ['/fr/docs/api-keys', 'site-docs'],
     ['/dashboard', 'site-dashboard'],
     ['/en/account', 'site-dashboard'],
+    ['/iban-validation-api', 'site-api-page'],
+    ['/de/iban-validation-api', 'site-api-page'],
+    ['/fr/iban-validation-api', 'site-api-page'],
     ['/blog/2026-08-26-choosing-an-iban-validation-api', 'site-signup'],
   ])('%s → %s', (path, expected) => {
     expect(doorForPath(path)).toBe(expected);
