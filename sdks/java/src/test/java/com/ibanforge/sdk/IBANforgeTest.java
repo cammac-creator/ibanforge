@@ -137,7 +137,7 @@ class IBANforgeTest {
         void userAgentCarriesTheSdkVersion() {
             server.enqueue(MockApiServer.CannedResponse.json(200, "{\"status\":\"ok\"}"));
             builder().build().health();
-            assertEquals("ibanforge-java/1.5.0", server.lastRequest().header("user-agent"));
+            assertEquals("ibanforge-java/1.8.1", server.lastRequest().header("user-agent"));
         }
     }
 

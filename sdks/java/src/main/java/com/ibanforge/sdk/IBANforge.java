@@ -71,7 +71,7 @@ import java.util.Map;
  */
 public final class IBANforge {
 
-    static final String VERSION = "1.5.0";
+    static final String VERSION = "1.8.1";
     private static final String DEFAULT_BASE_URL = "https://api.ibanforge.com";
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
     private static final String USER_AGENT = "ibanforge-java/" + VERSION;

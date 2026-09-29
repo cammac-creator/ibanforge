@@ -39,7 +39,7 @@ public sealed class IBANforgeClient : IDisposable
     public const string DefaultBaseUrl = "https://api.ibanforge.com";
 
     /// <summary>SDK version, also sent as part of the <c>User-Agent</c> header.</summary>
-    public const string Version = "1.5.0";
+    public const string Version = "1.8.1";
 
     private const string ApiKeyEnvironmentVariable = "IBANFORGE_API_KEY";
     private const string BaseUrlEnvironmentVariable = "IBANFORGE_API_BASE";
