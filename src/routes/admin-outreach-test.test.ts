@@ -5,6 +5,7 @@ import { closeAll, getStatsDB } from '../lib/db.js';
 import {
   asksToStop,
   ownWords,
+  quotableLines,
   summarizeOutreachTest,
   type OutreachTestSummary,
 } from '../lib/outreach-test.js';
@@ -320,6 +321,16 @@ describe('a stop request is read in the reply, not in the quoted original', () =
     );
     expect(ownWords('Ja.\nAm 3. März 2031 schrieb jemand:\n> abmelden')).toBe('Ja.');
     expect(ownWords('ok\n-----Original Message-----\nunsubscribe')).toBe('ok');
+  });
+
+  it('drops the lines of our own message when a reply arrives without quote marks', () => {
+    const ours =
+      'Hello,\n\nA short offer about your key.\n\nTo stop receiving messages like this one, reply "unsubscribe".';
+    const reply =
+      'Thanks, I will think about it.\nHello,\nA short offer about your key.\nTo stop receiving messages like this one, reply "unsubscribe".';
+    expect(asksToStop('Re: x', reply)).toBe(true);
+    expect(asksToStop('Re: x', reply, quotableLines(ours))).toBe(false);
+    expect(asksToStop('Re: x', `unsubscribe please\n${reply}`, quotableLines(ours))).toBe(true);
   });
 
   it('recognises the three offered words and a plain subject', () => {

@@ -158,18 +158,47 @@ function foldSubject(s: string | null | undefined): string {
   return (s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-/** The reply's own lines, before the quoted original. */
-export function ownWords(body: string): string {
+/** A line as compared with our own message: quote marks, case and spacing folded. */
+function foldLine(line: string): string {
+  return line
+    .replace(/^[\s>]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** Lines of our message long enough to be recognised in a reply (a greeting is not). */
+export function quotableLines(body: string | null | undefined): Set<string> {
+  return new Set(
+    (body ?? '')
+      .split(/\r?\n/)
+      .map(foldLine)
+      .filter((l) => l.length >= 20),
+  );
+}
+
+/**
+ * The reply's own lines: everything before the quoted original, and without
+ * any line that repeats our message. The second half is for a reply that
+ * reaches the CRM without its quote marks (an HTML-only mail converted to
+ * text): the quote would otherwise carry our own stop words into the count.
+ */
+export function ownWords(body: string, ours: Set<string> = new Set()): string {
   const kept: string[] = [];
   for (const line of body.split(/\r?\n/)) {
     if (QUOTE_START_RE.test(line.trim())) break;
+    if (ours.has(foldLine(line))) continue;
     kept.push(line);
   }
   return kept.join('\n');
 }
 
-export function asksToStop(subject: string | null, body: string | null): boolean {
-  return OPT_OUT_RE.test(`${subject ?? ''}\n${ownWords(body ?? '')}`);
+export function asksToStop(
+  subject: string | null,
+  body: string | null,
+  ours: Set<string> = new Set(),
+): boolean {
+  return OPT_OUT_RE.test(`${subject ?? ''}\n${ownWords(body ?? '', ours)}`);
 }
 
 export function isAutomaticReply(subject: string | null, body: string | null): boolean {
@@ -190,11 +219,17 @@ export function summarizeOutreachTest(
   // ─── Sent ──────────────────────────────────────────────────────────────────
   const outRows = db
     .prepare(
-      `SELECT customer_email, msg_date, subject FROM email_messages
+      `SELECT customer_email, msg_date, subject, body FROM email_messages
         WHERE direction = 'out' AND msg_date >= ? ORDER BY msg_date ASC`,
     )
-    .all(q.since) as Array<{ customer_email: string; msg_date: string; subject: string | null }>;
+    .all(q.since) as Array<{
+    customer_email: string;
+    msg_date: string;
+    subject: string | null;
+    body: string | null;
+  }>;
   const firstSend = new Map<string, number>();
+  const ourLines = new Map<string, Set<string>>();
   const seen = new Set<string>();
   const byDay: Record<string, number> = {};
   let messages = 0;
@@ -213,6 +248,7 @@ export function summarizeOutreachTest(
     const day = new Date(at).toISOString().slice(0, 10);
     byDay[day] = (byDay[day] ?? 0) + 1;
     if (!firstSend.has(email) || at < (firstSend.get(email) as number)) firstSend.set(email, at);
+    ourLines.set(email, new Set([...(ourLines.get(email) ?? []), ...quotableLines(r.body)]));
     firstAt = firstAt === null ? at : Math.min(firstAt, at);
     lastAt = lastAt === null ? at : Math.max(lastAt, at);
   }
@@ -242,7 +278,7 @@ export function summarizeOutreachTest(
       entry.automatic++;
     } else {
       entry.human++;
-      if (asksToStop(r.subject, text)) entry.optout = true;
+      if (asksToStop(r.subject, text, ourLines.get(email))) entry.optout = true;
     }
     replied.set(email, entry);
   }
