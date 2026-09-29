@@ -2963,7 +2963,7 @@
       "vopYes": "obligatoire pour les prestataires du pays",
       "vopNo": "pas d'obligation à ce jour",
       "register": "Registre des codes banque",
-      "registerNone": "aucun registre publié : structure et clé de contrôle seulement",
+      "registerNone": "aucune donnée de code banque réutilisable : structure et clé de contrôle seulement",
       "registerComposite": "carte composite IBANforge, assemblée depuis les annuaires BIC (pas un registre national)"
     },
     "checksTitle": "Ce que l'API vérifie sur un IBAN {country}",
@@ -2971,7 +2971,7 @@
       "structure": "La longueur, le jeu de caractères de chaque champ et la clé de contrôle mod 97.",
       "bankNational": "Le code banque contre {register}, rafraîchi chaque mois : établissement, BIC apparié, statut.",
       "bankComposite": "Le code banque contre notre carte composite assemblée depuis les annuaires BIC : un BIC et un nom de banque quand ils y figurent, sans la valeur d'un registre national.",
-      "bankNone": "Aucun registre de codes banque n'est publié pour ce pays : au-delà de la structure, l'API ne peut pas dire si le code banque existe.",
+      "bankNone": "IBANforge ne détient pour ce pays aucune donnée de code banque qu'il puisse réutiliser : au-delà de la structure, l'API ne peut pas dire si le code banque existe, et répond que le code n'a pas été consulté.",
       "sepa": "La joignabilité SEPA du pays et les schémas ouverts ({schemes}).",
       "sepaOut": "Le pays est hors SEPA : un virement SEPA n'atteindra pas ce compte.",
       "vop": "Le devoir de vérification du bénéficiaire qui pèse, ou non, sur les prestataires du pays."

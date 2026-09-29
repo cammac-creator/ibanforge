@@ -2963,7 +2963,7 @@
       "vopYes": "Pflicht für die Anbieter des Landes",
       "vopNo": "bis heute keine Pflicht",
       "register": "Bankleitzahlen-Register",
-      "registerNone": "kein veröffentlichtes Register: nur Aufbau und Prüfziffern",
+      "registerNone": "keine weiterverwendbaren Bankleitzahl-Daten: nur Aufbau und Prüfziffern",
       "registerComposite": "IBANforge-Verbundkarte, aus BIC-Verzeichnissen zusammengesetzt (kein nationales Register)"
     },
     "checksTitle": "Was die API an einer IBAN aus {country} prüft",
@@ -2971,7 +2971,7 @@
       "structure": "Die Länge, den Zeichensatz jedes Feldes und die Prüfziffern nach mod 97.",
       "bankNational": "Die Bankleitzahl gegen {register}, monatlich aufgefrischt: Institut, zugehöriger BIC, Status.",
       "bankComposite": "Die Bankleitzahl gegen unsere Verbundkarte aus BIC-Verzeichnissen: BIC und Bankname, wenn sie dort stehen, ohne das Gewicht eines nationalen Registers.",
-      "bankNone": "Für dieses Land wird kein Bankleitzahlen-Register veröffentlicht: über den Aufbau hinaus kann die API nicht sagen, ob die Bankleitzahl existiert.",
+      "bankNone": "IBANforge hält für dieses Land keine Bankleitzahl-Daten, die es weiterverwenden darf: Über den Aufbau hinaus kann die API nicht sagen, ob die Bankleitzahl existiert, und antwortet, dass der Code nicht geprüft wurde.",
       "sepa": "Die SEPA-Erreichbarkeit des Landes und die offenen Verfahren ({schemes}).",
       "sepaOut": "Das Land liegt ausserhalb von SEPA: eine SEPA-Überweisung erreicht dieses Konto nicht.",
       "vop": "Die Pflicht zur Empfängerprüfung, die für die Anbieter des Landes gilt oder nicht gilt."

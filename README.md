@@ -254,6 +254,8 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 
 Some of these sources may be served but not redistributed: the EBA STEP2 and NBP directory rows, the OeNB, NBB and BCSM registers, the Bank of England PRA list, the UN list and the EPC registers. So are the Polish, Finnish and Luxembourg keys of the composite bank-code map and the Finance Finland list. They are not in this repository: the hosted API loads them from a private repository, and a deployment without them answers "not consulted" where they would have spoken, never "no". See [NOTICE](NOTICE).
 
+The keys of the composite map that came from sources granting no right to reuse them were removed on 29 September 2026, from this repository and from the service: all of them for the United Arab Emirates, Bosnia and Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and Türkiye, whose bank codes now answer "not consulted" with no BIC, and part of them for Spain and Italy. The Italian and Romanian keys were rebuilt from open data (`scripts/derive-map-keys.ts`).
+
 ## Resources for AI agents
 
 - [`llms.txt`](https://ibanforge.com/llms.txt) — short summary + recommended starter prompt

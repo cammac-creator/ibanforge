@@ -56,6 +56,8 @@ Finland moved here on 16 September 2026, from the authoritative table above: a r
 
 Everywhere else, bank codes resolve against our composite map: **121k+ BIC entries** assembled from GLEIF (LEI-enriched), the public SWIFT directory, SIX, EBA STEP2 SCT, Bundesbank and NBP data. A hit names who holds the matching BIC — it does **not** prove the institution issues IBANs, and an absence proves nothing at all. In the ~30 countries whose bank codes are letters, a prefix fallback can return `candidates > 1`, and the response flags it as indicative.
 
+Since 29 September 2026 the map no longer covers **the United Arab Emirates, Bosnia and Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and Türkiye**: every pairing we held for them came from a source that grants no right to reuse it (a commercial IBAN site, or a banking association that reserves commercial use). An IBAN of these countries is still validated, and its bank code answers `unavailable` (`no_reference_data_for_country`) with no `bic` block, never a guess. For the same reason part of the Spanish and Italian keys left the map; the Italian ones and the Romanian ones were rebuilt from open data (the Banca d'Italia's LEI then GLEIF, and the BIC directory where the bank code is the start of the BIC).
+
 The Netherlands additionally checks the Betaalvereniging list of IBAN-issuing providers (`issuer.iban_issuer`): a code whose holder is not on that list keeps its name but loses its `bank` type — naming the BIC holder is a fact, calling it your counterparty's bank would be a guess.
 
 ## United Kingdom — PRA deposit-taking authorisation

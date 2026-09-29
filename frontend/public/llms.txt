@@ -15,7 +15,7 @@ BIC directory, 121k+ entries (entries, not institutions): GLEIF and national reg
 - United Kingdom: the Vocalink modulus check on the sort code and account number, and whether the bank is on the Bank of England list of banks authorised to take deposits.
 - Poland: the check digit of the settlement number. Netherlands: whether the identifier belongs to a provider on the Betaalvereniging Nederland list of IBAN-issuing institutions.
 - Every SEPA bank we resolve: whether the EPC Verification of Payee register lists it as ready (a bank absent from that register comes back `false`, which does not prove it ignores VoP requests); SCT, SCT Inst and SDD reachability from the EPC scheme registers where they list the bank (`sepa.basis: "epc_register"`), the country's schemes otherwise (`sepa.basis: "country_default"`).
-- Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`.
+- Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`; for United Arab Emirates, Bosnia and Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and Türkiye, structure and mod-97 only: we hold no bank-code data we may reuse there, so `bank_code_check` answers `unavailable` and `bic` is null.
 
 ## Three questions, three layers
 

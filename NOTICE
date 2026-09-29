@@ -66,8 +66,10 @@ files of this repository, and the terms each publisher attaches to them. It
 describes the files as they stand in this revision. Row counts were read on
 24 September 2026 at commit 5094d72a; they change at every refresh (monthly
 for the BIC data, weekly for the sanctions data). On 25 September 2026 the
-records of group C were removed from these files. This section is not legal
-advice: where a publisher's terms have not been established, it says so.
+records of group C were removed from these files, and on 29 September 2026
+the keys of the composite map listed at the end of group C. This section is
+not legal advice: where a publisher's terms have not been established, it
+says so.
 
 Files concerned:
   data/bic.sqlite
@@ -89,8 +91,8 @@ Each source is listed in one of three groups:
   A. terms that permit reproduction, under the conditions stated;
   B. terms not yet confirmed;
   C. not redistributable here, and removed from the files of this
-     repository on 25 September 2026; the IBANforge API serves the database
-     records among them from a private repository.
+     repository on 25 or 29 September 2026; the IBANforge API serves some of
+     them from a private repository, as each entry says.
 
 --------------------------------------------------------------------------------
 A. Sources whose terms permit reproduction, under the conditions stated
@@ -98,7 +100,11 @@ A. Sources whose terms permit reproduction, under the conditions stated
 
 GLEIF (Global Legal Entity Identifier Foundation), LEI reference data
   Where: data/bic.sqlite, table bic_entries, source 'gleif' (39,297 rows),
-         including registered and head-office addresses.
+         including registered and head-office addresses; and the Italian
+         keys of src/db/bic_data.json rebuilt on 29 September 2026, whose BIC
+         is the one the Mapping Table below pairs with the LEI the Banca
+         d'Italia publishes for the bank code (a copy in part of the Mapping
+         Table: the notice below covers them).
   Terms: CC0 1.0 Universal Public Domain Dedication.
          https://www.gleif.org/en/about/open-data
 
@@ -134,7 +140,9 @@ GLEIF (Global Legal Entity Identifier Foundation), LEI reference data
 
 Deutsche Bundesbank, Bankleitzahlendatei
   Where: data/bic.sqlite, table bic_entries, source 'bundesbank' (143 rows),
-         and table de_blz (3,506 rows); frontend/data/registers/de-blz.json.
+         and table de_blz (3,506 rows); frontend/data/registers/de-blz.json;
+         the German keys of src/db/bic_data.json, taken from the
+         Bankleitzahlendatei by sigalor/iban-to-bic and mdomke/schwifty.
   Attribution required by the Bundesbank:
          Quelle: Deutsche Bundesbank
   Terms: section 4.1 of the Bundesbank's terms of use: "Es steht Ihnen
@@ -150,7 +158,9 @@ Deutsche Bundesbank, Bankleitzahlendatei
 
 SIX Group AG, Bank Master
   Where: data/bic.sqlite, table ch_clearing (1,164 rows);
-         frontend/data/registers/ch-iid.json.
+         frontend/data/registers/ch-iid.json; the Swiss and Liechtenstein
+         keys of src/db/bic_data.json, taken from the Bank Master directly
+         and through mdomke/schwifty.
   Terms: "Information in the Download Bank Master may be used freely."
          (Record description bank master V3.0, page 3)
          https://www.six-group.com/dam/download/banking-services/interbank-clearing/en/bc_bank_master/bankmaster-v3-record-description-en.pdf
@@ -246,7 +256,9 @@ Národná banka Slovenska, directory of identification codes for the domestic
 payment system
   Where: data/bic.sqlite, table national_bank_codes, country SK (38 rows,
          version 225, effective 18 May 2026);
-         frontend/data/registers/sk-bank.json.
+         frontend/data/registers/sk-bank.json; the Slovak keys of
+         src/db/bic_data.json, taken from the same directory by
+         mdomke/schwifty.
   Attribution:
          Zdroj: Národná banka Slovenska
          (with the version and effective date of the edition, stored with
@@ -265,7 +277,9 @@ payment system
          edition 254, effective 1 September 2026), and table
          national_bank_codes_pending, which holds an edition announced
          before its effective date (none at this revision);
-         frontend/data/countries.json (the Czech example's answer).
+         frontend/data/countries.json (the Czech example's answer); the
+         Czech keys of src/db/bic_data.json, taken from the same directory by
+         mdomke/schwifty and checked against edition 254.
   Attribution:
          Zdroj: ČNB
          (with the edition and its effective date, stored with every row)
@@ -285,7 +299,9 @@ e passivita ecc.")
          force, edition of 23 September 2026), and table
          national_bank_codes_retired (1,907 codes the Banca d'Italia has
          struck off, with the date and the legal successor in force);
-         frontend/data/registers/it-bank.json.
+         frontend/data/registers/it-bank.json; src/db/bic_data.json, whose
+         Italian keys rebuilt on 29 September 2026 join the LEI the registers
+         publish for each code to the BIC GLEIF pairs with it.
   Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
          https://creativecommons.org/licenses/by/4.0/ ; the open data of the
          Banca d'Italia published on the AgID portal dati.gov.it, which the
@@ -305,13 +321,71 @@ e passivita ecc.")
   Reuse of these records carries the same attribution requirement.
 
 Betaalvereniging Nederland, BIC list
-  Where: src/db/nl-psp.json (94 entries).
+  Where: src/db/nl-psp.json (94 entries); the Dutch keys of
+         src/db/bic_data.json taken from its list by sigalor/iban-to-bic and
+         mdomke/schwifty (the other Dutch keys are derived from the BIC
+         entries of data/bic.sqlite, see the composite map in group B).
   Terms: may be used free of charge without a formal licence agreement,
          with attribution to Betaalvereniging Nederland and a caution that a
          BIC or bank code may be changed, withdrawn or added at any time.
   Attribution and caution:
          Source: Betaalvereniging Nederland. A BIC or bank code may be
          changed, withdrawn or added at any time.
+
+Banka Slovenije, list of identifiers of payment service providers
+  Where: the Slovenian keys of src/db/bic_data.json (829 keys), taken from
+         the Banka Slovenije list by mdomke/schwifty (a list of 2025 at the
+         latest).
+  Attribution:
+         Vir: Banka Slovenije
+  Terms: "users of the BS website may make free use of the information
+         directly obtained therein", and "BS must be cited as the source";
+         where the information is sold, buyers must be told, before they pay
+         and each time they access it, that it is available free of charge on
+         the Banka Slovenije website. The Slovenian version of the terms adds
+         that the data must not be altered, and that no reproduction for
+         marketing or advertising activities is allowed without the Bank's
+         prior consent.
+         https://www.bsi.si/en/disclaimer-and-copyright
+         https://www.bsi.si/sl/pogoji-uporabe
+         The API does not yet serve the source line and the free-of-charge
+         notice with the answers built from these keys.
+
+Lietuvos bankas (Bank of Lithuania), list of payment service providers
+  Where: the Lithuanian keys of src/db/bic_data.json (287 keys), taken from
+         the Bank of Lithuania's list by mdomke/schwifty.
+  Attribution:
+         Source: Lietuvos bankas
+  Terms: "When using information and visual material presented on the
+         website, please indicate the Bank of Lithuania as the source."
+         https://www.lb.lt/en/terms-of-use
+         The page refuses automated access; it was read on its Web Archive
+         copy of 20 September 2026 and has not yet been re-read in a browser.
+
+Magyar Nemzeti Bank, directory of bank codes (sht.xlsx)
+  Where: the Hungarian keys of src/db/bic_data.json (176 keys), taken from
+         the MNB file by mdomke/schwifty, which keeps the first three digits
+         of each code and the BIC of its first branch: an extract of the
+         file.
+  Attribution:
+         Forrás: Magyar Nemzeti Bank
+  Terms: "A weboldalon szereplő információk – ellenkező rendelkezés
+         hiányában – változatlan tartalommal, a forrás megjelölésével
+         szabadon terjeszthetők." (unless otherwise provided, the information
+         on the website may be distributed freely, with unchanged content
+         and with the source indicated). Whether an extract counts as
+         unchanged content has not been confirmed with the MNB.
+         https://www.mnb.hu/a-jegybank/informaciok-a-jegybankrol/gyakorlati-tudnivalok/jogi-nyilatkozat
+
+Hrvatska narodna banka (Croatian National Bank), list of bank codes (VBB)
+  Where: the Croatian keys of src/db/bic_data.json (21 keys), taken from the
+         HNB list by mdomke/schwifty.
+  Attribution:
+         Izvor: HNB
+  Terms: "The Croatian National Bank permits copying material from its web
+         site under the condition that the CNB is stated as the source. […]
+         It is not permitted to amend the contents of the material."
+         https://www.hnb.hr/en/terms-of-use
 
 IBANforge's own tables
   data/compliance.sqlite, table sanctioned_countries (14 rows), a list of
@@ -341,15 +415,24 @@ SIX Group AG, BIC entries
          separately.
 
 Composite bank-code map
-  Where: src/db/bic_data.json (18,467 keys in 70 countries at this
+  Where: src/db/bic_data.json (17,920 keys in 62 countries at this
          revision; its Austrian, Belgian, Finnish, Luxembourg and Polish
-         keys were removed on 25 September 2026, see group C).
+         keys were removed on 25 September 2026, and the keys taken from
+         commercial sites or from publishers reserving commercial use on
+         29 September 2026, see group C).
   Built from: the datasets of sigalor/iban-to-bic, which that project
          generates from files published by national central banks and
-         banking associations; the bank registries of mdomke/schwifty,
-         compiled by that project from national sources; the SIX Bank
-         Master; keys derived from the BIC entries of data/bic.sqlite; and
-         manual additions.
+         banking associations; part of the bank registries of
+         mdomke/schwifty, whose files come from national publishers for some
+         countries (see group A) and from manual contributions naming no
+         source for others; the SIX Bank Master; keys derived from the BIC
+         entries of data/bic.sqlite where the IBAN bank code is the start of
+         the BIC, among them the San Marino keys and most Dutch keys (729
+         Dutch keys were added the same day as the schwifty import without
+         coming from it); the Italian keys rebuilt on 29 September 2026 from
+         the Banca d'Italia's LEI and the GLEIF Mapping Table, and the
+         Romanian keys rebuilt the same day from the BIC entries
+         (scripts/derive-map-keys.ts); and manual additions.
   Terms: both projects are distributed under the MIT License (copyright
          notices at the end of this file). Those licences do not grant
          rights that the national publishers have not granted, and the terms
@@ -364,19 +447,21 @@ SWIFT, IBAN Registry
   Terms: not reviewed.
 
 --------------------------------------------------------------------------------
-C. Removed from this repository on 25 September 2026
+C. Removed from this repository on 25 and 29 September 2026
 --------------------------------------------------------------------------------
 
-The records below were in this repository until 25 September 2026. Their
-publishers reserve all rights, restrict use to non-commercial purposes,
-publish no terms, or have permitted use in the IBANforge API without
-permitting redistribution of the data. They were removed that day from
-data/bic.sqlite and data/compliance.sqlite, from the composite map
-src/db/bic_data.json, from the website exports, and from the test fixtures,
-sample API responses and documentation examples of the repository. The
-IBANforge API loads the database records among them from a private
-repository and serves them under the permissions described below; where it
-has not loaded them, its answers say that the source was not consulted.
+The records below were in this repository until 25 September 2026, except
+the last entry, removed on 29 September 2026. Their publishers reserve all
+rights, restrict use to non-commercial purposes, publish no terms, or have
+permitted use in the IBANforge API without permitting redistribution of the
+data. They were removed from data/bic.sqlite and data/compliance.sqlite,
+from the composite map src/db/bic_data.json, from the website exports, and
+from the test fixtures, sample API responses and documentation examples of
+the repository. The IBANforge API loads the database records among the
+first entries from a private repository and serves them under the
+permissions described below; where it has not loaded them, its answers say
+that the source was not consulted. It does not serve the keys of the last
+entry at all.
 Earlier commits of this repository, and forks of it, keep copies of these
 records: they are not covered by the MIT License in LICENSE, they remain
 subject to their publishers' terms, and this repository grants no right to
@@ -505,6 +590,42 @@ UK Financial Conduct Authority (FCA), Financial Services Register lists
          could not be read without a browser and may apply to these lists
          as well.
          https://www.fca.org.uk/legal
+
+Keys of the composite map taken from commercial sites or from publishers
+reserving commercial use (removed on 29 September 2026)
+  Formerly in: src/db/bic_data.json, 756 keys imported from the bank
+         registries of mdomke/schwifty, whose files for these countries do
+         not come from a national register. The IBANforge API no longer
+         serves them either: the United Arab Emirates, Bosnia and
+         Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and
+         Türkiye answer that no bank-code data was consulted, and the Italian
+         and Romanian keys that open data rebuilds are listed in group B.
+  ibancalculator.com, run by Telauges OÜ: the United Arab Emirates (56 keys),
+         Bosnia and Herzegovina (25), Estonia (16), Georgia (20), Kazakhstan
+         (49), Moldova (9), Serbia (26), and the BICs of 219 Italian keys.
+         The data was obtained by sending invented IBANs to the site's
+         validator. Terms: none published; "Copyright © 2025 Telauges OÜ";
+         the site sells bulk access to these data.
+         https://www.ibancalculator.com/contact.html
+  iban.es: 242 Spanish keys. Terms: "Copyright © 2017 IBAN.es", no terms
+         page; its contact, order and price links lead to IBAN.com, whose
+         terms state that its bank directory data "may not be used to
+         prepare or compile directories, database […] without the prior
+         written permission of IBANCOM" (3.2).
+         https://www.iban.com/terms
+  Türkiye Bankalar Birliği (The Banks Association of Türkiye): 48 Turkish
+         keys. Terms: "Web sitemizde yayınlanan çalışmalar kaynak
+         gösterilmek suretiyle izinsiz yayımlanabilir, ancak bu bilgilerin
+         ticari amaçlarla kullanımı Türkiye Bankalar Birliği'nin yazılı
+         iznine tabidir." (works published on the site may be published
+         without permission if the source is given, but any commercial use
+         of this information requires the Association's written permission).
+         https://www.tbb.org.tr/kullanim-kosullari
+  internationalmoneytransfers.org (Money Transfer Comparison): 46 Romanian
+         keys. Terms: "Copyright © 2026 Money Transfer Comparison. All rights
+         reserved."; "Reproduction is prohibited other than in accordance
+         with the copyright notice".
+         https://moneytransfercomparison.com/terms-and-conditions/
 
 --------------------------------------------------------------------------------
 MIT License notices for the data compilations named above

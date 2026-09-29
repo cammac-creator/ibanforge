@@ -41,7 +41,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 }
 ```
 
-The name is served as the register writes it. The register publishes no BIC: the `bic` block beside the verdict still comes from our composite map (`basis: "curated_map"`).
+The name is served as the register writes it. The register publishes no BIC: the `bic` block beside the verdict still comes from our composite map (`basis: "curated_map"`). Since 29 September 2026, most of the map's Italian keys are rebuilt from open data: the LEI the Banca d'Italia publishes for the code, then the BIC GLEIF pairs with that LEI. A code without a LEI, or whose LEI GLEIF pairs with no single BIC, has no `bic` block rather than a pairing we could not source.
 
 ## A code the Banca d'Italia has struck off: retired, with its legal successor, never refused
 
@@ -82,7 +82,7 @@ The official Italian example of the ISO 13616 registry, `IT60 X054 2811 1010 000
 
 ## A code the registers do not list: the answer we gave before, never "not allocated"
 
-The Banca d'Italia lists the institutions it registers, not the allocation of the ABI code space. **Poste Italiane (07601)**, the **Banca d'Italia itself (01000)** and the Italian branches of EU payment institutions (**Qonto, 36092**) issue real Italian IBANs outside these registers. So an Italian code the registers do not list gets exactly the answer it got before: our composite map, `authoritative: false`, and never `not_allocated`.
+The Banca d'Italia lists the institutions it registers, not the allocation of the ABI code space. **Poste Italiane (07601)**, the **Banca d'Italia itself (01000)** and the Italian branches of EU payment institutions (**Qonto, 36092**) issue real Italian IBANs outside these registers. So an Italian code the registers do not list gets the answer our composite map gives: its BIC where the map holds one (the Banca d'Italia's code 01000 and Qonto's 36092 do), otherwise `absent_from_reference_data`, `authoritative: false`, and never `not_allocated`. Poste Italiane's 07601 is in the second case since 29 September 2026: the pairing we held came from a source that grants no right to reuse it.
 
 ## What the registers publish
 

@@ -41,7 +41,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 }
 ```
 
-Le nom est servi tel que le registre l'écrit. Le registre ne publie aucun BIC : le bloc `bic` à côté du verdict vient toujours de notre carte composite (`basis: "curated_map"`).
+Le nom est servi tel que le registre l'écrit. Le registre ne publie aucun BIC : le bloc `bic` à côté du verdict vient toujours de notre carte composite (`basis: "curated_map"`). Depuis le 29 septembre 2026, la plupart des clés italiennes de la carte sont reconstruites depuis des données ouvertes : le LEI que la Banca d'Italia publie pour le code, puis le BIC que GLEIF associe à ce LEI. Un code sans LEI, ou dont le LEI n'a pas de BIC unique chez GLEIF, n'a pas de bloc `bic` plutôt qu'une correspondance dont la source nous manque.
 
 ## Un code que la Banca d'Italia a radié : retiré, avec son successeur légal, jamais refusé
 
@@ -82,7 +82,7 @@ L'exemple italien officiel du registre ISO 13616, `IT60 X054 2811 1010 0000 0123
 
 ## Un code que les registres ne listent pas : la réponse d'avant, jamais « non attribué »
 
-La Banca d'Italia liste les établissements qu'elle inscrit, pas l'attribution de l'espace des codes ABI. **Poste Italiane (07601)**, la **Banca d'Italia elle-même (01000)** et les succursales italiennes d'établissements de paiement européens (**Qonto, 36092**) émettent de vrais IBAN italiens hors de ces registres. Un code italien que les registres ne listent pas reçoit donc exactement la réponse d'avant : notre carte composite, `authoritative: false`, et jamais `not_allocated`.
+La Banca d'Italia liste les établissements qu'elle inscrit, pas l'attribution de l'espace des codes ABI. **Poste Italiane (07601)**, la **Banca d'Italia elle-même (01000)** et les succursales italiennes d'établissements de paiement européens (**Qonto, 36092**) émettent de vrais IBAN italiens hors de ces registres. Un code italien que les registres ne listent pas reçoit donc la réponse de notre carte composite : son BIC quand la carte en porte un (c'est le cas du code 01000 de la Banca d'Italia et du 36092 de Qonto), sinon `absent_from_reference_data`, `authoritative: false`, et jamais `not_allocated`. Le 07601 de Poste Italiane est dans le second cas depuis le 29 septembre 2026 : la correspondance que nous avions venait d'une source qui n'en accorde pas la réutilisation.
 
 ## Ce que les registres publient
 
