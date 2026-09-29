@@ -7,6 +7,7 @@ import {
   interpretLiveAnswer,
   liveExampleIban,
   normaliseLiveCode,
+  registerPagesApiKey,
 } from "./register-live";
 
 /**
@@ -188,6 +189,7 @@ describe("asking the API", () => {
 
   it("posts the synthetic IBAN with the server key, cached for a day, never the key in the body", async () => {
     process.env.API_URL = "https://api.example.test";
+    delete process.env.REGISTER_PAGES_API_KEY;
     process.env.PLAYGROUND_API_KEY = "ifk_test_invented";
     const calls: Array<[string, RequestInit]> = [];
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
@@ -203,6 +205,56 @@ describe("asking the API", () => {
     expect(String(init.body)).toBe(JSON.stringify({ iban: liveExampleIban("AT", "19981") }));
     expect(String(init.body)).not.toContain("ifk_");
     expect((init as { next?: { revalidate?: number | false } }).next?.revalidate).toBe(86_400);
+  });
+
+  /** The Authorization header of the one call a page makes, under a given environment. */
+  async function authorizationSent(env: Record<string, string | undefined>): Promise<string | undefined> {
+    process.env.API_URL = "https://api.example.test";
+    for (const [name, value] of Object.entries(env)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    const calls: RequestInit[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      calls.push(init);
+      return new Response(JSON.stringify(answer(VERIFIED_AT)), { status: 200 });
+    });
+    await fetchLiveRegisterEntry("AT", "19981");
+    expect(calls).toHaveLength(1);
+    return (calls[0]!.headers as Record<string, string>).Authorization;
+  }
+
+  it("reads the registers with a key of their own, never the playground's when both are set", async () => {
+    // Audit of 29/09/2026: a sweep of bank codes must drain this key only, so
+    // that the playground and the home-page demo keep theirs.
+    expect(
+      await authorizationSent({
+        REGISTER_PAGES_API_KEY: "ifk_registers_invented",
+        PLAYGROUND_API_KEY: "ifk_playground_invented",
+      }),
+    ).toBe("Bearer ifk_registers_invented");
+  });
+
+  it("falls back to the playground key while the register key is not set, so the deploy breaks nothing", async () => {
+    expect(
+      await authorizationSent({ REGISTER_PAGES_API_KEY: undefined, PLAYGROUND_API_KEY: "ifk_playground_invented" }),
+    ).toBe("Bearer ifk_playground_invented");
+    // A variable created empty in the host's settings is not a key.
+    expect(
+      await authorizationSent({ REGISTER_PAGES_API_KEY: "", PLAYGROUND_API_KEY: "ifk_playground_invented" }),
+    ).toBe("Bearer ifk_playground_invented");
+  });
+
+  it("sends no Authorization header at all when neither key is set, never an empty Bearer", async () => {
+    expect(await authorizationSent({ REGISTER_PAGES_API_KEY: undefined, PLAYGROUND_API_KEY: undefined })).toBeUndefined();
+    expect(await authorizationSent({ REGISTER_PAGES_API_KEY: "", PLAYGROUND_API_KEY: "" })).toBeUndefined();
+  });
+
+  it("chooses the key the same way from any environment it is given", () => {
+    expect(registerPagesApiKey({ REGISTER_PAGES_API_KEY: "a", PLAYGROUND_API_KEY: "b" })).toBe("a");
+    expect(registerPagesApiKey({ PLAYGROUND_API_KEY: "b" })).toBe("b");
+    expect(registerPagesApiKey({ REGISTER_PAGES_API_KEY: "", PLAYGROUND_API_KEY: "b" })).toBe("b");
+    expect(registerPagesApiKey({})).toBe("");
   });
 
   it("never asks the API about a code of the wrong shape", async () => {
