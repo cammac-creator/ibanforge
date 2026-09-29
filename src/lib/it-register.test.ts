@@ -140,7 +140,9 @@ const RETIRED: Array<{
     successor_name: 'BNP PARIBAS SA',
   },
   {
-    code: '23019',
+    // 08716 est une clé que la carte reconstruit depuis des données ouvertes
+    // (code ABI → LEI → BIC, 29/09/2026) ; la radiation, elle, est inventée.
+    code: '08716',
     name: 'Banca di Esempio S.p.A.',
     retired_on: '2020-01-31',
     successor_code: null,
@@ -349,13 +351,13 @@ describe('a code the register has struck off is retired, never refused', () => {
   });
 
   it('drops a curated key the register declares retired, even while bic_data.json still carries it', () => {
-    // 23019 est dans la carte curée (ARABITRRXXX) ; cette édition FIXE le
-    // déclare radié. L'élagage au chargement suffit à couper le BIC.
+    // 08716 est dans la carte curée ; cette édition FIXE le déclare radié.
+    // L'élagage au chargement suffit à couper le BIC.
     const curated = JSON.parse(
       readFileSync(resolve(__dirname, '../db/bic_data.json'), 'utf8'),
     ) as Record<string, { bic: string }>;
-    expect(curated['IT:23019']?.bic).toBe('ARABITRRXXX');
-    const r = check(itIban('23019'));
+    expect(curated['IT:08716']?.bic).toBeDefined();
+    const r = check(itIban('08716'));
     expect(r.bank_code_check?.retired).toBe(true);
     expect(r.bic ?? null).toBeNull();
   });
@@ -377,7 +379,6 @@ describe('a code the register has struck off is retired, never refused', () => {
 
 describe('a code the register never listed gets the answer it had before the register', () => {
   it.each([
-    ['07601', 'BPPIITRRXXX'],
     ['01000', 'BITAITRRENT'],
     ['36092', 'QNTOITM2XXX'],
   ])('%s (outside the Banca d’Italia registers) keeps the composite map', (code, bic) => {
@@ -392,6 +393,18 @@ describe('a code the register never listed gets the answer it had before the reg
     });
     expect(r.bic?.code).toBe(bic);
     expect(r.bank_code_holder).toBe('inferred');
+  });
+
+  it('07601 (Poste Italiane) lost its map key on 29/09/2026 and answers like any code the map lacks', () => {
+    // Its pairing came from a commercial site with no licence (withdrawal of
+    // 29/09/2026), and the Banca d'Italia registers, which would rebuild it
+    // through the LEI, do not list Poste Italiane. No BIC, and no refusal.
+    const r = check(itIban('07601'));
+    expect(r.bic ?? null).toBeNull();
+    expect(r.bank_code_check?.status).toBe('not_in_register');
+    expect(r.bank_code_check?.reason).toBe('absent_from_reference_data');
+    expect(r.bank_code_check?.authoritative).toBe(false);
+    expect(r.bank_code_holder).not.toBe('not_allocated');
   });
 
   it('a code neither the register nor the map knows stays absent_from_reference_data, never not_allocated', () => {

@@ -35,6 +35,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // published account details agree on; see docs/data-sources.md.
 // 25/09/2026 : 18 467 clés dans 70 pays, après le retrait des clés AT, BE, LU,
 // PL et FI (famille sous conditions, NOTICE groupe C).
+// 29/09/2026: 17,920 keys in 62 countries, after the withdrawal of the keys no
+// publisher granted us (see UNLICENSED_MAP_COUNTRIES below; Italian and
+// Romanian keys rebuilt from open data by scripts/derive-map-keys.ts).
 // Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
 // ---------------------------------------------------------------------------
 
@@ -179,6 +182,44 @@ export const WITHDRAWN_BANK_CODE_COUNTRIES: ReadonlySet<string> = new Set([
   'LU',
   'PL',
   'FI',
+]);
+
+/**
+ * Countries whose every map key came from a source that grants no right to
+ * reuse it, withdrawn from the repository AND from the service on 29/09/2026
+ * (decision of Claude-Alain on the licence inventory of the map).
+ *
+ * The keys had been imported from a third-party compilation. For these eight
+ * countries its national files were in fact scraped from a commercial IBAN
+ * site (by sending it invented IBANs), or copied from a banking association
+ * that reserves any commercial use for its written permission (TR). No open
+ * source rebuilds them, and no private file brings them back: unlike
+ * WITHDRAWN_BANK_CODE_COUNTRIES, nothing restores these countries.
+ *
+ * Two guards, both needed:
+ *  - `lookupByCountryBank` answers nothing, not even through the prefix search.
+ *    Georgian and Moldovan bank codes are two letters, and `bic8 LIKE code%`
+ *    would still name a bank for them: a guess that the map used to overshadow,
+ *    and for Georgia one the country's scheme does not support (a Georgian
+ *    bank code is not, as a rule, the start of that bank's BIC).
+ *  - `countryHasReferenceData` says we hold nothing for them. Their BIC
+ *    directory rows are not a reference for their bank codes, and without this
+ *    every code would come back `not_in_register` / `absent_from_reference_data`,
+ *    an answer that sounds checked. The honest one is `unavailable` /
+ *    `no_reference_data_for_country`, with `bic: null`.
+ *
+ * Spain and Italy lost part of their keys for the same reason and keep the
+ * rest; a withdrawn code there answers as any code the map does not carry.
+ */
+export const UNLICENSED_MAP_COUNTRIES: ReadonlySet<string> = new Set([
+  'AE',
+  'BA',
+  'EE',
+  'GE',
+  'KZ',
+  'MD',
+  'RS',
+  'TR',
 ]);
 
 /**
@@ -880,6 +921,11 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
   // Sans garde, comme le tchèque : une base illisible remonte en `lookup_failed`.
   if (countryCode === 'IT' && lookupRetiredNationalCode('IT', bankCode)) return null;
 
+  // The countries whose map keys no publisher granted (29/09/2026): nothing
+  // pairs their bank codes with a BIC any more, and the prefix search below
+  // must not do it in the map's place. See UNLICENSED_MAP_COUNTRIES.
+  if (UNLICENSED_MAP_COUNTRIES.has(countryCode)) return null;
+
   // Strategy 1: exact key lookup in bic_data.json
   const data = getBicData();
   const key = `${countryCode}:${bankCode}`;
@@ -1054,6 +1100,13 @@ export function restrictedDirectoryLoaded(): boolean {
 export function countryHasReferenceData(countryCode: string): boolean {
   const cached = referenceDataCache.get(countryCode);
   if (cached !== undefined) return cached;
+
+  // Withdrawn on 29/09/2026 with nothing to replace them: their directory rows
+  // do not decide their bank codes (UNLICENSED_MAP_COUNTRIES).
+  if (UNLICENSED_MAP_COUNTRIES.has(countryCode)) {
+    referenceDataCache.set(countryCode, false);
+    return false;
+  }
 
   const prefix = `${countryCode}:`;
   let has = Object.keys(getBicData()).some((k) => k.startsWith(prefix));
