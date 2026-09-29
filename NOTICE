@@ -103,8 +103,9 @@ GLEIF (Global Legal Entity Identifier Foundation), LEI reference data
          including registered and head-office addresses; and the Italian
          keys of src/db/bic_data.json rebuilt on 29 September 2026, whose BIC
          is the one the Mapping Table below pairs with the LEI the Banca
-         d'Italia publishes for the bank code (a copy in part of the Mapping
-         Table: the notice below covers them).
+         d'Italia publishes for the bank code, and the Italian website export
+         frontend/data/registers/it-bank.json that repeats them (a copy in
+         part of the Mapping Table: the notice below covers them).
   Terms: CC0 1.0 Universal Public Domain Dedication.
          https://www.gleif.org/en/about/open-data
 
