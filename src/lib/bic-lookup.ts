@@ -517,6 +517,30 @@ const SOURCE_NAMES: Record<string, string> = {
 /** The curated map is our own assembly, and says so rather than borrowing a registry's name. */
 const CURATED_MAP_SOURCE = 'IBANforge curated bank-code map';
 
+/**
+ * The credit a national publisher asks for, on every answer served from the
+ * map keys taken from its file (29/09/2026, NOTICE group A). Every key of these
+ * four countries comes from the publisher named here, through
+ * mdomke/schwifty. Carried in `bic.source`, the field each such answer already
+ * has, the way the Czech register's name carries "Zdroj: ČNB".
+ *
+ * Banka Slovenije also asks that whoever sells its information tell the buyer,
+ * on each access, that it is free on its own website: that sentence travels
+ * with the credit.
+ */
+const CURATED_MAP_CREDIT: Readonly<Record<string, string>> = {
+  SI: 'Vir: Banka Slovenije. This information is available free of charge on the Banka Slovenije website (www.bsi.si).',
+  LT: 'Source: Lietuvos bankas',
+  HU: 'Forrás: Magyar Nemzeti Bank',
+  HR: 'Izvor: HNB',
+};
+
+/** `bic.source` for a pairing the curated map made, with the publisher's credit where one is due. */
+export function curatedMapSource(countryCode: string): string {
+  const credit = CURATED_MAP_CREDIT[countryCode];
+  return credit ? `${CURATED_MAP_SOURCE}; ${credit}` : CURATED_MAP_SOURCE;
+}
+
 export function sourceName(source: string | null | undefined): string | null {
   if (!source) return null;
   return SOURCE_NAMES[source] ?? source;
@@ -998,7 +1022,7 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
       // The curated map decided WHICH institution this bank code belongs to; a
       // directory row only supplied its details. Crediting GLEIF for a pairing
       // the map made would overstate what the registry actually says.
-      source: CURATED_MAP_SOURCE,
+      source: curatedMapSource(countryCode),
       as_of: getReferenceAsOf() || null,
       ...(vintage ? { source_as_of: vintage.as_of } : {}),
     };

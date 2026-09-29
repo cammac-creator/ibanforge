@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { lookupByCountryBank } from './bic-lookup.js';
 import { validateIBAN } from './iban.js';
@@ -23,6 +24,30 @@ describe('the BIC block says where it comes from', () => {
     // decided WHICH institution this bank code belongs to.
     expect(hit!.source).toBe('IBANforge curated bank-code map');
     expect(hit!.as_of).toMatch(/^\d{4}-\d{2}$/);
+  });
+
+  it('adds the credit its publisher asks for to the keys taken from a national file', () => {
+    // 29/09/2026 (NOTICE group A): the Slovenian, Lithuanian, Hungarian and
+    // Croatian keys come from the central bank of each country, which asks to
+    // be named; Banka Slovenije also asks that the buyer be told, on each
+    // access, that the information is free on its website.
+    const map = JSON.parse(
+      readFileSync(new URL('../db/bic_data.json', import.meta.url), 'utf8'),
+    ) as Record<string, unknown>;
+    const credits = {
+      SI: ['Vir: Banka Slovenije', 'free of charge', 'www.bsi.si'],
+      LT: ['Source: Lietuvos bankas'],
+      HU: ['Forrás: Magyar Nemzeti Bank'],
+      HR: ['Izvor: HNB'],
+    } as const;
+    for (const [cc, parts] of Object.entries(credits)) {
+      const key = Object.keys(map).find((k) => k.startsWith(`${cc}:`));
+      expect(key, `${cc} has map keys`).toBeDefined();
+      const hit = lookupByCountryBank(cc, key!.slice(3));
+      expect(hit?.match, key).toBe('register');
+      expect(hit?.source, key).toMatch(/^IBANforge curated bank-code map; /);
+      for (const part of parts) expect(hit?.source, key).toContain(part);
+    }
   });
 
   it('names the directory dataset when the prefix fallback read it', () => {
