@@ -270,7 +270,7 @@
       "q0": "IBANforge vérifie-t-il qui détient le compte ?",
       "a0": "Non. Il vérifie l’IBAN et la banque qui se trouve derrière. Le rapprochement du nom du titulaire est la vérification du bénéficiaire (VoP), faite par la banque du bénéficiaire.",
       "q1": "Quels pays reçoivent un verdict du registre national ?",
-      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI : là, le registre national tranche si un code banque est attribué. Dans les autres pays, la réponse nomme la banque d’après un registre partiel ou une carte composite, et dit qu’elle ne peut pas exclure un code.",
+      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI : là, le registre national tranche si un code banque est attribué. Dans les autres pays, la réponse nomme la banque d’après un registre partiel ou une carte composite, et dit qu’elle ne peut pas exclure un code. Pour AE, BA, EE, GE, KZ, MD, RS et TR, nous ne détenons aucune donnée de code banque réutilisable : la réponse dit que la banque n’a pas été consultée.",
       "q2": "Puis-je essayer sans m’inscrire ?",
       "a2": "Oui. Sans aucune clé, POST /v1/iban/validate répond jusqu’à {trialWeekly} validations par semaine depuis chaque adresse, en entier.",
       "q3": "Que donne une clé gratuite ?",
@@ -2081,7 +2081,7 @@
         },
         "bankCode": {
           "label": "Code banque vérifié dans le registre national (absent = non attribué)",
-          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI : le registre national lui-même. Listes partielles en FI, SM et LU, où une absence ne vaut pas refus. Ailleurs, une carte composite, signalée authoritative: false.",
+          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI : le registre national lui-même. Listes partielles en FI, SM et LU, où une absence ne vaut pas refus. Ailleurs, une carte composite, signalée authoritative: false ; aucune pour AE, BA, EE, GE, KZ, MD, RS et TR, signalés non consultés.",
           "ibancom": "Non vérifié par nous",
           "ibanapi": "Annoncé sur leur page d'accueil (24 septembre 2026) : le code banque de l'IBAN est rapproché de leur propre registre bancaire (banques centrales, données SEPA et relecture manuelle). Qu'un code absent de ce registre ne soit attribué à personne : non vérifié par nous.",
           "libs": "Selon la bibliothèque : schwifty refuse un code banque inconnu de son registre embarqué. Les autres, non vérifiées par nous.",

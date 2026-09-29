@@ -349,13 +349,14 @@ Banka Slovenije, list of identifiers of payment service providers
          prior consent.
          https://www.bsi.si/en/disclaimer-and-copyright
          https://www.bsi.si/sl/pogoji-uporabe
-         The API does not yet serve the source line and the free-of-charge
-         notice with the answers built from these keys.
+  Served with every API answer built from these keys, in bic.source:
+         Vir: Banka Slovenije. This information is available free of charge on the Banka Slovenije website (www.bsi.si).
 
 Lietuvos bankas (Bank of Lithuania), list of payment service providers
   Where: the Lithuanian keys of src/db/bic_data.json (287 keys), taken from
          the Bank of Lithuania's list by mdomke/schwifty.
-  Attribution:
+  Attribution, served with every API answer built from these keys, in
+  bic.source:
          Source: Lietuvos bankas
   Terms: "When using information and visual material presented on the
          website, please indicate the Bank of Lithuania as the source."
@@ -368,7 +369,8 @@ Magyar Nemzeti Bank, directory of bank codes (sht.xlsx)
          the MNB file by mdomke/schwifty, which keeps the first three digits
          of each code and the BIC of its first branch: an extract of the
          file.
-  Attribution:
+  Attribution, served with every API answer built from these keys, in
+  bic.source:
          Forrás: Magyar Nemzeti Bank
   Terms: "A weboldalon szereplő információk – ellenkező rendelkezés
          hiányában – változatlan tartalommal, a forrás megjelölésével
@@ -381,7 +383,8 @@ Magyar Nemzeti Bank, directory of bank codes (sht.xlsx)
 Hrvatska narodna banka (Croatian National Bank), list of bank codes (VBB)
   Where: the Croatian keys of src/db/bic_data.json (21 keys), taken from the
          HNB list by mdomke/schwifty.
-  Attribution:
+  Attribution, served with every API answer built from these keys, in
+  bic.source:
          Izvor: HNB
   Terms: "The Croatian National Bank permits copying material from its web
          site under the condition that the CNB is stated as the source. […]
@@ -416,7 +419,7 @@ SIX Group AG, BIC entries
          separately.
 
 Composite bank-code map
-  Where: src/db/bic_data.json (17,920 keys in 62 countries at this
+  Where: src/db/bic_data.json (17,909 keys in 62 countries at this
          revision; its Austrian, Belgian, Finnish, Luxembourg and Polish
          keys were removed on 25 September 2026, and the keys taken from
          commercial sites or from publishers reserving commercial use on
@@ -432,8 +435,8 @@ Composite bank-code map
          Dutch keys were added the same day as the schwifty import without
          coming from it); the Italian keys rebuilt on 29 September 2026 from
          the Banca d'Italia's LEI and the GLEIF Mapping Table, and the
-         Romanian keys rebuilt the same day from the BIC entries
-         (scripts/derive-map-keys.ts); and manual additions.
+         Romanian keys rebuilt the same day from the GLEIF rows of the BIC
+         entries (scripts/derive-map-keys.ts); and manual additions.
   Terms: both projects are distributed under the MIT License (copyright
          notices at the end of this file). Those licences do not grant
          rights that the national publishers have not granted, and the terms
@@ -600,12 +603,14 @@ reserving commercial use (removed on 29 September 2026)
          serves them either: the United Arab Emirates, Bosnia and
          Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and
          Türkiye answer that no bank-code data was consulted, and the Italian
-         and Romanian keys that open data rebuilds are listed in group B.
+         and Romanian keys that the Banca d'Italia and GLEIF rebuild are
+         listed in group B.
   ibancalculator.com, run by Telauges OÜ: the United Arab Emirates (56 keys),
          Bosnia and Herzegovina (25), Estonia (16), Georgia (20), Kazakhstan
-         (49), Moldova (9), Serbia (26), and the BICs of 219 Italian keys.
-         The data was obtained by sending invented IBANs to the site's
-         validator. Terms: none published; "Copyright © 2025 Telauges OÜ";
+         (49), Moldova (9), Serbia (26), and the codes and BICs of 219 Italian
+         keys. The keys of the seven countries were obtained by sending
+         invented IBANs to the site's validator; the Italian codes and BICs
+         were scraped from its bank-code page (blz.html). Terms: none published; "Copyright © 2025 Telauges OÜ";
          the site sells bulk access to these data.
          https://www.ibancalculator.com/contact.html
   iban.es: 242 Spanish keys. Terms: "Copyright © 2017 IBAN.es", no terms

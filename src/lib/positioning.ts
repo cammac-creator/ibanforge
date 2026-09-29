@@ -230,7 +230,7 @@ export function positioningLong(): string {
   const countries = datasetFacts().claim.countries;
   return (
     'IBANforge checks the bank behind an IBAN before you pay. ' +
-    `It validates IBANs from all ${countries} IBAN countries and names the bank and its BIC, with the source of that answer. ` +
+    `It validates IBANs from all ${countries} IBAN countries and, in all but ${UNLICENSED_MAP_COUNTRIES.size} of them, names the bank and its BIC, with the source of that answer. ` +
     `Where it reads the national register (${namesOf(authoritative)}), it also tells you whether the bank code is allocated at all; ` +
     'elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. ' +
     'For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), ' +

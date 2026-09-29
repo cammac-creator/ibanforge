@@ -53,25 +53,30 @@ n'est pas plus autorisé que la redistribution.
 | MD | 9 | ibancalculator.com (`generated_md`) | idem | aucun | idem, y compris par la recherche par préfixe |
 | RS | 26 | ibancalculator.com (`generated_rs`) | idem | aucun | idem |
 | TR | 48 | Türkiye Bankalar Birliği (`manual_tr`) | usage commercial soumis à l'accord écrit de la TBB (clause écrite) | aucun | idem |
-| IT | 219 | codes et BIC de ibancalculator.com (`generated_it`) | idem AE | **175 reconstruites** : code ABI → LEI (Banca d'Italia, CC BY 4.0) → BIC (GLEIF, table BIC↔LEI de SWIFT) ; 120 au même BIC, 55 à un BIC différent (souvent le BIC propre de la banque locale au lieu de celui de son organe central) | code reconstruit : le BIC reconstruit ; sinon (sans LEI, LEI sans BIC, plusieurs BIC sans siège unique, code hors registre) : pas de BIC, verdict du registre inchangé, ou `absent_from_reference_data` hors registre (Poste Italiane 07601) |
+| IT | 219 | codes et BIC de ibancalculator.com (`generated_it`) | site commercial, codes et BIC aspirés de sa page des codes banque (`blz.html`), aucune licence | **175 reconstruites** : code ABI → LEI (Banca d'Italia, CC BY 4.0) → BIC (GLEIF, table BIC↔LEI de SWIFT) ; 120 au même BIC, 55 à un BIC différent (souvent le BIC propre de la banque locale au lieu de celui de son organe central) | code reconstruit : le BIC reconstruit ; sinon (sans LEI, LEI sans BIC, plusieurs BIC sans siège unique, code hors registre) : pas de BIC, verdict du registre inchangé, ou `absent_from_reference_data` hors registre (Poste Italiane 07601) |
 | ES | 242 | iban.es (`generated_es`), lié à IBAN.com | site commercial, conditions d'IBAN.com contre la compilation d'annuaires | aucun (les 145 clés venues des fichiers nationaux par sigalor, et 4 ajouts manuels, restent) | `bic: null`, `not_in_register` / `absent_from_reference_data`, comme tout code absent de la carte |
-| RO | 46 | internationalmoneytransfers.org (`generated_ro`) | « Reproduction is prohibited » (clause écrite) | **34 reconstruites**, toutes au même BIC : le code roumain est `BIC[:4]`, un seul BIC8 de `bic_entries` y répond | code reconstruit : même réponse ; préfixe à plusieurs BIC8 (3) : la recherche par préfixe répond avec `candidates` ; préfixe absent de l'annuaire (9) : `absent_from_reference_data` |
+| RO | 46 | internationalmoneytransfers.org (`generated_ro`) | « Reproduction is prohibited » (clause écrite) | **23 reconstruites depuis GLEIF seul**, toutes au même BIC : le code roumain est `BIC[:4]`, un seul BIC8 roumain de GLEIF y répond. La copie SwiftCodes (groupe B, droits non établis) n'est jamais lue pour reconstruire | code reconstruit : même réponse ; sinon la recherche par préfixe de l'annuaire répond comme pour tout code roumain absent de la carte, en nommant sa source (SwiftCodes pour 12 codes au même BIC8, 2 préfixes ambigus avec `candidates`), ou `absent_from_reference_data` (9) |
 
 La règle de reconstruction ne regarde jamais l'ancienne valeur : une dérivation
 ambiguë ou vide retire la clé, même quand l'un des candidats était l'ancien BIC.
 Elle est écrite et testée dans `scripts/derive-map-keys.ts` ; la garde des huit
 pays retirés en entier est `UNLICENSED_MAP_COUNTRIES` (`src/lib/bic-lookup.ts`,
 test `src/lib/unlicensed-map.test.ts`). Mesure avant/après, code par code, par
-`scripts/audit/curated-map-replay.ts` : aucune réponse des 59 autres pays de la
-carte ne change. Attributions et citations : `NOTICE` (groupe A pour la Banca
+`scripts/audit/curated-map-replay.ts` : aucune réponse des 55 autres pays de la
+carte ne change ; en Slovénie, Lituanie, Hongrie et Croatie, seul `bic.source`
+change, pour porter la mention due (ci-dessous). Attributions et citations : `NOTICE` (groupe A pour la Banca
 d'Italia et GLEIF, groupe C pour les sources retirées).
 
 Hors de ce retrait, et inchangé : les pays dont l'inventaire n'a trouvé aucune
 condition publiée (NO, SE, LV, et les listes manuelles de schwifty sans source
 nommée : FR, PT, IT, IE, BG, GB, CR, GR, ME, CY, AD, ES, IS, IL, MC) restent dans
-la carte, en attendant la réponse des éditeurs à qui écrire là où il y en a un. SI, LT, HU et HR, dont les
-éditeurs autorisent la reproduction avec mention, entrent au groupe A de
-`NOTICE`.
+la carte, en attendant la réponse des éditeurs à qui écrire là où il y en a un ;
+l'Italie garde donc aussi ses 69 clés manuelles d'origine inconnue. SI, LT, HU
+et HR, dont les éditeurs autorisent la reproduction avec mention, entrent au
+groupe A de `NOTICE`, et chaque réponse tirée de leurs clés porte cette mention
+dans `bic.source` (« Vir: Banka Slovenije » avec la phrase de gratuité que
+demande Banka Slovenije, « Source: Lietuvos bankas », « Forrás: Magyar Nemzeti
+Bank », « Izvor: HNB »).
 
 ## Ce qui alimente `bic.sqlite`
 
@@ -306,7 +311,7 @@ Origines, relevées dans l'historique git et dans les scripts des projets amont 
 | schwifty (MIT), import du 08/04/2026 (`9e8e34a8`) | après les retraits du 25/09 et du 29/09 : NO, SI, CH, LT, HU, FR, PT, IT, SK, SE, CZ, IE, LV, BG, CR, GR, HR, GB, LI, DE, ME, CY, NL, AD, ES, IS, IL, MC | **pas seulement des registres nationaux** : fichiers de banques centrales pour une partie des pays (SI, LT, HU, HR, CZ, SK, DE, CH, LI, NL…), contributions manuelles sans source nommée pour d'autres (FR, PT, IT, IE, BG, GB…) ; les fichiers tirés de sites commerciaux (ibancalculator.com, iban.es) ou d'éditeurs qui réservent l'usage commercial (TBB, comparateur roumain) sont retirés le 29/09/2026, voir plus haut |
 | SIX BankMaster | CH | voir plus haut |
 | clés dérivées de `bic_entries` (`51f86e96`) | GB, IE, **SM**, **la plupart des clés NL** et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` (GLEIF, et SwiftCodes du groupe B). Les 11 clés SM sont des préfixes de BIC tirés de là, pas une donnée de la BCSM ni de schwifty (le code bancaire d'un IBAN saint-marinais compte six caractères, ces clés de quatre lettres ne servent probablement jamais) ; 729 des 735 clés NL ajoutées le jour de l'import schwifty viennent de ce mécanisme, pas de schwifty |
-| reconstruction du 29/09/2026 (`scripts/derive-map-keys.ts`) | IT (175 clés), RO (34 clés) | IT : LEI publié par la Banca d'Italia pour le code, puis BIC que GLEIF associe à ce LEI ; RO : le BIC8 unique de `bic_entries` qui commence par le code |
+| reconstruction du 29/09/2026 (`scripts/derive-map-keys.ts`) | IT (175 clés), RO (23 clés) | IT : LEI publié par la Banca d'Italia pour le code, puis BIC que GLEIF associe à ce LEI ; RO : le BIC8 roumain unique de GLEIF qui commence par le code. Jamais la copie SwiftCodes |
 | ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
 
 **Clés CZ, 25/09/2026** : les 36 clés tchèques ont été confrontées au číselník
@@ -1473,10 +1478,12 @@ générale. Seuls les jeux de dati.gov.it sont couverts.
   crédit à sa place. Même choix que « Zdroj: ČNB » dans le nom tchèque.
 - Le registre ne publie **aucun BIC** : pour un code en vigueur, le BIC servi
   reste celui de la carte composite (`basis: curated_map`), jamais inventé.
-  Depuis le 29/09/2026, la plupart de ces clés sont reconstruites depuis le LEI
-  que le registre publie et le BIC que GLEIF associe à ce LEI
-  (`scripts/derive-map-keys.ts`) ; un code sans LEI, ou dont le LEI n'a pas de
-  BIC unique, n'a pas de BIC plutôt qu'une correspondance sans source.
+  Depuis le 29/09/2026, les clés qui venaient d'ibancalculator.com sont
+  reconstruites depuis le LEI que le registre publie et le BIC que GLEIF associe
+  à ce LEI (`scripts/derive-map-keys.ts`) ; parmi elles, un code sans LEI, ou dont
+  le LEI n'a pas de BIC unique, n'a plus de BIC plutôt qu'une correspondance sans
+  source. Les autres clés italiennes (fichiers nationaux par sigalor, ajouts
+  manuels sans source nommée) sont inchangées.
 - Adresse servie : le siège légal **en Italie** (pour une banque étrangère, sa
   succursale italienne, l'entité titulaire du code) ; le LEI quand la Banca
   d'Italia le publie. Sur un code radié, le nom du dernier titulaire seulement.

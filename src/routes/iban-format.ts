@@ -71,7 +71,7 @@ function upgradeToFullValidation(): string {
   upgradeHint ??=
     'valid: true here means the IBAN is well formed (length, structure, mod-97), nothing more. ' +
     `POST /v1/iban/validate ($0.005, or keyless for the first ${REST_TRIAL_WEEKLY_LIMIT} calls a week per source address) ` +
-    'names the bank and its BIC with the source of that answer, SEPA and VoP readiness, and, ' +
+    'names the bank and its BIC with the source of that answer (where we hold bank-code data we may use), SEPA and VoP readiness, and, ' +
     `where it reads the national register (${codesOf(registerCountries().authoritative)}), ` +
     'whether the bank code is allocated at all. ' +
     // 24/09/2026: this route is the one an assistant that can only send GET

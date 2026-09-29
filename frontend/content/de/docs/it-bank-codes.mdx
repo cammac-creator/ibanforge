@@ -41,7 +41,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 }
 ```
 
-Der Name wird so geliefert, wie das Register ihn schreibt. Das Register veröffentlicht keinen BIC: Der `bic`-Block neben dem Urteil kommt weiterhin aus unserer zusammengesetzten Karte (`basis: "curated_map"`). Seit dem 29. September 2026 werden die meisten italienischen Schlüssel der Karte aus offenen Daten neu aufgebaut: der LEI, den die Banca d'Italia für den Code veröffentlicht, dann der BIC, den GLEIF diesem LEI zuordnet. Ein Code ohne LEI, oder dessen LEI bei GLEIF keinen eindeutigen BIC hat, erhält keinen `bic`-Block statt einer Zuordnung ohne belegbare Quelle.
+Der Name wird so geliefert, wie das Register ihn schreibt. Das Register veröffentlicht keinen BIC: Der `bic`-Block neben dem Urteil kommt weiterhin aus unserer zusammengesetzten Karte (`basis: "curated_map"`). Seit dem 29. September 2026 werden die italienischen Schlüssel der Karte, die von einer kommerziellen IBAN-Website stammten, aus offenen Daten neu aufgebaut: der LEI, den die Banca d'Italia für den Code veröffentlicht, dann der BIC, den GLEIF diesem LEI zuordnet. Unter ihnen erhält ein Code ohne LEI, oder dessen LEI bei GLEIF keinen eindeutigen BIC hat, keinen `bic`-Block statt einer Zuordnung ohne belegbare Quelle. Die übrigen italienischen Schlüssel der Karte, aus nationalen Dateien oder ohne genannte Quelle von Hand ergänzt, bleiben unverändert.
 
 ## Ein Code, den die Banca d'Italia gelöscht hat: zurückgezogen, mit Rechtsnachfolger, nie abgelehnt
 

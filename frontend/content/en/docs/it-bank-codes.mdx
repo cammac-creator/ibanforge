@@ -41,7 +41,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 }
 ```
 
-The name is served as the register writes it. The register publishes no BIC: the `bic` block beside the verdict still comes from our composite map (`basis: "curated_map"`). Since 29 September 2026, most of the map's Italian keys are rebuilt from open data: the LEI the Banca d'Italia publishes for the code, then the BIC GLEIF pairs with that LEI. A code without a LEI, or whose LEI GLEIF pairs with no single BIC, has no `bic` block rather than a pairing we could not source.
+The name is served as the register writes it. The register publishes no BIC: the `bic` block beside the verdict still comes from our composite map (`basis: "curated_map"`). Since 29 September 2026, the map's Italian keys that had come from a commercial IBAN site are rebuilt from open data: the LEI the Banca d'Italia publishes for the code, then the BIC GLEIF pairs with that LEI. Among those, a code without a LEI, or whose LEI GLEIF pairs with no single BIC, has no `bic` block rather than a pairing we could not source. The map's other Italian keys, taken from national files or added by hand without a named source, are unchanged.
 
 ## A code the Banca d'Italia has struck off: retired, with its legal successor, never refused
 

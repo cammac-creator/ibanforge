@@ -41,7 +41,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 }
 ```
 
-Le nom est servi tel que le registre l'écrit. Le registre ne publie aucun BIC : le bloc `bic` à côté du verdict vient toujours de notre carte composite (`basis: "curated_map"`). Depuis le 29 septembre 2026, la plupart des clés italiennes de la carte sont reconstruites depuis des données ouvertes : le LEI que la Banca d'Italia publie pour le code, puis le BIC que GLEIF associe à ce LEI. Un code sans LEI, ou dont le LEI n'a pas de BIC unique chez GLEIF, n'a pas de bloc `bic` plutôt qu'une correspondance dont la source nous manque.
+Le nom est servi tel que le registre l'écrit. Le registre ne publie aucun BIC : le bloc `bic` à côté du verdict vient toujours de notre carte composite (`basis: "curated_map"`). Depuis le 29 septembre 2026, les clés italiennes de la carte qui venaient d'un site commercial d'IBAN sont reconstruites depuis des données ouvertes : le LEI que la Banca d'Italia publie pour le code, puis le BIC que GLEIF associe à ce LEI. Parmi elles, un code sans LEI, ou dont le LEI n'a pas de BIC unique chez GLEIF, n'a pas de bloc `bic` plutôt qu'une correspondance dont la source nous manque. Les autres clés italiennes de la carte, tirées de fichiers nationaux ou ajoutées à la main sans source nommée, sont inchangées.
 
 ## Un code que la Banca d'Italia a radié : retiré, avec son successeur légal, jamais refusé
 
