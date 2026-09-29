@@ -71,7 +71,8 @@ export type FindingCode =
   | 'issuer_not_bank'
   | 'country_risk'
   | 'address_not_structured'
-  | 'verify_payee_name';
+  | 'verify_payee_name'
+  | 'bank_not_consulted';
 
 export type RowStatus = 'ok' | 'warning' | 'error';
 
@@ -462,6 +463,19 @@ export function auditTable(
             detail: `Bank code ${result.bank_code_check.value} is absent from the national register.`,
           });
         }
+        // 29/09/2026: a bank code nothing could be read against (no bank-code
+        // data we may use for the country, or a register not loaded) says
+        // nothing about the bank. A line without any other finding used to come
+        // out `ok`, which a reader takes for a checked bank.
+        if (result.bank_code_check?.status === 'unavailable') {
+          findings.push({
+            code: 'bank_not_consulted',
+            detail:
+              result.bank_code_check.reason === 'no_reference_data_for_country'
+                ? `No bank-code data we may use for ${row.country}: the bank behind code ${result.bank_code_check.value} was not identified.`
+                : `The reference data for bank code ${result.bank_code_check.value} could not be consulted.`,
+          });
+        }
         if (result.modulus_check && result.modulus_check.passed === false) {
           findings.push({
             code: 'modulus_check_failed',
@@ -632,6 +646,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     country_risk: 'Elevated country risk',
     address_not_structured: 'Address not structured (ISO 20022)',
     verify_payee_name: 'Verify the payee name (VoP)',
+    bank_not_consulted: 'Bank not consulted',
   },
   fr: {
     iban_missing: 'IBAN manquant',
@@ -648,6 +663,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     country_risk: 'Risque pays élevé',
     address_not_structured: 'Adresse non structurée (ISO 20022)',
     verify_payee_name: 'Vérifier le nom du bénéficiaire (VoP)',
+    bank_not_consulted: 'Banque non consultée',
   },
   de: {
     iban_missing: 'IBAN fehlt',
@@ -664,6 +680,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     country_risk: 'Erhöhtes Länderrisiko',
     address_not_structured: 'Adresse nicht strukturiert (ISO 20022)',
     verify_payee_name: 'Empfängernamen prüfen (VoP)',
+    bank_not_consulted: 'Bank nicht geprüft',
   },
 };
 

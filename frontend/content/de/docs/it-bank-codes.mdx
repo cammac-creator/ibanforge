@@ -41,7 +41,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 }
 ```
 
-Der Name wird so geliefert, wie das Register ihn schreibt. Das Register veröffentlicht keinen BIC: Der `bic`-Block neben dem Urteil kommt weiterhin aus unserer zusammengesetzten Karte (`basis: "curated_map"`).
+Der Name wird so geliefert, wie das Register ihn schreibt. Das Register veröffentlicht keinen BIC: Der `bic`-Block neben dem Urteil kommt weiterhin aus unserer zusammengesetzten Karte (`basis: "curated_map"`). Seit dem 29. September 2026 werden die italienischen Schlüssel der Karte, die von einer kommerziellen IBAN-Website stammten, aus offenen Daten neu aufgebaut: der LEI, den die Banca d'Italia für den Code veröffentlicht, dann der BIC, den GLEIF diesem LEI zuordnet. Unter ihnen erhält ein Code ohne LEI, oder dessen LEI bei GLEIF keinen eindeutigen BIC hat, keinen `bic`-Block statt einer Zuordnung ohne belegbare Quelle. Die übrigen italienischen Schlüssel der Karte, aus nationalen Dateien oder ohne genannte Quelle von Hand ergänzt, bleiben unverändert.
 
 ## Ein Code, den die Banca d'Italia gelöscht hat: zurückgezogen, mit Rechtsnachfolger, nie abgelehnt
 
@@ -82,7 +82,7 @@ Das offizielle italienische Beispiel des ISO-13616-Registers, `IT60 X054 2811 10
 
 ## Ein Code, den die Register nicht führen: die bisherige Antwort, nie „nicht vergeben“
 
-Die Banca d'Italia führt die Institute, die sie einträgt, nicht die Vergabe des ABI-Coderaums. **Poste Italiane (07601)**, die **Banca d'Italia selbst (01000)** und die italienischen Zweigniederlassungen europäischer Zahlungsinstitute (**Qonto, 36092**) geben echte italienische IBAN außerhalb dieser Register aus. Ein italienischer Code, den die Register nicht führen, erhält daher genau die bisherige Antwort: unsere zusammengesetzte Karte, `authoritative: false`, und nie `not_allocated`.
+Die Banca d'Italia führt die Institute, die sie einträgt, nicht die Vergabe des ABI-Coderaums. **Poste Italiane (07601)**, die **Banca d'Italia selbst (01000)** und die italienischen Zweigniederlassungen europäischer Zahlungsinstitute (**Qonto, 36092**) geben echte italienische IBAN außerhalb dieser Register aus. Ein italienischer Code, den die Register nicht führen, erhält daher die Antwort unserer zusammengesetzten Karte: seinen BIC, wo die Karte einen führt (so beim Code 01000 der Banca d'Italia und bei 36092 von Qonto), sonst `absent_from_reference_data`, `authoritative: false`, und nie `not_allocated`. Die 07601 der Poste Italiane fällt seit dem 29. September 2026 in den zweiten Fall: Die Zuordnung, die wir hatten, stammte aus einer Quelle, die keine Weiterverwendung gestattet.
 
 ## Was die Register veröffentlichen
 

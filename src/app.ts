@@ -89,6 +89,7 @@ import {
   CANNOT_CALL_TITLE,
   NOT_WHAT_IT_IS,
   SEPA_VOP_LINE,
+  otherCountriesLine,
   cannotCallJson,
   cannotCallLines,
   packSummary,
@@ -448,7 +449,7 @@ function buildLlmsTxt(): string {
     '- Poland: the check digit of the eight-digit settlement number.',
     '- Netherlands: whether the four-letter identifier belongs to a provider on the Betaalvereniging Nederland list of IBAN-issuing institutions (a voluntary list, so an absence is not a refusal).',
     SEPA_VOP_LINE,
-    '- Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`.',
+    otherCountriesLine(),
   ].join('\n');
   // Card first, x402 as the option it is (brief of 24/09/2026): every figure
   // below is read from the constant the checkout or the paywall applies.

@@ -11,6 +11,7 @@ import { validateIBAN } from './iban.js';
 import { validateBIC } from './bic-validator.js';
 import {
   RESTRICTED_DIRECTORY_NOTE,
+  UNLICENSED_MAP_COUNTRIES,
   bicCountryName,
   lookup,
   namedRow,
@@ -160,6 +161,13 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
   // the correct one the only one.
   const countryRisk = countryCode ? getCountryRisk(countryCode) : 'standard';
   const isTestBic = result.risk_indicators?.test_bic ?? false;
+  // No bank because the country's bank-code data was withdrawn for want of a
+  // licence (29/09/2026): the bank axis cannot be screened, and the score is
+  // held at elevated rather than left to add up to `low`.
+  const bankCodeDataUnavailable =
+    bic8 === null &&
+    result.bank_code_check?.reason === 'no_reference_data_for_country' &&
+    UNLICENSED_MAP_COUNTRIES.has(countryCode);
 
   let compliance: ComplianceResult;
   try {
@@ -171,6 +179,7 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
       countryRisk,
       isTestBic,
       bankCode,
+      bankCodeDataUnavailable,
     );
   } catch {
     // The database is unreachable, which is a different thing from an IBAN we
@@ -185,6 +194,7 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
       countryRisk,
       isTestBic,
       bankCode,
+      bankCodeDataUnavailable,
     );
   }
 

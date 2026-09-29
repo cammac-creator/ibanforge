@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-25",
+ "generated_at": "2026-09-29",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -104,29 +104,20 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
      "code": "AE",
      "name": "United Arab Emirates"
     },
-    "bic": {
-     "code": "BOMLAEADXXX",
-     "bic8": "BOMLAEAD",
-     "bank_name": "MASHREQBANK PSC",
-     "city": "DUBAI",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "5493000SA3K24EQKA103"
-    },
+    "bic": null,
     "bank_code_check": {
      "value": "033",
-     "status": "verified",
-     "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
+     "match": null,
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09"
     },
@@ -134,11 +125,7 @@
      "member": false,
      "vop_required": false
     },
-    "issuer": {
-     "type": "bank",
-     "name": "MASHREQBANK PSC",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "standard",
      "sepa_reachable": false,
@@ -335,7 +322,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
@@ -345,10 +332,10 @@
     "bic": null,
     "bank_code_check": {
      "value": "129",
-     "status": "not_in_register",
-     "reason": "absent_from_reference_data",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
      "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09"
     },
@@ -1323,29 +1310,20 @@
     ],
     "vop_required": true
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
      "code": "EE",
      "name": "Estonia"
     },
-    "bic": {
-     "code": "HABAEE2XXXX",
-     "bic8": "HABAEE2X",
-     "bank_name": "SWEDBANK AS",
-     "city": "TALLINN",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "549300PHQZ4HL15HH975"
-    },
+    "bic": null,
     "bank_code_check": {
      "value": "22",
-     "status": "verified",
-     "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
+     "match": null,
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09"
     },
@@ -1353,11 +1331,7 @@
      "member": true,
      "vop_required": true
     },
-    "issuer": {
-     "type": "bank",
-     "name": "SWEDBANK AS",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "standard",
      "sepa_reachable": true,
@@ -1848,29 +1822,20 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
      "code": "GE",
      "name": "Georgia"
     },
-    "bic": {
-     "code": "BNLNGE22XXX",
-     "bic8": "BNLNGE22",
-     "bank_name": "საქართველოს ეროვნული ბანკი",
-     "city": "თბილისი",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "254900MHQHBC58M2GR84"
-    },
+    "bic": null,
     "bank_code_check": {
      "value": "NB",
-     "status": "verified",
-     "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
+     "match": null,
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09"
     },
@@ -1878,11 +1843,7 @@
      "member": false,
      "vop_required": false
     },
-    "issuer": {
-     "type": "bank",
-     "name": "საქართველოს ეროვნული ბანკი",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "standard",
      "sepa_reachable": false,
@@ -2254,7 +2215,7 @@
      "bic8": "NBHRHR2X",
      "bank_name": "Hrvatska narodna banka",
      "city": "Zagreb",
-     "source": "IBANforge curated bank-code map",
+     "source": "IBANforge curated bank-code map; Izvor: HNB",
      "as_of": "2026-09",
      "basis": "curated_map",
      "authoritative": false,
@@ -2330,7 +2291,7 @@
      "bic8": "OTPVHUHB",
      "bank_name": "OTP Bank Nyrt.",
      "city": "Budapest",
-     "source": "IBANforge curated bank-code map",
+     "source": "IBANforge curated bank-code map; Forrás: Magyar Nemzeti Bank",
      "as_of": "2026-09",
      "basis": "curated_map",
      "authoritative": false,
@@ -2884,29 +2845,20 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
      "code": "KZ",
      "name": "Kazakhstan"
     },
-    "bic": {
-     "code": "NBRKKZKXXXX",
-     "bic8": "NBRKKZKX",
-     "bank_name": "Республиканское государственное учреждение \"Национальный Банк Республики Казахстан\"",
-     "city": "город Нур-Султан",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "5493001XNTPYS3WWQO58"
-    },
+    "bic": null,
     "bank_code_check": {
      "value": "125",
-     "status": "verified",
-     "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
+     "match": null,
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09"
     },
@@ -2914,11 +2866,7 @@
      "member": false,
      "vop_required": false
     },
-    "issuer": {
-     "type": "bank",
-     "name": "Республиканское государственное учреждение \"Национальный Банк Республики Казахстан\"",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "elevated",
      "sepa_reachable": false,
@@ -3437,42 +3385,28 @@
     ],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
      "code": "MD",
      "name": "Moldova"
     },
-    "bic": {
-     "code": "AGRNMD2X",
-     "bic8": "AGRNMD2X",
-     "bank_name": "Banca Comerciala\"MOLDOVA-AGROINDBANK\"S.A.",
-     "city": "Chisinau",
-     "source": "GLEIF LEI-to-BIC mapping",
-     "as_of": "2026-09",
-     "basis": "directory_prefix",
-     "authoritative": false,
-     "lei": "254900B52ULZDEBJ3043"
-    },
+    "bic": null,
     "bank_code_check": {
      "value": "AG",
-     "status": "verified",
-     "match": "prefix",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
+     "match": null,
+     "register": null,
      "authoritative": false,
-     "candidates": 2,
      "as_of": "2026-09"
     },
     "sepa": {
      "member": true,
      "vop_required": false
     },
-    "issuer": {
-     "type": "bank",
-     "name": "Banca Comerciala\"MOLDOVA-AGROINDBANK\"S.A.",
-     "classification": "default"
-    },
+    "issuer": null,
     "risk_indicators": {
      "country_risk": "standard",
      "sepa_reachable": true,
@@ -4501,7 +4435,7 @@
     ],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
@@ -4511,10 +4445,10 @@
     "bic": null,
     "bank_code_check": {
      "value": "260",
-     "status": "not_in_register",
-     "reason": "absent_from_reference_data",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
      "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09"
     },
@@ -4882,7 +4816,7 @@
      "bic8": "SZKBSI2X",
      "bank_name": "DEŽELNA BANKA SLOVENIJE d.d.",
      "city": "Ljubljana",
-     "source": "IBANforge curated bank-code map",
+     "source": "IBANforge curated bank-code map; Vir: Banka Slovenije. This information is available free of charge on the Banka Slovenije website (www.bsi.si).",
      "as_of": "2026-09",
      "basis": "curated_map",
      "authoritative": false,
@@ -5367,7 +5301,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": null,
    "api": {
     "valid": true,
     "country": {
@@ -5377,10 +5311,10 @@
     "bic": null,
     "bank_code_check": {
      "value": "00061",
-     "status": "not_in_register",
-     "reason": "absent_from_reference_data",
+     "status": "unavailable",
+     "reason": "no_reference_data_for_country",
      "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "register": null,
      "authoritative": false,
      "as_of": "2026-09"
     },

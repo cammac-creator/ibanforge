@@ -33,10 +33,14 @@ const { dbDir, previousPath, blankedAbi } = await vi.hoisted(async () => {
   // Une ligne qui ne nomme personne, et une ligne dont la ville est vide.
   insert.run('XMPLITN1', 'XMPLITN1XXX', '', 'Roma');
   insert.run('XMPLITC1', 'XMPLITC1XXX', 'BANCA DI ESEMPIO SPA', '');
-  // Le chemin de la validation : une clé italienne de la carte composite, sans
-  // ville dans la carte, dont la ligne de description est PUBLIQUE (copie
-  // figée du répertoire SWIFT). Dans cette copie seulement, sa ville est vidée,
-  // comme la liste STEP2 laisse les siennes.
+  // Le chemin de la validation : une clé britannique de la carte composite,
+  // dérivée de l'annuaire (le code bancaire est le début du BIC), sans ville
+  // dans la carte, dont la ligne de description est PUBLIQUE (copie figée du
+  // répertoire SWIFT). Dans cette copie seulement, sa ville est vidée, comme la
+  // liste STEP2 laisse les siennes. Le Royaume-Uni plutôt que l'Italie depuis
+  // le 29/09/2026 : les seules clés italiennes hors du registre de la Banca
+  // d'Italia qui restent dans la carte sont décrites par GLEIF, pas par la
+  // copie figée ; et aucun registre britannique ne répond à la place de la carte.
   const map = JSON.parse(readFileSync(resolve(here, '../db/bic_data.json'), 'utf8')) as Record<
     string,
     { bic: string; city?: string }
@@ -44,23 +48,9 @@ const { dbDir, previousPath, blankedAbi } = await vi.hoisted(async () => {
   const byBic11 = db.prepare(
     "SELECT bic11 FROM bic_entries WHERE bic11 = ? AND source = 'swiftcodes' AND city != ''",
   );
-  // Un code que le registre italien ne connaît pas (25/09/2026) : ailleurs, la
-  // Banca d'Italia nomme le titulaire (`confirmed`) ou dit le code radié, et la
-  // réponse ne passe plus par la seule carte composite que ce test décrit.
-  const known = new Set(
-    (
-      db
-        .prepare(
-          `SELECT code FROM national_bank_codes WHERE country = 'IT'
-           UNION SELECT code FROM national_bank_codes_retired WHERE country = 'IT'`,
-        )
-        .all() as Array<{ code: string }>
-    ).map((r) => r.code),
-  );
   let abi: string | null = null;
   for (const [key, entry] of Object.entries(map)) {
-    if (!/^IT:\d{5}$/.test(key) || entry.city || entry.bic.length !== 11) continue;
-    if (known.has(key.slice(3))) continue;
+    if (!/^GB:[A-Z]{4}$/.test(key) || entry.city || entry.bic.length !== 11) continue;
     if (!byBic11.get(entry.bic)) continue;
     db.prepare("UPDATE bic_entries SET city = '' WHERE bic11 = ?").run(entry.bic);
     abi = key.slice(3);
@@ -175,8 +165,8 @@ describe('GET /v1/bic/:code: complete or not found', () => {
 
 describe('the validation bic block never serves an empty string', () => {
   it('a curated-map answer whose directory row leaves the town blank is inferred and serves city null', () => {
-    expect(blankedAbi, 'no Italian curated key with a public description row').not.toBeNull();
-    const r = validateIBAN(ibanFor('IT', `X${blankedAbi}11101000000123456`));
+    expect(blankedAbi, 'no British curated key with a public description row').not.toBeNull();
+    const r = validateIBAN(ibanFor('GB', `${blankedAbi}20000012345678`));
     enrichResult(r);
     expect(r.valid).toBe(true);
     expect(r.bic?.basis).toBe('curated_map');

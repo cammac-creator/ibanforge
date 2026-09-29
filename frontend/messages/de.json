@@ -270,7 +270,7 @@
       "q0": "Prüft IBANforge, wer Inhaber des Kontos ist?",
       "a0": "Nein. Es prüft die IBAN und die Bank dahinter. Der Abgleich des Kontoinhabernamens ist die Empfängerüberprüfung (VoP), die die Bank des Empfängers durchführt.",
       "q1": "Welche Länder erhalten ein Urteil aus dem nationalen Register?",
-      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: Dort entscheidet das nationale Register, ob eine Bankleitzahl vergeben ist. In den übrigen Ländern nennt die Antwort die Bank aus einem Teilregister oder einer zusammengesetzten Karte und sagt, dass sie einen Code nicht ausschließen kann.",
+      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: Dort entscheidet das nationale Register, ob eine Bankleitzahl vergeben ist. In den übrigen Ländern nennt die Antwort die Bank aus einem Teilregister oder einer zusammengesetzten Karte und sagt, dass sie einen Code nicht ausschließen kann. Für AE, BA, EE, GE, KZ, MD, RS und TR haben wir keine weiterverwendbaren Bankleitzahl-Daten: Die Antwort sagt, dass die Bank nicht geprüft wurde.",
       "q2": "Kann ich es ohne Anmeldung testen?",
       "a2": "Ja. Ganz ohne Schlüssel beantwortet POST /v1/iban/validate bis zu {trialWeekly} Validierungen pro Woche je Adresse, vollständig.",
       "q3": "Was bringt ein kostenloser Schlüssel?",
@@ -2081,7 +2081,7 @@
         },
         "bankCode": {
           "label": "Bankcode gegen das nationale Register geprüft (fehlt er dort, ist er nicht vergeben)",
-          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM und LU, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false.",
+          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM und LU, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false; keine für AE, BA, EE, GE, KZ, MD, RS und TR, als nicht geprüft gekennzeichnet.",
           "ibancom": "Von uns nicht geprüft",
           "ibanapi": "Laut ihrer Startseite (24. September 2026): Der Bankcode der IBAN wird mit ihrem eigenen Bankregister abgeglichen (Zentralbanken, SEPA-Daten und manuelle Prüfung). Ob ein dort fehlender Code nicht vergeben ist: von uns nicht geprüft.",
           "libs": "Je nach Bibliothek: schwifty lehnt einen Bankcode ab, den sein mitgeliefertes Register nicht kennt. Andere von uns nicht geprüft.",
@@ -2527,7 +2527,8 @@
       "duplicate": "Doppelte IBAN",
       "issuer_not_bank": "Konto bei einem Zahlungsinstitut, nicht bei einer Bank",
       "country_risk": "Erhöhtes Länderrisiko",
-      "address_not_structured": "Adresse nicht strukturiert (ISO 20022)"
+      "address_not_structured": "Adresse nicht strukturiert (ISO 20022)",
+      "bank_not_consulted": "Bank nicht geprüft"
     },
     "pay": {
       "title": "Kommentierte Arbeitsmappe erhalten: {price} $ für {rows} Zeilen",
@@ -2963,7 +2964,7 @@
       "vopYes": "Pflicht für die Anbieter des Landes",
       "vopNo": "bis heute keine Pflicht",
       "register": "Bankleitzahlen-Register",
-      "registerNone": "kein veröffentlichtes Register: nur Aufbau und Prüfziffern",
+      "registerNone": "keine weiterverwendbaren Bankleitzahl-Daten: nur Aufbau und Prüfziffern",
       "registerComposite": "IBANforge-Verbundkarte, aus BIC-Verzeichnissen zusammengesetzt (kein nationales Register)"
     },
     "checksTitle": "Was die API an einer IBAN aus {country} prüft",
@@ -2971,7 +2972,7 @@
       "structure": "Die Länge, den Zeichensatz jedes Feldes und die Prüfziffern nach mod 97.",
       "bankNational": "Die Bankleitzahl gegen {register}, monatlich aufgefrischt: Institut, zugehöriger BIC, Status.",
       "bankComposite": "Die Bankleitzahl gegen unsere Verbundkarte aus BIC-Verzeichnissen: BIC und Bankname, wenn sie dort stehen, ohne das Gewicht eines nationalen Registers.",
-      "bankNone": "Für dieses Land wird kein Bankleitzahlen-Register veröffentlicht: über den Aufbau hinaus kann die API nicht sagen, ob die Bankleitzahl existiert.",
+      "bankNone": "IBANforge hält für dieses Land keine Bankleitzahl-Daten, die es weiterverwenden darf: Über den Aufbau hinaus kann die API nicht sagen, ob die Bankleitzahl existiert, und antwortet, dass der Code nicht geprüft wurde.",
       "sepa": "Die SEPA-Erreichbarkeit des Landes und die offenen Verfahren ({schemes}).",
       "sepaOut": "Das Land liegt ausserhalb von SEPA: eine SEPA-Überweisung erreicht dieses Konto nicht.",
       "vop": "Die Pflicht zur Empfängerprüfung, die für die Anbieter des Landes gilt oder nicht gilt."

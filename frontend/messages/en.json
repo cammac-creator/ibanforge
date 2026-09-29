@@ -270,7 +270,7 @@
       "q0": "Does IBANforge check who holds the account?",
       "a0": "No. It checks the IBAN and the bank behind it. Matching the name of the account holder is the Verification of Payee check, made by the payee’s bank.",
       "q1": "Which countries get a verdict from the national register?",
-      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: there the national register settles whether a bank code is allocated. In the other countries the answer names the bank from a partial register or a composite map, and says that it cannot rule a code out.",
+      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: there the national register settles whether a bank code is allocated. In the other countries the answer names the bank from a partial register or a composite map, and says that it cannot rule a code out. For AE, BA, EE, GE, KZ, MD, RS and TR we hold no bank-code data we may reuse: the answer says the bank was not consulted.",
       "q2": "Can I try it without signing up?",
       "a2": "Yes. Without any key, POST /v1/iban/validate answers up to {trialWeekly} validations a week from each address, in full.",
       "q3": "What does a free key give me?",
@@ -2081,7 +2081,7 @@
         },
         "bankCode": {
           "label": "Bank code checked against the national register (a miss means not allocated)",
-          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: the national register itself. Partial lists in FI, SM and LU, where a miss is not a refusal. Elsewhere a composite map, answered with authoritative: false.",
+          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: the national register itself. Partial lists in FI, SM and LU, where a miss is not a refusal. Elsewhere a composite map, answered with authoritative: false; none for AE, BA, EE, GE, KZ, MD, RS and TR, answered as not consulted.",
           "ibancom": "Not checked by us",
           "ibanapi": "Announced on their home page (24 September 2026): the bank code in the IBAN is resolved against their own bank registry (central banks, SEPA data and manual review). Whether a code missing from it means not allocated: not checked by us.",
           "libs": "Varies by library: schwifty rejects a bank code unknown to its bundled registry. Others not checked by us.",
@@ -2527,7 +2527,8 @@
       "duplicate": "Duplicate IBAN",
       "issuer_not_bank": "Held at a payment institution, not a bank",
       "country_risk": "Elevated country risk",
-      "address_not_structured": "Address not structured (ISO 20022)"
+      "address_not_structured": "Address not structured (ISO 20022)",
+      "bank_not_consulted": "Bank not consulted"
     },
     "pay": {
       "title": "Get the annotated workbook: ${price} for {rows} rows",
@@ -2963,7 +2964,7 @@
       "vopYes": "mandatory for the country's providers",
       "vopNo": "no duty to date",
       "register": "Bank-code register",
-      "registerNone": "no published register: structure and check digits only",
+      "registerNone": "no bank-code data we may reuse: structure and check digits only",
       "registerComposite": "IBANforge composite map, assembled from BIC directories (not a national register)"
     },
     "checksTitle": "What the API checks on a {country} IBAN",
@@ -2971,7 +2972,7 @@
       "structure": "The length, the charset of every field and the mod-97 check digits.",
       "bankNational": "The bank code against {register}, refreshed monthly: institution, matching BIC, status.",
       "bankComposite": "The bank code against our composite map assembled from BIC directories: a BIC and a bank name when they are listed, without the weight of a national register.",
-      "bankNone": "No bank-code register is published for this country: beyond the structure, the API cannot say whether the bank code exists.",
+      "bankNone": "IBANforge holds no bank-code data it may reuse for this country: beyond the structure, the API cannot say whether the bank code exists, and answers that the code was not consulted.",
       "sepa": "The country's SEPA reachability and the open schemes ({schemes}).",
       "sepaOut": "The country is outside SEPA: a SEPA transfer will not reach this account.",
       "vop": "The Verification of Payee duty that does, or does not, bind the country's providers."

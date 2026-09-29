@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildBicComplianceResponse, buildComplianceResponse } from './compliance-response.js';
 import { buildComplianceResult } from './compliance.js';
 import { getCountryRisk } from './countries.js';
+import { UNLICENSED_MAP_COUNTRIES } from './bic-lookup.js';
 
 /**
  * The defect these tests exist for, measured on production 28/07/2026:
@@ -138,6 +139,11 @@ describe('buildComplianceResponse: honest names, and a flag that carries no weig
         getCountryRisk(r.country!.code),
         r.risk_indicators?.test_bic ?? false,
         legacyConfidence(r),
+        // The withdrawn-data floor (29/09/2026) is its own input, the same on
+        // both sides: this test is about the inferred flag's weight.
+        !r.bic &&
+          r.bank_code_check?.reason === 'no_reference_data_for_country' &&
+          UNLICENSED_MAP_COUNTRIES.has(r.country!.code),
       );
       expect(r.compliance.risk_score, iban).toBe(legacy.risk_score);
       expect(r.compliance.risk_level, iban).toBe(legacy.risk_level);

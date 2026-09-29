@@ -1,7 +1,7 @@
 import { datasetFacts } from './dataset-facts.js';
 import { registerCoverage, structuralRuleCountries } from './enrich.js';
 import { IBAN_LENGTHS, getCountryName } from './countries.js';
-import { getSourceFreshness } from './bic-lookup.js';
+import { UNLICENSED_MAP_COUNTRIES, getSourceFreshness } from './bic-lookup.js';
 import { LU_SOURCE, luRegisterConfigured } from './lu-register.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET } from './trial.js';
 import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
@@ -230,7 +230,7 @@ export function positioningLong(): string {
   const countries = datasetFacts().claim.countries;
   return (
     'IBANforge checks the bank behind an IBAN before you pay. ' +
-    `It validates IBANs from all ${countries} IBAN countries and names the bank and its BIC, with the source of that answer. ` +
+    `It validates IBANs from all ${countries} IBAN countries and, in all but ${UNLICENSED_MAP_COUNTRIES.size} of them, names the bank and its BIC, with the source of that answer. ` +
     `Where it reads the national register (${namesOf(authoritative)}), it also tells you whether the bank code is allocated at all; ` +
     'elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. ' +
     'For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), ' +
@@ -452,6 +452,23 @@ export const BANK_LEVEL_SANCTIONS =
  */
 export const SEPA_VOP_LINE =
   '- Every SEPA bank we resolve: whether the EPC Verification of Payee register lists it as ready (a bank absent from that register comes back `false`, which does not prove it ignores VoP requests); SCT, SCT Inst and SDD reachability from the EPC scheme registers where they list the bank (`sepa.basis: "epc_register"`), the country\'s schemes otherwise (`sepa.basis: "country_default"`).';
+
+/**
+ * The last line of the "country by country" block, word for word in the API
+ * llms.txt and the two site llms files (positioning.test.ts holds them).
+ *
+ * Since 29/09/2026 it names the countries the composite map no longer covers
+ * at all (UNLICENSED_MAP_COUNTRIES in bic-lookup.ts): every key we held for
+ * them came from a source that grants no right to reuse it. Read from the
+ * constant, so a country leaving or joining that set changes the sentence.
+ */
+export function otherCountriesLine(): string {
+  const none = [...UNLICENSED_MAP_COUNTRIES].sort();
+  return (
+    '- Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`; ' +
+    `for ${namesOf(none)}, structure and mod-97 only: we hold no bank-code data we may reuse there, so \`bank_code_check\` answers \`unavailable\` and \`bic\` is null.`
+  );
+}
 
 /**
  * The prepaid packs in one phrase, from the price list GET /v1/credits/bundles

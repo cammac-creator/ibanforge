@@ -95,7 +95,9 @@ describe('the validation bic block', () => {
       'FR1420041010050500013M02606',
       'GB29NWBK60161331926819',
       'NO9386011117947',
-      'AE070331234567890123456',
+      // Hors SEPA, clé de la carte dérivée de l'annuaire. C'était un IBAN
+      // émirien jusqu'au retrait du 29/09/2026 (UNLICENSED_MAP_COUNTRIES).
+      'JO94CBJO0010000000000131000302',
     ];
     let traced = 0;
     for (const iban of ibans) {

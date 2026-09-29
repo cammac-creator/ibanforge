@@ -65,7 +65,11 @@ describe('curated bank-code map', () => {
     // 25/09/2026 : 18 467 clés dans 70 pays après le retrait des clés AT, BE,
     // LU, PL et FI (famille sous conditions, NOTICE groupe C) ; plancher abaissé
     // en conséquence, toujours assez haut pour qu'une perte massive se voie.
-    expect(audit.total).toBeGreaterThan(18_000);
-    expect(audit.countries).toBeGreaterThanOrEqual(70);
+    // 29/09/2026: 17,909 keys in 62 countries after the withdrawal of the keys
+    // no publisher granted (UNLICENSED_MAP_COUNTRIES, part of IT and ES; IT and
+    // RO rebuilt from the Banca d'Italia and GLEIF by scripts/derive-map-keys.ts).
+    // Floor lowered again, for the same reason.
+    expect(audit.total).toBeGreaterThan(17_500);
+    expect(audit.countries).toBeGreaterThanOrEqual(62);
   });
 });

@@ -12,6 +12,7 @@ import {
   positioningOneLine,
   registerCountries,
   SEPA_VOP_LINE,
+  otherCountriesLine,
   shareInWords,
 } from './positioning.js';
 import { buildRouteTable } from '../middleware/x402.js';
@@ -264,6 +265,17 @@ describe('the static surfaces say what the code says', () => {
     '%s carries the SEPA and VoP line the API serves',
     (rel) => {
       expect(read(rel)).toContain(SEPA_VOP_LINE);
+    },
+  );
+
+  // 29/09/2026: the countries the composite map no longer covers are named in
+  // the last line; a static copy that kept the old sentence would announce a
+  // BIC map for them.
+  it.each(['frontend/public/llms.txt', 'frontend/public/llms-full.txt'])(
+    '%s carries the line for every other country the API serves, the uncovered ones named',
+    (rel) => {
+      expect(read(rel)).toContain(otherCountriesLine());
+      expect(otherCountriesLine()).toContain('Türkiye');
     },
   );
 });

@@ -71,7 +71,7 @@ describe('sepa.bank_reachability', () => {
 
   it('a non-SEPA country never gets bank_reachability, even when its BIC8 is in an EPC register', () => {
     forced.listedEverywhere = true;
-    const r = enriched('AE070331234567890123456');
+    const r = enriched('JO94CBJO0010000000000131000302');
     expect(r.sepa?.member).toBe(false);
     expect(r.bic?.code).toBeTruthy();
     expect(r.sepa).not.toHaveProperty('bank_reachability');

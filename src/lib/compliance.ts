@@ -227,6 +227,16 @@ export type BankCodeConfidence = 'confirmed' | 'inferred' | 'unverified' | 'deni
 /** Le score minimal d'une banque résolue qu'aucune liste de sanctions n'a pu contrôler. */
 export const SANCTIONS_LISTS_UNAVAILABLE_FLOOR = 50;
 
+/**
+ * The floor of an IBAN whose bank we hold no data to resolve because the only
+ * data we had was withdrawn for want of a licence (29/09/2026,
+ * UNLICENSED_MAP_COUNTRIES in bic-lookup.ts). Until then these IBANs named a
+ * bank, which the sanctions lists screened; without it the bank axis is
+ * silent, and a silence must not add up to `low`. Same reasoning, same value
+ * as SANCTIONS_LISTS_UNAVAILABLE_FLOOR.
+ */
+export const BANK_CODE_DATA_UNAVAILABLE_FLOOR = 50;
+
 export function calculateRiskScore(
   sanctions: SanctionsCheck,
   reachability: ReachabilityCheck,
@@ -248,6 +258,13 @@ export function calculateRiskScore(
    * banque a été passée aux listes chargées.
    */
   unscreenedLists: readonly string[] = [],
+  /**
+   * No bank could be resolved because we hold no bank-code data we may use for
+   * this country (bank_code_check reason `no_reference_data_for_country` for a
+   * country of UNLICENSED_MAP_COUNTRIES). The caller decides; see
+   * BANK_CODE_DATA_UNAVAILABLE_FLOOR.
+   */
+  bankCodeDataUnavailable: boolean = false,
 ): { risk_score: number; risk_level: ScoredRiskLevel; flags: string[] } {
   let score = 0;
   const flags: string[] = [];
@@ -390,6 +407,13 @@ export function calculateRiskScore(
     flags.push('sanctions_lists_unavailable');
     score = Math.max(score, SANCTIONS_LISTS_UNAVAILABLE_FLOOR);
   }
+  // No bank to screen because the country's bank-code data was withdrawn: a
+  // floor, not a weight, exactly like the one above. Only without a resolved
+  // bank: a bank that did resolve was screened (or raised the floor above).
+  if (bankCodeDataUnavailable && !bankResolved) {
+    flags.push('bank_code_data_unavailable');
+    score = Math.max(score, BANK_CODE_DATA_UNAVAILABLE_FLOOR);
+  }
   return { risk_score: score, risk_level: levelOf(score), flags };
 }
 
@@ -438,6 +462,7 @@ export function unreadableComplianceResult(
   countryRisk: string,
   isTestBic: boolean,
   bankCode: BankCodeConfidence = 'confirmed',
+  bankCodeDataUnavailable: boolean = false,
 ): ComplianceResult {
   const attempt = <T>(...tries: Array<() => T>): T | null => {
     for (const t of tries) {
@@ -481,6 +506,7 @@ export function unreadableComplianceResult(
     bankCode,
     bic8 !== null,
     attempt(() => unscreenedSanctionsLists()) ?? [],
+    bankCodeDataUnavailable,
   );
   const NOT_LOADED = new Set([
     'sanctions_lists_unavailable',
@@ -543,6 +569,7 @@ export function buildComplianceResult(
   countryRisk: string,
   isTestBic: boolean,
   bankCode: BankCodeConfidence = 'confirmed',
+  bankCodeDataUnavailable: boolean = false,
 ): ComplianceResult {
   // Nothing to screen. Return before touching the database: the sanctions,
   // reachability and VoP lookups would all miss and their misses are what used
@@ -563,6 +590,7 @@ export function buildComplianceResult(
     bankCode,
     bic8 !== null,
     unscreenedSanctionsLists(),
+    bankCodeDataUnavailable,
   );
   return { sanctions, reachability, vop, risk_score, risk_level, flags };
 }
