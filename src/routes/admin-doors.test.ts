@@ -110,4 +110,42 @@ describe('GET /v1/admin/doors', () => {
     expect(body.weeks_shown).toBe(10);
     expect(body.requested.weeks).toBe('beaucoup');
   });
+
+  it('rend à part les créations automatiques d’un robot, et le contrôle reste égal', async () => {
+    // Trois clés anonymes prises sans navigateur depuis un même réseau inventé,
+    // en semaine 40, jamais servies.
+    const db = getStatsDB();
+    for (let i = 1; i <= 3; i++) {
+      const created = `2026-10-0${i} 05:00:00`;
+      db.prepare(
+        `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, source, tier, monthly_limit)
+         VALUES (?, ?, 'anonymous', ?, 'api-direct', 'anonymous', 25)`,
+      ).run(`rt-robot-${i}`, `ifk_rtr0000${i}`, created);
+      db.prepare(
+        `INSERT INTO key_creations (ip_hash, created_at, user_agent, key_prefix) VALUES (?, ?, ?, ?)`,
+      ).run('reseau-robot-invente', created, 'robot-invente/1.0', `ifk_rtr0000${i}`);
+    }
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    const res = await app.request('/v1/admin/doors?weeks=4', { headers: headers(SECRET) });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ReturnType<typeof getDoorBoard>;
+    const w40 = body.weeks.find((w) => w.key === '2026-W40');
+    expect(w40?.totals.created).toBe(2);
+    expect(w40?.automated).toEqual({
+      label: 'Robot d’exploration, créations sans suite',
+      created: 3,
+    });
+    expect(body.automated.created).toBe(3);
+    expect(body.last_week.numbers).toMatchObject({ created: 2, automated: 3 });
+    expect(body.last_week.sentence).toContain('robot d’exploration, créations sans suite : 3');
+    expect(body.control).toMatchObject({
+      created_total: 6,
+      people_created: 3,
+      automated: 3,
+      external_fleet: 6,
+      equal: true,
+    });
+    expect(JSON.stringify(body)).not.toMatch(/reseau-robot|ifk_|rt-robot/);
+  });
 });

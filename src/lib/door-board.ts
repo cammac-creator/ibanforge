@@ -36,6 +36,11 @@
  *   voir `key-origins.ts`), pour toutes ses colonnes. Les clés d'avant le
  *   marquage (PR 220, 23.09.2026) n'en ont pas : elles vont dans « inconnue »,
  *   jamais devinées.
+ * - **Des personnes, et une ligne à part** (29.09.2026) : les créations
+ *   automatiques d'un robot d'exploration (section « Les créations
+ *   automatiques » plus bas) ne comptent dans aucune colonne ni aucune porte.
+ *   Elles forment, semaine par semaine, une ligne nommée à part, jamais
+ *   supprimée, et le contrôle du parc les additionne à la colonne « créées ».
  *
  * ## Ce que la réponse ne contient jamais
  *
@@ -45,7 +50,7 @@ import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { isInternalBuyer } from './pack-sales.js';
 import { KEY_ORIGIN_DOORS, KEY_ORIGIN_TAGS } from './key-origins.js';
-import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+import { FREE_TIER_MONTHLY_LIMIT, type KeyTier } from './tiers.js';
 import { normalizeEmail } from './email-norm.js';
 import {
   dayMonth,
@@ -204,6 +209,16 @@ export interface DoorRow extends DoorCounts {
 
 export type WeekKind = 'current' | 'complete' | 'before' | 'undated';
 
+/**
+ * La ligne à part des créations automatiques. Une seule colonne : par
+ * définition, ces clés n'ont jamais servi, jamais payé, et n'ont pas d'adresse
+ * à relancer.
+ */
+export interface AutomatedLine {
+  label: string;
+  created: number;
+}
+
 export interface WeekRow {
   /** `AAAA-Wss`, ou `before` (avant la première semaine montrée), ou `undated`. */
   key: string;
@@ -211,9 +226,12 @@ export interface WeekRow {
   title: string;
   monday: string | null;
   sunday: string | null;
+  /** Des personnes : les créations automatiques n'y sont jamais. */
   totals: DoorCounts;
   /** Les portes de cette ligne, sans les portes à zéro partout. */
   doors: DoorRow[];
+  /** Les créations automatiques de la semaine, à part. */
+  automated: AutomatedLine;
 }
 
 export interface FreeUsers {
@@ -255,6 +273,8 @@ export interface LastWeek {
     paid: number;
     free_active: number;
     free_active_keys: number;
+    /** Les créations automatiques de la semaine, hors de `created`. */
+    automated: number;
   };
   nudged: number;
   called_after_nudge: number;
@@ -274,8 +294,16 @@ export interface LastWeek {
  * recoupement indépendant joué sur la production.
  */
 export interface DoorBoardControl {
-  /** La colonne « créées », toutes lignes et toutes portes additionnées. */
+  /**
+   * Tout ce que le tableau range : la colonne « créées », toutes lignes et
+   * toutes portes additionnées, PLUS la ligne à part des créations
+   * automatiques. C'est ce total qui doit égaler le parc externe.
+   */
   created_total: number;
+  /** La colonne « créées » seule : des personnes. */
+  people_created: number;
+  /** La ligne à part des créations automatiques, toute l'histoire. */
+  automated: number;
   /** Le parc externe du jour, compté par un regroupement SQL, avec la même règle. */
   external_fleet: number;
   equal: boolean;
@@ -292,8 +320,10 @@ export interface DoorBoard {
   weeks: WeekRow[];
   /** Les semaines montrées (en cours et closes), porte par porte. */
   by_door: DoorRow[];
-  /** Toutes les lignes, avant et sans date comprises : toute l'histoire. */
+  /** Toutes les lignes, avant et sans date comprises : toute l'histoire, en personnes. */
   totals: DoorCounts;
+  /** Les créations automatiques de toute l'histoire, à part. */
+  automated: AutomatedLine;
   control: DoorBoardControl;
   free_users: FreeUsers;
   last_week: LastWeek;
@@ -336,10 +366,17 @@ export const DOOR_BOARD_DEFINITIONS: Readonly<Record<string, string>> = {
     '200 requêtes par mois (ni abonnement ni plafond relevé), a appelé au moins une fois sur les ' +
     '30 jours qui finissent le dimanche de la semaine passée. Le seuil de 50 compte ces ' +
     'personnes ; le nombre de clés est donné à côté. Le mois civil, définition du 22.09, aussi.',
+  automatique:
+    'Robot d’exploration, créations sans suite : les clés anonymes prises sans navigateur ' +
+    '(porte « API directe ») qui n’ont jamais reçu une seule réponse réussie, quand leur réseau ' +
+    'en a pris au moins trois de ce genre en sept jours. Elles sont comptées à part, jamais ' +
+    'effacées, et ne sont pas des personnes. Une clé seule sans suite reste une personne ; une ' +
+    'telle clé qui sert ou qui est réclamée redevient une personne.',
   controle:
-    'Cohérence interne : la colonne « créées », toutes semaines et toutes portes additionnées, ' +
-    'égale le parc externe compté par la même règle. Elle montre que le tableau ne perd ni ne ' +
-    'double aucune clé ; elle ne dit pas que la règle elle-même est juste.',
+    'Cohérence interne : la colonne « créées » et la ligne à part des créations automatiques, ' +
+    'toutes semaines et toutes portes additionnées, égalent le parc externe compté par la même ' +
+    'règle. Elle montre que le tableau ne perd ni ne double aucune clé ; elle ne dit pas que la ' +
+    'règle elle-même est juste.',
 };
 
 // ─── Les issues de paiement ─────────────────────────────────────────────────
@@ -548,6 +585,217 @@ function prefixesSeen(
   return seen;
 }
 
+// ─── Les créations automatiques ─────────────────────────────────────────────
+
+/**
+ * « Robot d'exploration, créations sans suite » (29.09.2026).
+ *
+ * Un robot d'exploration d'API lit la description OpenAPI et appelle chaque
+ * route qu'elle décrit, `POST /v1/keys/generate` comprise, sans corps : chaque
+ * passage frappe une clé anonyme par la porte `api-direct`, que rien n'utilise
+ * ensuite. Comptées comme des personnes, ces clés gonflaient la colonne
+ * « créées », la phrase du lundi et le bulletin.
+ *
+ * ## La règle, par lignée, toutes conditions réunies
+ *
+ *   1. externe (la règle du parc, inchangée) ;
+ *   2. née par la porte `api-direct` : ni navigateur, ni origine déclarée ;
+ *   3. anonyme sur toutes ses lignes : jamais réclamée, aucune adresse ;
+ *   4. jamais servie : ni premier appel métier réussi, ni paiement, ni aucune
+ *      réponse 2xx dans le journal des appels, sur aucun de ses préfixes (une
+ *      route hors métier compte : `lineage_facts` ne voit que le métier) ;
+ *   5. née d'un réseau (`key_creations.ip_hash`, jamais le seau `unknown`) qui a
+ *      frappé au moins trois clés remplissant 2 à 4 dans une fenêtre de sept
+ *      jours contenant la sienne.
+ *
+ * Ce qui reste une personne : une clé qui a servi, ne serait-ce qu'une fois
+ * (4, jugée clé par clé, même sur un réseau très actif) ; une clé seule sans
+ * suite (5 en demande trois) ; une clé à adresse ou réclamée (3) ; toute clé
+ * prise dans un navigateur (2). Seules les clés qui remplissent 2 à 4 comptent
+ * vers le seuil de 5 : les clés à adresse d'un réseau partagé n'y comptent pas.
+ *
+ * La fenêtre glisse : les deux premières clés d'une rafale passent à part dès
+ * que la troisième arrive. La semaine en cours peut donc encore bouger après
+ * coup, comme pour un premier appel arrivé en retard.
+ *
+ * ## La mémoire, qui n'efface jamais
+ *
+ * `key_creations` est purgée après 30 jours (`recordKeyCreation`) : sans
+ * mémoire, la preuve réseau d'une clé disparaîtrait avec sa ligne de naissance,
+ * et la clé reviendrait parmi les personnes d'une semaine close. La lignée est
+ * donc notée dans `door_board_automated` dès que la preuve réseau est vue, et la
+ * note ne remplace QUE la condition 5 : 1 à 4 sont relues à chaque calcul, et
+ * une clé notée qui sert ou qui est réclamée redevient une personne. Une note
+ * n'est jamais effacée parce que la preuve vivante retombe : les voisines d'une
+ * rafale sont purgées avant la clé du milieu, dont le compte tomberait sous
+ * trois. La note ne porte aucun hachage d'adresse.
+ *
+ * Limite assumée : une création que personne n'a jamais calculée pendant ses 30
+ * premiers jours (ni la page, ni le résumé du lundi, ni le bulletin) n'a pas
+ * de note et reste une personne. C'est le côté sûr.
+ */
+export const AUTOMATED_LABEL_FR = 'Robot d’exploration, créations sans suite';
+
+/** La porte d'une création sans navigateur ni origine déclarée. */
+export const AUTOMATED_DOOR = 'api-direct';
+const AUTOMATED_TIER: KeyTier = 'anonymous';
+/** Au moins trois créations du même réseau… */
+export const AUTOMATED_MIN_CREATIONS = 3;
+/** …dans une fenêtre de sept jours. */
+export const AUTOMATED_WINDOW_DAYS = 7;
+/** Le seau que `recordKeyCreation` écrit quand l'adresse manque : jamais un réseau. */
+export const UNKNOWN_NETWORK = 'unknown';
+
+/**
+ * Une réponse 2xx, une seule, sur un préfixe : sans borne de date, donc sans
+ * relire l'historique d'une clé qui a servi (le premier 2xx trouvé arrête la
+ * recherche), et sans ligne du tout pour une clé jamais présentée. Exportée
+ * pour qu'un test tienne son plan d'exécution (index des préfixes).
+ */
+export const LOG_PREFIX_SERVED_SQL =
+  'SELECT 1 AS hit FROM request_log WHERE key_prefix = ? AND status >= 200 AND status < 300 LIMIT 1';
+
+/** Les naissances rattachées à un réseau connu (30 jours au plus, la purge de la table). */
+export const AUTOMATED_BIRTHS_SQL =
+  'SELECT key_prefix, ip_hash, created_at FROM key_creations ' +
+  'WHERE key_prefix IS NOT NULL AND ip_hash IS NOT NULL AND ip_hash <> ?';
+
+const MEMO_ENSURED = new WeakSet<object>();
+
+function automatedMemo(db: DatabaseType.Database): DatabaseType.Database {
+  if (MEMO_ENSURED.has(db)) return db;
+  // Pas de contre-apostrophe ni de point d'interrogation dans ces commentaires
+  // SQL : ils vivent dans un gabarit JS.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS door_board_automated (
+      -- La lignée (key_hash de la clé née). Aucune adresse, même hachée.
+      lineage_hash TEXT PRIMARY KEY,
+      -- Le premier calcul qui a vu la preuve réseau, UTC, format datetime(now).
+      marked_at    TEXT NOT NULL
+    );
+  `);
+  MEMO_ENSURED.add(db);
+  return db;
+}
+
+/** Les lignées notées. Une mémoire illisible rend l'ensemble vide : le côté des personnes. */
+function readAutomatedMemo(db: DatabaseType.Database): Set<string> {
+  try {
+    return new Set(
+      (
+        automatedMemo(db).prepare('SELECT lineage_hash FROM door_board_automated').all() as Array<{
+          lineage_hash: string;
+        }>
+      ).map((r) => r.lineage_hash),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/** Ajoute des notes, sans jamais en retirer. Un échec d'écriture ne coûte pas le tableau. */
+function writeAutomatedMemo(db: DatabaseType.Database, ids: string[], nowMs: number): void {
+  if (ids.length === 0) return;
+  try {
+    const insert = automatedMemo(db).prepare(
+      'INSERT OR IGNORE INTO door_board_automated (lineage_hash, marked_at) VALUES (?, ?)',
+    );
+    const at = sqliteUtc(nowMs);
+    db.transaction(() => {
+      for (const id of ids) insert.run(id, at);
+    })();
+  } catch (err) {
+    console.error(
+      '[door-board] mémoire des créations automatiques non écrite :',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/**
+ * Les lignées externes qui sont des créations automatiques, selon la règle
+ * ci-dessus. Les conditions sans requête d'abord, le journal des appels en
+ * dernier et seulement pour les candidates.
+ */
+function findAutomated(
+  db: DatabaseType.Database,
+  external: Lineage[],
+  lineageOfPrefix: Map<string, string>,
+  firstSuccess: Map<string, number>,
+  firstPaid: Map<string, number>,
+  nowMs: number,
+): Set<string> {
+  const found = new Set<string>();
+  // 2, 3 et la part de 4 qui se lit sans le journal.
+  const eligible = new Map<string, Lineage>();
+  for (const l of external) {
+    if (l.door !== AUTOMATED_DOOR) continue;
+    if (!l.rows.every((r) => r.tier === AUTOMATED_TIER)) continue;
+    if (firstSuccess.has(l.id) || firstPaid.has(l.id)) continue;
+    eligible.set(l.id, l);
+  }
+  if (eligible.size === 0) return found;
+
+  // Le reste de 4 : une réponse 2xx sur l'un de ses préfixes, cherchée une fois.
+  const servedProbe = db.prepare(LOG_PREFIX_SERVED_SQL);
+  const neverServedCache = new Map<string, boolean>();
+  const neverServed = (id: string): boolean => {
+    let answer = neverServedCache.get(id);
+    if (answer === undefined) {
+      const rows = eligible.get(id)?.rows ?? [];
+      answer = !rows.some((r) => servedProbe.get(r.key_prefix) !== undefined);
+      neverServedCache.set(id, answer);
+    }
+    return answer;
+  };
+
+  // 5, la preuve vivante : les naissances candidates, réseau par réseau.
+  const byNetwork = new Map<string, Map<string, number>>();
+  for (const r of db.prepare(AUTOMATED_BIRTHS_SQL).all(UNKNOWN_NETWORK) as Array<{
+    key_prefix: string;
+    ip_hash: string;
+    created_at: string | null;
+  }>) {
+    const id = lineageOfPrefix.get(r.key_prefix);
+    const ms = parseDbUtc(r.created_at);
+    if (id === undefined || ms === null || !eligible.has(id) || !neverServed(id)) continue;
+    let births = byNetwork.get(r.ip_hash);
+    if (!births) {
+      births = new Map();
+      byNetwork.set(r.ip_hash, births);
+    }
+    // Une lignée compte une fois pour son réseau, à sa naissance la plus ancienne.
+    const seen = births.get(id);
+    if (seen === undefined || ms < seen) births.set(id, ms);
+  }
+  const proven = new Set<string>();
+  const windowMs = AUTOMATED_WINDOW_DAYS * DAY_MS;
+  for (const births of byNetwork.values()) {
+    const sorted = [...births.entries()].sort((a, b) => a[1] - b[1]);
+    // Pour chaque début, la plus grande fenêtre de sept jours qui en part.
+    let end = 0;
+    for (let start = 0; start < sorted.length; start++) {
+      if (end < start) end = start;
+      while (end + 1 < sorted.length && sorted[end + 1][1] - sorted[start][1] < windowMs) end++;
+      if (end - start + 1 >= AUTOMATED_MIN_CREATIONS) {
+        for (let i = start; i <= end; i++) proven.add(sorted[i][0]);
+      }
+    }
+  }
+
+  // La note supplée la preuve réseau purgée ; 1 à 4 restent relues.
+  const remembered = readAutomatedMemo(db);
+  for (const id of eligible.keys()) {
+    if (proven.has(id) || (remembered.has(id) && neverServed(id))) found.add(id);
+  }
+  writeAutomatedMemo(
+    db,
+    [...proven].filter((id) => !remembered.has(id)),
+    nowMs,
+  );
+  return found;
+}
+
 /** Un nombre et son nom accordé : 0 et 1 au singulier, comme en français. */
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n <= 1 ? one : many}`;
@@ -575,14 +823,20 @@ export function monthNameFr(month: string): string {
 
 /**
  * La phrase du résumé du lundi, la même sur la page. Une seule phrase, sans
- * tiret long : la porte en tête, les relances quand il y en a eu, et le seuil
- * des utilisateurs gratuits quand il est franchi.
+ * tiret long : la porte en tête, les relances quand il y en a eu, les
+ * créations automatiques à part quand il y en a eu, et le seuil des
+ * utilisateurs gratuits quand il est franchi.
  */
 export function buildSentence(week: Omit<LastWeek, 'sentence'>, free: FreeUsers): string {
   const total = week.numbers.created;
+  const automated = week.numbers.automated;
   let head: string;
   if (total === 0 || week.top_doors.length === 0) {
-    head = 'Aucune clé externe n’a été créée la semaine passée';
+    // Les clés du robot sont externes : « aucune clé externe » les nierait.
+    head =
+      automated > 0
+        ? 'Aucune clé n’a été créée par une personne la semaine passée'
+        : 'Aucune clé externe n’a été créée la semaine passée';
   } else if (week.top_doors.length === 1) {
     const top = week.top_doors[0];
     head =
@@ -606,6 +860,10 @@ export function buildSentence(week: Omit<LastWeek, 'sentence'>, free: FreeUsers)
       (week.followup_pending > 0 ? `, ${week.followup_pending} encore dans ce délai` : '') +
       ')';
   }
+  const apart =
+    automated > 0
+      ? ` ; à part, ${AUTOMATED_LABEL_FR.charAt(0).toLowerCase()}${AUTOMATED_LABEL_FR.slice(1)} : ${automated}`
+      : '';
   let threshold = '';
   if (free.crossed) {
     const first = free.crossed_by[0];
@@ -619,7 +877,7 @@ export function buildSentence(week: Omit<LastWeek, 'sentence'>, free: FreeUsers)
       ` (des personnes, pas des clés) ${where}, plus de ${free.threshold} :` +
       ' le plafond gratuit est à réévaluer (décision du 22.09)';
   }
-  return `${head}${nudges}${threshold}.`;
+  return `${head}${nudges}${apart}${threshold}.`;
 }
 
 /** Le mois UTC `AAAA-MM` d'un instant, et celui d'avant. */
@@ -692,6 +950,10 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
     if (ms !== null) firstPaid.set(r.lineage_hash, ms);
   }
 
+  // ── Les créations automatiques, sorties des personnes, gardées à part ─────
+  const automatedIds = findAutomated(db, external, lineageOfPrefix, firstSuccess, firstPaid, nowMs);
+  const people = external.filter((l) => !automatedIds.has(l.id));
+
   // ── Le rangement : une ligne par semaine montrée, puis « avant » et « sans date »
   type Bucket = { counts: Map<string, DoorCounts> };
   const buckets = new Map<string, Bucket>();
@@ -719,7 +981,13 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
     c[field] += 1;
   };
 
-  for (const l of external) {
+  const automatedByBucket = new Map<string, number>();
+  for (const id of automatedIds) {
+    const key = bucketKey(lineages.get(id)?.birthMs ?? null);
+    automatedByBucket.set(key, (automatedByBucket.get(key) ?? 0) + 1);
+  }
+
+  for (const l of people) {
     bump(l.birthMs, l.door, 'created');
     const success = firstSuccess.get(l.id);
     if (success !== undefined) bump(success, l.door, 'first_success');
@@ -752,6 +1020,7 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
       sunday: week?.sunday ?? null,
       totals,
       doors: sortDoors(doors),
+      automated: { label: AUTOMATED_LABEL_FR, created: automatedByBucket.get(key) ?? 0 },
     };
   };
 
@@ -759,10 +1028,16 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
     rowFor(w.label, i === 0 ? 'current' : 'complete', w, weekTitle(w)),
   );
   weeks.push(rowFor('before', 'before', null, `Avant le ${dayMonth(oldest.monday)}`));
-  if (buckets.has('undated')) weeks.push(rowFor('undated', 'undated', null, 'Date inconnue'));
+  if (buckets.has('undated') || automatedByBucket.has('undated')) {
+    weeks.push(rowFor('undated', 'undated', null, 'Date inconnue'));
+  }
 
   const totals = emptyCounts();
-  for (const w of weeks) addCounts(totals, w.totals);
+  let automatedTotal = 0;
+  for (const w of weeks) {
+    addCounts(totals, w.totals);
+    automatedTotal += w.automated.created;
+  }
 
   const doorTotals = new Map<string, DoorCounts>();
   for (const w of weeks) {
@@ -792,11 +1067,16 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
         WHERE ext = 1`,
     )
     .get() as { lineages: number; rows: number };
+  // Les créations automatiques sont hors des personnes, jamais hors du parc :
+  // la ligne à part s'additionne à la colonne « créées » pour l'égaler.
+  const ranked = totals.created + automatedTotal;
   const control: DoorBoardControl = {
-    created_total: totals.created,
+    created_total: ranked,
+    people_created: totals.created,
+    automated: automatedTotal,
     external_fleet: fleet.lineages,
-    equal: totals.created === fleet.lineages,
-    gap: totals.created - fleet.lineages,
+    equal: ranked === fleet.lineages,
+    gap: ranked - fleet.lineages,
     external_key_rows: fleet.rows,
   };
 
@@ -892,6 +1172,7 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
       paid: lastRow.totals.paid,
       free_active: freeUsers.active_people,
       free_active_keys: freeUsers.active_keys,
+      automated: lastRow.automated.created,
     },
     nudged: lastRow.totals.nudged,
     called_after_nudge: lastRow.totals.called_after_nudge,
@@ -906,6 +1187,7 @@ export function getDoorBoard(opts: DoorBoardOptions = {}): DoorBoard {
     weeks,
     by_door: byDoor,
     totals,
+    automated: { label: AUTOMATED_LABEL_FR, created: automatedTotal },
     control,
     free_users: freeUsers,
     last_week: { ...partial, sentence: buildSentence(partial, freeUsers) },

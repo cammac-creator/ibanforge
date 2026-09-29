@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getStatsDB } from './db.js';
 import {
+  AUTOMATED_LABEL_FR,
   DOOR_LABELS_FR,
   FREE_USERS_THRESHOLD,
   LOG_FIRST_ID_AT_OR_AFTER_SQL,
   LOG_PREFIX_BETWEEN_IDS_SQL,
   LOG_PREFIX_FROM_ID_SQL,
+  LOG_PREFIX_SERVED_SQL,
   OTHER_DOOR,
   PAID_OUTCOMES,
   UNKNOWN_DOOR,
@@ -108,6 +110,52 @@ function call(prefix: string, iso: string, status = 200): void {
     .run(status, stamp(iso), prefix);
 }
 
+/** Une réponse sur une route hors métier : la clé a servi, sans premier appel métier. */
+function callOther(prefix: string, iso: string, status = 200): void {
+  getStatsDB()
+    .prepare(
+      `INSERT INTO request_log (method, path, status, created_at, key_prefix)
+       VALUES ('GET', '/v1/keys/usage', ?, ?, ?)`,
+    )
+    .run(status, stamp(iso), prefix);
+}
+
+/**
+ * Une clé anonyme prise sans navigateur (porte `api-direct`), et sa ligne de
+ * naissance dans `key_creations`, sur un réseau inventé.
+ */
+function anonymousKey(
+  created: string,
+  network: string,
+): { hash: string; prefix: string; lineage: string } {
+  const k = key({
+    created,
+    source: 'api-direct',
+    tier: 'anonymous',
+    email: 'anonymous',
+    emailNorm: null,
+    monthlyLimit: 25,
+  });
+  birth(k.prefix, network, created);
+  return k;
+}
+
+function birth(prefix: string, network: string, iso: string): void {
+  getStatsDB()
+    .prepare(
+      `INSERT INTO key_creations (ip_hash, created_at, user_agent, key_prefix) VALUES (?, ?, ?, ?)`,
+    )
+    .run(network, stamp(iso), 'robot-invente/1.0', prefix);
+}
+
+/** Une rafale : `n` clés anonymes du même réseau, espacées de `everyHours` heures. */
+function burst(network: string, startIso: string, n: number, everyHours: number) {
+  const start = Date.parse(startIso);
+  return Array.from({ length: n }, (_, i) =>
+    anonymousKey(new Date(start + i * everyHours * 3_600_000).toISOString(), network),
+  );
+}
+
 function purchase(
   k: { hash: string; prefix: string; lineage: string },
   p: { iso: string; kind?: string; rail?: string; outcome?: string; issuedByUs?: number },
@@ -153,8 +201,17 @@ beforeEach(() => {
     'request_log',
     'key_purchases',
     'api_usage',
+    'key_creations',
   ]) {
     db.prepare(`DELETE FROM ${table}`).run();
+  }
+  // La mémoire des créations automatiques naît au premier calcul du tableau.
+  if (
+    db
+      .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'door_board_automated'`)
+      .get()
+  ) {
+    db.prepare('DELETE FROM door_board_automated').run();
   }
 });
 
@@ -355,6 +412,8 @@ describe('le contrôle du parc', () => {
     expect(week(board, 'undated').totals.created).toBe(1);
     expect(board.control).toEqual({
       created_total: 4,
+      people_created: 4,
+      automated: 0,
       external_fleet: 4,
       equal: true,
       gap: 0,
@@ -524,6 +583,7 @@ describe('la semaine passée, telle que le résumé du lundi la dira', () => {
       paid: 1,
       free_active: 0,
       free_active_keys: 0,
+      automated: 0,
     });
     expect(board.last_week.sentence).toBe(
       'La porte « Documentation » a donné le plus de clés (2 sur 3), 1 relance partie ' +
@@ -545,6 +605,180 @@ describe('la semaine passée, telle que le résumé du lundi la dira', () => {
     expect(getDoorBoard({ now: NOW }).last_week.sentence).toBe(
       '3 portes sont à égalité en tête, avec 1 clé chacune sur 3.',
     );
+  });
+});
+
+describe('les créations automatiques, à part des personnes', () => {
+  it('écarte le robot : des créations espacées d’un même réseau, sans aucun appel', () => {
+    const person = key({ created: '2026-09-29T08:00:00Z', source: 'site-docs' });
+    firstSuccess(person.lineage, '2026-09-29T09:00:00Z');
+    // Quatre clés anonymes sans navigateur, une toutes les onze heures, jamais servies.
+    burst('reseau-robot-a', '2026-09-29T02:00:00Z', 4, 11);
+    const board = getDoorBoard({ now: NOW });
+    const w = week(board, '2026-W40');
+    expect(w.totals).toMatchObject({ created: 1, first_success: 1 });
+    expect(w.doors.map((d) => d.door)).toEqual(['site-docs']);
+    expect(w.automated).toEqual({ label: AUTOMATED_LABEL_FR, created: 4 });
+    expect(board.automated).toEqual({ label: AUTOMATED_LABEL_FR, created: 4 });
+    expect(board.totals.created).toBe(1);
+    expect(board.by_door.map((d) => d.door)).toEqual(['site-docs']);
+    expect(board.last_week.numbers).toMatchObject({ created: 1, first_success: 1, automated: 4 });
+    expect(board.last_week.sentence).toBe(
+      'Toutes les clés de la semaine passée viennent de la porte « Documentation » ; à part, ' +
+        'robot d’exploration, créations sans suite : 4.',
+    );
+    // Jamais supprimées : le contrôle les additionne à la colonne « créées ».
+    expect(board.control).toEqual({
+      created_total: 5,
+      people_created: 1,
+      automated: 4,
+      external_fleet: 5,
+      equal: true,
+      gap: 0,
+      external_key_rows: 5,
+    });
+    const body = JSON.stringify(board);
+    expect(body).not.toContain('reseau-robot-a');
+    expect(body).not.toContain('ifk_');
+  });
+
+  it('dit une semaine où seul le robot a pris des clés sans nier qu’elles sont externes', () => {
+    burst('reseau-robot-b', '2026-09-30T05:00:00Z', 3, 17);
+    const board = getDoorBoard({ now: NOW });
+    expect(board.last_week.numbers).toMatchObject({ created: 0, automated: 3 });
+    expect(board.last_week.sentence).toBe(
+      'Aucune clé n’a été créée par une personne la semaine passée ; à part, ' +
+        'robot d’exploration, créations sans suite : 3.',
+    );
+  });
+
+  it('bascule les deux premières clés d’une rafale dès que la troisième arrive', () => {
+    const [first, second] = burst('reseau-robot-c', '2026-10-03T08:00:00Z', 2, 20);
+    expect(week(getDoorBoard({ now: NOW }), '2026-W40').totals.created).toBe(2);
+    anonymousKey('2026-10-05T08:00:00Z', 'reseau-robot-c');
+    const board = getDoorBoard({ now: NOW });
+    expect(week(board, '2026-W40')).toMatchObject({
+      totals: { created: 0 },
+      automated: { created: 2 },
+    });
+    expect(week(board, '2026-W41')).toMatchObject({
+      totals: { created: 0 },
+      automated: { created: 1 },
+    });
+    expect(first.prefix).not.toBe(second.prefix);
+  });
+
+  it('garde une personne à une seule clé anonyme sans appel', () => {
+    anonymousKey('2026-09-30T08:00:00Z', 'reseau-seul');
+    const board = getDoorBoard({ now: NOW });
+    const w = week(board, '2026-W40');
+    expect(w.totals.created).toBe(1);
+    expect(w.doors).toMatchObject([{ door: 'api-direct', created: 1 }]);
+    expect(w.automated.created).toBe(0);
+    expect(board.last_week.sentence).toBe(
+      'Toutes les clés de la semaine passée viennent de la porte « API directe, sans navigateur ».',
+    );
+  });
+
+  it('garde une personne qui appelle, même quand son réseau a pris plusieurs clés', () => {
+    // Un réseau partagé : trois clés jamais servies (le robot), et deux personnes
+    // derrière la même adresse, l'une avec un appel métier réussi, l'autre avec
+    // une seule réponse sur une route hors métier.
+    burst('reseau-partage', '2026-09-29T03:00:00Z', 3, 13);
+    const caller = anonymousKey('2026-09-30T10:00:00Z', 'reseau-partage');
+    firstSuccess(caller.lineage, '2026-09-30T10:05:00Z');
+    call(caller.prefix, '2026-09-30T10:05:00Z');
+    const other = anonymousKey('2026-10-01T10:00:00Z', 'reseau-partage');
+    callOther(other.prefix, '2026-10-01T10:02:00Z');
+    const board = getDoorBoard({ now: NOW });
+    const w = week(board, '2026-W40');
+    expect(w.totals).toMatchObject({ created: 2, first_success: 1 });
+    expect(w.automated.created).toBe(3);
+    expect(board.control).toMatchObject({ created_total: 5, external_fleet: 5, equal: true });
+  });
+
+  it('ne compte vers le seuil que les clés sans suite : deux clés servies et une seule sans suite restent des personnes', () => {
+    const served = anonymousKey('2026-09-29T08:00:00Z', 'reseau-actif');
+    firstSuccess(served.lineage, '2026-09-29T08:01:00Z');
+    const touched = anonymousKey('2026-09-29T20:00:00Z', 'reseau-actif');
+    callOther(touched.prefix, '2026-09-29T20:01:00Z');
+    anonymousKey('2026-09-30T08:00:00Z', 'reseau-actif');
+    const w = week(getDoorBoard({ now: NOW }), '2026-W40');
+    expect(w.totals.created).toBe(3);
+    expect(w.automated.created).toBe(0);
+  });
+
+  it('ne compte pas les clés à adresse ni réclamées d’un même réseau vers le seuil', () => {
+    anonymousKey('2026-09-29T08:00:00Z', 'reseau-bureau');
+    anonymousKey('2026-09-29T09:00:00Z', 'reseau-bureau');
+    for (const [iso, tier] of [
+      ['2026-09-29T10:00:00Z', 'email'],
+      ['2026-09-29T11:00:00Z', 'claimed'],
+    ] as const) {
+      const k = key({ created: iso, source: 'api-direct', tier });
+      birth(k.prefix, 'reseau-bureau', iso);
+    }
+    const w = week(getDoorBoard({ now: NOW }), '2026-W40');
+    expect(w.totals.created).toBe(4);
+    expect(w.automated.created).toBe(0);
+  });
+
+  it('ne prend jamais le seau des adresses inconnues pour un réseau', () => {
+    burst('unknown', '2026-09-29T02:00:00Z', 4, 5);
+    const w = week(getDoorBoard({ now: NOW }), '2026-W40');
+    expect(w.totals.created).toBe(4);
+    expect(w.automated.created).toBe(0);
+  });
+
+  it('garde des personnes quand trois créations s’étalent sur plus de sept jours', () => {
+    burst('reseau-lent', '2026-09-21T08:00:00Z', 3, 4 * 24);
+    const board = getDoorBoard({ now: NOW });
+    expect(board.totals.created).toBe(3);
+    expect(board.automated.created).toBe(0);
+  });
+
+  it('ne compte pas une clé née dans un navigateur, même en rafale sur un réseau', () => {
+    for (let i = 0; i < 3; i++) {
+      const iso = `2026-09-29T0${i + 1}:00:00Z`;
+      const k = key({ created: iso, source: 'site-signup', tier: 'anonymous', email: 'anonymous' });
+      birth(k.prefix, 'reseau-navigateur', iso);
+    }
+    expect(getDoorBoard({ now: NOW }).automated.created).toBe(0);
+  });
+
+  it('se souvient après la purge de 30 jours, et rend à la personne la clé qui sert ou qui est réclamée', () => {
+    const [a, b, c] = burst('reseau-robot-d', '2026-09-29T02:00:00Z', 3, 9);
+    expect(getDoorBoard({ now: NOW }).automated.created).toBe(3);
+    // La purge de `key_creations` efface la preuve réseau, pas la note.
+    getStatsDB().prepare('DELETE FROM key_creations').run();
+    const later = NOW + 40 * DAY;
+    const purged = getDoorBoard({ now: later, weeks: 52 });
+    expect(purged.automated.created).toBe(3);
+    expect(week(purged, '2026-W40')).toMatchObject({
+      totals: { created: 0 },
+      automated: { created: 3 },
+    });
+    // Une clé notée qui sert redevient une personne ; une clé réclamée aussi.
+    firstSuccess(a.lineage, '2026-11-10T08:00:00Z');
+    getStatsDB().prepare(`UPDATE api_keys SET tier = 'claimed' WHERE key_hash = ?`).run(b.hash);
+    const back = getDoorBoard({ now: later, weeks: 52 });
+    expect(week(back, '2026-W40')).toMatchObject({
+      totals: { created: 2 },
+      automated: { created: 1 },
+    });
+    expect(back.control).toMatchObject({ created_total: 3, external_fleet: 3, equal: true });
+    expect(c.prefix).toBeTruthy();
+  });
+
+  it('cherche une réponse réussie par l’index des préfixes, sans date', () => {
+    const detail = (
+      getStatsDB().prepare(`EXPLAIN QUERY PLAN ${LOG_PREFIX_SERVED_SQL}`).all('p') as Array<{
+        detail: string;
+      }>
+    )
+      .map((r) => r.detail)
+      .join(' | ');
+    expect(detail).toContain('idx_request_log_key_prefix (key_prefix=?)');
   });
 });
 
