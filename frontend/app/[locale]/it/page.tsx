@@ -4,15 +4,15 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { RegisterSearch } from "@/components/register-search";
 import { alternatesFor } from "@/lib/seo";
+import { registerIndexMeta } from "@/lib/register-meta";
 import { itBankFile, itCredit } from "@/lib/registers";
 import { itCopy } from "@/lib/it-register-copy";
 import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  const c = itCopy(locale);
-  const file = itBankFile();
-  return { title: c.indexTitle, description: c.indexIntro(file.batch1.length), alternates: alternatesFor(locale, "/it") };
+  const meta = registerIndexMeta(locale, "it", itBankFile().batch1.length);
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, "/it") };
 }
 
 export default async function ItIndexPage({ params }: { params: Promise<{ locale: string }> }) {

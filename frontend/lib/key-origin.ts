@@ -30,10 +30,31 @@
 export type SiteDoor =
   | 'site-home'
   | 'site-pricing'
+  | 'site-register'
   | 'site-docs'
   | 'site-dashboard'
   | 'site-api-page'
   | 'site-signup';
+
+/**
+ * The public bank-code pages, index included: where most of the search traffic
+ * lands (29/09/2026). A key taken there — from the call to action under the
+ * API's answer or from the header's button — gets a door of its own, so the
+ * board can say whether these pages bring keys at all.
+ *
+ * 🚨 /at, /be and /sm are NOT listed, on purpose: those registers may be served
+ * but not redistributed, their pages carry nothing beyond what they already
+ * show, and the Austrian page runs its own measurement pilot since 15/09/2026,
+ * whose series must not change door under it.
+ */
+const REGISTER_PREFIXES = ['/blz', '/iid', '/it', '/sk'] as const;
+
+/**
+ * The locale prefixes the router writes. Only these are stripped: English lives
+ * at the root, so `/it/03069` is the English page of an Italian code and not an
+ * Italian locale — a generic two-letter pattern swallowed the country segment.
+ */
+const LOCALE_PREFIX = /^\/(?:en|fr|de)(?=\/|$)/;
 
 /**
  * The door for a page path, locale prefix included or not.
@@ -44,11 +65,12 @@ export type SiteDoor =
  * itself still travels separately in `attribution.landing`.
  */
 export function doorForPath(pathname: string): SiteDoor {
-  // Strip a two-letter locale segment so /de/pricing and /pricing are one door.
-  const path = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '') || '/';
+  // Strip the locale segment so /de/pricing and /pricing are one door.
+  const path = pathname.replace(LOCALE_PREFIX, '') || '/';
   // The home has its own door since 27/09/2026, to measure what its redesign changes.
   if (path === '/') return 'site-home';
   if (path === '/pricing' || path.startsWith('/pricing/')) return 'site-pricing';
+  if (REGISTER_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'site-register';
   if (path === '/docs' || path.startsWith('/docs/')) return 'site-docs';
   if (path.startsWith('/dashboard') || path.startsWith('/account')) return 'site-dashboard';
   // The page written for developers who search for an IBAN validation API

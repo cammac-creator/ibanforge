@@ -2,10 +2,12 @@ import { JourneyActions } from "@/components/journey-actions";
 import { journeyFor } from "@/lib/journeys";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RegisterApiCta } from "@/components/register-api-cta";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
+import { blzMeta } from "@/lib/register-meta";
 import { apiJson, deBlzFile, formatIban, getBlz } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
@@ -27,10 +29,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale, blz } = await params;
   const entry = getBlz(blz);
   if (!entry) return { title: "Not Found" };
-  const t = await getTranslations({ locale, namespace: "registers" });
   const r = entry.register;
-  const vars = { blz: r.blz, name: r.name, town: r.town ?? "", bic: r.bic ?? "" };
-  return { title: t("blz.metaTitle", vars), description: t("blz.metaDescription", vars), alternates: alternatesFor(locale, `/blz/${r.blz}`) };
+  const meta = blzMeta(locale, r);
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, `/blz/${r.blz}`) };
 }
 
 export default async function BlzPage({ params }: { params: Promise<{ locale: string; blz: string }> }) {
@@ -88,6 +89,8 @@ export default async function BlzPage({ params }: { params: Promise<{ locale: st
         <p className="text-sm text-muted-foreground leading-relaxed">{t("common.apiText")}</p>
         <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
       </section>
+
+      <RegisterApiCta locale={locale} exampleIban={entry.example_iban} />
 
       {related.length > 0 && (
         <section className="flex flex-col gap-2">

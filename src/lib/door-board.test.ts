@@ -319,6 +319,20 @@ describe('les portes', () => {
     expect(w.doors[0]).toMatchObject({ door: 'site-docs', label: 'Documentation' });
   });
 
+  it('reconnaît la porte des pages de codes bancaires et la nomme en clair', () => {
+    // Le dialogue ouvert depuis /blz, /iid, /it ou /sk envoie `site-register`
+    // (frontend/lib/key-origin.ts) : sans l'entrée du vocabulaire, ces clés
+    // tomberaient dans « (autre) » et la porte la plus visitée resterait muette.
+    key({ created: '2026-09-29T08:00:00Z', source: 'site-register' });
+    key({ created: '2026-09-30T08:00:00Z', source: 'site-register' });
+    key({ created: '2026-09-30T09:00:00Z', source: 'site-signup' });
+    const w = week(getDoorBoard({ now: NOW }), '2026-W40');
+    const byDoor = Object.fromEntries(w.doors.map((d) => [d.door, d.created]));
+    expect(byDoor).toEqual({ 'site-register': 2, 'site-signup': 1 });
+    expect(byDoor[OTHER_DOOR]).toBeUndefined();
+    expect(w.doors[0]).toMatchObject({ door: 'site-register', label: 'Pages des codes bancaires' });
+  });
+
   it('ne compte pas une rotation comme une clé créée', () => {
     const born = key({ created: '2026-09-29T08:00:00Z', source: 'site-pricing' });
     key({ created: '2026-10-06T08:00:00Z', source: 'site-pricing', lineage: born.lineage });

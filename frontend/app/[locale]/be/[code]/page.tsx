@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
+import { beMeta } from "@/lib/register-meta";
 import { apiJson, formatIban } from "@/lib/registers";
 import { fetchLiveRegisterEntry } from "@/lib/register-live";
 import { localePath } from "@/lib/locale-path";
@@ -29,9 +30,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale, code } = await params;
   const entry = await fetchLiveRegisterEntry("BE", code);
   if (!entry) return { title: "Not Found" };
-  const t = await getTranslations({ locale, namespace: "registers" });
-  const vars = { code: entry.code, name: entry.name, bic: entry.bic ?? "" };
-  return { title: t("be.metaTitle", vars), description: t("be.metaDescription", vars), alternates: alternatesFor(locale, `/be/${entry.code}`) };
+  const meta = beMeta(locale, entry);
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, `/be/${entry.code}`) };
 }
 
 export default async function BeCodePage({ params }: { params: Promise<{ locale: string; code: string }> }) {

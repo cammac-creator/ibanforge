@@ -62,6 +62,8 @@ export const KEY_ORIGIN_DOORS = {
   'site-home': 'The key dialog opened from the home page.',
   'site-signup': 'The key dialog on the website, opened from a page with no door of its own.',
   'site-pricing': 'The key dialog opened from the pricing page.',
+  'site-register':
+    'The key dialog opened from a public bank-code page (/blz, /iid, /it, /sk and their indexes).',
   'site-docs': 'The key dialog opened from the documentation.',
   'site-dashboard': 'The key dialog opened from the dashboard or the account area.',
   'site-api-page':
