@@ -4,13 +4,14 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { RegisterSearch } from "@/components/register-search";
 import { alternatesFor } from "@/lib/seo";
+import { registerIndexMeta } from "@/lib/register-meta";
 import { deBlzFile } from "@/lib/registers";
 import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "registers" });
-  return { title: t("blz.indexTitle"), description: t("blz.indexIntro"), alternates: alternatesFor(locale, "/blz") };
+  const meta = registerIndexMeta(locale, "blz");
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, "/blz") };
 }
 
 export default async function BlzIndexPage({ params }: { params: Promise<{ locale: string }> }) {

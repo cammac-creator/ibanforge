@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RegisterApiCta } from "@/components/register-api-cta";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
 import { apiJson, formatIban, getItCode, itBankFile, itCredit } from "@/lib/registers";
 import { itCopy } from "@/lib/it-register-copy";
+import { itMeta } from "@/lib/register-meta";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
 
@@ -25,17 +27,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale, code } = await params;
   const entry = getItCode(code);
   if (!entry) return { title: "Not Found" };
-  const c = itCopy(locale);
   const r = entry.register;
-  const alternates = alternatesFor(locale, `/it/${r.code}`);
-  if (r.status === "retired") {
-    return {
-      title: c.retiredMetaTitle(r.code, r.name),
-      description: c.retiredMetaDescription(r.code, r.name, r.retired_on),
-      alternates,
-    };
-  }
-  return { title: c.metaTitle(r.code, r.name, r.town ?? ""), description: c.metaDescription(r.code, r.name, r.town ?? ""), alternates };
+  // A struck-off code keeps "struck off" in its title (itMeta): only the name is cut.
+  const meta = itMeta(locale, r);
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, `/it/${r.code}`) };
 }
 
 export default async function ItCodePage({ params }: { params: Promise<{ locale: string; code: string }> }) {
@@ -123,6 +118,8 @@ export default async function ItCodePage({ params }: { params: Promise<{ locale:
         <p className="text-sm text-muted-foreground leading-relaxed">{t("common.apiText")}</p>
         <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
       </section>
+
+      <RegisterApiCta locale={locale} exampleIban={entry.example_iban} />
 
       <section className="flex flex-wrap gap-4 text-sm">
         <Link href={localePath(locale, "/playground")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>

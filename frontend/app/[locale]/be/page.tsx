@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { RegisterSearch } from "@/components/register-search";
 import { alternatesFor } from "@/lib/seo";
+import { registerIndexMeta } from "@/lib/register-meta";
 import { localePath } from "@/lib/locale-path";
 
 /*
@@ -14,8 +15,8 @@ import { localePath } from "@/lib/locale-path";
  */
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "registers" });
-  return { title: t("be.indexTitle"), description: t("be.indexIntro"), alternates: alternatesFor(locale, "/be") };
+  const meta = registerIndexMeta(locale, "be");
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, "/be") };
 }
 
 export default async function BeIndexPage({ params }: { params: Promise<{ locale: string }> }) {

@@ -2772,8 +2772,6 @@
       "batchNote": "Die Liste unten ist die erste Tranche, die Codes, die am häufigsten gesucht werden. Jeder andere Code des Registers hat ebenfalls seine Seite: oben eintippen."
     },
     "blz": {
-      "metaTitle": "Bankleitzahl {blz}: {name}, {town}",
-      "metaDescription": "BLZ {blz} im Register der Deutschen Bundesbank: {name} in {town}, BIC {bic}. Status, Nachfolge-BLZ, IBAN-Aufbau, SEPA-Erreichbarkeit und die exakte Antwort der IBANforge-API.",
       "eyebrow": "Register der Deutschen Bundesbank",
       "title": "Bankleitzahl {blz}",
       "subtitle": "{name}, {town}",
@@ -2796,10 +2794,6 @@
       "countryLink": "Das Format der deutschen IBAN, mit dem offiziellen Beispiel"
     },
     "iid": {
-      "metaTitle": "IID {iid} (BC-Nummer): {name}, {town}",
-      "metaDescription": "Schweizer Clearing-Nummer {iid} im SIX BankMaster: {name} in {town}, BIC {bic}. Zahlungsdienste, QR-IID, IBAN-Aufbau und die exakte Antwort der IBANforge-API.",
-      "metaTitleRedirect": "IID {iid} (BC-Nummer): zusammengeführt mit IID {target}, {name}, {town}",
-      "metaDescriptionRedirect": "Die Schweizer Clearing-Nummer {iid} wird im SIX BankMaster auf die IID {target} umgeleitet: {name} in {town}, BIC {bic}. Zahlungen an diese Nummer gehen an die Nachfolgerin. IBAN-Aufbau und die exakte Antwort der IBANforge-API.",
       "eyebrow": "SIX BankMaster",
       "title": "IID {iid}",
       "subtitle": "{name}, {town}",
@@ -2845,8 +2839,6 @@
       "countryLink": "Das Format der Schweizer IBAN, mit dem offiziellen Beispiel"
     },
     "at": {
-      "metaTitle": "Österreichische Bankleitzahl {code}: {name}, {town}",
-      "metaDescription": "Bankleitzahl {code} im Verzeichnis der Oesterreichischen Nationalbank: {name} in {town}, BIC {bic}. Sitzadresse, LEI, IBAN-Aufbau, SEPA-Erreichbarkeit und die exakte Antwort der IBANforge-API.",
       "eyebrow": "Verzeichnis der Oesterreichischen Nationalbank",
       "title": "Bankleitzahl {code} (Österreich)",
       "subtitle": "{name}, {town}",
@@ -2867,8 +2859,6 @@
       "countryLink": "Das Format der österreichischen IBAN, mit dem offiziellen Beispiel"
     },
     "be": {
-      "metaTitle": "Belgischer Bankcode {code}: {name}",
-      "metaDescription": "Bankkennung {code} in der Liste der Belgischen Nationalbank: {name}, BIC {bic}. IBAN-Aufbau, SEPA-Erreichbarkeit und die exakte Antwort der IBANforge-API.",
       "eyebrow": "Liste der Belgischen Nationalbank",
       "title": "Belgischer Bankcode {code}",
       "subtitle": "{name}",
@@ -2886,8 +2876,6 @@
       "integrateLink": "Belgische Bankcodes in Ihrer Anwendung prüfen"
     },
     "sk": {
-      "metaTitle": "Slowakische Bankleitzahl {code}: {name}",
-      "metaDescription": "Zahlungscode {code} im Verzeichnis der Národná banka Slovenska: {name}, BIC {bic}. IBAN-Aufbau, SEPA-Erreichbarkeit und die genaue Antwort der IBANforge-API.",
       "eyebrow": "Verzeichnis der Národná banka Slovenska",
       "title": "Slowakische Bankleitzahl {code}",
       "facts": {
@@ -2926,6 +2914,16 @@
       "indexIntro": "Suchen Sie einen ABI-Code in der Liste der operativen Banken der Zentralbank der Republik San Marino: die Bank, den BIC, den die Zentralbank ihm zuordnet, den Sitz und die genaue Antwort der IBANforge-API, live gelesen.",
       "countryLink": "Der Aufbau der san-marinesischen IBAN, mit dem offiziellen Beispiel"
     }
+  },
+  "registerCta": {
+    "title": "Diese Antwort aus Ihrer eigenen Software",
+    "lead": "Die IBANforge-API prüft eine IBAN und nennt die Bank dahinter, mit ihrem BIC, sofern bekannt, aus nationalen Registern wie dem dieser Seite. Zwei Wege, ohne Bezahlung zu starten:",
+    "trialTitle": "Test ohne Schlüssel",
+    "trialText": "Senden Sie eine IBAN an POST /v1/iban/validate, ganz ohne Schlüssel, bis zu 25-mal pro Woche, nur auf dieser Route. Mit der Beispiel-IBAN dieser Seite:",
+    "keyTitle": "Gratis-Schlüssel",
+    "keyText": "200 Anfragen pro Monat auf allen Endpunkten, sobald Sie eine E-Mail-Adresse angeben und den zugesandten Code bestätigen. Ohne Adresse und ohne Karte startet er sofort mit 25 Anfragen pro Monat.",
+    "keyButton": "Schlüssel holen",
+    "docsLink": "So funktionieren Test und Schlüssel"
   },
   "countries": {
     "eyebrow": "IBAN nach Land",

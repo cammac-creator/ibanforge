@@ -22,10 +22,6 @@ export interface ItRegisterCopy {
   notExhaustiveTitle: string;
   notExhaustive: string;
   title: (code: string) => string;
-  metaTitle: (code: string, name: string, town: string) => string;
-  metaDescription: (code: string, name: string, town: string) => string;
-  retiredMetaTitle: (code: string, name: string) => string;
-  retiredMetaDescription: (code: string, name: string, date: string) => string;
   retiredTitle: string;
   retiredText: (date: string) => string;
   successorText: (name: string, code: string) => string;
@@ -65,12 +61,6 @@ const en: ItRegisterCopy = {
   notExhaustive:
     "The Banca d'Italia lists the banks, payment institutions and e-money institutions it registers, not the allocation of the ABI code space. Poste Italiane (07601), the Banca d'Italia itself (01000) and the Italian branches of EU payment institutions issue real Italian IBANs outside these registers. So a code listed here names its holder, and a code absent from them proves nothing: the API answers authoritative: false for Italy, and an absence is never a reason to stop a payment.",
   title: (code) => `Italian bank code ${code}`,
-  metaTitle: (code, name, town) => `Italian bank code ${code}: ${name}, ${town}`,
-  metaDescription: (code, name, town) =>
-    `ABI code ${code} in the Banca d'Italia registers: ${name}, ${town}. Registered office, LEI, IBAN structure and the exact answer of the IBANforge API.`,
-  retiredMetaTitle: (code, name) => `Italian bank code ${code}: ${name}, struck off`,
-  retiredMetaDescription: (code, name, date) =>
-    `ABI code ${code} (${name}) was struck off the Banca d'Italia registers on ${date}. Its legal successor, the IBAN structure and the exact answer of the IBANforge API.`,
   retiredTitle: "A code the Banca d'Italia has struck off",
   retiredText: (date) =>
     `The register lists this code for the last time on ${date}. The API answers verified with retired: true and serves no BIC, since nobody holds this code today. It is not a refusal: how long an old IBAN stays reachable after a merger is not published, so ask the beneficiary for their current details.`,
@@ -114,12 +104,6 @@ const fr: ItRegisterCopy = {
   notExhaustive:
     "La Banca d'Italia liste les banques, les établissements de paiement et de monnaie électronique qu'elle inscrit, pas l'attribution de l'espace des codes ABI. Poste Italiane (07601), la Banca d'Italia elle-même (01000) et les succursales italiennes d'établissements de paiement européens émettent de vrais IBAN italiens hors de ces registres. Un code listé ici nomme donc son titulaire, et un code absent ne prouve rien : l'API répond authoritative: false pour l'Italie, et une absence n'est jamais une raison d'arrêter un paiement.",
   title: (code) => `Code banque italien ${code}`,
-  metaTitle: (code, name, town) => `Code banque italien ${code} : ${name}, ${town}`,
-  metaDescription: (code, name, town) =>
-    `Code ABI ${code} dans les registres de la Banca d'Italia : ${name}, ${town}. Siège légal, LEI, structure de l'IBAN et réponse exacte de l'API IBANforge.`,
-  retiredMetaTitle: (code, name) => `Code banque italien ${code} : ${name}, radié`,
-  retiredMetaDescription: (code, name, date) =>
-    `Le code ABI ${code} (${name}) a été radié des registres de la Banca d'Italia le ${date}. Son successeur légal, la structure de l'IBAN et la réponse exacte de l'API IBANforge.`,
   retiredTitle: "Un code que la Banca d'Italia a radié",
   retiredText: (date) =>
     `Le registre porte ce code pour la dernière fois le ${date}. L'API répond verified avec retired: true et ne sert aucun BIC, puisque personne ne tient ce code aujourd'hui. Ce n'est pas un refus : la durée pendant laquelle un ancien IBAN reste joignable après une fusion n'est pas publiée, demandez donc au bénéficiaire ses coordonnées à jour.`,
@@ -163,12 +147,6 @@ const de: ItRegisterCopy = {
   notExhaustive:
     "Die Banca d'Italia führt die Banken, Zahlungsinstitute und E-Geld-Institute, die sie einträgt, nicht die Vergabe des ABI-Coderaums. Poste Italiane (07601), die Banca d'Italia selbst (01000) und die italienischen Zweigniederlassungen europäischer Zahlungsinstitute geben echte italienische IBAN außerhalb dieser Register aus. Ein hier geführter Code nennt also seinen Inhaber, und ein fehlender Code beweist nichts: Die API antwortet für Italien authoritative: false, und ein Fehlen ist nie ein Grund, eine Zahlung zu stoppen.",
   title: (code) => `Italienische Bankleitzahl ${code}`,
-  metaTitle: (code, name, town) => `Italienische Bankleitzahl ${code}: ${name}, ${town}`,
-  metaDescription: (code, name, town) =>
-    `ABI-Code ${code} in den Registern der Banca d'Italia: ${name}, ${town}. Sitz, LEI, IBAN-Aufbau und die genaue Antwort der IBANforge-API.`,
-  retiredMetaTitle: (code, name) => `Italienische Bankleitzahl ${code}: ${name}, gelöscht`,
-  retiredMetaDescription: (code, name, date) =>
-    `Der ABI-Code ${code} (${name}) wurde am ${date} aus den Registern der Banca d'Italia gelöscht. Sein Rechtsnachfolger, der IBAN-Aufbau und die genaue Antwort der IBANforge-API.`,
   retiredTitle: "Ein Code, den die Banca d'Italia gelöscht hat",
   retiredText: (date) =>
     `Das Register führt diesen Code zuletzt am ${date}. Die API antwortet verified mit retired: true und liefert keinen BIC, da heute niemand diesen Code hält. Das ist keine Ablehnung: Wie lange eine alte IBAN nach einer Fusion erreichbar bleibt, wird nicht veröffentlicht; fragen Sie den Empfänger nach seinen aktuellen Angaben.`,

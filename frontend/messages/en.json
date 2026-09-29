@@ -2772,8 +2772,6 @@
       "batchNote": "The list below is the first batch, the codes a reader looks up most. Every other code in the register has its page too: type it above."
     },
     "blz": {
-      "metaTitle": "Bankleitzahl {blz}: {name}, {town}",
-      "metaDescription": "BLZ {blz} in the Deutsche Bundesbank register: {name} in {town}, BIC {bic}. Status, successor code, IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
       "eyebrow": "Deutsche Bundesbank register",
       "title": "Bankleitzahl {blz}",
       "subtitle": "{name}, {town}",
@@ -2796,10 +2794,6 @@
       "countryLink": "The German IBAN format, with the official example"
     },
     "iid": {
-      "metaTitle": "IID {iid} (BC-Nummer): {name}, {town}",
-      "metaDescription": "Swiss clearing number {iid} in the SIX BankMaster: {name} in {town}, BIC {bic}. Payment services, QR-IID, IBAN structure and the exact answer of the IBANforge API.",
-      "metaTitleRedirect": "IID {iid} (BC-Nummer): merged into IID {target}, {name}, {town}",
-      "metaDescriptionRedirect": "Swiss clearing number {iid} is redirected in the SIX BankMaster to IID {target}: {name} in {town}, BIC {bic}. Payments to this number are routed to the successor. IBAN structure and the exact answer of the IBANforge API.",
       "eyebrow": "SIX BankMaster",
       "title": "IID {iid}",
       "subtitle": "{name}, {town}",
@@ -2845,8 +2839,6 @@
       "countryLink": "The Swiss IBAN format, with the official example"
     },
     "at": {
-      "metaTitle": "Austrian bank code {code}: {name}, {town}",
-      "metaDescription": "Bank code {code} in the Oesterreichische Nationalbank directory: {name} in {town}, BIC {bic}. Seat address, LEI, IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
       "eyebrow": "Oesterreichische Nationalbank directory",
       "title": "Austrian bank code {code}",
       "subtitle": "{name}, {town}",
@@ -2867,8 +2859,6 @@
       "countryLink": "The Austrian IBAN format, with the official example"
     },
     "be": {
-      "metaTitle": "Belgian bank code {code}: {name}",
-      "metaDescription": "Bank identifier {code} in the National Bank of Belgium list: {name}, BIC {bic}. IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
       "eyebrow": "National Bank of Belgium list",
       "title": "Belgian bank code {code}",
       "subtitle": "{name}",
@@ -2886,8 +2876,6 @@
       "integrateLink": "Check Belgian bank codes in your application"
     },
     "sk": {
-      "metaTitle": "Slovak bank code {code}: {name}",
-      "metaDescription": "Payment code {code} in the Národná banka Slovenska directory: {name}, BIC {bic}. IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
       "eyebrow": "Národná banka Slovenska directory",
       "title": "Slovak bank code {code}",
       "facts": {
@@ -2926,6 +2914,16 @@
       "indexIntro": "Look up an ABI code in the Central Bank of the Republic of San Marino list of operating banks: the bank, the BIC the Central Bank pairs with it, the registered office, and the exact answer of the IBANforge API, read live.",
       "countryLink": "The San Marino IBAN format, with the official example"
     }
+  },
+  "registerCta": {
+    "title": "Get this answer from your own software",
+    "lead": "The IBANforge API checks an IBAN and names the bank behind it, with its BIC when one is known, reading national registers such as the one on this page. Two ways to start without paying:",
+    "trialTitle": "Keyless trial",
+    "trialText": "Send an IBAN to POST /v1/iban/validate with no key at all, up to 25 times a week, on that route only. With this page’s example IBAN:",
+    "keyTitle": "Free key",
+    "keyText": "200 requests a month on every endpoint once you add an e-mail address and confirm the code sent to it. With no address and no card, it starts at 25 requests a month, straight away.",
+    "keyButton": "Get a key",
+    "docsLink": "How the trial and the keys work"
   },
   "countries": {
     "eyebrow": "IBAN by country",

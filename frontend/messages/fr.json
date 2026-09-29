@@ -2772,8 +2772,6 @@
       "batchNote": "La liste ci-dessous est le premier lot, les codes qu'on cherche le plus. Chaque autre code du registre a aussi sa page : tapez-le ci-dessus."
     },
     "blz": {
-      "metaTitle": "Bankleitzahl {blz} : {name}, {town}",
-      "metaDescription": "BLZ {blz} au registre de la Deutsche Bundesbank : {name} à {town}, BIC {bic}. Statut, code successeur, structure de l'IBAN, portée SEPA et la réponse exacte de l'API IBANforge.",
       "eyebrow": "Registre de la Deutsche Bundesbank",
       "title": "Bankleitzahl {blz}",
       "subtitle": "{name}, {town}",
@@ -2796,10 +2794,6 @@
       "countryLink": "Le format de l'IBAN allemand, avec l'exemple officiel"
     },
     "iid": {
-      "metaTitle": "IID {iid} (numéro de clearing) : {name}, {town}",
-      "metaDescription": "Numéro de clearing suisse {iid} au SIX BankMaster : {name} à {town}, BIC {bic}. Services de paiement, QR-IID, structure de l'IBAN et la réponse exacte de l'API IBANforge.",
-      "metaTitleRedirect": "IID {iid} (numéro de clearing) : fusionné dans l'IID {target}, {name}, {town}",
-      "metaDescriptionRedirect": "Le numéro de clearing suisse {iid} est redirigé au SIX BankMaster vers l'IID {target} : {name} à {town}, BIC {bic}. Les paiements vers ce numéro sont acheminés vers le successeur. Structure de l'IBAN et la réponse exacte de l'API IBANforge.",
       "eyebrow": "SIX BankMaster",
       "title": "IID {iid}",
       "subtitle": "{name}, {town}",
@@ -2845,8 +2839,6 @@
       "countryLink": "Le format de l'IBAN suisse, avec l'exemple officiel"
     },
     "at": {
-      "metaTitle": "Code banque autrichien {code} : {name}, {town}",
-      "metaDescription": "Code banque {code} dans le répertoire de l'Oesterreichische Nationalbank : {name} à {town}, BIC {bic}. Adresse du siège, LEI, structure de l'IBAN, portée SEPA et la réponse exacte de l'API IBANforge.",
       "eyebrow": "Répertoire de l'Oesterreichische Nationalbank",
       "title": "Code banque autrichien {code}",
       "subtitle": "{name}, {town}",
@@ -2867,8 +2859,6 @@
       "countryLink": "Le format de l'IBAN autrichien, avec l'exemple officiel"
     },
     "be": {
-      "metaTitle": "Code banque belge {code} : {name}",
-      "metaDescription": "Identifiant bancaire {code} dans la liste de la Banque nationale de Belgique : {name}, BIC {bic}. La structure de l'IBAN, la portée SEPA et la réponse exacte de l'API IBANforge.",
       "eyebrow": "Liste de la Banque nationale de Belgique",
       "title": "Code banque belge {code}",
       "subtitle": "{name}",
@@ -2886,8 +2876,6 @@
       "integrateLink": "Contrôler les codes banque belges dans votre application"
     },
     "sk": {
-      "metaTitle": "Code banque slovaque {code} : {name}",
-      "metaDescription": "Code de paiement {code} dans le répertoire de la Národná banka Slovenska : {name}, BIC {bic}. Structure de l’IBAN, portée SEPA et la réponse exacte de l’API IBANforge.",
       "eyebrow": "Répertoire de la Národná banka Slovenska",
       "title": "Code banque slovaque {code}",
       "facts": {
@@ -2926,6 +2914,16 @@
       "indexIntro": "Cherchez un code ABI dans la liste des banques opérationnelles de la Banque centrale de la République de Saint-Marin : la banque, le BIC que la Banque centrale lui associe, le siège social, et la réponse exacte de l’API IBANforge, lue en direct.",
       "countryLink": "Le format de l’IBAN saint-marinais, avec l’exemple officiel"
     }
+  },
+  "registerCta": {
+    "title": "Cette réponse, depuis votre logiciel",
+    "lead": "L’API IBANforge contrôle un IBAN et nomme la banque qui le tient, avec son BIC quand il est connu, en lisant des registres nationaux comme celui de cette page. Deux façons de commencer sans payer :",
+    "trialTitle": "Essai sans clé",
+    "trialText": "Envoyez un IBAN à POST /v1/iban/validate sans aucune clé, jusqu’à 25 fois par semaine, sur cette seule route. Avec l’IBAN d’exemple de cette page :",
+    "keyTitle": "Clé gratuite",
+    "keyText": "200 requêtes par mois sur tous les endpoints, une fois une adresse e-mail ajoutée et le code reçu confirmé. Sans adresse ni carte, elle démarre tout de suite à 25 requêtes par mois.",
+    "keyButton": "Prendre une clé",
+    "docsLink": "Comment marchent l’essai et les clés"
   },
   "countries": {
     "eyebrow": "IBAN par pays",

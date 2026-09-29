@@ -4,13 +4,14 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { RegisterSearch } from "@/components/register-search";
 import { alternatesFor } from "@/lib/seo";
+import { registerIndexMeta } from "@/lib/register-meta";
 import { chIidFile } from "@/lib/registers";
 import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "registers" });
-  return { title: t("iid.indexTitle"), description: t("iid.indexIntro"), alternates: alternatesFor(locale, "/iid") };
+  const meta = registerIndexMeta(locale, "iid");
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, "/iid") };
 }
 
 export default async function IidIndexPage({ params }: { params: Promise<{ locale: string }> }) {

@@ -47,10 +47,7 @@ describe("the Italian register copy", () => {
   it("repeats every value a function is given", () => {
     for (const l of langs) {
       const c = IT_REGISTER_COPY[l];
-      expect(c.metaTitle("03069", "INTESA", "TORINO"), l).toMatch(/03069.*INTESA.*TORINO/);
-      expect(c.retiredMetaDescription("03111", "UBI", "2021-04-11"), l).toMatch(/03111/);
-      expect(c.retiredMetaDescription("03111", "UBI", "2021-04-11"), l).toMatch(/UBI/);
-      expect(c.retiredMetaDescription("03111", "UBI", "2021-04-11"), l).toMatch(/2021-04-11/);
+      // Titles and descriptions moved to lib/register-meta.ts (29/09/2026), tested there.
       expect(c.successorText("INTESA", "03069"), l).toMatch(/INTESA.*03069/);
       expect(c.indexIntro(464), l).toContain("464");
       expect(c.partialRegisterCheck("Banca d'Italia, registers"), l).toContain("Banca d'Italia, registers");
@@ -64,6 +61,7 @@ describe("the Italian register copy", () => {
 
   it("types every leaf as a string or a function", () => {
     const leaves: Leaf[] = texts(IT_REGISTER_COPY.en).map(([, t]) => t);
-    expect(leaves.length).toBeGreaterThan(30);
+    // Four fewer since 29/09/2026: the titles and descriptions moved to lib/register-meta.ts.
+    expect(leaves.length).toBeGreaterThan(25);
   });
 });

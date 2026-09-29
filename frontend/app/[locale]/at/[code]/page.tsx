@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
+import { atMeta } from "@/lib/register-meta";
 import { apiJson, formatIban } from "@/lib/registers";
 import { fetchLiveRegisterEntry } from "@/lib/register-live";
 import { localePath } from "@/lib/locale-path";
@@ -28,9 +29,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale, code } = await params;
   const entry = await fetchLiveRegisterEntry("AT", code);
   if (!entry) return { title: "Not Found" };
-  const t = await getTranslations({ locale, namespace: "registers" });
-  const vars = { code: entry.code, name: entry.name, town: entry.town ?? "", bic: entry.bic ?? "" };
-  return { title: t("at.metaTitle", vars), description: t("at.metaDescription", vars), alternates: alternatesFor(locale, `/at/${entry.code}`) };
+  const meta = atMeta(locale, entry);
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, `/at/${entry.code}`) };
 }
 
 export default async function AtCodePage({ params }: { params: Promise<{ locale: string; code: string }> }) {

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RegisterApiCta } from "@/components/register-api-cta";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
+import { iidMeta } from "@/lib/register-meta";
 import { apiJson, chIidFile, formatIban, getIid, iidIdentity } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
@@ -29,15 +31,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale, iid } = await params;
   const entry = getIid(iid);
   if (!entry) return { title: "Not Found" };
-  const t = await getTranslations({ locale, namespace: "registers" });
   const r = entry.register;
-  const id = iidIdentity(entry);
-  const vars = { iid: r.iid, name: id.name, town: id.town, bic: id.bic, target: id.redirectedTo ?? "" };
   // A merged number says so in the title: "IID 04835: , " is what Google got
   // for twenty-six pages before 2026-09-07 (see iidIdentity).
-  const title = id.redirectedTo ? t("iid.metaTitleRedirect", vars) : t("iid.metaTitle", vars);
-  const description = id.redirectedTo ? t("iid.metaDescriptionRedirect", vars) : t("iid.metaDescription", vars);
-  return { title, description, alternates: alternatesFor(locale, `/iid/${r.iid}`) };
+  const meta = iidMeta(locale, r.iid, iidIdentity(entry), (entry.api as Api).valid_on ?? r.valid_on);
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, `/iid/${r.iid}`) };
 }
 
 export default async function IidPage({ params }: { params: Promise<{ locale: string; iid: string }> }) {
@@ -113,6 +111,8 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
         <p className="text-sm text-muted-foreground leading-relaxed">{t("common.apiText")}</p>
         <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">{apiJson(entry.api)}</pre>
       </section>
+
+      <RegisterApiCta locale={locale} exampleIban={entry.example_iban} />
 
       {related.length > 0 && (
         <section className="flex flex-col gap-2">

@@ -4,13 +4,14 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { RegisterSearch } from "@/components/register-search";
 import { alternatesFor } from "@/lib/seo";
+import { registerIndexMeta } from "@/lib/register-meta";
 import { skBankFile, skCredit } from "@/lib/registers";
 import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "registers" });
-  return { title: t("sk.indexTitle"), description: t("sk.indexIntro"), alternates: alternatesFor(locale, "/sk") };
+  const meta = registerIndexMeta(locale, "sk");
+  return { title: { absolute: meta.title }, description: meta.description, alternates: alternatesFor(locale, "/sk") };
 }
 
 export default async function SkIndexPage({ params }: { params: Promise<{ locale: string }> }) {
