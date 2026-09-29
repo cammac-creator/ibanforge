@@ -15,10 +15,29 @@
  * Une page de code reste la réponse de l'API pour ce code, comme avant, mais
  * lue au moment de la requête : un POST `/v1/iban/validate` côté serveur, sur un
  * IBAN synthétique construit ici (le même que l'export écrivait), avec la clé
- * serveur du bac à sable (`PLAYGROUND_API_KEY`, jamais envoyée au navigateur :
- * seules les variables `NEXT_PUBLIC_*` y parviennent). La réponse est mise en
- * cache un jour (`next.revalidate`) : un code lu une fois ne recoûte rien avant
- * le lendemain, et une relecture qui échoue garde la page déjà servie.
+ * serveur propre à ces pages (voir « La clé » plus bas ; jamais envoyée au
+ * navigateur : seules les variables `NEXT_PUBLIC_*` y parviennent). La réponse
+ * est mise en cache un jour (`next.revalidate`) : un code lu une fois ne recoûte
+ * rien avant le lendemain, et une relecture qui échoue garde la page déjà servie.
+ *
+ * ## La clé (audit du 29/09/2026)
+ *
+ * Ces pages lisent l'API avec `REGISTER_PAGES_API_KEY`, une clé à elles, et non
+ * plus avec celle du playground et de la démo de l'accueil
+ * (`app/api/playground/route.ts`). Un robot qui balaie des codes autrichiens
+ * fait appeler l'API une fois par code jamais lu : sur une clé partagée, il en
+ * épuisait le quota et faisait tomber le playground et la démo avec lui. Sur la
+ * sienne, il n'épuise que la sienne.
+ *
+ * Tant que la variable n'est pas posée (ou posée vide), repli sur
+ * `PLAYGROUND_API_KEY` : le déploiement ne casse rien, il garde seulement le
+ * partage d'avant. Changer de clé coûte une relecture par code, une fois : Next
+ * range l'en-tête `Authorization` dans la clé de son cache de données.
+ *
+ * Le plafond par visiteur ne peut pas vivre ici : une page servie depuis le
+ * cache n'exécute pas ce code, et un compteur en mémoire d'une instance ne voit
+ * pas les autres. Il vit dans une règle du pare-feu Vercel, en amont du cache,
+ * décrite (et testée) dans `firewall/register-pages-rate-limit.json`.
  *
  * ## Ce qu'une page ne peut plus faire
  *
@@ -37,7 +56,7 @@
  *   erreur, jamais une page fausse. Le cache de Next garde alors la dernière
  *   page réussie.
  *
- * ## Ce que coûte une page, sur la clé du bac à sable
+ * ## Ce que coûte une page, sur la clé des pages de registre
  *
  * Au plus un appel à l'API par code et par jour. `generateMetadata` et la page
  * lisent le même code dans la même requête : la lecture est mémorisée pour la
@@ -249,9 +268,21 @@ export function interpretLiveAnswer(
 }
 
 /**
- * Lit la page d'un code à l'API. Côté serveur seulement : la clé du bac à sable
- * n'existe que dans l'environnement du serveur. Mémorisée pour la requête (voir
- * « Ce que coûte une page » en tête).
+ * La clé avec laquelle ces pages lisent l'API (voir « La clé » en tête) : la
+ * leur, sinon celle du playground tant que la leur n'est pas posée, sinon
+ * aucune. `||` et non `??` : une variable posée vide dans Vercel doit retomber
+ * sur le repli, pas envoyer un `Bearer ` sans clé.
+ */
+export function registerPagesApiKey(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  return env.REGISTER_PAGES_API_KEY || env.PLAYGROUND_API_KEY || '';
+}
+
+/**
+ * Lit la page d'un code à l'API. Côté serveur seulement : la clé n'existe que
+ * dans l'environnement du serveur. Mémorisée pour la requête (voir « Ce que
+ * coûte une page » en tête).
  */
 export const fetchLiveRegisterEntry = cache(async function fetchLiveRegisterEntry(
   cc: LiveRegisterCountry,
@@ -261,7 +292,7 @@ export const fetchLiveRegisterEntry = cache(async function fetchLiveRegisterEntr
   if (!code) return null;
   const iban = liveExampleIban(cc, code);
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  const key = process.env.PLAYGROUND_API_KEY || '';
+  const key = registerPagesApiKey();
   let res: Response;
   try {
     res = await fetch(`${apiUrl}/v1/iban/validate`, {
