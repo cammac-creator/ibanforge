@@ -13,7 +13,6 @@
  */
 import { createHash } from 'node:crypto';
 import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
-import { isInternalEmail } from './internal-accounts.js';
 
 // ---------------------------------------------------------------------------
 // API payload shapes
@@ -112,7 +111,20 @@ export function emailDomain(email: string): string {
 // 'cohorte.invalid' is the synthetic contact domain for abuse cohorts
 // regrouped via POST /v1/admin/keys/relabel — .invalid can never receive
 // mail, and a farmed key must never resurface as a commercial lead.
-const INTERNAL_DOMAINS = ['ibanforge.com', 'example.com', 'example.org', 'cohorte.invalid'];
+// 'ibanforge.internal' and 'ibf-internal.dev' carry the keys we issue to our
+// own surfaces and probes (30.09.2026): the register pages' key, created on
+// 29.09, reached Telegram as a « nouveau lead corporate », company
+// « Ibanforge ». internal-accounts.ts already knew both domains; its whole
+// pattern is NOT reused here, because it also folds the address-less x402
+// buyer (`credits-buyer`) that revenue and pack sales must keep counting.
+const INTERNAL_DOMAINS = [
+  'ibanforge.com',
+  'ibanforge.internal',
+  'ibf-internal.dev',
+  'example.com',
+  'example.org',
+  'cohorte.invalid',
+];
 // Operator accounts, held as sha256 prefixes: this repo is public and must
 // not carry a personal address in the clear (the class that keeps coming
 // back). Extend privately via RADAR_INTERNAL_EMAILS (comma-separated, env).
@@ -146,11 +158,6 @@ export function isInternal(email: string): boolean {
   if (INTERNAL_DOMAINS.includes(emailDomain(e))) return true;
   if (INTERNAL_PROTON_RE.test(e)) return true;
   if (INTERNAL_SUBSTRINGS.some((s) => e.includes(s))) return true;
-  // The shared definition too (30.09.2026): this radar kept its own list and
-  // missed @ibanforge.internal, so the key we issue to our own register pages
-  // reached Telegram as a « nouveau lead corporate », company « Ibanforge ».
-  // Stats, CRM and the activation nudge already read internal-accounts.ts.
-  if (isInternalEmail(e)) return true;
   return false;
 }
 
