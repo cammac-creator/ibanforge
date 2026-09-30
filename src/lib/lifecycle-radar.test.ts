@@ -56,6 +56,9 @@ describe('classifiers', () => {
       'ca-alice@proton.me',
       'ca-bot-42@proton.me',
       'ferme-espagnole@cohorte.invalid',
+      // Keys we issue to our own surfaces (the register pages since 29.09.2026).
+      'pages-registres@ibanforge.internal',
+      'probe@ibf-internal.dev',
       '',
     ]) {
       expect(isInternal(e), e).toBe(true);
