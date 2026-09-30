@@ -13,6 +13,7 @@ import {
   dedupeMarkers,
   externalClients,
   fetchSearchConsole,
+  SEARCH_CONSOLE_TIMEOUT_MS,
   moneySummary,
   parseSqlUtc,
   recentSignups,
@@ -458,6 +459,21 @@ describe('fetchSearchConsole', () => {
       status: 0,
       data: null,
     });
+  });
+
+  it('gives fetch a ceiling, so a slow API blanks the card and not the growth view', async () => {
+    let signal: AbortSignal | null | undefined;
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      signal = init?.signal;
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    });
+    expect(SEARCH_CONSOLE_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
+    expect(await fetchSearchConsole('http://api.test', {})).toEqual({
+      ok: false,
+      status: 0,
+      data: null,
+    });
+    expect(signal).toBeInstanceOf(AbortSignal);
   });
 });
 

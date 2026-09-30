@@ -5,6 +5,7 @@ import { adminSearchConsole } from './admin-search-console.js';
 import {
   resetSearchConsoleAuth,
   resetSearchConsoleCache,
+  resetSearchConsoleRefresh,
   WITNESS_PATHS,
 } from '../lib/search-console.js';
 import { getStatsDB } from '../lib/db.js';
@@ -66,9 +67,22 @@ beforeEach(() => {
     private_key: privateKey,
   });
   resetSearchConsoleAuth();
+  resetSearchConsoleRefresh();
   getStatsDB().exec('DROP TABLE IF EXISTS search_console_cache');
   resetSearchConsoleCache();
 });
+
+/** Pushes the stored reading seven hours back, past the six-hour cadence. */
+const ageStoredReading = (): void => {
+  getStatsDB()
+    .prepare("UPDATE search_console_cache SET fetched_at = datetime('now', '-7 hours')")
+    .run();
+};
+
+const read = async (): Promise<{ status: number; body: Record<string, unknown> }> => {
+  const res = await app().request('/v1/admin/search-console', auth);
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -124,5 +138,31 @@ describe('GET /v1/admin/search-console', () => {
     expect(body).toMatchObject({ error: 'upstream', upstream_status: 429, stale: true });
     expect(body.weeks).toEqual(good.weeks);
     expect(body.fetched_at).toBe(good.fetched_at);
+  });
+
+  it('serves a reading past six hours at once, marked refreshing, and replaces it behind', async () => {
+    googleUp();
+    await read();
+    ageStoredReading();
+    const old = await read();
+    expect(old.status).toBe(200);
+    expect(old.body).toMatchObject({ stale: false, refreshing: true });
+    await vi.waitFor(async () => {
+      const next = await read();
+      expect(next.body.fetched_at).not.toBe(old.body.fetched_at);
+      expect(next.body.refreshing).toBe(false);
+    });
+  });
+
+  it('answers 502 with the old reading once the refresh behind it was refused', async () => {
+    googleUp();
+    const good = await read();
+    ageStoredReading();
+    vi.stubGlobal('fetch', async () => json({ error: 'rateLimitExceeded' }, 429));
+    expect((await read()).status).toBe(200);
+    await vi.waitFor(async () => expect((await read()).status).toBe(502));
+    const after = await read();
+    expect(after.body).toMatchObject({ error: 'upstream', upstream_status: 429, stale: true });
+    expect(after.body.weeks).toEqual(good.body.weeks);
   });
 });
