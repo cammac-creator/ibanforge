@@ -31,6 +31,7 @@ import { opsFail } from './lib/ops-alert.js';
 import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
 import { recordEvent } from './lib/events.js';
 import { frozenTrace } from './lib/bic-trace.js';
+import { warmSearchConsole } from './lib/search-console.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -283,6 +284,11 @@ function trialLedgerTick(): void {
 }
 trialLedgerTick();
 setInterval(trialLedgerTick, 60 * 60 * 1000).unref();
+
+// La lecture Search Console du tableau de bord est rafraîchie ici, toutes les
+// heures dès qu'elle a plus de six heures, plutôt qu'à l'ouverture de la page :
+// l'ouverture du matin trouve la lecture du matin, sans attendre Google.
+setInterval(() => warmSearchConsole(), 60 * 60 * 1000).unref();
 
 // ─── Drained shutdown ────────────────────────────────────────────────────────
 //

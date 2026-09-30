@@ -209,14 +209,30 @@ const b64 = (o: unknown): string => Buffer.from(JSON.stringify(o)).toString('bas
 
 /** In-memory access token, dropped a minute before Google would refuse it. */
 let token: { value: string; expiresAt: number } | null = null;
+/**
+ * The exchange in flight. The calls of one reading start together (see
+ * searchConsoleSummary): without this, each of the twelve would sign its own
+ * JWT and exchange it, twelve tokens for one reading.
+ */
+let tokenInflight: Promise<string> | null = null;
 
 /** Tests own the clock and the credential; they must also own this. */
 export function resetSearchConsoleAuth(): void {
   token = null;
+  tokenInflight = null;
 }
 
-async function accessToken(now: number): Promise<string> {
-  if (token && token.expiresAt > now) return token.value;
+function accessToken(now: number): Promise<string> {
+  if (token && token.expiresAt > now) return Promise.resolve(token.value);
+  if (!tokenInflight) {
+    tokenInflight = exchangeToken(now).finally(() => {
+      tokenInflight = null;
+    });
+  }
+  return tokenInflight;
+}
+
+async function exchangeToken(now: number): Promise<string> {
   const key = serviceAccount();
   if (!key) throw new SearchConsoleError(0, 'not_configured');
 
@@ -483,8 +499,34 @@ export function indexStateOf(result: IndexStatusResult | null): IndexState {
 // ---------------------------------------------------------------------------
 
 /**
+ * One witness. One that fails must not cost the other seven, nor the four
+ * weeks: the inspection quota is per day and shared with nothing else, so a
+ * 429 here is a partial reading, not a broken one.
+ */
+async function inspectWitness(path: string, at: number): Promise<SearchConsoleInspection> {
+  try {
+    const result = await inspect(`${SITE_ORIGIN}${path}`, at);
+    return {
+      path,
+      state: indexStateOf(result),
+      coverage: result.coverageState ?? null,
+      last_crawled: result.lastCrawlTime ? result.lastCrawlTime.slice(0, 10) : null,
+      error: null,
+    };
+  } catch (err) {
+    return {
+      path,
+      state: 'unknown',
+      coverage: null,
+      last_crawled: null,
+      error: err instanceof SearchConsoleError ? err.message : 'failed',
+    };
+  }
+}
+
+/**
  * One reading of the property: four weeks, two top lists, the sitemap, eight
- * witnesses. Nine calls to Google, of which eight are inspections.
+ * witnesses. Twelve calls to Google, of which eight are inspections.
  */
 export async function searchConsoleSummary(now: Date = new Date()): Promise<SearchConsoleSummary> {
   const at = now.getTime();
@@ -493,41 +535,23 @@ export async function searchConsoleSummary(now: Date = new Date()): Promise<Sear
   const topStart = dayKey(dayMs(end) - (TOP_WINDOW_DAYS - 1) * DAY_MS);
   const topWindow = { start: topStart, end };
 
-  const daily = await searchAnalytics(
-    { startDate: weeks[0].start, endDate: weeks[weeks.length - 1].end },
-    'date',
-    1000,
-    at,
-  );
+  // Every call starts at once (30.09.2026). One after the other, the twelve
+  // calls of a reading took 53 to 59 seconds (request_log, a week of them), the
+  // eight inspections being the slow ones, and the dashboard waited for all of
+  // them. Same calls, same quota, same order in the result.
   const topRange = { startDate: topWindow.start, endDate: topWindow.end };
-  const queries = await searchAnalytics(topRange, 'query', TOP_ROWS, at);
-  const pages = await searchAnalytics(topRange, 'page', TOP_ROWS, at);
-  const sitemaps = await sitemapStatus(at);
-
-  const inspections: SearchConsoleInspection[] = [];
-  for (const path of WITNESS_PATHS) {
-    // One witness that fails must not cost the other seven, nor the four weeks
-    // above it: the inspection quota is per day and shared with nothing else,
-    // so a 429 here is a partial reading, not a broken one.
-    try {
-      const result = await inspect(`${SITE_ORIGIN}${path}`, at);
-      inspections.push({
-        path,
-        state: indexStateOf(result),
-        coverage: result.coverageState ?? null,
-        last_crawled: result.lastCrawlTime ? result.lastCrawlTime.slice(0, 10) : null,
-        error: null,
-      });
-    } catch (err) {
-      inspections.push({
-        path,
-        state: 'unknown',
-        coverage: null,
-        last_crawled: null,
-        error: err instanceof SearchConsoleError ? err.message : 'failed',
-      });
-    }
-  }
+  const [daily, queries, pages, sitemaps, inspections] = await Promise.all([
+    searchAnalytics(
+      { startDate: weeks[0].start, endDate: weeks[weeks.length - 1].end },
+      'date',
+      1000,
+      at,
+    ),
+    searchAnalytics(topRange, 'query', TOP_ROWS, at),
+    searchAnalytics(topRange, 'page', TOP_ROWS, at),
+    sitemapStatus(at),
+    Promise.all(WITNESS_PATHS.map((path) => inspectWitness(path, at))),
+  ]);
 
   return {
     site: SITE_URL,
@@ -610,20 +634,117 @@ export function cacheAgeMs(fetchedAt: string, now: Date): number {
   return Number.isNaN(t) ? Number.POSITIVE_INFINITY : now.getTime() - t;
 }
 
+/** What a refresh that failed left behind: when, and Google's status. */
+export interface SearchConsoleFailure {
+  at: number;
+  status: number;
+}
+
+/** What the route serves: a stored reading, and what is happening to it. */
+export interface SearchConsoleReading extends CachedSummary {
+  /** A refresh is running in the background; the next open gets its result. */
+  refreshing: boolean;
+  /** The last refresh failed after this reading landed (the card says so). */
+  failure: SearchConsoleFailure | null;
+}
+
+/** After a failed refresh, the next background attempt waits this long. */
+export const RETRY_AFTER_FAILURE_MS = 30 * 60 * 1000;
+
+let inflight: Promise<CachedSummary> | null = null;
+let lastFailure: SearchConsoleFailure | null = null;
+
+/** Tests that run refreshes must start from a quiet module. */
+export function resetSearchConsoleRefresh(): void {
+  inflight = null;
+  lastFailure = null;
+}
+
 /**
- * The reading the route serves: cached under six hours, refetched otherwise.
+ * The one refresh in flight, started if there is none. Two opens during a
+ * refresh share it: on 30.09.2026 three reloads in one minute each paid a full
+ * reading, three times the inspection quota for one answer.
+ */
+function refreshOnce(now: Date): Promise<CachedSummary> {
+  if (!inflight) {
+    inflight = searchConsoleSummary(now)
+      .then((summary) => {
+        lastFailure = null;
+        return storeSummary(summary, now);
+      })
+      .catch((err: unknown) => {
+        lastFailure = {
+          at: now.getTime(),
+          status: err instanceof SearchConsoleError ? err.status : 0,
+        };
+        throw err;
+      })
+      .finally(() => {
+        inflight = null;
+      });
+  }
+  return inflight;
+}
+
+/** A background refresh whose failure is logged, never thrown at nobody. */
+function refreshInBackground(now: Date): void {
+  if (inflight) return;
+  refreshOnce(now).catch((err: unknown) => {
+    console.warn(
+      'Search Console refresh failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+  });
+}
+
+/** True when a failure is too recent for another background attempt. */
+function backingOff(now: Date): boolean {
+  return lastFailure !== null && now.getTime() - lastFailure.at < RETRY_AFTER_FAILURE_MS;
+}
+
+/**
+ * The reading the route serves, without ever making the dashboard wait for
+ * Google once a reading exists.
  *
- * Google is asked at most four times a day per instance, whatever the number of
- * dashboard opens — thirty-two of the two thousand daily inspections. `refresh`
- * skips the age check and is the one way to spend a call on purpose.
+ * Under six hours old, the stored reading as is. Older, the stored reading AT
+ * ONCE, and a refresh started behind it for the next open: until 30.09.2026 the
+ * first open after six hours waited for the whole reading, 53 to 59 seconds,
+ * and the growth view of the dashboard with it. Only the very first reading
+ * (nothing stored yet) and `refresh` wait for Google.
+ *
+ * Google is still asked at most four times a day per instance, whatever the
+ * number of dashboard opens — thirty-two of the two thousand daily
+ * inspections: one refresh at a time, none within half an hour of a failure.
  */
 export async function readSearchConsole({
   refresh = false,
   now = new Date(),
-}: { refresh?: boolean; now?: Date } = {}): Promise<CachedSummary> {
+}: { refresh?: boolean; now?: Date } = {}): Promise<SearchConsoleReading> {
   if (!refresh) {
     const cached = cachedSummary();
-    if (cached && cacheAgeMs(cached.fetched_at, now) < CACHE_MAX_AGE_MS) return cached;
+    if (cached) {
+      const young = cacheAgeMs(cached.fetched_at, now) < CACHE_MAX_AGE_MS;
+      if (!young && !backingOff(now)) refreshInBackground(now);
+      return {
+        ...cached,
+        refreshing: inflight !== null,
+        failure: young ? null : lastFailure,
+      };
+    }
   }
-  return storeSummary(await searchConsoleSummary(now), now);
+  const fresh = await refreshOnce(now);
+  return { ...fresh, refreshing: false, failure: null };
+}
+
+/**
+ * The hourly warm-up (src/index.ts): a reading past six hours is refreshed
+ * before anyone opens the dashboard, so the morning open finds this morning's
+ * reading rather than last night's. Same budget as the opens: nothing happens
+ * under six hours, during a refresh, or within half an hour of a failure.
+ */
+export function warmSearchConsole(now: Date = new Date()): void {
+  if (!isSearchConsoleConfigured() || inflight || backingOff(now)) return;
+  const cached = cachedSummary();
+  if (cached && cacheAgeMs(cached.fetched_at, now) < CACHE_MAX_AGE_MS) return;
+  refreshInBackground(now);
 }

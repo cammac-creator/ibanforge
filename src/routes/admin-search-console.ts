@@ -20,7 +20,9 @@ import {
  *        so does the last payload that landed, marked `stale`: a week-old
  *        reading is worth more than an empty card, as long as it says it is
  *        old. The dashboard's own reader keeps this body on purpose.
- *   200  — a reading under six hours old, or a fresh one.
+ *   200  — the stored reading, served at once even past six hours while a
+ *          refresh runs behind it (`refreshing: true`); the very first
+ *          reading, and `?refresh=1`, wait for Google.
  *
  * Admin only: the payload names the queries the site ranks on, which is
  * competitive information we do not publish.
@@ -36,7 +38,27 @@ adminSearchConsole.get('/v1/admin/search-console', async (c) => {
   }
   try {
     const read = await readSearchConsole({ refresh: c.req.query('refresh') === '1' });
-    return c.json({ ...read.summary, fetched_at: read.fetched_at, stale: false });
+    // A reading past six hours whose refresh Google refused: the same 502 as
+    // an awaited refusal, so the card still says the figures are old and why.
+    if (read.failure) {
+      return c.json(
+        {
+          ...read.summary,
+          fetched_at: read.fetched_at,
+          stale: true,
+          refreshing: read.refreshing,
+          error: 'upstream',
+          upstream_status: read.failure.status,
+        },
+        502,
+      );
+    }
+    return c.json({
+      ...read.summary,
+      fetched_at: read.fetched_at,
+      stale: false,
+      refreshing: read.refreshing,
+    });
   } catch (err) {
     const upstream_status = err instanceof SearchConsoleError ? err.status : 0;
     const cached = cachedSummary();

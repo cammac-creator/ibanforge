@@ -11,12 +11,15 @@ import {
   relativePath,
   resetSearchConsoleAuth,
   resetSearchConsoleCache,
+  resetSearchConsoleRefresh,
+  RETRY_AFTER_FAILURE_MS,
   SearchConsoleError,
   searchConsoleSummary,
   SITE_URL,
   topRows,
   weeklySeries,
   WITNESS_PATHS,
+  warmSearchConsole,
   windowEnd,
 } from './search-console.js';
 import { getStatsDB } from './db.js';
@@ -141,6 +144,7 @@ beforeEach(() => {
   calls = [];
   process.env.GSC_SA_JSON = ACCOUNT;
   resetSearchConsoleAuth();
+  resetSearchConsoleRefresh();
   getStatsDB().exec('DROP TABLE IF EXISTS search_console_cache');
   resetSearchConsoleCache();
 });
@@ -329,6 +333,27 @@ describe('searchConsoleSummary', () => {
     expect(s.inspections[0]).toMatchObject({ state: 'indexed', last_crawled: '2026-09-04' });
   });
 
+  it('starts the calls of a reading together, not one after the other', async () => {
+    googleUp();
+    const answer = globalThis.fetch;
+    let running = 0;
+    let peak = 0;
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 5));
+      try {
+        return await answer(url, init);
+      } finally {
+        running--;
+      }
+    });
+    await searchConsoleSummary(new Date('2026-09-07T06:00:00Z'));
+    // The token alone first, then the three analytics, the sitemap and the
+    // eight witnesses at once: in sequence they took close to a minute.
+    expect(peak).toBe(3 + 1 + WITNESS_PATHS.length);
+  });
+
   it('lets one witness fail without losing the other seven or the weeks', async () => {
     googleUp({
       inspect: (url) => (url.endsWith('/sk') ? json({ error: {} }, 429) : INDEXED()),
@@ -362,12 +387,67 @@ describe('the six-hour cache', () => {
     expect(calls.length).toBeGreaterThan(spent);
   });
 
-  it('refetches once the payload is past six hours', async () => {
+  const LATER = new Date(NOW.getTime() + CACHE_MAX_AGE_MS + 1000);
+
+  it('serves a reading past six hours AT ONCE and refreshes it behind', async () => {
+    googleUp();
+    const first = await readSearchConsole({ now: NOW });
+    const served = await readSearchConsole({ now: LATER });
+    // Nobody waits for Google: the stored reading comes back, flagged.
+    expect(served.fetched_at).toBe(first.fetched_at);
+    expect(served.refreshing).toBe(true);
+    expect(served.failure).toBeNull();
+    await vi.waitFor(() => expect(cachedSummary()?.fetched_at).toBe('2026-09-07 12:00:01'));
+  });
+
+  it('runs one refresh for several opens that arrive during it', async () => {
     googleUp();
     await readSearchConsole({ now: NOW });
     const spent = calls.length;
-    await readSearchConsole({ now: new Date(NOW.getTime() + CACHE_MAX_AGE_MS + 1000) });
+    await readSearchConsole({ now: LATER });
+    await readSearchConsole({ now: LATER });
+    await readSearchConsole({ now: LATER });
+    await vi.waitFor(() => expect(cachedSummary()?.fetched_at).toBe('2026-09-07 12:00:01'));
+    // One token exchange and one reading, not three.
+    expect(calls.length - spent).toBe(1 + 3 + 1 + WITNESS_PATHS.length);
+  });
+
+  it('says a background refresh failed, and waits before asking Google again', async () => {
+    googleUp();
+    const good = await readSearchConsole({ now: NOW });
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(String(url));
+      return json({ error: 'forbidden' }, 403);
+    });
+    await readSearchConsole({ now: LATER });
+    await vi.waitFor(async () =>
+      expect((await readSearchConsole({ now: LATER })).failure).toMatchObject({ status: 403 }),
+    );
+    const spent = calls.length;
+    const soon = await readSearchConsole({
+      now: new Date(LATER.getTime() + RETRY_AFTER_FAILURE_MS - 1000),
+    });
+    expect(calls.length).toBe(spent);
+    expect(soon).toMatchObject({ refreshing: false, failure: { status: 403 } });
+    expect(soon.summary).toEqual(good.summary);
+    await readSearchConsole({ now: new Date(LATER.getTime() + RETRY_AFTER_FAILURE_MS + 1000) });
     expect(calls.length).toBeGreaterThan(spent);
+  });
+
+  it('warms a reading past six hours before anyone opens, and leaves a young one', async () => {
+    googleUp();
+    await readSearchConsole({ now: NOW });
+    const spent = calls.length;
+    warmSearchConsole(new Date(NOW.getTime() + 60_000));
+    expect(calls.length).toBe(spent);
+    warmSearchConsole(LATER);
+    await vi.waitFor(() => expect(cachedSummary()?.fetched_at).toBe('2026-09-07 12:00:01'));
+  });
+
+  it('does not warm anything without a key', () => {
+    delete process.env.GSC_SA_JSON;
+    warmSearchConsole(LATER);
+    expect(calls).toHaveLength(0);
   });
 
   it('measures the age of a SQL stamp as UTC', () => {

@@ -580,12 +580,23 @@ export interface SearchConsole {
  * derivation in this file: nothing here reads the environment on its own, so
  * the reader is testable without one.
  */
+/** How long the growth view waits for the Search Console card at most. */
+export const SEARCH_CONSOLE_TIMEOUT_MS = 6000;
+
 export async function fetchSearchConsole(
   apiUrl: string,
   headers: HeadersInit,
 ): Promise<Fetched<SearchConsole>> {
   try {
-    const res = await fetch(`${apiUrl}/v1/admin/search-console`, { cache: 'no-store', headers });
+    // A ceiling, not an expectation: the route answers from its store in a
+    // fraction of a second. Until 30.09.2026 the first open after six hours
+    // waited for Google, close to a minute, and the whole growth view with it;
+    // should that ever come back, the card goes blank rather than the screen.
+    const res = await fetch(`${apiUrl}/v1/admin/search-console`, {
+      cache: 'no-store',
+      headers,
+      signal: AbortSignal.timeout(SEARCH_CONSOLE_TIMEOUT_MS),
+    });
     const body: unknown = await res.json().catch(() => null);
     // A summary is recognised by its weeks. `{ error: 'not_configured' }` and
     // an HTML error page from a proxy both come back as data: null, and the
