@@ -172,7 +172,13 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   LI: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
   DE: 'Deutsche Bundesbank Bankleitzahlendatei',
   AT: 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis',
-  BE: 'Banque nationale de Belgique, bank identification codes (Protocol Secretariat)',
+  // The free-of-charge sentence travels with the name, as "Zdroj: ČNB" does for
+  // Czechia below: the National Bank of Belgium answered in writing on
+  // 01/10/2026 that its Copyright and Reuse Policy applies in full, and that
+  // policy asks that recipients be told beforehand that the information can
+  // also be consulted free of charge on its website. This string is carried by
+  // every answer the Belgian register decides.
+  BE: 'Banque nationale de Belgique, bank identification codes (Protocol Secretariat); also available free of charge on the website of the National Bank of Belgium (www.nbb.be)',
   // Slovakia. The NBS allocates the "kód platobného styku" to the providers of
   // the domestic payment system and publishes the whole prevodník, versioned
   // and dated — the AT/BE claim exactly, with nothing to qualify. Named in both
