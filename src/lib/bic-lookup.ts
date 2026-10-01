@@ -520,7 +520,7 @@ const CURATED_MAP_SOURCE = 'IBANforge curated bank-code map';
 /**
  * The credit a national publisher asks for, on every answer served from the
  * map keys taken from its file (29/09/2026, NOTICE group A). Every key of these
- * four countries comes from the publisher named here, through
+ * five countries comes from the publisher named here, through
  * mdomke/schwifty. Carried in `bic.source`, the field each such answer already
  * has, the way the Czech register's name carries "Zdroj: ČNB".
  *
@@ -533,6 +533,9 @@ const CURATED_MAP_CREDIT: Readonly<Record<string, string>> = {
   LT: 'Source: Lietuvos bankas',
   HU: 'Forrás: Magyar Nemzeti Bank',
   HR: 'Izvor: HNB',
+  // 01/10/2026 : Finance Sweden, for Bankinfrastruktur i Sverige AB, answered
+  // in writing on 30/09/2026 that the list is public, with its disclaimer.
+  SE: 'Source: Bankinfrastruktur i Sverige AB, which does not guarantee that the published information is accurate; report any inaccuracy to Bankinfrastruktur i Sverige AB.',
 };
 
 /** `bic.source` for a pairing the curated map made, with the publisher's credit where one is due. */

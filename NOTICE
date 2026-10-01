@@ -391,6 +391,21 @@ Hrvatska narodna banka (Croatian National Bank), list of bank codes (VBB)
          It is not permitted to amend the contents of the material."
          https://www.hnb.hr/en/terms-of-use
 
+Bankinfrastruktur i Sverige AB, IBAN-ID och BIC-adress för banker
+  Where: the Swedish keys of src/db/bic_data.json (36 keys), taken from
+         the BSAB list (edition of 7 September 2023) by mdomke/schwifty.
+  Terms: on 30 September 2026, Finance Sweden (Svenska Bankföreningen)
+         answered our written request for BSAB: the data is public and is
+         updated as the parties that allocate clearing numbers report
+         changes, under BSAB's disclaimer: "Any inaccuracies or changes in
+         circumstances should be reported to Bankinfrastruktur i Sverige AB.
+         Bankinfrastruktur i Sverige AB does not guarantee that the
+         published information is accurate. The information is continuously
+         updated and supplemented."
+         https://www.bankinfrastruktur.se/framtidens-betalningsinfrastruktur/iban-och-svenskt-nationellt-kontonummer
+  Served with every API answer built from these keys, in bic.source:
+         Source: Bankinfrastruktur i Sverige AB, which does not guarantee that the published information is accurate; report any inaccuracy to Bankinfrastruktur i Sverige AB.
+
 IBANforge's own tables
   data/compliance.sqlite, table sanctioned_countries (14 rows), a list of
   country-level sanctions regimes compiled by IBANforge from public

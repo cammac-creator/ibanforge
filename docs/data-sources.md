@@ -76,7 +76,9 @@ et HR, dont les éditeurs autorisent la reproduction avec mention, entrent au
 groupe A de `NOTICE`, et chaque réponse tirée de leurs clés porte cette mention
 dans `bic.source` (« Vir: Banka Slovenije » avec la phrase de gratuité que
 demande Banka Slovenije, « Source: Lietuvos bankas », « Forrás: Magyar Nemzeti
-Bank », « Izvor: HNB »).
+Bank », « Izvor: HNB »). Depuis le 01/10/2026, les 36 clés suédoises aussi : la
+liste de Bankinfrastruktur i Sverige AB est publique (réponse écrite de Finance
+Sweden du 30/09/2026), sous son avertissement, que porte chaque réponse.
 
 ## Ce qui alimente `bic.sqlite`
 
