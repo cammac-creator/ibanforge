@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-25",
+  "captured_at": "2026-10-01",
   "response": {
     "iban": "CH1000230000000012345",
     "valid": true,
@@ -40,7 +40,7 @@
       "bank_name": "UBS Switzerland AG",
       "city": "Zürich",
       "source": "SIX BankMaster (Swiss IID / BC-Nummer register)",
-      "as_of": "2026-09",
+      "as_of": "2026-10",
       "basis": "national_register",
       "authoritative": true,
       "lei": "549300WOIFUSNYH0FL22",
@@ -66,7 +66,7 @@
         "ctry": "CH",
         "format": "structured",
         "source": "SIX BankMaster (Swiss IID register)",
-        "as_of": "2026-09-01"
+        "as_of": "2026-10-02"
       },
       "bic8": "UBSWCHZH"
     },
@@ -96,7 +96,7 @@
         "town": "Zürich",
         "country": "CH"
       },
-      "as_of": "2026-09"
+      "as_of": "2026-10"
     },
     "clearing": {
       "iid": "00230",
@@ -121,6 +121,6 @@
         "action": "POST /v1/iban/compliance"
       }
     ],
-    "processing_ms": 0.12
+    "processing_ms": 0.26
   }
 }

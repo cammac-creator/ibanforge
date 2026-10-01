@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-29",
+ "generated_at": "2026-10-01",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -50,7 +50,7 @@
      "bank_name": "ANDORRA BANC AGRÍCOL REIG, SA",
      "city": "LES ESCALDES",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300UHUTTOEC14D714"
@@ -61,7 +61,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -119,7 +119,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -177,7 +177,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -262,7 +262,7 @@
      "bank_name": "THE CENTRAL BANK OF THE REPUBLIC OF AZERBAIJAN",
      "city": "BAKU",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300P74FF45UQVU281"
@@ -273,7 +273,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -337,7 +337,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -380,7 +380,7 @@
     ],
     "vop_required": true
    },
-   "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+   "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat); also available free of charge on the website of the National Bank of Belgium (www.nbb.be)",
    "register_basis": "authoritative",
    "private_register": true,
    "api": null
@@ -432,7 +432,7 @@
      "bank_name": "Българска народна банка",
      "city": "Sofia",
      "source": "Bulgarian National Bank, BAE register",
-     "as_of": "2026-02",
+     "as_of": "2026-09",
      "basis": "national_register",
      "authoritative": true,
      "lei": "5299001WEKCK7E65TI48"
@@ -450,7 +450,7 @@
       "town": null,
       "country": "BG"
      },
-     "as_of": "2026-02"
+     "as_of": "2026-09"
     },
     "sepa": {
      "member": true,
@@ -506,7 +506,7 @@
      "bank_name": "CENTRAL BANK OF BAHRAIN",
      "city": "MANÂMA",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "54930065PJIB53WWMP12"
@@ -517,7 +517,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -581,7 +581,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -641,7 +641,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -699,7 +699,7 @@
      "bank_name": "National Bank of the Republic of Belarus",
      "city": "Минск",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "253400AAUDQ6NK0HNK41"
@@ -710,7 +710,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -771,7 +771,7 @@
      "match": null,
      "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
      "authoritative": true,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -823,7 +823,7 @@
      "bank_name": "BANCO DE COSTA RICA",
      "city": "SAN JOSE",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "5493007MCBLQ05S44531"
@@ -834,7 +834,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -900,7 +900,7 @@
      "bank_name": "BANK OF CYPRUS PUBLIC COMPANY LIMITED",
      "city": "NICOSIA",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "PQ0RAP85KK9Z75ONZW93"
@@ -911,7 +911,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -969,8 +969,8 @@
      "bic8": "GIBACZPX",
      "bank_name": "Česká spořitelna, a.s.",
      "city": "Praha 4",
-     "source": "Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze 254",
-     "as_of": "2026-09",
+     "source": "Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze 255",
+     "as_of": "2026-10",
      "basis": "national_register",
      "authoritative": true,
      "lei": "9KOGW2C2FCIOJQ7FF485"
@@ -988,7 +988,7 @@
       "town": null,
       "country": "CZ"
      },
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1048,7 +1048,7 @@
      "bank_name": "Commerzbank",
      "city": "Köln",
      "source": "Deutsche Bundesbank Bankleitzahlendatei",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "national_register",
      "authoritative": true,
      "lei": "851WYGNLUQLFZBSYGB56"
@@ -1066,7 +1066,7 @@
       "town": "Köln",
       "country": "DE"
      },
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1130,7 +1130,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -1185,7 +1185,7 @@
      "bank_name": "Nordea Bank Abp",
      "city": "COPENHAGEN",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "529900ODI3047E2LIV03"
@@ -1196,7 +1196,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1252,7 +1252,7 @@
      "bank_name": "BANCO AGRICOLA DE LA REPUBLICA DOMINICANA",
      "city": "SANTO DOMINGO",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": null
@@ -1263,7 +1263,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -1325,7 +1325,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1383,7 +1383,7 @@
      "bank_name": "NATIONAL BANK OF EGYPT",
      "city": "CAIRO",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "2138001QZGOK42KGQM03"
@@ -1394,7 +1394,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -1460,7 +1460,7 @@
      "bank_name": "CAIXABANK SA",
      "city": "Valencia",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "7CUNS533WID6K7DGFI87"
@@ -1471,7 +1471,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1560,7 +1560,7 @@
      "bank_name": "STANDARD CHARTERED BANK",
      "city": "STANLEY",
      "source": "GLEIF LEI-to-BIC mapping",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "directory_prefix",
      "authoritative": false,
      "lei": "RILFO74KP1CM8P6PCT96"
@@ -1572,7 +1572,7 @@
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
      "candidates": 1,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -1630,7 +1630,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -1692,7 +1692,7 @@
      "bank_name": "LA BANQUE POSTALE",
      "city": "PARIS",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "96950066U5XAAIRCPA78"
@@ -1703,7 +1703,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1768,7 +1768,7 @@
      "bank_name": "NatWest",
      "city": "London",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "213800IBT39XQ9C4CP71"
@@ -1779,7 +1779,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1837,7 +1837,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -1894,7 +1894,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -1948,7 +1948,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2010,7 +2010,7 @@
      "bank_name": "ΕΘΝΙΚΗ ΤΡΑΠΕΖΑ ΤΗΣ ΕΛΛΑΔΟΣ Α.Ε.",
      "city": "ATHENS",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "5UMCZOEYKCVFAW8ZLO05"
@@ -2021,7 +2021,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -2077,7 +2077,7 @@
      "bank_name": "BANCO DE LOS TRABAJADORES",
      "city": "GUATEMALA",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": null
@@ -2088,7 +2088,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2144,7 +2144,7 @@
      "bank_name": "BANCO DEL PAIS, SOCIEDAD ANONIMA",
      "city": "San Pedro Sula",
      "source": "GLEIF LEI-to-BIC mapping",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "directory_prefix",
      "authoritative": false,
      "lei": "98450077F43687DF1G79"
@@ -2156,7 +2156,7 @@
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
      "candidates": 1,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2216,7 +2216,7 @@
      "bank_name": "Hrvatska narodna banka",
      "city": "Zagreb",
      "source": "IBANforge curated bank-code map; Izvor: HNB",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "74780000X0J87XKFIL77"
@@ -2227,7 +2227,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -2292,7 +2292,7 @@
      "bank_name": "OTP Bank Nyrt.",
      "city": "Budapest",
      "source": "IBANforge curated bank-code map; Forrás: Magyar Nemzeti Bank",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "529900W3MOO00A18X956"
@@ -2303,7 +2303,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -2369,7 +2369,7 @@
      "bank_name": "ALLIED IRISH BANKS PUBLIC LIMITED COMPANY",
      "city": "Dublin",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "3U8WV1YX2VMUHH7Z1Q21"
@@ -2380,7 +2380,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -2444,7 +2444,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2502,7 +2502,7 @@
      "bank_name": "National Bank of Iraq",
      "city": "Baghdad",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "254900FJSRWZPDBJGT87"
@@ -2513,7 +2513,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2578,7 +2578,7 @@
      "bank_name": "Landsbankinn hf.",
      "city": "Reykjavík",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300TLZPT6JELDWM92"
@@ -2589,7 +2589,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -2724,7 +2724,7 @@
      "bank_name": "CENTRAL BANK OF JORDAN",
      "city": "AMMAN",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "54930066F5LI0K6UNX85"
@@ -2735,7 +2735,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2788,10 +2788,10 @@
     "bic": {
      "code": "CBKUKWKWXXX",
      "bic8": "CBKUKWKW",
-     "bank_name": "Central Bank of Kuwait",
+     "bank_name": "Central Bank Of Kuwait",
      "city": "Safat",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "2549005G75NMAK8TM233"
@@ -2802,7 +2802,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2810,7 +2810,7 @@
     },
     "issuer": {
      "type": "bank",
-     "name": "Central Bank of Kuwait",
+     "name": "Central Bank Of Kuwait",
      "classification": "default"
     },
     "risk_indicators": {
@@ -2860,7 +2860,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2912,7 +2912,7 @@
      "bank_name": "BANQUE DU LIBAN",
      "city": "BEIRUT",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300CRG6KNLZMYZH16"
@@ -2923,7 +2923,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -2979,7 +2979,7 @@
      "bank_name": "HERMES BANK LIMITED",
      "city": "GROS-ISLET",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": null
@@ -2990,7 +2990,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -3049,7 +3049,7 @@
      "bank_name": "LGT Bank AG",
      "city": "Vaduz",
      "source": "SIX BankMaster (Swiss IID / BC-Nummer register)",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "national_register",
      "authoritative": true,
      "lei": "7KDSOB6Z0X4S67TMX170"
@@ -3067,7 +3067,7 @@
       "town": "Vaduz",
       "country": "LI"
      },
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3129,7 +3129,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3220,7 +3220,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3280,7 +3280,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -3344,7 +3344,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3400,7 +3400,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3456,7 +3456,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3511,7 +3511,7 @@
      "bank_name": "Шпаркасе Банка Македонија АД Скопје",
      "city": "Skopje",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "529900XZX5N4NAI6CC60"
@@ -3522,7 +3522,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3580,7 +3580,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -3640,7 +3640,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -3702,7 +3702,7 @@
      "bank_name": "Central Bank of Malta",
      "city": "Valletta",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "5493002F1U5CO1UMKD70"
@@ -3713,7 +3713,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3777,7 +3777,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -3829,7 +3829,7 @@
      "bank_name": "BANCO DE AMERICA CENTRAL",
      "city": "MANAGUA",
      "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "directory_prefix",
      "authoritative": false,
      "lei": null
@@ -3841,7 +3841,7 @@
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
      "candidates": 1,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -3901,7 +3901,7 @@
      "bank_name": "ABN AMRO Bank N.V.",
      "city": "Amsterdam",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "BFXS5XCH7N0Y05NIXW11"
@@ -3912,7 +3912,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3971,7 +3971,7 @@
      "bank_name": "DANSKE BANK A/S",
      "city": "TRONDHEIM",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "MAES062Z21O4RZ2U7M96"
@@ -3982,7 +3982,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -4040,7 +4040,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4092,7 +4092,7 @@
      "bank_name": "STANDARD CHARTERED BANK (PAKISTAN) LIMITED",
      "city": "KARACHI",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300YTOMKUNPUTB551"
@@ -4103,7 +4103,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4191,7 +4191,7 @@
      "bank_name": "Bank of Palestine P.L.C",
      "city": "Ramallah",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "254900UPX0J6W0CTQR84"
@@ -4202,7 +4202,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4270,7 +4270,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -4322,7 +4322,7 @@
      "bank_name": "DOHA BANK Q.P.S.C",
      "city": "DOHA",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300O5KAG21BMZ8N83"
@@ -4333,7 +4333,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4394,7 +4394,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -4450,7 +4450,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -4510,7 +4510,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4562,7 +4562,7 @@
      "bank_name": "Al Rajhi Bank",
      "city": "Riyadh",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "558600BQZS4Y1DTU8589"
@@ -4573,7 +4573,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4637,7 +4637,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4691,7 +4691,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -4745,8 +4745,8 @@
      "bic8": "ESSESESS",
      "bank_name": "Skandinaviska Enskilda Banken AB",
      "city": "Stockholm",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "source": "IBANforge curated bank-code map; Source: Bankinfrastruktur i Sverige AB, which does not guarantee that the published information is accurate; report any inaccuracy to Bankinfrastruktur i Sverige AB.",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "F3JS33DEI6XQ4ZBPTN86"
@@ -4757,7 +4757,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -4817,7 +4817,7 @@
      "bank_name": "DEŽELNA BANKA SLOVENIJE d.d.",
      "city": "Ljubljana",
      "source": "IBANforge curated bank-code map; Vir: Banka Slovenije. This information is available free of charge on the Banka Slovenije website (www.bsi.si).",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300OBGOF2IVUD3L23"
@@ -4828,7 +4828,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -4995,7 +4995,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5053,7 +5053,7 @@
      "bank_name": "Banco Internacional de Sao Tome e Principe (BISTP)",
      "city": "Sao Tome",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": null
@@ -5064,7 +5064,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5120,7 +5120,7 @@
      "bank_name": "Banco Central de Reserva de El Salvador",
      "city": "San Salvador",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "549300U9H74ZS6M90L15"
@@ -5131,7 +5131,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5189,7 +5189,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5247,7 +5247,7 @@
      "bank_name": "SOCIETE TUNISIENNE DE BANQUE",
      "city": "Tunis",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "254900ZVFVXSGR01W972"
@@ -5258,7 +5258,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5316,7 +5316,7 @@
      "match": null,
      "register": null,
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5370,7 +5370,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5426,7 +5426,7 @@
      "bank_name": "Istituto per le Opere di Religione (IOR)",
      "city": "Vatican City",
      "source": "IBANforge curated bank-code map",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "curated_map",
      "authoritative": false,
      "lei": "254900E7HZKVQQ4I7325"
@@ -5437,7 +5437,7 @@
      "match": "register",
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -5495,7 +5495,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5555,7 +5555,7 @@
      "match": null,
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
@@ -5613,7 +5613,7 @@
      "bank_name": "CENTRAL BANK OF YEMEN",
      "city": "ADEN",
      "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
-     "as_of": "2026-09",
+     "as_of": "2026-10",
      "basis": "directory_prefix",
      "authoritative": false,
      "lei": null
@@ -5625,7 +5625,7 @@
      "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
      "authoritative": false,
      "candidates": 1,
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": false,
