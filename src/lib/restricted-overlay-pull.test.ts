@@ -114,6 +114,7 @@ class FakeGithub {
   private serveApi(req: IncomingMessage, res: ServerResponse): void {
     const path = req.url ?? '';
     this.requests.push({ server: 'api', path, auth: req.headers.authorization ?? null });
+    noKeepAlive(res);
     const json = (status: number, body: unknown): void => {
       res.writeHead(status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(body));
@@ -147,6 +148,7 @@ class FakeGithub {
   private serveStorage(req: IncomingMessage, res: ServerResponse): void {
     const path = req.url ?? '';
     this.requests.push({ server: 'storage', path, auth: req.headers.authorization ?? null });
+    noKeepAlive(res);
     const id = Number(/^\/blob\/(\d+)\?sig=signature-essai$/.exec(path)?.[1]);
     const asset = this.release?.assets[id - 1];
     if (!asset) {
@@ -156,6 +158,21 @@ class FakeGithub {
     res.writeHead(200, { 'content-type': 'application/octet-stream' });
     res.end(asset.body);
   }
+}
+
+/**
+ * Chaque réponse du faux GitHub ferme sa connexion : fetch n'en réutilise
+ * aucune. Sans cela, une connexion restée ouverte depuis un tirage précédent
+ * était reprise par le suivant ; or le serveur HTTP de Node ferme une connexion
+ * inactive au bout de cinq secondes (`keepAliveTimeout`). Sur une machine lente,
+ * les redémarrages synchrones de plusieurs tests (fusion des bases) dépassaient
+ * ces cinq secondes : la requête partait sur une connexion que le serveur
+ * fermait au même moment, le tirage entier échouait en `network_ECONNRESET`, et
+ * l'état gardait le refus d'un test précédent (échec de la CI du 01.10.2026,
+ * reproduit en ralentissant chaque redémarrage de 0,9 s).
+ */
+function noKeepAlive(res: ServerResponse): void {
+  res.setHeader('connection', 'close');
 }
 
 async function listen(server: Server): Promise<string> {
