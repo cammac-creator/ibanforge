@@ -39,6 +39,8 @@ describe('the BIC block says where it comes from', () => {
       LT: ['Source: Lietuvos bankas'],
       HU: ['Forrás: Magyar Nemzeti Bank'],
       HR: ['Izvor: HNB'],
+      // 01/10/2026: the Swedish list is public, with BSAB's disclaimer.
+      SE: ['Source: Bankinfrastruktur i Sverige AB', 'does not guarantee', 'report any inaccuracy'],
     } as const;
     for (const [cc, parts] of Object.entries(credits)) {
       const key = Object.keys(map).find((k) => k.startsWith(`${cc}:`));
