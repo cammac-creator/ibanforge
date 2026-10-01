@@ -170,6 +170,12 @@ describe('the register BIC wins the served pairing', () => {
     expect(r.bic?.source).toMatch(/Banque nationale de Belgique/);
   });
 
+  it('tells the recipient the Belgian list is free on the NBB website (written answer of 01/10/2026)', () => {
+    const r = check(FX.BE.iban(FX.BE.bank.code));
+    expect(r.bank_code_check?.register).toContain('free of charge');
+    expect(r.bank_code_check?.register).toContain('www.nbb.be');
+  });
+
   it('gives an EMI the BIC the register publishes for it', () => {
     // No curated key, and a numeric bank code means the directory prefix
     // fallback is structurally empty: before the register BIC was served, a

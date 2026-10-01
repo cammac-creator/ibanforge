@@ -376,8 +376,11 @@ Magyar Nemzeti Bank, directory of bank codes (sht.xlsx)
          hiányában – változatlan tartalommal, a forrás megjelölésével
          szabadon terjeszthetők." (unless otherwise provided, the information
          on the website may be distributed freely, with unchanged content
-         and with the source indicated). Whether an extract counts as
-         unchanged content has not been confirmed with the MNB.
+         and with the source indicated). On 1 October 2026 the MNB answered
+         our written request: using the routing table published on its
+         website as a source to return information about VIBER participants
+         is permitted without any attribution requirement, separate
+         procedure or fee. The credit above is kept by choice.
          https://www.mnb.hu/a-jegybank/informaciok-a-jegybankrol/gyakorlati-tudnivalok/jogi-nyilatkozat
 
 Hrvatska narodna banka (Croatian National Bank), list of bank codes (VBB)
@@ -544,7 +547,15 @@ identification codes, Protocol Secretariat
          (782 rows); frontend/data/registers/be-bank.json; the 781 BE keys
          of src/db/bic_data.json, taken by sigalor/iban-to-bic from the
          National Bank of Belgium's full list of codes.
-  Terms: none stated on the page. Not established.
+  Terms: on 1 October 2026 the National Bank of Belgium answered our
+         written request: our source wording is appropriate; any reuse is
+         carried out under the reuser's sole responsibility, under its
+         General Disclaimer and its Copyright and Reuse Policy, which apply
+         in full and require, among other things, that recipients be told
+         beforehand that the information can also be consulted free of
+         charge on the NBB website. Every Belgian answer of the API carries
+         that sentence.
+         https://www.nbb.be/en/disclaimer-and-legal-information/copyright-and-use-information
 
 Central Bank of the Republic of San Marino, operating banks
   Formerly in: data/bic.sqlite, table national_bank_codes, country SM (4 rows);
