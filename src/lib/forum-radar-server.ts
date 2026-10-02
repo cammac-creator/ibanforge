@@ -32,6 +32,7 @@ import {
   type ThreadCandidate,
   MAX_THREAD_AGE_DAYS,
   POSTABLE_SOURCE_NAMES,
+  NO_AI_DRAFT_SOURCES,
 } from './forum-radar.js';
 
 const TICK_MS = 60 * 60 * 1000;
@@ -551,30 +552,45 @@ async function watchPostedThreads(report: ScanReport): Promise<void> {
 /** Cost guard: at most N generations per scan; the daily tick catches up. */
 const DRAFTS_PER_SCAN = 6;
 
-async function backfillDrafts(report: ScanReport): Promise<void> {
-  const db = getStatsDB();
-  // Two kinds of missing text: no draft at all (full generation), or a draft
-  // that lacks its French mirror (translate it, NEVER regenerate: the draft
-  // may be validated or hand-edited and must survive verbatim).
-  const rows = db
+interface DraftBackfillRow {
+  id: number;
+  url: string;
+  source: string;
+  title: string;
+  excerpt: string | null;
+  lang: string;
+  notes: string | null;
+  draft: string | null;
+}
+
+/**
+ * The threads the next tick hands to the model. Two kinds of missing text: no
+ * draft at all (full generation), or a draft that lacks its French mirror
+ * (translate it, NEVER regenerate: the draft may be validated or hand-edited
+ * and must survive verbatim).
+ *
+ * Sites that ban AI-drafted text (NO_AI_DRAFT_SOURCES) are left out here, in
+ * SQL, rather than skipped in the loop: ranked first, their rows would eat the
+ * LIMIT on every tick and starve the GitHub threads.
+ */
+export function draftBackfillRows(limit: number = DRAFTS_PER_SCAN): DraftBackfillRow[] {
+  const banned = [...NO_AI_DRAFT_SOURCES];
+  return getStatsDB()
     .prepare(
       `SELECT id, url, source, title, excerpt, lang, notes, draft
        FROM forum_threads
        WHERE (draft IS NULL OR draft = '' OR draft_fr IS NULL OR draft_fr = '')
          AND status NOT IN ('dismissed', 'posted')
+         AND source NOT IN (${banned.map(() => '?').join(', ')})
        ORDER BY score DESC, first_seen DESC
        LIMIT ?`,
     )
-    .all(DRAFTS_PER_SCAN) as Array<{
-    id: number;
-    url: string;
-    source: string;
-    title: string;
-    excerpt: string | null;
-    lang: string;
-    notes: string | null;
-    draft: string | null;
-  }>;
+    .all(...banned, limit) as DraftBackfillRow[];
+}
+
+async function backfillDrafts(report: ScanReport): Promise<void> {
+  const db = getStatsDB();
+  const rows = draftBackfillRows();
 
   for (const row of rows) {
     try {

@@ -82,7 +82,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - check_compliance — sanctions lists (OFAC, EU, UN) on the bank (BIC8), the country against a fixed list of sanctioned jurisdictions, never the payee's name + FATF + SEPA Instant + VoP readiness + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
 - validate_payment_reference — RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero checksums against the dated document that publishes each rule, plus the QRR/QR-IBAN pairing verdict. Cost: free
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
-- check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
+- check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses (type K not permitted since 21.11.2025; banks guarantee its payment only until the end of September 2026), with a proposed structured form. Free.
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
 - request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the free allowance is spent. Cost: free
 - poll_api_key — collect the key once a human has approved it, handed over exactly once, with the config line to paste. Cost: free

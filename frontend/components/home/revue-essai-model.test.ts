@@ -60,10 +60,12 @@ describe("the trial of chapter 03, reading a real answer", () => {
     const answer = essaiAnswer(captured.response, copy)!
     expect(answer.rows[0]).toMatchObject({ value: "Valide", tone: "texte" })
     expect(answer.rows[1].value).toBe("UBS Switzerland AG")
+    // The month is the register edition the monthly refresh captured
+    // (captured-iban.json is rewritten by that robot): read it, never type it.
     expect(answer.rows[1].source).toEqual({
       before: "Code ",
       code: "00230",
-      after: " confirmé · SIX BankMaster (Swiss IID / BC-Nummer register) · 2026-09",
+      after: ` confirmé · SIX BankMaster (Swiss IID / BC-Nummer register) · ${captured.response.bank_code_check.as_of}`,
     })
     // The BIC comes from the same register, same date: its source is said once.
     expect(answer.rows[2]).toEqual({ value: "UBSWCHZH80A", tone: "mono", source: null })
