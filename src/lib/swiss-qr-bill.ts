@@ -3,9 +3,11 @@
  *
  * The payload is a fixed sequence of lines (SIX, Swiss Implementation
  * Guidelines QR-bill). This module parses it, checks every rule that can be
- * checked without a database, and answers the one question the SIX deadline
- * of 14 November 2026 makes urgent: is the creditor address STRUCTURED
- * (address type S), or still COMBINED (type K), which banks stop processing?
+ * checked without a database, and answers the one question that decides
+ * whether a QR-bill still gets paid: is the creditor address STRUCTURED
+ * (address type S), or still COMBINED (type K), which the standard has not
+ * permitted since 21 November 2025 and whose payment the banks guarantee only
+ * until the end of September 2026?
  *
  * What it reuses rather than re-implements:
  *   - IBAN structure and check digits: validateIBAN (src/lib/iban.ts)
@@ -21,16 +23,27 @@ import { validateIBAN } from './iban.js';
 import { isQrIidRange } from './ch-clearing.js';
 import { validatePaymentReference } from './payment-reference.js';
 import { checkPostalAddress, type AddressCheckResult } from './address-conformity.js';
+import { COMBINED_ADDRESS_NOTICE, COMBINED_ADDRESS_SOURCE } from './qr-bill-notice.js';
 
+export {
+  COMBINED_ADDRESS_CLAUSE,
+  COMBINED_ADDRESS_FORBIDDEN_FROM,
+  COMBINED_ADDRESS_NOTICE,
+  COMBINED_ADDRESS_PAYMENT_GUARANTEED_UNTIL,
+  COMBINED_ADDRESS_SOURCE,
+  UNSTRUCTURED_PAYMENT_ORDERS_REFUSED_FROM,
+} from './qr-bill-notice.js';
+
+/**
+ * The source of every finding but one: the standard itself. It used to end on
+ * a sentence credited to a SIX factsheet of 19.08.2025 ("from 14 November 2026
+ * payments based on QR-bills with a combined (type K) address are no longer
+ * processed") that neither SIX factsheet of that day contains. The type K
+ * finding now carries its own source, COMBINED_ADDRESS_SOURCE (qr-bill-notice.ts).
+ */
 export const QR_BILL_SOURCE =
   'SIX, Swiss Implementation Guidelines QR-bill, version 2.3 (published 2023, mandatory from 21 November 2025): ' +
-  'data structure of the Swiss QR Code, ch. 4; SIX factsheet of 19.08.2025 on structured addresses: from 14 November 2026 ' +
-  'payments based on QR-bills with a combined (type K) address are no longer processed.';
-
-/** Combined addresses (AdrTp "K") were removed from the standard on this date. */
-export const COMBINED_ADDRESS_FORBIDDEN_FROM = '2025-11-21';
-/** Banks stop processing payment orders that still carry a combined address. */
-export const COMBINED_ADDRESS_PROCESSING_STOPS = '2026-11-14';
+  'data structure of the Swiss QR Code, ch. 4.';
 
 export type QrFindingSeverity = 'error' | 'warning';
 
@@ -284,8 +297,8 @@ function reportParty(
       code: 'combined_address',
       severity: 'error',
       field: field('address_type'),
-      detail: `Address type K (combined) is no longer permitted since ${COMBINED_ADDRESS_FORBIDDEN_FROM}; from ${COMBINED_ADDRESS_PROCESSING_STOPS} banks stop processing payments built on it. Convert to type S (structured).`,
-      source: QR_BILL_SOURCE,
+      detail: COMBINED_ADDRESS_NOTICE.en,
+      source: COMBINED_ADDRESS_SOURCE,
     });
     if (!a.line2)
       findings.push({
@@ -643,7 +656,7 @@ export function checkSwissQrBill(payload: string): SwissQrBillCheck {
   const nextSteps: string[] = [];
   if (creditor.structured === false)
     nextSteps.push(
-      `Convert the creditor address to type S before ${COMBINED_ADDRESS_PROCESSING_STOPS}; see creditor.proposed_structured.`,
+      'Reissue the QR-bill with the creditor address in type S: the banks guarantee payment of a type K QR-bill only until the end of September 2026; see creditor.proposed_structured.',
     );
   if (ultimateDebtor.present && ultimateDebtor.structured === false)
     nextSteps.push(

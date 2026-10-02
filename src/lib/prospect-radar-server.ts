@@ -22,7 +22,7 @@ import { kvGet, kvSet, sendTelegramShort } from './forum-radar-server.js';
 import {
   CONTACT_PATHS,
   DESCRIBE_SYSTEM,
-  PROSPECT_MAIL_SYSTEM,
+  prospectMailSystem,
   buildDescribePrompt,
   buildProspectMailPrompt,
   extractEmails,
@@ -171,7 +171,7 @@ export async function draftOne(p: ProspectForMail): Promise<ProspectMail | null>
   // One immediate retry: a malformed generation is usually transient, and
   // without it the prospect stays stuck a full 6h cycle for one bad sample.
   for (let attempt = 1; ; attempt++) {
-    const out = await callAnthropic(PROSPECT_MAIL_SYSTEM, user);
+    const out = await callAnthropic(prospectMailSystem(), user);
     if (out == null) return null;
     const mail = parseProspectMail(out.text);
     if (mail) {

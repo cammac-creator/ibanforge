@@ -85,6 +85,20 @@ export const MAX_THREAD_AGE_DAYS = 30;
 export const POSTABLE_SOURCE_NAMES: ReadonlySet<string> = new Set(['stackexchange', 'github']);
 
 /**
+ * Sites that ban text drafted by a language model: their threads are still
+ * scanned and listed, but no AI draft is written for them (02/10/2026). The
+ * operator answers those in his own words, or not at all.
+ *   - Stack Overflow: "Please do not draft content for Stack Overflow using
+ *     large language model (LLM) services", https://stackoverflow.com/help/gen-ai-policy
+ *   - Money.SE: same wording, https://money.stackexchange.com/help/gen-ai-policy
+ *
+ * Row names (`forum_threads.source`), not the fetcher name `stackexchange`
+ * that POSTABLE_SOURCE_NAMES gates the scan with: removing it there would drop
+ * the threads themselves.
+ */
+export const NO_AI_DRAFT_SOURCES: ReadonlySet<string> = new Set(['stackoverflow', 'money_se']);
+
+/**
  * A thread that submits, announces or releases something is not a question:
  * nobody there is waiting for help, and a reply reads as promotion. The first
  * scan under the one-month rule surfaced four of these and no question at all

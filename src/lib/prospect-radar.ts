@@ -14,7 +14,7 @@
  *   exact opt-out line, no long dashes anywhere.
  */
 
-import { PRODUCT_FACTS } from './forum-draft-gen.js';
+import { productFacts } from './forum-draft-gen.js';
 
 // ---------------------------------------------------------------- addresses
 
@@ -179,7 +179,9 @@ export function recommendedLang(country: string | null): 'fr' | 'en' {
   return country && ['FR', 'CH', 'BE', 'LU', 'MC'].includes(country.toUpperCase()) ? 'fr' : 'en';
 }
 
-export const PROSPECT_MAIL_SYSTEM = `You write ONE cold outreach email (EN and FR versions) for IBANforge (ibanforge.com), an IBAN/BIC validation API. The reader is a busy founder or developer who has never heard of us.
+/** Built on call: productFacts() reads the registers (see forum-draft-gen.ts). */
+export function prospectMailSystem(): string {
+  return `You write ONE cold outreach email (EN and FR versions) for IBANforge (ibanforge.com), an IBAN/BIC validation API. The reader is a busy founder or developer who has never heard of us.
 
 Hard rules, in order:
 1. Body: 80 to 130 words, EXACTLY three short paragraphs, plain text, no bullet lists, no links other than ibanforge.com.
@@ -191,7 +193,7 @@ Hard rules, in order:
 Claude-Alain Martin
 IBANforge · ibanforge.com
 7. Use ONLY these product facts, never invent numbers or capabilities:
-${PRODUCT_FACTS}
+${productFacts()}
 8. FORBIDDEN: em dashes and en dashes anywhere (use commas or periods), superlatives ("best", "leading"), urgency ("limited", "act now"), claiming they need us, more than one product fact, any invented detail about them.
 9. The FR version is a natural rewrite in French (vouvoiement), not a word-for-word translation. Subjects: lowercase, concrete, under 60 characters, no colon-hype.
 
@@ -205,6 +207,7 @@ Output STRICTLY in this format (raw text between markers, nothing outside them):
 ===BODY_FR===
 (full email body, French, greeting to signature)
 ===END===`;
+}
 
 export function buildProspectMailPrompt(p: ProspectForMail): string {
   const lines: string[] = [

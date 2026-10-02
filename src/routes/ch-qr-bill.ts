@@ -6,8 +6,9 @@
  * IBAN and QR-IBAN range, QRR / SCOR / NON reference checksums and their
  * pairing with the IBAN, amount and currency, and above all whether the
  * addresses are STRUCTURED (type S) or still COMBINED (type K), which the
- * standard removed on 21.11.2025 and which banks stop processing on
- * 14.11.2026. A combined address comes back with a proposed structured form.
+ * standard removed on 21.11.2025 and whose payment the banks guarantee only
+ * until the end of September 2026 (COMBINED_ADDRESS_NOTICE). A combined
+ * address comes back with a proposed structured form.
  *
  * Free: pure rule evaluation over a published standard, no database, no
  * key, no quota. The paid surface stays the bank behind the IBAN.

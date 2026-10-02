@@ -38,6 +38,7 @@
  * sentence, and whether the tool writes anything. Keeping it free of schemas
  * is what lets discovery routes import it without pulling in an MCP server.
  */
+import { COMBINED_ADDRESS_CLAUSE } from '../lib/qr-bill-notice.js';
 
 /** What a tool costs per call, in USDC, or `'free'` when no payment is required. */
 export type ToolPrice = number | 'free';
@@ -144,7 +145,9 @@ export const MCP_TOOLS: readonly InventoryTool[] = [
     restRoute: 'POST /v1/ch/qr-bill/check',
     price: 'free',
     description:
-      'Check a Swiss QR-bill payload (the SPC text inside the QR code): header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON reference checksums and their pairing with the IBAN, amount, currency, and whether the addresses are structured (type S) or still combined (type K), which banks stop processing on 14.11.2026; a combined address comes back with a proposed structured form.',
+      'Check a Swiss QR-bill payload (the SPC text inside the QR code): header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON reference checksums and their pairing with the IBAN, amount, currency, and whether the addresses are structured (type S) or still combined (type K): ' +
+      COMBINED_ADDRESS_CLAUSE +
+      '; a combined address comes back with a proposed structured form.',
     readOnly: true,
     capability: 'swiss_qr_bill_check',
   },
