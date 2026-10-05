@@ -2,12 +2,14 @@
 title: "Data Processing Agreement"
 description: "Pre-signed DPA (art. 28 GDPR / FADP) for customers who embed the IBANforge API — roles, processing scope, sub-processors, TOMs."
 order: 3
-updated: "2026-09-27"
+updated: "2026-10-05"
 ---
 
 # Data Processing Agreement (DPA)
 
-**Last updated: September 27, 2026 · Version 1.4**
+**Last updated: October 5, 2026 · Version 1.5**
+
+*Revision 1.5 (October 5, 2026): Clauses 2, 4.2, 4.3 and 6 and Annex I now describe the processing as it already works, more precisely. For an invalid IBAN, at most the first 4 characters (country code and check digits) are kept, not 12. The network edge of our API host keeps the raw IP address and the path of each request for 7 days. The website's functions run in the Frankfurt region (EU). Clause 6 names the European Commission's adequacy decision for Switzerland, on which a transfer from the EU to the Processor relies. Nothing new is processed.*
 
 *Revision 1.4 (September 27, 2026): Clauses 2, 4.2 and 7 and Annex I now describe the file audit: the annotated report it produces, which reproduces the columns of the uploaded file, is stored for at most 2 hours if unpaid and 24 hours after payment, then deleted. It describes the file audit as it already works; nothing new is collected.*
 
@@ -31,7 +33,7 @@ This DPA supplements the [Terms of Service](/legal/terms) and applies whenever a
 
 ## 2. Processing instructions
 
-The Processor processes submitted data **only** to produce the API response (for the file audit, the report the Controller orders), and on no other instruction. IBANs submitted for validation are processed **in memory and are not stored** (sole exception: for invalid IBANs, at most the first 12 characters — country and bank identifier, never the account-identifying part — may be retained up to 12 months for data-quality diagnostics). The file audit is a separate deliverable: when the Controller uploads a file to it, the annotated report produced, which reproduces the columns of the uploaded file, is stored for at most **2 hours** if unpaid and **24 hours after payment**, then deleted. The Processor does not use Controller data to train models, build marketing profiles, or enrich third-party datasets.
+The Processor processes submitted data **only** to produce the API response (for the file audit, the report the Controller orders), and on no other instruction. IBANs submitted for validation are processed **in memory and are not stored** (sole exception: for invalid IBANs, at most the first 4 characters, the country code and check digits, may be retained up to 12 months for data-quality diagnostics). The file audit is a separate deliverable: when the Controller uploads a file to it, the annotated report produced, which reproduces the columns of the uploaded file, is stored for at most **2 hours** if unpaid and **24 hours after payment**, then deleted. The Processor does not use Controller data to train models, build marketing profiles, or enrich third-party datasets.
 
 ## 3. Confidentiality and personnel
 
@@ -40,8 +42,8 @@ The Service is operated by its owner; no employees have access to production dat
 ## 4. Technical and organisational measures (TOMs)
 
 - **4.1** Transport encryption (TLS) on all endpoints; HTTP redirected to HTTPS.
-- **4.2** **Data minimisation by design:** no storage of IBANs submitted for validation (the file audit keeps only its report, for the periods in Annex I.6); IP addresses stored only as salted hashes; API keys stored as hashes — a newly issued key is additionally held for one-time retrieval (cleared on first read, or after 7 days at the latest) and delivered to the customer by email.
-- **4.3** Hosting in the **Amsterdam (EU)** region (Railway), with volume-level isolation and a Zurich network edge for Swiss traffic.
+- **4.2** **Data minimisation by design:** no storage of IBANs submitted for validation (the file audit keeps only its report, for the periods in Annex I.6); IP addresses stored only as salted hashes in the Processor's own logs (the API host's network edge keeps the raw address and the request path for 7 days); API keys stored as hashes — a newly issued key is additionally held for one-time retrieval (cleared on first read, or after 7 days at the latest) and delivered to the customer by email.
+- **4.3** Hosting in the **Amsterdam (EU)** region (Railway), with volume-level isolation and a Zurich network edge for Swiss traffic; the website's functions run in Vercel's **Frankfurt (EU)** region.
 - **4.4** Request metadata automatically purged after **12 months** at the latest.
 - **4.5** Access to production restricted to the operator with strong authentication; secrets held in the hosting platform's secret store.
 - **4.6** Public status page and monitored error rates.
@@ -53,7 +55,7 @@ The Controller authorises the sub-processors listed in the [Privacy Policy §3](
 
 ## 6. International transfers
 
-Primary processing occurs within the European Union (Netherlands). For Controllers subject to the GDPR, processing therefore stays within the EU; for Swiss Controllers, Swiss law recognises the EU as adequate. Where a sub-processor operates from a third country, transfers rely on adequacy decisions or the sub-processor's standard contractual clauses.
+Submitted identifiers are processed within the European Union: by the API in Railway's Amsterdam region (Netherlands) and, for the website's playground and dashboard, by functions in Vercel's Frankfurt region (Germany). For Controllers subject to the GDPR, transfers to the Processor, established in Switzerland, rely on the European Commission's adequacy decision for Switzerland (Decision 2000/518/EC, confirmed by the Commission's review of 15 January 2024); no standard contractual clauses are needed. For Swiss Controllers, Swiss law recognises the EU as adequate. Where a sub-processor operates from a third country, transfers rely on adequacy decisions (including the EU-US and Swiss-US Data Privacy Framework for certified US sub-processors) or the sub-processor's standard contractual clauses. [Privacy Policy §3](/legal/privacy) says which sub-processors can receive submitted identifiers.
 
 ## 7. Assistance, incidents, audits
 
@@ -77,7 +79,7 @@ Contact for all DPA matters: **support@ibanforge.com**
 
 - **I.1 Subject matter:** validation and enrichment of bank identifiers (IBAN/BIC) submitted by the Controller through the API; for the file audit, checking a file uploaded by the Controller and producing its annotated report.
 - **I.2 Data subjects:** the Controller's customers, suppliers, employees or end users whose IBANs are submitted.
-- **I.3 Categories of personal data:** bank account identifiers (IBANs) and BICs in transit; for the file audit, the columns of the uploaded file (for example payee names and addresses); the Controller's contact email for account management; request metadata (endpoint, timestamp, status, latency, salted IP hash, API-key prefix).
+- **I.3 Categories of personal data:** bank account identifiers (IBANs) and BICs in transit; for the file audit, the columns of the uploaded file (for example payee names and addresses); the Controller's contact email for account management; request metadata (endpoint, timestamp, status, latency, salted IP hash, API-key prefix); in the API host's network edge log, the raw IP address and the request path, for 7 days.
 - **I.4 Special categories:** none.
 - **I.5 Processing operations:** ephemeral, automated in-memory validation/enrichment producing the API response; for the file audit, storage of the annotated report for the periods in I.6; aggregate service statistics without personal data.
-- **I.6 Retention:** IBANs submitted for validation are **not stored** (sole exception: for invalid IBANs, at most the first 12 characters — country and bank identifier, never the account-identifying part — up to 12 months for data-quality diagnostics). The file-audit report is kept at most **2 hours** if unpaid and **24 hours after payment**, then deleted. Request metadata (telemetry) is kept **at most 12 months**, and telemetry attributable to a terminated customer is deleted **by default 30 days after termination** (Clause 4.7). Billing records are kept as required by statutory bookkeeping law.
+- **I.6 Retention:** IBANs submitted for validation are **not stored** (sole exception: for invalid IBANs, at most the first 4 characters, the country code and check digits, up to 12 months for data-quality diagnostics). The file-audit report is kept at most **2 hours** if unpaid and **24 hours after payment**, then deleted. Request metadata (telemetry) is kept **at most 12 months**, and telemetry attributable to a terminated customer is deleted **by default 30 days after termination** (Clause 4.7). Billing records are kept as required by statutory bookkeeping law.

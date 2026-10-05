@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-09-27"
+updated: "2026-10-05"
 ---
 
 # Privacy Policy
 
-**Last updated: September 27, 2026 · Version 1.5**
+**Last updated: October 5, 2026 · Version 1.6**
+
+*Revision 1.6 (October 5, 2026): sections 1 to 4 now describe the processing as it already works, more precisely. For an invalid IBAN, at most the first 4 characters (country code and check digits) are kept, not 12. The network edge of our API host keeps the raw IP address and the path of each request for 7 days, outside our own logs. The website's functions run in the Frankfurt region (EU). The processor list now says which processors can receive the IBANs you submit. Nothing new is collected.*
 
 *Revision 1.5 (September 27, 2026): section 1 and the retention summary now describe the file audit: the annotated report it produces, which reproduces the columns of the uploaded file, is kept 2 hours if unpaid and 24 hours after payment, then deleted. It describes the file audit as it already works; nothing new is collected.*
 
@@ -25,37 +27,39 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 
 | Data | Purpose | Stored? |
 |---|---|---|
-| **IBANs submitted for validation** | Validation and enrichment (performance of the service) | **No.** Processed in memory, never written to storage. One exception: for *invalid* IBANs, at most the **first 12 characters** (country + bank identifier — never the account part) may be retained for data-quality diagnostics. |
+| **IBANs submitted for validation** | Validation and enrichment (performance of the service) | **No.** Processed in memory, never written to storage. One exception: for *invalid* IBANs, at most the **first 4 characters** (country code and check digits, never the bank or account part) may be retained for data-quality diagnostics. |
 | **Files uploaded to the file audit** (for example payee names, IBANs and addresses) | Producing the annotated report you order (performance of the service) | **Yes, briefly.** The report reproduces the columns of the uploaded file. It is kept **2 hours** if unpaid and **24 hours after payment**, then automatically deleted. |
 | **Email address** (free key signup) | Issuing your key, quota notifications, service messages | Yes, while your key exists. |
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
+| **Network edge log of our API host** (raw IP address, path without the query string, status, user-agent, timestamp) | Kept by Railway, our API host, to route and secure traffic, outside our own logs | Yes, **7 days**, then deleted by Railway. Send IBANs in the body of a `POST` request, never in a URL path. |
 | **Aggregated statistics** (daily counts by endpoint/country — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
 | **Payment data** | Processing card or USDC payments | Handled by Stripe / the x402 facilitator. We never see card numbers; we store the transaction reference and, for a USDC purchase, the paying wallet address and the on-chain transaction hash, to reconcile a payment whose settlement could not be confirmed. |
 | **Feedback reports** (free-form report, optional contact address) | Investigating data-quality issues, x402 refund decisions | Yes, **12 months**, then automatically deleted. |
 
-**IP addresses** are pseudonymised before storage: we keep only a salted hash, never the raw address.
+**IP addresses** are pseudonymised before they enter our own logs: we keep only a salted hash, never the raw address. The edge log of our API host, described above, keeps the raw address for 7 days.
 
 ## 2. Where the data lives
 
-The API and its databases run on Railway infrastructure in the **Amsterdam, Netherlands region (EU)**, fronted by Railway's European network edge (Zurich for most Swiss traffic). For EU/EEA customers, processing stays within the EU. For Swiss customers, data is processed in the EU: Swiss law recognises the EU as providing an adequate level of protection, and this policy and the [DPA](/legal/dpa) apply regardless of where you are.
+The API and its databases run on Railway infrastructure in the **Amsterdam, Netherlands region (EU)**, fronted by Railway's European network edge (Zurich for most Swiss traffic). The website's functions run in Vercel's **Frankfurt, Germany region (EU)**; its static pages are served from Vercel's global network. For EU/EEA customers, processing stays within the EU. For Swiss customers, data is processed in the EU: Swiss law recognises the EU as providing an adequate level of protection, and this policy and the [DPA](/legal/dpa) apply regardless of where you are.
 
 ## 3. Processors we use
 
-| Processor | Role | Location/region |
-|---|---|---|
-| Railway Corp. | API hosting & storage | Region: Amsterdam (EU) |
-| Vercel Inc. | Website & dashboard hosting — customer data transits its functions when the operator uses the dashboard, and playground submissions are relayed to the API | Global CDN |
-| Stripe Payments Europe | Card payments | EU |
-| Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US |
-| Infomaniak Network SA | Transactional & support email (operator-managed relay) | Switzerland |
-| GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US |
-| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US |
+| Processor | Role | Location/region | Receives the IBANs you submit? |
+|---|---|---|---|
+| Railway Corp. | API hosting & storage | Region: Amsterdam (EU) | Yes, in memory, to answer the request |
+| Vercel Inc. | Website & dashboard hosting — customer data transits its functions when the operator uses the dashboard, and playground submissions are relayed to the API | Functions: Frankfurt (EU); static pages: global CDN | Only an IBAN typed into the website's playground, relayed to the API |
+| Stripe Payments Europe | Card payments | EU | No |
+| Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US | No |
+| Infomaniak Network SA | Transactional & support email (operator-managed relay) | Switzerland | Only an IBAN you write in an e-mail to us |
+| GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US | No |
+| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US | Never from the API; only an IBAN you write in an e-mail to us |
 
-Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions or standard contractual clauses maintained by the processor.
+Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions (for US processors certified under them, the EU-US and Swiss-US Data Privacy Framework) or standard contractual clauses maintained by the processor.
 
 ## 4. Retention summary
 
-- IBANs submitted for validation: **not stored** (invalid-IBAN prefixes ≤12 characters: up to 12 months as request metadata).
+- IBANs submitted for validation: **not stored** (invalid-IBAN prefixes of at most 4 characters: up to 12 months as request metadata).
+- Edge log of our API host (raw IP address and path): **7 days**, kept and deleted by Railway.
 - File audit: the annotated report is deleted **2 hours** after the upload if unpaid, and **24 hours after payment** otherwise.
 - Request metadata: **12 months**, purged automatically. For API customers who terminate, metadata attributable to their keys is deleted **by default 30 days after termination** ([DPA clause 4.7](/legal/dpa)).
 - Key account (email): lifetime of the key; deleted on request.

@@ -7,13 +7,13 @@ else does.
 
 ## Reporting a vulnerability
 
-**Email `security@ibanforge.com`.**
+**Email `support@ibanforge.com` with `SECURITY` in the subject.**
 
-That is the same address published in
-[`/.well-known/security.txt`](https://api.ibanforge.com/.well-known/security.txt)
-(RFC 9116). `support@ibanforge.com` reaches the same people and is a fine
-fallback, but it is a public-facing inbox: prefer the security address for
-anything that should not be read by a support agent first.
+That is the one channel published everywhere: in both `security.txt` files
+([site](https://ibanforge.com/.well-known/security.txt),
+[API](https://api.ibanforge.com/.well-known/security.txt), RFC 9116) and in the
+[Legal Notice](https://ibanforge.com/en/legal/imprint). The mailbox is read by
+the operator in person; no support agent sits in front of it.
 
 Please do **not** open a public GitHub issue for a vulnerability. This
 repository is public, and an issue is a disclosure.
