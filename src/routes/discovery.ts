@@ -721,10 +721,13 @@ discovery.get('/.well-known/glama.json', (c) => c.json(GLAMA_MANIFEST));
 
 // /.well-known/security.txt — RFC 9116. Probed by a steady trickle of distinct IPs; several
 // directory scorers treat its absence as a maturity signal.
-const SECURITY_TXT = `Contact: mailto:security@ibanforge.com
+// One reporting channel everywhere (site, API, SECURITY.md, Legal Notice): the support
+// mailbox, which is read, with "SECURITY" in the subject. RFC 9116 makes Expires mandatory.
+const SECURITY_TXT = `Contact: mailto:support@ibanforge.com
+Expires: 2027-04-01T00:00:00.000Z
 Preferred-Languages: en, fr, de
 Canonical: https://api.ibanforge.com/.well-known/security.txt
-Policy: https://ibanforge.com/docs
+Policy: https://github.com/cammac-creator/ibanforge/blob/main/SECURITY.md
 `;
 
 discovery.get('/.well-known/security.txt', (c) =>

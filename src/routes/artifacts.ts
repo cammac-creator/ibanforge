@@ -490,8 +490,8 @@ that no integration is left without a path forward.
 
 ## Contact
 
-security@ibanforge.com for vulnerability disclosure, support@ibanforge.com for
-everything else.
+support@ibanforge.com for everything, with "SECURITY" in the subject for a
+vulnerability report.
 `;
 
 const AUTH = `# Authentication — IBANforge
