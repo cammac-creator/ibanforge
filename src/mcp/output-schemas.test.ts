@@ -193,10 +193,12 @@ describe('the truth fields are declared, so the schema never strips them', () =>
       'IT60X0542811101000000123456',
       'ES9121000418450200051332',
       'IT65A0542811101000000123456',
-      // L'Allemagne (06.10.2026) : l'exemple du registre (méthode 13, sans numéro
-      // de test publié : not_checked), dont method, source et table_fetched_on
-      // doivent traverser le schéma fermé sans être retirés par Zod.
+      // L'Allemagne (06.10.2026) : l'exemple du registre (méthode 13, second
+      // niveau : pass avec verified_by independent_implementation) et un code
+      // banque de la méthode 44 (not_checked). method, verified_by, source et
+      // table_fetched_on doivent traverser le schéma fermé sans être retirés par Zod.
       'DE89370400440532013000',
+      'DE48300600100000012345',
     ];
     const validate = z.object(TOOL_OUTPUT_SCHEMAS.validate_iban);
     const batch = z.object(TOOL_OUTPUT_SCHEMAS.batch_validate_iban);

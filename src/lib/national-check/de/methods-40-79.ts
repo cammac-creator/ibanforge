@@ -26,9 +26,9 @@ import { DE_METHODS_00_39 } from './methods-00-39.js';
  * 66, 69, 70, 72, 73, 75, 77, 79) ne sont pas écrites : une banque qui en
  * adopterait une passerait d'elle-même à `not_checked`.
  *
- * Une méthode écrite ici n'est pas pour autant servie : seules celles de
- * `DE_VERIFIED_METHODS` (verified.ts), qui passent tous les numéros de test
- * publiés par la Bundesbank, donnent un verdict.
+ * Une méthode écrite ici n'est pas pour autant servie : verified.ts dit
+ * lesquelles donnent un verdict, et sur quelle base (numéros officiels de la
+ * Bundesbank, ou implémentation indépendante seulement).
  */
 
 /** La méthode 00, à laquelle plusieurs méthodes de cette plage renvoient. */

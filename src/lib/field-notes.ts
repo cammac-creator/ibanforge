@@ -64,7 +64,7 @@ export const CHECKS_NOTE =
   'national_check_digits: the check key a country keeps inside the BBAN, a second check independent of mod-97. ' +
   'Checked for FR and MC (RIB key), BE (the last two digits, modulo 97), IT and SM (CIN), ES (DC) and DE (the account-number check digit, by the method the Bundesbank lists for the bank code), with the proof in the national_check_digits block, ' +
   'and for GB (Vocalink modulus), with the proof in modulus_check; not_checked elsewhere. ' +
-  'In DE it is not_checked when the bank code is not in the Bundesbank file or its method is not verified here yet, and not_applicable when the bank uses no check digit (method 09). ' +
+  'In DE it is not_checked when the bank code is not in the Bundesbank file or its method is not checked here, and not_applicable when the bank uses no check digit (method 09); national_check_digits.verified_by says whether a German verdict rests on the Bundesbank test numbers or on an independent implementation only. ' +
   'pass means the account number is well formed, never that the account exists; fail means it cannot have been issued as written, and valid stays true. ' +
   'A key may be added later; a key is never removed. Present only when valid is true.';
 
@@ -83,9 +83,10 @@ export const NATIONAL_CHECK_DIGITS_NOTE =
   'status: pass (the key matches, so the account number is well formed; it does not prove the account exists or is open) or fail (the key does not match: this account number cannot have been issued as written, a typo or a made-up number). ' +
   'A fail never makes valid false, because the IBAN check digits are right: read the two separately, and confirm the details with the beneficiary before paying. ' +
   'not_applicable: a BBAN without the national layout, which a valid IBAN never has, or in DE a bank that uses no check digit (method 09) or a method that defines none for that range of account numbers. ' +
-  'not_checked (DE only): the check did not run on our side, because the bank code is not in the Bundesbank file or its method is not verified here yet (a verdict is served only for the methods that give the expected answer on every test number the Bundesbank publishes); it says nothing about the beneficiary. ' +
+  'not_checked (DE only): the check did not run on our side, because the bank code is not in the Bundesbank file or its method is not checked here (method 44, and methods no bank uses); it says nothing about the beneficiary. ' +
+  'verified_by (DE only, whenever the method ran): bundesbank_test_numbers (the method gives the expected answer on every test number and worked example the Bundesbank publishes; a fail adds the blocking step national_check_digits_failed) or independent_implementation (the Bundesbank publishes no test number for the method, which was verified against an independent implementation only; a fail adds the warning step national_check_digits_suspect and never stops a payment). ' +
   'detail, present on fail, not_applicable and not_checked, says which digits disagree or why nothing was checked; it never gives the expected key. ' +
-  'In DE the block also carries method (the Bundesbank method code), source (with the credit line the Bundesbank asks for) and table_fetched_on (the day the method table was read). checks.national_check_digits repeats status.';
+  'In DE the block also carries method (the Bundesbank method code), verified_by, source (with the credit line the Bundesbank asks for) and table_fetched_on (the day the method table was read). checks.national_check_digits repeats status.';
 
 /** `sepa.bank_reachability`. */
 export const BANK_REACHABILITY_NOTE =
@@ -101,7 +102,7 @@ export const VOP_REGISTER_STATUS_NOTE =
  */
 export const VALIDATE_TRUTH_RETURNS =
   'bank_code_holder: confirmed (a register names who holds the bank code), inferred (we name a holder from a source that cannot settle it: our composite map, the prefix fallback, a published structural rule), not_allocated (the national register says nobody holds it: do not send) or unknown. valid stays true in all four: it only means the IBAN is well formed. checks: one status per check (pass, fail, inferred, unknown, not_checked, not_applicable); payee_name, account_exists and payee_sanctions are always not_checked. ' +
-  'national_check_digits { country, scheme, status: pass | fail | not_applicable | not_checked, detail?, method? } (FR, MC, BE, IT, SM, ES and DE only): the national key inside the BBAN; fail means the account number cannot have been issued as written, and valid stays true; not_checked (DE only) means the bank code or its Bundesbank method is not covered here.';
+  'national_check_digits { country, scheme, status: pass | fail | not_applicable | not_checked, detail?, method?, verified_by? } (FR, MC, BE, IT, SM, ES and DE only): the national key inside the BBAN; fail means the account number cannot have been issued as written, and valid stays true; in DE a fail with verified_by independent_implementation is a warning (national_check_digits_suspect), not a stop, and not_checked means the bank code or its Bundesbank method is not covered here.';
 
 /** Les noms honnêtes du bloc de conformité, pour la description de check_compliance. */
 export const COMPLIANCE_HONEST_NAMES =

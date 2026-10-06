@@ -46,6 +46,17 @@
  * qu'elle demande) et `table_fetched_on` (le jour où la table des méthodes a
  * été lue), comme `modulus_check` pour le Royaume-Uni.
  *
+ * Et `verified_by`, quand la méthode a tourné (décision de la session
+ * principale du 06.10.2026, deux niveaux) :
+ *
+ * - `bundesbank_test_numbers` : la méthode passe tous les numéros de test et
+ *   exemples que la Bundesbank publie pour elle ; un `fail` est bloquant
+ *   (`national_check_digits_failed`) ;
+ * - `independent_implementation` : la Bundesbank ne publie aucun numéro pour
+ *   cette méthode ; elle n'a été confrontée qu'à une implémentation
+ *   indépendante ; un `fail` est un avertissement
+ *   (`national_check_digits_suspect`), jamais un arrêt.
+ *
  * ## La langue
  *
  * `detail` est servi aux clients de l'API : il est en anglais, comme le reste
@@ -56,6 +67,15 @@
 export type NationalCheckScheme = 'fr_rib_key' | 'be_mod97' | 'it_cin' | 'es_dc' | 'de_pruefziffer';
 
 export type NationalCheckStatus = 'pass' | 'fail' | 'not_applicable' | 'not_checked';
+
+/** Sur quoi repose le verdict allemand (voir plus haut). */
+export type NationalCheckVerifiedBy = 'bundesbank_test_numbers' | 'independent_implementation';
+
+/** Les deux bases, pour les schémas publiés (OpenAPI, MCP). */
+export const NATIONAL_CHECK_VERIFIED_BY: readonly NationalCheckVerifiedBy[] = Object.freeze([
+  'bundesbank_test_numbers',
+  'independent_implementation',
+]);
 
 /** Les quatre statuts, pour les schémas publiés (OpenAPI, MCP). */
 export const NATIONAL_CHECK_STATUSES: readonly NationalCheckStatus[] = Object.freeze([
@@ -74,6 +94,11 @@ export interface NationalCheck {
   detail?: string;
   /** Allemagne seulement : le code de méthode de la Bundesbank pour ce code banque. */
   method?: string;
+  /**
+   * Allemagne seulement, quand la méthode a tourné : la base de sa vérification.
+   * Un `fail` n'est bloquant que sur `bundesbank_test_numbers`.
+   */
+  verified_by?: NationalCheckVerifiedBy;
   /** Allemagne seulement : la source, avec la mention que la Bundesbank demande. */
   source?: string;
   /** Allemagne seulement : le jour où la table des méthodes a été lue (AAAA-MM-JJ). */

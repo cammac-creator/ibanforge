@@ -33,8 +33,9 @@ import { DE_METHODS_00_39 } from './methods-00-39.js';
  * écrites ici en fonctions privées, d'après leur propre page de la
  * spécification, et ne sont pas servies seules.
  *
- * Une méthode écrite ici n'est pas pour autant servie : seules celles de
- * `DE_VERIFIED_METHODS` (verified.ts) donnent un verdict.
+ * Une méthode écrite ici n'est pas pour autant servie : verified.ts dit
+ * lesquelles donnent un verdict, et sur quelle base (numéros officiels de la
+ * Bundesbank, ou implémentation indépendante seulement).
  */
 
 const M = DE_METHODS_00_39;

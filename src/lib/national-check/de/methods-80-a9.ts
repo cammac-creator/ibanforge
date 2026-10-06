@@ -28,9 +28,9 @@ import { DE_METHODS_00_39 } from './methods-00-39.js';
  * A0, A1, A9) ne sont pas écrites : un code banque qui y passerait recevrait
  * `not_checked`.
  *
- * Une méthode écrite ici n'est pas pour autant servie : seules celles de
- * `DE_VERIFIED_METHODS` (verified.ts), qui passent tous les numéros de test
- * publiés par la Bundesbank, donnent un verdict.
+ * Une méthode écrite ici n'est pas pour autant servie : verified.ts dit
+ * lesquelles donnent un verdict, et sur quelle base (numéros officiels de la
+ * Bundesbank, ou implémentation indépendante seulement).
  */
 
 /** Les méthodes de base auxquelles celles-ci renvoient (« wie bei Verfahren 00 »). */

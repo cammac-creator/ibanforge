@@ -1,7 +1,8 @@
 /**
- * Allemagne : les méthodes de la Bundesbank qui donnent un verdict.
+ * Allemagne : les méthodes de la Bundesbank qui donnent un verdict, en deux
+ * niveaux (décision de la session principale du 06.10.2026).
  *
- * ## La règle
+ * ## Premier niveau : `DE_VERIFIED_METHODS`, vérifiées sur les numéros officiels
  *
  * Un faux « fail » bloquerait l'inscription SEPA d'un vrai client : c'est pire
  * que pas de contrôle. Une méthode n'entre dans cette liste que si
@@ -17,25 +18,30 @@
  * 4. aucun IBAN fabriqué selon les règles IBAN des banques (champ 14 du fichier
  *    étendu, non public) ne l'a fait échouer dans la mesure du 06.10.2026.
  *
- * Une méthode sans aucun numéro publié ne remplit pas la condition 2, même si
- * son calcul est simple : « zéro cas » ne vaut pas « tous les cas ». Elle est
- * écrite, mais sert `not_checked`, comme une méthode absente. Une banque qui
- * change de méthode pour une méthode hors liste passe d'elle-même à
- * `not_checked` au rafraîchissement mensuel suivant.
+ * Verdict servi avec `verified_by: "bundesbank_test_numbers"` ; un `fail` y est
+ * bloquant (étape `national_check_digits_failed`).
  *
- * La méthode 09 (« Keine Prüfzifferberechnung ») n'est pas une méthode à
- * vérifier : elle dit que la banque n'a pas de clé, et sert `not_applicable`.
+ * ## Second niveau : `DE_INDEPENDENTLY_VERIFIED_METHODS`
  *
- * ## Écrites mais hors liste, et pourquoi (06.10.2026)
+ * La Bundesbank ne publie pour ces méthodes ni numéro de test ni exemple
+ * complet : la condition 2 ne peut pas être remplie (« zéro cas » ne vaut pas
+ * « tous les cas »). Elles remplissent 1, 3 (accord complet avec
+ * l'implémentation indépendante sur chaque numéro essayé) et 4. Verdict servi
+ * avec `verified_by: "independent_implementation"` ; un `fail` n'est qu'un
+ * avertissement (étape `national_check_digits_suspect`), jamais un arrêt.
  *
- * - Sans numéro publié par la Bundesbank : 01, 02, 03, 04, 05, 07, 08, 11, 13,
- *   14, 15, 16, 18, 20, 21, 22, 23, 30, 48, 49, 59, 60, 67, 92. Parmi elles, 13
- *   (Commerzbank) et 20 (des caisses d'épargne) : leur calcul est simple et
- *   l'implémentation indépendante est d'accord sur chaque numéro essayé, mais
- *   la règle 2 les écarte tant qu'aucun numéro officiel n'existe.
+ * ## Le reste
+ *
  * - 44 : une règle IBAN de ses banques remplace le numéro de compte par un
  *   numéro SANS clé ; un IBAN parfaitement réel y échouerait. Elle reste aussi
  *   plus stricte que l'implémentation indépendante sur une partie des numéros.
+ *   `not_checked`, à aucun niveau.
+ * - Les méthodes qu'aucune banque n'utilise aujourd'hui ne sont pas écrites,
+ *   ou seulement comme brique d'une autre (02, 04, 07, 14, 15, 23…) : une
+ *   banque qui y passerait reçoit `not_checked` au rafraîchissement mensuel
+ *   suivant.
+ * - La méthode 09 (« Keine Prüfzifferberechnung ») n'est pas une méthode à
+ *   vérifier : elle dit que la banque n'a pas de clé, et sert `not_applicable`.
  */
 export const DE_VERIFIED_METHODS: ReadonlySet<string> = new Set([
   // 00 à 39
@@ -119,3 +125,32 @@ export const DE_VERIFIED_METHODS: ReadonlySet<string> = new Set([
   'E3',
   'E4',
 ]);
+
+/**
+ * Le second niveau : sans numéro publié par la Bundesbank, vérifiées seulement
+ * contre l'implémentation indépendante (voir plus haut). Jamais en même temps
+ * dans `DE_VERIFIED_METHODS`, jamais la 44 (tests de methods.test.ts).
+ */
+export const DE_INDEPENDENTLY_VERIFIED_METHODS: ReadonlySet<string> = new Set([
+  '01',
+  '03',
+  '05',
+  '08',
+  '11',
+  '13',
+  '16',
+  '18',
+  '20',
+  '21',
+  '22',
+  '30',
+  '48',
+  '49',
+  '59',
+  '60',
+  '67',
+  '92',
+]);
+
+/** Les méthodes écartées à tout niveau, avec leur raison (voir plus haut). */
+export const DE_EXCLUDED_METHODS: ReadonlySet<string> = new Set(['44']);

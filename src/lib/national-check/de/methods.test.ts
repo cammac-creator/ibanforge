@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DE_METHODS } from './methods.js';
 import { DE_OFFICIAL_VECTORS } from './vectors.js';
-import { DE_VERIFIED_METHODS } from './verified.js';
+import {
+  DE_EXCLUDED_METHODS,
+  DE_INDEPENDENTLY_VERIFIED_METHODS,
+  DE_VERIFIED_METHODS,
+} from './verified.js';
 
 /**
  * Les méthodes allemandes contre les numéros de test publiés par la
@@ -61,6 +65,22 @@ describe('the verified list', () => {
 
   it('does not list method 09, which is the absence of a method', () => {
     expect(DE_VERIFIED_METHODS.has('09')).toBe(false);
+    expect(DE_INDEPENDENTLY_VERIFIED_METHODS.has('09')).toBe(false);
+  });
+
+  it('keeps the two levels apart, and the excluded methods out of both (06.10.2026)', () => {
+    for (const method of DE_INDEPENDENTLY_VERIFIED_METHODS) {
+      expect(DE_VERIFIED_METHODS.has(method), method).toBe(false);
+      expect(DE_METHODS[method], method).toBeTypeOf('function');
+      // Le second niveau, c'est l'absence de numéro officiel : une méthode qui en
+      // a doit passer au premier niveau, après les avoir tous passés.
+      expect(DE_OFFICIAL_VECTORS[method], `${method} has official numbers`).toBeUndefined();
+    }
+    for (const method of DE_EXCLUDED_METHODS) {
+      expect(DE_VERIFIED_METHODS.has(method), method).toBe(false);
+      expect(DE_INDEPENDENTLY_VERIFIED_METHODS.has(method), method).toBe(false);
+    }
+    expect([...DE_EXCLUDED_METHODS]).toEqual(['44']);
   });
 
   it('every official number is ten digits or fewer, digits only', () => {

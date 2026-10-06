@@ -31,14 +31,14 @@ export const COPY_EN: AlternativesCopy = {
     items: [
       'The bank code is checked in the national register where we read it in full: Germany (Deutsche Bundesbank, edition of {deAsOf}), Switzerland and Liechtenstein (SIX BankMaster, valid from {chAsOf}), Austria, Belgium, Slovakia, the Czech Republic and Bulgaria. There, a code the register does not hold comes back not_allocated, with authoritative: true.',
       'Every answer names its sources: the register behind the bank-code verdict, the source of the BIC and the edition it was read from (bank_code_check.register, bic.source, as_of).',
-      'National check digits inside the account number, where a country has them: France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC), Germany (the Bundesbank check-digit method of each bank code, where the Bundesbank publishes test numbers for it) and the United Kingdom (modulus check).',
+      'National check digits inside the account number, where a country has them: France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC), Germany (the Bundesbank check-digit method of each bank code) and the United Kingdom (modulus check).',
       'Built for AI agents: an MCP server, hosted or as the ibanforge-mcp package, and x402, which lets an agent pay each call in USDC on Base with no account.',
       'A keyless trial of 25 validations a week on POST /v1/iban/validate, to try it before taking a key.',
     ],
     limitsHeading: 'What IBANforge does not do',
     limits: [
       'Check the account holder’s name. That is Verification of Payee, run by the payee’s bank.',
-      'Check the German account-number methods published without test numbers, or the national keys of the countries not named above: not yet.',
+      'Check the national keys of the countries not named above: not yet.',
       'Say whether the account exists or is open. No register publishes that.',
     ],
     pricesHeading: 'IBANforge prices',
@@ -96,7 +96,7 @@ export const COPY_EN: AlternativesCopy = {
         'For 2,000 validations with bank data, from the published prices: at IBANforge, $8 in prepaid credits (two packs of 1,000) that never expire. At IBANAPI, the smallest single plan with 2,000 bank lookups is Enterprise, $115 for 365 days, which includes 5,000. Repeat purchases of a smaller plan are not compared here.',
       betterFor: [
         'You want to run the validation engine inside your own infrastructure.',
-        'You need the domestic account number checked in the countries where IBANAPI announces it. In Germany, IBANforge checks it only for the Bundesbank methods that come with published test numbers.',
+        'You need the domestic account number checked in countries where IBANAPI announces it and IBANforge does not.',
       ],
       note:
         'What a bank code missing from IBANAPI’s registry means (allocated to nobody, or simply not listed) is not stated on the pages we read.',

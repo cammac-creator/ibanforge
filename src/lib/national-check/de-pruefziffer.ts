@@ -1,7 +1,7 @@
 import { DE_METHODS } from './de/methods.js';
 import { DE_TABLE_SOURCE, loadDeMethodTable } from './de/table.js';
-import { DE_VERIFIED_METHODS } from './de/verified.js';
-import type { NationalCheck } from './types.js';
+import { DE_INDEPENDENTLY_VERIFIED_METHODS, DE_VERIFIED_METHODS } from './de/verified.js';
+import type { NationalCheck, NationalCheckVerifiedBy } from './types.js';
 
 /**
  * Allemagne : la clé du numéro de compte, selon la méthode que la Bundesbank
@@ -31,13 +31,15 @@ import type { NationalCheck } from './types.js';
  *   sans algorithme ; `checks.national_check_digits` dit `not_checked` ;
  * - code banque absent du fichier de la Bundesbank : `not_checked` ;
  * - méthode 09 (la banque n'a pas de clé) : `not_applicable` ;
- * - méthode absente de `DE_VERIFIED_METHODS` : `not_checked`, jamais un verdict
- *   tiré d'un calcul que les numéros officiels n'ont pas confirmé ;
+ * - méthode d'aucun des deux niveaux de de/verified.ts : `not_checked` ;
  * - méthode vérifiée qui ne définit pas de clé pour ce numéro : `not_applicable` ;
- * - sinon `pass` ou `fail`.
+ * - sinon `pass` ou `fail`, avec `verified_by` qui dit le niveau.
  *
- * Seul `fail` déclenche l'étape bloquante de `next_steps`, et il ne peut venir
- * que d'une méthode vérifiée.
+ * Seul un `fail` du premier niveau (`bundesbank_test_numbers`, numéros
+ * officiels) déclenche l'étape bloquante de `next_steps`. Un `fail` du second
+ * (`independent_implementation`, aucun numéro officiel n'existe pour la
+ * méthode) n'est qu'un avertissement : `national_check_digits_suspect`
+ * (décision de la session principale du 06.10.2026).
  */
 export function checkGermanAccount(country: string, bban: string): NationalCheck | null {
   if (!/^\d{18}$/.test(bban)) {
@@ -79,20 +81,34 @@ export function checkGermanAccount(country: string, bban: string): NationalCheck
     };
   }
   const run = DE_METHODS[method];
-  if (!run || !DE_VERIFIED_METHODS.has(method)) {
+  const verifiedBy: NationalCheckVerifiedBy | null = !run
+    ? null
+    : DE_VERIFIED_METHODS.has(method)
+      ? 'bundesbank_test_numbers'
+      : DE_INDEPENDENTLY_VERIFIED_METHODS.has(method)
+        ? 'independent_implementation'
+        : null;
+  if (!run || verifiedBy === null) {
     return {
       country,
       scheme: 'de_pruefziffer',
       status: 'not_checked',
       method,
-      detail: `Bundesbank method ${method} is not checked here yet: a verdict is served only for the methods that give the expected answer on every test number the Bundesbank publishes.`,
+      detail: `Bundesbank method ${method} is not checked here: it is not implemented, or it failed a verification step (for method 44, real IBANs built under an IBAN rule carry account numbers without a check digit).`,
       ...provenance,
     };
   }
 
   const outcome = run(account, blz);
   if (outcome === 'pass') {
-    return { country, scheme: 'de_pruefziffer', status: 'pass', method, ...provenance };
+    return {
+      country,
+      scheme: 'de_pruefziffer',
+      status: 'pass',
+      method,
+      verified_by: verifiedBy,
+      ...provenance,
+    };
   }
   if (outcome === 'no_check') {
     return {
@@ -100,6 +116,7 @@ export function checkGermanAccount(country: string, bban: string): NationalCheck
       scheme: 'de_pruefziffer',
       status: 'not_applicable',
       method,
+      verified_by: verifiedBy,
       detail: `Bundesbank method ${method} defines no check digit for this range of account numbers, so there is nothing to check.`,
       ...provenance,
     };
@@ -109,7 +126,11 @@ export function checkGermanAccount(country: string, bban: string): NationalCheck
     scheme: 'de_pruefziffer',
     status: 'fail',
     method,
-    detail: `The account number does not satisfy check-digit method ${method}, which the Bundesbank lists for this bank code: this account number cannot have been issued as written.`,
+    verified_by: verifiedBy,
+    detail:
+      verifiedBy === 'bundesbank_test_numbers'
+        ? `The account number does not satisfy check-digit method ${method}, which the Bundesbank lists for this bank code: this account number cannot have been issued as written.`
+        : `The account number does not satisfy check-digit method ${method}, which the Bundesbank lists for this bank code. The Bundesbank publishes no test number for this method, so our implementation of it was verified against an independent one only: treat this as a warning, and have the beneficiary confirm the account number.`,
     ...provenance,
   };
 }

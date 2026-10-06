@@ -31,14 +31,14 @@ export const COPY_DE: AlternativesCopy = {
     items: [
       'Die Bankleitzahl wird im nationalen Register geprüft, wo wir es vollständig lesen: Deutschland (Deutsche Bundesbank, Stand {deAsOf}), Schweiz und Liechtenstein (SIX BankMaster, gültig ab {chAsOf}), Österreich, Belgien, die Slowakei, Tschechien und Bulgarien. Dort kommt ein Code, den das Register nicht führt, als not_allocated zurück, mit authoritative: true.',
       'Jede Antwort nennt ihre Quellen: das Register hinter dem Urteil über den Bankcode, die Quelle des BIC und den gelesenen Stand (bank_code_check.register, bic.source, as_of).',
-      'Nationale Prüfziffern in der Kontonummer, wo ein Land sie hat: Frankreich und Monaco (RIB-Schlüssel), Belgien, Italien und San Marino (CIN), Spanien (DC), Deutschland (die Prüfziffermethode der Bundesbank für jede Bankleitzahl, wo die Bundesbank Testkontonummern veröffentlicht) und das Vereinigte Königreich (Modulus-Prüfung).',
+      'Nationale Prüfziffern in der Kontonummer, wo ein Land sie hat: Frankreich und Monaco (RIB-Schlüssel), Belgien, Italien und San Marino (CIN), Spanien (DC), Deutschland (die Prüfziffermethode der Bundesbank für jede Bankleitzahl) und das Vereinigte Königreich (Modulus-Prüfung).',
       'Für KI-Agenten gebaut: ein MCP-Server, gehostet oder als Paket ibanforge-mcp, und x402, mit dem ein Agent jeden Aufruf in USDC auf Base bezahlt, ohne Konto.',
       'Eine Kostprobe ohne Schlüssel mit 25 Prüfungen pro Woche auf POST /v1/iban/validate, zum Ausprobieren, bevor Sie einen Schlüssel nehmen.',
     ],
     limitsHeading: 'Was IBANforge nicht macht',
     limits: [
       'Den Namen des Kontoinhabers prüfen. Das ist die Empfängerüberprüfung (Verification of Payee), die die Bank des Empfängers durchführt.',
-      'Die Prüfziffermethoden der Kontonummer prüfen, die ohne Testkontonummern veröffentlicht sind, oder die nationalen Schlüssel der oben nicht genannten Länder: noch nicht.',
+      'Die nationalen Schlüssel der oben nicht genannten Länder prüfen: noch nicht.',
       'Sagen, ob das Konto existiert oder offen ist. Das veröffentlicht kein Register.',
     ],
     pricesHeading: 'Preise von IBANforge',
@@ -96,7 +96,7 @@ export const COPY_DE: AlternativesCopy = {
         'Für 2.000 Prüfungen mit Bankdaten, nach den veröffentlichten Preisen: bei IBANforge 8 $ Guthaben (zwei Pakete zu 1.000), das nie verfällt. Bei IBANAPI ist der kleinste einzelne Tarif mit 2.000 Bankabfragen Enterprise, 115 $ für 365 Tage, mit 5.000 inklusive. Mehrfachkäufe eines kleineren Tarifs werden hier nicht verglichen.',
       betterFor: [
         'Sie wollen die Prüf-Engine in Ihrer eigenen Infrastruktur betreiben.',
-        'Sie brauchen die Prüfung der nationalen Kontonummer in den Ländern, für die IBANAPI sie ankündigt. In Deutschland prüft IBANforge sie nur für die Methoden der Bundesbank, zu denen Testkontonummern veröffentlicht sind.',
+        'Sie brauchen die Prüfung der nationalen Kontonummer in Ländern, für die IBANAPI sie ankündigt und IBANforge nicht.',
       ],
       note:
         'Was ein Bankcode bedeutet, der in IBANAPIs Register fehlt (niemandem zugeteilt oder nur nicht erfasst), steht nicht auf den Seiten, die wir gelesen haben.',

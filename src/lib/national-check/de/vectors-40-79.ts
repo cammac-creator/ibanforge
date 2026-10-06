@@ -7,7 +7,8 @@ import type { DeVectors } from './vectors-types.js';
  *
  * Les méthodes utilisées de cette plage absentes d'ici (48, 49, 59, 60, 67)
  * n'ont ni numéro de test ni exemple complet dans le document : elles sont
- * écrites, mais aucune n'est servie (verified.ts).
+ * servies au second niveau, vérifiées contre une implémentation indépendante
+ * seulement (verified.ts).
  */
 export const DE_VECTORS_40_79: DeVectors = {
   '40': [{ page: 12, kind: 'test_numbers', pass: ['1258345', '3231963'] }],

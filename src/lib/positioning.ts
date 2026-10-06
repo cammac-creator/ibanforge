@@ -259,8 +259,8 @@ export function positioningOneLine(): string {
  * whose RIB key was wrong, its mod-97 recomputed, came back `valid: true` and
  * `verified`. Since 25/09/2026 the national check digits of FR, MC, BE, IT, SM
  * and ES are checked (`checks.national_check_digits`, lib/national-check/),
- * and since 06/10/2026 the German account-number check digit, for the
- * Bundesbank methods verified against its published test numbers: the
+ * and since 06/10/2026 the German account-number check digit, by the
+ * Bundesbank method of each bank code: the
  * sentence says which countries, that `valid` does not move, and what is still
  * not checked (the other countries). Copied word for word in README.md and both site llms files
  * (positioning.test.ts); mcp/README.md keeps the old one until its next
@@ -271,9 +271,9 @@ export const NOT_WHAT_IT_IS =
   'not a sanctions screening of the payee (bank and country only), ' +
   'not a licensed copy of the SWIFT BIC directory. ' +
   'The national check digits inside the BBAN are checked for France and Monaco (RIB key), Belgium, ' +
-  'Italy and San Marino (CIN), Spain (DC), Germany (the account-number check digit, for the Bundesbank ' +
-  'methods verified against its published test numbers) and the United Kingdom (modulus check): a wrong ' +
-  'key shows in checks.national_check_digits and never turns valid to false. The Polish settlement-number ' +
+  'Italy and San Marino (CIN), Spain (DC), Germany (the account-number check digit, by the Bundesbank ' +
+  'method of each bank code) and the United Kingdom (modulus check): a wrong key shows in ' +
+  'checks.national_check_digits and never turns valid to false. The Polish settlement-number ' +
   'check digit is checked with the bank code. The national keys of the other countries are not checked yet.';
 
 /**

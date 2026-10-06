@@ -27,9 +27,9 @@ import {
  * Ce sont les méthodes de base : les méthodes suivantes y renvoient souvent
  * (« Die Berechnung erfolgt wie bei Verfahren 06 »).
  *
- * Une méthode écrite ici n'est pas pour autant servie : seules celles de
- * `DE_VERIFIED_METHODS` (verified.ts), qui passent tous les numéros de test
- * publiés par la Bundesbank, donnent un verdict.
+ * Une méthode écrite ici n'est pas pour autant servie : verified.ts dit
+ * lesquelles donnent un verdict, et sur quelle base (numéros officiels de la
+ * Bundesbank, ou implémentation indépendante seulement).
  */
 
 /** Le numéro de compte lu comme un nombre (dix chiffres au plus : exact en double). */

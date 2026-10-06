@@ -7,7 +7,9 @@ import type { DeVectors } from './vectors-types.js';
  *
  * Les méthodes de cette plage absentes d'ici (01 à 05, 07, 08, 11, 13 à 16,
  * 18, 20 à 23, 30) n'ont ni numéro de test ni exemple complet dans le
- * document : elles sont écrites, mais aucune n'est servie (verified.ts).
+ * document. Celles qu'une banque utilise sont servies au second niveau,
+ * vérifiées contre une implémentation indépendante seulement (verified.ts) ;
+ * les autres (02, 04, 07, 14, 15, 23) ne servent que de briques.
  */
 export const DE_VECTORS_00_39: DeVectors = {
   '00': [{ page: 1, kind: 'test_numbers', pass: ['9290701', '539290858', '1501824', '1501832'] }],

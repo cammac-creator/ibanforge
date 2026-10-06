@@ -5,8 +5,13 @@ import { checkFrenchRibKey } from './fr-rib.js';
 import { checkItalianCin } from './it-cin.js';
 import type { NationalCheck, NationalCheckScheme } from './types.js';
 
-export type { NationalCheck, NationalCheckScheme, NationalCheckStatus } from './types.js';
-export { NATIONAL_CHECK_STATUSES } from './types.js';
+export type {
+  NationalCheck,
+  NationalCheckScheme,
+  NationalCheckStatus,
+  NationalCheckVerifiedBy,
+} from './types.js';
+export { NATIONAL_CHECK_STATUSES, NATIONAL_CHECK_VERIFIED_BY } from './types.js';
 
 /**
  * Point d'entrée des clés de contrôle nationales : un IBAN en entrée, un bloc
@@ -41,8 +46,8 @@ export { NATIONAL_CHECK_STATUSES } from './types.js';
  * France et Monaco (clé RIB), Belgique (modulo 97 des dix premiers chiffres),
  * Italie et Saint-Marin (CIN), Espagne (DC), et depuis le 06.10.2026
  * l'Allemagne : la méthode que la Bundesbank attribue à chaque code banque
- * (de-pruefziffer.ts), verdict servi pour les seules méthodes vérifiées
- * (de/verified.ts), `not_checked` pour les autres.
+ * (de-pruefziffer.ts), verdict servi pour les méthodes vérifiées
+ * (de/verified.ts, deux niveaux), `not_checked` pour les autres.
  */
 export const NATIONAL_CHECK_SCHEMES: Readonly<Record<string, NationalCheckScheme>> = Object.freeze({
   FR: 'fr_rib_key',

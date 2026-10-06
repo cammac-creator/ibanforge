@@ -316,6 +316,12 @@ const NATIONAL_CHECK_DIGITS_SCHEMA = z
       .string()
       .optional()
       .describe('DE only: the Bundesbank check-digit method code of the bank code.'),
+    verified_by: z
+      .string()
+      .optional()
+      .describe(
+        'DE only: bundesbank_test_numbers (a fail is blocking) | independent_implementation (a fail is a warning, national_check_digits_suspect).',
+      ),
     source: z
       .string()
       .optional()

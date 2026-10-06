@@ -63,7 +63,7 @@ export const COPY_FR: ApiPageCopy = {
       "Si le compte existe ou s'il est ouvert. Aucun registre ne le publie : seule la banque du bénéficiaire le sait.",
       "Au nom de qui est le compte. Ce contrôle, c'est la vérification du bénéficiaire, faite par sa banque ; l'API dit seulement si cette banque est listée comme prête.",
       "Si le bénéficiaire est sanctionné. Le criblage optionnel porte sur la banque et le pays, pas sur la personne ou l'entreprise que vous payez.",
-      "Les méthodes allemandes du numéro de compte pour lesquelles la Bundesbank ne publie aucun numéro de test (elles répondent not_checked), et les clés nationales des pays qui ne sont pas cités plus haut : elles ne sont pas encore contrôlées.",
+      "Les clés nationales des pays qui ne sont pas cités plus haut : elles ne sont pas encore contrôlées. En Allemagne, une méthode que la Bundesbank publie sans numéro de test donne un avertissement, jamais un refus.",
     ],
     sources: "Chaque registre, sa licence et la date de l'édition que nous lisons",
   },

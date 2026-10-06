@@ -210,6 +210,35 @@ describe('national_check_digits_failed', () => {
     }
   });
 
+  it('DE second level: a fail verified only against an independent implementation warns, never stops (06.10.2026)', () => {
+    const second: NationalCheck = {
+      ...national('fail', 'de_pruefziffer'),
+      method: '13',
+      verified_by: 'independent_implementation',
+    };
+    for (const around of [base(), base({ bank_code_check: verified })]) {
+      const steps = nextSteps({ ...around, national_check_digits: second });
+      expect(steps.map((s) => s.code)).not.toContain('national_check_digits_failed');
+      const warn = steps.filter((s) => s.code === 'national_check_digits_suspect');
+      expect(warn).toHaveLength(1);
+      expect(warn[0]!.do).toMatch(/^Confirm before sending\. /);
+      expect(warn[0]!.do).not.toMatch(/Do not send/);
+      expect(warn[0]!.because).toBe(
+        'national_check_digits.status is fail (de_pruefziffer, method 13) with verified_by independent_implementation',
+      );
+      expect(`${warn[0]!.do} ${warn[0]!.because}`).not.toContain('—');
+      // Rien d'autre ne bouge : les étapes d'offre restent, contrairement au « Do not send ».
+      expect(steps.filter((s) => s.code !== 'national_check_digits_suspect')).toEqual(
+        nextSteps(around),
+      );
+    }
+    // Le même échec sur une méthode vérifiée par les numéros officiels arrête.
+    const official = { ...second, verified_by: 'bundesbank_test_numbers' as const };
+    expect(codesOf(base({ national_check_digits: official }))).toContain(
+      'national_check_digits_failed',
+    );
+  });
+
   it('comes right after a bank code the register denies', () => {
     const r = base({
       country: { code: 'BE', name: 'Belgium' },

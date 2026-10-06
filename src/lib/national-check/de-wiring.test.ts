@@ -10,10 +10,14 @@
  * 2. Le même compte rendu faux (chiffres ISO recalculés, donc `valid: true`)
  *    échoue, et seul `next_steps` bouge : exactement une étape bloquante de plus,
  *    moins les étapes d'offre. Rien d'autre ne change.
- * 3. Une méthode non vérifiée ne donne JAMAIS `fail` : `not_checked`, sans étape
- *    bloquante. La méthode 09 donne `not_applicable`, un code banque absent du
- *    fichier `not_checked`.
- * 4. Sans table, aucun bloc : `checks.national_check_digits` dit `not_checked`.
+ * 3. Second niveau (méthode publiée sans numéro de test, décision du 06.10.2026) :
+ *    `verified_by: independent_implementation`, et un compte faux donne `fail`
+ *    avec l'étape d'AVERTISSEMENT `national_check_digits_suspect`, jamais
+ *    l'étape bloquante ; les étapes d'offre restent.
+ * 4. Une méthode d'aucun niveau (44) ne donne JAMAIS `fail` : `not_checked`. La
+ *    méthode 09 donne `not_applicable`, un code banque absent du fichier
+ *    `not_checked`.
+ * 5. Sans table, aucun bloc : `checks.national_check_digits` dit `not_checked`.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateIBAN } from '../iban.js';
@@ -22,7 +26,11 @@ import { buildComplianceResponse } from '../compliance-response.js';
 import { DE_METHODS } from './de/methods.js';
 import { DE_TABLE_SOURCE, loadDeMethodTable, resetDeMethodTable } from './de/table.js';
 import { DE_OFFICIAL_VECTORS } from './de/vectors.js';
-import { DE_VERIFIED_METHODS } from './de/verified.js';
+import {
+  DE_EXCLUDED_METHODS,
+  DE_INDEPENDENTLY_VERIFIED_METHODS,
+  DE_VERIFIED_METHODS,
+} from './de/verified.js';
 
 /** Chiffres de contrôle ISO 13616 recalculés pour un BBAN donné. */
 function iso(cc: string, bban: string): string {
@@ -40,9 +48,10 @@ function enriched(iban: string) {
 }
 
 const STEP = 'national_check_digits_failed';
+const SUSPECT = 'national_check_digits_suspect';
 const OFFERS = new Set(['screen_compliance', 'generate_payment_qr']);
-const hasStep = (r: { next_steps?: Array<{ code: string }> }) =>
-  (r.next_steps ?? []).some((s) => s.code === STEP);
+const hasStep = (r: { next_steps?: Array<{ code: string }> }, code = STEP) =>
+  (r.next_steps ?? []).some((s) => s.code === code);
 
 const table = loadDeMethodTable();
 if (!table) throw new Error('data/de-pruefziffer.json must be present for these tests');
@@ -98,6 +107,7 @@ describe('German account check digits in the validation answer', () => {
       scheme: 'de_pruefziffer',
       status: 'pass',
       method,
+      verified_by: 'bundesbank_test_numbers',
       source: DE_TABLE_SOURCE,
       table_fetched_on: table.fetched_on,
     });
@@ -117,7 +127,9 @@ describe('German account check digits in the validation answer', () => {
       expect(bad.valid, badIban).toBe(true);
       expect(bad.national_check_digits?.status).toBe('fail');
       expect(bad.national_check_digits?.method).toBe(method);
+      expect(bad.national_check_digits?.verified_by).toBe('bundesbank_test_numbers');
       expect(bad.national_check_digits?.detail).toMatch(/cannot have been issued as written/);
+      expect(hasStep(bad, SUSPECT)).toBe(false);
       expect(bad.checks?.national_check_digits).toBe('fail');
 
       for (const field of [
@@ -148,14 +160,17 @@ describe('German account check digits in the validation answer', () => {
     },
   );
 
-  it('the IBAN registry example (method 13) is not_checked while 13 has no official number', () => {
+  it('the IBAN registry example (method 13, no official number) passes on the second level', () => {
     const r = enriched('DE89370400440532013000');
-    const method = methods['37040044'];
-    expect(r.national_check_digits?.method).toBe(method);
-    const expected = DE_VERIFIED_METHODS.has(method) ? 'pass' : 'not_checked';
-    expect(r.national_check_digits?.status).toBe(expected);
-    expect(r.checks?.national_check_digits).toBe(expected);
+    expect(methods['37040044']).toBe('13');
+    expect(r.national_check_digits).toMatchObject({
+      status: 'pass',
+      method: '13',
+      verified_by: 'independent_implementation',
+    });
+    expect(r.checks?.national_check_digits).toBe('pass');
     expect(hasStep(r)).toBe(false);
+    expect(hasStep(r, SUSPECT)).toBe(false);
   });
 
   it('a bank without check digits (method 09) is not_applicable, never a verdict', () => {
@@ -183,21 +198,25 @@ describe('German account check digits in the validation answer', () => {
     expect(hasStep(r)).toBe(false);
   });
 
-  it('an unverified method never fails, on any account number', () => {
+  it('a method of neither level (44) never fails, on any account number', () => {
     // Générateur à graine fixe : un échec se rejoue à l'identique.
     let seed = 20261006;
     const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
     const unverified = [...blzByMethod.entries()].filter(
-      ([m]) => m !== '09' && !DE_VERIFIED_METHODS.has(m),
+      ([m]) =>
+        m !== '09' && !DE_VERIFIED_METHODS.has(m) && !DE_INDEPENDENTLY_VERIFIED_METHODS.has(m),
     );
-    expect(unverified.length).toBeGreaterThan(0);
+    // Aujourd'hui la seule : 44 (une règle IBAN y met des numéros sans clé).
+    expect(unverified.map(([m]) => m).sort()).toEqual([...DE_EXCLUDED_METHODS].sort());
     for (const [method, blzs] of unverified) {
       for (let i = 0; i < 20; i++) {
         let account = '';
         for (let k = 0; k < 10; k++) account += String(Math.floor(rnd() * 10));
         const r = enriched(iso('DE', blzs[i % blzs.length] + account));
         expect(r.national_check_digits?.status, `${method} ${account}`).toBe('not_checked');
+        expect(r.national_check_digits).not.toHaveProperty('verified_by');
         expect(hasStep(r)).toBe(false);
+        expect(hasStep(r, SUSPECT)).toBe(false);
       }
     }
   });
@@ -213,12 +232,88 @@ describe('German account check digits in the validation answer', () => {
       const r = enriched(iso('DE', blz + account));
       const block = r.national_check_digits!;
       expect(block.status).toBe(r.checks?.national_check_digits);
-      expect(hasStep(r), r.iban).toBe(block.status === 'fail');
+      const official = block.verified_by === 'bundesbank_test_numbers';
+      expect(hasStep(r), r.iban).toBe(block.status === 'fail' && official);
+      expect(hasStep(r, SUSPECT), r.iban).toBe(block.status === 'fail' && !official);
       if (block.status === 'fail' || block.status === 'pass') {
-        expect(DE_VERIFIED_METHODS.has(block.method!), r.iban).toBe(true);
+        expect(block.verified_by, r.iban).toBe(
+          DE_VERIFIED_METHODS.has(block.method!)
+            ? 'bundesbank_test_numbers'
+            : DE_INDEPENDENTLY_VERIFIED_METHODS.has(block.method!)
+              ? 'independent_implementation'
+              : 'none',
+        );
       }
     }
   });
+});
+
+describe('German methods without official numbers: a fail is a warning, never a stop', () => {
+  /** Un compte que la méthode accepte, trouvé à graine fixe. */
+  function passingAccount(method: string, blz: string): string {
+    let seed = 1;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    for (let i = 0; i < 20000; i++) {
+      let a = '';
+      for (let k = 0; k < 10; k++) a += String(Math.floor(rnd() * 10));
+      if (DE_METHODS[method](a, blz) === 'pass') return a;
+    }
+    throw new Error(`no passing account for ${method}`);
+  }
+
+  const SECOND = [...DE_INDEPENDENTLY_VERIFIED_METHODS]
+    .filter((m) => blzByMethod.has(m))
+    .sort()
+    .map((method) => {
+      const blz = blzByMethod.get(method)![0];
+      return { method, blz, account: passingAccount(method, blz) };
+    });
+
+  it('covers the second-level methods that a bank uses today', () => {
+    expect(SECOND.map((c) => c.method)).toContain('13');
+    expect(SECOND.length).toBeGreaterThan(10);
+  });
+
+  it.each(SECOND)(
+    'method $method: pass, then a wrong account fails with the warning step and keeps the offers',
+    ({ method, blz, account }) => {
+      const goodIban = iso('DE', blz + account);
+      const badIban = iso('DE', blz + failingTwin(method, blz, account));
+      const good = enriched(goodIban);
+      const bad = enriched(badIban);
+
+      expect(good.national_check_digits).toMatchObject({
+        status: 'pass',
+        method,
+        verified_by: 'independent_implementation',
+      });
+      expect(bad.valid, badIban).toBe(true);
+      expect(bad.national_check_digits).toMatchObject({
+        status: 'fail',
+        method,
+        verified_by: 'independent_implementation',
+      });
+      expect(bad.national_check_digits?.detail).toMatch(/treat this as a warning/);
+      expect(bad.checks?.national_check_digits).toBe('fail');
+
+      // Jamais l'étape bloquante ; exactement une étape d'avertissement de plus,
+      // et TOUTES les autres étapes du témoin, offres comprises, dans le même ordre.
+      expect(hasStep(bad), badIban).toBe(false);
+      const warn = (bad.next_steps ?? []).filter((s) => s.code === SUSPECT);
+      expect(warn, badIban).toHaveLength(1);
+      expect(warn[0]!.do).toMatch(/^Confirm before sending\. /);
+      expect(warn[0]!.do).not.toMatch(/Do not send/);
+      expect(
+        (bad.next_steps ?? []).filter((s) => s.code !== SUSPECT),
+        badIban,
+      ).toEqual(good.next_steps ?? []);
+
+      const badCompliance = buildComplianceResponse(badIban);
+      if (!('compliance' in badCompliance)) throw new Error('compliance answer expected');
+      expect(badCompliance.national_check_digits?.verified_by).toBe('independent_implementation');
+      expect(badCompliance.next_steps, badIban).toEqual(bad.next_steps);
+    },
+  );
 });
 
 describe('without the method table', () => {

@@ -63,7 +63,7 @@ export const COPY_EN: ApiPageCopy = {
       "Whether the account exists or is open. No register publishes that: only the payee's bank knows.",
       "Whose name is on the account. That check is Verification of Payee, run by the payee's bank; the API only says whether that bank is listed as ready for it.",
       "Whether the payee is sanctioned. The optional screening covers the bank and the country, not the person or the company you pay.",
-      "The German account-number methods for which the Bundesbank publishes no test number (they answer not_checked), and the national keys of the countries not named above: they are not checked yet.",
+      "The national keys of the countries not named above: they are not checked yet. In Germany, a method the Bundesbank publishes without test numbers gives a warning, never a refusal.",
     ],
     sources: "Every register, its licence and the date of the edition we read",
   },

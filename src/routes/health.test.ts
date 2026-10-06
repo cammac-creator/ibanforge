@@ -178,7 +178,7 @@ describe('/health — freshness of the UK modulus table', () => {
  * tracked in git, so CI has it: the shape and the presence can be asserted.
  * Its absence must stay a degraded feature, exactly like the UK table.
  */
-describe('/health — the German check-digit method table', () => {
+describe('/health: the German check-digit method table', () => {
   it('says the table is loaded, when it was read, and how many bank codes it holds', async () => {
     const body = (await (await app.request('/health')).json()) as Record<string, unknown>;
     const de = body.de_pruefziffer as Record<string, unknown>;

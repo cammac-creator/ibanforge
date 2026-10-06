@@ -434,8 +434,13 @@ describe('the truth fields are in the contract', () => {
       'status',
       'detail',
       'method',
+      'verified_by',
       'source',
       'table_fetched_on',
+    ]);
+    expect(block.properties!.verified_by.enum).toEqual([
+      'bundesbank_test_numbers',
+      'independent_implementation',
     ]);
     expect(block.required).toEqual(['country', 'scheme', 'status']);
     // not_checked depuis l'Allemagne (06.10.2026) : code banque ou méthode non couverts.

@@ -63,7 +63,7 @@ export const COPY_DE: ApiPageCopy = {
       "Ob das Konto existiert oder offen ist. Kein Register veröffentlicht das: Nur die Bank des Empfängers weiß es.",
       "Auf wessen Namen das Konto läuft. Das ist die Empfängerüberprüfung, durchgeführt von der Bank des Empfängers; die API sagt nur, ob diese Bank dafür als bereit geführt wird.",
       "Ob der Empfänger sanktioniert ist. Die optionale Prüfung betrifft die Bank und das Land, nicht die Person oder das Unternehmen, das Sie bezahlen.",
-      "Die Prüfziffermethoden der Kontonummer, für die die Bundesbank keine Testkontonummer veröffentlicht (sie antworten mit not_checked), und die nationalen Schlüssel der oben nicht genannten Länder: Sie werden noch nicht geprüft.",
+      "Die nationalen Schlüssel der oben nicht genannten Länder: Sie werden noch nicht geprüft. In Deutschland liefert eine Methode, die die Bundesbank ohne Testkontonummern veröffentlicht, eine Warnung, nie eine Ablehnung.",
     ],
     sources: "Jedes Register, seine Lizenz und der Stand der Ausgabe, die wir lesen",
   },
