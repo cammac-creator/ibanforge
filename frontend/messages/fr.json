@@ -1891,12 +1891,17 @@
       },
       "imprint": {
         "title": "Mentions légales (en anglais)",
-        "description": "Identité de l'exploitant et contact pour ibanforge.com et api.ibanforge.com. Le document fait foi en anglais."
+        "description": "Identité, adresse postale et contact de l'exploitant de ibanforge.com et api.ibanforge.com. Le document fait foi en anglais."
       },
       "sla": {
         "title": "Accord de niveau de service, SLA (en anglais)",
         "description": "SLA des licences éditeur et OEM : disponibilité mensuelle de 99,5 %, crédits de service, mesure par la page d'état publique. Le document fait foi en anglais."
       }
+    },
+    "translation": {
+      "notice": "Traduction de courtoisie, sans valeur contractuelle. La version anglaise fait foi.",
+      "englishLink": "Lire la version anglaise",
+      "indexNotice": "Certains documents sont proposés en traduction de courtoisie. La version anglaise de chaque document fait foi."
     }
   },
   "status": {

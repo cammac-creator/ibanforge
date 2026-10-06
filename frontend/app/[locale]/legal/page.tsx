@@ -27,7 +27,13 @@ export default async function LegalIndexPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "legal" });
-  const docs = getAllLegalDocs();
+  const docs = getAllLegalDocs(locale);
+  // Since 2026-10-06 some locales carry courtesy translations: the note says
+  // which situation the reader is in, and each card is titled in the reader's
+  // language from the catalogue (which says when a document is in English).
+  const anyTranslated = docs.some((doc) => doc.translated);
+  const label = (slug: string, field: "title" | "description", fallback: string) =>
+    t.has(`docs.${slug}.${field}`) ? t(`docs.${slug}.${field}`) : fallback;
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-14">
@@ -35,7 +41,7 @@ export default async function LegalIndexPage({
       <p className="mt-2 text-muted-foreground">{t("index.subtitle")}</p>
       {locale !== "en" && (
         <p className="mt-3 text-xs text-muted-foreground border border-border rounded-md px-3 py-1.5 inline-block">
-          {t("englishOnly")}
+          {anyTranslated ? t("translation.indexNotice") : t("englishOnly")}
         </p>
       )}
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -46,9 +52,11 @@ export default async function LegalIndexPage({
             className="group rounded-lg border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
           >
             <h2 className="font-heading font-semibold text-foreground group-hover:text-primary transition-colors">
-              {doc.title}
+              {label(doc.slug, "title", doc.title)}
             </h2>
-            <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{doc.description}</p>
+            <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+              {label(doc.slug, "description", doc.description)}
+            </p>
             <p className="mt-3 text-xs font-mono text-muted-foreground">
               {t("updated")} {doc.updated}
             </p>

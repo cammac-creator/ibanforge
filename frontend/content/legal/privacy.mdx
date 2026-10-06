@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-10-05"
+updated: "2026-10-06"
 ---
 
 # Privacy Policy
 
-**Last updated: October 5, 2026 · Version 1.6**
+**Last updated: October 6, 2026 · Version 1.7**
+
+*Revision 1.7 (October 6, 2026): section 1 now says that the network edge log of our API host records the request path, without saying whether the query string is kept: we observed it absent once, and Railway's documentation does not say. The advice is therefore wider: send IBANs in the body of a `POST` request, never in a URL. Section 3 now points to the transfer mechanism of each processor, listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page. A German courtesy translation is published; the English version prevails. Nothing new is collected.*
 
 *Revision 1.6 (October 5, 2026): sections 1 to 4 now describe the processing as it already works, more precisely. For an invalid IBAN, at most the first 4 characters (country code and check digits) are kept, not 12. The network edge of our API host keeps the raw IP address and the path of each request for 7 days, outside our own logs. The website's functions run in the Frankfurt region (EU). The processor list now says which processors can receive the IBANs you submit. Nothing new is collected.*
 
@@ -31,7 +33,7 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 | **Files uploaded to the file audit** (for example payee names, IBANs and addresses) | Producing the annotated report you order (performance of the service) | **Yes, briefly.** The report reproduces the columns of the uploaded file. It is kept **2 hours** if unpaid and **24 hours after payment**, then automatically deleted. |
 | **Email address** (free key signup) | Issuing your key, quota notifications, service messages | Yes, while your key exists. |
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
-| **Network edge log of our API host** (raw IP address, path without the query string, status, user-agent, timestamp) | Kept by Railway, our API host, to route and secure traffic, outside our own logs | Yes, **7 days**, then deleted by Railway. Send IBANs in the body of a `POST` request, never in a URL path. |
+| **Network edge log of our API host** (raw IP address, request path, status, user-agent, timestamp) | Kept by Railway, our API host, to route and secure traffic, outside our own logs | Yes, **7 days**, then deleted by Railway. Send IBANs in the body of a `POST` request, never in a URL. |
 | **Aggregated statistics** (daily counts by endpoint/country — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
 | **Payment data** | Processing card or USDC payments | Handled by Stripe / the x402 facilitator. We never see card numbers; we store the transaction reference and, for a USDC purchase, the paying wallet address and the on-chain transaction hash, to reconcile a payment whose settlement could not be confirmed. |
 | **Feedback reports** (free-form report, optional contact address) | Investigating data-quality issues, x402 refund decisions | Yes, **12 months**, then automatically deleted. |
@@ -54,7 +56,7 @@ The API and its databases run on Railway infrastructure in the **Amsterdam, Neth
 | GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US | No |
 | Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US | Never from the API; only an IBAN you write in an e-mail to us |
 
-Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions (for US processors certified under them, the EU-US and Swiss-US Data Privacy Framework) or standard contractual clauses maintained by the processor.
+Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions (for US processors certified under them, the EU-US and Swiss-US Data Privacy Framework) or standard contractual clauses maintained by the processor. The mechanism for each processor is listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page.
 
 ## 4. Retention summary
 

@@ -2,12 +2,14 @@
 title: "Data Processing Agreement"
 description: "Pre-signed DPA (art. 28 GDPR / FADP) for customers who embed the IBANforge API — roles, processing scope, sub-processors, TOMs."
 order: 3
-updated: "2026-10-05"
+updated: "2026-10-06"
 ---
 
 # Data Processing Agreement (DPA)
 
-**Last updated: October 5, 2026 · Version 1.5**
+**Last updated: October 6, 2026 · Version 1.6**
+
+*Revision 1.6 (October 6, 2026): completes the agreement where art. 28 GDPR requires it. Clause 2 now says that the Processor informs the Controller immediately if, in its opinion, an instruction infringes data protection law. Clause 5 now says that each sub-processor is bound by a written contract to data protection obligations no less protective than this DPA (art. 28(4) GDPR). The new Annex II lists each sub-processor with its role, its region, whether it can receive submitted identifiers, and the mechanism on which a transfer outside Switzerland and the EU/EEA relies. The audit clause is unchanged. Version 1.6 only adds obligations on the Processor's side, so it applies immediately to every Controller. A German courtesy translation is published; the English version prevails.*
 
 *Revision 1.5 (October 5, 2026): Clauses 2, 4.2, 4.3 and 6 and Annex I now describe the processing as it already works, more precisely. For an invalid IBAN, at most the first 4 characters (country code and check digits) are kept, not 12. The network edge of our API host keeps the raw IP address and the path of each request for 7 days. The website's functions run in the Frankfurt region (EU). Clause 6 names the European Commission's adequacy decision for Switzerland, on which a transfer from the EU to the Processor relies. Nothing new is processed.*
 
@@ -35,6 +37,8 @@ This DPA supplements the [Terms of Service](/legal/terms) and applies whenever a
 
 The Processor processes submitted data **only** to produce the API response (for the file audit, the report the Controller orders), and on no other instruction. IBANs submitted for validation are processed **in memory and are not stored** (sole exception: for invalid IBANs, at most the first 4 characters, the country code and check digits, may be retained up to 12 months for data-quality diagnostics). The file audit is a separate deliverable: when the Controller uploads a file to it, the annotated report produced, which reproduces the columns of the uploaded file, is stored for at most **2 hours** if unpaid and **24 hours after payment**, then deleted. The Processor does not use Controller data to train models, build marketing profiles, or enrich third-party datasets.
 
+The Processor informs the Controller immediately if, in its opinion, an instruction infringes the GDPR, other Union or Member State data protection provisions, or the Swiss FADP.
+
 ## 3. Confidentiality and personnel
 
 The Service is operated by its owner; no employees have access to production data. Any future personnel will be bound by written confidentiality before access.
@@ -53,9 +57,11 @@ The Service is operated by its owner; no employees have access to production dat
 
 The Controller authorises the sub-processors listed in the [Privacy Policy §3](/legal/privacy) (Railway — Amsterdam (EU) hosting; Vercel — website & dashboard; Stripe — card payments; Coinbase CDP — USDC settlement, with the x402.org facilitator as fallback; Infomaniak — email; GitHub — public code & CI; Anthropic — AI-assisted drafting of correspondence). Changes are announced in the [changelog](/changelog) at least 30 days before a new sub-processor receives personal data; the Controller may object on reasonable grounds, in which case either party may terminate.
 
+The Processor engages a sub-processor only under a written contract that imposes on it data protection obligations no less protective than those set out in this DPA, in particular sufficient guarantees to implement appropriate technical and organisational measures in such a manner that the processing meets the requirements of the GDPR, as art. 28(4) GDPR provides. Annex II lists each sub-processor, its role and region, whether it can receive submitted identifiers, and the transfer mechanism it relies on.
+
 ## 6. International transfers
 
-Submitted identifiers are processed within the European Union: by the API in Railway's Amsterdam region (Netherlands) and, for the website's playground and dashboard, by functions in Vercel's Frankfurt region (Germany). For Controllers subject to the GDPR, transfers to the Processor, established in Switzerland, rely on the European Commission's adequacy decision for Switzerland (Decision 2000/518/EC, confirmed by the Commission's review of 15 January 2024); no standard contractual clauses are needed. For Swiss Controllers, Swiss law recognises the EU as adequate. Where a sub-processor operates from a third country, transfers rely on adequacy decisions (including the EU-US and Swiss-US Data Privacy Framework for certified US sub-processors) or the sub-processor's standard contractual clauses. [Privacy Policy §3](/legal/privacy) says which sub-processors can receive submitted identifiers.
+Submitted identifiers are processed within the European Union: by the API in Railway's Amsterdam region (Netherlands) and, for the website's playground and dashboard, by functions in Vercel's Frankfurt region (Germany). For Controllers subject to the GDPR, transfers to the Processor, established in Switzerland, rely on the European Commission's adequacy decision for Switzerland (Decision 2000/518/EC, confirmed by the Commission's review of 15 January 2024); no standard contractual clauses are needed. For Swiss Controllers, Swiss law recognises the EU as adequate. Where a sub-processor operates from a third country, transfers rely on adequacy decisions (including the EU-US and Swiss-US Data Privacy Framework for certified US sub-processors) or the sub-processor's standard contractual clauses. Annex II states the mechanism for each sub-processor and which of them can receive submitted identifiers.
 
 ## 7. Assistance, incidents, audits
 
@@ -83,3 +89,17 @@ Contact for all DPA matters: **support@ibanforge.com**
 - **I.4 Special categories:** none.
 - **I.5 Processing operations:** ephemeral, automated in-memory validation/enrichment producing the API response; for the file audit, storage of the annotated report for the periods in I.6; aggregate service statistics without personal data.
 - **I.6 Retention:** IBANs submitted for validation are **not stored** (sole exception: for invalid IBANs, at most the first 4 characters, the country code and check digits, up to 12 months for data-quality diagnostics). The file-audit report is kept at most **2 hours** if unpaid and **24 hours after payment**, then deleted. Request metadata (telemetry) is kept **at most 12 months**, and telemetry attributable to a terminated customer is deleted **by default 30 days after termination** (Clause 4.7). Billing records are kept as required by statutory bookkeeping law.
+
+## Annex II — Sub-processors and transfer mechanisms
+
+Data Privacy Framework (DPF) entries were checked on the official register, [dataprivacyframework.gov](https://www.dataprivacyframework.gov/list), on October 5, 2026. "Both frameworks" means the EU-US Data Privacy Framework and the Swiss-US Data Privacy Framework.
+
+| Sub-processor | Role | Region | Can receive submitted identifiers? | Transfer mechanism |
+|---|---|---|---|---|
+| Railway Corp. | API hosting and storage | Amsterdam, Netherlands (EU) | Yes, in memory, to answer the request | Processing in the EU. Railway Corporation is certified under both frameworks ([register entry](https://www.dataprivacyframework.gov/participant/2913)). |
+| Vercel Inc. | Website and dashboard hosting; playground submissions are relayed to the API | Functions: Frankfurt, Germany (EU); static pages: global network | Only an IBAN typed into the website's playground | Functions in the EU. Vercel Inc. is certified under both frameworks ([register entry](https://www.dataprivacyframework.gov/participant/6847)). |
+| Stripe Payments Europe | Card payments | EU | No | Established in the EU. Its US affiliate Stripe, LLC is certified under both frameworks ([register entry](https://www.dataprivacyframework.gov/participant/10014)). |
+| Coinbase (CDP facilitator) | USDC settlement of x402 payments, with the x402.org facilitator as fallback | US | No | Coinbase, Inc. is certified under both frameworks ([register entry](https://www.dataprivacyframework.gov/participant/6286)). |
+| Infomaniak Network SA | Transactional and support e-mail | Switzerland | Only an IBAN written in an e-mail to the Processor | Switzerland: adequacy decision of the European Commission (Decision 2000/518/EC). |
+| GitHub Inc. | Public source code and CI, no customer data | US | No | GitHub is certified under both frameworks ([register entry](https://www.dataprivacyframework.gov/participant/6174)). |
+| Anthropic PBC | AI-assisted drafting of correspondence, triggered by the operator | US | Never from the API; only an IBAN written in an e-mail to the Processor | Not certified under the DPF. Standard contractual clauses of Anthropic's [Data Processing Addendum](https://www.anthropic.com/legal/data-processing-addendum). |

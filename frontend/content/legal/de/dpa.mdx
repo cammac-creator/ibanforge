@@ -1,0 +1,105 @@
+---
+title: "Auftragsverarbeitungsvertrag (AVV)"
+description: "Vorunterzeichneter Auftragsverarbeitungsvertrag (Art. 28 DSGVO / DSG) für Kunden, die die IBANforge-API einbinden: Rollen, Umfang der Verarbeitung, Unterauftragsverarbeiter, TOM."
+order: 3
+updated: "2026-10-06"
+---
+
+# Auftragsverarbeitungsvertrag (AVV)
+
+**Stand: 6. Oktober 2026 · Version 1.6**
+
+*Änderung 1.6 (6. Oktober 2026): Der Vertrag wird dort ergänzt, wo Art. 28 DSGVO es verlangt. Ziffer 2 sieht nun vor, dass der Auftragsverarbeiter den Verantwortlichen unverzüglich informiert, wenn eine Weisung seiner Auffassung nach gegen Datenschutzrecht verstößt. Ziffer 5 sieht nun vor, dass jeder Unterauftragsverarbeiter durch schriftlichen Vertrag an Datenschutzpflichten gebunden ist, die nicht weniger schützen als dieser Vertrag (Art. 28 Abs. 4 DSGVO). Der neue Anhang II nennt für jeden Unterauftragsverarbeiter seine Rolle, seine Region, ob er übermittelte Kennungen erhalten kann, und den Mechanismus, auf den sich eine Übermittlung außerhalb der Schweiz und der EU/des EWR stützt. Die Prüfungsklausel bleibt unverändert. Version 1.6 begründet nur Pflichten des Auftragsverarbeiters und gilt daher sofort für jeden Verantwortlichen. Eine unverbindliche deutsche Übersetzung wird veröffentlicht; maßgebend ist die englische Fassung.*
+
+*Änderung 1.5 (5. Oktober 2026): Die Ziffern 2, 4.2, 4.3 und 6 sowie Anhang I beschreiben die Verarbeitung so, wie sie bereits erfolgt, genauer. Bei einer ungültigen IBAN werden höchstens die ersten 4 Zeichen (Ländercode und Prüfziffern) aufbewahrt, nicht 12. Der Netzwerkrand unseres API-Hosters speichert die rohe IP-Adresse und den Pfad jeder Anfrage 7 Tage lang. Die Funktionen der Website laufen in der Region Frankfurt (EU). Ziffer 6 nennt den Angemessenheitsbeschluss der Europäischen Kommission für die Schweiz, auf den sich eine Übermittlung aus der EU an den Auftragsverarbeiter stützt. Es wird nichts Neues verarbeitet.*
+
+*Änderung 1.4 (27. September 2026): Die Ziffern 2, 4.2 und 7 sowie Anhang I beschreiben nun das Datei-Audit: Der kommentierte Bericht, den es erstellt und der die Spalten der hochgeladenen Datei wiedergibt, wird höchstens 2 Stunden gespeichert, wenn er nicht bezahlt ist, und 24 Stunden nach der Zahlung, danach gelöscht. Beschrieben wird das Datei-Audit so, wie es bereits funktioniert; es wird nichts Neues erhoben.*
+
+*Änderung 1.3 (25. September 2026): Ziffer 4.7 legt fest, wann die Geschäftsbeziehung endet: Sie besteht fort, solange ein Schlüssel aktiv ist; der Widerruf des letzten Schlüssels oder ein entsprechender Antrag beendet sie und setzt die Löschfrist in Gang. Dies gilt sofort für neue Kunden und ab dem 1. November 2026 für Kunden, die eine frühere Fassung akzeptiert haben.*
+
+*Änderung 1.2 (5. August 2026): Die Hosting-Region in den Ziffern 4.3 und 6 wurde berichtigt: Die Verarbeitung erfolgt in der Railway-Region Amsterdam (EU), nicht in Zürich; nur der Netzwerkrand von Railway befindet sich in Zürich. Die Liste der Unterauftragsverarbeiter wurde vervollständigt und an Ziffer 3 der Datenschutzerklärung angeglichen (KI-gestützte Entwurfshilfe, CI-Infrastruktur). Ziffer 4.2 nennt nun das Zeitfenster für die einmalige Übergabe des Schlüssels. Die Aufbewahrungsklauseln erfassen nun jede anfragebezogene Tabelle.*
+
+*Änderung 1.1 (11. Juli 2026): Telemetriedaten, die einem Kunden nach Vertragsende zuzuordnen sind, werden nun **standardmäßig** 30 Tage nach Vertragsende gelöscht; zuvor erfolgte die Löschung auf Antrag. Siehe Ziffer 4.7 und Anhang I.6.*
+
+Dieser Vertrag ergänzt die [Nutzungsbedingungen](/de/legal/terms) und gilt, sobald ein Kunde („**Verantwortlicher**“) die IBANforge-API so nutzt, dass personenbezogene Daten betroffen sind; eine IBAN kann eine natürliche Person identifizieren. Er wird als stehender, vorunterzeichneter Vertrag angeboten: Wer den Dienst im Rahmen eines kostenpflichtigen oder kostenlosen Tarifs nutzt, kann sich ohne Gegenzeichnung auf ihn berufen; eine gegengezeichnete PDF-Fassung ist auf Anfrage unter **support@ibanforge.com** erhältlich.
+
+## 1. Rollen und Gegenstand
+
+- **Verantwortlicher:** Sie, der Kunde, der die API einbindet oder aufruft.
+- **Auftragsverarbeiter:** IBANforge, in der Schweiz niedergelassenes Einzelunternehmen ([Impressum](/de/legal/imprint)).
+- **Gegenstand:** Validierung und Anreicherung der vom Verantwortlichen übermittelten Bankkennungen.
+- **Dauer:** solange der Verantwortliche den Dienst nutzt.
+- **Art und Zweck:** flüchtige, automatisierte Verarbeitung übermittelter Kennungen, um Ergebnisse der Validierung und Anreicherung zurückzugeben.
+- **Datenkategorien:** Bankkontokennungen (IBAN) und, für die Kontoverwaltung, die Kontakt-E-Mail-Adresse des Verantwortlichen.
+- **Betroffene Personen:** Kunden, Lieferanten, Beschäftigte oder Endnutzer des Verantwortlichen, deren IBAN übermittelt werden.
+
+## 2. Weisungen
+
+Der Auftragsverarbeiter verarbeitet übermittelte Daten **ausschließlich**, um die API-Antwort zu erzeugen (beim Datei-Audit: den Bericht, den der Verantwortliche bestellt), und auf keine andere Weisung. Zur Validierung übermittelte IBAN werden **im Arbeitsspeicher verarbeitet und nicht gespeichert** (einzige Ausnahme: Bei ungültigen IBAN dürfen höchstens die ersten 4 Zeichen, also Ländercode und Prüfziffern, bis zu 12 Monate zur Diagnose der Datenqualität aufbewahrt werden). Das Datei-Audit ist eine eigene Leistung: Lädt der Verantwortliche eine Datei hoch, wird der erstellte kommentierte Bericht, der die Spalten der hochgeladenen Datei wiedergibt, höchstens **2 Stunden** gespeichert, wenn er nicht bezahlt ist, und **24 Stunden nach der Zahlung**, danach gelöscht. Der Auftragsverarbeiter nutzt Daten des Verantwortlichen nicht, um Modelle zu trainieren, Marketingprofile zu erstellen oder Datenbestände Dritter anzureichern.
+
+Der Auftragsverarbeiter informiert den Verantwortlichen unverzüglich, wenn eine Weisung seiner Auffassung nach gegen die DSGVO, gegen andere Datenschutzbestimmungen der Union oder der Mitgliedstaaten oder gegen das Schweizer DSG verstößt.
+
+## 3. Vertraulichkeit und Personal
+
+Der Dienst wird von seinem Inhaber betrieben; es gibt keine Beschäftigten mit Zugang zu Produktionsdaten. Künftiges Personal wird vor jedem Zugang schriftlich zur Vertraulichkeit verpflichtet.
+
+## 4. Technische und organisatorische Maßnahmen (TOM)
+
+- **4.1** Transportverschlüsselung (TLS) an allen Endpunkten; HTTP wird auf HTTPS umgeleitet.
+- **4.2** **Datenminimierung durch Technikgestaltung:** keine Speicherung von zur Validierung übermittelten IBAN (das Datei-Audit bewahrt nur seinen Bericht auf, für die Fristen in Anhang I.6); IP-Adressen in den eigenen Protokollen des Auftragsverarbeiters nur als gesalzene Hashwerte (der Netzwerkrand des API-Hosters speichert die rohe Adresse und den Anfragepfad 7 Tage lang); API-Schlüssel nur als Hashwerte gespeichert. Ein neu ausgegebener Schlüssel wird zusätzlich für einen einmaligen Abruf vorgehalten (gelöscht beim ersten Abruf, spätestens nach 7 Tagen) und dem Kunden per E-Mail zugestellt.
+- **4.3** Hosting in der Region **Amsterdam (EU)** (Railway), mit Isolierung auf Ebene des Speichervolumens und einem Netzwerkrand in Zürich für den Schweizer Datenverkehr; die Funktionen der Website laufen in der Vercel-Region **Frankfurt (EU)**.
+- **4.4** Anfrage-Metadaten werden spätestens nach **12 Monaten** automatisch gelöscht.
+- **4.5** Zugang zur Produktion nur für den Betreiber, mit starker Authentifizierung; Geheimnisse liegen im Geheimnisspeicher der Hosting-Plattform.
+- **4.6** Öffentliche Statusseite und überwachte Fehlerraten.
+- **4.7** **Löschung der Telemetrie nach Vertragsende, standardmäßig:** Anfrage-Metadaten (Telemetrie), die den API-Schlüsseln eines Kunden zuzuordnen sind, werden **30 Tage nach Ende** des Vertrags oder nach Deaktivierung des letzten Schlüssels des Kunden automatisch gelöscht, ohne dass es eines Antrags bedarf. Ein Schlüsselwechsel löst diese Löschung nicht aus (die Kundenbeziehung besteht fort). Die Beziehung besteht fort, solange ein Schlüssel aktiv ist; der Widerruf Ihres letzten Schlüssels oder ein entsprechender Antrag beendet sie und setzt die Löschfrist in Gang. Siehe Anhang I.6.
+
+## 5. Unterauftragsverarbeiter
+
+Der Verantwortliche genehmigt die in [Ziffer 3 der Datenschutzerklärung](/de/legal/privacy) aufgeführten Unterauftragsverarbeiter (Railway: Hosting in Amsterdam (EU); Vercel: Website und Dashboard; Stripe: Kartenzahlungen; Coinbase CDP: USDC-Abwicklung, mit dem x402.org-Facilitator als Rückfallebene; Infomaniak: E-Mail; GitHub: öffentlicher Code und CI; Anthropic: KI-gestützte Entwürfe von Korrespondenz). Änderungen werden im [Changelog](/de/changelog) mindestens 30 Tage angekündigt, bevor ein neuer Unterauftragsverarbeiter personenbezogene Daten erhält; der Verantwortliche kann aus berechtigten Gründen widersprechen, woraufhin jede Partei kündigen kann.
+
+Der Auftragsverarbeiter setzt einen Unterauftragsverarbeiter nur auf Grundlage eines schriftlichen Vertrags ein, der ihm Datenschutzpflichten auferlegt, die nicht weniger schützen als die in diesem Vertrag festgelegten, insbesondere hinreichende Garantien dafür, dass die geeigneten technischen und organisatorischen Maßnahmen so durchgeführt werden, dass die Verarbeitung entsprechend den Anforderungen der DSGVO erfolgt, wie es Art. 28 Abs. 4 DSGVO vorsieht. Anhang II nennt jeden Unterauftragsverarbeiter, seine Rolle und Region, ob er übermittelte Kennungen erhalten kann, und den Übermittlungsmechanismus, auf den er sich stützt.
+
+## 6. Internationale Übermittlungen
+
+Übermittelte Kennungen werden in der Europäischen Union verarbeitet: von der API in der Railway-Region Amsterdam (Niederlande) und, für den Playground und das Dashboard der Website, von Funktionen in der Vercel-Region Frankfurt (Deutschland). Für Verantwortliche, die der DSGVO unterliegen, stützen sich Übermittlungen an den in der Schweiz niedergelassenen Auftragsverarbeiter auf den Angemessenheitsbeschluss der Europäischen Kommission für die Schweiz (Entscheidung 2000/518/EG, bestätigt durch die Überprüfung der Kommission vom 15. Januar 2024); Standardvertragsklauseln sind nicht erforderlich. Für Schweizer Verantwortliche gilt die EU nach Schweizer Recht als Raum mit angemessenem Datenschutzniveau. Wo ein Unterauftragsverarbeiter aus einem Drittland tätig ist, stützen sich Übermittlungen auf Angemessenheitsbeschlüsse (einschließlich des EU-US- und des Swiss-US-Datenschutzrahmens, Data Privacy Framework, für zertifizierte US-Unterauftragsverarbeiter) oder auf die Standardvertragsklauseln des Unterauftragsverarbeiters. Anhang II nennt den Mechanismus für jeden Unterauftragsverarbeiter und welche von ihnen übermittelte Kennungen erhalten können.
+
+## 7. Unterstützung, Vorfälle, Prüfungen
+
+- **Anfragen betroffener Personen:** Da zur Validierung übermittelte IBAN nicht gespeichert und Berichte des Datei-Audits innerhalb von 24 Stunden nach der Zahlung gelöscht werden, hält der Auftragsverarbeiter in der Regel keine Daten, die herauszugeben oder zu löschen wären; er unterstützt den Verantwortlichen dennoch innerhalb von 30 Tagen bezüglich der vorhandenen Daten (Konto-E-Mail-Adresse, Anfrage-Metadaten).
+- **Verletzung des Schutzes personenbezogener Daten:** Meldung an den Verantwortlichen **unverzüglich und binnen 72 Stunden**, nachdem sie bekannt geworden ist, mit den nach Art. 33 Abs. 3 DSGVO erforderlichen Informationen.
+- **Prüfungen:** Der Auftragsverarbeiter stellt Unterlagen zum Nachweis der Einhaltung bereit (diesen Vertrag, die Datenschutzerklärung, eine Beschreibung der Architektur) und beantwortet einmal pro Jahr angemessene schriftliche Prüfungsfragen; Vor-Ort-Prüfungen werden angesichts des Betriebs durch eine einzige Person durch diese Mittel ersetzt, es sei denn, eine Aufsichtsbehörde verlangt etwas anderes.
+
+## 8. Löschung und Ende des Dienstes
+
+Bei Vertragsende wird die den Schlüsseln des Verantwortlichen zuzuordnende Telemetrie **standardmäßig 30 Tage nach Vertragsende** gelöscht (Ziffer 4.7); der Kontodatensatz des Verantwortlichen (E-Mail-Adresse, gehashter Schlüssel) wird auf Antrag gelöscht, vorbehaltlich gesetzlicher Aufbewahrungspflichten für Buchhaltungsunterlagen. Es gibt keinen gespeicherten IBAN-Bestand, der zurückzugeben oder zu löschen wäre.
+
+## 9. Haftung und anwendbares Recht
+
+Die Haftung richtet sich nach [Ziffer 8 der Nutzungsbedingungen](/de/legal/terms). Dieser Vertrag unterliegt Schweizer Recht; für Verantwortliche, die der DSGVO unterliegen, ist er im Einklang mit Art. 28 DSGVO auszulegen.
+
+Kontakt für alle Fragen zu diesem Vertrag: **support@ibanforge.com**
+
+---
+
+## Anhang I: Beschreibung der Verarbeitung
+
+- **I.1 Gegenstand:** Validierung und Anreicherung von Bankkennungen (IBAN/BIC), die der Verantwortliche über die API übermittelt; beim Datei-Audit die Prüfung einer vom Verantwortlichen hochgeladenen Datei und die Erstellung ihres kommentierten Berichts.
+- **I.2 Betroffene Personen:** Kunden, Lieferanten, Beschäftigte oder Endnutzer des Verantwortlichen, deren IBAN übermittelt werden.
+- **I.3 Kategorien personenbezogener Daten:** Bankkontokennungen (IBAN) und BIC während der Übertragung; beim Datei-Audit die Spalten der hochgeladenen Datei (zum Beispiel Namen und Adressen von Zahlungsempfängern); die Kontakt-E-Mail-Adresse des Verantwortlichen für die Kontoverwaltung; Anfrage-Metadaten (Endpunkt, Zeitstempel, Status, Latenz, gesalzener IP-Hash, Präfix des API-Schlüssels); im Protokoll des Netzwerkrands des API-Hosters die rohe IP-Adresse und der Anfragepfad, für 7 Tage.
+- **I.4 Besondere Kategorien:** keine.
+- **I.5 Verarbeitungsvorgänge:** flüchtige, automatisierte Validierung und Anreicherung im Arbeitsspeicher, die die API-Antwort erzeugt; beim Datei-Audit die Speicherung des kommentierten Berichts für die Fristen in I.6; aggregierte Statistiken über den Dienst ohne personenbezogene Daten.
+- **I.6 Aufbewahrung:** Zur Validierung übermittelte IBAN werden **nicht gespeichert** (einzige Ausnahme: bei ungültigen IBAN höchstens die ersten 4 Zeichen, also Ländercode und Prüfziffern, bis zu 12 Monate zur Diagnose der Datenqualität). Der Bericht des Datei-Audits wird höchstens **2 Stunden** aufbewahrt, wenn er nicht bezahlt ist, und **24 Stunden nach der Zahlung**, danach gelöscht. Anfrage-Metadaten (Telemetrie) werden **höchstens 12 Monate** aufbewahrt, und Telemetrie, die einem Kunden nach Vertragsende zuzuordnen ist, wird **standardmäßig 30 Tage nach Vertragsende** gelöscht (Ziffer 4.7). Buchhaltungsunterlagen werden nach den gesetzlichen Aufbewahrungspflichten aufbewahrt.
+
+## Anhang II: Unterauftragsverarbeiter und Übermittlungsmechanismen
+
+Die Einträge im Data Privacy Framework (DPF) wurden am 5. Oktober 2026 im amtlichen Register [dataprivacyframework.gov](https://www.dataprivacyframework.gov/list) geprüft. „Beide Rahmen“ bezeichnet den EU-US- und den Swiss-US-Datenschutzrahmen (Data Privacy Framework).
+
+| Unterauftragsverarbeiter | Rolle | Region | Kann übermittelte Kennungen erhalten? | Übermittlungsmechanismus |
+|---|---|---|---|---|
+| Railway Corp. | Hosting und Speicherung der API | Amsterdam, Niederlande (EU) | Ja, im Arbeitsspeicher, um die Anfrage zu beantworten | Verarbeitung in der EU. Railway Corporation ist unter beiden Rahmen zertifiziert ([Registereintrag](https://www.dataprivacyframework.gov/participant/2913)). |
+| Vercel Inc. | Hosting von Website und Dashboard; Eingaben im Playground werden an die API weitergeleitet | Funktionen: Frankfurt, Deutschland (EU); statische Seiten: globales Netz | Nur eine im Playground der Website eingegebene IBAN | Funktionen in der EU. Vercel Inc. ist unter beiden Rahmen zertifiziert ([Registereintrag](https://www.dataprivacyframework.gov/participant/6847)). |
+| Stripe Payments Europe | Kartenzahlungen | EU | Nein | In der EU niedergelassen. Das verbundene US-Unternehmen Stripe, LLC ist unter beiden Rahmen zertifiziert ([Registereintrag](https://www.dataprivacyframework.gov/participant/10014)). |
+| Coinbase (CDP-Facilitator) | USDC-Abwicklung von x402-Zahlungen, mit dem x402.org-Facilitator als Rückfallebene | USA | Nein | Coinbase, Inc. ist unter beiden Rahmen zertifiziert ([Registereintrag](https://www.dataprivacyframework.gov/participant/6286)). |
+| Infomaniak Network SA | Transaktions- und Support-E-Mail | Schweiz | Nur eine IBAN, die in einer E-Mail an den Auftragsverarbeiter steht | Schweiz: Angemessenheitsbeschluss der Europäischen Kommission (Entscheidung 2000/518/EG). |
+| GitHub Inc. | Öffentlicher Quellcode und CI, keine Kundendaten | USA | Nein | GitHub ist unter beiden Rahmen zertifiziert ([Registereintrag](https://www.dataprivacyframework.gov/participant/6174)). |
+| Anthropic PBC | KI-gestützte Entwürfe von Korrespondenz, vom Betreiber ausgelöst | USA | Nie aus der API; nur eine IBAN, die in einer E-Mail an den Auftragsverarbeiter steht | Nicht im DPF zertifiziert. Standardvertragsklauseln des [Data Processing Addendum](https://www.anthropic.com/legal/data-processing-addendum) von Anthropic. |

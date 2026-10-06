@@ -1891,12 +1891,17 @@
       },
       "imprint": {
         "title": "Legal Notice",
-        "description": "Operator identity and contact for ibanforge.com and api.ibanforge.com."
+        "description": "Operator identity, postal address and contact for ibanforge.com and api.ibanforge.com."
       },
       "sla": {
         "title": "Service Level Agreement",
         "description": "SLA for Editor/OEM subscriptions — 99.5% monthly availability, service credits, measurement by the public status page."
       }
+    },
+    "translation": {
+      "notice": "Courtesy translation, not binding. The English version prevails.",
+      "englishLink": "Read the English version",
+      "indexNotice": "Some documents are offered as courtesy translations. The English version of each document prevails."
     }
   },
   "status": {

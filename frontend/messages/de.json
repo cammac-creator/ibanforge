@@ -1874,29 +1874,34 @@
       "title": "Rechtliches",
       "subtitle": "Die Dokumente, die den Dienst regeln: Bedingungen, Datenschutz, Auftragsverarbeitung, Betreiberidentität."
     },
-    "englishOnly": "Vertragsdokumente werden auf Englisch bereitgestellt — die englische Fassung ist massgebend.",
+    "englishOnly": "Vertragsdokumente werden auf Englisch bereitgestellt. Maßgebend ist die englische Fassung.",
     "updated": "Aktualisiert am",
     "docs": {
       "terms": {
-        "title": "Nutzungsbedingungen (Dokument auf Englisch)",
-        "description": "Nutzungsbedingungen der IBANforge-API und der Website. Massgebend ist die englische Fassung."
+        "title": "Nutzungsbedingungen",
+        "description": "Nutzungsbedingungen der IBANforge-API und der Website, als unverbindliche Übersetzung. Maßgebend ist die englische Fassung."
       },
       "privacy": {
-        "title": "Datenschutzerklärung (auf Englisch)",
-        "description": "Was IBANforge verarbeitet und speichert, wie lange, und Ihre Rechte nach DSG und DSGVO. Massgebend ist die englische Fassung."
+        "title": "Datenschutzerklärung",
+        "description": "Was IBANforge verarbeitet und speichert, wie lange, und Ihre Rechte nach DSG und DSGVO. Unverbindliche Übersetzung, maßgebend ist die englische Fassung."
       },
       "dpa": {
-        "title": "Auftragsverarbeitungsvertrag, DPA (auf Englisch)",
-        "description": "Vorunterzeichneter Auftragsverarbeitungsvertrag (Art. 28 DSGVO / DSG) für Kunden, die die IBANforge-API einbinden. Massgebend ist die englische Fassung."
+        "title": "Auftragsverarbeitungsvertrag (AVV)",
+        "description": "Vorunterzeichneter Auftragsverarbeitungsvertrag nach Art. 28 DSGVO und DSG für Kunden, die die IBANforge-API einbinden. Unverbindliche Übersetzung, maßgebend ist die englische Fassung."
       },
       "imprint": {
-        "title": "Impressum (auf Englisch)",
-        "description": "Betreiber und Kontakt für ibanforge.com und api.ibanforge.com. Massgebend ist die englische Fassung."
+        "title": "Impressum",
+        "description": "Betreiber, Anschrift und Kontakt für ibanforge.com und api.ibanforge.com."
       },
       "sla": {
-        "title": "Service-Level-Vereinbarung, SLA (auf Englisch)",
-        "description": "SLA der Editor- und OEM-Lizenzen: 99,5 % monatliche Verfügbarkeit, Servicegutschriften, Messung über die öffentliche Statusseite. Massgebend ist die englische Fassung."
+        "title": "Service-Level-Vereinbarung (SLA)",
+        "description": "SLA der Editor- und OEM-Abonnements: 99,5 % monatliche Verfügbarkeit, Servicegutschriften, Messung über die öffentliche Statusseite. Unverbindliche Übersetzung, maßgebend ist die englische Fassung."
       }
+    },
+    "translation": {
+      "notice": "Unverbindliche Übersetzung. Maßgebend ist die englische Fassung.",
+      "englishLink": "Zur englischen Fassung",
+      "indexNotice": "Die Dokumente liegen als unverbindliche Übersetzungen vor. Maßgebend ist jeweils die englische Fassung."
     }
   },
   "status": {
