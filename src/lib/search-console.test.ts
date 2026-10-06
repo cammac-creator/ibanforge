@@ -268,6 +268,10 @@ describe('rows and paths', () => {
     expect(relativePath('https://ibanforge.com.evil.example/x')).toBe(
       'https://ibanforge.com.evil.example/x',
     );
+    expect(relativePath('https://ibanforge.com@evil.example/x')).toBe(
+      'https://ibanforge.com@evil.example/x',
+    );
+    expect(relativePath('https://ibanforge.com/')).toBe('/');
   });
 
   it('keeps a query verbatim and caps the list', () => {

@@ -64,6 +64,17 @@ describe('recipientDomains', () => {
 
   it('drops a trailing separator and repeats no domain', () => {
     expect(recipientDomains('a@example.com., b@example.com')).toEqual(['example.com']);
+    expect(recipientDomains('a@example.com.-.-')).toEqual(['example.com']);
+    expect(recipientDomains('a@---')).toEqual([]);
+  });
+
+  it('stays linear on a long run of dashes inside a domain', () => {
+    // The trailing-separator regex this replaced retried the run from each
+    // dash: quadratic time on a field anyone can fill.
+    const hostile = `a@${'-'.repeat(100_000)}x`;
+    const start = performance.now();
+    expect(recipientDomains(hostile)).toEqual([`${'-'.repeat(100_000)}x`]);
+    expect(performance.now() - start).toBeLessThan(200);
   });
 
   it('is empty for anything with no readable domain', () => {

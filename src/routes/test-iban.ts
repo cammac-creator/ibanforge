@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { Hono } from 'hono';
 import { getBicDB } from '../lib/db.js';
 import { validateIBAN } from '../lib/iban.js';
@@ -46,9 +47,15 @@ function mod11Digits(weights: readonly number[]): string {
   }
 }
 
+/**
+ * Account digits from the operating system's generator rather than
+ * Math.random. The numbers are fake and public, so nothing secret rides on
+ * them; the point is that a published fake account cannot be predicted from
+ * the ones handed out before it.
+ */
 function randDigits(n: number): string {
   let s = '';
-  for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 10);
+  for (let i = 0; i < n; i++) s += randomInt(10);
   return s;
 }
 
@@ -163,8 +170,7 @@ testIban.get('/v1/test-iban', (c) => {
 
   const items = [];
   for (let i = 0; i < count; i++) {
-    const country =
-      (countryParam as Country) || COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
+    const country = (countryParam as Country) || COUNTRIES[randomInt(COUNTRIES.length)];
     const item = generateOne(country);
     if (item) items.push(item);
   }
