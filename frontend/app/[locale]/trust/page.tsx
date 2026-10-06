@@ -54,7 +54,8 @@ const NOT_HAVE = ["0", "1", "2"] as const;
 /** The checks a reader can run from outside, one per hosting line. */
 const HOSTING = [
   { key: "api", icon: Server, check: "curl -sI https://api.ibanforge.com/health | grep -i x-railway-edge" },
-  { key: "site", icon: Globe, check: "curl -sI https://ibanforge.com/ | grep -i x-vercel-id" },
+  // A page rendered on request: a cached page may never reach a function.
+  { key: "site", icon: Globe, check: "curl -sI https://ibanforge.com/legal/dpa | grep -i x-vercel-id" },
   { key: "mail", icon: Building2, check: "dig +short NS ibanforge.com" },
 ] as const;
 

@@ -1950,12 +1950,12 @@
         "api": {
           "name": "API",
           "body": "Railway, région d'Amsterdam (Pays-Bas, UE). Le trafic suisse entre par le nœud réseau de Railway à Zurich.",
-          "checkNote": "L'en-tête x-railway-edge nomme le nœud d'entrée (zrh1 depuis la Suisse). La région d'Amsterdam elle-même n'est pas visible de l'extérieur."
+          "checkNote": "L'en-tête x-railway-edge nomme le nœud d'entrée le plus proche de vous (zrh1 depuis la Suisse). La région d'Amsterdam elle-même n'est pas visible de l'extérieur."
         },
         "site": {
           "name": "Site et tableau de bord",
           "body": "Vercel. Ses fonctions tournent dans la région de Francfort (Allemagne, UE) ; les pages statiques sont servies par le réseau mondial de Vercel.",
-          "checkNote": "L'en-tête x-vercel-id indique fra1 comme région de la fonction."
+          "checkNote": "Dans l'en-tête x-vercel-id, la partie qui suit le premier :: est la région où la fonction a tourné : fra1 est Francfort. La première partie est le nœud d'entrée le plus proche de vous."
         },
         "mail": {
           "name": "Courriel et DNS",
@@ -2076,7 +2076,7 @@
       },
       "security": {
         "title": "Sécurité",
-        "tests": "Chaque pull request et chaque poussée sur la branche principale lancent les tests automatisés dans GitHub Actions (API, site, SDK) et démarrent le conteneur de production. Les actualisations automatiques des données lancent les tests de l'API et un contrôle de qualité face aux données précédentes avant de publier.",
+        "tests": "Chaque pull request lance les tests automatisés dans GitHub Actions (API, site, SDK) et démarre le conteneur de production, comme chaque changement que l'exploitant pousse sur la branche principale. Les actualisations automatiques des données publient sans cette suite et font d'abord leurs propres contrôles : celles des BIC et des registres tchèque et italien lancent les tests de l'API et comparent les nouvelles données aux précédentes ; celle, hebdomadaire, des données de conformité vérifie que la couverture annoncée par l'API correspond aux nouvelles listes.",
         "testsLink": "Exécutions de la CI",
         "code": "Le code est public, sous licence MIT : chacun peut lire comment un IBAN est traité.",
         "codeLink": "Code source",

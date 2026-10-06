@@ -1950,12 +1950,12 @@
         "api": {
           "name": "API",
           "body": "Railway, Region Amsterdam (Niederlande, EU). Schweizer Datenverkehr gelangt über den Netzwerkrand von Railway in Zürich.",
-          "checkNote": "Der Header x-railway-edge nennt den Netzwerkrand (zrh1 aus der Schweiz). Die Region Amsterdam selbst ist von außen nicht sichtbar."
+          "checkNote": "Der Header x-railway-edge nennt den Netzwerkrand, der Ihnen am nächsten liegt (zrh1 aus der Schweiz). Die Region Amsterdam selbst ist von außen nicht sichtbar."
         },
         "site": {
           "name": "Website und Dashboard",
           "body": "Vercel. Die Funktionen laufen in der Region Frankfurt (Deutschland, EU); statische Seiten kommen aus dem globalen Netz von Vercel.",
-          "checkNote": "Der Header x-vercel-id nennt fra1 als Region der Funktion."
+          "checkNote": "Im Header x-vercel-id ist der Teil nach dem ersten :: die Region, in der die Funktion lief: fra1 ist Frankfurt. Der erste Teil ist der Netzwerkrand, der Ihnen am nächsten liegt."
         },
         "mail": {
           "name": "E-Mail und DNS",
@@ -2076,7 +2076,7 @@
       },
       "security": {
         "title": "Sicherheit",
-        "tests": "Jeder Pull-Request und jeder Push auf den Hauptzweig führt die automatisierten Tests in GitHub Actions aus (API, Website, SDKs) und startet den Produktionscontainer. Die automatischen Datenaktualisierungen führen vor der Veröffentlichung die API-Tests und eine Qualitätsprüfung gegen die bisherigen Daten aus.",
+        "tests": "Jeder Pull-Request führt die automatisierten Tests in GitHub Actions aus (API, Website, SDKs) und startet den Produktionscontainer, ebenso jede Änderung, die der Betreiber auf den Hauptzweig pusht. Die automatischen Datenaktualisierungen veröffentlichen ohne diese Testsuite und führen vorher eigene Prüfungen aus: Die Aktualisierungen der BIC-Daten und der tschechischen und italienischen Register führen die API-Tests aus und vergleichen die neuen Daten mit den bisherigen; die wöchentliche Aktualisierung der Compliance-Daten prüft, dass die von der API angekündigte Abdeckung den neuen Listen entspricht.",
         "testsLink": "CI-Läufe",
         "code": "Der Code ist öffentlich, unter der MIT-Lizenz: Jeder kann nachlesen, wie eine IBAN verarbeitet wird.",
         "codeLink": "Quellcode",

@@ -112,6 +112,32 @@ describe('the operator and the promises the page repeats', () => {
     }
   });
 
+  it('describes the CI and the data refreshes as the workflow files run them', () => {
+    // The sentence on tests is checkable by anyone in the public repository,
+    // so it must stay true of the files: ci.yml on pull requests and pushes to
+    // main (the robots push with GITHUB_TOKEN, which triggers no other
+    // workflow, hence "the operator"), the BIC, Czech and Italian refreshes
+    // behind `npm run test` and the quality diff, the compliance refresh
+    // behind its claims test only.
+    const wf = (name: string) =>
+      readFileSync(join(process.cwd(), '..', '.github', 'workflows', name), 'utf8');
+    const ci = wf('ci.yml');
+    expect(ci).toMatch(/push:\s*\n\s*branches: \[main\]/);
+    expect(ci).toMatch(/pull_request:\s*\n\s*branches: \[main\]/);
+    expect(ci).toMatch(/\n {2}docker:/);
+    for (const name of ['refresh-bic.yml', 'refresh-cz-register.yml', 'refresh-it-register.yml']) {
+      const w = wf(name);
+      expect(w, name).toContain('npm run test');
+      expect(w, name).toContain('scripts/refresh-diff.ts');
+      expect(w.indexOf('npm run test'), name).toBeLessThan(w.indexOf('git push'));
+    }
+    const compliance = wf('refresh-compliance.yml');
+    expect(compliance).toContain('src/routes/sanctions-claims.test.ts');
+    expect(compliance).not.toContain('npm run test');
+    expect(en.legal.trust.security.tests).toContain('the operator pushes');
+    expect(en.legal.trust.security.tests).toContain('the weekly compliance refresh checks');
+  });
+
   it('is linked from the Legal Notice in both languages', () => {
     expect(read('imprint.mdx')).toContain('](/trust)');
     expect(read('de/imprint.mdx')).toContain('](/de/trust)');

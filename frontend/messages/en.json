@@ -1950,12 +1950,12 @@
         "api": {
           "name": "API",
           "body": "Railway, Amsterdam region (Netherlands, EU). Swiss traffic enters through Railway's network edge in Zurich.",
-          "checkNote": "The x-railway-edge header names the edge (zrh1 from Switzerland). The Amsterdam region itself is not visible from outside."
+          "checkNote": "The x-railway-edge header names the edge nearest to you (zrh1 from Switzerland). The Amsterdam region itself is not visible from outside."
         },
         "site": {
           "name": "Website and dashboard",
           "body": "Vercel. Its functions run in the Frankfurt region (Germany, EU); static pages are served from Vercel's global network.",
-          "checkNote": "The x-vercel-id header shows fra1 as the region of the function."
+          "checkNote": "In the x-vercel-id header, the part after the first :: is the region where the function ran: fra1 is Frankfurt. The first part is the edge nearest to you."
         },
         "mail": {
           "name": "E-mail and DNS",
@@ -2076,7 +2076,7 @@
       },
       "security": {
         "title": "Security",
-        "tests": "Every pull request and every push to the main branch runs the automated tests in GitHub Actions (API, website, SDKs) and boots the production container. The automated data refreshes run the API tests and a quality check against the previous data before they publish.",
+        "tests": "Every pull request runs the automated tests in GitHub Actions (API, website, SDKs) and boots the production container, and so does every change the operator pushes to the main branch. The automated data refreshes publish without that suite and run their own checks first: the BIC, Czech and Italian refreshes run the API tests and compare the new data with the previous data; the weekly compliance refresh checks that the coverage the API announces matches the new lists.",
         "testsLink": "CI runs",
         "code": "The code is public, under the MIT licence: anyone can read how an IBAN is handled.",
         "codeLink": "Source code",
