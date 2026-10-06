@@ -125,6 +125,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       // someone already deciding, not pages we compete on.
       { url: `${prefix}/changelog`, changeFrequency: "weekly", priority: 0.5 },
       { url: `${prefix}/status`, changeFrequency: "daily", priority: 0.5 },
+      { url: `${prefix}/trust`, changeFrequency: "monthly", priority: 0.5 },
       { url: `${prefix}/legal`, changeFrequency: "yearly", priority: 0.3 },
       { url: `${prefix}/legal/terms`, changeFrequency: "yearly", priority: 0.4 },
       { url: `${prefix}/legal/privacy`, changeFrequency: "yearly", priority: 0.4 },
