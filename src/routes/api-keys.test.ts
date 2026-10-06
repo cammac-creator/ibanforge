@@ -16,7 +16,7 @@ import {
   keyCreationSource,
 } from '../lib/key-creation-guard.js';
 import { Hono } from 'hono';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 function makeApp() {
   const app = new Hono();
@@ -155,11 +155,14 @@ describe('/v1/admin/keys/import — only the shape the generator mints', () => {
     const apiKey = `ifk_${randomBytes(32).toString('hex')}`;
     const res = await importKey(apiKey);
     expect(res.status).toBe(201);
-    const row = getStatsDB()
-      .prepare('SELECT key_prefix FROM api_keys WHERE key_hash = ?')
-      .get(createHash('sha256').update(apiKey).digest('hex')) as { key_prefix: string } | undefined;
-    expect(row?.key_prefix).toBe(apiKey.slice(0, 12));
+    // The key authenticates, and the table holds its prefix and a 64-hex
+    // digest, never the key itself.
     expect(validateApiKey(apiKey).valid).toBe(true);
+    const row = getStatsDB()
+      .prepare('SELECT key_hash FROM api_keys WHERE key_prefix = ?')
+      .get(apiKey.slice(0, 12)) as { key_hash: string } | undefined;
+    expect(row?.key_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row?.key_hash).not.toContain(apiKey.slice(4));
   });
 });
 

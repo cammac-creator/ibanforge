@@ -29,19 +29,18 @@ export function getAllPosts(locale: string = 'en'): BlogPost[] {
   // outside SLUG_PATTERN would be a link to a 404, and the slug is written
   // into every card's href. content-slug.test.ts fails before a real post
   // could be dropped here.
-  const files = fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith('.mdx') && SLUG_PATTERN.test(f.slice(0, -'.mdx'.length)));
-  return files
-    .map((file) => {
-      const slug = file.slice(0, -'.mdx'.length);
-      const raw = fs.readFileSync(path.join(dir, file), 'utf-8');
-      const { data, content } = matter(raw);
-      const words = content.split(/\s+/).length;
-      const readingTime = `${Math.ceil(words / 200)} min read`;
-      return { slug, title: data.title, description: data.description || '', date: data.date, readingTime };
-    })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const posts: BlogPost[] = [];
+  for (const file of fs.readdirSync(dir)) {
+    if (!file.endsWith('.mdx')) continue;
+    const slug = file.slice(0, -'.mdx'.length);
+    if (!SLUG_PATTERN.test(slug)) continue;
+    const raw = fs.readFileSync(path.join(dir, file), 'utf-8');
+    const { data, content } = matter(raw);
+    const words = content.split(/\s+/).length;
+    const readingTime = `${Math.ceil(words / 200)} min read`;
+    posts.push({ slug, title: data.title, description: data.description || '', date: data.date, readingTime });
+  }
+  return posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export function getPost(slug: string, locale: string = 'en'): { meta: BlogPost; content: string } {
