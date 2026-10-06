@@ -9,6 +9,11 @@ on:
     - cron: '0 6 * * 1'
   workflow_dispatch:
 
+# The job reads the repository (checkout) and calls outside services with its
+# own secret. It writes nothing to GitHub, so the token gets read access only.
+permissions:
+  contents: read
+
 jobs:
   ping:
     runs-on: ubuntu-latest

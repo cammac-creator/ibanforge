@@ -24,6 +24,8 @@
  *    says so instead of pretending to check.
  */
 
+import { isOwnApiResource } from '../src/lib/own-api-resource.js';
+
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const BAZAAR_URL = 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources';
 const EXPECTED_BAZAAR_MIN = 5;
@@ -109,7 +111,9 @@ export async function countBazaarResources(fetchImpl: typeof fetch = fetch): Pro
       pagination?: { total?: unknown };
     };
     for (const item of data.items ?? []) {
-      if (typeof item.resource === 'string' && item.resource.startsWith('https://api.ibanforge.com')) {
+      // Host compared parsed, never by prefix: anyone can list a resource in
+      // this catalog, `https://api.ibanforge.com.attacker.example` included.
+      if (typeof item.resource === 'string' && isOwnApiResource(item.resource)) {
         found.add(item.resource);
       }
     }

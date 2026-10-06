@@ -3,6 +3,7 @@ import {
   validate402Envelope,
   endpointsFromManifest,
   runDiscoverabilityCanary,
+  countBazaarResources,
 } from './discoverability-canary.js';
 
 function envelope(overrides: Record<string, unknown> = {}): string {
@@ -116,6 +117,22 @@ describe('runDiscoverabilityCanary', () => {
     expect(out).toContain('🚨 Bazaar CDP : 3/5');
     expect(out).toContain('micro-règlement');
     expect(out).not.toContain('Tout vert');
+  });
+
+  it("ne compte pas un hôte étranger qui commence par le nom de l'API", async () => {
+    const page = JSON.stringify({
+      items: [
+        { resource: 'https://api.ibanforge.com/v1/iban/validate' },
+        { resource: 'https://api.ibanforge.com.attacker.example/v1/a' },
+        { resource: 'https://api.ibanforge.com@attacker.example/v1/b' },
+        { resource: 'https://api.ibanforge.community/v1/c' },
+      ],
+      pagination: { total: 4 },
+    });
+    const f = fakeFetch({ 'https://api.cdp.coinbase.com/': { status: 200, body: page } });
+    expect([...(await countBazaarResources(f))]).toEqual([
+      'https://api.ibanforge.com/v1/iban/validate',
+    ]);
   });
 
   it('alerte si le manifeste ne publie plus rien à sonder', async () => {

@@ -26,6 +26,7 @@ describe('checkNationalKey : les pays couverts', () => {
       IT: 'it_cin',
       SM: 'it_cin',
       ES: 'es_dc',
+      DE: 'de_pruefziffer',
     });
   });
 
@@ -64,7 +65,6 @@ describe('checkNationalKey : les pays couverts', () => {
 
 describe('checkNationalKey : les pays sans algorithme n’ont pas de bloc', () => {
   it.each([
-    'DE89370400440532013000',
     'CH9300762011623852957',
     'GB29NWBK60161331926819',
     'NL91ABNA0417164300',
@@ -92,5 +92,21 @@ describe('checkNationalKey : les pays sans algorithme n’ont pas de bloc', () =
       country: 'FR',
       status: 'not_applicable',
     });
+    expect(checkNationalKey('DE8937040044053201300')).toMatchObject({
+      country: 'DE',
+      scheme: 'de_pruefziffer',
+      status: 'not_applicable',
+    });
+  });
+});
+
+describe('checkNationalKey : l’Allemagne, méthode par code banque (06.10.2026)', () => {
+  it('l’exemple du registre IBAN reçoit un bloc qui nomme la méthode de sa banque', () => {
+    // 37040044 : méthode 13 dans le fichier de la Bundesbank, sans numéro de
+    // test publié, donc pas de verdict (de/verified.ts).
+    const block = checkNationalKey('DE89370400440532013000');
+    expect(block).toMatchObject({ country: 'DE', scheme: 'de_pruefziffer', method: '13' });
+    expect(['pass', 'not_checked']).toContain(block?.status);
+    expect(block?.source).toMatch(/^Quelle: Deutsche Bundesbank/);
   });
 });

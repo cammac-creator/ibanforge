@@ -10,6 +10,7 @@ import { getChClearingCount } from '../lib/ch-clearing.js';
 import { getStatsDB, getStatsDbState } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
 import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
+import { deMethodTableStatus, type DeMethodTableStatus } from '../lib/national-check/de/table.js';
 import { verificationDelivery } from '../lib/key-creation-guard.js';
 import { servedAt } from '../lib/served-at.js';
 import { restrictedOverlayHealth } from '../lib/restricted-overlay-runtime.js';
@@ -70,6 +71,19 @@ function probeUkModulus(): UkModulusStatus {
     return ukModulusStatus();
   } catch {
     return { available: false, fetched_on: null, age_days: null, stale: null };
+  }
+}
+
+/**
+ * The German check-digit method table (06/10/2026), optional for the same reason
+ * as the UK table: without it the German account check answers not_checked, a
+ * degraded feature and never an outage. Guarded the same way.
+ */
+function probeDeMethodTable(): DeMethodTableStatus {
+  try {
+    return deMethodTableStatus();
+  } catch {
+    return { available: false, fetched_on: null, bank_codes: null };
   }
 }
 
@@ -244,6 +258,10 @@ health.get('/health', (c) => {
       // true`, which a six-month-old table satisfies just as well as a fresh
       // one, while answering wrongly for every sorting code reallocated since.
       uk_modulus: probeUkModulus(),
+      // AJOUTÉ le 06.10.2026 à côté du contrat, rien de renommé : la table des
+      // méthodes de clé allemandes (national_check_digits, scheme de_pruefziffer).
+      // `available: false` veut dire que l'Allemagne répond not_checked.
+      de_pruefziffer: probeDeMethodTable(),
       // Per-register freshness, added 01/09/2026 and additive like the two
       // blocks above. The global date one screen up answers "did the refresh
       // run"; this answers "did every source survive it" — a register whose

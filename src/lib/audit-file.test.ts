@@ -373,6 +373,34 @@ describe('a failed national check key stops the row, like the UK check', () => {
     expect(res.summary.error).toBe(FAILED.length);
   });
 
+  it('Germany: an official-level fail stops the row, a second-level fail only warns (06.10.2026)', () => {
+    // 10070000 : méthode 63, vérifiée sur les numéros officiels (premier niveau).
+    // 37040044 : méthode 13, publiée sans numéro de test (second niveau).
+    const res = auditTable(
+      ['IBAN'],
+      [['DE90100700000123457600'], ['DE55370400440532014000'], ['DE89370400440532013000']],
+    );
+    const [official, second, good] = res.rows;
+    expect(official!.findings.map((f) => f.code)).toContain('national_check_digits_failed');
+    expect(official!.status).toBe('error');
+    expect(second!.findings.map((f) => f.code)).toContain('national_check_digits_suspect');
+    expect(second!.findings.map((f) => f.code)).not.toContain('national_check_digits_failed');
+    expect(second!.status).not.toBe('error');
+    expect(second!.next_steps).toContain('national_check_digits_suspect');
+    const codes = good!.findings.map((f) => f.code);
+    expect(codes).not.toContain('national_check_digits_suspect');
+    expect(codes).not.toContain('national_check_digits_failed');
+    expect(findingLabel('national_check_digits_suspect', 'en')).toBe(
+      'German account check digit fails (warning)',
+    );
+    expect(findingLabel('national_check_digits_suspect', 'fr')).toBe(
+      'Clé du compte allemand en échec (avertissement)',
+    );
+    expect(findingLabel('national_check_digits_suspect', 'de')).toBe(
+      'Deutsche Kontoprüfziffer fehlgeschlagen (Warnung)',
+    );
+  });
+
   it('names the finding in the three languages, in the workbook and in the free preview', () => {
     expect(findingLabel('national_check_digits_failed', 'en')).toBe('National check key fails');
     expect(findingLabel('national_check_digits_failed', 'fr')).toBe(
