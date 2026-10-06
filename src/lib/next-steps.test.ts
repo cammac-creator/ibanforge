@@ -140,6 +140,7 @@ describe('national_check_digits_failed', () => {
     be_mod97: 'BE',
     it_cin: 'IT',
     es_dc: 'ES',
+    de_pruefziffer: 'DE',
   };
   const SCHEMES = Object.keys(COUNTRY_OF) as NationalCheckScheme[];
 
@@ -194,14 +195,48 @@ describe('national_check_digits_failed', () => {
     expect(`${step.do} ${step.because}`).not.toContain('—');
   });
 
-  it('changes nothing on pass, on not_applicable, or without the block', () => {
+  it('changes nothing on pass, on not_applicable, on not_checked, or without the block', () => {
     for (const around of [base(), base({ bank_code_check: verified })]) {
       const without = nextSteps(around);
       expect(nextSteps({ ...around, national_check_digits: national('pass') })).toEqual(without);
       expect(nextSteps({ ...around, national_check_digits: national('not_applicable') })).toEqual(
         without,
       );
+      // L'Allemagne (06.10.2026) : une méthode pas encore vérifiée ici ne dit
+      // rien du bénéficiaire, et ne doit jamais retenir un paiement.
+      expect(
+        nextSteps({ ...around, national_check_digits: national('not_checked', 'de_pruefziffer') }),
+      ).toEqual(without);
     }
+  });
+
+  it('DE second level: a fail verified only against an independent implementation warns, never stops (06.10.2026)', () => {
+    const second: NationalCheck = {
+      ...national('fail', 'de_pruefziffer'),
+      method: '13',
+      verified_by: 'independent_implementation',
+    };
+    for (const around of [base(), base({ bank_code_check: verified })]) {
+      const steps = nextSteps({ ...around, national_check_digits: second });
+      expect(steps.map((s) => s.code)).not.toContain('national_check_digits_failed');
+      const warn = steps.filter((s) => s.code === 'national_check_digits_suspect');
+      expect(warn).toHaveLength(1);
+      expect(warn[0]!.do).toMatch(/^Confirm before sending\. /);
+      expect(warn[0]!.do).not.toMatch(/Do not send/);
+      expect(warn[0]!.because).toBe(
+        'national_check_digits.status is fail (de_pruefziffer, method 13) with verified_by independent_implementation',
+      );
+      expect(`${warn[0]!.do} ${warn[0]!.because}`).not.toContain('—');
+      // Rien d'autre ne bouge : les étapes d'offre restent, contrairement au « Do not send ».
+      expect(steps.filter((s) => s.code !== 'national_check_digits_suspect')).toEqual(
+        nextSteps(around),
+      );
+    }
+    // Le même échec sur une méthode vérifiée par les numéros officiels arrête.
+    const official = { ...second, verified_by: 'bundesbank_test_numbers' as const };
+    expect(codesOf(base({ national_check_digits: official }))).toContain(
+      'national_check_digits_failed',
+    );
   });
 
   it('comes right after a bank code the register denies', () => {

@@ -401,6 +401,26 @@ function decodeEntities(text: string): string {
   });
 }
 
+/**
+ * The markup without its HTML comments, which never reach the screen.
+ *
+ * Repeated until nothing changes: one removal can join the pieces around it
+ * into a new opening (`<!` + `<!-- x -->` + `--` reads `<!--`), and the result
+ * must hold none. An opening that is never closed hides the rest of the page,
+ * as it does in a browser. In doubt the text goes: a page read short leaves no
+ * edition, which the caller refuses as a changed layout, while a hidden
+ * edition read as a published one would date the register wrongly.
+ */
+export function withoutComments(html: string): string {
+  let out = html;
+  let previous: string;
+  do {
+    previous = out;
+    out = out.replace(/<!--[\s\S]*?(?:-->|$)/g, '');
+  } while (out !== previous);
+  return out;
+}
+
 /** Markup to readable text: drop the tags, then decode what they were hiding. */
 function textOf(html: string): string {
   return decodeEntities(html.replace(/<[^>]+>/g, ' '));
@@ -747,7 +767,7 @@ function isoDate(day: string, month: string, year: string): string | null {
  * caller refuses as a changed layout.
  */
 export function parseCzechEditions(html: string, pageUrl: string): CzechEdition[] {
-  const visible = html.replace(/<!--[\s\S]*?-->/g, '');
+  const visible = withoutComments(html);
   const editions: CzechEdition[] = [];
   for (const chunk of visible.split(/<\/li\s*>/i)) {
     let start = -1;

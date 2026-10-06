@@ -42,6 +42,12 @@ describe("Portée des verdicts visibles", () => {
       expect(verdict({ valid: true, checks: { national_check_digits: status } }, "iban").localCheckInvalid, String(status)).toBe(false);
     }
   });
+  it("une clé allemande fausse sur une méthode publiée sans numéro de test avertit, sans arrêter (06.10.2026)", () => {
+    const suspect = verdict({ valid: true, checks: { national_check_digits: "fail" }, national_check_digits: { country: "DE", scheme: "de_pruefziffer", status: "fail", method: "13", verified_by: "independent_implementation" } }, "iban");
+    expect(suspect).toMatchObject({ structure: "valid", localCheckInvalid: false, localCheckSuspect: true, next: "confirmDetails" });
+    const blocking = verdict({ valid: true, checks: { national_check_digits: "fail" }, national_check_digits: { country: "DE", scheme: "de_pruefziffer", status: "fail", method: "63", verified_by: "bundesbank_test_numbers" } }, "iban");
+    expect(blocking).toMatchObject({ localCheckInvalid: true, localCheckSuspect: false, next: "confirmDetails" });
+  });
   it("préserve la provenance distincte du code banque et du BIC", () => {
     expect(verdict({ valid: true, bank_code_check: { register: "Registre fictif", as_of: "2026-01-01" }, bic: { source: "Annuaire fictif", as_of: "2025-12-01" } }, "iban")).toMatchObject({ source: "Registre fictif", asOf: "2026-01-01", bicSource: "Annuaire fictif", bicAsOf: "2025-12-01" });
   });

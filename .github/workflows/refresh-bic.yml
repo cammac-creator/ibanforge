@@ -67,6 +67,16 @@ jobs:
       - name: Seed German Bankleitzahlen (Bundesbank)
         run: npm run db:seed-blz
 
+      # The check-digit method of each BLZ (field 9 of the same Bundesbank file),
+      # for the German account-number check (national_check_digits). Written to
+      # its own tracked file, data/de-pruefziffer.json, and never into
+      # data/bic.sqlite: refresh-cz-register.yml recommits that database daily,
+      # and a schema change there would conflict every day. Same sanity floor as
+      # the register: a short or malformed download fails the step and leaves
+      # the previous table standing.
+      - name: Export German check-digit methods (Bundesbank, field 9)
+        run: npm run db:seed-de-pruefziffer
+
       # Slovakia and Czechia only: the Austrian, Belgian and San Marino registers
       # belong to the restricted family and are not read here any more (the
       # seeder refuses them without SEED_FAMILY=restricted).
@@ -174,7 +184,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/bic.sqlite frontend/data/registers frontend/data/countries.json 'frontend/app/[locale]/playground/captured-iban.json'
+          git add data/bic.sqlite data/de-pruefziffer.json frontend/data/registers frontend/data/countries.json 'frontend/app/[locale]/playground/captured-iban.json'
           if git diff --staged --quiet; then
             echo "No changes to BIC database"
           else

@@ -212,6 +212,9 @@ export function essaiAnswer(payload: unknown, copy: EssaiCopy): EssaiAnswer | nu
     result = { tone: "stop", label: copy.verdictStop, note: copy.noteStop }
   } else if (verdict.localCheckInvalid) {
     result = { tone: "stop", label: copy.verdictStop, note: copy.localCheckInvalid }
+  } else if (verdict.localCheckSuspect) {
+    // German method published without test numbers: a warning, never "stop".
+    result = { tone: "neutre", label: copy.status[status === "notChecked" ? "unknown" : status], note: copy.localCheckInvalid }
   } else if (status === "verified") {
     result = { tone: "ok", label: copy.verdictOk, note: copy.noteOk }
   } else {
