@@ -1,5 +1,22 @@
 [build]
 dockerfilePath = "Dockerfile"
+# Redeploy the API only when something that enters its image changes: the paths the
+# Dockerfile copies, plus the build and deploy configuration. With a volume attached,
+# every redeploy is a short outage (Railway, "Caveats" of Volumes), and pushes that touch
+# only the site, the SDKs, the MCP package or the docs used to cause one for nothing.
+# 06.10.2026. Data robots that commit under data/ still redeploy, as they must.
+watchPatterns = [
+  "src/**",
+  "scripts/**",
+  "data/**",
+  "package.json",
+  "package-lock.json",
+  "tsconfig.json",
+  "tsconfig.build.json",
+  "Dockerfile",
+  "entrypoint.sh",
+  "railway.toml",
+]
 
 [deploy]
 healthcheckPath = "/health"
