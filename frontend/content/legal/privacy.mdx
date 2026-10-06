@@ -9,7 +9,7 @@ updated: "2026-10-06"
 
 **Last updated: October 6, 2026 · Version 1.7**
 
-*Revision 1.7 (October 6, 2026): section 1 now says that the network edge log of our API host records the request path, without saying whether the query string is kept: we observed it absent once, and Railway's documentation does not say. The advice is therefore wider: send IBANs in the body of a `POST` request, never in a URL. Section 2 now says where the API and the website's functions run, and that the operator is established in Switzerland, instead of saying that processing stays within the EU. Section 3 says more precisely what Anthropic can receive: the API never sends it an IBAN. It also points to the transfer mechanism of each processor, listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page. A German courtesy translation is published; the English version prevails. Nothing new is collected.*
+*Revision 1.7 (October 6, 2026): section 1 now says that the network edge log of our API host records the request path, without saying whether the query string is kept: we observed it absent once, and Railway's documentation does not say. The advice is therefore wider: send IBANs in the body of a `POST` request, never in a URL. Section 2 now says where the API and the website's functions run, and that the operator is established in Switzerland, instead of saying that processing stays within the EU. Sections 2 and 4 now describe the backups of the account state, which already exist, and how long a deleted e-mail address can remain in them. Section 3 adds these backups to Infomaniak's role, and says more precisely what Anthropic can receive: the API never sends it an IBAN. It also points to the transfer mechanism of each processor, listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page. A German courtesy translation is published; the English version prevails. Nothing new is collected.*
 
 *Revision 1.6 (October 5, 2026): sections 1 to 4 now describe the processing as it already works, more precisely. For an invalid IBAN, at most the first 4 characters (country code and check digits) are kept, not 12. The network edge of our API host keeps the raw IP address and the path of each request for 7 days, outside our own logs. The website's functions run in the Frankfurt region (EU). The processor list now says which processors can receive the IBANs you submit. Nothing new is collected.*
 
@@ -31,7 +31,7 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 |---|---|---|
 | **IBANs submitted for validation** | Validation and enrichment (performance of the service) | **No.** Processed in memory, never written to storage. One exception: for *invalid* IBANs, at most the **first 4 characters** (country code and check digits, never the bank or account part) may be retained for data-quality diagnostics. |
 | **Files uploaded to the file audit** (for example payee names, IBANs and addresses) | Producing the annotated report you order (performance of the service) | **Yes, briefly.** The report reproduces the columns of the uploaded file. It is kept **2 hours** if unpaid and **24 hours after payment**, then automatically deleted. |
-| **Email address** (free key signup) | Issuing your key, quota notifications, service messages | Yes, while your key exists. |
+| **Email address** (free key signup) | Issuing your key, quota notifications, service messages | Yes, while your key exists; after deletion, backups that still hold it age out within 90 days. |
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
 | **Network edge log of our API host** (raw IP address, request path, status, user-agent, timestamp) | Kept by Railway, our API host, to route and secure traffic, outside our own logs | Yes, **7 days**, then deleted by Railway. Send IBANs in the body of a `POST` request, never in a URL. |
 | **Aggregated statistics** (daily counts by endpoint/country — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
@@ -42,7 +42,7 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 
 ## 2. Where the data lives
 
-The API and its databases run on Railway infrastructure in the **Amsterdam, Netherlands region (EU)**, fronted by Railway's European network edge (Zurich for most Swiss traffic). The website's functions run in Vercel's **Frankfurt, Germany region (EU)**; its static pages are served from Vercel's global network. The operator is established in Switzerland, which the European Commission recognises as providing an adequate level of protection; Swiss law recognises the EU likewise. Section 3 lists the processors and where they operate, and this policy and the [DPA](/legal/dpa) apply regardless of where you are.
+The API and its databases run on Railway infrastructure in the **Amsterdam, Netherlands region (EU)**, fronted by Railway's European network edge (Zurich for most Swiss traffic). The website's functions run in Vercel's **Frankfurt, Germany region (EU)**; its static pages are served from Vercel's global network. The operator is established in Switzerland, which the European Commission recognises as providing an adequate level of protection; Swiss law recognises the EU likewise. The account state is backed up every night to a server of Infomaniak in Switzerland, which keeps 30 days of copies; monthly copies, the last three kept, are held on a computer operated by the operator in Switzerland. The account state covers the API keys (as hashes) and the e-mail addresses attached to them, quotas, credit balances, monthly usage counts, purchase records (payment references, payer e-mail, and for USDC the paying wallet address and transaction hash), and the records of key creation, claim and revocation, with the salted IP hash and user-agent recorded for them. It contains no IBAN submitted for validation and not the request log. Section 3 lists the processors and where they operate, and this policy and the [DPA](/legal/dpa) apply regardless of where you are.
 
 ## 3. Processors we use
 
@@ -52,7 +52,7 @@ The API and its databases run on Railway infrastructure in the **Amsterdam, Neth
 | Vercel Inc. | Website & dashboard hosting — customer data transits its functions when the operator uses the dashboard, and playground submissions are relayed to the API | Functions: Frankfurt (EU); static pages: global CDN | Only an IBAN typed into the website's playground, relayed to the API |
 | Stripe Payments Europe | Card payments | EU | No |
 | Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US | No |
-| Infomaniak Network SA | Transactional & support email (operator-managed relay) | Switzerland | Only an IBAN you write in an e-mail to us |
+| Infomaniak Network SA | Transactional & support email (operator-managed relay); nightly backup of the account state | Switzerland | Only an IBAN you write in an e-mail to us |
 | GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US | No |
 | Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US | The API never sends it one; only an IBAN you write in an e-mail to us |
 
@@ -64,7 +64,8 @@ Where processors are outside Switzerland/EEA, transfers rely on adequacy decisio
 - Edge log of our API host (raw IP address and path): **7 days**, kept and deleted by Railway.
 - File audit: the annotated report is deleted **2 hours** after the upload if unpaid, and **24 hours after payment** otherwise.
 - Request metadata: **12 months**, purged automatically. For API customers who terminate, metadata attributable to their keys is deleted **by default 30 days after termination** ([DPA clause 4.7](/legal/dpa)).
-- Key account (email): lifetime of the key; deleted on request.
+- Key account (email): lifetime of the key; deleted from the live record on request; backups that still hold it age out within 90 days.
+- Backups of the account state: **30 days** of nightly copies on a server of Infomaniak in Switzerland; monthly copies, the last three kept, on a computer operated by the operator in Switzerland.
 - Anonymous aggregates: kept indefinitely.
 
 ## 5. Your rights

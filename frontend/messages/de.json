@@ -1958,8 +1958,8 @@
           "checkNote": "Im Header x-vercel-id ist der Teil nach dem ersten :: die Region, in der die Funktion lief: fra1 ist Frankfurt. Der erste Teil ist der Netzwerkrand, der Ihnen am nächsten liegt."
         },
         "mail": {
-          "name": "E-Mail und DNS",
-          "body": "Infomaniak, Schweiz.",
+          "name": "E-Mail, DNS und Sicherungen",
+          "body": "Infomaniak, Schweiz. Ein Server dort hält auch die nächtlichen Sicherungen des Kontostands.",
           "checkNote": "Die Nameserver sind die von Infomaniak."
         }
       },
@@ -1990,7 +1990,11 @@
           },
           "5": {
             "what": "Ihre E-Mail-Adresse, wenn Sie eine angeben",
-            "keep": "Solange Ihr Schlüssel besteht. Löschung auf Antrag."
+            "keep": "Solange Ihr Schlüssel besteht. Auf Antrag aus dem aktiven Datenbestand gelöscht; Sicherungen, die sie noch enthalten, laufen innerhalb von 90 Tagen aus."
+          },
+          "6": {
+            "what": "Sicherungen des Kontostands: Schlüssel als Hashwerte, E-Mail-Adressen, Kontingente, Guthaben, Kaufbelege",
+            "keep": "Jede Nacht auf einen Server von Infomaniak in der Schweiz, 30 Tage an Kopien; monatliche Kopien auf einem Rechner des Betreibers in der Schweiz, die letzten drei aufbewahrt. Keine zur Validierung übermittelte IBAN, kein Anfrageprotokoll. Die Wiederherstellung wird getestet."
           }
         },
         "post": {
@@ -2042,7 +2046,7 @@
           },
           "infomaniak": {
             "name": "Infomaniak Network SA",
-            "role": "Transaktions- und Support-E-Mail",
+            "role": "Transaktions- und Support-E-Mail; nächtliche Sicherung des Kontostands",
             "region": "Schweiz",
             "ibans": "Nur eine IBAN, die Sie uns in einer E-Mail schreiben",
             "basis": "Schweiz: Angemessenheitsbeschluss der Europäischen Kommission"
@@ -2063,7 +2067,8 @@
           }
         },
         "note": "Dieselbe Liste mit denselben Grundlagen bildet Anhang II des Auftragsverarbeitungsvertrags.",
-        "noteLink": "Auftragsverarbeitungsvertrag"
+        "noteLink": "Auftragsverarbeitungsvertrag",
+        "changes": "Ein neuer Unterauftragsverarbeiter wird mindestens 30 Tage, bevor er personenbezogene Daten erhält, per E-Mail an die Adresse jedes aktiven Schlüssels und im Changelog angekündigt; nach dem Auftragsverarbeitungsvertrag können Sie widersprechen."
       },
       "transfers": {
         "title": "Übermittlungen aus der EU",
@@ -2135,7 +2140,7 @@
         "sources": "Quellen und Genehmigungen",
         "securityTxt": "security.txt",
         "securityPolicy": "Sicherheitsrichtlinie",
-        "dpaNote": "Der Auftragsverarbeitungsvertrag ist vorunterzeichnet; eine gegengezeichnete PDF-Fassung erhalten Sie auf Anfrage unter support@ibanforge.com."
+        "dpaNote": "Der Auftragsverarbeitungsvertrag ist vorunterzeichnet; eine gegengezeichnete PDF-Fassung erhalten Sie auf Anfrage unter support@ibanforge.com. Er sieht Prüfungen einschließlich einer Inspektion vor, höchstens einmal pro Kalenderjahr und mit 30 Tagen Ankündigung, wenn die Unterlagen nicht ausreichen."
       }
     }
   },

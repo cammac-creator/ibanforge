@@ -106,6 +106,52 @@ describe('the operator and the promises the page repeats', () => {
     expect(en.legal.trust.security.keys).toContain('after 7 days at the latest');
   });
 
+  it('declare the backups, the audit right and the e-mail notice the same way everywhere', () => {
+    const dpa = read('dpa.mdx');
+    const dpaDe = read('de/dpa.mdx');
+    const privacy = read('privacy.mdx');
+    const privacyDe = read('de/privacy.mdx');
+    // Backups: nightly at Infomaniak for 30 days, monthly copies on the
+    // operator's computer, the last three kept; a deleted address ages out of
+    // them within 90 days. The restore cannot leave an erased address out,
+    // so nothing may promise that it does; nothing calls the copies encrypted.
+    for (const text of [dpa, privacy]) {
+      expect(text).toContain('backed up every night to a server of Infomaniak in Switzerland');
+      expect(text).toContain('monthly copies, the last three kept');
+      expect(text).toContain('age out within 90 days');
+      expect(text).not.toMatch(/never restored|encrypted backup|backups? (?:are|is) encrypted/i);
+    }
+    for (const text of [dpaDe, privacyDe]) {
+      expect(text).toContain('jede Nacht auf einen Server von Infomaniak in der Schweiz gesichert');
+      expect(text).toContain('von denen die letzten drei aufbewahrt werden');
+      expect(text).toContain('innerhalb von 90 Tagen aus');
+    }
+    expect(dpa).toContain('**4.8** **Backup:**');
+    expect(dpa).toContain('The restore is tested.');
+    expect(dpaDe).toContain('**4.8** **Sicherung:**');
+    // Infomaniak's role says it in all four tables and on the page.
+    for (const [rel, heading] of [
+      ['dpa.mdx', '## Annex II'],
+      ['de/dpa.mdx', '## Anhang II'],
+      ['privacy.mdx', '## 3. Processors we use'],
+      ['de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter'],
+    ] as const) {
+      const row = tableRows(read(rel), heading).find((r) => r.includes('Infomaniak'));
+      expect(row, rel).toMatch(/backup of the account state|Sicherung des Kontostands/);
+    }
+    expect(en.legal.trust.processors.rows.infomaniak.role).toContain('nightly backup');
+    expect(en.legal.trust.retention.rows['5'].keep).toContain('age out within 90 days');
+    expect(en.legal.trust.retention.rows['6'].keep).toContain('the last three kept');
+    // Audit and inspection, and the e-mail before a new sub-processor.
+    expect(dpa).toContain('may carry out an audit, including an inspection, once per calendar year at most');
+    expect(dpa).not.toContain('on-site audits are replaced');
+    expect(dpaDe).toContain('eine Prüfung einschließlich einer Inspektion durchführen');
+    expect(dpa).toContain('(keys without an address: the changelog only)');
+    expect(dpaDe).toContain('(Schlüssel ohne Adresse: nur über das Changelog)');
+    expect(en.legal.trust.processors.changes).toContain('by e-mail to the address of each active key');
+    expect(en.legal.trust.documents.dpaNote).toContain('including an inspection');
+  });
+
   it('is written without long dashes in German and French', () => {
     for (const catalogue of [de, fr]) {
       expect(JSON.stringify(catalogue.legal.trust)).not.toContain('—');

@@ -1958,8 +1958,8 @@
           "checkNote": "In the x-vercel-id header, the part after the first :: is the region where the function ran: fra1 is Frankfurt. The first part is the edge nearest to you."
         },
         "mail": {
-          "name": "E-mail and DNS",
-          "body": "Infomaniak, Switzerland.",
+          "name": "E-mail, DNS and backups",
+          "body": "Infomaniak, Switzerland. A server there also holds the nightly backups of the account state.",
           "checkNote": "The name servers are Infomaniak's."
         }
       },
@@ -1990,7 +1990,11 @@
           },
           "5": {
             "what": "Your e-mail address, if you give one",
-            "keep": "As long as your key exists. Deleted on request."
+            "keep": "As long as your key exists. Deleted from the live record on request; backups that still hold it age out within 90 days."
+          },
+          "6": {
+            "what": "Backups of the account state: keys as hashes, e-mail addresses, quotas, credits, purchase records",
+            "keep": "Every night to a server of Infomaniak in Switzerland, 30 days of copies; monthly copies on a computer of the operator in Switzerland, the last three kept. No IBAN submitted for validation, no request log. The restore is tested."
           }
         },
         "post": {
@@ -2042,7 +2046,7 @@
           },
           "infomaniak": {
             "name": "Infomaniak Network SA",
-            "role": "Transactional and support e-mail",
+            "role": "Transactional and support e-mail; nightly backup of the account state",
             "region": "Switzerland",
             "ibans": "Only an IBAN you write in an e-mail to us",
             "basis": "Switzerland: adequacy decision of the European Commission"
@@ -2063,7 +2067,8 @@
           }
         },
         "note": "The same list, with the same bases, is Annex II of the data processing agreement.",
-        "noteLink": "DPA"
+        "noteLink": "DPA",
+        "changes": "A new sub-processor is announced at least 30 days before it receives personal data, by e-mail to the address of each active key and in the changelog; under the DPA you may object."
       },
       "transfers": {
         "title": "Transfers from the EU",
@@ -2135,7 +2140,7 @@
         "sources": "Sources and permissions",
         "securityTxt": "security.txt",
         "securityPolicy": "Security policy",
-        "dpaNote": "The DPA is pre-signed; a countersigned PDF is available on request at support@ibanforge.com."
+        "dpaNote": "The DPA is pre-signed; a countersigned PDF is available on request at support@ibanforge.com. It provides for audits, including an inspection, once per calendar year at most and on 30 days' notice, where the documents are not sufficient."
       }
     }
   },

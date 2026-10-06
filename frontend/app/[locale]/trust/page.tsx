@@ -48,7 +48,7 @@ export async function generateMetadata({
 }
 
 const GLANCE = ["operator", "region", "ibans", "notice"] as const;
-const RETENTION_ROWS = ["0", "1", "2", "3", "4", "5"] as const;
+const RETENTION_ROWS = ["0", "1", "2", "3", "4", "5", "6"] as const;
 const NOT_HAVE = ["0", "1", "2"] as const;
 
 /** The checks a reader can run from outside, one per hosting line. */
@@ -293,7 +293,8 @@ export default async function TrustPage({
             </tbody>
           </table>
         </div>
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p className="mt-4 text-sm text-muted-foreground leading-relaxed">{t("processors.changes")}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
           {t("processors.note")}{" "}
           <Link href={localePath(locale, "/legal/dpa")} className={linkClass}>
             {t("processors.noteLink")}

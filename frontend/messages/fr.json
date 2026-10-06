@@ -1958,8 +1958,8 @@
           "checkNote": "Dans l'en-tête x-vercel-id, la partie qui suit le premier :: est la région où la fonction a tourné : fra1 est Francfort. La première partie est le nœud d'entrée le plus proche de vous."
         },
         "mail": {
-          "name": "Courriel et DNS",
-          "body": "Infomaniak, Suisse.",
+          "name": "Courriel, DNS et sauvegardes",
+          "body": "Infomaniak, Suisse. Un serveur y garde aussi les sauvegardes nocturnes de l'état des comptes.",
           "checkNote": "Les serveurs de noms sont ceux d'Infomaniak."
         }
       },
@@ -1990,7 +1990,11 @@
           },
           "5": {
             "what": "Votre adresse e-mail, si vous en donnez une",
-            "keep": "Tant que votre clé existe. Effacée sur demande."
+            "keep": "Tant que votre clé existe. Effacée du registre actif sur demande ; les sauvegardes qui la contiennent encore expirent dans les 90 jours."
+          },
+          "6": {
+            "what": "Sauvegardes de l'état des comptes : clés en empreintes, adresses e-mail, quotas, crédits, achats",
+            "keep": "Chaque nuit sur un serveur d'Infomaniak en Suisse, 30 jours de copies ; copies mensuelles sur un ordinateur de l'exploitant en Suisse, les trois dernières gardées. Aucun IBAN envoyé à la validation, aucun journal des requêtes. La restauration est testée."
           }
         },
         "post": {
@@ -2042,7 +2046,7 @@
           },
           "infomaniak": {
             "name": "Infomaniak Network SA",
-            "role": "Courriels transactionnels et support",
+            "role": "Courriels transactionnels et support ; sauvegarde nocturne de l'état des comptes",
             "region": "Suisse",
             "ibans": "Seulement un IBAN que vous nous écrivez dans un courriel",
             "basis": "Suisse : décision d'adéquation de la Commission européenne"
@@ -2063,7 +2067,8 @@
           }
         },
         "note": "La même liste, avec les mêmes bases, forme l'annexe II de l'accord de traitement des données.",
-        "noteLink": "DPA"
+        "noteLink": "DPA",
+        "changes": "Un nouveau sous-traitant est annoncé au moins 30 jours avant de recevoir des données personnelles, par courriel à l'adresse de chaque clé active et dans le changelog ; le DPA vous permet de vous y opposer."
       },
       "transfers": {
         "title": "Transferts depuis l'UE",
@@ -2135,7 +2140,7 @@
         "sources": "Sources et autorisations",
         "securityTxt": "security.txt",
         "securityPolicy": "Politique de sécurité",
-        "dpaNote": "Le DPA est pré-signé ; un PDF contresigné est disponible sur demande à support@ibanforge.com."
+        "dpaNote": "Le DPA est pré-signé ; un PDF contresigné est disponible sur demande à support@ibanforge.com. Il prévoit des audits, y compris une inspection, une fois par année civile au plus et avec 30 jours de préavis, lorsque les documents ne suffisent pas."
       }
     }
   },
