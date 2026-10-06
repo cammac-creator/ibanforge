@@ -1939,7 +1939,7 @@
         "country": "Schweiz",
         "register": "Nicht im Handelsregister eingetragen: Ein Schweizer Einzelunternehmen muss sich erst ab einem Jahresumsatz von 100 000 Franken eintragen lassen (Art. 931 des Schweizerischen Obligationenrechts).",
         "vat": "Nicht im Schweizer Mehrwertsteuerregister eingetragen.",
-        "people": "Eine Person entwickelt und betreibt den Dienst. Es gibt keine Beschäftigten, und der Zugang zur Produktion ist dem Betreiber vorbehalten.",
+        "people": "Eine Person entwickelt und betreibt den Dienst. Es gibt keine Beschäftigten.",
         "contact": "Kontakt: support@ibanforge.com",
         "link": "Impressum"
       },
@@ -2058,7 +2058,7 @@
             "name": "Anthropic PBC",
             "role": "KI-gestützte Entwürfe von Antworten auf E-Mails, vom Betreiber ausgelöst",
             "region": "USA",
-            "ibans": "Nie aus der API; nur eine IBAN, die Sie uns in einer E-Mail schreiben",
+            "ibans": "Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben",
             "basis": "Nicht im Data Privacy Framework zertifiziert. Standardvertragsklauseln des Data Processing Addendum von Anthropic"
           }
         },

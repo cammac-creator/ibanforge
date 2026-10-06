@@ -9,7 +9,7 @@ updated: "2026-10-06"
 
 **Last updated: October 6, 2026 · Version 1.7**
 
-*Revision 1.7 (October 6, 2026): section 1 now says that the network edge log of our API host records the request path, without saying whether the query string is kept: we observed it absent once, and Railway's documentation does not say. The advice is therefore wider: send IBANs in the body of a `POST` request, never in a URL. Section 3 now points to the transfer mechanism of each processor, listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page. A German courtesy translation is published; the English version prevails. Nothing new is collected.*
+*Revision 1.7 (October 6, 2026): section 1 now says that the network edge log of our API host records the request path, without saying whether the query string is kept: we observed it absent once, and Railway's documentation does not say. The advice is therefore wider: send IBANs in the body of a `POST` request, never in a URL. Section 2 now says where the API and the website's functions run, and that the operator is established in Switzerland, instead of saying that processing stays within the EU. Section 3 says more precisely what Anthropic can receive: the API never sends it an IBAN. It also points to the transfer mechanism of each processor, listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page. A German courtesy translation is published; the English version prevails. Nothing new is collected.*
 
 *Revision 1.6 (October 5, 2026): sections 1 to 4 now describe the processing as it already works, more precisely. For an invalid IBAN, at most the first 4 characters (country code and check digits) are kept, not 12. The network edge of our API host keeps the raw IP address and the path of each request for 7 days, outside our own logs. The website's functions run in the Frankfurt region (EU). The processor list now says which processors can receive the IBANs you submit. Nothing new is collected.*
 
@@ -42,7 +42,7 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 
 ## 2. Where the data lives
 
-The API and its databases run on Railway infrastructure in the **Amsterdam, Netherlands region (EU)**, fronted by Railway's European network edge (Zurich for most Swiss traffic). The website's functions run in Vercel's **Frankfurt, Germany region (EU)**; its static pages are served from Vercel's global network. For EU/EEA customers, processing stays within the EU. For Swiss customers, data is processed in the EU: Swiss law recognises the EU as providing an adequate level of protection, and this policy and the [DPA](/legal/dpa) apply regardless of where you are.
+The API and its databases run on Railway infrastructure in the **Amsterdam, Netherlands region (EU)**, fronted by Railway's European network edge (Zurich for most Swiss traffic). The website's functions run in Vercel's **Frankfurt, Germany region (EU)**; its static pages are served from Vercel's global network. The operator is established in Switzerland, which the European Commission recognises as providing an adequate level of protection; Swiss law recognises the EU likewise. Section 3 lists the processors and where they operate, and this policy and the [DPA](/legal/dpa) apply regardless of where you are.
 
 ## 3. Processors we use
 
@@ -54,7 +54,7 @@ The API and its databases run on Railway infrastructure in the **Amsterdam, Neth
 | Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US | No |
 | Infomaniak Network SA | Transactional & support email (operator-managed relay) | Switzerland | Only an IBAN you write in an e-mail to us |
 | GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US | No |
-| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US | Never from the API; only an IBAN you write in an e-mail to us |
+| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US | The API never sends it one; only an IBAN you write in an e-mail to us |
 
 Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions (for US processors certified under them, the EU-US and Swiss-US Data Privacy Framework) or standard contractual clauses maintained by the processor. The mechanism for each processor is listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page.
 

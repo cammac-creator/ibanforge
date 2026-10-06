@@ -1939,7 +1939,7 @@
         "country": "Suisse",
         "register": "Non inscrite au registre du commerce : une raison individuelle suisse ne doit s'inscrire qu'à partir de 100 000 francs de chiffre d'affaires annuel (art. 931 du Code des obligations).",
         "vat": "Non assujettie à la TVA suisse.",
-        "people": "Une personne construit et exploite le service. Il n'y a pas d'employé, et l'accès à la production est réservé à l'exploitant.",
+        "people": "Une personne construit et exploite le service. Il n'y a pas d'employé.",
         "contact": "Contact : support@ibanforge.com",
         "link": "Mentions légales"
       },
@@ -2058,7 +2058,7 @@
             "name": "Anthropic PBC",
             "role": "Aide à la rédaction des réponses aux courriels, lancée par l'exploitant",
             "region": "États-Unis",
-            "ibans": "Jamais depuis l'API ; seulement un IBAN que vous nous écrivez dans un courriel",
+            "ibans": "L'API ne lui envoie jamais d'IBAN ; seulement un IBAN que vous nous écrivez dans un courriel",
             "basis": "Pas certifié au Data Privacy Framework. Clauses contractuelles types du Data Processing Addendum d'Anthropic"
           }
         },

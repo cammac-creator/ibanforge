@@ -1939,7 +1939,7 @@
         "country": "Switzerland",
         "register": "Not entered in the commercial register: a Swiss sole proprietorship must register only from CHF 100,000 of annual turnover (art. 931 of the Swiss Code of Obligations).",
         "vat": "Not registered for Swiss VAT.",
-        "people": "One person builds and runs the service. There are no employees, and access to production is restricted to the operator.",
+        "people": "One person builds and runs the service. There are no employees.",
         "contact": "Contact: support@ibanforge.com",
         "link": "Legal Notice"
       },
@@ -2058,7 +2058,7 @@
             "name": "Anthropic PBC",
             "role": "AI-assisted drafting of replies to e-mails, started by the operator",
             "region": "US",
-            "ibans": "Never from the API; only an IBAN you write in an e-mail to us",
+            "ibans": "The API never sends it one; only an IBAN you write in an e-mail to us",
             "basis": "Not certified under the Data Privacy Framework. Standard contractual clauses of Anthropic's Data Processing Addendum"
           }
         },
