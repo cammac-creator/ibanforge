@@ -22,7 +22,8 @@ IBANforge is an IBAN validation and BIC lookup API. Three areas live in one repo
 
 **1. Never push to `main`.** A push to `main` deploys the API to production. There is no
 staging. Work on a branch, open a pull request, let CI go green, and let a human merge.
-`main` carries no branch protection: the rule is the protection.
+`main` carries a ruleset that forbids force-push and deletion (since 2026), but it requires no pull
+request and no review: for everything else, the rule is the protection.
 
 **2. This repository is public.** Never write a customer's or prospect's name, a real
 e-mail address, or a real activity figure (accounts, calls served, revenue, reply rates)
