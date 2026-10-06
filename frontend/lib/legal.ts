@@ -4,10 +4,16 @@ import matter from 'gray-matter';
 import { SLUG_PATTERN } from './content-slug';
 
 /**
- * Legal documents (terms, privacy, dpa, imprint) live in content/legal/ as a
- * single English set — they are contractual texts, kept locale-independent on
- * purpose. Pages under app/[locale]/legal/ render them for every locale with
- * an "authoritative version is English" note on non-EN locales.
+ * Legal documents (terms, privacy, dpa, sla, imprint) live in content/legal/.
+ * The English set is the contractual one, and the only one that binds.
+ *
+ * Since 2026-10-06 a locale may also carry courtesy translations in
+ * content/legal/<locale>/<slug>.mdx (German first: EU customers read their
+ * data-processing agreement in German). A translated page says it is not
+ * binding and links to the English text; a document with no translation falls
+ * back to English, with a note saying so. `lib/legal.test.ts` keeps each
+ * translation on the same version and date as its English original, so a
+ * translation can never silently describe an older text.
  */
 
 const LEGAL_DIR = path.join(process.cwd(), 'content', 'legal');
@@ -18,11 +24,27 @@ export interface LegalMeta {
   description: string;
   order: number;
   updated: string;
+  /** True when the text served is a courtesy translation, not the English original. */
+  translated: boolean;
 }
 
 export const LEGAL_SLUGS = ['terms', 'privacy', 'dpa', 'sla', 'imprint'] as const;
 
-export function getLegalDoc(slug: string): { meta: LegalMeta; content: string } | null {
+/**
+ * The locales that may hold courtesy translations. A fixed list, checked
+ * before any path is built: the locale comes from the URL, and only these
+ * folder names may ever be joined to LEGAL_DIR.
+ */
+export const LEGAL_TRANSLATION_LOCALES = ['de'] as const;
+
+function isTranslationLocale(locale: string): boolean {
+  return (LEGAL_TRANSLATION_LOCALES as readonly string[]).includes(locale);
+}
+
+export function getLegalDoc(
+  slug: string,
+  locale: string = 'en',
+): { meta: LegalMeta; content: string } | null {
   if (!(LEGAL_SLUGS as readonly string[]).includes(slug)) return null;
   /*
    * FRT-09 (2026-09-01), second lock. LEGAL_SLUGS already closes the door on
@@ -31,9 +53,22 @@ export function getLegalDoc(slug: string): { meta: LegalMeta; content: string } 
    * caller contract is a nullable return, and getAllLegalDocs maps over it.
    */
   if (!SLUG_PATTERN.test(slug)) return null;
-  const file = path.join(LEGAL_DIR, `${slug}.mdx`);
-  if (!fs.existsSync(file)) return null;
-  const raw = fs.readFileSync(file, 'utf-8');
+  /*
+   * Two reads, each with a path the bundler can scope statically
+   * (content/legal/*.mdx, content/legal/<locale>/*.mdx). A path chosen at run
+   * time from either folder made Turbopack trace the whole project into the
+   * function (build warning of 2026-10-06).
+   */
+  const translated =
+    isTranslationLocale(locale) && fs.existsSync(path.join(LEGAL_DIR, locale, `${slug}.mdx`));
+  let raw: string;
+  if (translated) {
+    raw = fs.readFileSync(path.join(LEGAL_DIR, locale, `${slug}.mdx`), 'utf-8');
+  } else {
+    const file = path.join(LEGAL_DIR, `${slug}.mdx`);
+    if (!fs.existsSync(file)) return null;
+    raw = fs.readFileSync(file, 'utf-8');
+  }
   const { data, content } = matter(raw);
   return {
     meta: {
@@ -42,13 +77,14 @@ export function getLegalDoc(slug: string): { meta: LegalMeta; content: string } 
       description: data.description || '',
       order: data.order ?? 99,
       updated: data.updated || '',
+      translated,
     },
     content,
   };
 }
 
-export function getAllLegalDocs(): LegalMeta[] {
-  return LEGAL_SLUGS.map((slug) => getLegalDoc(slug)?.meta)
+export function getAllLegalDocs(locale: string = 'en'): LegalMeta[] {
+  return LEGAL_SLUGS.map((slug) => getLegalDoc(slug, locale)?.meta)
     .filter((m): m is LegalMeta => Boolean(m))
     .sort((a, b) => a.order - b.order);
 }

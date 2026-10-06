@@ -1,0 +1,91 @@
+---
+title: "Datenschutzerklärung"
+description: "Welche Daten IBANforge verarbeitet, was gespeichert wird, wie lange, und Ihre Rechte nach dem Schweizer DSG und der DSGVO."
+order: 2
+updated: "2026-10-06"
+---
+
+# Datenschutzerklärung
+
+**Stand: 6. Oktober 2026 · Version 1.7**
+
+*Änderung 1.7 (6. Oktober 2026): Ziffer 1 sagt nun, dass das Protokoll des Netzwerkrands unseres API-Hosters den Anfragepfad erfasst, ohne festzulegen, ob die Query-Zeichenfolge erhalten bleibt: Wir haben sie einmal als fehlend beobachtet, und die Dokumentation von Railway sagt dazu nichts. Die Empfehlung ist daher weiter gefasst: Senden Sie IBAN im Body einer `POST`-Anfrage, nie in einer URL. Ziffer 2 sagt nun, wo die API und die Funktionen der Website laufen und dass der Betreiber in der Schweiz niedergelassen ist, statt zu sagen, dass die Verarbeitung in der EU bleibt. Die Ziffern 2 und 4 beschreiben nun die bereits bestehenden Sicherungen des Kontostands und wie lange eine gelöschte E-Mail-Adresse darin verbleiben kann. Ziffer 3 nimmt diese Sicherungen in die Rolle von Infomaniak auf und sagt genauer, was Anthropic erhalten kann: Die API sendet ihm nie eine IBAN. Sie verweist zudem auf den Übermittlungsmechanismus jedes Auftragsverarbeiters, aufgeführt in Anhang II des [Auftragsverarbeitungsvertrags](/de/legal/dpa) und auf der Seite [Sicherheit und Vertrauen](/de/trust). Eine unverbindliche deutsche Übersetzung wird veröffentlicht; maßgebend ist die englische Fassung. Es wird nichts Neues erhoben.*
+
+*Änderung 1.6 (5. Oktober 2026): Die Ziffern 1 bis 4 beschreiben die Verarbeitung so, wie sie bereits erfolgt, genauer. Bei einer ungültigen IBAN werden höchstens die ersten 4 Zeichen (Ländercode und Prüfziffern) aufbewahrt, nicht 12. Der Netzwerkrand unseres API-Hosters speichert die rohe IP-Adresse und den Pfad jeder Anfrage 7 Tage lang, außerhalb unserer eigenen Protokolle. Die Funktionen der Website laufen in der Region Frankfurt (EU). Die Liste der Auftragsverarbeiter sagt nun, welche von ihnen die von Ihnen übermittelten IBAN erhalten können. Es wird nichts Neues erhoben.*
+
+*Änderung 1.5 (27. September 2026): Ziffer 1 und die Übersicht der Aufbewahrungsfristen beschreiben nun das Datei-Audit: Der kommentierte Bericht, den es erstellt und der die Spalten der hochgeladenen Datei wiedergibt, wird 2 Stunden aufbewahrt, wenn er nicht bezahlt ist, und 24 Stunden nach der Zahlung, danach gelöscht. Beschrieben wird das Datei-Audit so, wie es bereits funktioniert; es wird nichts Neues erhoben.*
+
+*Änderung 1.4 (26. September 2026): Ziffer 1 sagt nun, dass wir bei einem Kauf in USDC die zahlende Wallet-Adresse und den Hash der On-Chain-Transaktion speichern, um eine Zahlung abzugleichen, deren Abwicklung nicht bestätigt werden konnte.*
+
+*Änderung 1.3 (24. September 2026): Ziffer 6 beschreibt nun das Anmelde-Cookie und die Anmeldecodes der Kontoseite.*
+
+*Änderung 1.2 (6. August 2026): Der tägliche Job zum Lebenszyklus der Konten läuft nicht mehr in der CI, sondern in der Laufzeitumgebung der API selbst. Die Runner von GitHub verarbeiten keinerlei Kontodaten mehr; die Zeile zu GitHub unten wurde entsprechend angepasst.*
+
+*Änderung 1.1 (5. August 2026): Die Hosting-Region wurde berichtigt: Die API läuft in der Railway-Region Amsterdam (EU), nicht in Zürich; nur der Netzwerkrand von Railway befindet sich in Zürich. Die Liste der Auftragsverarbeiter wurde vervollständigt (KI-gestützte Entwurfshilfe, CI-Infrastruktur, Datenverkehr des Dashboards), die Zeile zu Rückmeldungen und der Abschnitt zu Geschäftskontakten wurden ergänzt.*
+
+Diese Erklärung beschreibt, welche personenbezogenen Daten **IBANforge** (siehe [Impressum](/de/legal/imprint)) verarbeitet, wenn Sie `ibanforge.com` und `api.ibanforge.com` nutzen, nach dem Schweizer Bundesgesetz über den Datenschutz (DSG) und, soweit anwendbar, der EU-Datenschutz-Grundverordnung (DSGVO). Kurz gesagt: **Zur Validierung übermittelte IBAN werden im Arbeitsspeicher verarbeitet und nicht gespeichert.** Eine Datei, die Sie in das Datei-Audit hochladen, wird nur als kommentierter Bericht aufbewahrt, 2 Stunden wenn er nicht bezahlt ist und 24 Stunden nach der Zahlung.
+
+## 1. Was wir verarbeiten und warum
+
+| Daten | Zweck | Gespeichert? |
+|---|---|---|
+| **Zur Validierung übermittelte IBAN** | Validierung und Anreicherung (Erbringung des Dienstes) | **Nein.** Verarbeitung im Arbeitsspeicher, nie in einen Speicher geschrieben. Eine Ausnahme: Bei *ungültigen* IBAN dürfen höchstens die **ersten 4 Zeichen** (Ländercode und Prüfziffern, nie der Bank- oder Kontoteil) zur Diagnose der Datenqualität aufbewahrt werden. |
+| **In das Datei-Audit hochgeladene Dateien** (zum Beispiel Namen von Zahlungsempfängern, IBAN und Adressen) | Erstellung des von Ihnen bestellten kommentierten Berichts (Erbringung des Dienstes) | **Ja, kurz.** Der Bericht gibt die Spalten der hochgeladenen Datei wieder. Er wird **2 Stunden** aufbewahrt, wenn er nicht bezahlt ist, und **24 Stunden nach der Zahlung**, danach automatisch gelöscht. |
+| **E-Mail-Adresse** (Anmeldung für einen kostenlosen Schlüssel) | Ausgabe Ihres Schlüssels, Hinweise zum Kontingent, Dienstmitteilungen | Ja, solange Ihr Schlüssel besteht; nach der Löschung laufen Sicherungen, die sie noch enthalten, innerhalb von 90 Tagen aus. |
+| **Anfrage-Metadaten** (Pfad, Status, Latenz, Zeitstempel, pseudonymisierte IP-Adresse, User-Agent, Präfix des Schlüssels) | Missbrauchsabwehr, Kapazitätsplanung, die öffentliche Statusseite | Ja, **höchstens 12 Monate**, danach automatisch gelöscht. |
+| **Protokoll des Netzwerkrands unseres API-Hosters** (rohe IP-Adresse, Anfragepfad, Status, User-Agent, Zeitstempel) | Von Railway, unserem API-Hoster, geführt, um den Datenverkehr zu leiten und abzusichern, außerhalb unserer eigenen Protokolle | Ja, **7 Tage**, danach von Railway gelöscht. Senden Sie IBAN im Body einer `POST`-Anfrage, nie in einer URL. |
+| **Aggregierte Statistiken** (tägliche Zählungen nach Endpunkt und Land, ohne personenbezogene Daten) | Produktanalyse, öffentliche Kennzahlen | Ja, unbefristet (anonym). |
+| **Zahlungsdaten** | Abwicklung von Karten- oder USDC-Zahlungen | Durch Stripe bzw. den x402-Facilitator. Wir sehen nie Kartennummern; wir speichern die Transaktionsreferenz und, bei einem Kauf in USDC, die zahlende Wallet-Adresse und den Hash der On-Chain-Transaktion, um eine Zahlung abzugleichen, deren Abwicklung nicht bestätigt werden konnte. |
+| **Rückmeldungen** (freier Text, optionale Kontaktadresse) | Untersuchung von Problemen der Datenqualität, Entscheidungen über x402-Erstattungen | Ja, **12 Monate**, danach automatisch gelöscht. |
+
+**IP-Adressen** werden pseudonymisiert, bevor sie in unsere eigenen Protokolle gelangen: Wir speichern nur einen gesalzenen Hashwert, nie die rohe Adresse. Das oben beschriebene Protokoll des Netzwerkrands unseres API-Hosters speichert die rohe Adresse 7 Tage lang.
+
+## 2. Wo die Daten liegen
+
+Die API und ihre Datenbanken laufen auf der Infrastruktur von Railway in der Region **Amsterdam, Niederlande (EU)**, hinter dem europäischen Netzwerkrand von Railway (Zürich für den größten Teil des Schweizer Datenverkehrs). Die Funktionen der Website laufen in der Vercel-Region **Frankfurt, Deutschland (EU)**; ihre statischen Seiten werden aus dem globalen Netz von Vercel ausgeliefert. Der Betreiber ist in der Schweiz niedergelassen, der die Europäische Kommission ein angemessenes Schutzniveau zuerkennt; das Schweizer Recht erkennt dies umgekehrt der EU zu. Der Kontostand wird jede Nacht auf einen Server von Infomaniak in der Schweiz gesichert, der 30 Tage an Kopien aufbewahrt; monatliche Kopien, von denen die letzten drei aufbewahrt werden, liegen auf einem vom Betreiber betriebenen Rechner in der Schweiz. Der Kontostand umfasst die API-Schlüssel (als Hashwerte) und die mit ihnen verbundenen E-Mail-Adressen, Kontingente, Guthaben, monatliche Nutzungszähler, Kaufbelege (Zahlungsreferenzen, E-Mail-Adresse des Zahlenden und bei USDC die zahlende Wallet-Adresse und den Transaktions-Hash) sowie die Einträge zur Erstellung, Beanspruchung und zum Widerruf von Schlüsseln, mit dem dafür erfassten gesalzenen IP-Hash und User-Agent. Er enthält keine zur Validierung übermittelten IBAN und nicht das Anfrageprotokoll. Ziffer 3 nennt die Auftragsverarbeiter und wo sie tätig sind, und diese Erklärung sowie der [Auftragsverarbeitungsvertrag](/de/legal/dpa) gelten unabhängig davon, wo Sie sich befinden.
+
+## 3. Unsere Auftragsverarbeiter
+
+| Auftragsverarbeiter | Rolle | Ort/Region | Erhält die von Ihnen übermittelten IBAN? |
+|---|---|---|---|
+| Railway Corp. | Hosting und Speicherung der API | Region: Amsterdam (EU) | Ja, im Arbeitsspeicher, um die Anfrage zu beantworten |
+| Vercel Inc. | Hosting von Website und Dashboard: Kundendaten durchlaufen seine Funktionen, wenn der Betreiber das Dashboard nutzt, und Eingaben im Playground werden an die API weitergeleitet | Funktionen: Frankfurt (EU); statische Seiten: globales CDN | Nur eine im Playground der Website eingegebene IBAN, die an die API weitergeleitet wird |
+| Stripe Payments Europe | Kartenzahlungen | EU | Nein |
+| Coinbase (CDP-Facilitator) | Abwicklung von x402/USDC-Zahlungen (x402.org-Facilitator als Rückfallebene) | USA | Nein |
+| Infomaniak Network SA | Transaktions- und Support-E-Mail (vom Betreiber verwaltetes Relais); nächtliche Sicherung des Kontostands | Schweiz | Nur eine IBAN, die Sie uns in einer E-Mail schreiben |
+| GitHub Inc. | Öffentlicher Quellcode und CI (keine Kundendaten: geplante Jobs zur Aktualisierung der Daten verarbeiten nur öffentliche Referenzdateien) | USA | Nein |
+| Anthropic PBC | KI-gestützte Entwürfe von Kundenkorrespondenz, vom Betreiber ausgelöst, nach Regeln zur Schwärzung | USA | Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben |
+
+Wo Auftragsverarbeiter außerhalb der Schweiz und des EWR tätig sind, stützen sich Übermittlungen auf Angemessenheitsbeschlüsse (für die danach zertifizierten US-Auftragsverarbeiter den EU-US- und den Swiss-US-Datenschutzrahmen, Data Privacy Framework) oder auf Standardvertragsklauseln des Auftragsverarbeiters. Der Mechanismus für jeden Auftragsverarbeiter ist in Anhang II des [Auftragsverarbeitungsvertrags](/de/legal/dpa) und auf der Seite [Sicherheit und Vertrauen](/de/trust) aufgeführt.
+
+## 4. Übersicht der Aufbewahrungsfristen
+
+- Zur Validierung übermittelte IBAN: **nicht gespeichert** (Präfixe ungültiger IBAN von höchstens 4 Zeichen: bis zu 12 Monate als Anfrage-Metadaten).
+- Protokoll des Netzwerkrands unseres API-Hosters (rohe IP-Adresse und Pfad): **7 Tage**, von Railway geführt und gelöscht.
+- Datei-Audit: Der kommentierte Bericht wird **2 Stunden** nach dem Hochladen gelöscht, wenn er nicht bezahlt ist, andernfalls **24 Stunden nach der Zahlung**.
+- Anfrage-Metadaten: **12 Monate**, automatisch gelöscht. Für API-Kunden, die kündigen, werden die ihren Schlüsseln zuzuordnenden Metadaten **standardmäßig 30 Tage nach Vertragsende** gelöscht ([Ziffer 4.7 des Auftragsverarbeitungsvertrags](/de/legal/dpa)).
+- Schlüsselkonto (E-Mail-Adresse): Lebensdauer des Schlüssels; auf Antrag aus dem aktiven Datenbestand gelöscht; Sicherungen, die sie noch enthalten, laufen innerhalb von 90 Tagen aus.
+- Sicherungen des Kontostands: nächtliche Kopien **30 Tage** lang auf einem Server von Infomaniak in der Schweiz; monatliche Kopien, von denen die letzten drei aufbewahrt werden, auf einem vom Betreiber betriebenen Rechner in der Schweiz.
+- Anonyme Aggregate: unbefristet.
+
+## 5. Ihre Rechte
+
+Nach DSG und DSGVO können Sie Auskunft, Berichtigung, Löschung, Einschränkung oder eine Kopie Ihrer Daten verlangen und der Verarbeitung widersprechen. Schreiben Sie an **support@ibanforge.com**; wir antworten innerhalb von 30 Tagen. Die Löschung Ihrer E-Mail-Adresse deaktiviert Ihren API-Schlüssel. Wenn Sie sich in der EU oder im EWR befinden, können Sie Beschwerde bei Ihrer Aufsichtsbehörde einlegen; in der Schweiz beim EDÖB.
+
+## 6. Cookies und Website
+
+Die Website verwendet **keine Werbe-Tracker**. Das Dashboard verwendet ein Sitzungs-Cookie ausschließlich zur Authentifizierung. Die Kontoseite verwendet ein Anmelde-Cookie für 7 Tage, ausschließlich zur Authentifizierung. Anmeldecodes sind 15 Minuten gültig und werden nur als Hashwert gespeichert. Die Spracheinstellung wird clientseitig gespeichert.
+
+## 7. Geschäftskontakte und Akquise
+
+Für Vertrieb und Support führt IBANforge eine schlanke Übersicht über Geschäftskontakte: Name, Funktion, berufliche E-Mail-Adresse, Unternehmen, die mit uns geführte Korrespondenz und Notizen zum Produktbedarf. Rechtsgrundlage: berechtigtes Interesse an der Kommunikation zwischen Unternehmen (Art. 6 Abs. 1 lit. f DSGVO; Interessenabwägung nach DSG). Wir können auch öffentlich verfügbare berufliche Kontaktdaten von Unternehmen erfassen, die den Dienst plausibel nutzen könnten, um ihnen einmal und zielgerichtet zu schreiben.
+
+- Diese Daten werden nie verkauft, nicht über die oben genannten Auftragsverarbeiter hinaus weitergegeben und nicht für automatisiertes Profiling verwendet.
+- Korrespondenz wird für die Dauer der Geschäftsbeziehung aufbewahrt; rechnungsbezogene Unterlagen folgen den gesetzlichen Aufbewahrungspflichten.
+- Wenn Sie keine Nachrichten mehr wünschen, antworten Sie „remove me“ auf eine beliebige Nachricht oder schreiben Sie an **support@ibanforge.com**: Wir löschen den Kontakt und schreiben Ihnen nicht mehr.
+
+## 8. Änderungen
+
+Wesentliche Änderungen dieser Erklärung werden auf dieser Seite und im [Changelog](/de/changelog) 30 Tage vor ihrem Inkrafttreten angekündigt.
+
+Kontakt: **support@ibanforge.com**

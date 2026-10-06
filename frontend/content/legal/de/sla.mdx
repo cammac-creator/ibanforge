@@ -1,0 +1,57 @@
+---
+title: "Service-Level-Vereinbarung (SLA)"
+description: "SLA für Editor- und OEM-Abonnements: 99,5 % monatliche Verfügbarkeit, Servicegutschriften, Messung über die öffentliche Statusseite."
+order: 5
+updated: "2026-10-05"
+---
+
+# Service-Level-Vereinbarung (SLA)
+
+**Stand: 5. Oktober 2026 · Version 1.1**
+
+*Änderung 1.1 (5. Oktober 2026): Die auf der Statusseite veröffentlichte Referenzzahl umfasst die letzten 30 Tage, nicht 90, wie schon seit dem 1. September 2026, und sie kann eine Anfrage nicht sehen, die die API nie erreicht. Zusage, Gutschriften, Ausschlüsse und die Prüfung eines Anspruchs bleiben unverändert.*
+
+Diese SLA ergänzt die [Nutzungsbedingungen](/de/legal/terms) und gilt **nur für aktive Editor- und OEM-Abonnements**. Der kostenlose Tarif, vorausbezahlte Guthabenpakete und x402-Zahlung pro Aufruf werden weiterhin ohne vertragliche SLA bereitgestellt, wie in den Nutzungsbedingungen festgelegt.
+
+## 1. Verfügbarkeitszusage
+
+Wir sagen eine **Verfügbarkeit der IBANforge-API von 99,5 % je Kalendermonat** zu.
+
+**Verfügbarkeit** ist der Anteil der Minuten eines Monats, in denen die API Anfragen ohne dienstweiten Ausfall beantwortet. Eine Minute gilt als nicht verfügbar, wenn mehr als die Hälfte der in dieser Minute eingegangenen gültigen Anfragen mit einem 5xx-Fehler scheitert oder wenn die API nicht erreichbar ist. Eine Minute ohne Datenverkehr gilt als verfügbar, es sei denn, unsere Überwachung zeigt, dass der Dienst ausgefallen war.
+
+Zur Orientierung: Die Erfolgsquote der letzten 30 Tage wird fortlaufend auf der [Statusseite](/de/status) veröffentlicht, berechnet aus demselben serverseitigen Anfrageprotokoll, mit dem wir Ansprüche auf Gutschriften prüfen. Dieses Protokoll kann eine Anfrage nicht sehen, die die API nie erreicht, zum Beispiel während eines Neustarts; ein Anspruch kann sich daher auch auf Ihre eigenen Aufzeichnungen der beobachteten Zeitfenster stützen.
+
+## 2. Servicegutschriften
+
+Liegt die Verfügbarkeit in einem Kalendermonat unter der Zusage, haben Sie Anspruch auf eine **Servicegutschrift** auf einer folgenden Rechnung:
+
+| Monatliche Verfügbarkeit | Servicegutschrift |
+|---|---|
+| unter 99,5 % | 10 % der Monatsgebühr |
+| unter 99,0 % | 25 % der Monatsgebühr |
+| unter 95,0 % | 50 % der Monatsgebühr |
+
+Servicegutschriften sind der **einzige und ausschließliche Rechtsbehelf** für nicht erreichte Verfügbarkeit. Sie sind auf 50 % einer Monatsgebühr begrenzt, nicht übertragbar und werden nicht ausgezahlt.
+
+**So machen Sie einen Anspruch geltend:** Schreiben Sie innerhalb von 30 Tagen nach Ende des betroffenen Monats an [support@ibanforge.com](mailto:support@ibanforge.com), mit Angabe des Monats und, wenn möglich, der von Ihnen beobachteten Zeitfenster. Wir prüfen Ansprüche anhand unseres serverseitigen Anfrageprotokolls und antworten mit dem Ergebnis und der gewährten Gutschrift.
+
+## 3. Ausschlüsse
+
+Folgendes gilt nicht als Zeit der Nichtverfügbarkeit:
+
+- **Angekündigte Wartung:** geplante Zeitfenster, die mindestens 48 Stunden im Voraus auf der [Statusseite](/de/status) oder per E-Mail angekündigt werden. Wir streben eine Wartung ohne Unterbrechung an; angekündigte Zeitfenster sind selten.
+- **Ihre Seite der Integration:** Fehler durch fehlerhafte Anfragen, überschrittene Kontingente, die mit dem dokumentierten `402`-Ablauf beantwortet werden, widerrufene oder offengelegte Schlüssel oder eine Nutzung, die gegen die [Nutzungsbedingungen](/de/legal/terms) verstößt.
+- **Ereignisse außerhalb unserer zumutbaren Kontrolle:** höhere Gewalt, Ausfälle des Internet-Backbones oder der Ausfall eines vorgelagerten Anbieters, den keine zumutbare Redundanz auf unserer Seite verhindert hätte.
+- **Sperrung wegen Nichtzahlung** des Abonnements.
+
+## 4. Support
+
+Editor- und OEM-Abonnenten haben einen **benannten Support-Kontakt** unter [support@ibanforge.com](mailto:support@ibanforge.com) (mit Editor/OEM im Betreff). Unsere angestrebte Zeit bis zur ersten Antwort beträgt **einen Werktag** (Montag bis Freitag, Schweizer Geschäftszeiten). Dieses Ziel ist eine Zusage zum Support, keine Verfügbarkeitszusage; Servicegutschriften nach Ziffer 2 gelten nur für die Verfügbarkeit.
+
+## 5. Änderungen
+
+Wir können diese SLA mit einer Frist von **30 Tagen** per E-Mail ändern, wenn die Änderung Ihre Rechte einschränkt; andere Änderungen treten mit ihrer Veröffentlichung in Kraft und werden im [Changelog](/de/changelog) dokumentiert. Für einen Monat gilt die Fassung, die zu Beginn dieses Monats in Kraft ist.
+
+## 6. Vorrang
+
+Weicht eine gesondert ausgehandelte Editor- oder OEM-Vereinbarung zwischen Ihnen und uns bei den Service-Levels von diesem Dokument ab, geht diese Vereinbarung vor.
