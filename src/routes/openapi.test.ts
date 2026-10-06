@@ -428,9 +428,28 @@ describe('the truth fields are in the contract', () => {
     const keys = Object.keys(v);
     expect(keys.indexOf('national_check_digits')).toBe(keys.indexOf('checks') + 1);
     const block = v.national_check_digits as Schema & { required?: string[] };
-    expect(Object.keys(block.properties!)).toEqual(['country', 'scheme', 'status', 'detail']);
+    expect(Object.keys(block.properties!)).toEqual([
+      'country',
+      'scheme',
+      'status',
+      'detail',
+      'method',
+      'verified_by',
+      'source',
+      'table_fetched_on',
+    ]);
+    expect(block.properties!.verified_by.enum).toEqual([
+      'bundesbank_test_numbers',
+      'independent_implementation',
+    ]);
     expect(block.required).toEqual(['country', 'scheme', 'status']);
-    expect(block.properties!.status.enum).toEqual(['pass', 'fail', 'not_applicable']);
+    // not_checked depuis l'Allemagne (06.10.2026) : code banque ou méthode non couverts.
+    expect(block.properties!.status.enum).toEqual([
+      'pass',
+      'fail',
+      'not_applicable',
+      'not_checked',
+    ]);
     // Pas d'enum fermé : l'Allemagne ajoutera des pays et des noms d'algorithme.
     expect(block.properties!.country.enum).toBeUndefined();
     expect(block.properties!.scheme.enum).toBeUndefined();

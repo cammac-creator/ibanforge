@@ -16,6 +16,7 @@ import {
   NATIONAL_CHECK_COUNTRIES,
   NATIONAL_CHECK_SCHEME_NAMES,
   NATIONAL_CHECK_STATUSES,
+  NATIONAL_CHECK_VERIFIED_BY,
 } from '../lib/national-check/index.js';
 import { frozenSources } from '../lib/source-vintage.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
@@ -2921,7 +2922,32 @@ const buildRawSpec = () => ({
               detail: {
                 type: 'string',
                 description:
-                  'Present on fail and not_applicable only: one sentence saying which digits disagree. It never gives the expected key.',
+                  'Present on fail, not_applicable and not_checked: one sentence saying which digits disagree, or why nothing was checked. It never gives the expected key.',
+              },
+              // Ajoutés le 06.10.2026, Allemagne seulement : la méthode que la
+              // Bundesbank attribue au code banque, et la provenance de la table.
+              method: {
+                type: 'string',
+                example: '00',
+                description:
+                  'DE only: the check-digit method the Deutsche Bundesbank lists for the bank code (field 9 of the Bankleitzahlendatei), for example 00, 63 or 09. Absent when the bank code is not in the Bundesbank file.',
+              },
+              verified_by: {
+                type: 'string',
+                enum: [...NATIONAL_CHECK_VERIFIED_BY],
+                description:
+                  'DE only, whenever the method ran: what the verdict rests on. bundesbank_test_numbers: the method gives the expected answer on every test number and worked example the Bundesbank publishes for it, and a fail adds the blocking step national_check_digits_failed. independent_implementation: the Bundesbank publishes no test number for the method, which was verified against an independent implementation only; a fail adds the warning step national_check_digits_suspect and never stops a payment.',
+              },
+              source: {
+                type: 'string',
+                description:
+                  'DE only: where the method and its algorithm come from, opening with the credit line the Bundesbank asks for (Quelle: Deutsche Bundesbank).',
+              },
+              table_fetched_on: {
+                type: 'string',
+                format: 'date',
+                description:
+                  'DE only: the day the method table was read from the Bundesbank file (refreshed monthly), not a date the Bundesbank publishes.',
               },
             },
           },

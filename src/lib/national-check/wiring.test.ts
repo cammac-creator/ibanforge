@@ -68,7 +68,14 @@ function withWrongKey(iban: string): string {
   return iso(cc, altered);
 }
 
-const EXAMPLES = NATIONAL_CHECK_COUNTRIES.map((cc) => EXAMPLE_IBANS[cc] as string);
+/**
+ * Les pays dont la clé ne dépend que de l'IBAN. L'Allemagne (06.10.2026) a son
+ * propre bloc de tests plus bas : sa clé dépend de la méthode que la Bundesbank
+ * attribue au code banque, et l'exemple du registre IBAN tombe sur une méthode
+ * sans numéro de test publié (13), donc `not_checked`.
+ */
+const STATIC_COUNTRIES = NATIONAL_CHECK_COUNTRIES.filter((cc) => cc !== 'DE');
+const EXAMPLES = STATIC_COUNTRIES.map((cc) => EXAMPLE_IBANS[cc] as string);
 
 const STEP = 'national_check_digits_failed';
 /** Les étapes d'offre, retirées après un « Do not send » (26/09/2026). */
@@ -161,7 +168,7 @@ describe('the national_check_digits block, served on every validation path', () 
   );
 
   it('serves no block where no algorithm is coded, and none on an invalid IBAN', () => {
-    for (const cc of ['DE', 'CH', 'AT', 'NL', 'PL', 'LI', 'LU', 'PT', 'GB']) {
+    for (const cc of ['CH', 'AT', 'NL', 'PL', 'LI', 'LU', 'PT', 'GB']) {
       const r = enriched(EXAMPLE_IBANS[cc] as string);
       expect(r.valid, cc).toBe(true);
       expect(r, cc).not.toHaveProperty('national_check_digits');
@@ -211,7 +218,7 @@ describe('a valid IBAN never gets not_applicable', () => {
     return out;
   }
 
-  it.each(NATIONAL_CHECK_COUNTRIES)(
+  it.each(STATIC_COUNTRIES)(
     '%s: 500 random BBANs of the registry layout give pass or fail, never not_applicable',
     (cc) => {
       const statuses = new Set<string>();
@@ -226,7 +233,7 @@ describe('a valid IBAN never gets not_applicable', () => {
     },
   );
 
-  it.each(NATIONAL_CHECK_COUNTRIES)(
+  it.each(STATIC_COUNTRIES)(
     '%s: through the enrichment, the block, checks and next_steps never disagree',
     (cc) => {
       for (let i = 0; i < 25; i++) {
@@ -247,6 +254,7 @@ describe('the served texts say what is checked, country by country', () => {
     IT: 'Italy',
     SM: 'San Marino',
     ES: 'Spain',
+    DE: 'Germany',
   };
 
   it('names every country and every scheme of the table', () => {

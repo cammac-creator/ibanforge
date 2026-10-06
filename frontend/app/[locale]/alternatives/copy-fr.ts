@@ -31,14 +31,14 @@ export const COPY_FR: AlternativesCopy = {
     items: [
       'Le code banque est vérifié dans le registre national là où nous le lisons en entier : Allemagne (Deutsche Bundesbank, édition de {deAsOf}), Suisse et Liechtenstein (SIX BankMaster, valable dès le {chAsOf}), Autriche, Belgique, Slovaquie, Tchéquie et Bulgarie. Là, un code que le registre ne contient pas revient not_allocated, avec authoritative: true.',
       'Chaque réponse nomme ses sources : le registre du verdict sur le code banque, la source du BIC et l’édition lue (bank_code_check.register, bic.source, as_of).',
-      'Les clés nationales cachées dans le numéro de compte, là où un pays en a : France et Monaco (clé RIB), Belgique, Italie et Saint-Marin (CIN), Espagne (DC) et Royaume-Uni (modulus check).',
+      'Les clés nationales cachées dans le numéro de compte, là où un pays en a : France et Monaco (clé RIB), Belgique, Italie et Saint-Marin (CIN), Espagne (DC), Allemagne (la méthode de clé que la Bundesbank attribue à chaque code banque) et Royaume-Uni (modulus check).',
       'Pensé pour les agents IA : un serveur MCP, hébergé ou en paquet ibanforge-mcp, et x402, qui permet à un agent de payer chaque appel en USDC sur Base, sans compte.',
       'Un essai sans clé de 25 validations par semaine sur POST /v1/iban/validate, pour essayer avant de prendre une clé.',
     ],
     limitsHeading: 'Ce qu’IBANforge ne fait pas',
     limits: [
       'Vérifier le nom du titulaire du compte. C’est la vérification du bénéficiaire (Verification of Payee), faite par la banque du bénéficiaire.',
-      'Vérifier les méthodes allemandes du numéro de compte, ni les clés nationales des pays non cités plus haut : pas encore.',
+      'Vérifier les clés nationales des pays non cités plus haut : pas encore.',
       'Dire si le compte existe ou s’il est ouvert. Aucun registre ne le publie.',
     ],
     pricesHeading: 'Les prix d’IBANforge',
@@ -96,7 +96,7 @@ export const COPY_FR: AlternativesCopy = {
         'Pour 2 000 validations avec données bancaires, d’après les prix publiés : chez IBANforge, 8 $ de crédits prépayés (deux packs de 1 000) qui n’expirent jamais. Chez IBANAPI, la plus petite offre unique qui compte 2 000 recherches bancaires est Enterprise, 115 $ pour 365 jours, qui en inclut 5 000. Les achats répétés d’une offre plus petite ne sont pas comparés ici.',
       betterFor: [
         'Vous voulez faire tourner le moteur de validation dans votre propre infrastructure.',
-        'Il vous faut le contrôle du numéro de compte national dans les pays où IBANAPI l’annonce. IBANforge ne vérifie pas encore les méthodes allemandes du numéro de compte.',
+        'Il vous faut le contrôle du numéro de compte national dans des pays où IBANAPI l’annonce et où IBANforge ne le fait pas.',
       ],
       note:
         'Ce que signifie un code banque absent du registre d’IBANAPI (attribué à personne, ou simplement pas répertorié) n’est pas dit sur les pages que nous avons lues.',

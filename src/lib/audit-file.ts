@@ -63,6 +63,7 @@ export type FindingCode =
   | 'bank_code_not_allocated'
   | 'modulus_check_failed'
   | 'national_check_digits_failed'
+  | 'national_check_digits_suspect'
   | 'sepa_not_reachable'
   | 'test_bic'
   | 'bic_mismatch'
@@ -482,9 +483,20 @@ export function auditTable(
             detail: 'The account number fails the UK modulus check.',
           });
         }
-        // La clé nationale du BBAN (FR, MC, BE, IT, SM, ES) : le détail du module
-        // dit quels chiffres ne concordent pas, sans jamais donner la bonne clé.
-        if (result.national_check_digits?.status === 'fail') {
+        // La clé nationale du BBAN (FR, MC, BE, IT, SM, ES, DE) : le détail du
+        // module dit quels chiffres ne concordent pas, sans jamais donner la
+        // bonne clé. Allemagne, méthode publiée sans numéro de test
+        // (`verified_by: independent_implementation`, 06.10.2026) : un
+        // avertissement, jamais une erreur, comme l'étape de next_steps.
+        if (
+          result.national_check_digits?.status === 'fail' &&
+          result.national_check_digits.verified_by === 'independent_implementation'
+        ) {
+          findings.push({
+            code: 'national_check_digits_suspect',
+            detail: result.national_check_digits.detail ?? 'The German account check digit fails.',
+          });
+        } else if (result.national_check_digits?.status === 'fail') {
           findings.push({
             code: 'national_check_digits_failed',
             detail:
@@ -637,6 +649,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     bank_code_not_allocated: 'Bank code not in the national register',
     modulus_check_failed: 'UK account checksum fails',
     national_check_digits_failed: 'National check key fails',
+    national_check_digits_suspect: 'German account check digit fails (warning)',
     sepa_not_reachable: 'Not reachable by SEPA transfer',
     test_bic: 'Test BIC',
     bic_mismatch: 'BIC in file differs from the register',
@@ -654,6 +667,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     bank_code_not_allocated: 'Code banque absent du registre national',
     modulus_check_failed: 'Contrôle de compte britannique en échec',
     national_check_digits_failed: 'Clé de contrôle nationale en échec',
+    national_check_digits_suspect: 'Clé du compte allemand en échec (avertissement)',
     sepa_not_reachable: "Hors de portée d'un virement SEPA",
     test_bic: 'BIC de test',
     bic_mismatch: 'BIC du fichier différent du registre',
@@ -671,6 +685,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     bank_code_not_allocated: 'Bankleitzahl nicht im nationalen Register',
     modulus_check_failed: 'Britische Kontoprüfziffer fehlgeschlagen',
     national_check_digits_failed: 'Nationale Prüfziffer fehlgeschlagen',
+    national_check_digits_suspect: 'Deutsche Kontoprüfziffer fehlgeschlagen (Warnung)',
     sepa_not_reachable: 'Per SEPA-Überweisung nicht erreichbar',
     test_bic: 'Test-BIC',
     bic_mismatch: 'BIC in der Datei weicht vom Register ab',

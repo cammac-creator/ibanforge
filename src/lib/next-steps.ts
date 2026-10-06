@@ -105,8 +105,21 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   // absent. « Key » et non « digits » dans la phrase : le CIN est une lettre.
   // Comme après le contrôle britannique, les étapes d'offre plus bas ne suivent
   // plus (voir `accountInDoubt`).
+  //
+  // Allemagne (06.10.2026, décision de la session principale) : une méthode que
+  // la Bundesbank publie sans aucun numéro de test n'est vérifiée que contre une
+  // implémentation indépendante (`verified_by: independent_implementation`).
+  // Son `fail` est servi, mais n'arrête pas un paiement : une étape
+  // d'avertissement à part, hors de `BLOCKING_STEPS`, qui laisse passer les
+  // étapes d'offre.
   const national = result.national_check_digits;
-  if (national?.status === 'fail') {
+  if (national?.status === 'fail' && national.verified_by === 'independent_implementation') {
+    steps.push({
+      code: 'national_check_digits_suspect',
+      do: 'Confirm before sending. The account number does not satisfy the check-digit method the Bundesbank lists for this bank, but that method comes with no published test number, so this is a warning and not a refusal. Ask the beneficiary to confirm the account number.',
+      because: `national_check_digits.status is fail (${national.scheme}, method ${national.method ?? 'unknown'}) with verified_by independent_implementation`,
+    });
+  } else if (national?.status === 'fail') {
     steps.push({
       code: 'national_check_digits_failed',
       do: 'Do not send. The national check key inside this IBAN does not match the bank and account numbers it carries, so the account number cannot have been issued as written, even though the IBAN check digits are correct. Ask the beneficiary to confirm the account number.',

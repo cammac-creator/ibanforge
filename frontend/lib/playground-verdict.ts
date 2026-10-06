@@ -10,8 +10,13 @@ export function playgroundVerdict(data: RecordValue, mode: 'iban' | 'compliance'
   const sanctions = record(compliance.sanctions);
   // Clé nationale fausse (clé RIB, CIN, DC, chiffres belges, modulus britannique) :
   // `checks.national_check_digits` vaut `fail` depuis le 25/09/2026, `valid` reste vrai.
+  const nationalFail = record(data.checks).national_check_digits === 'fail';
+  // Allemagne, méthode que la Bundesbank publie sans numéro de test
+  // (`verified_by: independent_implementation`, 06.10.2026) : un avertissement
+  // qui demande de faire confirmer le compte, jamais un « ne pas envoyer ».
+  const localCheckSuspect = nationalFail && record(data.national_check_digits).verified_by === 'independent_implementation';
   const localCheckInvalid = record(bank.check_digit).valid === false || record(data.modulus_check).passed === false
-    || record(data.checks).national_check_digits === 'fail';
+    || (nationalFail && !localCheckSuspect);
   const ambiguous = typeof bank.candidates === 'number' && bank.candidates > 1;
   const bankStatus = data.valid !== true ? 'notChecked'
     : bank.status === 'not_in_register' && bank.authoritative === true && bank.reason === 'not_allocated' ? 'notAllocated'
@@ -25,6 +30,7 @@ export function playgroundVerdict(data: RecordValue, mode: 'iban' | 'compliance'
     structure: data.valid === true ? 'valid' : data.valid === false ? 'invalid' : 'notChecked',
     bankStatus,
     localCheckInvalid,
+    localCheckSuspect,
     code: text(bank.value) ?? text(record(data.bban).bank_code),
     bankName: text(record(bank.institution).name),
     bicBankName: text(bic.bank_name),
@@ -36,7 +42,7 @@ export function playgroundVerdict(data: RecordValue, mode: 'iban' | 'compliance'
     sanctions: screened ? (sanctions.bank_sanctioned ? 'matchedSanctions' : 'noMatch') : 'notChecked',
     sanctionsSource: screened ? text(record(data.meta).sources) : null,
     sanctionsAsOf: screened ? text(record(data.meta).sanctions_as_of) : null,
-    next: typeof data.valid !== 'boolean' ? 'retry' : data.valid === false ? 'fixStructure' : (bankStatus === 'notAllocated' || localCheckInvalid) ? 'confirmDetails'
+    next: typeof data.valid !== 'boolean' ? 'retry' : data.valid === false ? 'fixStructure' : (bankStatus === 'notAllocated' || localCheckInvalid || localCheckSuspect) ? 'confirmDetails'
       : ['unknown', 'ambiguous', 'retired', 'matched'].includes(bankStatus) ? 'checkBank'
       : screened ? 'reviewScope' : 'screenBank',
   } as const;
