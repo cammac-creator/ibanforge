@@ -40,12 +40,13 @@ describe('the sub-processors of the trust page', () => {
     const rows = tableRows(doc, heading);
     expect(rows).toHaveLength(TRUST_PROCESSORS.length);
     for (const { key, dpf, basis } of TRUST_PROCESSORS) {
-      const link = dpf ?? basis;
-      if (link && link.includes('dataprivacyframework.gov')) {
-        expect(rows.some((r) => r.includes(link)), `${key} ${link}`).toBe(true);
+      // Every register entry of the page is in the annex, cell for cell.
+      if (dpf !== null) {
+        expect(new URL(dpf).hostname, key).toBe('www.dataprivacyframework.gov');
+        expect(rows.some((r) => r.includes(`(${dpf})`)), `${key} ${dpf}`).toBe(true);
       }
-      if (key === 'anthropic') {
-        expect(rows.some((r) => r.includes(basis!)), key).toBe(true);
+      if (key === 'anthropic' && basis !== null) {
+        expect(rows.some((r) => r.includes(`(${basis})`)), key).toBe(true);
       }
     }
   });
