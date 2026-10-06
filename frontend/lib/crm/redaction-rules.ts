@@ -73,8 +73,12 @@ export function recipientDomains(to: unknown): string[] {
   const domains = new Set<string>();
   for (const match of found) {
     // Trailing separators are not part of the domain: `a@example.com,` and
-    // `a@example.com.` both address example.com.
-    const domain = match.slice(1).replace(/[.-]+$/, '');
+    // `a@example.com.` both address example.com. Trimmed by a loop, not by
+    // `/[.-]+$/`: that regex retries a long run of dots and dashes from each
+    // of its characters, quadratic time on a field anyone can fill.
+    let end = match.length;
+    while (end > 1 && (match[end - 1] === '.' || match[end - 1] === '-')) end--;
+    const domain = match.slice(1, end);
     if (domain) domains.add(domain);
   }
   return [...domains];

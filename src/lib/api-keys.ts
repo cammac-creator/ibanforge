@@ -19,6 +19,15 @@ import { linkPaidKeyToLineage, recordLineageBirth, recordLineageClaim } from './
 export { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 const KEY_PREFIX = 'ifk_';
 
+/**
+ * The shape of every key this API mints: the prefix, then 32 bytes from
+ * `randomBytes` in lowercase hex, i.e. 256 bits of entropy. That entropy is
+ * why a single SHA-256 is the right way to store a key (a fast hash lookup, as
+ * GitHub and Stripe tokens do): there is no dictionary to try against it.
+ * The import route holds imported keys to this same shape.
+ */
+export const API_KEY_SHAPE = /^ifk_[0-9a-f]{64}$/;
+
 function hashKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
 }

@@ -446,15 +446,15 @@ export function weeklySeries(
 
 /** A page URL as the card prints it: the site's own origin dropped, `/` kept. */
 export function relativePath(url: string): string {
-  if (!url.startsWith(SITE_ORIGIN)) return url;
-  const rest = url.slice(SITE_ORIGIN.length);
-  // The origin has to END there. Without this, `https://ibanforge.com.evil
-  // .example/x` starts with the origin and would be printed as the path
-  // `.evil.example/x` — a foreign host wearing our own site's clothes on an
-  // operator screen. Google only returns URLs inside the verified property, so
-  // this is a guard against the day it stops being true, not against today.
-  if (rest !== '' && !rest.startsWith('/')) return url;
-  return rest === '' ? '/' : rest;
+  if (url === SITE_ORIGIN) return '/';
+  // The origin has to END there, hence the slash in the prefix. Without it,
+  // `https://ibanforge.com.evil.example/x` starts with the origin and would be
+  // printed as the path `.evil.example/x`: a foreign host wearing our own
+  // site's clothes on an operator screen. Google only returns URLs inside the
+  // verified property, so this is a guard against the day it stops being
+  // true, not against today.
+  if (!url.startsWith(`${SITE_ORIGIN}/`)) return url;
+  return url.slice(SITE_ORIGIN.length);
 }
 
 /** Analytics rows for the `query` / `page` dimensions, ranked as Google ranked them. */

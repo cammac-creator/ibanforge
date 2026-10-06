@@ -11,6 +11,7 @@ import {
   parseCzech,
   parseCzechEditions,
   planCzechEditions,
+  withoutComments,
   reportCzechStatus,
   seedCzechLive,
   writeCzech,
@@ -444,6 +445,31 @@ describe('parseCzechEditions', () => {
     expect(parseCzechEditions(CZ_PAGE.replace(/Číselník 254/, 'Verze 254'), CZ_PAGE_URL)).toEqual(
       [],
     );
+  });
+
+  it('reads no edition from a comment pieced back together or never closed', () => {
+    const hidden = '<ul><li>Číselník 999 platný od 1. 1. 2027</li></ul>';
+    // A removal that joins `<!` and `--` into a new opening.
+    expect(parseCzechEditions(`<!<!-- x -->--${hidden}-->`, CZ_PAGE_URL)).toEqual([]);
+    // An opening never closed hides the rest of the page, as in a browser.
+    expect(parseCzechEditions(`${CZ_PAGE}<!--${hidden}`, CZ_PAGE_URL)).toEqual(
+      parseCzechEditions(CZ_PAGE, CZ_PAGE_URL),
+    );
+  });
+});
+
+describe('withoutComments', () => {
+  it('removes every comment and leaves no opening behind', () => {
+    expect(withoutComments('a<!-- b -->c')).toBe('ac');
+    expect(withoutComments('a<!<!-- b -->--c-->d')).toBe('ad');
+    expect(withoutComments('a<!-- never closed')).toBe('a');
+    expect(withoutComments('<!<!<!-- -->-- -->--x')).not.toContain('<!--');
+  });
+
+  it('stays linear on a page full of openings that never close', () => {
+    const start = performance.now();
+    withoutComments('<!--'.repeat(50_000));
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });
 

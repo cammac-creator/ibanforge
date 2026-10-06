@@ -26,6 +26,7 @@ import {
   ownAllowanceDefault,
   hasActiveSubscription,
   PRO_MONTHLY_LIMIT,
+  API_KEY_SHAPE,
 } from '../lib/api-keys.js';
 import { ensureTopupRef, SALE_OUTCOMES_SQL } from '../lib/key-purchases.js';
 import { countClaimsBySource, hasClaimedRecently, recordKeyClaim } from '../lib/key-claims.js';
@@ -1528,14 +1529,23 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
 
   const apiKey = body.api_key;
   const email = body.email;
-  if (!apiKey || typeof apiKey !== 'string' || !apiKey.startsWith('ifk_')) {
-    return c.json({ error: 'invalid_key', message: 'api_key must start with ifk_' }, 400);
+  // The exact shape the generator mints, not just the prefix: the key is
+  // stored as a single SHA-256, which is only sound for a 256-bit random
+  // secret. A hand-typed `ifk_test` would sit in the table as a hash anyone
+  // could reverse from a dictionary.
+  if (typeof apiKey !== 'string' || !API_KEY_SHAPE.test(apiKey)) {
+    return c.json(
+      {
+        error: 'invalid_key',
+        message: 'api_key must be ifk_ followed by 64 lowercase hexadecimal characters',
+      },
+      400,
+    );
   }
   if (!email || typeof email !== 'string' || !email.includes('@')) {
     return c.json({ error: 'invalid_email' }, 400);
   }
 
-  const { createHash } = await import('node:crypto');
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
   const keyPrefix = apiKey.slice(0, 12);
   const monthlyLimit = typeof body.monthly_limit === 'number' ? body.monthly_limit : null;

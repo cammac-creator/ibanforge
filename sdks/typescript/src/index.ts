@@ -39,6 +39,18 @@ function readEnv(name: string): string | undefined {
   return proc?.env?.[name];
 }
 
+/**
+ * The base URL without its trailing slashes, in one linear pass. The regex
+ * `/\/+$/` it replaces backtracks: on a value holding a long run of slashes
+ * not at the end, it retries the run from every slash, so the time grows with
+ * the square of its length.
+ */
+function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return url.slice(0, end);
+}
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 export interface IBANforgeConfig {
@@ -623,7 +635,7 @@ export class IBANforge {
     // Explicit config wins, then the environment, then production. Resolved per
     // instance rather than at module load so a test (or a process that sets the
     // variable late) is not fighting an import-time snapshot.
-    this.baseUrl = (config.baseUrl || readEnv('IBANFORGE_API_BASE') || DEFAULT_BASE_URL).replace(/\/+$/, '');
+    this.baseUrl = trimTrailingSlashes(config.baseUrl || readEnv('IBANFORGE_API_BASE') || DEFAULT_BASE_URL);
     this.apiKey = config.apiKey ?? readEnv('IBANFORGE_API_KEY');
     this.timeoutMs = config.timeoutMs ?? 30_000;
   }

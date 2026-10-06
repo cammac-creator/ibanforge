@@ -457,6 +457,18 @@ export interface WebEventsSummary {
  */
 export const SERVER_EVENT_PAGE = '/api';
 
+/**
+ * A referrer host that is our own site (ibanforge.com or one of its
+ * subdomains), which the doors card leaves out of "where visitors come from".
+ * Matched on the label boundary: a bare `endsWith('ibanforge.com')` also hid
+ * `myibanforge.com` or `notibanforge.com`, someone else's site sending us
+ * visitors.
+ */
+export function isOwnReferrer(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === 'ibanforge.com' || h.endsWith('.ibanforge.com');
+}
+
 /** Names written by the server, never by the page. Kept in step with SERVER_EVENTS in the API. */
 const TRIAL_EVENT = 'api:trial';
 const TRIAL_EXHAUSTED_EVENT = 'api:trial-exhausted';

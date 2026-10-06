@@ -25,10 +25,16 @@ export interface BlogPost {
 export function getAllPosts(locale: string = 'en'): BlogPost[] {
   const dir = blogDir(locale);
   if (!fs.existsSync(dir)) return locale !== 'en' ? getAllPosts('en') : [];
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.mdx'));
+  // Listed only under a slug getPost would open: a file whose name falls
+  // outside SLUG_PATTERN would be a link to a 404, and the slug is written
+  // into every card's href. content-slug.test.ts fails before a real post
+  // could be dropped here.
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.mdx') && SLUG_PATTERN.test(f.slice(0, -'.mdx'.length)));
   return files
     .map((file) => {
-      const slug = file.replace('.mdx', '');
+      const slug = file.slice(0, -'.mdx'.length);
       const raw = fs.readFileSync(path.join(dir, file), 'utf-8');
       const { data, content } = matter(raw);
       const words = content.split(/\s+/).length;

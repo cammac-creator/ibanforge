@@ -61,6 +61,17 @@ describe('GET /v1/test-iban', () => {
     expect(overBody.test_ibans.length).toBe(1);
   });
 
+  it('draws the country and the account digits without Math.random', async () => {
+    const spy = vi.spyOn(Math, 'random');
+    try {
+      const res = await makeApp().request('/v1/test-iban?count=5');
+      expect(res.status).toBe(200);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('rejects an unsupported country with the honest reason', async () => {
     const res = await makeApp().request('/v1/test-iban?country=FR');
     expect(res.status).toBe(400);

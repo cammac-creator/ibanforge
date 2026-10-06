@@ -16,6 +16,7 @@ import {
   keyCreationSource,
 } from '../lib/key-creation-guard.js';
 import { Hono } from 'hono';
+import { createHash, randomBytes } from 'node:crypto';
 
 function makeApp() {
   const app = new Hono();
@@ -114,6 +115,51 @@ describe('/v1/admin/keys — admin auth (timing-safe)', () => {
     expect(res.status).toBe(201);
     const json = (await res.json()) as { api_key: string };
     expect(json.api_key).toMatch(/^ifk_/);
+  });
+});
+
+/**
+ * The import route stores a key it did not mint, as one SHA-256. That is sound
+ * only for the generator's own shape (256 random bits); anything weaker would
+ * sit in the table as a hash a dictionary reverses.
+ */
+describe('/v1/admin/keys/import — only the shape the generator mints', () => {
+  const admin = {
+    'Content-Type': 'application/json',
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+  };
+
+  async function importKey(apiKey: unknown): Promise<Response> {
+    return makeApp().request('/v1/admin/keys/import', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ api_key: apiKey, email: `import-${RUN_TAG}@example.com` }),
+    });
+  }
+
+  it('refuses a key that only carries the prefix', async () => {
+    for (const weak of ['ifk_', 'ifk_test', `ifk_${'a'.repeat(63)}`, `ifk_${'a'.repeat(65)}`]) {
+      const res = await importKey(weak);
+      expect(res.status, weak).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe('invalid_key');
+    }
+  });
+
+  it('refuses upper-case hex, other characters and a non-string', async () => {
+    expect((await importKey(`ifk_${'A'.repeat(64)}`)).status).toBe(400);
+    expect((await importKey(`ifk_${'g'.repeat(64)}`)).status).toBe(400);
+    expect((await importKey(42)).status).toBe(400);
+  });
+
+  it('imports a key of the generated shape, stored by its hash only', async () => {
+    const apiKey = `ifk_${randomBytes(32).toString('hex')}`;
+    const res = await importKey(apiKey);
+    expect(res.status).toBe(201);
+    const row = getStatsDB()
+      .prepare('SELECT key_prefix FROM api_keys WHERE key_hash = ?')
+      .get(createHash('sha256').update(apiKey).digest('hex')) as { key_prefix: string } | undefined;
+    expect(row?.key_prefix).toBe(apiKey.slice(0, 12));
+    expect(validateApiKey(apiKey).valid).toBe(true);
   });
 });
 

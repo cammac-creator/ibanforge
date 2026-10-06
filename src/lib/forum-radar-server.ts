@@ -13,6 +13,7 @@
  */
 import { getStatsDB } from './db.js';
 import { generateDraft, translateToFr } from './forum-draft-gen.js';
+import { isOwnApiResource } from './own-api-resource.js';
 import { recordVisibility, type VisibilityState } from './visibility.js';
 import {
   DISMISSED_REPO_MALUS,
@@ -694,10 +695,9 @@ async function countBazaar(target: string): Promise<number> {
       pagination?: { total?: unknown };
     };
     for (const item of data.items ?? []) {
-      if (
-        typeof item.resource === 'string' &&
-        item.resource.startsWith('https://api.ibanforge.com')
-      ) {
+      // Host compared parsed, never by prefix: anyone can list a resource in
+      // this catalog, `https://api.ibanforge.com.attacker.example` included.
+      if (typeof item.resource === 'string' && isOwnApiResource(item.resource)) {
         found.add(item.resource);
       }
     }
