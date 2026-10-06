@@ -115,7 +115,9 @@ export default async function TrustPage({
   ];
 
   return (
-    <div className="flex flex-col">
+    // German compounds ("Angemessenheitsbeschluss") are wider than a phone
+    // column: let them hyphenate, or break, rather than push the page sideways.
+    <div className="flex flex-col hyphens-auto break-words">
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="flex flex-col items-center text-center px-4 pt-24 pb-12 sm:pt-28 gap-6 max-w-3xl mx-auto">
         <span className="eyebrow">{t("eyebrow")}</span>
@@ -245,13 +247,15 @@ export default async function TrustPage({
             <Card key={key}>
               <p className="text-sm font-medium text-foreground">{t(`processors.rows.${key}.name`)}</p>
               <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{t(`processors.rows.${key}.role`)}</p>
-              <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-                <dt className="text-muted-foreground">{t("processors.col.region")}</dt>
-                <dd className="text-foreground/90">{t(`processors.rows.${key}.region`)}</dd>
-                <dt className="text-muted-foreground">{t("processors.col.ibans")}</dt>
-                <dd className="text-foreground/90">{t(`processors.rows.${key}.ibans`)}</dd>
-                <dt className="text-muted-foreground">{t("processors.col.basis")}</dt>
-                <dd className="text-foreground/90">{t(`processors.rows.${key}.basis`)}</dd>
+              <dl className="mt-3 space-y-2.5 text-sm">
+                {(["region", "ibans", "basis"] as const).map((field) => (
+                  <div key={field}>
+                    <dt className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                      {t(`processors.col.${field}`)}
+                    </dt>
+                    <dd className="mt-0.5 text-foreground/90 leading-relaxed">{t(`processors.rows.${key}.${field}`)}</dd>
+                  </div>
+                ))}
               </dl>
               <div className="mt-3">{processorLink(dpf, basis)}</div>
             </Card>
@@ -260,10 +264,10 @@ export default async function TrustPage({
 
         {/* Wider screens: the table, as in Annex II of the DPA. */}
         <div className="hidden md:block overflow-x-auto rounded-xl border border-border" style={{ background: "var(--ink-1)" }}>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm hyphens-none">
             <thead>
               <tr className="border-b border-border text-left text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                <th scope="col" className="px-4 py-2.5 font-normal">{t("processors.col.name")}</th>
+                <th scope="col" className="px-4 py-2.5 font-normal min-w-[11rem]">{t("processors.col.name")}</th>
                 <th scope="col" className="px-4 py-2.5 font-normal">{t("processors.col.role")}</th>
                 <th scope="col" className="px-4 py-2.5 font-normal">{t("processors.col.region")}</th>
                 <th scope="col" className="px-4 py-2.5 font-normal">{t("processors.col.ibans")}</th>

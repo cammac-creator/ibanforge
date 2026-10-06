@@ -49,7 +49,10 @@ export default async function LegalPage({
   const servedInEnglish = locale !== "en" && !translated;
 
   return (
-    <article className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10">
+    // `hyphens-auto break-words`: a German compound such as
+    // "Auftragsverarbeitungsvertrag" is wider than a phone in the h1 and pushed
+    // the page sideways at 390 px (2026-10-06). Tables keep their own scroller.
+    <article className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10 hyphens-auto break-words">
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <Link
           href={localePath(locale, '/legal')}

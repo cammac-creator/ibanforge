@@ -37,10 +37,8 @@ export const LEGAL_SLUGS = ['terms', 'privacy', 'dpa', 'sla', 'imprint'] as cons
  */
 export const LEGAL_TRANSLATION_LOCALES = ['de'] as const;
 
-function translationFile(slug: string, locale: string): string | null {
-  if (!(LEGAL_TRANSLATION_LOCALES as readonly string[]).includes(locale)) return null;
-  const file = path.join(LEGAL_DIR, locale, `${slug}.mdx`);
-  return fs.existsSync(file) ? file : null;
+function isTranslationLocale(locale: string): boolean {
+  return (LEGAL_TRANSLATION_LOCALES as readonly string[]).includes(locale);
 }
 
 export function getLegalDoc(
@@ -55,10 +53,22 @@ export function getLegalDoc(
    * caller contract is a nullable return, and getAllLegalDocs maps over it.
    */
   if (!SLUG_PATTERN.test(slug)) return null;
-  const translated = translationFile(slug, locale);
-  const file = translated ?? path.join(LEGAL_DIR, `${slug}.mdx`);
-  if (!fs.existsSync(file)) return null;
-  const raw = fs.readFileSync(file, 'utf-8');
+  /*
+   * Two reads, each with a path the bundler can scope statically
+   * (content/legal/*.mdx, content/legal/<locale>/*.mdx). A path chosen at run
+   * time from either folder made Turbopack trace the whole project into the
+   * function (build warning of 2026-10-06).
+   */
+  const translated =
+    isTranslationLocale(locale) && fs.existsSync(path.join(LEGAL_DIR, locale, `${slug}.mdx`));
+  let raw: string;
+  if (translated) {
+    raw = fs.readFileSync(path.join(LEGAL_DIR, locale, `${slug}.mdx`), 'utf-8');
+  } else {
+    const file = path.join(LEGAL_DIR, `${slug}.mdx`);
+    if (!fs.existsSync(file)) return null;
+    raw = fs.readFileSync(file, 'utf-8');
+  }
   const { data, content } = matter(raw);
   return {
     meta: {
@@ -67,7 +77,7 @@ export function getLegalDoc(
       description: data.description || '',
       order: data.order ?? 99,
       updated: data.updated || '',
-      translated: translated !== null,
+      translated,
     },
     content,
   };

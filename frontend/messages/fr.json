@@ -1875,7 +1875,7 @@
       "title": "Mentions & contrats",
       "subtitle": "Les documents qui régissent le service : conditions, confidentialité, sous-traitance des données, identité de l'opérateur."
     },
-    "englishOnly": "Les documents contractuels sont fournis en anglais — la version anglaise fait foi.",
+    "englishOnly": "Les documents contractuels sont fournis en anglais : la version anglaise fait foi.",
     "updated": "Mis à jour le",
     "docs": {
       "terms": {
@@ -1909,7 +1909,7 @@
         "title": "Sécurité et confiance",
         "description": "Qui exploite IBANforge, où tourne l'API, ce qui est gardé et combien de temps, les sous-traitants et la base de leurs transferts, la sécurité, la disponibilité, et ce que nous n'avons pas."
       },
-      "eyebrow": "Sécurité et confiance",
+      "eyebrow": "Pour votre revue de protection des données",
       "hero": {
         "title": "Sécurité et confiance",
         "description": "Qui exploite IBANforge, où tourne l'API, ce qu'elle garde et combien de temps, et ce que nous n'avons pas. Chaque fait renvoie au document ou à la vérification qui le prouve."
