@@ -301,16 +301,29 @@ const CHECKS_SCHEMA = z
 
 /**
  * `national_check_digits` : la preuve de `checks.national_check_digits` pour FR,
- * MC, BE, IT, SM et ES (25/09/2026). Déclaré ici parce que le schéma annoncé
- * est fermé : un bloc absent du schéma serait retiré par Zod, et le client MCP
- * officiel refuserait la réponse entière qui le porte.
+ * MC, BE, IT, SM et ES (25/09/2026), et DE (06.10.2026). Déclaré ici parce que
+ * le schéma annoncé est fermé : un bloc absent du schéma serait retiré par Zod,
+ * et le client MCP officiel refuserait la réponse entière qui le porte. Même
+ * raison pour les trois champs allemands : non déclarés, Zod les retirerait.
  */
 const NATIONAL_CHECK_DIGITS_SCHEMA = z
   .object({
     country: z.string().describe('The IBAN country (MC stays MC, SM stays SM).'),
-    scheme: z.string().describe('fr_rib_key | be_mod97 | it_cin | es_dc'),
-    status: z.string().describe('pass | fail | not_applicable'),
-    detail: z.string().optional().describe('Present on fail and not_applicable only.'),
+    scheme: z.string().describe('fr_rib_key | be_mod97 | it_cin | es_dc | de_pruefziffer'),
+    status: z.string().describe('pass | fail | not_applicable | not_checked'),
+    detail: z.string().optional().describe('Present on fail, not_applicable and not_checked.'),
+    method: z
+      .string()
+      .optional()
+      .describe('DE only: the Bundesbank check-digit method code of the bank code.'),
+    source: z
+      .string()
+      .optional()
+      .describe('DE only: the source, with the credit line the Bundesbank asks for.'),
+    table_fetched_on: z
+      .string()
+      .optional()
+      .describe('DE only: the day the method table was read (YYYY-MM-DD).'),
   })
   .optional()
   .describe(NATIONAL_CHECK_DIGITS_NOTE);

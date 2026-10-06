@@ -113,11 +113,12 @@ export function bankCodeCheckStatus(holder: BankCodeHolder | undefined): Checks[
  * La clé nationale.
  *
  * - Royaume-Uni : dérivée de `modulus_check`, comme depuis la 1.8.0.
- * - France, Monaco, Belgique, Italie, Saint-Marin, Espagne (25/09/2026) : le
- *   statut du bloc `national_check_digits`, tel quel. Le bloc est la preuve, ce
- *   champ en est le résumé : les deux ne divergent jamais.
- * - Ailleurs, et quand le bloc manque : `not_checked` (pas d'algorithme ici ;
- *   l'Allemagne attend la méthode de chaque code banque).
+ * - France, Monaco, Belgique, Italie, Saint-Marin, Espagne (25/09/2026),
+ *   Allemagne (06.10.2026) : le statut du bloc `national_check_digits`, tel
+ *   quel, `not_checked` allemand compris. Le bloc est la preuve, ce champ en est
+ *   le résumé : les deux ne divergent jamais.
+ * - Ailleurs, et quand le bloc manque : `not_checked` (pas d'algorithme ici,
+ *   ou table allemande des méthodes absente).
  */
 function nationalCheckDigits(result: IBANValidationResult): Checks['national_check_digits'] {
   if (result.country?.code === 'GB') {

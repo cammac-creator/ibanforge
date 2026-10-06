@@ -38,7 +38,7 @@ export const COPY_EN: ApiPageCopy = {
       {
         title: "National check digits",
         field: "checks.national_check_digits",
-        body: "Where a country hides its own key inside the account number: France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC) and the United Kingdom (modulus check). A wrong key shows in this field and never turns valid to false. In Poland, the check digit of the settlement number comes with the bank code, in bank_code_check.check_digit.",
+        body: "Where a country hides its own key inside the account number: France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC), Germany (the account-number check digit, by the method the Bundesbank lists for each bank code) and the United Kingdom (modulus check). A wrong key shows in this field and never turns valid to false. In Poland, the check digit of the settlement number comes with the bank code, in bank_code_check.check_digit.",
       },
       {
         title: "The bank and its BIC",
@@ -63,7 +63,7 @@ export const COPY_EN: ApiPageCopy = {
       "Whether the account exists or is open. No register publishes that: only the payee's bank knows.",
       "Whose name is on the account. That check is Verification of Payee, run by the payee's bank; the API only says whether that bank is listed as ready for it.",
       "Whether the payee is sanctioned. The optional screening covers the bank and the country, not the person or the company you pay.",
-      "The German account-number methods and the national keys of the countries not named above: they are not checked yet.",
+      "The German account-number methods for which the Bundesbank publishes no test number (they answer not_checked), and the national keys of the countries not named above: they are not checked yet.",
     ],
     sources: "Every register, its licence and the date of the edition we read",
   },

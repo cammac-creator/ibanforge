@@ -38,7 +38,7 @@ export const COPY_FR: ApiPageCopy = {
       {
         title: "Clés nationales",
         field: "checks.national_check_digits",
-        body: "Là où un pays place sa propre clé dans le numéro de compte : France et Monaco (clé RIB), Belgique, Italie et Saint-Marin (CIN), Espagne (DC) et Royaume-Uni (modulus check). Une clé fausse apparaît dans ce champ et ne rend jamais valid faux. En Pologne, le chiffre de contrôle du numéro de règlement accompagne le code banque, dans bank_code_check.check_digit.",
+        body: "Là où un pays place sa propre clé dans le numéro de compte : France et Monaco (clé RIB), Belgique, Italie et Saint-Marin (CIN), Espagne (DC), Allemagne (la clé du numéro de compte, selon la méthode que la Bundesbank attribue à chaque code banque) et Royaume-Uni (modulus check). Une clé fausse apparaît dans ce champ et ne rend jamais valid faux. En Pologne, le chiffre de contrôle du numéro de règlement accompagne le code banque, dans bank_code_check.check_digit.",
       },
       {
         title: "La banque et son BIC",
@@ -63,7 +63,7 @@ export const COPY_FR: ApiPageCopy = {
       "Si le compte existe ou s'il est ouvert. Aucun registre ne le publie : seule la banque du bénéficiaire le sait.",
       "Au nom de qui est le compte. Ce contrôle, c'est la vérification du bénéficiaire, faite par sa banque ; l'API dit seulement si cette banque est listée comme prête.",
       "Si le bénéficiaire est sanctionné. Le criblage optionnel porte sur la banque et le pays, pas sur la personne ou l'entreprise que vous payez.",
-      "Les méthodes allemandes de contrôle du numéro de compte et les clés nationales des pays qui ne sont pas cités plus haut : elles ne sont pas encore contrôlées.",
+      "Les méthodes allemandes du numéro de compte pour lesquelles la Bundesbank ne publie aucun numéro de test (elles répondent not_checked), et les clés nationales des pays qui ne sont pas cités plus haut : elles ne sont pas encore contrôlées.",
     ],
     sources: "Chaque registre, sa licence et la date de l'édition que nous lisons",
   },

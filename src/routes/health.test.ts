@@ -174,6 +174,50 @@ describe('/health — freshness of the UK modulus table', () => {
 });
 
 /**
+ * The German check-digit method table (06/10/2026). Unlike the UK table it is
+ * tracked in git, so CI has it: the shape and the presence can be asserted.
+ * Its absence must stay a degraded feature, exactly like the UK table.
+ */
+describe('/health — the German check-digit method table', () => {
+  it('says the table is loaded, when it was read, and how many bank codes it holds', async () => {
+    const body = (await (await app.request('/health')).json()) as Record<string, unknown>;
+    const de = body.de_pruefziffer as Record<string, unknown>;
+    expect(Object.keys(de)).toEqual(['available', 'fetched_on', 'bank_codes']);
+    expect(de.available).toBe(true);
+    expect(de.fetched_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(de.bank_codes as number).toBeGreaterThan(2800);
+  });
+
+  it('stays green without the table, and says available: false', async () => {
+    const saved = process.env.DE_PRUEFZIFFER_PATH;
+    vi.resetModules();
+    process.env.DE_PRUEFZIFFER_PATH = join(
+      mkdtempSync(join(tmpdir(), 'ibanforge-de-')),
+      'absent.json',
+    );
+    const [{ health: freshHealth }, db, compliance] = await Promise.all([
+      import('./health.js'),
+      import('../lib/db.js'),
+      import('../lib/compliance-db.js'),
+    ]);
+    const isolated = new Hono();
+    isolated.route('/', freshHealth);
+    try {
+      const res = await isolated.request('/health');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.status).toBe('ok');
+      expect(body.de_pruefziffer).toEqual({ available: false, fetched_on: null, bank_codes: null });
+    } finally {
+      db.closeAll();
+      compliance.closeComplianceDB();
+      if (saved === undefined) delete process.env.DE_PRUEFZIFFER_PATH;
+      else process.env.DE_PRUEFZIFFER_PATH = saved;
+    }
+  });
+});
+
+/**
  * /health takes no authentication. Anything it returns is public, so it may
  * carry product figures (database size, version) and never real activity data.
  *

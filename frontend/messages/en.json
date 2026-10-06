@@ -178,7 +178,7 @@
       "bank": "Bank code",
       "bankWhat": "The national register in DE, AT, BE, SK, CZ, BG, CH, LI",
       "account": "Account number",
-      "accountWhat": "The national check key in FR, MC, BE, IT, SM, ES",
+      "accountWhat": "The national check key in FR, MC, BE, IT, SM, ES, DE",
       "checksumTitle": "What a checksum tells you",
       "checksumItems": [
         "The check digits add up",
@@ -225,7 +225,7 @@
       "figRegisters": "countries whose national register is read in full",
       "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
       "figKeys": "countries whose national check key is verified, plus the UK modulus check",
-      "keyCodes": "FR, MC, BE, IT, SM, ES",
+      "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "median server processing",
       "fact0Title": "Operated from Switzerland, API hosted in the EU",
       "fact0Text": "IBANforge is run from Switzerland; the API itself runs in a European Union region.",

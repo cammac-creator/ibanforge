@@ -244,9 +244,10 @@ Plusieurs pays gardent dans le BBAN une clé de contrôle qui leur est propre, p
 | Belgique | `be_mod97` | Les deux derniers chiffres : les dix premiers chiffres modulo 97, ou 97 quand le reste est nul |
 | Italie, Saint-Marin | `it_cin` | Le CIN, la lettre de contrôle en tête du BBAN, calculée sur l'ABI, le CAB et le numéro de compte |
 | Espagne | `es_dc` | Les deux chiffres DC, en positions 9 et 10 du BBAN |
+| Allemagne | `de_pruefziffer` | La clé du numéro de compte à dix chiffres, calculée selon la méthode que la Deutsche Bundesbank attribue au code banque (champ 9 de sa Bankleitzahlendatei), nommée dans `method` |
 | Royaume-Uni | voir `modulus_check` | Le contrôle modulus de Vocalink sur le sort code et le numéro de compte |
 
-Pour ces six pays, un IBAN valide porte un bloc `national_check_digits`, et `checks.national_check_digits` en reprend le `status`. Dans les autres pays (hors Royaume-Uni), le contrôle vaut `not_checked` : les méthodes allemandes du numéro de compte, une par code banque, ne sont pas encore contrôlées.
+Pour ces sept pays, un IBAN valide porte un bloc `national_check_digits`, et `checks.national_check_digits` en reprend le `status`. Dans les autres pays (hors Royaume-Uni), le contrôle vaut `not_checked`.
 
 ```json
 {
@@ -263,6 +264,36 @@ Pour ces six pays, un IBAN valide porte un bloc `national_check_digits`, et `che
 
 - **`pass`** : la clé correspond, le numéro de compte est bien formé. Cela ne prouve pas que le compte existe ni qu'il est ouvert.
 - **`fail`** : la clé ne correspond pas. Ce numéro de compte n'a pas pu être émis tel qu'il est écrit : une faute de frappe, ou un numéro inventé. `valid` reste `true`, parce que les chiffres de contrôle de l'IBAN sont justes ; lisez les deux séparément, et faites confirmer les coordonnées par le bénéficiaire avant de payer. `detail` dit quels chiffres ne concordent pas et ne donne jamais la clé attendue.
+
+#### Allemagne : une méthode par code banque
+
+Les chiffres de contrôle d'un IBAN allemand couvrent déjà tout le BBAN, code banque et numéro de compte : une faute de frappe dans l'IBAN lui-même échoue au MOD-97. Ce que `de_pruefziffer` ajoute, c'est la règle de la banque. Chaque banque allemande déclare à la Deutsche Bundesbank la méthode selon laquelle ses numéros de compte sont construits, et ne peut émettre que des numéros qui la respectent. Un numéro de compte qui passe le MOD-97 mais viole la méthode de sa banque, typiquement un IBAN fabriqué autour d'un numéro mal recopié ou inventé, n'a pas pu être émis tel qu'il est écrit : `status` vaut `fail`, et `next_steps` dit de ne pas envoyer.
+
+Ce qu'il ne prouve pas, selon la Bundesbank elle-même : un numéro dont la clé se recalcule ne dit rien de l'existence du compte, seulement qu'il serait un numéro valable. Ni que le compte est ouvert, ni qui en est titulaire : c'est la vérification du bénéficiaire (VoP), faite par sa banque.
+
+La Bundesbank publie environ 145 méthodes (« Prüfzifferberechnungsmethoden », édition de juin 2018, toujours en vigueur). Un verdict n'est servi que pour les méthodes qui donnent le résultat attendu sur **tous** les numéros de test et exemples de calcul que la Bundesbank publie pour elles ; elles couvrent la plupart des codes banque allemands, et la liste est dans le [code source](https://github.com/cammac-creator/ibanforge/blob/main/src/lib/national-check/de/verified.ts). Avant qu'une méthode soit servie, des IBAN construits selon les règles IBAN propres aux banques (qui peuvent remplacer le code banque ou le numéro de compte) sont aussi passés à son contrôle, pour qu'un IBAN réel n'échoue jamais. Tout le reste répond `not_checked`, jamais `fail` :
+
+- **`pass`** / **`fail`** : comme plus haut, pour une méthode vérifiée.
+- **`not_applicable`** : la banque n'utilise pas de clé (méthode `09`), ou sa méthode n'en définit pas pour cette plage de numéros.
+- **`not_checked`** : le code banque n'est pas dans le fichier de la Bundesbank, ou sa méthode n'est pas encore vérifiée ici : les méthodes publiées sans aucun numéro de test (dont la méthode `13`) et la méthode `44`, où une règle IBAN remplace le numéro de compte par un numéro sans clé. Cela ne dit rien du bénéficiaire.
+
+Le bloc allemand porte aussi `method` (le code de méthode de la Bundesbank), `source` (qui commence par la mention que la Bundesbank demande, « Quelle: Deutsche Bundesbank ») et `table_fetched_on` (le jour où la méthode de chaque code banque a été lue dans le fichier de la Bundesbank ; rafraîchie chaque mois).
+
+```json
+{
+  "valid": true,
+  "checks": { "national_check_digits": "fail", "…": "…" },
+  "national_check_digits": {
+    "country": "DE",
+    "scheme": "de_pruefziffer",
+    "status": "fail",
+    "method": "63",
+    "detail": "The account number does not satisfy check-digit method 63, which the Bundesbank lists for this bank code: this account number cannot have been issued as written.",
+    "source": "Quelle: Deutsche Bundesbank (Bankleitzahlendatei, field 9; Prüfzifferberechnungsmethoden, Stand: Juni 2018)",
+    "table_fetched_on": "2026-10-06"
+  }
+}
+```
 
 ### IBAN invalide (200)
 

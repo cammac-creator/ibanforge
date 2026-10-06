@@ -244,9 +244,10 @@ Mehrere Länder führen im BBAN eine eigene Prüfziffer, die älter ist als die 
 | Belgien | `be_mod97` | Die letzten zwei Ziffern: die ersten zehn Ziffern modulo 97, oder 97, wenn der Rest 0 ist |
 | Italien, San Marino | `it_cin` | Der CIN, der Kontrollbuchstabe am Anfang des BBAN, über ABI, CAB und Kontonummer |
 | Spanien | `es_dc` | Die zwei DC-Ziffern, Positionen 9 und 10 des BBAN |
+| Deutschland | `de_pruefziffer` | Die Prüfziffer der zehnstelligen Kontonummer, berechnet nach der Methode, die die Deutsche Bundesbank der Bankleitzahl zuordnet (Feld 9 der Bankleitzahlendatei), genannt in `method` |
 | Vereinigtes Königreich | siehe `modulus_check` | Die Vocalink-Modulusprüfung über Sort Code und Kontonummer |
 
-Für diese sechs Länder trägt eine gültige IBAN einen Block `national_check_digits`, und `checks.national_check_digits` übernimmt dessen `status`. In den übrigen Ländern (außer dem Vereinigten Königreich) steht die Prüfung auf `not_checked`: Die deutschen Prüfziffernmethoden der Kontonummer, eine je Bankleitzahl, werden noch nicht geprüft.
+Für diese sieben Länder trägt eine gültige IBAN einen Block `national_check_digits`, und `checks.national_check_digits` übernimmt dessen `status`. In den übrigen Ländern (außer dem Vereinigten Königreich) steht die Prüfung auf `not_checked`.
 
 ```json
 {
@@ -263,6 +264,36 @@ Für diese sechs Länder trägt eine gültige IBAN einen Block `national_check_d
 
 - **`pass`**: Die Prüfziffer stimmt, die Kontonummer ist also wohlgeformt. Das beweist nicht, dass das Konto existiert oder eröffnet ist.
 - **`fail`**: Die Prüfziffer stimmt nicht. Diese Kontonummer kann so, wie sie geschrieben ist, nicht vergeben worden sein: ein Tippfehler oder eine erfundene Nummer. `valid` bleibt `true`, denn die IBAN-Prüfziffern stimmen; lesen Sie beides getrennt und lassen Sie die Angaben vor der Zahlung vom Empfänger bestätigen. `detail` sagt, welche Ziffern nicht zusammenpassen, und nennt nie die erwartete Prüfziffer.
+
+#### Deutschland: eine Methode je Bankleitzahl
+
+Die Prüfziffern einer deutschen IBAN decken bereits den ganzen BBAN ab, Bankleitzahl und Kontonummer: Ein Tippfehler in der IBAN selbst scheitert an MOD-97. Was `de_pruefziffer` hinzufügt, ist die Regel der Bank. Jede deutsche Bank meldet der Deutschen Bundesbank die Methode, nach der ihre Kontonummern gebildet werden, und darf nur Kontonummern vergeben, die ihr entsprechen. Eine Kontonummer, die MOD-97 besteht, aber die Methode ihrer Bank verletzt, typischerweise eine IBAN, die um eine vertippte oder erfundene Kontonummer herum erzeugt wurde, kann so, wie sie geschrieben ist, nicht vergeben worden sein: `status` ist `fail`, und `next_steps` rät, nicht zu senden.
+
+Was sie nicht beweist, mit den Worten der Bundesbank: Eine erfolgreich nachgerechnete Kontonummer sagt nichts über die Existenz des Kontos aus, sondern lediglich, dass dies eine gültige Kontonummer wäre. Weder, dass das Konto eröffnet ist, noch, wer es führt: Das ist die Empfängerüberprüfung (VoP) durch die Bank des Empfängers.
+
+Die Bundesbank veröffentlicht rund 145 Methoden („Prüfzifferberechnungsmethoden“, Stand Juni 2018, weiterhin gültig). Ein Ergebnis wird nur für die Methoden geliefert, die bei **allen** Testkontonummern und Rechenbeispielen, die die Bundesbank für sie veröffentlicht, das erwartete Ergebnis liefern; sie decken die meisten deutschen Bankleitzahlen ab, und die Liste steht im [Quellcode](https://github.com/cammac-creator/ibanforge/blob/main/src/lib/national-check/de/verified.ts). Bevor eine Methode geliefert wird, werden außerdem IBAN, die nach den IBAN-Regeln der Banken gebildet sind (die Bankleitzahl oder Kontonummer ersetzen können), gegen sie geprüft, damit eine echte IBAN nie scheitert. Alles andere antwortet mit `not_checked`, nie mit `fail`:
+
+- **`pass`** / **`fail`**: wie oben, für eine geprüfte Methode.
+- **`not_applicable`**: Die Bank verwendet keine Prüfziffer (Methode `09`), oder ihre Methode definiert keine für diesen Kontonummernbereich.
+- **`not_checked`**: Die Bankleitzahl steht nicht in der Datei der Bundesbank, oder ihre Methode ist hier noch nicht geprüft: Methoden, die ohne jede Testkontonummer veröffentlicht sind (darunter Methode `13`), und Methode `44`, bei der eine IBAN-Regel die Kontonummer durch eine ohne Prüfziffer ersetzt. Das sagt nichts über den Empfänger.
+
+Der deutsche Block trägt außerdem `method` (das Kennzeichen der Bundesbank), `source` (beginnt mit dem Quellenvermerk, den die Bundesbank verlangt: „Quelle: Deutsche Bundesbank“) und `table_fetched_on` (der Tag, an dem die Methode jeder Bankleitzahl aus der Datei der Bundesbank gelesen wurde; monatlich aktualisiert).
+
+```json
+{
+  "valid": true,
+  "checks": { "national_check_digits": "fail", "…": "…" },
+  "national_check_digits": {
+    "country": "DE",
+    "scheme": "de_pruefziffer",
+    "status": "fail",
+    "method": "63",
+    "detail": "The account number does not satisfy check-digit method 63, which the Bundesbank lists for this bank code: this account number cannot have been issued as written.",
+    "source": "Quelle: Deutsche Bundesbank (Bankleitzahlendatei, field 9; Prüfzifferberechnungsmethoden, Stand: Juni 2018)",
+    "table_fetched_on": "2026-10-06"
+  }
+}
+```
 
 ### Ungültige IBAN (200)
 

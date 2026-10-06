@@ -178,7 +178,7 @@
       "bank": "Bankleitzahl",
       "bankWhat": "Das nationale Register in DE, AT, BE, SK, CZ, BG, CH, LI",
       "account": "Kontonummer",
-      "accountWhat": "Der nationale Prüfschlüssel in FR, MC, BE, IT, SM, ES",
+      "accountWhat": "Der nationale Prüfschlüssel in FR, MC, BE, IT, SM, ES, DE",
       "checksumTitle": "Was eine Prüfsumme sagt",
       "checksumItems": [
         "Die Prüfziffern gehen auf",
@@ -225,7 +225,7 @@
       "figRegisters": "Länder, deren nationales Register vollständig gelesen wird",
       "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
       "figKeys": "Länder, deren nationaler Prüfschlüssel geprüft wird, dazu die britische Modulus-Prüfung",
-      "keyCodes": "FR, MC, BE, IT, SM, ES",
+      "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "mittlere Verarbeitung auf dem Server",
       "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
       "fact0Text": "IBANforge wird aus der Schweiz betrieben; die API selbst läuft in einer Region der Europäischen Union.",

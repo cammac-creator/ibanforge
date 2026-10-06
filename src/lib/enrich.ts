@@ -1664,9 +1664,11 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
     if (modulus) result.modulus_check = modulus;
   }
 
-  // La clé de contrôle nationale du BBAN (FR, MC, BE, IT, SM, ES), même idée que
-  // le contrôle britannique ci-dessus : un second contrôle, indépendant du modulo
-  // 97, lu dans l'IBAN seul, sans appel ni base. Strictement additif (décision du
+  // La clé de contrôle nationale du BBAN (FR, MC, BE, IT, SM, ES, et DE depuis le
+  // 06.10.2026, par la méthode que la Bundesbank attribue au code banque), même
+  // idée que le contrôle britannique ci-dessus : un second contrôle, indépendant
+  // du modulo 97, lu dans l'IBAN seul, sans appel ni base (pour DE, une table
+  // lue une fois par processus, national-check/de/table.ts). Strictement additif (décision du
   // 24/09/2026) : ni `valid`, ni `bank_code_holder`, ni le score, ni `next_steps`
   // ne le lisent ; `checks.national_check_digits` reprend son statut (checks.ts).
   // Le module découpe lui-même le BBAN brut : les champs `bban.*` d'iban-core

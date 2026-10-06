@@ -1,4 +1,5 @@
 import { checkBelgianMod97 } from './be-mod97.js';
+import { checkGermanAccount } from './de-pruefziffer.js';
 import { checkSpanishDc } from './es-dc.js';
 import { checkFrenchRibKey } from './fr-rib.js';
 import { checkItalianCin } from './it-cin.js';
@@ -31,14 +32,17 @@ export { NATIONAL_CHECK_STATUSES } from './types.js';
  * champs analysés par iban-core, qui rangent la clé nationale dans le numéro
  * de compte (France, Monaco, Espagne) ou la sautent (Italie, Saint-Marin).
  *
- * Fonction pure : ni base, ni réseau, ni horloge.
+ * Ni base, ni réseau, ni horloge. Une seule lecture de fichier : pour
+ * l'Allemagne, la table des méthodes par code banque (de/table.ts), lue une
+ * fois par processus ; sans elle, l'Allemagne n'a pas de bloc.
  *
  * ## Les pays
  *
  * France et Monaco (clé RIB), Belgique (modulo 97 des dix premiers chiffres),
- * Italie et Saint-Marin (CIN), Espagne (DC). L'Allemagne attend : la
- * Bundesbank attribue une méthode par code banque, et le chargeur ne garde pas
- * encore cette colonne.
+ * Italie et Saint-Marin (CIN), Espagne (DC), et depuis le 06.10.2026
+ * l'Allemagne : la méthode que la Bundesbank attribue à chaque code banque
+ * (de-pruefziffer.ts), verdict servi pour les seules méthodes vérifiées
+ * (de/verified.ts), `not_checked` pour les autres.
  */
 export const NATIONAL_CHECK_SCHEMES: Readonly<Record<string, NationalCheckScheme>> = Object.freeze({
   FR: 'fr_rib_key',
@@ -47,6 +51,7 @@ export const NATIONAL_CHECK_SCHEMES: Readonly<Record<string, NationalCheckScheme
   IT: 'it_cin',
   SM: 'it_cin',
   ES: 'es_dc',
+  DE: 'de_pruefziffer',
 });
 
 /** Les noms d'algorithme servis, dans l'ordre de la table, sans doublon. */
@@ -60,12 +65,14 @@ export const NATIONAL_CHECK_COUNTRIES: readonly string[] = Object.freeze(
 );
 
 const CHECKERS: Readonly<
-  Record<NationalCheckScheme, (country: string, bban: string) => NationalCheck>
+  Record<NationalCheckScheme, (country: string, bban: string) => NationalCheck | null>
 > = {
   fr_rib_key: checkFrenchRibKey,
   be_mod97: checkBelgianMod97,
   it_cin: checkItalianCin,
   es_dc: checkSpanishDc,
+  // `null` quand la table des méthodes manque : pas de bloc plutôt qu'un faux verdict.
+  de_pruefziffer: checkGermanAccount,
 };
 
 /** Le verdict de la clé nationale d'un IBAN, ou `null` si le pays n'en a pas ici. */

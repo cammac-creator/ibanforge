@@ -38,7 +38,7 @@ export const COPY_DE: ApiPageCopy = {
       {
         title: "Nationale Prüfziffern",
         field: "checks.national_check_digits",
-        body: "Wo ein Land seinen eigenen Schlüssel in der Kontonummer versteckt: Frankreich und Monaco (RIB-Schlüssel), Belgien, Italien und San Marino (CIN), Spanien (DC) und das Vereinigte Königreich (Modulus-Prüfung). Ein falscher Schlüssel steht in diesem Feld und macht valid nie falsch. In Polen kommt die Prüfziffer der Abrechnungsnummer mit der Bankleitzahl, in bank_code_check.check_digit.",
+        body: "Wo ein Land seinen eigenen Schlüssel in der Kontonummer versteckt: Frankreich und Monaco (RIB-Schlüssel), Belgien, Italien und San Marino (CIN), Spanien (DC), Deutschland (die Prüfziffer der Kontonummer, nach der Methode, die die Bundesbank jeder Bankleitzahl zuordnet) und das Vereinigte Königreich (Modulus-Prüfung). Ein falscher Schlüssel steht in diesem Feld und macht valid nie falsch. In Polen kommt die Prüfziffer der Abrechnungsnummer mit der Bankleitzahl, in bank_code_check.check_digit.",
       },
       {
         title: "Die Bank und ihr BIC",
@@ -63,7 +63,7 @@ export const COPY_DE: ApiPageCopy = {
       "Ob das Konto existiert oder offen ist. Kein Register veröffentlicht das: Nur die Bank des Empfängers weiß es.",
       "Auf wessen Namen das Konto läuft. Das ist die Empfängerüberprüfung, durchgeführt von der Bank des Empfängers; die API sagt nur, ob diese Bank dafür als bereit geführt wird.",
       "Ob der Empfänger sanktioniert ist. Die optionale Prüfung betrifft die Bank und das Land, nicht die Person oder das Unternehmen, das Sie bezahlen.",
-      "Die deutschen Prüfziffermethoden der Kontonummer und die nationalen Schlüssel der oben nicht genannten Länder: Sie werden noch nicht geprüft.",
+      "Die Prüfziffermethoden der Kontonummer, für die die Bundesbank keine Testkontonummer veröffentlicht (sie antworten mit not_checked), und die nationalen Schlüssel der oben nicht genannten Länder: Sie werden noch nicht geprüft.",
     ],
     sources: "Jedes Register, seine Lizenz und der Stand der Ausgabe, die wir lesen",
   },

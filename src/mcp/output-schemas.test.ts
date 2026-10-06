@@ -193,6 +193,10 @@ describe('the truth fields are declared, so the schema never strips them', () =>
       'IT60X0542811101000000123456',
       'ES9121000418450200051332',
       'IT65A0542811101000000123456',
+      // L'Allemagne (06.10.2026) : l'exemple du registre (méthode 13, sans numéro
+      // de test publié : not_checked), dont method, source et table_fetched_on
+      // doivent traverser le schéma fermé sans être retirés par Zod.
+      'DE89370400440532013000',
     ];
     const validate = z.object(TOOL_OUTPUT_SCHEMAS.validate_iban);
     const batch = z.object(TOOL_OUTPUT_SCHEMAS.batch_validate_iban);
@@ -214,8 +218,8 @@ describe('the truth fields are declared, so the schema never strips them', () =>
         (c as { national_check_digits?: unknown }).national_check_digits,
       );
     }
-    // Les deux statuts réellement servis passent le schéma.
-    expect([...statuses].sort()).toEqual(['fail', 'pass']);
+    // Les statuts réellement servis passent le schéma.
+    expect([...statuses].sort()).toEqual(['fail', 'not_checked', 'pass']);
   });
 
   it('check_compliance keeps the honest names inside its closed blocks', () => {

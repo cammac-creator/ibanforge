@@ -140,6 +140,7 @@ describe('national_check_digits_failed', () => {
     be_mod97: 'BE',
     it_cin: 'IT',
     es_dc: 'ES',
+    de_pruefziffer: 'DE',
   };
   const SCHEMES = Object.keys(COUNTRY_OF) as NationalCheckScheme[];
 
@@ -194,13 +195,18 @@ describe('national_check_digits_failed', () => {
     expect(`${step.do} ${step.because}`).not.toContain('—');
   });
 
-  it('changes nothing on pass, on not_applicable, or without the block', () => {
+  it('changes nothing on pass, on not_applicable, on not_checked, or without the block', () => {
     for (const around of [base(), base({ bank_code_check: verified })]) {
       const without = nextSteps(around);
       expect(nextSteps({ ...around, national_check_digits: national('pass') })).toEqual(without);
       expect(nextSteps({ ...around, national_check_digits: national('not_applicable') })).toEqual(
         without,
       );
+      // L'Allemagne (06.10.2026) : une méthode pas encore vérifiée ici ne dit
+      // rien du bénéficiaire, et ne doit jamais retenir un paiement.
+      expect(
+        nextSteps({ ...around, national_check_digits: national('not_checked', 'de_pruefziffer') }),
+      ).toEqual(without);
     }
   });
 
