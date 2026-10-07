@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-10-07
+
 ### Added
 
 - **The hosted MCP server reads your API key (7 October 2026).** `https://api.ibanforge.com/mcp` now accepts an IBANforge key in `Authorization: Bearer ifk_…` or `X-API-Key`, the two headers the REST API reads, and counts each tool call against that key exactly as the REST API does: the key's own allowance, one unit per call and one per IBAN in a batch, nothing on the free tools, the same refusals. Without a key nothing changes. A key in the URL is not read. An unknown, revoked or spent key gets the REST answer for that key and never falls back to the keyless allowance. The MCP pages say where the key goes in Claude Code, in Claude and Claude Desktop (Request headers of a custom connector) and in ChatGPT, which sends none.
