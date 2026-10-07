@@ -5,9 +5,15 @@
  *
  *   1. NUDGE (automatic). A key created at least 48 h ago that has never made a
  *      call gets exactly one message, ever, carrying the 30-second path.
- *   2. FOUNDER DRAFT (never sent alone). A key created in the last day or two
- *      gets a CRM draft written in the founder's voice, waiting in the
- *      dashboard for Claude-Alain to read, edit and send by hand.
+ *   2. FOUNDER DRAFT. A key created in the last day or two gets a CRM draft
+ *      written in the founder's voice. Nothing in this repository sends it;
+ *      since 21/09/2026 a script on the mail server schedules the untouched
+ *      draft on its own, and it compares the text with the template below.
+ *
+ * And one thing stops both for good: a STOP. The key dialog promises "at most
+ * one note from the founder, with a link to receive nothing more" (decision of
+ * 05/10/2026); the note carries that link, and isStopRequest() below is how
+ * the answer is recognised.
  *
  * Everything here is pure: predicates, selection, draft composition, draft id.
  * The database, the mail relay and the cadence live in
@@ -180,15 +186,67 @@ export interface FounderDraft {
   body: string;
 }
 
+// ---------------------------------------------------------------------------
+// STOP
+// ---------------------------------------------------------------------------
+
+/**
+ * The one link of the founder note: a mail to support with STOP as its subject.
+ * A mailto rather than a page, so it needs no route, no token and no redeploy
+ * of the site, and its answer lands in the mailbox the CRM already reads. The
+ * subject is what isStopRequest() reads, so the two cannot drift apart: the
+ * test of the note checks that its own link is recognised.
+ */
+export const STOP_MAILTO = 'mailto:support@ibanforge.com?subject=STOP';
+
+/** The words that mean "nothing more", alone on their line. The live test mail of 06/10/2026 asked for "unsubscribe". */
+const STOP_WORDS = new Set(['stop', 'unsubscribe']);
+
+/** Reply and forward prefixes, stacked or not, the way mail clients write them in the languages we receive. */
+const REPLY_PREFIX_RE =
+  /^\s*(?:(?:re|fw|fwd|tr|aw|wg|antw|sv|vs|rif|odp|r)\s*:\s*|\[[^\]]{1,24}\]\s*)+/i;
+
+/** A line reduced to its word: quotes, brackets and closing punctuation around it removed, lowercased. */
+function bareWord(line: string): string {
+  return line
+    .trim()
+    .replace(/^[\s"'«»“”‘’(<*_-]+/, '')
+    .replace(/[\s"'«»“”‘’)>*_.!,;:-]+$/, '')
+    .toLowerCase();
+}
+
+/**
+ * True when an inbound message asks for nothing more: STOP (or "unsubscribe")
+ * as the whole subject, reply prefixes aside, or as the whole first non-empty
+ * line of the body. Case does not matter; a trailing "!" or "." does not either.
+ *
+ * Exactly the word, on purpose: "Stop by next week" or "STOP sending me the
+ * invoice twice" are sentences about something else, and reading them as an
+ * opt-out would silence a person who is talking to us. When in doubt, the
+ * message is not a STOP; the existing rule (any real exchange silences the
+ * robots) still holds for it.
+ */
+export function isStopRequest(
+  subject: string | null | undefined,
+  body: string | null | undefined,
+): boolean {
+  if (STOP_WORDS.has(bareWord((subject ?? '').replace(REPLY_PREFIX_RE, '')))) return true;
+  const first = (body ?? '').split(/\r?\n/).find((line) => line.trim() !== '') ?? '';
+  return STOP_WORDS.has(bareWord(first));
+}
+
 /**
  * The founder's own note, one day in. It is the message with by far the best
- * answer rate, and the point of this pass is to make it systematic without
- * making it automatic: what is created here is a DRAFT, and nothing in this
- * codebase can send it.
+ * answer rate. What is created here is a DRAFT; nothing in this codebase sends
+ * it. A script on the mail server schedules it when it is still word for word
+ * this template (ibf_regles.FONDATEUR_TEXTE there): change a single character
+ * here and that script must change the same evening, or the note stops leaving
+ * and the server's welcome robot writes instead.
  *
  * Two questions, one of which ("how did you find us") is the acquisition
  * question that was until now asked by hand or not at all. Short, no product
- * pitch, no link farm: the reply is the goal, not the click.
+ * pitch, and one link only: the one that stops everything (STOP_MAILTO), which
+ * the key dialog promises since 07/10/2026.
  */
 export function buildFounderDraft(): FounderDraft {
   const body =
@@ -201,6 +259,8 @@ export function buildFounderDraft(): FounderDraft {
     `And an offer: if the first integration is fiddly, send me the call you are\n` +
     `making and I will tell you what comes back and why. I read every reply myself.\n\n` +
     `Claude-Alain Martin\n` +
-    `IBANforge`;
+    `IBANforge\n\n` +
+    `Rather hear nothing more from us? Reply STOP, or use this link:\n` +
+    STOP_MAILTO;
   return { subject: 'Two questions about your IBANforge key', body };
 }
