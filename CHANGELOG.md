@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+
+- **The MCP pages link to OpenAI's current guide for connecting a server to ChatGPT (7 October 2026).** The previous developer-mode link answered 404.
+
 ## [1.9.0] — 2026-10-07
 
 ### Added
