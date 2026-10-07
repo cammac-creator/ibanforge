@@ -1039,8 +1039,9 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
     {
       title: 'Request an IBANforge API key',
       description:
-        'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
-        'USE WHEN: you used up the free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+        'Start the process that gives your human a free IBANforge API key, without any e-mail address. ' +
+        'The key does not unlock this session: it works once your human puts it in the MCP client configuration (`config_line`, returned by poll_api_key) or sends it to the REST API, so tell them that when you hand it over. ' +
+        'USE WHEN: you used up the free allowance, a call answers 402, or your human is about to run more than a handful of validations. ' +
         'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
         'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
         'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
