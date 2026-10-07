@@ -81,6 +81,11 @@ import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import { MCP_WEEKLY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
 import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+import { keyRefusalPayload, meterToolCall } from '../mcp/key-meter.js';
+import { extractKey } from '../middleware/api-key.js';
+import { validateApiKey } from '../lib/api-keys.js';
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 /** The tools a call may name and be served; parity with registerTool is tested. */
 const MCP_TOOL_NAMES: ReadonlySet<string> = new Set(MCP_TOOLS.map((t) => t.name));
@@ -272,6 +277,39 @@ function billedFree(payload: Record<string, unknown>, listPrice?: number): Recor
   const listed = listPrice ?? payload.cost_usdc;
   if (typeof listed !== 'number') return payload;
   return { ...payload, cost_usdc: 0, list_price_usdc: listed };
+}
+
+/**
+ * Un appel d'outil de donnée, servi sur la clé de SA requête quand elle en
+ * porte une (07.10.2026), sinon tel quel : l'allocation sans clé a déjà été
+ * débitée par le gestionnaire POST, avant le SDK.
+ *
+ * 🚨 La clé vient de `extra.authInfo`, que le SDK attache aux messages de la
+ * seule requête HTTP qui l'a portée. Elle n'est rangée nulle part dans la
+ * session : `sessionCtx` est un objet partagé et muté à chaque requête, et une
+ * clé posée là facturerait l'appel d'une requête à la clé de la suivante.
+ */
+async function withKey(
+  tool: string,
+  args: Record<string, unknown>,
+  extra: { authInfo?: AuthInfo },
+  run: () => CallToolResult | Promise<CallToolResult>,
+): Promise<CallToolResult> {
+  const key = extra.authInfo?.token;
+  if (!key) return run();
+  const metered = await meterToolCall(key, tool, args, run);
+  if (metered === null) return run();
+  if (metered.served) return metered.result;
+  const payload = keyRefusalPayload(metered.cause);
+  return { isError: true, content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+}
+
+/** `withKey` à la forme d'un gestionnaire d'outil, pour les outils aux corps longs. */
+function keyed<A extends Record<string, unknown>>(
+  tool: string,
+  handler: (args: A) => CallToolResult | Promise<CallToolResult>,
+): (args: A, extra: { authInfo?: AuthInfo }) => Promise<CallToolResult> {
+  return (args, extra) => withKey(tool, args, extra, () => handler(args));
 }
 
 const READ_ONLY_ANNOTATIONS = {
@@ -534,15 +572,16 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.validate_iban,
       annotations: { title: 'Validate IBAN', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ iban }) => {
-      const result = validateIBAN(iban);
-      enrichResult(result);
-      const payload = billedFree(result as unknown as Record<string, unknown>);
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
-        structuredContent: payload,
-      };
-    },
+    async ({ iban }, extra) =>
+      withKey('validate_iban', { iban }, extra, () => {
+        const result = validateIBAN(iban);
+        enrichResult(result);
+        const payload = billedFree(result as unknown as Record<string, unknown>);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+          structuredContent: payload,
+        };
+      }),
   );
 
   server.registerTool(
@@ -563,26 +602,27 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.batch_validate_iban,
       annotations: { title: 'Batch Validate IBANs', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ ibans }) => {
-      // One cache for the whole batch: a payout list is mostly the same few
-      // banks, and without it every row re-resolves the same bank from scratch
-      // (PERF-05). Same shape as the REST route in src/routes/iban-batch.ts.
-      const cache = createEnrichCache();
-      const results = ibans.map((iban) => {
-        const result = validateIBAN(iban);
-        enrichResult(result, cache);
-        // The list price is stated explicitly here because `enrichResult`
-        // stamps every row with the SINGLE-call price (0.005) while a row of a
-        // batch is catalogued at 0.002 — the 60% discount this tool's own
-        // description sells. Reading the field back from the row would publish
-        // the wrong catalogue number under the right name.
-        return billedFree(result as unknown as Record<string, unknown>, 0.002);
-      });
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
-        structuredContent: { results, count: results.length },
-      };
-    },
+    async ({ ibans }, extra) =>
+      withKey('batch_validate_iban', { ibans }, extra, () => {
+        // One cache for the whole batch: a payout list is mostly the same few
+        // banks, and without it every row re-resolves the same bank from scratch
+        // (PERF-05). Same shape as the REST route in src/routes/iban-batch.ts.
+        const cache = createEnrichCache();
+        const results = ibans.map((iban) => {
+          const result = validateIBAN(iban);
+          enrichResult(result, cache);
+          // The list price is stated explicitly here because `enrichResult`
+          // stamps every row with the SINGLE-call price (0.005) while a row of a
+          // batch is catalogued at 0.002 — the 60% discount this tool's own
+          // description sells. Reading the field back from the row would publish
+          // the wrong catalogue number under the right name.
+          return billedFree(result as unknown as Record<string, unknown>, 0.002);
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
+          structuredContent: { results, count: results.length },
+        };
+      }),
   );
 
   server.registerTool(
@@ -603,7 +643,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.lookup_bic,
       annotations: { title: 'Lookup BIC/SWIFT', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ bic }) => {
+    keyed('lookup_bic', async ({ bic }) => {
       const validation = validateBIC(bic);
       if (!validation.valid) {
         const errorPayload = { bic: validation.bic, valid: false, error: validation.error };
@@ -662,7 +702,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         structuredContent: result as unknown as Record<string, unknown>,
       };
-    },
+    }),
   );
 
   server.registerTool(
@@ -685,7 +725,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.check_compliance,
       annotations: { title: 'Compliance Check', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ iban }) => {
+    keyed('check_compliance', async ({ iban }) => {
       // Shared with the REST route and the stdio MCP server. See
       // src/lib/compliance-response.ts. This copy was the one that omitted
       // `meta`, so the surface agents actually reach never carried the
@@ -695,7 +735,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
         structuredContent: combined,
       };
-    },
+    }),
   );
 
   server.registerTool(
@@ -738,7 +778,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.validate_payment_reference,
       annotations: { title: 'Validate Payment Reference', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ reference, reference_type, iban }) => {
+    keyed('validate_payment_reference', async ({ reference, reference_type, iban }) => {
       const payload = iban
         ? buildReferenceCheck(validateIBAN(iban), reference, reference_type ?? null)
         : validatePaymentReference(reference, reference_type ?? null);
@@ -746,7 +786,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
         structuredContent: payload as unknown as Record<string, unknown>,
       };
-    },
+    }),
   );
 
   server.registerTool(
@@ -770,13 +810,13 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.check_swiss_qr_bill,
       annotations: { title: 'Check Swiss QR-bill Payload', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ payload }) => {
+    keyed('check_swiss_qr_bill', async ({ payload }) => {
       const result = checkSwissQrBill(payload);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         structuredContent: result as unknown as Record<string, unknown>,
       };
-    },
+    }),
   );
 
   server.registerTool(
@@ -818,13 +858,13 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.check_postal_address,
       annotations: { title: 'Check ISO 20022 Postal Address', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ scheme, address }) => {
+    keyed('check_postal_address', async ({ scheme, address }) => {
       const payload = checkPostalAddress(scheme, address);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
         structuredContent: payload as unknown as Record<string, unknown>,
       };
-    },
+    }),
   );
 
   server.registerTool(
@@ -847,7 +887,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       outputSchema: TOOL_OUTPUT_SCHEMAS.lookup_ch_clearing,
       annotations: { title: 'Swiss Clearing Lookup', ...READ_ONLY_ANNOTATIONS },
     },
-    async ({ iid }) => {
+    keyed('lookup_ch_clearing', async ({ iid }) => {
       if (!/^\d{1,5}$/.test(iid)) {
         const errorPayload = {
           error: 'invalid_iid_format',
@@ -909,7 +949,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
         structuredContent: payload,
       };
-    },
+    }),
   );
 
   // ── Resources ──────────────────────────────────────────────────────────────
@@ -1604,7 +1644,28 @@ mcpHttp.post('/mcp', async (c) => {
     keyRequests = 0;
   }
 
-  if (toolUnits > 0) {
+  // ─── Une clé IBANforge présentée (07.10.2026) ─────────────────────────────
+  //
+  // Lue dans les deux en-têtes que l'API REST lit, jamais dans l'adresse : une
+  // clé dans l'URL d'un connecteur resterait écrite en clair chez le client et
+  // dans les journaux de tout ce qui la relaie.
+  //
+  // 🚨 Une clé PRÉSENTÉE, valide ou non, sort la requête de l'allocation sans
+  // clé, comme sur REST : une clé valide paie sur son propre compte (ses
+  // quotas, son comptage, rien de nouveau), une clé invalide ou épuisée reçoit
+  // le refus de l'API REST pour cette clé, et jamais l'allocation par adresse.
+  // Retomber sur celle-ci apprendrait à un client à jeter sa clé.
+  //
+  // Elle ne voyage que par `authInfo`, attaché par le SDK aux messages de
+  // CETTE requête : la session ne garde aucune clé.
+  const presentedKey = extractKey(c, { query: false });
+  if (presentedKey && toolCalls > 0) {
+    // L'attribution de la télémétrie, posée comme sur REST : seulement pour une
+    // clé valide. Le débit, lui, se fait par appel d'outil (src/mcp/key-meter.ts).
+    if (validateApiKey(presentedKey).valid) c.set('apiKeyPrefix', presentedKey.slice(0, 12));
+  }
+
+  if (toolUnits > 0 && !presentedKey) {
     const now = new Date();
     const limit = checkMcpToolAllowance(mcpBucket(ip, ''), toolUnits, now);
     if (limit.degraded) {
@@ -1779,7 +1840,10 @@ mcpHttp.post('/mcp', async (c) => {
     await server.connect(transport);
   }
 
-  const response = await transport.handleRequest(c.req.raw);
+  const authInfo: AuthInfo | undefined = presentedKey
+    ? { token: presentedKey, clientId: 'ibanforge-api-key', scopes: [] }
+    : undefined;
+  const response = await transport.handleRequest(c.req.raw, authInfo ? { authInfo } : undefined);
   // The outcome rides on the response OBJECT, not on `c.header()`: the SDK
   // builds its own Response and returning it bypasses the context's prepared
   // headers, so a served tool call reached the telemetry middleware carrying

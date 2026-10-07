@@ -335,6 +335,32 @@ function recordAndLoadStops(canonicalOf: (email: string) => string): Set<string>
   return new Set(rows.map((r) => canonicalOf(r.email)));
 }
 
+/**
+ * Cette adresse a-t-elle demandé STOP ? Lu par les avertissements de quota et
+ * de crédits (décision de Claude-Alain du 07.10.2026, point 8 : le STOP coupe
+ * aussi l'alerte de quota ; seuls les avis légaux et de sécurité continuent).
+ *
+ * 🚨 Le CRM est relu ICI, pas seulement la table : `outreach_stops` ne se
+ * remplit qu'à la passe quotidienne, et un STOP reçu ce matin doit déjà faire
+ * taire l'alerte de cet après-midi. Ramenée à la personne par la table des
+ * alias, comme la passe : un STOP venu d'une adresse déclarée couvre l'autre.
+ *
+ * 🚨 Fermée en cas de doute : une table illisible répond « sous STOP ». Une
+ * alerte qui ne part pas coûte un mail de service, l'en-tête X-Quota-* dit déjà
+ * tout à l'appelant ; une alerte envoyée à quelqu'un qui a dit STOP trahit la
+ * promesse de la fenêtre de clé.
+ */
+export function isAddressUnderStop(email: string): boolean {
+  try {
+    const aliasMap = loadAliasMap();
+    const canonicalOf = (e: string) => toCanonical(e.trim().toLowerCase(), aliasMap);
+    return recordAndLoadStops(canonicalOf).has(canonicalOf(email));
+  } catch (err) {
+    console.error('[stop] lecture impossible :', err instanceof Error ? err.message : err);
+    return true;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The pass
 // ---------------------------------------------------------------------------
