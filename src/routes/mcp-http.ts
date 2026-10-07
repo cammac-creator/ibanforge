@@ -1358,6 +1358,10 @@ export { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
  * store above). 30 a day per address is far above what any client needs (one
  * per process, re-opened after a redeploy) and far below what it takes to fill
  * a container. Same ledger as the tool-call allowance, separate key.
+ *
+ * Depuis le 08.10.2026, ce plafond ne compte que les ouvertures SANS clé
+ * valide ; une clé valide est bornée par ses sessions vivantes
+ * (`MCP_LIVE_SESSIONS_PER_KEY`, magasin ci-dessus).
  */
 export { MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
 
