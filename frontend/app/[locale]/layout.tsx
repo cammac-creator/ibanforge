@@ -159,8 +159,10 @@ export default async function LocaleLayout({ children, params }: Props) {
         <JsonLd />
         <link rel="alternate" type="application/rss+xml" title="IBANforge — blog & releases" href="/rss.xml" />
         <link rel="alternate" type="application/atom+xml" title="IBANforge — blog & releases" href="/atom.xml" />
-        {/* PE-safe motion: mark that JS is available before first paint so the
-            Reveal hidden state only applies with JS on (see globals.css .js). */}
+        {/* PE-safe motion: mark that JS is available before first paint, so a
+            hidden start state can be gated on html[data-js] and content stays
+            visible with JS off. (Its first reader, the Reveal primitive, was
+            removed with the old home on 07/10/2026.) */}
         <script
           dangerouslySetInnerHTML={{
             // A class on <html> is React's to manage: after a hydration error

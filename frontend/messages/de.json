@@ -67,7 +67,6 @@
     "contents": "In dieser Ausgabe",
     "integrations": {
       "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
-      "sub": "Jedes Paket unten existiert und lässt sich heute installieren. Was noch nicht veröffentlicht ist, sagt es.",
       "items": {
         "ts": "TypeScript-/JavaScript-SDK",
         "py": "Python-SDK",
@@ -78,17 +77,7 @@
         "odoo": "Odoo-18-Modul · eigene Module erforderlich",
         "sheets": "Google-Sheets-Add-on · manuelle Installation",
         "postman": "Postman-Sammlung"
-      },
-      "pause": "Liste anhalten",
-      "play": "Liste fortsetzen"
-    },
-    "reviewed": {
-      "label": "Unabhängig geprüft",
-      "quote": "The most artifact-complete submission the inbox has had.",
-      "context": "Kin Lane hat IBANforges API-Evangelist-Profil im August 2026 aus abgerufenen Artefakten neu aufgebaut — unser x402 erwies sich dabei als das erste unter den 3.767 MCP-Servern seines Katalogs.",
-      "linkReview": "Das öffentliche Review lesen",
-      "linkStory": "Die ganze Geschichte",
-      "quoteTranslation": "„Die artefaktvollständigste Einreichung, die der Posteingang je hatte.“"
+      }
     },
     "hero": {
       "demo": {
@@ -112,21 +101,13 @@
       "alt": "Kein Entwickler? Prüfen Sie eine Lieferantendatei ohne Code"
     },
     "demo": {
-      "aria": "Drei Antworten, die die API wirklich gegeben hat, nacheinander abgespielt",
-      "request": "POST /v1/iban/validate",
       "caption": "Antworten der Live-API, aufgezeichnet am 26. September 2026.",
       "pause": "Demo anhalten",
       "play": "Demo fortsetzen",
-      "scenarios": "Beispiele",
-      "ibanLabel": "IBAN",
-      "format": "Format und Prüfziffern",
-      "register": "Bankleitzahl im nationalen Register",
-      "bank": "Bank und BIC",
       "valid": "Gültig",
       "checksum": "Die Prüfziffern stimmen nicht",
       "confirmed": "Code {code} bestätigt",
       "notAllocated": "Code {code} nicht vergeben",
-      "registerName": "Register der Deutschen Bundesbank",
       "noBank": "Keine Bank führt diesen Code",
       "skipped": "Nicht gelesen",
       "tab0": "Eine echte Bank",
@@ -171,7 +152,6 @@
       "lead": "Die Mod-97-Prüfung beweist nur, dass die Ziffern aufgehen. Eine IBAN kann sie bestehen, mit einer Bankleitzahl, die keine Bank führt, oder einer, die nach einer Fusion aufgehoben wurde.",
       "readTitle": "Dieselbe IBAN, Teil für Teil gelesen",
       "readLead": "IBANforge liest jeden Teil der IBAN und sagt, welche Prüfungen es machen konnte.",
-      "anatomyCaption": "Dieselbe IBAN, Teil für Teil gelesen.",
       "country": "Land",
       "countryWhat": "Länge und Aufbau, {countries} Länder",
       "check": "Prüfziffern",
@@ -197,8 +177,6 @@
       ]
     },
     "audiences": {
-      "eyebrow": "Für Ihre Arbeitsweise",
-      "title": "Für Entwickler, Finanzteams und KI-Agenten",
       "lead": "Dieselbe Antwort, dort wo Sie sie brauchen.",
       "devTitle": "Entwickler",
       "devText": "Ein REST-Aufruf oder ein SDK in TypeScript, Python, Java oder .NET. Die Antwort ist JSON, mit einem dokumentierten nächsten Schritt.",
@@ -229,13 +207,6 @@
       "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "mittlere Verarbeitung auf dem Server",
       "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
-      "fact0Text": "IBANforge wird aus der Schweiz betrieben; die API selbst läuft in einer Region der Europäischen Union.",
-      "fact1Title": "Die Validierung speichert keine IBAN",
-      "fact1Text": "Eine geprüfte IBAN wird im Speicher validiert, nie abgelegt. Die Dateiprüfung bewahrt ihren Bericht 2 Stunden ohne Zahlung und 24 Stunden nach der Zahlung auf. Telemetrie wird 30 Tage nach Ihrem Austritt gelöscht (DPA-Klausel 4.7).",
-      "fact2Title": "Sanktionen auf Bankebene",
-      "fact2Text": "Die Bank hinter der IBAN wird gegen die Listen OFAC, EU, UN geprüft (BIC8). Der Kontoinhaber nie.",
-      "fact3Title": "Offen über seine Grenzen",
-      "fact3Text": "Es prüft nicht, wer Inhaber des Kontos ist: Dieser Namensabgleich gehört der Bank des Empfängers, über die Empfängerüberprüfung (VoP).",
       "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-09), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht.",
       "sourcesDated": "Zuletzt aktualisiert am {date}.",
       "sourcesLink": "Jede Quelle und ihre Lizenz"
@@ -255,7 +226,7 @@
       "proName": "Pro",
       "proPrice": "29 $",
       "proUnit": "/ Monat",
-      "proText": "10.000 Anfragen pro Monat auf demselben Schlüssel. Jederzeit kündbar: Der Schlüssel bleibt.",
+      "proText": "{requests} Anfragen pro Monat auf demselben Schlüssel. Jederzeit kündbar: Der Schlüssel bleibt.",
       "proCta": "Pro ansehen",
       "packsName": "Guthabenpakete",
       "packsPrice": "ab 4 $",
@@ -290,13 +261,6 @@
       "hero": {
         "eyebrow": "Jetzt testen",
         "title": "Eine echte Prüfung, ohne Anmeldung",
-        "promise": "Geben Sie eine IBAN ein oder wählen Sie ein Beispiel: Die Linse sendet sie an die Live-API und teilt die Antwort in Format, Bank und BIC.",
-        "auditLink": "Lieferantendatei prüfen",
-        "observe": "Die Linse in 3D ansehen",
-        "sceneAlt": "Eine kupfergefasste Glaslinse verwandelt einfallendes Licht in drei ausgehende Strahlen.",
-        "signature": "Die Linse für Ihre Daten",
-        "inputEyebrow": "IHRE IBAN",
-        "inputTitle": "Eine Nummer im Licht.",
         "inputLabel": "IBAN zur Prüfung",
         "submit": "Daten sichtbar machen",
         "loading": "Prüfung läuft…",
@@ -305,85 +269,35 @@
         "germany": "Deutschland",
         "errorExample": "Ein Fehler",
         "inputNote": "Ohne Registrierung. Die IBAN wird bei der Prüfung an den Dienst gesendet.",
-        "results": "Ermittelte Daten",
         "format": "IBAN-Format",
         "bank": "Bank",
         "waitFormat": "Bereit zur Prüfung",
         "waitBank": "Noch zu ermitteln",
         "waitBic": "Noch zu suchen",
-        "formatHint": "Prüfung der Struktur",
-        "bankHint": "Je nach Land und verfügbaren Quellen",
-        "bicHint": "Die Herkunft begleitet die Antwort",
-        "initial": "Starten Sie die Prüfung: Die Strahlen führen zu den Ergebnisdaten.",
         "edited": "Eingabe geändert. Starten Sie die Prüfung erneut.",
         "unavailable": "Der Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es gleich erneut.",
         "rateLimited": "Zu viele Prüfungen in kurzer Zeit. Versuchen Sie es in einigen Minuten erneut.",
-        "caption": "Ein Datenstrom. Drei unterscheidbare Informationen.",
-        "pause": "Pause",
-        "animate": "Animieren",
-        "fixed": "Standbild",
-        "showJson": "JSON anzeigen",
-        "hideJson": "JSON ausblenden",
-        "copy": "Ergebnis kopieren",
-        "copied": "Ergebnis kopiert.",
-        "selectCopy": "Der Text ist markiert. Verwenden Sie den Kopierbefehl.",
-        "scope": "Zusatzinformationen hängen von den verfügbaren Quellen ab.",
         "playgroundLink": "Vollständigen Tester öffnen",
-        "noJs": "JavaScript ist für den Tester und die 3D-Ansicht erforderlich. Bilder und Links bleiben verfügbar.",
-        "detailTitle": "Glas, Metall und Licht.",
-        "detailCaption": "Gewölbtes Glas · gebürstetes Metall · Studioreflexe",
-        "detailUnavailable": "Die Nahansicht ist in diesem Browser nicht verfügbar.",
-        "close": "Schließen",
-        "view3d": "In 3D ansehen",
+        "noJs": "Dieser Test ruft die API aus Ihrem Browser auf und braucht JavaScript. Ohne JavaScript lesen Sie hier eine echte Antwort der API:",
         "unallocated": "Code ohne Bank"
       },
       "gallery": {
         "eyebrow": "Drei Wege, es zu nutzen",
         "title": "Eine IBAN, eine ganze Datei oder in Ihren Werkzeugen",
-        "intro": "Prüfen Sie eine einzelne IBAN in einem Formular, jede Zeile einer Lieferantendatei vor einem Zahlungslauf, oder rufen Sie die API aus Ihrer Software und Ihren Agenten auf.",
         "items": [
           {
-            "eyebrow": "01 · Eine IBAN",
-            "title": "Eine Nummer in Sekunden prüfen",
-            "text": "Geben Sie eine IBAN ein oder rufen Sie POST /v1/iban/validate auf: Format, Bank, BIC und das Urteil des Registers kommen zusammen zurück, jeweils mit Quelle.",
-            "tags": [
-              "Format",
-              "Bank",
-              "BIC"
-            ],
-            "link": "Unten testen",
-            "alt": "Ein Lichtstrahl durchquert eine metallgefasste Linse und beleuchtet drei getrennte Datenfelder."
+            "eyebrow": "01 · Eine IBAN"
           },
           {
-            "eyebrow": "02 · Eine ganze Datei",
-            "title": "Eine Lieferantendatei prüfen",
-            "text": "Laden Sie eine CSV- oder Excel-Datei hoch: Die kostenlose Vorschau zählt, was zu korrigieren ist, und zeigt die ersten auffälligen Zeilen. Die kommentierte Arbeitsmappe bewertet jede Zeile vor dem nächsten Zahlungslauf.",
-            "tags": [
-              "CSV",
-              "Excel",
-              "Bericht"
-            ],
-            "link": "Lieferantendatei prüfen",
-            "alt": "Tabellenblätter werden vom Licht einer Linse durchquert und zu einer geordneten Datei."
+            "eyebrow": "02 · Eine ganze Datei"
           },
           {
-            "eyebrow": "03 · Ihre Werkzeuge",
-            "title": "In Ihre Software einbauen",
-            "text": "SDKs für TypeScript, Python, Java und .NET, eine Google-Sheets-Funktion und ein MCP-Server für KI-Agenten.",
-            "tags": [
-              "API",
-              "SDK",
-              "MCP"
-            ],
-            "link": "Dokumentation lesen",
-            "alt": "Die Strahlen der Linse erreichen drei Module für eine API, einen automatischen Ablauf und eine Tabelle."
+            "eyebrow": "03 · Ihre Werkzeuge"
           }
         ]
       }
     },
     "deadline": {
-      "heading": "Mitte November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
-      "band": "Ab Mitte November 2026 müssen Zahlungsaufträge nach den Swiss Payment Standards die Adressanforderungen erfüllen, wenn eine Adresse verwendet wird; SIX nennt den 14. November. POST /v1/address/check sagt kostenlos, ob eine Adresse besteht.",
       "cta": "Die Regeln lesen, Schiene für Schiene",
       "check": "POST /v1/address/check sagt kostenlos, ob eine Adresse besteht.",
       "window": "Mitte November 2026",
@@ -445,7 +359,7 @@
         "path": "/v1/ch/clearing/:iid",
         "cost": "$0.003",
         "costLabel": "pro Aufruf",
-        "description": "Schweizer BC-Nummer / IID-Suche mit SIC, euroSIC, Instant Payments und QR-IID-Daten — gestützt auf 1'100+ SIX BankMaster-Einträge"
+        "description": "Schweizer BC-Nummer / IID-Suche mit SIC, euroSIC, Instant Payments und QR-IID-Daten — gestützt auf 1 100+ SIX BankMaster-Einträge"
       }
     },
     "free": {
@@ -552,18 +466,18 @@
     },
     "oem": {
       "label": "Editor / OEM",
-      "text": "Benötigen Sie 50.000 Anfragen pro Monat, ein schriftliches SLA oder Supportzusagen? Editor/OEM beginnt bei 149 $ pro Monat. Eine gewöhnliche Integration ist mit Pro innerhalb der Grenzen und Bedingungen des Tarifs möglich.",
+      "text": "Benötigen Sie 50 000 Anfragen pro Monat, ein schriftliches SLA oder Supportzusagen? Editor/OEM beginnt bei 149 $ pro Monat. Eine gewöhnliche Integration ist mit Pro innerhalb der Grenzen und Bedingungen des Tarifs möglich.",
       "cta": "Zur Hersteller-Seite →"
     },
     "audit": {
       "label": "Prüfung der Kreditorendatei",
-      "text": "Kein Entwickler? Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen, und jede Zeile wird gegen dieselben Register geprüft: 149 $ bis 5'000 Zeilen, 349 $ bis 20'000, zuerst kostenlose Vorschau, kommentierte Arbeitsmappe direkt nach der Zahlung.",
+      "text": "Kein Entwickler? Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen, und jede Zeile wird gegen dieselben Register geprüft: 149 $ bis 5 000 Zeilen, 349 $ bis 20 000, zuerst kostenlose Vorschau, kommentierte Arbeitsmappe direkt nach der Zahlung.",
       "cta": "Datei prüfen"
     },
     "pro": {
       "label": "Pro-Abonnement",
       "title": "Lieber eine feste Monatsrechnung?",
-      "text": "Pro: 10'000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit im Kundenportal kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
+      "text": "Pro: 10 000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit im Kundenportal kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
       "note": "Die Integration in Ihr Produkt ist innerhalb der Grenzen und Bedingungen Ihres Tarifs erlaubt. Für ein schriftliches SLA, Supportzusagen oder höhere Volumen nutzen Sie das Editor/OEM-Angebot.",
       "existingKey": "Sie haben schon einen Schlüssel? Buchen Sie Pro darauf über <account>Ihr Konto</account>: Das Kontingent landet auf genau diesem Schlüssel, an Ihrer Integration ändert sich nichts.",
       "price": "29 $",
@@ -934,23 +848,32 @@
           },
           "names": {
             "nav_key": "Kopfzeile → Ihr Schlüssel",
-            "nav_status": "Badge → Status",
-            "cta_try": "Falz → Anfrage ausprobieren",
-            "cta_key": "Falz → Schlüssel holen",
-            "cta_audit_fold": "Falz → Datei prüfen",
-            "cta_rules": "Stichtag → Regeln lesen",
-            "cta_audit_deadline": "Stichtag → Datei prüfen",
-            "cta_audit": "Audit-Abschnitt → Prüfen",
-            "cta_playground_film": "Film → Live ausprobieren",
-            "cta_pricing": "Seitenende → Preise",
+            "cta_key_hero": "Titelseite → Schlüssel holen",
+            "cta_try_hero": "Titelseite → Ausprobieren",
+            "cta_journey_audit": "Titelseite → Lieferantendatei prüfen",
+            "cta_journey_api": "03 Test → Prüfung gesendet",
+            "cta_docs": "04 Drei Wege → Dokumentation",
+            "cta_audit": "04 Drei Wege → Dateiprüfung",
+            "cta_agents": "04 Drei Wege → Agenten",
+            "cta_try_pricing": "06 Preise → Ohne Schlüssel testen",
+            "cta_key_pricing": "06 Preise → Schlüssel holen",
+            "cta_pricing_pro": "06 Preise → Pro",
+            "cta_pricing_packs": "06 Preise → Pakete",
+            "cta_audit_pricing": "06 Preise → Dateiprüfung",
+            "cta_pricing": "06 Preise → Alle Preise",
+            "cta_rules": "06 Stichtag → Regeln lesen",
             "cta_key_final": "Seitenende → Schlüssel holen",
-            "cta_docs": "Seitenende → Dokumentation",
+            "cta_docs_final": "Seitenende → Dokumentation",
             "cta_key_account": "Seite Ihr Schlüssel → Schlüssel holen",
             "cta_key_tool": "Gratis-Werkzeuge → Schlüssel holen",
-            "cta_journey_api": "API-Pfad",
-            "cta_journey_audit": "Einstieg → Lieferantendatei prüfen",
             "cta_vendor_try": "Softwareanbieter → API testen",
-            "cta_vendor_docs": "Softwareanbieter → Integrationsanleitungen"
+            "cta_vendor_docs": "Softwareanbieter → Integrationsanleitungen",
+            "nav_status": "Alte Startseite: Badge → Status",
+            "cta_try": "Alte Startseite: Falz → Anfrage ausprobieren",
+            "cta_key": "Alte Startseite: Falz → Schlüssel holen",
+            "cta_audit_fold": "Alte Startseite: Falz → Datei prüfen",
+            "cta_audit_deadline": "Alte Startseite: Stichtag → Datei prüfen",
+            "cta_playground_film": "Alte Startseite: Film → Live ausprobieren"
           }
         }
       },
@@ -1604,24 +1527,33 @@
       "detailsTitle": "Alle ergänzenden Messungen",
       "detailsNote": "Trafficverlauf, aktive Konten, Registrierungen, Einstiege, Dateiaudits und Rückmeldungen. Jede Karte behält ihren Zeitraum und ihre Einheit.",
       "actionNames": {
-        "nav_key": "Kopfzeile → Ihr Schlüssel",
-        "nav_status": "Badge → Status",
-        "cta_try": "Anfrage ausprobieren · Falz",
-        "cta_key": "Schlüssel holen · Falz",
-        "cta_audit_fold": "Datei prüfen · Falz",
-        "cta_rules": "Regeln lesen · Stichtag",
-        "cta_audit_deadline": "Datei prüfen · Stichtag",
-        "cta_audit": "Prüfen · Audit-Abschnitt",
-        "cta_playground_film": "Live ausprobieren · Film",
-        "cta_pricing": "Preise · Seitenende",
+        "nav_key": "Ihr Schlüssel · Kopfzeile",
+        "cta_key_hero": "Schlüssel holen · Titelseite",
+        "cta_try_hero": "Ausprobieren · Titelseite",
+        "cta_journey_audit": "Lieferantendatei prüfen · Titelseite",
+        "cta_journey_api": "Prüfung gesendet · 03 Test",
+        "cta_docs": "Dokumentation · 04 Drei Wege",
+        "cta_audit": "Dateiprüfung · 04 Drei Wege",
+        "cta_agents": "Agenten · 04 Drei Wege",
+        "cta_try_pricing": "Ohne Schlüssel testen · 06 Preise",
+        "cta_key_pricing": "Schlüssel holen · 06 Preise",
+        "cta_pricing_pro": "Pro · 06 Preise",
+        "cta_pricing_packs": "Pakete · 06 Preise",
+        "cta_audit_pricing": "Dateiprüfung · 06 Preise",
+        "cta_pricing": "Alle Preise · 06 Preise",
+        "cta_rules": "Regeln lesen · 06 Stichtag",
         "cta_key_final": "Schlüssel holen · Seitenende",
-        "cta_docs": "Dokumentation · Seitenende",
+        "cta_docs_final": "Dokumentation · Seitenende",
         "cta_key_account": "Schlüssel holen · Seite Ihr Schlüssel",
         "cta_key_tool": "Schlüssel holen · Gratis-Werkzeuge",
-        "cta_journey_api": "API-Pfad",
-        "cta_journey_audit": "Lieferantendatei prüfen · Seitenanfang",
         "cta_vendor_try": "API testen · Softwareanbieter",
-        "cta_vendor_docs": "Integrationsanleitungen · Softwareanbieter"
+        "cta_vendor_docs": "Integrationsanleitungen · Softwareanbieter",
+        "nav_status": "Status · Alte Startseite: Badge",
+        "cta_try": "Anfrage ausprobieren · Alte Startseite: Falz",
+        "cta_key": "Schlüssel holen · Alte Startseite: Falz",
+        "cta_audit_fold": "Datei prüfen · Alte Startseite: Falz",
+        "cta_audit_deadline": "Datei prüfen · Alte Startseite: Stichtag",
+        "cta_playground_film": "Live ausprobieren · Alte Startseite: Film"
       }
     }
   },
@@ -2246,10 +2178,10 @@
       "eyebrow": "Editor / OEM",
       "title": "Brauchen Sie besondere Leistungszusagen?",
       "price": "Ab 149 $ pro Monat",
-      "priceDetail": "Ein Schlüssel mit 50'000 Anfragen pro Monat, das Recht, die API für Ihre Endkunden in Ihr eigenes Produkt einzubetten, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50'000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest. Der Weiterverkauf von Rohdatenauszügen der Datenbanken bleibt ausgeschlossen (AGB, Artikel 6).",
+      "priceDetail": "Ein Schlüssel mit 50 000 Anfragen pro Monat, das Recht, die API für Ihre Endkunden in Ihr eigenes Produkt einzubetten, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50 000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest. Der Weiterverkauf von Rohdatenauszügen der Datenbanken bleibt ausgeschlossen (AGB, Artikel 6).",
       "body": "Eine gewöhnliche API-Integration kann mit Pro starten. Besprechen Sie OEM mit uns, wenn Sie die API für Ihre Endkunden in Ihr Produkt einbetten möchten, ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
       "cta": "support@ibanforge.com",
-      "hint": "Beschreiben Sie Ihr Produkt und die benötigten Zusagen. Pro für 29 $ pro Monat mit 10.000 Anfragen ist direkt auf der Preisseite erhältlich.",
+      "hint": "Beschreiben Sie Ihr Produkt und die benötigten Zusagen. Pro für 29 $ pro Monat mit 10 000 Anfragen ist direkt auf der Preisseite erhältlich.",
       "slaLink": "SLA lesen"
     },
     "start": {
@@ -2682,7 +2614,7 @@
   },
   "audit": {
     "metaTitle": "Prüfung der Kreditorendatei: 149 $, Ergebnis sofort",
-    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist Mitte November 2026.",
+    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5 000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist Mitte November 2026.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
     "intro": "Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN, Bankleitzahl, Bankname und BIC, SEPA-Erreichbarkeit, Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
@@ -2696,8 +2628,8 @@
     },
     "prices": {
       "title": "Angezeigter Preis, keine Offerte",
-      "standard": "bis 5'000 Zeilen",
-      "large": "5'001 bis 20'000 Zeilen",
+      "standard": "bis {rows} Zeilen",
+      "large": "{from} bis {rows} Zeilen",
       "note": "Eine Datei, eine Kartenzahlung über Stripe. Die kommentierte Arbeitsmappe (.xlsx) und die Zusammenfassung sind sofort nach der Zahlung bereit und bleiben 24 Stunden herunterladbar."
     },
     "deadline": {
@@ -2706,14 +2638,14 @@
     },
     "upload": {
       "label": "Legen Sie Ihre Kreditorendatei hier ab",
-      "hint": "CSV oder XLSX, bis 10 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Spalten für Name, BIC und Adresse werden genutzt, wenn vorhanden.",
+      "hint": "CSV oder XLSX, bis 10 MB und 20 000 Zeilen. Eine Spalte namens IBAN genügt; Spalten für Name, BIC und Adresse werden genutzt, wenn vorhanden.",
       "button": "Kostenlos analysieren",
       "analyzing": "Analyse läuft",
       "error": {
         "network": "Der Server hat nicht geantwortet. Versuchen Sie es in einer Minute erneut.",
         "noIban": "Keine Spalte enthält IBAN. Nennen Sie eine Spalte IBAN oder prüfen Sie, ob die Kontospalte IBAN enthält.",
         "empty": "Die Datei enthält keine Datenzeilen.",
-        "tooManyRows": "Die Datei hat mehr als 20'000 Zeilen. Teilen Sie sie und laden Sie die Teile hoch.",
+        "tooManyRows": "Die Datei hat mehr als 20 000 Zeilen. Teilen Sie sie und laden Sie die Teile hoch.",
         "tooLarge": "Die Datei ist grösser als 10 MB.",
         "unreadable": "Die Datei konnte nicht als CSV oder XLSX gelesen werden.",
         "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
@@ -2880,12 +2812,12 @@
     "faq": {
       "title": "Fragen vor dem Hochladen",
       "q1": "Welche Dateien funktionieren?",
-      "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 10 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
+      "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 10 MB und 20 000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
       "q2": "Was geschieht mit meinen Daten?",
       "a2": "Die hochgeladene Datei wird nicht als solche aufbewahrt: Sie wird im Arbeitsspeicher unserer Server in den Niederlanden gelesen. Aufbewahrt wird der kommentierte Bericht, und er übernimmt jede Spalte Ihrer Datei — Kreditorennamen und IBAN eingeschlossen — mit den Befunden daneben. Er wird 2 Stunden nach dem Upload gelöscht, wenn Sie nicht bezahlen, sonst 24 Stunden nach der Zahlung, durch einen Durchlauf alle zehn Minuten. Nichts wird für etwas anderes verwendet.",
       "q3": "Was prüft die Prüfung, und was nicht?",
       "a3": "Struktur und Prüfziffer, Bankleitzahl gegen das nationale Register, Bankname und BIC, SEPA-Erreichbarkeit, Duplikate, den BIC Ihrer Datei gegen das Register, Adressland gegen IBAN-Land und die Regeln für strukturierte Adressen, wenn Adressspalten vorhanden sind. Sie bestätigt nicht, dass das Konto dem genannten Kreditor gehört: das ist die Verification of Payee der Banken.",
-      "q4": "Mehr als 20'000 Zeilen oder mehrere Dateien?",
+      "q4": "Mehr als 20 000 Zeilen oder mehrere Dateien?",
       "a4": "Teilen Sie die Datei: jeder Teil ist eine eigene Prüfung zum angezeigten Preis. Für wiederkehrenden Bedarf kosten die API und ihr Batch-Endpoint pro Zeile weniger; schreiben Sie an support@ibanforge.com.",
       "q5": "Kann ich die korrigierte Datei erneut prüfen lassen?",
       "a5": "Ja. Laden Sie sie erneut hoch: die kostenlose Vorschau sagt Ihnen, ob alles behoben ist, bevor Sie ein zweites Mal zahlen, und oft brauchen Sie das nicht."
@@ -2986,7 +2918,7 @@
     },
     "billing": {
       "title": "Was es kostet, was es sendet",
-      "text": "Eine Anfrage pro IBAN, mit Ihrem eigenen Schlüssel: 25 pro Monat kostenlos ohne Adresse, 200 pro Monat nach Beanspruchung des Schlüssels, danach Prepaid-Pakete oder das Pro-Abonnement für 29 Dollar pro Monat für 10'000 Anfragen. Ergebnisse bleiben sechs Stunden pro Nutzer im Cache, eine neu berechnete Tabelle zahlt also nicht zweimal.",
+      "text": "Eine Anfrage pro IBAN, mit Ihrem eigenen Schlüssel: 25 pro Monat kostenlos ohne Adresse, 200 pro Monat nach Beanspruchung des Schlüssels, danach Prepaid-Pakete oder das Pro-Abonnement für 29 Dollar pro Monat für 10 000 Anfragen. Ergebnisse bleiben sechs Stunden pro Nutzer im Cache, eine neu berechnete Tabelle zahlt also nicht zweimal.",
       "privacy": "Nichts verlässt die Tabelle ausser den IBAN-Zeichenketten, die die Funktionen erhalten; der Schlüssel bleibt in Ihren eigenen Skripteigenschaften, nie in der Tabelle.",
       "privacyLink": "Datenschutzerklärung",
       "limits": "IBANforge ist kein Verification-of-Payee-Dienst und behauptet nie, dass ein Konto einer Person gehört: Es sagt, was die Register über die Bank hinter der IBAN wissen."

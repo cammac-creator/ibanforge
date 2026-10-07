@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { record } from "@/components/lens/response"
+import { PUBLIC_API } from "@/lib/register-cta"
 import { afterLoadIdle } from "./revue-idle"
 import {
   ESSAI_DEFAULT,
@@ -232,6 +233,16 @@ export function RevueEssai({ copy, playgroundHref }: { copy: EssaiCopy; playgrou
         <p className="rv-essai__note" id="rv-essai-note">
           {copy.note}
         </p>
+        {/* Without JavaScript the buttons stay disabled: say why, and where a
+            real answer of the API can still be read (a GET, any browser). */}
+        <noscript>
+          <p className="rv-essai__note">
+            {copy.noJs}{" "}
+            <a className="rv-lien rv-souple" href={`${PUBLIC_API}/v1/demo`}>
+              {`${PUBLIC_API.replace("https://", "")}/v1/demo`}
+            </a>
+          </p>
+        </noscript>
       </form>
       <div aria-live="polite" aria-busy={phase === "loading"}>
         <dl className="rv-essai__res">

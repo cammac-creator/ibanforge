@@ -27,6 +27,7 @@ import { BANK_FIT, counterFit } from "@/components/home/revue-cover-fit"
 import "@/components/home/revue.css"
 import { getLandingStats, P50_PROCESSING_MS, SUPPORTED_COUNTRIES } from "@/lib/landing-stats"
 import { AUDIT_TIERS, formatUsd } from "@/lib/audit-tiers"
+import { PRO_MONTHLY_UNITS } from "@/lib/pricing-estimate"
 import { alternatesFor, urlFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
 import { formatGrouped } from "@/lib/format-grouped"
@@ -533,7 +534,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                   <small>{t("pricing.proUnit")}</small>
                 </p>
                 <p className="rv-formule__txt">
-                  {t("pricing.proText")}{" "}
+                  {t("pricing.proText", { requests: formatGrouped(PRO_MONTHLY_UNITS, locale) })}{" "}
                   <Link className="rv-lien rv-nw" href={localePath(locale, "/pricing")} data-evt="cta:pricing-pro">
                     <Arrow>{t("pricing.proCta")}</Arrow>
                   </Link>
