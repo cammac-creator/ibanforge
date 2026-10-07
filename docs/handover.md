@@ -633,13 +633,19 @@ comparison had been claiming that Java and .NET have no SDK, which stopped being
 timetable pages still announced an EPC deadline the EPC has since postponed. Neither change
 touches prices, quotas or the signup path.
 
-**A ninth register (Greece).** Written permission for commercial reuse was granted on
-8 September under two conditions: an exact credit line, and a disclaimer reproduced in full
-on every response carrying that data. The work exists on local branches that have never
-been pushed, so a cloud agent cannot see it. It was first built treating the country as an
-*authoritative* register, which is wrong — the published file lists credit institutions,
-not the whole code allocation, so a real payment institution's code would be answered "not
-allocated". The switch to the partial path is decided and under way. **Do not start over.**
+**A ninth register (Greece), taken up again from `main` on 7 October 2026.** Written
+permission for reuse "in its API responses" was granted on 8 September under two conditions:
+an exact credit line, and an Important Note reproduced in full on every response carrying
+that data. The first attempt (local branches `registre-gr-*`, 9 September, never pushed)
+treated the country as an *authoritative* register and wrote the codes into the public
+database, an export and one static page per code: both wrong, the first because the file
+lists credit institutions only, the second because the permission covers API responses, the
+scope of the ABBL letter that led to the private Luxembourg file. Those branches are not to
+be revived. The register now follows the Luxembourg model: a private file named by
+`GR_REGISTER_PATH` (`src/lib/gr-register.ts`, `scripts/seed-gr-register.ts`), a partial
+path in `enrich.ts` (a hit names the holder, a miss falls through to the composite map),
+the credit and the full note in `bank_code_check.register`. Dormant until the main session
+places the file and the variable in production.
 
 **Précision reçue le 14 septembre 2026.** La HBA confirme que HEBIC ne couvre pas les
 établissements de paiement et de monnaie électronique émettant des IBAN grecs ; elle renvoie

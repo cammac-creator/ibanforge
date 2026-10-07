@@ -1,5 +1,5 @@
 import { getLocale } from 'next-intl/server';
-import { BulletinView } from '@/components/dashboard/bulletin-view';
+import { BulletinView, type AnswerNotice } from '@/components/dashboard/bulletin-view';
 import {
   FetchFailed,
   fetchJSON,
@@ -36,8 +36,10 @@ export default async function BulletinPage({
 }) {
   await requireDashboardSession();
   const locale = await getLocale();
-  const { week } = await searchParams;
+  const { week, reponse } = await searchParams;
   const asked = typeof week === 'string' && WEEK_LABEL.test(week) ? week : null;
+  // Ce que la route des réponses a dit après son 303 (étape A2) ; toute autre valeur est ignorée.
+  const notice: AnswerNotice = reponse === 'ok' ? 'ok' : reponse === 'echec' ? 'echec' : null;
   const url = `${API_URL}/v1/admin/bulletin${asked ? `?week=${asked}` : ''}`;
   const read: Fetched<unknown> = ADMIN_SECRET
     ? await fetchJSON<unknown>(url, { 'X-Admin-Secret': ADMIN_SECRET })
@@ -55,7 +57,7 @@ export default async function BulletinPage({
         </p>
       </header>
       {data ? (
-        <BulletinView data={data} locale={locale} />
+        <BulletinView data={data} locale={locale} notice={notice} />
       ) : read.ok ? (
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-center">
           <p className="text-sm font-medium text-red-300">Bulletin du lundi indisponible</p>

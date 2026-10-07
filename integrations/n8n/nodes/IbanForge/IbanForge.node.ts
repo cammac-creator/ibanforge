@@ -1,8 +1,9 @@
+import { NodeConnectionTypes } from 'n8n-workflow';
 import type { INodeType, INodeTypeDescription } from 'n8n-workflow';
 
 /**
  * Declarative (routing-style) node: every operation maps straight onto the
- * REST API, no execute() code and zero runtime dependencies — the shape the
+ * REST API, no execute() code and zero runtime dependencies, the shape the
  * n8n verified-community-node programme requires (MIT + no deps + one
  * package per service).
  */
@@ -10,17 +11,18 @@ export class IbanForge implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'IBANforge',
     name: 'ibanForge',
-    icon: 'file:ibanforge.svg',
+    icon: { light: 'file:ibanforge.svg', dark: 'file:ibanforge.svg' },
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"]}}',
     description:
-      'Validate IBANs against 6 national bank registers, resolve BIC/SWIFT codes, look up Swiss clearing data and run compliance pre-checks',
+      'Validate IBANs and check the bank code against national bank registers, resolve BIC/SWIFT codes, look up Swiss clearing data and run compliance pre-checks',
     defaults: {
       name: 'IBANforge',
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    usableAsTool: true,
     credentials: [
       {
         name: 'ibanForgeApi',
@@ -43,7 +45,7 @@ export class IbanForge implements INodeType {
           {
             name: 'Validate IBAN',
             value: 'validateIban',
-            action: 'Validate an IBAN',
+            action: 'Validate IBAN',
             description:
               'Structure + checksum + issuing bank, bank-code check against the national register, SEPA and VoP reachability',
             routing: {
@@ -59,7 +61,7 @@ export class IbanForge implements INodeType {
           {
             name: 'Look Up BIC',
             value: 'lookupBic',
-            action: 'Look up a BIC or SWIFT code',
+            action: 'Look up BIC or SWIFT code',
             description: 'Resolve a BIC/SWIFT code into bank name, city, country and LEI',
             routing: {
               request: {
@@ -71,7 +73,7 @@ export class IbanForge implements INodeType {
           {
             name: 'Look Up Swiss Clearing',
             value: 'lookupChClearing',
-            action: 'Look up a swiss BC number IID',
+            action: 'Look up BC number or IID',
             description:
               'Swiss BC-Nummer / IID: institution, seat address, SIC/euroSIC/instant participation, QR-IID semantics',
             routing: {
@@ -84,9 +86,9 @@ export class IbanForge implements INodeType {
           {
             name: 'Compliance Check',
             value: 'complianceCheck',
-            action: 'Run a compliance pre check on an IBAN',
+            action: 'Run compliance check on IBAN',
             description:
-              'Bank-level sanctions (OFAC + EU), FATF lists, SEPA/VoP reachability, 0-100 risk score — bank-level, not name screening',
+              'Bank-level sanctions (OFAC + EU), FATF lists, SEPA/VoP reachability, 0-100 risk score, at bank level and not by name',
             routing: {
               request: {
                 method: 'POST',
@@ -106,7 +108,7 @@ export class IbanForge implements INodeType {
         type: 'string',
         required: true,
         default: '',
-        placeholder: 'DE89370400440532013000',
+        placeholder: 'e.g. DE89370400440532013000',
         description: 'The IBAN to check (spaces are tolerated)',
         displayOptions: {
           show: {
@@ -120,7 +122,7 @@ export class IbanForge implements INodeType {
         type: 'string',
         required: true,
         default: '',
-        placeholder: 'COBADEFF',
+        placeholder: 'e.g. COBADEFF',
         description: 'BIC8 or BIC11 to resolve',
         displayOptions: {
           show: {
@@ -134,7 +136,7 @@ export class IbanForge implements INodeType {
         type: 'string',
         required: true,
         default: '',
-        placeholder: '230',
+        placeholder: 'e.g. 230',
         description: 'Swiss institution identifier (3-5 digits) or QR-IID (30000-31999)',
         displayOptions: {
           show: {

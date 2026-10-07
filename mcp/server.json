@@ -8,14 +8,14 @@
     "source": "github",
     "subfolder": "mcp"
   },
-  "version": "1.8.1",
+  "version": "1.9.0",
   "websiteUrl": "https://ibanforge.com?src=mcp-registry",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "ibanforge-mcp",
-      "version": "1.8.1",
+      "version": "1.9.0",
       "transport": {
         "type": "stdio"
       },
@@ -38,7 +38,15 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://api.ibanforge.com/mcp"
+      "url": "https://api.ibanforge.com/mcp",
+      "headers": [
+        {
+          "name": "X-API-Key",
+          "description": "Optional ifk_* API key: tool calls then count against it exactly as on the REST API, instead of the keyless allowance per source address. Authorization: Bearer ifk_* works too. A free key needs no e-mail: POST https://api.ibanforge.com/v1/keys/generate with an empty body.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
     }
   ]
 }

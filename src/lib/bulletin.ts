@@ -15,7 +15,13 @@
  * - the age of the directory sources is `getSourceFreshness`, the function behind
  *   `/health`'s `bic_sources`, called in-process;
  * - the BIC codes asked for without an answer come from `operations`;
- * - the new forum threads come from `forum_threads.first_seen`.
+ * - the new forum threads come from `forum_threads.first_seen`;
+ * - (étape A2, 07.10.2026) l'historique des alertes de la semaine vient
+ *   d'`ops_alert_log`, qu'`ops-alert.ts` écrit à ses deux transitions ; ce que les
+ *   veilles du lundi ont déposé, de `bulletin_feed` (`bulletin-feed.ts`) ; les
+ *   propositions et leurs réponses, de `bulletin-decisions.ts`, dont les règles sont
+ *   calculées ici et jamais écrites ; l'encaissé moins les coûts (priorité 05), de
+ *   `bulletin-money.ts`.
  *
  * ## Why `operations` and not `request_log` for the missing BIC codes
  *
@@ -43,6 +49,10 @@ import {
 } from './door-board.js';
 import { HEARTBEATS, RADAR_BEATS } from './ops-alert.js';
 import { mergedPullsOfWeek, type MergedPullsRead } from './bulletin-github.js';
+import { readFeed, type BulletinFeed } from './bulletin-feed.js';
+import { readDecisions, type BulletinDecisions } from './bulletin-decisions.js';
+import { readMoney, type BulletinMoney } from './bulletin-money.js';
+import type { StripeRevenueResult } from './stripe-revenue.js';
 import {
   parseDbUtc,
   sqliteUtc,
@@ -307,6 +317,41 @@ export interface BulletinForumThreads {
   still_new: number;
 }
 
+export interface AlertOpenedGroup {
+  /** La clé de l'alerte sans son identifiant, comme dans le bloc de l'état courant. */
+  name: string;
+  label: string | null;
+  /** Combien d'alertes de ce nom se sont ouvertes (leur message est parti) dans la semaine. */
+  cases: number;
+  /** La première ouverture de la semaine, UTC. */
+  first_opened_at: string;
+  /** Parmi elles, combien sont encore ouvertes maintenant. */
+  still_open: number;
+}
+
+export interface AlertClosedGroup {
+  name: string;
+  label: string | null;
+  /** Combien d'alertes de ce nom se sont refermées dans la semaine. */
+  cases: number;
+  /** La dernière fermeture de la semaine, UTC. */
+  last_closed_at: string;
+  /** Le plus long de ces épisodes, en heures ; null quand aucun n'a d'ouverture connue. */
+  longest_hours: number | null;
+  /** Refermées dans la semaine, ouvertes avant que l'historique soit tenu : ouverture inconnue. */
+  opened_before_history: number;
+}
+
+export interface BulletinAlertHistory {
+  state: 'read';
+  /** Depuis quand l'historique est tenu, UTC ; null quand le repère est illisible. */
+  kept_since: string | null;
+  /** L'historique couvre-t-il toute la semaine, une partie, ou rien. */
+  coverage: 'full' | 'partial' | 'none';
+  opened: AlertOpenedGroup[];
+  closed: AlertClosedGroup[];
+}
+
 export interface NotYetBlock {
   key: string;
   title: string;
@@ -330,17 +375,25 @@ export interface Bulletin {
   };
   requested: { week: string | null };
   numbers: BulletinNumbers | Unread;
+  /** Étape A2 : au plus trois propositions, avec les réponses Oui / Plus tard / Non. */
+  decisions: BulletinDecisions | Unread;
   moved: {
     merged_pulls: MergedPullsRead;
-    /** The state NOW, not the week's: the history is not kept yet. */
+    /** L'état MAINTENANT, pas celui de la semaine. */
     heartbeats: BulletinHeartbeats | Unread;
     alerts: BulletinAlerts | Unread;
+    /** Étape A2 : les alertes ouvertes et refermées PENDANT la semaine. */
+    alert_history: BulletinAlertHistory | Unread;
     sources: BulletinSources | Unread;
   };
   needs: {
     missing_bics: BulletinMissingBics | Unread;
     forum_threads: BulletinForumThreads | Unread;
   };
+  /** Étape B : ce que les deux veilles du lundi ont déposé pour cette semaine. */
+  veille: BulletinFeed | Unread;
+  /** Priorité 05 : encaissé moins coûts, devise par devise, les inconnus dits. */
+  money: BulletinMoney | Unread;
   not_yet: NotYetBlock[];
   definitions: Record<string, string>;
 }
@@ -350,30 +403,6 @@ export interface Bulletin {
  * them so that an empty place is never read as "nothing happened".
  */
 export const BULLETIN_NOT_YET: readonly NotYetBlock[] = [
-  {
-    key: 'decisions',
-    title: 'À toi de décider',
-    reason:
-      'Les propositions, avec leurs boutons Oui, Plus tard et Non, arrivent à l’étape suivante du bulletin.',
-  },
-  {
-    key: 'veille',
-    title: 'La veille en trois lignes',
-    reason:
-      'La veille marché du lundi part encore seulement sur Telegram : elle ne dépose rien que cette page puisse lire.',
-  },
-  {
-    key: 'score_ia',
-    title: 'Le score des IA',
-    reason:
-      'La mesure du lundi (les requêtes d’acheteurs où une IA cite IBANforge) part encore seulement sur Telegram.',
-  },
-  {
-    key: 'alert_history',
-    title: 'Les alertes de la semaine',
-    reason:
-      'Seul l’état courant des alertes est gardé : une alerte ouverte puis refermée pendant la semaine ne laisse aucune trace.',
-  },
   {
     key: 'iban_by_country',
     title: 'Les IBAN cherchés par pays',
@@ -404,8 +433,32 @@ export const BULLETIN_DEFINITIONS: Readonly<Record<string, string>> = {
     'L’état courant des alertes d’exploitation : ouvertes (le message est parti, aucun succès ' +
     'ne les a refermées) ou en échec sans message parti. Une alerte sans nouvel échec depuis ' +
     'plus de 7 jours est rangée à part : rien ne la referme toute seule. Les alertes propres à ' +
-    'un achat ou à une session sont comptées sous leur nom, sans leur identifiant. ' +
-    'L’historique n’est pas encore gardé.',
+    'un achat ou à une session sont comptées sous leur nom, sans leur identifiant.',
+  historique_alertes:
+    'Les alertes ouvertes pendant la semaine (leur message est parti) et celles refermées ' +
+    'pendant la semaine, écrites par les alertes elles-mêmes à ces deux moments. ' +
+    'L’historique est tenu depuis la mise en ligne de l’étape A2 : une semaine d’avant ' +
+    'le dit, elle ne montre pas zéro.',
+  decisions:
+    'Au plus trois propositions : celles de la session principale, puis deux règles sans ' +
+    'modèle (une veille qui a déposé quatre semaines sans qu’aucune proposition née d’elle ' +
+    'reçoive un Oui ; un pays aux BIC introuvables, au moins 10 recherches sur 3 codes ' +
+    'différents dans la semaine). Oui et Non ne reviennent pas ; Plus tard revient 28 jours ' +
+    'après la réponse. Une semaine passée montre les réponses données ce lundi-là.',
+  argent:
+    'Encaissé moins coûts, pour le mois précédent entier et pour le mois de la semaine ' +
+    'jusqu’à son dimanche. Encaissé : les paiements Stripe d’IBANforge (packs, abonnements, ' +
+    'audits) par jour suisse, moins leurs remboursements, dans la devise du paiement ; les ' +
+    'frais Stripe dans la devise de règlement. Les autres coûts sont saisis par la session ' +
+    'principale avec leur période et leur nature (facture, relevé, estimation). Chaque ' +
+    'devise reste la sienne : rien n’est converti. Un poste qui ne couvre pas toute la ' +
+    'période est inconnu, jamais réparti ni compté pour zéro ; le résultat est alors un ' +
+    'plafond (« au plus »). L’argent reçu par x402 n’est pas compté ici.',
+  veille:
+    'Ce que les deux veilles du lundi ont déposé pour la semaine, en plus de leur message ' +
+    'Telegram : trois lignes de la veille marché (les portes qui s’ouvrent), et le score des ' +
+    'IA (requêtes de référence où une recherche web fait apparaître IBANforge, détecté par ' +
+    'le script, jamais jugé par le modèle). Rien de déposé : la page le dit.',
   sources: 'L’âge des sources de l’annuaire BIC, celui que sert /health, en ce moment.',
   bic_introuvables:
     'Les recherches de BIC bien formés sans réponse dans l’annuaire, par pays (5e et 6e ' +
@@ -704,6 +757,101 @@ function readAlerts(kv: OpsKv, nowMs: number): BulletinAlerts {
   };
 }
 
+/**
+ * Les alertes ouvertes et refermées PENDANT la semaine, lues dans `ops_alert_log`
+ * (étape A2).
+ *
+ * 🚨 Ouvertes dans la semaine, refermées dans la semaine : jamais « ouvertes à un moment
+ * de la semaine ». Plusieurs clés ne se referment jamais (`x402:facilitator`, les clés
+ * par achat, voir le bloc de l'état courant) : lues « à cheval », elles paraîtraient
+ * chaque semaine pour toujours. L'état courant, avec son rangement à part, dit déjà ce
+ * qui est ouvert maintenant.
+ */
+function readAlertHistory(week: SwissWeek): BulletinAlertHistory {
+  const db = getStatsDB();
+  const sinceRow = db
+    .prepare(`SELECT value FROM bulletin_meta WHERE key = 'ops_alert_log_since'`)
+    .get() as { value: string } | undefined;
+  const sinceMs = parseDbUtc(sinceRow?.value ?? null);
+  const coverage: BulletinAlertHistory['coverage'] =
+    sinceMs === null || week.endMs <= sinceMs
+      ? 'none'
+      : week.startMs >= sinceMs
+        ? 'full'
+        : 'partial';
+  const from = sqliteUtc(week.startMs);
+  const to = sqliteUtc(week.endMs);
+
+  const openedRows = db
+    .prepare(
+      `SELECT alert_key, opened_at, closed_at FROM ops_alert_log
+        WHERE opened_at >= ? AND opened_at < ?`,
+    )
+    .all(from, to) as Array<{ alert_key: string; opened_at: string; closed_at: string | null }>;
+  const opened = new Map<string, AlertOpenedGroup>();
+  for (const r of openedRows) {
+    const name = alertName(r.alert_key);
+    const at = sqliteUtc(parseDbUtc(r.opened_at) ?? 0);
+    const g = opened.get(name);
+    const open = r.closed_at === null ? 1 : 0;
+    if (g) {
+      g.cases += 1;
+      g.still_open += open;
+      if (at < g.first_opened_at) g.first_opened_at = at;
+    } else {
+      opened.set(name, {
+        name,
+        label: heartbeatLabel(r.alert_key),
+        cases: 1,
+        first_opened_at: at,
+        still_open: open,
+      });
+    }
+  }
+
+  const closedRows = db
+    .prepare(
+      `SELECT alert_key, opened_at, closed_at FROM ops_alert_log
+        WHERE closed_at >= ? AND closed_at < ?`,
+    )
+    .all(from, to) as Array<{ alert_key: string; opened_at: string | null; closed_at: string }>;
+  const closed = new Map<string, AlertClosedGroup>();
+  for (const r of closedRows) {
+    const name = alertName(r.alert_key);
+    const closedMs = parseDbUtc(r.closed_at) ?? 0;
+    const openedMs = parseDbUtc(r.opened_at);
+    const hours = openedMs === null ? null : hoursSince(openedMs, closedMs);
+    const at = sqliteUtc(closedMs);
+    const g = closed.get(name);
+    if (g) {
+      g.cases += 1;
+      if (at > g.last_closed_at) g.last_closed_at = at;
+      if (hours !== null) g.longest_hours = Math.max(g.longest_hours ?? 0, hours);
+      if (openedMs === null) g.opened_before_history += 1;
+    } else {
+      closed.set(name, {
+        name,
+        label: heartbeatLabel(r.alert_key),
+        cases: 1,
+        last_closed_at: at,
+        longest_hours: hours,
+        opened_before_history: openedMs === null ? 1 : 0,
+      });
+    }
+  }
+  const byTime =
+    <T>(key: (g: T) => string) =>
+    (a: T, b: T) =>
+      key(a).localeCompare(key(b));
+  return {
+    state: 'read',
+    kept_since: sinceMs === null ? null : sqliteUtc(sinceMs),
+    coverage,
+    opened: [...opened.values()].sort(byTime((g) => g.first_opened_at)),
+    closed: [...closed.values()].sort(byTime((g) => g.last_closed_at)),
+  };
+}
+
 function readSources(nowMs: number): BulletinSources {
   const sources: SourceView[] = getSourceFreshness().map((s) => {
     const updated = parseDbUtc(s.last_updated);
@@ -764,7 +912,7 @@ function internalPrefixes(db: DatabaseType.Database, prefixes: string[]): Set<st
   return out;
 }
 
-function readMissingBics(week: SwissWeek): BulletinMissingBics {
+export function readMissingBics(week: SwissWeek): BulletinMissingBics {
   const db = getStatsDB();
   const rows = db
     .prepare(MISSING_BICS_SQL)
@@ -843,6 +991,11 @@ export interface BulletinOptions {
   week?: string | null;
   /** Injectable clock, for the tests. */
   now?: number;
+  /**
+   * La lecture Stripe partagée (le cache de quinze minutes de la tuile « Encaissé »).
+   * Sans elle, le bloc de l'argent dit que Stripe n'est pas configuré : jamais un zéro.
+   */
+  stripe?: () => Promise<StripeRevenueResult>;
 }
 
 export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin> {
@@ -850,9 +1003,12 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
   const resolved = resolveBulletinWeek(opts.week, nowMs);
   const { week, weeksBack } = resolved;
 
-  // GitHub first: its wait (up to 12 s when the cache is cold) runs while the
-  // database is read below, instead of after it.
+  // GitHub et Stripe d'abord : leurs attentes (jusqu'à 12 s et 8 s quand leurs caches
+  // sont froids) courent pendant la lecture de la base ci-dessous, pas après elle.
   const mergedPulls = mergedPullsOfWeek(week, nowMs);
+  const stripeRead: Promise<StripeRevenueResult> = (
+    opts.stripe ?? (async () => ({ ok: false, reason: 'stripe_not_configured' }) as const)
+  )().catch(() => ({ ok: false, reason: 'stripe_unreachable' }) as const);
 
   // One read of `kv_state` feeds the signs of life and the alerts; when it fails,
   // both blocks say so rather than showing "no alert" and "never beat".
@@ -863,7 +1019,15 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
   const sources = guarded('sources', () => readSources(nowMs));
   const missingBics = guarded('missing_bics', () => readMissingBics(week));
   const forumThreads = guarded('forum_threads', () => readForumThreads(week));
+  const alertHistory = guarded('alert_history', () => readAlertHistory(week));
+  const veille = guarded('veille', () => readFeed(week.label));
+  // La règle des BIC introuvables lit le bloc ci-dessus ; non lu, cette règle n'est
+  // simplement pas appliquée, et les autres propositions s'affichent quand même.
+  const decisions = guarded('decisions', () =>
+    readDecisions(week, weeksBack === 1, missingBics.state === 'read' ? missingBics : null, nowMs),
+  );
 
+  const stripe = await stripeRead;
   return {
     version: BULLETIN_VERSION,
     observed_at: sqliteUtc(nowMs),
@@ -881,8 +1045,17 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
     },
     requested: { week: opts.week ?? null },
     numbers,
-    moved: { merged_pulls: await mergedPulls, heartbeats, alerts, sources },
+    decisions,
+    moved: {
+      merged_pulls: await mergedPulls,
+      heartbeats,
+      alerts,
+      alert_history: alertHistory,
+      sources,
+    },
     needs: { missing_bics: missingBics, forum_threads: forumThreads },
+    veille,
+    money: guarded('money', () => readMoney(week, stripe)),
     not_yet: BULLETIN_NOT_YET.map((b) => ({ ...b })),
     definitions: { ...BULLETIN_DEFINITIONS },
   };

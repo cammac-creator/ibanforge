@@ -13,7 +13,9 @@ account as soon as an IBAN is entered, using the IBANforge API
 (121k+ BIC codes, 89 countries). No manual bank pre-configuration required.
 """,
     "author": "IBANforge",
+    "maintainer": "IBANforge",
     "website": "https://ibanforge.com/?utm_source=odoo",
+    "support": "support@ibanforge.com",
     "license": "AGPL-3",
     "depends": [
         "base",
@@ -26,10 +28,14 @@ account as soon as an IBAN is entered, using the IBANforge API
         "views/res_config_settings_views.xml",
         "views/res_partner_bank_views.xml",
     ],
-    # Listing carousel: two screenshots taken on a real Odoo 18 instance on
-    # 2 September 2026 (the bank account form after the IBAN was typed, and
-    # the module's own Settings tab). icon.{svg,png} both ship (140x140).
+    # Store listing. All images are declared here; the FIRST one is the cover
+    # (static/description/banner.png, 1120x560). The two screenshots were
+    # taken on a real Odoo 18 instance on 2 September 2026 (the bank account
+    # form after the IBAN was typed, and the module's own Settings tab).
+    # icon.{svg,png} both ship (140x140). No price and no currency key: the
+    # module is free.
     "images": [
+        "static/description/banner.png",
         "static/description/screenshot-bank-account.png",
         "static/description/screenshot-settings.png",
     ],

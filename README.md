@@ -1,7 +1,7 @@
 # IBANforge
 
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://api.ibanforge.com/health)
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.8.1-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.9.0-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
 [![npm ibanforge-mcp](https://img.shields.io/npm/v/ibanforge-mcp?label=ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
 [![npm @ibanforge/sdk](https://img.shields.io/npm/v/@ibanforge/sdk?label=@ibanforge/sdk)](https://www.npmjs.com/package/@ibanforge/sdk)
 [![PyPI ibanforge](https://img.shields.io/pypi/v/ibanforge?label=pypi%20ibanforge)](https://pypi.org/project/ibanforge/)
@@ -55,9 +55,10 @@ claude mcp add ibanforge npx -- -y ibanforge-mcp
 POST https://api.ibanforge.com/mcp
 Content-Type: application/json
 Accept: application/json, text/event-stream
+Authorization: Bearer ifk_your_key   # optional
 ```
 
-Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when stdio is not an option (CI/CD, serverless, Vercel agents, etc.).
+Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when stdio is not an option (CI/CD, serverless, Vercel agents, etc.). Without a key it answers a keyless allowance per source address; with a key (`Authorization: Bearer` or `X-API-Key`), the tool calls count against that key exactly as on the REST API.
 
 ## Tools
 
@@ -70,7 +71,7 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (OFAC, EU, UN lists on the payee's bank, the country against a fixed sanctions list, FATF, VoP readiness) | $0.02    |
 | `validate_payment_reference` | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS or Finnish viitenumero checksum, plus the QRR ↔ QR-IBAN pairing verdict | **free** |
 | `check_postal_address` | An ISO 20022 address against one rail's published rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its source | **free** |
-| `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses ahead of 14.11.2026 | **free** |
+| `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses (type K not permitted since 21.11.2025; banks guarantee its payment only until the end of September 2026) | **free** |
 | `send_feedback`       | Report incorrect data or claim an x402 refund                                             | free     |
 | `request_api_key`     | You used up the free allowance, or need a durable key — a human approves in a browser, no e-mail  | free     |
 | `poll_api_key`        | Collect that key once it is approved, handed over exactly once                             | free     |
@@ -92,7 +93,7 @@ If you can open a web address but cannot send a POST (no code execution, no MCP 
 - https://ibanforge.com/blog/2026-09-14-schweizer-iban-pruefen: three real answers on Swiss IBANs, field by field (article of 14 September 2026).
 
 Do not simulate answers from the API: quote these real ones, with the date each carries (served_at, as_of, or the date of the page).
-To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp. A connector with no key draws on the same keyless allowance as any other caller, counted per source address. In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), so that allowance is shared with other users and may already be spent; other assistants were not checked by us. The hosted endpoint reads no key: to use one, run the npm package ibanforge-mcp in a desktop client with IBANFORGE_API_KEY set, or call the REST API with it (a POST to https://api.ibanforge.com/v1/keys/generate with no body returns a key, no e-mail).
+To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom connector in their assistant; where to click, assistant by assistant: https://ibanforge.com/docs/mcp. A connector with no key draws on the same keyless allowance as any other caller, counted per source address. In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), so that allowance is shared with other users and may already be spent; other assistants were not checked by us. With a key, the hosted endpoint counts the calls against that key, as the REST API does: in Claude, the user adds the request header Authorization: Bearer followed by the key when creating the connector; ChatGPT sends no key to a connector (OpenAI's documentation). A POST to https://api.ibanforge.com/v1/keys/generate with no body returns a key, no e-mail; the npm package ibanforge-mcp reads it from IBANFORGE_API_KEY.
 
 ---
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { nationalRegisterBicCodes } from '../lib/register-lists.js';
+import { READY_FIELD_DESCRIPTION } from '../lib/qr-bill-notice.js';
 import {
   BANK_CODE_HOLDER_NOTE,
   BANK_REACHABILITY_NOTE,
@@ -835,11 +836,7 @@ const QR_PARTY_SCHEMA = z.object({
 
 const CHECK_SWISS_QR_BILL_OUTPUT_SCHEMA = {
   valid: z.boolean().describe('True when no finding has severity error.'),
-  ready_for_2026_11_14: z
-    .boolean()
-    .describe(
-      'valid AND every present address is structured (type S): what banks require from 14.11.2026.',
-    ),
+  ready_for_2026_11_14: z.boolean().describe(READY_FIELD_DESCRIPTION),
   qr_type: z.string(),
   version: z.string(),
   coding: z.string(),

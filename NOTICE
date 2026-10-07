@@ -103,9 +103,13 @@ GLEIF (Global Legal Entity Identifier Foundation), LEI reference data
          including registered and head-office addresses; and the Italian
          keys of src/db/bic_data.json rebuilt on 29 September 2026, whose BIC
          is the one the Mapping Table below pairs with the LEI the Banca
-         d'Italia publishes for the bank code, and the Italian website export
-         frontend/data/registers/it-bank.json that repeats them (a copy in
-         part of the Mapping Table: the notice below covers them).
+         d'Italia publishes for the bank code, the Italian keys added on
+         7 October 2026 whose BIC is the one it pairs with the LEI of the
+         head office the European Central Bank names for an Italian branch,
+         their trace scripts/data/it-map-additions-2026-10-07.json, and the
+         Italian website export frontend/data/registers/it-bank.json that
+         repeats them (a copy in part of the Mapping Table: the notice below
+         covers them).
   Terms: CC0 1.0 Universal Public Domain Dedication.
          https://www.gleif.org/en/about/open-data
 
@@ -177,7 +181,12 @@ Bulgarian National Bank, BAE register
 
 European Central Bank, list of monetary financial institutions
   Where: data/bic.sqlite, table ecb_mfi (5,373 rows, list of
-         31 August 2026).
+         31 August 2026); scripts/data/it-map-additions-2026-10-07.json
+         (for 23 Italian branches, the RIAD code and the LEI of the head
+         office, list of 6 October 2026). That trace only records which
+         head office was used to choose a BIC in the GLEIF Mapping Table; no
+         value of the ECB list is served with those keys, which is why the
+         free-of-charge sentence below does not travel with them.
   Terms: "When such information is distributed or reproduced, it must appear
          accurately and the ECB must be cited as the source." Where the
          information is incorporated in documents that are sold, buyers must
@@ -302,7 +311,9 @@ e passivita ecc.")
          struck off, with the date and the legal successor in force);
          frontend/data/registers/it-bank.json; src/db/bic_data.json, whose
          Italian keys rebuilt on 29 September 2026 join the LEI the registers
-         publish for each code to the BIC GLEIF pairs with it.
+         publish for each code to the BIC GLEIF pairs with it, and whose keys
+         added on 7 October 2026 start from the holder the registers name
+         (scripts/data/it-map-additions-2026-10-07.json).
   Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
          https://creativecommons.org/licenses/by/4.0/ ; the open data of the
          Banca d'Italia published on the AgID portal dati.gov.it, which the
@@ -437,7 +448,7 @@ SIX Group AG, BIC entries
          separately.
 
 Composite bank-code map
-  Where: src/db/bic_data.json (17,909 keys in 62 countries at this
+  Where: src/db/bic_data.json (17,940 keys in 62 countries at this
          revision; its Austrian, Belgian, Finnish, Luxembourg and Polish
          keys were removed on 25 September 2026, and the keys taken from
          commercial sites or from publishers reserving commercial use on
@@ -454,7 +465,12 @@ Composite bank-code map
          coming from it); the Italian keys rebuilt on 29 September 2026 from
          the Banca d'Italia's LEI and the GLEIF Mapping Table, and the
          Romanian keys rebuilt the same day from the GLEIF rows of the BIC
-         entries (scripts/derive-map-keys.ts); and manual additions.
+         entries (scripts/derive-map-keys.ts); 31 Italian keys added on
+         7 October 2026 by the same script, 23 from the head office the
+         European Central Bank names for an Italian branch and the GLEIF
+         Mapping Table, 8 from the BIC the bank publishes on its own website
+         (address, date and quoted words in
+         scripts/data/it-bank-site-bics.json); and manual additions.
   Terms: both projects are distributed under the MIT License (copyright
          notices at the end of this file). Those licences do not grant
          rights that the national publishers have not granted, and the terms

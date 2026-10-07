@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { getStatsDB } from './db.js';
 import { generateApiKey } from './api-keys.js';
@@ -13,6 +15,7 @@ import {
   approveGrant,
   consumeGrantKey,
   denyGrant,
+  displayToHuman,
   drawUserCode,
   enterPoll,
   findGrantByUserCode,
@@ -751,5 +754,54 @@ describe('le compteur journalier du rail device', () => {
       )
       .get() as { n: number };
     expect(afterAll.n).toBe(beforeAll.n);
+  });
+});
+
+/**
+ * Le bloc que l'agent montre MOT POUR MOT à son humain (`displayToHuman`).
+ *
+ * 07.10.2026 : il disait `Click "Get the key"`. Or la page d'approbation suit la
+ * langue du navigateur (`/device` mène à `/fr/device` ou `/de/device`) et son
+ * bouton s'y appelle « Obtenir la clé » ou « Schlüssel holen ». Le rejeu en ligne
+ * l'a montré sur un iPhone français : l'humain cherchait un bouton qui n'existe
+ * pas dans sa langue. Le bloc désigne donc le bouton par sa PLACE, jamais par un
+ * libellé qu'une seule langue affiche.
+ */
+describe("le bloc montré à l'humain", () => {
+  const ROOT = join(import.meta.dirname, '..', '..');
+  const label = (locale: string): string => {
+    const messages = JSON.parse(
+      readFileSync(join(ROOT, 'frontend', 'messages', `${locale}.json`), 'utf8'),
+    ) as { device: { approveAnon: string } };
+    // « Get the key ({limit} requests a month) » : le libellé, sans sa parenthèse.
+    return messages.device.approveAnon.split('(')[0].trim();
+  };
+
+  it('ne cite le libellé du bouton dans aucune langue de la page', () => {
+    const block = displayToHuman({
+      status: 'ok',
+      userCode: 'BCDF-GHJK',
+      verificationUriComplete: 'https://ibanforge.com/device?code=BCDF-GHJK',
+    });
+    for (const locale of ['en', 'fr', 'de']) {
+      const shown = label(locale);
+      expect(shown.length, `libellé ${locale} introuvable`).toBeGreaterThan(3);
+      expect(
+        block,
+        `le bloc cite « ${shown} », que la page ${locale} n'affiche pas forcément`,
+      ).not.toContain(shown);
+    }
+  });
+
+  it('garde le lien, le code à comparer et la promesse sans adresse', () => {
+    const block = displayToHuman({
+      status: 'ok',
+      userCode: 'BCDF-GHJK',
+      verificationUriComplete: 'https://ibanforge.com/device?code=BCDF-GHJK',
+    });
+    expect(block).toContain('https://ibanforge.com/device?code=BCDF-GHJK');
+    expect(block).toContain('BCDF-GHJK');
+    expect(block).toContain('first button under the code');
+    expect(block).toContain('No e-mail, no card, no account.');
   });
 });

@@ -1634,7 +1634,7 @@
     "subtitle": "No e-mail needed: 25 free calls a month, on the spot. Give an address and we raise the same key to 200 a month. No credit card either way. The key is shown only once.",
     "emailLabel": "Email (optional)",
     "emailPlaceholder": "you@company.com — leave empty for a key with no e-mail",
-    "emailHint": "An address is only used to raise this same key to 200 a month, with a 6-digit code. It is never required, and nothing else is mailed to you.",
+    "emailHint": "An address is only used to raise this same key to 200 a month, with a 6-digit code, and to send you at most one note from the founder asking whether the key is useful to you, with a link to receive nothing more. It is never required.",
     "submit": "Generate my key",
     "submitAnonymous": "Get a key without an e-mail",
     "submitting": "Generating…",
@@ -1795,7 +1795,7 @@
         "Ask: “Check the documentation IBAN DE89370400440532013000 and report the register result, source and date.”",
         "Read bank_code_check and its sources. An unknown result confirms nothing; the check does not prove that the account exists or identify its holder."
       ],
-      "limits": "{weekly} tool units per network address per week (ISO week in UTC, reset on Monday 00:00 UTC), without a key; each IBAN in a batch counts as one unit. An API key does not raise this remote allowance. {remote} remote tools, {installed} in the local package: the two file-audit tools need the installed package.",
+      "limits": "{weekly} tool units per network address per week (ISO week in UTC, reset on Monday 00:00 UTC), without a key; each IBAN in a batch counts as one unit. With an API key in the Authorization header, calls count against that key instead, exactly as on the REST API. {remote} remote tools, {installed} in the local package: the two file-audit tools need the installed package.",
       "guide": "MCP guide and quotas",
       "local": "Does your client require a local process? Use this configuration.",
       "sdkHeading": "Integrate with an SDK",
@@ -2633,8 +2633,8 @@
       "note": "One file, one payment by card on Stripe. The annotated workbook (.xlsx) and the summary are ready right after payment and stay downloadable for 24 hours."
     },
     "deadline": {
-      "title": "Mid-November 2026: SIX stops processing QR-bill payments with unstructured addresses",
-      "text": "From that date, standing orders and payment templates built on QR-bills with a non-structured address are no longer processed. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
+      "title": "Mid-November 2026: Swiss payment orders with an unstructured address are refused",
+      "text": "From 14.11.2026 (SIX), any payment order with an unstructured address is refused, and payment templates that carry one can no longer be used. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
     },
     "upload": {
       "label": "Drop your creditor file here",
@@ -2833,11 +2833,11 @@
   },
   "qrBill": {
     "metaTitle": "Swiss QR-bill check: structured or combined address, QR-IBAN and reference, free",
-    "metaDescription": "Paste the text of a Swiss QR-bill code and see every rule verdict: header, QR-IBAN and reference pairing, checksums, amount, and whether the addresses are structured (type S) or still combined (type K) before the SIX deadline at mid-November 2026.",
+    "metaDescription": "Paste the text of a Swiss QR-bill code and see every rule verdict: header, QR-IBAN and reference pairing, checksums, amount, and whether the addresses are structured (type S) or still combined (type K, not permitted since 21.11.2025).",
     "eyebrow": "Free tool",
-    "title": "Is this QR-bill ready for mid-November 2026?",
+    "title": "Is this QR-bill valid, and are its addresses structured?",
     "intro": "Paste the text inside a Swiss QR-bill code (it starts with SPC). You get every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR, SCOR or NON reference and its checksum, amount, currency, and whether the addresses are structured (type S) or still combined (type K). A combined address comes back with the structured fields to use instead.",
-    "deadline": "Type K addresses were removed from the standard on 21 November 2025; from mid-November 2026 banks no longer process standing orders and payment templates built on them.",
+    "deadline": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, any payment order with an unstructured address is refused. Also redo the standing orders and templates captured from a type K QR-bill.",
     "docsLink": "Read the documentation",
     "input": {
       "label": "QR-bill text (Swiss Payments Code)",
@@ -2848,7 +2848,7 @@
     },
     "result": {
       "valid": "Well-formed",
-      "ready": "Ready for mid-November 2026",
+      "ready": "Valid, addresses structured (type S)",
       "yes": "Yes",
       "no": "No",
       "iban": "Creditor IBAN",
@@ -3197,7 +3197,7 @@
     "approveAnon": "Get the key ({limit} requests a month)",
     "approveAnonNote": "No e-mail, no card, no account.",
     "approveEmail": "Add an e-mail address instead ({limit} a month)",
-    "approveEmailNote": "We send a 6-digit code to check the mailbox is yours. The address is used for the key and for nothing else.",
+    "approveEmailNote": "We send a 6-digit code to check the mailbox is yours. The address is used for the key, and to send you at most one note from the founder asking whether the key is useful to you, with a link to receive nothing more.",
     "codeSent": "Code sent. Enter the 6 digits below.",
     "deny": "I did not ask for this",
     "doneTitle": "Done. Go back to your agent.",

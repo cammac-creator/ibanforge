@@ -569,6 +569,170 @@ describe('les signes de vie et les alertes, lus dans les clés d’ops-alert', (
   });
 });
 
+describe('l’historique des alertes de la semaine (étape A2)', () => {
+  function logRow(key: string, opened: string | null, closed: string | null): void {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO ops_alert_log (alert_key, opened_at, closed_at, fails) VALUES (?, ?, ?, 1)`,
+      )
+      .run(key, opened, closed);
+  }
+  function setSince(value: string): void {
+    getStatsDB()
+      .prepare(`UPDATE bulletin_meta SET value = ? WHERE key = 'ops_alert_log_since'`)
+      .run(value);
+  }
+
+  beforeAll(() => {
+    getStatsDB().exec('DELETE FROM ops_alert_log');
+    setSince('2026-09-20 08:00:00');
+    // Semaine 40 (27.09 22:00 UTC au 04.10 22:00 UTC).
+    logRow('heartbeat:weekly-veille', '2026-09-29 06:00:00', '2026-09-29 18:30:00');
+    logRow('x402:purchase-unconfirmed:achat-invente-9', '2026-09-30 08:00:00', null);
+    logRow(
+      'x402:purchase-unconfirmed:achat-invente-8',
+      '2026-10-01 08:00:00',
+      '2026-10-01 09:00:00',
+    );
+    // Ouverte la semaine 39, refermée la 40.
+    logRow('db:stats', '2026-09-25 10:00:00', '2026-09-28 10:00:00');
+    // Ouverte avant l'historique, refermée la 40.
+    logRow('x402:facilitator', null, '2026-10-02 12:00:00');
+    // Une clé qui ne se referme jamais, ouverte la 38 : absente de la 40.
+    logRow('stripe:refund:achat-invente-7', '2026-09-15 10:00:00', null);
+    // Hors semaine, après.
+    logRow('db:stats', '2026-10-05 10:00:00', null);
+  });
+
+  afterAll(() => {
+    getStatsDB().exec('DELETE FROM ops_alert_log');
+  });
+
+  it('montre les alertes ouvertes et refermées pendant la semaine, sous leur nom', async () => {
+    const b = await getBulletin({ now: NOW });
+    expect(b.moved.alert_history).toEqual({
+      state: 'read',
+      kept_since: '2026-09-20 08:00:00',
+      coverage: 'full',
+      opened: [
+        {
+          name: 'heartbeat:weekly-veille',
+          label: 'veille hebdo (+ canari découvrabilité)',
+          cases: 1,
+          first_opened_at: '2026-09-29 06:00:00',
+          still_open: 0,
+        },
+        {
+          name: 'x402:purchase-unconfirmed',
+          label: null,
+          cases: 2,
+          first_opened_at: '2026-09-30 08:00:00',
+          still_open: 1,
+        },
+      ],
+      closed: [
+        {
+          name: 'db:stats',
+          label: null,
+          cases: 1,
+          last_closed_at: '2026-09-28 10:00:00',
+          longest_hours: 72,
+          opened_before_history: 0,
+        },
+        {
+          name: 'heartbeat:weekly-veille',
+          label: 'veille hebdo (+ canari découvrabilité)',
+          cases: 1,
+          last_closed_at: '2026-09-29 18:30:00',
+          longest_hours: 12.5,
+          opened_before_history: 0,
+        },
+        {
+          name: 'x402:purchase-unconfirmed',
+          label: null,
+          cases: 1,
+          last_closed_at: '2026-10-01 09:00:00',
+          longest_hours: 1,
+          opened_before_history: 0,
+        },
+        {
+          name: 'x402:facilitator',
+          label: null,
+          cases: 1,
+          last_closed_at: '2026-10-02 12:00:00',
+          longest_hours: null,
+          opened_before_history: 1,
+        },
+      ],
+    });
+    expect(JSON.stringify(b.moved.alert_history)).not.toMatch(/achat-invente/);
+  });
+
+  it('dit qu’une semaine d’avant l’historique n’est pas couverte, au lieu de zéro', async () => {
+    const w38 = await getBulletin({ now: NOW, week: '2026-W38' });
+    expect(w38.moved.alert_history).toMatchObject({ coverage: 'partial' });
+    setSince('2026-10-01 08:00:00');
+    try {
+      const w39 = await getBulletin({ now: NOW, week: '2026-W39' });
+      expect(w39.moved.alert_history).toMatchObject({ coverage: 'none' });
+      const w40 = await getBulletin({ now: NOW });
+      expect(w40.moved.alert_history).toMatchObject({ coverage: 'partial' });
+    } finally {
+      setSince('2026-09-20 08:00:00');
+    }
+  });
+});
+
+describe('la veille, le score et les décisions dans le bulletin (étapes A2 et B)', () => {
+  afterAll(() => {
+    getStatsDB().exec(
+      'DELETE FROM bulletin_feed; DELETE FROM bulletin_proposals; DELETE FROM bulletin_answers;',
+    );
+  });
+
+  it('rend les dépôts de la semaine et dit « rien » pour une source muette', async () => {
+    getStatsDB()
+      .prepare(`INSERT INTO bulletin_feed (source, week, payload) VALUES (?, ?, ?)`)
+      .run(
+        'weekly-reco-baseline',
+        '2026-W40',
+        JSON.stringify({
+          lines: ['Présent : une requête inventée'],
+          score: { value: 2, out_of: 7, errors: 1 },
+        }),
+      );
+    const b = await getBulletin({ now: NOW });
+    expect(b.veille).toMatchObject({
+      state: 'read',
+      sources: [
+        { source: 'weekly-veille', state: 'none' },
+        {
+          source: 'weekly-reco-baseline',
+          state: 'read',
+          lines: ['Présent : une requête inventée'],
+          score: { value: 2, out_of: 7, errors: 1 },
+        },
+      ],
+    });
+  });
+
+  it('rend les propositions pour la dernière semaine close seulement', async () => {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO bulletin_proposals (week, title) VALUES ('2026-W40', 'Une proposition inventée')`,
+      )
+      .run();
+    const b = await getBulletin({ now: NOW });
+    expect(b.decisions).toMatchObject({
+      state: 'read',
+      computed: true,
+      shown: [{ kind: 'session', title: 'Une proposition inventée', answer: null }],
+    });
+    const w39 = await getBulletin({ now: NOW, week: '2026-W39' });
+    expect(w39.decisions).toMatchObject({ state: 'read', computed: false, shown: [] });
+  });
+});
+
 describe('un bloc illisible ne fait pas tomber les autres', () => {
   it('dit « non lu » pour ce bloc seulement', async () => {
     const db = getStatsDB();

@@ -10,13 +10,18 @@
  * Method: one Claude call per query with the server-side web_search tool,
  * asked to LIST what the results contain — never asked to judge us, so the
  * measurement stays neutral. Detection of "ibanforge" happens in this script.
- * No stored state: the weekly Telegram line is the time series (scores are
- * visibility measurements, not business figures, but the repo is public and
- * history belongs in the chat, not in a committed file).
+ * No state in this repository: the weekly Telegram line is the time series (scores
+ * are visibility measurements, not business figures, but the repo is public and
+ * history belongs in the chat, not in a committed file). Since step B of the
+ * Monday bulletin (07.10.2026), the score and three lines are also deposited in the
+ * API's private database, where the bulletin page reads them week by week.
  *
  * Cost: 7 small calls with 1-2 searches each — cents per run.
  */
 
+import { depositToBulletin, recoPayload } from './bulletin-deposit.js';
+
+const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -148,6 +153,12 @@ async function main(): Promise<void> {
 
   await sendTelegram(lines.join('\n'));
   console.log(`baseline sent: ${score}/${QUERIES.length} (${errors} errors)`);
+  // Étape B du bulletin du lundi : le message ci-dessus part comme avant ; le score et
+  // trois lignes vont en plus dans le bulletin. Jamais bloquant (voir bulletin-deposit.ts).
+  await depositToBulletin('weekly-reco-baseline', recoPayload(results), {
+    apiBase: API_BASE,
+    token: process.env.BULLETIN_FEED_TOKEN,
+  });
 }
 
 main().catch((e) => {

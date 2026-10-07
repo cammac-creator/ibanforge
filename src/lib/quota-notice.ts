@@ -11,6 +11,7 @@ import { isUnroutableEmail } from './disposable-domains.js';
 import { ensureTopupRef, keyHasPurchase, SALE_OUTCOMES_SQL } from './key-purchases.js';
 import { getStatsDB } from './db.js';
 import { ANONYMOUS_CONTACT, CREDITS_NOTICE_RATIO } from './tiers.js';
+import { isAddressUnderStop } from './activation-nudge-server.js';
 
 /**
  * Placeholders stored in `api_keys.email` when the buyer never gave an address
@@ -36,7 +37,10 @@ export type QuotaNoticeOutcome =
   | 'send_failed'
   | 'unroutable_contact'
   | 'flagged_cohort'
-  | 'too_new';
+  | 'too_new'
+  // L'adresse a répondu STOP (07.10.2026) : ni l'alerte des 80 %, ni celle des
+  // 10 % de crédits. Voir `isAddressUnderStop`.
+  | 'stopped';
 
 /**
  * A key younger than this never gets automated mail. A signup wave with
@@ -138,6 +142,9 @@ export async function maybeSendQuotaWarning(p: {
   // which is precisely the case the domain filter let through on 19/08.
   // Depuis le lot B1 : sauf si la lignée a acheté (voir isFarmFlagged).
   if (isFarmFlagged(p.keyHash)) return 'flagged_cohort';
+  // STOP, avant le verrou du mois : une adresse sous STOP ne doit pas brûler
+  // l'unique avertissement du mois si le STOP est levé à la main plus tard.
+  if (isAddressUnderStop(p.email)) return 'stopped';
   const ageHours = getKeyAgeHours(p.keyHash);
   if (ageHours != null && ageHours < MIN_KEY_AGE_HOURS) return 'too_new';
   if (!recordQuotaNotice(p.keyHash, p.month)) return 'already_notified';
@@ -244,6 +251,9 @@ export async function maybeSendCreditsWarning(p: {
   if (!to) return 'no_contact';
   if (isUnroutableEmail(to)) return 'unroutable_contact';
   if (isFarmFlagged(p.keyHash)) return 'flagged_cohort';
+  // Le destinataire RÉEL (l'adresse de la clé, ou celle du payeur) : c'est lui
+  // qui a pu dire STOP.
+  if (isAddressUnderStop(to)) return 'stopped';
   const lock = creditsNoticeLock(p.total);
   if (!recordQuotaNotice(p.keyHash, lock)) return 'already_notified';
 

@@ -28,6 +28,18 @@ import { BANK_CODE_DATA_UNAVAILABLE_FLOOR, calculateRiskScore } from './complian
 const map = JSON.parse(
   readFileSync(new URL('../db/bic_data.json', import.meta.url), 'utf8'),
 ) as Record<string, { bic: string }>;
+
+/** The Italian keys added on 07/10/2026, from the trace scripts/derive-map-keys.ts wrote. */
+const itAdditions = Object.entries(
+  (
+    JSON.parse(
+      readFileSync(
+        new URL('../../scripts/data/it-map-additions-2026-10-07.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { keys: Record<string, { bic: string | null; via?: string }> }
+  ).keys,
+).filter((entry): entry is [string, { bic: string; via: string }] => entry[1].bic !== null);
 const keysOf = (cc: string) => Object.keys(map).filter((k) => k.startsWith(`${cc}:`));
 
 describe('the countries whose every map key was withdrawn', () => {
@@ -161,7 +173,18 @@ describe('the countries that kept part of their keys', () => {
   // those plus the ones rebuilt from the Banca d'Italia's LEI and GLEIF.
   it('Spain and Italy stay under the size they had once the keys were withdrawn', () => {
     expect(keysOf('ES').length).toBeLessThanOrEqual(145);
-    expect(keysOf('IT').length).toBeLessThanOrEqual(250);
+    // 07/10/2026: Italy may also hold the keys added from open sources for the
+    // codes the 29/09 rebuild left without a BIC, each one in the trace with
+    // the chain of sources behind it, and none other.
+    expect(keysOf('IT').length).toBeLessThanOrEqual(250 + itAdditions.length);
+  });
+
+  it('every Italian key added on 07/10/2026 holds the BIC its trace names, and says where it comes from', () => {
+    expect(itAdditions.length).toBeGreaterThan(0);
+    for (const [key, outcome] of itAdditions) {
+      expect(map[key]?.bic, key).toBe(outcome.bic);
+      expect(['gleif-lei', 'ecb-head-office', 'bank-site'], key).toContain(outcome.via);
+    }
   });
 });
 

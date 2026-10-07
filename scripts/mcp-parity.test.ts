@@ -392,7 +392,32 @@ describe('parité MCP — les descriptions du device grant sont identiques au ca
         expect(text, "l'agent ne doit JAMAIS ouvrir le lien").toContain('Do NOT open the link');
         expect(text, 'ni inventer une adresse').toContain('do NOT invent an e-mail address');
         expect(text, 'le bloc se montre mot pour mot').toContain('VERBATIM');
+        // 07.10.2026 : la description promettait une clé « pour cette session ».
+        // Aucune des trois surfaces ne s'en sert dans la session en cours : le
+        // transport distant lit la clé dans les en-têtes de chaque requête
+        // (depuis le soir du 07.10), donc seulement une fois le connecteur
+        // reconfiguré, le paquet npm ne lit IBANFORGE_API_KEY qu'au démarrage,
+        // et le serveur stdio embarqué n'en lit aucune. L'agent doit donc dire
+        // à son humain où la clé sert.
+        expect(text, 'la clé ne débloque pas la session en cours').not.toMatch(
+          /this session its own/i,
+        );
+        expect(text, 'la clé ne débloque pas la session en cours').toContain(
+          'does not unlock this session',
+        );
+        expect(text, 'où la clé sert : la ligne de configuration').toContain('`config_line`');
+        // Décision du 07.10.2026, point 7 : le serveur hébergé lit la clé, et
+        // l'agent doit pouvoir dire à son humain où la mettre, Claude Desktop et
+        // ChatGPT compris.
+        expect(text, 'où la clé sert : l’en-tête du serveur hébergé').toContain(
+          '"Authorization: Bearer <key>"',
+        );
+        expect(text, 'Claude et Claude Desktop : le champ du connecteur').toContain(
+          'Request headers',
+        );
+        expect(text, 'ChatGPT : dit franchement').toContain('ChatGPT sends no key to a connector');
       } else {
+        expect(text, 'où la clé sert, en la remettant').toContain('"Authorization: Bearer <key>"');
         expect(text, 'ne jamais boucler serré : la maison a déjà payé ce défaut').toContain(
           'never in a tight loop',
         );

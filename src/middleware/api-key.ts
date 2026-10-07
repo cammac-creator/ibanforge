@@ -57,6 +57,16 @@ export const KEY_REVOKED_BURST_DETAIL =
   'per call with x402, which needs no key at all.';
 
 /**
+ * Ce que lit le porteur d'une clé inconnue, ou révoquée par son porteur ou par
+ * un abonnement clos : la même phrase dans les deux cas, pour ne jamais dire si
+ * la clé a existé. Exportée pour le transport MCP hébergé (07.10.2026).
+ */
+export const INVALID_KEY_DETAIL =
+  'An API key was provided (ifk_…) but it is invalid or revoked. ' +
+  'Check for typos or truncation, or take a new one in one call and without an e-mail: ' +
+  'POST /v1/keys/generate with no body at all.';
+
+/**
  * Extract an IBANforge API key from common locations agents use:
  *   1. Authorization: Bearer ifk_xxx       (standard, recommended)
  *   2. X-API-Key: ifk_xxx                  (de-facto standard for many agents/SDKs)
@@ -91,7 +101,10 @@ function setQuotaHeaders(
  * second copy of this reader would be a second place for the three accepted
  * locations to drift apart.
  */
-export function extractKey(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | null {
+export function extractKey(
+  c: Parameters<MiddlewareHandler<HonoEnv>>[0],
+  opts: { query?: boolean } = {},
+): string | null {
   const auth = c.req.header('Authorization');
   if (auth?.startsWith('Bearer ifk_')) return auth.slice(7);
   if (auth?.startsWith('Bearer ')) {
@@ -100,6 +113,11 @@ export function extractKey(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string
   }
   const xKey = c.req.header('X-API-Key') ?? c.req.header('x-api-key');
   if (xKey?.startsWith('ifk_')) return xKey;
+  // `query: false` pour le transport MCP hébergé (07.10.2026) : une clé dans
+  // l'adresse d'un connecteur reste écrite en clair dans la configuration du
+  // client et dans les journaux de tous ceux qui la relaient. Là, seuls les
+  // deux en-têtes comptent.
+  if (opts.query === false) return null;
   const queryKey = c.req.query('api_key');
   if (queryKey?.startsWith('ifk_')) return queryKey;
   return null;
@@ -733,13 +751,7 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
         c.set('paywallCause', { reason: 'key_revoked_burst', detail: KEY_REVOKED_BURST_DETAIL });
         c.header('X-API-Key-Revoked', 'burst');
       } else {
-        c.set('paywallCause', {
-          reason: 'invalid_api_key',
-          detail:
-            'An API key was provided (ifk_…) but it is invalid or revoked. ' +
-            'Check for typos or truncation, or take a new one in one call and without an e-mail: ' +
-            'POST /v1/keys/generate with no body at all.',
-        });
+        c.set('paywallCause', { reason: 'invalid_api_key', detail: INVALID_KEY_DETAIL });
       }
       c.header('X-API-Key-Invalid', 'true');
       await next();

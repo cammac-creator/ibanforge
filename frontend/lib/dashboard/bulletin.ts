@@ -133,6 +133,133 @@ export interface BulletinForumThreads {
   still_new: number;
 }
 
+// ─── Étapes A2 et B (07.10.2026) : des blocs facultatifs ─────────────────────
+//
+// Railway (l'API) et Vercel (ce site) ne passent pas en ligne au même instant, et le
+// domaine de production est promu à la main : cette page doit rendre une API qui
+// n'envoie pas encore ces blocs. Chacun est FACULTATIF ici ; un bloc absent ou mal
+// formé est simplement laissé de côté (la liste `not_yet` de l'API dit alors qu'il
+// n'est pas encore là), jamais toute la page.
+
+export type Answer = 'oui' | 'plus_tard' | 'non';
+export const ANSWERS: readonly Answer[] = ['oui', 'plus_tard', 'non'];
+
+export interface AnswerView {
+  key: string;
+  answer: Answer;
+  label: string;
+  week: string;
+  answered_at: string;
+}
+
+export interface ProposalView {
+  key: string;
+  kind: 'session' | 'bic_introuvable' | 'veille_sans_oui';
+  title: string;
+  detail: string | null;
+  origin: string | null;
+  country: string | null;
+  answer: AnswerView | null;
+  postponed_at: string | null;
+}
+
+export interface BulletinDecisions {
+  state: 'read';
+  computed: boolean;
+  shown: ProposalView[];
+  more: number;
+  answered: AnswerView[];
+}
+
+export interface FeedScore {
+  value: number;
+  out_of: number;
+  errors: number;
+}
+
+export type FeedView =
+  | {
+      source: string;
+      label: string;
+      state: 'read';
+      received_at: string;
+      lines: string[];
+      score: FeedScore | null;
+    }
+  | { source: string; label: string; state: 'none' };
+
+export interface BulletinFeed {
+  state: 'read';
+  sources: FeedView[];
+}
+
+export interface BulletinAlertHistory {
+  state: 'read';
+  kept_since: string | null;
+  coverage: 'full' | 'partial' | 'none';
+  opened: Array<{
+    name: string;
+    label: string | null;
+    cases: number;
+    first_opened_at: string;
+    still_open: number;
+  }>;
+  closed: Array<{
+    name: string;
+    label: string | null;
+    cases: number;
+    last_closed_at: string;
+    longest_hours: number | null;
+    opened_before_history: number;
+  }>;
+}
+
+// Priorité 05 : encaissé moins coûts.
+
+export type MinorByCurrency = Record<string, number>;
+
+export type CostLine =
+  | {
+      item: string;
+      label: string;
+      source: 'stripe' | 'saisie';
+      expected: boolean;
+      state: 'connu';
+      amounts: MinorByCurrency;
+      nature: 'mesure' | 'facture' | 'releve' | 'estime';
+    }
+  | {
+      item: string;
+      label: string;
+      source: 'stripe' | 'saisie';
+      expected: boolean;
+      state: 'inconnu';
+      reason: string;
+      blocking: boolean;
+    };
+
+export interface MoneyPeriod {
+  month: string;
+  from: string;
+  to: string;
+  complete: boolean;
+  received:
+    | { state: 'read'; count: number; gross: MinorByCurrency; refunded: MinorByCurrency; test_mode: boolean }
+    | { state: 'inconnu'; reason: string };
+  costs: CostLine[];
+  result: {
+    status: 'exact' | 'estime' | 'au_plus' | 'inconnu';
+    by_currency: MinorByCurrency | null;
+    missing: string[];
+  };
+}
+
+export interface BulletinMoney {
+  state: 'read';
+  stripe_read_at: string | null;
+  periods: MoneyPeriod[];
+}
+
 export interface BulletinPayload {
   version: typeof BULLETIN_VERSION;
   observed_at: string;
@@ -150,16 +277,24 @@ export interface BulletinPayload {
   };
   requested: { week: string | null };
   numbers: BulletinNumbers | Unread;
+  /** Étape A2 ; absent d'une API qui la précède. */
+  decisions?: BulletinDecisions | Unread;
   moved: {
     merged_pulls: MergedPullsRead;
     heartbeats: BulletinHeartbeats | Unread;
     alerts: BulletinAlerts | Unread;
+    /** Étape A2 ; absent d'une API qui la précède. */
+    alert_history?: BulletinAlertHistory | Unread;
     sources: BulletinSources | Unread;
   };
   needs: {
     missing_bics: BulletinMissingBics | Unread;
     forum_threads: BulletinForumThreads | Unread;
   };
+  /** Étape B ; absent d'une API qui la précède. */
+  veille?: BulletinFeed | Unread;
+  /** Priorité 05 ; absent d'une API qui la précède. */
+  money?: BulletinMoney | Unread;
   not_yet: Array<{ key: string; title: string; reason: string }>;
   definitions: Record<string, string>;
 }
@@ -227,7 +362,131 @@ export function readBulletin(payload: unknown): BulletinPayload | null {
     if (alerts.stale !== undefined && !Array.isArray(alerts.stale)) return null;
     blocks = { ...blocks, alerts: { ...alerts, stale: alerts.stale ?? [] } };
   }
-  return { ...payload, moved: blocks } as unknown as BulletinPayload;
+  blocks = { ...blocks, alert_history: optionalBlock(moved.alert_history, isAlertHistory) };
+  return {
+    ...payload,
+    moved: blocks,
+    decisions: optionalBlock(payload.decisions, isDecisions),
+    veille: optionalBlock(payload.veille, isFeed),
+    money: optionalBlock(payload.money, isMoney),
+  } as unknown as BulletinPayload;
+}
+
+/** Un bloc facultatif : gardé s'il a sa forme (ou dit `unread`), écarté sinon. */
+function optionalBlock(value: unknown, isRead: (v: Obj) => boolean): unknown {
+  if (!isBlock(value)) return undefined;
+  const v = value as Obj;
+  if (v.state === 'unread') return v;
+  return isRead(v) ? v : undefined;
+}
+
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isNat = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+const isStrOrNull = (v: unknown): boolean => v === null || isStr(v);
+
+/** Les clés que le formulaire de réponse peut envoyer : les trois formes de l'API, rien d'autre. */
+export const PROPOSAL_KEY = /^(session:\d{1,9}|regle:bic-introuvable:[A-Z]{2}|regle:veille-sans-oui:[a-z-]{1,40})$/;
+
+function isAnswerView(v: unknown): boolean {
+  return (
+    isObj(v) &&
+    isStr(v.key) &&
+    (ANSWERS as readonly unknown[]).includes(v.answer) &&
+    isStr(v.label) &&
+    isStr(v.week) &&
+    isStr(v.answered_at)
+  );
+}
+
+function isDecisions(v: Obj): boolean {
+  if (typeof v.computed !== 'boolean' || !isNat(v.more)) return false;
+  if (!Array.isArray(v.shown) || !Array.isArray(v.answered)) return false;
+  return (
+    v.answered.every(isAnswerView) &&
+    v.shown.every(
+      (p) =>
+        isObj(p) &&
+        isStr(p.key) &&
+        PROPOSAL_KEY.test(p.key) &&
+        ['session', 'bic_introuvable', 'veille_sans_oui'].includes(p.kind as string) &&
+        isStr(p.title) &&
+        isStrOrNull(p.detail) &&
+        isStrOrNull(p.origin) &&
+        (p.country === null || (isStr(p.country) && /^[A-Z]{2}$/.test(p.country))) &&
+        (p.answer === null || isAnswerView(p.answer)) &&
+        isStrOrNull(p.postponed_at),
+    )
+  );
+}
+
+function isFeed(v: Obj): boolean {
+  if (!Array.isArray(v.sources)) return false;
+  return v.sources.every((s) => {
+    if (!isObj(s) || !isStr(s.source) || !isStr(s.label)) return false;
+    if (s.state === 'none') return true;
+    if (s.state !== 'read' || !isStr(s.received_at)) return false;
+    if (!Array.isArray(s.lines) || !s.lines.every(isStr)) return false;
+    if (s.score === null) return true;
+    const sc = s.score;
+    return isObj(sc) && isNat(sc.value) && isNat(sc.out_of) && isNat(sc.errors) && sc.out_of > 0;
+  });
+}
+
+function isMinorMap(v: unknown): boolean {
+  return (
+    isObj(v) &&
+    Object.entries(v).every(([c, n]) => /^[a-z]{3}$/.test(c) && typeof n === 'number' && Number.isInteger(n))
+  );
+}
+
+function isCostLine(v: unknown): boolean {
+  if (!isObj(v) || !isStr(v.item) || !isStr(v.label) || typeof v.expected !== 'boolean') return false;
+  if (v.state === 'connu') return isMinorMap(v.amounts) && isStr(v.nature);
+  return v.state === 'inconnu' && isStr(v.reason) && typeof v.blocking === 'boolean';
+}
+
+function isMoney(v: Obj): boolean {
+  if (!isStrOrNull(v.stripe_read_at) || !Array.isArray(v.periods)) return false;
+  return v.periods.every((p) => {
+    if (!isObj(p) || !isStr(p.month) || !CIVIL.test(String(p.from)) || !CIVIL.test(String(p.to))) {
+      return false;
+    }
+    if (typeof p.complete !== 'boolean' || !Array.isArray(p.costs) || !p.costs.every(isCostLine)) {
+      return false;
+    }
+    const r = p.received;
+    const receivedOk =
+      isObj(r) &&
+      ((r.state === 'read' && isNat(r.count) && isMinorMap(r.gross) && isMinorMap(r.refunded)) ||
+        (r.state === 'inconnu' && isStr(r.reason)));
+    const res = p.result;
+    return (
+      receivedOk &&
+      isObj(res) &&
+      ['exact', 'estime', 'au_plus', 'inconnu'].includes(res.status as string) &&
+      (res.by_currency === null || isMinorMap(res.by_currency)) &&
+      Array.isArray(res.missing) &&
+      res.missing.every(isStr)
+    );
+  });
+}
+
+function isAlertHistory(v: Obj): boolean {
+  if (!['full', 'partial', 'none'].includes(v.coverage as string)) return false;
+  if (!isStrOrNull(v.kept_since)) return false;
+  if (!Array.isArray(v.opened) || !Array.isArray(v.closed)) return false;
+  return (
+    v.opened.every((g) => isObj(g) && isStr(g.name) && isNat(g.cases) && isStr(g.first_opened_at) && isNat(g.still_open)) &&
+    v.closed.every(
+      (g) =>
+        isObj(g) &&
+        isStr(g.name) &&
+        isNat(g.cases) &&
+        isStr(g.last_closed_at) &&
+        (g.longest_hours === null || typeof g.longest_hours === 'number') &&
+        isNat(g.opened_before_history),
+    )
+  );
 }
 
 // ─── Numbers and words ───────────────────────────────────────────────────────
@@ -406,4 +665,102 @@ const STALE_REASON: Record<NonNullable<SourceView['stale_reason']>, string> = {
 
 export function staleReasonText(reason: SourceView['stale_reason']): string {
   return reason ? STALE_REASON[reason] : 'à jour';
+}
+
+// ─── Étapes A2 et B, en mots ─────────────────────────────────────────────────
+
+const ANSWER_WORDS: Record<Answer, string> = { oui: 'Oui', plus_tard: 'Plus tard', non: 'Non' };
+
+export function answerWord(a: Answer): string {
+  return ANSWER_WORDS[a];
+}
+
+/** Une durée donnée en heures, en mots. */
+export function durationText(hours: number): string {
+  if (hours < 1) return 'moins d’une heure';
+  if (hours < 48) return `${fmt(Math.round(hours))} h`;
+  return `${fmt(Math.floor(hours / 24))} j`;
+}
+
+/** Le score des IA, dit avec son dénominateur, et partiel quand des requêtes ont échoué. */
+export function scoreText(score: FeedScore): string {
+  const base =
+    `${fmt(score.value)} ${score.out_of <= 1 ? 'requête' : 'requêtes'} de référence sur ${fmt(score.out_of)} ` +
+    'où une recherche web fait apparaître IBANforge.';
+  return score.errors > 0
+    ? `${base} Score partiel : ${count(score.errors, 'requête en erreur', 'requêtes en erreur')}.`
+    : base;
+}
+
+// ─── Priorité 05, en mots ────────────────────────────────────────────────────
+
+/** Les devises sans décimales de Stripe : leur unité mineure est l'unité. */
+const ZERO_DECIMAL = new Set([
+  'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
+]);
+
+/** `12,50 USD`, `−3,00 CHF` : des unités mineures, dites dans l'unité, à la française, sans Intl. */
+export function money(minor: number, currency: string, signed = false): string {
+  const zero = ZERO_DECIMAL.has(currency);
+  const value = zero ? minor : minor / 100;
+  const body = formatGrouped(Math.abs(value), 'fr', zero ? 0 : 2);
+  const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
+  return `${sign}${body} ${currency.toUpperCase()}`;
+}
+
+/** Chaque devise d'une table, par ordre alphabétique, réunies ; `—` quand elle est vide. */
+export function moneyList(map: MinorByCurrency, signed = false): string {
+  const entries = Object.entries(map).filter(([, v]) => v !== 0);
+  if (entries.length === 0) return signed ? '0' : '—';
+  return entries
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([c, v]) => money(v, c, signed))
+    .join(' · ');
+}
+
+/** `Septembre 2026` ou `Octobre 2026, du 1er au 4`. */
+export function periodTitle(p: { month: string; from: string; to: string; complete: boolean }): string {
+  const y = Number(p.month.slice(0, 4));
+  const m = Number(p.month.slice(5, 7));
+  const name = MONTHS[m - 1];
+  const title = `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+  if (p.complete) return title;
+  const { y: ty, m: tm, d: td } = civilParts(p.to);
+  const last = new Date(Date.UTC(ty, tm - 1, td - 1)).getUTCDate();
+  return `${title}, du 1er au ${last}`;
+}
+
+const COST_REASON: Record<string, string> = {
+  non_saisi: 'pas saisi',
+  partiel: 'saisi pour une partie de la période seulement',
+  deborde: 'saisi sur une période qui déborde, jamais réparti au prorata',
+  stripe_indisponible: 'Stripe non lu',
+  frais_incomplets: 'des frais illisibles chez Stripe',
+};
+
+export function costReasonText(reason: string): string {
+  return COST_REASON[reason] ?? 'inconnu';
+}
+
+const NATURE_WORD: Record<string, string> = {
+  mesure: 'mesuré chez Stripe',
+  facture: 'facture',
+  releve: 'relevé',
+  estime: 'estimation',
+};
+
+export function natureText(nature: string): string {
+  return NATURE_WORD[nature] ?? nature;
+}
+
+const RECEIVED_REASON: Record<string, string> = {
+  stripe_not_configured: 'Stripe n’est pas configuré pour l’API',
+  stripe_unreachable: 'Stripe n’a pas répondu',
+  stripe_slow: 'Stripe est en cours de lecture, recharger dans une minute',
+  classement_incomplet:
+    'le classement des paiements a manqué : une part de l’argent d’IBANforge peut ne pas être comptée',
+};
+
+export function receivedReasonText(reason: string): string {
+  return RECEIVED_REASON[reason] ?? 'la lecture de Stripe a échoué';
 }

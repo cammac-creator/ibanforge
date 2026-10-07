@@ -557,7 +557,7 @@ const TOOLS: Tool[] = [
     title: 'Check Swiss QR-bill Payload',
     annotations: { title: 'Check Swiss QR-bill Payload', ...READ_ONLY },
     description:
-      "Check a Swiss QR-bill payload, the text a QR-bill's code carries (starts with SPC), rule by rule, each finding citing the SIX document it comes from. USE WHEN: an agent, an ERP or an accounting tool holds a scanned or generated QR-bill and must know before paying or issuing it whether it is well-formed, whether the reference type matches the IBAN (QRR needs a QR-IBAN, IID 30000-31999), and above all whether the creditor and debtor addresses are STRUCTURED (type S) or still COMBINED (type K): the standard removed type K on 21.11.2025 and banks stop processing payments built on it from 14.11.2026. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the paid validate_iban. RETURNS: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines, to relay as a fix. IMPORTANT: relay each finding's source string. " +
+      "Check a Swiss QR-bill payload, the text a QR-bill's code carries (starts with SPC), rule by rule, each finding citing the SIX document it comes from. USE WHEN: an agent, an ERP or an accounting tool holds a scanned or generated QR-bill and must know before paying or issuing it whether it is well-formed, whether the reference type matches the IBAN (QRR needs a QR-IBAN, IID 30000-31999), and above all whether the creditor and debtor addresses are STRUCTURED (type S) or still COMBINED (type K): type K has not been permitted since 21.11.2025, and the banks guarantee payment of a type K QR-bill only until the end of September 2026. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the paid validate_iban. RETURNS: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines, to relay as a fix. IMPORTANT: relay each finding's source string. " +
       'COST: free (routed to POST /v1/ch/qr-bill/check).',
     inputSchema: {
       type: 'object',
@@ -574,7 +574,11 @@ const TOOLS: Tool[] = [
       type: 'object',
       properties: {
         valid: { type: 'boolean', description: 'True when no finding has severity error.' },
-        ready_for_2026_11_14: { type: 'boolean', description: 'valid AND every present address is structured (type S).' },
+        ready_for_2026_11_14: {
+          type: 'boolean',
+          description:
+            'valid AND every present address is structured (type S). The name is kept for compatibility and is not a deadline: type K has not been permitted since 21.11.2025, and the banks guarantee payment of a type K QR-bill only until the end of September 2026.',
+        },
         qr_type: { type: 'string' },
         version: { type: 'string' },
         coding: { type: 'string' },
@@ -959,8 +963,10 @@ const TOOLS: Tool[] = [
     title: 'Request an IBANforge API key',
     annotations: { title: 'Request an IBANforge API key' },
     description:
-      'Start the process that gives this session its own free IBANforge API key, without any e-mail address and without leaving your conversation. ' +
-      'USE WHEN: you used up the free allowance, a call answers 402, or you are about to run more than a handful of validations. ' +
+      'Start the process that gives your human a free IBANforge API key, without any e-mail address. ' +
+      'The key does not unlock this session: it works once your human puts it in the MCP client configuration and reconnects, or sends it to the REST API, so tell them where it goes when you hand it over: ' +
+      '`config_line` (returned by poll_api_key) for Claude Code with the npm package; for the hosted server https://api.ibanforge.com/mcp, the header "Authorization: Bearer <key>", which Claude and Claude Desktop take under Request headers when the custom connector is added; ChatGPT sends no key to a connector, so in ChatGPT the key serves on the REST API only. ' +
+      'USE WHEN: you used up the free allowance, a call answers 402, or your human is about to run more than a handful of validations. ' +
       'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
       'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
       'Do NOT open the link yourself, do NOT fill anything in on their behalf, and do NOT invent an e-mail address: the page gives a key with no address at all, and your human may add one if THEY choose. ' +
@@ -1028,7 +1034,7 @@ const TOOLS: Tool[] = [
       'HOW TO CALL IT: leave `device_code` empty to reuse the last request from this session. ' +
       'The server usually waits up to thirty seconds before answering, and sometimes answers at once when it is busy — either way, calling it once per minute is enough, never in a tight loop. ' +
       'WHAT THE ANSWERS MEAN: `authorization_pending` is normal and means nobody has approved yet — wait `retry_in_seconds` and call again; ' +
-      '`approved` carries the key ONCE and never again, so hand it to your human immediately together with `config_line`; ' +
+      '`approved` carries the key ONCE and never again, so hand it to your human immediately together with `config_line`, or the header "Authorization: Bearer <key>" for the hosted server; ' +
       '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
       '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
       '`invalid_grant` means this code can no longer be used at all — stop. ' +
@@ -1180,6 +1186,7 @@ const INSTRUCTIONS =
   // sans chiffre ni période, qui renvoie à rate-limits.yml et à GET /v1. Un
   // paquet publié reste figé jusqu'à la version suivante ; les quotas, non.
   'Free tier: 25 tool calls a week per source address here (ISO week in UTC, reset on Monday 00:00 UTC), no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
+  'On the hosted server https://api.ibanforge.com/mcp, send that key as "Authorization: Bearer ifk_..." (or X-API-Key) on every request: tool calls then count against the key exactly as REST calls do, instead of the weekly allowance. ' +
   'POST https://api.ibanforge.com/v1/keys/claim lifts that same key to 200 REST calls/month — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. The mailed code gives 200 every month; a payment gives 200 once. ' +
   // 2026-09-15 : copie CARACTÈRE POUR CARACTÈRE de la phrase device grant de
   // src/mcp/instructions.ts. Ce paquet est publié séparément et ne peut pas

@@ -1634,7 +1634,7 @@
     "subtitle": "Keine E-Mail nötig: 25 kostenlose Aufrufe pro Monat, sofort. Geben Sie eine Adresse an, und wir heben denselben Schlüssel auf 200 pro Monat. In beiden Fällen ohne Kreditkarte. Der Schlüssel wird nur einmal angezeigt.",
     "emailLabel": "E-Mail (optional)",
     "emailPlaceholder": "you@company.com — leer lassen für einen Schlüssel ohne E-Mail",
-    "emailHint": "Eine Adresse dient nur dazu, denselben Schlüssel auf 200 pro Monat zu heben, mit einem 6-stelligen Code. Sie ist nie erforderlich, und es wird Ihnen nichts anderes zugesandt.",
+    "emailHint": "Eine Adresse dient nur dazu, denselben Schlüssel mit einem 6-stelligen Code auf 200 pro Monat zu heben und Ihnen höchstens eine Nachricht des Gründers zu schicken, die fragt, ob der Schlüssel Ihnen nützt, mit einem Link, um nichts mehr zu erhalten. Sie ist nie erforderlich.",
     "submit": "Schlüssel generieren",
     "submitAnonymous": "Schlüssel ohne E-Mail holen",
     "submitting": "Generierung…",
@@ -1795,7 +1795,7 @@
         "Fragen Sie: „Prüfe die Dokumentations-IBAN DE89370400440532013000 und nenne Registerergebnis, Quelle und Datum.“",
         "Lesen Sie bank_code_check und die Quellen. unknown bestätigt nichts; die Prüfung belegt weder die Existenz des Kontos noch dessen Inhaber."
       ],
-      "limits": "{weekly} Tool-Einheiten pro Netzwerkadresse und Woche (ISO-Woche in UTC, Neustart montags um 00:00 UTC) ohne Schlüssel; jede IBAN eines Batches zählt als Einheit. Ein API-Schlüssel erhöht dieses entfernte Kontingent nicht. {remote} entfernte Tools, {installed} im lokalen Paket: Die beiden Dateiaudit-Tools benötigen das installierte Paket.",
+      "limits": "{weekly} Tool-Einheiten pro Netzwerkadresse und Woche (ISO-Woche in UTC, Neustart montags um 00:00 UTC) ohne Schlüssel; jede IBAN eines Batches zählt als Einheit. Mit einem API-Schlüssel im Authorization-Header zählen die Aufrufe stattdessen auf diesen Schlüssel, genau wie bei der REST-API. {remote} entfernte Tools, {installed} im lokalen Paket: Die beiden Dateiaudit-Tools benötigen das installierte Paket.",
       "guide": "MCP-Anleitung und Kontingente",
       "local": "Benötigt Ihr Client einen lokalen Prozess? Nutzen Sie diese Konfiguration.",
       "sdkHeading": "Mit einem SDK integrieren",
@@ -2633,8 +2633,8 @@
       "note": "Eine Datei, eine Kartenzahlung über Stripe. Die kommentierte Arbeitsmappe (.xlsx) und die Zusammenfassung sind sofort nach der Zahlung bereit und bleiben 24 Stunden herunterladbar."
     },
     "deadline": {
-      "title": "Mitte November 2026: SIX verarbeitet keine QR-Rechnungs-Zahlungen mit unstrukturierter Adresse mehr",
-      "text": "Ab diesem Datum werden Daueraufträge und Zahlungsvorlagen auf Basis von QR-Rechnungen mit unstrukturierter Adresse nicht mehr verarbeitet. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
+      "title": "Mitte November 2026: Schweizer Zahlungsaufträge mit unstrukturierter Adresse werden abgewiesen",
+      "text": "Ab dem 14.11.2026 (SIX) wird jeder Zahlungsauftrag mit unstrukturierter Adresse abgewiesen, und Zahlungsvorlagen mit einer solchen Adresse lassen sich nicht mehr verwenden. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
     },
     "upload": {
       "label": "Legen Sie Ihre Kreditorendatei hier ab",
@@ -2833,11 +2833,11 @@
   },
   "qrBill": {
     "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",
-    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, vor der SIX-Frist Mitte November 2026.",
+    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert sind (Typ K, seit dem 21.11.2025 nicht mehr zulässig).",
     "eyebrow": "Kostenloses Tool",
-    "title": "Ist diese QR-Rechnung bereit für Mitte November 2026?",
+    "title": "Ist diese QR-Rechnung gültig und sind ihre Adressen strukturiert?",
     "intro": "Fügen Sie den Text im Swiss-QR-Code ein (er beginnt mit SPC). Sie erhalten alle Urteile auf einmal: Kopfzeilen, Kreditoren-IBAN und QR-IBAN-Bereich, Referenz QRR, SCOR oder NON mit Prüfziffer, Betrag, Währung, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind. Eine kombinierte Adresse kommt mit den stattdessen zu verwendenden strukturierten Feldern zurück.",
-    "deadline": "Adressen vom Typ K wurden am 21. November 2025 aus dem Standard entfernt; ab Mitte November 2026 verarbeiten die Banken darauf beruhende Daueraufträge und Zahlungsvorlagen nicht mehr.",
+    "deadline": "Der Adresstyp K ist in einer QR-Rechnung seit dem 21.11.2025 nicht mehr zulässig (SIX, IG QR-Rechnung 2.3). Die Banken garantieren die Zahlung einer solchen QR-Rechnung nur bis Ende September 2026 (UBS: 30.09.2026; ZKB: längstens bis Ende September 2026). Eine QR-Rechnung mit Typ K kann daher bei der Zahlung abgewiesen werden: Stellen Sie sie mit Typ S neu aus. Ab dem 14.11.2026 wird jeder Zahlungsauftrag mit unstrukturierter Adresse abgewiesen. Erfassen Sie auch die Daueraufträge und Vorlagen neu, die aus einer QR-Rechnung mit Typ K übernommen wurden.",
     "docsLink": "Dokumentation lesen",
     "input": {
       "label": "Text der QR-Rechnung (Swiss Payments Code)",
@@ -2848,7 +2848,7 @@
     },
     "result": {
       "valid": "Wohlgeformt",
-      "ready": "Bereit für Mitte November 2026",
+      "ready": "Gültig, Adressen strukturiert (Typ S)",
       "yes": "Ja",
       "no": "Nein",
       "iban": "Kreditoren-IBAN",
@@ -3197,7 +3197,7 @@
     "approveAnon": "Schlüssel holen ({limit} Anfragen pro Monat)",
     "approveAnonNote": "Ohne E-Mail, ohne Karte, ohne Konto.",
     "approveEmail": "Stattdessen E-Mail-Adresse angeben ({limit} pro Monat)",
-    "approveEmailNote": "Wir senden einen 6-stelligen Code, um zu prüfen, dass das Postfach Ihnen gehört. Die Adresse dient nur dem Schlüssel.",
+    "approveEmailNote": "Wir senden einen 6-stelligen Code, um zu prüfen, dass das Postfach Ihnen gehört. Die Adresse dient dem Schlüssel und dazu, Ihnen höchstens eine Nachricht des Gründers zu schicken, die fragt, ob der Schlüssel Ihnen nützt, mit einem Link, um nichts mehr zu erhalten.",
     "codeSent": "Code gesendet. Geben Sie unten die 6 Ziffern ein.",
     "deny": "Das habe ich nicht angefordert",
     "doneTitle": "Fertig. Kehren Sie zu Ihrem Agenten zurück.",

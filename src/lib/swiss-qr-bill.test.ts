@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   checkSwissQrBill,
   splitPayload,
-  COMBINED_ADDRESS_PROCESSING_STOPS,
+  COMBINED_ADDRESS_NOTICE,
+  COMBINED_ADDRESS_SOURCE,
 } from './swiss-qr-bill.js';
 
 const QR_IBAN = 'CH4431999123000889012'; // IID 31999, in the QR range
@@ -87,7 +88,7 @@ describe('checkSwissQrBill', () => {
     expect(r.next_steps.join(' ')).toContain('/v1/iban/validate');
   });
 
-  it('flags a combined (K) creditor address, proposes the structured fields, and is not ready for 14.11.2026', () => {
+  it('flags a combined (K) creditor address, proposes the structured fields, and is not ready', () => {
     const r = checkSwissQrBill(
       payload({
         creditor: ['K', 'Robert Schneider AG', 'Rue du Lac 1268', '2501 Biel', '', '', 'CH'],
@@ -105,7 +106,14 @@ describe('checkSwissQrBill', () => {
       ctry: 'CH',
       confidence: 'high',
     });
-    expect(r.next_steps[0]).toContain(COMBINED_ADDRESS_PROCESSING_STOPS);
+    // The dates a bank actually published, never the payment-order date of
+    // 14.11.2026 sold as the day banks stop paying a type K QR-bill.
+    const finding = r.findings.find((f) => f.code === 'combined_address');
+    expect(finding?.detail).toBe(COMBINED_ADDRESS_NOTICE.en);
+    expect(finding?.source).toBe(COMBINED_ADDRESS_SOURCE);
+    expect(r.next_steps[0]).toContain('type S');
+    expect(r.next_steps[0]).toContain('end of September 2026');
+    expect(r.next_steps[0]).not.toMatch(/2026-11-14|14\.11\.2026/);
   });
 
   it('accepts an ordinary IBAN with SCOR and a valid RF reference, and with NON and no reference', () => {

@@ -42,6 +42,7 @@
 
 import { pathToFileURL } from 'node:url';
 import { runDiscoverabilityCanary } from './discoverability-canary.js';
+import { depositToBulletin, veilleLines } from './bulletin-deposit.js';
 
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const STATS_TOKEN = process.env.STATS_TOKEN ?? '';
@@ -580,6 +581,14 @@ async function main(): Promise<void> {
   }
   console.log('[veille] sending via Dory…');
   await sendToDory(report);
+  // Étape B du bulletin du lundi : le message Telegram ci-dessus part comme avant ;
+  // en plus, trois lignes des portes qui s'ouvrent vont dans le bulletin. Jamais
+  // bloquant, jamais écrit dans le journal (voir bulletin-deposit.ts).
+  await depositToBulletin(
+    'weekly-veille',
+    { lines: veilleLines(researchBlock) },
+    { apiBase: API_BASE, token: process.env.BULLETIN_FEED_TOKEN },
+  );
   console.log('[veille] done.');
 }
 

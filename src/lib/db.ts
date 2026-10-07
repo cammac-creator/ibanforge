@@ -1641,8 +1641,107 @@ function openStatsDB(): DatabaseType.Database {
         computed_at  TEXT NOT NULL
       );
     `);
+    migrateBulletinA2(statsDB);
   }
   return statsDB;
+}
+
+/**
+ * Le bulletin du lundi, étape A2 et ligne « encaissé moins coûts » (07.10.2026).
+ *
+ * Bloc autonome posé en DERNIER, comme les registres d'essai et le compte client :
+ * des `CREATE TABLE IF NOT EXISTS` et un `INSERT OR IGNORE`, aucun ALTER, donc aucune
+ * garde `PRAGMA table_info` et aucun index sur une colonne créée plus bas (le piège
+ * du 19/08). Rejouable à chaque ouverture sans rien changer.
+ *
+ * Hors de la sauvegarde (`src/lib/backup.ts`), délibérément : la sauvegarde rend son
+ * accès à un client qui a payé ; ces tables ne portent aucune donnée de client, et ce
+ * qu'elles gardent (historique des alertes, dépôts des veilles, réponses du lundi,
+ * coûts saisis) se perd sans toucher un client. Aucune adresse, aucune clé, aucune
+ * empreinte d'adresse IP.
+ */
+function migrateBulletinA2(statsDB: DatabaseType.Database): void {
+  statsDB.exec(`
+    -- L historique des alertes d exploitation, écrit par ops-alert.ts aux seules
+    -- transitions : une ligne quand le message d une alerte part, refermée quand
+    -- un succès la referme. Jusque-là seul l état courant existait (kv_state) :
+    -- une alerte ouverte puis refermée dans la semaine ne laissait aucune trace.
+    -- opened_at NULL : une alerte déjà ouverte avant que cet historique soit tenu,
+    -- dont seule la fermeture a été vue. Pas de texte du message : la clé suffit,
+    -- et un message peut porter un détail technique qu on ne veut pas garder.
+    CREATE TABLE IF NOT EXISTS ops_alert_log (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      alert_key  TEXT    NOT NULL,
+      opened_at  TEXT,
+      closed_at  TEXT,
+      fails      INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_ops_alert_log_opened ON ops_alert_log(opened_at);
+    CREATE INDEX IF NOT EXISTS idx_ops_alert_log_closed ON ops_alert_log(closed_at);
+    CREATE INDEX IF NOT EXISTS idx_ops_alert_log_open_key ON ops_alert_log(alert_key, closed_at);
+    -- Ce que les veilles du lundi déposent : une ligne par source et par semaine
+    -- suisse, réécrite par un nouveau dépôt de la même semaine (les trois essais
+    -- du workflow ne font qu une ligne). payload est le JSON déjà validé et
+    -- normalisé par la route : au plus trois lignes de texte brut et un score.
+    CREATE TABLE IF NOT EXISTS bulletin_feed (
+      source      TEXT NOT NULL,
+      week        TEXT NOT NULL,
+      payload     TEXT NOT NULL,
+      received_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (source, week)
+    ) WITHOUT ROWID;
+    -- Les propositions posées par la session principale. Celles que les règles
+    -- calculent ne sont pas écrites : la lecture du bulletin n écrit rien.
+    -- origin nomme la veille dont la proposition est née, ou NULL.
+    CREATE TABLE IF NOT EXISTS bulletin_proposals (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      week       TEXT NOT NULL,
+      origin     TEXT,
+      title      TEXT NOT NULL,
+      detail     TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    -- Les réponses du lundi, toutes gardées : la dernière d une clé fait foi.
+    -- Oui et Non ne reviennent pas ; Plus tard revient vingt-huit jours après.
+    -- label est le titre de la proposition au moment de la réponse, recopié par
+    -- l API (jamais un texte venu du navigateur).
+    CREATE TABLE IF NOT EXISTS bulletin_answers (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      proposal_key TEXT NOT NULL,
+      week         TEXT NOT NULL,
+      answer       TEXT NOT NULL CHECK (answer IN ('oui', 'plus_tard', 'non')),
+      origin       TEXT,
+      label        TEXT NOT NULL,
+      answered_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_bulletin_answers_key ON bulletin_answers(proposal_key, id);
+    -- Les coûts saisis par la session principale (facture, relevé ou estimation),
+    -- chacun pour une période explicite : du jour period_from inclus au jour
+    -- period_to exclu, dates civiles suisses. Un poste qui ne couvre pas toute
+    -- une période du bulletin y est inconnu : jamais réparti au prorata, jamais
+    -- compté pour zéro. Montant en unités mineures, devise ISO en minuscules :
+    -- les devises ne s additionnent jamais entre elles.
+    CREATE TABLE IF NOT EXISTS bulletin_costs (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      item         TEXT    NOT NULL,
+      period_from  TEXT    NOT NULL,
+      period_to    TEXT    NOT NULL,
+      amount_minor INTEGER NOT NULL,
+      currency     TEXT    NOT NULL,
+      nature       TEXT    NOT NULL CHECK (nature IN ('facture', 'releve', 'estime')),
+      note         TEXT,
+      recorded_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (item, period_from, period_to)
+    );
+    -- Les repères du bulletin. ops_alert_log_since : l instant où l historique
+    -- des alertes a commencé, pour qu une semaine d avant dise « pas gardé »
+    -- au lieu de montrer zéro alerte. Posé une fois, jamais réécrit.
+    CREATE TABLE IF NOT EXISTS bulletin_meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    INSERT OR IGNORE INTO bulletin_meta (key, value) VALUES ('ops_alert_log_since', datetime('now'));
+  `);
 }
 
 /**

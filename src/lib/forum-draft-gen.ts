@@ -3,6 +3,9 @@
  *
  * The operator's requirement (18/08/2026): every thread in the Forums tab
  * arrives with its reply draft and French summary ALREADY filled, no button.
+ * Except on the sites that ban AI-drafted text (Stack Overflow, Money.SE:
+ * NO_AI_DRAFT_SOURCES in forum-radar.ts, 02/10/2026), whose threads are listed
+ * for the operator to answer in his own words.
  * So generation runs inside the radar tick, right after a thread is scored
  * in, and as a bounded backfill for rows still missing a draft.
  *
@@ -22,17 +25,45 @@ import { enrichResult } from './enrich.js';
 import { lookup as lookupBic } from './bic-lookup.js';
 import { customerContextBlock } from './company-profiles.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+import { namesOf, registerCountries } from './positioning.js';
 import { logModelUsage } from './model-usage.js';
 
-export const PRODUCT_FACTS = [
-  `Free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests/month on a key that needs no e-mail and no card, ${FREE_TIER_MONTHLY_LIMIT} a month once you claim it.`,
-  'POST /v1/iban/validate returns bic, bank_code_check (does the national bank code exist in its register, with institution name/address where the register provides them), sepa.schemes (SCT/SDD reachability) and sepa.vop_participant (is the resolved institution listed VoP-ready in the EPC register).',
-  'National registers refreshed monthly: SIX BankMaster (CH/LI, includes QR-IID 30000-31999 and merger redirects), Bundesbank (DE), OeNB (AT), NBB (BE), plus GLEIF BIC-to-LEI open data.',
-  'OpenAPI spec: https://api.ibanforge.com/openapi.json · MCP server on npm: ibanforge-mcp.',
-  'Honest alternatives you may cite: schwifty (Python, offline snapshots), the paid SWIFT IBAN Plus directory, free national files (Bundesbank BLZ, SIX BankMaster), iban.com / ibanapi.com (commercial).',
-].join('\n');
+/**
+ * The registers, read from the code that decides the verdict rather than typed:
+ * the hand-written line this replaces (until 02/10/2026) named four registers
+ * "refreshed monthly" while the code held eight that settle a negative, the
+ * Austrian and Belgian ones arriving through the private overlay on its own
+ * schedule. No cadence is claimed: each register has its own.
+ * `forum-draft-gen.test.ts` fails if the line drifts from `registerCoverage()`.
+ */
+function registerFacts(): string {
+  const { authoritative, partial } = registerCountries();
+  return (
+    `Bank-code verdict from the national register, read in full (a code it does not hold comes back not_allocated): ${namesOf(authoritative)}. ` +
+    `Partial registers, where a hit names the holder and a miss is not a refusal: ${namesOf(partial)}. ` +
+    'The Swiss register (SIX BankMaster, also Liechtenstein) includes QR-IID 30000-31999 and merger redirects. GLEIF BIC-to-LEI open data.'
+  );
+}
 
-export const DRAFT_SYSTEM = `You draft forum/issue replies for the maintainer of ibanforge.com (IBAN/BIC validation API). The reader must experience a peer solving their problem, never a vendor.
+/**
+ * A function, not a module constant: the facts read `registerCoverage()`, and
+ * enrich.ts sits in an import cycle with this module (enrich -> ... -> ops-alert
+ * -> forum-radar-server -> here). Evaluated at load, the first read would hit
+ * NATIONAL_REGISTERS before enrich.ts has defined it.
+ */
+export function productFacts(): string {
+  return [
+    `Free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests/month on a key that needs no e-mail and no card, ${FREE_TIER_MONTHLY_LIMIT} a month once you claim it.`,
+    'POST /v1/iban/validate returns bic, bank_code_check (does the national bank code exist in its register, with institution name/address where the register provides them), sepa.schemes (SCT/SDD reachability) and sepa.vop_participant (is the resolved institution listed VoP-ready in the EPC register).',
+    registerFacts(),
+    'OpenAPI spec: https://api.ibanforge.com/openapi.json · MCP server on npm: ibanforge-mcp.',
+    'Honest alternatives you may cite: schwifty (Python, offline snapshots), the paid SWIFT IBAN Plus directory, free national files (Bundesbank BLZ, SIX BankMaster), iban.com / ibanapi.com (commercial).',
+  ].join('\n');
+}
+
+/** The drafting prompt, built on call for the same reason as productFacts(). */
+export function draftSystem(): string {
+  return `You draft forum/issue replies for the maintainer of ibanforge.com (IBAN/BIC validation API). The reader must experience a peer solving their problem, never a vendor.
 
 Hard rules, in order:
 1. FIRST solve or clearly explain the actual problem in the thread, in concrete technical terms. The reply must stand on its own even with every product mention deleted.
@@ -40,8 +71,8 @@ Hard rules, in order:
 3. Cite at least one honest alternative from the whitelist (a library, a free national file, a competitor). No strawmen.
 4. At most ONE product mention, tied to a verifiable fact from the whitelist below. No superlatives, no "best", no feature lists, no call to action, no "feel free to", no links other than documentation-grade ones.
 5. Use ONLY these product facts, never invent numbers or capabilities:
-${PRODUCT_FACTS}
-6. Write in the thread's language (given as "lang"). Sober markdown fitting the platform (GitHub issue or Stack Overflow answer). 120 to 250 words.
+${productFacts()}
+6. Write in the thread's language (given as "lang"). Sober markdown fitting a GitHub issue or discussion. 120 to 250 words.
 7. Typography: NEVER use em dashes or en dashes anywhere. Use commas, colons or parentheses. Short sentences.
 8. Never criticise a person; correcting a factual claim is fine.
 9. If the operator notes say "no product mention" (or the thread is not a problem the API solves), produce pure expertise with zero product mention and no disclosure line.
@@ -55,6 +86,7 @@ Return EXACTLY this structure, nothing before or after (the markers are parsed l
 ===SUMMARY_FR===
 <2-3 French sentences for the operator: what the thread asks, and the angle of this reply>
 ===END===`;
+}
 
 export interface DraftInput {
   title: string;
@@ -224,7 +256,7 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
       // 250 words fit well under 2000, but verbose action-style threads hit
       // that ceiling in production (stop_reason=max_tokens); headroom is cheap.
       max_tokens: 3000,
-      system: DRAFT_SYSTEM,
+      system: draftSystem(),
       // The customer-base block gives the reply real-world grounding (what
       // kind of pipelines actually hit this problem); the block itself
       // forbids naming any customer, and every draft is human-reviewed.

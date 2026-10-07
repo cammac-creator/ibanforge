@@ -80,6 +80,42 @@ Bank », « Izvor: HNB »). Depuis le 01/10/2026, les 36 clés suédoises aussi 
 liste de Bankinfrastruktur i Sverige AB est publique (réponse écrite de Finance
 Sweden du 30/09/2026), sous son avertissement, que porte chaque réponse.
 
+## 07/10/2026 : 31 des 44 codes italiens restés sans BIC retrouvent le leur, depuis des sources ouvertes
+
+La reconstruction du 29/09 avait laissé 44 codes italiens sans BIC (38 du
+registre, 6 hors registre, dont Poste Italiane 07601). Chacun a été repris
+code par code, uniquement sur des sources ouvertes, par
+`scripts/derive-map-keys.ts --add`, qui garde la règle du 29/09 (l'ancien BIC
+n'est jamais lu, une dérivation ambiguë ne donne rien) et ajoute deux étapes :
+
+1. **Succursale d'une banque étrangère** (23 codes). La Banca d'Italia ne publie
+   pas de LEI pour la succursale, ou publie un LEI de succursale auquel GLEIF
+   n'associe aucun BIC : une succursale n'a pas de personnalité juridique, son
+   BIC italien appartient au LEI du siège. La liste quotidienne des IFM de la
+   BCE (édition du 06/10/2026) nomme la succursale italienne et le LEI de son
+   siège (`HEAD_LEI`) ; la ligne BCE est retrouvée par le LEI publié par la
+   Banca d'Italia, ou à défaut par le nom exact ET la ville, uniques des deux
+   côtés. Puis le BIC italien unique que GLEIF associe à ce LEI. Aucune valeur
+   de la BCE n'est servie avec ces clés : la liste ne sert qu'à choisir.
+2. **Le site de la banque elle-même** (8 codes), en dernier : le BIC écrit sur
+   le domaine de la banque ou de son groupe, jamais un annuaire de codes IBAN
+   ou BIC. Il ne peut que départager les BIC de siège que GLEIF associe déjà à
+   la banque (03048, 03104) ; un site qui en nomme un autre est un conflit et
+   ne donne rien. Pour un code hors registre (Poste Italiane), une phrase de la
+   banque doit porter le code lui-même. Adresse, date et phrase citée :
+   `scripts/data/it-bank-site-bics.json` ; le script refuse une phrase qui
+   n'épelle pas le BIC.
+
+Restent sans BIC, comme voulu (`not_in_register` / `absent_from_reference_data`
+hors registre, verdict du registre inchangé sinon) : 8 codes du registre sans
+BIC dans aucune source ouverte (03179, 03269, 03296, 03386, 03407, 03593,
+10312, 36944), et 5 codes hors des registres d'IBAN (23004, 23018, 23019 et
+31011 figurent chez la Banca d'Italia, mais dans des registres que le
+chargeur italien ne lit pas parce qu'ils ne sont pas ceux des émetteurs d'IBAN :
+sociétés de gestion, intermédiaires financiers ; 36087 n'y figure nulle part). Mesure code par code (`scripts/audit/curated-map-replay.ts`) :
+31 codes italiens gagnent un BIC, aucun autre code italien et aucun des 63
+autres pays ne change de réponse.
+
 ## Ce qui alimente `bic.sqlite`
 
 Comptes relevés le 22/08/2026, à recompter après chaque rafraîchissement
@@ -314,6 +350,7 @@ Origines, relevées dans l'historique git et dans les scripts des projets amont 
 | SIX BankMaster | CH | voir plus haut |
 | clés dérivées de `bic_entries` (`51f86e96`) | GB, IE, **SM**, **la plupart des clés NL** et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` (GLEIF, et SwiftCodes du groupe B). Les 11 clés SM sont des préfixes de BIC tirés de là, pas une donnée de la BCSM ni de schwifty (le code bancaire d'un IBAN saint-marinais compte six caractères, ces clés de quatre lettres ne servent probablement jamais) ; 729 des 735 clés NL ajoutées le jour de l'import schwifty viennent de ce mécanisme, pas de schwifty |
 | reconstruction du 29/09/2026 (`scripts/derive-map-keys.ts`) | IT (175 clés), RO (23 clés) | IT : LEI publié par la Banca d'Italia pour le code, puis BIC que GLEIF associe à ce LEI ; RO : le BIC8 roumain unique de GLEIF qui commence par le code. Jamais la copie SwiftCodes |
+| ajouts du 07/10/2026 (même script, `--add`) | IT (31 clés) | 23 : succursale italienne d'une banque étrangère, LEI de son siège donné par la liste des IFM de la BCE, puis BIC italien que GLEIF associe à ce LEI ; 8 : BIC publié par la banque sur son propre site (adresse, date et phrase citée dans `scripts/data/it-bank-site-bics.json`). Trace code par code : `scripts/data/it-map-additions-2026-10-07.json` |
 | ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
 
 **Clés CZ, 25/09/2026** : les 36 clés tchèques ont été confrontées au číselník
@@ -663,9 +700,10 @@ La page nomme l'édition « 2026 B' τρίμηνο » (2026 T2), encore visible 
 l'édition et la date de consultation, en les distinguant ; ni la réponse reçue ni la consultation ne sont
 la date de publication du fichier.
 
-Le chantier grec existe sur des branches locales, mais HEBIC n'est pas encore intégré à `main` au
-14/09/2026. La bascule vers le traitement partiel reste une condition préalable à l'intégration par la
-session responsable des registres ; ne pas relancer ni publier les anciennes branches autoritatives.
+Le chantier grec existait sur des branches locales (`registre-gr-*`, 09/09/2026) qui traitaient HEBIC
+comme un registre qui fait foi et l'écrivaient dans la base publique. **Repris le 07/10/2026 depuis
+`main`, autrement** : chemin partiel, fichier privé, voir la section « HBA : l'index HEBIC grec (import
+privé) » en fin de fichier. Les anciennes branches ne sont ni relancées ni publiées.
 
 ### ✅ 10/09/2026 — Betaalvereniging Nederland confirme la réutilisation de sa liste BIC
 
@@ -1640,3 +1678,58 @@ ni page de liste n'est ajouté avant activation et vérification en production.
 L'import et le lecteur sont prêts pour l'intégrateur ; ni le stockage de production ni la
 chaîne de déploiement ne sont modifiés ici. L'import doit être exécuté mensuellement dans le
 circuit privé autorisé. Il n'est pas ajouté au workflow public qui régénère et commite les bases.
+
+
+## HBA : l'index HEBIC grec (import privé)
+
+Repris le 07/10/2026 sur le modèle de l'ABBL ci-dessus. Source : <https://www.hba.gr/info/hebicmap>
+(page qui nomme l'édition) et <https://www.hba.gr/info/hebicmap/downloadbanks> (fichier des banques,
+CSV en Windows-1253, adresse stable). Seul le fichier des banques est lu.
+
+**Pourquoi privé.** La permission du 08/09/2026 (section ✅ plus haut) porte sur la réutilisation des
+fichiers HEBIC « in its API responses », normalisés et crédités : la même portée que la lettre de
+l'ABBL. Elle ne couvre pas une copie du fichier dans ce dépôt public, dans `data/bic.sqlite`, dans un
+export du site ou dans un paquet (décision de Claude-Alain du 24/09/2026 : ce qui n'est pas
+redistribuable sort du dépôt public). Aucune ligne HEBIC n'est donc commitée ; les tests utilisent des
+lignes inventées.
+
+**Pourquoi partiel.** La HBA a précisé le 14/09/2026 que HEBIC ne couvre pas les établissements de
+paiement et de monnaie électronique qui émettent des IBAN grecs. Un code présent nomme son titulaire
+(`verified`, `authoritative: false`, bloc `institution`) ; un code absent retombe sur la réponse que
+la Grèce recevait avant (carte composite), jamais `not_allocated`. La Grèce n'entre ni dans
+`NATIONAL_REGISTERS` ni dans `NON_EXHAUSTIVE_REGISTERS` (`enrich.ts`) : elle a son chemin propre,
+comme le Luxembourg, et `src/lib/gr-register.test.ts` vérifie qu'elle n'est jamais un registre qui
+fait foi.
+
+### Stockage et raccordement
+
+`scripts/seed-gr-register.ts` produit un fichier JSON privé, jamais `data/bic.sqlite`, et refuse un
+chemin relatif ou situé dans un dépôt git. `GR_REGISTER_PATH` désigne ce fichier
+(`src/lib/gr-register.ts`). Écriture en mode 600 par remplacement atomique, après contrôle de
+l'en-tête, des codes (trois chiffres), des doublons, de l'édition et d'un plancher de 25
+établissements ; un recul d'édition ou une baisse de plus de 10 % demande une vérification manuelle
+et laisse le fichier précédent intact. Le remplacement est relu sans redémarrage. Sans la variable,
+rien ne change pour la Grèce ; un fichier configuré illisible donne `unavailable` / `lookup_failed`,
+jamais un rejet.
+
+### Les deux conditions de la HBA, servies
+
+`bank_code_check.register`, présent sur chaque réponse que ce registre décide, porte le crédit exact
+« Source: Hellenic Bank Association (HEBIC) », l'édition, le jour de lecture, la réserve du registre
+partiel, puis l'Important Note **en entier**, entre guillemets, mot pour mot. Le `llms.txt` de l'API
+la répète quand le fichier est branché (« et dans la documentation »). HEBIC ne publie ni BIC ni LEI :
+le bloc `bic` reste celui de la carte composite.
+
+### La date
+
+La HBA ne date pas ses éditions : le fichier garde l'édition que la page nomme (« 2026 Q2 » pour
+« Έκδοση 2026 B' τρίμηνο ») et le jour de lecture, séparément. Le crédit dit « read by IBANforge
+on », jamais « published » ; `as_of` porte le mois de lecture. Relu le 07/10/2026 : édition 2026 T2,
+35 établissements, aucune adresse non reconnue.
+
+### Ce qui reste à la session principale
+
+L'activation : poser le fichier sur le volume de production et la variable `GR_REGISTER_PATH`, puis
+prouver une réponse grecque en ligne. L'import mensuel dans le circuit privé autorisé, jamais dans le
+workflow public qui régénère et commite les bases. Ni page `/gr`, ni export, ni exemple tiré de HEBIC
+avant une décision sur la portée de la permission (le site n'est pas une « réponse de l'API »).

@@ -84,6 +84,7 @@ import { apiKeys, BUNDLES } from './routes/api-keys.js';
 import { PRO_PRICE_USD } from './lib/payment-links.js';
 import { PRO_MONTHLY_LIMIT } from './lib/api-keys.js';
 import { LU_SOURCE, luRegisterConfigured } from './lib/lu-register.js';
+import { GR_IMPORTANT_NOTE, GR_SOURCE, grRegisterConfigured } from './lib/gr-register.js';
 import {
   BANK_LEVEL_SANCTIONS,
   CANNOT_CALL_TITLE,
@@ -165,6 +166,7 @@ import {
 import { getIban, getIbansArray, getBic } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
+import { COMBINED_ADDRESS_NOTICE } from './lib/qr-bill-notice.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -407,6 +409,13 @@ function buildLlmsTxt(): string {
   const luSourceLine = luRegisterConfigured()
     ? `\n- Luxembourg bank codes: ${LU_SOURCE.replace(/^Source:\s*/, '')}. A listed code names its holder; an absence is not a non-allocation`
     : '';
+  // Greece (07/10/2026): the HEBIC index, from a private file like the ABBL's.
+  // The HBA asks for its exact credit and its Important Note in full beside
+  // HEBIC data; the note travels in every answer's bank_code_check.register and
+  // is repeated here, in the documentation, as the permission asks.
+  const grSourceLine = grRegisterConfigured()
+    ? `\n- Greek bank codes: ${GR_SOURCE.replace(/^Source:\s*/, '')} index (credit institutions only; payment and e-money institutions hold codes outside it, so an absence is not a non-allocation). Important Note: "${GR_IMPORTANT_NOTE}"`
+    : '';
   // The `>` line is the one paragraph an LLM keeps about this product. On
   // 24/09/2026 assistants still summarised IBANforge from the previous one
   // ("Swiss clearing, sanctions and compliance risk scoring, for developers
@@ -477,7 +486,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}${grSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}
@@ -515,7 +524,7 @@ ${cannotCallLines().join('\n')}
 - **Pay per call (x402, USDC on Base L2), an option with no signup:** see https://api.ibanforge.com/.well-known/x402. The batch rate ($${BATCH_PRICE_PER_IBAN} per IBAN) applies to these per-call USDC payments; on a key or a credit pack, one IBAN in a batch uses one credit.
 - **Paying as an agent, zero to first payment in 3 steps** (wallet with budget → USDC on Base → one $${packPrice} payment for 1,000 credits, or pay-per-call): https://ibanforge.com/docs/pay-as-an-agent
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\`: the tools of the HTTP transport plus the creditor-file audit (${STDIO_ONLY_TOOLS.join(', ')}), no signup
-- **MCP server (HTTP):** https://api.ibanforge.com/mcp (${MCP_TOOLS.length} tools, no signup)
+- **MCP server (HTTP):** https://api.ibanforge.com/mcp (${MCP_TOOLS.length} tools, no signup). With an API key in the \`Authorization: Bearer\` (or \`X-API-Key\`) header, its tool calls count against that key exactly as on the REST API.
 - **Try it with zero setup, as an agent (${MCP_WEEKLY_LIMIT} free tool calls a week per source address):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_WEEKLY_LIMIT} calls in the week you get JSON-RPC error -32000 until ${TRIAL_RESET}. For anything real, move to x402 or to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed). This allowance is separate from the keyless REST trial below: a source has both. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
 - **Try it with zero setup, from a terminal (${REST_TRIAL_WEEKLY_LIMIT} free validations a week per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"DE89370400440532013000"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left this week, when the count resets (\`resets_at\`), and how to take a key that needs no e-mail at all. The trial is counted by the ISO week in UTC and covers this route only. Past ${REST_TRIAL_WEEKLY_LIMIT} in the week the route goes back to 402, with \`cause.reason = "trial_exhausted"\`, until ${TRIAL_RESET}. The allowance is counted per source address (IPv6 counted per /64) and lives in the service database, so it survives a redeploy.
 - **The key that needs no e-mail is another door:** every endpoint, and ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed with a 6-digit code mailed to an address you read (POST /v1/keys/claim); an x402 payment made on the key raises it to ${FREE_TIER_MONTHLY_LIMIT} once, not every month. The HTTP MCP transport has its own allowance, counted by the week (${MCP_WEEKLY_LIMIT} tool calls a week per source address).
@@ -644,7 +653,7 @@ curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \\
   -d '{"payload":"SPC\\n0200\\n1\\nCH4431999123000889012\\nS\\nRobert Schneider AG\\nRue du Lac\\n1268\\n2501\\nBiel\\nCH\\n\\n\\n\\n\\n\\n\\n\\n1949.75\\nCHF\\nS\\nPia Rutschmann\\nMarktgasse\\n28\\n9400\\nRorschach\\nCH\\nQRR\\n210000000003139471430009017\\nOrder 15.06.2026\\nEPD"}'
 \`\`\`
 
-Takes the text inside a Swiss QR-bill code (\`payload\`, real line breaks) and returns every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON checksum and pairing with the IBAN, amount, currency, and \`ready_for_2026_11_14\`: whether the addresses are structured (type S) or still combined (type K), which banks stop processing on 14 November 2026. A combined address comes back with \`proposed_structured\`.
+Takes the text inside a Swiss QR-bill code (\`payload\`, real line breaks) and returns every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON checksum and pairing with the IBAN, amount, currency, and \`ready_for_2026_11_14\`: whether the addresses are structured (type S) or still combined (type K). ${COMBINED_ADDRESS_NOTICE.en} A combined address comes back with \`proposed_structured\`.
 
 ### 8b. request_api_key + poll_api_key — a durable key, approved by a human (${toolPriceLabel('request_api_key')})
 

@@ -20,6 +20,7 @@ import {
 } from '../lib/national-check/index.js';
 import { frozenSources } from '../lib/source-vintage.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
+import { COMBINED_ADDRESS_NOTICE, READY_FIELD_DESCRIPTION } from '../lib/qr-bill-notice.js';
 // Read from the route rather than retyped: the enum of error types and the
 // flood cap are what the handler enforces, and a contract that quotes its own
 // copy of them is a contract that will be wrong one refactor from now.
@@ -665,7 +666,9 @@ const buildRawSpec = () => ({
         operationId: 'checkSwissQrBill',
         summary: 'Free Swiss QR-bill payload check (structured vs combined address)',
         description:
-          'FREE rule check of the text inside a Swiss QR-bill code (the Swiss Payments Code, 31 positional lines from SPC to EPD): header and version, creditor IBAN and QR-IBAN range (IID 30000-31999), QRR/SCOR/NON reference checksum and its pairing with the IBAN, amount, currency, ultimate creditor left empty, and whether the creditor and ultimate debtor addresses are structured (type S) or still combined (type K). Type K was removed from the standard on 21.11.2025; from 14.11.2026 banks no longer process standing orders and payment templates built on it. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines. Pure rule evaluation, no database: the bank behind the IBAN is the job of POST /v1/iban/validate.',
+          'FREE rule check of the text inside a Swiss QR-bill code (the Swiss Payments Code, 31 positional lines from SPC to EPD): header and version, creditor IBAN and QR-IBAN range (IID 30000-31999), QRR/SCOR/NON reference checksum and its pairing with the IBAN, amount, currency, ultimate creditor left empty, and whether the creditor and ultimate debtor addresses are structured (type S) or still combined (type K). ' +
+          COMBINED_ADDRESS_NOTICE.en +
+          ' A combined address comes back with proposed_structured, the S-type fields derived from the combined lines. Pure rule evaluation, no database: the bank behind the IBAN is the job of POST /v1/iban/validate.',
         tags: ['Free'],
         security: [],
         requestBody: {
@@ -699,7 +702,7 @@ const buildRawSpec = () => ({
                   type: 'object',
                   properties: {
                     valid: { type: 'boolean' },
-                    ready_for_2026_11_14: { type: 'boolean', description: 'valid and every present address is structured (type S).' },
+                    ready_for_2026_11_14: { type: 'boolean', description: READY_FIELD_DESCRIPTION },
                     creditor_iban: { type: 'object', additionalProperties: true },
                     creditor: { type: 'object', additionalProperties: true },
                     ultimate_debtor: { type: 'object', additionalProperties: true },
@@ -2583,13 +2586,14 @@ const buildRawSpec = () => ({
           MCP_WEEKLY_LIMIT +
           ' tool units a week per source address (one per tool call, one per IBAN in batch_validate_iban; the week is the ISO week in UTC and resets on ' +
           TRIAL_RESET +
-          '), an allowance separate from the keyless REST trial.',
+          '), an allowance separate from the keyless REST trial. ' +
+          'With an API key (Authorization: Bearer ifk_… or X-API-Key), tool calls count against that key exactly as on the REST API instead; x402 is not read on this path.',
         tags: ['MCP'],
-        // Anonymous only, and said so (review of 24/09/2026, D8): the HTTP MCP
-        // transport answers a weekly free allowance with no credential, and it
-        // reads no key at all (the key middleware is mounted on /v1/* only).
-        // Declaring `apiKey` here told a client a key would lift that allowance.
-        security: [{}],
+        // Anonymous OR a key (07.10.2026, Claude-Alain's decision, point 7). Until
+        // then the transport read no key and this said `security: [{}]` only
+        // (review of 24/09/2026, D8). It now reads an optional key in the
+        // headers and counts the calls on it as REST does; x402 stays REST-only.
+        security: [{}, { apiKey: [] }],
         externalDocs: {
           description: 'MCP setup guide (Claude Desktop, Cursor, HTTP transport)',
           url: 'https://ibanforge.com/docs/mcp',

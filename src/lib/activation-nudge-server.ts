@@ -14,12 +14,17 @@
  *
  * Kill switch: ACTIVATION_NUDGE_DISABLED=1 stops the sending half. Drafts keep
  * being written, because nothing leaves the building when a draft is created.
+ *
+ * STOP (07/10/2026): an address that answered STOP gets neither half again,
+ * ever. Every pass records the inbound STOPs the CRM holds into outreach_stops
+ * BEFORE choosing anyone, and that table outlives the message: deleting a
+ * thread from the CRM must not turn a refusal back into a fresh contact.
  */
 import { getStatsDB } from './db.js';
 import { kvGet, kvSet } from './forum-radar-server.js';
 import { isEmailConfigured, sendActivationNudgeEmail } from './email.js';
 import { loadAliasMap, toCanonical } from './email-aliases.js';
-import { buildFounderDraft, draftId } from './activation-nudge.js';
+import { buildFounderDraft, draftId, isStopRequest } from './activation-nudge.js';
 import {
   DRAFT_LOOKBACK_HOURS,
   DRAFT_MAX_PER_PASS,
@@ -55,6 +60,12 @@ export interface ActivationPassReport {
   draft_candidates: number;
   drafts_created: number;
   drafted: string[];
+  /**
+   * Every address under STOP, canonical, sorted. Served by the admin endpoint,
+   * so the robots of the mail server that write on their own can honour the
+   * same list instead of keeping a second one.
+   */
+  stopped: string[];
   errors: string[];
 }
 
@@ -254,6 +265,103 @@ function markDelivered(keyPrefix: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// STOP
+// ---------------------------------------------------------------------------
+
+function ensureStopTable(): void {
+  getStatsDB().exec(`
+    CREATE TABLE IF NOT EXISTS outreach_stops (
+      email      TEXT PRIMARY KEY,
+      stopped_at TEXT NOT NULL DEFAULT (datetime('now')),
+      message_id TEXT
+    );
+  `);
+}
+
+/** The bare address in a header-like value ("Name <a@b.c>" or "a@b.c"), lowercased, or null. */
+function bareAddress(value: string | null | undefined): string | null {
+  const m = /[^\s<>"'(),;:]+@[^\s<>"'(),;:]+\.[^\s<>"'(),;:]+/.exec(value ?? '');
+  return m ? m[0].toLowerCase() : null;
+}
+
+/**
+ * Records every inbound STOP the CRM holds, then returns everyone under STOP.
+ *
+ * Read on both columns of the message, like every "have we talked to this
+ * person" question in this codebase: the thread key, and the address the mail
+ * actually came from. Our own domain is never recorded (a test we send
+ * ourselves must not silence a customer's thread). Canonical through the alias
+ * map, so a STOP from one declared address covers the person.
+ *
+ * Insert-only: a STOP is never lifted by code. Lifting one is a human decision
+ * (DELETE FROM outreach_stops WHERE email = ?), taken when the person writes
+ * back and asks for it.
+ */
+function recordAndLoadStops(canonicalOf: (email: string) => string): Set<string> {
+  ensureStopTable();
+  const db = getStatsDB();
+  // A cheap first sieve in SQL: only messages whose subject or opening carries
+  // one of the words can be a STOP; isStopRequest() decides exactly.
+  const inbound = db
+    .prepare(
+      `SELECT id, customer_email, counterparty, subject, body, snippet
+         FROM email_messages
+        WHERE direction = 'in'
+          AND (lower(COALESCE(subject, '')) LIKE '%stop%'
+            OR lower(COALESCE(subject, '')) LIKE '%unsubscribe%'
+            OR lower(substr(COALESCE(NULLIF(body, ''), snippet, ''), 1, 400)) LIKE '%stop%'
+            OR lower(substr(COALESCE(NULLIF(body, ''), snippet, ''), 1, 400)) LIKE '%unsubscribe%')`,
+    )
+    .all() as Array<{
+    id: string;
+    customer_email: string;
+    counterparty: string | null;
+    subject: string | null;
+    body: string | null;
+    snippet: string | null;
+  }>;
+  const insert = db.prepare(
+    `INSERT INTO outreach_stops (email, message_id) VALUES (?, ?) ON CONFLICT(email) DO NOTHING`,
+  );
+  for (const m of inbound) {
+    if (!isStopRequest(m.subject, m.body || m.snippet)) continue;
+    for (const raw of [m.customer_email, m.counterparty]) {
+      const address = bareAddress(raw);
+      if (!address || address.endsWith('@ibanforge.com')) continue;
+      insert.run(canonicalOf(address), m.id);
+    }
+  }
+  const rows = db.prepare('SELECT email FROM outreach_stops').all() as Array<{ email: string }>;
+  return new Set(rows.map((r) => canonicalOf(r.email)));
+}
+
+/**
+ * Cette adresse a-t-elle demandé STOP ? Lu par les avertissements de quota et
+ * de crédits (décision de Claude-Alain du 07.10.2026, point 8 : le STOP coupe
+ * aussi l'alerte de quota ; seuls les avis légaux et de sécurité continuent).
+ *
+ * 🚨 Le CRM est relu ICI, pas seulement la table : `outreach_stops` ne se
+ * remplit qu'à la passe quotidienne, et un STOP reçu ce matin doit déjà faire
+ * taire l'alerte de cet après-midi. Ramenée à la personne par la table des
+ * alias, comme la passe : un STOP venu d'une adresse déclarée couvre l'autre.
+ *
+ * 🚨 Fermée en cas de doute : une table illisible répond « sous STOP ». Une
+ * alerte qui ne part pas coûte un mail de service, l'en-tête X-Quota-* dit déjà
+ * tout à l'appelant ; une alerte envoyée à quelqu'un qui a dit STOP trahit la
+ * promesse de la fenêtre de clé.
+ */
+export function isAddressUnderStop(email: string): boolean {
+  try {
+    const aliasMap = loadAliasMap();
+    const canonicalOf = (e: string) => toCanonical(e.trim().toLowerCase(), aliasMap);
+    return recordAndLoadStops(canonicalOf).has(canonicalOf(email));
+  } catch (err) {
+    console.error('[stop] lecture impossible :', err instanceof Error ? err.message : err);
+    return true;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The pass
 // ---------------------------------------------------------------------------
 
@@ -270,6 +378,7 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
     draft_candidates: 0,
     drafts_created: 0,
     drafted: [],
+    stopped: [],
     errors: [],
   };
   if (running) {
@@ -285,10 +394,18 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
     const aliasMap = loadAliasMap();
     const canonicalOf = (e: string) => toCanonical(e.trim().toLowerCase(), aliasMap);
 
+    // --- 0. STOP, before anyone is chosen -----------------------------------
+    // Recorded first, so a STOP that arrived since the last pass already counts
+    // in this one, and read by both halves below.
+    const stopped = recordAndLoadStops(canonicalOf);
+    report.stopped = [...stopped].sort();
+
     // --- 1. The nudge -----------------------------------------------------
+    const blocked = loadNudgeBlockedSet(canonicalOf);
+    for (const address of stopped) blocked.add(address);
     const candidates = selectNudgeCandidates(loadNudgeCandidates(), NUDGE_MAX_PER_PASS, {
       canonicalOf,
-      blocked: loadNudgeBlockedSet(canonicalOf),
+      blocked,
     });
     report.nudge_candidates = candidates.length;
 
@@ -334,6 +451,9 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
       const canonical = toCanonical(row.email.trim().toLowerCase(), aliasMap);
       if (seen.has(canonical)) continue;
       seen.add(canonical);
+      // A STOP outlives its message: once the thread is deleted from the CRM,
+      // the "already has a thread" guard below would see a stranger again.
+      if (stopped.has(canonical)) continue;
       report.draft_candidates++;
       try {
         if (createFounderDraftIfAbsent(canonical, now)) {
