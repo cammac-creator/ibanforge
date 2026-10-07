@@ -276,11 +276,18 @@ discovery.get('/.well-known/oauth-protected-resource', (c) => c.json(oauthResour
  * 404, for the reason given below (clients that cannot tell "no auth here" from
  * "server broken"), and it names no authorization server: there is no OAuth,
  * and the key is never required.
+ *
+ * 🚨 `bearer_methods_supported` stays EMPTY on purpose. RFC 9728 speaks of
+ * OAuth access tokens there, and an `ifk_` key is not one; and Claude reads
+ * this document at the "Review detected authentication settings" step of
+ * adding a connector, so a change no real client was tried against could stop
+ * the keyless connector from being added at all. The optional key is said in
+ * `authentication_methods` and `note`, which no client acts on blindly.
  */
 const MCP_RESOURCE_METADATA = {
   resource: 'https://api.ibanforge.com/mcp',
   resource_documentation: 'https://ibanforge.com/docs/mcp',
-  bearer_methods_supported: ['header'],
+  bearer_methods_supported: [] as string[],
   authentication_methods: [
     {
       type: 'api_key',

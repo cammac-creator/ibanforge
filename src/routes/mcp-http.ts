@@ -1738,7 +1738,12 @@ mcpHttp.post('/mcp', async (c) => {
   // repart plus haut et n'est plus compté ici.
   //
   // Une seule écriture par requête `/mcp`, sur une table d'une ligne par jour.
-  if (toolCalls > 0) bumpMcpRemoteDaily({ toolCalls, keyRequests });
+  //
+  // 07.10.2026 : sans les requêtes qui portent une clé. Ce compteur alimente le
+  // tableau « MCP distant : activité sans clé », dont les appels ne se relient à
+  // personne ; un appel avec clé est attribué à sa clé dans `request_log`
+  // (`apiKeyPrefix`), comme sur REST, et le compter ici le ferait lire deux fois.
+  if (toolCalls > 0 && !presentedKey) bumpMcpRemoteDaily({ toolCalls, keyRequests });
 
   // 🚨 LE PORTEUR EST PRÉPARÉ ICI, AVANT QU'UNE SESSION NEUVE SOIT CRÉÉE, et
   // l'ordre des gestes est la moitié de la correction.

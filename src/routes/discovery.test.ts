@@ -158,7 +158,9 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
         authorization_servers?: unknown;
         note: string;
       };
-      expect(body.bearer_methods_supported, path).toEqual(['header']);
+      // Vide exprès : pas de jeton OAuth, et Claude lit ce champ quand on
+      // ajoute un connecteur (voir le commentaire de MCP_RESOURCE_METADATA).
+      expect(body.bearer_methods_supported, path).toEqual([]);
       expect(body.authentication_methods, path).toEqual([
         expect.objectContaining({ type: 'api_key', required: false }),
       ]);

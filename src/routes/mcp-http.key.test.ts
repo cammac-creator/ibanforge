@@ -392,6 +392,27 @@ describe('clé sur /mcp : le même comptage que REST', () => {
   });
 });
 
+describe('clé sur /mcp : la télémétrie', () => {
+  it('un appel avec clé ne se compte pas dans l’activité sans clé du MCP distant', async () => {
+    const app = makeApp();
+    const ip = freshIp();
+    const { key } = freshKey();
+    const session = await open(app, ip);
+    const toolCalls = () =>
+      (
+        getStatsDB()
+          .prepare("SELECT tool_calls FROM mcp_remote_daily WHERE day = date('now')")
+          .get() as { tool_calls: number } | undefined
+      )?.tool_calls ?? 0;
+
+    const before = toolCalls();
+    await call(app, session, ip, 'validate_iban', { iban: VALID_IBAN }, bearer(key));
+    expect(toolCalls(), 'un appel attribué à sa clé n’est pas une activité anonyme').toBe(before);
+    await call(app, session, ip, 'validate_iban', { iban: VALID_IBAN });
+    expect(toolCalls()).toBe(before + 1);
+  });
+});
+
 describe('clé sur /mcp : la session ne garde aucune clé', () => {
   it('clé A, puis aucune clé, puis clé B sur la même session : chaque appel paie sur sa propre porte', async () => {
     const app = makeApp();
