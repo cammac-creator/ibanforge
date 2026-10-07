@@ -649,6 +649,44 @@ describe('async payment methods — the day SEPA/TWINT is enabled', () => {
   });
 
   /**
+   * Priorité 01 de la feuille de route (défaut réparé le 11.09) : un paiement
+   * en deux temps doit inscrire son montant comme un paiement par carte, sinon
+   * l'argent affiché redevient faux en silence. Rien n'est inscrit tant que la
+   * session n'est pas payée ; le montant arrive avec l'évènement du règlement.
+   */
+  it('records what was charged once a deferred payment settles', () => {
+    const stamp = Date.now();
+    const sessionId = `cs_test_async_amount_${stamp}`;
+    processStripeEvent(
+      mockEvent({
+        id: `evt_amt1_${stamp}`,
+        bundle: '5k',
+        sessionId,
+        paymentStatus: 'unpaid',
+        amountTotal: 2900,
+        currency: 'eur',
+      }),
+    );
+    expect(storedAmount(sessionId)).toBeUndefined();
+    const settled = processStripeEvent(
+      mockEvent({
+        id: `evt_amt2_${stamp}`,
+        type: 'checkout.session.async_payment_succeeded',
+        bundle: '5k',
+        sessionId,
+        paymentStatus: 'paid',
+        amountTotal: 2900,
+        currency: 'eur',
+      }),
+    );
+    expect(settled.body.credits_minted).toBe(5000);
+    expect(storedAmount(sessionId)).toEqual({
+      amount_paid_minor: 2900,
+      amount_paid_currency: 'eur',
+    });
+  });
+
+  /**
    * Stripe retries a webhook for three days. The replay must go through the
    * same `stripe_session_id` barrier the card path uses: one settlement, one
    * key, one owner alert.
