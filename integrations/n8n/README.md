@@ -13,6 +13,10 @@ Typical uses: verify supplier IBANs at onboarding, triage a payout list before t
 | **Look up Swiss clearing** | BC-Nummer / IID → institution, seat address, SIC/euroSIC/instant rails, QR-IID semantics |
 | **Compliance check** | Bank-level sanctions (OFAC, EU, UN), FATF lists, SEPA/VoP, 0-100 risk score. Bank-level, not name screening |
 
+## Example workflow
+
+[`examples/check-supplier-iban.json`](https://github.com/cammac-creator/ibanforge/blob/main/integrations/n8n/examples/check-supplier-iban.json) is a four-node workflow you can paste into n8n (**Workflows → Import from File**, or paste it on the canvas): a manual trigger, a field holding a supplier IBAN, the IBANforge node set to **Validate IBAN**, and an **If** node that routes on the `valid` field of the answer. Pick your IBANforge API credentials on the IBANforge node after importing.
+
 ## Installation
 
 Community nodes panel: **Settings → Community nodes → Install** → `n8n-nodes-ibanforge`.
