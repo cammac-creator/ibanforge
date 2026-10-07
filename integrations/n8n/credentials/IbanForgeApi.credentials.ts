@@ -10,6 +10,8 @@ export class IbanForgeApi implements ICredentialType {
 
   displayName = 'IBANforge API';
 
+  icon = { light: 'file:ibanforge.svg', dark: 'file:ibanforge.svg' } as const;
+
   documentationUrl = 'https://ibanforge.com/docs/api-keys?src=n8n';
 
   properties: INodeProperties[] = [

@@ -14,31 +14,43 @@ docker compose -f docker-compose.test.yml run --rm odoo \
   --stop-after-init --without-demo=all --log-level=test
 ```
 
-Last run: 2 September 2026, Odoo 18 image, `0 failed, 0 error(s) of 10 tests`.
+Last run: 7 October 2026, Odoo 18.0 (image `odoo:18`, build 18.0-20260926), `0 failed, 0 error(s) of 10 tests`.
 
-## Publish on the Odoo Apps store (maintainer, one time)
+## Publish on the Odoo Apps store (maintainer)
 
-The store pulls modules from a git repository over SSH; every branch named after an Odoo
-version is scanned and each folder with a `__manifest__.py` at the root of that branch is a
-listing. The module therefore lives in a dedicated repository where it sits at the root:
+The store pulls modules from a git repository over SSH. Every branch named after an Odoo
+version (`18.0`) is scanned, and each folder that holds a `__manifest__.py` at the root of
+that branch is a listing. The module therefore lives in a dedicated public repository where
+the `ibanforge_bank_autofill/` folder sits at the root:
 <https://github.com/cammac-creator/ibanforge-odoo>, branch `18.0` (a copy of this folder,
-refreshed with `git subtree`).
+refreshed with `git subtree`, see below).
 
-1. On [apps.odoo.com](https://apps.odoo.com/apps/upload), sign in, **Add repository**, paste
-   `git@github.com:cammac-creator/ibanforge-odoo.git#18.0`.
-2. Odoo shows a public SSH key for your account: add it on GitHub as a read-only **deploy key**
-   of `ibanforge-odoo` (repository → Settings → Deploy keys).
-3. Odoo scans the branch within minutes. The listing takes its text from
-   `static/description/index.html`, its icon from `static/description/icon.png`, and its
-   screenshots from the `images` key of the manifest.
-4. Price: free (AGPL-3 is fragile for a paid listing; the module is a door to the API, not
-   the product).
+1. On [apps.odoo.com](https://apps.odoo.com/apps/upload), sign in, then *Add repository* and
+   enter the repository address followed by the branch, in the form the upload page documents:
+   `ssh://git@github.com/cammac-creator/ibanforge-odoo.git#18.0`.
+2. Odoo's upload page tells GitHub users to authorize the `online-odoo` user on the repository.
+   On a *public* repository this should not be needed (community answers only mention it for
+   private ones). If the first scan says the repository cannot be read, add that user.
+3. Odoo scans the branch. The listing takes its text from `static/description/index.html`, its
+   icon from `static/description/icon.png`, and its images from the `images` key of the
+   manifest (the first one, `banner.png`, is the cover). Re-scan from the vendor dashboard,
+   *Repositories*, after every push.
+4. Price: free (no `price` and no `currency` key in the manifest). AGPL-3 is fragile for a paid
+   listing; the module is a door to the API, not the product.
+5. The store's rules apply (see the upload page): no code downloaded or launched, nothing
+   undocumented, and a module that sends data out must say what and link the privacy policy
+   (done in the Privacy section of `index.html`). Support is expected: `support@ibanforge.com`.
 
 ## Refresh the dedicated repository after a change here
 
+Copy this folder over a clone of the dedicated repository and push a normal commit, after the
+change is merged into `main`. (`git subtree split` also works but walks the whole history of this
+repository, which takes many minutes and forces a `push -f`; do not mix the two methods.)
+
 ```bash
-cd ~/ibanforge
-git subtree split --prefix=integrations/odoo -b odoo-18.0
-git push -f git@github.com:cammac-creator/ibanforge-odoo.git odoo-18.0:18.0
-git branch -D odoo-18.0
+git clone --branch 18.0 git@github.com:cammac-creator/ibanforge-odoo.git /tmp/ibanforge-odoo-refresh
+rsync -a --delete --exclude '.git' --exclude '__pycache__' ~/ibanforge/integrations/odoo/ /tmp/ibanforge-odoo-refresh/
+git -C /tmp/ibanforge-odoo-refresh add -A
+git -C /tmp/ibanforge-odoo-refresh commit -m "Module update"
+git -C /tmp/ibanforge-odoo-refresh push origin 18.0
 ```
