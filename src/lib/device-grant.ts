@@ -1209,7 +1209,11 @@ export function displayToHuman(
     '\n' +
     `  1. Open:  ${outcome.verificationUriComplete}\n` +
     `  2. Check the code shown on the page reads:  ${outcome.userCode}\n` +
-    '  3. Click "Get the key". No e-mail, no card, no account.\n' +
+    // 🚨 Le bouton est désigné par sa PLACE, jamais par son libellé : la page
+    // suit la langue du navigateur (« Obtenir la clé », « Schlüssel holen »), et
+    // un humain à qui l'on dit `Click "Get the key"` cherche sur un téléphone
+    // français un bouton qui n'existe pas (rejeu en ligne du 07.10.2026).
+    '  3. Press the first button under the code. No e-mail, no card, no account.\n' +
     '\n' +
     `That gives ${ANONYMOUS_MONTHLY_LIMIT} requests a month. On the same page you may add an e-mail address\n` +
     `instead, which raises it to ${FREE_TIER_MONTHLY_LIMIT}. The code stops working in ${minutes} minutes.`
