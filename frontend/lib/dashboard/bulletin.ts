@@ -214,6 +214,52 @@ export interface BulletinAlertHistory {
   }>;
 }
 
+// Priority 05: money received minus costs.
+
+export type MinorByCurrency = Record<string, number>;
+
+export type CostLine =
+  | {
+      item: string;
+      label: string;
+      source: 'stripe' | 'saisie';
+      expected: boolean;
+      state: 'connu';
+      amounts: MinorByCurrency;
+      nature: 'mesure' | 'facture' | 'releve' | 'estime';
+    }
+  | {
+      item: string;
+      label: string;
+      source: 'stripe' | 'saisie';
+      expected: boolean;
+      state: 'inconnu';
+      reason: string;
+      blocking: boolean;
+    };
+
+export interface MoneyPeriod {
+  month: string;
+  from: string;
+  to: string;
+  complete: boolean;
+  received:
+    | { state: 'read'; count: number; gross: MinorByCurrency; refunded: MinorByCurrency; test_mode: boolean }
+    | { state: 'inconnu'; reason: string };
+  costs: CostLine[];
+  result: {
+    status: 'exact' | 'estime' | 'au_plus' | 'inconnu';
+    by_currency: MinorByCurrency | null;
+    missing: string[];
+  };
+}
+
+export interface BulletinMoney {
+  state: 'read';
+  stripe_read_at: string | null;
+  periods: MoneyPeriod[];
+}
+
 export interface BulletinPayload {
   version: typeof BULLETIN_VERSION;
   observed_at: string;
@@ -247,6 +293,8 @@ export interface BulletinPayload {
   };
   /** Step B; absent from an API that predates it. */
   veille?: BulletinFeed | Unread;
+  /** Priority 05; absent from an API that predates it. */
+  money?: BulletinMoney | Unread;
   not_yet: Array<{ key: string; title: string; reason: string }>;
   definitions: Record<string, string>;
 }
@@ -320,6 +368,7 @@ export function readBulletin(payload: unknown): BulletinPayload | null {
     moved: blocks,
     decisions: optionalBlock(payload.decisions, isDecisions),
     veille: optionalBlock(payload.veille, isFeed),
+    money: optionalBlock(payload.money, isMoney),
   } as unknown as BulletinPayload;
 }
 
@@ -380,6 +429,45 @@ function isFeed(v: Obj): boolean {
     if (s.score === null) return true;
     const sc = s.score;
     return isObj(sc) && isNat(sc.value) && isNat(sc.out_of) && isNat(sc.errors) && sc.out_of > 0;
+  });
+}
+
+function isMinorMap(v: unknown): boolean {
+  return (
+    isObj(v) &&
+    Object.entries(v).every(([c, n]) => /^[a-z]{3}$/.test(c) && typeof n === 'number' && Number.isInteger(n))
+  );
+}
+
+function isCostLine(v: unknown): boolean {
+  if (!isObj(v) || !isStr(v.item) || !isStr(v.label) || typeof v.expected !== 'boolean') return false;
+  if (v.state === 'connu') return isMinorMap(v.amounts) && isStr(v.nature);
+  return v.state === 'inconnu' && isStr(v.reason) && typeof v.blocking === 'boolean';
+}
+
+function isMoney(v: Obj): boolean {
+  if (!isStrOrNull(v.stripe_read_at) || !Array.isArray(v.periods)) return false;
+  return v.periods.every((p) => {
+    if (!isObj(p) || !isStr(p.month) || !CIVIL.test(String(p.from)) || !CIVIL.test(String(p.to))) {
+      return false;
+    }
+    if (typeof p.complete !== 'boolean' || !Array.isArray(p.costs) || !p.costs.every(isCostLine)) {
+      return false;
+    }
+    const r = p.received;
+    const receivedOk =
+      isObj(r) &&
+      ((r.state === 'read' && isNat(r.count) && isMinorMap(r.gross) && isMinorMap(r.refunded)) ||
+        (r.state === 'inconnu' && isStr(r.reason)));
+    const res = p.result;
+    return (
+      receivedOk &&
+      isObj(res) &&
+      ['exact', 'estime', 'au_plus', 'inconnu'].includes(res.status as string) &&
+      (res.by_currency === null || isMinorMap(res.by_currency)) &&
+      Array.isArray(res.missing) &&
+      res.missing.every(isStr)
+    );
   });
 }
 
@@ -600,4 +688,77 @@ export function scoreText(score: FeedScore): string {
   return score.errors > 0
     ? `${base}, score partiel : ${count(score.errors, 'requête en erreur', 'requêtes en erreur')}`
     : base;
+}
+
+// ─── Priority 05, in words ──────────────────────────────────────────────────
+
+/** Stripe's zero-decimal currencies: their minor unit is the unit. */
+const ZERO_DECIMAL = new Set([
+  'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
+]);
+
+/** `12,50 USD`, `−3,00 CHF`: minor units, said in the unit, the French way, without Intl. */
+export function money(minor: number, currency: string, signed = false): string {
+  const zero = ZERO_DECIMAL.has(currency);
+  const value = zero ? minor : minor / 100;
+  const body = formatGrouped(Math.abs(value), 'fr', zero ? 0 : 2);
+  const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
+  return `${sign}${body} ${currency.toUpperCase()}`;
+}
+
+/** Every currency of a map, in alphabetical order, joined; `—` when empty. */
+export function moneyList(map: MinorByCurrency, signed = false): string {
+  const entries = Object.entries(map).filter(([, v]) => v !== 0);
+  if (entries.length === 0) return signed ? '0' : '—';
+  return entries
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([c, v]) => money(v, c, signed))
+    .join(' · ');
+}
+
+/** `Septembre 2026` or `Octobre 2026, du 1er au 4`. */
+export function periodTitle(p: { month: string; from: string; to: string; complete: boolean }): string {
+  const y = Number(p.month.slice(0, 4));
+  const m = Number(p.month.slice(5, 7));
+  const name = MONTHS[m - 1];
+  const title = `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+  if (p.complete) return title;
+  const { y: ty, m: tm, d: td } = civilParts(p.to);
+  const last = new Date(Date.UTC(ty, tm - 1, td - 1)).getUTCDate();
+  return `${title}, du 1er au ${last}`;
+}
+
+const COST_REASON: Record<string, string> = {
+  non_saisi: 'pas saisi',
+  partiel: 'saisi pour une partie de la période seulement',
+  deborde: 'saisi sur une période qui déborde, jamais réparti au prorata',
+  stripe_indisponible: 'Stripe non lu',
+  frais_incomplets: 'des frais illisibles chez Stripe',
+};
+
+export function costReasonText(reason: string): string {
+  return COST_REASON[reason] ?? 'inconnu';
+}
+
+const NATURE_WORD: Record<string, string> = {
+  mesure: 'mesuré chez Stripe',
+  facture: 'facture',
+  releve: 'relevé',
+  estime: 'estimation',
+};
+
+export function natureText(nature: string): string {
+  return NATURE_WORD[nature] ?? nature;
+}
+
+const RECEIVED_REASON: Record<string, string> = {
+  stripe_not_configured: 'Stripe n’est pas configuré pour l’API',
+  stripe_unreachable: 'Stripe n’a pas répondu',
+  stripe_slow: 'Stripe est en cours de lecture, recharger dans une minute',
+  classement_incomplet:
+    'le classement des paiements a manqué : une part de l’argent d’IBANforge peut ne pas être comptée',
+};
+
+export function receivedReasonText(reason: string): string {
+  return RECEIVED_REASON[reason] ?? 'la lecture de Stripe a échoué';
 }

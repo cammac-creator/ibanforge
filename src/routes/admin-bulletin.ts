@@ -10,6 +10,8 @@ import {
   writeFeed,
 } from '../lib/bulletin-feed.js';
 import { addSessionProposal, isAnswer, recordAnswer } from '../lib/bulletin-decisions.js';
+import { deleteCost, listCosts, saveCost } from '../lib/bulletin-money.js';
+import { getStripeRevenue } from './admin-stripe-revenue.js';
 
 /**
  * The Monday bulletin (Claude-Alain's approval of 28.09.2026, steps A1 and A2).
@@ -30,6 +32,10 @@ import { addSessionProposal, isAnswer, recordAnswer } from '../lib/bulletin-deci
  *  - `POST /v1/admin/bulletin/proposals`: the main session adds a proposal;
  *  - `POST /v1/admin/bulletin/answers`: Oui / Plus tard / Non, from the dashboard
  *    page through the site's own route, which keeps the admin secret server side.
+ *
+ * Priority 05 adds the cost register behind the admin secret (`bulletin-money.ts`):
+ * `GET`, `POST` and `DELETE /v1/admin/bulletin/costs`. The amounts live in the
+ * private database only; none is ever written into this public repository.
  */
 export const adminBulletin = new Hono();
 
@@ -38,7 +44,7 @@ adminBulletin.get('/v1/admin/bulletin', async (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
-  return c.json(await getBulletin({ week: c.req.query('week') ?? null }));
+  return c.json(await getBulletin({ week: c.req.query('week') ?? null, stripe: getStripeRevenue }));
 });
 
 // ─── The veilles' deposit ────────────────────────────────────────────────────
@@ -152,4 +158,41 @@ adminBulletin.post('/v1/admin/bulletin/answers', async (c) => {
   const result = recordAnswer(key, answer, week, bics, now);
   if (!result.ok) return c.json({ error: result.error }, 404);
   return c.json(result);
+});
+
+// ─── Priority 05: the cost register ─────────────────────────────────────────
+
+/**
+ * A cost read from an invoice, a usage report or an estimate:
+ * `{ item, from, to, amount_minor, currency, nature, note? }`, the period from `from`
+ * included to `to` excluded (Swiss civil dates). The same period of the same item
+ * replaces the previous entry; an overlapping period is refused (409).
+ */
+adminBulletin.post('/v1/admin/bulletin/costs', async (c) => {
+  c.header('Cache-Control', 'private, no-store');
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const result = saveCost(await jsonBody(c));
+  if (!result.ok) return c.json({ error: result.error }, result.error === 'overlap' ? 409 : 400);
+  return c.json(result, result.replaced ? 200 : 201);
+});
+
+adminBulletin.get('/v1/admin/bulletin/costs', (c) => {
+  c.header('Cache-Control', 'private, no-store');
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ costs: listCosts() });
+});
+
+/** Removes an entry made by mistake, by its id. */
+adminBulletin.delete('/v1/admin/bulletin/costs/:id', (c) => {
+  c.header('Cache-Control', 'private, no-store');
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id < 1) return c.json({ error: 'invalid_id' }, 400);
+  return deleteCost(id) ? c.json({ ok: true }) : c.json({ error: 'not_found' }, 404);
 });

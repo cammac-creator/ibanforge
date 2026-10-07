@@ -6,10 +6,15 @@ import {
   ANSWERS,
   ageText,
   answerWord,
+  costReasonText,
   count,
   delta,
   durationText,
   fmt,
+  moneyList,
+  natureText,
+  periodTitle,
+  receivedReasonText,
   heartbeatText,
   heartbeatsTone,
   machineState,
@@ -24,6 +29,7 @@ import {
   type AlertView,
   type BulletinAlertHistory,
   type BulletinPayload,
+  type MoneyPeriod,
   type ProposalView,
   type Tone,
 } from '@/lib/dashboard/bulletin';
@@ -543,6 +549,109 @@ function Decisions({ data, locale, notice }: { data: BulletinPayload; locale: st
   );
 }
 
+const RESULT_WORD: Record<MoneyPeriod['result']['status'], string> = {
+  exact: 'Résultat',
+  estime: 'Résultat estimé',
+  au_plus: 'Au plus',
+  inconnu: 'Résultat inconnu',
+};
+
+function MoneyPeriodBlock({ p }: { p: MoneyPeriod }) {
+  const r = p.result;
+  const tone: Tone = r.status === 'inconnu' ? 'neutral' : r.status === 'au_plus' ? 'neutral' : 'ok';
+  return (
+    <li className="border-t border-[var(--ink-4)]/50 py-3 first:border-t-0 first:pt-1">
+      <p className="text-[13.5px] font-medium text-[var(--fg-1)]">{periodTitle(p)}</p>
+      <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-[13px]">
+        <dt className="text-[var(--fg-3)]">Encaissé</dt>
+        <dd className="text-right font-mono tabular-nums text-[var(--fg-1)] [overflow-wrap:anywhere]">
+          {p.received.state === 'read' ? moneyList(p.received.gross) : 'inconnu'}
+        </dd>
+        {p.received.state === 'read' && Object.keys(p.received.refunded).length > 0 && (
+          <>
+            <dt className="text-[var(--fg-3)]">Remboursé</dt>
+            <dd className="text-right font-mono tabular-nums text-[var(--fg-2)]">
+              {moneyList(Object.fromEntries(Object.entries(p.received.refunded).map(([c, v]) => [c, -v])))}
+            </dd>
+          </>
+        )}
+        {p.costs.map((c) => (
+          <CostRow key={c.item} line={c} />
+        ))}
+      </dl>
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-[var(--ink-4)]/40 pt-2">
+        <span className="inline-flex items-center gap-1.5 text-[13px] text-[var(--fg-2)]">
+          <span aria-hidden className={`h-2 w-2 rounded-full ${DOT[tone]}`} />
+          {RESULT_WORD[r.status]}
+        </span>
+        <span className="font-mono text-[15px] tabular-nums text-[var(--fg-1)] [overflow-wrap:anywhere]">
+          {r.by_currency ? moneyList(r.by_currency, true) : '—'}
+        </span>
+      </div>
+      {p.received.state !== 'read' && <Small>Encaissé inconnu : {receivedReasonText(p.received.reason)}.</Small>}
+      {p.received.state === 'read' && p.received.test_mode && <Small>Clé Stripe de test : montants fictifs.</Small>}
+      {r.status === 'au_plus' && r.missing.length > 0 && (
+        <Small>
+          Il manque : {r.missing.join(', ')}. Ces coûts ne peuvent que faire baisser le résultat.
+        </Small>
+      )}
+      {r.status === 'estime' && <Small>Au moins un coût est une estimation.</Small>}
+      {!p.complete && <Small>Mois en cours, lu jusqu’au dimanche de la semaine.</Small>}
+    </li>
+  );
+}
+
+function CostRow({ line }: { line: MoneyPeriod['costs'][number] }) {
+  if (line.state === 'connu') {
+    const zero = Object.values(line.amounts).every((v) => v === 0);
+    return (
+      <>
+        <dt className="text-[var(--fg-3)]">
+          {line.label} <span className="text-[11.5px] text-[var(--fg-4)]">({natureText(line.nature)})</span>
+        </dt>
+        <dd className="text-right font-mono tabular-nums text-[var(--fg-2)] [overflow-wrap:anywhere]">
+          {zero
+            ? moneyList(line.amounts, true)
+            : moneyList(Object.fromEntries(Object.entries(line.amounts).map(([c, v]) => [c, -v])))}
+        </dd>
+      </>
+    );
+  }
+  // A punctual cost nobody entered is not counted, and does not cap the result.
+  if (!line.blocking && line.reason === 'non_saisi') return null;
+  return (
+    <>
+      <dt className="text-[var(--fg-3)]">{line.label}</dt>
+      <dd className="text-right text-[12.5px] text-[var(--fg-4)]">inconnu, {costReasonText(line.reason)}</dd>
+    </>
+  );
+}
+
+function Money({ data }: { data: BulletinPayload }) {
+  const m = data.money;
+  if (!m) return null;
+  return (
+    <section className={overviewCard} aria-labelledby="bulletin-money">
+      <SectionTitle id="bulletin-money">Encaissé moins coûts</SectionTitle>
+      {m.state !== 'read' ? (
+        <Unread what="L’argent" reason={m.reason} />
+      ) : (
+        <>
+          <ul className="mt-2">
+            {m.periods.map((p) => (
+              <MoneyPeriodBlock key={p.month} p={p} />
+            ))}
+          </ul>
+          <p className="mt-1 text-[12px] leading-snug text-[var(--fg-4)]">
+            Chaque devise reste la sienne, rien n’est converti. Un coût non saisi pour toute la période est inconnu,
+            jamais compté pour zéro.{m.stripe_read_at ? ` Stripe lu le ${swissDayTime(m.stripe_read_at)}.` : ''}
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
 function Veille({ data }: { data: BulletinPayload }) {
   const v = data.veille;
   if (!v) return null;
@@ -661,6 +770,7 @@ export function BulletinView({
 
       <Decisions data={data} locale={locale} notice={notice} />
       <Numbers data={data} locale={locale} />
+      <Money data={data} />
       <Moved data={data} />
       <Needs data={data} locale={locale} />
       <Veille data={data} />

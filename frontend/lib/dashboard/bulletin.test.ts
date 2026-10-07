@@ -8,6 +8,9 @@ import {
   delta,
   heartbeatsTone,
   machineState,
+  money,
+  moneyList,
+  periodTitle,
   publicationDay,
   readBulletin,
   siteHomeText,
@@ -592,5 +595,120 @@ describe('les blocs des étapes A2 et B', () => {
     expect(html).toContain('Une décision inventée');
     expect(html).toContain('Réponse : Oui, le 28.09 à 09:00.');
     expect(html).not.toContain('bulletin-answer');
+  });
+});
+
+// ─── Priorité 05 : encaissé moins coûts (montants inventés et ronds) ────────
+
+function withMoney(): BulletinPayload {
+  const p = withA2();
+  p.money = {
+    state: 'read',
+    stripe_read_at: '2026-10-07T09:55:00.000Z',
+    periods: [
+      {
+        month: '2026-09',
+        from: '2026-09-01',
+        to: '2026-10-01',
+        complete: true,
+        received: { state: 'read', count: 3, gross: { usd: 4000 }, refunded: { usd: 1000 }, test_mode: false },
+        costs: [
+          {
+            item: 'frais_stripe',
+            label: 'Frais Stripe',
+            source: 'stripe',
+            expected: true,
+            state: 'connu',
+            amounts: { chf: 250 },
+            nature: 'mesure',
+          },
+          {
+            item: 'vercel',
+            label: 'Site (Vercel)',
+            source: 'saisie',
+            expected: true,
+            state: 'connu',
+            amounts: { usd: 2000 },
+            nature: 'releve',
+          },
+          {
+            item: 'railway',
+            label: 'API (Railway)',
+            source: 'saisie',
+            expected: true,
+            state: 'inconnu',
+            reason: 'non_saisi',
+            blocking: true,
+          },
+          {
+            item: 'domaines',
+            label: 'Noms de domaine et courriel',
+            source: 'saisie',
+            expected: false,
+            state: 'inconnu',
+            reason: 'non_saisi',
+            blocking: false,
+          },
+        ],
+        result: { status: 'au_plus', by_currency: { usd: 1000, chf: -250 }, missing: ['API (Railway)'] },
+      },
+      {
+        month: '2026-10',
+        from: '2026-10-01',
+        to: '2026-10-05',
+        complete: false,
+        received: { state: 'inconnu', reason: 'stripe_unreachable' },
+        costs: [],
+        result: { status: 'inconnu', by_currency: null, missing: [] },
+      },
+    ],
+  };
+  return p;
+}
+
+describe('encaissé moins coûts, côté site', () => {
+  it('écrit les montants en unités, devise par devise, sans Intl', () => {
+    // Le séparateur des milliers est l'espace insécable de format-grouped.
+    expect(money(123456, 'usd').replace(/\s/g, ' ')).toBe('1 234,56 USD');
+    expect(money(-250, 'chf')).toBe('−2,50 CHF');
+    expect(money(1000, 'usd', true)).toBe('+10,00 USD');
+    expect(money(500, 'jpy')).toBe('500 JPY');
+    expect(moneyList({ usd: 1000, chf: -250 }, true)).toBe('−2,50 CHF · +10,00 USD');
+    expect(moneyList({})).toBe('—');
+    expect(periodTitle({ month: '2026-09', from: '2026-09-01', to: '2026-10-01', complete: true })).toBe(
+      'Septembre 2026',
+    );
+    expect(periodTitle({ month: '2026-10', from: '2026-10-01', to: '2026-10-05', complete: false })).toBe(
+      'Octobre 2026, du 1er au 4',
+    );
+  });
+
+  it('garde le bloc quand il a sa forme, l’écarte seul sinon', () => {
+    expect(readBulletin(withMoney())?.money).toMatchObject({ state: 'read' });
+    const bad = withMoney() as unknown as Record<string, unknown>;
+    bad.money = { state: 'read', stripe_read_at: null, periods: [{ month: '2026-09', costs: 'beaucoup' }] };
+    const read = readBulletin(bad);
+    expect(read).not.toBeNull();
+    expect(read?.money).toBeUndefined();
+  });
+
+  it('dit un plafond quand un coût manque, et l’inconnu quand Stripe n’a pas répondu', () => {
+    const html = render(withMoney());
+    expect(html).toContain('Encaissé moins coûts');
+    expect(html.indexOf('Encaissé moins coûts')).toBeGreaterThan(html.indexOf('Les chiffres de la semaine'));
+    expect(html).toContain('Septembre 2026');
+    expect(html).toContain('10,00 USD');
+    expect(html).toContain('−10,00 USD');
+    expect(html).toContain('relevé');
+    expect(html).toContain('inconnu, pas saisi');
+    expect(html).toContain('Au plus');
+    expect(html).toContain('−2,50 CHF · +10,00 USD');
+    expect(html).toContain('Il manque : API (Railway).');
+    // Un poste ponctuel non saisi n'est pas une ligne « inconnu ».
+    expect(html).not.toContain('Noms de domaine et courriel');
+    expect(html).toContain('Octobre 2026, du 1er au 4');
+    expect(html).toContain('Résultat inconnu');
+    expect(html).toContain('Encaissé inconnu : Stripe n’a pas répondu.');
+    expect(html).toContain('Stripe lu le 07.10 à 11:55.');
   });
 });

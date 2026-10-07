@@ -114,6 +114,7 @@ describe('GET /v1/admin/bulletin', () => {
       [
         'decisions',
         'definitions',
+        'money',
         'moved',
         'needs',
         'not_yet',
@@ -420,5 +421,115 @@ describe('POST /v1/admin/bulletin/proposals et /answers', () => {
     });
     expect(unknown.status).toBe(404);
     expect(await unknown.json()).toEqual({ error: 'unknown_proposal' });
+  });
+});
+
+// ─── Priorité 05 : le registre des coûts et la ligne « encaissé moins coûts » ──
+
+describe('les coûts saisis et la ligne « encaissé moins coûts »', () => {
+  const app = buildApp();
+  const saved = { admin: process.env.ADMIN_SECRET, stripe: process.env.STRIPE_SECRET_KEY };
+
+  const call = (method: string, path: string, body?: unknown): Promise<Response> => {
+    ip += 1;
+    return Promise.resolve(
+      app.request(path, {
+        method,
+        headers: {
+          'x-forwarded-for': `198.18.0.${(ip % 250) + 1}`,
+          'X-Admin-Secret': SECRET,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+    );
+  };
+
+  beforeEach(() => {
+    process.env.ADMIN_SECRET = SECRET;
+    // Sans clé Stripe : l'encaissé est inconnu, jamais zéro.
+    delete process.env.STRIPE_SECRET_KEY;
+    getStatsDB().exec('DELETE FROM bulletin_costs');
+    resetMergedPullsCache();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('[]', { status: 200 })),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  afterAll(() => {
+    for (const [name, value] of [
+      ['ADMIN_SECRET', saved.admin],
+      ['STRIPE_SECRET_KEY', saved.stripe],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
+  const entry = {
+    item: 'vercel',
+    from: '2026-09-01',
+    to: '2026-10-01',
+    amount_minor: 1000,
+    currency: 'usd',
+    nature: 'releve',
+    note: 'relevé inventé',
+  };
+
+  it('enregistre, remplace, liste et retire une saisie', async () => {
+    const created = await call('POST', '/v1/admin/bulletin/costs', entry);
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: number };
+    const replaced = await call('POST', '/v1/admin/bulletin/costs', {
+      ...entry,
+      amount_minor: 1200,
+    });
+    expect(replaced.status).toBe(200);
+    expect(await replaced.json()).toEqual({ ok: true, id, replaced: true });
+    const overlap = await call('POST', '/v1/admin/bulletin/costs', {
+      ...entry,
+      from: '2026-09-15',
+      to: '2026-10-15',
+    });
+    expect(overlap.status).toBe(409);
+    expect(
+      (await call('POST', '/v1/admin/bulletin/costs', { ...entry, currency: 'dollars' })).status,
+    ).toBe(400);
+    const list = (await (await call('GET', '/v1/admin/bulletin/costs')).json()) as {
+      costs: Array<{ id: number; amount_minor: number; note: string }>;
+    };
+    expect(list.costs).toEqual([
+      expect.objectContaining({ id, amount_minor: 1200, note: 'relevé inventé' }),
+    ]);
+    expect((await call('DELETE', `/v1/admin/bulletin/costs/${id}`)).status).toBe(200);
+    expect((await call('DELETE', `/v1/admin/bulletin/costs/${id}`)).status).toBe(404);
+    expect((await call('DELETE', '/v1/admin/bulletin/costs/abc')).status).toBe(400);
+  });
+
+  it('dans le bulletin : Stripe non configuré, l’encaissé est inconnu et le coût saisi est montré', async () => {
+    await call('POST', '/v1/admin/bulletin/costs', entry);
+    const body = (await (await call('GET', '/v1/admin/bulletin')).json()) as Bulletin;
+    expect(body.money.state).toBe('read');
+    if (body.money.state !== 'read') return;
+    const [sep] = body.money.periods;
+    expect(sep).toMatchObject({
+      month: '2026-09',
+      complete: true,
+      received: { state: 'inconnu', reason: 'stripe_not_configured' },
+      result: { status: 'inconnu', by_currency: null },
+    });
+    expect(sep.costs.find((c) => c.item === 'vercel')).toMatchObject({
+      state: 'connu',
+      amounts: { usd: 1000 },
+      nature: 'releve',
+    });
   });
 });

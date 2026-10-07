@@ -49,6 +49,8 @@ import { HEARTBEATS, RADAR_BEATS } from './ops-alert.js';
 import { mergedPullsOfWeek, type MergedPullsRead } from './bulletin-github.js';
 import { readFeed, type BulletinFeed } from './bulletin-feed.js';
 import { readDecisions, type BulletinDecisions } from './bulletin-decisions.js';
+import { readMoney, type BulletinMoney } from './bulletin-money.js';
+import type { StripeRevenueResult } from './stripe-revenue.js';
 import {
   parseDbUtc,
   sqliteUtc,
@@ -388,6 +390,8 @@ export interface Bulletin {
   };
   /** Step B: what the two Monday veilles deposited for this week. */
   veille: BulletinFeed | Unread;
+  /** Priority 05: money received minus costs, currency by currency, unknowns said. */
+  money: BulletinMoney | Unread;
   not_yet: NotYetBlock[];
   definitions: Record<string, string>;
 }
@@ -439,6 +443,15 @@ export const BULLETIN_DEFINITIONS: Readonly<Record<string, string>> = {
     'reçoive un Oui ; un pays aux BIC introuvables, au moins 10 recherches sur 3 codes ' +
     'différents dans la semaine). Oui et Non ne reviennent pas ; Plus tard revient 28 jours ' +
     'après la réponse. Une semaine passée montre les réponses données ce lundi-là.',
+  argent:
+    'Encaissé moins coûts, pour le mois précédent entier et pour le mois de la semaine ' +
+    'jusqu’à son dimanche. Encaissé : les paiements Stripe d’IBANforge (packs, abonnements, ' +
+    'audits) par jour suisse, moins leurs remboursements, dans la devise du paiement ; les ' +
+    'frais Stripe dans la devise de règlement. Les autres coûts sont saisis par la session ' +
+    'principale avec leur période et leur nature (facture, relevé, estimation). Chaque ' +
+    'devise reste la sienne : rien n’est converti. Un poste qui ne couvre pas toute la ' +
+    'période est inconnu, jamais réparti ni compté pour zéro ; le résultat est alors un ' +
+    'plafond (« au plus »). L’argent reçu par x402 n’est pas compté ici.',
   veille:
     'Ce que les deux veilles du lundi ont déposé pour la semaine, en plus de leur message ' +
     'Telegram : trois lignes de la veille marché (les portes qui s’ouvrent), et le score des ' +
@@ -974,6 +987,11 @@ export interface BulletinOptions {
   week?: string | null;
   /** Injectable clock, for the tests. */
   now?: number;
+  /**
+   * The shared Stripe reading (the 15-minute cache of the "Encaissé" tile). Without
+   * it, the money block says Stripe is not configured: never a zero.
+   */
+  stripe?: () => Promise<StripeRevenueResult>;
 }
 
 export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin> {
@@ -981,9 +999,12 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
   const resolved = resolveBulletinWeek(opts.week, nowMs);
   const { week, weeksBack } = resolved;
 
-  // GitHub first: its wait (up to 12 s when the cache is cold) runs while the
-  // database is read below, instead of after it.
+  // GitHub and Stripe first: their waits (up to 12 s and 8 s when their caches are
+  // cold) run while the database is read below, instead of after it.
   const mergedPulls = mergedPullsOfWeek(week, nowMs);
+  const stripeRead: Promise<StripeRevenueResult> = (
+    opts.stripe ?? (async () => ({ ok: false, reason: 'stripe_not_configured' }) as const)
+  )().catch(() => ({ ok: false, reason: 'stripe_unreachable' }) as const);
 
   // One read of `kv_state` feeds the signs of life and the alerts; when it fails,
   // both blocks say so rather than showing "no alert" and "never beat".
@@ -1002,6 +1023,7 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
     readDecisions(week, weeksBack === 1, missingBics.state === 'read' ? missingBics : null, nowMs),
   );
 
+  const stripe = await stripeRead;
   return {
     version: BULLETIN_VERSION,
     observed_at: sqliteUtc(nowMs),
@@ -1029,6 +1051,7 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
     },
     needs: { missing_bics: missingBics, forum_threads: forumThreads },
     veille,
+    money: guarded('money', () => readMoney(week, stripe)),
     not_yet: BULLETIN_NOT_YET.map((b) => ({ ...b })),
     definitions: { ...BULLETIN_DEFINITIONS },
   };
