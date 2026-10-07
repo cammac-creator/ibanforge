@@ -9,8 +9,8 @@ class ResConfigSettings(models.TransientModel):
     ibanforge_api_key = fields.Char(
         string="IBANforge API Key",
         config_parameter="ibanforge.api_key",
-        help="Your IBANforge API key. Get a free key (200 requests/month) at "
-        "https://ibanforge.com.",
+        help="Your IBANforge API key. Get a free key at https://ibanforge.com: "
+        "200 requests a month with an e-mail address, 25 a month without one.",
     )
     ibanforge_base_url = fields.Char(
         string="IBANforge Base URL",

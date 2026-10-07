@@ -702,6 +702,67 @@ describe('MCP session store — the two exit doors', () => {
 });
 
 /**
+ * La borne mémoire d'une clé valide (08.10.2026) : une session ouverte avec
+ * une clé n'est plus refusée par le plafond de l'adresse, donc ce qui borne
+ * l'empreinte d'une clé, c'est son nombre de sessions VIVANTES. Au-delà, la
+ * clé ferme sa propre session la moins récente, jamais celle d'un autre.
+ */
+describe('MCP session store — une clé ne tient qu’un nombre borné de sessions vivantes', () => {
+  const closable = () => {
+    const closed = { value: false };
+    const transport = {
+      close: () => {
+        closed.value = true;
+        return Promise.resolve();
+      },
+    } as unknown as WebStandardStreamableHTTPServerTransport;
+    return { transport, closed };
+  };
+
+  it('une session de plus sur la clé K ferme la moins récente de K, et rien d’autre', () => {
+    const store = createMcpSessionStore(10, 30 * 60 * 1000, 2);
+    const t0 = 1_000_000;
+    const k1 = closable();
+    store.set('anon', closable().transport, t0);
+    store.set('k1', k1.transport, t0 + 1, 'K');
+    store.set('other', closable().transport, t0 + 2, 'L');
+    store.set('k2', closable().transport, t0 + 3, 'K');
+    expect(store.ownerCount('K')).toBe(2);
+
+    store.set('k3', closable().transport, t0 + 4, 'K');
+
+    expect(store.ownerCount('K')).toBe(2);
+    expect(store.get('k1'), 'la plus ancienne session de K est partie').toBeUndefined();
+    expect(k1.closed.value, 'et son transport a été fermé').toBe(true);
+    expect(store.get('k2')).toBeDefined();
+    expect(store.get('k3')).toBeDefined();
+    expect(store.get('anon'), 'une session sans clé reste').toBeDefined();
+    expect(store.get('other'), 'la session d’une autre clé reste').toBeDefined();
+    expect(store.ownerCount('L')).toBe(1);
+  });
+
+  it('une session de K servie récemment est protégée : c’est la moins récente qui part', () => {
+    const store = createMcpSessionStore(10, 30 * 60 * 1000, 2);
+    const t0 = 1_000_000;
+    store.set('k1', closable().transport, t0, 'K');
+    store.set('k2', closable().transport, t0 + 1, 'K');
+    store.get('k1', t0 + 2);
+
+    store.set('k3', closable().transport, t0 + 3, 'K');
+
+    expect(store.get('k1')).toBeDefined();
+    expect(store.get('k2')).toBeUndefined();
+    expect(store.get('k3')).toBeDefined();
+  });
+
+  it('les sessions sans clé ne sont pas bornées par clé (le plafond par adresse s’en charge)', () => {
+    const store = createMcpSessionStore(10, 30 * 60 * 1000, 2);
+    for (let i = 0; i < 5; i++) store.set(`anon${i}`, closable().transport, 1_000_000 + i);
+    expect(store.size).toBe(5);
+  });
+});
+
+/**
  * What a client hears when its session is gone (MCP-09, audit 2026-09-01).
  *
  * The SDK answers `400 Bad Request: Server not initialized`, which describes

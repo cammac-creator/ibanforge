@@ -8,12 +8,15 @@
  * complète est dans la description de la PR) :
  *   - les reçus et livraisons de ce qui a été payé (clé achetée, recharge,
  *     abonnement posé ou terminé, rapport d'audit) : la trace d'un paiement ;
+ *     depuis le 08.10.2026, l'avis de fin d'abonnement part SANS ses liens
+ *     d'achat ni son offre (src/lib/subscription-ended-notice.ts) ;
  *   - les codes à six chiffres et les clés demandés à l'instant par la
  *     personne elle-même : la réponse à sa propre demande ;
  *   - les avis légaux (préavis d'arrêt selon les CGU, incident selon le DPA),
  *     qui ne partent d'aucun code de ce dépôt : un humain les envoie.
  * Le dernier test de ce fichier tient cette liste par la structure : seules les
- * deux alertes lisent la liste des STOP.
+ * deux alertes lisent la liste des STOP pour se taire, et l'avis de fin
+ * d'abonnement la lit pour retirer ses offres, jamais pour se taire.
  *
  * Tous les envois passent par un relais simulé : rien ne sort.
  */
@@ -35,6 +38,7 @@ vi.mock('./mail-transport.js', async (importOriginal) => {
 const { maybeSendCreditsWarning, maybeSendQuotaWarning } = await import('./quota-notice.js');
 const { isAddressUnderStop } = await import('./activation-nudge-server.js');
 const { sendRechargeEmail } = await import('./email.js');
+const { sendSubscriptionEndedNotice } = await import('./subscription-ended-notice.js');
 const { generateApiKey, validateApiKey } = await import('./api-keys.js');
 const { addAlias } = await import('./email-aliases.js');
 const { getStatsDB } = await import('./db.js');
@@ -176,7 +180,57 @@ describe('ce qui continue de partir après un STOP', () => {
     expect(relay.mock.calls[0][0].to).toBe(holder);
   });
 
-  it('seules les deux alertes de consommation lisent la liste des STOP', () => {
+  /** Un avis de fin pour une clé sans allocation ni crédits : celui qui porte tous les liens. */
+  const ended = (to: string) => ({
+    to,
+    keyPrefix: 'ifk_test0000',
+    plan: 'pro' as const,
+    allowance: 0,
+    creditsRemaining: null,
+    topupRef: `ifr_${'b'.repeat(32)}`,
+  });
+  const OFFER_MARKERS = [
+    'buy.stripe.com',
+    'To keep it running',
+    '1,000 credits',
+    'Pro, $',
+    'Pro · $',
+  ];
+
+  it('l’avis de fin d’abonnement part après un STOP, sans liens d’achat ni offre', async () => {
+    const holder = address('ended-stop');
+    inbound(`ended-stop-${RUN}`, holder, 'STOP', '');
+    expect(isAddressUnderStop(holder)).toBe(true);
+
+    expect(await sendSubscriptionEndedNotice(ended(holder))).toBe(true);
+    expect(relay, 'l’avis du service part toujours').toHaveBeenCalledTimes(1);
+    const mail = relay.mock.calls[0][0] as unknown as { to: string; text: string; html: string };
+    expect(mail.to).toBe(holder);
+    // Le constat et l'état de la clé restent : c'est l'avis dû au client.
+    expect(mail.text).toContain('has ended. The key stays active.');
+    expect(mail.text).toContain('HTTP 402');
+    expect(mail.text).toContain('Your account (usage, balance)');
+    for (const marker of OFFER_MARKERS) {
+      expect(mail.text, `texte : ${marker}`).not.toContain(marker);
+      expect(mail.html, `HTML : ${marker}`).not.toContain(marker);
+    }
+    expect(mail.text).not.toContain('These links');
+    expect(mail.text).not.toContain('client_reference_id');
+  });
+
+  it('sans STOP, le même avis porte ses liens d’achat', async () => {
+    const holder = address('ended-open');
+    expect(isAddressUnderStop(holder)).toBe(false);
+
+    expect(await sendSubscriptionEndedNotice(ended(holder))).toBe(true);
+    const mail = relay.mock.calls[0][0] as unknown as { text: string; html: string };
+    expect(mail.text).toContain('To keep it running, by card');
+    expect(mail.text).toContain('buy.stripe.com');
+    expect(mail.html).toContain('buy.stripe.com');
+    expect(mail.text).toContain('These links pay for this same key');
+  });
+
+  it('seules les deux alertes de consommation lisent la liste des STOP pour se taire', () => {
     const root = join(import.meta.dirname, '..');
     const readers: string[] = [];
     const walk = (dir: string): void => {
@@ -191,10 +245,21 @@ describe('ce qui continue de partir après un STOP', () => {
       }
     };
     walk(root);
-    // La définition, et les deux alertes de quota-notice.ts : un troisième
-    // lecteur ferait taire un reçu, un code demandé ou un avis légal.
-    expect(readers.sort()).toEqual(['lib/activation-nudge-server.ts', 'lib/quota-notice.ts']);
+    // La définition, les deux alertes de quota-notice.ts, et l'avis de fin
+    // d'abonnement (08.10.2026), qui la lit pour retirer ses offres et part
+    // quand même. Un autre lecteur ferait taire un reçu, un code demandé ou un
+    // avis légal : le nommer ici exige de dire pourquoi.
+    expect(readers.sort()).toEqual([
+      'lib/activation-nudge-server.ts',
+      'lib/quota-notice.ts',
+      'lib/subscription-ended-notice.ts',
+    ]);
     const notice = readFileSync(join(root, 'lib/quota-notice.ts'), 'utf8');
     expect(notice.match(/isAddressUnderStop\(/g)).toHaveLength(2);
+    // L'avis de fin ne connaît qu'un usage de la liste : choisir `offers`, et
+    // envoyer dans tous les cas.
+    const ended = readFileSync(join(root, 'lib/subscription-ended-notice.ts'), 'utf8');
+    expect(ended).toContain('offers: !isAddressUnderStop(p.to)');
+    expect(ended.match(/isAddressUnderStop\(/g)).toHaveLength(1);
   });
 });

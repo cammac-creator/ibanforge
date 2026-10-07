@@ -79,7 +79,11 @@ import {
 } from '../lib/field-notes.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
-import { MCP_WEEKLY_LIMIT, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
+import {
+  MCP_WEEKLY_LIMIT,
+  MCP_SESSIONS_PER_IP_DAY,
+  MCP_LIVE_SESSIONS_PER_KEY,
+} from '../lib/mcp-limits.js';
 import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
 import { keyRefusalPayload, meterToolCall } from '../mcp/key-meter.js';
 import { extractKey } from '../middleware/api-key.js';
@@ -155,10 +159,21 @@ export interface McpSessionStore {
   readonly size: number;
   /** Reading a session marks it in use, which is what keeps it out of the sweep. */
   get(id: string, now?: number): WebStandardStreamableHTTPServerTransport | undefined;
-  set(id: string, transport: WebStandardStreamableHTTPServerTransport, now?: number): void;
+  /**
+   * `owner` : l'empreinte (`keyHash`) de la clé valide qui a OUVERT la session,
+   * absente pour une session ouverte sans clé. Voir `MCP_LIVE_SESSIONS_PER_KEY`.
+   */
+  set(
+    id: string,
+    transport: WebStandardStreamableHTTPServerTransport,
+    now?: number,
+    owner?: string,
+  ): void;
   delete(id: string): boolean;
   /** Drops every session idle for longer than the TTL; returns how many went. */
   sweep(now?: number): number;
+  /** Combien de sessions vivantes ce propriétaire tient dans le magasin. */
+  ownerCount(owner: string): number;
 }
 
 /**
@@ -166,14 +181,25 @@ export interface McpSessionStore {
  * module so the eviction rules can be exercised on a store of three sessions
  * instead of three hundred — the alternative is a test that allocates ~830 MB
  * of McpServer and leaves it in the runner for every file that comes after.
+ * `maxPerOwner` likewise (08.10.2026).
+ *
+ * 🚨 Le propriétaire est une ÉTIQUETTE D'ÉVICTION, jamais une clé de
+ * facturation. C'est l'empreinte de la clé, pas la clé, et elle ne sert qu'à
+ * choisir quelle session fermer quand une même clé dépasse son nombre de
+ * sessions vivantes. Le débit continue de lire la clé de CHAQUE requête
+ * (`authInfo`, voir `withKey`) : une requête suivante qui présente une autre
+ * clé, ou aucune, paie sur ce qu'elle présente, et ne change pas le
+ * propriétaire.
  */
 export function createMcpSessionStore(
   maxSessions: number = MCP_MAX_SESSIONS,
   idleMs: number = MCP_SESSION_IDLE_MS,
+  maxPerOwner: number = MCP_LIVE_SESSIONS_PER_KEY,
 ): McpSessionStore {
   interface Entry {
     transport: WebStandardStreamableHTTPServerTransport;
     lastSeen: number;
+    owner?: string;
   }
   // Insertion order is kept as recency order (a read re-inserts), so the head
   // of the Map is always the least recently used entry.
@@ -210,15 +236,27 @@ export function createMcpSessionStore(
       id: string,
       transport: WebStandardStreamableHTTPServerTransport,
       now: number = Date.now(),
+      owner?: string,
     ): void {
       entries.delete(id);
+      // La clé s'évince elle-même AVANT la boucle globale : une clé à son
+      // plafond rend sa propre session la moins récente, et ne pousse donc
+      // personne d'autre hors du magasin pour celle-ci.
+      if (owner !== undefined) {
+        const own = [...entries].filter(([, entry]) => entry.owner === owner);
+        // L'ordre du Map est l'ordre de récence : la tête est la moins récente.
+        for (let i = 0; i <= own.length - maxPerOwner; i++) release(own[i][0], own[i][1]);
+      }
       while (entries.size >= maxSessions) {
         const oldest = entries.entries().next();
         if (oldest.done) break;
         const [victimId, victim] = oldest.value;
         release(victimId, victim);
       }
-      entries.set(id, { transport, lastSeen: now });
+      entries.set(
+        id,
+        owner === undefined ? { transport, lastSeen: now } : { transport, lastSeen: now, owner },
+      );
     },
     delete(id: string): boolean {
       return entries.delete(id);
@@ -227,6 +265,11 @@ export function createMcpSessionStore(
       const stale = [...entries].filter(([, entry]) => now - entry.lastSeen >= idleMs);
       for (const [id, entry] of stale) release(id, entry);
       return stale.length;
+    },
+    ownerCount(owner: string): number {
+      let n = 0;
+      for (const entry of entries.values()) if (entry.owner === owner) n += 1;
+      return n;
     },
   };
 }
@@ -1664,12 +1707,18 @@ mcpHttp.post('/mcp', async (c) => {
   // Retomber sur celle-ci apprendrait à un client à jeter sa clé.
   //
   // Elle ne voyage que par `authInfo`, attaché par le SDK aux messages de
-  // CETTE requête : la session ne garde aucune clé.
+  // CETTE requête : la session ne garde aucune clé. Elle garde seulement, depuis
+  // le 08.10.2026, l'empreinte de la clé qui l'a ouverte, comme étiquette
+  // d'éviction du magasin (voir `createMcpSessionStore`), jamais pour payer.
   const presentedKey = extractKey(c, { query: false });
-  if (presentedKey && toolCalls > 0) {
+  // Lue UNE fois, et seulement quand elle sert : pour attribuer un appel
+  // d'outil, ou pour décider de l'ouverture d'une session (08.10.2026).
+  const keyCheck =
+    presentedKey && (toolCalls > 0 || !transport) ? validateApiKey(presentedKey) : null;
+  if (presentedKey && keyCheck?.valid && toolCalls > 0) {
     // L'attribution de la télémétrie, posée comme sur REST : seulement pour une
     // clé valide. Le débit, lui, se fait par appel d'outil (src/mcp/key-meter.ts).
-    if (validateApiKey(presentedKey).valid) c.set('apiKeyPrefix', presentedKey.slice(0, 12));
+    c.set('apiKeyPrefix', presentedKey.slice(0, 12));
   }
 
   if (toolUnits > 0 && !presentedKey) {
@@ -1763,7 +1812,21 @@ mcpHttp.post('/mcp', async (c) => {
   callCtx.ip = ip === 'unknown' ? null : ip;
   callCtx.userAgent = c.req.header('user-agent') ?? null;
 
-  if (!transport) {
+  // ─── Une session ouverte avec une clé VALIDE (08.10.2026) ──────────────────
+  //
+  // Elle n'est ni comptée sur l'adresse ni refusée : comme sur l'API REST, qui
+  // n'a pas de plafond de sessions, ce sont les quotas de la clé qui gouvernent
+  // ses appels. Les connecteurs Claude sortent tous des adresses d'Anthropic, et
+  // le plafond par adresse faisait refuser un client muni d'une clé à cause de
+  // tous les autres. La borne mémoire passe à la clé : au plus
+  // MCP_LIVE_SESSIONS_PER_KEY sessions vivantes, la moins récente de la même clé
+  // fermée d'abord (magasin, `owner`).
+  //
+  // Une clé inconnue, révoquée ou absente garde exactement le chemin d'avant :
+  // le plafond quotidien par adresse.
+  const sessionOwner = !transport && keyCheck?.valid ? keyCheck.keyHash : undefined;
+
+  if (!transport && sessionOwner === undefined) {
     // Opening a session costs a full McpServer, so it is metered like the tool
     // calls are (SEC-01, audit 2026-09-01). Checked here rather than on the
     // `initialize` method alone: this is the exact line where the memory is
@@ -1789,10 +1852,11 @@ mcpHttp.post('/mcp', async (c) => {
         error: {
           code: -32000,
           message:
-            `Daily MCP session limit reached (${MCP_SESSIONS_PER_IP_DAY} new sessions/day). ` +
-            'Reuse the mcp-session-id returned by initialize instead of opening a session per call, ' +
-            `or move to the REST API: POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key ` +
-            `with no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST calls/month.`,
+            `Daily MCP session limit reached (${MCP_SESSIONS_PER_IP_DAY} new sessions/day per source address, without a key). ` +
+            'Reuse the mcp-session-id returned by initialize instead of opening a session per call. ' +
+            'A session opened with a valid IBANforge key (Authorization: Bearer ifk_… or X-API-Key) is not counted ' +
+            `against the address. POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key ` +
+            `with no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} calls/month.`,
           data: { used: opened.used, limit: MCP_SESSIONS_PER_IP_DAY, remaining: 0 },
         },
       });
@@ -1803,8 +1867,13 @@ mcpHttp.post('/mcp', async (c) => {
     // ligne où la mémoire est dépensée, quoi que prétende le corps. Les refus
     // se lisent sous `/mcp:session:refused` dans `request_log`
     // (chantier « mesure agents », 15/09).
+    //
+    // 08.10.2026 : seulement sans clé valide. Ce compteur alimente le tableau
+    // « MCP distant : activité sans clé », comme `tool_calls` plus bas.
     bumpMcpRemoteDaily({ sessions: 1 });
+  }
 
+  if (!transport) {
     // New session — create transport and connect server
     transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID(),
@@ -1815,7 +1884,9 @@ mcpHttp.post('/mcp', async (c) => {
       // strict list would refuse every local probe. MCP-14 / SEC-07, 2026-09-01.
       ...mcpDnsRebindingOptions(),
       onsessioninitialized: (id) => {
-        mcpSessions.set(id, transport!);
+        // `sessionOwner` : l'empreinte de la clé valide qui ouvre, ou rien.
+        // Une étiquette d'éviction, jamais de facturation (voir le magasin).
+        mcpSessions.set(id, transport!, undefined, sessionOwner);
         // Le MÊME objet que celui muté au-dessus, désormais joignable par
         // l'en-tête de session. Un `{ ...callCtx }` ici couperait le lien avec
         // ce que les outils tiennent.
@@ -1929,6 +2000,14 @@ mcpHttp.get('/mcp', async (c) => {
           mcp_resets: TRIAL_RESET,
           mcp_resets_at: trialResetsAt(),
           mcp_sessions_per_day: MCP_SESSIONS_PER_IP_DAY,
+          // 08.10.2026 : AJOUTÉ à côté (les annuaires affichent des champs
+          // nommés). Le plafond ci-dessus ne compte que les ouvertures sans clé
+          // valide, par adresse ; une clé valide n'est jamais refusée à
+          // l'ouverture, elle garde au plus ce nombre de sessions vivantes.
+          mcp_sessions_scope: 'per source address, sessions opened without a valid key',
+          mcp_live_sessions_per_key: MCP_LIVE_SESSIONS_PER_KEY,
+          mcp_live_sessions_per_key_note:
+            'A session opened with a valid key is not counted against the address and never refused; past this many live sessions on one key, the least recently used session of that same key is closed (send initialize again).',
           session_idle_timeout_minutes: MCP_SESSION_IDLE_MS / 60000,
           anonymous_key: `POST /v1/keys/generate with no body at all — no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} REST req/month`,
           claim_to_full: `POST /v1/keys/claim — a mailed code or an x402 payment on the key; lifts that same key to ${FREE_TIER_MONTHLY_LIMIT} req/month`,

@@ -18,7 +18,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { mcpHttp } from './mcp-http.js';
+import { mcpHttp, mcpSessions } from './mcp-http.js';
 import { ibanValidate } from './iban-validate.js';
 import { apiKeyMiddleware } from '../middleware/api-key.js';
 import {
@@ -34,6 +34,7 @@ import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { trialWeekStart } from '../lib/trial.js';
 import { ANONYMOUS_MONTHLY_LIMIT } from '../lib/tiers.js';
 import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+import { MCP_LIVE_SESSIONS_PER_KEY, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
 import { KEY_METERED_TOOLS, restEquivalent } from '../mcp/key-meter.js';
 import type { HonoEnv } from '../types.js';
 
@@ -456,6 +457,114 @@ describe('clé sur /mcp : la session ne garde aucune clé', () => {
     expect(used(a.hash)).toBe(2);
     expect(used(b.hash)).toBe(1);
     expect(keylessUnits(ip)).toBe(1);
+  });
+});
+
+/**
+ * L'ouverture d'une session avec une clé valide (08.10.2026). Les connecteurs
+ * Claude sortent tous des adresses d'Anthropic : le plafond quotidien par
+ * adresse refusait un client muni d'une clé à cause de tous les autres. Une
+ * clé valide n'est plus comptée sur l'adresse ni refusée ; une clé inconnue ou
+ * absente garde le plafond par adresse.
+ *
+ * Le budget de l'adresse est brûlé par des `ping` sans session : chacun
+ * construit un transport (la mémoire que le plafond compte) qui n'est jamais
+ * rangé, ce qui garde l'empreinte du test à plat.
+ */
+describe('clé sur /mcp : l’ouverture de session', () => {
+  /** Une adresse à elle, hors de la plage que `freshIp` fait tourner. */
+  const SHARED_IP = '192.0.2.231';
+
+  async function ping(app: App, ip: string, headers?: Record<string, string>) {
+    return post(app, { jsonrpc: '2.0', id: 1, method: 'ping', params: {} }, { ip, headers });
+  }
+
+  function openingsToday(ip: string): number {
+    const row = getStatsDB()
+      .prepare("SELECT units FROM trial_ledger WHERE day = date('now') AND bucket = ?")
+      .get(ledgerBucket(ip, 'init:')) as { units: number } | undefined;
+    return row?.units ?? 0;
+  }
+
+  it(`une clé valide ouvre au-delà des ${MCP_SESSIONS_PER_IP_DAY} ouvertures de son adresse ; sans clé ou avec une clé inconnue, refusé`, async () => {
+    const app = makeApp();
+    const a = freshKey();
+    const b = freshKey();
+
+    // Les autres clients de la même adresse épuisent son plafond du jour.
+    for (let i = 0; i < MCP_SESSIONS_PER_IP_DAY; i++) {
+      const res = await ping(app, SHARED_IP);
+      expect(res.headers.get('X-MCP-Outcome')).not.toBe('session_rate_limited');
+    }
+    expect(openingsToday(SHARED_IP)).toBe(MCP_SESSIONS_PER_IP_DAY);
+
+    // Le défaut : un client muni d'une clé, depuis cette adresse.
+    for (let i = 0; i <= MCP_SESSIONS_PER_IP_DAY; i++) {
+      const res = await ping(app, SHARED_IP, bearer(a.key));
+      expect(res.headers.get('X-MCP-Outcome'), `ouverture ${i + 1} avec clé`).not.toBe(
+        'session_rate_limited',
+      );
+    }
+    // Une vraie session, par chaque en-tête que REST lit.
+    const viaBearer = await open(app, SHARED_IP, bearer(a.key));
+    const viaHeader = await open(app, SHARED_IP, { 'X-API-Key': b.key });
+    expect(viaBearer).not.toBe(viaHeader);
+    expect(openingsToday(SHARED_IP), 'rien de tout cela sur le compte de l’adresse').toBe(
+      MCP_SESSIONS_PER_IP_DAY,
+    );
+
+    // Et la session ouverte avec la clé sert ses appels, sur la clé.
+    const env = await call(
+      app,
+      viaBearer,
+      SHARED_IP,
+      'validate_iban',
+      { iban: VALID_IBAN },
+      bearer(a.key),
+    );
+    expect(env.result?.isError).toBeFalsy();
+    expect(used(a.hash)).toBe(1);
+
+    // Sans clé : le comportement d'avant, inchangé.
+    const keyless = await ping(app, SHARED_IP);
+    expect(keyless.headers.get('X-MCP-Outcome')).toBe('session_rate_limited');
+    const refusal = (await keyless.json()) as { error: { message: string } };
+    expect(refusal.error.message).toContain('Daily MCP session limit reached');
+    expect(refusal.error.message).toContain('valid IBANforge key');
+
+    // Une clé inconnue, ou révoquée, n'est pas une clé valide : le plafond de l'adresse.
+    const unknown = await ping(app, SHARED_IP, bearer(`ifk_${'0'.repeat(48)}`));
+    expect(unknown.headers.get('X-MCP-Outcome')).toBe('session_rate_limited');
+    const revoked = freshKey();
+    expect(revokeApiKey(revoked.key)).toBe(true);
+    const refusedRevoked = await post(
+      app,
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'vitest-mcp-key', version: '1.0.0' },
+        },
+      },
+      { ip: SHARED_IP, headers: bearer(revoked.key) },
+    );
+    expect(refusedRevoked.headers.get('X-MCP-Outcome')).toBe('session_rate_limited');
+    expect(refusedRevoked.headers.get('mcp-session-id')).toBeNull();
+  });
+
+  it('la session ouverte avec une clé valide est rangée sous cette clé, pas une session sans clé', async () => {
+    const app = makeApp();
+    const ip = freshIp();
+    const k = freshKey();
+    expect(mcpSessions.ownerCount(k.hash)).toBe(0);
+    await open(app, ip, bearer(k.key));
+    await open(app, ip, bearer(k.key));
+    await open(app, ip);
+    expect(mcpSessions.ownerCount(k.hash)).toBe(2);
+    expect(MCP_LIVE_SESSIONS_PER_KEY).toBeGreaterThan(2);
   });
 });
 
