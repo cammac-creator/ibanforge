@@ -13,7 +13,7 @@ bank account the moment an IBAN is entered, using the `IBANforge
 <https://ibanforge.com/?utm_source=odoo>`_ API.
 
 No manual bank pre-configuration is required: IBANforge resolves the BIC and
-bank name from a database of 121,000+ BIC codes across 75 countries, and this
+bank name from a database of 121,000+ BIC entries across 89 IBAN countries, and this
 module creates (or reuses) the matching ``res.bank`` record for you.
 
 What it does
@@ -31,24 +31,23 @@ What it does
 Value vs. native Odoo
 =====================
 
-+--------------------------------+---------------------+--------------------------------+--------------------+
-| Capability                     | Native ``base_iban``| OCA ``base_bank_from_iban``    | This module        |
-+================================+=====================+================================+====================+
-| Validate IBAN format (mod-97)  | Yes                 | Yes                            | Delegated to       |
-|                                |                     |                                | ``base_iban``      |
-+--------------------------------+---------------------+--------------------------------+--------------------+
-| Fill the BIC                   | No                  | No                             | Yes (via API)      |
-+--------------------------------+---------------------+--------------------------------+--------------------+
-| Fill the bank name             | No                  | Only if bank pre-configured    | Yes (find-or-create)|
-+--------------------------------+---------------------+--------------------------------+--------------------+
-| Worldwide BIC database         | No                  | No (manual local mapping)      | Yes (121k+ BIC)    |
-+--------------------------------+---------------------+--------------------------------+--------------------+
-| SEPA / risk / CH clearing      | No                  | No                             | Yes (info badge)   |
-+--------------------------------+---------------------+--------------------------------+--------------------+
++-------------------------------+----------------------+-----------------------------+----------------------------+
+| Capability                    | Native ``base_iban`` | OCA ``base_bank_from_iban`` | This module                |
++===============================+======================+=============================+============================+
+| Validate IBAN format (mod-97) | Yes                  | Yes                         | Delegated to ``base_iban`` |
++-------------------------------+----------------------+-----------------------------+----------------------------+
+| Fill the BIC                  | No                   | No                          | Yes (via API)              |
++-------------------------------+----------------------+-----------------------------+----------------------------+
+| Fill the bank name            | No                   | Only if bank pre-configured | Yes (find-or-create)       |
++-------------------------------+----------------------+-----------------------------+----------------------------+
+| Worldwide BIC database        | No                   | No (manual local mapping)   | Yes (121k+ BIC entries)    |
++-------------------------------+----------------------+-----------------------------+----------------------------+
+| SEPA / risk / CH clearing     | No                   | No                          | Yes (info badge)           |
++-------------------------------+----------------------+-----------------------------+----------------------------+
 
 The gap: ``base_bank_from_iban`` can only match a bank if you have already
-created it with its code. Nobody pre-configures 121,000 banks. IBANforge does
-it in one call, with no setup.
+created it with its code. Nobody pre-configures 121,000 BIC entries. IBANforge
+does it in one call, with no setup.
 
 Installation
 ============
@@ -65,8 +64,9 @@ Then install the module from the Apps menu (technical name:
 Configuration
 =============
 
-#. Get a **free API key** (200 requests/month) at
-   `ibanforge.com <https://ibanforge.com/?utm_source=odoo>`_.
+#. Get a **free API key** at
+   `ibanforge.com <https://ibanforge.com/docs/api-keys?utm_source=odoo>`_:
+   200 requests a month once you give an e-mail address, 25 a month without one.
 #. Open **Settings → IBANforge** and paste your API key.
 #. (Optional) Adjust the API base URL and toggle the SEPA / risk badge.
 
@@ -98,17 +98,45 @@ Known limitations (MVP)
 Privacy
 =======
 
-When an API key is configured, the IBAN you enter is sent over HTTPS to the
-configured IBANforge endpoint for validation. With no key configured, nothing
-leaves your server.
+**With no API key saved, nothing leaves your server**: the module makes no
+network call at all.
 
-Icon / App Store note
-=====================
+Once a key is saved, the module sends two things over HTTPS to
+``https://api.ibanforge.com`` (or to the API Base URL you set):
 
-This package ships both ``static/description/icon.svg`` and a 140x140
-``static/description/icon.png``. Before submitting to apps.odoo.com, add real
-Odoo screenshots and an ``images`` entry in ``__manifest__.py`` for the listing
-carousel.
+* the IBAN typed in the Account Number field of a partner bank account (while
+  you edit it, then again when the account is saved or its IBAN changes,
+  imports included);
+* your API key, in an ``X-API-Key`` header.
+
+Nothing else is sent: no partner name, no address, no other Odoo field. What
+comes back is the BIC, the bank name and the SEPA and risk indicators for that
+IBAN.
+
+The `IBANforge privacy policy <https://ibanforge.com/legal/privacy>`_ states
+that IBANs submitted for validation are processed in memory and are not stored,
+with one exception: for an invalid IBAN, at most its first 4 characters (country
+code and check digits, never the bank or account part) are kept, up to 12
+months, as request metadata. The module sends the IBAN in the body of the
+request, never in a URL.
+
+The hosting side also sees the address of your Odoo server: according to the
+same policy, the network edge of the API host keeps the raw IP address and the
+request path for 7 days, outside IBANforge's own logs, which keep only a salted
+hash of the address. Each call is counted against the monthly allowance of your
+key. A `data processing agreement <https://ibanforge.com/legal/dpa>`_ is
+available.
+An IBAN can be personal data: you stay in charge of what you enter in Odoo and
+of whether you enable the lookup.
+
+The module itself collects no usage statistics, has no telemetry, downloads no
+code and runs no other code.
+
+Support
+=======
+
+Questions, a bug or a request: support@ibanforge.com. Source code and issues:
+https://github.com/cammac-creator/ibanforge-odoo
 
 License
 =======
