@@ -46,6 +46,12 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  /*
+   * Standalone output for the container image of the self-hosted site
+   * (frontend/Dockerfile sets NEXT_OUTPUT=standalone). Left unset everywhere
+   * else, so a Vercel build, CI's `next build` and `next dev` are unchanged.
+   */
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   turbopack: {
     root: path.resolve(__dirname),
   },
