@@ -279,7 +279,7 @@ répertoire a répondu.
 | OFAC (US Treasury) | 223 entités | `treasury.gov/ofac/downloads/sdn.csv` |
 | ONU | 5 entités | `scsanctions.un.org/resources/xml/en/consolidated.xml` |
 | Union européenne | 2 entités | `webgate.ec.europa.eu/fsd/fsf/…` |
-| SECO (Suisse) | fetch en place | `sesam.search.admin.ch/…` |
+| SECO (Suisse) | 11 entités (liste du 28.09.2026) | `sesam.search.admin.ch/…/downloadXmlGesamtliste.xhtml` |
 | GAFI / FATF | listes pays | relevé `fatf_as_of` en base |
 | EPC — SCT | participants | `europeanpaymentscouncil.eu/…/sct.csv` |
 | EPC — SCT Inst | participants | `…/sct_inst.csv` |
@@ -290,6 +290,37 @@ répertoire a répondu.
 `f8547b4`). Vérifié le 22/08 : les sanctions en base portent OFAC, UN et EU.
 **SECO n'y apparaît pas.** Le flux est branché, il ne rapporte rien : ne pas
 annoncer SECO tant que la table ne le porte pas.
+
+**07/10/2026 : SECO ne portait plus une ligne depuis le 02/06/2026.** Jusqu'au
+31/05, la base tirée d'OpenSanctions portait une ligne SECO (SCTSAEA1). Toutes les
+versions de `data/compliance.sqlite` depuis le passage aux sources primaires
+(02/06/2026) n'ont que l'OFAC et l'UE (plus l'ONU jusqu'au retrait). L'export de recherche
+(`searchSanctionWithExport.xhtml?…&action=exportXml`) répond HTTP 500 chaque
+dimanche depuis le 12/07 (« fetch failed » ce jour-là), et la reprise n'avait
+rien à recopier : le robot publiait en vert une base sans la liste suisse. Du
+02/06 au 26/07, `metadata.sources` l'annonçait pourtant (chaîne écrite à la main,
+corrigée par `f8547b4`). Depuis :
+- la liste est lue dans l'**export complet** (`downloadXmlGesamtliste.xhtml`,
+  environ 42 Mo, `list-type="whole-list"`) par `scripts/seco-list.ts`, **par
+  structure** : cette liste garde l'histoire (cibles radiées, blocs `added` et
+  `removed`), et l'extraction sur le texte brut y accusait une banque radiée
+  (CMSYSYDA) et fabriquait un BIC à partir du nom « Swift Investments »
+  (INVESTME). Le 07/10 : 8 667 cibles, 7 108 en vigueur, 11 BIC8, dont deux
+  que ni l'OFAC, ni l'UE, ni la liste publique de l'ONU (06/10) ne nomment
+  (SCERIRTH, SCTSAEA1) ;
+- chaque liste publique (OFAC, UE, SECO) a son **plancher**
+  (`scripts/sanctions-source-floor.ts`), mesuré sur la taille publiée (lignes SDN,
+  lignes du fichier de l'UE, cibles SECO en vigueur, inscrites dans
+  `metadata.source_records`) : vide, sous le plancher absolu, en baisse de plus de
+  20 % ou sans plus aucun BIC, la liste est reprise de la base précédente, et sans
+  reprise possible le run échoue sans remplacer la base ;
+- `metadata.seco_list_date` porte la date de la liste elle-même ;
+- les réponses nomment SECO (`meta.sources`, `matched_lists`), mais les surfaces
+  de couverture disent encore « OFAC, EU, UN » : l'annonce est une PR à part
+  (`ANNOUNCEMENT_PENDING` dans `src/routes/sanctions-claims.test.ts`).
+- Conditions : annexes d'ordonnances du Conseil fédéral, actes officiels exclus
+  du droit d'auteur (LDA, art. 5, al. 1, let. a) ; aucune permission écrite du
+  SECO (voir `NOTICE`, groupe B).
 
 **06/09/2026 — le rafraîchissement hebdomadaire a échoué sur un 500 de l'UE** (SECO a
 répondu 500 aussi, comme depuis juillet) : la base produite ne portait plus qu'OFAC et ONU,
@@ -485,7 +516,8 @@ viennent du fichier Bank Master de SIX (« may be used freely »).
   hebdomadaire pour les sanctions et les registres EPC (`refresh-compliance.yml`,
   `0 3 * * 0`). Les deux cadences sont vérifiées sur les exécutions réelles.
 - ⚠️ **Deux sources sont volontairement absentes du pied de page** :
-  **SECO**, parce que son flux ne rapporte rien (voir plus haut), et **le GAFI**,
+  **SECO**, parce que son flux ne rapportait rien (voir plus haut ; lu depuis le
+  07/10/2026, annonce en attente), et **le GAFI**,
   parce que ses listes sont **statiques** — maintenues à la main dans
   `src/lib/compliance-static.ts` et datées par `FATF_AS_OF`. Le workflow les
   réinsère chaque semaine, ce qui n'est pas la même chose que les rafraîchir.

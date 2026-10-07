@@ -47,6 +47,14 @@ import {
   CARRY_OVER_MAX_AGE_DAYS,
   type CarryOverResult,
 } from './compliance-carry-over.js';
+import { parseSecoWholeList, SECO_WHOLE_LIST_URL } from './seco-list.js';
+import {
+  judgeSourceSize,
+  readPreviousSanctions,
+  SOURCE_RECORDS_KEY,
+  type PreviousSanctions,
+  type PublicSanctionsList,
+} from './sanctions-source-floor.js';
 
 /**
  * Lu une fois, avant tout téléchargement : `restricted` refait tout comme avant
@@ -129,7 +137,7 @@ function reportCarryOver(list: string, result: CarryOverResult): void {
       return;
     case 'previous_too_old':
       console.warn(
-        `  ${list}: NOT carried over — the previous database (${result.previousRefresh ?? 'undated'}) is older than ${CARRY_OVER_MAX_AGE_DAYS} days; the list is dropped and the claims gate will fail this run`,
+        `  ${list}: NOT carried over: the previous database (${result.previousRefresh ?? 'undated'}) is older than ${CARRY_OVER_MAX_AGE_DAYS} days`,
       );
       return;
     case 'no_rows':
@@ -141,8 +149,8 @@ function reportCarryOver(list: string, result: CarryOverResult): void {
   }
 }
 
-async function downloadFile(url: string, dest: string): Promise<void> {
-  const response = await fetchWithTimeout(url, 120_000);
+async function downloadFile(url: string, dest: string, timeoutMs = 120_000): Promise<void> {
+  const response = await fetchWithTimeout(url, timeoutMs);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} for ${url}`);
   }
@@ -262,8 +270,18 @@ function insertStaticData(db: Database.Database): void {
 // (non-commercial) and cannot be used in a paid product. OFAC is the spine:
 // its SDN remarks field carries "SWIFT/BIC <code>" tokens for sanctioned banks.
 // The other three rarely expose a BIC in their raw exports (measured: EU≈3,
-// SECO≈1, UN≈0 — OpenSanctions wasn't enriching them either), but we keep them
-// wired, best-effort, so the OFAC/EU/UN/SECO claim stays honest.
+// UN≈5), but we keep them wired so the coverage claim stays honest.
+//
+// SECO (07.10.2026): not a single row since the switch to primary sources
+// (02.06.2026). Its search export answered HTTP 500 every Sunday from 12.07,
+// and before that the blob extraction found nothing in it. It is now read from the WHOLE list, by
+// structure (scripts/seco-list.ts): 11 bank BICs in the list of 28.09.2026.
+//
+// Every public list (OFAC, EU, SECO) passes a floor of its own
+// (scripts/sanctions-source-floor.ts): a list that cannot be read, comes back
+// much smaller than last week, or stops yielding BICs is treated as a failed
+// download: carried over from the previous database when it is recent enough,
+// otherwise the run refuses to ship. A public list never leaves in silence.
 // ---------------------------------------------------------------------------
 
 // "SWIFT/BIC HAVIGB2L" or "SWIFT HAVIGB2L" inside free-text remarks.
@@ -295,7 +313,35 @@ interface SanctionsTally {
   unresolved: string[];
 }
 
-async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTally> {
+const newTally = (): SanctionsTally => ({
+  candidates: 0,
+  kept: 0,
+  directoryMatches: 0,
+  unresolved: [],
+});
+
+type EntityRow = [string, string, string, string, number];
+
+/** What one list yielded, before its floor decides whether it ships. */
+interface ListHarvest {
+  /** The size of the list as published (rows, lines or listed targets). */
+  records: number;
+  rows: EntityRow[];
+  tally: SanctionsTally;
+}
+
+/** What the sanctions step hands to the final gate and to `metadata`. */
+interface SanctionsOutcome {
+  tally: SanctionsTally;
+  /** Public lists refused AND not carried over: the database must not ship. */
+  refused: string[];
+  /** Size of each public list: read this run, or the last good measure when carried. */
+  sourceRecords: Record<string, number>;
+  /** Date of the SECO list served: read this run, or the carried database's. */
+  secoListDate: string | null;
+}
+
+async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsOutcome> {
   console.log('\n[2/5] Downloading primary-source sanctions (OFAC/EU/UN/SECO)...');
 
   // Our own BIC directory, read-only. It used to be a FILTER: a listed BIC was
@@ -319,11 +365,52 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
     `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code, directory_match)
      VALUES (?, ?, ?, ?, ?)`,
   );
-  const insertBatch = db.transaction((rows: Array<[string, string, string, string, number]>) => {
+  const insertBatch = db.transaction((rows: EntityRow[]) => {
     for (const row of rows) insertEntity.run(...row);
   });
 
-  const tally: SanctionsTally = { candidates: 0, kept: 0, directoryMatches: 0, unresolved: [] };
+  const tally = newTally();
+  // Read BEFORE anything is written: FINAL_DB_PATH is still the database in
+  // service, the one each list is compared with and carried over from.
+  const previous: PreviousSanctions = readPreviousSanctions(FINAL_DB_PATH);
+  const refused: string[] = [];
+  const sourceRecords: Record<string, number> = {};
+  let secoListDate: string | null;
+
+  /**
+   * A list that was read ships only past its floor. Refused or unread, it is
+   * carried over from the previous database (never OFAC, the spine); a list
+   * that cannot be carried over either is recorded in `refused`, and the run
+   * stops before replacing the database. Returns whether the fresh rows ship.
+   */
+  const settle = (list: PublicSanctionsList, harvest: ListHarvest | null, failure: string) => {
+    const refusal = harvest
+      ? judgeSourceSize(list, harvest.records, harvest.rows.length, previous)
+      : failure || 'not read';
+    if (harvest && refusal === null) {
+      if (harvest.rows.length) insertBatch(harvest.rows);
+      tally.candidates += harvest.tally.candidates;
+      tally.kept += harvest.rows.length;
+      tally.directoryMatches += harvest.tally.directoryMatches;
+      tally.unresolved.push(...harvest.tally.unresolved);
+      sourceRecords[list] = harvest.records;
+      return true;
+    }
+    console.warn(`  WARNING: ${list} refused: ${refusal}`);
+    // The reference for next week stays the last good measure, never the bad one.
+    const before = previous.records[list];
+    if (before !== undefined) sourceRecords[list] = before;
+    if (list === 'OFAC') {
+      refused.push(`OFAC (${refusal}; the spine is never carried over)`);
+      return false;
+    }
+    const carried = carryOverList(db, FINAL_DB_PATH, list);
+    reportCarryOver(list, carried);
+    if (carried.reason !== 'carried') {
+      refused.push(`${list} (${refusal}; nothing carried over: ${carried.reason})`);
+    }
+    return false;
+  };
 
   // Extract every "SWIFT/BIC <code>" from a blob of text and keep the ones that
   // are well-formed BICs (dedup via `seen`). The ONLY rejection left is a
@@ -331,6 +418,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
   const extractBics = (
     text: string,
     seen: Set<string>,
+    t: SanctionsTally,
   ): Array<{ bic8: string; inDirectory: boolean }> => {
     const out: Array<{ bic8: string; inDirectory: boolean }> = [];
     let m: RegExpExecArray | null;
@@ -340,10 +428,10 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       if (seen.has(bic8)) continue;
       if (!validateBIC(bic8).valid) continue;
       seen.add(bic8);
-      tally.candidates++;
+      t.candidates++;
       const inDirectory = !!bicLookup.get(bic8);
-      if (inDirectory) tally.directoryMatches++;
-      else tally.unresolved.push(bic8);
+      if (inDirectory) t.directoryMatches++;
+      else t.unresolved.push(bic8);
       out.push({ bic8, inDirectory });
     }
     return out;
@@ -351,14 +439,17 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
 
   try {
     // ---- OFAC SDN (US public domain) — the spine ----
+    let ofac: ListHarvest | null = null;
+    let ofacFailure = '';
     try {
+      const ofacTally = newTally();
       const csvPath = resolve(TMP_DIR, 'ofac_sdn.csv');
       console.log('  Fetching OFAC SDN: https://www.treasury.gov/ofac/downloads/sdn.csv');
       await downloadFile('https://www.treasury.gov/ofac/downloads/sdn.csv', csvPath);
       const { createReadStream } = await import('node:fs');
       const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
       const seen = new Set<string>();
-      const batch: Array<[string, string, string, string, number]> = [];
+      const batch: EntityRow[] = [];
       let lines = 0;
       let unresolved = 0;
       // SDN.csv columns (no header): 0=ent_num,1=SDN_Name,2=SDN_Type,3=Program,
@@ -423,13 +514,11 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
           }
         }
         if (!/SWIFT/i.test(remarks)) continue;
-        for (const { bic8, inDirectory } of extractBics(remarks, seen)) {
+        for (const { bic8, inDirectory } of extractBics(remarks, seen, ofacTally)) {
           if (!inDirectory) unresolved++;
           batch.push([bic8, name, 'OFAC', '', inDirectory ? 1 : 0]);
         }
       }
-      if (batch.length) insertBatch(batch);
-      tally.kept += batch.length;
       console.log(
         `  OFAC: ${lines} rows, ${batch.length} bank BICs kept (${unresolved} not in our directory)`,
       );
@@ -570,7 +659,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
         if (!arr) byFirstWord.set(fw, (arr = []));
         arr.push({ norm, bic8: r.bic8 });
       }
-      const nameBatch: Array<[string, string, string, string, number]> = [];
+      const nameBatch: EntityRow[] = [];
       const nameSeen = new Set<string>();
       const droppedByGeo: string[] = [];
       let namesMatched = 0;
@@ -598,8 +687,6 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
         }
         if (hit) namesMatched++;
       }
-      if (nameBatch.length) insertBatch(nameBatch);
-      tally.kept += nameBatch.length;
       console.log(
         `  OFAC name axis: ${entityNames.size} entity names read, ${namesMatched} matched in our directory ` +
           `-> ${nameBatch.length} BICs beyond the SWIFT tokens (OFAC only; ALT.csv aliases not read)`,
@@ -610,12 +697,18 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
             `${droppedByGeo.slice(0, 20).join(' ')}${droppedByGeo.length > 20 ? ' …' : ''}`,
         );
       }
+      ofac = { records: lines, rows: [...batch, ...nameBatch], tally: ofacTally };
     } catch (err) {
-      console.warn(`  WARNING: OFAC download/parse failed: ${(err as Error).message}`);
+      ofacFailure = (err as Error).message;
+      console.warn(`  WARNING: OFAC download/parse failed: ${ofacFailure}`);
     }
+    settle('OFAC', ofac, ofacFailure);
 
-    // ---- EU consolidated list (best-effort; rarely carries BICs) ----
+    // ---- EU consolidated list (rarely carries BICs) ----
+    let eu: ListHarvest | null = null;
+    let euFailure = '';
     try {
+      const euTally = newTally();
       const csvPath = resolve(TMP_DIR, 'eu_fsf.csv');
       const euUrl =
         'https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw';
@@ -624,19 +717,23 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       const { readFileSync } = await import('node:fs');
       const text = readFileSync(csvPath, 'utf-8');
       const seen = new Set<string>();
-      const batch: Array<[string, string, string, string, number]> = [];
+      const batch: EntityRow[] = [];
       let unresolved = 0;
-      for (const { bic8, inDirectory } of extractBics(text, seen)) {
+      for (const { bic8, inDirectory } of extractBics(text, seen, euTally)) {
         if (!inDirectory) unresolved++;
         batch.push([bic8, 'EU-listed entity', 'EU', '', inDirectory ? 1 : 0]);
       }
-      if (batch.length) insertBatch(batch);
-      tally.kept += batch.length;
-      console.log(`  EU: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
+      // The size of the file as published: its non-empty lines.
+      const records = text.split('\n').filter((l) => l.trim() !== '').length;
+      console.log(
+        `  EU: ${records} lines, ${batch.length} bank BICs read (${unresolved} not in our directory)`,
+      );
+      eu = { records, rows: batch, tally: euTally };
     } catch (err) {
-      console.warn(`  WARNING: EU download/parse failed: ${(err as Error).message}`);
-      reportCarryOver('EU', carryOverList(db, FINAL_DB_PATH, 'EU'));
+      euFailure = (err as Error).message;
+      console.warn(`  WARNING: EU download/parse failed: ${euFailure}`);
     }
+    settle('EU', eu, euFailure);
 
     // ---- UN SC consolidated XML (best-effort) ----
     // Chaîne privée seulement : la liste de l'ONU est tous droits réservés, elle
@@ -651,9 +748,11 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
         const { readFileSync } = await import('node:fs');
         const text = readFileSync(xmlPath, 'utf-8');
         const seen = new Set<string>();
-        const batch: Array<[string, string, string, string, number]> = [];
+        const batch: EntityRow[] = [];
         let unresolved = 0;
-        for (const { bic8, inDirectory } of extractBics(text, seen)) {
+        // Not floored here: the UN list belongs to the private chain, whose
+        // manifest gate refuses a member down more than 10%.
+        for (const { bic8, inDirectory } of extractBics(text, seen, tally)) {
           if (!inDirectory) unresolved++;
           batch.push([bic8, 'UN-listed entity', 'UN', '', inDirectory ? 1 : 0]);
         }
@@ -666,30 +765,46 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       }
     }
 
-    // ---- SECO (CH) consolidated list — XML (best-effort) ----
+    // ---- SECO (CH): the whole list, read by structure ----
+    // The search export (searchSanctionWithExport…exportXml) answered HTTP 500
+    // every Sunday from 12.07 to 04.10.2026, and the blob extraction on the whole
+    // list would accuse a de-listed bank and invent a BIC out of a company name
+    // (scripts/seco-list.ts says which). Measured on the size of the list in
+    // force, not on its handful of BICs.
+    let seco: ListHarvest | null = null;
+    let secoFailure = '';
+    let secoReadDate: string | null = null;
     try {
       const xmlPath = resolve(TMP_DIR, 'seco.xml');
-      console.log('  Fetching SECO (CH) list...');
-      await downloadFile(
-        'https://www.sesam.search.admin.ch/sesam-search-web/pages/search/searchSanctionWithExport.xhtml?lang=en&action=exportXml',
-        xmlPath,
-      );
+      console.log(`  Fetching SECO (CH) whole list: ${SECO_WHOLE_LIST_URL}`);
+      // About 42 MB, slower to start than the CSV feeds.
+      await downloadFile(SECO_WHOLE_LIST_URL, xmlPath, 300_000);
       const { readFileSync } = await import('node:fs');
-      const text = readFileSync(xmlPath, 'utf-8');
-      const seen = new Set<string>();
-      const batch: Array<[string, string, string, string, number]> = [];
-      let unresolved = 0;
-      for (const { bic8, inDirectory } of extractBics(text, seen)) {
-        if (!inDirectory) unresolved++;
-        batch.push([bic8, 'SECO-listed entity', 'SECO', '', inDirectory ? 1 : 0]);
+      const list = parseSecoWholeList(readFileSync(xmlPath, 'utf-8'));
+      const secoTally = newTally();
+      const rows: EntityRow[] = [];
+      for (const bank of list.banks) {
+        secoTally.candidates++;
+        const inDirectory = !!bicLookup.get(bank.bic8);
+        if (inDirectory) secoTally.directoryMatches++;
+        else secoTally.unresolved.push(bank.bic8);
+        const name = (bank.name || 'SECO-listed entity').substring(0, 200);
+        rows.push([bank.bic8, name, 'SECO', '', inDirectory ? 1 : 0]);
       }
-      if (batch.length) insertBatch(batch);
-      tally.kept += batch.length;
-      console.log(`  SECO: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
+      console.log(
+        `  SECO: list of ${list.listDate ?? 'unknown date'}, ${list.listedTargets} listed targets ` +
+          `(${list.targets - list.listedTargets} de-listed kept for history), ${rows.length} bank BICs read ` +
+          `(${secoTally.unresolved.length} not in our directory)`,
+      );
+      seco = { records: list.listedTargets, rows, tally: secoTally };
+      secoReadDate = list.listDate;
     } catch (err) {
-      console.warn(`  WARNING: SECO download/parse failed: ${(err as Error).message}`);
-      reportCarryOver('SECO', carryOverList(db, FINAL_DB_PATH, 'SECO'));
+      secoFailure = (err as Error).message;
+      console.warn(`  WARNING: SECO download/parse failed: ${secoFailure}`);
     }
+    secoListDate = settle('SECO', seco, secoFailure)
+      ? secoReadDate
+      : (previous.meta.seco_list_date ?? null);
   } finally {
     bicDB.close();
   }
@@ -710,7 +825,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       `  sanctioned BICs we cannot name: ${tally.unresolved.slice(0, 30).join(' ')}${tally.unresolved.length > 30 ? ' …' : ''}`,
     );
   }
-  return tally;
+  return { tally, refused, sourceRecords, secoListDate };
 }
 
 // ---------------------------------------------------------------------------
@@ -936,7 +1051,7 @@ function applyEmiAliases(db: Database.Database): void {
 // Metadata
 // ---------------------------------------------------------------------------
 
-function insertMetadata(db: Database.Database): void {
+function insertMetadata(db: Database.Database, sanctions: SanctionsOutcome): void {
   console.log('\n[5/5] Writing metadata...');
 
   const insertMeta = db.prepare(`INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`);
@@ -970,6 +1085,15 @@ function insertMetadata(db: Database.Database): void {
     insertMeta.run('version', '1.0.0');
     insertMeta.run('sources', sources);
     insertMeta.run('fatf_as_of', FATF_AS_OF);
+    // The size of each public list, what next week's floor compares with
+    // (scripts/sanctions-source-floor.ts). Keys sorted for a stable diff.
+    const records = Object.fromEntries(
+      Object.entries(sanctions.sourceRecords).sort(([a], [b]) => a.localeCompare(b)),
+    );
+    insertMeta.run(SOURCE_RECORDS_KEY, JSON.stringify(records));
+    // The date the SECO list itself carries, older than last_refresh: the
+    // federal list is republished when it changes, not every week.
+    if (sanctions.secoListDate) insertMeta.run('seco_list_date', sanctions.secoListDate);
   });
 
   runMeta();
@@ -1035,7 +1159,8 @@ async function main(): Promise<void> {
   insertStaticData(db);
 
   // 4. Primary-source sanctions (OFAC/EU/UN/SECO, BIC-level)
-  const sanctionsTally = await fetchPrimarySanctions(db);
+  const sanctions = await fetchPrimarySanctions(db);
+  const sanctionsTally = sanctions.tally;
 
   if (WITH_RESTRICTED) {
     // 5. EPC SEPA registers
@@ -1056,10 +1181,34 @@ async function main(): Promise<void> {
   }
 
   // 7. Metadata
-  insertMetadata(db);
+  insertMetadata(db, sanctions);
 
   // 8. Summary
   printSummary(db);
+
+  // 8a. The floor of each public list (scripts/sanctions-source-floor.ts). A
+  // public list refused and not carried over stops the run HERE, before the
+  // database in service is replaced: the API keeps last week's lists rather
+  // than serving a week without one. Checked after every download, so the run
+  // log names every list that failed, not only the first.
+  //
+  // The private chain (SEED_FAMILY=restricted) only extracts the restricted
+  // family from its working copy: a public list down there must not block the
+  // UN list and the EPC registers, so it is reported, not fatal.
+  if (sanctions.refused.length) {
+    const what = sanctions.refused.join('; ');
+    if (WITH_RESTRICTED) {
+      console.warn(
+        `[compliance] public lists refused in the private chain (not extracted): ${what}`,
+      );
+    } else {
+      db.close();
+      throw new Error(
+        `Refusing to ship compliance.sqlite without every public sanctions list: ${what}. ` +
+          `Keeping the existing database. Re-run once the sources answer.`,
+      );
+    }
+  }
 
   // 8b. Sanity floor — refuse to ship a database that screens nothing.
   // OFAC carries ~98% of our BIC coverage, so an OFAC fetch failure can fail

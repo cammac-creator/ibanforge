@@ -468,6 +468,25 @@ SWIFT, IBAN Registry
          length and the positions of the bank, branch and account codes).
   Terms: not reviewed.
 
+State Secretariat for Economic Affairs (SECO), Switzerland, consolidated
+list of the persons, entities and organisations subject to sanctions
+measures (whole list, published at www.sesam.search.admin.ch)
+  Where: data/compliance.sqlite, table sanctioned_entities, source_list
+         'SECO' (11 rows on 7 October 2026, list dated 28 September 2026,
+         date kept in metadata.seco_list_date). Only the entities in force
+         that the list names by a SWIFT code are kept: their BIC8 and their
+         name.
+  Terms: the list publishes the annexes of Federal Council ordinances (for
+         example SR 946.231.116.9, measures against Belarus). Under the
+         Federal Act on Copyright and Related Rights (SR 231.1), art. 5
+         para. 1: "Copyright does not protect: a. acts, ordinances,
+         international treaties and other official enactments". The general
+         terms of the federal websites ask for prior written consent to
+         reproduce their content; no written permission from SECO is held.
+         https://www.fedlex.admin.ch/eli/cc/1993/1798_1798_1798/en
+         Source: State Secretariat for Economic Affairs SECO,
+         www.sesam.search.admin.ch.
+
 --------------------------------------------------------------------------------
 C. Removed from this repository on 25 and 29 September 2026
 --------------------------------------------------------------------------------

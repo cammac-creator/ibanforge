@@ -102,10 +102,34 @@ const SERVED_FROM_PRIVATE_OVERLAY: readonly string[] = ['UN'];
 
 /**
  * Les listes que ce dépôt a le droit de porter, et doit donc porter : OFAC
- * (domaine public, CC0) et UE (CC BY 4.0). Le plancher qui empêche la
- * déclaration ci-dessus de cacher une liste publique disparue.
+ * (domaine public, CC0), UE (CC BY 4.0) et, depuis le 07.10.2026, SECO (annexes
+ * d'ordonnances du Conseil fédéral, actes officiels non protégés : art. 5 LDA ;
+ * voir NOTICE). Le plancher qui empêche la déclaration ci-dessus de cacher une
+ * liste publique disparue.
  */
-const REDISTRIBUTABLE: readonly string[] = ['EU', 'OFAC'];
+const REDISTRIBUTABLE: readonly string[] = ['EU', 'OFAC', 'SECO'];
+
+/**
+ * Les listes que la base porte et que chaque réponse nomme déjà (`meta.sources`,
+ * `matched_lists`), mais que les surfaces de couverture n'énoncent pas ENCORE.
+ *
+ * SECO, le 07.10.2026 : la liste suisse ne portait plus une ligne depuis le
+ * passage aux sources primaires du 02.06 (export de recherche en panne depuis
+ * juillet, extraction qui n'y trouvait rien) ; elle est désormais lue dans
+ * l'export complet (scripts/seco-list.ts). L'annoncer,
+ * c'est réécrire « OFAC, EU, UN » dans les onze surfaces ci-dessous, en trois
+ * langues, dont des fichiers que d'autres chantiers modifient le même jour (le
+ * pied de page et les sources du site, le serveur MCP). C'est l'objet d'une PR
+ * à part ; d'ici là, taire une liste que l'on contrôle est une sous-déclaration
+ * honnête, jamais une affirmation fausse : la garde contre la sur-déclaration
+ * reste entière.
+ *
+ * Retirer SECO d'ici, l'ajouter à `PROMISED_SANCTIONS_LISTS`
+ * (src/lib/compliance-db.ts) et réécrire les surfaces : un seul geste. Le
+ * dernier bloc de ce fichier prouve que les surfaces rougissent ce jour-là
+ * tant qu'elles ne nomment pas SECO.
+ */
+const ANNOUNCEMENT_PENDING: readonly string[] = ['SECO'];
 
 /**
  * Les listes que porte la base chargée, lues par l'accesseur que l'API utilise
@@ -117,6 +141,9 @@ const loaded = new Set(loadedSanctionsLists().map((l) => l.toUpperCase()));
 
 /** Ce que la production contrôle : les listes chargées, plus celles que sert la surcouche privée. */
 const served = new Set([...loaded, ...SERVED_FROM_PRIVATE_OVERLAY.map((l) => l.toUpperCase())]);
+
+/** Ce que les surfaces de couverture énoncent : le contrôlé, moins l'annonce en attente. */
+const announced = new Set([...served].filter((l) => !ANNOUNCEMENT_PENDING.includes(l)));
 
 /**
  * Every line of a served surface that names a sanctions authority outside
@@ -158,7 +185,7 @@ function overClaims(screened: ReadonlySet<string>): string[] {
 }
 
 describe('sanctions coverage claims match what is served', () => {
-  it('serves OFAC, EU and UN, and not SECO', () => {
+  it('serves OFAC, EU, UN and SECO', () => {
     // Pinned as ground truth so the rest of the file has something to compare
     // against. If a feed is genuinely added, this is the assertion to change
     // first, before any copy.
@@ -169,7 +196,19 @@ describe('sanctions coverage claims match what is served', () => {
     // fix for the EU list losing half its coverage the same way — made the UN
     // rows appear. The claim string is now derived from this table rather than
     // retyped, so the two cannot drift apart again.
-    expect([...served].sort()).toEqual(['EU', 'OFAC', 'UN']);
+    //
+    // SECO joined on 07/10/2026, read from the whole list (scripts/seco-list.ts):
+    // its search export had answered HTTP 500 every Sunday since July, and the
+    // refresher shipped without it in silence until the per-source floor.
+    expect([...served].sort()).toEqual(['EU', 'OFAC', 'SECO', 'UN']);
+  });
+
+  it('une annonce en attente porte sur une liste chargée, publique, et pas encore promise', () => {
+    for (const list of ANNOUNCEMENT_PENDING) {
+      expect(loaded.has(list), `${list} declared pending but absent from the database`).toBe(true);
+      expect(REDISTRIBUTABLE).toContain(list);
+      expect(PROMISED_SANCTIONS_LISTS).not.toContain(list);
+    }
   });
 
   it('la liste promise par les réponses est celle que les surfaces nomment', () => {
@@ -177,6 +216,7 @@ describe('sanctions coverage claims match what is served', () => {
     // pas été consultée » (drapeau sans poids, `listed: null`) : elle doit
     // nommer exactement ce que chaque surface affirme contrôler.
     expect([...PROMISED_SANCTIONS_LISTS].sort()).toEqual(['EU', 'OFAC', 'UN']);
+    expect([...PROMISED_SANCTIONS_LISTS].sort()).toEqual([...announced].sort());
     // Et la surcouche privée n'emporte jamais une liste publique.
     const privateLists = RESTRICTED_FAMILY.filter(
       (m) => m.table === 'sanctioned_entities' && m.where,
@@ -349,14 +389,14 @@ describe('no served surface names fewer sanctions lists than we screen', () => {
     'frontend/messages/fr.json',
   ];
 
-  it.each(COVERAGE_SURFACES)('%s names every list we serve', (rel) => {
-    const { claims, offenders } = underClaims(rel, served);
+  it.each(COVERAGE_SURFACES)('%s names every list we announce', (rel) => {
+    const { claims, offenders } = underClaims(rel, announced);
     // A surface that stopped claiming anything at all is the same failure with
     // the evidence removed, so silence does not pass either.
     expect(claims, `${rel} no longer states which sanctions lists are screened`).toBeGreaterThan(0);
     expect(
       offenders,
-      `${rel} names a sanctions list set other than the served ${[...served].sort().join(', ')}:\n${offenders.join('\n')}`,
+      `${rel} names a sanctions list set other than the announced ${[...announced].sort().join(', ')}:\n${offenders.join('\n')}`,
     ).toEqual([]);
   });
 });
@@ -408,7 +448,10 @@ describe('the sanctions guard still bites on a set we do not serve', () => {
   });
 
   it('flags the coverage surfaces when a list is served that none of them names', () => {
-    const withSeco = new Set([...served, 'SECO']);
+    // Le jour où l'annonce en attente est levée, les surfaces qui ne nomment pas
+    // la liste rougissent : la déclaration ne peut pas rester une échappatoire.
+    const withSeco = new Set([...announced, ...ANNOUNCEMENT_PENDING]);
+    expect(withSeco.has('SECO')).toBe(true);
     for (const rel of [
       'src/mcp/server.ts',
       'src/routes/openapi.ts',

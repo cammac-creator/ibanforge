@@ -306,7 +306,8 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
     expect(sources).not.toMatch(/EPC-/);
     // Ce qui a été consulté reste nommé : les listes publiques et le GAFI.
     expect(sources.split(',')).toEqual(expect.arrayContaining(['EU', 'OFAC', 'FATF']));
-    expect(m.complianceDb.loadedSanctionsLists()).toEqual(['EU', 'OFAC']);
+    // SECO depuis le 07.10.2026 : une liste publique, portée par la base du dépôt.
+    expect(m.complianceDb.loadedSanctionsLists()).toEqual(['EU', 'OFAC', 'SECO']);
   });
 
   it('does not match a bank only the missing UN list names', () => {
