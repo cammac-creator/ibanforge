@@ -400,3 +400,197 @@ describe('le rendu de la vue', () => {
     expect(toLocaleDate).not.toHaveBeenCalled();
   });
 });
+
+// ─── Étapes A2 et B : propositions, historique des alertes, veille ──────────
+
+function withA2(): BulletinPayload {
+  const p = sample();
+  p.not_yet = [];
+  p.decisions = {
+    state: 'read',
+    computed: true,
+    shown: [
+      {
+        key: 'session:7',
+        kind: 'session',
+        title: 'Publier le module inventé',
+        detail: 'Un détail inventé.',
+        origin: null,
+        country: null,
+        answer: null,
+        postponed_at: null,
+      },
+      {
+        key: 'regle:bic-introuvable:IT',
+        kind: 'bic_introuvable',
+        title: 'Chercher une source pour les BIC du pays IT',
+        detail: '12 recherches de BIC sans réponse la semaine 40, sur 4 codes différents.',
+        origin: null,
+        country: 'IT',
+        answer: {
+          key: 'regle:bic-introuvable:IT',
+          answer: 'plus_tard',
+          label: 'Chercher une source pour les BIC du pays IT',
+          week: '2026-W40',
+          answered_at: '2026-10-05 07:10:00',
+        },
+        postponed_at: null,
+      },
+    ],
+    more: 1,
+    answered: [],
+  };
+  p.moved.alert_history = {
+    state: 'read',
+    kept_since: '2026-10-01 18:00:00',
+    coverage: 'partial',
+    opened: [
+      {
+        name: 'heartbeat:weekly-veille',
+        label: 'veille hebdo (+ canari découvrabilité)',
+        cases: 1,
+        first_opened_at: '2026-10-02 06:00:00',
+        still_open: 1,
+      },
+    ],
+    closed: [
+      {
+        name: 'db:stats',
+        label: null,
+        cases: 2,
+        last_closed_at: '2026-10-03 10:00:00',
+        longest_hours: 3.5,
+        opened_before_history: 1,
+      },
+    ],
+  };
+  p.veille = {
+    state: 'read',
+    sources: [
+      {
+        source: 'weekly-veille',
+        label: 'La veille marché',
+        state: 'read',
+        received_at: '2026-10-05 06:30:00',
+        lines: ['Une porte inventée qui s’ouvre.', '<b>pas du HTML</b>'],
+        score: null,
+      },
+      { source: 'weekly-reco-baseline', label: 'Le score des IA', state: 'none' },
+    ],
+  };
+  return p;
+}
+
+describe('les blocs des étapes A2 et B', () => {
+  it('sont gardés par la garde quand ils ont leur forme', () => {
+    const read = readBulletin(withA2());
+    expect(read?.decisions).toMatchObject({ state: 'read', more: 1 });
+    expect(read?.moved.alert_history).toMatchObject({ coverage: 'partial' });
+    expect(read?.veille).toMatchObject({ state: 'read' });
+  });
+
+  it('une API d’avant l’étape A2 (sans ces blocs) s’affiche sans eux', () => {
+    const read = readBulletin(sample());
+    expect(read).not.toBeNull();
+    expect(read?.decisions).toBeUndefined();
+    const html = render(read as BulletinPayload);
+    expect(html).not.toContain('bulletin-answer');
+    expect(html).toContain('Les chiffres de la semaine');
+  });
+
+  it('un bloc mal formé est écarté seul, jamais la page', () => {
+    const bad = withA2() as unknown as Record<string, unknown>;
+    bad.decisions = {
+      state: 'read',
+      computed: true,
+      more: 0,
+      answered: [],
+      shown: [{ key: 'https://alpha.example.net', kind: 'session', title: 't' }],
+    };
+    bad.veille = { state: 'read', sources: [{ source: 'x', label: 'y', state: 'read', lines: [42] }] };
+    const read = readBulletin(bad);
+    expect(read).not.toBeNull();
+    expect(read?.decisions).toBeUndefined();
+    expect(read?.veille).toBeUndefined();
+    expect(read?.moved.alert_history).toMatchObject({ state: 'read' });
+    expect(render(read as BulletinPayload)).not.toContain('alpha.example.net');
+  });
+
+  it('rend les propositions en tête, avec trois boutons dans un formulaire sans JavaScript', () => {
+    const html = render(withA2());
+    const decide = html.indexOf('À toi de décider');
+    expect(decide).toBeGreaterThan(-1);
+    expect(decide).toBeLessThan(html.indexOf('Les chiffres de la semaine'));
+    expect(html).toContain('Publier le module inventé');
+    expect(html).toContain('Chercher une source pour les BIC : Italie (IT)');
+    const forms = html.match(/<form[^>]*>/g) ?? [];
+    expect(forms).toHaveLength(2);
+    for (const f of forms) {
+      expect(f).toContain('action="/api/dashboard/bulletin-answer"');
+      expect(f).toContain('method="post"');
+    }
+    expect(html).toMatch(/<input[^>]*name="key"[^>]*value="session:7"|<input[^>]*value="session:7"[^>]*name="key"/);
+    expect(html).toMatch(/<input[^>]*value="fr"/);
+    expect((html.match(/<button[^>]*name="answer"/g) ?? []).length).toBe(6);
+    for (const a of ['oui', 'plus_tard', 'non']) expect(html).toMatch(new RegExp(`<button[^>]*value="${a}"`));
+    expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>Plus tard</);
+    expect(html).toContain('Ta réponse : Plus tard, le 05.10 à 09:10.');
+    expect(html).toContain('1 autre proposition attend');
+    expect(html).not.toContain('<script');
+  });
+
+  it('dit l’issue d’une réponse quand la route revient', () => {
+    const ok = renderToStaticMarkup(createElement(BulletinView, { data: withA2(), locale: 'fr', notice: 'ok' }));
+    expect(ok).toContain('Réponse enregistrée.');
+    const ko = renderToStaticMarkup(createElement(BulletinView, { data: withA2(), locale: 'fr', notice: 'echec' }));
+    expect(ko).toContain('La réponse n’a pas été enregistrée');
+  });
+
+  it('rend l’historique de la semaine, et ce qu’il ne couvre pas', () => {
+    const html = render(withA2());
+    expect(html).toContain('Pendant la semaine : 1 alerte ouverte, 2 refermées.');
+    expect(html).toContain('Ouverte : veille hebdo (+ canari découvrabilité), le 02.10 à 08:00, toujours ouverte');
+    expect(html).toContain('Refermée : db:stats (2 fois), le 03.10 à 12:00, après 4 h (ouverte avant que l’historique soit tenu)');
+    expect(html).toContain('Historique tenu seulement depuis le 01.10 à 20:00');
+    const none = withA2();
+    none.moved.alert_history = { state: 'read', kept_since: '2026-10-06 08:00:00', coverage: 'none', opened: [], closed: [] };
+    expect(render(none)).toContain('Historique des alertes : pas encore tenu cette semaine-là.');
+  });
+
+  it('rend la veille en texte, et dit « rien de déposé » pour une source muette', () => {
+    const html = render(withA2());
+    expect(html).toContain('La veille et le score des IA');
+    expect(html).toContain('Une porte inventée qui s’ouvre.');
+    expect(html).toContain('&lt;b&gt;pas du HTML&lt;/b&gt;');
+    expect(html).toContain('Rien de déposé pour cette semaine.');
+    const scored = withA2();
+    if (scored.veille?.state !== 'read') throw new Error('sample');
+    scored.veille.sources[1] = {
+      source: 'weekly-reco-baseline',
+      label: 'Le score des IA',
+      state: 'read',
+      received_at: '2026-10-05 06:50:00',
+      lines: ['Présent : une requête inventée'],
+      score: { value: 2, out_of: 7, errors: 1 },
+    };
+    const s = render(scored);
+    expect(s).toContain('2 sur 7 requêtes, score partiel : 1 requête en erreur');
+  });
+
+  it('une semaine passée montre les réponses données ce lundi-là, sans boutons', () => {
+    const past = withA2();
+    past.decisions = {
+      state: 'read',
+      computed: false,
+      shown: [],
+      more: 0,
+      answered: [
+        { key: 'session:3', answer: 'oui', label: 'Une décision inventée', week: '2026-W39', answered_at: '2026-09-28 07:00:00' },
+      ],
+    };
+    const html = render(past);
+    expect(html).toContain('Une décision inventée');
+    expect(html).toContain('Réponse : Oui, le 28.09 à 09:00.');
+    expect(html).not.toContain('bulletin-answer');
+  });
+});

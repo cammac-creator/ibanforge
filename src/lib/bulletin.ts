@@ -15,7 +15,11 @@
  * - the age of the directory sources is `getSourceFreshness`, the function behind
  *   `/health`'s `bic_sources`, called in-process;
  * - the BIC codes asked for without an answer come from `operations`;
- * - the new forum threads come from `forum_threads.first_seen`.
+ * - the new forum threads come from `forum_threads.first_seen`;
+ * - (step A2, 07.10.2026) the week's alert history comes from `ops_alert_log`, which
+ *   `ops-alert.ts` writes at its two transitions; what the Monday veilles deposited
+ *   comes from `bulletin_feed` (`bulletin-feed.ts`); the proposals and their answers
+ *   from `bulletin-decisions.ts`, whose rules are computed here and never written.
  *
  * ## Why `operations` and not `request_log` for the missing BIC codes
  *
@@ -43,6 +47,8 @@ import {
 } from './door-board.js';
 import { HEARTBEATS, RADAR_BEATS } from './ops-alert.js';
 import { mergedPullsOfWeek, type MergedPullsRead } from './bulletin-github.js';
+import { readFeed, type BulletinFeed } from './bulletin-feed.js';
+import { readDecisions, type BulletinDecisions } from './bulletin-decisions.js';
 import {
   parseDbUtc,
   sqliteUtc,
@@ -307,6 +313,41 @@ export interface BulletinForumThreads {
   still_new: number;
 }
 
+export interface AlertOpenedGroup {
+  /** The alert key without its identifier, as in the current-state block. */
+  name: string;
+  label: string | null;
+  /** How many alerts of that name opened (their message left) during the week. */
+  cases: number;
+  /** The first opening of the week, UTC. */
+  first_opened_at: string;
+  /** Of those, how many are still open now. */
+  still_open: number;
+}
+
+export interface AlertClosedGroup {
+  name: string;
+  label: string | null;
+  /** How many alerts of that name closed during the week. */
+  cases: number;
+  /** The last closing of the week, UTC. */
+  last_closed_at: string;
+  /** The longest of those episodes, in hours; null when none has a known opening. */
+  longest_hours: number | null;
+  /** Closed during the week, opened before the history was kept: their opening is unknown. */
+  opened_before_history: number;
+}
+
+export interface BulletinAlertHistory {
+  state: 'read';
+  /** When the history started being kept, UTC; null when the marker cannot be read. */
+  kept_since: string | null;
+  /** Whether the history covers the whole week, part of it, or none of it. */
+  coverage: 'full' | 'partial' | 'none';
+  opened: AlertOpenedGroup[];
+  closed: AlertClosedGroup[];
+}
+
 export interface NotYetBlock {
   key: string;
   title: string;
@@ -330,17 +371,23 @@ export interface Bulletin {
   };
   requested: { week: string | null };
   numbers: BulletinNumbers | Unread;
+  /** Step A2: at most three proposals, with the answers Oui / Plus tard / Non. */
+  decisions: BulletinDecisions | Unread;
   moved: {
     merged_pulls: MergedPullsRead;
-    /** The state NOW, not the week's: the history is not kept yet. */
+    /** The state NOW, not the week's. */
     heartbeats: BulletinHeartbeats | Unread;
     alerts: BulletinAlerts | Unread;
+    /** Step A2: the alerts opened and closed DURING the week. */
+    alert_history: BulletinAlertHistory | Unread;
     sources: BulletinSources | Unread;
   };
   needs: {
     missing_bics: BulletinMissingBics | Unread;
     forum_threads: BulletinForumThreads | Unread;
   };
+  /** Step B: what the two Monday veilles deposited for this week. */
+  veille: BulletinFeed | Unread;
   not_yet: NotYetBlock[];
   definitions: Record<string, string>;
 }
@@ -350,30 +397,6 @@ export interface Bulletin {
  * them so that an empty place is never read as "nothing happened".
  */
 export const BULLETIN_NOT_YET: readonly NotYetBlock[] = [
-  {
-    key: 'decisions',
-    title: 'À toi de décider',
-    reason:
-      'Les propositions, avec leurs boutons Oui, Plus tard et Non, arrivent à l’étape suivante du bulletin.',
-  },
-  {
-    key: 'veille',
-    title: 'La veille en trois lignes',
-    reason:
-      'La veille marché du lundi part encore seulement sur Telegram : elle ne dépose rien que cette page puisse lire.',
-  },
-  {
-    key: 'score_ia',
-    title: 'Le score des IA',
-    reason:
-      'La mesure du lundi (les requêtes d’acheteurs où une IA cite IBANforge) part encore seulement sur Telegram.',
-  },
-  {
-    key: 'alert_history',
-    title: 'Les alertes de la semaine',
-    reason:
-      'Seul l’état courant des alertes est gardé : une alerte ouverte puis refermée pendant la semaine ne laisse aucune trace.',
-  },
   {
     key: 'iban_by_country',
     title: 'Les IBAN cherchés par pays',
@@ -404,8 +427,23 @@ export const BULLETIN_DEFINITIONS: Readonly<Record<string, string>> = {
     'L’état courant des alertes d’exploitation : ouvertes (le message est parti, aucun succès ' +
     'ne les a refermées) ou en échec sans message parti. Une alerte sans nouvel échec depuis ' +
     'plus de 7 jours est rangée à part : rien ne la referme toute seule. Les alertes propres à ' +
-    'un achat ou à une session sont comptées sous leur nom, sans leur identifiant. ' +
-    'L’historique n’est pas encore gardé.',
+    'un achat ou à une session sont comptées sous leur nom, sans leur identifiant.',
+  historique_alertes:
+    'Les alertes ouvertes pendant la semaine (leur message est parti) et celles refermées ' +
+    'pendant la semaine, écrites par les alertes elles-mêmes à ces deux moments. ' +
+    'L’historique est tenu depuis la mise en ligne de l’étape A2 : une semaine d’avant ' +
+    'le dit, elle ne montre pas zéro.',
+  decisions:
+    'Au plus trois propositions : celles de la session principale, puis deux règles sans ' +
+    'modèle (une veille qui a déposé quatre semaines sans qu’aucune proposition née d’elle ' +
+    'reçoive un Oui ; un pays aux BIC introuvables, au moins 10 recherches sur 3 codes ' +
+    'différents dans la semaine). Oui et Non ne reviennent pas ; Plus tard revient 28 jours ' +
+    'après la réponse. Une semaine passée montre les réponses données ce lundi-là.',
+  veille:
+    'Ce que les deux veilles du lundi ont déposé pour la semaine, en plus de leur message ' +
+    'Telegram : trois lignes de la veille marché (les portes qui s’ouvrent), et le score des ' +
+    'IA (requêtes de référence où une recherche web fait apparaître IBANforge, détecté par ' +
+    'le script, jamais jugé par le modèle). Rien de déposé : la page le dit.',
   sources: 'L’âge des sources de l’annuaire BIC, celui que sert /health, en ce moment.',
   bic_introuvables:
     'Les recherches de BIC bien formés sans réponse dans l’annuaire, par pays (5e et 6e ' +
@@ -704,6 +742,99 @@ function readAlerts(kv: OpsKv, nowMs: number): BulletinAlerts {
   };
 }
 
+/**
+ * The alerts opened and closed DURING the week, from `ops_alert_log` (step A2).
+ *
+ * 🚨 Opened in the week, closed in the week: never "open at some point of the week".
+ * Several keys never close (`x402:facilitator`, the per-purchase keys, see the
+ * current-state block): read as "overlapping", they would show in every week
+ * forever. The current state, with its stale bucket, already says what is open now.
+ */
+function readAlertHistory(week: SwissWeek): BulletinAlertHistory {
+  const db = getStatsDB();
+  const sinceRow = db
+    .prepare(`SELECT value FROM bulletin_meta WHERE key = 'ops_alert_log_since'`)
+    .get() as { value: string } | undefined;
+  const sinceMs = parseDbUtc(sinceRow?.value ?? null);
+  const coverage: BulletinAlertHistory['coverage'] =
+    sinceMs === null || week.endMs <= sinceMs
+      ? 'none'
+      : week.startMs >= sinceMs
+        ? 'full'
+        : 'partial';
+  const from = sqliteUtc(week.startMs);
+  const to = sqliteUtc(week.endMs);
+
+  const openedRows = db
+    .prepare(
+      `SELECT alert_key, opened_at, closed_at FROM ops_alert_log
+        WHERE opened_at >= ? AND opened_at < ?`,
+    )
+    .all(from, to) as Array<{ alert_key: string; opened_at: string; closed_at: string | null }>;
+  const opened = new Map<string, AlertOpenedGroup>();
+  for (const r of openedRows) {
+    const name = alertName(r.alert_key);
+    const at = sqliteUtc(parseDbUtc(r.opened_at) ?? 0);
+    const g = opened.get(name);
+    const open = r.closed_at === null ? 1 : 0;
+    if (g) {
+      g.cases += 1;
+      g.still_open += open;
+      if (at < g.first_opened_at) g.first_opened_at = at;
+    } else {
+      opened.set(name, {
+        name,
+        label: heartbeatLabel(r.alert_key),
+        cases: 1,
+        first_opened_at: at,
+        still_open: open,
+      });
+    }
+  }
+
+  const closedRows = db
+    .prepare(
+      `SELECT alert_key, opened_at, closed_at FROM ops_alert_log
+        WHERE closed_at >= ? AND closed_at < ?`,
+    )
+    .all(from, to) as Array<{ alert_key: string; opened_at: string | null; closed_at: string }>;
+  const closed = new Map<string, AlertClosedGroup>();
+  for (const r of closedRows) {
+    const name = alertName(r.alert_key);
+    const closedMs = parseDbUtc(r.closed_at) ?? 0;
+    const openedMs = parseDbUtc(r.opened_at);
+    const hours = openedMs === null ? null : hoursSince(openedMs, closedMs);
+    const at = sqliteUtc(closedMs);
+    const g = closed.get(name);
+    if (g) {
+      g.cases += 1;
+      if (at > g.last_closed_at) g.last_closed_at = at;
+      if (hours !== null) g.longest_hours = Math.max(g.longest_hours ?? 0, hours);
+      if (openedMs === null) g.opened_before_history += 1;
+    } else {
+      closed.set(name, {
+        name,
+        label: heartbeatLabel(r.alert_key),
+        cases: 1,
+        last_closed_at: at,
+        longest_hours: hours,
+        opened_before_history: openedMs === null ? 1 : 0,
+      });
+    }
+  }
+  const byTime =
+    <T>(key: (g: T) => string) =>
+    (a: T, b: T) =>
+      key(a).localeCompare(key(b));
+  return {
+    state: 'read',
+    kept_since: sinceMs === null ? null : sqliteUtc(sinceMs),
+    coverage,
+    opened: [...opened.values()].sort(byTime((g) => g.first_opened_at)),
+    closed: [...closed.values()].sort(byTime((g) => g.last_closed_at)),
+  };
+}
+
 function readSources(nowMs: number): BulletinSources {
   const sources: SourceView[] = getSourceFreshness().map((s) => {
     const updated = parseDbUtc(s.last_updated);
@@ -764,7 +895,7 @@ function internalPrefixes(db: DatabaseType.Database, prefixes: string[]): Set<st
   return out;
 }
 
-function readMissingBics(week: SwissWeek): BulletinMissingBics {
+export function readMissingBics(week: SwissWeek): BulletinMissingBics {
   const db = getStatsDB();
   const rows = db
     .prepare(MISSING_BICS_SQL)
@@ -863,6 +994,13 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
   const sources = guarded('sources', () => readSources(nowMs));
   const missingBics = guarded('missing_bics', () => readMissingBics(week));
   const forumThreads = guarded('forum_threads', () => readForumThreads(week));
+  const alertHistory = guarded('alert_history', () => readAlertHistory(week));
+  const veille = guarded('veille', () => readFeed(week.label));
+  // The rule on missing BIC codes reads the block above; unread, that rule is
+  // simply not applied, and the other proposals still show.
+  const decisions = guarded('decisions', () =>
+    readDecisions(week, weeksBack === 1, missingBics.state === 'read' ? missingBics : null, nowMs),
+  );
 
   return {
     version: BULLETIN_VERSION,
@@ -881,8 +1019,16 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
     },
     requested: { week: opts.week ?? null },
     numbers,
-    moved: { merged_pulls: await mergedPulls, heartbeats, alerts, sources },
+    decisions,
+    moved: {
+      merged_pulls: await mergedPulls,
+      heartbeats,
+      alerts,
+      alert_history: alertHistory,
+      sources,
+    },
     needs: { missing_bics: missingBics, forum_threads: forumThreads },
+    veille,
     not_yet: BULLETIN_NOT_YET.map((b) => ({ ...b })),
     definitions: { ...BULLETIN_DEFINITIONS },
   };

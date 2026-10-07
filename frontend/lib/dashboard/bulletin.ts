@@ -133,6 +133,87 @@ export interface BulletinForumThreads {
   still_new: number;
 }
 
+// ─── Step A2 and B (07.10.2026): optional blocks ─────────────────────────────
+//
+// Railway (the API) and Vercel (this site) do not go live at the same instant, and
+// the production domain is promoted by hand: this page must render an API that does
+// not send these blocks yet. Each one is OPTIONAL here; a missing or malformed one
+// is simply left out (the API's own `not_yet` list then says it is not there yet),
+// never the whole page.
+
+export type Answer = 'oui' | 'plus_tard' | 'non';
+export const ANSWERS: readonly Answer[] = ['oui', 'plus_tard', 'non'];
+
+export interface AnswerView {
+  key: string;
+  answer: Answer;
+  label: string;
+  week: string;
+  answered_at: string;
+}
+
+export interface ProposalView {
+  key: string;
+  kind: 'session' | 'bic_introuvable' | 'veille_sans_oui';
+  title: string;
+  detail: string | null;
+  origin: string | null;
+  country: string | null;
+  answer: AnswerView | null;
+  postponed_at: string | null;
+}
+
+export interface BulletinDecisions {
+  state: 'read';
+  computed: boolean;
+  shown: ProposalView[];
+  more: number;
+  answered: AnswerView[];
+}
+
+export interface FeedScore {
+  value: number;
+  out_of: number;
+  errors: number;
+}
+
+export type FeedView =
+  | {
+      source: string;
+      label: string;
+      state: 'read';
+      received_at: string;
+      lines: string[];
+      score: FeedScore | null;
+    }
+  | { source: string; label: string; state: 'none' };
+
+export interface BulletinFeed {
+  state: 'read';
+  sources: FeedView[];
+}
+
+export interface BulletinAlertHistory {
+  state: 'read';
+  kept_since: string | null;
+  coverage: 'full' | 'partial' | 'none';
+  opened: Array<{
+    name: string;
+    label: string | null;
+    cases: number;
+    first_opened_at: string;
+    still_open: number;
+  }>;
+  closed: Array<{
+    name: string;
+    label: string | null;
+    cases: number;
+    last_closed_at: string;
+    longest_hours: number | null;
+    opened_before_history: number;
+  }>;
+}
+
 export interface BulletinPayload {
   version: typeof BULLETIN_VERSION;
   observed_at: string;
@@ -150,16 +231,22 @@ export interface BulletinPayload {
   };
   requested: { week: string | null };
   numbers: BulletinNumbers | Unread;
+  /** Step A2; absent from an API that predates it. */
+  decisions?: BulletinDecisions | Unread;
   moved: {
     merged_pulls: MergedPullsRead;
     heartbeats: BulletinHeartbeats | Unread;
     alerts: BulletinAlerts | Unread;
+    /** Step A2; absent from an API that predates it. */
+    alert_history?: BulletinAlertHistory | Unread;
     sources: BulletinSources | Unread;
   };
   needs: {
     missing_bics: BulletinMissingBics | Unread;
     forum_threads: BulletinForumThreads | Unread;
   };
+  /** Step B; absent from an API that predates it. */
+  veille?: BulletinFeed | Unread;
   not_yet: Array<{ key: string; title: string; reason: string }>;
   definitions: Record<string, string>;
 }
@@ -227,7 +314,91 @@ export function readBulletin(payload: unknown): BulletinPayload | null {
     if (alerts.stale !== undefined && !Array.isArray(alerts.stale)) return null;
     blocks = { ...blocks, alerts: { ...alerts, stale: alerts.stale ?? [] } };
   }
-  return { ...payload, moved: blocks } as unknown as BulletinPayload;
+  blocks = { ...blocks, alert_history: optionalBlock(moved.alert_history, isAlertHistory) };
+  return {
+    ...payload,
+    moved: blocks,
+    decisions: optionalBlock(payload.decisions, isDecisions),
+    veille: optionalBlock(payload.veille, isFeed),
+  } as unknown as BulletinPayload;
+}
+
+/** An optional block: kept when it has its shape (or says `unread`), dropped otherwise. */
+function optionalBlock(value: unknown, isRead: (v: Obj) => boolean): unknown {
+  if (!isBlock(value)) return undefined;
+  const v = value as Obj;
+  if (v.state === 'unread') return v;
+  return isRead(v) ? v : undefined;
+}
+
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isNat = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+const isStrOrNull = (v: unknown): boolean => v === null || isStr(v);
+
+/** The keys the answer form may send: the API's three shapes, nothing else. */
+export const PROPOSAL_KEY = /^(session:\d{1,9}|regle:bic-introuvable:[A-Z]{2}|regle:veille-sans-oui:[a-z-]{1,40})$/;
+
+function isAnswerView(v: unknown): boolean {
+  return (
+    isObj(v) &&
+    isStr(v.key) &&
+    (ANSWERS as readonly unknown[]).includes(v.answer) &&
+    isStr(v.label) &&
+    isStr(v.week) &&
+    isStr(v.answered_at)
+  );
+}
+
+function isDecisions(v: Obj): boolean {
+  if (typeof v.computed !== 'boolean' || !isNat(v.more)) return false;
+  if (!Array.isArray(v.shown) || !Array.isArray(v.answered)) return false;
+  return (
+    v.answered.every(isAnswerView) &&
+    v.shown.every(
+      (p) =>
+        isObj(p) &&
+        isStr(p.key) &&
+        PROPOSAL_KEY.test(p.key) &&
+        ['session', 'bic_introuvable', 'veille_sans_oui'].includes(p.kind as string) &&
+        isStr(p.title) &&
+        isStrOrNull(p.detail) &&
+        isStrOrNull(p.origin) &&
+        (p.country === null || (isStr(p.country) && /^[A-Z]{2}$/.test(p.country))) &&
+        (p.answer === null || isAnswerView(p.answer)) &&
+        isStrOrNull(p.postponed_at),
+    )
+  );
+}
+
+function isFeed(v: Obj): boolean {
+  if (!Array.isArray(v.sources)) return false;
+  return v.sources.every((s) => {
+    if (!isObj(s) || !isStr(s.source) || !isStr(s.label)) return false;
+    if (s.state === 'none') return true;
+    if (s.state !== 'read' || !isStr(s.received_at)) return false;
+    if (!Array.isArray(s.lines) || !s.lines.every(isStr)) return false;
+    if (s.score === null) return true;
+    const sc = s.score;
+    return isObj(sc) && isNat(sc.value) && isNat(sc.out_of) && isNat(sc.errors) && sc.out_of > 0;
+  });
+}
+
+function isAlertHistory(v: Obj): boolean {
+  if (!['full', 'partial', 'none'].includes(v.coverage as string)) return false;
+  if (!isStrOrNull(v.kept_since)) return false;
+  if (!Array.isArray(v.opened) || !Array.isArray(v.closed)) return false;
+  return (
+    v.opened.every((g) => isObj(g) && isStr(g.name) && isNat(g.cases) && isStr(g.first_opened_at) && isNat(g.still_open)) &&
+    v.closed.every(
+      (g) =>
+        isObj(g) &&
+        isStr(g.name) &&
+        isNat(g.cases) &&
+        isStr(g.last_closed_at) &&
+        (g.longest_hours === null || typeof g.longest_hours === 'number') &&
+        isNat(g.opened_before_history),
+    )
+  );
 }
 
 // ─── Numbers and words ───────────────────────────────────────────────────────
@@ -406,4 +577,27 @@ const STALE_REASON: Record<NonNullable<SourceView['stale_reason']>, string> = {
 
 export function staleReasonText(reason: SourceView['stale_reason']): string {
   return reason ? STALE_REASON[reason] : 'à jour';
+}
+
+// ─── Step A2 and B, in words ─────────────────────────────────────────────────
+
+const ANSWER_WORDS: Record<Answer, string> = { oui: 'Oui', plus_tard: 'Plus tard', non: 'Non' };
+
+export function answerWord(a: Answer): string {
+  return ANSWER_WORDS[a];
+}
+
+/** A duration given in hours, in words. */
+export function durationText(hours: number): string {
+  if (hours < 1) return 'moins d’une heure';
+  if (hours < 48) return `${fmt(Math.round(hours))} h`;
+  return `${fmt(Math.floor(hours / 24))} j`;
+}
+
+/** The AI score, said with its denominator, and partial when queries failed. */
+export function scoreText(score: FeedScore): string {
+  const base = `${fmt(score.value)} sur ${fmt(score.out_of)} ${score.out_of <= 1 ? 'requête' : 'requêtes'}`;
+  return score.errors > 0
+    ? `${base}, score partiel : ${count(score.errors, 'requête en erreur', 'requêtes en erreur')}`
+    : base;
 }

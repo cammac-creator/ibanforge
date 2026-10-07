@@ -3,14 +3,18 @@ import { overviewCard } from './overview/section';
 import { countryName } from '@/lib/countries';
 import { localePath } from '@/lib/locale-path';
 import {
+  ANSWERS,
   ageText,
+  answerWord,
   count,
   delta,
+  durationText,
   fmt,
   heartbeatText,
   heartbeatsTone,
   machineState,
   publicationDay,
+  scoreText,
   siteHomeText,
   staleReasonText,
   swissDay,
@@ -18,9 +22,14 @@ import {
   unreadText,
   weekSpan,
   type AlertView,
+  type BulletinAlertHistory,
   type BulletinPayload,
+  type ProposalView,
   type Tone,
 } from '@/lib/dashboard/bulletin';
+
+/** Where the answer buttons post: the site's own route, which keeps the admin secret. */
+export const ANSWER_ROUTE = '/api/dashboard/bulletin-answer';
 
 /**
  * The Monday bulletin (Claude-Alain's approval of 28.09.2026, step A1).
@@ -300,6 +309,8 @@ function Moved({ data }: { data: BulletinPayload }) {
           <Line tone="neutral">Alertes : non lues, {unreadText(alerts.reason)}.</Line>
         )}
 
+        {data.moved.alert_history && <AlertHistoryLine history={data.moved.alert_history} />}
+
         {sources.state === 'read' ? (
           <Line
             tone={
@@ -328,7 +339,8 @@ function Moved({ data }: { data: BulletinPayload }) {
         )}
       </ul>
       <p className="mt-3 text-[12px] leading-snug text-[var(--fg-4)]">
-        Signes de vie, alertes et sources : l’état relevé le {data.observed_at_zurich}, pas celui de la semaine.
+        Signes de vie, alertes ouvertes et sources : l’état relevé le {data.observed_at_zurich}, pas celui de la
+        semaine.{data.moved.alert_history ? ' L’historique des alertes, lui, est celui de la semaine.' : ''}
       </p>
     </section>
   );
@@ -380,6 +392,200 @@ function Needs({ data, locale }: { data: BulletinPayload; locale: string }) {
   );
 }
 
+function groupTitle(g: { name: string; label: string | null; cases: number }): string {
+  const title = g.label ?? g.name;
+  return g.cases > 1 ? `${title} (${g.cases} fois)` : title;
+}
+
+/** The week's alert history (step A2): opened and closed DURING the week, never "overlapping". */
+function AlertHistoryLine({ history }: { history: BulletinAlertHistory | { state: 'unread'; reason: string } }) {
+  if (history.state !== 'read') {
+    return <Line tone="neutral">Historique des alertes : non lu, {unreadText(history.reason)}.</Line>;
+  }
+  if (history.coverage === 'none') {
+    return (
+      <Line tone="neutral">
+        Historique des alertes : pas encore tenu cette semaine-là.
+        {history.kept_since && <Small>Il est tenu depuis le {swissDayTime(history.kept_since)}.</Small>}
+      </Line>
+    );
+  }
+  const opened = history.opened.reduce((n, g) => n + g.cases, 0);
+  const closed = history.closed.reduce((n, g) => n + g.cases, 0);
+  return (
+    <Line tone={opened > 0 ? 'bad' : 'neutral'}>
+      {opened === 0 && closed === 0
+        ? 'Aucune alerte ouverte ni refermée pendant la semaine.'
+        : `Pendant la semaine : ${count(opened, 'alerte ouverte', 'alertes ouvertes')}, ${count(closed, 'refermée', 'refermées')}.`}
+      {history.opened.map((g) => (
+        <Small key={`o-${g.name}`}>
+          Ouverte : {groupTitle(g)}, le {swissDayTime(g.first_opened_at)}
+          {g.still_open > 0 ? (g.still_open === g.cases ? ', toujours ouverte' : `, ${fmt(g.still_open)} toujours ouverte${g.still_open > 1 ? 's' : ''}`) : ''}
+        </Small>
+      ))}
+      {history.closed.map((g) => (
+        <Small key={`c-${g.name}`}>
+          Refermée : {groupTitle(g)}, le {swissDayTime(g.last_closed_at)}
+          {g.longest_hours !== null ? `, après ${durationText(g.longest_hours)}` : ''}
+          {g.opened_before_history > 0 ? ' (ouverte avant que l’historique soit tenu)' : ''}
+        </Small>
+      ))}
+      {history.coverage === 'partial' && history.kept_since && (
+        <Small>Historique tenu seulement depuis le {swissDayTime(history.kept_since)} : le début de la semaine manque.</Small>
+      )}
+    </Line>
+  );
+}
+
+function proposalTitle(p: ProposalView): string {
+  if (p.kind === 'bic_introuvable' && p.country) {
+    return `Chercher une source pour les BIC : ${countryLabel(p.country)}`;
+  }
+  return p.title;
+}
+
+const ANSWER_BUTTON: Record<'chosen' | 'idle', string> = {
+  chosen: 'border-amber-300/70 bg-amber-300/15 text-amber-200',
+  idle: 'border-[var(--ink-4)] bg-[var(--ink-1)]/40 text-[var(--fg-2)] hover:border-[var(--fg-4)]',
+};
+
+/**
+ * A plain HTML form per proposal: no JavaScript in the browser (WebKit renders it as
+ * is), the site route checks the session, forwards to the API with the secret and
+ * comes back here with a 303.
+ */
+function AnswerForm({ p, locale }: { p: ProposalView; locale: string }) {
+  return (
+    <form method="post" action={ANSWER_ROUTE} className="mt-2 flex flex-wrap gap-1.5">
+      <input type="hidden" name="key" value={p.key} />
+      <input type="hidden" name="locale" value={locale} />
+      {ANSWERS.map((a) => {
+        const chosen = p.answer?.answer === a;
+        return (
+          <button
+            key={a}
+            type="submit"
+            name="answer"
+            value={a}
+            aria-pressed={chosen}
+            className={`min-h-[36px] rounded-full border px-3.5 text-[13px] ${ANSWER_BUTTON[chosen ? 'chosen' : 'idle']}`}
+          >
+            {answerWord(a)}
+          </button>
+        );
+      })}
+    </form>
+  );
+}
+
+function Decisions({ data, locale, notice }: { data: BulletinPayload; locale: string; notice: AnswerNotice }) {
+  const d = data.decisions;
+  if (!d) return null;
+  return (
+    <section className={overviewCard} aria-labelledby="bulletin-decisions" id="decisions">
+      <SectionTitle id="bulletin-decisions">À toi de décider</SectionTitle>
+      {notice && (
+        <p
+          role="status"
+          className={`mt-2 rounded-lg px-3 py-2 text-[13px] ${notice === 'ok' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}
+        >
+          {notice === 'ok'
+            ? 'Réponse enregistrée.'
+            : 'La réponse n’a pas été enregistrée : la proposition n’est peut-être plus affichée, ou l’API n’a pas répondu.'}
+        </p>
+      )}
+      {d.state !== 'read' ? (
+        <Unread what="Les propositions" plural reason={d.reason} />
+      ) : !d.computed ? (
+        d.answered.length === 0 ? (
+          <p className="mt-2 text-[13px] text-[var(--fg-3)]">Aucune réponse donnée au bulletin de cette semaine-là.</p>
+        ) : (
+          <ul className="mt-3">
+            {d.answered.map((a) => (
+              <Line key={a.key} tone="neutral">
+                {a.label}
+                <Small>
+                  Réponse : {answerWord(a.answer)}, le {swissDayTime(a.answered_at)}.
+                </Small>
+              </Line>
+            ))}
+          </ul>
+        )
+      ) : d.shown.length === 0 ? (
+        <p className="mt-2 text-[13px] text-[var(--fg-3)]">Rien à décider cette semaine.</p>
+      ) : (
+        <ul className="mt-3">
+          {d.shown.map((p) => (
+            <Line key={p.key} tone={p.answer ? 'ok' : 'neutral'}>
+              <span className="font-medium text-[var(--fg-1)]">{proposalTitle(p)}</span>
+              {p.detail && <Small>{p.detail}</Small>}
+              {p.postponed_at && <Small>Revenue : reportée le {swissDay(p.postponed_at)}.</Small>}
+              {p.answer && (
+                <Small>
+                  Ta réponse : {answerWord(p.answer.answer)}, le {swissDayTime(p.answer.answered_at)}. Tu peux la changer.
+                </Small>
+              )}
+              <AnswerForm p={p} locale={locale} />
+            </Line>
+          ))}
+        </ul>
+      )}
+      {d.state === 'read' && d.computed && d.more > 0 && (
+        <p className="mt-2 text-[12.5px] text-[var(--fg-4)]">
+          {count(d.more, 'autre proposition attend', 'autres propositions attendent')} : elle
+          {d.more > 1 ? 's viendront' : ' viendra'} quand une place se libère.
+        </p>
+      )}
+      <p className="mt-2 text-[12px] leading-snug text-[var(--fg-4)]">
+        Oui et Non ne reviennent pas ; Plus tard revient dans quatre semaines.
+      </p>
+    </section>
+  );
+}
+
+function Veille({ data }: { data: BulletinPayload }) {
+  const v = data.veille;
+  if (!v) return null;
+  return (
+    <section className={overviewCard} aria-labelledby="bulletin-veille">
+      <SectionTitle id="bulletin-veille">La veille et le score des IA</SectionTitle>
+      {v.state !== 'read' ? (
+        <Unread what="La veille" reason={v.reason} />
+      ) : (
+        <ul className="mt-3">
+          {v.sources.map((s) =>
+            s.state === 'read' ? (
+              <Line key={s.source} tone="neutral">
+                <span className="font-medium text-[var(--fg-1)]">{s.label}</span>
+                {s.score && (
+                  <p className="mt-1 font-mono text-[22px] leading-tight tabular-nums text-[var(--fg-1)]">
+                    {fmt(s.score.value)}
+                    <span className="text-[14px] text-[var(--fg-4)]"> / {fmt(s.score.out_of)}</span>
+                  </p>
+                )}
+                {s.score && <Small>{scoreText(s.score)} où une recherche web fait apparaître IBANforge.</Small>}
+                <ul className="mt-1 space-y-1">
+                  {s.lines.map((line, i) => (
+                    <li key={i} className="text-[13px] leading-snug text-[var(--fg-2)]">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+                <Small>Déposé le {swissDayTime(s.received_at)}.</Small>
+              </Line>
+            ) : (
+              <Line key={s.source} tone="neutral">
+                <span className="font-medium text-[var(--fg-1)]">{s.label}</span>
+                <Small>Rien de déposé pour cette semaine.</Small>
+              </Line>
+            ),
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function NotYet({ data }: { data: BulletinPayload }) {
   if (data.not_yet.length === 0) return null;
   return (
@@ -404,7 +610,18 @@ function weekNumber(label: string): string {
   return label.slice(-2).replace(/^0/, '');
 }
 
-export function BulletinView({ data, locale }: { data: BulletinPayload; locale: string }) {
+/** What the answer route said, read back from the address after its 303. */
+export type AnswerNotice = 'ok' | 'echec' | null;
+
+export function BulletinView({
+  data,
+  locale,
+  notice = null,
+}: {
+  data: BulletinPayload;
+  locale: string;
+  notice?: AnswerNotice;
+}) {
   const state = machineState(data);
   const pulls = data.moved.merged_pulls;
   const base = localePath(locale, '/dashboard/bulletin');
@@ -442,9 +659,11 @@ export function BulletinView({ data, locale }: { data: BulletinPayload; locale: 
         </div>
       </section>
 
+      <Decisions data={data} locale={locale} notice={notice} />
       <Numbers data={data} locale={locale} />
       <Moved data={data} />
       <Needs data={data} locale={locale} />
+      <Veille data={data} />
       <NotYet data={data} />
 
       <nav aria-label="Autres semaines" className="flex items-center justify-between gap-3 text-[13px]">
