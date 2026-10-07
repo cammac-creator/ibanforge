@@ -38,6 +38,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Fixed
 
+- **The Legal Notice says what a card payment receipt shows (7 October 2026).** It claimed that receipts state the operator's full details; Stripe's payment receipts name IBANforge and its support address only. An invoice with the full details is issued on request at support@ibanforge.com.
 - **The home page's live check explains itself without JavaScript (7 October 2026).** Its buttons wait for a script; with JavaScript off, a note now says so and links to a real API answer at api.ibanforge.com/v1/demo.
 - **Dead code of the former lens removed (7 October 2026).** The `.forge` and `.reveal` styles, the Reveal component, four unused images and 67 message keys no page read.
 
