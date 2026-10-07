@@ -46,6 +46,12 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  /*
+   * Standalone output for the container image of the self-hosted site
+   * (frontend/Dockerfile sets NEXT_OUTPUT=standalone). Left unset everywhere
+   * else, so a Vercel build, CI's `next build` and `next dev` are unchanged.
+   */
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   turbopack: {
     root: path.resolve(__dirname),
   },
@@ -63,8 +69,17 @@ const nextConfig: NextConfig = {
      * `/:path*` matches `/en` and `/robots.txt` but NOT the bare `/`. That is
      * the one path a header set called "for every route" must not miss.
      */
+    /*
+     * The self-hosted image names its commit (GIT_SHA, set by
+     * frontend/Dockerfile): "which version is online" is answered by
+     * `curl -sI https://ibanforge.com/ | grep -i x-site-version`, the proof the
+     * delivery chain and the integrator read. Absent on Vercel.
+     */
+    const version = process.env.GIT_SHA && /^[0-9a-f]{7,40}$/.test(process.env.GIT_SHA)
+      ? [{ key: "X-Site-Version", value: process.env.GIT_SHA.slice(0, 12) }]
+      : [];
     return [
-      { source: "/(.*)", headers: SECURITY_HEADERS },
+      { source: "/(.*)", headers: [...SECURITY_HEADERS, ...version] },
       /*
        * 2026-09-05 (evening check, decision 3A): the brand images carry a
        * content hash in their name, so they can be cached like the scripts.
