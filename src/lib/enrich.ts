@@ -27,6 +27,7 @@ import {
 } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
+import { lookupGrCode } from './gr-register.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
@@ -625,6 +626,34 @@ function decideBankCode(
       authoritative: false,
       as_of: lu.published.slice(0, 7),
       institution: { name: lu.name, street: null, post_code: null, town: null, country: 'LU' },
+    });
+  }
+  // Grèce (07/10/2026) : l'index HEBIC de la Hellenic Bank Association, servi
+  // depuis un fichier PRIVÉ comme le luxembourgeois (src/lib/gr-register.ts) :
+  // la permission de la HBA porte sur les réponses de l'API, pas sur une copie
+  // dans ce dépôt. Registre PARTIEL, jamais dans NATIONAL_REGISTERS : HEBIC ne
+  // liste que les établissements de crédit, alors que des établissements de
+  // paiement émettent aussi des IBAN grecs. Un code présent nomme son titulaire,
+  // avec le crédit exact et l'Important Note de la HBA en entier dans
+  // `register` ; un code absent retombe sur la réponse d'avant (carte
+  // composite), jamais `not_allocated`. Sans GR_REGISTER_PATH, rien ne change.
+  const gr = cc === 'GR' ? lookupGrCode(bankCode) : null;
+  if (gr) {
+    return withHolder('confirmed', {
+      value: bankCode,
+      status: 'verified',
+      match: 'register',
+      register: gr.register,
+      authoritative: false,
+      // Le mois où IBANforge a lu l'édition : la HBA ne date pas ses fichiers.
+      as_of: gr.read_on.slice(0, 7),
+      institution: {
+        name: gr.name,
+        street: gr.street,
+        post_code: gr.post_code,
+        town: gr.town,
+        country: 'GR',
+      },
     });
   }
   // Finland (16/09/2026): the transcribed Finance Finland list confirms what it

@@ -193,14 +193,18 @@ npm run build             # next build
 
 ## Work in progress, at 10 September 2026
 
-**The Greek register (HEBIC).** Branches `registre-gr-api` and `registre-gr-site`, local
-only, not pushed. The Hellenic Bank Association granted commercial reuse in writing on
-8 September under two conditions: the exact credit line, and its disclaimer reproduced in
-full on every response carrying HEBIC data. The branches currently treat Greece as an
-*authoritative* register, and that is wrong: the association's file lists credit
-institutions, not the whole code allocation, so a real payment institution's code would be
-answered "not allocated". The switch to `NON_EXHAUSTIVE_REGISTERS` is decided and being
-applied on `registre-gr-fix`. Do not start over.
+**The Greek register (HEBIC), taken up again on 7 October 2026.** The Hellenic Bank
+Association granted reuse "in its API responses" on 8 September, on two conditions: the exact
+credit line, and its Important Note reproduced in full on every response carrying HEBIC data.
+It is served like the Luxembourg register: from a PRIVATE file named by `GR_REGISTER_PATH`
+(`src/lib/gr-register.ts`, built by `scripts/seed-gr-register.ts`, which refuses a path inside
+a git repository), never from `data/bic.sqlite`, an export or a page. It is a PARTIAL
+register (credit institutions only, the association said on 14 September): a hit names the
+holder with the credit and the note in `bank_code_check.register`, a miss falls through to the
+composite map, and Greece is in neither `NATIONAL_REGISTERS` nor `NON_EXHAUSTIVE_REGISTERS`.
+Without the variable nothing changes; switching it on in production is the main session's
+step. The old local branches `registre-gr-api`, `registre-gr-site` and `registre-gr-fix`
+(9 September) wrote the codes into the public database and are not to be revived.
 
 **Moving the website off Vercel to an Infomaniak VPS in Geneva.** Branch `vps-migration`
 holds the first commit: a container image for `frontend/`, a deploy workflow that builds on

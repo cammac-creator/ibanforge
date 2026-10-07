@@ -84,6 +84,7 @@ import { apiKeys, BUNDLES } from './routes/api-keys.js';
 import { PRO_PRICE_USD } from './lib/payment-links.js';
 import { PRO_MONTHLY_LIMIT } from './lib/api-keys.js';
 import { LU_SOURCE, luRegisterConfigured } from './lib/lu-register.js';
+import { GR_IMPORTANT_NOTE, GR_SOURCE, grRegisterConfigured } from './lib/gr-register.js';
 import {
   BANK_LEVEL_SANCTIONS,
   CANNOT_CALL_TITLE,
@@ -407,6 +408,13 @@ function buildLlmsTxt(): string {
   const luSourceLine = luRegisterConfigured()
     ? `\n- Luxembourg bank codes: ${LU_SOURCE.replace(/^Source:\s*/, '')}. A listed code names its holder; an absence is not a non-allocation`
     : '';
+  // Greece (07/10/2026): the HEBIC index, from a private file like the ABBL's.
+  // The HBA asks for its exact credit and its Important Note in full beside
+  // HEBIC data; the note travels in every answer's bank_code_check.register and
+  // is repeated here, in the documentation, as the permission asks.
+  const grSourceLine = grRegisterConfigured()
+    ? `\n- Greek bank codes: ${GR_SOURCE.replace(/^Source:\s*/, '')} index (credit institutions only; payment and e-money institutions hold codes outside it, so an absence is not a non-allocation). Important Note: "${GR_IMPORTANT_NOTE}"`
+    : '';
   // The `>` line is the one paragraph an LLM keeps about this product. On
   // 24/09/2026 assistants still summarised IBANforge from the previous one
   // ("Swiss clearing, sanctions and compliance risk scoring, for developers
@@ -477,7 +485,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}${grSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}
