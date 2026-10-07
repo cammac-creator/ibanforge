@@ -1,8 +1,9 @@
+import { NodeConnectionTypes } from 'n8n-workflow';
 import type { INodeType, INodeTypeDescription } from 'n8n-workflow';
 
 /**
  * Declarative (routing-style) node: every operation maps straight onto the
- * REST API, no execute() code and zero runtime dependencies — the shape the
+ * REST API, no execute() code and zero runtime dependencies, the shape the
  * n8n verified-community-node programme requires (MIT + no deps + one
  * package per service).
  */
@@ -10,17 +11,18 @@ export class IbanForge implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'IBANforge',
     name: 'ibanForge',
-    icon: 'file:ibanforge.svg',
+    icon: { light: 'file:ibanforge.svg', dark: 'file:ibanforge.svg' },
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"]}}',
     description:
-      'Validate IBANs against 6 national bank registers, resolve BIC/SWIFT codes, look up Swiss clearing data and run compliance pre-checks',
+      'Validate IBANs and check the bank code against national bank registers, resolve BIC/SWIFT codes, look up Swiss clearing data and run compliance pre-checks',
     defaults: {
       name: 'IBANforge',
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    usableAsTool: true,
     credentials: [
       {
         name: 'ibanForgeApi',
@@ -86,7 +88,7 @@ export class IbanForge implements INodeType {
             value: 'complianceCheck',
             action: 'Run a compliance pre check on an IBAN',
             description:
-              'Bank-level sanctions (OFAC + EU), FATF lists, SEPA/VoP reachability, 0-100 risk score — bank-level, not name screening',
+              'Bank-level sanctions (OFAC + EU), FATF lists, SEPA/VoP reachability, 0-100 risk score, at bank level and not by name',
             routing: {
               request: {
                 method: 'POST',

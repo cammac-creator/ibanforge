@@ -1,6 +1,6 @@
 # n8n-nodes-ibanforge
 
-IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks inside your [n8n](https://n8n.io) workflows — backed by the [IBANforge](https://ibanforge.com?src=n8n) API and its 6 national bank registers (121k+ BIC entries, 89 IBAN countries).
+IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks inside your [n8n](https://n8n.io) workflows, backed by the [IBANforge](https://ibanforge.com?src=n8n) API and national bank registers (121k+ BIC entries, 89 IBAN countries).
 
 Typical uses: verify supplier IBANs at onboarding, triage a payout list before the batch leaves, enrich a CRM record with the issuing bank, stop payments whose bank code the national register does not know.
 
@@ -49,10 +49,10 @@ The [key dialog on ibanforge.com](https://ibanforge.com?src=n8n) does the same f
 
 ## Honest limits
 
-- The bank-code check tells you what the **national register** says about the code inside the IBAN — it never claims the *account* exists or matches a name (that is Verification of Payee, a regulated-PSP scheme).
+- The bank-code check tells you what the **national register** says about the code inside the IBAN. It never claims the *account* exists or matches a name (that is Verification of Payee, a regulated-PSP scheme).
 - Sanctions screening is **bank-level (BIC8)**, not name-level, and is not a regulated AML/CFT product.
 - Full API reference: [ibanforge.com/docs](https://ibanforge.com/docs?src=n8n) · data provenance: [ibanforge.com/docs/data-sources](https://ibanforge.com/docs/data-sources?src=n8n)
 
 ## License
 
-[MIT](../../LICENSE)
+[MIT](LICENSE)

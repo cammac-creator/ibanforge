@@ -1,183 +1,140 @@
-<!DOCTYPE html>
 <!-- Part of IBANforge Bank Auto-fill. See LICENSE file for full copyright and licensing details. -->
-<html lang="en">
-<head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>IBANforge Bank Auto-fill</title>
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            color: #1b2733;
-            margin: 0;
-            line-height: 1.6;
-            background: #ffffff;
-        }
-        .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
-        .hero {
-            background: linear-gradient(135deg, #0b3d91 0%, #1f6feb 100%);
-            color: #fff;
-            padding: 64px 0 56px;
-            text-align: center;
-        }
-        .hero h1 { font-size: 2.6rem; margin: 0 0 12px; font-weight: 700; }
-        .hero p { font-size: 1.25rem; margin: 0 auto; max-width: 640px; opacity: 0.95; }
-        .badge {
-            display: inline-block; margin-top: 24px; padding: 8px 18px;
-            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.4);
-            border-radius: 999px; font-size: 0.95rem;
-        }
-        .cta {
-            display: inline-block; margin-top: 24px; padding: 14px 28px;
-            background: #2ea043; color: #fff; text-decoration: none;
-            border-radius: 8px; font-weight: 600; font-size: 1.05rem;
-        }
-        section { padding: 48px 0; }
-        h2 { font-size: 1.8rem; margin: 0 0 24px; color: #0b3d91; }
-        .lead { font-size: 1.1rem; color: #44515f; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.98rem; }
-        th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #e3e8ee; }
-        th { background: #f4f7fb; color: #0b3d91; }
-        td.yes { color: #2ea043; font-weight: 600; }
-        td.no { color: #c23934; font-weight: 600; }
-        .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
-        .step { background: #f4f7fb; border-radius: 10px; padding: 22px; }
-        .step .n {
-            display: inline-flex; width: 34px; height: 34px; border-radius: 50%;
-            background: #1f6feb; color: #fff; align-items: center; justify-content: center;
-            font-weight: 700; margin-bottom: 12px;
-        }
-        .step h3 { margin: 0 0 8px; font-size: 1.1rem; }
-        .step p { margin: 0; color: #44515f; font-size: 0.96rem; }
-        .free { background: #eef7f0; border-left: 4px solid #2ea043; padding: 18px 22px; border-radius: 8px; }
-        footer { padding: 32px 0; text-align: center; color: #7a8794; font-size: 0.9rem; border-top: 1px solid #e3e8ee; }
-        a { color: #1f6feb; }
-    </style>
-</head>
-<body>
+<!-- Store description. A fragment on purpose: every style is inline, because the Odoo Apps store may drop a style block. No script, no external font, no remote image. -->
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1b2733;line-height:1.6;max-width:960px;margin:0 auto;">
 
-    <header class="hero">
-        <div class="wrap">
-            <h1>IBANforge Bank Auto-fill</h1>
-            <p>Type an IBAN, get the BIC and bank name filled in automatically. No manual bank setup, no maintaining a list of 121,000 banks.</p>
-            <div class="badge">Free &middot; AGPL-3 &middot; Odoo 18.0</div>
-            <div>
-                <a class="cta" href="https://ibanforge.com/?utm_source=odoo" target="_blank" rel="noreferrer noopener">Get a free API key</a>
+    <section style="background:#14263f;color:#f5f1e6;padding:48px 24px;text-align:center;border-radius:10px;">
+        <h1 style="font-size:2.4rem;margin:0 0 12px;font-weight:700;color:#f5f1e6;">IBANforge Bank Auto-fill</h1>
+        <p style="font-size:1.2rem;margin:0 auto;max-width:640px;">Type an IBAN, get the BIC and bank name filled in automatically. No manual bank setup, no list of 121,000 BIC entries to maintain.</p>
+        <p style="display:inline-block;margin:24px 0 0;padding:8px 18px;border:1px solid rgba(245,241,230,0.45);border-radius:999px;font-size:0.95rem;">Free &middot; AGPL-3 &middot; Odoo 18.0</p>
+        <p style="margin:20px 0 0;"><a href="https://ibanforge.com/docs/api-keys?utm_source=odoo" target="_blank" rel="noreferrer noopener" style="display:inline-block;padding:14px 28px;background:#c8742f;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:1.05rem;">Get a free API key</a></p>
+    </section>
+
+    <section style="padding:40px 8px 8px;">
+        <h2 style="font-size:1.7rem;margin:0 0 20px;color:#14263f;">The problem it solves</h2>
+        <p style="font-size:1.05rem;color:#44515f;">
+            Odoo validates the IBAN format, but it never fills the BIC or the bank name for you.
+            The OCA <code>base_bank_from_iban</code> module only matches a bank if you have already
+            created it with its national code by hand. Nobody pre-configures 121,000 BIC entries.
+        </p>
+        <p style="font-size:1.05rem;color:#44515f;">
+            IBANforge resolves the BIC and the bank name from a worldwide database in a single API
+            call, and this module creates or reuses the matching bank record for you, with no setup.
+        </p>
+    </section>
+
+    <section style="padding:32px 8px 8px;">
+        <h2 style="font-size:1.7rem;margin:0 0 20px;color:#14263f;">Value vs. native Odoo</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:0.98rem;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;padding:12px 14px;border-bottom:1px solid #e3e8ee;background:#f4f7fb;color:#14263f;">Capability</th>
+                    <th style="text-align:left;padding:12px 14px;border-bottom:1px solid #e3e8ee;background:#f4f7fb;color:#14263f;">Native <code>base_iban</code></th>
+                    <th style="text-align:left;padding:12px 14px;border-bottom:1px solid #e3e8ee;background:#f4f7fb;color:#14263f;">OCA <code>base_bank_from_iban</code></th>
+                    <th style="text-align:left;padding:12px 14px;border-bottom:1px solid #e3e8ee;background:#f4f7fb;color:#14263f;">This module</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;">Validate IBAN format (mod-97)</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#2a7f3f;font-weight:600;">Yes</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#2a7f3f;font-weight:600;">Yes</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;">Delegated to <code>base_iban</code></td>
+                </tr>
+                <tr>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;">Fill the BIC</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#b3342f;font-weight:600;">No</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#b3342f;font-weight:600;">No</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#2a7f3f;font-weight:600;">Yes (via API)</td>
+                </tr>
+                <tr>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;">Fill the bank name</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#b3342f;font-weight:600;">No</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;">Only if bank pre-configured</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#2a7f3f;font-weight:600;">Yes (find-or-create)</td>
+                </tr>
+                <tr>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;">Worldwide BIC database</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#b3342f;font-weight:600;">No</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#b3342f;font-weight:600;">No (manual local mapping)</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#2a7f3f;font-weight:600;">Yes (121k+ BIC entries, 89 IBAN countries)</td>
+                </tr>
+                <tr>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;">SEPA / risk / clearing indicators</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#b3342f;font-weight:600;">No</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#b3342f;font-weight:600;">No</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #e3e8ee;color:#2a7f3f;font-weight:600;">Yes (informative badge)</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section style="padding:32px 8px 8px;">
+        <h2 style="font-size:1.7rem;margin:0 0 20px;color:#14263f;">How it works</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;">
+            <div style="background:#f4f7fb;border-radius:10px;padding:22px;">
+                <div style="display:inline-block;width:34px;height:34px;line-height:34px;border-radius:50%;background:#14263f;color:#ffffff;text-align:center;font-weight:700;margin-bottom:12px;">1</div>
+                <h3 style="margin:0 0 8px;font-size:1.1rem;">Enter an IBAN</h3>
+                <p style="margin:0;color:#44515f;font-size:0.96rem;">On any partner bank account, type or paste an IBAN as usual.</p>
+            </div>
+            <div style="background:#f4f7fb;border-radius:10px;padding:22px;">
+                <div style="display:inline-block;width:34px;height:34px;line-height:34px;border-radius:50%;background:#14263f;color:#ffffff;text-align:center;font-weight:700;margin-bottom:12px;">2</div>
+                <h3 style="margin:0 0 8px;font-size:1.1rem;">Instant lookup</h3>
+                <p style="margin:0;color:#44515f;font-size:0.96rem;">IBANforge validates the IBAN and returns the BIC and bank name. An invalid IBAN shows a non-blocking warning.</p>
+            </div>
+            <div style="background:#f4f7fb;border-radius:10px;padding:22px;">
+                <div style="display:inline-block;width:34px;height:34px;line-height:34px;border-radius:50%;background:#14263f;color:#ffffff;text-align:center;font-weight:700;margin-bottom:12px;">3</div>
+                <h3 style="margin:0 0 8px;font-size:1.1rem;">Bank linked</h3>
+                <p style="margin:0;color:#44515f;font-size:0.96rem;">The matching bank record is found or created and linked, filling the BIC and bank name automatically.</p>
+            </div>
+            <div style="background:#f4f7fb;border-radius:10px;padding:22px;">
+                <div style="display:inline-block;width:34px;height:34px;line-height:34px;border-radius:50%;background:#14263f;color:#ffffff;text-align:center;font-weight:700;margin-bottom:12px;">4</div>
+                <h3 style="margin:0 0 8px;font-size:1.1rem;">Never in your way</h3>
+                <p style="margin:0;color:#44515f;font-size:0.96rem;">API down or no key? Entry and saving keep working exactly like stock Odoo. A bank you set by hand is never overwritten.</p>
             </div>
         </div>
-    </header>
+    </section>
 
-    <section>
-        <div class="wrap">
-            <h2>The problem it solves</h2>
-            <p class="lead">
-                Odoo validates the IBAN format, but it never fills the BIC or the bank name for you.
-                The OCA <code>base_bank_from_iban</code> module only matches a bank if you have already
-                created it with its national code by hand. Nobody pre-configures 121,000 banks.
+    <section id="privacy" style="padding:32px 8px 8px;">
+        <h2 style="font-size:1.7rem;margin:0 0 20px;color:#14263f;">Privacy: what leaves your Odoo server</h2>
+        <div style="background:#fbf4ec;border-left:4px solid #c8742f;padding:18px 22px;border-radius:8px;">
+            <ul style="margin:0;padding-left:20px;">
+                <li><strong>Nothing, until you save an API key</strong> in Settings, IBANforge. With no key, the module makes no network call at all.</li>
+                <li><strong>What is sent, once a key is saved:</strong> the IBAN typed in the Account Number field of a partner bank account (while you edit it, then again when the account is saved or its IBAN changes, imports included), and your API key in an <code>X-API-Key</code> header. Nothing else: no partner name, no address, no other Odoo field.</li>
+                <li><strong>Where it goes:</strong> over HTTPS to <code>https://api.ibanforge.com</code>, or to the address you set as API Base URL. What comes back is the BIC, the bank name and the SEPA and risk indicators for that IBAN.</li>
+                <li><strong>What IBANforge keeps:</strong> its <a href="https://ibanforge.com/legal/privacy?utm_source=odoo" target="_blank" rel="noreferrer noopener">privacy policy</a> states that IBANs submitted for validation are processed in memory and are not stored. A <a href="https://ibanforge.com/legal/dpa?utm_source=odoo" target="_blank" rel="noreferrer noopener">data processing agreement</a> is available. Each call is counted against the monthly allowance of your key.</li>
+                <li><strong>What the module itself does not do:</strong> no usage statistics, no telemetry, no code downloaded, no other code run.</li>
+            </ul>
+            <p style="margin:14px 0 0;color:#44515f;font-size:0.95rem;">An IBAN can be personal data. You stay in charge of what you enter in Odoo and of whether you enable the lookup.</p>
+        </div>
+    </section>
+
+    <section style="padding:32px 8px 8px;">
+        <h2 style="font-size:1.7rem;margin:0 0 20px;color:#14263f;">Free to start</h2>
+        <div style="background:#eef7f0;border-left:4px solid #2a7f3f;padding:18px 22px;border-radius:8px;">
+            <p style="margin:0;">
+                A <strong>free API key</strong> allows 200 lookups a month once you give an e-mail address
+                (25 a month without one). Get it at
+                <a href="https://ibanforge.com/docs/api-keys?utm_source=odoo" target="_blank" rel="noreferrer noopener">ibanforge.com</a>,
+                then paste it in Settings, IBANforge. The module itself is free and open source (AGPL-3).
+                Need more volume? The plans are listed on
+                <a href="https://ibanforge.com/pricing?utm_source=odoo" target="_blank" rel="noreferrer noopener">ibanforge.com/pricing</a>.
             </p>
-            <p class="lead">
-                IBANforge resolves the BIC and the bank name from a worldwide database in a single API
-                call, and this module creates or reuses the matching bank record for you, with no setup.
-            </p>
+            <p style="margin:12px 0 0;color:#44515f;font-size:0.95rem;">Through the form, an account makes one call while you type and one when you save it, so 200 lookups cover about 100 new accounts. Imports make one call per account.</p>
         </div>
     </section>
 
-    <section style="background:#fafbfc;">
-        <div class="wrap">
-            <h2>Value vs. native Odoo</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Capability</th>
-                        <th>Native <code>base_iban</code></th>
-                        <th>OCA <code>base_bank_from_iban</code></th>
-                        <th>This module</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Validate IBAN format (mod-97)</td>
-                        <td class="yes">Yes</td>
-                        <td class="yes">Yes</td>
-                        <td>Delegated to <code>base_iban</code></td>
-                    </tr>
-                    <tr>
-                        <td>Fill the BIC</td>
-                        <td class="no">No</td>
-                        <td class="no">No</td>
-                        <td class="yes">Yes (via API)</td>
-                    </tr>
-                    <tr>
-                        <td>Fill the bank name</td>
-                        <td class="no">No</td>
-                        <td>Only if bank pre-configured</td>
-                        <td class="yes">Yes (find-or-create)</td>
-                    </tr>
-                    <tr>
-                        <td>Worldwide BIC database</td>
-                        <td class="no">No</td>
-                        <td class="no">No (manual local mapping)</td>
-                        <td class="yes">Yes (121k+ BIC, 89 countries)</td>
-                    </tr>
-                    <tr>
-                        <td>SEPA / risk / clearing indicators</td>
-                        <td class="no">No</td>
-                        <td class="no">No</td>
-                        <td class="yes">Yes (informative badge)</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+    <section style="padding:32px 8px 8px;">
+        <h2 style="font-size:1.7rem;margin:0 0 20px;">Support</h2>
+        <p style="margin:0;color:#44515f;">
+            Questions, a bug or a request: <a href="mailto:support@ibanforge.com">support@ibanforge.com</a>.
+            Source code and issues:
+            <a href="https://github.com/cammac-creator/ibanforge-odoo" target="_blank" rel="noreferrer noopener">github.com/cammac-creator/ibanforge-odoo</a>.
+        </p>
     </section>
 
-    <section>
-        <div class="wrap">
-            <h2>How it works</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="n">1</div>
-                    <h3>Enter an IBAN</h3>
-                    <p>On any partner bank account, type or paste an IBAN as usual.</p>
-                </div>
-                <div class="step">
-                    <div class="n">2</div>
-                    <h3>Instant lookup</h3>
-                    <p>IBANforge validates the IBAN and returns the BIC and bank name. An invalid IBAN shows a non-blocking warning.</p>
-                </div>
-                <div class="step">
-                    <div class="n">3</div>
-                    <h3>Bank linked</h3>
-                    <p>The matching bank record is found or created and linked, filling the BIC and bank name automatically.</p>
-                </div>
-                <div class="step">
-                    <div class="n">4</div>
-                    <h3>Never in your way</h3>
-                    <p>API down or no key? Entry and saving keep working exactly like stock Odoo. A bank you set by hand is never overwritten.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+    <p style="padding:28px 0;text-align:center;color:#7a8794;font-size:0.9rem;border-top:1px solid #e3e8ee;margin:32px 0 0;">
+        IBANforge Bank Auto-fill &middot; AGPL-3 &middot;
+        <a href="https://ibanforge.com/?utm_source=odoo" target="_blank" rel="noreferrer noopener">ibanforge.com</a>
+    </p>
 
-    <section style="background:#fafbfc;">
-        <div class="wrap">
-            <h2>Free to start</h2>
-            <div class="free">
-                <p style="margin:0;">
-                    Create a <strong>free API key</strong> with 200 lookups per month at
-                    <a href="https://ibanforge.com/?utm_source=odoo" target="_blank" rel="noreferrer noopener">ibanforge.com</a>.
-                    Need more volume? Higher tiers and pay-per-call options are available on the same key.
-                </p>
-            </div>
-        </div>
-    </section>
-
-    <footer>
-        <div class="wrap">
-            IBANforge Bank Auto-fill &middot; AGPL-3 &middot;
-            <a href="https://ibanforge.com/?utm_source=odoo" target="_blank" rel="noreferrer noopener">ibanforge.com</a>
-        </div>
-    </footer>
-
-</body>
-</html>
+</div>
