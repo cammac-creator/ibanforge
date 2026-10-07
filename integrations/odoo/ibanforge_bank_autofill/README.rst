@@ -114,8 +114,18 @@ comes back is the BIC, the bank name and the SEPA and risk indicators for that
 IBAN.
 
 The `IBANforge privacy policy <https://ibanforge.com/legal/privacy>`_ states
-that IBANs submitted for validation are processed in memory and are not stored.
-A `data processing agreement <https://ibanforge.com/legal/dpa>`_ is available.
+that IBANs submitted for validation are processed in memory and are not stored,
+with one exception: for an invalid IBAN, at most its first 4 characters (country
+code and check digits, never the bank or account part) are kept, up to 12
+months, as request metadata. The module sends the IBAN in the body of the
+request, never in a URL.
+
+The hosting side also sees the address of your Odoo server: according to the
+same policy, the network edge of the API host keeps the raw IP address and the
+request path for 7 days, outside IBANforge's own logs, which keep only a salted
+hash of the address. Each call is counted against the monthly allowance of your
+key. A `data processing agreement <https://ibanforge.com/legal/dpa>`_ is
+available.
 An IBAN can be personal data: you stay in charge of what you enter in Odoo and
 of whether you enable the lookup.
 
