@@ -1,0 +1,101 @@
+name: Deploy site (VPS)
+
+# The website (frontend/) moves off Vercel to the operator's Infomaniak VPS
+# (decided 9 September and 7 October 2026). GitHub builds the image and pushes
+# it to ghcr.io; the VPS never builds (two cores, 4 GB shared with other
+# sites). It comes online through a dedicated SSH key whose only allowed
+# command is "deploy <sha>" (authorized_keys: restrict,command=...). The API
+# (src/) is not concerned: Railway keeps deploying it.
+#
+# Only first-party actions/* actions and the runner's own docker CLI, like
+# every other workflow of this repository (see OPS-15 in release-publish.yml).
+
+on:
+  push:
+    # claude/demenagement-site-20261007: the preparation branch, deploying to
+    # the candidate server while ibanforge.com still points at Vercel. Remove
+    # it from this list when the branch is merged.
+    branches: [main, claude/demenagement-site-20261007]
+    paths:
+      - "frontend/**"
+      # The feeds and /changelog read CHANGELOG.md at the image's commit.
+      - "CHANGELOG.md"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/cammac-creator/ibanforge-web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and push the image (context = repository root, see frontend/Dockerfile)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          # The previous image carries an inline cache: the npm ci layer is
+          # reused when frontend/package-lock.json has not changed.
+          docker pull "$IMAGE:latest" || echo "no previous image to reuse as cache"
+          docker build -f frontend/Dockerfile \
+            --cache-from "$IMAGE:latest" \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg GIT_SHA="$GITHUB_SHA" \
+            -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
+          docker image inspect "$IMAGE:$GITHUB_SHA" --format 'image size: {{.Size}} bytes'
+
+      - name: Boot the image and read three pages before anything ships
+        run: |
+          set -euo pipefail
+          docker run -d --name site-ci -p 3400:3000 \
+            -e API_URL=https://ibanforge-production.up.railway.app \
+            -e NEXT_PUBLIC_API_URL=https://api.ibanforge.com \
+            "$IMAGE:$GITHUB_SHA"
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:3400/robots.txt && break
+            sleep 2
+          done
+          for path in / /fr /de /robots.txt /sitemap.xml /rss.xml; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3400$path")
+            echo "$path -> $code"
+            [ "$code" = 200 ] || { docker logs --tail 60 site-ci; exit 1; }
+          done
+          # The feed must carry release entries read from ../CHANGELOG.md.
+          curl -fsS http://127.0.0.1:3400/rss.xml | grep -q '<title>Release ' \
+            || { echo "rss.xml has no release entry: CHANGELOG.md is missing from the image"; exit 1; }
+          docker rm -f site-ci >/dev/null
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      packages: read
+    steps:
+      - name: Ship to the VPS (forced command "deploy <sha>", ghcr token on stdin)
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$VPS_HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPYUhF/MiJIhunHMdPZGimuVdZj3+T6aKt1gPDoAlY7j" > ~/.ssh/known_hosts
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$VPS_USER@$VPS_HOST" "deploy $GITHUB_SHA"

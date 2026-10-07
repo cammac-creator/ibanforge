@@ -1,0 +1,18 @@
+# Read by BuildKit instead of the root .dockerignore when the image is built
+# with `docker build -f frontend/Dockerfile .` (the root .dockerignore belongs
+# to the API image). The context is the repository root, cut down to the two
+# things the site needs: frontend/ and CHANGELOG.md.
+*
+!frontend/
+!CHANGELOG.md
+frontend/node_modules
+frontend/.next
+frontend/coverage
+frontend/test-results
+frontend/playwright-report
+frontend/tsconfig.tsbuildinfo
+frontend/.env
+frontend/.env.*
+frontend/.vercel
+**/*.log
+**/.DS_Store

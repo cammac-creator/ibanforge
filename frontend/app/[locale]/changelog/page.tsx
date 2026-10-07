@@ -19,9 +19,10 @@ export const revalidate = 3600;
  * The commit SHA changes the URL on every deployment, which retires the old
  * entry by construction. It also makes the page show the changelog of the build
  * you are actually looking at. Falls back to `main` for local development,
- * where the variable is unset.
+ * where the variable is unset. `GIT_SHA` is the same commit for the
+ * self-hosted image (frontend/Dockerfile), which has no Vercel variable.
  */
-const REF = process.env.VERCEL_GIT_COMMIT_SHA || "main";
+const REF = process.env.GIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "main";
 const CHANGELOG_URL = `https://raw.githubusercontent.com/cammac-creator/ibanforge/${REF}/CHANGELOG.md`;
 
 async function getChangelog(): Promise<string | null> {
