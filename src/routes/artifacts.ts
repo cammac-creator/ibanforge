@@ -5,7 +5,11 @@ import {
   ANONYMOUS_MONTHLY_LIMIT as ANON_MONTHLY,
   FREE_TIER_MONTHLY_LIMIT as FREE_MONTHLY,
 } from '../lib/tiers.js';
-import { MCP_WEEKLY_LIMIT as MCP_FREE_WEEKLY, MCP_SESSIONS_PER_IP_DAY } from '../lib/mcp-limits.js';
+import {
+  MCP_WEEKLY_LIMIT as MCP_FREE_WEEKLY,
+  MCP_SESSIONS_PER_IP_DAY,
+  MCP_LIVE_SESSIONS_PER_KEY,
+} from '../lib/mcp-limits.js';
 import { authoritativeCountries, codesAnd } from '../lib/register-lists.js';
 
 /**
@@ -186,8 +190,15 @@ quotas:
   mcp_sessions:
     requests: ${MCP_SESSIONS_PER_IP_DAY}
     window: 1 day
-    scope: per client source address
+    scope: per client source address, for sessions opened without a valid API key
     note: New MCP sessions (initialize); reuse the mcp-session-id instead of opening one per call.
+      A session opened with a valid API key (Authorization Bearer or X-API-Key) is not counted
+      here and is never refused; see mcp_sessions_with_key.
+  mcp_sessions_with_key:
+    live_sessions: ${MCP_LIVE_SESSIONS_PER_KEY}
+    scope: per API key
+    note: Not a ceiling on openings. Past this many live sessions on one key, opening another
+      closes the least recently used session of that same key (send initialize again on it).
   rest_anonymous_trial:
     requests: ${REST_TRIAL_WEEKLY_LIMIT}
     window: 1 week (ISO week, UTC)

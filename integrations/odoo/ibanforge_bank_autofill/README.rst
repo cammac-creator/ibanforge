@@ -91,9 +91,10 @@ Known limitations (MVP)
   bank is already set: the existing ``bank_id`` is preserved (so a manually
   chosen bank is never lost). Clear the bank field to re-trigger detection.
 * **Two API calls per new account via the UI**: one on change (instant
-  feedback) and one on save (authoritative). With a 200/month free key this
-  consumes roughly twice per manually entered account. Imports and API-created
-  records only call once (on ``create``).
+  feedback) and one on save (authoritative), so a manually entered account
+  costs about two requests: about 100 accounts a month on a free key with an
+  e-mail address (200 requests), about 12 on a key without one (25). Imports
+  and API-created records only call once (on ``create``).
 
 Privacy
 =======

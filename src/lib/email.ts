@@ -955,6 +955,14 @@ export interface SubscriptionEndedEmailInput {
   creditsRemaining: number | null;
   /** La référence de recharge de la clé : les liens rechargent ou réabonnent CETTE clé. */
   topupRef: string | null;
+  /**
+   * Faux pour une adresse qui a répondu STOP (08.10.2026) : l'avis part quand
+   * même, c'est un avis du service payé, mais sans liens d'achat ni offre.
+   * Absent : vrai. Décidé par `sendSubscriptionEndedNotice`
+   * (src/lib/subscription-ended-notice.ts), jamais ici : `email.ts` ne lit pas
+   * la liste des STOP (elle importe déjà ce module, ce serait un cycle).
+   */
+  offers?: boolean;
 }
 
 /**
@@ -999,28 +1007,29 @@ export function buildSubscriptionEndedEmail(p: SubscriptionEndedEmailInput): {
       ? `It draws on the ${credits} prepaid credits left on it. When they run out, calls answer HTTP 402 (payment required) until the key receives a new payment.`
       : 'It has no allowance left: calls answer HTTP 402 (payment required) until the key receives a new payment.';
   }
+  // Après un STOP (décision de Claude-Alain du 07.10.2026, point 8, appliquée
+  // le 08.10) : le constat et l'état de la clé partent, le bloc d'achat non.
+  const offers = p.offers !== false;
   const links = packLinks(p.topupRef);
   const pro = p.topupRef ? proLink(p.topupRef) : PRO_PAYMENT_LINK;
   const sameKey = p.topupRef
     ? 'These links pay for this same key: nothing to change in your integration.'
     : 'For now these links deliver a new key: put it in place of this one in your integration.';
+  const offerText = offers
+    ? `To keep it running, by card:\n` +
+      `  1,000 credits  $4   ${links['1k']}\n` +
+      `  5,000 credits  $20  ${links['5k']}\n` +
+      ` 25,000 credits  $80  ${links['25k']}\n` +
+      `  Pro, $${PRO_PRICE_USD}/month  ${pro}\n` +
+      `${sameKey}\n\n`
+    : '';
   const text =
     `The ${name} subscription on key ${p.keyPrefix} has ended. The key stays active.\n` +
     `${now}\n\n` +
-    `To keep it running, by card:\n` +
-    `  1,000 credits  $4   ${links['1k']}\n` +
-    `  5,000 credits  $20  ${links['5k']}\n` +
-    ` 25,000 credits  $80  ${links['25k']}\n` +
-    `  Pro, $${PRO_PRICE_USD}/month  ${pro}\n` +
-    `${sameKey}\n\n` +
+    offerText +
     `Your account (usage, balance): ${ACCOUNT_PAGE}\n${ACCOUNT_SIGN_IN}\n\nIBANforge`;
-  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
-  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
-    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
-    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${name} ended on key ${p.keyPrefix}</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px">The key stays active.</p>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">${now}</p>
-    <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 12px">
+  const offerHtml = offers
+    ? `<div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 12px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">To keep it running, by card</div>
       <p style="margin:0 0 8px"><a href="${links['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
       <p style="margin:0 0 8px"><a href="${links['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
@@ -1028,7 +1037,15 @@ export function buildSubscriptionEndedEmail(p: SubscriptionEndedEmailInput): {
       <p style="margin:0"><a href="${pro}" style="color:#fbbf24;text-decoration:none">Pro · $${PRO_PRICE_USD}/month →</a></p>
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 18px">${sameKey}</p>
-    <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your account: usage, balance &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
+    `
+    : '';
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${name} ended on key ${p.keyPrefix}</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px">The key stays active.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">${now}</p>
+    ${offerHtml}<p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your account: usage, balance &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
   </div></body></html>`;

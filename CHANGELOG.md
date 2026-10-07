@@ -7,6 +7,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Fixed
 
+- **A hosted MCP session opened with a valid API key is no longer refused by the per-address session ceiling (8 October 2026).** The daily ceiling on new sessions now counts only the sessions opened without a valid key, per source address; Claude connectors, which all leave from the same addresses, no longer turn away a client that sends its key. A key keeps at most 30 live sessions: opening one more closes the least recently used session of that same key. An unknown, revoked or absent key keeps the per-address ceiling.
+- **The end-of-subscription e-mail carries no purchase links for an address that replied STOP (8 October 2026).** The notice itself is still sent: the key stays active and the e-mail says what it has left.
+- **The Odoo module states both free allowances (8 October 2026).** 200 requests a month with an e-mail address, 25 without, in its settings, field help, README and store description.
 - **The MCP pages link to OpenAI's current guide for connecting a server to ChatGPT (7 October 2026).** The previous developer-mode link answered 404.
 
 ## [1.9.0] — 2026-10-07

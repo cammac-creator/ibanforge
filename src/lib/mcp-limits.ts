@@ -20,5 +20,31 @@ export const MCP_WEEKLY_LIMIT = 25;
 /**
  * Une session réserve un serveur ; son plafond est distinct des appels et reste
  * QUOTIDIEN : il borne la mémoire du conteneur, pas une offre gratuite.
+ *
+ * Depuis le 08.10.2026, il ne vaut que pour les ouvertures SANS clé valide (ou
+ * avec une clé inconnue ou révoquée) : voir `MCP_SESSIONS_PER_KEY_DAY`.
  */
 export const MCP_SESSIONS_PER_IP_DAY = 30;
+
+/**
+ * Une session ouverte avec une clé VALIDE n'est plus comptée sur l'adresse, ni
+ * refusée (08.10.2026) : comme sur l'API REST, qui n'a pas de plafond de
+ * sessions, c'est le quota de la clé qui gouverne ses appels. Les connecteurs
+ * Claude sortent tous des adresses d'Anthropic : comptées par adresse, les
+ * ouvertures de tous leurs clients se partageaient le même plafond, et un
+ * client muni d'une clé pouvait être refusé à cause des autres.
+ *
+ * Ce qui borne la mémoire à la place : au plus ce nombre de sessions VIVANTES
+ * par clé dans le magasin. Une ouverture de plus ferme d'abord la session la
+ * moins récemment servie de LA MÊME clé, jamais celle d'un autre client ; le
+ * client qui y revient reçoit le 404 « send initialize again », que tout client
+ * MCP sait traiter.
+ *
+ * 🚨 Ce n'est pas une offre, c'est une borne d'empreinte. Sans elle, une clé
+ * sans e-mail (un seul POST, sans corps) rouvrait SEC-01 : des sessions sans
+ * limite, et l'éviction LRU du magasin jetait celles de tous les autres
+ * clients. Un nombre de sessions vivantes, pas d'ouvertures par jour : ce qui
+ * coûte, c'est l'empreinte, et un client qui ouvre une session par conversation
+ * ne doit jamais rencontrer de refus.
+ */
+export const MCP_LIVE_SESSIONS_PER_KEY = 30;

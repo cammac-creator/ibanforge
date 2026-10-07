@@ -61,11 +61,11 @@ import {
   sendApiKeyEmail,
   sendSubscriptionKeyEmail,
   sendSubscriptionAttachedEmail,
-  sendSubscriptionEndedEmail,
   sendRechargeEmail,
   alertKeyDeliveryFailure,
   sendAuditReadyEmail,
 } from '../lib/email.js';
+import { sendSubscriptionEndedNotice } from '../lib/subscription-ended-notice.js';
 
 /**
  * Les packs vendus par carte. `price_usd` ne sert qu'au repli de la
@@ -1453,7 +1453,9 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
   }
   if (result.subscription?.kind === 'ended' && result.subscription.to && !process.env.VITEST) {
     const s = result.subscription;
-    void sendSubscriptionEndedEmail({
+    // 08.10.2026 : par `sendSubscriptionEndedNotice`, qui retire les liens
+    // d'achat pour une adresse sous STOP ; l'avis lui-même part toujours.
+    void sendSubscriptionEndedNotice({
       to: s.to as string,
       keyPrefix: s.keyPrefix,
       plan: s.plan,

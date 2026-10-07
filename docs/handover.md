@@ -424,7 +424,13 @@ beside the trial's `rest:<h>`. The two allowances never share. What stays REST-o
 the `rest:` prefix (`rest_attempts_uncounted`, the admin week total, which now shows
 `mcp_this_week` beside it). The daily rows are still written for `trial_daily`; only the
 ceiling on MCP session openings (`init:<h>`, `MCP_SESSIONS_PER_IP_DAY`) stays daily, because it
-bounds container memory rather than a free offer. `GET /v1` serves `mcp_weekly_limit` and
+bounds container memory rather than a free offer. Since 8 October 2026 it counts only the
+openings without a valid key: a session opened with a valid key is neither counted on the address
+nor refused (the Claude connectors all leave from Anthropic's addresses, so a client with a key was
+refused because of everybody else). The memory bound moves to the key instead: at most
+`MCP_LIVE_SESSIONS_PER_KEY` live sessions per key in the store, the least recently used session of
+that same key closed first (`owner` in `createMcpSessionStore`, the key hash as an eviction label,
+never for billing). An unknown, revoked or absent key keeps the per-address path. `GET /v1` serves `mcp_weekly_limit` and
 `mcp_period`; `GET /mcp` adds `mcp_resets` and `mcp_resets_at`. The npm package
 `ibanforge-mcp` writes none of these figures, nor their period: a published package stays
 frozen until its next release, so its README and the instructions it serves point to
