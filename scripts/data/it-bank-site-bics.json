@@ -1,5 +1,5 @@
 {
-  "about": "BICs that Italian banks publish on their own websites, read on 7 October 2026 for the ABI codes the rebuild of 29 September 2026 left without a BIC. Used by scripts/derive-map-keys.ts as the last step of the Italian derivation: a website may only choose among the head-office BICs GLEIF already pairs with the bank, and a code outside the Banca d'Italia registers needs a sentence of the bank carrying the code itself (abi_quote). Only the bank's own domain or its group's is accepted, never a directory of IBAN or BIC codes. Each quote is copied from the page, spaces as published.",
+  "about": "BICs that Italian banks publish on their own websites, read on 7 October 2026 for the ABI codes the rebuild of 29 September 2026 left without a BIC. Used by scripts/derive-map-keys.ts as the last step of the Italian derivation: a website may only choose among the head-office BICs GLEIF already pairs with the bank, and a code outside the Banca d'Italia registers needs a sentence of the bank carrying the code itself (abi_quote). Only the bank's own domain or its group's is accepted, never a directory of IBAN or BIC codes. Each quote is the text of the page or document, markup removed and runs of white space collapsed, never paraphrased.",
   "codes": {
     "01015": {
       "bic": "BPMOIT22XXX",
@@ -27,7 +27,7 @@
       "holder": "CREDEM EUROMOBILIARE PRIVATE BANKING S.P.A.",
       "url": "https://www.credemeuromobiliarepb.it/it/footer/dati-societari",
       "consulted": "2026-10-07",
-      "quote": "Codice ABI: 3250 Albo delle banche: 4999 Codice CONSOB: 40218 Swift Code: EUBAITM1 XXX"
+      "quote": "Swift Code: EUBAITM1 XXX"
     },
     "07017": {
       "bic": "CCRTIT2TCIR",
@@ -57,7 +57,7 @@
       "holder": "BANCA DI CREDITO COOPERATIVO DI ROMA - SOCIETA' COOPERATIVA",
       "url": "https://www.bccroma.it/template/default.asp?i_menuID=10298",
       "consulted": "2026-10-07",
-      "quote": "Swift Code/BIC ICRAITRRROM; Aderente Indiretta TARGET2 ICRAITRRROM"
+      "quote": "Aderente Indiretta TARGET2 ICRAITRRROM"
     }
   }
 }
