@@ -38,7 +38,7 @@ export default async function BulletinPage({
   const locale = await getLocale();
   const { week, reponse } = await searchParams;
   const asked = typeof week === 'string' && WEEK_LABEL.test(week) ? week : null;
-  // What the answer route said after its 303 (step A2); any other value is ignored.
+  // Ce que la route des réponses a dit après son 303 (étape A2) ; toute autre valeur est ignorée.
   const notice: AnswerNotice = reponse === 'ok' ? 'ok' : reponse === 'echec' ? 'echec' : null;
   const url = `${API_URL}/v1/admin/bulletin${asked ? `?week=${asked}` : ''}`;
   const read: Fetched<unknown> = ADMIN_SECRET

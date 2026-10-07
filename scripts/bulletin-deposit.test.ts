@@ -60,7 +60,7 @@ describe('les lignes de la veille', () => {
 });
 
 describe('le dépôt de la mesure des IA', () => {
-  it('donne le score et où l’on apparaît, en trois lignes au plus', () => {
+  it('donne le score, erreurs comprises, et où l’on apparaît ou non', () => {
     const payload = recoPayload([
       { query: 'IBAN validation API', present: true },
       { query: 'IBAN to BIC API', present: false },
@@ -71,7 +71,6 @@ describe('le dépôt de la mesure des IA', () => {
       lines: [
         'Présent sur : IBAN validation API ; Swiss QR-IID lookup',
         'Absent de : IBAN to BIC API',
-        '1 requête en erreur : score partiel.',
       ],
       score: { value: 2, out_of: 4, errors: 1 },
     });

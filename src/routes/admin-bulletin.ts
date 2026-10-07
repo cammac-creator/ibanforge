@@ -25,17 +25,17 @@ import { getStripeRevenue } from './admin-stripe-revenue.js';
  * kept the body would show a frozen week to someone who believes they read today's
  * state. The header is set before the secret is checked, so the 401 carries it too.
  *
- * Step A2 adds three writers, each behind its own door:
+ * L'étape A2 (07.10.2026) ajoute trois écritures, chacune derrière sa porte :
  *
- *  - `POST /internal/bulletin/:source`: the two Monday veilles deposit their summary
- *    (`bulletin-feed.ts`), with `BULLETIN_FEED_TOKEN`;
- *  - `POST /v1/admin/bulletin/proposals`: the main session adds a proposal;
- *  - `POST /v1/admin/bulletin/answers`: Oui / Plus tard / Non, from the dashboard
- *    page through the site's own route, which keeps the admin secret server side.
+ *  - `POST /internal/bulletin/:source` : les deux veilles du lundi déposent leur
+ *    résumé (`bulletin-feed.ts`), avec `BULLETIN_FEED_TOKEN` ;
+ *  - `POST /v1/admin/bulletin/proposals` : la session principale pose une proposition ;
+ *  - `POST /v1/admin/bulletin/answers` : Oui / Plus tard / Non, depuis la page du
+ *    tableau de bord par la route du site, qui garde le secret côté serveur.
  *
- * Priority 05 adds the cost register behind the admin secret (`bulletin-money.ts`):
- * `GET`, `POST` and `DELETE /v1/admin/bulletin/costs`. The amounts live in the
- * private database only; none is ever written into this public repository.
+ * La priorité 05 ajoute le registre des coûts, derrière le secret d'administration
+ * (`bulletin-money.ts`) : `GET`, `POST` et `DELETE /v1/admin/bulletin/costs`. Les
+ * montants ne vivent que dans la base privée ; aucun n'est écrit dans ce dépôt public.
  */
 export const adminBulletin = new Hono();
 
@@ -47,16 +47,16 @@ adminBulletin.get('/v1/admin/bulletin', async (c) => {
   return c.json(await getBulletin({ week: c.req.query('week') ?? null, stripe: getStripeRevenue }));
 });
 
-// ─── The veilles' deposit ────────────────────────────────────────────────────
+// ─── Le dépôt des veilles ────────────────────────────────────────────────────
 
 /**
- * ⚠️ BULLETIN_FEED_TOKEN, never HEARTBEAT_TOKEN and never ADMIN_SECRET.
+ * ⚠️ BULLETIN_FEED_TOKEN, jamais HEARTBEAT_TOKEN et jamais ADMIN_SECRET.
  *
- * The token sits in the GitHub Actions secrets of a PUBLIC repository. Its own name
- * gives it the right blast radius: if it leaks, the attacker can write three lines
- * and a score into a private page, and nothing else; it neither silences a dead
- * man's switch (the heartbeat token) nor opens the dashboard (the admin secret).
- * Unset, the door refuses everything: it never opens by default.
+ * Le jeton vit dans les secrets GitHub Actions d'un dépôt PUBLIC. Un nom à lui lui
+ * donne le bon rayon d'explosion : s'il fuit, l'attaquant peut écrire trois lignes et
+ * un score dans une page privée, et rien d'autre ; il ne fait taire aucun homme mort
+ * (le jeton des battements) et n'ouvre pas le tableau de bord (le secret
+ * d'administration). Non posé, la porte refuse tout : elle ne s'ouvre jamais par défaut.
  */
 function isFeedAuthorized(provided: string | undefined): boolean {
   const expected = process.env.BULLETIN_FEED_TOKEN;
@@ -71,13 +71,13 @@ function isFeedAuthorized(provided: string | undefined): boolean {
 }
 
 /**
- * 🚨 The answer is `{ ok: true }` and nothing more, and a refusal names a short
- * code, never what was received: the workflows that call this run in a public
- * repository, and the lines they deposit can carry real figures.
+ * 🚨 La réponse est `{ ok: true }` et rien d'autre, et un refus donne un code court,
+ * jamais ce qui a été reçu : les workflows qui appellent cette route tournent dans un
+ * dépôt public, et les lignes qu'ils déposent peuvent porter des chiffres réels.
  */
 adminBulletin.post('/internal/bulletin/:source', async (c) => {
   c.header('Cache-Control', 'no-store');
-  // The refusal is silent on which of the two (token or source) is wrong.
+  // Le refus ne dit pas lequel des deux (jeton ou source) est faux.
   if (!isFeedAuthorized(c.req.header('x-bulletin-token'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
@@ -103,7 +103,7 @@ adminBulletin.post('/internal/bulletin/:source', async (c) => {
   return c.json({ ok: true });
 });
 
-// ─── Proposals and answers ──────────────────────────────────────────────────
+// ─── Les propositions et les réponses ───────────────────────────────────────
 
 async function jsonBody(c: { req: { json: () => Promise<unknown> } }): Promise<unknown> {
   try {
@@ -114,8 +114,8 @@ async function jsonBody(c: { req: { json: () => Promise<unknown> } }): Promise<u
 }
 
 /**
- * A proposal of the main session: `{ title, detail?, origin? }`, plain text, shown
- * from the bulletin of the last complete week until it is answered.
+ * Une proposition de la session principale : `{ title, detail?, origin? }`, en texte
+ * brut, montrée dès le bulletin de la dernière semaine close et jusqu'à sa réponse.
  */
 adminBulletin.post('/v1/admin/bulletin/proposals', async (c) => {
   c.header('Cache-Control', 'private, no-store');
@@ -130,9 +130,9 @@ adminBulletin.post('/v1/admin/bulletin/proposals', async (c) => {
 });
 
 /**
- * An answer to a proposal SHOWN by this Monday's bulletin: `{ key, answer }`, where
- * the answer is `oui`, `plus_tard` or `non`. A key the bulletin does not show answers
- * 404: one does not answer a proposal one cannot see.
+ * Une réponse à une proposition MONTRÉE par le bulletin de ce lundi : `{ key, answer }`,
+ * la réponse valant `oui`, `plus_tard` ou `non`. Une clé que le bulletin ne montre pas
+ * répond 404 : on ne répond pas à une proposition qu'on ne voit pas.
  */
 adminBulletin.post('/v1/admin/bulletin/answers', async (c) => {
   c.header('Cache-Control', 'private, no-store');
@@ -153,20 +153,20 @@ adminBulletin.post('/v1/admin/bulletin/answers', async (c) => {
   try {
     bics = readMissingBics(week);
   } catch {
-    // Unreadable, the rule on missing BIC codes is simply not applied, as on the page.
+    // Illisible, la règle des BIC introuvables n'est simplement pas appliquée, comme sur la page.
   }
   const result = recordAnswer(key, answer, week, bics, now);
   if (!result.ok) return c.json({ error: result.error }, 404);
   return c.json(result);
 });
 
-// ─── Priority 05: the cost register ─────────────────────────────────────────
+// ─── Priorité 05 : le registre des coûts ────────────────────────────────────
 
 /**
- * A cost read from an invoice, a usage report or an estimate:
- * `{ item, from, to, amount_minor, currency, nature, note? }`, the period from `from`
- * included to `to` excluded (Swiss civil dates). The same period of the same item
- * replaces the previous entry; an overlapping period is refused (409).
+ * Un coût lu sur une facture, un relevé d'usage ou une estimation :
+ * `{ item, from, to, amount_minor, currency, nature, note? }`, la période allant de
+ * `from` inclus à `to` exclu (dates civiles suisses). La même période du même poste
+ * remplace la saisie précédente ; une période qui en chevauche une autre est refusée (409).
  */
 adminBulletin.post('/v1/admin/bulletin/costs', async (c) => {
   c.header('Cache-Control', 'private, no-store');
@@ -186,7 +186,7 @@ adminBulletin.get('/v1/admin/bulletin/costs', (c) => {
   return c.json({ costs: listCosts() });
 });
 
-/** Removes an entry made by mistake, by its id. */
+/** Retire une saisie faite par erreur, par son identifiant. */
 adminBulletin.delete('/v1/admin/bulletin/costs/:id', (c) => {
   c.header('Cache-Control', 'private, no-store');
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {

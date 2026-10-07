@@ -133,13 +133,13 @@ export interface BulletinForumThreads {
   still_new: number;
 }
 
-// ─── Step A2 and B (07.10.2026): optional blocks ─────────────────────────────
+// ─── Étapes A2 et B (07.10.2026) : des blocs facultatifs ─────────────────────
 //
-// Railway (the API) and Vercel (this site) do not go live at the same instant, and
-// the production domain is promoted by hand: this page must render an API that does
-// not send these blocks yet. Each one is OPTIONAL here; a missing or malformed one
-// is simply left out (the API's own `not_yet` list then says it is not there yet),
-// never the whole page.
+// Railway (l'API) et Vercel (ce site) ne passent pas en ligne au même instant, et le
+// domaine de production est promu à la main : cette page doit rendre une API qui
+// n'envoie pas encore ces blocs. Chacun est FACULTATIF ici ; un bloc absent ou mal
+// formé est simplement laissé de côté (la liste `not_yet` de l'API dit alors qu'il
+// n'est pas encore là), jamais toute la page.
 
 export type Answer = 'oui' | 'plus_tard' | 'non';
 export const ANSWERS: readonly Answer[] = ['oui', 'plus_tard', 'non'];
@@ -214,7 +214,7 @@ export interface BulletinAlertHistory {
   }>;
 }
 
-// Priority 05: money received minus costs.
+// Priorité 05 : encaissé moins coûts.
 
 export type MinorByCurrency = Record<string, number>;
 
@@ -277,13 +277,13 @@ export interface BulletinPayload {
   };
   requested: { week: string | null };
   numbers: BulletinNumbers | Unread;
-  /** Step A2; absent from an API that predates it. */
+  /** Étape A2 ; absent d'une API qui la précède. */
   decisions?: BulletinDecisions | Unread;
   moved: {
     merged_pulls: MergedPullsRead;
     heartbeats: BulletinHeartbeats | Unread;
     alerts: BulletinAlerts | Unread;
-    /** Step A2; absent from an API that predates it. */
+    /** Étape A2 ; absent d'une API qui la précède. */
     alert_history?: BulletinAlertHistory | Unread;
     sources: BulletinSources | Unread;
   };
@@ -291,9 +291,9 @@ export interface BulletinPayload {
     missing_bics: BulletinMissingBics | Unread;
     forum_threads: BulletinForumThreads | Unread;
   };
-  /** Step B; absent from an API that predates it. */
+  /** Étape B ; absent d'une API qui la précède. */
   veille?: BulletinFeed | Unread;
-  /** Priority 05; absent from an API that predates it. */
+  /** Priorité 05 ; absent d'une API qui la précède. */
   money?: BulletinMoney | Unread;
   not_yet: Array<{ key: string; title: string; reason: string }>;
   definitions: Record<string, string>;
@@ -372,7 +372,7 @@ export function readBulletin(payload: unknown): BulletinPayload | null {
   } as unknown as BulletinPayload;
 }
 
-/** An optional block: kept when it has its shape (or says `unread`), dropped otherwise. */
+/** Un bloc facultatif : gardé s'il a sa forme (ou dit `unread`), écarté sinon. */
 function optionalBlock(value: unknown, isRead: (v: Obj) => boolean): unknown {
   if (!isBlock(value)) return undefined;
   const v = value as Obj;
@@ -384,7 +384,7 @@ const isStr = (v: unknown): v is string => typeof v === 'string';
 const isNat = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 const isStrOrNull = (v: unknown): boolean => v === null || isStr(v);
 
-/** The keys the answer form may send: the API's three shapes, nothing else. */
+/** Les clés que le formulaire de réponse peut envoyer : les trois formes de l'API, rien d'autre. */
 export const PROPOSAL_KEY = /^(session:\d{1,9}|regle:bic-introuvable:[A-Z]{2}|regle:veille-sans-oui:[a-z-]{1,40})$/;
 
 function isAnswerView(v: unknown): boolean {
@@ -667,7 +667,7 @@ export function staleReasonText(reason: SourceView['stale_reason']): string {
   return reason ? STALE_REASON[reason] : 'à jour';
 }
 
-// ─── Step A2 and B, in words ─────────────────────────────────────────────────
+// ─── Étapes A2 et B, en mots ─────────────────────────────────────────────────
 
 const ANSWER_WORDS: Record<Answer, string> = { oui: 'Oui', plus_tard: 'Plus tard', non: 'Non' };
 
@@ -675,29 +675,31 @@ export function answerWord(a: Answer): string {
   return ANSWER_WORDS[a];
 }
 
-/** A duration given in hours, in words. */
+/** Une durée donnée en heures, en mots. */
 export function durationText(hours: number): string {
   if (hours < 1) return 'moins d’une heure';
   if (hours < 48) return `${fmt(Math.round(hours))} h`;
   return `${fmt(Math.floor(hours / 24))} j`;
 }
 
-/** The AI score, said with its denominator, and partial when queries failed. */
+/** Le score des IA, dit avec son dénominateur, et partiel quand des requêtes ont échoué. */
 export function scoreText(score: FeedScore): string {
-  const base = `${fmt(score.value)} sur ${fmt(score.out_of)} ${score.out_of <= 1 ? 'requête' : 'requêtes'}`;
+  const base =
+    `${fmt(score.value)} ${score.out_of <= 1 ? 'requête' : 'requêtes'} de référence sur ${fmt(score.out_of)} ` +
+    'où une recherche web fait apparaître IBANforge.';
   return score.errors > 0
-    ? `${base}, score partiel : ${count(score.errors, 'requête en erreur', 'requêtes en erreur')}`
+    ? `${base} Score partiel : ${count(score.errors, 'requête en erreur', 'requêtes en erreur')}.`
     : base;
 }
 
-// ─── Priority 05, in words ──────────────────────────────────────────────────
+// ─── Priorité 05, en mots ────────────────────────────────────────────────────
 
-/** Stripe's zero-decimal currencies: their minor unit is the unit. */
+/** Les devises sans décimales de Stripe : leur unité mineure est l'unité. */
 const ZERO_DECIMAL = new Set([
   'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
 ]);
 
-/** `12,50 USD`, `−3,00 CHF`: minor units, said in the unit, the French way, without Intl. */
+/** `12,50 USD`, `−3,00 CHF` : des unités mineures, dites dans l'unité, à la française, sans Intl. */
 export function money(minor: number, currency: string, signed = false): string {
   const zero = ZERO_DECIMAL.has(currency);
   const value = zero ? minor : minor / 100;
@@ -706,7 +708,7 @@ export function money(minor: number, currency: string, signed = false): string {
   return `${sign}${body} ${currency.toUpperCase()}`;
 }
 
-/** Every currency of a map, in alphabetical order, joined; `—` when empty. */
+/** Chaque devise d'une table, par ordre alphabétique, réunies ; `—` quand elle est vide. */
 export function moneyList(map: MinorByCurrency, signed = false): string {
   const entries = Object.entries(map).filter(([, v]) => v !== 0);
   if (entries.length === 0) return signed ? '0' : '—';
@@ -716,7 +718,7 @@ export function moneyList(map: MinorByCurrency, signed = false): string {
     .join(' · ');
 }
 
-/** `Septembre 2026` or `Octobre 2026, du 1er au 4`. */
+/** `Septembre 2026` ou `Octobre 2026, du 1er au 4`. */
 export function periodTitle(p: { month: string; from: string; to: string; complete: boolean }): string {
   const y = Number(p.month.slice(0, 4));
   const m = Number(p.month.slice(5, 7));

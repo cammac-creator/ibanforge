@@ -577,7 +577,9 @@ describe('les blocs des étapes A2 et B', () => {
       score: { value: 2, out_of: 7, errors: 1 },
     };
     const s = render(scored);
-    expect(s).toContain('2 sur 7 requêtes, score partiel : 1 requête en erreur');
+    expect(s).toContain(
+      '2 requêtes de référence sur 7 où une recherche web fait apparaître IBANforge. Score partiel : 1 requête en erreur.',
+    );
   });
 
   it('une semaine passée montre les réponses données ce lundi-là, sans boutons', () => {

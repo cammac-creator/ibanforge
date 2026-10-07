@@ -37,6 +37,7 @@ function form(fields: Record<string, string>, origin?: string): NextRequest {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
+      Host: 'site.test',
       ...(origin ? { Origin: origin } : {}),
     },
     body,
@@ -63,7 +64,7 @@ describe('POST /api/dashboard/bulletin-answer', () => {
     );
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe(
-      'http://site.test/fr/dashboard/bulletin?reponse=ok#decisions',
+      '/fr/dashboard/bulletin?reponse=ok#decisions',
     );
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
@@ -83,7 +84,7 @@ describe('POST /api/dashboard/bulletin-answer', () => {
     const res = await POST(form({ key: 'session:3', answer: 'non', locale: 'de' }));
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe(
-      'http://site.test/de/dashboard/bulletin?reponse=echec#decisions',
+      '/de/dashboard/bulletin?reponse=echec#decisions',
     );
   });
 
@@ -115,11 +116,16 @@ describe('POST /api/dashboard/bulletin-answer', () => {
       form({ key: 'session:1', answer: 'oui', locale: 'fr' }, 'https://alpha.example.net'),
     );
     expect(foreign.status).toBe(403);
+    // Même nom, autre port : une autre origine.
+    const port = await POST(
+      form({ key: 'session:1', answer: 'oui', locale: 'fr' }, 'http://site.test:8080'),
+    );
+    expect(port.status).toBe(403);
     expect(fetch).not.toHaveBeenCalled();
     // Une langue inconnue retombe sur la langue par défaut, à la racine du site.
     const res = await POST(form({ key: 'session:1', answer: 'oui', locale: '//alpha.example.net' }));
     expect(res.headers.get('location')).toBe(
-      'http://site.test/dashboard/bulletin?reponse=ok#decisions',
+      '/dashboard/bulletin?reponse=ok#decisions',
     );
   });
 });

@@ -78,7 +78,7 @@ export interface RecoResult {
   error?: string;
 }
 
-/** Le dépôt de la mesure des IA : le score, et en trois lignes où l'on apparaît ou non. */
+/** Le dépôt de la mesure des IA : le score (erreurs comprises), et où l'on apparaît ou non. */
 export function recoPayload(results: RecoResult[]): DepositPayload {
   const errors = results.filter((r) => r.error).length;
   const present = results.filter((r) => !r.error && r.present).map((r) => r.query);
@@ -89,11 +89,8 @@ export function recoPayload(results: RecoResult[]): DepositPayload {
       : 'Présent sur aucune des requêtes de référence lues.',
   ];
   if (absent.length > 0) lines.push(toLine(`Absent de : ${absent.join(' ; ')}`));
-  if (errors > 0) {
-    lines.push(
-      `${errors} ${errors > 1 ? 'requêtes en erreur' : 'requête en erreur'} : score partiel.`,
-    );
-  }
+  // Les requêtes en erreur sont portées par le score (`errors`) : la page en tire
+  // « score partiel », une troisième ligne ne ferait que le répéter.
   return {
     lines: lines.slice(0, MAX_LINES),
     score: { value: present.length, out_of: results.length, errors },

@@ -34,7 +34,7 @@ import {
   type Tone,
 } from '@/lib/dashboard/bulletin';
 
-/** Where the answer buttons post: the site's own route, which keeps the admin secret. */
+/** Où postent les boutons de réponse : la route du site, qui garde le secret d'administration. */
 export const ANSWER_ROUTE = '/api/dashboard/bulletin-answer';
 
 /**
@@ -403,7 +403,7 @@ function groupTitle(g: { name: string; label: string | null; cases: number }): s
   return g.cases > 1 ? `${title} (${g.cases} fois)` : title;
 }
 
-/** The week's alert history (step A2): opened and closed DURING the week, never "overlapping". */
+/** L'historique des alertes (étape A2) : ouvertes et refermées PENDANT la semaine, jamais « à cheval ». */
 function AlertHistoryLine({ history }: { history: BulletinAlertHistory | { state: 'unread'; reason: string } }) {
   if (history.state !== 'read') {
     return <Line tone="neutral">Historique des alertes : non lu, {unreadText(history.reason)}.</Line>;
@@ -456,9 +456,9 @@ const ANSWER_BUTTON: Record<'chosen' | 'idle', string> = {
 };
 
 /**
- * A plain HTML form per proposal: no JavaScript in the browser (WebKit renders it as
- * is), the site route checks the session, forwards to the API with the secret and
- * comes back here with a 303.
+ * Un simple formulaire HTML par proposition : aucun JavaScript dans le navigateur
+ * (WebKit le rend tel quel) ; la route du site vérifie la session, transmet à l'API
+ * avec le secret et revient ici par un 303.
  */
 function AnswerForm({ p, locale }: { p: ProposalView; locale: string }) {
   return (
@@ -617,7 +617,7 @@ function CostRow({ line }: { line: MoneyPeriod['costs'][number] }) {
       </>
     );
   }
-  // A punctual cost nobody entered is not counted, and does not cap the result.
+  // Un coût ponctuel que personne n'a saisi n'est pas compté, et ne plafonne pas le résultat.
   if (!line.blocking && line.reason === 'non_saisi') return null;
   return (
     <>
@@ -672,7 +672,7 @@ function Veille({ data }: { data: BulletinPayload }) {
                     <span className="text-[14px] text-[var(--fg-4)]"> / {fmt(s.score.out_of)}</span>
                   </p>
                 )}
-                {s.score && <Small>{scoreText(s.score)} où une recherche web fait apparaître IBANforge.</Small>}
+                {s.score && <Small>{scoreText(s.score)}</Small>}
                 <ul className="mt-1 space-y-1">
                   {s.lines.map((line, i) => (
                     <li key={i} className="text-[13px] leading-snug text-[var(--fg-2)]">
@@ -719,7 +719,7 @@ function weekNumber(label: string): string {
   return label.slice(-2).replace(/^0/, '');
 }
 
-/** What the answer route said, read back from the address after its 303. */
+/** Ce que la route des réponses a dit, relu dans l'adresse après son 303. */
 export type AnswerNotice = 'ok' | 'echec' | null;
 
 export function BulletinView({
