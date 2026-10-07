@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   NUDGE_MAX_PER_PASS,
+  STOP_MAILTO,
   buildFounderDraft,
   draftId,
   isExcludedFromOutreach,
+  isStopRequest,
   neverCalled,
   selectNudgeCandidates,
   type NudgeCandidateRow,
@@ -196,4 +198,56 @@ describe('the founder draft', () => {
     expect(/[—–]/.test(subject)).toBe(false);
     expect(/[—–]/.test(body)).toBe(false);
   });
+
+  it('carries the link the key dialog promises, and that link is recognised as a STOP', () => {
+    // The dialog says "at most one note from the founder, with a link to
+    // receive nothing more" (decision of 05/10/2026): the link must be a real
+    // one, alone on its line so every mail client makes it clickable, and the
+    // mail it opens must be read as a STOP by the guard of the daily pass.
+    const { body } = buildFounderDraft();
+    expect(STOP_MAILTO).toBe('mailto:support@ibanforge.com?subject=STOP');
+    expect(body.split('\n')).toContain(STOP_MAILTO);
+    expect(body).toContain('Reply STOP');
+    const subject = new URL(STOP_MAILTO).searchParams.get('subject');
+    expect(isStopRequest(subject, '')).toBe(true);
+  });
+
+  it('keeps the line the mail server rewrites, word for word', () => {
+    // ibf_regles.texte_note_fondateur on the server swaps "yesterday" for the
+    // real day of the signup; it looks for this exact line.
+    expect(buildFounderDraft().body).toContain('You created an API key yesterday,\n');
+  });
+});
+
+describe('a STOP', () => {
+  it.each([
+    ['STOP', ''],
+    ['stop', null],
+    ['Re: STOP', 'Sent from my phone'],
+    ['AW: Re: Stop!', ''],
+    ['[EXT] RE: stop.', ''],
+    ['Unsubscribe', ''],
+    ['Re: Two questions about your IBANforge key', 'STOP\n\nOn Tue, the founder wrote:\n> Hello,'],
+    ['Re: Two questions about your IBANforge key', '\n\n  Stop.  \n> quoted'],
+    ['Re: Two questions about your IBANforge key', 'unsubscribe'],
+    [null, '"STOP"'],
+  ])('is read in %j / %j', (subject, body) => {
+    expect(isStopRequest(subject, body)).toBe(true);
+  });
+
+  it.each([
+    ['Stop by next week?', ''],
+    ['STOP sending the invoice twice', ''],
+    ['Re: Two questions about your IBANforge key', 'Thanks! Stop me if this is the wrong address.'],
+    ['Re: Two questions about your IBANforge key', 'We use it for supplier payments.\nSTOP'],
+    ['Re: non-stop payments', 'nonstop'],
+    ['Stopped working?', 'stopped'],
+    ['', ''],
+    [null, null],
+  ])(
+    'is not read in %j / %j: a sentence about something else is a person talking',
+    (subject, body) => {
+      expect(isStopRequest(subject, body)).toBe(false);
+    },
+  );
 });
