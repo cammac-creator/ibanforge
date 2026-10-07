@@ -67,7 +67,6 @@
     "contents": "In this issue",
     "integrations": {
       "heading": "In your language, your ERP, your spreadsheet",
-      "sub": "Every package below exists and installs today. What is not published yet says so.",
       "items": {
         "ts": "TypeScript / JavaScript SDK",
         "py": "Python SDK",
@@ -78,17 +77,7 @@
         "odoo": "Odoo 18 module · custom modules required",
         "sheets": "Google Sheets add-on · manual install",
         "postman": "Postman collection"
-      },
-      "pause": "Pause the list",
-      "play": "Play the list"
-    },
-    "reviewed": {
-      "label": "Independently reviewed",
-      "quote": "The most artifact-complete submission the inbox has had.",
-      "context": "Kin Lane rebuilt IBANforge's API Evangelist profile from fetched artifacts in August 2026 — and found our x402 support to be the first across the 3,767 MCP servers in his catalog.",
-      "linkReview": "Read the public review",
-      "linkStory": "The full story",
-      "quoteTranslation": ""
+      }
     },
     "hero": {
       "demo": {
@@ -112,21 +101,13 @@
       "alt": "Not a developer? Check a supplier file without writing code"
     },
     "demo": {
-      "aria": "Three answers the API really gave, played one after another",
-      "request": "POST /v1/iban/validate",
       "caption": "Answers recorded from the live API on 26 September 2026.",
       "pause": "Pause the demo",
       "play": "Resume the demo",
-      "scenarios": "Examples",
-      "ibanLabel": "IBAN",
-      "format": "Format and check digits",
-      "register": "Bank code in the national register",
-      "bank": "Bank and BIC",
       "valid": "Valid",
       "checksum": "The check digits do not match",
       "confirmed": "Code {code} confirmed",
       "notAllocated": "Code {code} not allocated",
-      "registerName": "Deutsche Bundesbank register",
       "noBank": "No bank holds this code",
       "skipped": "Not read",
       "tab0": "A real bank",
@@ -171,7 +152,6 @@
       "lead": "The mod-97 check only proves that the digits add up. An IBAN can pass it with a bank code no bank holds, or one retired after a merger.",
       "readTitle": "The same IBAN, read part by part",
       "readLead": "IBANforge reads each part of the IBAN and tells you which checks it could make.",
-      "anatomyCaption": "The same IBAN, read part by part.",
       "country": "Country",
       "countryWhat": "Length and structure, {countries} countries",
       "check": "Check digits",
@@ -197,8 +177,6 @@
       ]
     },
     "audiences": {
-      "eyebrow": "Built for your workflow",
-      "title": "For developers, finance teams and AI agents",
       "lead": "The same answer, wherever you need it.",
       "devTitle": "Developers",
       "devText": "One REST call, or an SDK in TypeScript, Python, Java or .NET. The answer is JSON, with a documented next step.",
@@ -229,13 +207,6 @@
       "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "median server processing",
       "fact0Title": "Operated from Switzerland, API hosted in the EU",
-      "fact0Text": "IBANforge is run from Switzerland; the API itself runs in a European Union region.",
-      "fact1Title": "Validation stores no IBAN",
-      "fact1Text": "An IBAN you check is validated in memory, never written to storage. The file audit keeps its report 2 hours unpaid, 24 hours after payment. Telemetry is erased 30 days after you leave (DPA clause 4.7).",
-      "fact2Title": "Sanctions at bank level",
-      "fact2Text": "The bank behind the IBAN is screened against the OFAC, EU, UN lists (BIC8). The account holder never is.",
-      "fact3Title": "Honest about its limits",
-      "fact3Text": "It does not check who holds the account: that name check belongs to the payee’s bank, through Verification of Payee.",
       "sources": "Sources: the national registers, SIX BankMaster, GLEIF, EBA STEP2, NBP and Bank of England (List of Banks, 2026-09), re-read at least every month, plus a public copy of the SWIFT directory frozen in January 2018 that still makes up about two thirds of the BIC directory.",
       "sourcesDated": "Last refresh {date}.",
       "sourcesLink": "Every source and its licence"
@@ -255,7 +226,7 @@
       "proName": "Pro",
       "proPrice": "$29",
       "proUnit": "/ month",
-      "proText": "10,000 requests a month on the same key. Cancel at any time: the key stays.",
+      "proText": "{requests} requests a month on the same key. Cancel at any time: the key stays.",
       "proCta": "See Pro",
       "packsName": "Credit packs",
       "packsPrice": "from $4",
@@ -290,13 +261,6 @@
       "hero": {
         "eyebrow": "Try it now",
         "title": "Run a real check, no sign-up",
-        "promise": "Type an IBAN or pick an example: the lens sends it to the live API and splits the answer into format, bank and BIC.",
-        "auditLink": "Check a supplier file",
-        "observe": "See the lens in 3D",
-        "sceneAlt": "A copper-rimmed glass lens transforms incoming light into three outgoing rays.",
-        "signature": "A lens for your data",
-        "inputEyebrow": "YOUR IBAN",
-        "inputTitle": "A number to illuminate.",
         "inputLabel": "IBAN to check",
         "submit": "Reveal the data",
         "loading": "Checking…",
@@ -305,85 +269,35 @@
         "germany": "Germany",
         "errorExample": "An error",
         "inputNote": "No sign-up required. The IBAN is sent to the service when you run a check.",
-        "results": "Revealed data",
         "format": "IBAN format",
         "bank": "Bank",
         "waitFormat": "Ready to check",
         "waitBank": "Ready to identify",
         "waitBic": "Ready to look up",
-        "formatHint": "The structure check",
-        "bankHint": "Depending on the country and available sources",
-        "bicHint": "The response includes its provenance",
-        "initial": "Run a check: the rays lead to the resulting data.",
         "edited": "Input changed. Run the check again to reveal its data.",
         "unavailable": "The service is temporarily unavailable. Please try again shortly.",
         "rateLimited": "Too many checks in a short time. Please try again in a few minutes.",
-        "caption": "One incoming stream. Three distinct pieces of information.",
-        "pause": "Pause",
-        "animate": "Animate",
-        "fixed": "Still image",
-        "showJson": "Show JSON",
-        "hideJson": "Hide JSON",
-        "copy": "Copy result",
-        "copied": "Result copied.",
-        "selectCopy": "The text is selected. Use the Copy command.",
-        "scope": "Enrichment depends on available sources.",
         "playgroundLink": "Open the full playground",
-        "noJs": "JavaScript is required for the checker and 3D view. Illustrations and links remain available.",
-        "detailTitle": "Glass, metal and light.",
-        "detailCaption": "Curved glass · brushed metal · studio reflections",
-        "detailUnavailable": "The close-up view is not available in this browser.",
-        "close": "Close",
-        "view3d": "View in 3D",
+        "noJs": "This check calls the API from your browser and needs JavaScript. Without it, a real answer from the API can be read here:",
         "unallocated": "No such bank code"
       },
       "gallery": {
         "eyebrow": "Three ways to use it",
         "title": "One IBAN, a whole file, or inside your tools",
-        "intro": "Check a single IBAN in a form, audit every line of a supplier file before a payment run, or call the API from your own software and agents.",
         "items": [
           {
-            "eyebrow": "01 · One IBAN",
-            "title": "Check a number in seconds",
-            "text": "Type an IBAN or call POST /v1/iban/validate: format, bank, BIC and the register verdict come back together, each with its source.",
-            "tags": [
-              "Format",
-              "Bank",
-              "BIC"
-            ],
-            "link": "Try it below",
-            "alt": "Light passes through a metal-rimmed lens and illuminates three separate data panels."
+            "eyebrow": "01 · One IBAN"
           },
           {
-            "eyebrow": "02 · A whole file",
-            "title": "Audit a supplier file",
-            "text": "Upload a CSV or Excel file: the free preview counts what needs fixing and shows the first flagged lines. The annotated workbook gives every line its status before the next payment run.",
-            "tags": [
-              "CSV",
-              "Excel",
-              "Report"
-            ],
-            "link": "Check a supplier file",
-            "alt": "Spreadsheet pages cross the light of a lens and become an organized file."
+            "eyebrow": "02 · A whole file"
           },
           {
-            "eyebrow": "03 · Your tools",
-            "title": "Plug it into your software",
-            "text": "SDKs for TypeScript, Python, Java and .NET, a Google Sheets function, and an MCP server for AI agents.",
-            "tags": [
-              "API",
-              "SDK",
-              "MCP"
-            ],
-            "link": "Read the documentation",
-            "alt": "Rays leaving the lens reach three modules representing an API, an automation and a table."
+            "eyebrow": "03 · Your tools"
           }
         ]
       }
     },
     "deadline": {
-      "heading": "Mid-November 2026: Switzerland stops processing unstructured addresses",
-      "band": "From mid-November 2026, payment orders under the Swiss Payment Standards must meet the address requirements when an address is used; SIX publishes 14 November. POST /v1/address/check says for free whether an address passes.",
       "cta": "Read the rules, rail by rail",
       "check": "POST /v1/address/check says for free whether an address passes.",
       "window": "mid-November 2026",
@@ -934,23 +848,32 @@
           },
           "names": {
             "nav_key": "Header → Your key",
-            "nav_status": "Badge → Status",
-            "cta_try": "Fold → Try a request",
-            "cta_key": "Fold → Get a key",
-            "cta_audit_fold": "Fold → Audit a file",
-            "cta_rules": "Deadline → Read the rules",
-            "cta_audit_deadline": "Deadline → Audit a file",
-            "cta_audit": "Audit section → Audit",
-            "cta_playground_film": "Film → Try it live",
-            "cta_pricing": "Page end → Pricing",
+            "cta_key_hero": "Cover → Get a key",
+            "cta_try_hero": "Cover → Try it",
+            "cta_journey_audit": "Cover → Check a supplier file",
+            "cta_journey_api": "03 Try it → Check sent",
+            "cta_docs": "04 Three ways → Documentation",
+            "cta_audit": "04 Three ways → File audit",
+            "cta_agents": "04 Three ways → Agents",
+            "cta_try_pricing": "06 Pricing → Try without a key",
+            "cta_key_pricing": "06 Pricing → Get a key",
+            "cta_pricing_pro": "06 Pricing → Pro",
+            "cta_pricing_packs": "06 Pricing → Packs",
+            "cta_audit_pricing": "06 Pricing → File audit",
+            "cta_pricing": "06 Pricing → All prices",
+            "cta_rules": "06 Deadline → Read the rules",
             "cta_key_final": "Page end → Get a key",
-            "cta_docs": "Page end → Documentation",
+            "cta_docs_final": "Page end → Documentation",
             "cta_key_account": "Your key page → Get a key",
             "cta_key_tool": "Free tools → Get a key",
-            "cta_journey_api": "API journey",
-            "cta_journey_audit": "Journey → Check a supplier file",
             "cta_vendor_try": "Software vendors → Try the API",
-            "cta_vendor_docs": "Software vendors → Integration guides"
+            "cta_vendor_docs": "Software vendors → Integration guides",
+            "nav_status": "Old home: badge → Status",
+            "cta_try": "Old home: fold → Try a request",
+            "cta_key": "Old home: fold → Get a key",
+            "cta_audit_fold": "Old home: fold → Audit a file",
+            "cta_audit_deadline": "Old home: deadline → Audit a file",
+            "cta_playground_film": "Old home: film → Try it live"
           }
         }
       },
@@ -1604,24 +1527,33 @@
       "detailsTitle": "All supplementary readings",
       "detailsNote": "Traffic history, active accounts, signups, entry points, file audits and feedback. Each card keeps its window and unit.",
       "actionNames": {
-        "nav_key": "Header → Your key",
-        "nav_status": "Badge → Status",
-        "cta_try": "Try a request · top of page",
-        "cta_key": "Get a key · top of page",
-        "cta_audit_fold": "Audit a file · top of page",
-        "cta_rules": "Read the rules · Deadline",
-        "cta_audit_deadline": "Audit a file · Deadline",
-        "cta_audit": "Audit · Audit section",
-        "cta_playground_film": "Try it live · Film",
-        "cta_pricing": "Pricing · Page end",
+        "nav_key": "Your key · Header",
+        "cta_key_hero": "Get a key · Cover",
+        "cta_try_hero": "Try it · Cover",
+        "cta_journey_audit": "Check a supplier file · Cover",
+        "cta_journey_api": "Check sent · 03 Try it",
+        "cta_docs": "Documentation · 04 Three ways",
+        "cta_audit": "File audit · 04 Three ways",
+        "cta_agents": "Agents · 04 Three ways",
+        "cta_try_pricing": "Try without a key · 06 Pricing",
+        "cta_key_pricing": "Get a key · 06 Pricing",
+        "cta_pricing_pro": "Pro · 06 Pricing",
+        "cta_pricing_packs": "Packs · 06 Pricing",
+        "cta_audit_pricing": "File audit · 06 Pricing",
+        "cta_pricing": "All prices · 06 Pricing",
+        "cta_rules": "Read the rules · 06 Deadline",
         "cta_key_final": "Get a key · Page end",
-        "cta_docs": "Documentation · Page end",
+        "cta_docs_final": "Documentation · Page end",
         "cta_key_account": "Get a key · Your key page",
         "cta_key_tool": "Get a key · Free tools",
-        "cta_journey_api": "API journey",
-        "cta_journey_audit": "Check a supplier file · Journey",
         "cta_vendor_try": "Try the API · Software vendors",
-        "cta_vendor_docs": "Integration guides · Software vendors"
+        "cta_vendor_docs": "Integration guides · Software vendors",
+        "nav_status": "Status · Old home: badge",
+        "cta_try": "Try a request · Old home: fold",
+        "cta_key": "Get a key · Old home: fold",
+        "cta_audit_fold": "Audit a file · Old home: fold",
+        "cta_audit_deadline": "Audit a file · Old home: deadline",
+        "cta_playground_film": "Try it live · Old home: film"
       }
     }
   },
@@ -2696,8 +2628,8 @@
     },
     "prices": {
       "title": "Displayed price, no quote",
-      "standard": "up to 5,000 rows",
-      "large": "5,001 to 20,000 rows",
+      "standard": "up to {rows} rows",
+      "large": "{from} to {rows} rows",
       "note": "One file, one payment by card on Stripe. The annotated workbook (.xlsx) and the summary are ready right after payment and stay downloadable for 24 hours."
     },
     "deadline": {

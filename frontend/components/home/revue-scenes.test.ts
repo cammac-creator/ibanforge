@@ -105,6 +105,18 @@ describe("chapter 03, a real check", () => {
     expect(html).not.toContain("rv-essai__verdict")
     expect(html).toContain('data-evt="cta:journey-api"')
   })
+
+  it.each(["en", "fr", "de"] as const)("says why its buttons wait when JavaScript is off (%s)", (locale) => {
+    const lens = messages[locale].home.lens.hero
+    const copy = essaiCopy(lens, messages[locale].home.demo, messages[locale].playground.verdict)
+    const html = renderToStaticMarkup(createElement(RevueEssai, { copy, playgroundHref: "/playground" }))
+    // Disabled until the script answers them: without JavaScript they never
+    // would, so the page says so and points at an answer any browser can read.
+    const noscript = /<noscript>([\s\S]*?)<\/noscript>/.exec(html)?.[1] ?? ""
+    expect(text(noscript)).toContain(lens.noJs)
+    expect(noscript).toContain('href="https://api.ibanforge.com/v1/demo"')
+    expect(lens.noJs).not.toMatch(/3D|lens|lentille|Linse/i)
+  })
 })
 
 describe("the small pieces of the home", () => {

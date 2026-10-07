@@ -17,19 +17,28 @@ import { overviewCard } from './section';
  * in driven browsers; those and Lighthouse have been silent since 2026-09-06,
  * and the rows of that day were removed.
  */
+// The doors of the home page in the order a visitor meets them (the issue of
+// 28/09/2026, `data-landing="home-v4"`), then the other pages. The doors of the
+// previous home are no longer listed: their rows still show, labelled, while
+// they remain in the 30-day window.
 const DOOR_ORDER = [
   'nav:key',
-  'nav:status',
-  'cta:try',
-  'cta:key',
-  'cta:audit-fold',
-  'cta:rules',
-  'cta:audit-deadline',
-  'cta:audit',
-  'cta:playground-film',
-  'cta:pricing',
-  'cta:key-final',
+  'cta:key-hero',
+  'cta:try-hero',
+  'cta:journey-audit',
+  'cta:journey-api',
   'cta:docs',
+  'cta:audit',
+  'cta:agents',
+  'cta:try-pricing',
+  'cta:key-pricing',
+  'cta:pricing-pro',
+  'cta:pricing-packs',
+  'cta:audit-pricing',
+  'cta:pricing',
+  'cta:rules',
+  'cta:key-final',
+  'cta:docs-final',
   'cta:key-account',
   'cta:key-tool',
 ];

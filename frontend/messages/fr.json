@@ -67,7 +67,6 @@
     "contents": "Au sommaire",
     "integrations": {
       "heading": "Dans votre langage, votre ERP, votre tableur",
-      "sub": "Chaque paquet ci-dessous existe et s’installe aujourd’hui. Ce qui n’est pas encore publié le dit.",
       "items": {
         "ts": "SDK TypeScript / JavaScript",
         "py": "SDK Python",
@@ -78,17 +77,7 @@
         "odoo": "Module Odoo 18 · modules personnalisés requis",
         "sheets": "Complément Google Sheets · installation manuelle",
         "postman": "Collection Postman"
-      },
-      "pause": "Mettre la liste en pause",
-      "play": "Relancer la liste"
-    },
-    "reviewed": {
-      "label": "Relu indépendamment",
-      "quote": "The most artifact-complete submission the inbox has had.",
-      "context": "Kin Lane a reconstruit la fiche API Evangelist d'IBANforge à partir des artefacts consultés, en août 2026 — et notre x402 s'est révélé le premier parmi les 3 767 serveurs MCP de son catalogue.",
-      "linkReview": "Lire la revue publique",
-      "linkStory": "L'histoire complète",
-      "quoteTranslation": "« La candidature la plus complète en artefacts que la boîte de réception ait reçue. »"
+      }
     },
     "hero": {
       "demo": {
@@ -112,21 +101,13 @@
       "alt": "Pas développeur ? Vérifiez un fichier fournisseurs sans écrire de code"
     },
     "demo": {
-      "aria": "Trois réponses réellement données par l’API, jouées l’une après l’autre",
-      "request": "POST /v1/iban/validate",
       "caption": "Réponses enregistrées sur l’API en ligne le 26 septembre 2026.",
       "pause": "Mettre la démonstration en pause",
       "play": "Reprendre la démonstration",
-      "scenarios": "Exemples",
-      "ibanLabel": "IBAN",
-      "format": "Format et chiffres de contrôle",
-      "register": "Code banque dans le registre national",
-      "bank": "Banque et BIC",
       "valid": "Valide",
       "checksum": "Les chiffres de contrôle ne correspondent pas",
       "confirmed": "Code {code} confirmé",
       "notAllocated": "Code {code} non attribué",
-      "registerName": "Registre de la Deutsche Bundesbank",
       "noBank": "Aucune banque ne détient ce code",
       "skipped": "Non lu",
       "tab0": "Une vraie banque",
@@ -171,7 +152,6 @@
       "lead": "Le contrôle mod-97 prouve seulement que les chiffres s’additionnent. Un IBAN peut le réussir avec un code banque qu’aucune banque ne détient, ou retiré après une fusion.",
       "readTitle": "Le même IBAN, lu partie par partie",
       "readLead": "IBANforge lit chaque partie de l’IBAN et dit quels contrôles il a pu faire.",
-      "anatomyCaption": "Le même IBAN, lu partie par partie.",
       "country": "Pays",
       "countryWhat": "Longueur et structure, {countries} pays",
       "check": "Chiffres de contrôle",
@@ -197,8 +177,6 @@
       ]
     },
     "audiences": {
-      "eyebrow": "Pour votre façon de travailler",
-      "title": "Développeurs, équipes finance et agents IA",
       "lead": "La même réponse, là où vous en avez besoin.",
       "devTitle": "Développeurs",
       "devText": "Un appel REST, ou un SDK TypeScript, Python, Java ou .NET. La réponse est un JSON, avec une étape suivante documentée.",
@@ -229,13 +207,6 @@
       "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "traitement médian côté serveur",
       "fact0Title": "Exploité depuis la Suisse, API hébergée dans l’UE",
-      "fact0Text": "IBANforge est exploité depuis la Suisse ; l’API elle-même tourne dans une région de l’Union européenne.",
-      "fact1Title": "La validation ne stocke aucun IBAN",
-      "fact1Text": "Un IBAN contrôlé est validé en mémoire, jamais écrit. L’audit de fichier garde son rapport 2 heures sans paiement, 24 heures après paiement. La télémétrie est effacée 30 jours après votre départ (clause 4.7 du DPA).",
-      "fact2Title": "Sanctions au niveau de la banque",
-      "fact2Text": "La banque derrière l’IBAN est contrôlée sur les listes OFAC, EU, UN (BIC8). Le titulaire du compte ne l’est jamais.",
-      "fact3Title": "Franc sur ses limites",
-      "fact3Text": "Il ne vérifie pas qui détient le compte : ce contrôle du nom revient à la banque du bénéficiaire, par la vérification du bénéficiaire (VoP).",
       "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP et Bank of England (List of Banks, 2026-09), relus au moins chaque mois, plus une copie publique de l’annuaire SWIFT figée en janvier 2018, qui fait encore environ deux tiers de l’annuaire BIC.",
       "sourcesDated": "Dernière mise à jour le {date}.",
       "sourcesLink": "Chaque source et sa licence"
@@ -255,7 +226,7 @@
       "proName": "Pro",
       "proPrice": "29 $",
       "proUnit": "/ mois",
-      "proText": "10 000 requêtes par mois sur la même clé. Résiliable à tout moment : la clé reste.",
+      "proText": "{requests} requêtes par mois sur la même clé. Résiliable à tout moment : la clé reste.",
       "proCta": "Voir Pro",
       "packsName": "Packs de crédits",
       "packsPrice": "dès 4 $",
@@ -290,13 +261,6 @@
       "hero": {
         "eyebrow": "Essayez maintenant",
         "title": "Un vrai contrôle, sans inscription",
-        "promise": "Saisissez un IBAN ou choisissez un exemple : la lentille l’envoie à l’API en ligne et sépare la réponse en format, banque et BIC.",
-        "auditLink": "Vérifier un fichier fournisseurs",
-        "observe": "Voir la lentille en 3D",
-        "sceneAlt": "Une lentille de verre cerclée de cuivre transforme le flux entrant en trois rayons sortants.",
-        "signature": "La lentille de vos données",
-        "inputEyebrow": "VOTRE IBAN",
-        "inputTitle": "Un numéro à éclairer.",
         "inputLabel": "IBAN à vérifier",
         "submit": "Révéler les données",
         "loading": "Contrôle en cours…",
@@ -305,85 +269,35 @@
         "germany": "Allemagne",
         "errorExample": "Une erreur",
         "inputNote": "Essai sans inscription. L’IBAN est envoyé au service lors du contrôle.",
-        "results": "Données révélées",
         "format": "Format IBAN",
         "bank": "Banque",
         "waitFormat": "À vérifier",
         "waitBank": "À identifier",
         "waitBic": "À rechercher",
-        "formatHint": "Le contrôle de la structure",
-        "bankHint": "Selon le pays et les sources disponibles",
-        "bicHint": "La provenance accompagne la réponse",
-        "initial": "Lancez le test : les rayons conduisent aux données du résultat.",
         "edited": "Saisie modifiée. Relancez le contrôle pour révéler ses données.",
         "unavailable": "Le service est momentanément indisponible. Réessayez dans un instant.",
         "rateLimited": "Trop de contrôles rapprochés. Réessayez dans quelques minutes.",
-        "caption": "Un flux entre. Trois informations se distinguent.",
-        "pause": "Pause",
-        "animate": "Animer",
-        "fixed": "Vue fixe",
-        "showJson": "Voir le JSON",
-        "hideJson": "Masquer le JSON",
-        "copy": "Copier le résultat",
-        "copied": "Résultat copié.",
-        "selectCopy": "Le texte est sélectionné. Utilisez la commande Copier.",
-        "scope": "Les enrichissements dépendent des sources disponibles.",
         "playgroundLink": "Ouvrir le testeur complet",
-        "noJs": "JavaScript est nécessaire au testeur et à la 3D. Les illustrations et les liens restent disponibles.",
-        "detailTitle": "Le verre, le métal et la lumière.",
-        "detailCaption": "Verre bombé · métal brossé · reflets de studio",
-        "detailUnavailable": "La vue rapprochée n’est pas disponible dans ce navigateur.",
-        "close": "Fermer",
-        "view3d": "Voir en 3D",
+        "noJs": "Cet essai appelle l’API depuis votre navigateur et a besoin de JavaScript. Sans lui, une vraie réponse de l’API se lit ici :",
         "unallocated": "Code sans banque"
       },
       "gallery": {
         "eyebrow": "Trois façons de l’utiliser",
         "title": "Un IBAN, un fichier entier, ou dans vos outils",
-        "intro": "Vérifiez un IBAN dans un formulaire, contrôlez chaque ligne d’un fichier fournisseurs avant un paiement, ou appelez l’API depuis vos logiciels et vos agents.",
         "items": [
           {
-            "eyebrow": "01 · Un IBAN",
-            "title": "Vérifier un numéro en quelques secondes",
-            "text": "Saisissez un IBAN ou appelez POST /v1/iban/validate : format, banque, BIC et verdict du registre arrivent ensemble, chacun avec sa source.",
-            "tags": [
-              "Format",
-              "Banque",
-              "BIC"
-            ],
-            "link": "Essayer plus bas",
-            "alt": "Un faisceau traverse une lentille cerclée de métal et éclaire trois plaques de données distinctes."
+            "eyebrow": "01 · Un IBAN"
           },
           {
-            "eyebrow": "02 · Un fichier entier",
-            "title": "Contrôler un fichier fournisseurs",
-            "text": "Déposez un fichier CSV ou Excel : l’aperçu gratuit compte ce qu’il faut corriger et montre les premières lignes signalées. Le classeur annoté donne à chaque ligne son statut avant le prochain paiement.",
-            "tags": [
-              "CSV",
-              "Excel",
-              "Rapport"
-            ],
-            "link": "Vérifier un fichier fournisseurs",
-            "alt": "Des feuilles de tableau traversées par la lumière d’une lentille deviennent un fichier organisé."
+            "eyebrow": "02 · Un fichier entier"
           },
           {
-            "eyebrow": "03 · Vos outils",
-            "title": "Le brancher dans vos logiciels",
-            "text": "Des SDK TypeScript, Python, Java et .NET, une fonction Google Sheets et un serveur MCP pour les agents IA.",
-            "tags": [
-              "API",
-              "SDK",
-              "MCP"
-            ],
-            "link": "Lire la documentation",
-            "alt": "Les rayons sortant de la lentille rejoignent trois modules représentant une API, un automatisme et un tableau."
+            "eyebrow": "03 · Vos outils"
           }
         ]
       }
     },
     "deadline": {
-      "heading": "Mi-novembre 2026 : la Suisse cesse de traiter les adresses non structurées",
-      "band": "À partir de la mi-novembre 2026, les ordres de paiement relevant des Swiss Payment Standards doivent respecter les exigences d’adresse lorsqu’une adresse est utilisée ; SIX publie le 14 novembre. POST /v1/address/check dit gratuitement si une adresse passe.",
       "cta": "Lire les règles, rail par rail",
       "check": "POST /v1/address/check dit gratuitement si une adresse passe.",
       "window": "mi-novembre 2026",
@@ -934,23 +848,32 @@
           },
           "names": {
             "nav_key": "En-tête → Votre clé",
-            "nav_status": "Badge → Statut",
-            "cta_try": "Pli → Essayer une requête",
-            "cta_key": "Pli → Obtenir une clé",
-            "cta_audit_fold": "Pli → Auditer un fichier",
-            "cta_rules": "Échéance → Lire les règles",
-            "cta_audit_deadline": "Échéance → Auditer un fichier",
-            "cta_audit": "Section audit → Auditer",
-            "cta_playground_film": "Film → Essayer en direct",
-            "cta_pricing": "Fin de page → Tarifs",
+            "cta_key_hero": "Couverture → Obtenir une clé",
+            "cta_try_hero": "Couverture → Essayer",
+            "cta_journey_audit": "Couverture → Contrôler un fichier",
+            "cta_journey_api": "03 Essai → Contrôle envoyé",
+            "cta_docs": "04 Trois façons → Documentation",
+            "cta_audit": "04 Trois façons → Audit de fichier",
+            "cta_agents": "04 Trois façons → Agents",
+            "cta_try_pricing": "06 Tarifs → Essayer sans clé",
+            "cta_key_pricing": "06 Tarifs → Obtenir une clé",
+            "cta_pricing_pro": "06 Tarifs → Pro",
+            "cta_pricing_packs": "06 Tarifs → Packs",
+            "cta_audit_pricing": "06 Tarifs → Audit de fichier",
+            "cta_pricing": "06 Tarifs → Tous les tarifs",
+            "cta_rules": "06 Échéance → Lire les règles",
             "cta_key_final": "Fin de page → Obtenir une clé",
-            "cta_docs": "Fin de page → Documentation",
+            "cta_docs_final": "Fin de page → Documentation",
             "cta_key_account": "Page Votre clé → Obtenir une clé",
             "cta_key_tool": "Outils gratuits → Obtenir une clé",
-            "cta_journey_api": "Parcours API",
-            "cta_journey_audit": "Parcours → Contrôler un fichier",
             "cta_vendor_try": "Éditeurs → Tester l’API",
-            "cta_vendor_docs": "Éditeurs → Guides d’intégration"
+            "cta_vendor_docs": "Éditeurs → Guides d’intégration",
+            "nav_status": "Ancien accueil : badge → Statut",
+            "cta_try": "Ancien accueil : pli → Essayer une requête",
+            "cta_key": "Ancien accueil : pli → Obtenir une clé",
+            "cta_audit_fold": "Ancien accueil : pli → Auditer un fichier",
+            "cta_audit_deadline": "Ancien accueil : échéance → Auditer un fichier",
+            "cta_playground_film": "Ancien accueil : film → Essayer en direct"
           }
         }
       },
@@ -1604,24 +1527,33 @@
       "detailsTitle": "Toutes les lectures complémentaires",
       "detailsNote": "Historique du trafic, comptes actifs, inscriptions, portes d’entrée, audits de fichiers et retours. Chaque carte conserve sa période et son unité.",
       "actionNames": {
-        "nav_key": "En-tête → Votre clé",
-        "nav_status": "Badge → Statut",
-        "cta_try": "Essayer une requête · haut de page",
-        "cta_key": "Obtenir une clé · haut de page",
-        "cta_audit_fold": "Auditer un fichier · haut de page",
-        "cta_rules": "Lire les règles · Échéance",
-        "cta_audit_deadline": "Auditer un fichier · Échéance",
-        "cta_audit": "Auditer · Section audit",
-        "cta_playground_film": "Essayer en direct · Film",
-        "cta_pricing": "Tarifs · Fin de page",
+        "nav_key": "Votre clé · En-tête",
+        "cta_key_hero": "Obtenir une clé · Couverture",
+        "cta_try_hero": "Essayer · Couverture",
+        "cta_journey_audit": "Contrôler un fichier · Couverture",
+        "cta_journey_api": "Contrôle envoyé · 03 Essai",
+        "cta_docs": "Documentation · 04 Trois façons",
+        "cta_audit": "Audit de fichier · 04 Trois façons",
+        "cta_agents": "Agents · 04 Trois façons",
+        "cta_try_pricing": "Essayer sans clé · 06 Tarifs",
+        "cta_key_pricing": "Obtenir une clé · 06 Tarifs",
+        "cta_pricing_pro": "Pro · 06 Tarifs",
+        "cta_pricing_packs": "Packs · 06 Tarifs",
+        "cta_audit_pricing": "Audit de fichier · 06 Tarifs",
+        "cta_pricing": "Tous les tarifs · 06 Tarifs",
+        "cta_rules": "Lire les règles · 06 Échéance",
         "cta_key_final": "Obtenir une clé · Fin de page",
-        "cta_docs": "Documentation · Fin de page",
+        "cta_docs_final": "Documentation · Fin de page",
         "cta_key_account": "Obtenir une clé · Page Votre clé",
         "cta_key_tool": "Obtenir une clé · Outils gratuits",
-        "cta_journey_api": "Parcours API",
-        "cta_journey_audit": "Contrôler un fichier · Parcours",
         "cta_vendor_try": "Tester l’API · Éditeurs",
-        "cta_vendor_docs": "Guides d’intégration · Éditeurs"
+        "cta_vendor_docs": "Guides d’intégration · Éditeurs",
+        "nav_status": "Statut · Ancien accueil : badge",
+        "cta_try": "Essayer une requête · Ancien accueil : pli",
+        "cta_key": "Obtenir une clé · Ancien accueil : pli",
+        "cta_audit_fold": "Auditer un fichier · Ancien accueil : pli",
+        "cta_audit_deadline": "Auditer un fichier · Ancien accueil : échéance",
+        "cta_playground_film": "Essayer en direct · Ancien accueil : film"
       }
     }
   },
@@ -2696,8 +2628,8 @@
     },
     "prices": {
       "title": "Prix affiché, sans devis",
-      "standard": "jusqu'à 5 000 lignes",
-      "large": "de 5 001 à 20 000 lignes",
+      "standard": "jusqu'à {rows} lignes",
+      "large": "de {from} à {rows} lignes",
       "note": "Un fichier, un paiement par carte sur Stripe. Le classeur annoté (.xlsx) et la synthèse sont prêts dès le paiement et restent téléchargeables 24 heures."
     },
     "deadline": {

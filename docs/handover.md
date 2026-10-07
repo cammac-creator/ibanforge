@@ -920,7 +920,8 @@ le ruban des intégrations et l'anatomie de septembre sont retirés. `components
 - **03, l'essai** (`revue-essai.tsx`) fait l'appel réel du testeur de la lentille, sans la 3D : le
   relais existant `/api/playground`, seulement sur un geste (un envoi ou un exemple), les quatre
   exemples, une requête périmée ignorée, abandon après 12 s, une saisie qui efface la réponse, rien
-  de stocké. Au repos, les trois lignes attendent avec « À vérifier », « À identifier », « À
+  de stocké. Sans JavaScript, ses boutons restent désactivés : un `<noscript>` (`home.lens.hero.noJs`) dit pourquoi
+  et renvoie à `api.ibanforge.com/v1/demo`, une vraie réponse lisible par n'importe quel navigateur. Au repos, les trois lignes attendent avec « À vérifier », « À identifier », « À
   rechercher » ; la vraie réponse monte à leur place. `revue-essai-model.ts` la lit par le verdict
   partagé du playground (`lensResponse`, `lib/playground-verdict.ts`) : un format valide ne confirme
   pas une banque, une absence dans une source partielle ne devient jamais un refus, « Ne pas
@@ -954,7 +955,11 @@ le ruban des intégrations et l'anatomie de septembre sont retirés. `components
   compte des codes de `home.coverage.registerCodes` et `keyCodes`, 0,4 de `P50_PROCESSING_MS`, les
   quotas de `data/onboarding.json`, les prix de Pro et des packs des messages, les deux paliers de
   l'audit de `frontend/lib/audit-tiers.ts`, que `audit-tiers.test.ts` compare à `src/lib/audit-file.ts`
-  lu comme texte. La page `/audit` écrit encore ses prix en dur : à brancher sur la même constante.
+  lu comme texte. La page `/audit` les lit aussi, dans la page et dans ses données structurées (07/10/2026) ; les
+  phrases qui citent un prix ou un plafond (titre, description, étapes) ne peuvent pas appeler la constante :
+  `audit-tiers.test.ts` vérifie qu'elles ne citent que ces prix et chaque plafond groupé comme la langue l'écrit.
+  Le quota de Pro des tarifs vient de `PRO_MONTHLY_UNITS` (`lib/pricing-estimate.ts`), groupé par `formatGrouped`
+  (« 10 000 » en allemand aussi, plus « 10.000 »).
 - **Mesure** : le film émet `forge:station` 0 et 3 (`film:start`, `film:end` au tableau de bord) ;
   ces deux lignes ont affiché zéro du 27 au 28/09/2026, le film qui les émettait ayant été retiré :
   ce n'est pas une panne de collecte. Aller à la faute de frappe cale la boucle dans le noir de fin
@@ -964,7 +969,10 @@ le ruban des intégrations et l'anatomie de septembre sont retirés. `components
   `cta:try-hero`, `cta:try-pricing`, `cta:journey-api` (l'envoi de l'essai), `cta:journey-audit`,
   `cta:docs`, `cta:audit`, `cta:agents`, `cta:pricing`, `cta:pricing-pro`, `cta:pricing-packs`,
   `cta:rules`, `cta:docs-final` ; `cta:audit-pricing` naît (la ligne de l'audit dans les tarifs),
-  `cta:audit-deadline` disparaît avec le bandeau de l'échéance.
+  `cta:audit-deadline` disparaît avec le bandeau de l'échéance. Le tableau de bord les range dans l'ordre de la page et
+  les nomme (`landing-doors-card.tsx`, `dashboard.overview.fresh.doors.names`, `dashboard.audience.actionNames`,
+  07/10/2026) ; les portes de l'ancien accueil y gardent un nom « Ancien accueil » tant qu'elles restent dans la
+  fenêtre de 30 jours.
 - Les codes de registres et de clés nationales que la page écrit (`home.coverage.registerCodes`,
   `home.coverage.keyCodes`, `home.problem.bankWhat`, la FAQ) sont comparés au code par
   `src/lib/positioning.test.ts`, dans les trois langues. Les promesses publiques de la page sont
@@ -980,13 +988,16 @@ le ruban des intégrations et l'anatomie de septembre sont retirés. `components
 - La porte `site-home` compte à part les clés prises depuis l'accueil. Une porte se déclare à
   trois endroits qui doivent rester en phase : `frontend/lib/key-origin.ts` (`doorForPath`),
   `src/lib/key-origins.ts` (`KEY_ORIGIN_DOORS`) et `src/lib/door-board.ts` (son libellé).
-- Restent sans usage, à retirer dans un changement à part : les styles `.forge` et `.reveal` de
-  `globals.css`, `components/reveal.tsx`, les images de la lentille dans `public/brand/lens/` (sauf
-  `finale-*`, le sol du film), et les clés de `home.*` que seule l'ancienne page lisait
-  (`home.lens.hero` hors celles de l'essai, `home.lens.gallery` hors le surtitre, le titre et les
-  noms des trois façons, `home.reviewed`, `home.integrations.sub`, `pause`, `play`, `home.coverage.fact0Text`
-  et `fact1*` à `fact3*`, `home.problem.anatomyCaption`, `home.audiences.eyebrow` et `title`, `home.deadline.heading` et `band`, et les clés
-  `home.demo.*` que ni le film ni l'essai ne lisent).
+- Retirés le 07/10/2026 : les styles `.forge` et `.reveal` de `globals.css` (226 règles, enlevées par sélecteur),
+  `components/reveal.tsx`, quatre images de la lentille dans `public/brand/lens/` (seul `finale-*`, le sol du film,
+  reste, et `components/lens/assets.ts` ne nomme plus que lui), et 67 clés de `home.*` que seule l'ancienne page
+  lisait (`home.lens.hero` hors celles de l'essai et `noJs`, `home.lens.gallery` hors le surtitre, le titre et les
+  noms des trois façons, `home.reviewed`, `home.integrations.sub`, `pause` et `play`, `home.coverage.fact0Text` et
+  `fact1*` à `fact3*`, `home.problem.anatomyCaption`, `home.audiences.eyebrow` et `title`, `home.deadline.heading`
+  et `band`, les clés `home.demo.*` que ni le film ni l'essai ne lisent). Restent sans usage, hors de cette liste :
+  `components/forge/` sauf `cta-beacon.tsx` (importé par `conditional-shell.tsx`), `lib/forge/` et la clé
+  `home.hero.demo` (encore chargée dans `LAYOUT_CLIENT_MESSAGES`) ; leur retrait libérerait la dépendance `three`,
+  à faire avec le lot des dépendances.
 
 Le vitest du site couvre `lib/`, `app/` et `components/` (`components/**/*.test.ts`) ; un test placé
 ailleurs ne tourne pas, et son absence ressemble à un succès. Il tourne sans DOM : les composants se

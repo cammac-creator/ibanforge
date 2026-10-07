@@ -7,6 +7,8 @@ import { AuditWorkbookPreview } from "@/components/audit-workbook-preview";
 import { Upload, Eye, Download } from "lucide-react";
 import { alternatesFor, urlFor } from "@/lib/seo";
 import { auditImageFor } from "@/lib/audit-images";
+import { AUDIT_TIERS, formatUsd } from "@/lib/audit-tiers";
+import { formatGrouped } from "@/lib/format-grouped";
 
 export async function generateMetadata({
   params,
@@ -39,6 +41,18 @@ export default async function AuditPage({
   const { locale } = await params;
   const t = await getTranslations("audit");
 
+  // The two tiers, read once from lib/audit-tiers.ts (compared to the API's own
+  // constants by audit-tiers.test.ts): the prices and the row ceilings are never
+  // typed on this page, in the markup or in the structured data.
+  const [standard, large] = AUDIT_TIERS;
+  const tiers = [
+    { price: standard.price, label: t("prices.standard", { rows: formatGrouped(standard.rows, locale) }) },
+    {
+      price: large.price,
+      label: t("prices.large", { from: formatGrouped(standard.rows + 1, locale), rows: formatGrouped(large.rows, locale) }),
+    },
+  ];
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -47,10 +61,14 @@ export default async function AuditPage({
     brand: { "@type": "Brand", name: "IBANforge" },
     url: urlFor(locale, '/audit'),
     image: [auditImageFor(locale).url],
-    offers: [
-      { "@type": "Offer", price: "149", priceCurrency: "USD", description: t("prices.standard"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
-      { "@type": "Offer", price: "349", priceCurrency: "USD", description: t("prices.large"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
-    ],
+    offers: tiers.map((tier) => ({
+      "@type": "Offer",
+      price: String(tier.price),
+      priceCurrency: "USD",
+      description: tier.label,
+      availability: "https://schema.org/InStock",
+      url: urlFor(locale, '/audit'),
+    })),
   };
 
   const faqLd = {
@@ -107,12 +125,11 @@ export default async function AuditPage({
         </div>
         <div className="rounded-lg border p-5 flex flex-col gap-3">
           <h2 className="font-semibold">{t("prices.title")}</h2>
-          <p className="text-2xl font-semibold tracking-tight">
-            $149 <span className="text-sm font-normal text-muted-foreground">{t("prices.standard")}</span>
-          </p>
-          <p className="text-2xl font-semibold tracking-tight">
-            $349 <span className="text-sm font-normal text-muted-foreground">{t("prices.large")}</span>
-          </p>
+          {tiers.map((tier) => (
+            <p key={tier.price} className="text-2xl font-semibold tracking-tight">
+              {formatUsd(tier.price, locale)} <span className="text-sm font-normal text-muted-foreground">{tier.label}</span>
+            </p>
+          ))}
           <p className="text-sm text-muted-foreground leading-relaxed">{t("prices.note")}</p>
         </div>
       </section>

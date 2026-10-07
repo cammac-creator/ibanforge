@@ -25,6 +25,8 @@ export type EssaiCopy = {
   unavailable: string
   rateLimited: string
   playground: string
+  /** Said only without JavaScript: the buttons wait for a script that never comes. */
+  noJs: string
   valid: string
   checksum: string
   structureInvalid: string
@@ -69,6 +71,7 @@ export function essaiCopy(lens: Words, demo: Words, verdict: Words): EssaiCopy {
     unavailable: lens.unavailable,
     rateLimited: lens.rateLimited,
     playground: lens.playgroundLink,
+    noJs: lens.noJs,
     valid: demo.valid,
     checksum: demo.checksum,
     structureInvalid: verdict.structureInvalid,
