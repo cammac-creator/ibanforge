@@ -26,7 +26,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createInterface } from 'node:readline';
 import { createReadStream } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as XLSX from 'xlsx';
 import { getCountryName } from '../src/lib/countries.js';
 import {
@@ -116,7 +116,9 @@ async function importSwiftCodes(db: Database.Database): Promise<number> {
   const repoDir = resolve(TMP_DIR, 'SwiftCodes');
   if (!existsSync(repoDir)) {
     console.log('  Cloning repository...');
-    execSync(`git clone --depth 1 https://github.com/PeterNotenboom/SwiftCodes.git ${repoDir}`, { stdio: 'pipe' });
+    // No shell: the target folder comes from SEED_TMP_DIR, and a path with a
+    // space or a quote in it must stay one argument, never become a command.
+    execFileSync('git', ['clone', '--depth', '1', 'https://github.com/PeterNotenboom/SwiftCodes.git', repoDir], { stdio: 'pipe' });
   }
 
   const countriesDir = resolve(repoDir, 'AllCountries');

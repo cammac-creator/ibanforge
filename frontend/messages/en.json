@@ -51,7 +51,8 @@
       "iid": "Swiss IID",
       "at": "Austrian bank codes",
       "be": "Belgian bank codes",
-      "countries": "IBAN by country"
+      "countries": "IBAN by country",
+      "trust": "Security & trust"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · Bank of England (List of Banks, 2026-09) — monthly · SwiftCodes/MIT — frozen copy, 2018 · OFAC · UN · EU · EPC — weekly"
@@ -178,7 +179,7 @@
       "bank": "Bank code",
       "bankWhat": "The national register in DE, AT, BE, SK, CZ, BG, CH, LI",
       "account": "Account number",
-      "accountWhat": "The national check key in FR, MC, BE, IT, SM, ES",
+      "accountWhat": "The national check key in FR, MC, BE, IT, SM, ES, DE",
       "checksumTitle": "What a checksum tells you",
       "checksumItems": [
         "The check digits add up",
@@ -225,7 +226,7 @@
       "figRegisters": "countries whose national register is read in full",
       "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
       "figKeys": "countries whose national check key is verified, plus the UK modulus check",
-      "keyCodes": "FR, MC, BE, IT, SM, ES",
+      "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "median server processing",
       "fact0Title": "Operated from Switzerland, API hosted in the EU",
       "fact0Text": "IBANforge is run from Switzerland; the API itself runs in a European Union region.",
@@ -1891,11 +1892,255 @@
       },
       "imprint": {
         "title": "Legal Notice",
-        "description": "Operator identity and contact for ibanforge.com and api.ibanforge.com."
+        "description": "Operator identity, postal address and contact for ibanforge.com and api.ibanforge.com."
       },
       "sla": {
         "title": "Service Level Agreement",
         "description": "SLA for Editor/OEM subscriptions — 99.5% monthly availability, service credits, measurement by the public status page."
+      }
+    },
+    "translation": {
+      "notice": "Courtesy translation, not binding. The English version prevails.",
+      "englishLink": "Read the English version",
+      "indexNotice": "Some documents are offered as courtesy translations. The English version of each document prevails."
+    },
+    "trust": {
+      "meta": {
+        "title": "Security and trust",
+        "description": "Who runs IBANforge, where the API runs, what is kept and for how long, the sub-processors and the basis of their transfers, security, availability, and what we do not have."
+      },
+      "eyebrow": "For your data-protection review",
+      "hero": {
+        "title": "Security and trust",
+        "description": "Who runs IBANforge, where the API runs, what it keeps and for how long, and what we do not have. Each fact links to the document or the check that proves it."
+      },
+      "checked": "Checked on October 6, 2026. The contractual documents prevail over this summary.",
+      "glance": {
+        "operator": {
+          "label": "Operator",
+          "value": "Sole proprietorship, Switzerland"
+        },
+        "region": {
+          "label": "API region",
+          "value": "Amsterdam (EU)"
+        },
+        "ibans": {
+          "label": "Submitted IBANs",
+          "value": "Not stored"
+        },
+        "notice": {
+          "label": "Notice before closing",
+          "value": "Six months, paying customers"
+        }
+      },
+      "operator": {
+        "title": "Who runs IBANforge",
+        "lead": "IBANforge is a sole proprietorship under Swiss law, run by Claude-Alain Martin.",
+        "country": "Switzerland",
+        "register": "Not entered in the commercial register: a Swiss sole proprietorship must register only from CHF 100,000 of annual turnover (art. 931 of the Swiss Code of Obligations).",
+        "vat": "Not registered for Swiss VAT.",
+        "people": "One person builds and runs the service. There are no employees.",
+        "contact": "Contact: support@ibanforge.com",
+        "link": "Legal Notice"
+      },
+      "hosting": {
+        "title": "Where it runs",
+        "sub": "Each line can be checked from outside, with the command next to it.",
+        "checkLabel": "Check",
+        "api": {
+          "name": "API",
+          "body": "Railway, Amsterdam region (Netherlands, EU). Swiss traffic enters through Railway's network edge in Zurich.",
+          "checkNote": "The x-railway-edge header names the edge nearest to you (zrh1 from Switzerland). The Amsterdam region itself is not visible from outside."
+        },
+        "site": {
+          "name": "Website and dashboard",
+          "body": "Vercel. Its functions run in the Frankfurt region (Germany, EU); static pages are served from Vercel's global network.",
+          "checkNote": "In the x-vercel-id header, the part after the first :: is the region where the function ran: fra1 is Frankfurt. The first part is the edge nearest to you."
+        },
+        "mail": {
+          "name": "E-mail, DNS and backups",
+          "body": "Infomaniak, Switzerland. A server there also holds the nightly backups of the account state.",
+          "checkNote": "The name servers are Infomaniak's."
+        }
+      },
+      "retention": {
+        "title": "What we keep, and for how long",
+        "colWhat": "Data",
+        "colKeep": "Kept",
+        "rows": {
+          "0": {
+            "what": "IBANs you submit for validation",
+            "keep": "Not stored. Processed in memory to answer the request."
+          },
+          "1": {
+            "what": "An invalid IBAN",
+            "keep": "Only its first 4 characters (country code and check digits), with the request metadata, up to 12 months."
+          },
+          "2": {
+            "what": "Request metadata: path, status, latency, time, user-agent, key prefix",
+            "keep": "12 months, then deleted automatically. The IP address is kept only as a salted hash."
+          },
+          "3": {
+            "what": "Edge log of our API host: raw IP address, request path, status, user-agent, time",
+            "keep": "7 days, kept and deleted by Railway, outside our own logs."
+          },
+          "4": {
+            "what": "A file uploaded to the file audit",
+            "keep": "Only its annotated report: 2 hours if unpaid, 24 hours after payment."
+          },
+          "5": {
+            "what": "Your e-mail address, if you give one",
+            "keep": "As long as your key exists. Deleted from the live record on request; backups that still hold it age out within 90 days."
+          },
+          "6": {
+            "what": "Backups of the account state: keys as hashes, e-mail addresses, quotas, credits, purchase records",
+            "keep": "Every night to a server of Infomaniak in Switzerland, 30 days of copies; monthly copies on a computer of the operator in Switzerland, the last three kept. No IBAN submitted for validation, no request log. The restore is tested."
+          }
+        },
+        "post": {
+          "title": "Send IBANs in the body of a POST request",
+          "body": "POST /v1/iban/validate, /v1/iban/batch and /v1/iban/compliance take the IBAN in the JSON body. Never put an IBAN in a URL: the edge log of our host records the request path."
+        },
+        "link": "Privacy Policy"
+      },
+      "processors": {
+        "title": "Sub-processors",
+        "sub": "Who processes data for us, where, and on what basis data leaves Switzerland and the EU. Data Privacy Framework entries checked on the official register on October 5, 2026.",
+        "col": {
+          "name": "Sub-processor",
+          "role": "Role",
+          "region": "Region",
+          "ibans": "Receives submitted IBANs?",
+          "basis": "Transfer basis"
+        },
+        "registerLink": "Register entry",
+        "documentLink": "Document",
+        "rows": {
+          "railway": {
+            "name": "Railway Corp.",
+            "role": "API hosting and storage",
+            "region": "Amsterdam (EU)",
+            "ibans": "Yes, in memory, to answer the request",
+            "basis": "EU-US and Swiss-US Data Privacy Framework, active (Railway Corporation)"
+          },
+          "vercel": {
+            "name": "Vercel Inc.",
+            "role": "Website and dashboard; playground submissions are relayed to the API",
+            "region": "Functions: Frankfurt (EU). Static pages: global network",
+            "ibans": "Only an IBAN typed into the website's playground",
+            "basis": "EU-US and Swiss-US Data Privacy Framework, active (Vercel Inc.)"
+          },
+          "stripe": {
+            "name": "Stripe Payments Europe",
+            "role": "Card payments",
+            "region": "EU",
+            "ibans": "No",
+            "basis": "Established in the EU. Its US affiliate Stripe, LLC: EU-US and Swiss-US Data Privacy Framework, active"
+          },
+          "coinbase": {
+            "name": "Coinbase (CDP facilitator)",
+            "role": "USDC settlement of x402 payments; the x402.org facilitator is the fallback",
+            "region": "US",
+            "ibans": "No",
+            "basis": "EU-US and Swiss-US Data Privacy Framework, active (Coinbase, Inc.)"
+          },
+          "infomaniak": {
+            "name": "Infomaniak Network SA",
+            "role": "Transactional and support e-mail; nightly backup of the account state",
+            "region": "Switzerland",
+            "ibans": "Only an IBAN you write in an e-mail to us",
+            "basis": "Switzerland: adequacy decision of the European Commission"
+          },
+          "github": {
+            "name": "GitHub Inc.",
+            "role": "Public source code and CI, no customer data",
+            "region": "US",
+            "ibans": "No",
+            "basis": "EU-US and Swiss-US Data Privacy Framework, active (GitHub)"
+          },
+          "anthropic": {
+            "name": "Anthropic PBC",
+            "role": "AI-assisted drafting of replies to e-mails, started by the operator",
+            "region": "US",
+            "ibans": "The API never sends it one; only an IBAN you write in an e-mail to us",
+            "basis": "Not certified under the Data Privacy Framework. Standard contractual clauses of Anthropic's Data Processing Addendum"
+          }
+        },
+        "note": "The same list, with the same bases, is Annex II of the data processing agreement.",
+        "noteLink": "DPA",
+        "changes": "A new sub-processor is announced at least 30 days before it receives personal data, by e-mail to the address of each active key and in the changelog; under the DPA you may object."
+      },
+      "transfers": {
+        "title": "Transfers from the EU",
+        "switzerland": "IBANforge is established in Switzerland. The European Commission recognises Switzerland as providing an adequate level of protection (Decision 2000/518/EC) and confirmed it in its review of 15 January 2024: personal data can be transferred from the EU to us without standard contractual clauses.",
+        "us": "For US sub-processors certified under them, transfers rely on the EU-US Data Privacy Framework (Commission Implementing Decision (EU) 2023/1795) and, from Switzerland, on the Swiss-US Data Privacy Framework, in force since 15 September 2024.",
+        "decisionLink": "Decision 2000/518/EC",
+        "reviewLink": "The Swiss data protection authority on the 2024 review",
+        "dpfLink": "Implementing Decision (EU) 2023/1795",
+        "listLink": "Data Privacy Framework register"
+      },
+      "security": {
+        "title": "Security",
+        "tests": "Every pull request runs the automated tests in GitHub Actions (API, website, SDKs) and boots the production container, and so does every change the operator pushes to the main branch. The automated data refreshes publish without that suite and run their own checks first: the BIC, Czech and Italian refreshes run the API tests and compare the new data with the previous data; the weekly compliance refresh checks that the coverage the API announces matches the new lists.",
+        "testsLink": "CI runs",
+        "code": "The code is public, under the MIT licence: anyone can read how an IBAN is handled.",
+        "codeLink": "Source code",
+        "keys": "API keys are stored as SHA-256 hashes. A newly issued key is also held once for retrieval, then erased on first retrieval or after 7 days at the latest.",
+        "tls": "All traffic is encrypted. Current clients negotiate TLS 1.3, plain HTTP is redirected to HTTPS, and both hosts send HSTS.",
+        "report": "To report a vulnerability, write to support@ibanforge.com with SECURITY in the subject. The same channel is in the security.txt file of both hosts (RFC 9116) and in our security policy.",
+        "reportTxt": "security.txt",
+        "reportPolicy": "Security policy",
+        "deps": "Dependabot watches the dependencies and opens security updates as public pull requests."
+      },
+      "availability": {
+        "title": "Availability, said plainly",
+        "status": "The status page publishes the API's success rate over 7 and 30 days, computed from our server-side request log.",
+        "statusLink": "Status page",
+        "sla": "Editor/OEM subscriptions carry a written SLA: 99.5% availability per calendar month, with service credits.",
+        "slaLink": "SLA",
+        "probe": "An external probe, on a server at Infomaniak in Switzerland, calls the API and the website every minute and alerts the operator. Its results are not published.",
+        "instance": "The API runs as a single instance with a persistent volume, in one region. Each update, including the automatic data refreshes, restarts it, and requests that arrive during the switch wait or fail. Railway documents this for any service with a volume; we have observed switches lasting from under a minute to almost five minutes. The status page cannot count those requests, because they never reach the API.",
+        "instanceLink": "Railway documentation"
+      },
+      "data": {
+        "title": "Where the data comes from",
+        "registers": "Where a national register is consulted, the answer comes from it and names it, with its date: the Deutsche Bundesbank for Germany, SIX BankMaster for Switzerland and Liechtenstein, the national banks of Austria, Belgium, the Czech Republic and Slovakia, among others. Elsewhere a composite BIC map answers, and the response says it is not authoritative.",
+        "permissions": "Where a publisher sets conditions, they are honoured in the response itself; the publishers who gave us written permission are listed on the sources page.",
+        "frozen": "About two thirds of our BIC directory rows come from a public copy of the SWIFT directory whose data dates from January 2018 and is no longer updated. We say so on the sources page and in the API's health endpoint; where a national register answers, it takes precedence.",
+        "sourcesLink": "Sources and permissions",
+        "docsLink": "Data sources, register by register"
+      },
+      "continuity": {
+        "title": "If IBANforge stopped",
+        "notice": "Every paying customer (Pro subscribers, holders of credit packs, Editor/OEM customers) is told at least six months before the service stops, by e-mail and in the Terms, and no renewal is charged for the month in which it stops. For a free key, the notice before we end it is at least 30 days.",
+        "noticeLink": "Terms of Service, §3 and §9",
+        "code": "The code is published under the MIT licence, and the validation core is a separate MIT package on npm (ibanforge).",
+        "codeRepo": "Repository",
+        "codeNpm": "npm package",
+        "selfhost": "The API's code can run on your own servers. The data files of the repository keep their publishers' terms (NOTICE file), and the data we may serve but not redistribute, such as the Austrian, Belgian and San Marino registers, is not in the repository: a copy run elsewhere answers \"not consulted\" for it.",
+        "selfhostLink": "NOTICE file"
+      },
+      "notHave": {
+        "title": "What we do not have",
+        "items": {
+          "0": "No ISO 27001 or SOC 2 certification.",
+          "1": "No team: one person builds and runs the service.",
+          "2": "No second region and no standby instance (see Availability)."
+        },
+        "body": "The measures on this page are what we do instead, and each one can be checked."
+      },
+      "documents": {
+        "title": "The documents",
+        "terms": "Terms of Service",
+        "privacy": "Privacy Policy",
+        "dpa": "Data Processing Agreement (DPA)",
+        "sla": "Service Level Agreement (SLA)",
+        "imprint": "Legal Notice",
+        "status": "Status page",
+        "sources": "Sources and permissions",
+        "securityTxt": "security.txt",
+        "securityPolicy": "Security policy",
+        "dpaNote": "The DPA is pre-signed; a countersigned PDF is available on request at support@ibanforge.com. It provides for audits, including an inspection, once per calendar year at most and on 30 days' notice, where the documents are not sufficient."
       }
     }
   },
@@ -2521,6 +2766,7 @@
       "bank_code_not_allocated": "Bank code not in the national register",
       "modulus_check_failed": "UK account checksum fails",
       "national_check_digits_failed": "National check key fails",
+      "national_check_digits_suspect": "German account check digit fails (warning)",
       "sepa_not_reachable": "Not reachable by SEPA transfer",
       "test_bic": "Test BIC",
       "bic_mismatch": "BIC in file differs from the register",

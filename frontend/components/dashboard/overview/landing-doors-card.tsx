@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import type { SignupSources, WebEventsSummary } from '@/lib/dashboard-overview';
-import { trialFunnel, SERVER_EVENT_PAGE } from '@/lib/dashboard-overview';
+import { isOwnReferrer, trialFunnel, SERVER_EVENT_PAGE } from '@/lib/dashboard-overview';
 import { FetchFailed, type Fetched } from './fetching';
 import { overviewCard } from './section';
 
@@ -83,7 +83,7 @@ export async function LandingDoorsCard({
   // that nobody navigated to, and `by_page` groups by path so no name filter
   // reaches it.
   const pages = (month.data?.by_page ?? []).filter((p) => p.page !== SERVER_EVENT_PAGE).slice(0, 4);
-  const referrers = (month.data?.by_referrer ?? []).filter((r) => !r.referrer.endsWith('ibanforge.com')).slice(0, 4);
+  const referrers = (month.data?.by_referrer ?? []).filter((r) => !isOwnReferrer(r.referrer)).slice(0, 4);
 
   return (
     <div className={overviewCard}>

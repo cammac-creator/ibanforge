@@ -13,6 +13,7 @@ import {
   dedupeMarkers,
   externalClients,
   fetchSearchConsole,
+  isOwnReferrer,
   SEARCH_CONSOLE_TIMEOUT_MS,
   moneySummary,
   parseSqlUtc,
@@ -577,5 +578,21 @@ describe('the keyless trial card on the dashboard', () => {
       expect(label).not.toMatch(/\d/);
       expect(label).not.toMatch(/\bday\b|jour|\bTag\b/i);
     }
+  });
+});
+
+describe('isOwnReferrer', () => {
+  it('drops our own site and its subdomains', () => {
+    expect(isOwnReferrer('ibanforge.com')).toBe(true);
+    expect(isOwnReferrer('www.ibanforge.com')).toBe(true);
+    expect(isOwnReferrer('api.ibanforge.com')).toBe(true);
+    expect(isOwnReferrer('IBANforge.com')).toBe(true);
+  });
+
+  it('keeps another site whose name only ends like ours', () => {
+    expect(isOwnReferrer('myibanforge.com')).toBe(false);
+    expect(isOwnReferrer('notibanforge.com')).toBe(false);
+    expect(isOwnReferrer('ibanforge.com.example')).toBe(false);
+    expect(isOwnReferrer('news.ycombinator.com')).toBe(false);
   });
 });

@@ -49,6 +49,9 @@ export function SiteFooter() {
     {
       title: t("column.legal"),
       links: [
+        // One page that gathers hosting, sub-processors, retention and
+        // security for an EU buyer's review (06/10/2026); the documents follow.
+        { href: localePath(locale, '/trust'), label: t("link.trust") },
         { href: localePath(locale, '/sources'), label: t("link.sources") },
         { href: localePath(locale, '/legal/terms'), label: t("link.terms") },
         { href: localePath(locale, '/legal/privacy'), label: t("link.privacy") },

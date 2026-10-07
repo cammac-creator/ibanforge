@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
-    "@scalar/api-reference-react": "^0.9.74",
+    "@scalar/api-reference-react": "^0.9.78",
     "@tailwindcss/typography": "^0.5.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -49,5 +49,11 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@ai-sdk/provider-utils": "4.0.33",
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "7.1.6"
+    }
   }
 }

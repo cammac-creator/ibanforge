@@ -64,6 +64,24 @@ describe('IBANforge — construction & base URL', () => {
     );
   });
 
+  it('trims trailing slashes in linear time, whatever the base URL holds', async () => {
+    // A long run of slashes followed by something else: the regex this
+    // replaced retried the run from every slash (quadratic time).
+    const hostile = `https://example.test${'/'.repeat(100_000)}x`;
+    const start = performance.now();
+    const sdk = new IBANforge({ baseUrl: hostile });
+    expect(performance.now() - start).toBeLessThan(100);
+    fetchMock.mockResolvedValue(jsonResponse({ valid: true }));
+    await sdk.formatIban('CH93');
+    expect(calledUrl()).toBe(`${hostile}/v1/iban/format?iban=CH93`);
+  });
+
+  it('strips every trailing slash and nothing else', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ valid: true }));
+    await new IBANforge({ baseUrl: 'https://example.test/api//' }).formatIban('CH93');
+    expect(calledUrl()).toBe('https://example.test/api/v1/iban/format?iban=CH93');
+  });
+
   it('defaults to the public production base URL', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ valid: true }));
     await new IBANforge().formatIban('CH93');

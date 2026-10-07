@@ -25,6 +25,7 @@ const PAGES_WITH_OWN_ALTERNATES = [
   "vendors/page.tsx",
   "sources/page.tsx",
   "status/page.tsx",
+  "trust/page.tsx",
   "tools/test-iban/page.tsx",
   "legal/page.tsx",
   "legal/[slug]/page.tsx",
@@ -70,6 +71,7 @@ const EXPECTED_PATH: Record<(typeof PAGES_WITH_OWN_ALTERNATES)[number], string> 
   "vendors/page.tsx": '"/vendors"',
   "sources/page.tsx": '"/sources"',
   "status/page.tsx": '"/status"',
+  "trust/page.tsx": '"/trust"',
   "tools/test-iban/page.tsx": '"/tools/test-iban"',
   "legal/page.tsx": '"/legal"',
   "legal/[slug]/page.tsx": "`/legal/${slug}`",
@@ -108,7 +110,13 @@ describe("alternatesFor path argument", () => {
  * on code lines only (comments below spell out the removed pattern for
  * anyone reading the fix, which would otherwise self-trigger this guard).
  */
-const DEDUPED_TITLE_PAGES = ["status/page.tsx", "legal/page.tsx", "legal/[slug]/page.tsx", "account/page.tsx"] as const;
+const DEDUPED_TITLE_PAGES = [
+  "status/page.tsx",
+  "trust/page.tsx",
+  "legal/page.tsx",
+  "legal/[slug]/page.tsx",
+  "account/page.tsx",
+] as const;
 
 function codeOnly(source: string): string {
   return source

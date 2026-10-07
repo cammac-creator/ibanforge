@@ -2,12 +2,14 @@
 title: "Service Level Agreement"
 description: "SLA for Editor/OEM subscriptions — 99.5% monthly availability, service credits, measurement by the public status page."
 order: 5
-updated: "2026-07-11"
+updated: "2026-10-05"
 ---
 
 # Service Level Agreement (SLA)
 
-**Last updated: July 11, 2026 · Version 1.0**
+**Last updated: October 5, 2026 · Version 1.1**
+
+*Revision 1.1 (October 5, 2026): the reference figure published on the status page covers the last 30 days, not 90, as it has since September 1, 2026, and it cannot see a request that never reaches the API. The commitment, the credits, the exclusions and the way a claim is verified are unchanged.*
 
 This SLA supplements the [Terms of Service](/legal/terms) and applies **only to active Editor/OEM subscriptions**. The free tier, prepaid credit packs and x402 pay-per-call remain provided without a contractual SLA, as stated in the Terms.
 
@@ -17,7 +19,7 @@ We commit to **99.5% Availability of the IBANforge API per calendar month**.
 
 **Availability** is the percentage of minutes in the month during which the API answers requests without a service-wide failure. A minute counts as unavailable when more than half of the valid requests received in that minute fail with a 5xx error, or when the API is unreachable. Months with no traffic in a given minute count that minute as available unless our monitoring shows the service was down.
 
-For reference: measured availability over the last 90 days is published continuously on the [status page](/status), computed from the same server-side request log we use to verify credit claims.
+For reference: the success rate of the last 30 days is published continuously on the [status page](/status), computed from the same server-side request log we use to verify credit claims. That log cannot see a request that never reaches the API, for example during a restart; a claim may therefore also rest on your own records of the time windows you observed.
 
 ## 2. Service credits
 

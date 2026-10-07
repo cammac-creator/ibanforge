@@ -211,9 +211,12 @@ for thirteen minutes, from a devDependency imported at runtime and therefore abs
 `npm ci --omit=dev`. The guard added since is `scripts/check-runtime-deps.ts`, plus a CI
 job that builds the production image and boots it.
 
-**`main` carries no branch protection.** The rule "never push to `main`" is the protection.
-A branch protection rule requiring the CI context is the single highest-value change
-available on this repository, and it takes two minutes.
+**`main` is protected only against force-push and deletion** (repository ruleset "main : pas de
+force-push, pas de suppression"). It requires no pull request and no status check: the rule "never
+push to `main`" is the protection for everything else. Requiring the CI context on `main` would
+block the integrator, which merges locally and pushes the merge commit, and the two data robots
+that commit to `main`; it needs a bypass designed for both before it can be switched on. CodeQL
+default setup scans the repository since 6 October 2026.
 
 **Two scheduled workflows commit to `main`**, and therefore deploy: the monthly reference
 data rebuild and the weekly compliance refresh. Both have quality gates that have caught

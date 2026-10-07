@@ -133,6 +133,17 @@ describe('pageGist — the useful text of a page', () => {
   it('caps the output so a long page stays a short prompt', () => {
     expect(pageGist(`<body>${'mot '.repeat(5000)}</body>`).length).toBeLessThanOrEqual(1600);
   });
+
+  it('drops a script whose end tag carries a space, a newline, attributes or capitals', () => {
+    for (const end of ['</script >', '</script\n>', '</script foo="bar">', '</SCRIPT>']) {
+      const gist = pageGist(`<body><script>var leak = "secret";${end}<p>Texte visible.</p></body>`);
+      expect(gist, end).toContain('Texte visible.');
+      expect(gist, end).not.toContain('leak');
+    }
+    const styled = pageGist('<body><STYLE type="x">.a{}</style ><p>Visible.</p></body>');
+    expect(styled).toContain('Visible.');
+    expect(styled).not.toContain('.a{}');
+  });
 });
 
 describe('parseDescribeOutput', () => {

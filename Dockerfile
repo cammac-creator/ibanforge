@@ -38,6 +38,11 @@ RUN npm ci --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist/ dist/
 COPY --from=builder /app/reference/ reference/
+# The check-digit method of each German bank code, from the Bundesbank's public
+# Bankleitzahlendatei (field 9), tracked in git and refreshed by the monthly
+# workflow. Copied OUTSIDE data/, which the Railway volume masks at runtime; an
+# absent file only turns the German account check off (not_checked).
+COPY data/de-pruefziffer.json reference/de-pruefziffer.json
 COPY src/db/bic_data.json dist/db/bic_data.json
 COPY src/db/nl-psp.json dist/db/nl-psp.json
 
@@ -57,6 +62,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 # Outside data/, which the Railway volume masks at runtime.
 ENV UK_MODULUS_PATH=/app/reference/uk-modulus.json
+ENV DE_PRUEFZIFFER_PATH=/app/reference/de-pruefziffer.json
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"

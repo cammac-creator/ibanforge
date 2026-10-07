@@ -51,7 +51,8 @@
       "iid": "Schweizer IID",
       "at": "Österreichische BLZ",
       "be": "Belgische Bankcodes",
-      "countries": "IBAN nach Land"
+      "countries": "IBAN nach Land",
+      "trust": "Sicherheit & Vertrauen"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · Bank of England (List of Banks, 2026-09) — monatlich · SwiftCodes/MIT — eingefrorene Kopie, 2018 · OFAC · UN · EU · EPC — wöchentlich"
@@ -178,7 +179,7 @@
       "bank": "Bankleitzahl",
       "bankWhat": "Das nationale Register in DE, AT, BE, SK, CZ, BG, CH, LI",
       "account": "Kontonummer",
-      "accountWhat": "Der nationale Prüfschlüssel in FR, MC, BE, IT, SM, ES",
+      "accountWhat": "Der nationale Prüfschlüssel in FR, MC, BE, IT, SM, ES, DE",
       "checksumTitle": "Was eine Prüfsumme sagt",
       "checksumItems": [
         "Die Prüfziffern gehen auf",
@@ -225,7 +226,7 @@
       "figRegisters": "Länder, deren nationales Register vollständig gelesen wird",
       "registerCodes": "DE, AT, BE, SK, CZ, BG, CH, LI",
       "figKeys": "Länder, deren nationaler Prüfschlüssel geprüft wird, dazu die britische Modulus-Prüfung",
-      "keyCodes": "FR, MC, BE, IT, SM, ES",
+      "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "mittlere Verarbeitung auf dem Server",
       "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
       "fact0Text": "IBANforge wird aus der Schweiz betrieben; die API selbst läuft in einer Region der Europäischen Union.",
@@ -1874,28 +1875,272 @@
       "title": "Rechtliches",
       "subtitle": "Die Dokumente, die den Dienst regeln: Bedingungen, Datenschutz, Auftragsverarbeitung, Betreiberidentität."
     },
-    "englishOnly": "Vertragsdokumente werden auf Englisch bereitgestellt — die englische Fassung ist massgebend.",
+    "englishOnly": "Vertragsdokumente werden auf Englisch bereitgestellt. Maßgebend ist die englische Fassung.",
     "updated": "Aktualisiert am",
     "docs": {
       "terms": {
-        "title": "Nutzungsbedingungen (Dokument auf Englisch)",
-        "description": "Nutzungsbedingungen der IBANforge-API und der Website. Massgebend ist die englische Fassung."
+        "title": "Nutzungsbedingungen",
+        "description": "Nutzungsbedingungen der IBANforge-API und der Website, als unverbindliche Übersetzung. Maßgebend ist die englische Fassung."
       },
       "privacy": {
-        "title": "Datenschutzerklärung (auf Englisch)",
-        "description": "Was IBANforge verarbeitet und speichert, wie lange, und Ihre Rechte nach DSG und DSGVO. Massgebend ist die englische Fassung."
+        "title": "Datenschutzerklärung",
+        "description": "Was IBANforge verarbeitet und speichert, wie lange, und Ihre Rechte nach DSG und DSGVO. Unverbindliche Übersetzung, maßgebend ist die englische Fassung."
       },
       "dpa": {
-        "title": "Auftragsverarbeitungsvertrag, DPA (auf Englisch)",
-        "description": "Vorunterzeichneter Auftragsverarbeitungsvertrag (Art. 28 DSGVO / DSG) für Kunden, die die IBANforge-API einbinden. Massgebend ist die englische Fassung."
+        "title": "Auftragsverarbeitungsvertrag (AVV)",
+        "description": "Vorunterzeichneter Auftragsverarbeitungsvertrag nach Art. 28 DSGVO und DSG für Kunden, die die IBANforge-API einbinden. Unverbindliche Übersetzung, maßgebend ist die englische Fassung."
       },
       "imprint": {
-        "title": "Impressum (auf Englisch)",
-        "description": "Betreiber und Kontakt für ibanforge.com und api.ibanforge.com. Massgebend ist die englische Fassung."
+        "title": "Impressum",
+        "description": "Betreiber, Anschrift und Kontakt für ibanforge.com und api.ibanforge.com."
       },
       "sla": {
-        "title": "Service-Level-Vereinbarung, SLA (auf Englisch)",
-        "description": "SLA der Editor- und OEM-Lizenzen: 99,5 % monatliche Verfügbarkeit, Servicegutschriften, Messung über die öffentliche Statusseite. Massgebend ist die englische Fassung."
+        "title": "Service-Level-Vereinbarung (SLA)",
+        "description": "SLA der Editor- und OEM-Abonnements: 99,5 % monatliche Verfügbarkeit, Servicegutschriften, Messung über die öffentliche Statusseite. Unverbindliche Übersetzung, maßgebend ist die englische Fassung."
+      }
+    },
+    "translation": {
+      "notice": "Unverbindliche Übersetzung. Maßgebend ist die englische Fassung.",
+      "englishLink": "Zur englischen Fassung",
+      "indexNotice": "Die Dokumente liegen als unverbindliche Übersetzungen vor. Maßgebend ist jeweils die englische Fassung."
+    },
+    "trust": {
+      "meta": {
+        "title": "Sicherheit und Vertrauen",
+        "description": "Wer IBANforge betreibt, wo die API läuft, was wie lange aufbewahrt wird, die Unterauftragsverarbeiter und die Grundlage ihrer Übermittlungen, Sicherheit, Verfügbarkeit und was wir nicht haben."
+      },
+      "eyebrow": "Für Ihre Datenschutzprüfung",
+      "hero": {
+        "title": "Sicherheit und Vertrauen",
+        "description": "Wer IBANforge betreibt, wo die API läuft, was sie wie lange aufbewahrt und was wir nicht haben. Jede Angabe verweist auf das Dokument oder die Prüfung, die sie belegt."
+      },
+      "checked": "Geprüft am 6. Oktober 2026. Maßgebend sind die Vertragsdokumente, nicht diese Zusammenfassung.",
+      "glance": {
+        "operator": {
+          "label": "Betreiber",
+          "value": "Einzelunternehmen, Schweiz"
+        },
+        "region": {
+          "label": "Region der API",
+          "value": "Amsterdam (EU)"
+        },
+        "ibans": {
+          "label": "Übermittelte IBAN",
+          "value": "Nicht gespeichert"
+        },
+        "notice": {
+          "label": "Frist vor einer Einstellung",
+          "value": "Sechs Monate, zahlende Kunden"
+        }
+      },
+      "operator": {
+        "title": "Wer IBANforge betreibt",
+        "lead": "IBANforge ist ein Einzelunternehmen nach Schweizer Recht, betrieben von Claude-Alain Martin.",
+        "country": "Schweiz",
+        "register": "Nicht im Handelsregister eingetragen: Ein Schweizer Einzelunternehmen muss sich erst ab einem Jahresumsatz von 100 000 Franken eintragen lassen (Art. 931 des Schweizerischen Obligationenrechts).",
+        "vat": "Nicht im Schweizer Mehrwertsteuerregister eingetragen.",
+        "people": "Eine Person entwickelt und betreibt den Dienst. Es gibt keine Beschäftigten.",
+        "contact": "Kontakt: support@ibanforge.com",
+        "link": "Impressum"
+      },
+      "hosting": {
+        "title": "Wo der Dienst läuft",
+        "sub": "Jede Zeile lässt sich von außen prüfen, mit dem Befehl daneben.",
+        "checkLabel": "Prüfen",
+        "api": {
+          "name": "API",
+          "body": "Railway, Region Amsterdam (Niederlande, EU). Schweizer Datenverkehr gelangt über den Netzwerkrand von Railway in Zürich.",
+          "checkNote": "Der Header x-railway-edge nennt den Netzwerkrand, der Ihnen am nächsten liegt (zrh1 aus der Schweiz). Die Region Amsterdam selbst ist von außen nicht sichtbar."
+        },
+        "site": {
+          "name": "Website und Dashboard",
+          "body": "Vercel. Die Funktionen laufen in der Region Frankfurt (Deutschland, EU); statische Seiten kommen aus dem globalen Netz von Vercel.",
+          "checkNote": "Im Header x-vercel-id ist der Teil nach dem ersten :: die Region, in der die Funktion lief: fra1 ist Frankfurt. Der erste Teil ist der Netzwerkrand, der Ihnen am nächsten liegt."
+        },
+        "mail": {
+          "name": "E-Mail, DNS und Sicherungen",
+          "body": "Infomaniak, Schweiz. Ein Server dort hält auch die nächtlichen Sicherungen des Kontostands.",
+          "checkNote": "Die Nameserver sind die von Infomaniak."
+        }
+      },
+      "retention": {
+        "title": "Was wir aufbewahren und wie lange",
+        "colWhat": "Daten",
+        "colKeep": "Aufbewahrung",
+        "rows": {
+          "0": {
+            "what": "Zur Validierung übermittelte IBAN",
+            "keep": "Nicht gespeichert. Verarbeitung im Arbeitsspeicher, um die Anfrage zu beantworten."
+          },
+          "1": {
+            "what": "Eine ungültige IBAN",
+            "keep": "Nur ihre ersten 4 Zeichen (Ländercode und Prüfziffern), mit den Anfrage-Metadaten, bis zu 12 Monate."
+          },
+          "2": {
+            "what": "Anfrage-Metadaten: Pfad, Status, Latenz, Zeit, User-Agent, Präfix des Schlüssels",
+            "keep": "12 Monate, danach automatisch gelöscht. Die IP-Adresse nur als gesalzener Hashwert."
+          },
+          "3": {
+            "what": "Protokoll des Netzwerkrands unseres API-Hosters: rohe IP-Adresse, Anfragepfad, Status, User-Agent, Zeit",
+            "keep": "7 Tage, von Railway geführt und gelöscht, außerhalb unserer eigenen Protokolle."
+          },
+          "4": {
+            "what": "Eine in das Datei-Audit hochgeladene Datei",
+            "keep": "Nur ihr kommentierter Bericht: 2 Stunden, wenn er nicht bezahlt ist, 24 Stunden nach der Zahlung."
+          },
+          "5": {
+            "what": "Ihre E-Mail-Adresse, wenn Sie eine angeben",
+            "keep": "Solange Ihr Schlüssel besteht. Auf Antrag aus dem aktiven Datenbestand gelöscht; Sicherungen, die sie noch enthalten, laufen innerhalb von 90 Tagen aus."
+          },
+          "6": {
+            "what": "Sicherungen des Kontostands: Schlüssel als Hashwerte, E-Mail-Adressen, Kontingente, Guthaben, Kaufbelege",
+            "keep": "Jede Nacht auf einen Server von Infomaniak in der Schweiz, 30 Tage an Kopien; monatliche Kopien auf einem Rechner des Betreibers in der Schweiz, die letzten drei aufbewahrt. Keine zur Validierung übermittelte IBAN, kein Anfrageprotokoll. Die Wiederherstellung wird getestet."
+          }
+        },
+        "post": {
+          "title": "IBAN im Body einer POST-Anfrage senden",
+          "body": "POST /v1/iban/validate, /v1/iban/batch und /v1/iban/compliance nehmen die IBAN im JSON-Body entgegen. Setzen Sie nie eine IBAN in eine URL: Das Protokoll des Netzwerkrands unseres Hosters erfasst den Anfragepfad."
+        },
+        "link": "Datenschutzerklärung"
+      },
+      "processors": {
+        "title": "Unterauftragsverarbeiter",
+        "sub": "Wer Daten für uns verarbeitet, wo, und auf welcher Grundlage Daten die Schweiz und die EU verlassen. Einträge im Data Privacy Framework am 5. Oktober 2026 im amtlichen Register geprüft.",
+        "col": {
+          "name": "Unterauftragsverarbeiter",
+          "role": "Rolle",
+          "region": "Region",
+          "ibans": "Erhält übermittelte IBAN?",
+          "basis": "Übermittlungsgrundlage"
+        },
+        "registerLink": "Registereintrag",
+        "documentLink": "Dokument",
+        "rows": {
+          "railway": {
+            "name": "Railway Corp.",
+            "role": "Hosting und Speicherung der API",
+            "region": "Amsterdam (EU)",
+            "ibans": "Ja, im Arbeitsspeicher, um die Anfrage zu beantworten",
+            "basis": "EU-US- und Swiss-US-Data-Privacy-Framework, aktiv (Railway Corporation)"
+          },
+          "vercel": {
+            "name": "Vercel Inc.",
+            "role": "Website und Dashboard; Eingaben im Playground werden an die API weitergeleitet",
+            "region": "Funktionen: Frankfurt (EU). Statische Seiten: globales Netz",
+            "ibans": "Nur eine im Playground der Website eingegebene IBAN",
+            "basis": "EU-US- und Swiss-US-Data-Privacy-Framework, aktiv (Vercel Inc.)"
+          },
+          "stripe": {
+            "name": "Stripe Payments Europe",
+            "role": "Kartenzahlungen",
+            "region": "EU",
+            "ibans": "Nein",
+            "basis": "In der EU niedergelassen. Das verbundene US-Unternehmen Stripe, LLC: EU-US- und Swiss-US-Data-Privacy-Framework, aktiv"
+          },
+          "coinbase": {
+            "name": "Coinbase (CDP-Facilitator)",
+            "role": "USDC-Abwicklung von x402-Zahlungen; der x402.org-Facilitator dient als Rückfallebene",
+            "region": "USA",
+            "ibans": "Nein",
+            "basis": "EU-US- und Swiss-US-Data-Privacy-Framework, aktiv (Coinbase, Inc.)"
+          },
+          "infomaniak": {
+            "name": "Infomaniak Network SA",
+            "role": "Transaktions- und Support-E-Mail; nächtliche Sicherung des Kontostands",
+            "region": "Schweiz",
+            "ibans": "Nur eine IBAN, die Sie uns in einer E-Mail schreiben",
+            "basis": "Schweiz: Angemessenheitsbeschluss der Europäischen Kommission"
+          },
+          "github": {
+            "name": "GitHub Inc.",
+            "role": "Öffentlicher Quellcode und CI, keine Kundendaten",
+            "region": "USA",
+            "ibans": "Nein",
+            "basis": "EU-US- und Swiss-US-Data-Privacy-Framework, aktiv (GitHub)"
+          },
+          "anthropic": {
+            "name": "Anthropic PBC",
+            "role": "KI-gestützte Entwürfe von Antworten auf E-Mails, vom Betreiber ausgelöst",
+            "region": "USA",
+            "ibans": "Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben",
+            "basis": "Nicht im Data Privacy Framework zertifiziert. Standardvertragsklauseln des Data Processing Addendum von Anthropic"
+          }
+        },
+        "note": "Dieselbe Liste mit denselben Grundlagen bildet Anhang II des Auftragsverarbeitungsvertrags.",
+        "noteLink": "Auftragsverarbeitungsvertrag",
+        "changes": "Ein neuer Unterauftragsverarbeiter wird mindestens 30 Tage, bevor er personenbezogene Daten erhält, per E-Mail an die Adresse jedes aktiven Schlüssels und im Changelog angekündigt; nach dem Auftragsverarbeitungsvertrag können Sie widersprechen."
+      },
+      "transfers": {
+        "title": "Übermittlungen aus der EU",
+        "switzerland": "IBANforge ist in der Schweiz niedergelassen. Die Europäische Kommission erkennt der Schweiz ein angemessenes Datenschutzniveau zu (Entscheidung 2000/518/EG) und hat dies bei ihrer Überprüfung vom 15. Januar 2024 bestätigt: Personenbezogene Daten können ohne Standardvertragsklauseln aus der EU an uns übermittelt werden.",
+        "us": "Für danach zertifizierte US-Unterauftragsverarbeiter stützen sich Übermittlungen auf den EU-US-Datenschutzrahmen (Durchführungsbeschluss (EU) 2023/1795 der Kommission) und, aus der Schweiz, auf den Swiss-US-Datenschutzrahmen, in Kraft seit dem 15. September 2024.",
+        "decisionLink": "Entscheidung 2000/518/EG",
+        "reviewLink": "Der EDÖB zur Überprüfung von 2024",
+        "dpfLink": "Durchführungsbeschluss (EU) 2023/1795",
+        "listLink": "Register des Data Privacy Framework"
+      },
+      "security": {
+        "title": "Sicherheit",
+        "tests": "Jeder Pull-Request führt die automatisierten Tests in GitHub Actions aus (API, Website, SDKs) und startet den Produktionscontainer, ebenso jede Änderung, die der Betreiber auf den Hauptzweig pusht. Die automatischen Datenaktualisierungen veröffentlichen ohne diese Testsuite und führen vorher eigene Prüfungen aus: Die Aktualisierungen der BIC-Daten und der tschechischen und italienischen Register führen die API-Tests aus und vergleichen die neuen Daten mit den bisherigen; die wöchentliche Aktualisierung der Compliance-Daten prüft, dass die von der API angekündigte Abdeckung den neuen Listen entspricht.",
+        "testsLink": "CI-Läufe",
+        "code": "Der Code ist öffentlich, unter der MIT-Lizenz: Jeder kann nachlesen, wie eine IBAN verarbeitet wird.",
+        "codeLink": "Quellcode",
+        "keys": "API-Schlüssel werden als SHA-256-Hashwerte gespeichert. Ein neu ausgegebener Schlüssel wird zusätzlich einmal zum Abruf vorgehalten und beim ersten Abruf, spätestens nach 7 Tagen, gelöscht.",
+        "tls": "Der gesamte Datenverkehr ist verschlüsselt. Aktuelle Clients handeln TLS 1.3 aus, HTTP wird auf HTTPS umgeleitet, und beide Hosts senden HSTS.",
+        "report": "Eine Schwachstelle melden Sie an support@ibanforge.com mit SECURITY im Betreff. Derselbe Weg steht in der security.txt beider Hosts (RFC 9116) und in unserer Sicherheitsrichtlinie.",
+        "reportTxt": "security.txt",
+        "reportPolicy": "Sicherheitsrichtlinie",
+        "deps": "Dependabot überwacht die Abhängigkeiten und öffnet Sicherheitsupdates als öffentliche Pull-Requests."
+      },
+      "availability": {
+        "title": "Verfügbarkeit, offen gesagt",
+        "status": "Die Statusseite veröffentlicht die Erfolgsquote der API über 7 und 30 Tage, berechnet aus unserem serverseitigen Anfrageprotokoll.",
+        "statusLink": "Statusseite",
+        "sla": "Editor- und OEM-Abonnements haben eine schriftliche SLA: 99,5 % Verfügbarkeit je Kalendermonat, mit Servicegutschriften.",
+        "slaLink": "SLA",
+        "probe": "Eine externe Sonde auf einem Server bei Infomaniak in der Schweiz ruft die API und die Website jede Minute auf und alarmiert den Betreiber. Ihre Ergebnisse werden nicht veröffentlicht.",
+        "instance": "Die API läuft als einzelne Instanz mit einem persistenten Speichervolumen in einer Region. Jede Aktualisierung, auch die automatischen Datenaktualisierungen, startet sie neu, und Anfragen, die während des Wechsels eintreffen, warten oder scheitern. Railway dokumentiert dies für jeden Dienst mit Speichervolumen; wir haben Wechsel von unter einer Minute bis zu knapp fünf Minuten beobachtet. Die Statusseite kann diese Anfragen nicht zählen, weil sie die API nie erreichen.",
+        "instanceLink": "Dokumentation von Railway"
+      },
+      "data": {
+        "title": "Woher die Daten stammen",
+        "registers": "Wo ein nationales Register abgefragt wird, stammt die Antwort aus ihm und nennt es, mit Datum: die Deutsche Bundesbank für Deutschland, SIX BankMaster für die Schweiz und Liechtenstein, die Nationalbanken Österreichs, Belgiens, Tschechiens und der Slowakei, neben anderen. Andernorts antwortet eine zusammengesetzte BIC-Karte, und die Antwort sagt, dass sie nicht maßgeblich ist.",
+        "permissions": "Wo ein Herausgeber Bedingungen stellt, werden sie in der Antwort selbst eingehalten; die Herausgeber, die uns eine schriftliche Genehmigung erteilt haben, stehen auf der Quellenseite.",
+        "frozen": "Rund zwei Drittel der Zeilen unseres BIC-Verzeichnisses stammen aus einer öffentlichen Kopie des SWIFT-Verzeichnisses, deren Daten von Januar 2018 stammen und nicht mehr aktualisiert werden. Wir sagen das auf der Quellenseite und im Health-Endpunkt der API; wo ein nationales Register antwortet, hat es Vorrang.",
+        "sourcesLink": "Quellen und Genehmigungen",
+        "docsLink": "Datenquellen, Register für Register"
+      },
+      "continuity": {
+        "title": "Falls IBANforge eingestellt würde",
+        "notice": "Jeder zahlende Kunde (Pro-Abonnenten, Inhaber von Guthabenpaketen, Editor/OEM-Kunden) wird mindestens sechs Monate vor der Einstellung per E-Mail und in den Nutzungsbedingungen informiert, und für den Monat der Einstellung wird keine Verlängerung berechnet. Für einen kostenlosen Schlüssel beträgt die Frist, bevor wir ihn beenden, mindestens 30 Tage.",
+        "noticeLink": "Nutzungsbedingungen, Ziffern 3 und 9",
+        "code": "Der Code ist unter der MIT-Lizenz veröffentlicht, und der Validierungskern ist ein eigenes MIT-Paket auf npm (ibanforge).",
+        "codeRepo": "Repository",
+        "codeNpm": "npm-Paket",
+        "selfhost": "Der Code der API kann auf Ihren eigenen Servern laufen. Die Datendateien des Repositorys unterliegen weiterhin den Bedingungen ihrer Herausgeber (NOTICE-Datei), und die Daten, die wir bereitstellen, aber nicht weitergeben dürfen, etwa die Register Österreichs, Belgiens und San Marinos, sind nicht im Repository: Eine anderswo betriebene Kopie antwortet dafür mit „nicht abgefragt“.",
+        "selfhostLink": "NOTICE-Datei"
+      },
+      "notHave": {
+        "title": "Was wir nicht haben",
+        "items": {
+          "0": "Keine Zertifizierung nach ISO 27001 oder SOC 2.",
+          "1": "Kein Team: Eine Person entwickelt und betreibt den Dienst.",
+          "2": "Keine zweite Region und keine Bereitschaftsinstanz (siehe Verfügbarkeit)."
+        },
+        "body": "Die Maßnahmen auf dieser Seite sind das, was wir stattdessen tun, und jede lässt sich prüfen."
+      },
+      "documents": {
+        "title": "Die Dokumente",
+        "terms": "Nutzungsbedingungen",
+        "privacy": "Datenschutzerklärung",
+        "dpa": "Auftragsverarbeitungsvertrag (AVV)",
+        "sla": "Service-Level-Vereinbarung (SLA)",
+        "imprint": "Impressum",
+        "status": "Statusseite",
+        "sources": "Quellen und Genehmigungen",
+        "securityTxt": "security.txt",
+        "securityPolicy": "Sicherheitsrichtlinie",
+        "dpaNote": "Der Auftragsverarbeitungsvertrag ist vorunterzeichnet; eine gegengezeichnete PDF-Fassung erhalten Sie auf Anfrage unter support@ibanforge.com. Er sieht Prüfungen einschließlich einer Inspektion vor, höchstens einmal pro Kalenderjahr und mit 30 Tagen Ankündigung, wenn die Unterlagen nicht ausreichen."
       }
     }
   },
@@ -2521,6 +2766,7 @@
       "bank_code_not_allocated": "Bankleitzahl nicht im nationalen Register",
       "modulus_check_failed": "Britische Kontoprüfziffer fehlgeschlagen",
       "national_check_digits_failed": "Nationale Prüfziffer fehlgeschlagen",
+      "national_check_digits_suspect": "Deutsche Kontoprüfziffer fehlgeschlagen (Warnung)",
       "sepa_not_reachable": "Per SEPA-Überweisung nicht erreichbar",
       "test_bic": "Test-BIC",
       "bic_mismatch": "BIC in der Datei weicht vom Register ab",

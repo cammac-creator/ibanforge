@@ -15,6 +15,7 @@ import {
   recencyBonus,
   repoOfUrl,
   scoreThread,
+  stripHtml,
   type MarketplaceDef,
   threadAgeDays,
   POSTABLE_SOURCE_NAMES,
@@ -410,5 +411,17 @@ describe('la règle du 03/09 — un mois, et seulement les forums où on peut r�
   it('seules les sources GitHub et Stack Exchange restent ingérées', () => {
     expect([...POSTABLE_SOURCE_NAMES].sort()).toEqual(['github', 'stackexchange']);
     expect(MAX_THREAD_AGE_DAYS).toBe(30);
+  });
+});
+
+describe('stripHtml', () => {
+  it('drops the tags and decodes the common entities', () => {
+    expect(stripHtml('IBAN &amp; BIC <b>check</b>')).toBe('IBAN & BIC check');
+    expect(stripHtml('&quot;a&quot; &#39;b&apos; 1 &lt; 2 &gt; 0')).toBe('"a" \'b\' 1 < 2 > 0');
+  });
+
+  it('decodes once: an escaped entity stays the text its author wrote', () => {
+    expect(stripHtml('write &amp;lt;b&amp;gt; for bold')).toBe('write &lt;b&gt; for bold');
+    expect(stripHtml('&amp;amp;')).toBe('&amp;');
   });
 });

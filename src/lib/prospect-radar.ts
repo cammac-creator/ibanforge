@@ -248,9 +248,13 @@ export function pageGist(html: string, cap = 1600): string {
     /<meta[^>]+content=["']([^"']{1,400})["'][^>]*name=["']description["']/i.exec(html)?.[1] ??
     /<meta[^>]+property=["']og:description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??
     '';
+  // An end tag may carry spaces or attributes before its `>` (`</script >`,
+  // `</script\n>`): a browser closes the element there, so the pattern does too.
+  // The gist feeds a prompt, not a page; this is about not handing the model a
+  // page's code as if it were its text.
   const body = html
     .replace(
-      /<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi,
+      /<script\b[\s\S]*?<\/script\b[^>]*>|<style\b[\s\S]*?<\/style\b[^>]*>|<noscript\b[\s\S]*?<\/noscript\b[^>]*>/gi,
       ' ',
     )
     .replace(/<[^>]+>/g, ' ')

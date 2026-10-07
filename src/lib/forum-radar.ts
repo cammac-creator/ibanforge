@@ -174,14 +174,24 @@ export function detectLang(text: string): 'en' | 'de' | 'fr' {
   return 'en';
 }
 
-function stripHtml(s: string): string {
+const HTML_ENTITIES: Readonly<Record<string, string>> = {
+  quot: '"',
+  '#39': "'",
+  apos: "'",
+  amp: '&',
+  lt: '<',
+  gt: '>',
+};
+
+/**
+ * Markup to plain text. The entities are decoded in ONE pass: decoded one
+ * after the other, `&amp;lt;` (the text "&lt;" as its author wrote it) went
+ * to `&lt;` and then to `<`, a character nobody typed.
+ */
+export function stripHtml(s: string): string {
   return s
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+    .replace(/&(quot|#39|apos|amp|lt|gt);/g, (_, name: string) => HTML_ENTITIES[name])
     .replace(/\s+/g, ' ')
     .trim();
 }

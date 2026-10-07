@@ -22,7 +22,8 @@ IBANforge is an IBAN validation and BIC lookup API. Three areas live in one repo
 
 **1. Never push to `main`.** A push to `main` deploys the API to production. There is no
 staging. Work on a branch, open a pull request, let CI go green, and let a human merge.
-`main` carries no branch protection: the rule is the protection.
+`main` carries a ruleset that forbids force-push and deletion (since 2026), but it requires no pull
+request and no review: for everything else, the rule is the protection.
 
 **2. This repository is public.** Never write a customer's or prospect's name, a real
 e-mail address, or a real activity figure (accounts, calls served, revenue, reply rates)
@@ -70,6 +71,16 @@ not watching.
 **10. Leave other people's work alone.** Several agents and sessions share this repository.
 Branches, worktrees under `.claude/`, and stashes belong to whoever made them. `git fetch`
 before every push. If you break `main`, fix it or revert it immediately.
+
+**11. Aucune donnée personnelle brute de la production ne passe par un assistant de code** (décision de
+Claude-Alain du 06.10.2026). Claude Code et Codex tournent sous des abonnements qu'aucun contrat de
+sous-traitance ne couvre, alors que le DPA (puce 4.5) réserve l'accès à la production à l'exploitant. Donc :
+jamais `railway logs` (le journal de bord de Railway porte les adresses IP en clair) ; jamais une requête qui
+affiche une ligne de `stats.sqlite` portant une adresse e-mail, une adresse IP, une empreinte d'IP, une clé, un
+portefeuille ou un agent utilisateur ; jamais l'ouverture d'un fichier de `~/ibanforge-backups/` ni de l'export
+`/v1/admin/backup`. De la base, seulement des comptes et des totaux, par un script en lecture seule qui n'imprime
+que des nombres. Pour voir une ligne précise, c'est Claude-Alain qui regarde. `/health`, les routes publiques et
+le CRM restent permis.
 
 ---
 
