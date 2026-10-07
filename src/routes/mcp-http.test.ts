@@ -761,9 +761,11 @@ describe('POST /mcp — an expired session says what to do about it', () => {
  * tools/call with no session header paid a unit, spent a session opening and
  * built a McpServer, for a 400.
  */
-describe('POST /mcp — no text promises a key on a transport that reads none', () => {
-  it('sends a caller whose allowance cannot be counted to REST or the npm package', () => {
-    expect(MCP_ACCOUNTING_UNAVAILABLE).toMatch(/reads no key/);
+describe('POST /mcp — the accounting refusal names every way on', () => {
+  it('sends a caller whose allowance cannot be counted to its key, REST or the npm package', () => {
+    // 07.10.2026 : le transport lit une clé dans les en-têtes, et le dit.
+    expect(MCP_ACCOUNTING_UNAVAILABLE).not.toMatch(/reads no key/);
+    expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('Authorization: Bearer ifk_');
     expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('https://api.ibanforge.com/v1');
     expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('IBANFORGE_API_KEY');
     expect(MCP_ACCOUNTING_UNAVAILABLE).not.toMatch(/use an API key or x402 to continue/);

@@ -48,19 +48,35 @@ Après enregistrement, redémarrez le client. Le module npm expose **13 outils**
 https://api.ibanforge.com/mcp
 ```
 
-Transport HTTP streamable, **25 appels d'outils gratuits par semaine et par adresse source**, sans aucune clé (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC ; un lot compte un appel par IBAN ; distinct de l'essai REST sans clé) : le chemin le plus rapide pour qu'un agent évalue la donnée avant tout engagement. Pour un usage suivi, lancez le paquet npm avec votre clé gratuite.
+Transport HTTP streamable, **25 appels d'outils gratuits par semaine et par adresse source**, sans aucune clé (semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC ; un lot compte un appel par IBAN ; distinct de l'essai REST sans clé) : le chemin le plus rapide pour qu'un agent évalue la donnée avant tout engagement. Pour un usage suivi, envoyez votre clé gratuite avec chaque requête (ci-dessous), ou lancez le paquet npm avec elle.
+
+### Avec votre clé
+
+L'endpoint hébergé lit une clé IBANforge envoyée dans un en-tête de la requête, `Authorization: Bearer ifk_…` ou `X-API-Key: ifk_…`, les deux mêmes en-têtes que l'API REST. Les appels d'outils se comptent alors sur cette clé exactement comme les appels REST : son allocation à elle, une unité par appel, une par IBAN dans un lot, rien sur les outils gratuits, et les mêmes refus. L'allocation sans clé ci-dessus n'est plus utilisée. Une clé écrite dans l'adresse (`?api_key=`) n'est pas lue. Si la clé est inconnue, révoquée ou épuisée, l'outil répond avec le message de l'API REST pour cette clé et ne retombe jamais sur l'allocation sans clé.
+
+**Claude Code :**
+
+```bash
+claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp --header "Authorization: Bearer ifk_votre_cle"
+```
+
+**Claude et Claude Desktop** (connecteur personnalisé, étapes plus bas) : sous **Request headers**, ajoutez l'en-tête `Authorization` avec la valeur `Bearer ifk_votre_cle`. La page de Claude, lue le 7 octobre 2026, décrit ce champ pour des identifiants fixes comme une clé d'API. En Team et Enterprise, tous ceux qui utilisent le connecteur partagent alors cette clé. *Non essayé par nous.*
+
+**ChatGPT :** la [page d'OpenAI sur l'authentification](https://developers.openai.com/plugins/build/auth), lue le 7 octobre 2026, indique que ChatGPT se connecte à un serveur MCP par OAuth ou sans authentification, et ne peut pas présenter une clé d'API. Dans ChatGPT, l'endpoint hébergé reste donc sur son allocation sans clé ; votre clé sert sur l'API REST, ou avec le paquet npm dans un autre client.
+
+**Gemini :** non vérifié par nous.
 
 ### L'ajouter comme connecteur dans un assistant de conversation
 
 Dans un assistant de conversation, l'adresse ci-dessus devient un *connecteur personnalisé* : l'assistant appelle alors lui-même les outils MCP, au lieu de deviner une réponse qu'il ne peut pas obtenir.
 
-**Un connecteur sans clé puise dans la même allocation sans clé que tout autre appelant**, comptée par adresse source. Dans Claude, les appels d'un connecteur partent du cloud d'Anthropic, pas de votre appareil (page officielle ci-dessous, section « Network requirements ») : cette allocation est donc partagée avec d'autres utilisateurs et peut être déjà épuisée quand vous commencez. Autres assistants : non vérifié par nous. L'endpoint hébergé ne lit aucune clé. Pour travailler avec votre propre clé, lancez le paquet npm dans un client de bureau avec `IBANFORGE_API_KEY` renseignée (Option 1 ci-dessus), ou appelez l'API REST avec la clé : un POST sur `https://api.ibanforge.com/v1/keys/generate` sans corps en renvoie une, sans e-mail.
+**Un connecteur sans clé puise dans la même allocation sans clé que tout autre appelant**, comptée par adresse source. Dans Claude, les appels d'un connecteur partent du cloud d'Anthropic, pas de votre appareil (page officielle ci-dessous, section « Network requirements ») : cette allocation est donc partagée avec d'autres utilisateurs et peut être déjà épuisée quand vous commencez. Autres assistants : non vérifié par nous. Avec votre propre clé, le connecteur se compte sur cette clé : voir *Avec votre clé* ci-dessus (Claude la prend en en-tête de requête, ChatGPT n'en envoie aucune). Un POST sur `https://api.ibanforge.com/v1/keys/generate` sans corps renvoie une clé, sans e-mail.
 
 Où cliquer, d'après la page officielle de chaque éditeur lue le 24 septembre 2026 ; les menus changent, et la page citée fait foi.
 
 **Claude** ([page officielle](https://support.claude.com/en/articles/11175166), mise à jour le 11 août 2026). Les connecteurs personnalisés sont ouverts aux plans Free, Pro, Max, Team et Enterprise ; en Free, un seul connecteur personnalisé. *Non essayé par nous.*
 
-- Plan individuel (la page donne ces étapes sous Pro et Max) : ouvrez **Customize > Connectors**, cliquez sur **+** puis **Add custom connector**, saisissez `https://api.ibanforge.com/mcp` et cliquez sur **Add**. Les champs OAuth de **Advanced settings** sont facultatifs ; ce serveur ne demande aucune authentification.
+- Plan individuel (la page donne ces étapes sous Pro et Max) : ouvrez **Customize > Connectors**, cliquez sur **+** puis **Add custom connector**, saisissez `https://api.ibanforge.com/mcp` et cliquez sur **Add**. Les champs OAuth de **Advanced settings** sont facultatifs ; ce serveur ne demande aucune authentification. Pour utiliser votre clé, remplissez **Request headers** (voir *Avec votre clé* ci-dessus).
 - Team ou Enterprise : un Owner ouvre **Organization settings > Connectors**, clique sur **Add**, survole **Custom** et choisit **Web**, saisit l'adresse et clique sur **Add** ; les membres le trouvent ensuite dans **Customize > Connectors** et cliquent sur **Connect**.
 - Dans une conversation : le bouton **+** en bas à gauche, puis **Connectors**, pour l'activer.
 
@@ -176,9 +192,17 @@ Signaler un résultat faux, une donnée périmée ou absente, ou tout ce qui vou
 
 Demander une clé sans e-mail : l’outil rend un lien qu’une personne ouvre et approuve dans son navigateur. Disponible sur les deux transports.
 
+La clé ne débloque pas la session qui l’a demandée : elle sert une fois placée dans la configuration du client, après une reconnexion. Où la mettre :
+
+- **Claude Code avec le paquet npm :** la `config_line` que rend `poll_api_key`, une commande `claude mcp add … -e IBANFORGE_API_KEY=…`.
+- **Claude Code sur l’endpoint hébergé :** `--header "Authorization: Bearer ifk_…"` (voir *Avec votre clé*).
+- **Claude et Claude Desktop :** les **Request headers** du connecteur personnalisé, ou `IBANFORGE_API_KEY` dans `claude_desktop_config.json` avec le paquet npm (Option 1).
+- **ChatGPT :** nulle part sur un connecteur, qui n’envoie aucune clé ; la clé sert sur l’API REST.
+- **Tout client HTTP :** l’API REST, avec `Authorization: Bearer ifk_…`.
+
 ### poll_api_key
 
-Récupérer la clé après son approbation, avec le `device_code` reçu de `request_api_key`. La clé n’est rendue qu’une fois : conservez-la. Disponible sur les deux transports.
+Récupérer la clé après son approbation, avec le `device_code` reçu de `request_api_key`. La clé n’est rendue qu’une fois : conservez-la, et placez-la comme le dit la liste ci-dessus. Disponible sur les deux transports.
 
 ## Des résultats qui disent quoi faire ensuite
 

@@ -181,6 +181,8 @@ quotas:
     resets: ${TRIAL_RESET}
     unit: one per tool call, one per IBAN in batch_validate_iban
     note: Full paid responses over the HTTP MCP transport with no key and no wallet. Separate from the REST trial below.
+      With an API key in the Authorization (Bearer) or X-API-Key header, the calls count against
+      that key exactly as on the REST API (free_tier above), not against this allowance.
   mcp_sessions:
     requests: ${MCP_SESSIONS_PER_IP_DAY}
     window: 1 day

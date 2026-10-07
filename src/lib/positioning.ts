@@ -393,8 +393,9 @@ export const NO_SIMULATION_RULE =
  * connector with no key draws on the keyless MCP allowance like any caller,
  * counted per source address, and in Claude its calls leave from Anthropic's
  * cloud (Anthropic's page, "Network requirements"): the allowance is shared
- * with other users behind that address. /mcp reads no key (the key middleware
- * is mounted on /v1/* only), so the way to a key is the npm package or REST.
+ * with other users behind that address. Since 07.10.2026 /mcp reads a key in
+ * the request headers (Claude's custom connectors take one under "Request
+ * headers"; ChatGPT's send none, per OpenAI's page on authentication).
  */
 export const CONNECTOR_HINT =
   'To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom ' +
@@ -402,9 +403,10 @@ export const CONNECTOR_HINT =
   'A connector with no key draws on the same keyless allowance as any other caller, counted per source address. ' +
   "In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), " +
   'so that allowance is shared with other users and may already be spent; other assistants were not checked by us. ' +
-  'The hosted endpoint reads no key: to use one, run the npm package ibanforge-mcp in a desktop client with ' +
-  'IBANFORGE_API_KEY set, or call the REST API with it (a POST to https://api.ibanforge.com/v1/keys/generate ' +
-  'with no body returns a key, no e-mail).';
+  'With a key, the hosted endpoint counts the calls against that key, as the REST API does: in Claude, the user ' +
+  'adds the request header Authorization: Bearer followed by the key when creating the connector; ChatGPT sends ' +
+  "no key to a connector (OpenAI's documentation). A POST to https://api.ibanforge.com/v1/keys/generate with no " +
+  'body returns a key, no e-mail; the npm package ibanforge-mcp reads it from IBANFORGE_API_KEY.';
 
 /** The block as lines of text: llms.txt of the API, README and the site's llms files. */
 export function cannotCallLines(): string[] {

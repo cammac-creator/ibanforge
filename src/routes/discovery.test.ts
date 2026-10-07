@@ -143,9 +143,10 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     expect(Array.isArray(body.authentication_methods)).toBe(true);
   });
 
-  it('says on both /mcp spellings that the transport reads no credential (review of 24/09/2026)', async () => {
+  it('says on both /mcp spellings that the transport reads an optional key, and nothing else (07.10.2026)', async () => {
     // It used to copy the API's metadata and announce api_key and x402 for /mcp,
-    // which reads neither.
+    // which then read neither (review of 24/09/2026). Since 07.10.2026 /mcp
+    // reads an optional key in the headers; still no OAuth and no x402.
     const app = makeApp();
     for (const path of [
       '/.well-known/oauth-protected-resource/mcp',
@@ -153,14 +154,19 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     ]) {
       const body = (await (await app.request(path)).json()) as {
         bearer_methods_supported: string[];
-        authentication_methods: unknown[];
+        authentication_methods: Array<{ type: string; required: boolean }>;
         authorization_servers?: unknown;
         note: string;
       };
+      // Vide exprès : pas de jeton OAuth, et Claude lit ce champ quand on
+      // ajoute un connecteur (voir le commentaire de MCP_RESOURCE_METADATA).
       expect(body.bearer_methods_supported, path).toEqual([]);
-      expect(body.authentication_methods, path).toEqual([]);
+      expect(body.authentication_methods, path).toEqual([
+        expect.objectContaining({ type: 'api_key', required: false }),
+      ]);
       expect(body.authorization_servers, path).toBeUndefined();
-      expect(body.note, path).toMatch(/reads no credential/);
+      expect(body.note, path).toMatch(/needs no credential/);
+      expect(body.note, path).toMatch(/No OAuth and no x402/);
     }
     // The API's own document keeps its two methods.
     const api = (await (await app.request('/.well-known/oauth-protected-resource')).json()) as {

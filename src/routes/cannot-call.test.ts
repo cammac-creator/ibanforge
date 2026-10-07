@@ -126,10 +126,13 @@ describe('what the block may not say', () => {
 
   it('says the connector route shares the keyless allowance, and where a key goes', () => {
     // Review of 24/09/2026 (D8): the connector was offered as a way into the
-    // allowance, while its calls leave from the assistant's servers and /mcp
-    // reads no key.
+    // allowance, while its calls leave from the assistant's servers. Since
+    // 07.10.2026 /mcp reads a key in the headers: the hint says where it goes,
+    // and that ChatGPT sends none.
     expect(CONNECTOR_HINT).toMatch(/same keyless allowance/);
-    expect(CONNECTOR_HINT).toMatch(/reads no key/);
+    expect(CONNECTOR_HINT).toMatch(/request header Authorization: Bearer/);
+    expect(CONNECTOR_HINT).toMatch(/ChatGPT sends no key to a connector/);
+    expect(CONNECTOR_HINT).not.toMatch(/reads no key/);
     expect(CONNECTOR_HINT).toContain('IBANFORGE_API_KEY');
     expect(CONNECTOR_HINT).not.toMatch(/x402/);
   });

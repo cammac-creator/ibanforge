@@ -190,7 +190,7 @@ Remote MCP: add `https://api.ibanforge.com/mcp` in a compatible client. For a lo
 npx -y ibanforge-mcp
 ```
 
-Or the hosted transport, no install: `https://api.ibanforge.com/mcp` — it answers 25 free tool calls a week per source address with no key at all (ISO week in UTC, reset on Monday 00:00 UTC), which is the fastest way for an assistant to evaluate the data before you commit to anything.
+Or the hosted transport, no install: `https://api.ibanforge.com/mcp` — it answers 25 free tool calls a week per source address with no key at all (ISO week in UTC, reset on Monday 00:00 UTC), which is the fastest way for an assistant to evaluate the data before you commit to anything. With your key in the `Authorization: Bearer` header, its calls count against that key exactly as on the REST API ([where to put it](/docs/mcp)).
 
 ## What you get back
 

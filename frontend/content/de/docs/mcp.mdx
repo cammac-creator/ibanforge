@@ -48,19 +48,35 @@ Nach dem Speichern den Client neu starten. Das npm-Paket bietet **13 Tools**, de
 https://api.ibanforge.com/mcp
 ```
 
-Streamable-HTTP-Transport, **25 kostenlose Tool-Aufrufe pro Woche und Quelladresse**, ganz ohne Schlüssel (ISO-Woche in UTC, Neustart montags um 00:00 UTC; ein Batch zählt einen Aufruf pro IBAN; getrennt vom REST-Test ohne Schlüssel): der schnellste Weg für einen Agenten, die Daten zu prüfen, bevor Sie sich festlegen. Für dauerhafte Nutzung das npm-Paket mit dem kostenlosen Schlüssel betreiben.
+Streamable-HTTP-Transport, **25 kostenlose Tool-Aufrufe pro Woche und Quelladresse**, ganz ohne Schlüssel (ISO-Woche in UTC, Neustart montags um 00:00 UTC; ein Batch zählt einen Aufruf pro IBAN; getrennt vom REST-Test ohne Schlüssel): der schnellste Weg für einen Agenten, die Daten zu prüfen, bevor Sie sich festlegen. Für dauerhafte Nutzung den kostenlosen Schlüssel mit jeder Anfrage senden (siehe unten) oder das npm-Paket damit betreiben.
+
+### Mit Ihrem Schlüssel
+
+Der gehostete Endpoint liest einen IBANforge-Schlüssel aus einem Header der Anfrage, `Authorization: Bearer ifk_…` oder `X-API-Key: ifk_…`, dieselben zwei Header wie die REST-API. Die Tool-Aufrufe werden dann genau wie REST-Aufrufe auf diesen Schlüssel gezählt: sein eigenes Kontingent, eine Einheit pro Aufruf, eine pro IBAN in einem Batch, nichts für die kostenlosen Tools, und dieselben Ablehnungen. Das schlüssellose Kontingent oben wird nicht mehr genutzt. Ein Schlüssel in der Adresse (`?api_key=`) wird nicht gelesen. Ist der Schlüssel unbekannt, widerrufen oder aufgebraucht, antwortet das Tool mit der Meldung der REST-API für diesen Schlüssel und fällt nie auf das schlüssellose Kontingent zurück.
+
+**Claude Code:**
+
+```bash
+claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp --header "Authorization: Bearer ifk_ihr_schluessel"
+```
+
+**Claude und Claude Desktop** (benutzerdefinierter Connector, Schritte unten): Unter **Request headers** den Header `Authorization` mit dem Wert `Bearer ifk_ihr_schluessel` hinzufügen. Die Seite von Claude, gelesen am 7. Oktober 2026, beschreibt dieses Feld für feste Zugangsdaten wie API-Schlüssel. In Team und Enterprise teilen sich dann alle, die den Connector nutzen, diesen Schlüssel. *Von uns nicht ausprobiert.*
+
+**ChatGPT:** Die [Seite von OpenAI zur Authentifizierung](https://developers.openai.com/plugins/build/auth), gelesen am 7. Oktober 2026, sagt, dass ChatGPT sich mit OAuth oder ohne Authentifizierung mit einem MCP-Server verbindet und keinen eigenen API-Schlüssel übergeben kann. In ChatGPT bleibt der gehostete Endpoint daher beim schlüssellosen Kontingent; Ihr Schlüssel dient der REST-API oder dem npm-Paket in einem anderen Client.
+
+**Gemini:** von uns nicht geprüft.
 
 ### Als Connector in einem Chat-Assistenten hinzufügen
 
 In einem Chat-Assistenten wird die Adresse oben zu einem *benutzerdefinierten Connector*: Der Assistent ruft die MCP-Tools dann selbst auf, statt eine Antwort zu erraten, die er nicht abrufen kann.
 
-**Ein Connector ohne Schlüssel greift auf dasselbe schlüssellose Kontingent zu wie jeder andere Aufrufer**, gezählt pro Quelladresse. In Claude gehen die Aufrufe eines Connectors von der Cloud von Anthropic aus, nicht von Ihrem Gerät (offizielle Seite unten, Abschnitt „Network requirements“): Dieses Kontingent wird also mit anderen Nutzern geteilt und kann schon aufgebraucht sein, wenn Sie beginnen. Andere Assistenten: von uns nicht geprüft. Der gehostete Endpoint liest keinen Schlüssel. Um mit Ihrem eigenen Schlüssel zu arbeiten, betreiben Sie das npm-Paket in einem Desktop-Client mit gesetztem `IBANFORGE_API_KEY` (Option 1 oben), oder rufen Sie die REST-API mit dem Schlüssel auf: Ein POST auf `https://api.ibanforge.com/v1/keys/generate` ohne Body liefert einen, ohne E-Mail.
+**Ein Connector ohne Schlüssel greift auf dasselbe schlüssellose Kontingent zu wie jeder andere Aufrufer**, gezählt pro Quelladresse. In Claude gehen die Aufrufe eines Connectors von der Cloud von Anthropic aus, nicht von Ihrem Gerät (offizielle Seite unten, Abschnitt „Network requirements“): Dieses Kontingent wird also mit anderen Nutzern geteilt und kann schon aufgebraucht sein, wenn Sie beginnen. Andere Assistenten: von uns nicht geprüft. Mit Ihrem eigenen Schlüssel wird der Connector auf diesen Schlüssel gezählt: siehe *Mit Ihrem Schlüssel* oben (Claude nimmt ihn als Header der Anfrage, ChatGPT sendet keinen). Ein POST auf `https://api.ibanforge.com/v1/keys/generate` ohne Body liefert einen Schlüssel, ohne E-Mail.
 
 Wo Sie klicken, nach der offiziellen Seite jedes Anbieters, gelesen am 24. September 2026; Menüs ändern sich, maßgeblich ist die verlinkte Seite.
 
 **Claude** ([offizielle Seite](https://support.claude.com/en/articles/11175166), aktualisiert am 11. August 2026). Benutzerdefinierte Connectors gibt es in den Plänen Free, Pro, Max, Team und Enterprise; im Free-Plan ist es ein einziger benutzerdefinierter Connector. *Von uns nicht ausprobiert.*
 
-- Einzelplan (die Seite führt diese Schritte unter Pro und Max): **Customize > Connectors** öffnen, auf **+** und dann **Add custom connector** klicken, `https://api.ibanforge.com/mcp` eingeben und auf **Add** klicken. Die OAuth-Felder unter **Advanced settings** sind optional; dieser Server verlangt keine Authentifizierung.
+- Einzelplan (die Seite führt diese Schritte unter Pro und Max): **Customize > Connectors** öffnen, auf **+** und dann **Add custom connector** klicken, `https://api.ibanforge.com/mcp` eingeben und auf **Add** klicken. Die OAuth-Felder unter **Advanced settings** sind optional; dieser Server verlangt keine Authentifizierung. Für Ihren Schlüssel **Request headers** ausfüllen (siehe *Mit Ihrem Schlüssel* oben).
 - Team oder Enterprise: Ein Owner öffnet **Organization settings > Connectors**, klickt auf **Add**, fährt über **Custom** und wählt **Web**, gibt die Adresse ein und klickt auf **Add**; Mitglieder finden ihn danach unter **Customize > Connectors** und klicken auf **Connect**.
 - In einer Unterhaltung: die Schaltfläche **+** unten links, dann **Connectors**, um ihn einzuschalten.
 
@@ -176,9 +192,17 @@ Ein falsches Ergebnis, veraltete oder fehlende Daten oder alles, was Sie an der 
 
 Einen Schlüssel ohne E-Mail anfordern: Das Tool liefert einen Link, den eine Person im Browser öffnet und genehmigt. Auf beiden Transporten verfügbar.
 
+Der Schlüssel schaltet die Sitzung, die ihn angefordert hat, nicht frei: Er wirkt, sobald er in der Konfiguration des Clients steht, nach einer neuen Verbindung. Wohin damit:
+
+- **Claude Code mit dem npm-Paket:** die `config_line`, die `poll_api_key` liefert, ein Befehl `claude mcp add … -e IBANFORGE_API_KEY=…`.
+- **Claude Code am gehosteten Endpoint:** `--header "Authorization: Bearer ifk_…"` (siehe *Mit Ihrem Schlüssel*).
+- **Claude und Claude Desktop:** die **Request headers** des benutzerdefinierten Connectors, oder `IBANFORGE_API_KEY` in `claude_desktop_config.json` mit dem npm-Paket (Option 1).
+- **ChatGPT:** nirgends an einem Connector, der keinen Schlüssel sendet; der Schlüssel dient der REST-API.
+- **Jeder HTTP-Client:** die REST-API, mit `Authorization: Bearer ifk_…`.
+
 ### poll_api_key
 
-Den genehmigten Schlüssel mit dem `device_code` von `request_api_key` abholen. Er wird nur einmal ausgegeben: bewahren Sie ihn auf. Auf beiden Transporten verfügbar.
+Den genehmigten Schlüssel mit dem `device_code` von `request_api_key` abholen. Er wird nur einmal ausgegeben: bewahren Sie ihn auf und hinterlegen Sie ihn, wie die Liste oben sagt. Auf beiden Transporten verfügbar.
 
 ## Ergebnisse, die sagen, was als Nächstes zu tun ist
 
