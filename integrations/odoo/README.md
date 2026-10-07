@@ -43,10 +43,14 @@ refreshed with `git subtree`, see below).
 
 ## Refresh the dedicated repository after a change here
 
-Run from the main checkout, after the change is merged into `main`:
+Copy this folder over a clone of the dedicated repository and push a normal commit, after the
+change is merged into `main`. (`git subtree split` also works but walks the whole history of this
+repository, which takes many minutes and forces a `push -f`; do not mix the two methods.)
 
 ```bash
-git -C ~/ibanforge subtree split --prefix=integrations/odoo -b odoo-18.0
-git -C ~/ibanforge push -f git@github.com:cammac-creator/ibanforge-odoo.git odoo-18.0:18.0
-git -C ~/ibanforge branch -D odoo-18.0
+git clone --branch 18.0 git@github.com:cammac-creator/ibanforge-odoo.git /tmp/ibanforge-odoo-refresh
+rsync -a --delete --exclude '.git' --exclude '__pycache__' ~/ibanforge/integrations/odoo/ /tmp/ibanforge-odoo-refresh/
+git -C /tmp/ibanforge-odoo-refresh add -A
+git -C /tmp/ibanforge-odoo-refresh commit -m "Module update"
+git -C /tmp/ibanforge-odoo-refresh push origin 18.0
 ```
