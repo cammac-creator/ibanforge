@@ -31,6 +31,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Bulletin du lundi (étape B) : le score et trois lignes déposés EN PLUS du
+          # message Telegram, par POST /internal/bulletin/weekly-reco-baseline. Absent,
+          # le dépôt est sauté avec un avertissement ; jamais un échec du run, jamais le
+          # contenu dans ce journal public (scripts/bulletin-deposit.ts).
+          BULLETIN_FEED_TOKEN: ${{ secrets.BULLETIN_FEED_TOKEN }}
         run: npm run reco-baseline
 
       # Homme mort : dire au backend que ce cron est bien passé.
