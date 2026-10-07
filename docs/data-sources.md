@@ -80,6 +80,42 @@ Bank », « Izvor: HNB »). Depuis le 01/10/2026, les 36 clés suédoises aussi 
 liste de Bankinfrastruktur i Sverige AB est publique (réponse écrite de Finance
 Sweden du 30/09/2026), sous son avertissement, que porte chaque réponse.
 
+## 07/10/2026 : 31 des 44 codes italiens restés sans BIC retrouvent le leur, depuis des sources ouvertes
+
+La reconstruction du 29/09 avait laissé 44 codes italiens sans BIC (38 du
+registre, 6 hors registre, dont Poste Italiane 07601). Chacun a été repris
+code par code, uniquement sur des sources ouvertes, par
+`scripts/derive-map-keys.ts --add`, qui garde la règle du 29/09 (l'ancien BIC
+n'est jamais lu, une dérivation ambiguë ne donne rien) et ajoute deux étapes :
+
+1. **Succursale d'une banque étrangère** (23 codes). La Banca d'Italia ne publie
+   pas de LEI pour la succursale, ou publie un LEI de succursale auquel GLEIF
+   n'associe aucun BIC : une succursale n'a pas de personnalité juridique, son
+   BIC italien appartient au LEI du siège. La liste quotidienne des IFM de la
+   BCE (édition du 06/10/2026) nomme la succursale italienne et le LEI de son
+   siège (`HEAD_LEI`) ; la ligne BCE est retrouvée par le LEI publié par la
+   Banca d'Italia, ou à défaut par le nom exact ET la ville, uniques des deux
+   côtés. Puis le BIC italien unique que GLEIF associe à ce LEI. Aucune valeur
+   de la BCE n'est servie avec ces clés : la liste ne sert qu'à choisir.
+2. **Le site de la banque elle-même** (8 codes), en dernier : le BIC écrit sur
+   le domaine de la banque ou de son groupe, jamais un annuaire de codes IBAN
+   ou BIC. Il ne peut que départager les BIC de siège que GLEIF associe déjà à
+   la banque (03048, 03104) ; un site qui en nomme un autre est un conflit et
+   ne donne rien. Pour un code hors registre (Poste Italiane), une phrase de la
+   banque doit porter le code lui-même. Adresse, date et phrase citée :
+   `scripts/data/it-bank-site-bics.json` ; le script refuse une phrase qui
+   n'épelle pas le BIC.
+
+Restent sans BIC, comme voulu (`not_in_register` / `absent_from_reference_data`
+hors registre, verdict du registre inchangé sinon) : 8 codes du registre sans
+BIC dans aucune source ouverte (03179, 03269, 03296, 03386, 03407, 03593,
+10312, 36944), et 5 codes hors des registres d'IBAN (23004, 23018, 23019 et
+31011 figurent chez la Banca d'Italia, mais dans des registres que le
+chargeur italien ne lit pas parce qu'ils ne sont pas ceux des émetteurs d'IBAN :
+sociétés de gestion, intermédiaires financiers ; 36087 n'y figure nulle part). Mesure code par code (`scripts/audit/curated-map-replay.ts`) :
+31 codes italiens gagnent un BIC, aucun autre code italien et aucun des 63
+autres pays ne change de réponse.
+
 ## Ce qui alimente `bic.sqlite`
 
 Comptes relevés le 22/08/2026, à recompter après chaque rafraîchissement
@@ -314,6 +350,7 @@ Origines, relevées dans l'historique git et dans les scripts des projets amont 
 | SIX BankMaster | CH | voir plus haut |
 | clés dérivées de `bic_entries` (`51f86e96`) | GB, IE, **SM**, **la plupart des clés NL** et les autres pays dont le code banque de l'IBAN est alphabétique | les sources de `bic.sqlite` (GLEIF, et SwiftCodes du groupe B). Les 11 clés SM sont des préfixes de BIC tirés de là, pas une donnée de la BCSM ni de schwifty (le code bancaire d'un IBAN saint-marinais compte six caractères, ces clés de quatre lettres ne servent probablement jamais) ; 729 des 735 clés NL ajoutées le jour de l'import schwifty viennent de ce mécanisme, pas de schwifty |
 | reconstruction du 29/09/2026 (`scripts/derive-map-keys.ts`) | IT (175 clés), RO (23 clés) | IT : LEI publié par la Banca d'Italia pour le code, puis BIC que GLEIF associe à ce LEI ; RO : le BIC8 roumain unique de GLEIF qui commence par le code. Jamais la copie SwiftCodes |
+| ajouts du 07/10/2026 (même script, `--add`) | IT (31 clés) | 23 : succursale italienne d'une banque étrangère, LEI de son siège donné par la liste des IFM de la BCE, puis BIC italien que GLEIF associe à ce LEI ; 8 : BIC publié par la banque sur son propre site (adresse, date et phrase citée dans `scripts/data/it-bank-site-bics.json`). Trace code par code : `scripts/data/it-map-additions-2026-10-07.json` |
 | ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
 
 **Clés CZ, 25/09/2026** : les 36 clés tchèques ont été confrontées au číselník
