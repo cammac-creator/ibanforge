@@ -256,8 +256,10 @@ export const FREE_TIER_NOTE =
   `free with no key on this transport: ${MCP_WEEKLY_LIMIT} units a week per source address, one per call and ` +
   `one per IBAN in batch_validate_iban, reset on ${TRIAL_RESET}. ` +
   `Or an ifk_ key with no e-mail at all: POST ${KEY_GENERATE_URL} with no body for ` +
-  `${ANONYMOUS_MONTHLY_LIMIT} REST calls/month, and POST /v1/keys/claim lifts that same key to ` +
-  `${FREE_TIER_MONTHLY_LIMIT} a month`;
+  `${ANONYMOUS_MONTHLY_LIMIT} calls/month, on the REST API or on this transport, and POST /v1/keys/claim lifts that same key to ` +
+  `${FREE_TIER_MONTHLY_LIMIT} a month. ` +
+  // 07.10.2026 : le transport lit la clé (décision de Claude-Alain, point 7).
+  'Send the key here as Authorization: Bearer ifk_… (or X-API-Key) and each call counts against it exactly as on the REST API';
 const costLine = (price: string): string => `COST: ${price} (${FREE_TIER_NOTE}).`;
 
 /**
@@ -1080,7 +1082,8 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
       title: 'Request an IBANforge API key',
       description:
         'Start the process that gives your human a free IBANforge API key, without any e-mail address. ' +
-        'The key does not unlock this session: it works once your human puts it in the MCP client configuration (`config_line`, returned by poll_api_key) or sends it to the REST API, so tell them that when you hand it over. ' +
+        'The key does not unlock this session: it works once your human puts it in the MCP client configuration and reconnects, or sends it to the REST API, so tell them where it goes when you hand it over: ' +
+        '`config_line` (returned by poll_api_key) for Claude Code with the npm package; for the hosted server https://api.ibanforge.com/mcp, the header "Authorization: Bearer <key>", which Claude and Claude Desktop take under Request headers when the custom connector is added; ChatGPT sends no key to a connector, so in ChatGPT the key serves on the REST API only. ' +
         'USE WHEN: you used up the free allowance, a call answers 402, or your human is about to run more than a handful of validations. ' +
         'WHAT YOU MUST DO WITH THE RESULT: read `status` first — `ok` means a code was issued, anything else means no code exists and `display_to_human` tells you and your human what to do instead. ' +
         'On `ok`, show `display_to_human` to your human VERBATIM (the user_code and the link) and say, in your own words, that opening the link and approving takes about fifteen seconds and asks for nothing. ' +
@@ -1187,7 +1190,7 @@ function createMcpServer(ctx: McpCallContext, sessionKey: () => string | undefin
         'HOW TO CALL IT: leave `device_code` empty to reuse the last request from this session. ' +
         'The server usually waits up to thirty seconds before answering, and sometimes answers at once when it is busy — either way, calling it once per minute is enough, never in a tight loop. ' +
         'WHAT THE ANSWERS MEAN: `authorization_pending` is normal and means nobody has approved yet — wait `retry_in_seconds` and call again; ' +
-        '`approved` carries the key ONCE and never again, so hand it to your human immediately together with `config_line`; ' +
+        '`approved` carries the key ONCE and never again, so hand it to your human immediately together with `config_line`, or the header "Authorization: Bearer <key>" for the hosted server; ' +
         '`access_denied` means somebody refused — tell your human, ask THEM whether to try again, and open at most ONE more request; ' +
         '`expired_token` means the code timed out — you may call request_api_key ONE more time, and if that expires too, stop and keep using the keyless allowance or x402; ' +
         '`invalid_grant` means this code can no longer be used at all — stop. ' +
@@ -1375,13 +1378,15 @@ function checkMcpSessionLimit(key: string): {
 /**
  * The refusal when the keyless allowance could not be counted at all.
  *
- * It used to say "use an API key or x402 to continue" on /mcp, which reads
- * neither (review of 24/09/2026): the ways to continue are the REST API and the
- * npm package.
+ * It used to say "use an API key or x402 to continue" on /mcp, which read
+ * neither (review of 24/09/2026). Since 07.10.2026 the transport reads a key in
+ * the headers, never x402: the key comes first, then the REST API and the npm
+ * package.
  */
 export const MCP_ACCOUNTING_UNAVAILABLE =
-  'Free-tier accounting is temporarily unavailable on this transport, which reads no key. ' +
-  'To continue, call the REST API (https://api.ibanforge.com/v1) with a key or an x402 payment, ' +
+  'Free-tier accounting is temporarily unavailable on this transport. ' +
+  'To continue, send your IBANforge key on this transport (Authorization: Bearer ifk_… or X-API-Key), ' +
+  'call the REST API (https://api.ibanforge.com/v1) with a key or an x402 payment, ' +
   'or run the npm package ibanforge-mcp with IBANFORGE_API_KEY set.';
 
 export function mcpAllowanceRefusal(
@@ -1400,7 +1405,9 @@ export function mcpAllowanceRefusal(
       `one per tool call and one per IBAN in batch_validate_iban; it resets on ${TRIAL_RESET} (${resetsAt}). ` +
       'You can take a key without giving anyone an e-mail: POST ' +
       `${KEY_GENERATE_URL} with no body at all returns an ifk_ key worth ` +
-      `${ANONYMOUS_MONTHLY_LIMIT} REST calls/month, on the spot. ` +
+      `${ANONYMOUS_MONTHLY_LIMIT} calls/month, on the spot. ` +
+      'Send it on this transport as "Authorization: Bearer ifk_…" (or X-API-Key): your calls then count ' +
+      'against the key, exactly as on the REST API, instead of this weekly allowance. ' +
       `POST ${KEY_CLAIM_URL} lifts that same key to ${FREE_TIER_MONTHLY_LIMIT} a month: a 6-digit code ` +
       'on an address your human gives you for this, or an x402 payment on the key — that rail grants ' +
       `${FREE_TIER_MONTHLY_LIMIT} once, not ${FREE_TIER_MONTHLY_LIMIT} a month. ` +
@@ -1898,6 +1905,10 @@ mcpHttp.get('/mcp', async (c) => {
           },
           claude_code_cli:
             'claude mcp add ibanforge --transport http https://api.ibanforge.com/mcp',
+          // 07.10.2026 : le transport lit la clé dans les en-têtes. Ajouté à
+          // côté, jamais à la place : les annuaires affichent des champs nommés.
+          claude_code_cli_with_key:
+            'claude mcp add ibanforge --transport http https://api.ibanforge.com/mcp --header "Authorization: Bearer ifk_your_key"',
           curl_initialize: `curl -X POST https://api.ibanforge.com/mcp -H 'Content-Type: application/json' -H 'Accept: application/json,text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"${LATEST_PROTOCOL_VERSION}","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}' -i`,
         },
         tools: registeredToolNames(),
@@ -1926,6 +1937,10 @@ mcpHttp.get('/mcp', async (c) => {
           // seule porte qui ne demande RIEN à l'agent — pas même de savoir
           // poster sur une route REST : deux appels d'outil et un humain qui
           // clique.
+          // 07.10.2026 (décision de Claude-Alain, point 7) : une clé présentée
+          // ici paie sur son propre compte, comme sur REST.
+          with_key:
+            'Send Authorization: Bearer ifk_… (or X-API-Key: ifk_…) on every POST: tool calls then count against that key exactly as on the REST API (same allowance, same units, same refusals) instead of the keyless allowance. A key in the URL is not read.',
           device_grant: `Call the request_api_key tool, show the code to a human, then poll_api_key — a human approves in a browser, the agent never handles an address. The code lives ${DEVICE_CODE_TTL_SECONDS / 60} minutes and the key comes back at ${ANONYMOUS_MONTHLY_LIMIT} REST req/month, or ${FREE_TIER_MONTHLY_LIMIT} if the human adds an address on that page.`,
         },
         x402: 'https://api.ibanforge.com/.well-known/x402',

@@ -2586,13 +2586,14 @@ const buildRawSpec = () => ({
           MCP_WEEKLY_LIMIT +
           ' tool units a week per source address (one per tool call, one per IBAN in batch_validate_iban; the week is the ISO week in UTC and resets on ' +
           TRIAL_RESET +
-          '), an allowance separate from the keyless REST trial.',
+          '), an allowance separate from the keyless REST trial. ' +
+          'With an API key (Authorization: Bearer ifk_… or X-API-Key), tool calls count against that key exactly as on the REST API instead; x402 is not read on this path.',
         tags: ['MCP'],
-        // Anonymous only, and said so (review of 24/09/2026, D8): the HTTP MCP
-        // transport answers a weekly free allowance with no credential, and it
-        // reads no key at all (the key middleware is mounted on /v1/* only).
-        // Declaring `apiKey` here told a client a key would lift that allowance.
-        security: [{}],
+        // Anonymous OR a key (07.10.2026, Claude-Alain's decision, point 7). Until
+        // then the transport read no key and this said `security: [{}]` only
+        // (review of 24/09/2026, D8). It now reads an optional key in the
+        // headers and counts the calls on it as REST does; x402 stays REST-only.
+        security: [{}, { apiKey: [] }],
         externalDocs: {
           description: 'MCP setup guide (Claude Desktop, Cursor, HTTP transport)',
           url: 'https://ibanforge.com/docs/mcp',

@@ -32,7 +32,7 @@ const ACCESS_END = 'Missing data, wrong result, or something blocking you from p
 const STDIO_ACCESS =
   'This installed MCP server calls the REST API, not the remote /mcp service. ' +
   'Without a key, validate_iban goes through the REST keyless trial, counted per source address: read the trial block of each answer for what is left and when it resets. ' +
-  'The remote /mcp service has its own allowance, separate from this one, which an API key does not increase. ' +
+  'The remote /mcp service has its own keyless allowance, separate from this one; a key sent to it in the Authorization header is counted there exactly as on the REST API. ' +
   'For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key with its own allowance comes back on the spot. ' +
   'POST https://api.ibanforge.com/v1/keys/claim raises the allowance of that same key — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. ' +
   'Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. With the mailed code the larger allowance is renewed with each new period; a payment grants it once, without renewal. ' +

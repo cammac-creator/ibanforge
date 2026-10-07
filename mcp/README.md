@@ -15,7 +15,7 @@ For business software and AI agents alike: an API key that needs no e-mail, prep
 
 This README gives no figures on purpose: a published package stays as it is until the next release, while the allowances of the service can change. The figures in force are served live at [rate-limits.yml](https://api.ibanforge.com/.well-known/rate-limits.yml) and by [GET /v1](https://api.ibanforge.com/v1).
 
-- **Remote MCP, nothing to install:** `https://api.ibanforge.com/mcp` answers full tool calls without a key or a wallet, within its own allowance per source address (`mcp_anonymous` in rate-limits.yml), a batch counting one per IBAN. It is separate from the REST trial below, and an API key does not raise it.
+- **Remote MCP, nothing to install:** `https://api.ibanforge.com/mcp` answers full tool calls without a key or a wallet, within its own allowance per source address (`mcp_anonymous` in rate-limits.yml), a batch counting one per IBAN. It is separate from the REST trial below. With an API key in the `Authorization: Bearer` header, its calls count against that key exactly as on the REST API.
 - **This package, before you have a key:** `validate_iban` goes through the REST API's keyless trial (`rest_anonymous_trial`), counted per source address; the `trial` block of each answer says how many calls are left and when the count resets. The other paid tools need a key, prepaid credits or x402.
 - **A key that needs no e-mail and no card:** `POST https://api.ibanforge.com/v1/keys/generate` with an empty body returns an `ifk_` key with its own allowance on every endpoint (`anonymous_key`). Claimed at `POST /v1/keys/claim` with a code mailed to an address given for this, the same key gets a larger allowance (`free_tier`; see [Keep using the same key](#keep-using-the-same-key)).
 
@@ -60,13 +60,21 @@ of them.
 
 Use the Streamable HTTP URL **https://api.ibanforge.com/mcp** in a compatible MCP client.
 This remote service has its own allowance per source address (see [Free access](#free-access));
-each IBAN in a batch counts as one unit. An API key does not increase this remote allowance.
+each IBAN in a batch counts as one unit. With a key sent as `Authorization: Bearer ifk_...`
+(or `X-API-Key`), tool calls count against that key exactly as on the REST API, instead of
+this allowance. A key in the URL is not read.
 
 For Claude Code:
 
 ```bash
 claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp
+# with your key:
+claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp --header "Authorization: Bearer ifk_your_key"
 ```
+
+In Claude and Claude Desktop, add the key under **Request headers** when you create the custom
+connector. ChatGPT sends no key to a connector: there, the remote service stays on its keyless
+allowance.
 
 Ask: “Validate DE89370400440532013000, identify the bank, and explain what the result
 can and cannot prove.” Read `valid`, `bank_code_check` and the provenance of any BIC.

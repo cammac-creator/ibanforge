@@ -268,23 +268,34 @@ discovery.get('/.well-known/oauth-protected-resource', (c) => c.json(oauthResour
  * The same document for the hosted MCP transport, said the way /mcp works.
  *
  * Until the review of 24/09/2026 this copied the API's metadata and announced an
- * API key and x402 for /mcp, which reads neither: the key middleware is mounted
- * on /v1/* only, and /mcp answers a keyless weekly allowance per source. A
- * client reading `api_key` here would send a key and expect it to lift that
- * allowance. It still answers 200 rather than 404, for the reason given below
- * (clients that cannot tell "no auth here" from "server broken"), and it says
- * the truth in the fields RFC 9728 defines: no authorization server, and an
- * empty `bearer_methods_supported`, the RFC's way of saying "no bearer token".
+ * API key and x402 for /mcp, which then read neither. Since 07.10.2026
+ * (Claude-Alain's decision, point 7) /mcp reads an OPTIONAL key in the
+ * `Authorization: Bearer` or `X-API-Key` header and counts the calls against
+ * it exactly as the REST API does; without one it answers the keyless weekly
+ * allowance per source. x402 is still not read here. It answers 200 rather than
+ * 404, for the reason given below (clients that cannot tell "no auth here" from
+ * "server broken"), and it names no authorization server: there is no OAuth,
+ * and the key is never required.
  */
 const MCP_RESOURCE_METADATA = {
   resource: 'https://api.ibanforge.com/mcp',
   resource_documentation: 'https://ibanforge.com/docs/mcp',
-  bearer_methods_supported: [] as string[],
-  authentication_methods: [] as unknown[],
+  bearer_methods_supported: ['header'],
+  authentication_methods: [
+    {
+      type: 'api_key',
+      required: false,
+      header: 'Authorization: Bearer ifk_… (or X-API-Key: ifk_…)',
+      description:
+        'Optional. With a key, tool calls count against it exactly as on the REST API (same allowance, ' +
+        'same units, same refusals). A key in the URL is not read.',
+      docs: 'https://ibanforge.com/docs/mcp',
+    },
+  ] as unknown[],
   note:
-    'The hosted MCP transport reads no credential: no OAuth, no API key, no x402. It answers a keyless ' +
-    'weekly allowance per source address. A key works on the REST API (https://api.ibanforge.com/v1) ' +
-    'and in the npm package ibanforge-mcp through IBANFORGE_API_KEY.',
+    'The hosted MCP transport needs no credential: without one it answers a keyless weekly allowance per ' +
+    'source address. An optional API key in the Authorization or X-API-Key header is read and counted as on ' +
+    'the REST API (https://api.ibanforge.com/v1). No OAuth and no x402 on this transport.',
 };
 
 discovery.get('/.well-known/oauth-protected-resource/mcp', (c) => c.json(MCP_RESOURCE_METADATA));

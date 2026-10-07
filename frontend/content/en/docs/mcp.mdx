@@ -48,19 +48,35 @@ After saving, restart the client. The npm package exposes **13 tools**, the remo
 https://api.ibanforge.com/mcp
 ```
 
-Streamable HTTP transport, **25 free tool calls a week per source address**, no key at all (ISO week in UTC, reset on Monday 00:00 UTC; a batch counts one call per IBAN; separate from the keyless REST trial): the fastest way for an agent to evaluate the data before committing to anything. For sustained use, run the npm package with your free key.
+Streamable HTTP transport, **25 free tool calls a week per source address**, no key at all (ISO week in UTC, reset on Monday 00:00 UTC; a batch counts one call per IBAN; separate from the keyless REST trial): the fastest way for an agent to evaluate the data before committing to anything. For sustained use, send your free key with each request (below), or run the npm package with it.
+
+### With your key
+
+The hosted endpoint reads an IBANforge key sent in a request header, `Authorization: Bearer ifk_…` or `X-API-Key: ifk_…`, the same two headers as the REST API. The tool calls are then counted against that key exactly as REST calls are: its own allowance, one unit per call, one per IBAN in a batch, nothing on the free tools, and the same refusals. The keyless allowance above is no longer used. A key written in the address (`?api_key=`) is not read. If the key is unknown, revoked or used up, the tool answers with the REST message for that key and never falls back to the keyless allowance.
+
+**Claude Code:**
+
+```bash
+claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp --header "Authorization: Bearer ifk_your_key"
+```
+
+**Claude and Claude Desktop** (custom connector, steps below): under **Request headers**, add the header `Authorization` with the value `Bearer ifk_your_key`. Claude's page, read on 7 October 2026, describes this field for fixed credentials such as API keys. On Team and Enterprise, everyone who uses the connector then shares that key. *Not tried by us.*
+
+**ChatGPT:** OpenAI's [authentication page](https://developers.openai.com/plugins/build/auth), read on 7 October 2026, says ChatGPT connects to an MCP server with OAuth or with no authentication, and cannot present a custom API key. In ChatGPT the hosted endpoint therefore stays on its keyless allowance; your key serves on the REST API, or with the npm package in another client.
+
+**Gemini:** not checked by us.
 
 ### Add it as a connector in a chat assistant
 
 In a chat assistant, the address above becomes a *custom connector*: the assistant then calls the MCP tools itself instead of guessing an answer it cannot fetch.
 
-**A connector with no key draws on the same keyless allowance as any other caller**, counted per source address. In Claude, a connector's calls leave from Anthropic's cloud, not from your device (official page below, section "Network requirements"): that allowance is therefore shared with other users and may already be spent when you start. Other assistants: not checked by us. The hosted endpoint reads no key. To work with your own key, run the npm package in a desktop client with `IBANFORGE_API_KEY` set (Option 1 above), or call the REST API with the key: a POST to `https://api.ibanforge.com/v1/keys/generate` with no body returns one, no e-mail.
+**A connector with no key draws on the same keyless allowance as any other caller**, counted per source address. In Claude, a connector's calls leave from Anthropic's cloud, not from your device (official page below, section "Network requirements"): that allowance is therefore shared with other users and may already be spent when you start. Other assistants: not checked by us. With your own key, the connector is counted on that key instead: see *With your key* above (Claude takes it as a request header, ChatGPT sends none). A POST to `https://api.ibanforge.com/v1/keys/generate` with no body returns a key, no e-mail.
 
 Where to click, from each vendor's official page as read on 24 September 2026; menus move, and the linked page is the reference.
 
 **Claude** ([official page](https://support.claude.com/en/articles/11175166), updated 11 August 2026). Custom connectors are available on the Free, Pro, Max, Team and Enterprise plans; Free users are limited to one custom connector. *Not tried by us.*
 
-- Individual plan (the page lists these steps under Pro and Max): open **Customize > Connectors**, click **+** then **Add custom connector**, enter `https://api.ibanforge.com/mcp`, and click **Add**. The OAuth fields under **Advanced settings** are optional; this server asks for no authentication.
+- Individual plan (the page lists these steps under Pro and Max): open **Customize > Connectors**, click **+** then **Add custom connector**, enter `https://api.ibanforge.com/mcp`, and click **Add**. The OAuth fields under **Advanced settings** are optional; this server asks for no authentication. To use your key, fill **Request headers** (see *With your key* above).
 - Team or Enterprise: an Owner opens **Organization settings > Connectors**, clicks **Add**, hovers over **Custom** and selects **Web**, enters the address and clicks **Add**; members then find it in **Customize > Connectors** and click **Connect**.
 - In a conversation: the **+** button at the lower left of the chat, then **Connectors**, to switch it on.
 
@@ -176,9 +192,17 @@ Report a wrong result, stale or missing data, or anything blocking you from usin
 
 Request a key without email: the tool returns a link for a person to open and approve in their browser. Available on both transports.
 
+The key does not unlock the session that asked for it: it works once placed in the client configuration, after a reconnection. Where it goes:
+
+- **Claude Code with the npm package:** the `config_line` that `poll_api_key` returns, a `claude mcp add … -e IBANFORGE_API_KEY=…` command.
+- **Claude Code on the hosted endpoint:** `--header "Authorization: Bearer ifk_…"` (see *With your key*).
+- **Claude and Claude Desktop:** the **Request headers** of the custom connector, or `IBANFORGE_API_KEY` in `claude_desktop_config.json` with the npm package (Option 1).
+- **ChatGPT:** nowhere on a connector, which sends no key; the key serves on the REST API.
+- **Any HTTP client:** the REST API, with `Authorization: Bearer ifk_…`.
+
 ### poll_api_key
 
-Collect the approved key with the `device_code` returned by `request_api_key`. The key is returned only once: keep it. Available on both transports.
+Collect the approved key with the `device_code` returned by `request_api_key`. The key is returned only once: keep it, and put it where the list above says. Available on both transports.
 
 ## Results that say what to do next
 
