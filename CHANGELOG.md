@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- **Greek bank codes: the Hellenic Bank Association's HEBIC index, as a partial register served from a private file (7 October 2026).** When `GR_REGISTER_PATH` is set, a listed code names its holder in `bank_code_check`, with the exact credit and the association's Important Note in full in `register`. An absent code keeps its previous answer, never `not_allocated`. Without the variable nothing changes.
 - **The Monday bulletin keeps the week's alert history (7 October 2026).** Each operational alert writes one row when its message leaves and closes it when a success closes the alert; the private bulletin shows the alerts opened and closed during the week, and says when a week predates the history instead of showing zero.
 - **Proposals with Yes, Later and No in the Monday bulletin (7 October 2026).** At most three a week: those posted by the operator and two rules without a model (a country whose BIC lookups keep missing, a watch with no Yes for four weeks). Yes and No never come back; Later comes back 28 days after the answer.
 - **The two Monday watches deposit their summary in the bulletin (7 October 2026).** `POST /internal/bulletin/:source`, behind its own token, takes at most three plain-text lines and, for the AI recommendation baseline, a score; their Telegram messages are unchanged.
@@ -20,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Changed
 
+- **31 of the 44 Italian bank codes left without a BIC on 29 September now have one, from open sources only (7 October 2026).** For the Italian branch of a foreign bank, the European Central Bank's list of monetary financial institutions gives the LEI of its head office, and the BIC is the single Italian one GLEIF pairs with that LEI (23 codes). Last, the BIC a bank publishes on its own website (8 codes, Poste Italiane 07601 among them; address, date and quoted words in `scripts/data/it-bank-site-bics.json`). The 13 other codes still answer without a BIC. No other answer changes.
 - **`GET /v1/admin/stripe-revenue` adds `ibanforge_days` (7 October 2026).** The packs, subscriptions and audits of each Swiss day, so the bulletin reads a period without a second Stripe read.
 - **The key dialog says what the address is used for (7 October 2026).** Instead of "nothing else is mailed to you", it now says the address also brings at most one note from the founder asking whether the key is useful, with a link to receive nothing more; same sentence on the agent approval page, in English, French and German.
 - **The founder's note carries a stop link (7 October 2026).** It ends with "Reply STOP, or use this link" and a mailto link to support with STOP as its subject.
