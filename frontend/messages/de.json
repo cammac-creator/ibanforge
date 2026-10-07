@@ -2633,8 +2633,8 @@
       "note": "Eine Datei, eine Kartenzahlung über Stripe. Die kommentierte Arbeitsmappe (.xlsx) und die Zusammenfassung sind sofort nach der Zahlung bereit und bleiben 24 Stunden herunterladbar."
     },
     "deadline": {
-      "title": "Mitte November 2026: SIX verarbeitet keine QR-Rechnungs-Zahlungen mit unstrukturierter Adresse mehr",
-      "text": "Ab diesem Datum werden Daueraufträge und Zahlungsvorlagen auf Basis von QR-Rechnungen mit unstrukturierter Adresse nicht mehr verarbeitet. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
+      "title": "Mitte November 2026: Schweizer Zahlungsaufträge mit unstrukturierter Adresse werden abgewiesen",
+      "text": "Ab dem 14.11.2026 (SIX) wird jeder Zahlungsauftrag mit unstrukturierter Adresse abgewiesen, und Zahlungsvorlagen mit einer solchen Adresse lassen sich nicht mehr verwenden. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
     },
     "upload": {
       "label": "Legen Sie Ihre Kreditorendatei hier ab",
@@ -2833,11 +2833,11 @@
   },
   "qrBill": {
     "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",
-    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, vor der SIX-Frist Mitte November 2026.",
+    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert sind (Typ K, seit dem 21.11.2025 nicht mehr zulässig).",
     "eyebrow": "Kostenloses Tool",
-    "title": "Ist diese QR-Rechnung bereit für Mitte November 2026?",
+    "title": "Ist diese QR-Rechnung gültig und sind ihre Adressen strukturiert?",
     "intro": "Fügen Sie den Text im Swiss-QR-Code ein (er beginnt mit SPC). Sie erhalten alle Urteile auf einmal: Kopfzeilen, Kreditoren-IBAN und QR-IBAN-Bereich, Referenz QRR, SCOR oder NON mit Prüfziffer, Betrag, Währung, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind. Eine kombinierte Adresse kommt mit den stattdessen zu verwendenden strukturierten Feldern zurück.",
-    "deadline": "Adressen vom Typ K wurden am 21. November 2025 aus dem Standard entfernt; ab Mitte November 2026 verarbeiten die Banken darauf beruhende Daueraufträge und Zahlungsvorlagen nicht mehr.",
+    "deadline": "Der Adresstyp K ist in einer QR-Rechnung seit dem 21.11.2025 nicht mehr zulässig (SIX, IG QR-Rechnung 2.3). Die Banken garantieren die Zahlung einer solchen QR-Rechnung nur bis Ende September 2026 (UBS: 30.09.2026; ZKB: längstens bis Ende September 2026). Eine QR-Rechnung mit Typ K kann daher bei der Zahlung abgewiesen werden: Stellen Sie sie mit Typ S neu aus. Ab dem 14.11.2026 wird jeder Zahlungsauftrag mit unstrukturierter Adresse abgewiesen. Erfassen Sie auch die Daueraufträge und Vorlagen neu, die aus einer QR-Rechnung mit Typ K übernommen wurden.",
     "docsLink": "Dokumentation lesen",
     "input": {
       "label": "Text der QR-Rechnung (Swiss Payments Code)",
@@ -2848,7 +2848,7 @@
     },
     "result": {
       "valid": "Wohlgeformt",
-      "ready": "Bereit für Mitte November 2026",
+      "ready": "Gültig, Adressen strukturiert (Typ S)",
       "yes": "Ja",
       "no": "Nein",
       "iban": "Kreditoren-IBAN",

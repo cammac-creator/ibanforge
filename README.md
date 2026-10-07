@@ -70,7 +70,7 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (OFAC, EU, UN lists on the payee's bank, the country against a fixed sanctions list, FATF, VoP readiness) | $0.02    |
 | `validate_payment_reference` | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS or Finnish viitenumero checksum, plus the QRR ↔ QR-IBAN pairing verdict | **free** |
 | `check_postal_address` | An ISO 20022 address against one rail's published rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its source | **free** |
-| `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses ahead of 14.11.2026 | **free** |
+| `check_swiss_qr_bill` | A Swiss QR-bill payload — header, QR-IBAN and reference pairing, structured (S) versus combined (K) addresses (type K not permitted since 21.11.2025; banks guarantee its payment only until the end of September 2026) | **free** |
 | `send_feedback`       | Report incorrect data or claim an x402 refund                                             | free     |
 | `request_api_key`     | You used up the free allowance, or need a durable key — a human approves in a browser, no e-mail  | free     |
 | `poll_api_key`        | Collect that key once it is approved, handed over exactly once                             | free     |

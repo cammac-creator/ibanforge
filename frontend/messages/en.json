@@ -2633,8 +2633,8 @@
       "note": "One file, one payment by card on Stripe. The annotated workbook (.xlsx) and the summary are ready right after payment and stay downloadable for 24 hours."
     },
     "deadline": {
-      "title": "Mid-November 2026: SIX stops processing QR-bill payments with unstructured addresses",
-      "text": "From that date, standing orders and payment templates built on QR-bills with a non-structured address are no longer processed. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
+      "title": "Mid-November 2026: Swiss payment orders with an unstructured address are refused",
+      "text": "From 14.11.2026 (SIX), any payment order with an unstructured address is refused, and payment templates that carry one can no longer be used. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
     },
     "upload": {
       "label": "Drop your creditor file here",
@@ -2833,11 +2833,11 @@
   },
   "qrBill": {
     "metaTitle": "Swiss QR-bill check: structured or combined address, QR-IBAN and reference, free",
-    "metaDescription": "Paste the text of a Swiss QR-bill code and see every rule verdict: header, QR-IBAN and reference pairing, checksums, amount, and whether the addresses are structured (type S) or still combined (type K) before the SIX deadline at mid-November 2026.",
+    "metaDescription": "Paste the text of a Swiss QR-bill code and see every rule verdict: header, QR-IBAN and reference pairing, checksums, amount, and whether the addresses are structured (type S) or still combined (type K, not permitted since 21.11.2025).",
     "eyebrow": "Free tool",
-    "title": "Is this QR-bill ready for mid-November 2026?",
+    "title": "Is this QR-bill valid, and are its addresses structured?",
     "intro": "Paste the text inside a Swiss QR-bill code (it starts with SPC). You get every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR, SCOR or NON reference and its checksum, amount, currency, and whether the addresses are structured (type S) or still combined (type K). A combined address comes back with the structured fields to use instead.",
-    "deadline": "Type K addresses were removed from the standard on 21 November 2025; from mid-November 2026 banks no longer process standing orders and payment templates built on them.",
+    "deadline": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, any payment order with an unstructured address is refused. Also redo the standing orders and templates captured from a type K QR-bill.",
     "docsLink": "Read the documentation",
     "input": {
       "label": "QR-bill text (Swiss Payments Code)",
@@ -2848,7 +2848,7 @@
     },
     "result": {
       "valid": "Well-formed",
-      "ready": "Ready for mid-November 2026",
+      "ready": "Valid, addresses structured (type S)",
       "yes": "Yes",
       "no": "No",
       "iban": "Creditor IBAN",

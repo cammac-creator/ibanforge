@@ -13,6 +13,7 @@ import {
 import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 import { dataTools, FREE_ENDPOINTS } from '../mcp/inventory.js';
 import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
+import { COMBINED_ADDRESS_CLAUSE } from '../lib/qr-bill-notice.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 import { CONSENT_BOUNDARY } from '../lib/consent.js';
 
@@ -431,10 +432,12 @@ const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
   },
   check_swiss_qr_bill: {
     description:
-      'Rule-by-rule check of a Swiss QR-bill payload (SPC text): header, QR-IBAN and reference pairing, checksums, amount, currency, and structured (S) versus combined (K) addresses ahead of the SIX deadline of 14.11.2026, with a proposed structured form for combined addresses. Free.',
+      'Rule-by-rule check of a Swiss QR-bill payload (SPC text): header, QR-IBAN and reference pairing, checksums, amount, currency, and structured (S) versus combined (K) addresses (' +
+      COMBINED_ADDRESS_CLAUSE +
+      '), with a proposed structured form for combined addresses. Free.',
     tags: ['swiss', 'qr-bill', 'qr-iban', 'iso-20022', 'postal-address', 'free'],
     examples: [
-      'Is this QR-bill ready for 14 November 2026, or does its creditor address still use type K?',
+      'Does this QR-bill still carry a combined (type K) creditor address that the bank may refuse at payment?',
     ],
   },
 };

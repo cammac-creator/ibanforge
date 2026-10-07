@@ -165,6 +165,7 @@ import {
 import { getIban, getIbansArray, getBic } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
+import { COMBINED_ADDRESS_NOTICE } from './lib/qr-bill-notice.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -644,7 +645,7 @@ curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \\
   -d '{"payload":"SPC\\n0200\\n1\\nCH4431999123000889012\\nS\\nRobert Schneider AG\\nRue du Lac\\n1268\\n2501\\nBiel\\nCH\\n\\n\\n\\n\\n\\n\\n\\n1949.75\\nCHF\\nS\\nPia Rutschmann\\nMarktgasse\\n28\\n9400\\nRorschach\\nCH\\nQRR\\n210000000003139471430009017\\nOrder 15.06.2026\\nEPD"}'
 \`\`\`
 
-Takes the text inside a Swiss QR-bill code (\`payload\`, real line breaks) and returns every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON checksum and pairing with the IBAN, amount, currency, and \`ready_for_2026_11_14\`: whether the addresses are structured (type S) or still combined (type K), which banks stop processing on 14 November 2026. A combined address comes back with \`proposed_structured\`.
+Takes the text inside a Swiss QR-bill code (\`payload\`, real line breaks) and returns every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON checksum and pairing with the IBAN, amount, currency, and \`ready_for_2026_11_14\`: whether the addresses are structured (type S) or still combined (type K). ${COMBINED_ADDRESS_NOTICE.en} A combined address comes back with \`proposed_structured\`.
 
 ### 8b. request_api_key + poll_api_key — a durable key, approved by a human (${toolPriceLabel('request_api_key')})
 

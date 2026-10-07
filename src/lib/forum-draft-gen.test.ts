@@ -7,9 +7,70 @@ import {
   parseMarkedOutput,
   stripDashes,
   translateToFr,
-  DRAFT_SYSTEM,
+  draftSystem,
+  productFacts,
 } from './forum-draft-gen.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { IBAN_LENGTHS, getCountryName } from './countries.js';
+import { registerCoverage } from './enrich.js';
+
+/**
+ * The facts the drafting model may quote about the registers come from the
+ * code that decides the verdict. Until 02/10/2026 they were a sentence typed
+ * by hand: four registers "refreshed monthly" while the code held eight that
+ * settle a negative. A register that joins or leaves `registerCoverage()` now
+ * makes this test fail instead of leaving the model to repeat a stale list.
+ */
+describe('productFacts() — the registers, read from the code', () => {
+  const lineOf = (prefix: string): string => {
+    const line = productFacts()
+      .split('\n')
+      .find((l) => l.startsWith(prefix));
+    if (!line) throw new Error(`productFacts() has no line starting with "${prefix}"`);
+    return line;
+  };
+  const sentence = (line: string, start: string): string => {
+    const from = line.indexOf(start);
+    expect(from, start).toBeGreaterThanOrEqual(0);
+    return line.slice(from, line.indexOf('. ', from));
+  };
+  const line = lineOf('Bank-code verdict from the national register');
+  const authoritative = sentence(line, 'Bank-code verdict');
+  const partial = sentence(line, 'Partial registers');
+  const named = (text: string, cc: string): boolean =>
+    new RegExp(`\\b${getCountryName(cc) ?? cc}\\b`).test(text);
+
+  it('names every country whose register settles a negative, and no other as such', () => {
+    const codes = Object.keys(IBAN_LENGTHS);
+    const expected = codes.filter((cc) => registerCoverage(cc).basis === 'authoritative');
+    expect(expected.length).toBeGreaterThan(0);
+    for (const cc of codes) {
+      expect(named(authoritative, cc), `${cc} in the authoritative sentence`).toBe(
+        expected.includes(cc),
+      );
+    }
+  });
+
+  it('names every partial register in its own sentence', () => {
+    const codes = Object.keys(IBAN_LENGTHS).filter(
+      (cc) => registerCoverage(cc).basis === 'partial',
+    );
+    expect(codes.length).toBeGreaterThan(0);
+    for (const cc of codes) expect(named(partial, cc), cc).toBe(true);
+  });
+
+  it('claims no refresh cadence', () => {
+    expect(productFacts()).not.toMatch(/refreshed monthly/i);
+  });
+
+  it('reaches both prompts that quote it', () => {
+    expect(draftSystem()).toContain(productFacts());
+    const prospect = readFileSync(join(import.meta.dirname, 'prospect-radar.ts'), 'utf8');
+    expect(prospect).toContain('${productFacts()}');
+  });
+});
 
 describe('buildVerifiedFacts — les données réelles injectées dans le brouillon', () => {
   it('résout un IBAN valide contre la vraie base (BIC, schémas SEPA)', () => {
@@ -137,20 +198,20 @@ describe('generateDraft — comportement sans clé', () => {
   });
 });
 
-describe('DRAFT_SYSTEM — la doctrine tient ses invariants', () => {
+describe('draftSystem() — la doctrine tient ses invariants', () => {
   it('interdit les tirets cadratins et impose la divulgation et les alternatives', () => {
-    expect(DRAFT_SYSTEM).toContain('NEVER use em dashes');
-    expect(DRAFT_SYSTEM).toContain('disclosure: I built ibanforge.com');
-    expect(DRAFT_SYSTEM).toContain('honest alternative');
+    expect(draftSystem()).toContain('NEVER use em dashes');
+    expect(draftSystem()).toContain('disclosure: I built ibanforge.com');
+    expect(draftSystem()).toContain('honest alternative');
     // Les deux marches du palier gratuit, lues dans les constantes : une
     // réponse de forum qui ne cite qu'un chiffre sur deux fait croire que la
     // clé demande une adresse.
-    expect(DRAFT_SYSTEM).toContain(`${ANONYMOUS_MONTHLY_LIMIT} requests/month`);
-    expect(DRAFT_SYSTEM).toContain(`${FREE_TIER_MONTHLY_LIMIT} a month`);
+    expect(draftSystem()).toContain(`${ANONYMOUS_MONTHLY_LIMIT} requests/month`);
+    expect(draftSystem()).toContain(`${FREE_TIER_MONTHLY_LIMIT} a month`);
   });
   it('demande le format à marqueurs, pas du JSON', () => {
-    expect(DRAFT_SYSTEM).toContain('===DRAFT===');
-    expect(DRAFT_SYSTEM).toContain('===SUMMARY_FR===');
+    expect(draftSystem()).toContain('===DRAFT===');
+    expect(draftSystem()).toContain('===SUMMARY_FR===');
   });
 });
 

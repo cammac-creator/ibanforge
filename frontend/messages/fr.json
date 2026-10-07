@@ -2633,8 +2633,8 @@
       "note": "Un fichier, un paiement par carte sur Stripe. Le classeur annoté (.xlsx) et la synthèse sont prêts dès le paiement et restent téléchargeables 24 heures."
     },
     "deadline": {
-      "title": "Mi-novembre 2026 : SIX cesse de traiter les paiements QR-facture à adresse non structurée",
-      "text": "Dès cette date, les ordres permanents et modèles de paiement fondés sur des QR-factures à adresse non structurée ne sont plus traités. Si votre fichier de créanciers a des colonnes rue, NPA et localité, l'audit vous dit quelles lignes ne sont pas prêtes."
+      "title": "Mi-novembre 2026 : tout ordre de paiement suisse à adresse non structurée est refusé",
+      "text": "Dès le 14.11.2026 (SIX), tout ordre de paiement à adresse non structurée est refusé, et les modèles de paiement qui en ont une ne peuvent plus servir. Si votre fichier de créanciers a des colonnes rue, NPA et localité, l'audit vous dit quelles lignes ne sont pas prêtes."
     },
     "upload": {
       "label": "Déposez votre fichier de créanciers ici",
@@ -2833,11 +2833,11 @@
   },
   "qrBill": {
     "metaTitle": "Contrôle de QR-facture suisse : adresse structurée ou combinée, QR-IBAN et référence, gratuit",
-    "metaDescription": "Collez le texte d'un code QR-facture suisse et voyez chaque verdict : en-tête, appariement QR-IBAN et référence, sommes de contrôle, montant, et si les adresses sont structurées (type S) ou encore combinées (type K) avant l'échéance SIX de mi-novembre 2026.",
+    "metaDescription": "Collez le texte d'un code QR-facture suisse et voyez chaque verdict : en-tête, appariement QR-IBAN et référence, sommes de contrôle, montant, et si les adresses sont structurées (type S) ou encore combinées (type K, plus permis depuis le 21.11.2025).",
     "eyebrow": "Outil gratuit",
-    "title": "Cette QR-facture est-elle prête pour la mi-novembre 2026 ?",
+    "title": "Cette QR-facture est-elle valide, et ses adresses structurées ?",
     "intro": "Collez le texte contenu dans un code QR-facture suisse (il commence par SPC). Vous obtenez tous les verdicts d'un coup : en-tête, IBAN du créancier et plage QR-IBAN, référence QRR, SCOR ou NON et sa somme de contrôle, montant, monnaie, et si les adresses sont structurées (type S) ou encore combinées (type K). Une adresse combinée revient avec les champs structurés à utiliser à la place.",
-    "deadline": "Les adresses de type K ont été retirées de la norme le 21 novembre 2025 ; à partir de la mi-novembre 2026, les banques ne traitent plus les ordres permanents et modèles de paiement qui s'appuient dessus.",
+    "deadline": "Le type K n'est plus permis dans une QR-facture depuis le 21.11.2025 (SIX, IG QR-facture 2.3). Les banques n'en garantissent le paiement que jusqu'à fin septembre 2026 (UBS : 30.09.2026 ; ZKB : au plus tard fin septembre 2026). Une QR-facture K risque donc d'être refusée au paiement : réémettez-la en type S. Dès le 14.11.2026, tout ordre de paiement à adresse non structurée est refusé. Refaites aussi les ordres permanents et les modèles saisis depuis une QR-facture K.",
     "docsLink": "Lire la documentation",
     "input": {
       "label": "Texte de la QR-facture (Swiss Payments Code)",
@@ -2848,7 +2848,7 @@
     },
     "result": {
       "valid": "Bien formée",
-      "ready": "Prête pour la mi-novembre 2026",
+      "ready": "Valide, adresses structurées (type S)",
       "yes": "Oui",
       "no": "Non",
       "iban": "IBAN du créancier",

@@ -314,7 +314,7 @@ Four schemes are checked arithmetically, each against a primary document that pu
 
 ## Step 5 — check the whole QR-bill payload (`POST /v1/ch/qr-bill/check`, free)
 
-The text inside a Swiss QR code (the "Swiss Payments Code", 31 positional lines from `SPC` to `EPD`) can be checked in one call: header and version, creditor IBAN and whether it sits in the QR-IID range, the `QRR` / `SCOR` / `NON` reference and its checksum, the pairing rules (a QR-IBAN requires `QRR`; an ordinary IBAN forbids it), amount and currency, ultimate creditor left empty, and the one thing the SIX deadline of **14 November 2026** makes urgent: are the creditor and ultimate debtor addresses **structured (type S)** or still **combined (type K)**?
+The text inside a Swiss QR code (the "Swiss Payments Code", 31 positional lines from `SPC` to `EPD`) can be checked in one call: header and version, creditor IBAN and whether it sits in the QR-IID range, the `QRR` / `SCOR` / `NON` reference and its checksum, the pairing rules (a QR-IBAN requires `QRR`; an ordinary IBAN forbids it), amount and currency, ultimate creditor left empty, and the one question that decides whether a QR-bill still gets paid: are the creditor and ultimate debtor addresses **structured (type S)** or still **combined (type K)**?
 
 ```bash
 curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \
@@ -322,7 +322,7 @@ curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \
   -d '{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }'
 ```
 
-The answer carries `valid` (no error-level finding), `ready_for_2026_11_14` (valid and every present address is type S), one `findings` entry per broken rule with its `source`, and for a combined address a `proposed_structured` block: the type S fields derived from the two combined lines, to relay as the fix. Type K addresses were removed from the standard on 21 November 2025; from 14 November 2026 banks no longer process standing orders and payment templates built on them.
+The answer carries `valid` (no error-level finding), `ready_for_2026_11_14` (valid and every present address is type S; the field name is not a deadline), one `findings` entry per broken rule with its `source`, and for a combined address a `proposed_structured` block: the type S fields derived from the two combined lines, to relay as the fix. Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, any payment order with an unstructured address is refused. Also redo the standing orders and templates captured from a type K QR-bill.
 
 It is free, pure rule evaluation, no database: the bank behind the IBAN and its payment-rail participation remain the job of `POST /v1/iban/validate`. The same check is the MCP tool `check_swiss_qr_bill` and the page [/tools/qr-bill](/tools/qr-bill).
 

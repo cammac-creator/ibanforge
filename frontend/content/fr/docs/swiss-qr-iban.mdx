@@ -369,7 +369,7 @@ Ce `meta.disclaimer` n'est pas un ornement et il n'est pas adouci ici : il s'agi
 
 ## Étape 5 — contrôler toute la charge utile de la QR-facture (`POST /v1/ch/qr-bill/check`, gratuit)
 
-Le texte contenu dans un code QR suisse (le « Swiss Payments Code », 31 lignes positionnelles de `SPC` à `EPD`) se contrôle en un appel : en-tête et version, IBAN du créancier et son appartenance à la plage QR-IID, la référence `QRR` / `SCOR` / `NON` et sa somme de contrôle, les règles d'appariement (un QR-IBAN exige `QRR` ; un IBAN ordinaire l'interdit), montant et monnaie, créancier final laissé vide, et ce que l'échéance SIX du **14 novembre 2026** rend urgent : les adresses du créancier et du débiteur final sont-elles **structurées (type S)** ou encore **combinées (type K)** ?
+Le texte contenu dans un code QR suisse (le « Swiss Payments Code », 31 lignes positionnelles de `SPC` à `EPD`) se contrôle en un appel : en-tête et version, IBAN du créancier et son appartenance à la plage QR-IID, la référence `QRR` / `SCOR` / `NON` et sa somme de contrôle, les règles d'appariement (un QR-IBAN exige `QRR` ; un IBAN ordinaire l'interdit), montant et monnaie, créancier final laissé vide, et la question qui décide si une QR-facture est encore payée : les adresses du créancier et du débiteur final sont-elles **structurées (type S)** ou encore **combinées (type K)** ?
 
 ```bash
 curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \
@@ -377,7 +377,7 @@ curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \
   -d '{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }'
 ```
 
-La réponse porte `valid` (aucun constat de niveau erreur), `ready_for_2026_11_14` (valide et chaque adresse présente est de type S), une entrée `findings` par règle enfreinte avec sa `source`, et pour une adresse combinée un bloc `proposed_structured` : les champs de type S dérivés des deux lignes combinées, à relayer comme correctif. Les adresses de type K ont été retirées de la norme le 21 novembre 2025 ; dès le 14 novembre 2026 les banques ne traitent plus les ordres permanents et modèles de paiement qui s'appuient dessus.
+La réponse porte `valid` (aucun constat de niveau erreur), `ready_for_2026_11_14` (valide et chaque adresse présente est de type S ; le nom du champ n'est pas une échéance), une entrée `findings` par règle enfreinte avec sa `source`, et pour une adresse combinée un bloc `proposed_structured` : les champs de type S dérivés des deux lignes combinées, à relayer comme correctif. Le type K n'est plus permis dans une QR-facture depuis le 21.11.2025 (SIX, IG QR-facture 2.3). Les banques n'en garantissent le paiement que jusqu'à fin septembre 2026 (UBS : 30.09.2026 ; ZKB : au plus tard fin septembre 2026). Une QR-facture K risque donc d'être refusée au paiement : réémettez-la en type S. Dès le 14.11.2026, tout ordre de paiement à adresse non structurée est refusé. Refaites aussi les ordres permanents et les modèles saisis depuis une QR-facture K.
 
 C'est gratuit, pure évaluation de règles, sans base de données : la banque derrière l'IBAN et sa participation aux rails de paiement restent le travail de `POST /v1/iban/validate`. Le même contrôle est l'outil MCP `check_swiss_qr_bill` et la page [/tools/qr-bill](/tools/qr-bill).
 
