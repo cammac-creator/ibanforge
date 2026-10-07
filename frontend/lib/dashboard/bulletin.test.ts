@@ -8,6 +8,9 @@ import {
   delta,
   heartbeatsTone,
   machineState,
+  money,
+  moneyList,
+  periodTitle,
   publicationDay,
   readBulletin,
   siteHomeText,
@@ -398,5 +401,316 @@ describe('le rendu de la vue', () => {
     expect(dateFormat).not.toHaveBeenCalled();
     expect(toLocale).not.toHaveBeenCalled();
     expect(toLocaleDate).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Étapes A2 et B : propositions, historique des alertes, veille ──────────
+
+function withA2(): BulletinPayload {
+  const p = sample();
+  p.not_yet = [];
+  p.decisions = {
+    state: 'read',
+    computed: true,
+    shown: [
+      {
+        key: 'session:7',
+        kind: 'session',
+        title: 'Publier le module inventé',
+        detail: 'Un détail inventé.',
+        origin: null,
+        country: null,
+        answer: null,
+        postponed_at: null,
+      },
+      {
+        key: 'regle:bic-introuvable:IT',
+        kind: 'bic_introuvable',
+        title: 'Chercher une source pour les BIC du pays IT',
+        detail: '12 recherches de BIC sans réponse la semaine 40, sur 4 codes différents.',
+        origin: null,
+        country: 'IT',
+        answer: {
+          key: 'regle:bic-introuvable:IT',
+          answer: 'plus_tard',
+          label: 'Chercher une source pour les BIC du pays IT',
+          week: '2026-W40',
+          answered_at: '2026-10-05 07:10:00',
+        },
+        postponed_at: null,
+      },
+    ],
+    more: 1,
+    answered: [],
+  };
+  p.moved.alert_history = {
+    state: 'read',
+    kept_since: '2026-10-01 18:00:00',
+    coverage: 'partial',
+    opened: [
+      {
+        name: 'heartbeat:weekly-veille',
+        label: 'veille hebdo (+ canari découvrabilité)',
+        cases: 1,
+        first_opened_at: '2026-10-02 06:00:00',
+        still_open: 1,
+      },
+    ],
+    closed: [
+      {
+        name: 'db:stats',
+        label: null,
+        cases: 2,
+        last_closed_at: '2026-10-03 10:00:00',
+        longest_hours: 3.5,
+        opened_before_history: 1,
+      },
+    ],
+  };
+  p.veille = {
+    state: 'read',
+    sources: [
+      {
+        source: 'weekly-veille',
+        label: 'La veille marché',
+        state: 'read',
+        received_at: '2026-10-05 06:30:00',
+        lines: ['Une porte inventée qui s’ouvre.', '<b>pas du HTML</b>'],
+        score: null,
+      },
+      { source: 'weekly-reco-baseline', label: 'Le score des IA', state: 'none' },
+    ],
+  };
+  return p;
+}
+
+describe('les blocs des étapes A2 et B', () => {
+  it('sont gardés par la garde quand ils ont leur forme', () => {
+    const read = readBulletin(withA2());
+    expect(read?.decisions).toMatchObject({ state: 'read', more: 1 });
+    expect(read?.moved.alert_history).toMatchObject({ coverage: 'partial' });
+    expect(read?.veille).toMatchObject({ state: 'read' });
+  });
+
+  it('une API d’avant l’étape A2 (sans ces blocs) s’affiche sans eux', () => {
+    const read = readBulletin(sample());
+    expect(read).not.toBeNull();
+    expect(read?.decisions).toBeUndefined();
+    const html = render(read as BulletinPayload);
+    expect(html).not.toContain('bulletin-answer');
+    expect(html).toContain('Les chiffres de la semaine');
+  });
+
+  it('un bloc mal formé est écarté seul, jamais la page', () => {
+    const bad = withA2() as unknown as Record<string, unknown>;
+    bad.decisions = {
+      state: 'read',
+      computed: true,
+      more: 0,
+      answered: [],
+      shown: [{ key: 'https://alpha.example.net', kind: 'session', title: 't' }],
+    };
+    bad.veille = { state: 'read', sources: [{ source: 'x', label: 'y', state: 'read', lines: [42] }] };
+    const read = readBulletin(bad);
+    expect(read).not.toBeNull();
+    expect(read?.decisions).toBeUndefined();
+    expect(read?.veille).toBeUndefined();
+    expect(read?.moved.alert_history).toMatchObject({ state: 'read' });
+    expect(render(read as BulletinPayload)).not.toContain('alpha.example.net');
+  });
+
+  it('rend les propositions en tête, avec trois boutons dans un formulaire sans JavaScript', () => {
+    const html = render(withA2());
+    const decide = html.indexOf('À toi de décider');
+    expect(decide).toBeGreaterThan(-1);
+    expect(decide).toBeLessThan(html.indexOf('Les chiffres de la semaine'));
+    expect(html).toContain('Publier le module inventé');
+    expect(html).toContain('Chercher une source pour les BIC : Italie (IT)');
+    const forms = html.match(/<form[^>]*>/g) ?? [];
+    expect(forms).toHaveLength(2);
+    for (const f of forms) {
+      expect(f).toContain('action="/api/dashboard/bulletin-answer"');
+      expect(f).toContain('method="post"');
+    }
+    expect(html).toMatch(/<input[^>]*name="key"[^>]*value="session:7"|<input[^>]*value="session:7"[^>]*name="key"/);
+    expect(html).toMatch(/<input[^>]*value="fr"/);
+    expect((html.match(/<button[^>]*name="answer"/g) ?? []).length).toBe(6);
+    for (const a of ['oui', 'plus_tard', 'non']) expect(html).toMatch(new RegExp(`<button[^>]*value="${a}"`));
+    expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>Plus tard</);
+    expect(html).toContain('Ta réponse : Plus tard, le 05.10 à 09:10.');
+    expect(html).toContain('1 autre proposition attend');
+    expect(html).not.toContain('<script');
+  });
+
+  it('dit l’issue d’une réponse quand la route revient', () => {
+    const ok = renderToStaticMarkup(createElement(BulletinView, { data: withA2(), locale: 'fr', notice: 'ok' }));
+    expect(ok).toContain('Réponse enregistrée.');
+    const ko = renderToStaticMarkup(createElement(BulletinView, { data: withA2(), locale: 'fr', notice: 'echec' }));
+    expect(ko).toContain('La réponse n’a pas été enregistrée');
+  });
+
+  it('rend l’historique de la semaine, et ce qu’il ne couvre pas', () => {
+    const html = render(withA2());
+    expect(html).toContain('Pendant la semaine : 1 alerte ouverte, 2 refermées.');
+    expect(html).toContain('Ouverte : veille hebdo (+ canari découvrabilité), le 02.10 à 08:00, toujours ouverte');
+    expect(html).toContain('Refermée : db:stats (2 fois), le 03.10 à 12:00, après 4 h (ouverte avant que l’historique soit tenu)');
+    expect(html).toContain('Historique tenu seulement depuis le 01.10 à 20:00');
+    const none = withA2();
+    none.moved.alert_history = { state: 'read', kept_since: '2026-10-06 08:00:00', coverage: 'none', opened: [], closed: [] };
+    expect(render(none)).toContain('Historique des alertes : pas encore tenu cette semaine-là.');
+  });
+
+  it('rend la veille en texte, et dit « rien de déposé » pour une source muette', () => {
+    const html = render(withA2());
+    expect(html).toContain('La veille et le score des IA');
+    expect(html).toContain('Une porte inventée qui s’ouvre.');
+    expect(html).toContain('&lt;b&gt;pas du HTML&lt;/b&gt;');
+    expect(html).toContain('Rien de déposé pour cette semaine.');
+    const scored = withA2();
+    if (scored.veille?.state !== 'read') throw new Error('sample');
+    scored.veille.sources[1] = {
+      source: 'weekly-reco-baseline',
+      label: 'Le score des IA',
+      state: 'read',
+      received_at: '2026-10-05 06:50:00',
+      lines: ['Présent : une requête inventée'],
+      score: { value: 2, out_of: 7, errors: 1 },
+    };
+    const s = render(scored);
+    expect(s).toContain(
+      '2 requêtes de référence sur 7 où une recherche web fait apparaître IBANforge. Score partiel : 1 requête en erreur.',
+    );
+  });
+
+  it('une semaine passée montre les réponses données ce lundi-là, sans boutons', () => {
+    const past = withA2();
+    past.decisions = {
+      state: 'read',
+      computed: false,
+      shown: [],
+      more: 0,
+      answered: [
+        { key: 'session:3', answer: 'oui', label: 'Une décision inventée', week: '2026-W39', answered_at: '2026-09-28 07:00:00' },
+      ],
+    };
+    const html = render(past);
+    expect(html).toContain('Une décision inventée');
+    expect(html).toContain('Réponse : Oui, le 28.09 à 09:00.');
+    expect(html).not.toContain('bulletin-answer');
+  });
+});
+
+// ─── Priorité 05 : encaissé moins coûts (montants inventés et ronds) ────────
+
+function withMoney(): BulletinPayload {
+  const p = withA2();
+  p.money = {
+    state: 'read',
+    stripe_read_at: '2026-10-07T09:55:00.000Z',
+    periods: [
+      {
+        month: '2026-09',
+        from: '2026-09-01',
+        to: '2026-10-01',
+        complete: true,
+        received: { state: 'read', count: 3, gross: { usd: 4000 }, refunded: { usd: 1000 }, test_mode: false },
+        costs: [
+          {
+            item: 'frais_stripe',
+            label: 'Frais Stripe',
+            source: 'stripe',
+            expected: true,
+            state: 'connu',
+            amounts: { chf: 250 },
+            nature: 'mesure',
+          },
+          {
+            item: 'vercel',
+            label: 'Site (Vercel)',
+            source: 'saisie',
+            expected: true,
+            state: 'connu',
+            amounts: { usd: 2000 },
+            nature: 'releve',
+          },
+          {
+            item: 'railway',
+            label: 'API (Railway)',
+            source: 'saisie',
+            expected: true,
+            state: 'inconnu',
+            reason: 'non_saisi',
+            blocking: true,
+          },
+          {
+            item: 'domaines',
+            label: 'Noms de domaine et courriel',
+            source: 'saisie',
+            expected: false,
+            state: 'inconnu',
+            reason: 'non_saisi',
+            blocking: false,
+          },
+        ],
+        result: { status: 'au_plus', by_currency: { usd: 1000, chf: -250 }, missing: ['API (Railway)'] },
+      },
+      {
+        month: '2026-10',
+        from: '2026-10-01',
+        to: '2026-10-05',
+        complete: false,
+        received: { state: 'inconnu', reason: 'stripe_unreachable' },
+        costs: [],
+        result: { status: 'inconnu', by_currency: null, missing: [] },
+      },
+    ],
+  };
+  return p;
+}
+
+describe('encaissé moins coûts, côté site', () => {
+  it('écrit les montants en unités, devise par devise, sans Intl', () => {
+    // Le séparateur des milliers est l'espace insécable de format-grouped.
+    expect(money(123456, 'usd').replace(/\s/g, ' ')).toBe('1 234,56 USD');
+    expect(money(-250, 'chf')).toBe('−2,50 CHF');
+    expect(money(1000, 'usd', true)).toBe('+10,00 USD');
+    expect(money(500, 'jpy')).toBe('500 JPY');
+    expect(moneyList({ usd: 1000, chf: -250 }, true)).toBe('−2,50 CHF · +10,00 USD');
+    expect(moneyList({})).toBe('—');
+    expect(periodTitle({ month: '2026-09', from: '2026-09-01', to: '2026-10-01', complete: true })).toBe(
+      'Septembre 2026',
+    );
+    expect(periodTitle({ month: '2026-10', from: '2026-10-01', to: '2026-10-05', complete: false })).toBe(
+      'Octobre 2026, du 1er au 4',
+    );
+  });
+
+  it('garde le bloc quand il a sa forme, l’écarte seul sinon', () => {
+    expect(readBulletin(withMoney())?.money).toMatchObject({ state: 'read' });
+    const bad = withMoney() as unknown as Record<string, unknown>;
+    bad.money = { state: 'read', stripe_read_at: null, periods: [{ month: '2026-09', costs: 'beaucoup' }] };
+    const read = readBulletin(bad);
+    expect(read).not.toBeNull();
+    expect(read?.money).toBeUndefined();
+  });
+
+  it('dit un plafond quand un coût manque, et l’inconnu quand Stripe n’a pas répondu', () => {
+    const html = render(withMoney());
+    expect(html).toContain('Encaissé moins coûts');
+    expect(html.indexOf('Encaissé moins coûts')).toBeGreaterThan(html.indexOf('Les chiffres de la semaine'));
+    expect(html).toContain('Septembre 2026');
+    expect(html).toContain('10,00 USD');
+    expect(html).toContain('−10,00 USD');
+    expect(html).toContain('relevé');
+    expect(html).toContain('inconnu, pas saisi');
+    expect(html).toContain('Au plus');
+    expect(html).toContain('−2,50 CHF · +10,00 USD');
+    expect(html).toContain('Il manque : API (Railway).');
+    // Un poste ponctuel non saisi n'est pas une ligne « inconnu ».
+    expect(html).not.toContain('Noms de domaine et courriel');
+    expect(html).toContain('Octobre 2026, du 1er au 4');
+    expect(html).toContain('Résultat inconnu');
+    expect(html).toContain('Encaissé inconnu : Stripe n’a pas répondu.');
+    expect(html).toContain('Stripe lu le 07.10 à 11:55.');
   });
 });

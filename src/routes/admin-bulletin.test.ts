@@ -112,7 +112,9 @@ describe('GET /v1/admin/bulletin', () => {
     const body = (await res.json()) as Bulletin;
     expect(Object.keys(body).sort()).toEqual(
       [
+        'decisions',
         'definitions',
+        'money',
         'moved',
         'needs',
         'not_yet',
@@ -120,6 +122,7 @@ describe('GET /v1/admin/bulletin', () => {
         'observed_at',
         'observed_at_zurich',
         'requested',
+        'veille',
         'version',
         'week',
       ].sort(),
@@ -147,8 +150,11 @@ describe('GET /v1/admin/bulletin', () => {
     for (const block of [
       body.moved.heartbeats,
       body.moved.alerts,
+      body.moved.alert_history,
       body.moved.sources,
       body.needs.forum_threads,
+      body.decisions,
+      body.veille,
     ]) {
       expect(block.state).toBe('read');
     }
@@ -203,5 +209,327 @@ describe('GET /v1/admin/bulletin', () => {
     expect(github).toHaveBeenCalledTimes(1);
     await app.request('/v1/admin/bulletin?week=2026-W39', { headers: headers(SECRET) });
     expect(github).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── Étape A2 : le dépôt des veilles, les propositions et les réponses ──────
+
+const FEED_TOKEN = 'jeton-factice-du-depot';
+const HEARTBEAT = 'jeton-factice-des-battements';
+
+describe('POST /internal/bulletin/:source, le dépôt des veilles', () => {
+  const app = buildApp();
+  const saved = {
+    feed: process.env.BULLETIN_FEED_TOKEN,
+    hb: process.env.HEARTBEAT_TOKEN,
+    admin: process.env.ADMIN_SECRET,
+  };
+
+  const deposit = (
+    source: string,
+    body: unknown,
+    token: string | null = FEED_TOKEN,
+  ): Promise<Response> => {
+    ip += 1;
+    return Promise.resolve(
+      app.request(`/internal/bulletin/${source}`, {
+        method: 'POST',
+        headers: {
+          'x-forwarded-for': `203.0.113.${(ip % 250) + 1}`,
+          'content-type': 'application/json',
+          ...(token !== null ? { 'x-bulletin-token': token } : {}),
+        },
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+      }),
+    );
+  };
+
+  const rows = (): Array<{ source: string; week: string; payload: string }> =>
+    getStatsDB()
+      .prepare(`SELECT source, week, payload FROM bulletin_feed ORDER BY source, week`)
+      .all() as Array<{ source: string; week: string; payload: string }>;
+
+  beforeEach(() => {
+    process.env.BULLETIN_FEED_TOKEN = FEED_TOKEN;
+    process.env.HEARTBEAT_TOKEN = HEARTBEAT;
+    process.env.ADMIN_SECRET = SECRET;
+    getStatsDB().exec('DELETE FROM bulletin_feed');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  afterAll(() => {
+    for (const [name, value] of [
+      ['BULLETIN_FEED_TOKEN', saved.feed],
+      ['HEARTBEAT_TOKEN', saved.hb],
+      ['ADMIN_SECRET', saved.admin],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
+  const good = { lines: ['Une porte inventée qui s’ouvre.'] };
+
+  it('refuse sans jeton, avec un mauvais jeton, et avec un jeton de la bonne longueur', async () => {
+    expect((await deposit('weekly-veille', good, null)).status).toBe(401);
+    expect((await deposit('weekly-veille', good, 'faux')).status).toBe(401);
+    expect((await deposit('weekly-veille', good, 'x'.repeat(FEED_TOKEN.length))).status).toBe(401);
+    expect(rows()).toEqual([]);
+  });
+
+  it('n’accepte ni le jeton des battements ni le secret d’administration', async () => {
+    expect((await deposit('weekly-veille', good, HEARTBEAT)).status).toBe(401);
+    expect((await deposit('weekly-veille', good, SECRET)).status).toBe(401);
+    expect(rows()).toEqual([]);
+  });
+
+  it('refuse tout quand BULLETIN_FEED_TOKEN n’est pas posé, ou vide', async () => {
+    delete process.env.BULLETIN_FEED_TOKEN;
+    expect((await deposit('weekly-veille', good)).status).toBe(401);
+    process.env.BULLETIN_FEED_TOKEN = '';
+    expect((await deposit('weekly-veille', good, '')).status).toBe(401);
+    expect(rows()).toEqual([]);
+  });
+
+  it('refuse une source hors liste, un corps trop gros, illisible ou hors forme', async () => {
+    expect((await deposit('autre-veille', good)).status).toBe(404);
+    expect((await deposit('weekly-veille', { lines: ['x'.repeat(5000)] })).status).toBe(413);
+    expect((await deposit('weekly-veille', 'pas du json')).status).toBe(400);
+    expect(
+      (await deposit('weekly-veille', { lines: ['un'], score: { value: 1, out_of: 7 } })).status,
+    ).toBe(400);
+    expect(
+      (await deposit('weekly-veille', { lines: ['un'], lien: 'https://example.com' })).status,
+    ).toBe(400);
+    expect(rows()).toEqual([]);
+  });
+
+  it('répond { ok: true } et rien d’autre, une ligne par source et par semaine', async () => {
+    for (let i = 0; i < 3; i++) {
+      const res = await deposit('weekly-veille', good);
+      expect(res.status).toBe(200);
+      // Rien de ce qui a été reçu ne revient : les journaux des workflows sont publics.
+      expect(await res.text()).toBe('{"ok":true}');
+    }
+    const res = await deposit('weekly-reco-baseline', {
+      lines: ['Présent : une requête inventée'],
+      score: { value: 2, out_of: 7, errors: 0 },
+    });
+    expect(res.status).toBe(200);
+    expect(rows().map((r) => [r.source, r.week])).toEqual([
+      ['weekly-reco-baseline', '2026-W40'],
+      ['weekly-veille', '2026-W40'],
+    ]);
+    const bulletin = (await (
+      await app.request('/v1/admin/bulletin', { headers: headers(SECRET) })
+    ).json()) as Bulletin;
+    expect(bulletin.veille).toMatchObject({
+      state: 'read',
+      sources: [
+        { source: 'weekly-veille', state: 'read', lines: ['Une porte inventée qui s’ouvre.'] },
+        { source: 'weekly-reco-baseline', state: 'read', score: { value: 2, out_of: 7 } },
+      ],
+    });
+  });
+});
+
+describe('POST /v1/admin/bulletin/proposals et /answers', () => {
+  const app = buildApp();
+  const previous = process.env.ADMIN_SECRET;
+
+  const post = (path: string, body: unknown, secret: string | null = SECRET): Promise<Response> => {
+    ip += 1;
+    return Promise.resolve(
+      app.request(path, {
+        method: 'POST',
+        headers: {
+          'x-forwarded-for': `192.0.2.${(ip % 250) + 1}`,
+          'content-type': 'application/json',
+          ...(secret ? { 'X-Admin-Secret': secret } : {}),
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+  };
+
+  beforeEach(() => {
+    process.env.ADMIN_SECRET = SECRET;
+    getStatsDB().exec('DELETE FROM bulletin_proposals; DELETE FROM bulletin_answers;');
+    resetMergedPullsCache();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('[]', { status: 200 })),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  afterAll(() => {
+    if (previous === undefined) delete process.env.ADMIN_SECRET;
+    else process.env.ADMIN_SECRET = previous;
+  });
+
+  it('refuse sans le secret', async () => {
+    expect((await post('/v1/admin/bulletin/proposals', { title: 'x' }, null)).status).toBe(401);
+    expect(
+      (await post('/v1/admin/bulletin/answers', { key: 'session:1', answer: 'oui' }, null)).status,
+    ).toBe(401);
+  });
+
+  it('pose une proposition, puis reçoit sa réponse, montrée par le bulletin', async () => {
+    const created = await post('/v1/admin/bulletin/proposals', {
+      title: 'Une proposition inventée',
+      origin: 'weekly-veille',
+    });
+    expect(created.status).toBe(201);
+    const { key, week } = (await created.json()) as { key: string; week: string };
+    expect(key).toMatch(/^session:\d+$/);
+    expect(week).toBe('2026-W40');
+
+    const answered = await post('/v1/admin/bulletin/answers', { key, answer: 'plus_tard' });
+    expect(answered.status).toBe(200);
+    expect(await answered.json()).toEqual({ ok: true, key, answer: 'plus_tard', week: '2026-W40' });
+
+    const bulletin = (await (
+      await app.request('/v1/admin/bulletin', { headers: headers(SECRET) })
+    ).json()) as Bulletin;
+    expect(bulletin.decisions).toMatchObject({
+      state: 'read',
+      shown: [{ key, answer: { answer: 'plus_tard', label: 'Une proposition inventée' } }],
+    });
+  });
+
+  it('refuse une réponse hors forme, et une clé que le bulletin ne montre pas', async () => {
+    expect((await post('/v1/admin/bulletin/proposals', { title: '' })).status).toBe(400);
+    expect(
+      (await post('/v1/admin/bulletin/answers', { key: 'session:1', answer: 'peut-être' })).status,
+    ).toBe(400);
+    expect((await post('/v1/admin/bulletin/answers', ['session:1', 'oui'])).status).toBe(400);
+    const unknown = await post('/v1/admin/bulletin/answers', {
+      key: 'session:424242',
+      answer: 'oui',
+    });
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ error: 'unknown_proposal' });
+  });
+});
+
+// ─── Priorité 05 : le registre des coûts et la ligne « encaissé moins coûts » ──
+
+describe('les coûts saisis et la ligne « encaissé moins coûts »', () => {
+  const app = buildApp();
+  const saved = { admin: process.env.ADMIN_SECRET, stripe: process.env.STRIPE_SECRET_KEY };
+
+  const call = (method: string, path: string, body?: unknown): Promise<Response> => {
+    ip += 1;
+    return Promise.resolve(
+      app.request(path, {
+        method,
+        headers: {
+          'x-forwarded-for': `198.18.0.${(ip % 250) + 1}`,
+          'X-Admin-Secret': SECRET,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+    );
+  };
+
+  beforeEach(() => {
+    process.env.ADMIN_SECRET = SECRET;
+    // Sans clé Stripe : l'encaissé est inconnu, jamais zéro.
+    delete process.env.STRIPE_SECRET_KEY;
+    getStatsDB().exec('DELETE FROM bulletin_costs');
+    resetMergedPullsCache();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('[]', { status: 200 })),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  afterAll(() => {
+    for (const [name, value] of [
+      ['ADMIN_SECRET', saved.admin],
+      ['STRIPE_SECRET_KEY', saved.stripe],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
+  const entry = {
+    item: 'vercel',
+    from: '2026-09-01',
+    to: '2026-10-01',
+    amount_minor: 1000,
+    currency: 'usd',
+    nature: 'releve',
+    note: 'relevé inventé',
+  };
+
+  it('enregistre, remplace, liste et retire une saisie', async () => {
+    const created = await call('POST', '/v1/admin/bulletin/costs', entry);
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: number };
+    const replaced = await call('POST', '/v1/admin/bulletin/costs', {
+      ...entry,
+      amount_minor: 1200,
+    });
+    expect(replaced.status).toBe(200);
+    expect(await replaced.json()).toEqual({ ok: true, id, replaced: true });
+    const overlap = await call('POST', '/v1/admin/bulletin/costs', {
+      ...entry,
+      from: '2026-09-15',
+      to: '2026-10-15',
+    });
+    expect(overlap.status).toBe(409);
+    expect(
+      (await call('POST', '/v1/admin/bulletin/costs', { ...entry, currency: 'dollars' })).status,
+    ).toBe(400);
+    const list = (await (await call('GET', '/v1/admin/bulletin/costs')).json()) as {
+      costs: Array<{ id: number; amount_minor: number; note: string }>;
+    };
+    expect(list.costs).toEqual([
+      expect.objectContaining({ id, amount_minor: 1200, note: 'relevé inventé' }),
+    ]);
+    expect((await call('DELETE', `/v1/admin/bulletin/costs/${id}`)).status).toBe(200);
+    expect((await call('DELETE', `/v1/admin/bulletin/costs/${id}`)).status).toBe(404);
+    expect((await call('DELETE', '/v1/admin/bulletin/costs/abc')).status).toBe(400);
+  });
+
+  it('dans le bulletin : Stripe non configuré, l’encaissé est inconnu et le coût saisi est montré', async () => {
+    await call('POST', '/v1/admin/bulletin/costs', entry);
+    const body = (await (await call('GET', '/v1/admin/bulletin')).json()) as Bulletin;
+    expect(body.money.state).toBe('read');
+    if (body.money.state !== 'read') return;
+    const [sep] = body.money.periods;
+    expect(sep).toMatchObject({
+      month: '2026-09',
+      complete: true,
+      received: { state: 'inconnu', reason: 'stripe_not_configured' },
+      result: { status: 'inconnu', by_currency: null },
+    });
+    expect(sep.costs.find((c) => c.item === 'vercel')).toMatchObject({
+      state: 'connu',
+      amounts: { usd: 1000 },
+      nature: 'releve',
+    });
   });
 });

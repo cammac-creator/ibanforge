@@ -3,14 +3,23 @@ import { overviewCard } from './overview/section';
 import { countryName } from '@/lib/countries';
 import { localePath } from '@/lib/locale-path';
 import {
+  ANSWERS,
   ageText,
+  answerWord,
+  costReasonText,
   count,
   delta,
+  durationText,
   fmt,
+  moneyList,
+  natureText,
+  periodTitle,
+  receivedReasonText,
   heartbeatText,
   heartbeatsTone,
   machineState,
   publicationDay,
+  scoreText,
   siteHomeText,
   staleReasonText,
   swissDay,
@@ -18,9 +27,15 @@ import {
   unreadText,
   weekSpan,
   type AlertView,
+  type BulletinAlertHistory,
   type BulletinPayload,
+  type MoneyPeriod,
+  type ProposalView,
   type Tone,
 } from '@/lib/dashboard/bulletin';
+
+/** Où postent les boutons de réponse : la route du site, qui garde le secret d'administration. */
+export const ANSWER_ROUTE = '/api/dashboard/bulletin-answer';
 
 /**
  * The Monday bulletin (Claude-Alain's approval of 28.09.2026, step A1).
@@ -300,6 +315,8 @@ function Moved({ data }: { data: BulletinPayload }) {
           <Line tone="neutral">Alertes : non lues, {unreadText(alerts.reason)}.</Line>
         )}
 
+        {data.moved.alert_history && <AlertHistoryLine history={data.moved.alert_history} />}
+
         {sources.state === 'read' ? (
           <Line
             tone={
@@ -328,7 +345,8 @@ function Moved({ data }: { data: BulletinPayload }) {
         )}
       </ul>
       <p className="mt-3 text-[12px] leading-snug text-[var(--fg-4)]">
-        Signes de vie, alertes et sources : l’état relevé le {data.observed_at_zurich}, pas celui de la semaine.
+        Signes de vie, alertes ouvertes et sources : l’état relevé le {data.observed_at_zurich}, pas celui de la
+        semaine.{data.moved.alert_history ? ' L’historique des alertes, lui, est celui de la semaine.' : ''}
       </p>
     </section>
   );
@@ -380,6 +398,303 @@ function Needs({ data, locale }: { data: BulletinPayload; locale: string }) {
   );
 }
 
+function groupTitle(g: { name: string; label: string | null; cases: number }): string {
+  const title = g.label ?? g.name;
+  return g.cases > 1 ? `${title} (${g.cases} fois)` : title;
+}
+
+/** L'historique des alertes (étape A2) : ouvertes et refermées PENDANT la semaine, jamais « à cheval ». */
+function AlertHistoryLine({ history }: { history: BulletinAlertHistory | { state: 'unread'; reason: string } }) {
+  if (history.state !== 'read') {
+    return <Line tone="neutral">Historique des alertes : non lu, {unreadText(history.reason)}.</Line>;
+  }
+  if (history.coverage === 'none') {
+    return (
+      <Line tone="neutral">
+        Historique des alertes : pas encore tenu cette semaine-là.
+        {history.kept_since && <Small>Il est tenu depuis le {swissDayTime(history.kept_since)}.</Small>}
+      </Line>
+    );
+  }
+  const opened = history.opened.reduce((n, g) => n + g.cases, 0);
+  const closed = history.closed.reduce((n, g) => n + g.cases, 0);
+  return (
+    <Line tone={opened > 0 ? 'bad' : 'neutral'}>
+      {opened === 0 && closed === 0
+        ? 'Aucune alerte ouverte ni refermée pendant la semaine.'
+        : `Pendant la semaine : ${count(opened, 'alerte ouverte', 'alertes ouvertes')}, ${count(closed, 'refermée', 'refermées')}.`}
+      {history.opened.map((g) => (
+        <Small key={`o-${g.name}`}>
+          Ouverte : {groupTitle(g)}, le {swissDayTime(g.first_opened_at)}
+          {g.still_open > 0 ? (g.still_open === g.cases ? ', toujours ouverte' : `, ${fmt(g.still_open)} toujours ouverte${g.still_open > 1 ? 's' : ''}`) : ''}
+        </Small>
+      ))}
+      {history.closed.map((g) => (
+        <Small key={`c-${g.name}`}>
+          Refermée : {groupTitle(g)}, le {swissDayTime(g.last_closed_at)}
+          {g.longest_hours !== null ? `, après ${durationText(g.longest_hours)}` : ''}
+          {g.opened_before_history > 0 ? ' (ouverte avant que l’historique soit tenu)' : ''}
+        </Small>
+      ))}
+      {history.coverage === 'partial' && history.kept_since && (
+        <Small>Historique tenu seulement depuis le {swissDayTime(history.kept_since)} : le début de la semaine manque.</Small>
+      )}
+    </Line>
+  );
+}
+
+function proposalTitle(p: ProposalView): string {
+  if (p.kind === 'bic_introuvable' && p.country) {
+    return `Chercher une source pour les BIC : ${countryLabel(p.country)}`;
+  }
+  return p.title;
+}
+
+const ANSWER_BUTTON: Record<'chosen' | 'idle', string> = {
+  chosen: 'border-amber-300/70 bg-amber-300/15 text-amber-200',
+  idle: 'border-[var(--ink-4)] bg-[var(--ink-1)]/40 text-[var(--fg-2)] hover:border-[var(--fg-4)]',
+};
+
+/**
+ * Un simple formulaire HTML par proposition : aucun JavaScript dans le navigateur
+ * (WebKit le rend tel quel) ; la route du site vérifie la session, transmet à l'API
+ * avec le secret et revient ici par un 303.
+ */
+function AnswerForm({ p, locale }: { p: ProposalView; locale: string }) {
+  return (
+    <form method="post" action={ANSWER_ROUTE} className="mt-2 flex flex-wrap gap-1.5">
+      <input type="hidden" name="key" value={p.key} />
+      <input type="hidden" name="locale" value={locale} />
+      {ANSWERS.map((a) => {
+        const chosen = p.answer?.answer === a;
+        return (
+          <button
+            key={a}
+            type="submit"
+            name="answer"
+            value={a}
+            aria-pressed={chosen}
+            className={`min-h-[36px] rounded-full border px-3.5 text-[13px] ${ANSWER_BUTTON[chosen ? 'chosen' : 'idle']}`}
+          >
+            {answerWord(a)}
+          </button>
+        );
+      })}
+    </form>
+  );
+}
+
+function Decisions({ data, locale, notice }: { data: BulletinPayload; locale: string; notice: AnswerNotice }) {
+  const d = data.decisions;
+  if (!d) return null;
+  return (
+    <section className={overviewCard} aria-labelledby="bulletin-decisions" id="decisions">
+      <SectionTitle id="bulletin-decisions">À toi de décider</SectionTitle>
+      {notice && (
+        <p
+          role="status"
+          className={`mt-2 rounded-lg px-3 py-2 text-[13px] ${notice === 'ok' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}
+        >
+          {notice === 'ok'
+            ? 'Réponse enregistrée.'
+            : 'La réponse n’a pas été enregistrée : la proposition n’est peut-être plus affichée, ou l’API n’a pas répondu.'}
+        </p>
+      )}
+      {d.state !== 'read' ? (
+        <Unread what="Les propositions" plural reason={d.reason} />
+      ) : !d.computed ? (
+        d.answered.length === 0 ? (
+          <p className="mt-2 text-[13px] text-[var(--fg-3)]">Aucune réponse donnée au bulletin de cette semaine-là.</p>
+        ) : (
+          <ul className="mt-3">
+            {d.answered.map((a) => (
+              <Line key={a.key} tone="neutral">
+                {a.label}
+                <Small>
+                  Réponse : {answerWord(a.answer)}, le {swissDayTime(a.answered_at)}.
+                </Small>
+              </Line>
+            ))}
+          </ul>
+        )
+      ) : d.shown.length === 0 ? (
+        <p className="mt-2 text-[13px] text-[var(--fg-3)]">Rien à décider cette semaine.</p>
+      ) : (
+        <ul className="mt-3">
+          {d.shown.map((p) => (
+            <Line key={p.key} tone={p.answer ? 'ok' : 'neutral'}>
+              <span className="font-medium text-[var(--fg-1)]">{proposalTitle(p)}</span>
+              {p.detail && <Small>{p.detail}</Small>}
+              {p.postponed_at && <Small>Revenue : reportée le {swissDay(p.postponed_at)}.</Small>}
+              {p.answer && (
+                <Small>
+                  Ta réponse : {answerWord(p.answer.answer)}, le {swissDayTime(p.answer.answered_at)}. Tu peux la changer.
+                </Small>
+              )}
+              <AnswerForm p={p} locale={locale} />
+            </Line>
+          ))}
+        </ul>
+      )}
+      {d.state === 'read' && d.computed && d.more > 0 && (
+        <p className="mt-2 text-[12.5px] text-[var(--fg-4)]">
+          {count(d.more, 'autre proposition attend', 'autres propositions attendent')} : elle
+          {d.more > 1 ? 's viendront' : ' viendra'} quand une place se libère.
+        </p>
+      )}
+      <p className="mt-2 text-[12px] leading-snug text-[var(--fg-4)]">
+        Oui et Non ne reviennent pas ; Plus tard revient dans quatre semaines.
+      </p>
+    </section>
+  );
+}
+
+const RESULT_WORD: Record<MoneyPeriod['result']['status'], string> = {
+  exact: 'Résultat',
+  estime: 'Résultat estimé',
+  au_plus: 'Au plus',
+  inconnu: 'Résultat inconnu',
+};
+
+function MoneyPeriodBlock({ p }: { p: MoneyPeriod }) {
+  const r = p.result;
+  const tone: Tone = r.status === 'inconnu' ? 'neutral' : r.status === 'au_plus' ? 'neutral' : 'ok';
+  return (
+    <li className="border-t border-[var(--ink-4)]/50 py-3 first:border-t-0 first:pt-1">
+      <p className="text-[13.5px] font-medium text-[var(--fg-1)]">{periodTitle(p)}</p>
+      <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-[13px]">
+        <dt className="text-[var(--fg-3)]">Encaissé</dt>
+        <dd className="text-right font-mono tabular-nums text-[var(--fg-1)] [overflow-wrap:anywhere]">
+          {p.received.state === 'read' ? moneyList(p.received.gross) : 'inconnu'}
+        </dd>
+        {p.received.state === 'read' && Object.keys(p.received.refunded).length > 0 && (
+          <>
+            <dt className="text-[var(--fg-3)]">Remboursé</dt>
+            <dd className="text-right font-mono tabular-nums text-[var(--fg-2)]">
+              {moneyList(Object.fromEntries(Object.entries(p.received.refunded).map(([c, v]) => [c, -v])))}
+            </dd>
+          </>
+        )}
+        {p.costs.map((c) => (
+          <CostRow key={c.item} line={c} />
+        ))}
+      </dl>
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-[var(--ink-4)]/40 pt-2">
+        <span className="inline-flex items-center gap-1.5 text-[13px] text-[var(--fg-2)]">
+          <span aria-hidden className={`h-2 w-2 rounded-full ${DOT[tone]}`} />
+          {RESULT_WORD[r.status]}
+        </span>
+        <span className="font-mono text-[15px] tabular-nums text-[var(--fg-1)] [overflow-wrap:anywhere]">
+          {r.by_currency ? moneyList(r.by_currency, true) : '—'}
+        </span>
+      </div>
+      {p.received.state !== 'read' && <Small>Encaissé inconnu : {receivedReasonText(p.received.reason)}.</Small>}
+      {p.received.state === 'read' && p.received.test_mode && <Small>Clé Stripe de test : montants fictifs.</Small>}
+      {r.status === 'au_plus' && r.missing.length > 0 && (
+        <Small>
+          Il manque : {r.missing.join(', ')}. Ces coûts ne peuvent que faire baisser le résultat.
+        </Small>
+      )}
+      {r.status === 'estime' && <Small>Au moins un coût est une estimation.</Small>}
+      {!p.complete && <Small>Mois en cours, lu jusqu’au dimanche de la semaine.</Small>}
+    </li>
+  );
+}
+
+function CostRow({ line }: { line: MoneyPeriod['costs'][number] }) {
+  if (line.state === 'connu') {
+    const zero = Object.values(line.amounts).every((v) => v === 0);
+    return (
+      <>
+        <dt className="text-[var(--fg-3)]">
+          {line.label} <span className="text-[11.5px] text-[var(--fg-4)]">({natureText(line.nature)})</span>
+        </dt>
+        <dd className="text-right font-mono tabular-nums text-[var(--fg-2)] [overflow-wrap:anywhere]">
+          {zero
+            ? moneyList(line.amounts, true)
+            : moneyList(Object.fromEntries(Object.entries(line.amounts).map(([c, v]) => [c, -v])))}
+        </dd>
+      </>
+    );
+  }
+  // Un coût ponctuel que personne n'a saisi n'est pas compté, et ne plafonne pas le résultat.
+  if (!line.blocking && line.reason === 'non_saisi') return null;
+  return (
+    <>
+      <dt className="text-[var(--fg-3)]">{line.label}</dt>
+      <dd className="text-right text-[12.5px] text-[var(--fg-4)]">inconnu, {costReasonText(line.reason)}</dd>
+    </>
+  );
+}
+
+function Money({ data }: { data: BulletinPayload }) {
+  const m = data.money;
+  if (!m) return null;
+  return (
+    <section className={overviewCard} aria-labelledby="bulletin-money">
+      <SectionTitle id="bulletin-money">Encaissé moins coûts</SectionTitle>
+      {m.state !== 'read' ? (
+        <Unread what="L’argent" reason={m.reason} />
+      ) : (
+        <>
+          <ul className="mt-2">
+            {m.periods.map((p) => (
+              <MoneyPeriodBlock key={p.month} p={p} />
+            ))}
+          </ul>
+          <p className="mt-1 text-[12px] leading-snug text-[var(--fg-4)]">
+            Chaque devise reste la sienne, rien n’est converti. Un coût non saisi pour toute la période est inconnu,
+            jamais compté pour zéro.{m.stripe_read_at ? ` Stripe lu le ${swissDayTime(m.stripe_read_at)}.` : ''}
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function Veille({ data }: { data: BulletinPayload }) {
+  const v = data.veille;
+  if (!v) return null;
+  return (
+    <section className={overviewCard} aria-labelledby="bulletin-veille">
+      <SectionTitle id="bulletin-veille">La veille et le score des IA</SectionTitle>
+      {v.state !== 'read' ? (
+        <Unread what="La veille" reason={v.reason} />
+      ) : (
+        <ul className="mt-3">
+          {v.sources.map((s) =>
+            s.state === 'read' ? (
+              <Line key={s.source} tone="neutral">
+                <span className="font-medium text-[var(--fg-1)]">{s.label}</span>
+                {s.score && (
+                  <p className="mt-1 font-mono text-[22px] leading-tight tabular-nums text-[var(--fg-1)]">
+                    {fmt(s.score.value)}
+                    <span className="text-[14px] text-[var(--fg-4)]"> / {fmt(s.score.out_of)}</span>
+                  </p>
+                )}
+                {s.score && <Small>{scoreText(s.score)}</Small>}
+                <ul className="mt-1 space-y-1">
+                  {s.lines.map((line, i) => (
+                    <li key={i} className="text-[13px] leading-snug text-[var(--fg-2)]">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+                <Small>Déposé le {swissDayTime(s.received_at)}.</Small>
+              </Line>
+            ) : (
+              <Line key={s.source} tone="neutral">
+                <span className="font-medium text-[var(--fg-1)]">{s.label}</span>
+                <Small>Rien de déposé pour cette semaine.</Small>
+              </Line>
+            ),
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function NotYet({ data }: { data: BulletinPayload }) {
   if (data.not_yet.length === 0) return null;
   return (
@@ -404,7 +719,18 @@ function weekNumber(label: string): string {
   return label.slice(-2).replace(/^0/, '');
 }
 
-export function BulletinView({ data, locale }: { data: BulletinPayload; locale: string }) {
+/** Ce que la route des réponses a dit, relu dans l'adresse après son 303. */
+export type AnswerNotice = 'ok' | 'echec' | null;
+
+export function BulletinView({
+  data,
+  locale,
+  notice = null,
+}: {
+  data: BulletinPayload;
+  locale: string;
+  notice?: AnswerNotice;
+}) {
   const state = machineState(data);
   const pulls = data.moved.merged_pulls;
   const base = localePath(locale, '/dashboard/bulletin');
@@ -442,9 +768,12 @@ export function BulletinView({ data, locale }: { data: BulletinPayload; locale: 
         </div>
       </section>
 
+      <Decisions data={data} locale={locale} notice={notice} />
       <Numbers data={data} locale={locale} />
+      <Money data={data} />
       <Moved data={data} />
       <Needs data={data} locale={locale} />
+      <Veille data={data} />
       <NotYet data={data} />
 
       <nav aria-label="Autres semaines" className="flex items-center justify-between gap-3 text-[13px]">

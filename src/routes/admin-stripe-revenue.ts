@@ -27,6 +27,7 @@ import {
   StripeRevenueCache,
   type StripeRevenueCacheOptions,
   type StripeRevenueClient,
+  type StripeRevenueResult,
   type StripeRevenueSnapshot,
   type StripeUnavailableReason,
 } from '../lib/stripe-revenue.js';
@@ -58,6 +59,14 @@ function defaultFactory(): StripeRevenueClient | null {
 }
 
 let cache = new StripeRevenueCache({ factory: defaultFactory });
+
+/**
+ * La lecture partagée, pour le bulletin du lundi (ligne « encaissé moins coûts ») : le
+ * même cache de quinze minutes que la tuile, jamais une seconde lecture de Stripe.
+ */
+export function getStripeRevenue(): Promise<StripeRevenueResult> {
+  return cache.get();
+}
 
 /** Les tests posent leur fabrique et leur horloge ; la production n'appelle jamais ceci. */
 export function _setStripeRevenueForTests(opts: StripeRevenueCacheOptions | null): void {

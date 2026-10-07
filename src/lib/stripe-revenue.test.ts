@@ -497,3 +497,53 @@ describe('le cache : quinze minutes, une seule lecture en vol', () => {
     expect(fake.maxInFlight()).toBe(1);
   });
 });
+
+describe('le détail par jour suisse (bulletin du lundi, ligne « encaissé moins coûts »)', () => {
+  it('range chaque paiement d’IBANforge à son jour suisse, jamais « autre »', () => {
+    // 30.09.2026 à 22:30 UTC = 01.10.2026 à 00:30 heure suisse (été).
+    const lateNight = Date.parse('2026-09-30T22:30:00Z') / 1000;
+    const morning = Date.parse('2026-10-01T08:00:00Z') / 1000;
+    const s = summarizeStripeRevenue(
+      {
+        charges: [
+          charge({ pi: 'pi_day_pack', amount: 400, net: 319, fee: 41, created: lateNight }),
+          charge({
+            pi: 'pi_day_audit',
+            amount: 900,
+            net: 800,
+            fee: 60,
+            created: morning,
+            refunded: 900,
+          }),
+          charge({
+            pi: 'pi_day_nofee',
+            amount: 400,
+            net: 0,
+            fee: 0,
+            created: morning,
+            withBalance: false,
+          }),
+          charge({ pi: 'pi_day_other', amount: 700, net: 600, fee: 50, created: morning }),
+        ],
+        invoicePayments: [],
+        sessions: [
+          session('pi_day_pack', { bundle: '1k' }),
+          session('pi_day_audit', { audit_job: 'job_day' }),
+          session('pi_day_nofee', { bundle: '1k' }),
+        ],
+        payouts: [],
+        balance: null,
+      },
+      READ_AT,
+    );
+    expect(s.ibanforge_days).toEqual({
+      '2026-10-01': {
+        count: 3,
+        gross: { usd: 1700 },
+        refunded: { usd: 900 },
+        fees: { chf: 101 },
+        net_unknown: 1,
+      },
+    });
+  });
+});

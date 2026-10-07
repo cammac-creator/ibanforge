@@ -72,6 +72,7 @@
  * requêtes simultanées (StripeRevenueCache).
  */
 import type Stripe from 'stripe';
+import { zurichParts } from './swiss-week.js';
 
 export type RevenueKind = 'pack' | 'abonnement' | 'audit' | 'autre';
 export const REVENUE_KINDS: readonly RevenueKind[] = ['pack', 'abonnement', 'audit', 'autre'];
@@ -95,6 +96,21 @@ export interface KindTotals {
   /** Paiements sans transaction de solde lisible : leur net et leurs frais manquent. */
   net_unknown: number;
   last_payment_at: string | null;
+}
+
+/**
+ * L'argent d'IBANforge d'une journée suisse : ce que la ligne « encaissé moins coûts »
+ * du bulletin du lundi additionne sur une période (07.10.2026). Même périmètre que
+ * `ibanforge` (jamais « autre »), mêmes règles : brut et remboursé dans la devise du
+ * paiement, frais dans la devise de règlement.
+ */
+export interface DayTotals {
+  count: number;
+  gross: MinorByCurrency;
+  refunded: MinorByCurrency;
+  fees: MinorByCurrency;
+  /** Paiements sans transaction de solde lisible : leurs frais manquent. */
+  net_unknown: number;
 }
 
 export interface StripeRevenueSnapshot {
@@ -126,6 +142,17 @@ export interface StripeRevenueSnapshot {
   balance: { available: MinorByCurrency; pending: MinorByCurrency } | null;
   /** Pas encore sur le compte bancaire. null si les virements ou le solde manquent. */
   awaiting_payout: MinorByCurrency | null;
+  /**
+   * Le périmètre `ibanforge`, jour par jour (date civile suisse `AAAA-MM-JJ` du
+   * paiement) : ce qui permet de lire une période sans seconde lecture de Stripe.
+   */
+  ibanforge_days: Record<string, DayTotals>;
+}
+
+/** La date civile suisse `AAAA-MM-JJ` d'un instant UTC. */
+function swissDay(ms: number): string {
+  const p = zurichParts(ms);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
 }
 
 /** Une page de liste Stripe, réduite à ce que la pagination lit. */
@@ -306,6 +333,7 @@ export function summarizeStripeRevenue(
   >;
   const ibanforge = emptyTotals();
   const account = emptyTotals();
+  const days: Record<string, DayTotals> = {};
   let livemode: boolean | null = null;
 
   for (const ch of input.charges) {
@@ -337,6 +365,15 @@ export function summarizeStripeRevenue(
         t.net_unknown++;
       }
       t.last_payment_at = later(t.last_payment_at, at);
+    }
+    if (kind !== 'autre') {
+      const key = swissDay(ch.created * 1000);
+      const d = (days[key] ??= { count: 0, gross: {}, refunded: {}, fees: {}, net_unknown: 0 });
+      d.count++;
+      add(d.gross, ch.currency, gross);
+      if (ch.amount_refunded > 0) add(d.refunded, ch.currency, ch.amount_refunded);
+      if (bt) add(d.fees, bt.currency, bt.fee);
+      else d.net_unknown++;
     }
   }
 
@@ -389,6 +426,7 @@ export function summarizeStripeRevenue(
     payouts,
     balance,
     awaiting_payout: awaiting,
+    ibanforge_days: days,
   };
 }
 

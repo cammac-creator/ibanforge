@@ -47,6 +47,7 @@
  * clé est inchangé.
  */
 import { kvGet, kvSet } from './forum-radar-server.js';
+import { logAlertClosed, logAlertOpened } from './ops-alert-log.js';
 
 /** Fenêtre anti-tempête : une même clé au plus une fois par période. */
 const STORM_WINDOW_MS = 6 * 60 * 60 * 1000;
@@ -197,6 +198,9 @@ export async function opsFail(key: string, detail: string, threshold = 1): Promi
     if (ok) {
       markSent(key);
       writeState(key, { fails: s.fails, firing: true });
+      // L'historique du bulletin (étape A2) : l'alerte n'est ouverte que parce que
+      // son message est parti. Ne jette pas (voir ops-alert-log.ts).
+      logAlertOpened(key, s.fails);
     } else {
       // Telegram muet : l'alerte n'existe pour personne, donc elle reste à émettre.
       writeState(key, s);
@@ -218,6 +222,9 @@ export async function opsOk(key: string, detail = ''): Promise<void> {
     const wasFiring = s.firing;
     writeState(key, { fails: 0, firing: false });
     if (!wasFiring) return;
+    // Refermée pour l'historique avant le message de résolution : la fermeture est
+    // un fait, que Telegram réponde ou non.
+    logAlertClosed(key, s.fails);
     await notifyOps(`✅ IBANforge — ${key} résolu${detail ? `\n${detail}` : ''}`);
   } catch (err) {
     console.error('[ops-alert] opsOk failed:', err instanceof Error ? err.message : err);
