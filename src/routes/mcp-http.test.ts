@@ -707,7 +707,7 @@ describe('MCP session store — the two exit doors', () => {
  * l'empreinte d'une clé, c'est son nombre de sessions VIVANTES. Au-delà, la
  * clé ferme sa propre session la moins récente, jamais celle d'un autre.
  */
-describe('MCP session store — une clé ne tient qu’un nombre borné de sessions vivantes', () => {
+describe('MCP session store : une clé ne tient qu’un nombre borné de sessions vivantes', () => {
   const closable = () => {
     const closed = { value: false };
     const transport = {
