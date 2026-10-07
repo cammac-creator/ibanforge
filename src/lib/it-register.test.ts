@@ -395,16 +395,23 @@ describe('a code the register never listed gets the answer it had before the reg
     expect(r.bank_code_holder).toBe('inferred');
   });
 
-  it('07601 (Poste Italiane) lost its map key on 29/09/2026 and answers like any code the map lacks', () => {
-    // Its pairing came from a commercial site with no licence (withdrawal of
-    // 29/09/2026), and the Banca d'Italia registers, which would rebuild it
-    // through the LEI, do not list Poste Italiane. No BIC, and no refusal.
+  it('07601 (Poste Italiane) is back in the composite map, from what Poste Italiane publishes itself', () => {
+    // Its first pairing came from a commercial site with no licence (withdrawn
+    // on 29/09/2026), and the Banca d'Italia registers do not list Poste
+    // Italiane. Rebuilt on 07/10/2026 from poste.it, which names the ABI code
+    // and the BIC (scripts/data/it-bank-site-bics.json). Still the composite
+    // map, never the register: no refusal and no authority.
     const r = check(itIban('07601'));
-    expect(r.bic ?? null).toBeNull();
-    expect(r.bank_code_check?.status).toBe('not_in_register');
-    expect(r.bank_code_check?.reason).toBe('absent_from_reference_data');
-    expect(r.bank_code_check?.authoritative).toBe(false);
-    expect(r.bank_code_holder).not.toBe('not_allocated');
+    expect(r.bank_code_check).toEqual({
+      value: '07601',
+      status: 'verified',
+      match: 'register',
+      register: COMPOSITE,
+      authoritative: false,
+      as_of: r.bank_code_check!.as_of,
+    });
+    expect(r.bic?.code).toBe('BPPIITRRXXX');
+    expect(r.bank_code_holder).toBe('inferred');
   });
 
   it('a code neither the register nor the map knows stays absent_from_reference_data, never not_allocated', () => {

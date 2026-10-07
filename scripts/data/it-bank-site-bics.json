@@ -1,0 +1,63 @@
+{
+  "about": "BICs that Italian banks publish on their own websites, read on 7 October 2026 for the ABI codes the rebuild of 29 September 2026 left without a BIC. Used by scripts/derive-map-keys.ts as the last step of the Italian derivation: a website may only choose among the head-office BICs GLEIF already pairs with the bank, and a code outside the Banca d'Italia registers needs a sentence of the bank carrying the code itself (abi_quote). Only the bank's own domain or its group's is accepted, never a directory of IBAN or BIC codes. Each quote is the text of the page or document, markup removed and runs of white space collapsed, never paraphrased.",
+  "codes": {
+    "01015": {
+      "bic": "BPMOIT22XXX",
+      "holder": "BANCO DI SARDEGNA S.P.A.",
+      "url": "https://www.bancosardegna.it/parla-con-noi/faq/filiali-contatti?id=2789707255",
+      "consulted": "2026-10-07",
+      "quote": "Il codice BIC/Swift valido per tutti i clienti delle banche che fanno parte del Gruppo BPER Banca, compreso il Banco di Sardegna e le carte prepagate BPER con Iban, è BPMOIT22XXX"
+    },
+    "03048": {
+      "bic": "BDCPITTTXXX",
+      "holder": "BANCA DEL PIEMONTE S.P.A.",
+      "url": "https://www.bancadelpiemonte.it/wp-content/uploads/2026/05/1_Bilancio-2025.pdf",
+      "consulted": "2026-10-07",
+      "quote": "Codice BIC BDCP IT TT"
+    },
+    "03104": {
+      "bic": "DEUTITMMXXX",
+      "holder": "DEUTSCHE BANK S.P.A.",
+      "url": "https://trasparenza.deutsche-bank.it/SitiPubblici/ShowDocPub.ashx?TIPODOC=INFORMAZIONI+RELATIVE+AL+SERVIZIO+DI+TRASFERIMENTO+DEI+SERVIZI+DI+PAGAMENTO+CONNESSI+AL+CONTO+DI+PAGAMENTO&FOLDER=0000002311",
+      "consulted": "2026-10-07",
+      "quote": "Indirizzo SWIFT: DEUT IT MM"
+    },
+    "03250": {
+      "bic": "EUBAITM1XXX",
+      "holder": "CREDEM EUROMOBILIARE PRIVATE BANKING S.P.A.",
+      "url": "https://www.credemeuromobiliarepb.it/it/footer/dati-societari",
+      "consulted": "2026-10-07",
+      "quote": "Swift Code: EUBAITM1 XXX"
+    },
+    "07017": {
+      "bic": "CCRTIT2TCIR",
+      "holder": "BANCA DI CREDITO COOPERATIVO DEL CIRCEO E PRIVERNATE - SOCIETA' COOPERATIVA",
+      "url": "https://www.bccc.it/dati-societari/",
+      "consulted": "2026-10-07",
+      "quote": "Codice ABI n. 07017 Codice Bic/Swift: CCRTIT2TCIR"
+    },
+    "07092": {
+      "bic": "CCRTIT2TCRT",
+      "holder": "BANCA DI CREDITO COOPERATIVO DEI CASTELLI ROMANI E DEL TUSCOLO - SOCIETA' COOPERATIVA",
+      "url": "https://www.bcccastellituscolo.it/dati-societari/",
+      "consulted": "2026-10-07",
+      "quote": "Codice ABI n. 07092 Codice Swift: CCRTIT2TCRT"
+    },
+    "07601": {
+      "bic": "BPPIITRRXXX",
+      "holder": "Poste Italiane S.p.A., Patrimonio BancoPosta",
+      "url": "https://www.poste.it/bonifici-sepa-e-postagiro",
+      "consulted": "2026-10-07",
+      "quote": "fornire all’ordinante il tuo codice IBAN e il seguente codice BIC: BPPIITRRXXX",
+      "abi_url": "https://www.poste.it/resources/bancoposta/pdf/trasparenza/FI_SP_SA_CBPFDip.pdf",
+      "abi_quote": "Poste Italiane SpA, - Patrimonio BancoPosta, (di seguito anche”Poste Italiane” o ”Poste”), codice ABI 07601"
+    },
+    "08327": {
+      "bic": "ICRAITRRROM",
+      "holder": "BANCA DI CREDITO COOPERATIVO DI ROMA - SOCIETA' COOPERATIVA",
+      "url": "https://www.bccroma.it/template/default.asp?i_menuID=10298",
+      "consulted": "2026-10-07",
+      "quote": "Aderente Indiretta TARGET2 ICRAITRRROM"
+    }
+  }
+}

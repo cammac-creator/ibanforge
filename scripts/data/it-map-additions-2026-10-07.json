@@ -1,0 +1,343 @@
+{
+  "sources": {
+    "gleif-lei": "Banca d'Italia, Albi ed elenchi di vigilanza (open data, CC BY 4.0): the LEI of the ABI code; GLEIF (CC0) and the BIC-to-LEI Mapping Table developed by SWIFT (notice in NOTICE): the BIC of that LEI in Italy.",
+    "ecb-head-office": "Source: European Central Bank, list of monetary financial institutions (https://www.ecb.europa.eu/stats/money/mfi/general/html/index.en.html), whose information may be obtained free of charge on that website: the Italian branch and the LEI of its head office; GLEIF (CC0) and the BIC-to-LEI Mapping Table developed by SWIFT: the BIC of that LEI in Italy.",
+    "bank-site": "The bank's own website, at the address and on the date given, in the words quoted.",
+    "gleif-prefix": "GLEIF (CC0) and the BIC-to-LEI Mapping Table developed by SWIFT."
+  },
+  "keys": {
+    "IT:01015": {
+      "bic": "BPMOIT22XXX",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://www.bancosardegna.it/parla-con-noi/faq/filiali-contatti?id=2789707255",
+        "consulted": "2026-10-07",
+        "quote": "Il codice BIC/Swift valido per tutti i clienti delle banche che fanno parte del Gruppo BPER Banca, compreso il Banco di Sardegna e le carte prepagate BPER con Iban, è BPMOIT22XXX"
+      }
+    },
+    "IT:03041": {
+      "bic": "UBSWITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004528963274",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "5299007QVIQ7IO64NX37"
+      }
+    },
+    "IT:03048": {
+      "bic": "BDCPITTTXXX",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://www.bancadelpiemonte.it/wp-content/uploads/2026/05/1_Bilancio-2025.pdf",
+        "consulted": "2026-10-07",
+        "quote": "Codice BIC BDCP IT TT"
+      }
+    },
+    "IT:03051": {
+      "bic": "BARCITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004847230518",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "2G5BKIC2CB69PRJH1W31"
+      }
+    },
+    "IT:03095": {
+      "bic": "COBAITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0001198963145",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "851WYGNLUQLFZBSYGB56"
+      }
+    },
+    "IT:03097": {
+      "bic": "AARBITR1XXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0001627501111",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "EZKODONU5TYHW4PP1R34"
+      }
+    },
+    "IT:03104": {
+      "bic": "DEUTITMMXXX",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://trasparenza.deutsche-bank.it/SitiPubblici/ShowDocPub.ashx?TIPODOC=INFORMAZIONI+RELATIVE+AL+SERVIZIO+DI+TRASFERIMENTO+DEI+SERVIZI+DI+PAGAMENTO+CONNESSI+AL+CONTO+DI+PAGAMENTO&FOLDER=0000002311",
+        "consulted": "2026-10-07",
+        "quote": "Indirizzo SWIFT: DEUT IT MM"
+      }
+    },
+    "IT:03105": {
+      "bic": "VOWAITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0001232771625",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "529900GJD3OQLRZCKW37"
+      }
+    },
+    "IT:03151": {
+      "bic": "HYPTIT2BXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0001764360047",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "0W5QHUNYV4W7GJO62R27"
+      }
+    },
+    "IT:03179": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    },
+    "IT:03250": {
+      "bic": "EUBAITM1XXX",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://www.credemeuromobiliarepb.it/it/footer/dati-societari",
+        "consulted": "2026-10-07",
+        "quote": "Swift Code: EUBAITM1 XXX"
+      }
+    },
+    "IT:03269": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    },
+    "IT:03271": {
+      "bic": "ALLFITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0002367758548",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "95980020140005844330"
+      }
+    },
+    "IT:03296": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    },
+    "IT:03343": {
+      "bic": "PICTITTTXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0003131651364",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "549300GSSPQ1QSKI1376"
+      }
+    },
+    "IT:03373": {
+      "bic": "KREDITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004591871911",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "6B2PBRV1FCJDMR45RZ53"
+      }
+    },
+    "IT:03380": {
+      "bic": "BOFAIT2XXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004852322762",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "EQYXK86SF381Q21S3020"
+      }
+    },
+    "IT:03386": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    },
+    "IT:03387": {
+      "bic": "BCDMITM1XXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0003132877082",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "969500LMCDZA0RTATI42"
+      }
+    },
+    "IT:03389": {
+      "bic": "BSCHITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0003124616764",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "5493006QMFDDMYWIAM13"
+      }
+    },
+    "IT:03407": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    },
+    "IT:03432": {
+      "bic": "BSUIITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0001039487584",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "1VUV7VQFKUOQSJ21A208"
+      }
+    },
+    "IT:03437": {
+      "bic": "BTRLITR1XXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004082678137",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "549300RG3H390KEL8896"
+      }
+    },
+    "IT:03438": {
+      "bic": "ISAEITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004570546172",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "96950023SCR9X9F3L662"
+      }
+    },
+    "IT:03475": {
+      "bic": "INGBITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0000205387246",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "3TK20IVIUJ8J3ZU0QE75"
+      }
+    },
+    "IT:03561": {
+      "bic": "ABCOITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004916351812",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "969500090LN710HT1B25"
+      }
+    },
+    "IT:03566": {
+      "bic": "CITIITMXXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0000101247333",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "E57ODZWZ7FF32TWEFA76"
+      }
+    },
+    "IT:03593": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    },
+    "IT:03646": {
+      "bic": "NTSBITM1XXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0004817610962",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "529900JB9XYZ8E87N345"
+      }
+    },
+    "IT:03647": {
+      "bic": "BUNQITM2XXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0005204823995",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "7245002ZUXNOEJ0QPZ44"
+      }
+    },
+    "IT:03665": {
+      "bic": "SOBKITM2XXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0005199986522",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "529900061MKLB90PD429"
+      }
+    },
+    "IT:03669": {
+      "bic": "REVOITM2XXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0005317009873",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "485100NUOK3CEDCUTW40"
+      }
+    },
+    "IT:03674": {
+      "bic": "TRBKITMMXXX",
+      "via": "ecb-head-office",
+      "evidence": {
+        "ecb_riad_code": "IT0005287396910",
+        "ecb_list_date": "2026-10-06",
+        "head_lei": "5299009IFX1XTKDY4568"
+      }
+    },
+    "IT:07017": {
+      "bic": "CCRTIT2TCIR",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://www.bccc.it/dati-societari/",
+        "consulted": "2026-10-07",
+        "quote": "Codice ABI n. 07017 Codice Bic/Swift: CCRTIT2TCIR"
+      }
+    },
+    "IT:07092": {
+      "bic": "CCRTIT2TCRT",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://www.bcccastellituscolo.it/dati-societari/",
+        "consulted": "2026-10-07",
+        "quote": "Codice ABI n. 07092 Codice Swift: CCRTIT2TCRT"
+      }
+    },
+    "IT:07601": {
+      "bic": "BPPIITRRXXX",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://www.poste.it/bonifici-sepa-e-postagiro",
+        "consulted": "2026-10-07",
+        "quote": "fornire all’ordinante il tuo codice IBAN e il seguente codice BIC: BPPIITRRXXX",
+        "abi_url": "https://www.poste.it/resources/bancoposta/pdf/trasparenza/FI_SP_SA_CBPFDip.pdf",
+        "abi_quote": "Poste Italiane SpA, - Patrimonio BancoPosta, (di seguito anche”Poste Italiane” o ”Poste”), codice ABI 07601"
+      }
+    },
+    "IT:08327": {
+      "bic": "ICRAITRRROM",
+      "via": "bank-site",
+      "evidence": {
+        "url": "https://www.bccroma.it/template/default.asp?i_menuID=10298",
+        "consulted": "2026-10-07",
+        "quote": "Aderente Indiretta TARGET2 ICRAITRRROM"
+      }
+    },
+    "IT:10312": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    },
+    "IT:23004": {
+      "bic": null,
+      "reason": "not_in_register"
+    },
+    "IT:23018": {
+      "bic": null,
+      "reason": "not_in_register"
+    },
+    "IT:23019": {
+      "bic": null,
+      "reason": "not_in_register"
+    },
+    "IT:31011": {
+      "bic": null,
+      "reason": "not_in_register"
+    },
+    "IT:36087": {
+      "bic": null,
+      "reason": "not_in_register"
+    },
+    "IT:36944": {
+      "bic": null,
+      "reason": "lei_without_bic"
+    }
+  }
+}
