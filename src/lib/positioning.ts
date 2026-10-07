@@ -3,6 +3,7 @@ import { registerCoverage, structuralRuleCountries } from './enrich.js';
 import { IBAN_LENGTHS, getCountryName } from './countries.js';
 import { UNLICENSED_MAP_COUNTRIES, getSourceFreshness } from './bic-lookup.js';
 import { LU_SOURCE, luRegisterConfigured } from './lu-register.js';
+import { GR_SOURCE, grRegisterConfigured } from './gr-register.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET } from './trial.js';
 import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
@@ -62,6 +63,7 @@ const DISPLAY_ORDER = [
   'IT',
   'SM',
   'LU',
+  'GR',
   'LV',
   'GI',
 ];
@@ -92,6 +94,8 @@ export function registerCountries(): RegisterCountries {
   // `registerCoverage('LU')` does not know about it. Added where it answers,
   // never claimed where it does not.
   if (luRegisterConfigured() && !partial.includes('LU')) partial.push('LU');
+  // Greece (07/10/2026): the HEBIC index, the same private-file model.
+  if (grRegisterConfigured() && !partial.includes('GR')) partial.push('GR');
   return {
     authoritative: byDisplayOrder(authoritative),
     partial: byDisplayOrder(partial),
@@ -114,6 +118,7 @@ export function codesOf(codes: readonly string[]): string {
 /** The register name a caller reads in `bank_code_check.register`, per country. */
 function registerNameOf(cc: string): string | null {
   if (cc === 'LU') return LU_SOURCE.replace(/^Source:\s*/, '');
+  if (cc === 'GR') return `${GR_SOURCE.replace(/^Source:\s*/, '')} index`;
   return registerCoverage(cc).register;
 }
 

@@ -700,9 +700,10 @@ La page nomme l'édition « 2026 B' τρίμηνο » (2026 T2), encore visible 
 l'édition et la date de consultation, en les distinguant ; ni la réponse reçue ni la consultation ne sont
 la date de publication du fichier.
 
-Le chantier grec existe sur des branches locales, mais HEBIC n'est pas encore intégré à `main` au
-14/09/2026. La bascule vers le traitement partiel reste une condition préalable à l'intégration par la
-session responsable des registres ; ne pas relancer ni publier les anciennes branches autoritatives.
+Le chantier grec existait sur des branches locales (`registre-gr-*`, 09/09/2026) qui traitaient HEBIC
+comme un registre qui fait foi et l'écrivaient dans la base publique. **Repris le 07/10/2026 depuis
+`main`, autrement** : chemin partiel, fichier privé, voir la section « HBA : l'index HEBIC grec (import
+privé) » en fin de fichier. Les anciennes branches ne sont ni relancées ni publiées.
 
 ### ✅ 10/09/2026 — Betaalvereniging Nederland confirme la réutilisation de sa liste BIC
 
@@ -1677,3 +1678,58 @@ ni page de liste n'est ajouté avant activation et vérification en production.
 L'import et le lecteur sont prêts pour l'intégrateur ; ni le stockage de production ni la
 chaîne de déploiement ne sont modifiés ici. L'import doit être exécuté mensuellement dans le
 circuit privé autorisé. Il n'est pas ajouté au workflow public qui régénère et commite les bases.
+
+
+## HBA : l'index HEBIC grec (import privé)
+
+Repris le 07/10/2026 sur le modèle de l'ABBL ci-dessus. Source : <https://www.hba.gr/info/hebicmap>
+(page qui nomme l'édition) et <https://www.hba.gr/info/hebicmap/downloadbanks> (fichier des banques,
+CSV en Windows-1253, adresse stable). Seul le fichier des banques est lu.
+
+**Pourquoi privé.** La permission du 08/09/2026 (section ✅ plus haut) porte sur la réutilisation des
+fichiers HEBIC « in its API responses », normalisés et crédités : la même portée que la lettre de
+l'ABBL. Elle ne couvre pas une copie du fichier dans ce dépôt public, dans `data/bic.sqlite`, dans un
+export du site ou dans un paquet (décision de Claude-Alain du 24/09/2026 : ce qui n'est pas
+redistribuable sort du dépôt public). Aucune ligne HEBIC n'est donc commitée ; les tests utilisent des
+lignes inventées.
+
+**Pourquoi partiel.** La HBA a précisé le 14/09/2026 que HEBIC ne couvre pas les établissements de
+paiement et de monnaie électronique qui émettent des IBAN grecs. Un code présent nomme son titulaire
+(`verified`, `authoritative: false`, bloc `institution`) ; un code absent retombe sur la réponse que
+la Grèce recevait avant (carte composite), jamais `not_allocated`. La Grèce n'entre ni dans
+`NATIONAL_REGISTERS` ni dans `NON_EXHAUSTIVE_REGISTERS` (`enrich.ts`) : elle a son chemin propre,
+comme le Luxembourg, et `src/lib/gr-register.test.ts` vérifie qu'elle n'est jamais un registre qui
+fait foi.
+
+### Stockage et raccordement
+
+`scripts/seed-gr-register.ts` produit un fichier JSON privé, jamais `data/bic.sqlite`, et refuse un
+chemin relatif ou situé dans un dépôt git. `GR_REGISTER_PATH` désigne ce fichier
+(`src/lib/gr-register.ts`). Écriture en mode 600 par remplacement atomique, après contrôle de
+l'en-tête, des codes (trois chiffres), des doublons, de l'édition et d'un plancher de 25
+établissements ; un recul d'édition ou une baisse de plus de 10 % demande une vérification manuelle
+et laisse le fichier précédent intact. Le remplacement est relu sans redémarrage. Sans la variable,
+rien ne change pour la Grèce ; un fichier configuré illisible donne `unavailable` / `lookup_failed`,
+jamais un rejet.
+
+### Les deux conditions de la HBA, servies
+
+`bank_code_check.register`, présent sur chaque réponse que ce registre décide, porte le crédit exact
+« Source: Hellenic Bank Association (HEBIC) », l'édition, le jour de lecture, la réserve du registre
+partiel, puis l'Important Note **en entier**, entre guillemets, mot pour mot. Le `llms.txt` de l'API
+la répète quand le fichier est branché (« et dans la documentation »). HEBIC ne publie ni BIC ni LEI :
+le bloc `bic` reste celui de la carte composite.
+
+### La date
+
+La HBA ne date pas ses éditions : le fichier garde l'édition que la page nomme (« 2026 Q2 » pour
+« Έκδοση 2026 B' τρίμηνο ») et le jour de lecture, séparément. Le crédit dit « read by IBANforge
+on », jamais « published » ; `as_of` porte le mois de lecture. Relu le 07/10/2026 : édition 2026 T2,
+35 établissements, aucune adresse non reconnue.
+
+### Ce qui reste à la session principale
+
+L'activation : poser le fichier sur le volume de production et la variable `GR_REGISTER_PATH`, puis
+prouver une réponse grecque en ligne. L'import mensuel dans le circuit privé autorisé, jamais dans le
+workflow public qui régénère et commite les bases. Ni page `/gr`, ni export, ni exemple tiré de HEBIC
+avant une décision sur la portée de la permission (le site n'est pas une « réponse de l'API »).
