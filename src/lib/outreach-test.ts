@@ -158,6 +158,14 @@ function foldSubject(s: string | null | undefined): string {
   return (s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
+/**
+ * A subject without its reply and forward prefixes ("Re:", "AW:", "Fwd:", "TR:"…),
+ * folded: the thread a message belongs to.
+ */
+function threadSubject(s: string | null | undefined): string {
+  return foldSubject(s).replace(/^((re|aw|wg|fw|fwd|tr|antw|sv|vs)\s*(\[\d+\])?\s*:\s*)+/, '');
+}
+
 /** A line as compared with our own message: quote marks, case and spacing folded. */
 function foldLine(line: string): string {
   return line
@@ -235,10 +243,20 @@ export function summarizeOutreachTest(
   let messages = 0;
   let firstAt: number | null = null;
   let lastAt: number | null = null;
+  // Our other messages to the same people (a service notice sent the same weeks,
+  // for one): an answer in one of those threads is not an answer to the test.
+  const otherThreads = new Map<string, Set<string>>();
   for (const r of outRows) {
     const at = parseStamp(r.msg_date);
     if (at === null || at < sinceMs || at > untilMs) continue;
-    if (!subjects.has(foldSubject(r.subject))) continue;
+    if (!subjects.has(foldSubject(r.subject))) {
+      const thread = threadSubject(r.subject);
+      if (thread && !subjects.has(thread)) {
+        const who = canonical(r.customer_email);
+        otherThreads.set(who, new Set([...(otherThreads.get(who) ?? []), thread]));
+      }
+      continue;
+    }
     const email = canonical(r.customer_email);
     if (!email.includes('@') || isInternalEmail(email)) continue;
     const once = `${email}|${foldSubject(r.subject)}|${new Date(at).toISOString().slice(0, 16)}`;
@@ -272,6 +290,7 @@ export function summarizeOutreachTest(
     const sentAt = firstSend.get(email);
     const at = parseStamp(r.msg_date);
     if (sentAt === undefined || at === null || at <= sentAt || at > untilMs) continue;
+    if (otherThreads.get(email)?.has(threadSubject(r.subject))) continue;
     const text = r.body ?? r.snippet;
     const entry = replied.get(email) ?? { human: 0, optout: false, automatic: 0 };
     if (isAutomaticReply(r.subject, text)) {

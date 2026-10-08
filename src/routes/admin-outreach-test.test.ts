@@ -268,6 +268,36 @@ describe('GET /v1/admin/outreach-test — the four figures', () => {
     });
   });
 
+  it('leaves out an answer in the thread of another of our messages, such as a service notice', async () => {
+    mail('n-carl', CARL, 'out', '2031-03-10T09:21:00', 'Our website moves to Switzerland');
+    mail(
+      'i-notice',
+      CARL,
+      'in',
+      '2031-03-11T08:00:00',
+      'RE: Our website moves to Switzerland',
+      'We object.',
+    );
+    mail('n-ana', ANA, 'out', '2031-03-10T09:31:00', 'Our website moves to Switzerland');
+    mail(
+      'i-notice-fwd',
+      ANA,
+      'in',
+      '2031-03-12T08:00:00',
+      'AW: Fwd: our website moves  to switzerland',
+      'Noted.',
+    );
+    const { body } = await read(WINDOW);
+    expect(body.replies).toEqual({
+      recipients: 2,
+      messages: 2,
+      optout_recipients: 1,
+      other_recipients: 1,
+      automatic_only_recipients: 1,
+    });
+    expect(body.sent.messages).toBe(3);
+  });
+
   it('counts a subscription on an existing key, not one before the first send, ours, or a pack', async () => {
     const { body } = await read(WINDOW);
     expect(body.subscriptions).toMatchObject({
