@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Changed
 
+- **Announced: the website and the dashboard move from Vercel to a server in Switzerland on or after 19 October 2026 (8 October 2026).** They will run on a virtual server in Infomaniak's public cloud in Switzerland, which we operate. Infomaniak Network SA, already a sub-processor for e-mail and backups, takes over the hosting from Vercel Inc., which leaves the list; no sub-processor is added, and the API does not move. Until 9 November 2026, the old Vercel deployment stays idle, as a way back if something goes wrong. Every active key with an address is told by e-mail between 8 and 12 October. Under DPA clause 5, a customer may object on reasonable grounds until 12 November 2026, in which case either party may terminate. The exact day of the move will be added here.
 - **Privacy Policy 1.8 (8 October 2026).** Section 1 names, among the uses of the e-mail address, at most one note from the founder asking whether the key is useful, and says that a reply STOP ends everything but legal and security notices; the payment data row says that we keep the payer's e-mail address, the amount and the currency of each purchase, and that an invoice you ask for carries the name and address you give us and is kept ten years, as Swiss accounting law requires. Nothing new is collected.
 
 ### Fixed
