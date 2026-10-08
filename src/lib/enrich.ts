@@ -28,6 +28,8 @@ import {
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
 import { lookupGrCode } from './gr-register.js';
+import { lookupEeCode } from './ee-register.js';
+import { lookupMeCode } from './me-register.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
@@ -656,6 +658,42 @@ function decideBankCode(
       },
     });
   }
+  // Estonie et Monténégro (08/10/2026) : deux listes d'autorité, servies depuis un
+  // fichier PRIVÉ comme la Grèce (EE_REGISTER_PATH, ME_REGISTER_PATH ;
+  // src/lib/ee-register.ts, src/lib/me-register.ts) : la permission porte sur les
+  // réponses de l'API, pas sur une copie des tables dans ce dépôt. Registres
+  // PARTIELS, jamais dans NATIONAL_REGISTERS ni NON_EXHAUSTIVE_REGISTERS : un code
+  // listé nomme son titulaire, avec la source, la date de dernière modification de
+  // la page (Estonie) et le jour de lecture dans `register` ; un code absent
+  // retombe sur la réponse d'avant, jamais `not_allocated` ni
+  // `national_register_unavailable`. Sans la variable, rien ne change. Une erreur
+  // de lecture d'un fichier configuré remonte à checkBankCode et devient
+  // `unavailable` / `lookup_failed`.
+  const ee = cc === 'EE' ? lookupEeCode(bankCode) : null;
+  if (ee) {
+    return withHolder('confirmed', {
+      value: bankCode,
+      status: 'verified',
+      match: 'register',
+      register: ee.register,
+      authoritative: false,
+      as_of: ee.read_on.slice(0, 7),
+      institution: { name: ee.name, street: null, post_code: null, town: null, country: 'EE' },
+    });
+  }
+  const me = cc === 'ME' ? lookupMeCode(bankCode) : null;
+  if (me) {
+    return withHolder('confirmed', {
+      value: bankCode,
+      status: 'verified',
+      match: 'register',
+      register: me.register,
+      authoritative: false,
+      as_of: me.read_on.slice(0, 7),
+      // Verbatim : la CBCG publie le nom, jamais une adresse.
+      institution: { name: me.name, street: null, post_code: null, town: null, country: 'ME' },
+    });
+  }
   // Finland (16/09/2026): the transcribed Finance Finland list confirms what it
   // knows and says nothing about the rest. It needs the whole BBAN, not the
   // 3-digit slice: institution codes run 1 to 4 characters and only the longest
@@ -1251,6 +1289,53 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           as_of: reg.as_of?.slice(0, 7) ?? (getReferenceAsOf() || null),
           // Same licence as the German block above: the register publishes
           // this BIC per bank code, so the pairing is the register's, not ours.
+          ...bicProvenance('national_register'),
+        };
+      }
+    } catch {
+      lookupFailed = true;
+    }
+  }
+
+  // Estonia (08/10/2026): the Finantsinspektsioon names the holder of the code,
+  // and Eesti Pangaliit's list supplies the BIC. The pairing is joined by code
+  // and identical name at import (scripts/seed-ee-register.ts) and is OURS, not
+  // the authority's: `curated_map`, advisory, never `national_register`. A listed
+  // code without a BIC keeps `bic: null`; nothing is derived from a name.
+  if (cc === 'EE') {
+    try {
+      const reg = lookupEeCode(bankCode);
+      if (reg?.bic) {
+        bic = {
+          code: reg.bic,
+          bank_name: nonEmpty(reg.name),
+          // The lists publish no town: taken from the directory row of the BIC
+          // they name, as the Bulgarian and Slovak blocks do.
+          city: nonEmpty(lookup(`${reg.bic}XXX`)?.city),
+          source: reg.bic_source,
+          as_of: reg.read_on.slice(0, 7),
+          ...bicProvenance('curated_map'),
+        };
+      }
+    } catch {
+      lookupFailed = true;
+    }
+  }
+
+  // Montenegro (08/10/2026): the Central Bank of Montenegro publishes the BIC
+  // beside the code, so the pairing is the register's own and wins over a key of
+  // the composite map that would disagree (same rule as Germany and Slovakia).
+  if (cc === 'ME') {
+    try {
+      const reg = lookupMeCode(bankCode);
+      if (reg) {
+        bic = {
+          code: reg.bic,
+          // Verbatim, as the central bank writes it.
+          bank_name: nonEmpty(reg.name),
+          city: nonEmpty(lookup(`${reg.bic}XXX`)?.city),
+          source: reg.credit,
+          as_of: reg.read_on.slice(0, 7),
           ...bicProvenance('national_register'),
         };
       }

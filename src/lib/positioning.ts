@@ -4,6 +4,8 @@ import { IBAN_LENGTHS, getCountryName } from './countries.js';
 import { UNLICENSED_MAP_COUNTRIES, getSourceFreshness } from './bic-lookup.js';
 import { LU_SOURCE, luRegisterConfigured } from './lu-register.js';
 import { GR_SOURCE, grRegisterConfigured } from './gr-register.js';
+import { EE_SOURCE, eeRegisterConfigured } from './ee-register.js';
+import { ME_SOURCE, meRegisterConfigured } from './me-register.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET } from './trial.js';
 import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
@@ -64,6 +66,8 @@ const DISPLAY_ORDER = [
   'SM',
   'LU',
   'GR',
+  'EE',
+  'ME',
   'LV',
   'GI',
 ];
@@ -96,6 +100,10 @@ export function registerCountries(): RegisterCountries {
   if (luRegisterConfigured() && !partial.includes('LU')) partial.push('LU');
   // Greece (07/10/2026): the HEBIC index, the same private-file model.
   if (grRegisterConfigured() && !partial.includes('GR')) partial.push('GR');
+  // Estonia and Montenegro (08/10/2026): the same private-file model, answered
+  // only where EE_REGISTER_PATH and ME_REGISTER_PATH name a file.
+  if (eeRegisterConfigured() && !partial.includes('EE')) partial.push('EE');
+  if (meRegisterConfigured() && !partial.includes('ME')) partial.push('ME');
   return {
     authoritative: byDisplayOrder(authoritative),
     partial: byDisplayOrder(partial),
@@ -119,6 +127,10 @@ export function codesOf(codes: readonly string[]): string {
 function registerNameOf(cc: string): string | null {
   if (cc === 'LU') return LU_SOURCE.replace(/^Source:\s*/, '');
   if (cc === 'GR') return `${GR_SOURCE.replace(/^Source:\s*/, '')} index`;
+  if (cc === 'EE')
+    return `${EE_SOURCE.replace(/^Source:\s*/, '')} (identity codes of credit, payment and e-money institutions)`;
+  if (cc === 'ME')
+    return `${ME_SOURCE.replace(/^Source:\s*/, '')} (banking identification codes in the RTGS system, banks only)`;
   return registerCoverage(cc).register;
 }
 
@@ -229,13 +241,30 @@ export function bicDirectorySentence(options: { withCount?: boolean } = {}): str
   );
 }
 
+/**
+ * The countries where we hold no bank-code data we may reuse: the countries whose
+ * composite-map keys were withdrawn (UNLICENSED_MAP_COUNTRIES, bic-lookup.ts),
+ * minus any that a partial register names on THIS deployment. Estonia leaves
+ * where `EE_REGISTER_PATH` names the Finantsinspektsioon file (ee-register.ts): a
+ * listed code names its bank, so the sentences below can no longer say it has no
+ * data there. Read at each call, like the other private registers, so the static
+ * copies of these sentences (README, llms files) keep the unconfigured wording
+ * that positioning.test.ts holds them to. The set itself is untouched, because its
+ * guards still decide a code the file does not carry (`unavailable`,
+ * `no_reference_data_for_country`, never `absent`).
+ */
+export function uncoveredCountries(): string[] {
+  const named = new Set(registerCountries().partial);
+  return [...UNLICENSED_MAP_COUNTRIES].filter((cc) => !named.has(cc)).sort();
+}
+
 /** The long paragraph: llms files, README, OpenAPI. */
 export function positioningLong(): string {
   const { authoritative } = registerCountries();
   const countries = datasetFacts().claim.countries;
   return (
     'IBANforge checks the bank behind an IBAN before you pay. ' +
-    `It validates IBANs from all ${countries} IBAN countries and, in all but ${UNLICENSED_MAP_COUNTRIES.size} of them, names the bank and its BIC, with the source of that answer. ` +
+    `It validates IBANs from all ${countries} IBAN countries and, in all but ${uncoveredCountries().length} of them, names the bank and its BIC, with the source of that answer. ` +
     `Where it reads the national register (${namesOf(authoritative)}), it also tells you whether the bank code is allocated at all; ` +
     'elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. ' +
     'For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), ' +
@@ -468,10 +497,12 @@ export const SEPA_VOP_LINE =
  * Since 29/09/2026 it names the countries the composite map no longer covers
  * at all (UNLICENSED_MAP_COUNTRIES in bic-lookup.ts): every key we held for
  * them came from a source that grants no right to reuse it. Read from the
- * constant, so a country leaving or joining that set changes the sentence.
+ * constant, so a country leaving or joining that set changes the sentence; a
+ * country that a partial register names since (Estonia, 08/10/2026) is left out,
+ * see uncoveredCountries().
  */
 export function otherCountriesLine(): string {
-  const none = [...UNLICENSED_MAP_COUNTRIES].sort();
+  const none = uncoveredCountries();
   return (
     '- Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`; ' +
     `for ${namesOf(none)}, structure and mod-97 only: we hold no bank-code data we may reuse there, so \`bank_code_check\` answers \`unavailable\` and \`bic\` is null.`
