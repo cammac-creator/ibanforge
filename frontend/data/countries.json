@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-01",
+ "generated_at": "2026-10-08",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -1310,35 +1310,10 @@
     ],
     "vop_required": true
    },
-   "register": null,
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "EE",
-     "name": "Estonia"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "22",
-     "status": "unavailable",
-     "reason": "no_reference_data_for_country",
-     "match": null,
-     "register": null,
-     "authoritative": false,
-     "as_of": "2026-10"
-    },
-    "sepa": {
-     "member": true,
-     "vop_required": true
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": true,
-     "test_bic": false
-    }
-   }
+   "register": "Finantsinspektsioon (identity codes of credit, payment and e-money institutions)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "EG": {
    "code": "EG",
@@ -2666,7 +2641,7 @@
       "town": null,
       "country": "IT"
      },
-     "as_of": "2026-09"
+     "as_of": "2026-10"
     },
     "sepa": {
      "member": true,
@@ -3441,35 +3416,10 @@
     ],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "ME",
-     "name": "Montenegro"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "505",
-     "status": "not_in_register",
-     "reason": "absent_from_reference_data",
-     "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
-     "as_of": "2026-10"
-    },
-    "sepa": {
-     "member": true,
-     "vop_required": false
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": false,
-     "test_bic": false
-    }
-   }
+   "register": "Central Bank of Montenegro (banking identification codes in the RTGS system, banks only)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "MK": {
    "code": "MK",

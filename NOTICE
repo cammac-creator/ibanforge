@@ -80,6 +80,9 @@ Files concerned:
     exported for the website; they repeat records from the sources below)
   src/db/bic_data.json (composite map from national bank codes to BICs)
   src/db/nl-psp.json
+  scripts/fixtures/registers/*.html and src/test-support/ee-me-fixtures.ts
+    (a few lines quoted from the Estonian and Montenegrin pages, read on
+    8 October 2026, as test citations: not the tables)
   scripts/data/eu-emi-register-2026-05-22.json
   scripts/data/iban-registry-2026-05-22.json
   test fixtures and sample API responses elsewhere that repeat these records
@@ -447,6 +450,18 @@ SIX Group AG, BIC entries
          whether its terms cover these rows has not been confirmed
          separately.
 
+Eesti Pangaliit (Estonian Banking Association), list of bank codes
+  Where: the BIC of 13 of the 19 codes of the private Estonian file (see
+         group C), paired by IBANforge with the Finantsinspektsioon code of
+         the same name (six codes have no BIC: the list does not carry them).
+         Read on 8 October 2026. The codes themselves never come from this
+         list.
+  Terms: none found on the page. It names the Finantsinspektsioon as the
+         official source of the identification codes. Credited in bic.source
+         as "Eesti Pangaliit (Estonian Banking Association), list of bank
+         codes". No permission for this list is recorded.
+         https://pangaliit.ee/settlements-and-standards/bank-codes
+
 Composite bank-code map
   Where: src/db/bic_data.json (17,940 keys in 62 countries at this
          revision; its Austrian, Belgian, Finnish, Luxembourg and Polish
@@ -601,6 +616,53 @@ ABBL, Luxembourg Register of IBAN-BIC Codes
          file. It does not cover redistribution of the register in this
          repository.
 
+Finantsinspektsioon (Estonian Financial Supervision and Resolution Authority),
+identity codes of the international account numbers
+  Never in: this repository. The API reads 19 codes (10 of credit
+         institutions and their foreign branches, 9 of payment and e-money
+         institutions and their foreign branches) from a private file written
+         by scripts/seed-ee-register.ts, read on 8 October 2026 from the two
+         pages named below, with the date each page states for its last edit
+         (25 August 2025 and 9 September 2026). The 16 Estonian keys of the
+         composite map, taken from a commercial site, are in the last entry of
+         this group.
+  Terms: permission received on 5 October 2026, to a request to reuse these
+         codes "in our API responses, one entry per request": the authority's
+         publicly available information "may be used" by IBANforge
+         "including in connection with the provision of commercial
+         services", with no separate permission needed. The source to cite is
+         Finantsinspektsioon. Publishing the whole table in this repository
+         was not requested and is not covered.
+         https://www.fi.ee/en/banking-and-credit/applying-activity-licences/identity-codes-international-account-numbers-credit-institutions
+         https://www.fi.ee/en/payment-and-e-money-services/applying-operating-licence-payment-services/identity-codes-international-account-numbers-payment-institutions-and-e-money-institutions
+  Served with every API answer built from these codes, in
+  bank_code_check.register:
+         Source: Finantsinspektsioon (Estonian Financial Supervision and Resolution Authority), …
+         (page last edited <date>; read by IBANforge on <date>)
+  The list is treated as partial: a listed code names its holder, an absence
+         is not a non-allocation.
+
+Central Bank of Montenegro (Centralna banka Crne Gore), banking
+identification codes in the RTGS system
+  Never in: this repository. The API reads 12 banks (name, BIC and the
+         three-digit code that opens a Montenegrin account number) from a
+         private file written by scripts/seed-me-register.ts, read on
+         8 October 2026 from the page named below, which states no date. The
+         table of other RTGS participants on the same page is not used.
+  Terms: permission received on 7 October 2026, to a request to reuse these
+         codes "in our API responses, one entry per request": commercial use
+         is permitted with the source "Central Bank of Montenegro", and
+         keeping the data up to date is IBANforge's responsibility. Names are
+         kept as published. Publishing the whole table in this repository was
+         not requested and is not covered.
+         https://www.cbcg.me/en/core-functions/payment-system/cbcg-payment-system/rtgs-system
+  Served with every API answer built from these codes, in
+  bank_code_check.register and bic.source:
+         Source: Central Bank of Montenegro, … (no publication date stated;
+         read by IBANforge on <date>)
+  The table is treated as partial: it lists banks, not the allocation of
+         the code space, so an absence is not a non-allocation.
+
 Bank of England, List of PRA-regulated Banks
   Formerly in: data/bic.sqlite, table pra_banks (281 rows).
   Terms: written permission of 25 August 2026 for the monthly list as a
@@ -647,6 +709,9 @@ reserving commercial use (removed on 29 September 2026)
          Türkiye answer that no bank-code data was consulted, and the Italian
          and Romanian keys that the Banca d'Italia and GLEIF rebuild are
          listed in group B.
+  Estonia comes back on 8 October 2026 through its authority (see the
+         Finantsinspektsioon entry above). Nothing of the 16 keys below is
+         reused: the codes come from the authority, the BICs from group B.
   ibancalculator.com, run by Telauges OÜ: the United Arab Emirates (56 keys),
          Bosnia and Herzegovina (25), Estonia (16), Georgia (20), Kazakhstan
          (49), Moldova (9), Serbia (26), and the codes and BICs of 219 Italian

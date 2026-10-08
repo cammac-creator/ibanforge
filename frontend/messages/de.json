@@ -243,7 +243,7 @@
       "q0": "Prüft IBANforge, wer Inhaber des Kontos ist?",
       "a0": "Nein. Es prüft die IBAN und die Bank dahinter. Der Abgleich des Kontoinhabernamens ist die Empfängerüberprüfung (VoP), die die Bank des Empfängers durchführt.",
       "q1": "Welche Länder erhalten ein Urteil aus dem nationalen Register?",
-      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: Dort entscheidet das nationale Register, ob eine Bankleitzahl vergeben ist. In den übrigen Ländern nennt die Antwort die Bank aus einem Teilregister oder einer zusammengesetzten Karte und sagt, dass sie einen Code nicht ausschließen kann. Für AE, BA, EE, GE, KZ, MD, RS und TR haben wir keine weiterverwendbaren Bankleitzahl-Daten: Die Antwort sagt, dass die Bank nicht geprüft wurde.",
+      "a1": "DE, AT, BE, SK, CZ, BG, CH, LI: Dort entscheidet das nationale Register, ob eine Bankleitzahl vergeben ist. In den übrigen Ländern nennt die Antwort die Bank aus einem Teilregister oder einer zusammengesetzten Karte und sagt, dass sie einen Code nicht ausschließen kann. Für AE, BA, GE, KZ, MD, RS und TR haben wir keine weiterverwendbaren Bankleitzahl-Daten: Die Antwort sagt, dass die Bank nicht geprüft wurde.",
       "q2": "Kann ich es ohne Anmeldung testen?",
       "a2": "Ja. Ganz ohne Schlüssel beantwortet POST /v1/iban/validate bis zu {trialWeekly} Validierungen pro Woche je Adresse, vollständig.",
       "q3": "Was bringt ein kostenloser Schlüssel?",
@@ -2259,7 +2259,7 @@
         },
         "bankCode": {
           "label": "Bankcode gegen das nationale Register geprüft (fehlt er dort, ist er nicht vergeben)",
-          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM und LU, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false; keine für AE, BA, EE, GE, KZ, MD, RS und TR, als nicht geprüft gekennzeichnet.",
+          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM, LU, EE und ME, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false; keine für AE, BA, GE, KZ, MD, RS und TR, als nicht geprüft gekennzeichnet.",
           "ibancom": "Von uns nicht geprüft",
           "ibanapi": "Laut ihrer Startseite (24. September 2026): Der Bankcode der IBAN wird mit ihrem eigenen Bankregister abgeglichen (Zentralbanken, SEPA-Daten und manuelle Prüfung). Ob ein dort fehlender Code nicht vergeben ist: von uns nicht geprüft.",
           "libs": "Je nach Bibliothek: schwifty lehnt einen Bankcode ab, den sein mitgeliefertes Register nicht kennt. Andere von uns nicht geprüft.",
