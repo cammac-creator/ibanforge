@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **Privacy Policy 1.8 (8 October 2026).** Section 1 names, among the uses of the e-mail address, at most one note from the founder asking whether the key is useful, and says that a reply STOP ends everything but legal and security notices; the payment data row says that we keep the payer's e-mail address, the amount and the currency of each purchase, and that an invoice you ask for carries the name and address you give us and is kept ten years, as Swiss accounting law requires. Nothing new is collected.
+
 ### Fixed
 
 - **A hosted MCP session opened with a valid API key is no longer refused by the per-address session ceiling (8 October 2026).** The daily ceiling on new sessions now counts only the sessions opened without a valid key, per source address; Claude connectors, which all leave from the same addresses, no longer turn away a client that sends its key. A key keeps at most 30 live sessions: opening one more closes the least recently used session of that same key. An unknown, revoked or absent key keeps the per-address ceiling.
