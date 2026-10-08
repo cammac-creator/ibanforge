@@ -1,0 +1,32 @@
+# Supprime une version de l'image du site publiée sur ghcr.io (cammac-creator/ibanforge-web), désignée par le début de
+# son étiquette. Créé le 08.10.2026 pour retirer l'image de septembre (étiquette 2a0e6199…), encore téléchargeable sans
+# compte, qui contient les registres AT, BE et SM retirés le 26.09.2026 (décision de Claude-Alain du 08.10.2026).
+# Lancement à la main seulement ; le jeton du dépôt suffit si le paquet a donné ce dépôt comme administrateur.
+name: Supprimer une version de l'image du site
+on:
+  workflow_dispatch:
+    inputs:
+      prefixe:
+        description: Début de l'étiquette de la version à supprimer (8 caractères au moins)
+        required: true
+permissions:
+  packages: write
+  contents: read
+jobs:
+  supprimer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trouver et supprimer la version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREFIXE: ${{ inputs.prefixe }}
+        run: |
+          set -euo pipefail
+          [ "${#PREFIXE}" -ge 8 ] || { echo "préfixe trop court"; exit 1; }
+          base="/users/cammac-creator/packages/container/ibanforge-web/versions"
+          gh api --paginate "$base" --jq '.[] | "\(.id) \(.metadata.container.tags | join(","))"' > versions.txt
+          echo "versions trouvées : $(wc -l < versions.txt)"
+          ids=$(awk -v p="$PREFIXE" '{ n=split($2,t,","); for(i=1;i<=n;i++) if (index(t[i],p)==1) { print $1; break } }' versions.txt)
+          [ -n "$ids" ] || { echo "aucune version ne commence par $PREFIXE"; exit 1; }
+          for id in $ids; do gh api -X DELETE "$base/$id" && echo "version $id supprimée"; done
+          gh api --paginate "$base" --jq '.[] | .metadata.container.tags | join(",")' | grep -c "^$PREFIXE" && { echo "encore présente"; exit 1; } || echo "plus aucune version $PREFIXE"
