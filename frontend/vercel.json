@@ -1,10 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["fra1"],
+  "ignoreCommand": "git diff --quiet \"${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}\" HEAD -- . ../CHANGELOG.md",
   "git": {
     "deploymentEnabled": {
       "dependabot/**": false,
-      "codex/**": false
+      "codex/**": false,
+      "claude/**": false
     }
   }
 }
