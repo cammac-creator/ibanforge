@@ -47,11 +47,11 @@ n'est pas plus autorisé que la redistribution.
 |---|---:|---|---|---|---|
 | AE | 56 | ibancalculator.com (`manual_ae`) | site commercial, données aspirées en lui envoyant des IBAN inventés, aucune licence | aucun | `bic: null`, `unavailable` / `no_reference_data_for_country` |
 | BA | 25 | ibancalculator.com (`generated_ba`) | idem | aucun | idem |
-| EE | 16 | ibancalculator.com (`generated_ee`) | idem | aucun | idem |
+| EE | 16 | ibancalculator.com (`generated_ee`) | idem | **aucune clé reprise** ; revenue le 08/10/2026 par les pages de la Finantsinspektsioon, voir la section de ce jour | idem pour un code que la liste de l'autorité ne porte pas, et partout où le fichier privé n'est pas branché ; un code listé répond `verified` là où il l'est |
 | GE | 20 | ibancalculator.com (`generated_ge`) | idem | aucun | idem, y compris par la recherche par préfixe |
 | KZ | 49 | ibancalculator.com (`generated_kz`) | idem | aucun | idem |
 | MD | 9 | ibancalculator.com (`generated_md`) | idem | aucun | idem, y compris par la recherche par préfixe |
-| RS | 26 | ibancalculator.com (`generated_rs`) | idem | aucun | idem |
+| RS | 26 | ibancalculator.com (`generated_rs`) | idem | **aucune clé reprise** ; revenue le 10/10/2026 par la liste PDF de la Banque nationale de Serbie, voir la section de ce jour | idem pour un code que la liste ne porte pas, et partout où le fichier privé n'est pas branché ; une banque listée répond `verified` là où il l'est |
 | TR | 48 | Türkiye Bankalar Birliği (`manual_tr`) | usage commercial soumis à l'accord écrit de la TBB (clause écrite) | aucun | idem |
 | IT | 219 | codes et BIC de ibancalculator.com (`generated_it`) | site commercial, codes et BIC aspirés de sa page des codes banque (`blz.html`), aucune licence | **175 reconstruites** : code ABI → LEI (Banca d'Italia, CC BY 4.0) → BIC (GLEIF, table BIC↔LEI de SWIFT) ; 120 au même BIC, 55 à un BIC différent (souvent le BIC propre de la banque locale au lieu de celui de son organe central) | code reconstruit : le BIC reconstruit ; sinon (sans LEI, LEI sans BIC, plusieurs BIC sans siège unique, code hors registre) : pas de BIC, verdict du registre inchangé, ou `absent_from_reference_data` hors registre (Poste Italiane 07601) |
 | ES | 242 | iban.es (`generated_es`), lié à IBAN.com | site commercial, conditions d'IBAN.com contre la compilation d'annuaires | aucun (les 145 clés venues des fichiers nationaux par sigalor, et 4 ajouts manuels, restent) | `bic: null`, `not_in_register` / `absent_from_reference_data`, comme tout code absent de la carte |
@@ -115,6 +115,220 @@ chargeur italien ne lit pas parce qu'ils ne sont pas ceux des émetteurs d'IBAN 
 sociétés de gestion, intermédiaires financiers ; 36087 n'y figure nulle part). Mesure code par code (`scripts/audit/curated-map-replay.ts`) :
 31 codes italiens gagnent un BIC, aucun autre code italien et aucun des 63
 autres pays ne change de réponse.
+
+## 08/10/2026 : l'Estonie et le Monténégro, par leurs sources officielles (fichiers privés)
+
+Deux registres **partiels**, servis depuis deux fichiers PRIVÉS, sur le modèle de la Grèce :
+`EE_REGISTER_PATH` et `ME_REGISTER_PATH` désignent les fichiers, que lisent `src/lib/ee-register.ts` et
+`src/lib/me-register.ts` (relus sans redémarrage, comme `GR_REGISTER_PATH`). Ils sont écrits par
+`scripts/seed-ee-register.ts` et `scripts/seed-me-register.ts`, branchés dans `enrich.ts`
+(`decideBankCode` et `resolveBank`). **Aucune ligne des tables n'est dans ce dépôt** : ni `data/bic.sqlite`, ni
+la carte composite, ni un fichier de `src/db/`. Sans la variable, le pays répond comme avant.
+
+### Les permissions
+
+Les lettres de septembre demandaient de réutiliser ces codes « in our API responses, one entry per
+request ». Les deux réponses disent oui à cet usage ; la publication des tables complètes dans le dépôt
+public n'a pas été demandée (décision de la session principale, 08/10/2026).
+
+- **Estonie.** Permission reçue le 05/10/2026 de la Finantsinspektsioon : ses informations publiques
+  « may be used … including in connection with the provision of commercial services », sans autre
+  permission. Source à citer : Finantsinspektsioon.
+- **Monténégro.** Permission reçue le 07/10/2026 de la Banque centrale du Monténégro : usage commercial
+  autorisé avec la source « Central Bank of Montenegro » ; la mise à jour des données est de notre
+  responsabilité.
+
+### Où sont les fichiers, et comment les mettre en ligne
+
+- **Dans la copie de travail de ce chantier** (dossier ignoré par git, vérifié avec `git check-ignore`) :
+  `docs/internal/registres-ee-me-2026-10-08/ee-register.json` et `me-register.json`, en mode 600. Les
+  chargeurs y écrivent par défaut ; ils refusent un chemin que git suivrait dans un dépôt.
+- **En production** (étape de la session principale, comme pour `GR_REGISTER_PATH`) : poser les deux
+  fichiers sur le volume de l'API (par exemple sous `/app/data/`, hors du dépôt), puis les variables
+  `EE_REGISTER_PATH` et `ME_REGISTER_PATH` avec leurs chemins absolus. Remplacer un fichier par
+  écriture d'un voisin puis `mv` : l'API le relit sans redémarrage. Prouver ensuite une réponse en ligne
+  (`EE382200221020145685` doit nommer Swedbank AS). Retirer une variable éteint le pays.
+- **Relire à la main** : `npx tsx scripts/seed-ee-register.ts` et `npx tsx scripts/seed-me-register.ts`
+  réécrivent le fichier ; avec `--check`, ils comparent sans écrire (sortie 1 si la page a changé, avec les
+  différences). Une page qui change de forme fait échouer le script ; la disparition d'un code demande
+  `--accept-loss` après lecture. La banque centrale a écrit que la mise à jour du Monténégro nous revient :
+  aucun workflow ne relit ces pages, un contrôle `--check` périodique reste à brancher.
+
+### Ce qui a été lu, le 08/10/2026
+
+| Source | Adresse | Lu |
+|---|---|---|
+| Finantsinspektsioon, établissements de crédit et succursales étrangères | `fi.ee/en/banking-and-credit/applying-activity-licences/identity-codes-international-account-numbers-credit-institutions` | 10 codes ; « Page last edited on 25/08/2025 » |
+| Finantsinspektsioon, établissements de paiement et de monnaie électronique | `fi.ee/en/payment-and-e-money-services/applying-operating-licence-payment-services/identity-codes-international-account-numbers-payment-institutions-and-e-money-institutions` | 9 codes ; « Page last edited on 09/09/2026 » |
+| Eesti Pangaliit, liste des codes de banque (BIC seulement) | `pangaliit.ee/settlements-and-standards/bank-codes` | 13 BIC joints |
+| Banque centrale du Monténégro, RTGS, « Banking identification codes in the RTGS system » | `cbcg.me/en/core-functions/payment-system/cbcg-payment-system/rtgs-system` | 12 banques, aucune date sur la page |
+
+Les tests ne gardent que de petites citations de ces pages (`scripts/fixtures/registers/`, quelques lignes
+chacune, sans script ni clé du site) et un fichier privé d'essai de quelques lignes aux dates inventées
+(`src/test-support/ee-me-fixtures.ts`).
+
+### Partiels, et pourquoi aucun des deux n'entre dans `NATIONAL_REGISTERS`
+
+- **Estonie.** Eesti Pangaliit liste trois codes que les pages de l'autorité ne portent pas le
+  08/10/2026 : 00 (AS TBB pank), 83 (Svenska Handelsbanken AB Eesti filiaal) et 99 (AS Pocopay). Ils
+  ne sont **pas importés** (les codes viennent de l'autorité seule) et ne sont jamais refusés. La page
+  des établissements de crédit n'a pas été modifiée depuis août 2025. Un code présent nomme son
+  titulaire ; un code absent garde la réponse d'avant (`unavailable` /
+  `no_reference_data_for_country`, `bic: null`), jamais `not_allocated`.
+- **Monténégro.** Le tableau liste des banques, pas l'attribution de l'espace des codes. Le tableau
+  voisin des « participants » du RTGS (23 lignes, sans BIC : le Trésor 830 et 832, les douanes 805,
+  l'administration fiscale 820, le ministère de l'Intérieur 825 et 840, le compte de liquidité 831,
+  le dépositaire central 929, le fonds de garantie des dépôts 931, deux banques en faillite 714 et 715)
+  **n'est pas lu**. Un code absent garde la réponse de la carte composite.
+
+Ni l'un ni l'autre n'est dans `NON_EXHAUSTIVE_REGISTERS` : ils n'existent que là où le fichier est
+branché, comme le Luxembourg et la Grèce (`registerCoverage()` ne les connaît pas ; `registerCountries()`
+les ajoute quand la variable est posée).
+
+### Le BIC
+
+- **Monténégro :** la banque centrale publie le BIC à côté du code ; l'appariement est le sien
+  (`bic.basis: "national_register"`, `bic.authoritative: true`) et passe devant une clé de la carte
+  composite. La carte donnait au code 535 (Prva banka Crne Gore) le BIC `NIKBMEP2XXX` ; la réponse sert
+  maintenant `PRVAMEPG`. Les onze autres BIC concordaient déjà. Les douze BIC sont dans l'annuaire.
+- **Estonie :** les pages de l'autorité ne publient pas de BIC. Il vient de la liste d'Eesti Pangaliit,
+  **joint par le code, à nom identique** des deux côtés ; l'appariement est le nôtre
+  (`bic.basis: "curated_map"`, `authoritative: false`) et `bic.source` nomme Pangaliit. Six codes
+  n'ont aucun BIC (15, 62, 55, 21, 01, 72) : `bic: null`. Cinq d'entre eux ont, dans notre annuaire GLEIF,
+  un BIC au même nom légal ; **il n'est pas utilisé**, parce qu'un nom qui concorde n'est pas un
+  appariement publié (le code 72, Unifiedpost Payments Eesti, n'a aucun BIC estonien de l'annuaire
+  à son nom). Les ajouter reste une décision de la session principale.
+- **Pangaliit n'a pas de conditions publiées sur cette page**, et aucune permission n'est consignée :
+  NOTICE, groupe B. Elle renvoie elle-même à la Finantsinspektsioon comme source officielle des codes.
+
+### Les dates
+
+Estonie : chaque page porte sa date de dernière modification, gardée séparément (25/08/2025 et
+09/09/2026) avec le jour de lecture ; le crédit dit « page last edited » et « read by IBANforge on »,
+jamais « published ». Monténégro : la page ne date rien ; le crédit dit « no publication date stated;
+read by IBANforge on ». Dans les deux cas `as_of` porte le mois de lecture.
+
+### Ce que ça change dans les réponses, là où les fichiers sont branchés
+
+Estonie, IBAN `EE38 2200 2210 2014 5685` (code 22) : `unavailable` / `no_reference_data_for_country`,
+`bic: null` → `verified`, `match: "register"`, `authoritative: false`, titulaire Swedbank AS, BIC
+`HABAEE2X`. Monténégro, IBAN d'exemple officiel `ME25 5050 0001 2345 6789 51` (code 505) : inchangé
+(505 n'est pas dans le tableau de la banque centrale). `UNLICENSED_MAP_COUNTRIES` garde l'Estonie : les
+clés de la carte restent retirées, et un code que la liste ne porte pas répond comme avant. Là où le
+fichier estonien est branché, `uncoveredCountries()` (`positioning.ts`) sort l'Estonie de la phrase des
+pays « sans données » et du décompte « in all but N » (7 au lieu de 8) du `/llms.txt` de l'API et de
+l'OpenAPI ; les copies statiques (README, `llms.txt`, `llms-full.txt`) gardent la phrase sans fichier,
+que `positioning.test.ts` leur impose, comme pour le Luxembourg et la Grèce.
+
+Textes du site mis à jour le même jour, sans réécriture large, dans les trois langues : la FAQ et le
+tableau comparatif de `frontend/messages/{en,fr,de}.json` (l'Estonie sort des pays sans données, l'Estonie
+et le Monténégro entrent dans les listes partielles), `frontend/content/*/docs/iban-validate.mdx` (le
+Monténégro rejoint Saint-Marin parmi les BIC `national_register`), `frontend/content/*/docs/data-sources.mdx`
+(l'exception estonienne), la phrase de `src/mcp/server.ts` sur Saint-Marin, et `frontend/data/countries.json`
+régénéré par `npm run pages:export-countries` (les deux pays y sont des registres privés, sans réponse
+exportée, comme le Luxembourg ; l'export a aussi mis à jour `generated_at` et le mois de la réponse
+italienne).
+
+## 10/10/2026 : la Serbie, par la liste PDF de la Banque nationale de Serbie (fichier privé)
+
+Même modèle que l'Estonie et le Monténégro (section du 08/10/2026), décision de Claude-Alain du
+10/10/2026. Un registre **partiel** servi depuis un fichier PRIVÉ désigné par `RS_REGISTER_PATH`
+(`src/lib/rs-register.ts`, relu sans redémarrage), écrit par `scripts/seed-rs-register.ts`, branché dans
+`enrich.ts` (`decideBankCode` et `resolveBank`). **Aucune ligne de la table n'est dans ce dépôt.** Sans la
+variable, la Serbie répond comme avant.
+
+### La permission (reçue le 09/10/2026)
+
+De la Banque nationale de Serbie (service des systèmes de paiement), texte utile : « you have permision to
+use the data you've requested and only for the purpose you've requested, which is reuse of the PDF list of
+the banks participating in Serbia's RTGS and Clearing payment systems, giving each bank's three-character
+NBS code, BIC/SWIFT code and company registration number (matični broj), for commercial purposes only. As
+stated in your request, bank list will be credited as "Source: National Bank of Serbia" with the
+publication date. » La NBS ajoute qu'elle n'est pas responsable des décisions prises sur ces données, et que
+les liens doivent mener directement à www.nbs.rs, sans usage publicitaire. Notre demande portait sur les
+réponses de l'API, une entrée par requête : la publication de la table dans le dépôt public n'a pas été
+demandée.
+
+Ce qui est servi : le crédit « Source: National Bank of Serbia » avec la date du document, dans
+`bank_code_check.register` et `bic.source` ; l'adresse du document sur `www.nbs.rs` (jamais un lien
+publicitaire) ; et, dans `register`, l'absence de responsabilité de la NBS. Le `/llms.txt` de l'API
+répète le crédit et l'adresse quand le fichier est branché.
+
+### La source
+
+`https://www.nbs.rs/export/sites/NBS_site/documents-eng/platni-sistem/banks_account_numbers.pdf`,
+« Account numbers and bank identification codes of participants in the NBS RTGS and clearing system »,
+deux pages. Lu le 10/10/2026 : **20 lignes, 19 banques serbes importées**. Le document porte en tête la date
+« 1/9/2026 », lue jour/mois/année (le PDF a été créé le 02/09/2026, `Last-Modified` du 02/09/2026) : le
+**1er septembre 2026**, que le crédit imprime. Le jour de lecture est gardé à part. (La NBS publie aussi
+`ucesnici_RTGS_e.pdf`, la liste des participants au RTGS, sans code ni BIC, et `banks_in_int_po.pdf`, la
+compensation internationale : ni l'un ni l'autre n'est lu.)
+
+**Le code.** Le document n'a pas de colonne « code ». Le code NBS à trois caractères, c'est-à-dire les
+positions 5 à 7 de l'IBAN serbe, est le début à trois chiffres du groupe central du compte de la banque à
+la NBS (`908 – 10501 – 97` : code 105). La liste de la compensation internationale de la NBS le confirme
+(colonne ID : 105, 145, 155, 160…). Le chargeur vérifie la clé ISO 7064 mod 97-10 de chacun des 20 comptes
+(tous justes le 10/10/2026), ce qui attrape une ligne mal lue, et refuse un texte dont le nombre de comptes
+« 908 – … » diffère de celui des lignes lues.
+
+**Le texte.** Le PDF est lu avec `pdftotext -raw` (poppler, `brew install poppler`), aucune bibliothèque
+PDF n'étant ajoutée aux dépendances ; les tests ne gardent qu'une citation de quelques lignes du texte
+extrait (`scripts/fixtures/registers/rs-nbs-participants-2026-10-10.txt`).
+
+### Partiel, et ce qui est écarté
+
+- **Partiel** : la liste nomme des banques participantes, pas l'attribution de l'espace des codes (la NBS,
+  908, n'y figure pas comme participante). Un code absent garde la réponse d'avant (`unavailable` /
+  `no_reference_data_for_country`, `bic: null`), jamais `not_allocated`. Pas dans `NATIONAL_REGISTERS` ni
+  `NON_EXHAUSTIVE_REGISTERS` : le pays n'existe que là où le fichier est branché. Mesuré le 10/10/2026 :
+  l'IBAN d'exemple du registre IBAN pour la Serbie (`RS35 2600 0560 1001 6113 79`, code 260) porte un code
+  que la liste ne porte pas, et garde la réponse d'avant.
+- **Écarté** : la vingtième ligne, Euroclear Bank SA/NV (BIC belge `MGTCBEBE`, numéro d'entreprise belge). Il
+  participe aux systèmes mais n'émet pas d'IBAN serbe ; le chargeur ne garde que les lignes à BIC serbe et
+  le dit.
+- **Le matični broj** reste dans le fichier privé (champ `registration_number`) et n'est **jamais servi** : le
+  bloc `institution` n'a aucun champ pour lui, et la NBS autorise le réemploi du numéro dans le cadre de la
+  demande, pas de le publier. Un test vérifie qu'aucune réponse ne le contient. Il pourra servir à joindre
+  un jour un LEI ; ce n'est pas fait.
+
+### Le BIC
+
+La liste publie le BIC à côté de chaque banque, onze caractères (`XXX` compris, gardés tels que publiés) :
+l'appariement est celui de la NBS (`bic.basis: "national_register"`, `bic.authoritative: true`), comme pour
+le Monténégro. Les 19 BIC sont dans notre annuaire. `PARTIAL_REGISTERS_PAIRING_THE_BIC` (`register-lists.ts`)
+compte la Serbie avec Saint-Marin et le Monténégro, et le contrat OpenAPI et les descriptions MCP la
+nomment.
+
+### La date dans les réponses
+
+`bank_code_check.as_of` porte le mois de la date du document (2026-09), la moitié datée du crédit ; `register`
+imprime « list dated 2026-09-01 » et « read by IBANforge on <jour de lecture> ».
+
+### Où est le fichier, et comment le mettre en ligne
+
+- **Dans la copie de travail** (dossier ignoré par git, mode 600) :
+  `docs/internal/registres-ee-me-2026-10-08/rs-register.json`, à côté des deux autres (le dossier garde le nom
+  de la première livraison). À copier avant de retirer la copie de travail, ou à régénérer par
+  `npx tsx scripts/seed-rs-register.ts` (poppler requis).
+- **En production** : poser le fichier sur le volume de l'API, hors du dépôt, et la variable
+  `RS_REGISTER_PATH` (chemin absolu), comme pour `GR_REGISTER_PATH`. Prouver ensuite
+  `RS35160000012345678956` : « BANCA INTESA AKCIONARSKO DRUŠTVO BEOGRAD », `DBDBRSBGXXX`, un `register` qui
+  commence par « Source: National Bank of Serbia ».
+- **Relecture à la main** : `npx tsx scripts/seed-rs-register.ts --check` compare sans écrire (sortie 1 si le
+  document a changé) ; sans `--check` le fichier est réécrit ; la disparition d'un code demande
+  `--accept-loss`. Aucun workflow ne relit la page.
+
+### Ce que ça change dans les réponses, là où le fichier est branché
+
+`unavailable` / `no_reference_data_for_country`, `bic: null` → `verified`, `match: "register"`,
+`authoritative: false`, banque nommée, BIC de la NBS. `uncoveredCountries()` (`positioning.ts`) sort aussi la
+Serbie de la phrase des pays « sans données » et du décompte « in all but N » (6 au lieu de 8 avec l'Estonie
+et la Serbie branchées) ; les copies statiques gardent la phrase sans fichier. Textes du site alignés dans
+les trois langues, là où ils contredisaient : la FAQ et le tableau comparatif de `frontend/messages`
+(la Serbie sort des pays sans données et entre dans les listes partielles), `iban-validate.mdx` (la Serbie
+rejoint Saint-Marin et le Monténégro parmi les BIC `national_register`), `data-sources.mdx` (l'exception
+serbe), la phrase de `src/mcp/server.ts`, et `frontend/data/countries.json` régénéré par
+`npm run pages:export-countries`.
 
 ## Ce qui alimente `bic.sqlite`
 
