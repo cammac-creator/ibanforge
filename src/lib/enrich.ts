@@ -30,6 +30,7 @@ import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
 import { lookupGrCode } from './gr-register.js';
 import { lookupEeCode } from './ee-register.js';
 import { lookupMeCode } from './me-register.js';
+import { lookupRsCode } from './rs-register.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
@@ -658,8 +659,8 @@ function decideBankCode(
       },
     });
   }
-  // Estonie et Monténégro (08/10/2026) : deux listes d'autorité, servies depuis un
-  // fichier PRIVÉ comme la Grèce (EE_REGISTER_PATH, ME_REGISTER_PATH ;
+  // Estonie et Monténégro (08/10/2026), puis Serbie (10/10/2026) : des listes d'autorité,
+  // servies depuis un fichier PRIVÉ comme la Grèce (EE_REGISTER_PATH, ME_REGISTER_PATH ;
   // src/lib/ee-register.ts, src/lib/me-register.ts) : la permission porte sur les
   // réponses de l'API, pas sur une copie des tables dans ce dépôt. Registres
   // PARTIELS, jamais dans NATIONAL_REGISTERS ni NON_EXHAUSTIVE_REGISTERS : un code
@@ -692,6 +693,26 @@ function decideBankCode(
       as_of: me.read_on.slice(0, 7),
       // Verbatim : la CBCG publie le nom, jamais une adresse.
       institution: { name: me.name, street: null, post_code: null, town: null, country: 'ME' },
+    });
+  }
+  // Serbie (10/10/2026) : la liste PDF des participants aux systèmes RTGS et de
+  // compensation de la Banque nationale de Serbie, servie depuis un fichier PRIVÉ
+  // (RS_REGISTER_PATH, src/lib/rs-register.ts) comme l'Estonie et le Monténégro.
+  // Partielle : un code listé nomme sa banque, avec le crédit « Source: National
+  // Bank of Serbia », la date du document et le jour de lecture dans `register` ; un
+  // code absent retombe sur la réponse d'avant. Le matični broj du fichier n'est pas
+  // servi : le bloc `institution` n'a pas de champ pour lui.
+  const rs = cc === 'RS' ? lookupRsCode(bankCode) : null;
+  if (rs) {
+    return withHolder('confirmed', {
+      value: bankCode,
+      status: 'verified',
+      match: 'register',
+      register: rs.register,
+      authoritative: false,
+      // Le mois de la date que le document porte : la moitié datée du crédit.
+      as_of: rs.published.slice(0, 7),
+      institution: { name: rs.name, street: null, post_code: null, town: null, country: 'RS' },
     });
   }
   // Finland (16/09/2026): the transcribed Finance Finland list confirms what it
@@ -1336,6 +1357,28 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           city: nonEmpty(lookup(`${reg.bic}XXX`)?.city),
           source: reg.credit,
           as_of: reg.read_on.slice(0, 7),
+          ...bicProvenance('national_register'),
+        };
+      }
+    } catch {
+      lookupFailed = true;
+    }
+  }
+
+  // Serbia (10/10/2026): the National Bank of Serbia's list publishes the BIC
+  // beside the code, so the pairing is the register's own and wins over any key of
+  // the composite map (none for Serbia since the withdrawal of 29/09/2026).
+  if (cc === 'RS') {
+    try {
+      const reg = lookupRsCode(bankCode);
+      if (reg) {
+        bic = {
+          code: reg.bic,
+          // Verbatim, as the NBS writes it.
+          bank_name: nonEmpty(reg.name),
+          city: nonEmpty(lookup(reg.bic.length === 8 ? `${reg.bic}XXX` : reg.bic)?.city),
+          source: reg.credit,
+          as_of: reg.published.slice(0, 7),
           ...bicProvenance('national_register'),
         };
       }

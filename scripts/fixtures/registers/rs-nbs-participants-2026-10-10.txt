@@ -1,0 +1,28 @@
+[Citation de test : quelques lignes du texte que `pdftotext -raw` tire du PDF de la Banque nationale de Serbie
+lu le 2026-10-10 (https://www.nbs.rs/export/sites/NBS_site/documents-eng/platni-sistem/banks_account_numbers.pdf).
+Ce n'est pas la table : de quoi essayer le chargeur, avec un nom coulé sur plusieurs lignes, un saut de page
+et la ligne d'Euroclear, qui n'a pas de BIC serbe.]
+ACCOUNT NUMBERS AND BANK IDENTIFICATION CODES OF PARTICIPANTS
+IN THE NBS RTGS AND CLEARING SYSTEM
+1/9/2026
+No Bank Account
+Registration
+number
+BIC
+1. AIKBANK AKCIONARSKO DRUŠTVO, BEOGRAD 908 – 10501 – 97 06876366 AIKBRS22XXX
+5. BANCA INTESA AKCIONARSKO DRUŠTVO BEOGRAD 908 – 16001 – 87 07759231 DBDBRSBGXXX
+9.
+BANKA POŠTANSKA ŠTEDIONICA AKCIONARSKO
+DRUŠTVO, BEOGRAD
+908 – 20001 – 18 07004893 SBPORSBGXXX
+12. RAIFFEISEN BANKA A.D. BEOGRAD 908 – 26501 – 15 17335600 RZBSRSBGXXX
+15. ERSTE BANK AKCIONARSKO DRUŠTVO NOVI SAD 908 – 34001 – 19 08063818 GIBARS22XXXNo Bank Account
+Registration
+number
+BIC
+16. 3 BANKA A.D. NOVI SAD 908 – 37001 – 40 08761132 OPPBRS22XXX
+19.
+BANK OF CHINA SRBIJA A.D. BEOGRAD – NOVI
+BEOGRAD
+908 – 38501 - 02 21251640 BKCHRSBGXXX
+20. EUROCLEAR BANK SA/NV BRUSSELS 908 – 99001 – 86 0429.875.591 MGTCBEBEXXX

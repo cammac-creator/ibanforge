@@ -87,6 +87,7 @@ import { LU_SOURCE, luRegisterConfigured } from './lib/lu-register.js';
 import { GR_IMPORTANT_NOTE, GR_SOURCE, grRegisterConfigured } from './lib/gr-register.js';
 import { EE_SOURCE, eeRegisterConfigured } from './lib/ee-register.js';
 import { ME_SOURCE, meRegisterConfigured } from './lib/me-register.js';
+import { RS_PUBLICATION, RS_SOURCE, rsRegisterConfigured } from './lib/rs-register.js';
 import {
   BANK_LEVEL_SANCTIONS,
   CANNOT_CALL_TITLE,
@@ -427,6 +428,12 @@ function buildLlmsTxt(): string {
   const meSourceLine = meRegisterConfigured()
     ? `\n- Montenegrin bank codes: ${ME_SOURCE.replace(/^Source:\s*/, '')}, banking identification codes in the RTGS system (the page states no date). A listed code names its bank; an absence is not a non-allocation`
     : '';
+  // Serbia (10/10/2026): the NBS asks for "Source: National Bank of Serbia" with the
+  // publication date, and links that lead straight to www.nbs.rs. The date of the
+  // list travels in every answer's bank_code_check.register.
+  const rsSourceLine = rsRegisterConfigured()
+    ? `\n- Serbian bank codes: ${RS_SOURCE.replace(/^Source:\s*/, '')}, list of participants in the NBS RTGS and clearing systems, account numbers and bank identification codes (${RS_PUBLICATION}). A listed code names its bank; an absence is not a non-allocation. The National Bank of Serbia accepts no responsibility for decisions taken on this data`
+    : '';
   // The `>` line is the one paragraph an LLM keeps about this product. On
   // 24/09/2026 assistants still summarised IBANforge from the previous one
   // ("Swiss clearing, sanctions and compliance risk scoring, for developers
@@ -497,7 +504,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}${grSourceLine}${eeSourceLine}${meSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}${grSourceLine}${eeSourceLine}${meSourceLine}${rsSourceLine}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}

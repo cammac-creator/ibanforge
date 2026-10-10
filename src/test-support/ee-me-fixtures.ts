@@ -1,13 +1,13 @@
 /**
- * Les deux registres privés (Estonie, Monténégro) réduits à quelques lignes, pour
- * les essais qui passent par la vraie validation.
+ * Les trois registres privés (Estonie, Monténégro, Serbie) réduits à quelques lignes,
+ * pour les essais qui passent par la vraie validation.
  *
  * Les tables entières ne sont pas dans ce dépôt public : les permissions de la
- * Finantsinspektsioon et de la Banque centrale du Monténégro portent sur les
- * réponses de l'API, une entrée par requête (src/lib/ee-register.ts,
- * src/lib/me-register.ts). Un essai écrit donc un fichier privé de quelques lignes
- * dans un dossier temporaire et pointe `EE_REGISTER_PATH` / `ME_REGISTER_PATH`
- * dessus. Les lignes sont des citations de test (les mêmes que les fragments de
+ * Finantsinspektsioon, de la Banque centrale du Monténégro et de la Banque nationale
+ * de Serbie portent sur les réponses de l'API, une entrée par requête
+ * (src/lib/ee-register.ts, me-register.ts, rs-register.ts). Un essai écrit donc un
+ * fichier privé de quelques lignes dans un dossier temporaire et pointe
+ * `EE_REGISTER_PATH` / `ME_REGISTER_PATH` / `RS_REGISTER_PATH` dessus. Les lignes sont des citations de test (les mêmes que les fragments de
  * scripts/fixtures/registers/) ; les DATES, elles, sont inventées et lointaines
  * (2098, 2099) : ce qu'un essai lit dans la réponse vient du fichier, jamais d'une
  * horloge ni de la vraie lecture.
@@ -65,6 +65,41 @@ export const ME_FIXTURE = {
     { code: '510', name: 'Crnogorska komercijalna banka AD', bic: 'CKBCMEPG' },
     { code: '530', name: 'NLB Banka AD', bic: 'MNBAMEPG' },
     { code: '535', name: 'Prva banka Crne Gore AD - Osnovana 1901. godine', bic: 'PRVAMEPG' },
+  ],
+} as const;
+
+export const RS_FIXTURE = {
+  schema: 1,
+  source: 'Source: National Bank of Serbia',
+  publication:
+    'https://www.nbs.rs/export/sites/NBS_site/documents-eng/platni-sistem/banks_account_numbers.pdf',
+  published: '2099-01-02',
+  read_on: '2099-03-04',
+  entries: [
+    {
+      code: '105',
+      name: 'AIKBANK AKCIONARSKO DRUŠTVO, BEOGRAD',
+      bic: 'AIKBRS22XXX',
+      registration_number: '06876366',
+    },
+    {
+      code: '160',
+      name: 'BANCA INTESA AKCIONARSKO DRUŠTVO BEOGRAD',
+      bic: 'DBDBRSBGXXX',
+      registration_number: '07759231',
+    },
+    {
+      code: '200',
+      name: 'BANKA POŠTANSKA ŠTEDIONICA AKCIONARSKO DRUŠTVO, BEOGRAD',
+      bic: 'SBPORSBGXXX',
+      registration_number: '07004893',
+    },
+    {
+      code: '265',
+      name: 'RAIFFEISEN BANKA A.D. BEOGRAD',
+      bic: 'RZBSRSBGXXX',
+      registration_number: '17335600',
+    },
   ],
 } as const;
 

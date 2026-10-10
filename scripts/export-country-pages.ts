@@ -43,6 +43,7 @@ const { curatedMapCountries, restrictedRegisterCountries } =
 const { LU_SOURCE } = await import('../src/lib/lu-register.js');
 const { EE_SOURCE } = await import('../src/lib/ee-register.js');
 const { ME_SOURCE } = await import('../src/lib/me-register.js');
+const { RS_SOURCE } = await import('../src/lib/rs-register.js');
 
 /**
  * The countries whose bank codes the API decides against a register it serves
@@ -50,7 +51,8 @@ const { ME_SOURCE } = await import('../src/lib/me-register.js');
  * 25/09/2026): Austria, Belgium and San Marino from the restricted overlay
  * (src/lib/restricted-family.ts), Luxembourg from the ABBL file
  * (src/lib/lu-register.ts), Estonia and Montenegro from their authorities' files
- * (src/lib/ee-register.ts, src/lib/me-register.ts, 08/10/2026), Poland and Finland from the keys of the composite
+ * (src/lib/ee-register.ts, src/lib/me-register.ts, 08/10/2026), Serbia from the
+ * National Bank of Serbia's (src/lib/rs-register.ts, 10/10/2026), Poland and Finland from the keys of the composite
  * map and the Finnish list the overlay carries (members `map_pl`, `map_fi`,
  * `register_fi`). This script runs on the public database, where
  * their example would answer "register not consulted", which is not what the
@@ -71,6 +73,12 @@ function privateRegister(
   if (cc === 'ME') {
     return {
       register: `${ME_SOURCE.replace(/^Source:\s*/, '')} (banking identification codes in the RTGS system, banks only)`,
+      basis: 'partial',
+    };
+  }
+  if (cc === 'RS') {
+    return {
+      register: `${RS_SOURCE.replace(/^Source:\s*/, '')} (list of banks participating in the RTGS and clearing systems)`,
       basis: 'partial',
     };
   }

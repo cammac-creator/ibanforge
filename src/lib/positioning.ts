@@ -6,6 +6,7 @@ import { LU_SOURCE, luRegisterConfigured } from './lu-register.js';
 import { GR_SOURCE, grRegisterConfigured } from './gr-register.js';
 import { EE_SOURCE, eeRegisterConfigured } from './ee-register.js';
 import { ME_SOURCE, meRegisterConfigured } from './me-register.js';
+import { RS_SOURCE, rsRegisterConfigured } from './rs-register.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET } from './trial.js';
 import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
@@ -68,6 +69,7 @@ const DISPLAY_ORDER = [
   'GR',
   'EE',
   'ME',
+  'RS',
   'LV',
   'GI',
 ];
@@ -104,6 +106,8 @@ export function registerCountries(): RegisterCountries {
   // only where EE_REGISTER_PATH and ME_REGISTER_PATH name a file.
   if (eeRegisterConfigured() && !partial.includes('EE')) partial.push('EE');
   if (meRegisterConfigured() && !partial.includes('ME')) partial.push('ME');
+  // Serbia (10/10/2026): the same model, answered only where RS_REGISTER_PATH names a file.
+  if (rsRegisterConfigured() && !partial.includes('RS')) partial.push('RS');
   return {
     authoritative: byDisplayOrder(authoritative),
     partial: byDisplayOrder(partial),
@@ -131,6 +135,8 @@ function registerNameOf(cc: string): string | null {
     return `${EE_SOURCE.replace(/^Source:\s*/, '')} (identity codes of credit, payment and e-money institutions)`;
   if (cc === 'ME')
     return `${ME_SOURCE.replace(/^Source:\s*/, '')} (banking identification codes in the RTGS system, banks only)`;
+  if (cc === 'RS')
+    return `${RS_SOURCE.replace(/^Source:\s*/, '')} (list of banks participating in the RTGS and clearing systems)`;
   return registerCoverage(cc).register;
 }
 
@@ -245,9 +251,10 @@ export function bicDirectorySentence(options: { withCount?: boolean } = {}): str
  * The countries where we hold no bank-code data we may reuse: the countries whose
  * composite-map keys were withdrawn (UNLICENSED_MAP_COUNTRIES, bic-lookup.ts),
  * minus any that a partial register names on THIS deployment. Estonia leaves
- * where `EE_REGISTER_PATH` names the Finantsinspektsioon file (ee-register.ts): a
- * listed code names its bank, so the sentences below can no longer say it has no
- * data there. Read at each call, like the other private registers, so the static
+ * where `EE_REGISTER_PATH` names the Finantsinspektsioon file (ee-register.ts),
+ * Serbia where `RS_REGISTER_PATH` names the National Bank of Serbia file
+ * (rs-register.ts): a listed code names its bank, so the sentences below can no
+ * longer say there is no data there. Read at each call, like the other private registers, so the static
  * copies of these sentences (README, llms files) keep the unconfigured wording
  * that positioning.test.ts holds them to. The set itself is untouched, because its
  * guards still decide a code the file does not carry (`unavailable`,
