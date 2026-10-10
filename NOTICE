@@ -80,9 +80,10 @@ Files concerned:
     exported for the website; they repeat records from the sources below)
   src/db/bic_data.json (composite map from national bank codes to BICs)
   src/db/nl-psp.json
-  scripts/fixtures/registers/*.html and src/test-support/ee-me-fixtures.ts
+  scripts/fixtures/registers/* and src/test-support/ee-me-fixtures.ts
     (a few lines quoted from the Estonian and Montenegrin pages, read on
-    8 October 2026, as test citations: not the tables)
+    8 October 2026, and from the Serbian list, read on 10 October 2026, as
+    test citations: not the tables)
   scripts/data/eu-emi-register-2026-05-22.json
   scripts/data/iban-registry-2026-05-22.json
   test fixtures and sample API responses elsewhere that repeat these records
@@ -663,6 +664,38 @@ identification codes in the RTGS system
   The table is treated as partial: it lists banks, not the allocation of
          the code space, so an absence is not a non-allocation.
 
+National Bank of Serbia, account numbers and bank identification codes of
+participants in the NBS RTGS and clearing system (PDF list)
+  Never in: this repository. The API reads 19 Serbian banks (name, three-digit
+         NBS code, BIC and company registration number) from a private file
+         written by scripts/seed-rs-register.ts, read on 10 October 2026 from
+         the document named below, which is dated 1 September 2026 (1/9/2026).
+         The registration number is kept in that file and is never served. The
+         one other participant on the list, Euroclear Bank, has a Belgian BIC
+         and is not imported.
+  Terms: permission received on 9 October 2026, to a request to reuse this list
+         in the API responses, one entry per request: "you have permision to
+         use the data you've requested and only for the purpose you've
+         requested, which is reuse of the PDF list of the banks participating
+         in Serbia's RTGS and Clearing payment systems, giving each bank's
+         three-character NBS code, BIC/SWIFT code and company registration
+         number (matični broj), for commercial purposes only. As stated in your
+         request, bank list will be credited as "Source: National Bank of
+         Serbia" with the publication date." The NBS adds that it is not
+         responsible for decisions taken on these data, and that links must
+         lead directly to www.nbs.rs and not be used for advertising.
+         Publishing the whole table in this repository was not requested and is
+         not covered.
+         https://www.nbs.rs/export/sites/NBS_site/documents-eng/platni-sistem/banks_account_numbers.pdf
+  Served with every API answer built from these codes, in
+  bank_code_check.register and bic.source:
+         Source: National Bank of Serbia, … (list dated <date>; read by
+         IBANforge on <date>)
+  and, in bank_code_check.register, that the National Bank of Serbia accepts no
+         responsibility for decisions taken on this data. The list is treated
+         as partial: it names participating banks, not the allocation of the
+         code space, so an absence is not a non-allocation.
+
 Bank of England, List of PRA-regulated Banks
   Formerly in: data/bic.sqlite, table pra_banks (281 rows).
   Terms: written permission of 25 August 2026 for the monthly list as a
@@ -712,6 +745,8 @@ reserving commercial use (removed on 29 September 2026)
   Estonia comes back on 8 October 2026 through its authority (see the
          Finantsinspektsioon entry above). Nothing of the 16 keys below is
          reused: the codes come from the authority, the BICs from group B.
+         Serbia comes back on 10 October 2026 through the National Bank of
+         Serbia (entry above); nothing of its 26 keys below is reused either.
   ibancalculator.com, run by Telauges OÜ: the United Arab Emirates (56 keys),
          Bosnia and Herzegovina (25), Estonia (16), Georgia (20), Kazakhstan
          (49), Moldova (9), Serbia (26), and the codes and BICs of 219 Italian

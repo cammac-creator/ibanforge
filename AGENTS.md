@@ -206,19 +206,21 @@ Without the variable nothing changes; switching it on in production is the main 
 step. The old local branches `registre-gr-api`, `registre-gr-site` and `registre-gr-fix`
 (9 September) wrote the codes into the public database and are not to be revived.
 
-**The Estonian and Montenegrin registers (8 October 2026).** Two PARTIAL registers, served like the
-Greek one from PRIVATE files named by `EE_REGISTER_PATH` and `ME_REGISTER_PATH`
-(`src/lib/ee-register.ts`, `src/lib/me-register.ts`): the Finantsinspektsioon identity codes (BIC joined by
-code from the Eesti Pangaliit list) and the RTGS banking identification codes of the Central Bank of
-Montenegro. The permissions cover API responses, one entry per request; the tables are not in this
-repository. `scripts/seed-ee-register.ts` and `scripts/seed-me-register.ts` write the files under
-`docs/internal/registres-ee-me-2026-10-08/` (ignored by git; they refuse a path git would track) or at the
-variable's path, and `--check` compares without writing. A hit names the holder with the source and its dates
-in `bank_code_check.register`; a miss keeps the answer it had before, never `not_allocated`; neither country is
-in `NATIONAL_REGISTERS` or `NON_EXHAUSTIVE_REGISTERS`. Estonia stays in `UNLICENSED_MAP_COUNTRIES`: the withdrawn
-composite keys do not come back, though where the Estonian file is set the public "no data" sentence no longer
-names it (`uncoveredCountries()` in `positioning.ts`). Without the variables nothing changes; switching them on
-in production is the main session's step.
+**The Estonian, Montenegrin and Serbian registers (8 and 10 October 2026).** Three PARTIAL registers, served
+like the Greek one from PRIVATE files named by `EE_REGISTER_PATH`, `ME_REGISTER_PATH` and `RS_REGISTER_PATH`
+(`src/lib/ee-register.ts`, `me-register.ts`, `rs-register.ts`): the Finantsinspektsioon identity codes (BIC
+joined by code from the Eesti Pangaliit list), the RTGS banking identification codes of the Central Bank of
+Montenegro, and the PDF list of the banks in the RTGS and clearing systems of the National Bank of Serbia. The
+permissions cover API responses, one entry per request; the tables are not in this repository.
+`scripts/seed-ee-register.ts`, `seed-me-register.ts` and `seed-rs-register.ts` (the last reads the PDF with
+`pdftotext`) write the files under `docs/internal/registres-ee-me-2026-10-08/` (ignored by git; they refuse a
+path git would track) or at the variable's path, and `--check` compares without writing. A hit names the holder
+with the source and its dates in `bank_code_check.register`; a miss keeps the answer it had before, never
+`not_allocated`; none of the three is in `NATIONAL_REGISTERS` or `NON_EXHAUSTIVE_REGISTERS`. Estonia and Serbia
+stay in `UNLICENSED_MAP_COUNTRIES`: the withdrawn composite keys do not come back, though where their file is set
+the public "no data" sentence no longer names them (`uncoveredCountries()` in `positioning.ts`). The Serbian
+company registration number is kept in its file and never served. Without the variables nothing changes;
+switching them on in production is the main session's step.
 
 **Moving the website off Vercel to an Infomaniak VPS in Geneva.** Branch `vps-migration`
 holds the first commit: a container image for `frontend/`, a deploy workflow that builds on

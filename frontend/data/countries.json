@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-08",
+ "generated_at": "2026-10-10",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -4385,35 +4385,10 @@
     ],
     "vop_required": false
    },
-   "register": null,
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "RS",
-     "name": "Serbia"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "260",
-     "status": "unavailable",
-     "reason": "no_reference_data_for_country",
-     "match": null,
-     "register": null,
-     "authoritative": false,
-     "as_of": "2026-10"
-    },
-    "sepa": {
-     "member": true,
-     "vop_required": false
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": false,
-     "test_bic": false
-    }
-   }
+   "register": "National Bank of Serbia (list of banks participating in the RTGS and clearing systems)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "RU": {
    "code": "RU",

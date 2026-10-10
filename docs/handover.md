@@ -653,18 +653,21 @@ path in `enrich.ts` (a hit names the holder, a miss falls through to the composi
 the credit and the full note in `bank_code_check.register`. Dormant until the main session
 places the file and the variable in production.
 
-**Estonia and Montenegro, from their authorities (8 October 2026).** Two partial registers on the Greek
-model: private files named by `EE_REGISTER_PATH` and `ME_REGISTER_PATH` (`src/lib/ee-register.ts`,
-`src/lib/me-register.ts`, `scripts/seed-ee-register.ts`, `scripts/seed-me-register.ts`), never `data/bic.sqlite`
-and never a file of the repository. The letters of September asked to reuse these codes "in our API responses,
-one entry per request", the permissions received on 5 October (Finantsinspektsioon) and 7 October (Central Bank
-of Montenegro) say yes to that use, and publishing the tables was not requested. A hit is `verified` /
-`confirmed` / `authoritative: false` with the source and dates in `bank_code_check.register`; a miss keeps its
-previous answer; without the variables nothing changes. The Estonian BIC is Eesti Pangaliit's, joined by us
-(`curated_map`); the Montenegrin BIC is the central bank's (`national_register`). Putting the files and the two
-variables in production, and proving `EE382200221020145685` online, is the main session's step; nothing
-re-reads the pages automatically (`--check` does it by hand). Details, dates and the codes left out on purpose:
-`docs/data-sources.md`, section of 8 October 2026.
+**Estonia, Montenegro and Serbia, from their authorities (8 and 10 October 2026).** Three partial registers on
+the Greek model: private files named by `EE_REGISTER_PATH`, `ME_REGISTER_PATH` and `RS_REGISTER_PATH`
+(`src/lib/ee-register.ts`, `me-register.ts`, `rs-register.ts`, `scripts/seed-ee-register.ts`,
+`seed-me-register.ts`, `seed-rs-register.ts`), never `data/bic.sqlite` and never a file of the repository. The
+letters asked to reuse these codes "in our API responses, one entry per request"; the permissions received on
+5 October (Finantsinspektsioon), 7 October (Central Bank of Montenegro) and 9 October (National Bank of Serbia)
+say yes to that use, and publishing the tables was not requested. A hit is `verified` / `confirmed` /
+`authoritative: false` with the source and dates in `bank_code_check.register`; a miss keeps its previous
+answer; without the variables nothing changes. The Estonian BIC is Eesti Pangaliit's, joined by us
+(`curated_map`); the Montenegrin and Serbian BICs are the central banks' (`national_register`). The Serbian list
+is a PDF read with `pdftotext` (poppler); its company registration number stays in the private file and is
+never served. Putting the files and the variables in production, and proving `EE382200221020145685`,
+`ME25510000012345678920` and `RS35160000012345678956` online, is the main session's step; nothing re-reads the
+pages automatically (`--check` does it by hand). Details, dates and the codes left out on purpose:
+`docs/data-sources.md`, sections of 8 and 10 October 2026.
 
 **Précision reçue le 14 septembre 2026.** La HBA confirme que HEBIC ne couvre pas les
 établissements de paiement et de monnaie électronique émettant des IBAN grecs ; elle renvoie
