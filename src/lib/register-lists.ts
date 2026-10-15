@@ -49,12 +49,16 @@ const SHORT_REGISTER_NAME: Record<string, string> = {
 /**
  * Registers that settle NO negative (`bank_code_check.authoritative: false`)
  * while the BIC they print beside a code they list is their own pairing, so
- * `bic.basis` is `national_register`. San Marino only, today: see the San
- * Marino block of resolveBank in enrich.ts. Luxembourg's register pairs its BIC
- * the same way but answers only where its private file is configured, so the
- * static texts leave it out, as they always have.
+ * `bic.basis` is `national_register`. San Marino, and Montenegro since
+ * 08/10/2026 (the Central Bank of Montenegro publishes the BIC beside each
+ * code, and the site texts name it with San Marino) and Serbia since 10/10/2026
+ * (the National Bank of Serbia's list does the same): see the San Marino,
+ * Montenegro and Serbia blocks of resolveBank in enrich.ts. Luxembourg's register pairs its
+ * BIC the same way but is left out, as it always has been. Estonia is NOT here:
+ * its BIC comes from Eesti Pangaliit, joined by us, so `bic.basis` is
+ * `curated_map`.
  */
-const PARTIAL_REGISTERS_PAIRING_THE_BIC = ['SM'];
+const PARTIAL_REGISTERS_PAIRING_THE_BIC = ['SM', 'ME', 'RS'];
 
 /**
  * What each register publishes about the institution, for the `institution`
@@ -79,6 +83,11 @@ const INSTITUTION_DEPTH: Record<string, InstitutionDepth> = {
   SK: { depth: 'name', publisher: 'the Národná banka Slovenska', script: 'Slovak diacritics' },
   CZ: { depth: 'name', publisher: 'the Česká národní banka', script: 'Czech diacritics' },
   LU: { depth: 'name', publisher: 'the ABBL' },
+  // Estonie et Monténégro (08/10/2026, fichiers privés) : le nom seul, comme la Belgique.
+  EE: { depth: 'name', publisher: 'the Finantsinspektsioon' },
+  ME: { depth: 'name', publisher: 'the Central Bank of Montenegro' },
+  // Serbie (10/10/2026) : le nom seul ; le matični broj du fichier n'est pas servi.
+  RS: { depth: 'name', publisher: 'the National Bank of Serbia' },
   // Le siège légal en Italie (pour une banque étrangère, sa succursale
   // italienne), et le LEI quand elle le publie. Sur un code radié, le nom seul.
   IT: { depth: 'registered_office', publisher: "the Banca d'Italia" },
@@ -158,12 +167,13 @@ export function nationalRegisterBicNames(): string {
 
 /**
  * Every country whose register answers with an institution block, in display
- * order: the authoritative registers, then the partial ones, then Luxembourg
- * (partial, but only where its private file is configured).
+ * order: the authoritative registers, then the partial ones, then Luxembourg,
+ * Estonia, Montenegro and Serbia (partial, but only where their private files are
+ * configured: the contract describes them either way).
  */
 export function registerCountriesWithInstitution(): string[] {
   const { authoritative, partial } = registerCountries();
-  return [...new Set([...authoritative, ...partial, 'LU'])];
+  return [...new Set([...authoritative, ...partial, 'LU', 'EE', 'ME', 'RS'])];
 }
 
 /** The countries a depth applies to, in display order. */
