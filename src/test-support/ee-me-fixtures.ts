@@ -57,8 +57,7 @@ export const EE_FIXTURE = {
 export const ME_FIXTURE = {
   schema: 1,
   source: 'Source: Central Bank of Montenegro',
-  publication:
-    'https://www.cbcg.me/en/core-functions/payment-system/payment-systems/rtgs-system',
+  publication: 'https://www.cbcg.me/en/core-functions/payment-system/payment-systems/rtgs-system',
   read_on: '2099-03-04',
   entries: [
     { code: '907', name: 'Centralna banka Crne Gore', bic: 'CBCGMEPG' },
