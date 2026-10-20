@@ -656,7 +656,7 @@ identification codes in the RTGS system
          keeping the data up to date is IBANforge's responsibility. Names are
          kept as published. Publishing the whole table in this repository was
          not requested and is not covered.
-         https://www.cbcg.me/en/core-functions/payment-system/cbcg-payment-system/rtgs-system
+         https://www.cbcg.me/en/core-functions/payment-system/payment-systems/rtgs-system
   Served with every API answer built from these codes, in
   bank_code_check.register and bic.source:
          Source: Central Bank of Montenegro, … (no publication date stated;

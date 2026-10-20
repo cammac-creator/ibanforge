@@ -161,7 +161,7 @@ public n'a pas été demandée (décision de la session principale, 08/10/2026).
 | Finantsinspektsioon, établissements de crédit et succursales étrangères | `fi.ee/en/banking-and-credit/applying-activity-licences/identity-codes-international-account-numbers-credit-institutions` | 10 codes ; « Page last edited on 25/08/2025 » |
 | Finantsinspektsioon, établissements de paiement et de monnaie électronique | `fi.ee/en/payment-and-e-money-services/applying-operating-licence-payment-services/identity-codes-international-account-numbers-payment-institutions-and-e-money-institutions` | 9 codes ; « Page last edited on 09/09/2026 » |
 | Eesti Pangaliit, liste des codes de banque (BIC seulement) | `pangaliit.ee/settlements-and-standards/bank-codes` | 13 BIC joints |
-| Banque centrale du Monténégro, RTGS, « Banking identification codes in the RTGS system » | `cbcg.me/en/core-functions/payment-system/cbcg-payment-system/rtgs-system` | 12 banques, aucune date sur la page |
+| Banque centrale du Monténégro, RTGS, « Banking identification codes in the RTGS system » | `cbcg.me/en/core-functions/payment-system/payment-systems/rtgs-system` | 12 banques, aucune date sur la page |
 
 Les tests ne gardent que de petites citations de ces pages (`scripts/fixtures/registers/`, quelques lignes
 chacune, sans script ni clé du site) et un fichier privé d'essai de quelques lignes aux dates inventées

@@ -73,7 +73,7 @@ describe('buildMeRegister', () => {
     expect(register).toMatchObject({
       source: 'Source: Central Bank of Montenegro',
       publication:
-        'https://www.cbcg.me/en/core-functions/payment-system/cbcg-payment-system/rtgs-system',
+        'https://www.cbcg.me/en/core-functions/payment-system/payment-systems/rtgs-system',
       read_on: '2026-10-08',
     });
     expect(Object.keys(register)).not.toContain('published');

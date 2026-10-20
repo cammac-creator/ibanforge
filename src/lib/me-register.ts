@@ -49,7 +49,7 @@ import { z } from 'zod';
 export const ME_SOURCE = 'Source: Central Bank of Montenegro';
 
 export const ME_PUBLICATION =
-  'https://www.cbcg.me/en/core-functions/payment-system/cbcg-payment-system/rtgs-system';
+  'https://www.cbcg.me/en/core-functions/payment-system/payment-systems/rtgs-system';
 
 const date = z
   .string()
