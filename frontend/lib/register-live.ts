@@ -77,6 +77,20 @@ const REGISTER_PREFIX: Record<LiveRegisterCountry, string> = {
   SM: 'Central Bank of the Republic of San Marino',
 };
 
+/**
+ * Le registre nommé par la réponse, un éventuel « Source: » de tête retiré.
+ *
+ * Saint-Marin (21/10/2026) : depuis la confirmation écrite de la BCSM du
+ * 16/10/2026, `bank_code_check.register` s'ouvre sur la formule qu'elle a
+ * acceptée, « Source: Central Bank of the Republic of San Marino, Operating
+ * Banks ». L'API et le site ne se publient pas au même instant et une réponse
+ * reste un jour en cache : les deux formes doivent donner la même page, faute de
+ * quoi une banque listée tomberait en 404.
+ */
+function namesRegister(register: string, cc: LiveRegisterCountry): boolean {
+  return register.replace(/^Source:\s*/, '').startsWith(REGISTER_PREFIX[cc]);
+}
+
 /** Durée de cache d'une réponse de l'API pour une page de code, en secondes. */
 export const LIVE_REVALIDATE_SECONDS = 86_400;
 
@@ -232,7 +246,7 @@ export function interpretLiveAnswer(
   if (answer.valid !== true || !check)
     throw new RegisterPageUnavailableError(`${cc} ${code}: no bank-code verdict in the answer`);
   const register = text(check.register);
-  const fromRegister = !!register && register.startsWith(REGISTER_PREFIX[cc]);
+  const fromRegister = !!register && namesRegister(register, cc);
   if (check.status === 'verified' && check.match === 'register' && fromRegister) {
     const institution = (check.institution ?? {}) as Json;
     const name = text(institution.name);

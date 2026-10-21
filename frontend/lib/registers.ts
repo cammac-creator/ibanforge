@@ -197,12 +197,19 @@ export function skCredit(r: SkRegister): string {
 /**
  * San Marino's credit on its live page, and why its date is worded differently
  * from Slovakia's. The BCSM publishes no edition and no revision date, so the
- * month the API stamps is the month WE read the page; a bare "(2026-09)" would
- * read as the source's own date and quietly overstate it. The register name and
- * the month come from the API's answer (lib/register-live.ts).
+ * date is the day WE read the page; a bare "(2026-09)" would read as the
+ * source's own date and quietly overstate it. The credit comes from the API's
+ * answer (lib/register-live.ts).
+ *
+ * Depuis la confirmation écrite de la BCSM du 16/10/2026, l'API sert déjà la
+ * formule acceptée, « Source: Central Bank of the Republic of San Marino,
+ * Operating Banks (read by IBANforge on AAAA-MM-JJ) » : la page l'imprime telle
+ * quelle, sans second « Source: ». Une réponse plus ancienne, encore en cache,
+ * garde l'ancien format.
  */
 export function smLiveCredit(entry: { source: string | null; register: string; as_of: string | null }): string {
   const source = entry.source ?? entry.register;
+  if (/^Source:/.test(source)) return source;
   return entry.as_of ? `Source: ${source} (read in ${entry.as_of})` : `Source: ${source}`;
 }
 

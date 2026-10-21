@@ -389,14 +389,15 @@ function buildLlmsTxt(): string {
   const czSourceLine = czCredit
     ? `\n- Czech bank codes: ${czCredit} — reproduced with attribution under the ČNB site terms (source named, facts unaltered)`
     : '';
-  // San Marino. Credited on the same rule and from the same columns, with one
-  // difference stated rather than hidden: bcsm.sm publishes no terms of use at
-  // all, so the licence is recorded as UNKNOWN and the credit is given by
-  // choice. The date is the day we read the page — the BCSM states no edition —
-  // which is why nationalRegisterCredit words it "read on".
+  // Saint-Marin. Le 16/10/2026, la Banque centrale a confirmé par écrit que cet
+  // usage est acceptable si l'information est reproduite exactement, attribuée
+  // à sa source et présentée sans tromper, avec la formule que
+  // nationalRegisterCredit écrit (SM_CREDIT) et la date de consultation : le
+  // jour où nous avons lu la page, la BCSM ne datant pas sa liste. Ce n'est pas
+  // une licence, et la phrase ne le dit pas.
   const smCredit = nationalRegisterCredit('SM');
   const smSourceLine = smCredit
-    ? `\n- San Marino bank codes: ${smCredit} — four operating banks, licence unknown (bcsm.sm publishes no terms of use); credited by choice, and the list names holders rather than allocating the code space, so an absence there is not a non-allocation`
+    ? `\n- San Marino bank codes: ${smCredit} — four operating banks, served in API answers on the written confirmation of the Central Bank of the Republic of San Marino (16 October 2026) that this use is acceptable provided the information is accurately reproduced, attributed to its source and not presented in a misleading manner; the list names holders rather than allocating the code space, so an absence there is not a non-allocation`
     : '';
   // L'Italie (25/09/2026). CC BY 4.0 : l'auteur, la licence et son URI,
   // l'adresse du jeu et la mention des modifications, avec l'édition lue dans

@@ -465,7 +465,11 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     table: 'national_bank_codes',
     where: { column: 'country', value: 'SM' },
     minRows: RESTRICTED_FLOORS.register_sm,
-    label: 'Central Bank of the Republic of San Marino, operating banks (licence unknown)',
+    // Confirmation écrite de la BCSM du 16/10/2026 : l'usage dans les réponses de
+    // l'API est acceptable avec la formule et la date de consultation. Elle ne
+    // porte pas sur une copie de la liste dans ce dépôt : le membre reste privé.
+    label:
+      'Central Bank of the Republic of San Marino, Operating Banks (written confirmation for API answers, with attribution)',
   },
   {
     id: 'pra',

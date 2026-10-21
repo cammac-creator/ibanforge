@@ -9,6 +9,7 @@ import {
   normaliseLiveCode,
   registerPagesApiKey,
 } from "./register-live";
+import { smLiveCredit } from "./registers";
 
 /**
  * Les pages /at, /be et /sm, lues à l'API au moment de la requête. Toutes les
@@ -28,7 +29,11 @@ function mod97(iban: string): number {
 }
 
 const AT_REGISTER = "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis";
+/** Le registre saint-marinais tel que l'API le nomme depuis la confirmation écrite de la BCSM (16/10/2026). */
 const SM_REGISTER =
+  "Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on 2026-01-15). Banks only: the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation";
+/** Le nom d'avant, qu'une réponse encore en cache peut porter. */
+const SM_REGISTER_BEFORE =
   "Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)";
 
 /** Une réponse de /v1/iban/validate inventée, de la forme que l'API sert. */
@@ -165,6 +170,35 @@ describe("reading the API's answer", () => {
     expect(interpretLiveAnswer("SM", "09999", "x", answer(composite))).toBeNull();
     const listed = { ...VERIFIED_AT, value: "09991", register: SM_REGISTER, authoritative: false, institution: { name: "Banca di Esempio", street: null, post_code: null, town: "San Marino", country: "SM" } };
     expect(interpretLiveAnswer("SM", "09991", "x", answer(listed))?.name).toBe("Banca di Esempio");
+  });
+
+  it("draws the San Marino page from the new credit and from the old one alike", () => {
+    // L'API et le site ne se publient pas au même instant, et une réponse reste un
+    // jour en cache : un nom ouvert par « Source: » ne doit pas faire tomber une
+    // banque listée en 404, et l'ancien nom doit encore donner sa page.
+    const institution = { name: "Banca di Esempio", street: null, post_code: null, town: "San Marino", country: "SM" };
+    const credit = "Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on 2026-01-15)";
+    const bic = { ...answer({}).bic, code: "XMPLSMSMXXX", source: credit };
+    for (const register of [SM_REGISTER, SM_REGISTER_BEFORE]) {
+      const listed = { ...VERIFIED_AT, value: "09991", register, authoritative: false, institution, as_of: "2026-01" };
+      const entry = interpretLiveAnswer("SM", "09991", "x", answer(listed, { bic }));
+      expect(entry?.name, register).toBe("Banca di Esempio");
+      expect(entry?.register, register).toBe(register);
+    }
+    // Un autre registre que la liste de la BCSM ne gagne rien à s'ouvrir par « Source: ».
+    const other = { ...VERIFIED_AT, value: "09991", register: "Source: Example Register", authoritative: false, institution };
+    expect(interpretLiveAnswer("SM", "09991", "x", answer(other))).toBeNull();
+  });
+
+  it("prints the credit the API serves once, without a second Source:", () => {
+    const credit = "Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on 2026-01-15)";
+    expect(smLiveCredit({ source: credit, register: SM_REGISTER, as_of: "2026-01" })).toBe(credit);
+    // Sans BIC du registre, le nom du registre porte déjà la formule et la date.
+    expect(smLiveCredit({ source: null, register: SM_REGISTER, as_of: "2026-01" })).toBe(SM_REGISTER);
+    // Une réponse d'avant le 16/10/2026, encore en cache : l'ancien format.
+    expect(smLiveCredit({ source: "Central Bank of the Republic of San Marino, operating banks", register: SM_REGISTER_BEFORE, as_of: "2026-01" })).toBe(
+      "Source: Central Bank of the Republic of San Marino, operating banks (read in 2026-01)",
+    );
   });
 
   it("refuses to draw a page when the register was not consulted", () => {
