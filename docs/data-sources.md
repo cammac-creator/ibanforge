@@ -357,7 +357,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation et traitement confirmés par écrit le 09/09/2026, **citation de la NBS obligatoire** ; conditions du fichier conservées | ✅ **réponse du 09/09/2026 relue le 14/09/2026** — ingérée le 06/09/2026, voir ci-dessous |
 | Česká národní banka — Číselník kódů platebního styku (`national_bank_codes` et `national_bank_codes_pending`, pays CZ) | 46 en édition 254 (effet 01.09.2026) | conditions du site, § 3 : stocker, transmettre et reproduire permis, **« Zdroj: ČNB » obligatoire**, faits et sens d'un extrait inchangés ; avis écrit du service des paiements du 27/08/2026 dans le même sens | ✅ **conditions lues le 24/09/2026 — ingéré le 25/09/2026**, voir ci-dessous |
 | Banca d'Italia : registres des banques, établissements de paiement et de monnaie électronique, historique et fusions (`national_bank_codes` et `national_bank_codes_retired`, pays IT) | 464 codes en vigueur et 1 907 radiés, édition du 23/09/2026 | open data **CC BY 4.0** (portail AgID dati.gov.it et catalogue DCAT de la Banca d'Italia) : réutilisation commerciale permise, **citer la source et indiquer les modifications** | ✅ **conditions lues le 24/09/2026 et relues le 25/09/2026, ingéré le 25/09/2026**, registre **partiel**, voir ci-dessous |
-| Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | ❓ **AUCUNE condition d'utilisation publiée** — ni licence, ni interdiction | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, licence `unknown`, lettre à écrire, voir ci-dessous |
+| Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | aucune condition d'utilisation publiée ; **confirmation écrite du 16/10/2026** que l'usage décrit est acceptable si l'information est reproduite exactement, attribuée à sa source et présentée sans tromper, **attribution « Source: Central Bank of the Republic of San Marino, Operating Banks » avec la date de consultation** | ✅ **confirmé par écrit le 16/10/2026** (pas une licence : sans obligation pour la Banque) — ingérée le 06/09/2026, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
 
@@ -1813,28 +1813,69 @@ Conséquences dans le code, à ne pas « ranger » plus tard :
 - `nationalRegisterIsExhaustive()` porte la distinction, plutôt qu'une liste de
   pays recopiée à chaque endroit.
 
-### La licence : aucune, et c'est consigné comme tel
+### L'usage, confirmé par écrit le 16/10/2026
 
-Vérifié le **06/09/2026** : bcsm.sm ne publie **aucune condition d'utilisation**.
-Il y a une politique de confidentialité et un « © Central Bank of the Republic of
-San Marino » en pied de page, rien d'autre — ni autorisation, ni interdiction.
+Vérifié le **06/09/2026** : bcsm.sm ne publie **aucune condition d'utilisation**
+(une politique de confidentialité et un « © Central Bank of the Republic of San
+Marino » en pied de page, rien d'autre). Nous avons donc écrit le 07/09/2026.
 
-**Aucune clause n'est inventée.** La licence est enregistrée `unknown`. Position
-retenue : quatre lignes de données de routage (nom, adresse, ABI, BIC) publiées
-par l'autorité de surveillance pour être utilisées, servies **un enregistrement
-par requête**, avec le crédit
-« Source: Central Bank of the Republic of San Marino, operating banks (read on
-<date>) » donné **par choix et non par obligation**.
+Le **16/10/2026**, le service des relations extérieures de la BCSM a répondu par
+écrit. En substance :
 
-⏳ **Lettre de confirmation à la BCSM à écrire** (prochain lot de courrier). En
-cas de refus, le registre est retiré.
+- l'usage des informations de la page « Operating Banks » tel que notre message
+  le décrivait (nommer la banque derrière un IBAN saint-marinais, y compris pour
+  des clients payants) « is acceptable provided that the information is
+  accurately reproduced, appropriately attributed to its source, and not
+  presented in a misleading manner » ;
+- « The proposed attribution — “Source: Central Bank of the Republic of San
+  Marino, Operating Banks”, together with the date on which the information was
+  accessed — is acceptable » ;
+- elle prend acte que l'absence d'un code de la page n'est pas présentée comme
+  la preuve que ce code n'existe pas (c'est notre comportement : `authoritative:
+  false`, raison `absent_from_reference_data`, jamais `not_allocated`) ;
+- pour les codes ABI des établissements de paiement et de monnaie électronique,
+  elle recommande de consulter les sections correspondantes de son site.
+
+Son courriel porte un avertissement : il est envoyé de bonne foi et ne crée
+**aucune obligation** pour la Banque. Ce n'est donc **ni une licence formelle ni
+un engagement** de sa part : une confirmation écrite que cet usage est
+acceptable, aux trois conditions ci-dessus. Elle porte sur l'usage décrit, dans
+les réponses de l'API ; la publication de la liste dans ce dépôt n'a pas été
+demandée et n'est pas couverte : les quatre lignes restent dans la surcouche
+privée (membre `register_sm`).
+
+Ce que le code en fait (21/10/2026) :
+
+- la formule acceptée est une constante, `SM_CREDIT` (`src/lib/sm-credit.ts`),
+  comme pour la Grèce, le Monténégro ou la Serbie ; `bic.source` sert `smCredit(jour de lecture)`, soit « Source: Central
+  Bank of the Republic of San Marino, Operating Banks (read by IBANforge on
+  2026-10-01) » pour la lecture du 01/10/2026 ;
+- `bank_code_check.register` sert le même crédit suivi de la réserve « Banks
+  only: the list does not publish the allocation of the ABI code space, so an
+  absence is not a non-allocation » (`smRegisterName`). C'est elle qui tient la
+  troisième condition ;
+- le nom par pays, qui ne lit aucune ligne (`registerCoverage` : pages pays,
+  colonne `register` de l'audit de fichier), reste un nom, sans date ni
+  « Source: » : « Central Bank of the Republic of San Marino, Operating Banks
+  (banks only; …) » ;
+- seule la **date** vient des lignes (`as_of`). Le libellé que les lignes
+  stockent (« operating banks », sans « Source: ») date d'avant la réponse et
+  n'est plus servi : la surcouche en service n'a pas à être reconstruite ;
+- un code absent de la liste répond exactement comme avant, sans aucun crédit de
+  la BCSM.
+
+**Piste future, rien d'importé** : les codes ABI des établissements de paiement
+et de monnaie électronique saint-marinais, dans les sections du site de la BCSM
+que sa réponse recommande. Une telle source changerait ce qu'une absence peut
+dire ; elle demanderait sa propre lecture et sa propre relecture des conditions.
 
 ### La date : la nôtre, et le crédit le dit
 
 La page ne porte **ni numéro d'édition ni date de révision**. `as_of` est donc le
-**jour de lecture**, et `nationalRegisterCredit('SM')` l'écrit « read on … »
-plutôt qu'entre parenthèses nues : une date nue s'y lirait comme celle de la BCSM
-et la surestimerait. Corollaire assumé : chaque exécution du seeder réécrit les
+**jour de lecture**, et `nationalRegisterCredit('SM')` l'écrit « read by IBANforge
+on … » plutôt qu'entre parenthèses nues : une date nue s'y lirait comme celle de
+la BCSM et la surestimerait. C'est aussi la « date on which the information was
+accessed » que la BCSM demande à côté de l'attribution. Corollaire assumé : chaque exécution du seeder réécrit les
 quatre lignes avec une date neuve, donc `data/bic.sqlite` et `sm-bank.json`
 bougent à chaque rafraîchissement même si la page n'a pas changé.
 
