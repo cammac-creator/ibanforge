@@ -112,14 +112,20 @@
  * bic-lookup.ts. Adding it to either would turn four rows of good data into a
  * denial engine for a country whose code space we have never seen.
  *
- * ## The licence, and why `as_of` is the day we read the page
+ * ## L'usage confirmé par écrit, et pourquoi `as_of` est le jour de lecture
  *
- * bcsm.sm publishes NO terms of use (checked 06/09/2026: a privacy policy and a
- * "© Central Bank of the Republic of San Marino" footer, nothing else). The
- * position, written up in docs/data-sources.md, is that four lines of routing
- * data published by the supervisor to be used are served one per request with
- * the source credited; the licence is recorded as UNKNOWN rather than guessed,
- * and a letter to the BCSM is queued. Nothing here invents a clause.
+ * bcsm.sm ne publie aucune condition d'utilisation (vérifié le 06/09/2026). Le
+ * 16/10/2026, le service des relations extérieures de la BCSM a répondu par écrit
+ * à notre demande du 07/09/2026 : nommer la banque derrière un IBAN
+ * saint-marinais à partir de cette page, y compris pour des clients payants, est
+ * acceptable si l'information est reproduite exactement, attribuée à sa source et
+ * présentée sans tromper, avec l'attribution « Source: Central Bank of the
+ * Republic of San Marino, Operating Banks » et la date de consultation. Ce n'est
+ * pas une licence : le courriel, envoyé de bonne foi, ne crée aucune obligation
+ * pour la Banque. Il porte sur les réponses de l'API, pas sur une copie de la
+ * liste dans un dépôt public : ces lignes restent dans la surcouche privée. La
+ * formule servie vit dans SM_CREDIT (src/lib/sm-credit.ts) ; l'API ne
+ * lit plus que la date des lignes écrites ici. docs/data-sources.md.
  *
  * The page states no edition and no revision date, so `as_of` is the DAY THIS
  * SEEDER READ IT — the only date we can honestly stand behind — and the stored
@@ -585,7 +591,12 @@ async function parseSlovakiaLive(): Promise<Entry[]> {
  * immediately printed "(read on 2026-09-06) (2026-09-06)". `source` is the
  * string a served `bic.source` shows, `as_of` is the date beside it, and the
  * one place they are joined is nationalRegisterCredit() — which words San
- * Marino's as "read on" precisely because that date is ours and not the BCSM's.
+ * Marino's as "read by IBANforge on" precisely because that date is ours and not
+ * the BCSM's.
+ *
+ * Libellé inchangé au 16/10/2026, exprès : c'est ce que stocke la surcouche
+ * privée en service. L'API ne le sert plus ; elle sert la formule que la BCSM a
+ * acceptée (SM_CREDIT) avec la date de la ligne.
  */
 export function sanMarinoSource(): string {
   return 'Central Bank of the Republic of San Marino, operating banks';

@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-10",
+ "generated_at": "2026-10-21",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -4870,7 +4870,7 @@
     ],
     "vop_required": false
    },
-   "register": "Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)",
+   "register": "Central Bank of the Republic of San Marino, Operating Banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)",
    "register_basis": "partial",
    "private_register": true,
    "api": null

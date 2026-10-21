@@ -10,8 +10,9 @@ import { localePath } from "@/lib/locale-path";
 
 /*
  * Rendue à la demande depuis l'API, jamais depuis un fichier (étape du retrait,
- * 25/09/2026) : la liste de la BCSM, dont la licence est inconnue, est servie par
- * l'API depuis une surcouche privée et ne vit plus dans ce dépôt public. Aucun
+ * 25/09/2026) : la liste de la BCSM est servie par l'API depuis une surcouche
+ * privée et ne vit plus dans ce dépôt public (la confirmation écrite de la BCSM
+ * du 16/10/2026 porte sur les réponses de l'API, pas sur une copie). Aucun
  * code n'est pré-rendu, la construction n'appelle jamais l'API ; chaque page est
  * mise en cache un jour. Voir lib/register-live.ts.
  */

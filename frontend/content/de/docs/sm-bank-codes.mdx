@@ -21,12 +21,17 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 ```json
 {
   "valid": true,
-  "bic": { "code": "…", "basis": "national_register", "authoritative": true },
+  "bic": {
+    "code": "…",
+    "source": "Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on …)",
+    "basis": "national_register",
+    "authoritative": true
+  },
   "bank_code_check": {
     "value": "03034",
     "status": "verified",
     "match": "register",
-    "register": "Central Bank of the Republic of San Marino, operating banks (banks only; …)",
+    "register": "Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on …). Banks only: …",
     "authoritative": false,
     "institution": {
       "name": "…",
@@ -73,9 +78,9 @@ Die Schweiz ist das Spiegelbild: Das SIX-Register klärt die Bankleitzahl, währ
 
 ## Aktualität und Quellenangabe
 
-Die BCSM veröffentlicht **weder eine Ausgabennummer noch ein Revisionsdatum**, also ist `as_of` der Tag, an dem wir die Seite gelesen haben — und die Quellenangabe sagt das ausdrücklich: *Source: Central Bank of the Republic of San Marino, operating banks (read on …)*. Ein nacktes Datum läse sich dort als das der Zentralbank und überzeichnete es.
+Die BCSM veröffentlicht **weder eine Ausgabennummer noch ein Revisionsdatum**, also ist `as_of` der Tag, an dem wir die Seite gelesen haben — und die Quellenangabe sagt das ausdrücklich: *Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on …)*. Ein nacktes Datum läse sich dort als das der Zentralbank und überzeichnete es.
 
-**Die Lizenz ist unbekannt, und wir sagen das, statt zu raten.** bcsm.sm veröffentlicht keine Nutzungsbedingungen — nur eine Datenschutzerklärung und einen Copyright-Hinweis im Fuß (geprüft am 6. September 2026). Unsere Position: vier Zeilen Routing-Daten, von der Aufsicht zur Nutzung veröffentlicht, pro Anfrage als ein Datensatz ausgeliefert, die Quelle aus eigenem Entschluss und nicht aus Pflicht genannt. Ein Brief an die Zentralbank liegt zum Versand bereit; bei Widerspruch kommt das Register wieder heraus. Siehe [Datenquellen](/docs/data-sources).
+**Die Zentralbank hat diese Nutzung schriftlich bestätigt.** bcsm.sm veröffentlicht keine Nutzungsbedingungen, also haben wir gefragt. Am 16. Oktober 2026 antwortete die Zentralbank der Republik San Marino auf unsere Anfrage vom 7. September: Die Bank hinter einer san-marinesischen IBAN anhand ihrer Seite *Operating Banks* zu nennen, auch für zahlende Kunden, ist akzeptabel, sofern die Informationen genau wiedergegeben, ihrer Quelle angemessen zugeschrieben und nicht irreführend dargestellt werden. Sie hat die obige Quellenangabe mit dem Datum, an dem die Seite gelesen wurde, akzeptiert. Sie hat zudem zur Kenntnis genommen, dass ein auf der Liste fehlender Code nie als Beweis dafür dargestellt wird, dass es ihn nicht gibt; genau das sagt `authoritative: false`. Ihre E-Mail wurde in gutem Glauben versandt und begründet keine Verpflichtung der Bank: Sie ist eine schriftliche Bestätigung, dass diese Nutzung unter diesen Bedingungen akzeptabel ist, keine Lizenz. Sie betrifft die beschriebene Nutzung in den Antworten der API, die einen Datensatz pro Anfrage ausliefern; die Liste selbst wird nicht neu veröffentlicht. Siehe [Datenquellen](/docs/data-sources).
 
 ## Die ehrlichen Grenzen
 

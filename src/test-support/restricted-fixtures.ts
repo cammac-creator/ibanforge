@@ -209,7 +209,13 @@ const BE_ROWS: NationalRow[] = [
   },
 ];
 
-/** Le crédit que portent les lignes saint-marinaises, tel que l'écrit scripts/seed-national.ts. */
+/**
+ * Le libellé que portent les lignes saint-marinaises, tel que l'écrit
+ * scripts/seed-national.ts et que la surcouche privée le stocke. Gardé tel quel
+ * exprès : depuis la confirmation écrite de la BCSM (16/10/2026), l'API n'en lit
+ * plus que la date et sert la formule acceptée (SM_CREDIT), ce que
+ * src/lib/sm-enrich.test.ts prouve sur ce libellé-ci.
+ */
 export const SM_SOURCE = 'Central Bank of the Republic of San Marino, operating banks';
 /** Le jour où la page inventée a été « lue » : volontairement pas une vraie date de lecture. */
 export const SM_READ_ON = '2026-01-15';

@@ -10,10 +10,11 @@ import { afterAll, describe, it, expect, vi } from 'vitest';
  * `national_register_unavailable` (the register was consulted and answered).
  *
  * Il tourne sur une page INVENTÉE (src/test-support/restricted-fixtures.ts) :
- * la BCSM ne publie aucune condition d'utilisation, ses lignes quittent donc le
- * dépôt public avec les autres registres de licence inconnue (décision du
- * 24/09/2026), et un test qui se sautait sans elles ne testerait rien sur une
- * copie publique.
+ * les lignes de la BCSM ont quitté le dépôt public avec les autres registres
+ * sous conditions (décision du 24/09/2026), et un test qui se sautait sans
+ * elles ne testerait rien sur une copie publique. La confirmation écrite de la
+ * BCSM du 16/10/2026 porte sur les réponses de l'API, pas sur une copie de sa
+ * liste dans ce dépôt : la page reste inventée.
  *
  * A San Marino BBAN is `1!a5!n5!n12!c`: a CIN letter, then five digits of ABI
  * in IBAN positions 6-10, five of CAB, and twelve of account. Chaque IBAN
@@ -27,7 +28,7 @@ const { fixture, FX, SM_SOURCE } = await vi.hoisted(async () => {
 afterAll(() => fixture.restore());
 
 const { validateIBAN } = await import('./iban.js');
-const { enrichResult } = await import('./enrich.js');
+const { enrichResult, registerCoverage } = await import('./enrich.js');
 const {
   lookupNationalCode,
   nationalRegisterCredit,
@@ -146,7 +147,8 @@ describe('the BIC pairing is the supervisor s, even though the code space is not
     expect(r.bic?.basis).toBe('national_register');
     expect(r.bic?.authoritative).toBe(true);
     expect(r.bank_code_check?.authoritative).toBe(false);
-    expect(r.bic?.source).toBe(nationalRegisterEdition('SM').source);
+    // Le crédit que la BCSM a accepté, pas le libellé stocké : voir plus bas.
+    expect(r.bic?.source).toBe(nationalRegisterCredit('SM'));
   });
 
   it('resolves a bank our curated map could never have reached', () => {
@@ -158,17 +160,66 @@ describe('the BIC pairing is the supervisor s, even though the code space is not
   });
 });
 
-describe('the attribution, and what its date belongs to', () => {
-  it('words San Marino s credit as a READ date, not an edition', () => {
+/**
+ * L'attribution que la BCSM a acceptée par écrit le 16/10/2026 : « Source:
+ * Central Bank of the Republic of San Marino, Operating Banks », avec la date de
+ * consultation. Écrite ici en toutes lettres, sans importer la constante : une
+ * constante qui dériverait emporterait sinon son test avec elle.
+ */
+const ACCEPTED = 'Source: Central Bank of the Republic of San Marino, Operating Banks';
+const SCOPE =
+  'the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation';
+
+describe('the attribution the BCSM accepted in writing, and what its date belongs to', () => {
+  it('serves the accepted formula and the read date in register and bic.source', () => {
+    const r = check(LISTED);
+    const readOn = FX.SM.bank.as_of;
+    expect(readOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(r.bic?.source).toBe(`${ACCEPTED} (read by IBANforge on ${readOn})`);
+    // La réserve reste : c'est elle qui tient la troisième condition (ne pas
+    // présenter l'information de façon trompeuse).
+    expect(r.bank_code_check?.register).toBe(
+      `${ACCEPTED} (read by IBANforge on ${readOn}). Banks only: ${SCOPE}`,
+    );
+    // Le mois de `as_of` ne change pas : la date complète vit dans le crédit.
+    expect(r.bank_code_check?.as_of).toBe(readOn!.slice(0, 7));
+  });
+
+  it('takes only the date from the stored row, never its old wording', () => {
+    // Le jeu d'essai garde la ligne telle que la surcouche privée la stocke
+    // aujourd'hui (« operating banks », sans « Source: ») : si la réponse lisait
+    // encore ce libellé, le test ci-dessus échouerait.
     const { source, as_of } = nationalRegisterEdition('SM');
     expect(source).toBe(SM_SOURCE);
+    expect(source).not.toMatch(/^Source:/);
     expect(as_of).toBe(FX.SM.bank.as_of);
-    // "read on" is the whole point: the BCSM publishes no edition and no
-    // revision date, so a bare parenthesis would read as the source's own date
-    // and overstate it. Slovakia's, which IS the register's date, reads plain.
-    expect(nationalRegisterCredit('SM')).toBe(`Source: ${source} (read on ${as_of})`);
+    // "read by IBANforge on" is the whole point: the BCSM publishes no edition
+    // and no revision date, so a bare parenthesis would read as the source's own
+    // date and overstate it. Slovakia's, which IS the register's date, reads plain.
+    expect(nationalRegisterCredit('SM')).toBe(`${ACCEPTED} (read by IBANforge on ${as_of})`);
     expect(nationalRegisterCredit('SK')).toMatch(/^Zdroj: /);
-    expect(nationalRegisterCredit('SK')).not.toMatch(/read on/);
+    expect(nationalRegisterCredit('SK')).not.toMatch(/read/);
+  });
+
+  it('names the register, undated and without a credit, where no row is read', () => {
+    // Les pages pays insèrent ce nom après « against » : un nom, pas un crédit,
+    // et rien de la liste n'y est reproduit.
+    expect(registerCoverage('SM')).toEqual({
+      basis: 'partial',
+      register: `Central Bank of the Republic of San Marino, Operating Banks (banks only; ${SCOPE})`,
+    });
+  });
+
+  it('puts no BCSM credit on a code the list does not carry', () => {
+    for (const iban of [SWIFT_EXAMPLE, FABRICATED]) {
+      const r = check(iban);
+      expect(r.bank_code_check?.register, iban).not.toMatch(
+        /Central Bank of the Republic of San Marino/,
+      );
+      expect(JSON.stringify(r.bic ?? null), iban).not.toMatch(
+        /Central Bank of the Republic of San Marino/,
+      );
+    }
   });
 });
 

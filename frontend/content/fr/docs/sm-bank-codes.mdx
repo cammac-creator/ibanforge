@@ -21,12 +21,17 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 ```json
 {
   "valid": true,
-  "bic": { "code": "…", "basis": "national_register", "authoritative": true },
+  "bic": {
+    "code": "…",
+    "source": "Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on …)",
+    "basis": "national_register",
+    "authoritative": true
+  },
   "bank_code_check": {
     "value": "03034",
     "status": "verified",
     "match": "register",
-    "register": "Central Bank of the Republic of San Marino, operating banks (banks only; …)",
+    "register": "Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on …). Banks only: …",
     "authoritative": false,
     "institution": {
       "name": "…",
@@ -73,9 +78,9 @@ La Suisse est l'image miroir : le registre SIX règle le code banque tandis que 
 
 ## Fraîcheur et citation
 
-La BCSM ne publie **ni numéro d'édition ni date de révision** : `as_of` est donc le jour où nous avons lu la page, et le crédit le dit en toutes lettres — *Source: Central Bank of the Republic of San Marino, operating banks (read on …)*. Une date nue s'y lirait comme celle de la Banque centrale et la surestimerait.
+La BCSM ne publie **ni numéro d'édition ni date de révision** : `as_of` est donc le jour où nous avons lu la page, et le crédit le dit en toutes lettres — *Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on …)*. Une date nue s'y lirait comme celle de la Banque centrale et la surestimerait.
 
-**La licence est inconnue, et nous le disons plutôt que de la deviner.** bcsm.sm ne publie aucune condition d'utilisation — seulement une politique de confidentialité et un copyright en pied de page (vérifié le 6 septembre 2026). Notre position : quatre lignes de données de routage publiées par le superviseur pour être utilisées, servies un enregistrement par requête, la source créditée par choix et non par obligation. Une lettre à la Banque centrale est en attente d'envoi ; en cas d'objection, le registre est retiré. Voir [sources des données](/docs/data-sources).
+**La Banque centrale a confirmé cet usage par écrit.** bcsm.sm ne publie aucune condition d'utilisation : nous avons donc demandé. Le 16 octobre 2026, la Banque centrale de la République de Saint-Marin a répondu à notre demande du 7 septembre : nommer la banque derrière un IBAN saint-marinais à partir de sa page *Operating Banks*, y compris pour des clients payants, est acceptable à condition que l'information soit reproduite exactement, attribuée à sa source et ne soit pas présentée de façon trompeuse. Elle a accepté l'attribution ci-dessus, avec la date de lecture de la page. Elle a aussi pris acte qu'un code absent de la liste n'est jamais présenté comme la preuve que ce code n'existe pas, et c'est ce que dit `authoritative: false`. Son courriel, envoyé de bonne foi, ne crée aucune obligation pour la Banque : c'est une confirmation écrite que cet usage est acceptable à ces conditions, pas une licence. Elle porte sur l'usage décrit, dans les réponses de l'API, qui servent un enregistrement par requête ; la liste elle-même n'est pas republiée. Voir [sources des données](/docs/data-sources).
 
 ## Les limites honnêtes
 

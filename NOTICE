@@ -589,13 +589,30 @@ identification codes, Protocol Secretariat
          that sentence.
          https://www.nbb.be/en/disclaimer-and-legal-information/copyright-and-use-information
 
-Central Bank of the Republic of San Marino, operating banks
+Central Bank of the Republic of San Marino, Operating Banks
   Formerly in: data/bic.sqlite, table national_bank_codes, country SM (4 rows);
          frontend/data/registers/sm-bank.json.
-  Terms: none published, neither a licence nor a prohibition. Licence
-         unknown.
-  Credit given by choice, not by obligation:
-         Source: Central Bank of the Republic of San Marino, operating banks (read on <date>)
+  Terms: none published on bcsm.sm. On 16 October 2026 the Central Bank of
+         the Republic of San Marino (its external relations service) answered
+         our written request of 7 September 2026: using the information of
+         its "Operating Banks" page as described, to name the bank behind a
+         San Marino IBAN, including for paying customers, "is acceptable
+         provided that the information is accurately reproduced,
+         appropriately attributed to its source, and not presented in a
+         misleading manner", and the proposed attribution, with the date on
+         which the information was accessed, "is acceptable". It took note
+         that a code absent from the page is not presented as proof that the
+         code does not exist. Its e-mail was sent in good faith and creates
+         no obligation for the Bank: a written confirmation that this use is
+         acceptable on those conditions, not a licence. It concerns the use
+         described, in API answers; publishing the list in this repository
+         was not requested and is not covered.
+         https://www.bcsm.sm/en/functions/statutory-functions/payment-system/operating-banks
+  Served with every API answer built from the list, in bic.source:
+         Source: Central Bank of the Republic of San Marino, Operating Banks (read by IBANforge on <date>)
+  and in bank_code_check.register, followed by: Banks only: the list does
+         not publish the allocation of the ABI code space, so an absence is
+         not a non-allocation.
 
 Finance Finland (Finanssiala ry), Finnish monetary institution codes and
 BICs (list published 16 March 2026)

@@ -1,4 +1,5 @@
 import { getBicDB } from './db.js';
+import { smCredit } from './sm-credit.js';
 
 /**
  * National bank-code registers that share one shape: an authority allocates a
@@ -480,14 +481,18 @@ export function nationalRegisterEdition(cc: string): {
  * a second "Zdroj:".
  *
  * San Marino's is the day WE read the page: the BCSM publishes no edition and
- * no revision date. "read on" is not decoration — a bare `(2026-09-06)` there
- * would read as the source's date and quietly overstate it, which is the exact
- * failure getBgAsOf() was written to avoid one register over.
+ * no revision date. "read by IBANforge on" is not decoration — a bare
+ * `(2026-09-06)` there would read as the source's date and quietly overstate
+ * it, which is the exact failure getBgAsOf() was written to avoid one register
+ * over. Its wording no longer comes from the stored row: see src/lib/sm-credit.ts.
  */
 const CREDIT_FORMAT: Record<string, (source: string, asOf: string) => string> = {
   SK: (source, asOf) => `Zdroj: ${source} (${asOf})`,
   CZ: (source, asOf) => `${source} (platný od ${asOf})`,
-  SM: (source, asOf) => `Source: ${source} (read on ${asOf})`,
+  // La ligne stockée garde l'ancien libellé (« operating banks », sans
+  // « Source: ») tant que la surcouche privée n'est pas reconstruite : seule sa
+  // date est lue, le libellé est celui que la BCSM a accepté.
+  SM: (_source, asOf) => smCredit(asOf),
   // L'Italie : CC BY 4.0 demande l'auteur, la licence, et d'« indiquer les
   // modifications apportées ». La ligne stockée porte l'auteur, le jeu et la
   // licence ; la date est celle de l'édition (le nom du fichier de la Banca

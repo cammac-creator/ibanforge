@@ -25,6 +25,7 @@ import {
   nationalRegisterEdition,
   withRegisterClock,
 } from './national-registers.js';
+import { SM_CREDIT, SM_REGISTER_NAME, smCredit, smRegisterName } from './sm-credit.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
 import { lookupGrCode } from './gr-register.js';
@@ -251,7 +252,10 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // codes ajoutés, aucun retiré) ; toujours rechargée à la main. Le retour parmi
   // les registres qui refusent reste une décision de Claude-Alain.
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions; transcribed list, a miss is not a denial)',
-  SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
+  // Saint-Marin : le nom seul, sans date ici (aucune ligne n'est lue) ; un code
+  // de la liste porte le crédit que la BCSM a accepté par écrit le 16/10/2026,
+  // avec le jour de lecture (smRegisterName, plus bas).
+  SM: SM_REGISTER_NAME,
   // L'Italie (25/09/2026, décision de Claude-Alain du 24/09, point 5). Les
   // registres de la Banca d'Italia listent les banques, les établissements de
   // paiement et de monnaie électronique qu'elle inscrit ; Poste Italiane
@@ -291,7 +295,12 @@ export type RegisterBasis = 'authoritative' | 'partial' | 'none';
 
 export interface RegisterCoverage {
   basis: RegisterBasis;
-  /** The register's name, exactly as `bank_code_check.register` prints it. */
+  /**
+   * The register's name, exactly as `bank_code_check.register` prints it. Une
+   * exception : pour un code de la liste saint-marinaise, la réponse ajoute le
+   * jour de lecture au crédit (smRegisterName) ; ce nom-ci, qui ne lit aucune
+   * ligne, n'a pas de date à donner.
+   */
   register: string | null;
 }
 
@@ -770,7 +779,12 @@ function decideBankCode(
         value: bankCode,
         status: 'verified',
         match: 'register',
-        register: partial,
+        // Saint-Marin (16/10/2026) : la BCSM a accepté par écrit l'attribution
+        // « Source: Central Bank of the Republic of San Marino, Operating
+        // Banks » avec la date de consultation ; c'est donc ici le jour de
+        // lecture complet de la ligne, pas le mois de `as_of`. Une ligne sans
+        // date (base antérieure à la colonne) garde le nom sans date.
+        register: cc === 'SM' && reg.as_of ? smRegisterName(reg.as_of) : partial,
         // The point of this whole branch. The register named this institution,
         // which is worth serving; it still does not license reading a MISS as a
         // denial, and `authoritative` is the field that says so.
@@ -1297,12 +1311,21 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           ),
           // The register's own credit where it stores one — Slovakia and
           // Czechia, whose terms make naming the source a condition of reuse
-          // (the Czech one reads "Zdroj: ČNB, …, verze N"), and San Marino,
-          // whose licence is unknown and which is therefore credited by choice
-          // rather than by obligation. All are read from the row and never
-          // written here. Austria and Belgium store none and take the
-          // register's name.
-          source: reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc],
+          // (the Czech one reads "Zdroj: ČNB, …, verze N"). Both are read from
+          // the row and never written here. Austria and Belgium store none and
+          // take the register's name.
+          //
+          // Saint-Marin est l'exception, depuis le 16/10/2026 : la BCSM a
+          // accepté par écrit une formule précise, avec la date de consultation
+          // (SM_CREDIT, src/lib/sm-credit.ts). La formule est donc écrite
+          // ici et seule la date vient de la ligne, dont le libellé stocké
+          // (« operating banks ») date d'avant la réponse.
+          source:
+            cc === 'SM'
+              ? reg.as_of
+                ? smCredit(reg.as_of)
+                : SM_CREDIT
+              : (reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc]),
           // Year-month, as this field is documented. Slovakia and Czechia
           // state an effective date of their own and San Marino carries the
           // day we read its page; AT and BE are dated by the reference set,

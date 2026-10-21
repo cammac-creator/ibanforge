@@ -247,9 +247,10 @@ describe('slovakSource', () => {
  * San Marino — the BCSM "operating banks" page.
  *
  * The fixture reproduces the STRUCTURE of the page as read on 06/09/2026, with
- * invented banks, codes, addresses and numbers (25/09/2026: the BCSM publishes
- * no terms of use, so its content does not belong in a public repository, not
- * even as a test fixture). Both traps of the real markup are kept: the first
+ * invented banks, codes, addresses and numbers (25/09/2026: its content does
+ * not belong in a public repository, not even as a test fixture; the BCSM's
+ * written confirmation of 16/10/2026 covers API answers, not a copy of its list
+ * here). Both traps of the real markup are kept: the first
  * bank's name split across two adjacent <strong> with NO whitespace between
  * them, and the fourth block writing "Telephone/Fax:" where the others write
  * "Phone/Fax:" while the opening label alternates between "Corporate name:"
@@ -322,6 +323,8 @@ describe('parseSanMarino', () => {
     }
     // The name alone. Putting the date in here too printed it twice the first
     // time it was logged; the two are joined once, in nationalRegisterCredit().
+    // Le libellé stocké garde l'ancienne graphie : l'API sert désormais la
+    // formule acceptée par la BCSM (SM_CREDIT) et ne lit que la date.
     expect(sanMarinoSource()).toBe('Central Bank of the Republic of San Marino, operating banks');
   });
 
