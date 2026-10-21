@@ -1,6 +1,6 @@
 import { BACKUP_FORMAT } from '../lib/backup.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { apiKeys } from './api-keys.js';
+import { apiKeys, BUNDLES } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { generateApiKey, getKeyTier, validateApiKey } from '../lib/api-keys.js';
 import { burstRevocationFor, revokeBurstBatch } from '../lib/key-revocations.js';
@@ -790,6 +790,10 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     const body = (await fourth.json()) as { error: string; message: string };
     expect(body.error).toBe('key_creation_limit');
     expect(body.message).toContain('credits');
+    // The pack price it quotes is the one the API sells, not a retyped figure.
+    expect(body.message).toContain(
+      `($${BUNDLES['1k'].price_usdc} per 1,000, POST /v1/credits/buy/1k)`,
+    );
   });
 
   it('an address the mail server refuses answers 400 undeliverable_email, not a 503 that blames the relay', async () => {
