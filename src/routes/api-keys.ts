@@ -369,7 +369,9 @@ apiKeys.post('/v1/keys/generate', async (c) => {
           error: 'key_creation_limit',
           message:
             `At most ${DAILY_KEY_CREATION_LIMIT} free keys per network per day — existing keys keep working. ` +
-            'Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) ' +
+            // The price is read from BUNDLES: a retyped "$5" outlived the move to $4
+            // here for five weeks (found on 21/10/2026).
+            `Need more capacity today? Prepaid credits are instant ($${BUNDLES['1k'].price_usdc} per 1,000, POST /v1/credits/buy/1k) ` +
             'and x402 pay-per-call needs no key at all.',
         },
         429,
