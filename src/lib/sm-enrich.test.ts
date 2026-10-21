@@ -29,6 +29,7 @@ afterAll(() => fixture.restore());
 
 const { validateIBAN } = await import('./iban.js');
 const { enrichResult, registerCoverage } = await import('./enrich.js');
+const { auditTable } = await import('./audit-file.js');
 const {
   lookupNationalCode,
   nationalRegisterCredit,
@@ -199,6 +200,20 @@ describe('the attribution the BCSM accepted in writing, and what its date belong
     expect(nationalRegisterCredit('SM')).toBe(`${ACCEPTED} (read by IBANforge on ${as_of})`);
     expect(nationalRegisterCredit('SK')).toMatch(/^Zdroj: /);
     expect(nationalRegisterCredit('SK')).not.toMatch(/read/);
+  });
+
+  it('carries the dated credit into the paid file audit for a listed bank', () => {
+    // La colonne `register` d'une ligne d'audit nommait la BCSM sans « Source: »
+    // ni date, à côté du nom de banque tiré de sa liste (relevé du 21/10/2026).
+    const res = auditTable(['IBAN'], [[LISTED], [SWIFT_EXAMPLE]]);
+    const byLine = new Map(res.rows.map((r) => [r.line, r]));
+    const readOn = FX.SM.bank.as_of;
+    expect(byLine.get(1)!.register).toBe(
+      `${ACCEPTED} (read by IBANforge on ${readOn}). Banks only: ${SCOPE}`,
+    );
+    expect(byLine.get(1)!.register_basis).toBe('partial');
+    // Un code que la liste ne porte pas n'emprunte rien à la BCSM : nom du pays, sans date.
+    expect(byLine.get(2)!.register).toBe(registerCoverage('SM').register);
   });
 
   it('names the register, undated and without a credit, where no row is read', () => {

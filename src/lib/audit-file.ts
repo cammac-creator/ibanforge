@@ -444,6 +444,15 @@ export function auditTable(
         const coverage = registerCoverage(row.country);
         row.register_basis = coverage.basis;
         row.register = coverage.register;
+        // Saint-Marin (21/10/2026) : quand la banque de la ligne vient de la
+        // liste de la BCSM, l'attribution qu'elle a acceptée par écrit va AVEC le
+        // jour de lecture. La réponse porte ce crédit daté ; le nom du pays, lui,
+        // ne lit aucune ligne et n'a pas de date. Un code absent de la liste
+        // n'utilise rien de la BCSM et garde le nom du pays.
+        const check = result.bank_code_check;
+        if (row.country === 'SM' && check?.status === 'verified' && check.match === 'register') {
+          row.register = check.register ?? row.register;
+        }
         row.bank_name = result.bic?.bank_name ?? result.issuer?.name ?? null;
         row.bic_registry = result.bic?.code ?? null;
         row.sepa_reachable = result.risk_indicators?.sepa_reachable ?? result.sepa?.member ?? null;
