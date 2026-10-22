@@ -386,9 +386,9 @@
         "compliance": "Compliance Check"
       },
       "summary": {
-        "total": "Estimated monthly total",
-        "payg": "pay-per-call via x402",
-        "note": "You only pay for what you actually call",
+        "total": "Pay-per-call total (x402)",
+        "payg": "agents paying each call in USDC, no key",
+        "note": "A credit pack or Pro usually costs less for the same volume: see below",
         "basis": "Comparison uses the full volume, excluding any remaining free allowance, existing credits and network fees. Packs are one-time purchases; Pro is monthly. A batch of N IBANs consumes N units.",
         "anonymous": "This volume fits the free no-email key’s 25 monthly requests, if its allowance is available.",
         "claimed": "After verifying an address you choose to provide, the same key allows 200 requests per month: this volume then fits its available allowance.",

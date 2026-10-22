@@ -386,9 +386,9 @@
         "compliance": "Vérification compliance"
       },
       "summary": {
-        "total": "Total mensuel estimé",
-        "payg": "paiement à l’appel via x402",
-        "note": "Vous ne payez que ce que vous appelez réellement",
+        "total": "Total payé à l’appel (x402)",
+        "payg": "agents qui paient chaque appel en USDC, sans clé",
+        "note": "Un paquet de crédits ou Pro coûte en général moins pour le même volume : voir plus bas",
         "basis": "Comparaison sur le volume complet, hors quota gratuit restant, crédits déjà détenus et frais de réseau. Les packs sont des achats ponctuels ; Pro est mensuel. Un lot de N IBAN consomme N unités.",
         "anonymous": "Ce volume tient dans les 25 requêtes mensuelles de la clé gratuite sans e-mail, si son quota est disponible.",
         "claimed": "Après vérification d’une adresse choisie, cette même clé donne 200 requêtes par mois : ce volume tient alors dans le quota disponible.",

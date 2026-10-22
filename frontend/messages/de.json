@@ -386,9 +386,9 @@
         "compliance": "Compliance-Prüfung"
       },
       "summary": {
-        "total": "Geschätzte Monatskosten",
-        "payg": "Pay-per-Call via x402",
-        "note": "Sie zahlen nur für das, was Sie tatsächlich aufrufen",
+        "total": "Summe bei Zahlung pro Aufruf (x402)",
+        "payg": "Agenten, die jeden Aufruf in USDC zahlen, ohne Schlüssel",
+        "note": "Ein Credit-Paket oder Pro kostet für dasselbe Volumen meist weniger: siehe unten",
         "basis": "Vergleich für das gesamte Volumen, ohne verbleibendes Freikontingent, vorhandenes Guthaben und Netzwerkgebühren. Pakete sind einmalige Käufe; Pro ist monatlich. Ein Batch mit N IBANs verbraucht N Einheiten.",
         "anonymous": "Dieses Volumen passt in die 25 monatlichen Anfragen des kostenlosen Schlüssels ohne E-Mail, sofern das Kontingent verfügbar ist.",
         "claimed": "Nach Verifizierung einer freiwillig angegebenen Adresse erlaubt derselbe Schlüssel 200 Anfragen pro Monat: Dieses Volumen passt dann ins verfügbare Kontingent.",
