@@ -281,6 +281,21 @@ describe('the trial is exhausted', () => {
     // Et le chiffre cité est bien le plafond appliqué, jamais un chiffre retapé.
     expect(body.cause?.detail).toContain(`${REST_TRIAL_WEEKLY_LIMIT} keyless validations`);
   });
+
+  // L'agent de nos outils de contrôle range la requête à part dans les
+  // chiffres, et rien d'autre. Tout le monde peut le recopier : s'il ouvrait
+  // la moindre faveur, ce serait une porte gratuite.
+  it('counts a call signed by one of our tools (IBANforge-outil/) exactly the same', async () => {
+    const h = freshHeaders({ 'user-agent': 'IBANforge-outil/verif' });
+    for (let i = 0; i < REST_TRIAL_WEEKLY_LIMIT; i += 1) {
+      const ok = await validate({ iban: VALID_IBAN }, h);
+      expect(ok.status).toBe(200);
+    }
+    const res = await validate({ iban: VALID_IBAN }, h);
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as { cause?: { reason: string } };
+    expect(body.cause?.reason).toBe('trial_exhausted');
+  });
 });
 
 /**

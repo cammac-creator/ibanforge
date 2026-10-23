@@ -2,7 +2,7 @@ import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { getDemandGaps } from './demand-gaps.js';
 import { monthEndedBefore, proposeFromDemand, type DemandProposal } from './demand-proposal.js';
-import { buildBillableFilter } from './stats.js';
+import { buildBillableFilter, NOT_INTERNAL_TOOL_SQL } from './stats.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 import { SALE_OUTCOMES_SQL } from './key-purchases.js';
 import { getAutomatedKeyPrefixes } from './door-board.js';
@@ -141,9 +141,12 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
   // it. It is exposed to SQLite as a function instead, so the filter becomes a
   // subquery with zero parameters, whatever the number of keys.
   registerInternalEmailFn(db);
+  // Our keyless control tools (User-Agent `IBANforge-outil/…`) leave too:
+  // they are not demand either. See NOT_INTERNAL_TOOL_SQL in stats.ts.
   const notInternal =
     'AND (key_prefix IS NULL OR key_prefix NOT IN ' +
-    '(SELECT key_prefix FROM api_keys WHERE is_internal_email(email)))';
+    '(SELECT key_prefix FROM api_keys WHERE is_internal_email(email))) ' +
+    NOT_INTERNAL_TOOL_SQL;
 
   // The exploration robot that `door-board.ts` keeps out of the door board —
   // see the comment on `registerAutomatedPrefixFn` above.
