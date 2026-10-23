@@ -158,6 +158,9 @@ export function accountUsd(k: {
  */
 const DISCOVERY_PATHS = new Set([
   '/mcp',
+  // L'adresse des répertoires de connecteurs : ses poignées de main lisent le
+  // même catalogue que celles de `/mcp` (23.10.2026).
+  '/mcp/directory',
   '/.well-known/x402',
   '/.well-known/ai-plugin.json',
   '/openapi.json',

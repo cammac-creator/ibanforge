@@ -52,6 +52,7 @@ import { ogImage } from './routes/og-image.js';
 // true the day one of them moves (it did on 24/09/2026: ten a day became
 // twenty-five a week).
 import { mcpHttp, MCP_WEEKLY_LIMIT } from './routes/mcp-http.js';
+import { MCP_DIRECTORY_PATH } from './mcp/directory.js';
 import { mcpCard } from './routes/mcp-card.js';
 // The tool inventory, so /llms.txt counts the tools instead of asserting a
 // number. It claimed "7 tools" while the servers exposed 8 (audit 2026-09-01,
@@ -999,17 +1000,22 @@ export function buildApp(): Hono<HonoEnv> {
       // `mcpToolCall` marker and stored in its own column — the path stays
       // `/mcp:tools-call` so the counters that compare that exact string keep
       // counting.
-      const mcpOutcome = path === '/mcp' ? c.res.headers.get('X-MCP-Outcome') : null;
-      const recordedPath =
-        path !== '/mcp'
-          ? path
-          : c.get('mcpToolCall')
-            ? '/mcp:tools-call'
-            : mcpOutcome === 'rate_limited'
-              ? '/mcp:tools-call:refused'
-              : mcpOutcome === 'session_rate_limited'
-                ? '/mcp:session:refused'
-                : path;
+      //
+      // L'adresse des répertoires de connecteurs (`/mcp/directory`, 23.10.2026)
+      // partage les compteurs de `/mcp` : ses appels d'outils et ses refus
+      // prennent les mêmes chemins virtuels. Ses poignées de main gardent leur
+      // chemin réel, pour qu'on voie qui se connecte par un répertoire.
+      const mcpTransport = path === '/mcp' || path === MCP_DIRECTORY_PATH;
+      const mcpOutcome = mcpTransport ? c.res.headers.get('X-MCP-Outcome') : null;
+      const recordedPath = !mcpTransport
+        ? path
+        : c.get('mcpToolCall')
+          ? '/mcp:tools-call'
+          : mcpOutcome === 'rate_limited'
+            ? '/mcp:tools-call:refused'
+            : mcpOutcome === 'session_rate_limited'
+              ? '/mcp:session:refused'
+              : path;
       recordRequest(
         c.req.method,
         recordedPath,

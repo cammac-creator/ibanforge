@@ -966,3 +966,36 @@ export const TOOL_OUTPUT_SCHEMAS = {
   request_api_key: REQUEST_API_KEY_OUTPUT_SCHEMA,
   poll_api_key: POLL_API_KEY_OUTPUT_SCHEMA,
 } satisfies Record<string, z.ZodRawShape>;
+
+/**
+ * The output schemas of the connector-directory address (`/mcp/directory`,
+ * `src/mcp/directory.ts`): the same shapes without `cost_usdc` and
+ * `list_price_usdc`.
+ *
+ * 🚨 A separate map, not a loosened field. `cost_usdc` is REQUIRED in the
+ * shapes `/mcp` serves, so a directory result that drops it would fail the
+ * SDK's validation; and the field descriptions name the paid route, so they
+ * would come back through `tools/list` even with no value in the result.
+ * Derived from the map above, never copied: a field added to a tool reaches
+ * both addresses.
+ */
+const PRICE_FIELDS: ReadonlySet<string> = new Set(['cost_usdc', 'list_price_usdc']);
+
+function withoutPriceFields<S extends z.ZodRawShape>(shape: S): z.ZodRawShape {
+  return Object.fromEntries(Object.entries(shape).filter(([key]) => !PRICE_FIELDS.has(key)));
+}
+
+export const DIRECTORY_TOOL_OUTPUT_SCHEMAS: Record<
+  keyof typeof TOOL_OUTPUT_SCHEMAS,
+  z.ZodRawShape
+> = {
+  ...(Object.fromEntries(
+    Object.entries(TOOL_OUTPUT_SCHEMAS).map(([tool, shape]) => [tool, withoutPriceFields(shape)]),
+  ) as Record<keyof typeof TOOL_OUTPUT_SCHEMAS, z.ZodRawShape>),
+  batch_validate_iban: {
+    ...BATCH_VALIDATE_IBAN_OUTPUT_SCHEMA,
+    results: z
+      .array(z.object(withoutPriceFields(VALIDATE_IBAN_OUTPUT_SCHEMA)))
+      .describe('One result per input IBAN, in the same order. Same shape as validate_iban.'),
+  },
+};
