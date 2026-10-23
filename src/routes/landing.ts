@@ -22,6 +22,7 @@ const landing = new Hono();
 
 landing.get('/', (c) => {
   c.header('Cache-Control', 'public, max-age=3600');
+  c.header('X-Robots-Tag', 'noindex, follow');
 
   // PLAYGROUND_API_KEY is deliberately NOT read here any more: it used to be
   // interpolated into the page's <script>, which published a live credential to
@@ -110,8 +111,7 @@ landing.get('/', (c) => {
           name="description"
           content="Validate IBANs, lookup BICs, score compliance risk. 121K BICs, 89 countries. Free tier or x402 micropayments. MCP native for AI agents."
         />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://api.ibanforge.com" />
+        <meta name="robots" content="noindex, follow" />
         <meta property="og:title" content="IBANforge — IBAN Validation & BIC Lookup API" />
         <meta
           property="og:description"
@@ -1002,7 +1002,7 @@ landing.get('/', (c) => {
       <body>
         <nav class="nav">
           <div class="nav-inner">
-            <a href="/" class="nav-logo">IBAN<span>forge</span></a>
+            <a href="https://ibanforge.com/" class="nav-logo">IBAN<span>forge</span></a>
             <div class="nav-links">
               <a href="#tryit">Try it</a>
               <a href="#pricing">Pricing</a>
