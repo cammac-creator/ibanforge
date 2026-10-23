@@ -23,6 +23,61 @@ const DEBUT = new Date('2026-08-01T00:00:00.000Z');
 const FIN = new Date('2026-09-11T12:00:00.000Z');
 
 describe('Résumé des paiements refusés', () => {
+  it('lit encore les détails de carte avec un mandat développé Endive', () => {
+    const details = {
+      type: 'card',
+      card: {
+        brand: 'visa',
+        last4: '4242',
+        country: 'CH',
+        mandate: { id: 'mandate_fictif', object: 'mandate' },
+      },
+    } as Stripe.Charge.PaymentMethodDetails;
+    const r = summarizeFailedPayments(
+      [
+        charge({
+          created: 1757000000,
+          payment_method_details: details,
+          failure_code: 'generic_decline',
+        }),
+      ],
+      30,
+      DEBUT,
+      FIN,
+    );
+    expect(r.latest[0]).toMatchObject({
+      card_brand: 'visa',
+      card_last4: '4242',
+      card_country: 'CH',
+      decline_reason: 'generic_decline',
+    });
+    expect(r.by_reason).toEqual({ generic_decline: 1 });
+  });
+
+  it.each([
+    'code_invalid',
+    'code_expired',
+    'insufficient_funds',
+    'customer_declined',
+    'payment_limit_exceeded',
+    'partner_generic_decline',
+  ])('conserve le nouveau motif BLIK %s sans liste fermée', (reason) => {
+    const r = summarizeFailedPayments(
+      [
+        charge({
+          created: 1757000000,
+          payment_method_details: { type: 'blik', blik: {} } as Stripe.Charge.PaymentMethodDetails,
+          outcome: { reason } as Stripe.Charge.Outcome,
+        }),
+      ],
+      30,
+      DEBUT,
+      FIN,
+    );
+    expect(r.by_reason).toEqual({ [reason]: 1 });
+    expect(r.latest[0]).toMatchObject({ decline_reason: reason, card_brand: null });
+  });
+
   it('compte les tentatives, les acheteurs et le motif du refus', () => {
     const r = summarizeFailedPayments(
       [

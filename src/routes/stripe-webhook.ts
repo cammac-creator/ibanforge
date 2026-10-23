@@ -36,7 +36,8 @@
  */
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
+import { createStripeClient } from '../lib/stripe-client.js';
 import { getStatsDB } from '../lib/db.js';
 import { getUsage, OEM_MONTHLY_LIMIT, PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
@@ -177,7 +178,7 @@ function getStripe(): Stripe {
   if (!_stripe) {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error('STRIPE_SECRET_KEY is not set');
-    _stripe = new Stripe(key);
+    _stripe = createStripeClient(key);
   }
   return _stripe;
 }
