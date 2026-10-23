@@ -103,6 +103,32 @@ const prospectRow = (email: string, over: Partial<ProspectRow> = {}): ProspectRo
 });
 
 describe('buildDossiers', () => {
+  it('ne crée aucun dossier depuis un profil interne sans clé', () => {
+    expect(buildDossiers({
+      ...base,
+      prospects: [prospectRow('acme@alpha.example.net')],
+      profiles: {
+        interne: profile({ client_kinds: [{ kind: 'internal', count: 8 }], total: 8 }),
+      },
+    })).toEqual([]);
+  });
+
+  it('conserve un client avec clé même si son agent annonce un outil interne', () => {
+    const out = buildDossiers({
+      ...base,
+      keys: [keyRow('acme@alpha.example.net')],
+      profiles: {
+        ifk_acme: profile({
+          key_prefix: 'ifk_acme', total: 8, ok: 8,
+          client_kinds: [{ kind: 'internal', count: 8 }],
+          user_agents: [{ ua: 'IBANforge-outil/exemple', count: 8 }],
+        }),
+      },
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].requests).toBe(8);
+  });
+
   it('gathers every key of one address into a single dossier', () => {
     const out = buildDossiers({
       ...base,
