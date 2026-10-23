@@ -1374,6 +1374,10 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', createPlaygroundRelay(app));
 
   // Landing page (must be last — catches GET /)
+  app.get('/', async (c, next) => {
+    c.header('Link', '<https://api.ibanforge.com/.well-known/api-catalog>; rel="api-catalog"');
+    await next();
+  });
   app.route('/', landing);
 
   // JSON 404 for unmatched routes — the body tells the caller what to call

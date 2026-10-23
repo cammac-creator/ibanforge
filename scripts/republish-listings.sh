@@ -107,8 +107,6 @@ echo
 cat <<EOF
 ▶ Manual refresh required (no API):
 
-  □ Smithery       https://smithery.ai/server/ibanforge/ibanforge
-                   → Click "Redeploy from npm" on the dashboard
   □ MCP.so         https://mcp.so/server/ibanforge
                    → "Refresh from GitHub" on the dashboard
   □ RapidAPI       https://rapidapi.com/  → your IBANforge listing
@@ -122,9 +120,11 @@ cat <<EOF
   • Coinbase Bazaar  — re-indexed after each x402 settlement
   • agentic.market   — pulls from Bazaar; ~24h lag
 
+Smithery: relay closure announced for 2026-10-31; no longer a publishing step (https://smithery.ai/future).
+
 ═══ Summary @ v$VERSION ═══
    API-published:   npm × 2, PyPI, MCP Registry
-   Manual checklist: 5 platforms (1-5 min each)
+   Manual checklist: 4 platforms (1-5 min each)
    Total time when scripted: ~5 min API + ~10 min manual
 
 EOF
