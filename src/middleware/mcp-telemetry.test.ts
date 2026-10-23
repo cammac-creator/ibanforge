@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildApp } from '../app.js';
 import { getStatsDB } from '../lib/db.js';
-import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
+import { MCP_SESSIONS_PER_IP_DAY, MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 
 const MCP_HEADERS = {
   'Content-Type': 'application/json',
@@ -162,5 +162,102 @@ describe('MCP telemetry — a refusal has its own path', () => {
     const ip = '203.0.113.171';
     await openSession(app, ip);
     expect(recentMcpPaths(1)).toEqual(['/mcp']);
+  });
+});
+
+/**
+ * Nos outils de contrôle signent `IBANforge-outil/<nom>`. Ils sortent des
+ * chiffres (catégorie `internal`), jamais d'un quota : l'agent se recopie par
+ * n'importe qui, et une faveur liée à lui serait une porte gratuite.
+ */
+describe('MCP — un appel signé par nos outils consomme comme les autres', () => {
+  const TOOL_UA = 'IBANforge-outil/verif';
+
+  async function openToolSession(app: ReturnType<typeof buildApp>, ip: string): Promise<string> {
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: { ...MCP_HEADERS, 'x-real-ip': ip, 'user-agent': TOOL_UA },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'vitest', version: '1' },
+        },
+      }),
+    });
+    return res.headers.get('mcp-session-id') ?? '';
+  }
+
+  function callToolAsTool(app: ReturnType<typeof buildApp>, sessionId: string, ip: string) {
+    return app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        ...MCP_HEADERS,
+        'x-real-ip': ip,
+        'mcp-session-id': sessionId,
+        'user-agent': TOOL_UA,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } },
+      }),
+    });
+  }
+
+  function lastMcpKind(): { path: string; client_kind: string | null } {
+    return getStatsDB()
+      .prepare(
+        "SELECT path, client_kind FROM request_log WHERE path LIKE '/mcp%' ORDER BY id DESC LIMIT 1",
+      )
+      .get() as { path: string; client_kind: string | null };
+  }
+
+  it('dépense l’allocation de la semaine et se fait refuser au même appel', async () => {
+    const { getMcpToolStats } = await import('../lib/stats.js');
+    const servedBefore =
+      getMcpToolStats(1).tools.find((t) => t.tool === 'lookup_ch_clearing')?.served ?? 0;
+
+    const app = buildApp();
+    // TEST-NET-2, une adresse réservée à ce cas : l'allocation se compte par adresse.
+    const ip = '198.51.100.150';
+    const sessionId = await openToolSession(app, ip);
+    expect(sessionId).toBeTruthy();
+
+    for (let i = 0; i < MCP_WEEKLY_LIMIT; i++) {
+      // Un appel servi revient en flux SSE, un refus en JSON : on lit le texte.
+      const res = await callToolAsTool(app, sessionId, ip);
+      expect(await res.text(), `appel ${i + 1} refusé avant l'allocation`).not.toContain('-32000');
+    }
+    const refused = await callToolAsTool(app, sessionId, ip);
+    const body = (await refused.json()) as { error?: { code: number } };
+    expect(body.error?.code).toBe(-32000);
+
+    // Refusé comme n'importe qui, mais rangé à part dans les chiffres.
+    expect(lastMcpKind()).toEqual({ path: '/mcp:tools-call:refused', client_kind: 'internal' });
+    // Et le compteur par outil des agents ne l'a pas vu.
+    const servedAfter =
+      getMcpToolStats(1).tools.find((t) => t.tool === 'lookup_ch_clearing')?.served ?? 0;
+    expect(servedAfter).toBe(servedBefore);
+  });
+
+  it('tombe sous le même plafond de sessions par adresse', async () => {
+    const app = buildApp();
+    const ip = '198.51.100.151';
+    const burn = () =>
+      app.request('/mcp', {
+        method: 'POST',
+        headers: { ...MCP_HEADERS, 'x-real-ip': ip, 'user-agent': TOOL_UA },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: {} }),
+      });
+    for (let i = 0; i < MCP_SESSIONS_PER_IP_DAY; i++) await burn();
+    const refused = await burn();
+    const body = (await refused.json()) as { error?: { message: string } };
+    expect(body.error?.message).toContain('Daily MCP session limit reached');
+    expect(lastMcpKind()).toEqual({ path: '/mcp:session:refused', client_kind: 'internal' });
   });
 });

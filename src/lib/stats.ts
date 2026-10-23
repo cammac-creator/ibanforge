@@ -128,8 +128,38 @@ export function extractClientIp(headers: {
  * - `bot`       : known crawlers/probes (Decixa, x402scan, Glama, GoogleBot, etc.)
  * - `web`       : interactive browser session (UA contains Mozilla + WebKit/Gecko)
  * - `api`       : everything else (REST direct, programmatic, server-to-server)
+ * - `internal`  : our own control tools, which sign `IBANforge-outil/<name>`
+ *                 (see `INTERNAL_TOOL_UA_PREFIX`). Kept out of the market
+ *                 figures, never out of any quota.
  */
-export type ClientKind = 'mcp_http' | 'mcp_stdio' | 'bot' | 'web' | 'api';
+export type ClientKind = 'mcp_http' | 'mcp_stdio' | 'bot' | 'web' | 'api' | 'internal';
+
+/**
+ * The User-Agent prefix our own control tools carry (audits, checks, probes),
+ * compared in lower case and at the START of the agent only:
+ * `xIBANforge-outil/…` or `Mozilla/5.0 IBANforge-outil/…` are not ours.
+ *
+ * 🚨 This is a STATISTICS label, never a credential. Anyone can copy the
+ * string, so it opens nothing: a keyless `/mcp` call signed with it spends the
+ * weekly allowance and the per-address session cap exactly like any other, and
+ * the keyless trial of `/v1/iban/validate` counts it the same way
+ * (`mcp-telemetry.test.ts` and `anonymous-trial.test.ts` hold that). All it
+ * changes is the bucket the dashboard files the request under.
+ */
+export const INTERNAL_TOOL_UA_PREFIX = 'ibanforge-outil/';
+
+/**
+ * "Not a keyless call from one of our tools", for queries on `request_log`.
+ *
+ * Only on `request_log`: `operations` has no `client_kind` column, which is
+ * why this is NOT folded into `EXTERNAL_ONLY_SQL` (that one also runs on
+ * `operations`). COALESCE because rows predating the column carry NULL, and a
+ * bare `client_kind <> 'internal'` would silently drop every one of them.
+ * A key always speaks louder than the agent: a keyed call stays counted under
+ * its key's rules whatever User-Agent it carries.
+ */
+export const NOT_INTERNAL_TOOL_SQL =
+  "AND NOT (key_prefix IS NULL AND COALESCE(client_kind, 'api') = 'internal')";
 
 // Indexers / catalogs / search engine crawlers — non-paying, non-monetizable
 // but useful to track for distribution attribution.
@@ -183,14 +213,17 @@ const AGENT_PATTERNS = [
 ];
 
 /**
- * Classify the origin of an HTTP request into one of 5 buckets so the
+ * Classify the origin of an HTTP request into one of 6 buckets so the
  * dashboard can attribute traffic and revenue per channel.
  *
- * Order matters: we check `/mcp` path first (highest signal), then known
- * client UAs (most specific), then bots (catch-all crawlers), then the
- * loose "browser" heuristic, then fallback to `api`.
+ * Order matters: our own tools' signature first (a check of `/mcp` by one of
+ * our tools is not an agent, and a tool named `…-cursor-check` is not Cursor),
+ * then the `/mcp` path (highest signal), then known client UAs (most
+ * specific), then bots (catch-all crawlers), then the loose "browser"
+ * heuristic, then fallback to `api`.
  */
 export function classifyClient(path: string, userAgent: string | undefined): ClientKind {
+  if (userAgent && userAgent.toLowerCase().startsWith(INTERNAL_TOOL_UA_PREFIX)) return 'internal';
   if (path.startsWith('/mcp')) return 'mcp_http';
   if (!userAgent) return 'api';
   const ua = userAgent.toLowerCase();
@@ -791,6 +824,7 @@ export function getSourceStats(days: number): SourceStatsResponse {
                 AND path NOT LIKE '%\\%7B%' ESCAPE '\\'
                 AND path NOT LIKE '%{%'
                 ${EXTERNAL_ONLY_SQL}
+                ${NOT_INTERNAL_TOOL_SQL}
            THEN 1 ELSE 0 END) AS paid_calls,
       SUM(CASE WHEN status = 402 THEN 1 ELSE 0 END) AS paywall_hits,
       SUM(CASE WHEN status >= 400 AND status != 402 THEN 1 ELSE 0 END) AS errors,
@@ -893,6 +927,11 @@ const TRAFFIC_TREND_SQL = `WITH classified AS (
              WHEN key_prefix IS NOT NULL THEN 'with_key'
              -- Below here key_prefix IS NULL, so a keyed browser call cannot
              -- also land in the browser bucket: the natures stay exclusive.
+             -- A keyless check by one of our tools (User-Agent
+             -- IBANforge-outil/…) is ours, not the market's: same nature as
+             -- our keys. Placed AFTER with_key on purpose, so a customer key
+             -- that copies the agent stays a customer.
+             WHEN COALESCE(client_kind, 'api') = 'internal' THEN 'internal'
              -- COALESCE rather than a bare client_kind: NULL = 'api' is NULL,
              -- never true, so rows predating the column (added by migration,
              -- so the old ones carry NULL) only land in anonymous_api by
@@ -1809,7 +1848,10 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
   // produce real 2xx traffic that is NOT market signal — a perf audit once
   // showed up as "126 Paid success" on a day with zero real client calls.
   // Anonymous traffic (key_prefix NULL) stays counted: it can't be attributed,
-  // and x402 demand is precisely what the funnel exists to measure.
+  // and x402 demand is precisely what the funnel exists to measure — except a
+  // keyless check signed by one of our tools (NOT_INTERNAL_TOOL_SQL), which is
+  // attributable, to us. Same fragment as `paid_calls` in getSourceStats, so
+  // DASH-03's `paid_calls <= funnel success` keeps holding.
   const internalPrefixes = (
     db.prepare('SELECT key_prefix, email FROM api_keys').all() as Array<{
       key_prefix: string;
@@ -1844,6 +1886,7 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
       AND path NOT LIKE '%\\%7B%' ESCAPE '\\'
       AND path NOT LIKE '%{%'
       ${internalFilter}
+      ${NOT_INTERNAL_TOOL_SQL}
     GROUP BY date(created_at)
     ORDER BY date ASC
   `,
@@ -2942,6 +2985,9 @@ export function getCohortFootprint(): CohortFootprint {
  * which carry their
  * own path — the same name can therefore appear with served calls at zero and
  * refusals above it, and that is the interesting case.
+ *
+ * Keyless calls from our own control tools (User-Agent `IBANforge-outil/…`)
+ * are left out: they show what WE check, not what agents come for.
  */
 export interface McpToolUsage {
   tool: string;
@@ -2960,6 +3006,7 @@ export function getMcpToolStats(days: number): { period_days: number; tools: Mcp
          FROM request_log
         WHERE tool_name IS NOT NULL
           AND created_at >= date('now', ?)
+          ${NOT_INTERNAL_TOOL_SQL}
         GROUP BY tool_name
         ORDER BY served DESC, refused DESC, tool ASC`,
     )

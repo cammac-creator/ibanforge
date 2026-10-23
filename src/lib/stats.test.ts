@@ -11,6 +11,8 @@ import {
   getStatsHistory,
   getStatusByPath,
   getBusinessFunnel,
+  getSourceStats,
+  getTrafficTrend,
   getClientProfiles,
   getBotProfiles,
   classifyClient,
@@ -294,6 +296,63 @@ describe('getBusinessFunnel', () => {
     // external + anonymous count; the internal audit key must not.
     expect(after - before).toBe(2);
   });
+
+  it('écarte un contrôle sans clé signé par nos outils (client_kind internal)', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const successToday = () => getBusinessFunnel(1).find((r) => r.date === today)?.success ?? 0;
+    const paidToday = () => getSourceStats(1).by_client_kind.reduce((t, r) => t + r.paid_calls, 0);
+
+    const before = { funnel: successToday(), paid: paidToday() };
+    recordRequest('POST', '/v1/iban/validate', 200, 10, 'internal', null, 'IBANforge-outil/t');
+    recordRequest('POST', '/v1/iban/validate', 200, 10, 'api', null, null, null);
+    // Le même chiffre des deux côtés : DASH-03 tient `paid_calls <= funnel`.
+    expect(successToday() - before.funnel).toBe(1);
+    expect(paidToday() - before.paid).toBe(1);
+  });
+});
+
+describe('getTrafficTrend — nos outils de contrôle', () => {
+  const today = () => new Date().toISOString().slice(0, 10);
+  const row = () => getTrafficTrend(1).find((r) => r.date === today());
+
+  it('range un contrôle sans clé de nos outils en internal, pas en API anonyme', () => {
+    const before = row();
+    recordRequest('GET', '/v1', 200, 3, classifyClient('/v1', 'IBANforge-outil/verif'));
+    recordRequest('POST', '/mcp', 200, 3, classifyClient('/mcp', 'IBANforge-outil/verif'));
+    const after = row()!;
+
+    expect(after.internal - (before?.internal ?? 0)).toBe(2);
+    expect(after.anonymous_api - (before?.anonymous_api ?? 0)).toBe(0);
+    expect(after.agent - (before?.agent ?? 0)).toBe(0);
+    // Les six natures partitionnent toujours le total du jour.
+    const natures =
+      after.with_key +
+      after.agent +
+      after.declared_bot +
+      after.browser +
+      after.anonymous_api +
+      after.internal;
+    expect(natures).toBe(after.total);
+  });
+
+  it('laisse une vraie clé client dans « Avec clé », même si elle recopie l’agent', () => {
+    const customer = generateApiKey(`trend-tool-${Date.now()}@alpha.example.net`);
+    expect(customer).not.toBeNull();
+    const before = row();
+    recordRequest(
+      'GET',
+      '/v1/bic/:code',
+      200,
+      3,
+      'internal',
+      null,
+      'IBANforge-outil/copie',
+      customer!.key_prefix,
+    );
+    const after = row()!;
+    expect(after.with_key - (before?.with_key ?? 0)).toBe(1);
+    expect(after.internal - (before?.internal ?? 0)).toBe(0);
+  });
 });
 
 describe('recordRejection', () => {
@@ -416,6 +475,28 @@ describe('recordRejection', () => {
 });
 
 describe('classifyClient', () => {
+  // Nos outils de contrôle signent `IBANforge-outil/<nom>` : ils passent avant
+  // tout le reste, y compris le chemin `/mcp` et les motifs d'agents.
+  it('classe la signature de nos outils en internal, quelle que soit la casse', () => {
+    expect(classifyClient('/v1', 'IBANforge-outil/verif')).toBe('internal');
+    expect(classifyClient('/v1/iban/validate', 'ibanforge-outil/audit-visibilite')).toBe(
+      'internal',
+    );
+    expect(classifyClient('/', 'IBANFORGE-OUTIL/x')).toBe('internal');
+    // Avant le test du chemin /mcp, et avant les motifs d'agents (« cursor »).
+    expect(classifyClient('/mcp', 'IBANforge-outil/verif')).toBe('internal');
+    expect(classifyClient('/mcp:tools-call', 'IBANforge-outil/verif')).toBe('internal');
+    expect(classifyClient('/v1/demo', 'IBANforge-outil/cursor-check')).toBe('internal');
+  });
+
+  it('ne reconnaît la signature qu’en tête et avec sa barre oblique', () => {
+    expect(classifyClient('/v1', 'xIBANforge-outil/verif')).toBe('api');
+    expect(classifyClient('/v1', 'Mozilla/5.0 IBANforge-outil/verif')).not.toBe('internal');
+    expect(classifyClient('/v1', 'IBANforge-outil')).toBe('api');
+    expect(classifyClient('/v1', ' IBANforge-outil/verif')).toBe('api');
+    expect(classifyClient('/mcp', 'xIBANforge-outil/verif')).toBe('mcp_http');
+  });
+
   it('classifies /mcp paths as mcp_http regardless of UA', () => {
     expect(classifyClient('/mcp', 'curl/8.0')).toBe('mcp_http');
     expect(classifyClient('/mcp/initialize', undefined)).toBe('mcp_http');
