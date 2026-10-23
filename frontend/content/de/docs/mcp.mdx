@@ -72,7 +72,7 @@ In einem Chat-Assistenten wird die Adresse oben zu einem *benutzerdefinierten Co
 
 **Ein Connector ohne Schlüssel greift auf dasselbe schlüssellose Kontingent zu wie jeder andere Aufrufer**, gezählt pro Quelladresse. In Claude gehen die Aufrufe eines Connectors von der Cloud von Anthropic aus, nicht von Ihrem Gerät (offizielle Seite unten, Abschnitt „Network requirements“): Dieses Kontingent wird also mit anderen Nutzern geteilt und kann schon aufgebraucht sein, wenn Sie beginnen. Andere Assistenten: von uns nicht geprüft. Mit Ihrem eigenen Schlüssel wird der Connector auf diesen Schlüssel gezählt: siehe *Mit Ihrem Schlüssel* oben (Claude nimmt ihn als Header der Anfrage, ChatGPT sendet keinen). Ein POST auf `https://api.ibanforge.com/v1/keys/generate` ohne Body liefert einen Schlüssel, ohne E-Mail.
 
-Wo Sie klicken, nach der offiziellen Seite jedes Anbieters, gelesen am 24. September 2026; Menüs ändern sich, maßgeblich ist die verlinkte Seite.
+Wo Sie klicken, nach den verlinkten offiziellen Seiten. Claude, ChatGPT und Gemini: gelesen am 24. September 2026; Mistral und Perplexity: gelesen am 23. Oktober 2026. Menüs ändern sich; maßgeblich ist die verlinkte Seite.
 
 **Claude** ([offizielle Seite](https://support.claude.com/en/articles/11175166), aktualisiert am 11. August 2026). Benutzerdefinierte Connectors gibt es in den Plänen Free, Pro, Max, Team und Enterprise; im Free-Plan ist es ein einziger benutzerdefinierter Connector. *Von uns nicht ausprobiert.*
 
@@ -91,6 +91,18 @@ Wo Sie klicken, nach der offiziellen Seite jedes Anbieters, gelesen am 24. Septe
 - Auf gemini.google.com unten auf **Settings** und dann **Connected Apps** klicken; unter „Custom apps“ eine benutzerdefinierte App hinzufügen, `https://api.ibanforge.com/mcp` eingeben, auf **Next** klicken und den Anweisungen folgen.
 - Die Seite verlangt Zugangsdaten unter „Advanced features“, wenn ein Server keine Dynamic Client Registration unterstützt. Dieser Server verlangt keine Authentifizierung; ob Gemini das akzeptiert, haben wir nicht geprüft.
 - In einer Anfrage: **@** eingeben und die App auswählen.
+
+**Mistral (Le Chat)** ([offizieller Connector-Leitfaden, jetzt unter Vibe Work](https://docs.mistral.ai/vibe/work/connectors/mcp-connectors), gelesen am 23. Oktober 2026). Administratorzugang erforderlich; Inhaber von Free-, Pro- und Student-Konten sind standardmäßig Administratoren. *Von uns nicht ausprobiert.*
+
+- **Connectors → + Add Connector → Custom MCP Connector** öffnen. Als Namen `IBANforge`, als Serveradresse `https://api.ibanforge.com/mcp` eingeben, dann **Connect**.
+- Der Leitfaden beschreibt automatische Authentifizierungserkennung, auch ohne Zugangsdaten. IBANforge lässt sich ohne Schlüssel ausprobieren; das Hinzufügen eines Schlüssels in diesem Assistenten haben wir nicht geprüft.
+
+**Perplexity** ([offizielle Seite](https://www.perplexity.ai/help-center/en/articles/13915507-adding-custom-remote-connectors), gelesen am 23. Oktober 2026). Laut [Veröffentlichungsankündigung](https://www.perplexity.ai/changelog/what-we-shipped---march-13-2026) für Pro, Max und Enterprise verfügbar. In Organisationen muss der Administrator benutzerdefinierte Connectors erlauben. *Von uns nicht ausprobiert.*
+
+- **Plugins → Add custom → Connector → Add MCP connector → Remote** öffnen. Ohne Plugins bei **Customize → Connectors** beginnen.
+- Als Namen `IBANforge` und als Adresse `https://api.ibanforge.com/mcp` eingeben, **Streamable HTTP** und **None** wählen, um ohne Schlüssel zu testen. Den Hinweis lesen, dann **Add** und die Connector-Karte zum Aktivieren öffnen. Der Leitfaden nennt auch API-Schlüssel; deren Header-Übermittlung an IBANforge haben wir nicht geprüft.
+
+Für Connector-Verzeichnisse stellt `https://api.ibanforge.com/mcp/directory` dieselben Tools ohne Preise oder Angebote bereit. Die Adresse teilt die Limits und Zähler von `/mcp`: Ein Adresswechsel gibt kein zusätzliches Kontingent. Sie bedeutet nicht, dass IBANforge in das Verzeichnis eines Assistenten aufgenommen wurde.
 
 Im offiziellen MCP-Registry ist der Server als `io.github.cammac-creator/ibanforge` gelistet.
 

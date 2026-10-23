@@ -155,7 +155,8 @@ function decideVerdict(b: BotDossier): BotVerdict {
 }
 
 export function buildBots(profiles: Record<string, BotProfileRow>, now: Date): BotDossier[] {
-  return Object.values(profiles).map((p) => {
+  // Nos sondes et audits restent hors des fiches commerciales, même si l’API les renvoie.
+  return Object.values(profiles).filter((p) => p.client_kind !== 'internal').map((p) => {
     const last = parseUtc(p.last_seen);
     const first = parseUtc(p.first_seen);
     const b: BotDossier = {

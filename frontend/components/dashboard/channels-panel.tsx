@@ -21,6 +21,7 @@ const KIND_LABEL: Record<string, { label: string; color: string }> = {
   api: { label: 'REST direct', color: '#3b82f6' },
   web: { label: 'Navigateur', color: '#22c55e' },
   bot: { label: 'Bots / crawlers', color: '#71717a' },
+  internal: { label: 'Nos outils', color: '#52525b' },
 };
 
 export function ChannelsPanel({ rows, periodDays }: { rows: ChannelRow[]; periodDays: number }) {
@@ -32,7 +33,8 @@ export function ChannelsPanel({ rows, periodDays }: { rows: ChannelRow[]; period
         <InfoDot>
           Le trafic par mode d&rsquo;accès. « Payés » = 200 sur un endpoint facturable (clé ou x402) ; « paywall » =
           402, l&rsquo;agent voulait mais n&rsquo;a pas payé. C&rsquo;est la vue qui vérifie la thèse du canal
-          reco-IA : si MCP convertit, ça se voit ici.
+          reco-IA : si MCP convertit, ça se voit ici. « Nos outils » désigne nos sondes et audits,
+          classés « Hors marché » dans la tendance.
         </InfoDot>
       </div>
       {sorted.length === 0 ? (

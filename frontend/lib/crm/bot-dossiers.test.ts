@@ -42,6 +42,17 @@ const build = (rows: Record<string, Partial<BotProfileRow>>) =>
 const verdictOf = (o: Partial<BotProfileRow>) => build({ 'x/1.0': o })[0].verdict;
 
 describe('buildBots', () => {
+  it('écarte nos outils avant tout verdict commercial et tout regroupement', () => {
+    const bots = build({
+      'IBANforge-outil/controle': { client_kind: 'internal', billable_ok: 12 },
+      'outil-fictif/1': { client_kind: 'internal', not_found: 100 },
+      'crawler/1': { client_kind: 'bot', total: 7 },
+      'api/1': { client_kind: 'api', total: 3 },
+    });
+    expect(bots.map((b) => b.userAgent)).toEqual(['crawler/1', 'api/1']);
+    expect(groupBots(bots, NOW).reduce((n, b) => n + b.requests, 0)).toBe(10);
+  });
+
   it('keeps the contact page a crawler advertises in its own user agent', () => {
     const [b] = build({ 'crawler/1.0': { homepage: 'https://flows.example.net/bots' } });
     expect(b.homepage).toBe('https://flows.example.net/bots');
