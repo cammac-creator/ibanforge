@@ -53,6 +53,7 @@ import { ogImage } from './routes/og-image.js';
 // twenty-five a week).
 import { mcpHttp, MCP_WEEKLY_LIMIT } from './routes/mcp-http.js';
 import { MCP_DIRECTORY_PATH } from './mcp/directory.js';
+import { MCP_CHATGPT_PATH } from './mcp/chatgpt.js';
 import { mcpCard } from './routes/mcp-card.js';
 // The tool inventory, so /llms.txt counts the tools instead of asserting a
 // number. It claimed "7 tools" while the servers exposed 8 (audit 2026-09-01,
@@ -1005,7 +1006,9 @@ export function buildApp(): Hono<HonoEnv> {
       // partage les compteurs de `/mcp` : ses appels d'outils et ses refus
       // prennent les mêmes chemins virtuels. Ses poignées de main gardent leur
       // chemin réel, pour qu'on voie qui se connecte par un répertoire.
-      const mcpTransport = path === '/mcp' || path === MCP_DIRECTORY_PATH;
+      // L'adresse ChatGPT (`/mcp/chatgpt`, 24.10.2026) suit la même règle.
+      const mcpTransport =
+        path === '/mcp' || path === MCP_DIRECTORY_PATH || path === MCP_CHATGPT_PATH;
       const mcpOutcome = mcpTransport ? c.res.headers.get('X-MCP-Outcome') : null;
       const recordedPath = !mcpTransport
         ? path

@@ -17,7 +17,12 @@
 
 import { Hono, type Context } from 'hono';
 import type { HonoEnv } from '../types.js';
-import { McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  McpServer,
+  type RegisteredPrompt,
+  type RegisteredResource,
+  type RegisteredTool,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
   LATEST_PROTOCOL_VERSION,
@@ -95,6 +100,22 @@ import {
   directoryPayload,
 } from '../mcp/directory.js';
 import {
+  CHATGPT_ACCOUNTING_UNAVAILABLE,
+  CHATGPT_ALLOWANCE_NOTE,
+  CHATGPT_COUNTRIES_DESCRIPTION,
+  CHATGPT_PROMPT_DESCRIPTION,
+  CHATGPT_SESSION_REFUSAL,
+  CHATGPT_TOOL_META,
+  CHATGPT_TOOL_SET,
+  MCP_CHATGPT_INSTRUCTIONS,
+  MCP_CHATGPT_PATH,
+  chatgptAllowanceRefusal,
+  chatgptDescription,
+  chatgptDiscoveryBody,
+  chatgptPayload,
+  chatgptValidateAndExplainPrompt,
+} from '../mcp/chatgpt.js';
+import {
   MCP_WEEKLY_LIMIT,
   MCP_SESSIONS_PER_IP_DAY,
   MCP_LIVE_SESSIONS_PER_KEY,
@@ -108,6 +129,16 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 /** The tools a call may name and be served; parity with registerTool is tested. */
 const MCP_TOOL_NAMES: ReadonlySet<string> = new Set(MCP_TOOLS.map((t) => t.name));
+
+/**
+ * Ce qu'un appel peut nommer et se faire servir, adresse par adresse : les
+ * onze outils sur `/mcp` et `/mcp/directory`, les six de `/mcp/chatgpt`
+ * (24.10.2026). Un outil retiré de l'adresse ChatGPT y est traité comme un
+ * outil inconnu : ni débité, ni compté comme un appel servi.
+ */
+function servableTools(variant: McpVariant): ReadonlySet<string> {
+  return variant === 'chatgpt' ? CHATGPT_TOOL_SET : MCP_TOOL_NAMES;
+}
 import {
   ANONYMOUS_MONTHLY_LIMIT,
   FREE_TIER_MONTHLY_LIMIT,
@@ -293,12 +324,13 @@ export function createMcpSessionStore(
 export const mcpSessions = createMcpSessionStore();
 
 /**
- * L'adresse sur laquelle chaque session a été ouverte : `/mcp` ou
- * `/mcp/directory` (23.10.2026). Un seul magasin pour les deux, pour que la
- * borne mémoire et les plafonds par clé restent communs ; mais une session
- * ouverte sur l'une n'est jamais servie sur l'autre, sans quoi l'offre de
- * `/mcp` reviendrait sur l'adresse des répertoires par un simple identifiant
- * de session. Une `WeakMap` : elle suit le transport et n'a rien à purger.
+ * L'adresse sur laquelle chaque session a été ouverte : `/mcp`,
+ * `/mcp/directory` (23.10.2026) ou `/mcp/chatgpt` (24.10.2026). Un seul
+ * magasin pour toutes, pour que la borne mémoire et les plafonds par clé
+ * restent communs ; mais une session ouverte sur l'une n'est jamais servie sur
+ * une autre, sans quoi l'offre de `/mcp`, ou un outil retiré de l'adresse
+ * ChatGPT, reviendrait par un simple identifiant de session. Une `WeakMap` :
+ * elle suit le transport et n'a rien à purger.
  */
 const sessionVariant = new WeakMap<WebStandardStreamableHTTPServerTransport, McpVariant>();
 
@@ -382,10 +414,12 @@ async function serveOnKey(
   if (metered === null) return run();
   if (metered.served) return metered.result;
   // L'adresse des répertoires ne relaie pas le texte de paiement de l'API REST.
+  // L'adresse ChatGPT n'arrive jamais ici : elle ne lit aucune clé (voir
+  // `handleMcpPost`), donc `authInfo` y est toujours absent.
   const payload =
-    variant === 'directory'
-      ? directoryKeyRefusalPayload(metered.cause)
-      : keyRefusalPayload(metered.cause);
+    variant === 'mcp'
+      ? keyRefusalPayload(metered.cause)
+      : directoryKeyRefusalPayload(metered.cause);
   return { isError: true, content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
 }
 
@@ -596,13 +630,22 @@ function createMcpServer(
 ): McpServer {
   // `/mcp/directory` (src/mcp/directory.ts) : les mêmes outils et les mêmes
   // données, sans rien qui vende. `/mcp` ne change pas : chaque texte de cette
-  // fonction y reste celui d'avant, `dir` ne choisit que pour l'autre adresse.
-  const dir = variant === 'directory';
-  /** La ligne de prix de /mcp ; sur l'adresse des répertoires, la seule limite sans clé. */
-  const cost = (price: string): string => (dir ? DIRECTORY_ALLOWANCE_NOTE : costLine(price));
-  /** Le prix du catalogue sur /mcp ; sur l'adresse des répertoires, aucun prix et les étapes filtrées. */
+  // fonction y reste celui d'avant, `dir` ne choisit que pour les autres adresses.
+  // `/mcp/chatgpt` (src/mcp/chatgpt.ts, 24.10.2026) prend tout ce que fait
+  // l'adresse des répertoires (`dir`), puis se resserre (`chat`) : six outils,
+  // aucune clé, des déclenchements sur demande explicite.
+  const dir = variant !== 'mcp';
+  const chat = variant === 'chatgpt';
+  /** La ligne de prix de /mcp ; sur les autres adresses, la seule limite d'usage. */
+  const cost = (price: string): string =>
+    chat ? CHATGPT_ALLOWANCE_NOTE : dir ? DIRECTORY_ALLOWANCE_NOTE : costLine(price);
+  /** Le prix du catalogue sur /mcp ; ailleurs, aucun prix et les étapes filtrées. */
   const bill = (payload: Record<string, unknown>, listPrice?: number): Record<string, unknown> =>
-    dir ? directoryPayload(payload) : billedFree(payload, listPrice);
+    chat
+      ? chatgptPayload(payload)
+      : dir
+        ? directoryPayload(payload)
+        : billedFree(payload, listPrice);
   /** Un appel d'outil de donnée servi sur la clé de SA requête : voir `serveOnKey`. */
   function withKey(
     tool: string,
@@ -653,7 +696,10 @@ function createMcpServer(
       // paquets (src/mcp/directory.ts). Une clé qui écrase la précédente, et
       // non un ternaire : `src/mcp/instructions.test.ts` vérifie que /mcp passe
       // bien la constante partagée au constructeur.
-      ...(dir ? { instructions: MCP_DIRECTORY_INSTRUCTIONS } : {}),
+      // L'adresse ChatGPT a le sien, sans clé ni retour d'information.
+      ...(dir
+        ? { instructions: chat ? MCP_CHATGPT_INSTRUCTIONS : MCP_DIRECTORY_INSTRUCTIONS }
+        : {}),
     },
   );
 
@@ -1445,6 +1491,56 @@ function createMcpServer(
     }
   }
 
+  // L'adresse ChatGPT (src/mcp/chatgpt.ts), posée par-dessus celle des
+  // répertoires, de la même façon et pour la même raison (les tests de parité
+  // lisent le texte de chaque enregistrement) :
+  //  - les cinq outils hors périmètre sont RETIRÉS du serveur, pas seulement
+  //    cachés de `tools/list` : un `tools/call` direct reçoit « not found » du
+  //    SDK avant tout gestionnaire, donc avant toute clé, tout rapport, tout
+  //    effet ;
+  //  - les six gardent leurs annotations, avec leur déclencheur réécrit et la
+  //    déclaration d'accès anonyme (`noauth`) de la référence d'OpenAI ;
+  //  - la ressource des pays et le prompt reçoivent leurs textes adaptés.
+  // `src/routes/mcp-chatgpt.test.ts` est rouge si un outil exclu répond encore,
+  // ou si une réécriture n'a pas trouvé son passage.
+  if (chat) {
+    const internals = server as unknown as {
+      _registeredTools?: Record<string, RegisteredTool>;
+      _registeredResources?: Record<string, RegisteredResource>;
+      _registeredPrompts?: Record<string, RegisteredPrompt>;
+    };
+    for (const [name, tool] of Object.entries(internals._registeredTools ?? {})) {
+      if (!CHATGPT_TOOL_SET.has(name)) {
+        tool.remove();
+        continue;
+      }
+      tool.update({
+        description: chatgptDescription(name, tool.description ?? ''),
+        _meta: CHATGPT_TOOL_META,
+      });
+    }
+    const countries = internals._registeredResources?.['ibanforge://countries'];
+    countries?.update({
+      metadata: { ...countries.metadata, description: CHATGPT_COUNTRIES_DESCRIPTION },
+    });
+    internals._registeredPrompts?.validate_and_explain?.update({
+      description: CHATGPT_PROMPT_DESCRIPTION,
+      // Le schéma des arguments reste celui de l'enregistrement : le SDK a
+      // déjà validé `iban` comme une chaîne quand ce rappel s'exécute.
+      callback: async (args) => ({
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: chatgptValidateAndExplainPrompt(String((args as { iban: string }).iban)),
+            },
+          },
+        ],
+      }),
+    });
+  }
+
   return server;
 }
 
@@ -1460,17 +1556,25 @@ function createMcpServer(
  * against tools/list: the day the SDK renames that field this returns an empty
  * array and the test goes red, instead of the document going quietly stale.
  */
-let toolNamesCache: string[] | null = null;
-function registeredToolNames(): string[] {
-  if (toolNamesCache) return toolNamesCache;
+// Une entrée par adresse (24.10.2026) : `/mcp/chatgpt` n'enregistre que six
+// outils, et sa découverte doit lire les siens, pas l'inventaire des onze.
+const toolNamesCache = new Map<McpVariant, string[]>();
+function registeredToolNames(variant: McpVariant = 'mcp'): string[] {
+  const cached = toolNamesCache.get(variant);
+  if (cached) return cached;
   // An empty context and no session: this instance only ever has its catalogue
   // read, no handler of it ever runs. Handing it a real caller would be a lie
   // about who asked.
-  const probe = createMcpServer({ ip: null, userAgent: null }, () => undefined) as unknown as {
+  const probe = createMcpServer(
+    { ip: null, userAgent: null },
+    () => undefined,
+    variant,
+  ) as unknown as {
     _registeredTools?: Record<string, unknown>;
   };
-  toolNamesCache = Object.keys(probe._registeredTools ?? {});
-  return toolNamesCache;
+  const names = Object.keys(probe._registeredTools ?? {});
+  toolNamesCache.set(variant, names);
+  return names;
 }
 
 // ── MCP tool call rate limiting ───────────────────────────────────────────────
@@ -1684,10 +1788,11 @@ function mcpDnsRebindingOptions(): {
   };
 }
 
-// Handle POST /mcp and POST /mcp/directory (client → server messages). The
-// two addresses share this handler, and with it every counter: the keyless
-// units and the session openings are debited on the same buckets, whichever
-// address the call came through (src/mcp/directory.ts).
+// Handle POST /mcp, POST /mcp/directory and POST /mcp/chatgpt (client → server
+// messages). The three addresses share this handler, and with it every counter:
+// the keyless units and the session openings are debited on the same buckets,
+// whichever address the call came through (src/mcp/directory.ts,
+// src/mcp/chatgpt.ts).
 async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<Response> {
   // Parse the body to check if this is a tools/call (rate-limited)
   // vs. discovery (unlimited). We clone the request so the transport
@@ -1729,8 +1834,10 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
     // Only a tool this server registers can be served (review of 24/09/2026):
     // a call to an unknown name gets "tool not found" from the SDK, so it is
     // neither charged nor counted as a served call.
+    // Depuis le 24.10.2026, par adresse : les cinq outils retirés de
+    // `/mcp/chatgpt` y sont des noms inconnus.
     const servable = calls.filter(
-      (m) => typeof m?.params?.name === 'string' && MCP_TOOL_NAMES.has(m.params.name),
+      (m) => typeof m?.params?.name === 'string' && servableTools(variant).has(m.params.name),
     );
     toolCalls = servable.length;
     keyRequests = servable.filter((m) => m?.params?.name === 'request_api_key').length;
@@ -1851,7 +1958,13 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   // CETTE requête : la session ne garde aucune clé. Elle garde seulement, depuis
   // le 08.10.2026, l'empreinte de la clé qui l'a ouverte, comme étiquette
   // d'éviction du magasin (voir `createMcpSessionStore`), jamais pour payer.
-  const presentedKey = extractKey(c, { query: false });
+  //
+  // 🚨 L'adresse ChatGPT (24.10.2026) ne lit AUCUNE clé : ChatGPT n'en envoie
+  // pas à un connecteur, et l'adresse se déclare anonyme. Une clé présentée là
+  // est ignorée : l'appel est débité sur l'adresse source comme tout appel sans
+  // clé, l'ouverture de session compte dans la franchise du jour, et aucune
+  // réponse ne parle de clé. Aucune exemption, aucune allocation de plus.
+  const presentedKey = variant === 'chatgpt' ? null : extractKey(c, { query: false });
   // Lue UNE fois, et seulement quand elle sert : pour attribuer un appel
   // d'outil, ou pour décider de l'ouverture d'une session (08.10.2026).
   const keyCheck =
@@ -1877,7 +1990,11 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32000,
           message:
-            variant === 'directory' ? DIRECTORY_ACCOUNTING_UNAVAILABLE : MCP_ACCOUNTING_UNAVAILABLE,
+            variant === 'chatgpt'
+              ? CHATGPT_ACCOUNTING_UNAVAILABLE
+              : variant === 'directory'
+                ? DIRECTORY_ACCOUNTING_UNAVAILABLE
+                : MCP_ACCOUNTING_UNAVAILABLE,
           data: { degraded: true },
         },
       });
@@ -1894,9 +2011,11 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         jsonrpc: '2.0',
         id: rpcId,
         error:
-          variant === 'directory'
-            ? directoryAllowanceRefusal(limit.used, MCP_WEEKLY_LIMIT, trialResetsAt(now))
-            : mcpAllowanceRefusal(limit.used, now),
+          variant === 'chatgpt'
+            ? chatgptAllowanceRefusal(limit.used, MCP_WEEKLY_LIMIT, trialResetsAt(now))
+            : variant === 'directory'
+              ? directoryAllowanceRefusal(limit.used, MCP_WEEKLY_LIMIT, trialResetsAt(now))
+              : mcpAllowanceRefusal(limit.used, now),
       });
     }
   }
@@ -1997,13 +2116,15 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32000,
           message:
-            variant === 'directory'
-              ? DIRECTORY_SESSION_REFUSAL
-              : `Daily MCP session limit reached (${MCP_SESSIONS_PER_IP_DAY} new sessions/day per source address, without a key). ` +
-                'Reuse the mcp-session-id returned by initialize instead of opening a session per call. ' +
-                'A session opened with a valid IBANforge key (Authorization: Bearer ifk_… or X-API-Key) is not counted ' +
-                `against the address. POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key ` +
-                `with no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} calls/month.`,
+            variant === 'chatgpt'
+              ? CHATGPT_SESSION_REFUSAL
+              : variant === 'directory'
+                ? DIRECTORY_SESSION_REFUSAL
+                : `Daily MCP session limit reached (${MCP_SESSIONS_PER_IP_DAY} new sessions/day per source address, without a key). ` +
+                  'Reuse the mcp-session-id returned by initialize instead of opening a session per call. ' +
+                  'A session opened with a valid IBANforge key (Authorization: Bearer ifk_… or X-API-Key) is not counted ' +
+                  `against the address. POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key ` +
+                  `with no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} calls/month.`,
           data: { used: opened.used, limit: MCP_SESSIONS_PER_IP_DAY, remaining: 0 },
         },
       });
@@ -2092,6 +2213,7 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
 
 mcpHttp.post('/mcp', (c) => handleMcpPost(c, 'mcp'));
 mcpHttp.post(MCP_DIRECTORY_PATH, (c) => handleMcpPost(c, 'directory'));
+mcpHttp.post(MCP_CHATGPT_PATH, (c) => handleMcpPost(c, 'chatgpt'));
 
 /**
  * The discovery body of `GET /mcp/directory` without a session: how to connect,
@@ -2112,8 +2234,8 @@ function directoryDiscoveryBody(): Record<string, unknown> {
   };
 }
 
-// Handle GET /mcp and GET /mcp/directory (SSE stream for server → client
-// notifications, OR discovery hint)
+// Handle GET /mcp, GET /mcp/directory and GET /mcp/chatgpt (SSE stream for
+// server → client notifications, OR discovery hint)
 async function handleMcpGet(c: Context<HonoEnv>, variant: McpVariant): Promise<Response> {
   const sessionId = c.req.header('mcp-session-id');
   const transport = sessionFor(sessionId, variant);
@@ -2121,6 +2243,12 @@ async function handleMcpGet(c: Context<HonoEnv>, variant: McpVariant): Promise<R
   if (!transport && variant === 'directory') {
     c.header('Allow', 'POST, DELETE');
     return c.json(directoryDiscoveryBody(), 405);
+  }
+
+  // Les six outils que cette adresse enregistre vraiment, lus sur elle.
+  if (!transport && variant === 'chatgpt') {
+    c.header('Allow', 'POST, DELETE');
+    return c.json(chatgptDiscoveryBody(registeredToolNames('chatgpt')), 405);
   }
 
   if (!transport) {
@@ -2220,8 +2348,9 @@ async function handleMcpGet(c: Context<HonoEnv>, variant: McpVariant): Promise<R
 
 mcpHttp.get('/mcp', (c) => handleMcpGet(c, 'mcp'));
 mcpHttp.get(MCP_DIRECTORY_PATH, (c) => handleMcpGet(c, 'directory'));
+mcpHttp.get(MCP_CHATGPT_PATH, (c) => handleMcpGet(c, 'chatgpt'));
 
-// Handle DELETE /mcp and DELETE /mcp/directory (close session)
+// Handle DELETE /mcp, DELETE /mcp/directory and DELETE /mcp/chatgpt (close session)
 async function handleMcpDelete(c: Context<HonoEnv>, variant: McpVariant): Promise<Response> {
   const sessionId = c.req.header('mcp-session-id');
   const transport = sessionFor(sessionId, variant);
@@ -2237,5 +2366,6 @@ async function handleMcpDelete(c: Context<HonoEnv>, variant: McpVariant): Promis
 
 mcpHttp.delete('/mcp', (c) => handleMcpDelete(c, 'mcp'));
 mcpHttp.delete(MCP_DIRECTORY_PATH, (c) => handleMcpDelete(c, 'directory'));
+mcpHttp.delete(MCP_CHATGPT_PATH, (c) => handleMcpDelete(c, 'chatgpt'));
 
 export { mcpHttp };
