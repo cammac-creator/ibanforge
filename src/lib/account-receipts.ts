@@ -32,7 +32,8 @@
  * (`receipt_number`) sans rien envoyer : ce numéro ne prouve donc pas qu'un reçu
  * est parti par mail. Seule `receipt_email` le prouve (constaté le 28.09.2026).
  */
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
+import { createStripeClient } from './stripe-client.js';
 import { listOwnedPurchases, type OwnedPurchase } from './account.js';
 import { PRO_PORTAL_URL } from './payment-links.js';
 
@@ -136,7 +137,7 @@ let stripeClient: Stripe | null = null;
 const fetchFromStripe: ReceiptUrlFetcher = async (stripeSessionId) => {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
-  stripeClient ??= new Stripe(key, { timeout: STRIPE_TIMEOUT_MS, maxNetworkRetries: 1 });
+  stripeClient ??= createStripeClient(key, { timeout: STRIPE_TIMEOUT_MS, maxNetworkRetries: 1 });
   const session = await stripeClient.checkout.sessions.retrieve(stripeSessionId, {
     expand: ['payment_intent.latest_charge'],
   });

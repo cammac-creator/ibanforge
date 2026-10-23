@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
+import { createStripeClient } from '../lib/stripe-client.js';
 import { isAdminAuthorized } from './api-keys.js';
 
 /**
@@ -58,7 +59,7 @@ function getStripe(): Stripe | null {
   if (_stripe) return _stripe;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
-  _stripe = new Stripe(key);
+  _stripe = createStripeClient(key);
   return _stripe;
 }
 /** Les tests posent leur propre client ; la production n'appelle jamais ceci. */

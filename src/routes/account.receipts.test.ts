@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Hono } from 'hono';
+import Stripe from 'stripe';
 import { apiKeys } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { generateCreditKey, rotateApiKey } from '../lib/api-keys.js';
@@ -454,6 +455,9 @@ describe('GET /v1/account/receipt?ref=rcpt_…', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const cases: Array<() => Promise<string | null>> = [
       async () => {
+        throw new Stripe.errors.StripeConnectionError({ message: 'Réponse interrompue' });
+      },
+      async () => {
         throw Object.assign(new Error('No such checkout.session: cs_test_alpha_secret'), {
           type: 'StripeInvalidRequestError',
         });
@@ -473,6 +477,7 @@ describe('GET /v1/account/receipt?ref=rcpt_…', () => {
     // Le journal ne cite ni la session Stripe, ni un lien, ni la référence servie.
     const logged = warn.mock.calls.flat().join(' ');
     expect(logged).toContain('StripeInvalidRequestError');
+    expect(logged).toContain('StripeConnectionError');
     expect(logged).not.toContain('cs_test_alpha');
     expect(logged).not.toContain('https://');
     expect(logged).not.toContain('rcpt_');

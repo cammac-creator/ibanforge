@@ -19,6 +19,7 @@
  */
 import { Hono } from 'hono';
 import Stripe from 'stripe';
+import { createStripeClient } from '../lib/stripe-client.js';
 import type { HonoEnv } from '../types.js';
 import {
   auditFile,
@@ -101,7 +102,7 @@ function getStripe(): Stripe | null {
   if (_stripe) return _stripe;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
-  _stripe = new Stripe(key);
+  _stripe = createStripeClient(key);
   return _stripe;
 }
 /** Tests swap the client; production never calls this. */
@@ -303,7 +304,7 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
     Math.floor(Date.parse(`${job.expires_at.replace(' ', 'T')}Z`) / 1000) - 300;
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'payment',
-    payment_method_types: ['card'],
+    allowed_payment_method_types: ['card'],
     expires_at: checkoutExpiresAt,
     locale,
     // A 100 % promotion code is how the operator proves the paid path without a card.
@@ -358,8 +359,13 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
       }
       if (!reserved) return pending();
       if (!reserved.expires_at || reserved.expires_at <= Date.now() / 1000) return expired();
+      // Une réservation d'avant Stripe 23 peut déjà exister chez Stripe après
+      // une coupure réseau. Garder son corps ET sa version, sinon le rejeu
+      // échoue (paramètre retiré ou conflit d'idempotence). Elle expire avec
+      // le rapport ; aucune nouvelle réservation n'utilise cet ancien format.
       session = await stripe.checkout.sessions.create(reserved, {
         idempotencyKey: `audit:${job.id}`,
+        ...('payment_method_types' in reserved ? { apiVersion: '2026-08-26.dahlia' } : {}),
       });
     }
     if (session.metadata?.audit_job !== job.id) {
