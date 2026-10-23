@@ -1846,7 +1846,7 @@
         "title": "Security and trust",
         "description": "Who runs IBANforge, where the API runs, what it keeps and for how long, and what we do not have. Each fact links to the document or the check that proves it."
       },
-      "checked": "Checked on October 6, 2026. The contractual documents prevail over this summary.",
+      "checked": "Checked on October 27, 2026. The contractual documents prevail over this summary.",
       "glance": {
         "operator": {
           "label": "Operator",
@@ -1886,12 +1886,12 @@
         },
         "site": {
           "name": "Website and dashboard",
-          "body": "Vercel. Its functions run in the Frankfurt region (Germany, EU); static pages are served from Vercel's global network.",
-          "checkNote": "In the x-vercel-id header, the part after the first :: is the region where the function ran: fra1 is Frankfurt. The first part is the edge nearest to you."
+          "body": "Infomaniak, Switzerland: a virtual server in Infomaniak's public cloud, run by us. Every page, static or not, is served from it, with no content delivery network in front.",
+          "checkNote": "netname INFOMANIAK-CLOUD and country CH: the address belongs to Infomaniak's public cloud and is registered in Switzerland. The register gives the country, not the data centre."
         },
         "mail": {
           "name": "E-mail, DNS and backups",
-          "body": "Infomaniak, Switzerland. A server there also holds the nightly backups of the account state.",
+          "body": "Infomaniak, Switzerland. The website's server also holds the nightly backups of the account state.",
           "checkNote": "The name servers are Infomaniak's."
         }
       },
@@ -1955,13 +1955,6 @@
             "ibans": "Yes, in memory, to answer the request",
             "basis": "EU-US and Swiss-US Data Privacy Framework, active (Railway Corporation)"
           },
-          "vercel": {
-            "name": "Vercel Inc.",
-            "role": "Website and dashboard; playground submissions are relayed to the API",
-            "region": "Functions: Frankfurt (EU). Static pages: global network",
-            "ibans": "Only an IBAN typed into the website's playground",
-            "basis": "EU-US and Swiss-US Data Privacy Framework, active (Vercel Inc.)"
-          },
           "stripe": {
             "name": "Stripe Payments Europe",
             "role": "Card payments",
@@ -1978,9 +1971,9 @@
           },
           "infomaniak": {
             "name": "Infomaniak Network SA",
-            "role": "Transactional and support e-mail; nightly backup of the account state",
+            "role": "Website and dashboard hosting, on a virtual server we run (playground submissions pass through it on their way to the API); transactional and support e-mail; nightly backup of the account state",
             "region": "Switzerland",
-            "ibans": "Only an IBAN you write in an e-mail to us",
+            "ibans": "Only an IBAN typed into the website's playground, in transit to the API, or one you write in an e-mail to us",
             "basis": "Switzerland: adequacy decision of the European Commission"
           },
           "github": {
@@ -2030,7 +2023,7 @@
         "statusLink": "Status page",
         "sla": "Editor/OEM subscriptions carry a written SLA: 99.5% availability per calendar month, with service credits.",
         "slaLink": "SLA",
-        "probe": "An external probe, on a server at Infomaniak in Switzerland, calls the API and the website every minute and alerts the operator. Its results are not published.",
+        "probe": "A probe on the website's server, at Infomaniak in Switzerland, calls the API and the website every minute and alerts the operator. If that server stops, the website stops with it and the probe can no longer raise the alert; a check from the operator's computer then remains, while that computer is on. Its results are not published.",
         "instance": "The API runs as a single instance with a persistent volume, in one region. Each update, including the automatic data refreshes, restarts it, and requests that arrive during the switch wait or fail. Railway documents this for any service with a volume; we have observed switches lasting from under a minute to almost five minutes. The status page cannot count those requests, because they never reach the API.",
         "instanceLink": "Railway documentation"
       },

@@ -2,12 +2,14 @@
 title: "Datenschutzerklärung"
 description: "Welche Daten IBANforge verarbeitet, was gespeichert wird, wie lange, und Ihre Rechte nach dem Schweizer DSG und der DSGVO."
 order: 2
-updated: "2026-10-08"
+updated: "2026-10-27"
 ---
 
 # Datenschutzerklärung
 
-**Stand: 8. Oktober 2026 · Version 1.8**
+**Stand: 27. Oktober 2026 · Version 1.9**
+
+*Änderung 1.9 (27. Oktober 2026): Website und Dashboard sind von Vercel auf einen virtuellen Server in der Public Cloud von Infomaniak in der Schweiz umgezogen, den wir selbst betreiben. Ziffer 2 sagt nun, wo sie laufen und dass alle ihre Seiten von diesem Server ausgeliefert werden. In Ziffer 3 ist Vercel Inc. kein Auftragsverarbeiter mehr, und die Rolle des bereits aufgeführten Auftragsverarbeiters Infomaniak umfasst nun das Hosting von Website und Dashboard: Eine im Playground eingegebene IBAN durchläuft auf dem Weg zur API diesen Server, und Kundendaten durchlaufen ihn, wenn der Betreiber das Dashboard nutzt. Es kommt kein Auftragsverarbeiter hinzu. Es wird nichts Neues erhoben. Diese Änderung wurde am 8. Oktober 2026 im [Changelog](/de/changelog) angekündigt; sie streicht einen Auftragsverarbeiter und fügt keinen hinzu und gilt daher ab dem Tag des Umzugs.*
 
 *Änderung 1.8 (8. Oktober 2026): Abschnitt 1 nennt unter den Verwendungen der E-Mail-Adresse höchstens eine Nachricht des Gründers, ob Ihnen der Schlüssel nützt, und sagt, dass eine Antwort STOP alles außer rechtlichen und sicherheitsbezogenen Hinweisen beendet; die Zeile zu den Zahlungsdaten sagt, dass wir die E-Mail-Adresse der zahlenden Person, den Betrag und die Währung jedes Kaufs speichern und dass eine angeforderte Rechnung den Namen und die Anschrift enthält, die Sie angeben, und zehn Jahre aufbewahrt wird, wie es das schweizerische Buchführungsrecht verlangt. Es werden keine neuen Daten erhoben.*
 
@@ -44,17 +46,16 @@ Diese Erklärung beschreibt, welche personenbezogenen Daten **IBANforge** (siehe
 
 ## 2. Wo die Daten liegen
 
-Die API und ihre Datenbanken laufen auf der Infrastruktur von Railway in der Region **Amsterdam, Niederlande (EU)**, hinter dem europäischen Netzwerkrand von Railway (Zürich für den größten Teil des Schweizer Datenverkehrs). Die Funktionen der Website laufen in der Vercel-Region **Frankfurt, Deutschland (EU)**; ihre statischen Seiten werden aus dem globalen Netz von Vercel ausgeliefert. Der Betreiber ist in der Schweiz niedergelassen, der die Europäische Kommission ein angemessenes Schutzniveau zuerkennt; das Schweizer Recht erkennt dies umgekehrt der EU zu. Der Kontostand wird jede Nacht auf einen Server von Infomaniak in der Schweiz gesichert, der 30 Tage an Kopien aufbewahrt; monatliche Kopien, von denen die letzten drei aufbewahrt werden, liegen auf einem vom Betreiber betriebenen Rechner in der Schweiz. Der Kontostand umfasst die API-Schlüssel (als Hashwerte) und die mit ihnen verbundenen E-Mail-Adressen, Kontingente, Guthaben, monatliche Nutzungszähler, Kaufbelege (Zahlungsreferenzen, E-Mail-Adresse des Zahlenden und bei USDC die zahlende Wallet-Adresse und den Transaktions-Hash) sowie die Einträge zur Erstellung, Beanspruchung und zum Widerruf von Schlüsseln, mit dem dafür erfassten gesalzenen IP-Hash und User-Agent. Er enthält keine zur Validierung übermittelten IBAN und nicht das Anfrageprotokoll. Ziffer 3 nennt die Auftragsverarbeiter und wo sie tätig sind, und diese Erklärung sowie der [Auftragsverarbeitungsvertrag](/de/legal/dpa) gelten unabhängig davon, wo Sie sich befinden.
+Die API und ihre Datenbanken laufen auf der Infrastruktur von Railway in der Region **Amsterdam, Niederlande (EU)**, hinter dem europäischen Netzwerkrand von Railway (Zürich für den größten Teil des Schweizer Datenverkehrs). Website und Dashboard laufen auf einem virtuellen Server in der Public Cloud von Infomaniak in der **Schweiz**, den wir selbst betreiben; alle ihre Seiten, statisch oder nicht, werden von diesem Server ausgeliefert. Der Betreiber ist in der Schweiz niedergelassen, der die Europäische Kommission ein angemessenes Schutzniveau zuerkennt; das Schweizer Recht erkennt dies umgekehrt der EU zu. Der Kontostand wird jede Nacht auf einen Server von Infomaniak in der Schweiz gesichert, der 30 Tage an Kopien aufbewahrt; monatliche Kopien, von denen die letzten drei aufbewahrt werden, liegen auf einem vom Betreiber betriebenen Rechner in der Schweiz. Der Kontostand umfasst die API-Schlüssel (als Hashwerte) und die mit ihnen verbundenen E-Mail-Adressen, Kontingente, Guthaben, monatliche Nutzungszähler, Kaufbelege (Zahlungsreferenzen, E-Mail-Adresse des Zahlenden und bei USDC die zahlende Wallet-Adresse und den Transaktions-Hash) sowie die Einträge zur Erstellung, Beanspruchung und zum Widerruf von Schlüsseln, mit dem dafür erfassten gesalzenen IP-Hash und User-Agent. Er enthält keine zur Validierung übermittelten IBAN und nicht das Anfrageprotokoll. Ziffer 3 nennt die Auftragsverarbeiter und wo sie tätig sind, und diese Erklärung sowie der [Auftragsverarbeitungsvertrag](/de/legal/dpa) gelten unabhängig davon, wo Sie sich befinden.
 
 ## 3. Unsere Auftragsverarbeiter
 
 | Auftragsverarbeiter | Rolle | Ort/Region | Erhält die von Ihnen übermittelten IBAN? |
 |---|---|---|---|
 | Railway Corp. | Hosting und Speicherung der API | Region: Amsterdam (EU) | Ja, im Arbeitsspeicher, um die Anfrage zu beantworten |
-| Vercel Inc. | Hosting von Website und Dashboard: Kundendaten durchlaufen seine Funktionen, wenn der Betreiber das Dashboard nutzt, und Eingaben im Playground werden an die API weitergeleitet | Funktionen: Frankfurt (EU); statische Seiten: globales CDN | Nur eine im Playground der Website eingegebene IBAN, die an die API weitergeleitet wird |
 | Stripe Payments Europe | Kartenzahlungen | EU | Nein |
 | Coinbase (CDP-Facilitator) | Abwicklung von x402/USDC-Zahlungen (x402.org-Facilitator als Rückfallebene) | USA | Nein |
-| Infomaniak Network SA | Transaktions- und Support-E-Mail (vom Betreiber verwaltetes Relais); nächtliche Sicherung des Kontostands | Schweiz | Nur eine IBAN, die Sie uns in einer E-Mail schreiben |
+| Infomaniak Network SA | Hosting von Website und Dashboard auf einem virtuellen Server, den wir betreiben: Kundendaten durchlaufen ihn, wenn der Betreiber das Dashboard nutzt, und Eingaben im Playground durchlaufen ihn auf dem Weg zur API; Transaktions- und Support-E-Mail (vom Betreiber verwaltetes Relais); nächtliche Sicherung des Kontostands | Schweiz | Nur eine im Playground der Website eingegebene IBAN, die an die API weitergeleitet wird, oder eine IBAN, die Sie uns in einer E-Mail schreiben |
 | GitHub Inc. | Öffentlicher Quellcode und CI (keine Kundendaten: geplante Jobs zur Aktualisierung der Daten verarbeiten nur öffentliche Referenzdateien) | USA | Nein |
 | Anthropic PBC | KI-gestützte Entwürfe von Kundenkorrespondenz, vom Betreiber ausgelöst, nach Regeln zur Schwärzung | USA | Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben |
 

@@ -7,5 +7,5 @@ Location: Switzerland
 /* TECHNOLOGY */
 API: Hono, TypeScript, SQLite, x402
 Frontend: Next.js, shadcn/ui, Tailwind CSS
-Deployment: Railway (API), Vercel (Frontend)
+Deployment: Railway (API), Infomaniak, Switzerland (website)
 Data: GLEIF BIC-LEI mapping (CC0)

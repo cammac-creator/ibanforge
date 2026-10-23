@@ -16,7 +16,6 @@ export const DPF_CHECKED_ON = '2026-10-05';
 
 export type TrustProcessorKey =
   | 'railway'
-  | 'vercel'
   | 'stripe'
   | 'coinbase'
   | 'infomaniak'
@@ -32,15 +31,15 @@ export interface TrustProcessor {
 }
 
 /**
- * Same order and same processors as Privacy Policy §3 and DPA Annex II.
- * Entries read on dataprivacyframework.gov on 2026-10-05, both the EU-US and
- * the Swiss-US frameworks active for each: Railway Corporation, Vercel Inc.,
- * Stripe, LLC (the US affiliate: the processor itself is Stripe Payments
- * Europe, in the EU), Coinbase, Inc., GitHub. Anthropic has no entry.
+ * Même ordre et mêmes sous-traitants que la politique §3 et le DPA, annexe II.
+ * Entrées lues le 05.10.2026 sur le registre DPF, cadres UE-USA et Suisse-USA
+ * actifs : Railway Corporation, Stripe, LLC (filiale américaine de Stripe
+ * Payments Europe, établie dans l'UE), Coinbase, Inc. et GitHub. Anthropic
+ * n'a pas d'entrée. Infomaniak se fonde sur l'adéquation de la Suisse.
+ * Vercel Inc. quitte la liste le 27.10.2026, au déménagement du site.
  */
 export const TRUST_PROCESSORS: readonly TrustProcessor[] = [
   { key: 'railway', dpf: 'https://www.dataprivacyframework.gov/participant/2913', basis: null },
-  { key: 'vercel', dpf: 'https://www.dataprivacyframework.gov/participant/6847', basis: null },
   { key: 'stripe', dpf: 'https://www.dataprivacyframework.gov/participant/10014', basis: null },
   { key: 'coinbase', dpf: 'https://www.dataprivacyframework.gov/participant/6286', basis: null },
   { key: 'infomaniak', dpf: null, basis: 'https://eur-lex.europa.eu/eli/dec/2000/518/oj' },
