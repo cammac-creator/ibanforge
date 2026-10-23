@@ -26,8 +26,12 @@ import { TRIAL_RESET } from '../lib/trial.js';
 import type { PaywallCause } from '../types.js';
 import type { NextStep } from '../lib/next-steps.js';
 
-/** The two hosted addresses of the transport, and which one a session was opened on. */
-export type McpVariant = 'mcp' | 'directory';
+/**
+ * The hosted addresses of the transport, and which one a session was opened
+ * on. `chatgpt` (`/mcp/chatgpt`, `src/mcp/chatgpt.ts`) takes every adaptation
+ * of `directory` and narrows it further.
+ */
+export type McpVariant = 'mcp' | 'directory' | 'chatgpt';
 
 export const MCP_DIRECTORY_PATH = '/mcp/directory';
 
