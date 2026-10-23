@@ -16,7 +16,7 @@ name: Release & republish
 # package version exists, so when npm was manual the order is: npm FIRST, then
 # re-run this workflow so the MCP Registry step succeeds.
 #
-# Platforms without a publish API (Smithery, MCP.so, RapidAPI, DevHunt, Glama)
+# Platforms without a publish API (MCP.so, RapidAPI, DevHunt, Glama)
 # need a manual refresh — the job ends with a checklist in the run summary.
 
 on:
@@ -193,13 +193,14 @@ jobs:
           The following platforms do NOT expose a publish API. Refresh them
           by hand within 24h of this release:
 
-          - [ ] **Smithery** — https://smithery.ai/server/ibanforge/ibanforge → Settings → "Redeploy from npm"
           - [ ] **MCP.so** — https://mcp.so/server/ibanforge → "Refresh from GitHub"
           - [ ] **RapidAPI** — https://rapidapi.com/[your-account]/api/ibanforge → re-import OpenAPI from https://api.ibanforge.com/openapi.json
           - [ ] **DevHunt** — https://devhunt.org → Edit description + screenshots
           - [ ] **Glama** — auto-rescan within 24-48h, but you can trigger manually at https://glama.ai/mcp/servers/cammac-creator/ibanforge/admin/dockerfile → Build + Make Release
           - [ ] **Coinbase Bazaar** — auto-indexed after the next paid x402 settlement; if absent 48h after release, run scripts/bazaar-warmup.mjs to trigger a fresh settlement
           - [ ] **agentic.market** — depends on Bazaar; if Bazaar shows IBANforge but agentic.market UI lags, post in #x402 on discord.gg/cdp
+
+          Smithery: relay closure announced for 2026-10-31; no longer a publishing step (https://smithery.ai/future).
 
           ## npm — automatic once each package has its trusted publisher (RELEASING.md)
 
