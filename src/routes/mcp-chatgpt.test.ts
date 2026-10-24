@@ -34,11 +34,14 @@ import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { trialWeekStart } from '../lib/trial.js';
 import { MCP_SESSIONS_PER_IP_DAY, MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
-import { DIRECTORY_SESSION_REFUSAL } from '../mcp/directory.js';
+import {
+  DIRECTORY_ALLOWANCE_NOTE,
+  DIRECTORY_SESSION_REFUSAL,
+  directoryToolDescriptions,
+} from '../mcp/directory.js';
 import {
   CHATGPT_ACCOUNTING_UNAVAILABLE,
   CHATGPT_ALLOWANCE_NOTE,
-  CHATGPT_DESCRIPTION_EDITS,
   CHATGPT_SESSION_REFUSAL,
   CHATGPT_TOOLS,
   DISCLAIMER_VENDORS,
@@ -546,18 +549,17 @@ describe('/mcp/chatgpt — rouge si une offre, une clé ou un fournisseur revien
     expect(found, found.join('\n')).toEqual([]);
   });
 
-  it('les descriptions : chaque réécriture a trouvé son passage, aucun déclencheur large ne reste', async () => {
+  it('les descriptions : le texte de /mcp/directory, fini par la note de cette adresse, sans déclencheur large', async () => {
     const app = buildApp();
     const ip = '203.0.113.24';
     const { id } = await open(app, CHAT, ip);
     const tools = toolsOf(await rpc(app, CHAT, ip, id, 'tools/list'));
-    const byName = new Map(tools.map((t) => [t.name, t.description]));
-    for (const [tool, edits] of Object.entries(CHATGPT_DESCRIPTION_EDITS)) {
-      const served = byName.get(tool) ?? '';
-      for (const [from, to] of edits) {
-        expect(served, `${tool}: réécriture servie`).toContain(to);
-        expect(served, `${tool}: passage remplacé`).not.toContain(from);
-      }
+    const directory = directoryToolDescriptions(DIRECTORY_ALLOWANCE_NOTE);
+    for (const tool of tools) {
+      // Une seule différence avec l'adresse des répertoires : la note de la limite.
+      expect(tool.description, tool.name).toBe(
+        directory[tool.name]!.split(DIRECTORY_ALLOWANCE_NOTE).join(CHATGPT_ALLOWANCE_NOTE),
+      );
     }
     for (const tool of tools) {
       expect(tool.description, tool.name).toContain(CHATGPT_ALLOWANCE_NOTE);

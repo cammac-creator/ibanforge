@@ -40,6 +40,7 @@ const QR_SURFACES = [
   'src/app.ts',
   'src/mcp/server.ts',
   'src/routes/mcp-http.ts',
+  'src/mcp/directory.ts',
   'src/mcp/inventory.ts',
   'src/routes/openapi.ts',
   'src/mcp/output-schemas.ts',

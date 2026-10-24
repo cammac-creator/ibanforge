@@ -318,14 +318,14 @@ describe('/mcp/directory — rouge si une offre revient', () => {
       expect(tool.description, tool.name).not.toContain('COST:');
     }
     expect(DIRECTORY_ALLOWANCE_NOTE).not.toMatch(/\d/);
-    // Les deux outils du device grant, réécrits depuis le texte de /mcp : chaque
-    // réécriture a bien trouvé son passage.
+    // Les deux outils du device grant, écrits entiers pour cette adresse : la
+    // ligne à coller est l'en-tête du connecteur, jamais le paquet npm.
     const request = tools.find((t) => t.name === 'request_api_key')?.description ?? '';
     expect(request).not.toContain('npm package');
-    expect(request).not.toContain('answers 402');
+    expect(request).not.toContain('402');
     expect(request).toContain('Authorization: Bearer <key>');
     const poll = tools.find((t) => t.name === 'poll_api_key')?.description ?? '';
-    expect(poll).toContain('keep using the keyless allowance;');
+    expect(poll).toContain('config_line is the header "Authorization: Bearer <key>"');
   });
 });
 
