@@ -592,7 +592,7 @@ describe('/mcp/chatgpt — rouge si une offre, une clé ou un fournisseur revien
     });
   });
 
-  it('meta.disclaimer : seuls les fournisseurs partent, et seulement ici', async () => {
+  it('meta.disclaimer : les fournisseurs partent, la dernière phrase devient un constat, et seulement ici', async () => {
     const app = buildApp();
     const ip = '203.0.113.25';
     const shared = getComplianceMeta().disclaimer;
@@ -604,20 +604,26 @@ describe('/mcp/chatgpt — rouge si une offre, une clé ou un fournisseur revien
       const res = await callTool(app, path, ip, id, 'check_compliance', { iban: DE_IBAN });
       return (structured(res).meta as { disclaimer: string }).disclaimer;
     };
+    // Décision de Claude-Alain du 24.10.2026 : sur les deux adresses des
+    // répertoires, le besoin d'un prestataire réglementé est dit comme un fait.
+    const FACT =
+      'IBANforge is not a regulated AML/CFT screening provider; regulated screening, ' +
+      'including the name-level checks of KYC/AML obligations, is done by such providers.';
     const onChat = await disclaimerOn(CHAT);
-    expect(onChat).toBe(chatgptDisclaimer(shared));
+    const onDir = await disclaimerOn(DIR);
+    expect(onChat).toBe(onDir);
     expect(onChat).not.toBe(shared);
     for (const kept of [
       'NOT a regulated AML/CFT product',
       'NOT the beneficiary / account-holder name',
       'Most sanctions designations target persons and companies, which this does not screen.',
-      'Use a regulated provider for name-level KYC/AML obligations.',
+      FACT,
     ]) {
       expect(onChat, kept).toContain(kept);
     }
+    expect(onChat).not.toContain('Use a regulated provider');
     expect(recommendsVendor(onChat)).toBe(false);
     expect(await disclaimerOn('/mcp')).toBe(shared);
-    expect(await disclaimerOn(DIR)).toBe(shared);
   });
 });
 
