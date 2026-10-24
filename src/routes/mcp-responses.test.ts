@@ -18,12 +18,12 @@
  * en production seulement.
  *
  * Ce que le crible laisse, et seulement par passage exact, chacun pour sa
- * raison (`EXEMPT`) : le disclaimer de `check_compliance` (texte légal, gardé
+ * raison (`directoryVerbatimPassages`) : le disclaimer de `check_compliance` (texte légal, gardé
  * mot pour mot, question posée à Claude-Alain), la citation attribuée des
  * sources du type K, les deux citations de SPS entre guillemets, et l'Important
  * Note de la HBA que sa licence impose en entier. Et les valeurs qui sont des
  * DONNÉES (noms, adresses, IBAN formatés, lignes d'une QR-facture reçue) :
- * `DATA_KEYS`.
+ * `RESPONSE_DATA_KEYS`.
  *
  * `/mcp` ne bouge pas : ses réponses servent ici de corpus, pour prouver que
  * chaque réécriture trouve encore son passage (aucune n'est périmée) et que le
@@ -49,19 +49,19 @@ import { checkPostalAddress } from '../lib/address-conformity.js';
 import { buildReferenceCheck, validatePaymentReference } from '../lib/payment-reference.js';
 import { checkNationalKey } from '../lib/national-check/index.js';
 import { getComplianceMeta } from '../lib/compliance-db.js';
-import { COMBINED_ADDRESS_SOURCE } from '../lib/qr-bill-notice.js';
-import { GR_IMPORTANT_NOTE, grRegisterName } from '../lib/gr-register.js';
+import { grRegisterName } from '../lib/gr-register.js';
 import { eeBicSourceName, eeRegisterName } from '../lib/ee-register.js';
 import { meCredit, meRegisterName } from '../lib/me-register.js';
 import { rsCredit, rsRegisterName } from '../lib/rs-register.js';
 import { curatedMapSource } from '../lib/bic-lookup.js';
 import type { IBANValidationResult, PaywallCause } from '../types.js';
-import { directiveHits } from '../mcp/directives.js';
+import { type ResponseCrib, cribResponse, emptyResponseCrib } from '../mcp/directives.js';
 import {
   DIRECTORY_RESPONSE_EDITS,
   directoryResponse,
   directoryResponseText,
   directoryStepSentence,
+  directoryVerbatimPassages,
 } from '../mcp/directory-responses.js';
 import {
   DIRECTORY_ACCOUNTING_UNAVAILABLE,
@@ -78,7 +78,6 @@ import {
   CHATGPT_SESSION_REFUSAL,
   CHATGPT_TOOLS,
   chatgptAllowanceRefusal,
-  chatgptDisclaimer,
 } from '../mcp/chatgpt.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
 
@@ -87,103 +86,16 @@ const ROOT = join(import.meta.dirname, '..', '..');
 // ── Le crible ────────────────────────────────────────────────────────────────
 
 /**
- * Les passages servis tels quels, exprès. Retirés du texte AVANT le crible,
- * à l'octet près : un mot de plus autour d'eux est lu.
+ * Le crible des réponses (`cribResponse`, src/mcp/directives.ts) et les passages
+ * servis mot pour mot exprès (`directoryVerbatimPassages`,
+ * src/mcp/directory-responses.ts, chacun avec sa raison) : les mêmes que lit la
+ * preuve en ligne de la passation du 24.10.2026.
  */
-const EXEMPT: ReadonlyArray<readonly [string, string]> = (() => {
-  const disclaimer = getComplianceMeta().disclaimer;
-  return [
-    [
-      disclaimer,
-      'disclaimer de check_compliance : texte légal, gardé mot pour mot (« Use a regulated provider… ») ; ' +
-        'sa réécriture est une décision de Claude-Alain, posée dans la passation du 24.10.2026',
-    ],
-    [chatgptDisclaimer(disclaimer), 'le même, sans ses fournisseurs, sur /mcp/chatgpt'],
-    [
-      COMBINED_ADDRESS_SOURCE,
-      'citation attribuée (SIX, UBS, ZKB) : ce que disent ces documents, dans le champ source',
-    ],
-    ['"N — Must not be sent"', 'citation de la légende des statuts de SPS, entre guillemets'],
-    [
-      '"Data already provided in another element must not be repeated."',
-      'citation de SPS, entre guillemets',
-    ],
-    [
-      `Important Note: "${GR_IMPORTANT_NOTE}"`,
-      'licence de la HBA : l’Important Note en entier sur chaque réponse tirée de HEBIC (production seulement)',
-    ],
-  ] as const;
-})();
-
-/**
- * Les clés dont la valeur est une DONNÉE, recopiée d'un registre ou de la
- * requête, jamais écrite par IBANforge : noms et adresses d'établissements,
- * IBAN formatés, lignes d'adresse et message d'une QR-facture reçue.
- */
-const DATA_KEYS: ReadonlySet<string> = new Set([
-  'name',
-  'bank_name',
-  'institution',
-  'street',
-  'city',
-  'region',
-  'post_code',
-  'romanized',
-  'address',
-  'adr_line',
-  'formatted',
-  'iban',
-  'value',
-  'line1',
-  'line2',
-  'postal_code',
-  'town',
-  'strt_nm',
-  'bldg_nb',
-  'pst_cd',
-  'twn_nm',
-  'unstructured_message',
-  'billing_information',
-]);
-
-interface Read {
-  /** Chaque chaîne lue, par clé : ce qui prouve que le crible lit chaque étage. */
-  keys: Set<string>;
-  count: number;
-  hits: string[];
+const VERBATIM = directoryVerbatimPassages().map(([passage]) => passage);
+function crib(value: unknown, where: string, read?: ResponseCrib): ResponseCrib {
+  return cribResponse(value, where, VERBATIM, read);
 }
-
-function emptyRead(): Read {
-  return { keys: new Set(), count: 0, hits: [] };
-}
-
-function unexempt(text: string): string {
-  return EXEMPT.reduce((t, [passage]) => t.split(passage).join(' '), text);
-}
-
-/** Passe le crible sur toute chaîne d'une valeur JSON, texte des blocs compris. */
-function crib(value: unknown, where: string, read: Read = emptyRead(), key = ''): Read {
-  if (typeof value === 'string') {
-    if (key === 'text' && /^\s*[[{]/.test(value)) {
-      try {
-        return crib(JSON.parse(value), `${where}<text>`, read, '');
-      } catch {
-        // Pas du JSON : une phrase, lue comme les autres.
-      }
-    }
-    if (DATA_KEYS.has(key)) return read;
-    read.count += 1;
-    if (key) read.keys.add(key);
-    for (const hit of directiveHits(unexempt(value), 'response')) {
-      read.hits.push(`${where}: ${hit} → ${value.slice(0, 200)}`);
-    }
-  } else if (Array.isArray(value)) {
-    value.forEach((v, i) => crib(v, `${where}[${i}]`, read, key));
-  } else if (value && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value)) crib(v, `${where}.${k}`, read, k);
-  }
-  return read;
-}
+const emptyRead = emptyResponseCrib;
 
 /** Toutes les chaînes d'une valeur JSON, texte des blocs compris : le corpus de /mcp. */
 function strings(value: unknown, out: string[] = []): string[] {

@@ -27,20 +27,21 @@
  *    text changed at its source no longer matches, its old wording reaches the
  *    address, and the same test turns red on it.
  *
- * Kept verbatim, on purpose, and named in the test with their reason: the
- * licence notices a publisher requires on every access, the citations of a
- * standard between quotation marks, the attributed citation of the type K
- * sources, and the `check_compliance` disclaimer (a legal text, which belongs
- * to Claude-Alain: see the handover of 24.10.2026).
+ * Kept verbatim, on purpose, each with its reason: `directoryVerbatimPassages`
+ * below.
  *
  * Separate from `DIRECTORY_TEXT_EDITS` (the descriptions): that table is held
  * to "every passage is found in what `/mcp` serves in `tools/list`", which a
  * response text never is.
  */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { getComplianceMeta } from '../lib/compliance-db.js';
 import { DEVICE_TEXTS } from '../lib/device-grant.js';
+import { GR_IMPORTANT_NOTE } from '../lib/gr-register.js';
 import type { NextStep } from '../lib/next-steps.js';
+import { COMBINED_ADDRESS_SOURCE } from '../lib/qr-bill-notice.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import { chatgptDisclaimer } from './chatgpt.js';
 
 /** A passage of a response text and what these addresses say in its place. */
 type ResponseEdit = readonly [string | RegExp, string];
@@ -239,6 +240,39 @@ export const DIRECTORY_RESPONSE_EDITS: ReadonlyArray<ResponseEdit> = [
       `raises it to ${FREE_TIER_MONTHLY_LIMIT}.`,
   ],
 ];
+
+/**
+ * The passages these addresses serve word for word, on purpose, each with its
+ * reason. The response crib (`cribResponse` in `src/mcp/directives.ts`, read by
+ * `src/routes/mcp-responses.test.ts` and by the online proof) removes them,
+ * byte for byte, before it reads a text: a word added around one is read.
+ * A function, not a constant: the disclaimer comes with the compliance
+ * metadata, read from its database.
+ */
+export function directoryVerbatimPassages(): ReadonlyArray<readonly [string, string]> {
+  const disclaimer = getComplianceMeta().disclaimer;
+  return [
+    [
+      disclaimer,
+      'the check_compliance disclaimer ("Use a regulated provider…"): a legal text, kept word for word; ' +
+        'rewording it is a decision of Claude-Alain, asked in the handover of 24.10.2026',
+    ],
+    [chatgptDisclaimer(disclaimer), 'the same, without its vendors, on /mcp/chatgpt'],
+    [
+      COMBINED_ADDRESS_SOURCE,
+      'an attributed citation (SIX, UBS, ZKB): what those documents say, in the source field',
+    ],
+    ['"N — Must not be sent"', 'a quotation of the SPS status legend, between quotation marks'],
+    [
+      '"Data already provided in another element must not be repeated."',
+      'a quotation of SPS, between quotation marks',
+    ],
+    [
+      `Important Note: "${GR_IMPORTANT_NOTE}"`,
+      'the HBA licence: its Important Note in full on every response carrying HEBIC data (production only)',
+    ],
+  ];
+}
 
 /** A response text as these addresses serve it. */
 export function directoryResponseText(text: string): string {

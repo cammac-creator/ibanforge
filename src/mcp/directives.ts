@@ -114,3 +114,86 @@ export function directiveHits(text: string, kind: DirectiveTextKind): string[] {
   }
   return hits;
 }
+
+/**
+ * The keys whose value is DATA, copied from a register or from the request,
+ * never written by IBANforge: names and addresses of institutions, formatted
+ * IBANs, the address lines and message of a QR-bill under test. A response
+ * crib that read them would turn red on a bank named after a verb, or on the
+ * user's own words.
+ */
+export const RESPONSE_DATA_KEYS: ReadonlySet<string> = new Set([
+  'name',
+  'bank_name',
+  'institution',
+  'street',
+  'city',
+  'region',
+  'post_code',
+  'romanized',
+  'address',
+  'adr_line',
+  'formatted',
+  'iban',
+  'value',
+  'line1',
+  'line2',
+  'postal_code',
+  'town',
+  'strt_nm',
+  'bldg_nb',
+  'pst_cd',
+  'twn_nm',
+  'unstructured_message',
+  'billing_information',
+]);
+
+/** What the response crib read, and what it found. */
+export interface ResponseCrib {
+  /** The keys whose strings were read: what proves that the crib reads each layer. */
+  keys: Set<string>;
+  count: number;
+  hits: string[];
+}
+
+export function emptyResponseCrib(): ResponseCrib {
+  return { keys: new Set(), count: 0, hits: [] };
+}
+
+/**
+ * The crib over a whole served JSON value (a tool result, a JSON-RPC error, a
+ * discovery body): every string at every depth, the JSON written inside a text
+ * block parsed and read the same way, `RESPONSE_DATA_KEYS` left aside, and the
+ * `verbatim` passages (served word for word on purpose: see
+ * `directoryVerbatimPassages` in `src/mcp/directory-responses.ts`) removed byte
+ * for byte before the text is read. A word added around one of them is read.
+ */
+export function cribResponse(
+  value: unknown,
+  where: string,
+  verbatim: readonly string[],
+  read: ResponseCrib = emptyResponseCrib(),
+  key = '',
+): ResponseCrib {
+  if (typeof value === 'string') {
+    if (key === 'text' && /^\s*[[{]/.test(value)) {
+      try {
+        return cribResponse(JSON.parse(value), `${where}<text>`, verbatim, read, '');
+      } catch {
+        // Not JSON: a sentence, read like the others.
+      }
+    }
+    if (RESPONSE_DATA_KEYS.has(key)) return read;
+    read.count += 1;
+    if (key) read.keys.add(key);
+    const text = verbatim.reduce((t, passage) => t.split(passage).join(' '), value);
+    for (const hit of directiveHits(text, 'response')) {
+      read.hits.push(`${where}: ${hit} → ${value.slice(0, 200)}`);
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((v, i) => cribResponse(v, `${where}[${i}]`, verbatim, read, key));
+  } else if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) cribResponse(v, `${where}.${k}`, verbatim, read, k);
+  }
+  return read;
+}
