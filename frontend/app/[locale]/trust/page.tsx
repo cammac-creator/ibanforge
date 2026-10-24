@@ -51,11 +51,12 @@ const GLANCE = ["operator", "region", "ibans", "notice"] as const;
 const RETENTION_ROWS = ["0", "1", "2", "3", "4", "5", "6"] as const;
 const NOT_HAVE = ["0", "1", "2"] as const;
 
-/** The checks a reader can run from outside, one per hosting line. */
+/** Vérifications publiques, une par ligne d’hébergement. */
 const HOSTING = [
   { key: "api", icon: Server, check: "curl -sI https://api.ibanforge.com/health | grep -i x-railway-edge" },
-  // A page rendered on request: a cached page may never reach a function.
-  { key: "site", icon: Globe, check: "curl -sI https://ibanforge.com/legal/dpa | grep -i x-vercel-id" },
+  // Le registre RIPE donne le réseau et le pays de cette adresse
+  // (INFOMANIAK-CLOUD, CH), sans attester la ville du serveur.
+  { key: "site", icon: Globe, check: 'whois $(dig +short ibanforge.com) | grep -i -E "^(netname|country):"' },
   { key: "mail", icon: Building2, check: "dig +short NS ibanforge.com" },
 ] as const;
 

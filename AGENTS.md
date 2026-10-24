@@ -222,7 +222,7 @@ the public "no data" sentence no longer names them (`uncoveredCountries()` in `p
 company registration number is kept in its file and never served. Without the variables nothing changes;
 switching them on in production is the main session's step.
 
-**Moving the website off Vercel to an Infomaniak VPS in Geneva.** Branch `vps-migration`
+**Moving the website off Vercel to an Infomaniak VPS in Switzerland.** Branch `vps-migration`
 holds the first commit: a container image for `frontend/`, a deploy workflow that builds on
 GitHub and ships to the VPS over a restricted SSH key, and the legal texts updated
 (Infomaniak replaces Vercel as sub-processor). The API does not move. Remaining: two DNS

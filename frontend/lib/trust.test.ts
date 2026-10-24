@@ -190,3 +190,35 @@ describe('the operator and the promises the page repeats', () => {
     expect(read('de/imprint.mdx')).toContain('](/de/trust)');
   });
 });
+
+describe('le site après son déménagement en Suisse', () => {
+  const LEGAL_TEXTS = [
+    'privacy.mdx',
+    'de/privacy.mdx',
+    'dpa.mdx',
+    'de/dpa.mdx',
+    'imprint.mdx',
+    'de/imprint.mdx',
+  ];
+  // Les notes conservent l’historique ; le texte en vigueur ne doit plus
+  // nommer l’ancien hébergeur ni attribuer une ville au serveur.
+  const inForce = (rel: string) =>
+    read(rel)
+      .split('\n')
+      .filter((line) => !/^\*(Revision|Änderung) /.test(line))
+      .join('\n');
+
+  it.each(LEGAL_TEXTS)('%s ne nomme plus Vercel ni Francfort', (rel) => {
+    expect(inForce(rel)).not.toMatch(/Vercel|Frankfurt|global (?:CDN|network)|globale[sn]? (?:CDN|Netz)/);
+  });
+
+  it.each(LEGAL_TEXTS)('%s ne donne aucune ville pour le serveur du site', (rel) => {
+    expect(inForce(rel)).not.toMatch(/Geneva|Genf|Genève/);
+  });
+
+  it('retire Vercel et Francfort de la page confiance dans les trois langues', () => {
+    for (const catalogue of [en, de, fr]) {
+      expect(JSON.stringify(catalogue.legal.trust)).not.toMatch(/Vercel|Frankfurt|Francfort|fra1|x-vercel/);
+    }
+  });
+});
