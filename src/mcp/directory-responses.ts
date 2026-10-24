@@ -35,13 +35,11 @@
  * response text never is.
  */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { getComplianceMeta } from '../lib/compliance-db.js';
 import { DEVICE_TEXTS } from '../lib/device-grant.js';
 import { GR_IMPORTANT_NOTE } from '../lib/gr-register.js';
 import type { NextStep } from '../lib/next-steps.js';
 import { COMBINED_ADDRESS_SOURCE } from '../lib/qr-bill-notice.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
-import { chatgptDisclaimer } from './chatgpt.js';
 
 /** A passage of a response text and what these addresses say in its place. */
 type ResponseEdit = readonly [string | RegExp, string];
@@ -193,6 +191,16 @@ export const DIRECTORY_RESPONSE_EDITS: ReadonlyArray<ResponseEdit> = [
     ': this is a warning, and the beneficiary can confirm the account number.',
   ],
 
+  // src/lib/compliance-db.ts: the last sentence of `meta.disclaimer` of
+  // check_compliance, with its vendors (/mcp/directory) or without them, once
+  // `chatgptDisclaimer` has run (/mcp/chatgpt). Said as a fact, scope kept:
+  // Claude-Alain's decision of 24.10.2026, for these two addresses only.
+  [
+    /Use a regulated provider(?: \([^)]*\))? for name-level KYC\/AML obligations\./g,
+    'IBANforge is not a regulated AML/CFT screening provider; regulated screening, ' +
+      'including the name-level checks of KYC/AML obligations, is done by such providers.',
+  ],
+
   // src/lib/device-grant.ts: `message` of poll_api_key and `display_to_human`
   // of request_api_key. Whole sentences, matched as written in DEVICE_TEXTS.
   [
@@ -246,18 +254,11 @@ export const DIRECTORY_RESPONSE_EDITS: ReadonlyArray<ResponseEdit> = [
  * reason. The response crib (`cribResponse` in `src/mcp/directives.ts`, read by
  * `src/routes/mcp-responses.test.ts` and by the online proof) removes them,
  * byte for byte, before it reads a text: a word added around one is read.
- * A function, not a constant: the disclaimer comes with the compliance
- * metadata, read from its database.
+ * The check_compliance disclaimer is no longer among them: its last sentence
+ * is rewritten above (decision of Claude-Alain, 24.10.2026).
  */
 export function directoryVerbatimPassages(): ReadonlyArray<readonly [string, string]> {
-  const disclaimer = getComplianceMeta().disclaimer;
   return [
-    [
-      disclaimer,
-      'the check_compliance disclaimer ("Use a regulated provider…"): a legal text, kept word for word; ' +
-        'rewording it is a decision of Claude-Alain, asked in the handover of 24.10.2026',
-    ],
-    [chatgptDisclaimer(disclaimer), 'the same, without its vendors, on /mcp/chatgpt'],
     [
       COMBINED_ADDRESS_SOURCE,
       'an attributed citation (SIX, UBS, ZKB): what those documents say, in the source field',

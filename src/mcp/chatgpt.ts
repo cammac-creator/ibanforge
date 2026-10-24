@@ -33,10 +33,12 @@
  * 🚨 No figure is written here either: the texts speak of a weekly allowance
  * without its number, which travels in the refusal's `data`.
  *
- * 🚨 No new legal text. The only rewritten passage of a shared notice is the
- * list of vendors in `meta.disclaimer` of `check_compliance` (a commercial
- * recommendation): its scope, the absence of any payee screening and the need
- * for a regulated provider stay word for word.
+ * 🚨 No new legal text. Here, the only rewritten passage of a shared notice is
+ * the list of vendors in `meta.disclaimer` of `check_compliance` (a commercial
+ * recommendation): its scope and the absence of any payee screening stay word
+ * for word. Its last sentence, the need for a regulated provider, is then said
+ * as a fact on both directory addresses (`DIRECTORY_RESPONSE_EDITS` in
+ * src/mcp/directory-responses.ts, decision of Claude-Alain, 24.10.2026).
  */
 import { TRIAL_RESET } from '../lib/trial.js';
 import {
