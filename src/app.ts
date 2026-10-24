@@ -45,6 +45,7 @@ import { testIban } from './routes/test-iban.js';
 import { landing } from './routes/landing.js';
 import { openapi } from './routes/openapi.js';
 import { discovery } from './routes/discovery.js';
+import { openaiDomain, OPENAI_APPS_CHALLENGE_PATH } from './routes/openai-domain.js';
 import { artifacts } from './routes/artifacts.js';
 import { ogImage } from './routes/og-image.js';
 // MCP_WEEKLY_LIMIT travels with the route that enforces it: the /v1 text below
@@ -253,6 +254,10 @@ const SKIP_TRACKING = new Set([
   '/stats/events',
   '/health',
   '/ping',
+  // Preuve de domaine d'OpenAI (src/routes/openai-domain.ts) : une vérification du
+  // portail, pas du trafic client. Ni les 200 ni les 404 d'avant la pose du
+  // jeton n'entrent dans la télémétrie.
+  OPENAI_APPS_CHALLENGE_PATH,
 ]);
 
 // /llms.txt — emerging standard (llmstxt.org) for AI agents to understand the API.
@@ -1358,6 +1363,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', testIban);
   app.route('/', openapi);
   app.route('/', discovery);
+  app.route('/', openaiDomain);
   app.route('/', artifacts);
   app.route('/', ogImage);
   app.route('/', mcpHttp);
