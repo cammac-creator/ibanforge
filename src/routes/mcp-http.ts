@@ -84,24 +84,26 @@ import {
 } from '../lib/field-notes.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
-import { DIRECTORY_TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import {
   DIRECTORY_ACCOUNTING_UNAVAILABLE,
   DIRECTORY_ALLOWANCE_NOTE,
+  DIRECTORY_PROMPT_DESCRIPTION,
   DIRECTORY_SESSION_REFUSAL,
   MCP_DIRECTORY_INSTRUCTIONS,
   MCP_DIRECTORY_PATH,
   type McpVariant,
   directoryAllowanceRefusal,
   directoryConfigLine,
-  directoryDescription,
   directoryDeviceText,
   directoryKeyRefusalPayload,
+  directoryOutputSchema,
   directoryPayload,
+  directoryServerDescription,
+  directoryShape,
+  directoryToolDescriptions,
 } from '../mcp/directory.js';
 import {
   CHATGPT_ACCOUNTING_UNAVAILABLE,
-  CHATGPT_ALLOWANCE_NOTE,
   CHATGPT_COUNTRIES_DESCRIPTION,
   CHATGPT_PROMPT_DESCRIPTION,
   CHATGPT_SESSION_REFUSAL,
@@ -629,16 +631,15 @@ function createMcpServer(
   variant: McpVariant = 'mcp',
 ): McpServer {
   // `/mcp/directory` (src/mcp/directory.ts) : les mêmes outils et les mêmes
-  // données, sans rien qui vende. `/mcp` ne change pas : chaque texte de cette
-  // fonction y reste celui d'avant, `dir` ne choisit que pour les autres adresses.
-  // `/mcp/chatgpt` (src/mcp/chatgpt.ts, 24.10.2026) prend tout ce que fait
-  // l'adresse des répertoires (`dir`), puis se resserre (`chat`) : six outils,
-  // aucune clé, des déclenchements sur demande explicite.
+  // données, sans rien qui vende. `/mcp/chatgpt` (src/mcp/chatgpt.ts,
+  // 24.10.2026) prend tout ce que fait l'adresse des répertoires (`dir`), puis
+  // se resserre (`chat`) : six outils, aucune clé.
+  // Les textes enregistrés ci-dessous (descriptions, paramètres) sont ceux de
+  // `/mcp`, à l'octet près. Les deux autres adresses reçoivent les leurs à la
+  // fin de cette fonction, écrits entiers dans src/mcp/directory.ts, sans
+  // aucune consigne au modèle (24.10.2026).
   const dir = variant !== 'mcp';
   const chat = variant === 'chatgpt';
-  /** La ligne de prix de /mcp ; sur les autres adresses, la seule limite d'usage. */
-  const cost = (price: string): string =>
-    chat ? CHATGPT_ALLOWANCE_NOTE : dir ? DIRECTORY_ALLOWANCE_NOTE : costLine(price);
   /** Le prix du catalogue sur /mcp ; ailleurs, aucun prix et les étapes filtrées. */
   const bill = (payload: Record<string, unknown>, listPrice?: number): Record<string, unknown> =>
     chat
@@ -671,7 +672,8 @@ function createMcpServer(
       // The first line every MCP client and directory reads. Written once in
       // src/lib/positioning.ts, where the register countries and the share of
       // the frozen 2018 directory copy are read from the data (24/09/2026).
-      description: serverDescription(),
+      // Les adresses des répertoires la disent sans s'adresser au lecteur.
+      description: dir ? directoryServerDescription() : serverDescription(),
       websiteUrl: 'https://ibanforge.com',
       icons: [
         {
@@ -713,10 +715,8 @@ function createMcpServer(
         'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
         'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
         'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ' +
-        (dir
-          ? 'A local mod-97 checksum only catches typos: this tool also resolves the BIC/SWIFT, tells whether the IBAN is a virtual IBAN issued by an EMI or a neobank (compliance risk), and checks SEPA reachability. '
-          : 'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
-            'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ') +
+        'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
+        'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
         `RETURNS: ${VALIDATE_TRUTH_RETURNS} ` +
         'valid (boolean), bank_code_holder, checks, country { code, name }, bic { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, source_as_of?, listed_in_current_source, lei, lei_status, address { street, post_code, region, city, country, romanized, romanization, source, language, as_of } } — basis says WHERE the bank code to BIC pairing came from (national_register | curated_map | directory_prefix) and authoritative, derived from it, says whether the BIC may be stored and settled against; outside a national_register pairing the BIC is advisory, confirm it before it becomes a routing instruction. code is 8 or 11 characters, as the consulted source publishes it: COMPARE A SUPPLIED BIC ON bic8, never on code — the branch code is informational and in a cooperative network it names the LOCAL bank while the first eight name its clearing institution (Swiss IID 30020 is RBABCH22180, Crédit Mutuel de la Vallée SA, while RBABCH22 alone is Entris Banking AG). redirected_from is present when the register answered for the bank code that took over the one you asked about (CH/LI: SIX redirects a concatenated IID, which does not make the IBAN invalid) — lei and address are read from the same directory row /v1/bic/:code serves, so this call already carries them; both are null when GLEIF publishes nothing for that BIC, which means "no LEI on file", not "the institution has none". bic.address is the LEGAL ENTITY seat, so bic.address.city may legitimately differ from bic.city (the register city for THIS bank code), and bic.address.as_of dates the entity last filing, usually much older than bic.as_of. ' +
         'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required, vop_participant — is the resolved bank listed as ready in the EPC VoP register, bank_reachability, bank_schemes, vop_register_status: the bank itself in the EPC registers, never the country }, ' +
@@ -725,7 +725,7 @@ function createMcpServer(
         'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. ' +
         `${authoritativeVerdictSentence()} ` +
         'match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution. ' +
-        cost('$0.005 per call'),
+        costLine('$0.005 per call'),
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
       },
@@ -749,15 +749,13 @@ function createMcpServer(
     {
       title: 'Batch Validate IBANs',
       description:
-        (dir
-          ? 'Validate up to 100 IBANs in a single call; each IBAN counts as one validate_iban call, with or without a key. '
-          : 'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, it costs $0.002 per IBAN instead of $0.005 per validate_iban call; ' +
-            'on an API key or a credit pack each IBAN uses one request or credit, the same as one validate_iban call. ') +
+        'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, it costs $0.002 per IBAN instead of $0.005 per validate_iban call; ' +
+        'on an API key or a credit pack each IBAN uses one request or credit, the same as one validate_iban call. ' +
         'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
         'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
         'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
         'RETURNS: { results: [...same shape as validate_iban], count, valid_count }. ' +
-        cost('$0.002 USDC per IBAN via x402'),
+        costLine('$0.002 USDC per IBAN via x402'),
       inputSchema: {
         ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
       },
@@ -798,7 +796,7 @@ function createMcpServer(
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
         `BACKED BY: ${bicDirectorySentence({ withCount: true })} ${F.claim.lei} of the rows carry an LEI from GLEIF. ` +
         `SOURCE: ${bicSourceNote({ withMonth: true })} ` +
-        cost('$0.003 per call'),
+        costLine('$0.003 per call'),
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
       },
@@ -877,13 +875,11 @@ function createMcpServer(
         "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
         'or needs a numeric risk score for an internal payment-approval workflow. ' +
         'NOT A REGULATED AML/CFT PRODUCT — informational triage only. ' +
-        (dir
-          ? 'For regulated screening, use a regulated AML/CFT screening provider. '
-          : 'For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ') +
+        'For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
         `CHECKS: IBAN validity + ${BANK_LEVEL_SANCTIONS} + FATF status + SEPA Instant reachability + whether the EPC Verification of Payee (VoP) register lists the bank as ready; the name check itself is done by the payee's bank, never here. ` +
         'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop). ' +
         `${COMPLIANCE_HONEST_NAMES} ` +
-        cost('$0.02 per call'),
+        costLine('$0.02 per call'),
       inputSchema: {
         iban: z.string().describe('IBAN to check'),
       },
@@ -917,10 +913,8 @@ function createMcpServer(
         'AMBIGUITY: only a leading "RF" and a 27-digit length pin a scheme down. A bare 12-digit string is both a Belgian OGM and a legal Finnish length, so the more specific reading is returned and the other appears in also_valid_as. Pass reference_type when you know the country. ' +
         "THE PAIRING RULE — the part no checksum library reproduces: pass an iban and you also get a pairing verdict. Per the Swiss Implementation Guidelines a QRR reference may ONLY be used with a QR-IBAN (institution identifier in the SIX range 30000-31999), and an ISO 11649 reference may NOT be used with one. Outside CH and LI, pairing is not_applicable — there is no QR-IBAN to pair against — and that does not affect the reference's own checksum verdict. " +
         'IMPORTANT: valid and pairing are INDEPENDENT. A reference can be arithmetically valid and still illegal on that account. Read both, and relay source/as_of — they are what makes the verdict auditable. ' +
-        (dir
-          ? ''
-          : 'FREE: the checksums are published commodities. The paid surface is POST /v1/iban/validate, which returns this same pairing block with the full IBAN enrichment. ') +
-        cost('$0 per call, on every surface'),
+        'FREE: the checksums are published commodities. The paid surface is POST /v1/iban/validate, which returns this same pairing block with the full IBAN enrichment. ' +
+        costLine('$0 per call, on every surface'),
       inputSchema: {
         reference: z
           .string()
@@ -963,10 +957,9 @@ function createMcpServer(
       description:
         "Check a Swiss QR-bill payload, the text a QR-bill's code carries (starts with SPC), rule by rule, each finding citing the SIX document it comes from. USE WHEN: an agent, an ERP or an accounting tool holds a scanned or generated QR-bill and must know before paying or issuing it whether it is well-formed, whether the reference type matches the IBAN (QRR needs a QR-IBAN, IID 30000-31999), and above all whether the creditor and debtor addresses are STRUCTURED (type S) or still COMBINED (type K): " +
         COMBINED_ADDRESS_CLAUSE +
-        '. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the ' +
-        (dir ? '' : 'paid ') +
+        '. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the paid ' +
         "validate_iban. RETURNS: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines, to relay as a fix. IMPORTANT: relay each finding's source string. " +
-        cost('$0 per call, on every surface'),
+        costLine('$0 per call, on every surface'),
       inputSchema: {
         payload: z
           .string()
@@ -999,10 +992,8 @@ function createMcpServer(
         "SCHEMES: 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+ / T2, ECB), 'fedwire' (Federal Reserve). There is deliberately NO 'cbpr+' scheme: that guideline sits behind swift.com, unreachable to automated readers, and a conformity boolean quoting an unread document would be a guess dressed as a verdict — the note field restates this on every answer. " +
         'VERDICTS: pass, fail, and not_applicable — the last marks a rule whose precondition is not met and never counts as a pass. conforms is true when no finding failed. ' +
         "IMPORTANT: relay each finding's source string — it names the exact document, version and validity date the rule is quoted from. They are what makes the verdict auditable. " +
-        (dir
-          ? ''
-          : 'FREE: the rules are published commodities. The paid surface is the postal_address block that /v1/bic and /v1/iban/validate return for the resolved institution. ') +
-        cost('$0 per call, on every surface'),
+        'FREE: the rules are published commodities. The paid surface is the postal_address block that /v1/bic and /v1/iban/validate return for the resolved institution. ' +
+        costLine('$0 per call, on every surface'),
       inputSchema: {
         scheme: z
           .enum(ADDRESS_SCHEMES as [AddressScheme, ...AddressScheme[]])
@@ -1051,7 +1042,7 @@ function createMcpServer(
         `BACKED BY: ${F.claim.chClearing} SIX BankMaster entries (Swiss official source, refreshed monthly). ` +
         'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
         'Only relevant for CH and LI accounts. ' +
-        cost('$0.003 per call'),
+        costLine('$0.003 per call'),
       inputSchema: {
         iid: z.string().describe('Swiss IID (1-5 digit number)'),
       },
@@ -1172,24 +1163,17 @@ function createMcpServer(
     'send_feedback',
     {
       title: 'Send Feedback to IBANforge',
-      description: dir
-        ? 'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
-          'latency, or anything blocking you from using the service (missing network, quota shape). ' +
-          'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, capability) and want it fixed. ' +
-          'This tool does NOT count against the keyless allowance — it works even after the allowance is spent. ' +
-          'A human reads every report.'
-        : 'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
-          'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
-          'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
-          'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
-          'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
+      description:
+        'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
+        'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
+        'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
+        'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
+        'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
       inputSchema: {
         error_type: z
           .enum(FEEDBACK_ERROR_TYPES)
           .describe(
-            dir
-              ? 'Category of the report. Use "other" for product feedback, access blockers or feature needs.'
-              : 'Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.',
+            'Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.',
           ),
         notes: z
           .string()
@@ -1470,25 +1454,36 @@ function createMcpServer(
     }),
   );
 
-  // Les schémas de sortie sans `cost_usdc` ni `list_price_usdc` sur l'adresse
-  // des répertoires (src/mcp/output-schemas.ts), et les descriptions des deux
-  // outils du device grant sans rail de paiement ni paquet npm. Posés après
-  // coup, par l'`update()` public du SDK, parce que les tests de parité avec
-  // les serveurs stdio lisent le texte de chaque `registerTool` : la référence
-  // `TOOL_OUTPUT_SCHEMAS.<outil>`, et la description de ces deux outils au
-  // caractère près (scripts/mcp-parity.test.ts).
-  // `src/routes/mcp-directory.test.ts` est rouge si un outil échappe à ce
-  // passage (un prix reviendrait par `tools/list`).
+  // Les adresses des répertoires (src/mcp/directory.ts), posées après coup par
+  // l'`update()` public du SDK, parce que les tests de parité avec les serveurs
+  // stdio lisent le texte de chaque `registerTool` (la référence
+  // `TOOL_OUTPUT_SCHEMAS.<outil>`, la description des deux outils du device
+  // grant au caractère près : scripts/mcp-parity.test.ts) :
+  //  - chaque description d'outil, écrite entière, sans consigne au modèle ;
+  //  - chaque paramètre et chaque champ de sortie, leurs textes repris passage
+  //    par passage (`DIRECTORY_TEXT_EDITS`), contraintes intactes ;
+  //  - les schémas de sortie sans `cost_usdc` ni `list_price_usdc` ;
+  //  - la description du prompt.
+  // `src/routes/mcp-directory.test.ts` est rouge si un prix revient par
+  // `tools/list`, `src/routes/mcp-descriptions.test.ts` si une consigne revient.
   if (dir) {
-    const tools = (server as unknown as { _registeredTools?: Record<string, RegisteredTool> })
-      ._registeredTools;
-    for (const [name, tool] of Object.entries(tools ?? {})) {
-      const shape =
-        DIRECTORY_TOOL_OUTPUT_SCHEMAS[name as keyof typeof DIRECTORY_TOOL_OUTPUT_SCHEMAS];
-      if (shape) tool.update({ outputSchema: shape });
-      if (tool.description)
-        tool.update({ description: directoryDescription(name, tool.description) });
+    const internals = server as unknown as {
+      _registeredTools?: Record<string, RegisteredTool>;
+      _registeredPrompts?: Record<string, RegisteredPrompt>;
+    };
+    const texts = directoryToolDescriptions(DIRECTORY_ALLOWANCE_NOTE);
+    for (const [name, tool] of Object.entries(internals._registeredTools ?? {})) {
+      const params = (tool.inputSchema as unknown as { shape?: z.ZodRawShape } | undefined)?.shape;
+      const output = directoryOutputSchema(name);
+      tool.update({
+        ...(texts[name] ? { description: texts[name] } : {}),
+        ...(params ? { paramsSchema: directoryShape(params) } : {}),
+        ...(output ? { outputSchema: output } : {}),
+      });
     }
+    internals._registeredPrompts?.validate_and_explain?.update({
+      description: DIRECTORY_PROMPT_DESCRIPTION,
+    });
   }
 
   // L'adresse ChatGPT (src/mcp/chatgpt.ts), posée par-dessus celle des
@@ -1498,11 +1493,11 @@ function createMcpServer(
   //    cachés de `tools/list` : un `tools/call` direct reçoit « not found » du
   //    SDK avant tout gestionnaire, donc avant toute clé, tout rapport, tout
   //    effet ;
-  //  - les six gardent leurs annotations, avec leur déclencheur réécrit et la
-  //    déclaration d'accès anonyme (`noauth`) de la référence d'OpenAI ;
+  //  - les six gardent leurs annotations, avec la description de l'adresse des
+  //    répertoires finie par la note de cette adresse, et la déclaration
+  //    d'accès anonyme (`noauth`) de la référence d'OpenAI ;
   //  - la ressource des pays et le prompt reçoivent leurs textes adaptés.
-  // `src/routes/mcp-chatgpt.test.ts` est rouge si un outil exclu répond encore,
-  // ou si une réécriture n'a pas trouvé son passage.
+  // `src/routes/mcp-chatgpt.test.ts` est rouge si un outil exclu répond encore.
   if (chat) {
     const internals = server as unknown as {
       _registeredTools?: Record<string, RegisteredTool>;
@@ -1515,7 +1510,7 @@ function createMcpServer(
         continue;
       }
       tool.update({
-        description: chatgptDescription(name, tool.description ?? ''),
+        ...(chatgptDescription(name) ? { description: chatgptDescription(name) } : {}),
         _meta: CHATGPT_TOOL_META,
       });
     }

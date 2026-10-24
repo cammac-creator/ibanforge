@@ -19,9 +19,10 @@
  *    and no answer mentions a key. A key read here would bring back the key
  *    refusal texts and the keyed-session exemption, for a client that cannot
  *    send one.
- *  - EXPLICIT REQUESTS ONLY. The texts ask the model to call a tool when the
- *    user asks for a check or for bank information, never because a string
- *    looks like an IBAN.
+ *  - NO BROAD TRIGGER. The texts say what each tool answers, as facts, and
+ *    give the model no direction at all (24.10.2026, the same rule as
+ *    `/mcp/directory`, see its header): none of them presents a string that
+ *    merely looks like an IBAN as a reason to run a check.
  *
  * 🚨 Same allowance, same counters as `/mcp` and `/mcp/directory` (decision of
  * Claude-Alain, 23.10.2026, choice 2A): the same weekly bucket and the same
@@ -42,7 +43,7 @@ import {
   LATEST_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
 } from '@modelcontextprotocol/sdk/types.js';
-import { directoryPayload } from './directory.js';
+import { directoryPayload, directoryToolDescriptions } from './directory.js';
 
 export const MCP_CHATGPT_PATH = '/mcp/chatgpt';
 
@@ -70,22 +71,21 @@ export const CHATGPT_TOOL_META: Record<string, unknown> = {
 };
 
 /**
- * The `instructions` block of `initialize` on this address. Every tool named
- * here is one of the six (`src/routes/mcp-chatgpt.test.ts`).
+ * The `instructions` block of `initialize` on this address: a description of
+ * the server, its six tools and its limit, with no direction to the model.
+ * Every tool named here is one of the six (`src/routes/mcp-chatgpt.test.ts`).
  */
 export const MCP_CHATGPT_INSTRUCTIONS =
-  'IBANforge checks bank identifiers and says where each answer comes from. ' +
-  'Call a tool only when the user explicitly asks to check an IBAN or asks for bank information: ' +
-  'validate_iban for one IBAN, batch_validate_iban for several, lookup_bic for a BIC/SWIFT code, ' +
-  'lookup_ch_clearing for a Swiss clearing number (IID), validate_payment_reference for a structured payment reference ' +
-  'and its pairing with an IBAN, check_compliance for bank-level compliance triage. ' +
-  'A string that merely looks like an IBAN is not, on its own, a reason to call a tool. ' +
-  'These checks never establish that an account exists, who holds it or whether a payee name matches, ' +
-  'and they never approve a payment; IBANforge sends no money. ' +
-  'Report missing or unconsulted data as unknown, never as a clean result, and relay the source and date each answer carries. ' +
+  'IBANforge checks bank identifiers and states where each answer comes from. ' +
+  'validate_iban covers one IBAN, batch_validate_iban several, lookup_bic a BIC/SWIFT code, ' +
+  'lookup_ch_clearing a Swiss clearing number (IID), validate_payment_reference a structured payment reference ' +
+  'and its pairing with an IBAN, and check_compliance a bank-level compliance triage. ' +
+  'These checks establish neither that an account exists, nor who holds it, nor whether a payee name matches, ' +
+  'and they approve no payment; IBANforge sends no money. ' +
+  'Data that is missing or was not consulted comes back as unknown or null, distinct from a clean result, and each answer carries its source and date. ' +
   'Usage is limited by a weekly allowance shared by every request from the same network source address: ' +
-  `one unit per tool call, one per IBAN in batch_validate_iban, reset on ${TRIAL_RESET}. ` +
-  'When it is reached, tell the user when it resets and wait for the reset. ' +
+  `one unit per tool request, one per IBAN in batch_validate_iban, reset on ${TRIAL_RESET}. ` +
+  'Past the allowance, requests are refused until the reset, and the refusal gives the reset time. ' +
   'Documentation: https://ibanforge.com/docs';
 
 /** What each tool says about the allowance, in place of the line `/mcp` prices. */
@@ -93,84 +93,13 @@ export const CHATGPT_ALLOWANCE_NOTE =
   'Counts against a weekly usage allowance shared by the source network address.';
 
 /**
- * The descriptions of the six tools, rewritten from the `/mcp/directory` text
- * rather than written a third time: each edit names the exact passage it
- * replaces, so the returns, limits and verdict sentences stay those of the
- * other addresses. A passage changed there no longer matches, the old trigger
- * stays in place, and `src/routes/mcp-chatgpt.test.ts` turns red (it checks
- * that every replacement is served and every replaced passage is gone).
+ * The description of each of the six tools: the `/mcp/directory` text
+ * (`directoryToolDescriptions` in src/mcp/directory.ts), whose only sentence
+ * about a key is the allowance note, ended here with this address's note.
+ * One text for the two addresses, so a fact corrected there is corrected here.
  */
-export const CHATGPT_DESCRIPTION_EDITS: Readonly<
-  Record<string, ReadonlyArray<readonly [string, string]>>
-> = {
-  validate_iban: [
-    [
-      'USE WHEN: the user mentions an IBAN, asks to validate an IBAN and identify the issuing bank, asks to detect a typo in an IBAN, ' +
-        'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
-        'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
-        'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ',
-      'USE WHEN: the user explicitly asks to check an IBAN or for the bank information behind it: whether it is valid or holds a typo, ' +
-        'which bank issued it, whether that is a traditional bank or a neobank, e-money or virtual-IBAN provider, ' +
-        'whether the bank is reachable on SEPA rails, or whether it is listed for Verification of Payee (VoP, EU 2024/886). ' +
-        'A string that merely looks like an IBAN is not, on its own, a reason to call this tool. ',
-    ],
-  ],
-  batch_validate_iban: [
-    [
-      'each IBAN counts as one validate_iban call, with or without a key. ',
-      'each IBAN counts as one unit of the weekly allowance, the same as one validate_iban call. ' +
-        'A batch that needs more units than remain this week is refused as a whole, without any result, ' +
-        'and its units are still added to the week until the reset: when the allowance may be running low, check fewer IBANs. ',
-    ],
-    [
-      'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
-        'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
-        'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ',
-      'USE WHEN: the user explicitly asks to check several IBANs together, for example to clean a spreadsheet of bank accounts ' +
-        'or to triage a payout list before sending, or when answering the request would otherwise take more than 2-3 validate_iban calls in a row. ',
-    ],
-    [
-      'RETURNS: { results: [...same shape as validate_iban], count, valid_count }. ',
-      'RETURNS: { results: [...one per input IBAN, in the same order, same shape as validate_iban], count }. ' +
-        'There is no separate count of valid IBANs: read results[].valid. ',
-    ],
-  ],
-  check_compliance: [
-    [
-      'USE WHEN: the user is about to send a payment / payout / refund and wants to triage risk first, ' +
-        "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
-        'or needs a numeric risk score for an internal payment-approval workflow. ',
-      "USE WHEN: the user explicitly asks for a bank-level compliance check of an IBAN: whether the payee's bank or its country " +
-        'appears on a sanctions or FATF list, whether a SEPA Instant transfer can reach the bank, or whether the bank is listed ' +
-        'for Verification of Payee. The result is information for a person to weigh: it never approves, blocks or authorises a payment. ',
-    ],
-  ],
-  validate_payment_reference: [
-    [
-      'USE WHEN: assembling a payment instruction from an invoice, a QR-bill or a remittance advice; whenever a Swiss IBAN and a reference appear together (the pairing rule is what most integrations get wrong); ' +
-        'or when the user pastes an "RF..." string, a 27-digit number, a +++123/4567/89012+++ block, or asks whether a payment reference is correct. ',
-      'USE WHEN: the user explicitly asks whether a structured payment reference is correct (an RF creditor reference, ' +
-        'a 27-digit Swiss QR reference, a Belgian +++123/4567/89012+++ structured communication, a Finnish reference number), ' +
-        'or whether a reference may be used with a given IBAN; when both are given, pass both (the Swiss pairing rule is what most integrations get wrong). ',
-    ],
-  ],
-  lookup_ch_clearing: [
-    [
-      'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
-        'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
-        'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ',
-      'USE WHEN: the user explicitly asks about a Swiss or Liechtenstein clearing number (BC-Nummer / IID): which institution holds it, ' +
-        'its routing for a Swiss instant transfer (SIC, euroSIC), its QR-IID, ' +
-        'or what kind of institution it is (bank vs PFS vs SIC-only participant). ',
-    ],
-  ],
-};
-
-export function chatgptDescription(tool: string, description: string): string {
-  return (CHATGPT_DESCRIPTION_EDITS[tool] ?? []).reduce(
-    (text, [from, to]) => text.split(from).join(to),
-    description,
-  );
+export function chatgptDescription(tool: string): string | undefined {
+  return directoryToolDescriptions(CHATGPT_ALLOWANCE_NOTE)[tool];
 }
 
 /**
@@ -236,9 +165,9 @@ export const CHATGPT_COUNTRIES_DESCRIPTION =
   'The IBAN countries IBANforge knows, each with its IBAN length, SEPA membership, whether Verification of Payee ' +
   'is required, and a country risk classification. Reference data about countries, not about any account.';
 
-/** The `validate_and_explain` prompt, said with what the check does not establish. */
+/** The `validate_and_explain` prompt, described rather than ordered, with what the check does not establish. */
 export const CHATGPT_PROMPT_DESCRIPTION =
-  'Validate an IBAN the user asked about and explain the result in plain language, including what it does not establish.';
+  'A prompt template: the validation of one IBAN the user asked about, followed by a plain-language explanation of the result, including what it does not establish.';
 
 export function chatgptValidateAndExplainPrompt(iban: string): string {
   return `Please validate this IBAN and explain the result in plain language for a non-technical user.
@@ -249,7 +178,7 @@ Use the validate_iban tool first, then:
 1. State whether the IBAN is valid or not
 2. If valid: name the country, the bank and its BIC with the source the result gives, and whether it is a traditional bank or an e-money institution or neobank
 3. Explain the SEPA reachability and whether Verification of Payee (VoP) is required for this country
-4. Summarize the risk indicators in plain language, and call unknown or unconsulted data unknown
+4. Summarize the risk indicators in plain language, and describe unknown or unconsulted data as unknown
 5. If invalid: explain what's wrong (wrong format, failed checksum, unsupported country)
 6. Say that this check does not confirm that the account exists or who holds it, and that it does not approve a payment
 
