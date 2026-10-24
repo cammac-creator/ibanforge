@@ -17,8 +17,8 @@
  *
  * Ne sont pas lus ici, exprès : les noms de propriétés et les valeurs d'enum
  * (des champs du contrat, pas du texte), et les RÉPONSES des outils (refus,
- * `display_to_human`, `next_steps`) : ce sont des champs de réponse, que ce
- * chantier ne touche pas (brief du 24.10.2026).
+ * `display_to_human`, `next_steps`), que lit `src/routes/mcp-responses.test.ts`
+ * avec le même crible (`src/mcp/directives.ts`).
  *
  * `/mcp` garde ses textes à l'octet près. Que le crible ne passe pas pour rien,
  * c'est le premier bloc (il attrape les consignes que servaient les adresses) et
@@ -33,6 +33,7 @@ import {
   directoryToolDescriptions,
 } from '../mcp/directory.js';
 import { CHATGPT_ALLOWANCE_NOTE } from '../mcp/chatgpt.js';
+import { DIRECTIVES, directiveHits } from '../mcp/directives.js';
 
 const HEADERS = {
   'Content-Type': 'application/json',
@@ -46,61 +47,10 @@ const INIT = {
 const DE_IBAN = 'DE89370400440532013000';
 
 /**
- * Les motifs du brief (insensibles à la casse, mots entiers), et pourquoi
- * chacun a la forme qu'il a :
- *  - `call` garde l'espace du brief (`call `) : « calls », « call. » et
- *    « per call, » ne sont pas des verbes adressés au modèle ; les textes des
- *    deux adresses n'emploient d'ailleurs le nom qu'au pluriel ;
- *  - `important` sans les deux-points du brief : l'ancien texte écrivait aussi
- *    « IMPORTANT — », qu'un motif `important:` laisserait passer ;
- *  - `you` et `your` en plus : une description parle de l'outil, pas à son
- *    lecteur (« your human », « tells you »), et c'est la forme que prenaient
- *    les consignes que les motifs du brief ne nomment pas.
- * Aucun faux positif légitime n'a demandé d'exception : chaque passage qui en
- * produisait un a été reformulé (« never » factuel → « not », « instead » →
- * « in place of »), plutôt que d'ouvrir un trou dans le crible.
+ * Les motifs et les gardes vivent dans `src/mcp/directives.ts` depuis le
+ * 24.10.2026 : le crible des réponses (`mcp-responses.test.ts`) et la preuve en
+ * ligne lisent les mêmes. Leurs raisons y sont écrites.
  */
-const DIRECTIVES: readonly RegExp[] = [
-  /\buse when\b/i,
-  /\bdo not\b/i,
-  /\bdon['’]t\b/i,
-  /\bnever\b/i,
-  /\bmust\b/i,
-  /\bimportant\b/i,
-  /\bprefer\b/i,
-  /\balways\b/i,
-  /\byou should\b/i,
-  /\bcall\s/i,
-  /\brelay\b/i,
-  /\bverbatim\b/i,
-  /\binstead\b/i,
-  /\byou\b/i,
-  /\byour\b/i,
-];
-
-/**
- * Un verbe à l'impératif en tête de phrase, que la liste du brief ne nomme pas
- * (« Read both », « Pass reference_type », « Confirm it »). Sensible à la
- * casse : les descriptions des deux adresses sont écrites à la troisième
- * personne (« Validates », « Checks »), donc un verbe nu en tête de phrase est
- * une consigne. Ne s'applique ni aux titres (« Validate IBAN » est un nom
- * d'outil), ni au texte du prompt, qui est le message que l'utilisateur choisit
- * d'envoyer et qui, par nature, demande quelque chose.
- */
-const IMPERATIVE =
-  /(?:^|[.;:!?]\s+|\s[—–]\s+|\(\s*)(Use|Call|Read|Pass|Confirm|Verify|Compare|Count|Branch|Wait|Show|Tell|Give|Ask|Treat|Report|Keep|Stop|Open|Send|Retry|Try|Hand|Supply|Leave|Prefer|Avoid|Ignore|Store|Relay|Display|Paste|Include|Run|Do|Make|Check|Validate|Resolve|Start|Collect|Remember|Fall|Reuse|Put|Add|Omit|Strip)\b/;
-
-/**
- * La seconde moitié de l'engagement : « ni aucun texte masqué ou encodé ». Les
- * caractères invisibles et bidirectionnels (espaces de largeur nulle, marques
- * de direction, isolats, jointures, BOM) et les caractères de contrôle autres
- * que le saut de ligne. Les lettres accentuées des noms de banques et de
- * registres (Crédit Mutuel, Národná banka) ne sont pas visées.
- */
-const HIDDEN =
-  // eslint-disable-next-line no-control-regex
-  /[\u0000-\u0009\u000B-\u001F\u007F\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/;
-
 interface Text {
   where: string;
   text: string;
@@ -108,17 +58,7 @@ interface Text {
 }
 
 function directivesIn(t: Text): string[] {
-  const hits = DIRECTIVES.filter((re) => re.test(t.text)).map((re) => String(re));
-  const hidden = t.text.match(HIDDEN);
-  if (hidden)
-    hits.push(`caractère masqué U+${hidden[0].codePointAt(0)!.toString(16).padStart(4, '0')}`);
-  if (t.kind === 'description') {
-    const m = t.text.match(IMPERATIVE);
-    if (m) hits.push(`impératif « ${m[1]} »`);
-  }
-  return hits.map((h) => {
-    return `${t.where}: ${h} → ${t.text.slice(0, 160)}…`;
-  });
+  return directiveHits(t.text, t.kind).map((h) => `${t.where}: ${h} → ${t.text.slice(0, 160)}…`);
 }
 
 type App = ReturnType<typeof buildApp>;

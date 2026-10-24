@@ -87,14 +87,16 @@ import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import {
   DIRECTORY_ACCOUNTING_UNAVAILABLE,
   DIRECTORY_ALLOWANCE_NOTE,
+  DIRECTORY_NO_SESSION,
   DIRECTORY_PROMPT_DESCRIPTION,
   DIRECTORY_SESSION_REFUSAL,
+  DIRECTORY_UNKNOWN_SESSION,
   MCP_DIRECTORY_INSTRUCTIONS,
   MCP_DIRECTORY_PATH,
   type McpVariant,
   directoryAllowanceRefusal,
   directoryConfigLine,
-  directoryDeviceText,
+  directoryEndpointMessage,
   directoryKeyRefusalPayload,
   directoryOutputSchema,
   directoryPayload,
@@ -102,6 +104,7 @@ import {
   directoryShape,
   directoryToolDescriptions,
 } from '../mcp/directory.js';
+import { directoryResult } from '../mcp/directory-responses.js';
 import {
   CHATGPT_ACCOUNTING_UNAVAILABLE,
   CHATGPT_COUNTRIES_DESCRIPTION,
@@ -128,6 +131,7 @@ import { extractKey } from '../middleware/api-key.js';
 import { validateApiKey } from '../lib/api-keys.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 /** The tools a call may name and be served; parity with registerTool is tested. */
 const MCP_TOOL_NAMES: ReadonlySet<string> = new Set(MCP_TOOLS.map((t) => t.name));
@@ -778,9 +782,17 @@ function createMcpServer(
           // the wrong catalogue number under the right name.
           return bill(result as unknown as Record<string, unknown>, 0.002);
         });
+        // `valid_count` as POST /v1/iban/batch computes it (24.10.2026): the
+        // description of this tool announced it, the REST route and the npm
+        // package returned it, and this transport did not. Added to
+        // `structuredContent` only: the text block keeps its bare array.
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
-          structuredContent: { results, count: results.length },
+          structuredContent: {
+            results,
+            count: results.length,
+            valid_count: results.filter((r) => r.valid).length,
+          },
         };
       }),
   );
@@ -1312,9 +1324,9 @@ function createMcpServer(
           verification_uri_complete: null,
           expires_in: null,
           interval: null,
-          display_to_human: dir
-            ? directoryDeviceText(displayToHuman({ status: result.error }), DEVICE_TEXTS)
-            : displayToHuman({ status: result.error }),
+          // Sur les adresses des répertoires, réécrit à la sortie
+          // (`directoryResult`, src/mcp/directory-responses.ts).
+          display_to_human: displayToHuman({ status: result.error }),
         };
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(refused) }],
@@ -1412,12 +1424,11 @@ function createMcpServer(
       if (id && answer.status === 'approved') sessionDeviceCode.delete(id);
 
       // L'adresse des répertoires : la ligne à coller est l'en-tête du
-      // connecteur, jamais le paquet npm, et aucun texte ne renvoie à un rail
-      // de paiement.
+      // connecteur, jamais le paquet npm. Son `message` y est réécrit à la
+      // sortie, comme toute réponse (`directoryResult`).
       if (dir) {
         answer = {
           ...answer,
-          message: directoryDeviceText(answer.message, DEVICE_TEXTS),
           config_line: answer.api_key ? directoryConfigLine(answer.api_key) : answer.config_line,
         };
       }
@@ -1463,9 +1474,15 @@ function createMcpServer(
   //  - chaque paramètre et chaque champ de sortie, leurs textes repris passage
   //    par passage (`DIRECTORY_TEXT_EDITS`), contraintes intactes ;
   //  - les schémas de sortie sans `cost_usdc` ni `list_price_usdc` ;
-  //  - la description du prompt.
+  //  - la description du prompt ;
+  //  - et chaque RÉPONSE (24.10.2026) : le rappel de chaque outil est enveloppé,
+  //    et son résultat, `structuredContent` et blocs de texte, passe par
+  //    `directoryResult` (src/mcp/directory-responses.ts). Un seul point de
+  //    passage, refus de clé et erreurs de format compris : les textes de
+  //    src/lib/ restent ceux de l'API REST et de `/mcp`.
   // `src/routes/mcp-directory.test.ts` est rouge si un prix revient par
-  // `tools/list`, `src/routes/mcp-descriptions.test.ts` si une consigne revient.
+  // `tools/list`, `src/routes/mcp-descriptions.test.ts` si une consigne revient
+  // dans une description, `src/routes/mcp-responses.test.ts` dans une réponse.
   if (dir) {
     const internals = server as unknown as {
       _registeredTools?: Record<string, RegisteredTool>;
@@ -1475,10 +1492,16 @@ function createMcpServer(
     for (const [name, tool] of Object.entries(internals._registeredTools ?? {})) {
       const params = (tool.inputSchema as unknown as { shape?: z.ZodRawShape } | undefined)?.shape;
       const output = directoryOutputSchema(name);
+      const handler = tool.handler as unknown as (
+        args: unknown,
+        extra: unknown,
+      ) => CallToolResult | Promise<CallToolResult>;
       tool.update({
         ...(texts[name] ? { description: texts[name] } : {}),
         ...(params ? { paramsSchema: directoryShape(params) } : {}),
         ...(output ? { outputSchema: output } : {}),
+        callback: (async (args: unknown, extra: unknown) =>
+          directoryResult(await handler(args, extra))) as unknown as ToolCallback<z.ZodRawShape>,
       });
     }
     internals._registeredPrompts?.validate_and_explain?.update({
@@ -1894,7 +1917,9 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32001,
           message:
-            'Session expired or server redeployed. Send initialize again to open a new session.',
+            variant === 'mcp'
+              ? 'Session expired or server redeployed. Send initialize again to open a new session.'
+              : DIRECTORY_UNKNOWN_SESSION,
           data: { session_id: sessionId, idle_timeout_minutes: MCP_SESSION_IDLE_MS / 60000 },
         },
       },
@@ -1916,8 +1941,10 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32000,
           message:
-            'Bad Request: no session. Send initialize alone first, then send tools/call with the ' +
-            'mcp-session-id header that initialize returned.',
+            variant === 'mcp'
+              ? 'Bad Request: no session. Send initialize alone first, then send tools/call with the ' +
+                'mcp-session-id header that initialize returned.'
+              : DIRECTORY_NO_SESSION,
         },
       },
       400,
@@ -2222,8 +2249,7 @@ function directoryDiscoveryBody(): Record<string, unknown> {
     supported_versions: SUPPORTED_PROTOCOL_VERSIONS,
     transport: 'streamable-http',
     endpoint: `https://api.ibanforge.com${MCP_DIRECTORY_PATH}`,
-    message:
-      'This is the IBANforge MCP HTTP endpoint for connector directories. To use it, send a POST with a JSON-RPC initialize request, then keep the returned mcp-session-id header on subsequent requests.',
+    message: directoryEndpointMessage('connector directories'),
     tools: registeredToolNames(),
     documentation: 'https://ibanforge.com/docs',
   };

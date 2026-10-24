@@ -501,6 +501,9 @@ const BATCH_VALIDATE_IBAN_OUTPUT_SCHEMA = {
     .array(z.object(VALIDATE_IBAN_OUTPUT_SCHEMA))
     .describe('One result per input IBAN, in the same order. Same shape as validate_iban.'),
   count: z.number().describe('Number of IBANs processed.'),
+  // 24.10.2026 : the descriptions announced it, the REST route and the npm
+  // package returned it; the hosted transport and `src/mcp/server.ts` now do.
+  valid_count: z.number().describe('Number of results whose valid is true.'),
 };
 
 const LOOKUP_BIC_OUTPUT_SCHEMA = {
