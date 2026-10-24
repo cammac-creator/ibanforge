@@ -70,9 +70,13 @@ export const MCP_DIRECTORY_PATH = '/mcp/directory';
 export const DIRECTORY_ALLOWANCE_NOTE =
   'Without a key, a fair-use weekly allowance per source address applies.';
 
-/** Where an IBANforge key comes from, said once for every text below. */
+/**
+ * What a key changes, said once for every refusal below, as a fact: the
+ * refusals of this address describe the limit and its way out, and direct no
+ * one (24.10.2026).
+ */
 const KEY_SENTENCE =
-  'use an IBANforge API key from ibanforge.com, sent as "Authorization: Bearer ifk_..." (or X-API-Key)';
+  'Requests that carry an IBANforge API key from ibanforge.com, sent as "Authorization: Bearer ifk_..." (or X-API-Key), are counted on that key.';
 
 /**
  * The `instructions` block of `initialize` on this address: a description of
@@ -119,6 +123,10 @@ export const DIRECTORY_TEXT_EDITS: ReadonlyArray<readonly [string, string]> = [
   ['well formed, never that the account exists;', 'well formed, not that the account exists;'],
   ['a key is never removed.', 'no key is removed.'],
   ['(GB has modulus_check instead)', '(GB has modulus_check)'],
+  [
+    '(a register may still name the holder: see bank_code_holder and bank_code_check)',
+    '(a register may still name the holder, in bank_code_holder and bank_code_check)',
+  ],
   [
     'A fail never makes valid false, because the IBAN check digits are right: read the two separately, and confirm the details with the beneficiary before paying.',
     'A fail leaves valid true, because the IBAN check digits are right: the two verdicts are independent.',
@@ -203,7 +211,12 @@ export const DIRECTORY_TEXT_EDITS: ReadonlyArray<readonly [string, string]> = [
     'Always false. Neither publisher allocates bank codes.',
     'false in every answer: neither publisher allocates bank codes.',
   ],
+  [
+    'Ordered advice derived from THIS result: what blocks a payment first, what merely enriches it after.',
+    'What THIS result means for a payment, in order: what blocks a payment first, what merely qualifies it after; each step states a finding.',
+  ],
   ['Branch on `code`, never on the prose.', '`code` is stable; the prose may change.'],
+  ['so the advice is auditable.', 'so each step is auditable.'],
   ['Stable identifier. Branch on this.', 'Stable identifier of the step.'],
   [
     'An IBANforge call that performs the step, when one exists.',
@@ -416,7 +429,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       'Each IBAN counts as one unit, the same as one validate_iban request. ' +
       `${note} ` +
       'A batch that needs more units than remain in that weekly allowance is refused as a whole, without any result, and its units still count until the reset. ' +
-      'Returns: { results: [...same shape as validate_iban], count }; results[].valid tells the valid IBANs apart, and no separate count of them is returned.',
+      'Returns: { results: [...same shape as validate_iban], count, valid_count }; valid_count is the number of results whose valid is true.',
     lookup_bic:
       'Resolves a BIC/SWIFT code (8 or 11 characters, e.g. UBSWCHZH80A, DEUTDEFF) into the institution behind it: name, country, city, LEI and registered head-office address where available. ' +
       'Suited to a question about which bank a BIC belongs to, where that bank is, or its LEI for compliance or regulatory matching. ' +
@@ -506,7 +519,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
   return texts;
 }
 
-/** The refusal past the weekly allowance: when it comes back, and the key. */
+/** The refusal past the weekly allowance: when it comes back, and what a key changes. */
 export function directoryAllowanceRefusal(
   used: number,
   limit: number,
@@ -519,21 +532,42 @@ export function directoryAllowanceRefusal(
   return {
     code: -32000,
     message:
-      `Weekly keyless allowance reached for this source address; try again next week (it resets on ${TRIAL_RESET}) ` +
-      `or ${KEY_SENTENCE}.`,
+      `Weekly keyless allowance reached for this source address; it resets on ${TRIAL_RESET} (resets_at in data). ` +
+      KEY_SENTENCE,
     data: { used, limit, remaining: 0, period: 'week', resets_at: resetsAt },
   };
 }
 
 /** The refusal when the allowance could not be counted at all: not the caller's consumption. */
 export const DIRECTORY_ACCOUNTING_UNAVAILABLE =
-  'Keyless allowance accounting is temporarily unavailable on this address; try again in a few minutes ' +
-  `or ${KEY_SENTENCE}.`;
+  'Keyless allowance accounting is temporarily unavailable on this address, which does not mean that the weekly allowance is used up. ' +
+  KEY_SENTENCE;
 
 /** The refusal of one session opening too many from one address in a day, without a key. */
 export const DIRECTORY_SESSION_REFUSAL =
-  'Daily session limit reached for this source address without a key. Reuse the mcp-session-id returned by ' +
-  `initialize instead of opening a session per call, try again tomorrow, or ${KEY_SENTENCE}.`;
+  'Daily session limit reached for this source address without a key; it resets at 00:00 UTC. ' +
+  'The mcp-session-id returned by initialize stays valid for later requests, so one session serves many requests. ' +
+  'Sessions opened with an IBANforge API key from ibanforge.com, sent as "Authorization: Bearer ifk_..." (or X-API-Key), ' +
+  'are not counted against the address.';
+
+/**
+ * The two session errors `/mcp` words as directions ("Send initialize again",
+ * "Send initialize alone first"), said here as facts. Shared by
+ * `/mcp/chatgpt`: neither names a key.
+ */
+export const DIRECTORY_UNKNOWN_SESSION =
+  'Unknown session: it expired, or the server was redeployed. An initialize request opens a new session.';
+export const DIRECTORY_NO_SESSION =
+  'Bad Request: no session. Tool requests are served within a session, which an initialize request sent alone opens; ' +
+  'the mcp-session-id header it returns identifies the session on later requests.';
+
+/** What `GET` on this address says about connecting, without a direction. */
+export function directoryEndpointMessage(audience: string): string {
+  return (
+    `This is the IBANforge MCP HTTP endpoint for ${audience}. It answers POST requests: a JSON-RPC initialize ` +
+    'request opens a session, and the mcp-session-id header it returns identifies that session on later requests.'
+  );
+}
 
 /**
  * What a key that cannot pay this call reads on this address.
@@ -558,29 +592,11 @@ export function directoryKeyRefusalPayload(cause: PaywallCause): Record<string, 
   return {
     error: cause.reason,
     message:
-      `This IBANforge API key cannot serve this call: ${KEY_REFUSAL_REASONS[cause.reason]}. ` +
-      'Check the key at https://ibanforge.com, or try again once its monthly allowance resets.',
+      `This IBANforge API key cannot serve this request: ${KEY_REFUSAL_REASONS[cause.reason]}. ` +
+      'Keys are managed at https://ibanforge.com' +
+      (cause.quota ? '; quota.resets gives the date the monthly allowance renews.' : '.'),
     ...(cause.quota ? { quota: cause.quota } : {}),
   };
-}
-
-/**
- * The device-grant sentences `/mcp` serves that name a payment rail
- * (`DEVICE_TEXTS` in `src/lib/device-grant.ts`), said without it. Matched on
- * the exact `/mcp` sentence, so a sentence changed there falls back to itself
- * and the directory test turns red if it names a rail.
- */
-export function directoryDeviceText(text: string, deviceTexts: Record<string, string>): string {
-  if (text === deviceTexts.expired_token) {
-    return 'This code expired without being approved. Ask for a new one at most once, then fall back to the keyless allowance.';
-  }
-  if (text === deviceTexts.device_rate_limited) {
-    return (
-      'This network has already taken its free keys for today, counting the ones still waiting for ' +
-      'approval. Existing keys keep working, and the keyless allowance needs nothing.'
-    );
-  }
-  return text;
 }
 
 /** The line a human pastes once a key is approved: the connector header, never the npm package. */

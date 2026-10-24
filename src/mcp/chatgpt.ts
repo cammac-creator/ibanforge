@@ -43,7 +43,11 @@ import {
   LATEST_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
 } from '@modelcontextprotocol/sdk/types.js';
-import { directoryPayload, directoryToolDescriptions } from './directory.js';
+import {
+  directoryEndpointMessage,
+  directoryPayload,
+  directoryToolDescriptions,
+} from './directory.js';
 
 export const MCP_CHATGPT_PATH = '/mcp/chatgpt';
 
@@ -141,24 +145,23 @@ export function chatgptAllowanceRefusal(
   return {
     code: -32000,
     message:
-      'Weekly usage allowance reached for this source network address, so this call was not served. ' +
+      'Weekly usage allowance reached for this source network address, so this request was not served. ' +
       'The allowance is shared by every request that reaches IBANforge from that address, whoever sends it, ' +
-      'and counts one unit per tool call and one per IBAN in batch_validate_iban. ' +
-      `It resets on ${TRIAL_RESET} (resets_at in data): wait until then and try again.`,
+      'and counts one unit per tool request and one per IBAN in batch_validate_iban. ' +
+      `It resets on ${TRIAL_RESET} (resets_at in data).`,
     data: { used, limit, remaining: 0, period: 'week', resets_at: resetsAt },
   };
 }
 
 /** The refusal when the allowance could not be counted: not the caller's consumption, and nothing served. */
 export const CHATGPT_ACCOUNTING_UNAVAILABLE =
-  'Usage accounting is temporarily unavailable on this connector, so this call was not served. ' +
-  'This does not mean that the weekly allowance is used up. Try again in a few minutes.';
+  'Usage accounting is temporarily unavailable on this connector, so this request was not served. ' +
+  'This does not mean that the weekly allowance is used up, and the condition is temporary.';
 
 /** The refusal of one session opening too many from one address in a day. */
 export const CHATGPT_SESSION_REFUSAL =
-  'Daily limit of new sessions reached for this source network address. ' +
-  'Reuse the mcp-session-id returned by initialize instead of opening a new session for each call, ' +
-  'or try again after 00:00 UTC.';
+  'Daily limit of new sessions reached for this source network address; it resets at 00:00 UTC. ' +
+  'The mcp-session-id returned by initialize stays valid for later requests, so one session serves many requests.';
 
 /** The `ibanforge://countries` resource, described for this address: reference data, not an account. */
 export const CHATGPT_COUNTRIES_DESCRIPTION =
@@ -197,8 +200,7 @@ export function chatgptDiscoveryBody(tools: readonly string[]): Record<string, u
     transport: 'streamable-http',
     endpoint: `https://api.ibanforge.com${MCP_CHATGPT_PATH}`,
     authentication: 'none',
-    message:
-      'This is the IBANforge MCP HTTP endpoint for ChatGPT. To use it, send a POST with a JSON-RPC initialize request, then keep the returned mcp-session-id header on subsequent requests.',
+    message: directoryEndpointMessage('ChatGPT'),
     tools: [...tools],
     documentation: 'https://ibanforge.com/docs',
   };

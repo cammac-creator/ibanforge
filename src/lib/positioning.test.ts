@@ -347,6 +347,7 @@ const OWNED = [
   'src/routes/mcp-http.ts',
   // Les textes des adresses des répertoires (24.10.2026), mesurés à zéro avant d'entrer ici.
   'src/mcp/directory.ts',
+  'src/mcp/directory-responses.ts',
   'src/mcp/chatgpt.ts',
   'src/mcp/server.ts',
   'src/routes/mcp-card.ts',

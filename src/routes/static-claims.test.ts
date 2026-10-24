@@ -103,6 +103,7 @@ const MIGRATED = [
   'src/lib/consent.ts',
   // Les textes des adresses des répertoires (24.10.2026), mesurés à zéro avant d'entrer ici.
   'src/mcp/directory.ts',
+  'src/mcp/directory-responses.ts',
   'src/mcp/chatgpt.ts',
   'src/mcp/inventory.ts',
   'src/mcp/output-schemas.ts',

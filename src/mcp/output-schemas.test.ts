@@ -180,7 +180,7 @@ describe('the truth fields are declared, so the schema never strips them', () =>
       }
       const batch = z
         .object(TOOL_OUTPUT_SCHEMAS.batch_validate_iban)
-        .parse({ results: [r], count: 1 });
+        .parse({ results: [r], count: 1, valid_count: 1 });
       expect(batch.results[0]!.checks, iban).toEqual(r.checks);
     }
   });
@@ -211,7 +211,7 @@ describe('the truth fields are declared, so the schema never strips them', () =>
       statuses.add(r.national_check_digits!.status);
       expect(validate.parse(r).national_check_digits, iban).toEqual(r.national_check_digits);
       expect(
-        batch.parse({ results: [r], count: 1 }).results[0]!.national_check_digits,
+        batch.parse({ results: [r], count: 1, valid_count: 1 }).results[0]!.national_check_digits,
         iban,
       ).toEqual(r.national_check_digits);
       const c = { ...buildComplianceResponse(iban), cost_usdc: 0 };

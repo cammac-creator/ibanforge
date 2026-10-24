@@ -563,13 +563,7 @@ describe('/mcp/chatgpt — rouge si une offre, une clé ou un fournisseur revien
     }
     for (const tool of tools) {
       expect(tool.description, tool.name).toContain(CHATGPT_ALLOWANCE_NOTE);
-      for (const gone of [
-        'pastes any string',
-        'valid_count',
-        'with or without a key',
-        'Without a key',
-        'COST:',
-      ]) {
+      for (const gone of ['pastes any string', 'with or without a key', 'Without a key', 'COST:']) {
         expect(tool.description, `${tool.name}: ${gone}`).not.toContain(gone);
       }
     }
@@ -837,9 +831,10 @@ describe('/mcp/chatgpt — les cas du dossier, sur leurs invariants stables', ()
 
     const p2 = (await call('batch_validate_iban', {
       ibans: ['CH9300762011623852957', 'GB29NWBK60161331926819', 'DE89370400440532013001'],
-    })) as { results: Array<Record<string, unknown>>; count: number };
+    })) as { results: Array<Record<string, unknown>>; count: number; valid_count: number };
     expect(p2.count).toBe(3);
-    expect(p2).not.toHaveProperty('valid_count');
+    // `valid_count`, comme POST /v1/iban/batch (24.10.2026) : deux IBAN valides sur trois.
+    expect(p2.valid_count).toBe(2);
     expect(p2.results.map((r) => r.valid)).toEqual([true, true, false]);
     expect(p2.results[2].error).toBe('checksum_failed');
     expect((p2.results[1].bic as { authoritative: boolean }).authoritative).toBe(false);
