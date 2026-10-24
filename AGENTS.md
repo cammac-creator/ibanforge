@@ -36,8 +36,9 @@ becomes "close to a third were automation".
 **3. One Node version per area.** Node 22 at the root: `better-sqlite3` ships no linux-x64
 prebuild for the ABI of Node 24, so 24 breaks the production image. Node 24 under
 `frontend/`. Node 20 for `mcp/` and `sdks/typescript/`. CI runs each in its own job.
-The production image pins an exact 22.x patch (`FROM node:22.23.4-slim`), bumped by
-Dependabot's docker entry, which ignores majors; never go back to the floating `22-slim`.
+The production image pins an exact 22.x patch (`FROM node:22.x.y-slim`), bumped by
+Dependabot's docker entry, which ignores majors; never go back to the floating `22-slim`
+(`scripts/dockerfile-node-pin.test.ts`).
 
 **4. `npm run check` before every commit** (typecheck, prettier, lint, tests, runtime
 dependency check). Frontend tests run **from** `frontend/`: at the root, vitest finds
