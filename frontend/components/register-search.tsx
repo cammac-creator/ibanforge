@@ -33,8 +33,11 @@ export function RegisterSearch({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           inputMode="numeric"
+          autoComplete="off"
+          enterKeyHint="search"
           placeholder={placeholder}
-          className="rounded-md border bg-background px-3 py-2 font-mono text-sm w-44"
+          // 16 px au doigt, sinon Safari iOS zoome sur le champ (mobile-native).
+          className="rounded-md border bg-background px-3 py-2 font-mono text-sm pointer-coarse:text-base w-44"
           style={{ borderColor: "var(--hairline)" }}
         />
       </label>

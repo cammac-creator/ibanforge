@@ -274,7 +274,9 @@ function BannerIdentity({ mode, data }: { mode: PlaygroundMode; data: Rec }) {
         </span>
       )}
       {name && (
-        <span className="min-w-0 truncate text-sm font-medium text-[var(--fg-1)]">{name}</span>
+        // Tronqué sur une ligne : le nom entier reste lisible au survol et dans
+        // les détails techniques (un nom de 249 signes existe, break-ui).
+        <span className="min-w-0 truncate text-sm font-medium text-[var(--fg-1)]" title={name}>{name}</span>
       )}
       {bic && (
         <span className="font-mono text-xs text-[var(--fg-3)]">{bic}</span>

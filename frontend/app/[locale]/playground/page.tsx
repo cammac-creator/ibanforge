@@ -163,7 +163,12 @@ export default function PlaygroundPage() {
             onChange={(e) => setInputs((i) => ({ ...i, [activeTab]: e.target.value }))}
             disabled={isLoading}
             autoComplete="off"
+            // Un IBAN, un BIC ou un numéro : ni correction ni minuscule
+            // imposée par le clavier du téléphone (mobile-native, 25.10.2026).
+            autoCapitalize="characters"
+            autoCorrect="off"
             spellCheck={false}
+            enterKeyHint="go"
             aria-label={t(`tabs.${activeTab}`)}
           />
           <Button
