@@ -11,11 +11,10 @@ import {
   type ProspectRow,
 } from './build-contacts';
 import { lastInboundMessage, lastInboundNeedsNoReply } from './no-reply';
-import { warmAccount } from './sending-account';
 import type { Contact } from './types';
 
-// Same reason as sending-account.test.ts: the warm mailbox is configured, not
-// committed. Supply a value so the account assertions have something to check.
+// The variable that used to name a personal mailbox for warm threads. Set on
+// purpose, as on a server that still carries it: it must change nothing.
 const savedWarm = process.env.CRM_WARM_ACCOUNT;
 beforeAll(() => {
   process.env.CRM_WARM_ACCOUNT = 'warm@personal.invalid';
@@ -478,18 +477,18 @@ describe('buildContacts', () => {
     expect(out[1].messages).toHaveLength(0);
   });
 
-  it('sends from the warm mailbox once a client thread exists, from the cold one otherwise', () => {
-    const cold = buildContacts({ ...base, keys: [keyRow('alpha@example.net')] });
-    expect(cold[0].account).toBe('claude-alain@ibanforge.com');
+  it('sends from the company mailbox, whether a client thread exists or not', () => {
+    const first = buildContacts({ ...base, keys: [keyRow('alpha@example.net')] });
+    expect(first[0].account).toBe('claude-alain@ibanforge.com');
 
-    const warm = buildContacts({
+    // Before 26/10/2026 an existing thread switched the contact to a personal
+    // mailbox. It no longer does, even with CRM_WARM_ACCOUNT set above.
+    const ongoing = buildContacts({
       ...base,
       keys: [keyRow('alpha@example.net')],
       messages: [msgRow('alpha@example.net')],
     });
-    // Asserted against the constant: the value is a personal mailbox read
-    // from CRM_WARM_ACCOUNT, and must not be written into this repository.
-    expect(warm[0].account).toBe(warmAccount());
+    expect(ongoing[0].account).toBe('claude-alain@ibanforge.com');
   });
 
   it('exposes the ready-made mail of a prospect and nothing when there is no body', () => {

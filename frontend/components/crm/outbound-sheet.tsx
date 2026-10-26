@@ -13,6 +13,7 @@ import {
   type ProposedAngle,
 } from '@/lib/crm/api-result';
 import { canLoadReadyMail } from '@/lib/crm/ready-mail';
+import { sendingAccount } from '@/lib/crm/sending-account';
 import { nextActionLabel } from '@/lib/crm/situation';
 import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Situation } from '@/lib/crm/types';
@@ -224,6 +225,9 @@ export function OutboundSheet({
   onSent: (to: string) => void;
 }) {
   const router = useRouter();
+  // The mailbox this sheet writes from, shown and sent: always one of ours,
+  // whatever the contact carries (sending-account.ts, rule of 26/10/2026).
+  const account = sendingAccount(null, c.account);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [fr, setFr] = useState<string | null>(null);
@@ -536,7 +540,7 @@ export function OutboundSheet({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          account: c.account,
+          account,
           to: c.email,
           // A hint only: the VPS returns its own subject. The last subject of
           // the thread is what keeps a follow-up in the same thread as the mail
@@ -634,7 +638,7 @@ export function OutboundSheet({
       const r = await fetch('/api/crm/draft-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: c.email, subject, body, account: c.account }),
+        body: JSON.stringify({ email: c.email, subject, body, account }),
       });
       const a = await readAnswer(r);
       // 200 is not proof of a stored row, see lib/crm/api-result.ts.
@@ -690,7 +694,7 @@ export function OutboundSheet({
         // rather than guessed there: the route holds neither the thread nor
         // the grant the operator gave.
         body: JSON.stringify({
-          account: c.account,
+          account,
           to: c.email,
           subject,
           body,
@@ -891,7 +895,7 @@ export function OutboundSheet({
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">
-          À {c.company || c.email}, depuis {c.account}
+          À {c.company || c.email}, depuis {account}
         </span>
         <div className="flex shrink-0 items-center gap-3">
           <button

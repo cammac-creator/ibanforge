@@ -125,6 +125,10 @@ npm run build             # next build
   `src/routes/free-doors-claims.test.ts` holds it. The npm package `ibanforge-mcp` quotes none
   of these figures: it is frozen until its next release, so it points to `rate-limits.yml` and
   `GET /v1` (`mcp/src/published-text.test.ts`).
+- `frontend/lib/crm/sending-account.ts` — the one mailbox the dashboard writes from. Every mail
+  of IBANforge leaves from an `@ibanforge.com` address, never from a personal mailbox, a reply
+  to an old thread included (Claude-Alain's rule of 26 October 2026). The send and draft routes
+  under `frontend/app/api/crm/` refuse any other sender before relaying.
 - `src/middleware/x402.ts` — prices. `frontend/data/` — what the site pre-renders,
   exported from the API by `npm run pages:export` and `pages:export-countries`.
 - `docs/data-sources.md` — every data source, its licence, and the permission we hold in
