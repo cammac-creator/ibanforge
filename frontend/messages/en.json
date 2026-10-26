@@ -329,35 +329,30 @@
       "0": {
         "method": "POST",
         "path": "/v1/iban/validate",
-        "cost": "$0.005",
         "costLabel": "per call",
         "description": "Validate a single IBAN with SEPA, issuer, and risk data"
       },
       "1": {
         "method": "POST",
         "path": "/v1/iban/batch",
-        "cost": "$0.002",
         "costLabel": "per IBAN in USDC via x402 (up to 100)",
         "description": "Batch validation with full enrichment per IBAN"
       },
       "2": {
         "method": "GET",
         "path": "/v1/bic/:code",
-        "cost": "$0.003",
         "costLabel": "per call",
         "description": "Lookup BIC/SWIFT code (121K BIC database, LEI-enriched via GLEIF)"
       },
       "3": {
         "method": "POST",
         "path": "/v1/iban/compliance",
-        "cost": "$0.02",
         "costLabel": "per call",
         "description": "Full compliance check with sanctions screening, SEPA Instant reachability, VoP participant status, and risk score (0-100)"
       },
       "4": {
         "method": "GET",
         "path": "/v1/ch/clearing/:iid",
-        "cost": "$0.003",
         "costLabel": "per call",
         "description": "Swiss BC-Nummer / IID lookup with SIC, euroSIC, Instant Payments and QR-IID data — backed by 1,100+ SIX BankMaster entries"
       }

@@ -1,6 +1,8 @@
 import catalogue from "@/data/onboarding.json";
 import Link from "next/link";
 import { localePath } from "@/lib/locale-path";
+import { formatUsd } from "@/lib/format-usd";
+import { endpointCost } from "@/lib/pricing-estimate";
 import { JourneyActions } from "@/components/journey-actions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -240,7 +242,7 @@ export default async function AgentsPage({
             >
               <div className="flex items-center justify-between gap-3 mb-1">
                 <code className="font-mono text-sm text-amber-500 break-all">{name}</code>
-                <span className="font-mono text-xs text-muted-foreground">{(tool?.price === "free" || name === "audit_status") ? t("mcp.free") : tool ? `$${tool.price}${name === "batch_validate_iban" ? " / IBAN" : ""}` : t("mcp.auditPrice")}</span>
+                <span className="font-mono text-xs text-muted-foreground">{(tool?.price === "free" || name === "audit_status") ? t("mcp.free") : tool ? `${formatUsd(Number(tool.price), locale)}${name === "batch_validate_iban" ? " / IBAN" : ""}` : t("mcp.auditPrice")}</span>
               </div>
               <p className="text-xs font-medium mb-2">{t(catalogue.remote.includes(name) ? "mcp.bothTransports" : "mcp.installedOnly")}</p>
               <p className="text-xs text-muted-foreground" style={{ lineHeight: 1.65 }}>
@@ -349,19 +351,19 @@ export default async function AgentsPage({
 
         <div className="flex flex-col gap-3">
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/validate" price="$0.005" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/validate" price={formatUsd(endpointCost("/v1/iban/validate"), locale)} />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/batch" price="$0.002 / IBAN" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/batch" price={`${formatUsd(endpointCost("/v1/iban/batch"), locale)} / IBAN`} />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="GET" path="/v1/bic/:code" price="$0.003" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="GET" path="/v1/bic/:code" price={formatUsd(endpointCost("/v1/bic/:code"), locale)} />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="GET" path="/v1/ch/clearing/:iid" price="$0.003" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="GET" path="/v1/ch/clearing/:iid" price={formatUsd(endpointCost("/v1/ch/clearing/:iid"), locale)} />
           </div>
           <div className="rounded-lg border px-5 py-4" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
-            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/compliance" price="$0.02" />
+            <EndpointRow className="max-sm:!grid-cols-[auto_minmax(0,1fr)] max-sm:[&>span:last-child]:col-start-2 [&>span:nth-child(2)]:break-all" method="POST" path="/v1/iban/compliance" price={formatUsd(endpointCost("/v1/iban/compliance"), locale)} />
           </div>
         </div>
       </section>

@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl"
 import { Input } from "@/components/ui/input"
 import { localePath } from "@/lib/locale-path"
 import { formatGrouped } from "@/lib/format-grouped"
+import { formatUsd } from "@/lib/format-usd"
 import { ENDPOINTS, MAX_VOLUME, formatCost, packQuote, freeKeyTier, PRO_MONTHLY_PRICE, PRO_MONTHLY_UNITS } from "@/lib/pricing-estimate"
 
 export function CostCalculator() {
@@ -83,7 +84,7 @@ export function CostCalculator() {
           <tbody>
             {rows.map((row, i) => {
               const cost = row.volume > 0 ? (
-                <span className="text-amber-500">{formatCost(row.total)}</span>
+                <span className="text-amber-500">{formatCost(row.total, locale)}</span>
               ) : (
                 <span className="text-muted-foreground/50">—</span>
               )
@@ -96,7 +97,7 @@ export function CostCalculator() {
                   <td className="px-3 sm:px-4 py-2.5">
                     <span className="font-mono text-xs text-foreground">{row.label}</span>
                     <span className="block font-mono text-[11px] text-muted-foreground sm:hidden">
-                      {formatCost(row.cost)}/{row.key === "batch" ? "IBAN" : t("perCall")}
+                      {formatUsd(row.cost, locale)}/{row.key === "batch" ? "IBAN" : t("perCall")}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
@@ -116,7 +117,7 @@ export function CostCalculator() {
                     <span className="mt-1 block font-mono text-xs font-semibold tnum sm:hidden">{cost}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-muted-foreground hidden sm:table-cell">
-                    {formatCost(row.cost)}/{row.key === "batch" ? "IBAN" : t("perCall")}
+                    {formatUsd(row.cost, locale)}/{row.key === "batch" ? "IBAN" : t("perCall")}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs font-semibold tnum hidden sm:table-cell">
                     {cost}
@@ -139,7 +140,7 @@ export function CostCalculator() {
               large que la carte et emportait le total hors du cadre à 390 px. */}
           <div className="ml-auto min-w-0 text-right">
             <p className="text-3xl font-bold font-mono text-amber-500 tnum">
-              {formatCost(paygTotal)}
+              {formatCost(paygTotal, locale)}
             </p>
             <p className="text-xs text-muted-foreground">{t("summary.payg")}</p>
           </div>
@@ -149,12 +150,12 @@ export function CostCalculator() {
         {totalUnits > 0 && <div className="grid gap-3 sm:grid-cols-2" aria-live="polite">
           <a href="#packs" className="rounded-lg border border-border p-4 hover:border-amber-500/60 focus-visible:outline-2 focus-visible:outline-amber-500">
             <p className="text-xs text-muted-foreground">{t("summary.packTitle")}</p>
-            <p className="text-xl font-mono font-semibold mt-1">{formatCost(pack.price)}</p>
+            <p className="text-xl font-mono font-semibold mt-1">{formatUsd(pack.price, locale)}</p>
             <p className="text-xs mt-2">{t("summary.packDetail", { credits: formatNumber(pack.credits) })}</p>
           </a>
           <a href={proFits ? "#pro" : localePath(locale, "/vendors")} className="rounded-lg border border-border p-4 hover:border-amber-500/60 focus-visible:outline-2 focus-visible:outline-amber-500">
             <p className="text-xs text-muted-foreground">{t("summary.proTitle")}</p>
-            <p className="text-xl font-mono font-semibold mt-1">{proFits ? formatCost(PRO_MONTHLY_PRICE) : t("summary.overPro")}</p>
+            <p className="text-xl font-mono font-semibold mt-1">{proFits ? formatUsd(PRO_MONTHLY_PRICE, locale) : t("summary.overPro")}</p>
             <p className="text-xs mt-2">{t(proFits ? "summary.proDetail" : "summary.overProDetail", { credits: formatNumber(PRO_MONTHLY_UNITS) })}</p>
           </a>
         </div>}
