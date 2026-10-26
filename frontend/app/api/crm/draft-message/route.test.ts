@@ -44,7 +44,7 @@ function post(body: unknown): Promise<Response> {
 describe('POST /api/crm/draft-message', () => {
   it('keeps a long draft whole, up to the ceiling the send path uses', () => {
     const long = 'a'.repeat(20_000);
-    return post({ email: 'acme@example.net', subject: 'Suivi', body: long, account: 'main' }).then(async (res) => {
+    return post({ email: 'acme@example.net', subject: 'Suivi', body: long, account: 'claude-alain@ibanforge.com' }).then(async (res) => {
       expect(res.status).toBe(200);
       expect(String(sent!.messages[0].body)).toHaveLength(20_000);
     });
@@ -60,6 +60,17 @@ describe('POST /api/crm/draft-message', () => {
     const first = sent!.messages[0].id;
     await post({ email: 'acme@example.net', subject: 'Autre', body: 'y' });
     expect(sent!.messages[0].id).toBe(first);
+  });
+
+  it('stores the company mailbox the draft will leave from, and refuses a personal one', async () => {
+    await post({ email: 'acme@example.net', subject: 'Suivi', body: 'x', account: ' Claude-Alain@IBANforge.com' });
+    expect(sent!.messages[0].counterparty).toBe('claude-alain@ibanforge.com');
+
+    sent = null;
+    const res = await post({ email: 'acme@example.net', subject: 'Suivi', body: 'x', account: 'warm@personal.invalid' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: 'sender_not_allowed' });
+    expect(sent).toBeNull();
   });
 
   it('refuses a body with no address or no subject', async () => {

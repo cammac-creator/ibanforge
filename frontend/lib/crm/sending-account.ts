@@ -1,6 +1,16 @@
 /**
  * Which of OUR mailboxes a message leaves from.
  *
+ * ## Only ever a mailbox of the company domain (26/10/2026)
+ *
+ * Until that date a contact with an existing thread was "warm", and its mails
+ * left from the owner's personal mailbox, configured in CRM_WARM_ACCOUNT, on
+ * the idea that a reply should leave from the mailbox that carried the thread.
+ * The owner ended that rule: IBANforge correspondence leaves from an
+ * @ibanforge.com address, a reply to an old thread included. The thread still
+ * holds together in the recipient's mailbox, because a reply keeps its subject.
+ * CRM_WARM_ACCOUNT is no longer read anywhere.
+ *
  * ## Why this is not `draft.counterparty || contact.account`
  *
  * That is what it was, and on 29/07/2026 it put an unsendable draft in front of
@@ -17,30 +27,34 @@
  * here, so the last resort is a real mailbox, not ''.
  */
 
-/** Mailbox used for a contact we have never emailed. */
-export const COLD_ACCOUNT = 'claude-alain@ibanforge.com';
+/** The mailbox every message of this dashboard leaves from. */
+export const SENDING_ACCOUNT = 'claude-alain@ibanforge.com';
+
+const COMPANY_DOMAIN = 'ibanforge.com';
+
 /**
- * Mailbox that carries the existing warm threads.
- *
- * A personal address, so it is read from CRM_WARM_ACCOUNT rather than
- * committed to this public repository. Absent, only the cold mailbox is
- * recognised as ours, and a warm draft falls back to it — the same fallback
- * this module already applies to any address it does not recognise, so the
- * failure mode is one we already handle rather than a new one.
+ * The mailboxes a message may leave from: each one must also exist on the VPS
+ * that sends, which is why this is a list and not the whole domain. A public
+ * address of the domain that is not a mailbox there would fail at send time.
  */
-export function warmAccount(): string {
-  return (process.env.CRM_WARM_ACCOUNT ?? '').trim().toLowerCase();
+export function ourMailboxes(): readonly string[] {
+  return [SENDING_ACCOUNT];
 }
 
 /**
- * Read at call time, not at import: the value comes from the environment, and
- * a module-level constant would freeze whatever was set when the bundle was
- * first evaluated — which is how a test, or a server restarted before its
- * variables were in place, ends up asserting against an empty mailbox.
+ * True for exactly one address of the company domain, and nothing else.
+ *
+ * The routes that relay to the VPS ask this before relaying: whatever a page
+ * open since before 26/10/2026 still holds, a mail never leaves from a personal
+ * mailbox. Strict on purpose: one `@`, the domain itself, no subdomain, so that
+ * `x@ibanforge.com.evil.test` or `x@mail.ibanforge.com` is not ours.
  */
-export function ourMailboxes(): readonly string[] {
-  const warm = warmAccount();
-  return warm ? [COLD_ACCOUNT, warm] : [COLD_ACCOUNT];
+export function isCompanyMailbox(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase();
+  const at = normalized.indexOf('@');
+  if (at <= 0 || at !== normalized.lastIndexOf('@')) return false;
+  return normalized.slice(at + 1) === COMPANY_DOMAIN;
 }
 
 function ours(value: string | null | undefined): string | null {
@@ -54,5 +68,5 @@ function ours(value: string | null | undefined): string | null {
  * @param filed   the mailbox the contact is filed under
  */
 export function sendingAccount(pinned: string | null | undefined, filed: string | null | undefined): string {
-  return ours(pinned) ?? ours(filed) ?? COLD_ACCOUNT;
+  return ours(pinned) ?? ours(filed) ?? SENDING_ACCOUNT;
 }

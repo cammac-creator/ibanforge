@@ -12,7 +12,7 @@ import type {
 } from './types';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
-import { COLD_ACCOUNT, warmAccount } from './sending-account';
+import { SENDING_ACCOUNT } from './sending-account';
 
 /** The outcome values the UI knows how to draw. Anything else reads as none. */
 const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne'];
@@ -485,7 +485,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
       messages,
       draft,
       unread: threadIsUnread(messages, input.reads[id]),
-      account: messages.length > 0 ? warmAccount() : COLD_ACCOUNT,
+      account: SENDING_ACCOUNT,
       apiKey: {
         keyPrefix: row.key_prefix,
         paid: isPaid,
@@ -535,7 +535,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
       messages,
       draft,
       unread: id ? threadIsUnread(messages, input.reads[id]) : false,
-      account: COLD_ACCOUNT,
+      account: SENDING_ACCOUNT,
       sourcing: sourcingOf(p),
       readyMail: readyMailOf(p),
       ...(id && businessByEmail.has(id) ? { business: businessByEmail.get(id) } : {}),
@@ -593,13 +593,11 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
       messages,
       draft,
       unread: threadIsUnread(messages, input.reads[id]),
-      // Always the company mailbox, never the warm personal one, and this is
-      // the one place that rule is stated. A request for a data permission or
-      // a regulatory question is written by IBANforge the company; an answer
-      // arriving at a personal address later is a filing problem, not a
-      // formality. It also cannot be empty, which warmAccount() can be when
-      // CRM_WARM_ACCOUNT is unset.
-      account: COLD_ACCOUNT,
+      // The company mailbox, like every contact since 26/10/2026 (see
+      // sending-account.ts). A request for a data permission or a regulatory
+      // question is written by IBANforge the company, and an answer arriving at
+      // a personal address later would be a filing problem, not a formality.
+      account: SENDING_ACCOUNT,
       institution,
     });
   }

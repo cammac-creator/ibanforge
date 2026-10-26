@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
 import { CORRESPONDENT_LANG_NAME, normaliseLang } from '@/lib/crm/correspondent-lang';
 import { applyRedactionRules, parseRedactionRules } from '@/lib/crm/redaction-rules';
+import { isCompanyMailbox } from '@/lib/crm/sending-account';
 // The two free quotas as the API exports them (scripts/export-onboarding.ts).
 import catalogue from '@/data/onboarding.json';
 
@@ -359,6 +360,18 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
+  }
+  /*
+   * `account` is the mailbox the VPS writes the draft as, and may deposit it
+   * into: a draft found in a personal mailbox would leave from it. Same rule
+   * as the send route, the owner's of 26/10/2026: only the company domain.
+   */
+  const account = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).account : undefined;
+  if (!isCompanyMailbox(account)) {
+    return NextResponse.json(
+      { error: 'sender_not_allowed', message: 'IBANforge n’écrit que depuis une adresse @ibanforge.com : recharge la page.' },
+      { status: 400 },
+    );
   }
   const rawRules = process.env.CRM_DRAFT_REDACTION_RULES;
   /*

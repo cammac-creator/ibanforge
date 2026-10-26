@@ -11,6 +11,7 @@ import {
 } from '@/lib/crm/api-result';
 import { isAutomated } from '@/lib/crm/automated';
 import { institutionalBrief } from '@/lib/crm/institutional-brief';
+import { sendingAccount } from '@/lib/crm/sending-account';
 import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
@@ -179,6 +180,9 @@ export function ReplySheet({
   onSent: (to: string) => void;
 }) {
   const router = useRouter();
+  // The mailbox this sheet writes from, shown and sent: always one of ours,
+  // whatever the contact carries (sending-account.ts, rule of 26/10/2026).
+  const account = sendingAccount(null, c.account);
   /**
    * Prefilled, unlike the body, and editable rather than derived silently.
    *
@@ -324,7 +328,7 @@ export function ReplySheet({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          account: c.account,
+          account,
           to: c.email,
           // A hint only, and the answer's own subject: the thread stays one
           // thread in the recipient's mailbox.
@@ -425,7 +429,7 @@ export function ReplySheet({
         // rather than guessed there: the route holds neither the thread nor
         // the grant the operator gave.
         body: JSON.stringify({
-          account: c.account,
+          account,
           to: c.email,
           subject,
           body,
@@ -595,7 +599,7 @@ export function ReplySheet({
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">
-          {firstLetter ? 'Première demande à' : 'Réponse à'} {who}, depuis {c.account}
+          {firstLetter ? 'Première demande à' : 'Réponse à'} {who}, depuis {account}
         </span>
         <div className="flex shrink-0 items-center gap-3">
           <button

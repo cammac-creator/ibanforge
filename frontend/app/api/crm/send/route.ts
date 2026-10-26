@@ -4,6 +4,7 @@ import { isAuthenticated } from '@/lib/auth';
 import type { MessageRow } from '@/lib/crm/build-contacts';
 import { checkDraft } from '@/lib/crm/guardrails';
 import type { Intent } from '@/lib/crm/intent';
+import { isCompanyMailbox } from '@/lib/crm/sending-account';
 import { countSentToday } from '@/lib/crm/sent-today';
 
 /**
@@ -236,6 +237,24 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  /**
+   * IBANforge writes from its own domain, never from a personal mailbox: the
+   * owner's rule of 26/10/2026. The composer already picks only that mailbox
+   * (sending-account.ts); this is for whatever it does not control, a page
+   * left open since before the rule or a hand-made request. Refused before
+   * anything else, so no rule and no counter is spent on a mail that will not
+   * leave.
+   */
+  const account = typeof b.account === 'string' ? b.account.trim().toLowerCase() : '';
+  if (!isCompanyMailbox(account)) {
+    return NextResponse.json(
+      {
+        error: 'sender_not_allowed',
+        message: 'IBANforge n’écrit que depuis une adresse @ibanforge.com. Ce mail n’est pas parti : recharge la page.',
+      },
+      { status: 400 },
+    );
+  }
 
   const now = new Date();
   const intent: Intent = b.intent === 'reply' ? 'reply' : 'outbound';
@@ -264,7 +283,6 @@ export async function POST(req: NextRequest) {
   try {
     // Only the four fields the VPS knows are relayed. `intent` and `override`
     // are this route's own vocabulary and have no business downstream.
-    const account = typeof b.account === 'string' ? b.account : '';
     const r = await fetch(`${upstream}/api/crm/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CRM-Secret': secret },
@@ -280,13 +298,14 @@ export async function POST(req: NextRequest) {
     // rejected" for EVERY message from a mailbox it has flagged, a minimal
     // test mail included (measured 02/09/2026). Read raw, that looks like a
     // problem with this mail; it is a problem with the mailbox, and the way
-    // out is the other sending account or an unblock at the provider.
+    // out is an unblock at the provider: since 26/10/2026 there is no other
+    // mailbox to fall back to, by design.
     if (!r.ok && data && typeof (data as { detail?: unknown }).detail === 'string') {
       const detail = (data as { detail: string }).detail;
       if (/5\.2\.0/.test(detail) && /spam/i.test(detail)) {
         (data as { detail: string }).detail =
-          `La boîte d'envoi ${account || ''} est bloquée par son hébergeur (protection anti-spam sortante) : ` +
-          'ce refus vise la boîte, pas ce mail. Envoie depuis l\'autre compte, ou débloque la boîte dans le Manager Infomaniak. ' +
+          `La boîte d'envoi ${account} est bloquée par son hébergeur (protection anti-spam sortante) : ` +
+          'ce refus vise la boîte, pas ce mail. Débloque la boîte dans le Manager Infomaniak. ' +
           `Réponse du serveur : ${detail}`;
       }
     }
