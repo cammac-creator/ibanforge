@@ -182,7 +182,12 @@ export function AuditClient({ locale }: { locale: string }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.ch"
-                className="rounded-md border bg-background px-3 py-2 text-sm"
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                // 16 px au doigt, sinon Safari iOS zoome sur le champ (mobile-native).
+                className="rounded-md border bg-background px-3 py-2 text-sm pointer-coarse:text-base"
               />
             </label>
             <Button type="button" onClick={() => void pay()} disabled={stage === "paying"} className="w-fit">

@@ -385,7 +385,14 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t('emailPlaceholder')}
                     disabled={busy}
-                    className="w-full px-3 py-2.5 font-mono text-sm rounded-md border outline-none"
+                    // Clavier d'adresse sans majuscule ni correction, et 16 px au
+                    // doigt : sous 16 px, Safari iOS zoome sur le champ (mobile-native).
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint="send"
+                    className="w-full px-3 py-2.5 font-mono text-sm pointer-coarse:text-base rounded-md border outline-none"
                     style={{
                       background: 'var(--ink-2)',
                       borderColor: 'var(--ink-4)',
@@ -473,7 +480,8 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                   maxLength={6}
                   autoFocus
                   disabled={busy}
-                  className="w-full px-3 py-2.5 font-mono rounded-md border outline-none mb-5"
+                  enterKeyHint="done"
+                  className="w-full px-3 py-2.5 font-mono pointer-coarse:text-base rounded-md border outline-none mb-5"
                   style={{
                     background: 'var(--ink-2)',
                     borderColor: 'var(--ink-4)',

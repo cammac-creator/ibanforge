@@ -184,8 +184,12 @@
   transition: text-decoration-color 0.3s var(--rv-courbe);
 }
 
-.rv-lien:hover {
-  text-decoration-color: var(--rv-t1);
+/* Survols derrière (hover: hover) and (pointer: fine) : sur un téléphone, le
+   premier toucher posait un :hover qui restait (mobile-native, 25.10.2026). */
+@media (hover: hover) and (pointer: fine) {
+  .rv-lien:hover {
+    text-decoration-color: var(--rv-t1);
+  }
 }
 
 /* The arrow after a link: never alone on a line, never underlined. */
@@ -318,8 +322,10 @@
   transition: text-decoration-color 0.3s var(--rv-courbe);
 }
 
-.rv-alt:hover {
-  text-decoration-color: var(--rv-t1);
+@media (hover: hover) and (pointer: fine) {
+  .rv-alt:hover {
+    text-decoration-color: var(--rv-t1);
+  }
 }
 
 /* The contents of the issue: on a large screen only (a phone reaches the
@@ -455,9 +461,13 @@
   transition: color 0.3s var(--rv-courbe);
 }
 
-.rv-ex:hover,
 .rv-ex[aria-current="true"] {
   color: var(--rv-t1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .rv-ex:hover {
+    color: var(--rv-t1);
+  }
 }
 
 .rv-ex__lettre {
@@ -961,8 +971,10 @@
   place-items: center;
 }
 
-.rv-d__pause:hover {
-  color: var(--rvd-t1);
+@media (hover: hover) and (pointer: fine) {
+  .rv-d__pause:hover {
+    color: var(--rvd-t1);
+  }
 }
 
 .rv-d__pause:focus-visible {
@@ -1246,9 +1258,11 @@
     background-color 0.3s var(--rv-courbe);
 }
 
-.rv-essai__envoi:hover {
-  border-color: var(--rv-ambre-c);
-  background: var(--rv-ambre-c);
+@media (hover: hover) and (pointer: fine) {
+  .rv-essai__envoi:hover {
+    border-color: var(--rv-ambre-c);
+    background: var(--rv-ambre-c);
+  }
 }
 
 .rv-essai__envoi:disabled {
@@ -1289,8 +1303,10 @@
     border-color 0.3s var(--rv-courbe);
 }
 
-.rv-essai__ex button:hover {
-  color: var(--rv-t1);
+@media (hover: hover) and (pointer: fine) {
+  .rv-essai__ex button:hover {
+    color: var(--rv-t1);
+  }
 }
 
 .rv-essai__ex button[aria-pressed="true"] {
@@ -1522,9 +1538,13 @@
   transition: color 0.3s var(--rv-courbe);
 }
 
-.rv-voie__b:hover,
 .rv-voie__b[aria-current="true"] {
   color: var(--rv-t1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .rv-voie__b:hover {
+    color: var(--rv-t1);
+  }
 }
 
 .rv-voie__num {
@@ -2058,8 +2078,10 @@
   transition: text-decoration-color 0.3s var(--rv-courbe);
 }
 
-.rv-integ__liste a:hover {
-  text-decoration-color: var(--rv-b2);
+@media (hover: hover) and (pointer: fine) {
+  .rv-integ__liste a:hover {
+    text-decoration-color: var(--rv-b2);
+  }
 }
 
 .rv-integ__liste small {
@@ -2443,8 +2465,10 @@
     transition: color 0.3s var(--rv-courbe);
   }
 
-  .rv-sommaire__liste a:hover {
-    color: var(--rv-t1);
+  @media (hover: hover) and (pointer: fine) {
+    .rv-sommaire__liste a:hover {
+      color: var(--rv-t1);
+    }
   }
 
   .rv-sommaire__num {

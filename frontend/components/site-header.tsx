@@ -92,10 +92,12 @@ export function SiteHeader() {
             {t("nav.freeKey")}
           </button>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger. 32 px dessinés, 44 px au toucher : la zone
+              invisible `after:` agrandit la cible sans pousser la barre, déjà
+              au plus juste à 320 px (mobile-native, 25.10.2026). */}
           <button
             type="button"
-            className="lg:hidden flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            className="relative lg:hidden flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors after:absolute after:-inset-1.5"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label={t("toggleMenu")}
             // Audit 2026-09-01 (WEB-09): the button said nothing about the
@@ -117,14 +119,23 @@ export function SiteHeader() {
           user tabbing through the header fell into an invisible menu (WEB-09,
           audit 2026-09-01). `inert` removes the whole subtree from focus and
           from the accessibility tree while leaving the height transition
-          intact, which `display: none` would kill. */}
+          intact, which `display: none` would kill.
+
+          Ouvert, il était plafonné à 320 px (`max-h-80`) pour huit entrées
+          d'environ 344 px : « Mon compte » sortait coupé à mi-hauteur, en
+          français comme en allemand (break-ui, 25.10.2026). Le plafond est
+          maintenant la hauteur visible sous l'en-tête (`dvh`, qui suit la barre
+          d'adresse), et le menu défile seul au-delà, en paysage par exemple,
+          sans entraîner la page (`overscroll-contain`). */}
       <div
         id={MOBILE_MENU_ID}
         inert={!mobileOpen}
         aria-hidden={!mobileOpen}
         className={cn(
-          "lg:hidden border-t border-border overflow-hidden transition-all duration-200",
-          mobileOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
+          "lg:hidden border-t border-border transition-all duration-200",
+          mobileOpen
+            ? "max-h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain opacity-100"
+            : "max-h-0 overflow-hidden opacity-0"
         )}
       >
         <nav className="flex flex-col gap-1 px-4 py-3">
