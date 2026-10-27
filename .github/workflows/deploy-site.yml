@@ -12,10 +12,7 @@ name: Deploy site (VPS)
 
 on:
   push:
-    # claude/demenagement-site-20261007: the preparation branch, deploying to
-    # the candidate server while ibanforge.com still points at Vercel. Remove
-    # it from this list when the branch is merged.
-    branches: [main, claude/demenagement-site-20261007]
+    branches: [main]
     paths:
       - "frontend/**"
       # The feeds and /changelog read CHANGELOG.md at the image's commit.
