@@ -329,35 +329,30 @@
       "0": {
         "method": "POST",
         "path": "/v1/iban/validate",
-        "cost": "$0.005",
         "costLabel": "pro Aufruf",
         "description": "Eine einzelne IBAN validieren mit SEPA-, Emittenten- und Risikodaten"
       },
       "1": {
         "method": "POST",
         "path": "/v1/iban/batch",
-        "cost": "$0.002",
         "costLabel": "pro IBAN in USDC über x402 (bis zu 100)",
         "description": "Batch-Validierung mit vollständiger Anreicherung pro IBAN"
       },
       "2": {
         "method": "GET",
         "path": "/v1/bic/:code",
-        "cost": "$0.003",
         "costLabel": "pro Aufruf",
         "description": "BIC/SWIFT-Code in der konsolidierten BIC-Datenbank nachschlagen (GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP)"
       },
       "3": {
         "method": "POST",
         "path": "/v1/iban/compliance",
-        "cost": "$0.02",
         "costLabel": "pro Aufruf",
         "description": "Vollständiger Compliance-Check mit Sanktionsprüfung, SEPA-Instant-Erreichbarkeit, VoP-Status und Risiko-Score (0-100)"
       },
       "4": {
         "method": "GET",
         "path": "/v1/ch/clearing/:iid",
-        "cost": "$0.003",
         "costLabel": "pro Aufruf",
         "description": "Schweizer BC-Nummer / IID-Suche mit SIC, euroSIC, Instant Payments und QR-IID-Daten — gestützt auf 1 100+ SIX BankMaster-Einträge"
       }
@@ -1749,7 +1744,7 @@
       "eyebrow": "Weg 2 · Kostenloser Schlüssel",
       "heading": "25 kostenlose Aufrufe pro Monat — ohne E-Mail, ohne Registrierung",
       "description": "POSTen Sie mit leerem Body und erhalten Sie den Schlüssel. Er wird nur einmal angezeigt. Fügen Sie ihn als Authorization: Bearer ifk_… bei jedem Aufruf hinzu. Für 200 pro Monat rufen Sie /v1/keys/claim mit einer Adresse auf, die Sie lesen können.",
-      "fallbackNote": "Wenn das monatliche Kontingent erschöpft ist, wechselt die API automatisch auf x402: derselbe Agent kann weiter aufrufen und zahlt $0.005 pro Request, ohne zusätzliches Setup, bis das Kontingent am 1. des nächsten Monats zurückgesetzt wird."
+      "fallbackNote": "Wenn das monatliche Kontingent erschöpft ist, wechselt die API automatisch auf x402: derselbe Agent kann weiter aufrufen und zahlt 0,005 $ pro Request, ohne zusätzliches Setup, bis das Kontingent am 1. des nächsten Monats zurückgesetzt wird."
     },
     "x402": {
       "eyebrow": "Weg 3 · x402",

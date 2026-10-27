@@ -10,6 +10,9 @@ import { ClientMessages } from "@/components/client-messages"
 import { GetKeyButton } from "@/components/api-key-dialog"
 import { alternatesFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
+import { formatGrouped } from "@/lib/format-grouped"
+import { formatUsd } from "@/lib/format-usd"
+import { endpointCost } from "@/lib/pricing-estimate"
 
 // Title and description come from the catalogue since 2026-09-05 (evening
 // check): French and German searchers used to read an English snippet for a
@@ -29,10 +32,12 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 const ENDPOINT_COUNT = 5
 
 // Live Stripe Payment Links for the prepaid credit packs (card checkout).
+// Des nombres, pas du texte : la page les écrit dans sa langue (« 1,000 »
+// crédits pour « $4 » en anglais, « 1 000 » pour « 4 $ » en français et en allemand).
 const CREDIT_PACKS = [
-  { bundle: "1k", price: "$4", credits: "1 000", url: "https://buy.stripe.com/bJe3coeZb31P6CsamK8so05" },
-  { bundle: "5k", price: "$20", credits: "5 000", url: "https://buy.stripe.com/aFafZa6sF45TaSI9iG8so01" },
-  { bundle: "25k", price: "$80", credits: "25 000", url: "https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02" },
+  { bundle: "1k", price: 4, credits: 1_000, url: "https://buy.stripe.com/bJe3coeZb31P6CsamK8so05" },
+  { bundle: "5k", price: 20, credits: 5_000, url: "https://buy.stripe.com/aFafZa6sF45TaSI9iG8so01" },
+  { bundle: "25k", price: 80, credits: 25_000, url: "https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02" },
 ] as const
 
 // Pro subscription (02/09/2026): the flat monthly tier, a public Payment Link
@@ -50,10 +55,12 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const { locale } = await params;
   const t = await getTranslations('pricing');
 
+  // Le prix vient de lib/pricing-estimate.ts, retrouvé par le chemin, et
+  // s'écrit dans la langue de la page ; le catalogue ne fait que nommer la route.
   const ENDPOINTS = Array.from({ length: ENDPOINT_COUNT }, (_, i) => ({
     method: t(`endpoints.${i}.method`),
     path: t(`endpoints.${i}.path`),
-    cost: t(`endpoints.${i}.cost`),
+    cost: formatUsd(endpointCost(t(`endpoints.${i}.path`)), locale),
     costLabel: t(`endpoints.${i}.costLabel`),
     description: t(`endpoints.${i}.description`),
   }))
@@ -161,8 +168,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                   href={p.url}
                   className="flex flex-1 basis-20 flex-col items-center gap-0.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2 py-2.5 text-center transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
                 >
-                  <span className="font-mono text-base font-bold text-amber-500">{p.price}</span>
-                  <span className="text-[11px] text-muted-foreground">{p.credits}</span>
+                  <span className="font-mono text-base font-bold text-amber-500">{formatUsd(p.price, locale)}</span>
+                  <span className="text-[11px] text-muted-foreground">{formatGrouped(p.credits, locale)}</span>
                 </a>
               ))}
             </div>
