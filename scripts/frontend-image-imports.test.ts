@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
  * export … from et export *, import() avec une chaîne littérale, import = require, typeof import('…') en position de
  * type, et /// <reference path="…" />. Les chemins relatifs et l'alias `@/` (qui pointe sur `frontend/`) sont résolus.
  * Dans un TEST, lire le code de l'API à l'exécution reste permis (readFileSync, import() d'un chemin calculé) ; une
- * page ou une route, elle, ne lit jamais hors de `frontend/` (le pré-rendu casserait dans l'image de la même façon).
+ * page ou une route, elle, ne lit jamais hors de `frontend/`, sauf `CHANGELOG.md` que l'image copie pour les flux (le pré-rendu casserait dans l'image de la même façon).
  */
 const root = resolve(import.meta.dirname, '..');
 const frontend = join(root, 'frontend');
@@ -53,6 +53,15 @@ export function staticSpecifiers(fileName: string, text: string): string[] {
       ts.isStringLiteral(node.moduleReference.expression)
     ) {
       found.push(node.moduleReference.expression.text);
+    } else if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'require' &&
+      node.arguments.length > 0 &&
+      ts.isStringLiteralLike(node.arguments[0])
+    ) {
+      // require('…') d'un fichier .js ou .cjs chargé au build (configuration).
+      found.push(node.arguments[0].text);
     } else if (
       ts.isImportTypeNode(node) &&
       ts.isLiteralTypeNode(node.argument) &&
@@ -100,8 +109,11 @@ describe("l'image Docker du site", () => {
       "export * from '../../src/lib/y';",
       "type U = typeof import('../../src/lib/u');",
       "import { W } from '@/../src/lib/w';",
+      "const z = require('../../src/lib/z');",
     ].join('\n');
-    expect(staticSpecifiers(file, interdit).filter((s) => leavesFrontend(file, s))).toHaveLength(9);
+    expect(staticSpecifiers(file, interdit).filter((s) => leavesFrontend(file, s))).toHaveLength(
+      10,
+    );
     const permis = [
       "import { E } from './e';",
       "import { F } from '../lib/f';",

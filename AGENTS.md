@@ -45,7 +45,8 @@ dependency check). Frontend tests run **from** `frontend/`: at the root, vitest 
 nothing and exits zero, which reads like success.
 A file under `frontend/`, tests included, never imports statically from outside `frontend/`: the site's
 Docker image copies only that folder (plus `CHANGELOG.md`), so CI stays green and the deployment fails
-(28.10.2026). A test may read API code at run time; a page or a route never reads outside `frontend/`.
+(28.10.2026). A test may read API code at run time; a page or a route never reads outside `frontend/` (except
+`CHANGELOG.md`, which the image copies for the feeds).
 `scripts/frontend-image-imports.test.ts` enforces the import part.
 
 **5. Prettier on `src/**/*.ts` is a CI gate.** Run `npx prettier --write` on every file you
