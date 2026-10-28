@@ -2018,7 +2018,7 @@
         "statusLink": "Statusseite",
         "sla": "Editor- und OEM-Abonnements haben eine schriftliche SLA: 99,5 % Verfügbarkeit je Kalendermonat, mit Servicegutschriften.",
         "slaLink": "SLA",
-        "probe": "Eine Sonde auf dem Server der Website, bei Infomaniak in der Schweiz, ruft die API und die Website jede Minute auf und alarmiert den Betreiber. Fällt dieser Server aus, fällt die Website mit ihm aus, und die Sonde kann keinen Alarm mehr auslösen; dann bleibt eine Prüfung vom Rechner des Betreibers aus, solange dieser eingeschaltet ist. Ihre Ergebnisse werden nicht veröffentlicht.",
+        "probe": "Eine Sonde auf dem Server der Website, bei Infomaniak in der Schweiz, ruft die API und die Website jede Minute auf und alarmiert den Betreiber. Eine zweite Prüfung läuft außerhalb von Infomaniak, auf einem Rechner des Betreibers: Alle zwei Minuten ruft sie die Website und die API auf und alarmiert den Betreiber nach drei Fehlschlägen in Folge; so wird auch ein Ausfall des Servers der Website gemeldet, solange dieser Rechner online ist. Ihre Ergebnisse werden nicht veröffentlicht.",
         "instance": "Die API läuft als einzelne Instanz mit einem persistenten Speichervolumen in einer Region. Jede Aktualisierung, auch die automatischen Datenaktualisierungen, startet sie neu, und Anfragen, die während des Wechsels eintreffen, warten oder scheitern. Railway dokumentiert dies für jeden Dienst mit Speichervolumen; wir haben Wechsel von unter einer Minute bis zu knapp fünf Minuten beobachtet. Die Statusseite kann diese Anfragen nicht zählen, weil sie die API nie erreichen.",
         "instanceLink": "Dokumentation von Railway"
       },

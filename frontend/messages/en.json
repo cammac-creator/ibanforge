@@ -2018,7 +2018,7 @@
         "statusLink": "Status page",
         "sla": "Editor/OEM subscriptions carry a written SLA: 99.5% availability per calendar month, with service credits.",
         "slaLink": "SLA",
-        "probe": "A probe on the website's server, at Infomaniak in Switzerland, calls the API and the website every minute and alerts the operator. If that server stops, the website stops with it and the probe can no longer raise the alert; a check from the operator's computer then remains, while that computer is on. Its results are not published.",
+        "probe": "A probe on the website's server, at Infomaniak in Switzerland, calls the API and the website every minute and alerts the operator. A second check runs outside Infomaniak, from the operator's own machine: every two minutes it calls the website and the API, and it alerts the operator after three failures in a row, so a stop of the website's server is reported too, while that machine is online. Their results are not published.",
         "instance": "The API runs as a single instance with a persistent volume, in one region. Each update, including the automatic data refreshes, restarts it, and requests that arrive during the switch wait or fail. Railway documents this for any service with a volume; we have observed switches lasting from under a minute to almost five minutes. The status page cannot count those requests, because they never reach the API.",
         "instanceLink": "Railway documentation"
       },

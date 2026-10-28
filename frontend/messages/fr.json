@@ -2018,7 +2018,7 @@
         "statusLink": "Page de statut",
         "sla": "Les abonnements Editor/OEM ont un SLA écrit : 99,5 % de disponibilité par mois civil, avec crédits de service.",
         "slaLink": "SLA",
-        "probe": "Une sonde, sur le serveur du site chez Infomaniak en Suisse, appelle l'API et le site chaque minute et alerte l'exploitant. Si ce serveur s'arrête, le site s'arrête avec lui et la sonde ne peut plus donner l'alerte ; il reste alors une vérification depuis l'ordinateur de l'exploitant, tant qu'il est allumé. Ses résultats ne sont pas publiés.",
+        "probe": "Une sonde, sur le serveur du site chez Infomaniak en Suisse, appelle l'API et le site chaque minute et alerte l'exploitant. Une seconde vérification tourne hors d'Infomaniak, sur une machine de l'exploitant : toutes les deux minutes, elle appelle le site et l'API et prévient l'exploitant après trois échecs de suite ; un arrêt du serveur du site est donc signalé lui aussi, tant que cette machine est en ligne. Leurs résultats ne sont pas publiés.",
         "instance": "L'API tourne en une seule instance avec un volume persistant, dans une seule région. Chaque mise à jour, y compris les actualisations automatiques des données, la redémarre, et les requêtes qui arrivent pendant la bascule attendent ou échouent. Railway le documente pour tout service avec volume ; nous avons observé des bascules de moins d'une minute à près de cinq minutes. La page de statut ne peut pas compter ces requêtes, car elles n'atteignent jamais l'API.",
         "instanceLink": "Documentation de Railway"
       },
