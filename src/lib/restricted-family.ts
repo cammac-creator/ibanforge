@@ -23,7 +23,8 @@
  * heures si son propriétaire le demande. La limite ne bouge pas : elle n'entre
  * jamais dans ce dépôt, un paquet ou un export du site, seulement ici, comme
  * membre. D'où les membres `seco`, `map_tr` et ceux des clés retirées le
- * 29/09/2026 (`supplement`), et l'origine de chaque membre (`origin`), que
+ * 29/09/2026 (`supplement`), les registres israélien et mongol (`register_il`,
+ * `register_mn`), et l'origine de chaque membre (`origin`), que
  * `RESTRICTED_WITHDRAWN` nomme pour un retrait en minutes.
  *
  * ## Ce qui n'y est pas, et pourquoi
@@ -433,6 +434,11 @@ export const RESTRICTED_FLOORS = {
   map_es: 150,
   map_it: 150,
   map_ro: 20,
+  // 28/10/2026 : registres partiels de la case 2, relevés le jour même (22 codes
+  // israéliens, 34 participants mongols hors liquidation). Planchers à la moitié,
+  // communs au seeder (scripts/seed-national.ts).
+  register_il: 11,
+  register_mn: 17,
 } as const;
 
 /**
@@ -724,6 +730,38 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     origin: 'internationalmoneytransfers.org',
     supplement: true,
   },
+  // Règle du 28/10/2026, case 2 (suite du point 7) : deux registres PARTIELS pour
+  // des pays où l'API ne nommait aucune banque, sur le modèle de Saint-Marin (même
+  // table, `NON_EXHAUSTIVE_REGISTERS` dans enrich.ts : un code listé nomme son
+  // titulaire, une absence ne dit rien). Relus chaque mois par la chaîne privée
+  // (scripts/seed-national.ts, SEED_FAMILY=restricted), jamais dans ce dépôt.
+  {
+    // La Banque d'Israël sur le portail ouvert du gouvernement : la liste des
+    // sociétés bancaires (jeu 375), complétée par la liste des agences pour les
+    // codes qu'elle ne porte pas (scripts/seed-national-il.ts).
+    id: 'register_il',
+    kind: 'bic',
+    table: 'national_bank_codes',
+    where: { column: 'country', value: 'IL' },
+    minRows: RESTRICTED_FLOORS.register_il,
+    label:
+      'Bank of Israel, list of banking corporations and bank branches on data.gov.il (licence "other (open)" without text; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'boi.org.il',
+  },
+  {
+    // Le registre unifié des participants au système de paiement de la Mongolbank,
+    // un PDF (scripts/seed-national-mn.ts) : le BIC de la seule colonne SWIFT.
+    id: 'register_mn',
+    kind: 'bic',
+    table: 'national_bank_codes',
+    where: { column: 'country', value: 'MN' },
+    minRows: RESTRICTED_FLOORS.register_mn,
+    label:
+      'Bank of Mongolia, unified register of payment system participants (no reuse terms published; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'mongolbank.mn',
+  },
   // --- compliance.sqlite ----------------------------------------------------
   {
     id: 'un',
@@ -838,7 +876,7 @@ export function restrictedBicSources(): Set<string> {
   );
 }
 
-/** Les pays de `national_bank_codes` que la famille retire (AT, BE, SM). */
+/** Les pays de `national_bank_codes` que la famille porte (AT, BE, SM, IL, MN). */
 export function restrictedRegisterCountries(): Set<string> {
   return new Set(
     membersOf('bic')

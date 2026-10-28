@@ -26,6 +26,7 @@ import {
   withRegisterClock,
 } from './national-registers.js';
 import { SM_CREDIT, SM_REGISTER_NAME, smCredit, smRegisterName } from './sm-credit.js';
+import { IL_MN_REGISTER_NAME, ilMnCredit, ilMnRegisterName, isIlMn } from './il-mn-credit.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
 import { lookupGrCode } from './gr-register.js';
@@ -269,6 +270,14 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // aucun bloc `bic` pour le porter à sa place. Même choix que « Zdroj: ČNB »
   // dans le nom tchèque. L'édition voyage dans `as_of`.
   IT: "Banca d'Italia, registers of banks, payment institutions and e-money institutions (Albi ed elenchi di vigilanza, https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/#/area-download, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/, normalised and joined by IBANforge; Poste Italiane and branches of EU payment institutions hold ABI codes outside these registers, so an absence is not a non-allocation)",
+  // Israël et Mongolie (28/10/2026, règle des données du 28.10, case 2) : la Banque
+  // d'Israël sur data.gov.il et le registre des participants de la Mongolbank,
+  // servis depuis la surcouche privée (membres `register_il`, `register_mn`). Le nom
+  // seul ici ; un code listé porte le crédit daté de sa ligne (ilMnRegisterName).
+  // Sans la surcouche, aucun code n'est lu et la réponse dit « non consulté »
+  // (privateRegisterNotLoaded).
+  IL: IL_MN_REGISTER_NAME.IL,
+  MN: IL_MN_REGISTER_NAME.MN,
 };
 
 /**
@@ -784,7 +793,16 @@ function decideBankCode(
         // Banks » avec la date de consultation ; c'est donc ici le jour de
         // lecture complet de la ligne, pas le mois de `as_of`. Une ligne sans
         // date (base antérieure à la colonne) garde le nom sans date.
-        register: cc === 'SM' && reg.as_of ? smRegisterName(reg.as_of) : partial,
+        //
+        // Israël et Mongolie (28/10/2026) : de même, le crédit daté de la ligne
+        // (le jeu de data.gov.il et sa mise à jour, le registre mongol et le jour
+        // de lecture), puis la réserve du registre partiel.
+        register:
+          cc === 'SM' && reg.as_of
+            ? smRegisterName(reg.as_of)
+            : isIlMn(cc) && reg.source && reg.as_of
+              ? ilMnRegisterName(cc, reg.source, reg.as_of)
+              : partial,
         // The point of this whole branch. The register named this institution,
         // which is worth serving; it still does not license reading a MISS as a
         // denial, and `authoritative` is the field that says so.
@@ -957,6 +975,8 @@ function decideBankCode(
  */
 function privateRegisterNotLoaded(cc: string): boolean {
   if (cc === 'SM') return !nationalRegisterAvailable('SM');
+  // Israël et Mongolie (28/10/2026) : même surcouche, même règle.
+  if (isIlMn(cc)) return !nationalRegisterAvailable(cc);
   if (cc === 'LU') return !luRegisterConfigured();
   return false;
 }
@@ -1281,7 +1301,20 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
       lookupFailed = true;
     }
   }
-  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'CZ' || cc === 'SM') {
+  // Israël et Mongolie (28/10/2026) prennent le même bloc que Saint-Marin : registres
+  // partiels, mais le BIC imprimé à côté d'un code listé est celui de l'autorité (la
+  // Banque d'Israël publie le sien, épuré au chargement des BIC qui ne sont pas
+  // israéliens ; la Mongolbank sa colonne SWIFT, seule lue). Un code listé sans BIC
+  // garde `bic: null` ou la carte composite, jamais le BIC d'une banque du groupe.
+  if (
+    cc === 'AT' ||
+    cc === 'BE' ||
+    cc === 'SK' ||
+    cc === 'CZ' ||
+    cc === 'SM' ||
+    cc === 'IL' ||
+    cc === 'MN'
+  ) {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
       if (reg?.bic) {
@@ -1325,7 +1358,9 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
               ? reg.as_of
                 ? smCredit(reg.as_of)
                 : SM_CREDIT
-              : (reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc]),
+              : isIlMn(cc) && reg.source && reg.as_of
+                ? ilMnCredit(cc, reg.source, reg.as_of)
+                : (reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc]),
           // Year-month, as this field is documented. Slovakia and Czechia
           // state an effective date of their own and San Marino carries the
           // day we read its page; AT and BE are dated by the reference set,

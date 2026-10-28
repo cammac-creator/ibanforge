@@ -5,7 +5,9 @@
  * famille sous conditions (src/lib/restricted-family.ts). Sans variable, ce
  * script ne lit que les registres publics (SK, CZ, et IT quand on le nomme) ;
  * `SEED_FAMILY=restricted`, posée par la chaîne privée (`npm run overlay:seed`),
- * lit AT, BE et SM seuls. Nommer un pays hors de son mode est refusé.
+ * lit AT, BE et SM seuls, et depuis le 28/10/2026 Israël et la Mongolie (registres
+ * partiels de la case 2, scripts/seed-national-il.ts et scripts/seed-national-mn.ts).
+ * Nommer un pays hors de son mode est refusé.
  *
  * ⚠️ FOUR of these five are exhaustive; San Marino is NOT. AT, BE, SK and CZ are
  * published by the authority that allocates the codes, which is what lets an
@@ -19,7 +21,7 @@
  *   npx tsx scripts/seed-national.ts          # every public register (SK, CZ)
  *   npx tsx scripts/seed-national.ts CZ       # one
  *   npx tsx scripts/seed-national.ts IT       # Italy, only ever on its own
- *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM (private chain)
+ *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM, IL, MN (private chain)
  *
  * ITALIE — Banca d'Italia, registres des banques, des établissements de paiement
  * et de monnaie électronique (open data CC BY 4.0). NON exhaustif, comme
@@ -154,6 +156,8 @@ import {
   reportItalianStatus,
   seedItalianLive,
 } from './seed-national-it.js';
+import { IL_DATASETS, readIsraelLive } from './seed-national-il.js';
+import { MN_PAGE, readMongoliaLive } from './seed-national-mn.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -167,6 +171,11 @@ const SOURCES = {
   SM: 'https://www.bcsm.sm/en/functions/statutory-functions/payment-system/operating-banks',
   // The PAGE again: the CSV carries neither its edition nor its effective date.
   CZ: 'https://www.cnb.cz/cs/platebni-styk/ucty-kody-bank/',
+  // Règle du 28/10/2026, case 2, chaîne privée seulement : l'API ouverte de
+  // data.gov.il (scripts/seed-national-il.ts) et la page de la Mongolbank qui porte
+  // le lien du PDF (scripts/seed-national-mn.ts).
+  IL: `https://data.gov.il/api/3/action/package_show?id=${IL_DATASETS.banks.package}`,
+  MN: MN_PAGE,
 } as const;
 
 /**
@@ -195,6 +204,8 @@ const MIN_EXPECTED: Record<string, number> = {
   SK: 25,
   SM: RESTRICTED_FLOORS.register_sm,
   CZ: 35,
+  IL: RESTRICTED_FLOORS.register_il,
+  MN: RESTRICTED_FLOORS.register_mn,
 };
 
 /**
@@ -682,6 +693,19 @@ export function parseSanMarino(html: string, readOn: string): Entry[] {
       as_of: readOn,
     });
   }
+  return entries;
+}
+
+/** Israël et Mongolie : lus par leurs modules, chaque écart du chargeur dit dans le journal. */
+async function parseIsraelLive(): Promise<Entry[]> {
+  const { entries, notes } = await readIsraelLive();
+  for (const note of notes) console.log(`  IL: ${note}`);
+  return entries;
+}
+
+async function parseMongoliaLive(): Promise<Entry[]> {
+  const { entries, notes } = await readMongoliaLive();
+  for (const note of notes) console.log(`  MN: ${note}`);
   return entries;
 }
 
@@ -1357,13 +1381,16 @@ async function main(): Promise<void> {
     ['BE', parseBelgium],
     ['SK', parseSlovakiaLive],
     ['SM', parseSanMarinoLive],
+    ['IL', parseIsraelLive],
+    ['MN', parseMongoliaLive],
   ];
   // Deux modes, jamais les deux à la fois (seedFamilyFromEnv) :
   // - sans SEED_FAMILY (robots publics, copie d'un contributeur) : les registres
   //   publics seuls, la Slovaquie et la Tchéquie (l'Italie sur demande). Depuis
   //   l'étape du retrait (25/09/2026), AT, BE et SM ne sont plus téléchargés ici :
   //   la base de ce dépôt ne les porte plus ;
-  // - SEED_FAMILY=restricted (chaîne privée de la surcouche) : AT, BE et SM seuls.
+  // - SEED_FAMILY=restricted (chaîne privée de la surcouche) : AT, BE, SM, et depuis
+  //   le 28/10/2026 IL et MN, seuls.
   // Un pays nommé hors de son mode est refusé plutôt que sauté en silence : une
   // commande `seed-national.ts AT` lancée sans la variable écrirait la famille
   // dans data/, d'où elle serait commitée.

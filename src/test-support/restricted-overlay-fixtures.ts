@@ -174,6 +174,22 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         'Remplissage',
         '2026-01-15',
       );
+      // Israël et Mongolie (28/10/2026, registres partiels) : codes 9xx et 99xx, que
+      // les vraies listes ne portent pas.
+      pad(
+        'IL',
+        floorOf('register_il'),
+        Array.from({ length: 50 }, (_, i) => String(900 + i)),
+        'Remplissage',
+        '2026-01-15',
+      );
+      pad(
+        'MN',
+        floorOf('register_mn'),
+        Array.from({ length: 50 }, (_, i) => String(9900 + i)),
+        'Remplissage',
+        '2026-01-15',
+      );
 
       const pra = bic.prepare(
         `INSERT INTO pra_banks (frn, firm_name, lei, section, lei_basis, list_month, source)

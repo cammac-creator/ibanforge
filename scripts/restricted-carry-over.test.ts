@@ -109,6 +109,8 @@ function fakeSeeders(sourcePath: string, net: Network) {
           ['AT', 'register_at'],
           ['BE', 'register_be'],
           ['SM', 'register_sm'],
+          ['IL', 'register_il'],
+          ['MN', 'register_mn'],
         ] as const) {
           if (down.has(member)) {
             note(member, 0);

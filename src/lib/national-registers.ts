@@ -1,4 +1,5 @@
 import { getBicDB } from './db.js';
+import { ilMnCredit } from './il-mn-credit.js';
 import { smCredit } from './sm-credit.js';
 
 /**
@@ -56,7 +57,18 @@ export interface NationalCodeEntry {
 }
 
 /** Width of the bank code as an IBAN of that country carries it. */
-const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3, SK: 4, CZ: 4, SM: 5, IT: 5 };
+const CODE_WIDTH: Record<string, number> = {
+  AT: 5,
+  BE: 3,
+  SK: 4,
+  CZ: 4,
+  SM: 5,
+  IT: 5,
+  // 28/10/2026, registres partiels servis par la surcouche privée : la banque, positions
+  // 5 à 7 de l'IBAN israélien ; le participant, positions 5 à 8 de l'IBAN mongol.
+  IL: 3,
+  MN: 4,
+};
 
 /**
  * 🚨 Which of these registers EXHAUST their country's bank-code space.
@@ -102,6 +114,12 @@ const EXHAUSTIVE: Record<string, boolean> = {
   CZ: true,
   SM: false,
   IT: false,
+  // Israël et Mongolie (28/10/2026) : la Banque d'Israël publie les sociétés bancaires
+  // et leurs agences, la Mongolbank les participants à son système de paiement ;
+  // ni l'une ni l'autre ne publie l'attribution de l'espace des codes. Un code
+  // listé nomme son titulaire, un code absent ne dit rien.
+  IL: false,
+  MN: false,
 };
 
 /**
@@ -498,6 +516,10 @@ const CREDIT_FORMAT: Record<string, (source: string, asOf: string) => string> = 
   // licence ; la date est celle de l'édition (le nom du fichier de la Banca
   // d'Italia), et la modification est dite ici, une fois pour toutes les surfaces.
   IT: (source, asOf) => `Source: ${source}, edition ${asOf}; normalised and joined by IBANforge`,
+  // Israël et Mongolie (28/10/2026) : la ligne stockée et sa date, dites pour ce
+  // qu'elles sont (src/lib/il-mn-credit.ts).
+  IL: (source, asOf) => ilMnCredit('IL', source, asOf),
+  MN: (source, asOf) => ilMnCredit('MN', source, asOf),
 };
 
 /**

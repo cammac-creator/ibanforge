@@ -113,6 +113,8 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       register_at: 'failed:http_503',
       register_be: 'failed:http_503',
       register_sm: 'failed:http_503',
+      register_il: 'failed:http_503',
+      register_mn: 'failed:http_503',
       pra: 'failed:download_failed',
       map_pl: 'failed:http_503',
       map_fi: 'failed:http_503',
@@ -142,6 +144,8 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       'ebaclearing.eu',
       'nbb.be',
       'bcsm.sm',
+      'data.gov.il',
+      'mongolbank.mn',
       'bankofengland.co.uk',
       'pypi.org',
     ])

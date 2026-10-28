@@ -151,7 +151,9 @@ npm run build             # next build
   NBP and OeNB directory rows, the AT, BE and SM registers, the PRA list, the UN list, both
   EPC registers, and since 28 October 2026 the Swiss SECO list and the composite-map keys
   withdrawn on 29 September: TR, AE, BA, GE, KZ, MD, EE, RS and the rest of IT, ES and RO,
-  served as a code-by-code `supplement` where the public map has no key), listed ONCE, with
+  served as a code-by-code `supplement` where the public map has no key, and the partial
+  registers of Israel and Mongolia, `register_il` and `register_mn`, read from the Bank of
+  Israel on data.gov.il and the Mongolbank participants PDF), listed ONCE, with
   each table's definition and how its rows are dated. Every answer read from the EPC
   registers carries "Source: European Payments Council" and the day they were extracted. In
   production it comes from a private file per database, named by

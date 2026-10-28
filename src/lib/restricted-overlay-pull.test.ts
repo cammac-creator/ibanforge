@@ -689,6 +689,9 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     const o = openDb(source);
     o.exec('DROP TABLE curated_bank_codes');
     o.exec('DROP TABLE fi_monetary_codes');
+    // Les registres israélien et mongol (28/10/2026) partagent la table des registres
+    // autrichien, belge et saint-marinais : leurs lignes seules sont ôtées.
+    o.exec("DELETE FROM national_bank_codes WHERE country IN ('IL', 'MN')");
     o.close();
     const out = join(dir, 'restricted-bic.sqlite');
     if (readdirSync(dir).includes('restricted-bic.sqlite')) return out;

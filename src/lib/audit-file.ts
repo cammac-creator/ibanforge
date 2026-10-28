@@ -450,7 +450,12 @@ export function auditTable(
         // ne lit aucune ligne et n'a pas de date. Un code absent de la liste
         // n'utilise rien de la BCSM et garde le nom du pays.
         const check = result.bank_code_check;
-        if (row.country === 'SM' && check?.status === 'verified' && check.match === 'register') {
+        // Israël et Mongolie (28/10/2026) : même règle, le crédit daté de la ligne.
+        if (
+          (row.country === 'SM' || row.country === 'IL' || row.country === 'MN') &&
+          check?.status === 'verified' &&
+          check.match === 'register'
+        ) {
           row.register = check.register ?? row.register;
         }
         row.bank_name = result.bic?.bank_name ?? result.issuer?.name ?? null;

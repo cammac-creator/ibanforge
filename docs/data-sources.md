@@ -56,6 +56,44 @@ ou retiré), ces pays répondent toujours « non consulté ». Les comptes de la
 2026.10.1 diffèrent de ceux du 29/09 (la compilation a grandi) : la roue lue est
 celle du mois, ses comptes sont ceux du passage.
 
+## 28/10/2026 (suite) : Israël et Mongolie, registres partiels par la surcouche privée
+
+Suite du point 7 de la règle (pays où l'API ne nommait aucune banque ; recherche du jour dans le
+dossier interne du chantier). Deux sources officielles de la **case 2**, servies depuis la surcouche
+privée comme Saint-Marin (`national_bank_codes`, registres **partiels** de `NON_EXHAUSTIVE_REGISTERS`) :
+un code listé nomme son titulaire, une absence ne dit rien (jamais `not_allocated`). Relues chaque mois
+par la chaîne privée (`scripts/seed-national.ts`, `SEED_FAMILY=restricted`). **Aucune ligne dans ce
+dépôt** : les tests n'utilisent que des banques inventées.
+
+| Pays | Membre | Origine | Source | Ce qui est servi |
+|---|---|---|---|---|
+| Israël (code = positions 5 à 7) | `register_il` | `boi.org.il` | Banque d'Israël sur data.gov.il : « List of banking corporations in Israel » (jeu 375) et, pour les codes qu'elle ne porte pas, « Bank branches » (agences ouvertes), lus par l'API du portail (`scripts/seed-national-il.ts`) | le nom ; le BIC publié, mis en majuscules, seulement s'il est israélien (lettres 5-6 = `IL` : le BIC britannique d'une succursale est écarté) ; aucun BIC pour un code venu de la liste des agences |
+| Mongolie (code = positions 5 à 8) | `register_mn` | `mongolbank.mn` | Mongolbank, registre unifié des participants au système de paiement, PDF lié depuis `mongolbank.mn/mn/p/1306`, lu par `pdftotext -layout` (`scripts/seed-national-mn.ts`) | le nom en cyrillique, tel que publié ; le BIC de la **seule colonne SWIFT**, rangé par sa position sous l'en-tête (les colonnes RTGS et ACH+ sont des identifiants nationaux : un participant sans SWIFT a `bic: null`) ; banques en liquidation (ЭХА) écartées |
+
+**Conditions lues.** Israël : licence « אחר (פתוח) » (« autre (ouvert) ») sans texte sur data.gov.il ;
+les conditions du site de la Banque d'Israël réservent la reproduction à son accord écrit. Mongolie :
+aucune condition publiée, un « Copyright » seul. D'où la case 2 : servi, source citée, retiré dans les
+48 heures sur demande (`RESTRICTED_WITHDRAWN=boi.org.il` ou `mongolbank.mn`).
+
+**Le crédit.** `bank_code_check.register` et `bic.source` portent « Source: Bank of Israel, <jeu>
+(data.gov.il), dataset updated <date> » (la date de mise à jour du jeu, que les conditions historiques
+du portail demandaient de citer avec son nom) et « Source: Bank of Mongolia (Mongolbank), unified
+register of payment system participants (read by IBANforge on <date>) » (la Mongolbank ne date pas son
+PDF : c'est le jour de lecture, dit comme tel) ; `register` ajoute la réserve du registre partiel.
+Le BIC est celui de l'autorité : `bic.basis: "national_register"` (`PARTIAL_REGISTERS_PAIRING_THE_BIC`).
+
+**Sans la surcouche** (membre absent ou retiré), un code de ces deux pays absent de la carte composite
+répond `unavailable` / `national_register_unavailable`, comme Saint-Marin. La clé publique `IL:020` de la
+carte reste en place ; là où il répond, le registre passe devant elle.
+
+**La chaîne privée** lit la Mongolie avec `pdftotext` (poppler) : le passage mensuel du dépôt privé doit
+l'avoir. Un échec de lecture laisse le membre absent ou repris (`scripts/restricted-carry-over.ts`), sans
+bloquer les autres.
+
+**Non intégré, exprès.** La Russie (répertoire BIK de la Banque de Russie, conditions de la case 1) :
+l'intégrer touche aux sanctions, décision de Claude-Alain. Oman, Libye, Somalie, Mauritanie, Djibouti,
+Soudan, Timor oriental, Burundi : aucune table officielle code → banque trouvée le 28/10/2026.
+
 ## 25/09/2026 : la famille sous conditions a quitté le dépôt public
 
 Ce qui peut être servi mais pas redistribué (décision de Claude-Alain du
