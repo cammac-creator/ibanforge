@@ -146,6 +146,10 @@ const STATIC = [
     `frontend/content/${lang}/blog/2026-09-29-german-iban-bic-python-javascript.mdx`,
     `frontend/content/${lang}/blog/2026-09-29-check-iban-list-google-sheets.mdx`,
   ]),
+  // What coding assistants read (28/10/2026): the Context7 rules and the
+  // public agent skill quote the keyless trial and the free key.
+  'context7.json',
+  'skills/validate-iban-before-payment/SKILL.md',
 ];
 
 const app = buildApp();

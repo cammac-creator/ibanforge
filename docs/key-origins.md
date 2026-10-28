@@ -24,6 +24,8 @@ request. A tag says a deliberate effort produced the visit.
 | `smithery` | the Smithery listing (`smithery.yaml`) |
 | `glama` | the Glama listing (`glama.json`) |
 | `api-trial` | the keyless REST trial, once its weekly allowance is spent |
+| `context7` | the rules of `context7.json`, read by coding assistants through the Context7 index |
+| `skill` | the agent skill `skills/validate-iban-before-payment/SKILL.md`: its key command and its links (Context7 indexes it too) |
 
 **A door** is what the server writes when no tag says anything finer: the
 surface the key was actually minted on. It is always true and never specific.
