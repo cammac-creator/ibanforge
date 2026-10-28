@@ -30,6 +30,7 @@ import {
   AUDIT_MAX_ROWS,
   AUDIT_TIERS,
   type AuditLang,
+  type AuditResult,
 } from '../lib/audit-file.js';
 import {
   createAuditJob,
@@ -89,6 +90,32 @@ function uploadAllowed(ip: string, now: number = Date.now()): boolean {
   recent.push(now);
   uploadTimes.set(ip, recent);
   return true;
+}
+
+/**
+ * Whether an upload is the site's sample file rather than a customer's.
+ *
+ * Until 28/10/2026, "Try with a sample file" posted the eight-row sample
+ * through this same route and it was counted as an upload, so the counter
+ * could not tell a real file from a demonstration. The page now sends
+ * `sample=1`; a page still cached in a browser, or a script reusing the
+ * sample, does not, so the content is compared as well.
+ */
+const SAMPLE_BYTES = Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8');
+export function isSampleUpload(flag: unknown, buffer: Buffer): boolean {
+  return flag === '1' || buffer.equals(SAMPLE_BYTES);
+}
+
+/**
+ * Whether a file holds at least one Swiss or Liechtenstein row: the IBAN's
+ * country once it validated, else the first two letters of what was typed, so
+ * that a Swiss creditor with a mistyped IBAN still makes a Swiss file.
+ */
+export function containsSwissRows(rows: AuditResult['rows']): boolean {
+  return rows.some((r) => {
+    const country = r.country ?? r.iban_input.replace(/\s+/g, '').slice(0, 2).toUpperCase();
+    return country === 'CH' || country === 'LI';
+  });
 }
 
 function langOf(v: unknown): AuditLang {
@@ -231,18 +258,22 @@ audit.post('/v1/audit/upload', async (c) => {
     preview,
     report,
   });
-  recordSafely(
-    () =>
-      recordOperation(
-        'audit_upload',
-        null,
-        true,
-        0,
-        `${result.summary.rows} rows, tier ${result.summary.tier}`,
-        c.get('apiKeyPrefix'),
-      ),
-    'audit_upload',
-  );
+  // The sample is booked apart, so `uploads` counts customer files only. A
+  // real file with a Swiss or Liechtenstein row gets a second row of its own:
+  // the operation detail keeps twelve characters (stats.ts), too few to carry
+  // the marker. Country stays null on both, so neither enters a per-country
+  // count.
+  const sample = isSampleUpload(body.sample, buffer);
+  const detail = `${result.summary.rows} rows, tier ${result.summary.tier}`;
+  const keyPrefix = c.get('apiKeyPrefix');
+  const kind = sample ? 'audit_sample' : 'audit_upload';
+  recordSafely(() => recordOperation(kind, null, true, 0, detail, keyPrefix), kind);
+  if (!sample && containsSwissRows(result.rows)) {
+    recordSafely(
+      () => recordOperation('audit_upload_ch', null, true, 0, detail, keyPrefix),
+      'audit_upload_ch',
+    );
+  }
   return c.json({
     ...publicJob(job, { sessionId: null }),
     processing_ms: Math.round((performance.now() - started) * 100) / 100,

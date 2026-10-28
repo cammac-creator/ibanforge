@@ -26,6 +26,11 @@ import { decodeOpsCursor, encodeOpsCursor } from '../lib/ops-cursor.js';
  * the village must never show the traffic it generates. The same
  * is_internal_email() the funnel uses decides; keyless x402 calls stay.
  *
+ * `audit_upload_ch` is not an operation but a marker written beside an
+ * `audit_upload` (src/routes/audit.ts, 28/10/2026): served here, one Swiss
+ * file would walk the road twice and the feed would say more about a customer
+ * file than "an audit happened".
+ *
  * Same exposure level as the public /stats page (aggregates of the same
  * table), free on purpose: every poll is one indexed LIMIT-50 read on a WAL
  * database — cheaper than a cache layer whose staleness would hide fresh
@@ -60,6 +65,7 @@ opsRecent.get('/v1/ops/recent', (c) => {
       `SELECT id, created_at AS t, operation_type AS type, country_code AS country, success
        FROM operations
        WHERE id > ?
+         AND operation_type <> 'audit_upload_ch'
          AND (key_prefix IS NULL
               OR key_prefix NOT IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email)))
        ORDER BY id DESC
