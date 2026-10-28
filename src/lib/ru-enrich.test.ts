@@ -48,6 +48,8 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
   insert.run('049999903', 'Филиал № 2 АО «Альфа-Тест»', 'ZZALRUM2SP3', SOURCE);
   // Une banque qu'aucune liste ne porte.
   insert.run('049999911', 'ООО «Бета-Тест»', 'ZZBERUMM', SOURCE);
+  // Une banque qu'aucune liste ne porte, sous aucun BIC.
+  insert.run('049999931', 'ООО «Дельта-Тест»', 'ZZDLRUMM', SOURCE);
   // Un établissement sans aucun BIC SWIFT, siège et succursale.
   insert.run('049999921', 'ПАО «Гамма-Тест»', null, SOURCE);
   insert.run('049999922', 'Филиал ПАО «Гамма-Тест»', null, SOURCE);
@@ -59,6 +61,7 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
   for (const code of ['049999901', '049999904', '049999902', '049999903'])
     licence.run(code, '9001', SOURCE);
   licence.run('049999911', '9002', SOURCE);
+  licence.run('049999931', '9004', SOURCE);
   licence.run('049999921', '9003', SOURCE);
   licence.run('049999922', '9003', SOURCE);
   bic.close();
@@ -174,7 +177,7 @@ describe('Russia: the sanctions screen covers the whole institution', () => {
   });
 
   it('screens and clears an institution no list carries', () => {
-    const c = screened(ru('049999911')).compliance;
+    const c = screened(ru('049999931')).compliance;
     expect(c.sanctions.bank_screened).toBe(true);
     expect(c.sanctions.bank_sanctioned).toBe(false);
     expect(c.sanctions.matched_lists).toEqual([]);

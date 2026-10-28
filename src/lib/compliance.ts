@@ -35,9 +35,10 @@ let _checkVop: Database.Statement | null = null;
  *   `SOMRRUMM` ; les succursales de VTB ont des BIC `VTBRRUM2…`, la liste nomme
  *   `VTBRRUMM`) : la comparaison se fait sur les six premiers caractères, le code de
  *   l'institution et son pays, qu'aucune autre licence du répertoire ne partage ;
- * - une succursale est la même personne morale que son siège : ce sont tous les BIC
- *   SWIFT de l'établissement qui passent aux listes (`institutionBics`,
- *   src/lib/ru-institution.ts), pas seulement celui de la ligne.
+ * - une succursale est la même personne morale que son siège : c'est le BIC SWIFT par
+ *   défaut de chaque ligne de la licence de l'établissement qui passe aux listes
+ *   (`institutionBics`, src/lib/ru-institution.ts), pas seulement celui de la ligne ;
+ *   les BIC secondaires du répertoire ne sont ni servis ni comparés.
  *
  * `institutionBics` vaut `null` quand la lecture de l'établissement n'a pas abouti :
  * aucune clé, l'axe banque dit « non contrôlé », jamais un « non » sur un seul BIC.
