@@ -121,6 +121,9 @@ describe('parseMongoliaText', () => {
     expect(() => parseMongoliaText(SAMPLE.replace('SWIFT БИК', 'SWIFT'))).toThrow(
       /header not found/,
     );
+    expect(() => parseMongoliaText(SAMPLE.replace('Данс', 'Акт '))).toThrow(
+      /account column not found/,
+    );
   });
 
   it('refuses a word of the name that runs into the account or BIC columns', () => {

@@ -119,7 +119,10 @@ describe('readIsraelLive', () => {
       const resource = u.searchParams.get('resource_id');
       const offset = Number(u.searchParams.get('offset'));
       const limit = Number(u.searchParams.get('limit'));
-      const rows = resource === IL_DATASETS.banks.resource ? BANKS : BRANCHES;
+      const rows = (resource === IL_DATASETS.banks.resource ? BANKS : BRANCHES).map((r, i) => ({
+        _id: i + 1,
+        ...r,
+      }));
       const total = resource === IL_DATASETS.banks.resource ? BANKS.length : branchTotal;
       return { success: true, result: { records: rows.slice(offset, offset + limit), total } };
     };
@@ -139,6 +142,18 @@ describe('readIsraelLive', () => {
     };
     const { entries } = await readIsraelLive(get);
     expect(entries.map((e) => e.code)).toEqual(['901', '092', '093', '009', '094']);
+  });
+
+  it('refuses a portal that serves the same page whatever the offset', async () => {
+    const stuck = portal();
+    const get = async (url: string): Promise<unknown> => {
+      const u = new URL(url);
+      u.searchParams.set('offset', '0');
+      const body = (await stuck(u.href)) as { result?: { records?: unknown[] } };
+      if (body.result?.records) body.result.records = body.result.records.slice(0, 2);
+      return body;
+    };
+    await expect(readIsraelLive(get)).rejects.toThrow(/without _id or twice/);
   });
 
   it('refuses a branch list that lost its Close_Date field', () => {

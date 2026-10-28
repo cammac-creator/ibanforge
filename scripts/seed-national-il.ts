@@ -244,6 +244,9 @@ async function readAll(
 ): Promise<Array<Record<string, unknown>>> {
   const limit = 500;
   const rows: Array<Record<string, unknown>> = [];
+  // Un portail qui ignorerait le décalage renverrait la même page : une ligne lue
+  // deux fois (même `_id`) fait échouer plutôt qu'atteindre le total par des doublons.
+  const ids = new Set<string>();
   for (let offset = 0; ; offset = rows.length) {
     const page = parseDatastorePage(
       await get(
@@ -251,7 +254,13 @@ async function readAll(
       ),
       resource,
     );
-    rows.push(...page.records);
+    for (const record of page.records) {
+      const id = String(record._id ?? '');
+      if (id === '' || ids.has(id))
+        throw new Error(`IL: ${resource} served a row without _id or twice`);
+      ids.add(id);
+      rows.push(record);
+    }
     if (page.records.length === 0 || rows.length >= page.total) {
       if (rows.length !== page.total)
         throw new Error(`IL: ${resource} announced ${page.total} rows, ${rows.length} were read`);
