@@ -117,7 +117,9 @@ const ISO_CTRY_CLAUSE =
  *   address is provided » ; dans SIC « validation of the addresses will be
  *   waived » ; les banques « may continue to offer [...] the unstructured
  *   address »).
- * - T2, Fedwire, Banque d'Angleterre : tels que lus le 02.09.2026, pas relus.
+ * - Fedwire, annonce du 27.08.2026, relue le 28.10.2026 :
+ *   https://www.frbservices.org/news/communications/082726-fedwire-funds-services-release-rescheduled/
+ * - T2, Banque d'Angleterre : tels que lus le 02.09.2026, pas relus.
  */
 export const CBPR_NOTE =
   "No 'cbpr+' scheme is offered, on purpose. The CBPR+ usage guideline and the PMPG \"November 2026 postal " +
@@ -130,9 +132,10 @@ export const CBPR_NOTE =
   'by December 2026 at the latest; in September 2026 the EPC postponed the end of unstructured addresses in its ' +
   'rulebooks, planned for 15.11.2026, with a new date announced for October 2026 and none found on 28.10.2026; SIX ' +
   'keeps 14.11.2026 for the Swiss Payment Standards (town and country required whenever an address is given), but ' +
-  'SIC does not validate addresses and each bank decides what it still accepts (six-group.com, read 28.10.2026); as ' +
-  'of 02.09.2026 the Eurosystem T2 R2026.NOV was unchanged, Fedwire had moved to November 2027 and the Bank of ' +
-  'England expected a twelve-month deferral, subject to confirmation. ' +
+  'SIC does not validate addresses and each bank decides what it still accepts (six-group.com, read 28.10.2026). ' +
+  'Fedwire moved its release to November 2027 (FRFS announcement of 27.08.2026, read 28.10.2026). As ' +
+  'of 02.09.2026 the Eurosystem T2 R2026.NOV was unchanged and the Bank of England expected a twelve-month ' +
+  'deferral, subject to confirmation. ' +
   'See ibanforge.com/blog/2026-09-02-which-date-structured-addresses.';
 
 /** ISO 20022 `Max70Text` — the width of one `AdrLine`. */

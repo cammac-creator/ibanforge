@@ -1001,6 +1001,13 @@ le ruban des intégrations et l'anatomie de septembre sont retirés. `components
   les nomme (`landing-doors-card.tsx`, `dashboard.overview.fresh.doors.names`, `dashboard.audience.actionNames`,
   07/10/2026) ; les portes de l'ancien accueil y gardent un nom « Ancien accueil » tant qu'elles restent dans la
   fenêtre de 30 jours.
+  Depuis le 28/10/2026, les achats et l’audit sont nommés dans les trois langues :
+  `cta:buy-pack-1k`, `cta:buy-pack-5k`, `cta:buy-pack-25k`, `cta:buy-pro`, `cta:buy-audit`,
+  `cta:oem-mail`, `cta:buy-topup-1k`, `cta:buy-topup-5k`, `cta:buy-topup-25k`,
+  `cta:buy-pro-on-key`, `cta:audit-upload`, `cta:audit-sample`, `cta:audit-from-qr`.
+  Le marqueur `audit_upload_ch` reste dans le détail des audits suisses, sans entrer dans
+  les totaux d’opérations ni les agrégats journaliers et horaires ; les lectures écartent
+  aussi ses anciennes lignes agrégées, sans réécriture de l’historique.
 - Les codes de registres et de clés nationales que la page écrit (`home.coverage.registerCodes`,
   `home.coverage.keyCodes`, `home.problem.bankWhat`, la FAQ) sont comparés au code par
   `src/lib/positioning.test.ts`, dans les trois langues. Les promesses publiques de la page sont
