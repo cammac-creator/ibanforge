@@ -27,6 +27,7 @@ import {
 } from './national-registers.js';
 import { SM_CREDIT, SM_REGISTER_NAME, smCredit, smRegisterName } from './sm-credit.js';
 import { IL_MN_REGISTER_NAME, ilMnCredit, ilMnRegisterName, isIlMn } from './il-mn-credit.js';
+import { RU_REGISTER_NAME, ruCredit, ruRegisterName } from './ru-credit.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
 import { lookupGrCode } from './gr-register.js';
@@ -278,6 +279,10 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // (privateRegisterNotLoaded).
   IL: IL_MN_REGISTER_NAME.IL,
   MN: IL_MN_REGISTER_NAME.MN,
+  // Russie (28/10/2026, décision « Nommer seulement ») : le répertoire des BIK de la
+  // Banque de Russie, servi depuis la surcouche privée (membre `register_ru`), même
+  // règle : le nom seul ici, un code listé porte le crédit daté de sa ligne.
+  RU: RU_REGISTER_NAME,
 };
 
 /**
@@ -802,7 +807,9 @@ function decideBankCode(
             ? smRegisterName(reg.as_of)
             : isIlMn(cc) && reg.source && reg.as_of
               ? ilMnRegisterName(cc, reg.source, reg.as_of)
-              : partial,
+              : cc === 'RU' && reg.source && reg.as_of
+                ? ruRegisterName(reg.source, reg.as_of)
+                : partial,
         // The point of this whole branch. The register named this institution,
         // which is worth serving; it still does not license reading a MISS as a
         // denial, and `authoritative` is the field that says so.
@@ -817,7 +824,8 @@ function decideBankCode(
         },
         // Israël : le mois du jeu qui a nommé CE code (les deux jeux de data.gov.il ont
         // chacun leur date), la même que celle que `register` imprime.
-        as_of: (isIlMn(cc) ? reg.as_of?.slice(0, 7) : undefined) ?? asOf ?? as_of,
+        // La Russie de même : le mois du jour ouvrable du répertoire lu.
+        as_of: (isIlMn(cc) || cc === 'RU' ? reg.as_of?.slice(0, 7) : undefined) ?? asOf ?? as_of,
       });
     }
     // Le troisième cas (25/09/2026) : le registre a CONNU ce code et l'a radié,
@@ -977,8 +985,8 @@ function decideBankCode(
  */
 function privateRegisterNotLoaded(cc: string): boolean {
   if (cc === 'SM') return !nationalRegisterAvailable('SM');
-  // Israël et Mongolie (28/10/2026) : même surcouche, même règle.
-  if (isIlMn(cc)) return !nationalRegisterAvailable(cc);
+  // Israël et Mongolie, puis la Russie (28/10/2026) : même surcouche, même règle.
+  if (isIlMn(cc) || cc === 'RU') return !nationalRegisterAvailable(cc);
   if (cc === 'LU') return !luRegisterConfigured();
   return false;
 }
@@ -1310,6 +1318,8 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // garde la réponse d'avant, comme à Saint-Marin : la carte composite s'il y a une
   // clé (aucune aujourd'hui pour ces codes), sinon `bic: null`. Le chargeur ne prête
   // jamais à un code le BIC d'une autre banque de son groupe.
+  // La Russie (28/10/2026) aussi : le BIC SWIFT que la Banque de Russie marque par
+  // défaut pour ce BIK, jamais celui du siège prêté à une succursale.
   if (
     cc === 'AT' ||
     cc === 'BE' ||
@@ -1317,7 +1327,8 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
     cc === 'CZ' ||
     cc === 'SM' ||
     cc === 'IL' ||
-    cc === 'MN'
+    cc === 'MN' ||
+    cc === 'RU'
   ) {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
@@ -1364,7 +1375,9 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
                 : SM_CREDIT
               : isIlMn(cc) && reg.source && reg.as_of
                 ? ilMnCredit(cc, reg.source, reg.as_of)
-                : (reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc]),
+                : cc === 'RU' && reg.source && reg.as_of
+                  ? ruCredit(reg.source, reg.as_of)
+                  : (reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc]),
           // Year-month, as this field is documented. Slovakia and Czechia
           // state an effective date of their own and San Marino carries the
           // day we read its page; AT and BE are dated by the reference set,

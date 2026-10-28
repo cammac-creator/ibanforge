@@ -57,6 +57,7 @@ const FAMILY_HOSTS = [
   'bcsm.sm',
   'data.gov.il',
   'mongolbank.mn',
+  'cbr.ru',
   'bankofengland.co.uk',
   'un.org',
   'europeanpaymentscouncil.eu',

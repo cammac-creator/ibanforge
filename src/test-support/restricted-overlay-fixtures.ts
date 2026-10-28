@@ -190,6 +190,15 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         'Remplissage',
         '2026-01-15',
       );
+      // Russie (28/10/2026, décision « Nommer seulement ») : BIK 0499xxxxx, que le vrai
+      // répertoire ne porte pas.
+      pad(
+        'RU',
+        floorOf('register_ru'),
+        Array.from({ length: 400 }, (_, i) => String(49900000 + i).padStart(9, '0')),
+        'Remplissage',
+        '2026-01-15',
+      );
 
       const pra = bic.prepare(
         `INSERT INTO pra_banks (frn, firm_name, lei, section, lei_basis, list_month, source)
@@ -204,7 +213,10 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       // composite, liste finlandaise) : tables créées depuis la constante, lignes
       // inventées jusqu'aux planchers. BIC `XMP…`, noms « Remplissage ».
       for (const spec of RESTRICTED_TABLES.bic.filter(
-        (t) => t.name === 'curated_bank_codes' || t.name === 'fi_monetary_codes',
+        (t) =>
+          t.name === 'curated_bank_codes' ||
+          t.name === 'fi_monetary_codes' ||
+          t.name === 'ru_bik_licences',
       )) {
         const exists = bic
           .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -248,6 +260,14 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       );
       for (let i = 0; i < floorOf('register_fi') + 5; i++)
         fiList.run(String(9000 + i), `Remplissage FI ${i}`);
+      // Les licences des BIK russes de remplissage : une licence inventée pour
+      // dix BIK.
+      const ruLicence = bic.prepare(
+        `INSERT OR IGNORE INTO ru_bik_licences (code, licence, source, as_of)
+         VALUES (?, ?, 'Remplissage', '2026-01-15')`,
+      );
+      for (let i = 0; i < floorOf('register_ru_licences') + 5; i++)
+        ruLicence.run(String(49900000 + i).padStart(9, '0'), `99${Math.floor(i / 10)}`);
     })();
   } finally {
     bic.close();

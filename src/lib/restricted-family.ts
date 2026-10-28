@@ -24,7 +24,9 @@
  * jamais dans ce dépôt, un paquet ou un export du site, seulement ici, comme
  * membre. D'où les membres `seco`, `map_tr` et ceux des clés retirées le
  * 29/09/2026 (`supplement`), les registres israélien et mongol (`register_il`,
- * `register_mn`), et l'origine de chaque membre (`origin`), que
+ * `register_mn`), le répertoire russe (`register_ru`, `register_ru_licences`,
+ * décision du 28/10/2026 « Nommer seulement », servi d'ici bien que libre), et
+ * l'origine de chaque membre (`origin`), que
  * `RESTRICTED_WITHDRAWN` nomme pour un retrait en minutes.
  *
  * ## Ce qui n'y est pas, et pourquoi
@@ -353,6 +355,29 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
       freshness: 'max_as_of',
       decideTogether: false,
     },
+    {
+      // Russie (28/10/2026) : chaque BIK servi du répertoire de la Banque de Russie
+      // et le numéro de licence de son établissement (`RegN`, sans le numéro de
+      // succursale après « / ») : une licence, une personne morale, siège et
+      // succursales. Aucune base publique ne porte cette table ; la fusion la crée
+      // depuis cette définition. Lue par la conformité seulement
+      // (src/lib/ru-institution.ts), pour contrôler l'établissement entier et non le
+      // seul BIC d'une ligne.
+      name: 'ru_bik_licences',
+      columns: ['code', 'licence', 'source', 'as_of'],
+      onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE ru_bik_licences (
+  code    TEXT PRIMARY KEY,
+  licence TEXT NOT NULL,
+  source  TEXT NOT NULL,
+  as_of   TEXT NOT NULL
+)`,
+        'CREATE INDEX idx_ru_bik_licences_licence ON ru_bik_licences(licence)',
+      ],
+      freshness: 'max_as_of',
+      decideTogether: false,
+    },
   ],
   compliance: [
     {
@@ -439,6 +464,11 @@ export const RESTRICTED_FLOORS = {
   // communs au seeder (scripts/seed-national.ts).
   register_il: 11,
   register_mn: 17,
+  // 28/10/2026 (décision « Nommer seulement ») : 663 établissements de crédit et
+  // succursales actifs et sans restriction dans l'ED807 du jour, dont 660 portent
+  // un numéro de licence. Planchers à la moitié, communs au seeder.
+  register_ru: 330,
+  register_ru_licences: 330,
 } as const;
 
 /**
@@ -762,6 +792,36 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     mayBeAbsent: true,
     origin: 'mongolbank.mn',
   },
+  // Décision du 28/10/2026 (« Nommer seulement ») : le répertoire des BIK de la
+  // Banque de Russie (ED807 quotidien). Case 1 de la grille (reproduction libre,
+  // source citée), servi tout de même depuis la surcouche, par prudence pour un
+  // pays sous sanctions : retrait en minutes par `RESTRICTED_WITHDRAWN=cbr.ru`.
+  // Registre PARTIEL (établissements de crédit et succursales seulement), relu
+  // chaque mois par la chaîne privée (scripts/seed-national.ts,
+  // SEED_FAMILY=restricted, module scripts/seed-national-ru.ts).
+  {
+    id: 'register_ru',
+    kind: 'bic',
+    table: 'national_bank_codes',
+    where: { column: 'country', value: 'RU' },
+    minRows: RESTRICTED_FLOORS.register_ru,
+    label:
+      'Bank of Russia, BIC directory of the Bank of Russia payment system (ED807; reproduction permitted with a link to the source; served from the private file, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'cbr.ru',
+  },
+  {
+    // Le numéro de licence de chaque BIK du même répertoire, lu par la
+    // conformité seule (src/lib/ru-institution.ts).
+    id: 'register_ru_licences',
+    kind: 'bic',
+    table: 'ru_bik_licences',
+    where: null,
+    minRows: RESTRICTED_FLOORS.register_ru_licences,
+    label: 'Bank of Russia, BIC directory (ED807): licence number of each served BIK',
+    mayBeAbsent: true,
+    origin: 'cbr.ru',
+  },
   // --- compliance.sqlite ----------------------------------------------------
   {
     id: 'un',
@@ -876,7 +936,7 @@ export function restrictedBicSources(): Set<string> {
   );
 }
 
-/** Les pays de `national_bank_codes` que la famille porte (AT, BE, SM, IL, MN). */
+/** Les pays de `national_bank_codes` que la famille porte (AT, BE, SM, IL, MN, RU). */
 export function restrictedRegisterCountries(): Set<string> {
   return new Set(
     membersOf('bic')

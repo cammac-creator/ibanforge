@@ -158,7 +158,13 @@ npm run build             # next build
   withdrawn on 29 September: TR, AE, BA, GE, KZ, MD, EE, RS and the rest of IT, ES and RO,
   served as a code-by-code `supplement` where the public map has no key, and the partial
   registers of Israel and Mongolia, `register_il` and `register_mn`, read from the Bank of
-  Israel on data.gov.il and the Mongolbank participants PDF), listed ONCE, with
+  Israel on data.gov.il and the Mongolbank participants PDF, and the Bank of Russia BIC
+  directory, `register_ru` and `register_ru_licences`, on Claude-Alain's decision of 28
+  October 2026 to name Russian banks only, free terms but kept out of this repository as a
+  precaution; for a Russian bank the sanctions screen takes the default SWIFT BIC of every
+  line of its licence, head office and branches (secondary BICs are neither served nor
+  compared), each compared on its first six characters, see `bankKeys` in
+  `src/lib/compliance.ts`), listed ONCE, with
   each table's definition and how its rows are dated. Every answer read from the EPC
   registers carries "Source: European Payments Council" and the day they were extracted. In
   production it comes from a private file per database, named by

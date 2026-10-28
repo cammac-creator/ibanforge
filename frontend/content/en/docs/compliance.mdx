@@ -106,6 +106,8 @@ A sanctioned-country IBAN (e.g. Russia) returns `risk_level: "high"` with a scor
 
 The `meta.scope` field says `bank_bic_only`, and it means it: screening is performed at the **bank level** (BIC8), not the account-holder level. It flags payments routed through designated institutions or sanctioned countries. It does **not** screen beneficiary names, and it is **not** a regulated AML/CFT product — for name-level KYC/AML obligations, use a regulated provider. The full disclaimer ships in every response, so downstream agents can't miss it.
 
+Russian IBANs are the one exception to the exact BIC8 match. The bank is named from the Bank of Russia BIC directory, and the default SWIFT BIC of every line of the same licence (head office and branches) is compared with the lists on its first six characters, because the lists often carry another BIC of the same bank. A Russian bank without any SWIFT BIC is not screened (`bank_screened: false`, `institution_listed: null`), and a bank that a list designates without a BIC, or under a BIC with another prefix, cannot be matched.
+
 ## Data freshness
 
 | Source | Refresh |

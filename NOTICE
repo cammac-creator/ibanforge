@@ -780,6 +780,32 @@ participants (PDF)
          not the allocation of the bank-code space, so an absence is not a
          non-allocation.
 
+Bank of Russia, BIC directory of the Bank of Russia payment system (ED807)
+  Never in: this repository. Since 28 October 2026 the API reads, from its
+         private repository, rebuilt every month: the nine-digit BIK (IBAN
+         positions 5 to 13), the name, in Cyrillic as published, and the
+         SWIFT BIC the directory marks as the default one, of the credit
+         institutions and branches it lists as active and without a
+         restriction of participation (a branch whose head office is not
+         served is left out); and the licence number of each served BIK,
+         used by the sanctions screen only. A default SWIFT BIC that is not
+         Russian is not served. No address, account or other participant of
+         the directory is served.
+  Terms: "Все материалы сайта Банка России могут быть воспроизведены в
+         любых средствах массовой информации, на серверах сети Интернет или
+         на любых иных носителях без каких-либо ограничений по объему и
+         срокам публикации. Единственным условием перепечатки и
+         ретрансляции является ссылка на первоисточник." (Bank of Russia,
+         https://www.cbr.ru/about/). Kept out of this repository as a
+         precaution, the country being under sanctions.
+         https://www.cbr.ru/s/newbik
+  Served with every API answer built from these codes, in
+  bank_code_check.register and bic.source:
+         Source: Bank of Russia, BIC directory of the Bank of Russia payment
+         system (ED807), https://www.cbr.ru, business day <date>
+  The directory is treated as partial here: only its credit institutions and
+         branches are served, so an absence is not a non-allocation.
+
 Bank of England, List of PRA-regulated Banks
   Formerly in: data/bic.sqlite, table pra_banks (281 rows).
   Terms: written permission of 25 August 2026 for the monthly list as a
