@@ -1,7 +1,14 @@
 import { Children, isValidElement, type ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuditClient, sampleCsv } from "./audit-client";
-import { SAMPLE_CREDITOR_CSV } from "../../src/lib/audit-sample";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+// L'exemple de l'API, chargé à l'exécution et non par un import statique : l'image Docker du site ne copie que
+// frontend/, et la vérification de types de `next build` y échouait sur `../../src/lib/audit-sample` (déploiement du
+// 28.10.2026). Même principe que `lib/audit-tiers.test.ts`, qui lit le code de l'API par readFileSync.
+const SAMPLE_PATH = resolve(__dirname, "../../src/lib/audit-sample.ts");
+let SAMPLE_CREDITOR_CSV = "";
 
 // Petit hôte de hooks pour appeler les vrais gestionnaires du composant sans DOM.
 // Les états et références survivent au rendu suivant, notamment après un exemple.
@@ -22,6 +29,11 @@ vi.mock("react", async (original) => ({
   useEffect: () => undefined,
 }));
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
+
+beforeAll(async () => {
+  const echantillon = (await import(/* @vite-ignore */ pathToFileURL(SAMPLE_PATH).href)) as { SAMPLE_CREDITOR_CSV: string };
+  SAMPLE_CREDITOR_CSV = echantillon.SAMPLE_CREDITOR_CSV;
+});
 
 function elements(node: ReactNode): Record<string, unknown>[] {
   return Children.toArray(node).flatMap((child) => {
