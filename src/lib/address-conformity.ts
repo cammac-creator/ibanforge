@@ -104,17 +104,34 @@ const ISO_CTRY_CLAUSE =
   ' Alpha-2 is the ISO 20022 CountryCode data type; the ISO 20022 base schema itself could not be ' +
   'fetched (iso20022.org unreachable, 26.08.2026).';
 
+/**
+ * Served on every answer of /v1/address/check. Its dates were last read on
+ * 02.09.2026 until 28/10/2026, when the Swiss and EPC parts were brought up to
+ * date. Each date says when it was read:
+ * - Swift, 27.08.2026: https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages
+ * - EPC, September 2026: https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline
+ *   (403 to a script on 28.10.2026; a web search that day found no new end date).
+ * - SIX, read 28.10.2026: https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html
+ *   ("Town Name" and "Country" "must always be used [...] whenever an address is
+ *   provided"; in SIC "validation of the addresses will be waived"; banks "may
+ *   continue to offer [...] the unstructured address").
+ * - T2, Fedwire, Bank of England: as read on 02.09.2026, not re-read since.
+ */
 export const CBPR_NOTE =
   "No 'cbpr+' scheme is offered, on purpose. The CBPR+ usage guideline and the PMPG \"November 2026 postal " +
   'address guidance"' +
   ' are published on swift.com, which was unreachable on 26.08.2026 (iso20022.org likewise; ' +
   'europeanpaymentscouncil.eu returns 403 on its document library). Every rule applied here is quoted from a ' +
   'document that was actually read, and each finding names it. A boolean claiming CBPR+ conformity would be a ' +
-  'guess dressed as a verdict. Dates, as of 02.09.2026: on 27 August 2026 Swift deferred all payments changes of ' +
+  'guess dressed as a verdict. Dates: on 27 August 2026 Swift deferred all payments changes of ' +
   'its November 2026 Standards Release, the retirement of unstructured addresses included, with an update promised ' +
-  'by December 2026 at the latest; SIX (14.11.2026), the Eurosystem T2 R2026.NOV and the EPC rulebooks (15.11.2026) ' +
-  'were unchanged on that day; Fedwire moved to November 2027; the Bank of England expects a twelve-month deferral, ' +
-  'subject to confirmation. See ibanforge.com/blog/2026-09-02-which-date-structured-addresses.';
+  'by December 2026 at the latest; in September 2026 the EPC postponed the end of unstructured addresses in its ' +
+  'rulebooks, planned for 15.11.2026, with a new date announced for October 2026 and none found on 28.10.2026; SIX ' +
+  'keeps 14.11.2026 for the Swiss Payment Standards (town and country required whenever an address is given), but ' +
+  'SIC does not validate addresses and each bank decides what it still accepts (six-group.com, read 28.10.2026); as ' +
+  'of 02.09.2026 the Eurosystem T2 R2026.NOV was unchanged, Fedwire had moved to November 2027 and the Bank of ' +
+  'England expected a twelve-month deferral, subject to confirmation. ' +
+  'See ibanforge.com/blog/2026-09-02-which-date-structured-addresses.';
 
 /** ISO 20022 `Max70Text` — the width of one `AdrLine`. */
 const ADR_LINE_MAX_LENGTH = 70;

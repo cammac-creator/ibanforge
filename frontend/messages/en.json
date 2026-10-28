@@ -819,7 +819,9 @@
           "otherCurrency": "{count, plural, one {# report in another currency: excluded from the CHF total.} other {# reports in another currency: excluded from the CHF total.}}",
           "unavailable": "Paid amounts unavailable. Catalogue prices are not used as a substitute.",
           "revenueNote": "Amounts confirmed by Stripe at checkout, including discounts, before refunds and fees. This total is not profit.",
-          "ratioNote": "Reports and uploads within the period, including samples and internal tests. This is not visitor conversion; the ratio can exceed 100%."
+          "samples": "{count, plural, =0 {No click on the sample file, counted apart.} one {# click on the sample file, counted apart.} other {# clicks on the sample file, counted apart.}}",
+          "uploadsCh": "{count, plural, =0 {No file with a Swiss or Liechtenstein row.} one {# file with at least one Swiss or Liechtenstein row.} other {# files with at least one Swiss or Liechtenstein row.}}",
+          "ratioNote": "Reports and uploads within the period, internal tests included; since 28.10.2026 clicks on the sample are counted apart, before that they were among the uploads. This is not visitor conversion; the ratio can exceed 100%."
         },
         "doors": {
           "title": "Actions across the site",
@@ -2602,7 +2604,7 @@
   },
   "audit": {
     "metaTitle": "Creditor file audit: $149, result at once",
-    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then $149 up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline at mid-November 2026.",
+    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then $149 up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses under the Swiss Payment Standards in force from 14.11.2026.",
     "eyebrow": "Creditor file audit",
     "title": "Audit your creditor file before the next payment run",
     "intro": "Every row goes through the same registers the IBANforge API serves: IBAN, bank code, bank name and BIC, SEPA reach, ISO 20022 address rules. You see what to fix for free; the annotated workbook has a displayed price, paid by card, downloadable at once.",
@@ -2621,8 +2623,8 @@
       "note": "One file, one payment by card on Stripe. The annotated workbook (.xlsx) and the summary are ready right after payment and stay downloadable for 24 hours."
     },
     "deadline": {
-      "title": "Mid-November 2026: Swiss payment orders with an unstructured address are refused",
-      "text": "From 14.11.2026 (SIX), any payment order with an unstructured address is refused, and payment templates that carry one can no longer be used. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
+      "title": "From 14.11.2026: town and country required in every Swiss payment address",
+      "text": "From 14.11.2026, the Swiss Payment Standards (SIX) require a structured or hybrid address in a payment order, with the town and country in their own fields. The SIC system does not validate addresses: each bank decides what it still accepts. Some still accept domestic Swiss payments for now; a SEPA or international payment without a town may be rejected. Swift and the EPC have postponed their own November deadlines. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
     },
     "upload": {
       "label": "Drop your creditor file here",
@@ -2724,7 +2726,7 @@
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
     },
-    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then $149 for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before mid-November 2026.",
+    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then $149 for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address under the Swiss Payment Standards in force from 14.11.2026.",
     "steps": {
       "title": "Three steps, one file",
       "s1t": "Drop your file",
@@ -2825,7 +2827,7 @@
     "eyebrow": "Free tool",
     "title": "Is this QR-bill valid, and are its addresses structured?",
     "intro": "Paste the text inside a Swiss QR-bill code (it starts with SPC). You get every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR, SCOR or NON reference and its checksum, amount, currency, and whether the addresses are structured (type S) or still combined (type K). A combined address comes back with the structured fields to use instead.",
-    "deadline": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, any payment order with an unstructured address is refused. Also redo the standing orders and templates captured from a type K QR-bill.",
+    "deadline": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, the Swiss Payment Standards require a structured or hybrid address in a payment order, with the town and country in their own fields. The SIC system does not validate addresses: each bank decides. Some still accept domestic Swiss payments for now; a SEPA or international payment without a town may be rejected. Also redo the standing orders and templates captured from a type K QR-bill.",
     "docsLink": "Read the documentation",
     "input": {
       "label": "QR-bill text (Swiss Payments Code)",
@@ -2853,6 +2855,11 @@
       "proposedCreditor": "Proposed structured creditor address",
       "proposedDebtor": "Proposed structured debtor address",
       "nextSteps": "What to do next"
+    },
+    "toAudit": {
+      "title": "Paying Swiss suppliers from a file?",
+      "text": "The file audit checks your whole creditor file at once, row by row: IBAN, bank and BIC, and the addresses when the file has them. The preview is free.",
+      "link": "Check my creditor file"
     },
     "api": {
       "title": "The same check from code",

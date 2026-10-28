@@ -819,7 +819,9 @@
           "otherCurrency": "{count, plural, one {# Bericht in einer anderen Währung: nicht im CHF-Gesamtbetrag enthalten.} other {# Berichte in einer anderen Währung: nicht im CHF-Gesamtbetrag enthalten.}}",
           "unavailable": "Bezahlte Beträge nicht verfügbar. Katalogpreise werden nicht als Ersatz verwendet.",
           "revenueNote": "Von Stripe beim Checkout bestätigte Beträge, inklusive Rabatten, vor Rückerstattungen und Gebühren. Dieser Gesamtbetrag ist kein Gewinn.",
-          "ratioNote": "Berichte und Uploads im Zeitraum, einschließlich Beispielen und internen Tests. Das ist keine Besucher-Konversionsrate; das Verhältnis kann über 100 % liegen."
+          "samples": "{count, plural, =0 {Kein Klick auf die Beispieldatei, separat gezählt.} one {# Klick auf die Beispieldatei, separat gezählt.} other {# Klicks auf die Beispieldatei, separat gezählt.}}",
+          "uploadsCh": "{count, plural, =0 {Keine Datei mit einer Zeile aus der Schweiz oder Liechtenstein.} one {# Datei mit mindestens einer Zeile aus der Schweiz oder Liechtenstein.} other {# Dateien mit mindestens einer Zeile aus der Schweiz oder Liechtenstein.}}",
+          "ratioNote": "Berichte und Uploads im Zeitraum, interne Tests eingeschlossen; seit dem 28.10.2026 werden Klicks auf das Beispiel separat gezählt, vorher steckten sie in den Uploads. Das ist keine Besucher-Konversionsrate; das Verhältnis kann über 100 % liegen."
         },
         "doors": {
           "title": "Aktionen auf der Website",
@@ -2602,7 +2604,7 @@
   },
   "audit": {
     "metaTitle": "Prüfung der Kreditorendatei: 149 $, Ergebnis sofort",
-    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5 000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist Mitte November 2026.",
+    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5 000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen nach den ab 14.11.2026 geltenden Swiss Payment Standards.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
     "intro": "Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN, Bankleitzahl, Bankname und BIC, SEPA-Erreichbarkeit, Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
@@ -2621,8 +2623,8 @@
       "note": "Eine Datei, eine Kartenzahlung über Stripe. Die kommentierte Arbeitsmappe (.xlsx) und die Zusammenfassung sind sofort nach der Zahlung bereit und bleiben 24 Stunden herunterladbar."
     },
     "deadline": {
-      "title": "Mitte November 2026: Schweizer Zahlungsaufträge mit unstrukturierter Adresse werden abgewiesen",
-      "text": "Ab dem 14.11.2026 (SIX) wird jeder Zahlungsauftrag mit unstrukturierter Adresse abgewiesen, und Zahlungsvorlagen mit einer solchen Adresse lassen sich nicht mehr verwenden. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
+      "title": "Ab dem 14.11.2026: Ort und Land in jeder Schweizer Zahlungsadresse verlangt",
+      "text": "Ab dem 14.11.2026 verlangen die Swiss Payment Standards (SIX) in einem Zahlungsauftrag eine strukturierte oder hybride Adresse, mit Ort und Land in eigenen Feldern. Das SIC-System prüft die Adressen nicht: Jede Bank entscheidet, was sie noch annimmt. Manche akzeptieren Inlandzahlungen vorläufig weiter; eine SEPA- oder Auslandzahlung ohne Ort kann abgewiesen werden. Swift und der EPC haben ihre eigenen Fristen vom November verschoben. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
     },
     "upload": {
       "label": "Legen Sie Ihre Kreditorendatei hier ab",
@@ -2724,7 +2726,7 @@
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
     },
-    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor Mitte November 2026.",
+    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse nach den ab 14.11.2026 geltenden Swiss Payment Standards.",
     "steps": {
       "title": "Drei Schritte, eine Datei",
       "s1t": "Datei ablegen",
@@ -2825,7 +2827,7 @@
     "eyebrow": "Kostenloses Tool",
     "title": "Ist diese QR-Rechnung gültig und sind ihre Adressen strukturiert?",
     "intro": "Fügen Sie den Text im Swiss-QR-Code ein (er beginnt mit SPC). Sie erhalten alle Urteile auf einmal: Kopfzeilen, Kreditoren-IBAN und QR-IBAN-Bereich, Referenz QRR, SCOR oder NON mit Prüfziffer, Betrag, Währung, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind. Eine kombinierte Adresse kommt mit den stattdessen zu verwendenden strukturierten Feldern zurück.",
-    "deadline": "Der Adresstyp K ist in einer QR-Rechnung seit dem 21.11.2025 nicht mehr zulässig (SIX, IG QR-Rechnung 2.3). Die Banken garantieren die Zahlung einer solchen QR-Rechnung nur bis Ende September 2026 (UBS: 30.09.2026; ZKB: längstens bis Ende September 2026). Eine QR-Rechnung mit Typ K kann daher bei der Zahlung abgewiesen werden: Stellen Sie sie mit Typ S neu aus. Ab dem 14.11.2026 wird jeder Zahlungsauftrag mit unstrukturierter Adresse abgewiesen. Erfassen Sie auch die Daueraufträge und Vorlagen neu, die aus einer QR-Rechnung mit Typ K übernommen wurden.",
+    "deadline": "Der Adresstyp K ist in einer QR-Rechnung seit dem 21.11.2025 nicht mehr zulässig (SIX, IG QR-Rechnung 2.3). Die Banken garantieren die Zahlung einer solchen QR-Rechnung nur bis Ende September 2026 (UBS: 30.09.2026; ZKB: längstens bis Ende September 2026). Eine QR-Rechnung mit Typ K kann daher bei der Zahlung abgewiesen werden: Stellen Sie sie mit Typ S neu aus. Ab dem 14.11.2026 verlangen die Swiss Payment Standards in einem Zahlungsauftrag eine strukturierte oder hybride Adresse, mit Ort und Land in eigenen Feldern. Das SIC-System prüft die Adressen nicht: Jede Bank entscheidet selbst. Manche akzeptieren Inlandzahlungen vorläufig weiter; eine SEPA- oder Auslandzahlung ohne Ort kann abgewiesen werden. Erfassen Sie auch die Daueraufträge und Vorlagen neu, die aus einer QR-Rechnung mit Typ K übernommen wurden.",
     "docsLink": "Dokumentation lesen",
     "input": {
       "label": "Text der QR-Rechnung (Swiss Payments Code)",
@@ -2853,6 +2855,11 @@
       "proposedCreditor": "Vorgeschlagene strukturierte Kreditorenadresse",
       "proposedDebtor": "Vorgeschlagene strukturierte Debitorenadresse",
       "nextSteps": "Nächste Schritte"
+    },
+    "toAudit": {
+      "title": "Sie bezahlen Schweizer Lieferanten aus einer Datei?",
+      "text": "Die Dateiprüfung kontrolliert Ihre ganze Kreditorendatei auf einmal, Zeile für Zeile: IBAN, Bank und BIC, und die Adressen, wenn die Datei welche hat. Die Vorschau ist kostenlos.",
+      "link": "Meine Kreditorendatei prüfen"
     },
     "api": {
       "title": "Dieselbe Prüfung aus dem Code",
