@@ -88,6 +88,10 @@ const FILES = [
     `frontend/content/${lang}/blog/2026-09-29-german-iban-bic-python-javascript.mdx`,
     `frontend/content/${lang}/blog/2026-09-29-check-iban-list-google-sheets.mdx`,
   ]),
+  // Ajoutés le 28/10/2026 : ce que lisent les assistants de code (règles de
+  // l'index Context7 et compétence d'agent publique) cite l'essai sans clé.
+  'context7.json',
+  'skills/validate-iban-before-payment/SKILL.md',
 ];
 
 /** Une ligne qui parle de l'essai. Les autres ne regardent pas ce garde. */

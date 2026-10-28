@@ -103,6 +103,10 @@ export const KEY_ORIGIN_TAGS = {
   smithery: 'The Smithery listing (smithery.yaml).',
   glama: 'The Glama listing (glama.json).',
   'api-trial': 'The keyless REST trial, once its weekly allowance is spent.',
+  context7:
+    'The Context7 documentation index read by coding assistants: the rules of context7.json.',
+  skill:
+    'The agent skill skills/validate-iban-before-payment/SKILL.md, its key command and its links (also served through Context7, which indexes it).',
 } as const;
 
 export type KeyOriginTag = keyof typeof KEY_ORIGIN_TAGS;

@@ -483,6 +483,9 @@ const OWNED = [
   'frontend/components/json-ld.tsx',
   'README.md',
   'glama.json',
+  // Ce que lisent les assistants de code (28.10.2026), mesuré à zéro avant d'entrer ici.
+  'context7.json',
+  'skills/validate-iban-before-payment/SKILL.md',
 ];
 
 /** Lines that explain an old wording in a code comment are history, not copy. */

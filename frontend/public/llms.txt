@@ -153,6 +153,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - x402: https://api.ibanforge.com/.well-known/x402
 - A2A agents: https://api.ibanforge.com/.well-known/agents.json
 - MCP server card: https://api.ibanforge.com/.well-known/mcp/server-card.json
+- Agent skill for coding assistants, validate an IBAN before a payment (SKILL.md): https://github.com/cammac-creator/ibanforge/blob/main/skills/validate-iban-before-payment/SKILL.md
 - Full agent guide: https://api.ibanforge.com/llms.txt
 
 ## Reference pages (human-readable, one URL per code)
