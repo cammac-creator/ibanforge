@@ -154,6 +154,22 @@ export interface RestrictedMember {
    * manuel la remplace (FI_LIST_PATH, scripts/seed-curated-map.ts).
    */
   staticList?: boolean;
+  /**
+   * Qui a publié la donnée, en un mot (son domaine) : le nom qu'un retrait
+   * donne à `RESTRICTED_WITHDRAWN` pour cesser de servir tous les membres de
+   * cette origine en un redémarrage (voir `withdrawnMembers`). Plusieurs membres
+   * peuvent partager une origine (les clés aspirées chez un même concurrent).
+   */
+  origin: string;
+  /**
+   * Clés de la carte composite servies EN COMPLÉMENT, code par code (règle du
+   * 28/10/2026) : une clé que le fichier public porte déjà, ou qu'une source
+   * officielle décide, garde la réponse publique ; la surcouche n'ajoute que
+   * les codes qui n'en ont aucune. Sans ce drapeau, un membre de
+   * `curated_bank_codes` sert un pays entier, et seulement quand le fichier
+   * public n'en porte plus aucune clé (PL, FI, LU).
+   */
+  supplement?: boolean;
 }
 
 export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly RestrictedTable[]>> = {
@@ -390,6 +406,21 @@ export const RESTRICTED_FLOORS = {
   map_fi: 400,
   map_lu: 80,
   register_fi: 50,
+  // 28/10/2026 : les clés retirées le 29/09/2026, relevées dans la roue
+  // schwifty 2026.10.1 (56 AE, 25 BA, 16 EE, 20 GE, 49 KZ, 9 MD, 26 RS, 49 TR
+  // valides ; ES, IT et RO avant le complément). Planchers à peu près à la
+  // moitié : une compilation qui perd la moitié d'un pays n'est plus la même.
+  map_ae: 25,
+  map_ba: 10,
+  map_ee: 8,
+  map_ge: 10,
+  map_kz: 20,
+  map_md: 4,
+  map_rs: 10,
+  map_tr: 20,
+  map_es: 150,
+  map_it: 150,
+  map_ro: 20,
 } as const;
 
 /**
@@ -422,6 +453,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     // 189 lignes propres à EBA STEP2 le 25/09/2026.
     minRows: 100,
     label: 'EBA CLEARING, STEP2 SCT reachable PSPs (all rights reserved)',
+    origin: 'ebaclearing.eu',
   },
   {
     id: 'nbp',
@@ -431,6 +463,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     // 21 lignes le 25/09/2026.
     minRows: 10,
     label: 'Narodowy Bank Polski, EWIB directory (non-commercial by default)',
+    origin: 'nbp.pl',
   },
   {
     id: 'oenb',
@@ -442,6 +475,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     // Un membre vide est donc légitime ; un plancher le ferait refuser à tort.
     minRows: 0,
     label: 'Oesterreichische Nationalbank, SEPA directory (terms unknown)',
+    origin: 'oenb.at',
   },
   {
     id: 'register_at',
@@ -450,6 +484,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     where: { column: 'country', value: 'AT' },
     minRows: RESTRICTED_FLOORS.register_at,
     label: 'Oesterreichische Nationalbank, Austrian bank codes (terms unknown)',
+    origin: 'oenb.at',
   },
   {
     id: 'register_be',
@@ -458,6 +493,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     where: { column: 'country', value: 'BE' },
     minRows: RESTRICTED_FLOORS.register_be,
     label: 'National Bank of Belgium, Belgian bank codes (terms unknown)',
+    origin: 'nbb.be',
   },
   {
     id: 'register_sm',
@@ -470,6 +506,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     // porte pas sur une copie de la liste dans ce dépôt : le membre reste privé.
     label:
       'Central Bank of the Republic of San Marino, Operating Banks (written confirmation for API answers, with attribution)',
+    origin: 'bcsm.sm',
   },
   {
     id: 'pra',
@@ -478,6 +515,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     where: null,
     minRows: RESTRICTED_FLOORS.pra,
     label: 'Bank of England, PRA List of Banks (permission for API use only)',
+    origin: 'bankofengland.co.uk',
   },
   // Membres venus après la première surcouche (voir `mayBeAbsent`).
   {
@@ -489,6 +527,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     label:
       'Polish bank codes of the composite map, from the NBP EWIB file (non-commercial by default)',
     mayBeAbsent: true,
+    origin: 'nbp.pl',
   },
   {
     id: 'map_fi',
@@ -498,6 +537,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     minRows: RESTRICTED_FLOORS.map_fi,
     label: 'Finnish bank codes of the composite map, from Finance Finland (terms not established)',
     mayBeAbsent: true,
+    origin: 'financefinland.fi',
   },
   {
     id: 'map_lu',
@@ -507,6 +547,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     minRows: RESTRICTED_FLOORS.map_lu,
     label: 'Luxembourg bank codes of the composite map, from the ABBL register (API use only)',
     mayBeAbsent: true,
+    origin: 'abbl.lu',
   },
   {
     id: 'register_fi',
@@ -517,6 +558,159 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     label: 'Finance Finland, Finnish monetary institution codes (terms not established)',
     mayBeAbsent: true,
     staticList: true,
+    origin: 'financefinland.fi',
+  },
+  // Règle du 28/10/2026 (« go pour B », DECISIONS.md) : les clés banque → BIC
+  // retirées le 29/09/2026 reviennent, servies depuis la surcouche et jamais
+  // depuis ce dépôt, en COMPLÉMENT du fichier public (`supplement`). Toutes sont
+  // relues chaque mois dans la dernière roue schwifty (scripts/seed-curated-map.ts),
+  // depuis le fichier dont elles venaient le 29/09 (docs/data-sources.md). Case 2
+  // de la grille pour la Turquie (association qui réserve l'usage commercial à
+  // son accord écrit), case 4 pour les autres (compilations de sites concurrents).
+  // Un propriétaire qui demande l'arrêt : RESTRICTED_WITHDRAWN=<origine>, puis
+  // retrait du membre ici (48 heures au plus).
+  {
+    // Banques turques : la liste de la TBB (`manual_tr` de schwifty).
+    id: 'map_tr',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'TR' },
+    minRows: RESTRICTED_FLOORS.map_tr,
+    label:
+      'Turkish bank codes, Türkiye Bankalar Birliği list compiled by mdomke/schwifty (commercial use subject to written consent; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'tbb.org.tr',
+    supplement: true,
+  },
+  {
+    // `manual_ae` de schwifty : ibancalculator.com.
+    id: 'map_ae',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'AE' },
+    minRows: RESTRICTED_FLOORS.map_ae,
+    label:
+      'Emirati bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_ba` de schwifty : ibancalculator.com.
+    id: 'map_ba',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'BA' },
+    minRows: RESTRICTED_FLOORS.map_ba,
+    label:
+      'Bosnian bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_ge` de schwifty : ibancalculator.com.
+    id: 'map_ge',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'GE' },
+    minRows: RESTRICTED_FLOORS.map_ge,
+    label:
+      'Georgian bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_kz` de schwifty : ibancalculator.com.
+    id: 'map_kz',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'KZ' },
+    minRows: RESTRICTED_FLOORS.map_kz,
+    label:
+      'Kazakh bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_md` de schwifty : ibancalculator.com.
+    id: 'map_md',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'MD' },
+    minRows: RESTRICTED_FLOORS.map_md,
+    label:
+      'Moldovan bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_ee` de schwifty : ibancalculator.com. Le registre officiel privé gagne là où il répond (enrich.ts).
+    id: 'map_ee',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'EE' },
+    minRows: RESTRICTED_FLOORS.map_ee,
+    label:
+      'Estonian bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served where the official list does not answer, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_rs` de schwifty : ibancalculator.com. Le registre officiel privé gagne là où il répond (enrich.ts).
+    id: 'map_rs',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'RS' },
+    minRows: RESTRICTED_FLOORS.map_rs,
+    label:
+      'Serbian bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served where the official list does not answer, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_it` de schwifty : ibancalculator.com. Les clés reconstruites depuis la Banca d'Italia et GLEIF gardent la priorité.
+    id: 'map_it',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'IT' },
+    minRows: RESTRICTED_FLOORS.map_it,
+    label:
+      "Italian bank codes, ibancalculator.com compiled by mdomke/schwifty (no licence; served only for codes the public map and the Banca d'Italia rebuild leave without a BIC, withdrawn within 48 hours on request)",
+    mayBeAbsent: true,
+    origin: 'ibancalculator.com',
+    supplement: true,
+  },
+  {
+    // `generated_es` de schwifty : iban.es.
+    id: 'map_es',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'ES' },
+    minRows: RESTRICTED_FLOORS.map_es,
+    label:
+      'Spanish bank codes, iban.es compiled by mdomke/schwifty (no licence; served only for codes the public map does not carry, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'iban.es',
+    supplement: true,
+  },
+  {
+    // `generated_ro` de schwifty : internationalmoneytransfers.org. Les clés reconstruites depuis GLEIF gardent la priorité.
+    id: 'map_ro',
+    kind: 'bic',
+    table: 'curated_bank_codes',
+    where: { column: 'country', value: 'RO' },
+    minRows: RESTRICTED_FLOORS.map_ro,
+    label:
+      'Romanian bank codes, internationalmoneytransfers.org compiled by mdomke/schwifty (reproduction prohibited; served only for codes the public map does not carry, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'internationalmoneytransfers.org',
+    supplement: true,
   },
   // --- compliance.sqlite ----------------------------------------------------
   {
@@ -528,6 +722,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     // regarde : le membre est alors refusé, l'ONU n'est plus nommée (PR 249).
     minRows: 1,
     label: 'United Nations Security Council consolidated list (all rights reserved)',
+    origin: 'un.org',
   },
   {
     id: 'epc_sepa',
@@ -537,6 +732,7 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     // 4 463 lignes le 25/09/2026 (SCT, SCT Inst, SDD Core).
     minRows: 3000,
     label: 'European Payments Council, SEPA scheme registers (non-commercial by default)',
+    origin: 'europeanpaymentscouncil.eu',
   },
   {
     id: 'epc_vop',
@@ -546,6 +742,25 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     // 1 288 lignes le 25/09/2026.
     minRows: 1000,
     label: 'European Payments Council, Verification of Payee register (non-commercial by default)',
+    origin: 'europeanpaymentscouncil.eu',
+  },
+  {
+    // Règle du 28/10/2026, case 2 : la liste suisse des sanctions, servie depuis
+    // la surcouche sans attendre la réponse du SECO (les conditions des sites
+    // fédéraux demandent un accord écrit préalable pour reproduire leur
+    // contenu ; aucun n'est tenu). Lue dans l'export complet par
+    // scripts/seco-list.ts, en chaîne privée seulement. Une dizaine de BIC de
+    // banque : un plancher à une ligne, comme l'ONU ; la taille de la liste
+    // elle-même est gardée par scripts/sanctions-source-floor.ts.
+    id: 'seco',
+    kind: 'compliance',
+    table: 'sanctioned_entities',
+    where: { column: 'source_list', value: 'SECO' },
+    minRows: 1,
+    label:
+      'State Secretariat for Economic Affairs SECO, Swiss sanctions list (no written permission; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'seco.admin.ch',
   },
 ];
 
@@ -620,11 +835,63 @@ export function restrictedRegisterCountries(): Set<string> {
   );
 }
 
-/** Les pays dont les clés de la carte composite viennent de la surcouche (PL, FI, LU). */
+/**
+ * Les pays dont TOUTES les clés de la carte composite viennent de la surcouche
+ * (PL, FI, LU) : servis pays entier, quand le fichier public n'en porte aucune.
+ * Les membres en complément (`supplement`) n'en sont pas : voir
+ * `restoredMapCountries`.
+ */
 export function curatedMapCountries(): Set<string> {
   return new Set(
     membersOf('bic')
-      .filter((m) => m.table === 'curated_bank_codes' && m.where)
+      .filter((m) => m.table === 'curated_bank_codes' && m.where && !m.supplement)
       .map((m) => m.where!.value),
   );
+}
+
+/**
+ * Les pays dont la surcouche complète la carte code par code (règle du
+ * 28/10/2026) : les clés retirées le 29/09/2026, de retour depuis le fichier
+ * privé seulement. Une clé publique garde toujours la priorité.
+ */
+export function restoredMapCountries(): Set<string> {
+  return new Set(
+    membersOf('bic')
+      .filter((m) => m.table === 'curated_bank_codes' && m.where && m.supplement)
+      .map((m) => m.where!.value),
+  );
+}
+
+/**
+ * La variable qui retire des membres SANS toucher au fichier privé : une liste
+ * séparée par des virgules d'origines (`ibancalculator.com`) ou d'identifiants
+ * de membres (`map_tr`). Posée sur le serveur, elle prend effet au redémarrage
+ * que Railway fait à chaque changement de variable : quelques minutes, contre
+ * un passage de la chaîne privée et un tirage pour un retrait par le fichier,
+ * que les gardes contre la perte d'un membre refuseraient d'ailleurs
+ * (`members_lost`). Un membre retiré n'est pas servi (ses lignes sont ôtées de
+ * la copie fusionnée), n'est ni refusé ni absent, et `GET /health` le nomme
+ * sous `restricted_overlays.<base>.withdrawn`.
+ */
+export const WITHDRAWN_ENV = 'RESTRICTED_WITHDRAWN';
+
+/**
+ * Ce que `RESTRICTED_WITHDRAWN` retire : les identifiants des membres dont
+ * l'identifiant ou l'origine est nommé, et les mots qui ne nomment rien (une
+ * faute de frappe ne doit pas passer pour un retrait : `/health` les montre).
+ */
+export function withdrawnMembers(value: string | undefined = process.env[WITHDRAWN_ENV]): {
+  ids: Set<string>;
+  unmatched: string[];
+} {
+  const ids = new Set<string>();
+  const unmatched: string[] = [];
+  for (const raw of (value ?? '').split(',')) {
+    const token = raw.trim().toLowerCase();
+    if (token === '') continue;
+    const hits = RESTRICTED_FAMILY.filter((m) => m.id === token || m.origin === token);
+    if (hits.length === 0) unmatched.push(token);
+    for (const m of hits) ids.add(m.id);
+  }
+  return { ids, unmatched };
 }

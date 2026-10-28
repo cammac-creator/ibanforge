@@ -595,6 +595,13 @@ export interface IBANValidationResult {
     /** Where `schemes` comes from: the EPC registers (bank grain) or the country default. */
     basis?: 'country_default' | 'epc_register';
     /**
+     * Present only when the EPC registers (schemes or VoP) were read for the
+     * resolved bank (rule of 28/10/2026): the credit their terms ask for,
+     * "Source: European Payments Council", and the day they were extracted.
+     */
+    register_source?: string;
+    register_as_of?: string | null;
+    /**
      * Whether the EPC scheme registers list the resolved BANK, never borrowed
      * from the country: `listed`, `not_listed` (absence from the register is not
      * exclusion from the scheme), `no_bank` (no BIC resolved: a register may still name the holder),
@@ -1053,6 +1060,13 @@ export interface ReachabilityCheck {
   screened: boolean;
   /** At least one of the three schemes; null when the registers were not consulted. */
   listed_in_epc_registers?: boolean | null;
+  /**
+   * Present only when the EPC scheme registers were read for this bank (rule of
+   * 28/10/2026): the credit their terms ask for, and the day they were
+   * extracted (YYYY-MM-DD, null when unknown). Absent when the country answered.
+   */
+  source?: string;
+  as_of?: string | null;
 }
 
 export interface VopCheck {
@@ -1067,6 +1081,9 @@ export interface VopCheck {
   screened: boolean;
   /** The VoP register status under its own name (`not_found` → `not_listed`); null when not consulted. */
   register_status?: 'active' | 'pending' | 'inactive' | 'not_listed' | null;
+  /** As on ReachabilityCheck: present only when the EPC VoP register was read for this bank. */
+  source?: string;
+  as_of?: string | null;
 }
 
 /**

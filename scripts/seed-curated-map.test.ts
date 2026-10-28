@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import {
+  CURATED_COUNTRIES,
   MAX_WHEEL_BYTES,
   REGISTRY_FILES,
   SCHWIFTY_INDEX_URL,
@@ -17,7 +18,7 @@ import {
   type CuratedFetch,
 } from './seed-curated-map.js';
 import { SEED_REPORT_ENV, readSeedReport } from './seed-report.js';
-import { RESTRICTED_FLOORS } from '../src/lib/restricted-family.js';
+import { RESTRICTED_FAMILY, RESTRICTED_FLOORS } from '../src/lib/restricted-family.js';
 
 /**
  * Le seeder des membres venus après la première surcouche, sans réseau : une
@@ -174,6 +175,14 @@ describe('seed-curated-map : clés PL, FI, LU et liste finlandaise, sans réseau
     else process.env[SEED_REPORT_ENV] = savedReport;
   });
 
+  /** Les membres du 28/10/2026, que ces roues ne portent pas : chacun en panne, seul. */
+  const RESTORED_MISSING = Object.fromEntries(
+    CURATED_COUNTRIES.filter((cc) => !['PL', 'FI', 'LU'].includes(cc)).map((cc) => [
+      `map_${cc.toLowerCase()}`,
+      'failed:missing_file',
+    ]),
+  );
+
   const states = (): Record<string, string> =>
     Object.fromEntries(
       [...readSeedReport(report).values()].map((r) => [
@@ -196,6 +205,7 @@ describe('seed-curated-map : clés PL, FI, LU et liste finlandaise, sans réseau
       map_pl: `loaded:${RESTRICTED_FLOORS.map_pl + 3}`,
       map_fi: `loaded:${RESTRICTED_FLOORS.map_fi + 3}`,
       map_lu: `loaded:${RESTRICTED_FLOORS.map_lu + 3}`,
+      ...RESTORED_MISSING,
       register_fi: 'failed:static_list',
     });
     const rows = db
@@ -269,14 +279,87 @@ describe('seed-curated-map : clés PL, FI, LU et liste finlandaise, sans réseau
     const net = fakeNetwork(wheel, { sha256: 'f'.repeat(64) });
     await seedCuratedMap({ db, fetchImpl: net.fetchImpl, log: () => {} });
     expect(states()).toEqual({
-      map_pl: 'failed:download_failed',
-      map_fi: 'failed:download_failed',
-      map_lu: 'failed:download_failed',
+      ...Object.fromEntries(
+        CURATED_COUNTRIES.map((cc) => [`map_${cc.toLowerCase()}`, 'failed:download_failed']),
+      ),
       register_fi: 'failed:static_list',
     });
     expect(
       db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'curated_bank_codes'").get(),
     ).toBeUndefined();
+  });
+
+  it('les clés du 29/09 (règle du 28/10) : un fichier par origine, la forme de chaque pays, le crédit qui la nomme', async () => {
+    // Registres INVENTÉS, codes et BIC `XMP…` : aucune vraie paire code → BIC.
+    const make = (cc: string, n: number, code: (i: number) => string, bic = `XMPZ${cc}AA`) =>
+      JSON.stringify(
+        Array.from({ length: n }, (_, i) => ({
+          country_code: cc,
+          primary: true,
+          bic,
+          bank_code: code(i),
+          name: `Remplissage ${cc} ${i}`,
+          short_name: `Remplissage ${cc}`,
+        })),
+      );
+    const letters = (i: number) =>
+      String.fromCharCode(65 + Math.floor(i / 26)) + String.fromCharCode(65 + (i % 26));
+    const wheel = buildZip({
+      'schwifty/bank_registry/manual_tr.json': make('TR', RESTRICTED_FLOORS.map_tr, (i) =>
+        String(90000 + i),
+      ),
+      'schwifty/bank_registry/generated_ge.json': make('GE', RESTRICTED_FLOORS.map_ge, letters),
+      'schwifty/bank_registry/generated_es.json': make(
+        'ES',
+        RESTRICTED_FLOORS.map_es,
+        (i) => String(9000 + i),
+        'XMPZESMMXYZ',
+      ),
+      // Une liste d'une autre origine, que la carte n'a jamais portée : jamais lue.
+      'schwifty/bank_registry/manual_md.json': make('MD', 50, letters),
+      // Une liste manuelle restée au fichier public : jamais lue non plus.
+      'schwifty/bank_registry/manual_it.json': make('IT', 500, (i) => String(90000 + i)),
+    });
+    await seedCuratedMap({ db, fetchImpl: fakeNetwork(wheel).fetchImpl, log: () => {} });
+    expect(states()).toMatchObject({
+      map_tr: `loaded:${RESTRICTED_FLOORS.map_tr}`,
+      map_ge: `loaded:${RESTRICTED_FLOORS.map_ge}`,
+      map_es: `loaded:${RESTRICTED_FLOORS.map_es}`,
+      map_md: 'failed:missing_file',
+      map_it: 'failed:missing_file',
+    });
+    const credit = (cc: string) =>
+      (
+        db
+          .prepare('SELECT DISTINCT source FROM curated_bank_codes WHERE country = ?')
+          .all(cc) as Array<{
+          source: string;
+        }>
+      ).map((r) => r.source);
+    expect(credit('TR')).toEqual([
+      'mdomke/schwifty 2099.1.0 (MIT), compiled from Türkiye Bankalar Birliği (The Banks Association of Türkiye)',
+    ]);
+    expect(credit('GE')).toEqual([
+      'mdomke/schwifty 2099.1.0 (MIT), compiled from ibancalculator.com',
+    ]);
+    expect(credit('ES')).toEqual(['mdomke/schwifty 2099.1.0 (MIT), compiled from iban.es']);
+    // Onze caractères, comme les clés d'avant le 29/09 ; un BIC déjà complet reste tel quel.
+    const bics = (cc: string) =>
+      db.prepare('SELECT DISTINCT bic FROM curated_bank_codes WHERE country = ?').all(cc);
+    expect(bics('TR')).toEqual([{ bic: 'XMPZTRAAXXX' }]);
+    expect(bics('ES')).toEqual([{ bic: 'XMPZESMMXYZ' }]);
+    expect(
+      db.prepare("SELECT code FROM curated_bank_codes WHERE country = 'GE' LIMIT 1").get(),
+    ).toEqual({
+      code: 'AA',
+    });
+  });
+
+  it('chaque pays du seeder est un membre `map_<pays>` de la famille, et réciproquement', () => {
+    const members = RESTRICTED_FAMILY.filter((m) => m.table === 'curated_bank_codes').map(
+      (m) => m.id,
+    );
+    expect(CURATED_COUNTRIES.map((cc) => `map_${cc.toLowerCase()}`).sort()).toEqual(members.sort());
   });
 
   it('index indisponible : cause http_<statut>, et la roue n’est pas demandée', async () => {

@@ -206,6 +206,26 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         curated.run('FI', String(500 + i).padStart(3, '0'), 'XMPMFIH1');
       for (let i = 0; i < floorOf('map_lu') + 5; i++)
         curated.run('LU', String(800 + i).padStart(3, '0'), 'XMPMLULL');
+      // Les clés rétablies le 28/10/2026, servies en complément : la forme du
+      // code de chaque pays, des codes que la carte publique ne porte pas
+      // (vérifié à l'écriture : aucun n'y est), un BIC `XMP…` par pays.
+      const letter = (i: number) => String.fromCharCode(65 + (i % 26));
+      const restored: Array<[string, (i: number) => string]> = [
+        ['TR', (i) => String(99000 + i)],
+        ['AE', (i) => String(900 + i)],
+        ['BA', (i) => String(900 + i)],
+        ['GE', (i) => `Q${letter(i)}`],
+        ['KZ', (i) => String(900 + i)],
+        ['MD', (i) => `Q${i % 10}`],
+        ['EE', (i) => String(70 + i)],
+        ['RS', (i) => String(900 + i)],
+        ['IT', (i) => String(99000 + i)],
+        ['ES', (i) => String(9800 + i)],
+        ['RO', (i) => `XMQ${letter(i)}`],
+      ];
+      for (const [cc, code] of restored)
+        for (let i = 0; i < floorOf(`map_${cc.toLowerCase()}`) + 5; i++)
+          curated.run(cc, code(i), `XMPZ${cc}22XXX`);
       const fiList = bic.prepare(
         `INSERT OR IGNORE INTO fi_monetary_codes (code, bic, institution, source, as_of)
          VALUES (?, 'XMPRFIH1', ?, 'Remplissage', '2026-01-15')`,
@@ -234,6 +254,12 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         compliance.prepare('SELECT COUNT(*) AS n FROM vop_participants').get() as { n: number }
       ).n;
       for (let i = vopCount; i < floorOf('epc_vop') + 10; i++) vop.run(`XMPV${tag(i)}`);
+      // La liste SECO, servie par la surcouche depuis le 28/10/2026 : deux BIC inventés.
+      const seco = compliance.prepare(
+        "INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code, directory_match) VALUES (?, ?, 'SECO', '', 0)",
+      );
+      for (let i = 0; i < floorOf('seco') + 1; i++)
+        seco.run(`XMPC${tag(i)}`, `Remplissage SECO ${i}`);
     })();
   } finally {
     compliance.close();

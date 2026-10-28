@@ -696,7 +696,9 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
       .path;
   }
 
-  const LATE = ['map_pl', 'map_fi', 'map_lu', 'register_fi'];
+  // Les membres venus après la première surcouche, dans l'ordre de la famille :
+  // PL, FI, LU et la liste finlandaise, puis les clés rétablies le 28/10/2026.
+  const LATE = RESTRICTED_FAMILY.filter((m) => m.kind === 'bic' && m.mayBeAbsent).map((m) => m.id);
 
   it('release sans les membres tardifs que la base sert : refusée au tirage, retenue, toujours servis au redémarrage', async () => {
     // Relecture de la PR 267, défaut 1 : le fichier posé aurait été refusé au

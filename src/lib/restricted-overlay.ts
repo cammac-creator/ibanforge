@@ -76,6 +76,7 @@ import {
   memberPredicate,
   membersOf,
   restrictedTable,
+  withdrawnMembers,
   type OverlayKind,
   type RestrictedMember,
   type RestrictedTable,
@@ -179,14 +180,16 @@ export function carriedOverFromMeta(
 
 /**
  * Ce qu'il advient d'un membre : servi par la surcouche, gardé du public, refusé,
- * ou absent (un membre `mayBeAbsent` que le fichier ne porte pas du tout : ni
- * servi, ni refusé, sans alerte ; voir src/lib/restricted-family.ts).
+ * absent (un membre `mayBeAbsent` que le fichier ne porte pas du tout : ni
+ * servi, ni refusé, sans alerte ; voir src/lib/restricted-family.ts), ou retiré
+ * (nommé par `RESTRICTED_WITHDRAWN` : accepté, puis ôté de la copie servie, à la
+ * demande de son propriétaire ; ni une faute du fichier, ni une perte).
  */
-export type MemberState = 'applied' | 'kept_public' | 'refused' | 'absent';
+export type MemberState = 'applied' | 'kept_public' | 'refused' | 'absent' | 'withdrawn';
 
-/** Refusé, au sens des portes : ni servi ni absent (un membre absent n'est pas une faute du fichier). */
+/** Refusé, au sens des portes : ni servi, ni absent, ni retiré (aucun n'est une faute du fichier). */
 export function memberRefused(member: { state: MemberState }): boolean {
-  return member.state !== 'applied' && member.state !== 'absent';
+  return member.state !== 'applied' && member.state !== 'absent' && member.state !== 'withdrawn';
 }
 
 /** Pourquoi un membre accepté est servi par la surcouche, ou laissé au public. */
@@ -700,6 +703,8 @@ export function buildMergedDatabase(options: {
   outputPath: string;
   /** Garder la copie figée d'une surcouche acceptée (voir MergeResult.frozen_path). */
   keepFrozen?: boolean;
+  /** Les membres à ne pas servir ; par défaut, ceux que nomme `RESTRICTED_WITHDRAWN`. */
+  withdrawn?: ReadonlySet<string>;
 }): MergeResult {
   const started = Date.now();
   const { kind, publicPath, outputPath } = options;
@@ -726,7 +731,14 @@ export function buildMergedDatabase(options: {
   }
   let keep = false;
   try {
-    const result = mergeFrozen({ kind, publicPath, overlayPath: frozen, outputPath, started });
+    const result = mergeFrozen({
+      kind,
+      publicPath,
+      overlayPath: frozen,
+      outputPath,
+      started,
+      withdrawn: options.withdrawn ?? withdrawnMembers().ids,
+    });
     keep = !!options.keepFrozen && result.state !== 'refused';
     return keep ? { ...result, frozen_path: frozen } : result;
   } finally {
@@ -745,8 +757,9 @@ function mergeFrozen(options: {
   overlayPath: string;
   outputPath: string;
   started: number;
+  withdrawn: ReadonlySet<string>;
 }): MergeResult {
-  const { kind, publicPath, overlayPath, outputPath, started } = options;
+  const { kind, publicPath, overlayPath, outputPath, started, withdrawn } = options;
   const inspection = inspectOverlay(overlayPath, kind);
   const finish = (result: Omit<MergeResult, 'duration_ms'>): MergeResult => ({
     ...result,
@@ -914,6 +927,26 @@ function mergeFrozen(options: {
       }
     }
 
+    // Les membres retirés à la demande de leur propriétaire (RESTRICTED_WITHDRAWN,
+    // règle du 28/10/2026) : acceptés et fusionnés comme les autres, puis leurs
+    // lignes sont ôtées de la copie servie. APRÈS la fusion, pour qu'un membre
+    // d'une table décidée d'un bloc (`bic_entries`) parte seul, sans emporter
+    // ses voisins ni changer leur préséance. Le fichier privé n'est pas touché :
+    // ôter la variable et redémarrer le sert de nouveau.
+    for (const member of membersOf(kind)) {
+      const r = report(member.id);
+      if (!withdrawn.has(member.id) || (r.state !== 'applied' && r.state !== 'kept_public'))
+        continue;
+      const predicate = memberPredicate(member);
+      if (tableExists(db, 'main', member.table))
+        db.prepare(`DELETE FROM main.${quoteIdent(member.table)} WHERE ${predicate.sql}`).run(
+          ...predicate.params,
+        );
+      r.state = 'withdrawn';
+      r.reason = 'withdrawn_on_request';
+      r.inserted = 0;
+    }
+
     // `last_refresh` ne dit jamais plus frais que le plus ancien membre servi en
     // (a) ou (b) : en (c), le contenu est celui du public, daté par lui.
     if (kind === 'compliance' && servedDates.length > 0 && publicRefresh) {
@@ -934,7 +967,10 @@ function mergeFrozen(options: {
     const refused = members.filter((m) => m.state === 'refused').length;
     const kept = members.filter((m) => m.state === 'kept_public').length;
     const applied = members.filter((m) => m.state === 'applied').length;
-    if (applied + kept === 0) {
+    // Un membre retiré a été accepté : tout retirer sert la base publique, ce
+    // n'est pas un refus du fichier.
+    const withdrawnCount = members.filter((m) => m.state === 'withdrawn').length;
+    if (applied + kept + withdrawnCount === 0) {
       removeFileWithCompanions(temporary);
       return finish({
         state: 'refused',
@@ -1040,7 +1076,7 @@ function memberDates(
  *
  * Membres absents : ceux de `absentMembers` (la reprise n'a rien à reprendre
  * pour un membre que la surcouche précédente ne portait pas encore), et les
- * membres `mayBeAbsent` dont la base lue n'a pas la table. Ni table (si aucun
+ * membres `mayBeAbsent` dont la base lue n'a pas la table, ou aucune ligne. Ni table (si aucun
  * autre membre ne la porte), ni ligne, ni compte : le fichier ne les porte pas
  * du tout, et le chargeur les lit absents. Jamais un membre de la première
  * surcouche : pour lui, une table manquante reste une erreur.
@@ -1134,6 +1170,16 @@ export function extractOverlay(options: {
       for (const member of membersOf(kind)) {
         if (absent.has(member.id)) continue;
         const rows = countMember(db, 'main', member);
+        // Un membre venu après la première surcouche dont la base lue ne porte
+        // aucune ligne, alors que sa table existe pour ses voisins (une clé de
+        // pays que la roue n'a pas donnée, SECO sans liste lisible au premier
+        // passage) : absent, comme sans table, et non refusé. Perdre un membre
+        // déjà servi reste refusé plus loin : par la porte du manifeste et par le
+        // chargeur de l'API (`members_lost`).
+        if (rows === 0 && member.mayBeAbsent) {
+          absent.add(member.id);
+          continue;
+        }
         if (rows < member.minRows)
           throw new Error(
             `${member.id} : ${rows} lignes, plancher ${member.minRows}. Surcouche non écrite.`,

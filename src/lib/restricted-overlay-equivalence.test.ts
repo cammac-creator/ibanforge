@@ -489,7 +489,7 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
 
   it('insère chaque membre depuis la surcouche, la base publique ne portant plus rien', () => {
     // identical_to_public: null = la base publique n'avait aucune ligne du membre.
-    expect(twins.length).toBe(14);
+    expect(twins.length).toBe(26);
     for (const [id, twin] of twins) expect(twin, id).toBeNull();
   });
 
@@ -564,6 +564,18 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       'bic.map_fi': 'applied:identical',
       'bic.map_lu': 'applied:identical',
       'bic.register_fi': 'applied:identical',
+      'bic.map_tr': 'applied:identical',
+      'bic.map_ae': 'applied:identical',
+      'bic.map_ba': 'applied:identical',
+      'bic.map_ge': 'applied:identical',
+      'bic.map_kz': 'applied:identical',
+      'bic.map_md': 'applied:identical',
+      'bic.map_ee': 'applied:identical',
+      'bic.map_rs': 'applied:identical',
+      'bic.map_it': 'applied:identical',
+      'bic.map_es': 'applied:identical',
+      'bic.map_ro': 'applied:identical',
+      'compliance.seco': 'applied:identical',
     });
     // Le montage doit mordre : la base plus récente répond autrement que la complète.
     const moved = [...before.keys()].filter(

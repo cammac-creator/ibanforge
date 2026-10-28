@@ -2,6 +2,7 @@ import { datasetFacts } from './dataset-facts.js';
 import { registerCoverage, structuralRuleCountries } from './enrich.js';
 import { IBAN_LENGTHS, getCountryName } from './countries.js';
 import { UNLICENSED_MAP_COUNTRIES, getSourceFreshness } from './bic-lookup.js';
+import { restoredMapCountries } from './restricted-family.js';
 import { LU_SOURCE, luRegisterConfigured } from './lu-register.js';
 import { GR_SOURCE, grRegisterConfigured } from './gr-register.js';
 import { EE_SOURCE, eeRegisterConfigured } from './ee-register.js';
@@ -258,11 +259,22 @@ export function bicDirectorySentence(options: { withCount?: boolean } = {}): str
  * copies of these sentences (README, llms files) keep the unconfigured wording
  * that positioning.test.ts holds them to. The set itself is untouched, because its
  * guards still decide a code the file does not carry (`unavailable`,
- * `no_reference_data_for_country`, never `absent`).
+ * `no_reference_data_for_country`, never `absent`). Since 28/10/2026 a country
+ * also leaves when the private overlay serves its map keys again (a `supplement`
+ * member in restricted-family.ts): all eight today, so the list is empty. Read
+ * from the family, not from the loaded map, like the private registers of
+ * Austria, Belgium, Poland or Finland, which the sentences count as covered: a
+ * deployment without its overlay answers « not consulted » on each response.
  */
 export function uncoveredCountries(): string[] {
   const named = new Set(registerCountries().partial);
-  return [...UNLICENSED_MAP_COUNTRIES].filter((cc) => !named.has(cc)).sort();
+  const restored = restoredMapCountries();
+  return [...UNLICENSED_MAP_COUNTRIES].filter((cc) => !named.has(cc) && !restored.has(cc)).sort();
+}
+
+/** « in all but N of them », or « in each of them » when nothing is left out. */
+function allBut(n: number): string {
+  return n === 0 ? 'in each of them' : `in all but ${n} of them`;
 }
 
 /** The long paragraph: llms files, README, OpenAPI. */
@@ -271,7 +283,7 @@ export function positioningLong(): string {
   const countries = datasetFacts().claim.countries;
   return (
     'IBANforge checks the bank behind an IBAN before you pay. ' +
-    `It validates IBANs from all ${countries} IBAN countries and, in all but ${uncoveredCountries().length} of them, names the bank and its BIC, with the source of that answer. ` +
+    `It validates IBANs from all ${countries} IBAN countries and, ${allBut(uncoveredCountries().length)}, names the bank and its BIC, with the source of that answer. ` +
     `Where it reads the national register (${namesOf(authoritative)}), it also tells you whether the bank code is allocated at all; ` +
     'elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. ' +
     'For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), ' +
@@ -506,12 +518,16 @@ export const SEPA_VOP_LINE =
  * them came from a source that grants no right to reuse it. Read from the
  * constant, so a country leaving or joining that set changes the sentence; a
  * country that a partial register names since (Estonia, 08/10/2026) is left out,
- * see uncoveredCountries().
+ * see uncoveredCountries(). Since 28/10/2026 the private overlay serves all
+ * eight again, and the clause goes when no country is left in it.
  */
 export function otherCountriesLine(): string {
   const none = uncoveredCountries();
+  const head =
+    '- Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`';
+  if (none.length === 0) return `${head}.`;
   return (
-    '- Every other IBAN country: structure, mod-97 and a composite BIC map, answered with `authoritative: false`; ' +
+    `${head}; ` +
     `for ${namesOf(none)}, structure and mod-97 only: we hold no bank-code data we may reuse there, so \`bank_code_check\` answers \`unavailable\` and \`bic\` is null.`
   );
 }

@@ -12,6 +12,7 @@ import {
 import { reportSeedMember } from './seed-report.js';
 import {
   RESTRICTED_BIC_INSERT_ORDER,
+  RESTRICTED_FAMILY,
   RESTRICTED_TABLES,
   membersOf,
   restrictedBicSources,
@@ -148,11 +149,11 @@ function fakeSeeders(sourcePath: string, net: Network) {
             db.prepare(sql).run();
         };
         ensure('curated_bank_codes');
-        for (const [cc, member] of [
-          ['PL', 'map_pl'],
-          ['FI', 'map_fi'],
-          ['LU', 'map_lu'],
-        ] as const) {
+        // Chaque membre de la table, PL, FI et LU comme les clés rétablies le
+        // 28/10/2026 : un pays, un membre.
+        for (const [cc, member] of RESTRICTED_FAMILY.filter(
+          (m) => m.table === 'curated_bank_codes',
+        ).map((m) => [m.where!.value, m.id] as const)) {
           if (down.has(member)) {
             note(member, 0);
             continue;

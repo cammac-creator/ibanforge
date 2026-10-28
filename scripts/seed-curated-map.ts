@@ -1,7 +1,13 @@
 /**
  * Les clés PL, FI et LU de la carte composite, et la liste finlandaise des codes
  * d'établissement, pour la surcouche privée (membres `map_pl`, `map_fi`, `map_lu`
- * et `register_fi` de src/lib/restricted-family.ts).
+ * et `register_fi` de src/lib/restricted-family.ts). Depuis la règle du
+ * 28/10/2026 (« go pour B »), aussi les clés retirées du dépôt et du service le
+ * 29/09/2026 : TR (liste de la TBB), AE, BA, GE, KZ, MD, EE, RS et le reste
+ * d'IT (ibancalculator.com), ES (iban.es), RO (internationalmoneytransfers.org),
+ * un membre `map_<pays>` chacun, servis en complément du fichier public. Chacune
+ * est relue dans le fichier de la roue d'où elle venait (`REGISTRY_FILES`), et
+ * son crédit nomme cette origine.
  *
  * ## Pourquoi ce fichier existe
  *
@@ -74,21 +80,96 @@ export const MAX_WHEEL_BYTES = 32 * 1024 * 1024;
  * roue. Le nom v2 passe en premier, l'ancien reste lu pour une roue plus ancienne,
  * et le nom v2 du registre luxembourgeois est lu d'avance.
  */
-export const REGISTRY_FILES: Readonly<Record<'PL' | 'FI' | 'LU', readonly string[]>> = {
-  PL: ['schwifty/bank_registry/generated_pl.v2.json', 'schwifty/bank_registry/generated_pl.json'],
-  FI: ['schwifty/bank_registry/generated_fi.v2.json', 'schwifty/bank_registry/generated_fi.json'],
-  LU: [
-    'schwifty/bank_registry/generated_lu.v2.json',
-    'schwifty/bank_registry/generated_lu.json',
-    'schwifty/bank_registry/manual_lu.json',
-  ],
+/**
+ * Les pays de la carte composite que la surcouche porte : PL, FI et LU servis
+ * pays entier (25/09/2026), puis, depuis la règle du 28/10/2026, les clés
+ * retirées le 29/09/2026, servies en complément (`supplement` dans
+ * src/lib/restricted-family.ts).
+ */
+export const CURATED_COUNTRIES = [
+  'PL',
+  'FI',
+  'LU',
+  'TR',
+  'AE',
+  'BA',
+  'GE',
+  'KZ',
+  'MD',
+  'EE',
+  'RS',
+  'IT',
+  'ES',
+  'RO',
+] as const;
+export type CuratedCountry = (typeof CURATED_COUNTRIES)[number];
+
+const REGISTRY = (name: string): string => `schwifty/bank_registry/${name}.json`;
+
+/**
+ * Pour les clés du 29/09/2026, UN fichier par pays, celui d'où elles venaient
+ * (docs/data-sources.md, section du 29/09/2026) : jamais les listes manuelles de
+ * schwifty qui restent au fichier public (`manual_it`, `manual_es`), ni une
+ * liste d'une autre origine (`manual_md`, jamais dans la carte). Une origine,
+ * un membre : c'est ce qui permet de la retirer seule.
+ */
+export const REGISTRY_FILES: Readonly<Record<CuratedCountry, readonly string[]>> = {
+  PL: [REGISTRY('generated_pl.v2'), REGISTRY('generated_pl')],
+  FI: [REGISTRY('generated_fi.v2'), REGISTRY('generated_fi')],
+  LU: [REGISTRY('generated_lu.v2'), REGISTRY('generated_lu'), REGISTRY('manual_lu')],
+  TR: [REGISTRY('manual_tr')],
+  AE: [REGISTRY('manual_ae')],
+  BA: [REGISTRY('generated_ba')],
+  GE: [REGISTRY('generated_ge')],
+  KZ: [REGISTRY('generated_kz')],
+  MD: [REGISTRY('generated_md')],
+  EE: [REGISTRY('generated_ee')],
+  RS: [REGISTRY('generated_rs')],
+  IT: [REGISTRY('generated_it')],
+  ES: [REGISTRY('generated_es')],
+  RO: [REGISTRY('generated_ro')],
 };
 
-/** La forme d'un code bancaire de l'IBAN, par pays. */
-const CODE_SHAPE: Readonly<Record<'PL' | 'FI' | 'LU', RegExp>> = {
+/**
+ * La forme du code bancaire de l'IBAN, par pays : la tranche que
+ * `lookupByCountryBank` cherche dans la carte (src/lib/countries.ts).
+ */
+const CODE_SHAPE: Readonly<Record<CuratedCountry, RegExp>> = {
   PL: /^\d{8}$/,
   FI: /^\d{3}$/,
   LU: /^\d{3}$/,
+  TR: /^\d{5}$/,
+  AE: /^\d{3}$/,
+  BA: /^\d{3}$/,
+  GE: /^[A-Z]{2}$/,
+  KZ: /^\d{3}$/,
+  MD: /^[A-Z0-9]{2}$/,
+  EE: /^\d{2}$/,
+  RS: /^\d{3}$/,
+  IT: /^\d{5}$/,
+  ES: /^\d{4}$/,
+  RO: /^[A-Z]{4}$/,
+};
+
+/**
+ * Ce que la compilation compile, nommé dans le crédit de chaque ligne et donc
+ * dans `bic.source` des réponses (règle du 28/10/2026 : source citée).
+ */
+const COMPILED_FROM: Readonly<Record<CuratedCountry, string>> = {
+  PL: 'Narodowy Bank Polski, EWIB',
+  FI: 'Finance Finland',
+  LU: 'ABBL, Luxembourg register of IBAN/BIC codes',
+  TR: 'Türkiye Bankalar Birliği (The Banks Association of Türkiye)',
+  AE: 'ibancalculator.com',
+  BA: 'ibancalculator.com',
+  GE: 'ibancalculator.com',
+  KZ: 'ibancalculator.com',
+  MD: 'ibancalculator.com',
+  EE: 'ibancalculator.com',
+  RS: 'ibancalculator.com',
+  IT: 'ibancalculator.com',
+  ES: 'iban.es',
+  RO: 'internationalmoneytransfers.org',
 };
 const BIC_SHAPE = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -129,11 +210,8 @@ export type CuratedFetch = (url: string) => Promise<{
   arrayBuffer(): Promise<ArrayBuffer>;
 }>;
 
-const MEMBER_BY_COUNTRY: Readonly<Record<'PL' | 'FI' | 'LU', string>> = {
-  PL: 'map_pl',
-  FI: 'map_fi',
-  LU: 'map_lu',
-};
+/** Le membre d'un pays : `map_<pays>`, contrôlé contre la famille au premier usage. */
+const memberOf = (cc: CuratedCountry): string => `map_${cc.toLowerCase()}`;
 
 function member(id: string): RestrictedMember {
   const found = RESTRICTED_FAMILY.find((m) => m.id === id);
@@ -198,7 +276,7 @@ export function readWheel(wheel: Buffer): Map<string, string> {
  * La forme décide, pas le nom du fichier. Une entrée sans liste de codes reste une
  * ligne sans code : écartée et comptée plus loin. Toute autre forme est une Error.
  */
-function registryEntries(cc: 'PL' | 'FI' | 'LU', text: string): unknown[] {
+function registryEntries(cc: CuratedCountry, text: string): unknown[] {
   const parsed: unknown = JSON.parse(text);
   if (Array.isArray(parsed)) return parsed;
   const v2 = parsed as { entries?: unknown; expand_from?: unknown; expand_into?: unknown } | null;
@@ -223,7 +301,7 @@ function registryEntries(cc: 'PL' | 'FI' | 'LU', text: string): unknown[] {
  * qui n'a pas la forme attendue est écarté (et compté), jamais corrigé.
  */
 export function parseRegistry(
-  cc: 'PL' | 'FI' | 'LU',
+  cc: CuratedCountry,
   texts: readonly string[],
 ): { rows: Array<CuratedRow & { name: string | null }>; skipped: number } {
   const byCode = new Map<string, CuratedRow & { name: string | null; primary: boolean }>();
@@ -249,8 +327,10 @@ export function parseRegistry(
       }
       // La carte servait les BIC finlandais sous leur forme à onze caractères
       // (import du 08/04/2026) ; les BIC polonais et luxembourgeois tels que la
-      // compilation les donne. Même forme, même réponse qu'avant le retrait.
-      const bic = cc === 'FI' && read.length === 8 ? `${read}XXX` : read;
+      // compilation les donne. Même forme, même réponse qu'avant le retrait. Les
+      // clés du 29/09/2026 étaient aussi à onze caractères (siège : `XXX`).
+      const elevenChars = cc !== 'PL' && cc !== 'LU';
+      const bic = elevenChars && read.length === 8 ? `${read}XXX` : read;
       const primary = entry.primary === true;
       const name = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : null;
       const before = byCode.get(code);
@@ -302,12 +382,12 @@ function ensureTable(db: Database.Database, m: RestrictedMember): void {
 /** Remplace les lignes d'un pays de la carte composite (membre `map_<pays>`). */
 export function writeCuratedRows(
   db: Database.Database,
-  cc: 'PL' | 'FI' | 'LU',
+  cc: CuratedCountry,
   rows: readonly CuratedRow[],
   source: string,
   asOf: string | null,
 ): void {
-  const m = member(MEMBER_BY_COUNTRY[cc]);
+  const m = member(memberOf(cc));
   ensureTable(db, m);
   const p = memberPredicate(m);
   db.transaction(() => {
@@ -357,14 +437,9 @@ export function curatedRowsFromMap(text: string): Record<'PL' | 'FI' | 'LU', Cur
   return out;
 }
 
-/** Le crédit d'une ligne : la compilation, sa version et la source nationale qu'elle compile. */
-export function schwiftySource(cc: 'PL' | 'FI' | 'LU', version: string): string {
-  const national = {
-    PL: 'Narodowy Bank Polski, EWIB',
-    FI: 'Finance Finland',
-    LU: 'ABBL, Luxembourg register of IBAN/BIC codes',
-  }[cc];
-  return `mdomke/schwifty ${version} (MIT), compiled from ${national}`;
+/** Le crédit d'une ligne : la compilation, sa version et ce qu'elle compile. */
+export function schwiftySource(cc: CuratedCountry, version: string): string {
+  return `mdomke/schwifty ${version} (MIT), compiled from ${COMPILED_FROM[cc]}`;
 }
 
 /**
@@ -452,12 +527,12 @@ export async function seedCuratedMap(options: {
   } catch (err) {
     const cause = failureCause(err) === 'error' ? 'download_failed' : failureCause(err);
     log(`[carte] schwifty illisible (${cause}) : aucune clé écrite`);
-    for (const cc of ['PL', 'FI', 'LU'] as const) fail(MEMBER_BY_COUNTRY[cc], cause);
+    for (const cc of CURATED_COUNTRIES) fail(memberOf(cc), cause);
   }
 
   if (files && result.release) {
-    for (const cc of ['PL', 'FI', 'LU'] as const) {
-      const id = MEMBER_BY_COUNTRY[cc];
+    for (const cc of CURATED_COUNTRIES) {
+      const id = memberOf(cc);
       const texts = REGISTRY_FILES[cc]
         .map((name) => files!.get(name))
         .filter((t): t is string => !!t);
@@ -523,7 +598,7 @@ async function main(): Promise<void> {
   // Famille sous conditions (voir l'en-tête) : la chaîne privée seulement.
   if (seedFamilyFromEnv() !== 'restricted') {
     console.error(
-      '[carte] refusé : les clés PL, FI et LU et la liste finlandaise sont reconstruites ' +
+      '[carte] refusé : les clés de la carte et la liste finlandaise sont reconstruites ' +
         'seulement par la chaîne privée (SEED_FAMILY=restricted, npm run overlay:seed).',
     );
     process.exitCode = 1;

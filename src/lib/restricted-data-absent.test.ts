@@ -94,13 +94,21 @@ describe('control: the invented datasets answer when they are loaded', () => {
       screened: true,
       // Nom honnête ajouté le 25/09/2026.
       listed_in_epc_registers: true,
+      // La mention des conditions de l'EPC et le jour d'extraction (28/10/2026).
+      source: 'Source: European Payments Council',
+      as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
     expect(r.compliance.vop).toEqual({
       participant: true,
       status: 'active',
       screened: true,
       register_status: 'active',
+      source: 'Source: European Payments Council',
+      as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
+    // La validation porte la même mention, dès que les registres ont été lus.
+    expect(r.sepa?.register_source).toBe('Source: European Payments Council');
+    expect(r.sepa?.register_as_of).toBe(r.compliance.vop.as_of);
     expect(r.compliance.risk_score).toBe(0);
     expect(r.sepa?.vop_participant).toBe(true);
     expect((r.sepa as { basis?: string }).basis).toBe('epc_register');
@@ -127,6 +135,8 @@ describe('control: the invented datasets answer when they are loaded', () => {
       sdd: false,
       screened: true,
       listed_in_epc_registers: true,
+      source: 'Source: European Payments Council',
+      as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
   });
 
@@ -143,6 +153,9 @@ describe('control: the invented datasets answer when they are loaded', () => {
     expect(r.checks?.sepa_reachability).toBe('unknown');
     const c = mods().response.buildComplianceResponse('NL19BICK0123456789');
     expect(c.compliance.reachability.listed_in_epc_registers).toBe(false);
+    // Lu chez l'EPC, et absent : la réponse dépend quand même de ses registres.
+    expect(c.compliance.reachability.source).toBe('Source: European Payments Council');
+    expect(r.sepa?.register_source).toBe('Source: European Payments Council');
     expect(c.compliance.vop.register_status).toBe('not_listed');
   });
 
@@ -151,6 +164,8 @@ describe('control: the invented datasets answer when they are loaded', () => {
       participant: false,
       status: 'pending',
       screened: true,
+      source: 'Source: European Payments Council',
+      as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
     expect(validate(mods(), FX.BE.iban(FX.BE.bank.code)).sepa?.vop_participant).toBe(false);
     expect(validate(mods(), FX.BE.iban(FX.BE.bank.code)).sepa?.vop_register_status).toBe('pending');
@@ -226,6 +241,10 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
     expect(r.sepa?.bank_schemes).toBeNull();
     expect(r.sepa?.vop_register_status).toBeNull();
     expect(r.checks?.sepa_reachability).toBe('unknown');
+    // Rien n'a été lu chez l'EPC : aucune mention de sa source (28/10/2026).
+    expect(r.compliance.reachability.source).toBeUndefined();
+    expect(r.compliance.vop.source).toBeUndefined();
+    expect(r.sepa?.register_source).toBeUndefined();
     // Les registres EPC manquent : l'index des traces courantes est incomplet,
     // et un BIC qu'il ne trouve pas répond « non consulté », jamais `false`.
     expect(r.bic?.listed_in_current_source).not.toBe(false);
@@ -239,6 +258,8 @@ describe.each(['empty', 'absent'] as const)('every restricted dataset missing, t
     expect(r.bic?.code.slice(0, 8)).toBe('NBRBBY2X');
     expect(r.compliance.reachability.screened).toBe(true);
     expect(r.compliance.vop.screened).toBe(true);
+    // Le pays a répondu, pas l'EPC : aucune mention de sa source.
+    expect(r.compliance.reachability.source).toBeUndefined();
     expect(r.compliance.flags).toEqual(
       expect.arrayContaining(['sanctioned_country', 'no_sepa_instant', 'no_vop']),
     );

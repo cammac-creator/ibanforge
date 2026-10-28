@@ -226,7 +226,23 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     const h = await health();
     expect(h.restricted_overlays.bic).toMatchObject({
       state: 'applied',
-      absent: ['map_pl', 'map_fi', 'map_lu', 'register_fi'],
+      absent: [
+        'map_pl',
+        'map_fi',
+        'map_lu',
+        'register_fi',
+        'map_tr',
+        'map_ae',
+        'map_ba',
+        'map_ge',
+        'map_kz',
+        'map_md',
+        'map_ee',
+        'map_rs',
+        'map_it',
+        'map_es',
+        'map_ro',
+      ],
     });
     expect(h.restricted_overlays.compliance).toEqual({ state: 'refused', sha256: null });
   });
