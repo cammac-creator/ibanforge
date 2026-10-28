@@ -599,8 +599,12 @@ export function recordOperation(
       truncatedError,
       keyPrefix ?? null,
     );
-    upsertDaily().run(type, 1, success ? 1 : 0, revenueUsdc);
-    upsertHourly().run(hour, dow, type, 1, success ? 1 : 0);
+    // Ce marqueur qualifie un audit déjà compté par audit_upload : il reste
+    // dans operations pour le détail suisse, sans doubler les agrégats.
+    if (type !== 'audit_upload_ch') {
+      upsertDaily().run(type, 1, success ? 1 : 0, revenueUsdc);
+      upsertHourly().run(hour, dow, type, 1, success ? 1 : 0);
+    }
     return true;
   } catch (err) {
     // Stats are non-critical — never crash the API, but log so a broken stats
@@ -1220,7 +1224,7 @@ export function getStats(): StatsOverview {
 
   const last7 = db
     .prepare(
-      "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-6 days') GROUP BY date ORDER BY date DESC",
+      "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE operation_type <> 'audit_upload_ch' AND date >= date('now', '-6 days') GROUP BY date ORDER BY date DESC",
     )
     .all() as Array<{ date: string; total: number; revenue: number }>;
 
@@ -1648,7 +1652,7 @@ export function getQuickStats(): {
   const db = getStatsDB();
   const row = db
     .prepare(
-      'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE reject_reason IS NULL',
+      "SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE reject_reason IS NULL AND operation_type <> 'audit_upload_ch'",
     )
     .get() as { total: number; success_count: number };
 
@@ -1684,7 +1688,7 @@ export function getHourlyStats(days: number = 7): HourlyStatsResponse {
       `
     SELECT day_of_week as day, hour, SUM(total) as total
     FROM hourly_stats
-    WHERE date >= date('now', '-' || ? || ' days')
+    WHERE operation_type <> 'audit_upload_ch' AND date >= date('now', '-' || ? || ' days')
     GROUP BY day_of_week, hour
     ORDER BY day_of_week, hour
   `,

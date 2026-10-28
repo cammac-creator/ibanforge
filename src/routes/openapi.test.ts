@@ -7,6 +7,15 @@ import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv
 import { bicLookup } from './bic-lookup.js';
 import { buildBicComplianceResponse, buildComplianceResponse } from '../lib/compliance-response.js';
 import type { HonoEnv } from '../types.js';
+import { CBPR_NOTE } from '../lib/address-conformity.js';
+
+it('aligne la date Fedwire du contrat sur la note de report', () => {
+  const description = buildSpec().paths['/v1/address/check'].post.description;
+  expect(description).toContain('Fedwire release rescheduled to November 2027');
+  expect(description).not.toContain('Fedwire production 16 Nov 2026');
+  expect(CBPR_NOTE).toContain('Fedwire moved its release to November 2027');
+  expect(CBPR_NOTE).toContain('27.08.2026, read 28.10.2026');
+});
 
 /**
  * The machine contract must describe every step the endpoint actually demands.

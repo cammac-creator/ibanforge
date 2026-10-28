@@ -215,7 +215,7 @@ export function AuditClient({ locale }: { locale: string }) {
 
 
 /** A small, synthetic creditor file: real bank codes, invented accounts, one of each finding. */
-function sampleCsv(): string {
+export function sampleCsv(): string {
   return [
     "Nom;IBAN;BIC;Adresse;NPA;Ville;Pays",
     "Alpha Menuiserie SA;CH10 0023 0000 0000 1234 5;;Rue du Lac 12;1003;Lausanne;CH",
