@@ -21,12 +21,14 @@
  * recopie l'état avant et après dans des blocs `<added>` et `<removed>`. Lancée
  * sur le texte brut, l'extraction des autres listes ramenait, mesuré le
  * 07.10.2026 :
- * - CMSYSYDA (Commercial Bank of Syria), RADIÉE chez SECO : une fausse
- *   accusation ;
- * - INVESTME, lu dans le NOM « Swift Investments (PVT) Ltd » : un code qui passe
- *   `validateBIC` (ST est un pays) et ne désigne aucune banque ;
- * et manquait KHJBSDKH (« SWIFT/BIC code: … »), SCERIRTH et SCTSAEA1
- * (« SWIFT codes: … »).
+ * - le BIC d'une banque RADIÉE chez SECO : une fausse accusation ;
+ * - un « code » lu dans le NOM d'une société qui commence par « Swift » : une
+ *   suite qui passe `validateBIC` (le pays y tombe sur un vrai code de pays) et
+ *   ne désigne aucune banque ;
+ * et manquait trois banques dont la liste écrit les codes sous la forme
+ * « SWIFT/BIC code: … » ou « SWIFT codes: … ».
+ * (Les codes et les noms réels ne sont pas écrits ici : depuis le 28.10.2026, la
+ * liste est servie depuis la surcouche privée et n'entre pas dans ce dépôt.)
  *
  * D'où les règles :
  * 1. seules les `<target>` de premier niveau comptent (jamais celles des blocs
@@ -101,10 +103,10 @@ const LIST_SEPARATOR = /^\s*(?:,|\/|\band\b)\s*/;
  * Les codes SWIFT qu'un champ de texte annonce, dans l'ordre, sans doublon.
  *
  * Seule la liste qui suit IMMÉDIATEMENT le libellé est lue, et seulement des
- * codes écrits en capitales : « Swift Investments (PVT) Ltd » ne donne rien, ni
- * « SWIFT/BIC: CMSYSYDA, all offices worldwide » autre chose que CMSYSYDA. Un
- * code coupé par une espace (« REF AIRTH », dans l'histoire de la liste) n'est
- * pas recollé : il manque plutôt que d'être deviné.
+ * codes écrits en capitales : « Swift Investments Alpha Ltd » ne donne rien, ni
+ * « SWIFT/BIC: EPSISYDA, all offices worldwide » autre chose que EPSISYDA. Un
+ * code coupé par une espace (« QRS AIRTH ») n'est pas recollé : il manque
+ * plutôt que d'être deviné.
  */
 export function swiftCodesIn(text: string): string[] {
   const out: string[] = [];

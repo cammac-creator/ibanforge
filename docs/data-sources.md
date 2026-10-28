@@ -18,7 +18,7 @@ pour le **dépôt public**. Quatre cas :
 |---|---|---|---|
 | 1. Libre | conditions qui permettent l'usage commercial (GLEIF, Bundesbank, SIX, BCE, UE, GAFI, Banca d'Italia…) | servi, source citée, sans rien demander | oui, avec sa mention |
 | 2. Zone grise | « non commercial », « tous droits réservés », « accord écrit », propriétaire silencieux (NBP, EBA Clearing, ONU, SECO, TBB…) | servi depuis le fichier privé, source citée, **sans attendre de réponse ni écrire de lettre de permission par défaut** | **jamais** |
-| 3. Le propriétaire a répondu | licence ou arrêt demandés (l'EPC, depuis le 27/10/2026) | servi pendant la discussion ; un « arrêtez » écrit est suivi dans les 48 heures | **jamais** |
+| 3. Le propriétaire a répondu | licence ou arrêt demandés | servi pendant la discussion ; un « arrêtez » écrit est suivi dans les 48 heures | **jamais** |
 | 4. Copié chez un concurrent | compilations de sites qui vendent le même service (ibancalculator.com, iban.es, internationalmoneytransfers.org) | servi depuis le fichier privé, source citée | **jamais** |
 
 Tout ce qui est ajouté ou rétabli au titre des cas 2 à 4 passe par la famille sous
@@ -608,11 +608,15 @@ surcouche privée** (membre `seco`, cas 2 de la règle du 28/10), jamais écrite
 `SEED_FAMILY=restricted`. Les réponses la nomment (`matched_lists`,
 `meta.sources`) ; les surfaces de couverture disent encore « OFAC, EU, UN »
 (annonce à part, `ANNOUNCEMENT_PENDING` dans `src/routes/sanctions-claims.test.ts`).
-Chaque liste mesurée (OFAC et UE au robot public, SECO à la chaîne privée) a son
-**plancher** (`scripts/sanctions-source-floor.ts`), sur la taille publiée : vide,
-sous le plancher absolu, en baisse de plus de 20 % ou sans plus aucun BIC, elle
-est reprise de la base précédente, et sans reprise possible le robot public
-échoue sans remplacer la base.
+Chaque liste mesurée a son **plancher** (`scripts/sanctions-source-floor.ts`), sur
+la taille publiée. Pour l'OFAC et l'UE (robot public) : vide, sous le plancher
+absolu, en baisse de plus de 20 % ou sans plus aucun BIC, elle est reprise de la
+base précédente, et sans reprise possible le robot échoue sans remplacer la base.
+Pour SECO (chaîne privée), seuls le plancher absolu et la règle « plus aucun BIC »
+s'appliquent : la base précédente y est la base publique fusionnée avec la
+surcouche, dont `metadata.source_records` ne porte pas la mesure de SECO ; une
+liste refusée y est reprise de la surcouche précédente, sinon le membre est
+absent et la porte du manifeste refuse de perdre un membre déjà publié.
 
 **06/09/2026 — le rafraîchissement hebdomadaire a échoué sur un 500 de l'UE** (SECO a
 répondu 500 aussi, comme depuis juillet) : la base produite ne portait plus qu'OFAC et ONU,

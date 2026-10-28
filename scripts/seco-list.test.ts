@@ -54,7 +54,7 @@ const FIXTURE = wholeList([
     `<modification modification-type="de-listed" enactment-date="2025-06-20" effective-date="2025-06-20"/>${listed('2016-01-19')}`,
   ),
   // Le mot « Swift » dans un NOM d'entreprise n'est jamais un code.
-  entity('4', 'Swift Investments (PVT) Ltd', ['Type of entity: company'], listed()),
+  entity('4', 'Swift Investments Alpha Ltd', ['Type of entity: company'], listed()),
   // Un code qui n'existe plus que dans l'histoire (bloc <removed>) ne compte pas.
   entity(
     '5',
@@ -152,8 +152,8 @@ describe('swiftCodesIn', () => {
   });
 
   it('ne recolle pas un code coupé et ne lit pas un mot', () => {
-    expect(swiftCodesIn('SWIFT: REF AIRTH')).toEqual([]);
-    expect(swiftCodesIn('Swift Investments (PVT) Ltd')).toEqual([]);
+    expect(swiftCodesIn('SWIFT: QRS AIRTH')).toEqual([]);
+    expect(swiftCodesIn('Swift Investments Alpha Ltd')).toEqual([]);
     expect(swiftCodesIn('SWIFT/BIC: see BRANCHES below')).toEqual([]);
     expect(swiftCodesIn('Website: https://example.org')).toEqual([]);
   });
