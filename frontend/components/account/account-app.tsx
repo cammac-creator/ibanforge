@@ -668,6 +668,7 @@ function TopupLinks({ topup, locale }: { topup: NonNullable<KeySheet["topup"]>; 
           <a
             key={p.slug}
             href={topup.links[p.slug]}
+            data-evt={`cta:buy-topup-${p.slug}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex flex-1 basis-24 flex-col items-center gap-0.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-center hover:border-amber-500/60 hover:bg-amber-500/10"
@@ -683,6 +684,7 @@ function TopupLinks({ topup, locale }: { topup: NonNullable<KeySheet["topup"]>; 
       {topup.pro && (
         <a
           href={topup.pro}
+          data-evt="cta:buy-pro-on-key"
           target="_blank"
           rel="noopener noreferrer"
           className="flex flex-col items-center gap-0.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-center hover:border-amber-500/60 hover:bg-amber-500/10"

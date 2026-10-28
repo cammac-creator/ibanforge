@@ -166,6 +166,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                 <a
                   key={p.bundle}
                   href={p.url}
+                  data-evt={`cta:buy-pack-${p.bundle}`}
                   className="flex flex-1 basis-20 flex-col items-center gap-0.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2 py-2.5 text-center transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
                 >
                   <span className="font-mono text-base font-bold text-amber-500">{formatUsd(p.price, locale)}</span>
@@ -262,7 +263,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
               variant="amber"
               className="px-5"
               nativeButton={false}
-              render={<a href={PRO_PAYMENT_LINK} rel="noopener" />}
+              render={<a href={PRO_PAYMENT_LINK} data-evt="cta:buy-pro" rel="noopener" />}
             >
               {t('pro.cta')}
             </Button>

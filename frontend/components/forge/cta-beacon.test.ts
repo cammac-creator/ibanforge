@@ -14,12 +14,13 @@ function mount(userAgent: string, extra: Record<string, unknown> = {}) {
   CtaBeacon({ locale: 'fr', page: '/fr/docs/mcp' });
 }
 
-function click() {
-  const event = new Event('click');
+function click(name = 'cta:vendor-docs') {
+  const event = new Event('click', { cancelable: true });
   Object.defineProperty(event, 'target', {
-    value: { closest: () => ({ getAttribute: () => 'docs:connector' }) },
+    value: { closest: () => ({ getAttribute: () => name }) },
   });
   listeners.get(event.type)?.(event);
+  return event;
 }
 
 function station(detail: number) {
@@ -31,7 +32,7 @@ function station(detail: number) {
 beforeEach(() => {
   listeners = new Map();
   const doc = {
-    addEventListener: (type: string, listener: EventListener) => listeners.set(type, listener),
+    addEventListener: vi.fn((type: string, listener: EventListener) => listeners.set(type, listener)),
     removeEventListener: (type: string, listener: EventListener) => {
       if (listeners.get(type) === listener) listeners.delete(type);
     },
@@ -80,7 +81,7 @@ describe('la balise de clic', () => {
     const [url, blob] = sendBeacon.mock.calls[0] as unknown as [string, Blob];
     expect(url).toMatch(/\/v1\/web\/events$/);
     expect(JSON.parse(await blob.text())).toEqual({
-      name: 'docs:connector', page: '/fr/docs/mcp', locale: 'fr', referrer: '', viewport: 'phone',
+      name: 'cta:vendor-docs', page: '/fr/docs/mcp', locale: 'fr', referrer: '', viewport: 'phone',
     });
     station(0);
     station(0);
@@ -102,5 +103,55 @@ describe('la balise de clic', () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/v1\/web\/events$/), expect.objectContaining({
       method: 'POST', keepalive: true,
     }));
+  });
+
+  it.each(['beacon', 'refus', 'absent'] as const)(
+    'envoie avant la navigation externe, sans lire sa référence privée (%s)',
+    async (transport) => {
+      if (transport === 'refus') sendBeacon.mockReturnValue(false);
+      mount(humanAgent, transport === 'absent' ? { sendBeacon: undefined } : {});
+      expect(document.addEventListener).toHaveBeenCalledWith('click', expect.any(Function), true);
+      const getAttribute = vi.fn((key: string) => key === 'data-evt' ? 'cta:buy-pro-on-key' : null);
+      const closest = vi.fn(() => ({
+        href: 'https://buy.stripe.com/exemple?client_reference_id=reference_fictive',
+        target: '_blank', getAttribute,
+      }));
+      const event = new Event('click', { cancelable: true });
+      // Le clic touche un enfant du lien ; la capture précède le gestionnaire et la navigation.
+      Object.defineProperty(event, 'target', { value: { closest } });
+      listeners.get('click')?.(event);
+      expect(closest).toHaveBeenCalledWith('[data-evt]');
+      expect(getAttribute.mock.calls).toEqual([['data-evt']]);
+      expect(event.defaultPrevented).toBe(false);
+      let body: string;
+      if (transport === 'beacon') {
+        expect(sendBeacon).toHaveBeenCalledOnce();
+        expect(fetchMock).not.toHaveBeenCalled();
+        const blob = (sendBeacon.mock.calls[0] as unknown as [string, Blob])[1];
+        expect(blob.type).toBe('text/plain');
+        body = await blob.text();
+      } else {
+        expect(fetchMock).toHaveBeenCalledOnce();
+        const options = fetchMock.mock.calls[0][1];
+        expect(options).toMatchObject({ method: 'POST', keepalive: true, headers: { 'Content-Type': 'text/plain' } });
+        body = options.body;
+      }
+      expect(JSON.parse(body)).toEqual({
+        name: 'cta:buy-pro-on-key', page: '/fr/docs/mcp', locale: 'fr', referrer: '', viewport: 'phone',
+      });
+      expect(body).not.toContain('reference_fictive');
+    },
+  );
+
+  it.each([
+    'cta:buy-pack-1k', 'cta:buy-pack-5k', 'cta:buy-pack-25k', 'cta:buy-pro',
+    'cta:buy-audit', 'cta:oem-mail', 'cta:buy-topup-1k', 'cta:buy-topup-5k',
+    'cta:buy-topup-25k', 'cta:buy-pro-on-key',
+  ])('transmet un clic d’achat %s sans bloquer son action', async (name) => {
+    mount(humanAgent);
+    expect(click(name).defaultPrevented).toBe(false);
+    expect(sendBeacon).toHaveBeenCalledOnce();
+    const blob = (sendBeacon.mock.calls[0] as unknown as [string, Blob])[1];
+    expect(JSON.parse(await blob.text()).name).toBe(name);
   });
 });
