@@ -228,9 +228,8 @@ export function loadedComplianceSources(): string | null {
 
 /**
  * La mention que demandent les conditions de l'EPC, dans chaque réponse tirée de
- * ses registres (règle du 28/10/2026 : les registres restent servis pendant la
- * discussion de la licence, la source est citée). Une seule chaîne, pour les
- * blocs SEPA et VoP de la validation et de la conformité.
+ * ses registres (28/10/2026). Une seule chaîne, pour les blocs SEPA et VoP de la
+ * validation et de la conformité.
  */
 export const EPC_SOURCE = 'Source: European Payments Council';
 

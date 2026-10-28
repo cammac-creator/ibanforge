@@ -79,7 +79,7 @@ function secoXml(listed: number): string {
   const bank = (ssid: number, name: string, info: string) =>
     `<target ssid="${ssid}"><sanctions-set-id>1</sanctions-set-id><entity><identity ssid="${ssid}0" main="true"><name><name-part order="1"><value>${name}</value></name-part></name></identity>` +
     `<other-information ssid="${ssid}1">${info}</other-information></entity>${mod}</target>`;
-  parts.push(bank(1, 'Alpha Bank Co Ltd', 'SWIFT/BIC code: ALFASDKH and 5040942458'));
+  parts.push(bank(1, 'Alpha Bank Co Ltd', 'SWIFT/BIC code: ALFASDKH and 0000000000'));
   parts.push(bank(2, 'Beta Trust Bankers', 'SWIFT codes: BETAIRTHKSH (Kish), GAMAAEA1 (Dubai)'));
   for (let i = 3; i <= listed; i++) {
     parts.push(

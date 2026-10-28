@@ -51,6 +51,9 @@ const { fixture, publicEs } = await vi.hoisted(async () => {
   insert.run('EE', '22', 'XMPZEE22XXX', credit('ibancalculator.com'));
   insert.run('EE', '15', 'XMPZEE15XXX', credit('ibancalculator.com'));
   insert.run('EE', '71', 'XMPZEE71XXX', credit('ibancalculator.com'));
+  // Serbie : un code que la liste inventée de la NBS nomme (105), un qu'elle ne porte pas (998).
+  insert.run('RS', '105', 'XMPZRS22XXX', credit('ibancalculator.com'));
+  insert.run('RS', '998', 'XMPZRS98XXX', credit('ibancalculator.com'));
   db.close();
   return { fixture, publicEs };
 });
@@ -67,7 +70,7 @@ import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import { buildComplianceResponse } from './compliance-response.js';
 import { uncoveredCountries } from './positioning.js';
-import { EE_FIXTURE, writePrivateFixture } from '../test-support/ee-me-fixtures.js';
+import { EE_FIXTURE, RS_FIXTURE, writePrivateFixture } from '../test-support/ee-me-fixtures.js';
 
 afterAll(() => fixture.restore());
 
@@ -158,6 +161,16 @@ describe('les clés rétablies par la surcouche (règle du 28/10/2026)', () => {
     expect(answer(ibanOf('EE', '15' + '00221020145685')).bic ?? null).toBeNull();
     // Absent de la liste : la clé rétablie répond.
     expect(answer(ibanOf('EE', '71' + '00221020145685')).bic?.code).toBe('XMPZEE71XXX');
+  });
+
+  it('cèdent à la liste de la Banque nationale de Serbie partout où elle répond', () => {
+    const file = writePrivateFixture('rs-register.json', RS_FIXTURE);
+    removers.push(file.remove);
+    vi.stubEnv('RS_REGISTER_PATH', file.path);
+    const listed = RS_FIXTURE.entries.find((c) => c.code === '105')!;
+    expect(answer(ibanOf('RS', '105' + '000005601001611')).bic?.code).toBe(listed.bic);
+    // Absent de la liste : la clé rétablie répond.
+    expect(answer(ibanOf('RS', '998' + '000005601001611')).bic?.code).toBe('XMPZRS98XXX');
   });
 
   it('ne sont écrites dans aucun fichier du dépôt', () => {

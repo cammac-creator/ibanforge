@@ -35,7 +35,7 @@ function wholeList(targets: string[], type = 'whole-list'): string {
 
 const FIXTURE = wholeList([
   // « SWIFT/BIC code: … and <un numéro> » : manqué par l'ancienne extraction.
-  entity('1', 'Alpha Bank Co Ltd', ['SWIFT/BIC code: ALFASDKH and 5040942458'], listed()),
+  entity('1', 'Alpha Bank Co Ltd', ['SWIFT/BIC code: ALFASDKH and 0000000000'], listed()),
   // Plusieurs codes dans un champ, dont une succursale : deux établissements.
   entity(
     '2',
@@ -145,7 +145,7 @@ describe('swiftCodesIn', () => {
     expect(swiftCodesIn('SWIFT: DELTKPPY')).toEqual(['DELTKPPY']);
     expect(swiftCodesIn('SWIFT/BIC: DELTKPPY.')).toEqual(['DELTKPPY']);
     expect(swiftCodesIn('Swift: IOTAIRTH')).toEqual(['IOTAIRTH']);
-    expect(swiftCodesIn('SWIFT/BIC code: ALFASDKH and 5040942458')).toEqual(['ALFASDKH']);
+    expect(swiftCodesIn('SWIFT/BIC code: ALFASDKH and 0000000000')).toEqual(['ALFASDKH']);
     expect(swiftCodesIn('SWIFT/BIC: EPSISYDA, all offices worldwide [NPWMD].')).toEqual([
       'EPSISYDA',
     ]);
