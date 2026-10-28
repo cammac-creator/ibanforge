@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Hono } from 'hono';
 import { webEvents, resetWebEventLimiter, WEB_EVENTS_PER_WINDOW } from './web-events.js';
 import { parseWebEvent, recordServerEvent, SERVER_EVENT_PAGE } from '../lib/web-events.js';
@@ -63,6 +65,20 @@ describe('parseWebEvent', () => {
     expect(parseWebEvent({ name: 'cta:try', page: 'fr', locale: 'fr' })).toBeNull();
     expect(parseWebEvent({ name: 'cta:try', page: '/fr', locale: 'it' })).toBeNull();
     expect(parseWebEvent('cta:try')).toBeNull();
+  });
+
+  it('accepts every tag the audit page and the QR-bill tool carry (28/10/2026)', () => {
+    // The page owns the vocabulary, the API refuses what it does not know: a
+    // tag the server would drop is a click nobody ever sees. Read from the
+    // components themselves, so a renamed tag cannot slip past.
+    const root = join(import.meta.dirname, '..', '..');
+    const tags = ['frontend/components/audit-client.tsx', 'frontend/components/qr-bill-client.tsx']
+      .flatMap((f) => [...readFileSync(join(root, f), 'utf8').matchAll(/data-evt="([^"]+)"/g)])
+      .map((m) => m[1]);
+    for (const name of ['cta:audit-upload', 'cta:audit-sample', 'cta:audit-from-qr'])
+      expect(tags).toContain(name);
+    for (const name of tags)
+      expect(parseWebEvent({ name, page: '/fr/audit', locale: 'fr' })?.name, name).toBe(name);
   });
 
   it('refuses the api: family — those rows are written by the server, never claimed', () => {

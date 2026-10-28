@@ -50,6 +50,9 @@ export function AuditClient({ locale }: { locale: string }) {
       const form = new FormData();
       form.append("file", file);
       form.append("lang", locale);
+      // L'exemple est compté à part (audit_sample) : sans ce champ, chaque clic sur
+      // « Essayer avec un fichier d'exemple » passait pour un fichier de client.
+      if (example) form.append("sample", "1");
       try {
         const r = await fetch(`${API_BASE}/v1/audit/upload`, { method: "POST", body: form });
         const body = (await r.json()) as AuditStatus & { error?: string; message?: string };
@@ -124,7 +127,7 @@ export function AuditClient({ locale }: { locale: string }) {
           }}
         />
         <div className="flex flex-wrap justify-center gap-2">
-          <Button type="button" onClick={() => inputRef.current?.click()} disabled={stage === "uploading" || stage === "paying"}>
+          <Button type="button" data-evt="cta:audit-upload" onClick={() => inputRef.current?.click()} disabled={stage === "uploading" || stage === "paying"}>
             {stage === "uploading" ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
@@ -137,6 +140,7 @@ export function AuditClient({ locale }: { locale: string }) {
           <Button
             type="button"
             variant="outline"
+            data-evt="cta:audit-sample"
             disabled={stage === "uploading" || stage === "paying"}
             onClick={() => void upload(new File([sampleCsv()], "exemple-creanciers.csv", { type: "text/csv" }), true)}
           >
@@ -163,7 +167,7 @@ export function AuditClient({ locale }: { locale: string }) {
             <div className="rounded-xl border p-5 flex flex-col gap-4" data-audit-demonstration>
               <p className="text-sm text-muted-foreground">{t("demo.next")}</p>
               <div className="flex flex-wrap gap-3">
-                <Button type="button" onClick={() => inputRef.current?.click()}>{t("demo.upload")}</Button>
+                <Button type="button" data-evt="cta:audit-upload" onClick={() => inputRef.current?.click()}>{t("demo.upload")}</Button>
                 <a className="rounded-md border px-4 py-2 text-sm underline underline-offset-4" href={`${API_BASE}/v1/audit/sample-report.xlsx?lang=${locale}`}>
                   {t("demo.download")}
                 </a>
