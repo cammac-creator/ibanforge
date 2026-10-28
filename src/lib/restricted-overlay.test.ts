@@ -89,6 +89,8 @@ describe('la famille « sous conditions », une seule constante', () => {
       'map_it',
       'map_es',
       'map_ro',
+      'register_il',
+      'register_mn',
     ]);
     expect(membersOf('compliance').map((m) => m.id)).toEqual(['un', 'epc_sepa', 'epc_vop', 'seco']);
     // Les membres venus après la première surcouche, et eux seuls, peuvent manquer
@@ -109,6 +111,8 @@ describe('la famille « sous conditions », une seule constante', () => {
       'map_it',
       'map_es',
       'map_ro',
+      'register_il',
+      'register_mn',
       'seco',
     ]);
     expect(RESTRICTED_FAMILY.filter((m) => m.staticList).map((m) => m.id)).toEqual(['register_fi']);
@@ -132,7 +136,7 @@ describe('la famille « sous conditions », une seule constante', () => {
   });
 
   it('laisse la Slovaquie et la Tchéquie publiques', () => {
-    expect([...restrictedRegisterCountries()].sort()).toEqual(['AT', 'BE', 'SM']);
+    expect([...restrictedRegisterCountries()].sort()).toEqual(['AT', 'BE', 'IL', 'MN', 'SM']);
     expect([...restrictedBicSources()].sort()).toEqual(['eba_step2', 'nbp', 'oenb']);
   });
 
@@ -541,6 +545,8 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         map_it: 'applied:identical',
         map_es: 'applied:identical',
         map_ro: 'applied:identical',
+        register_il: 'applied:identical',
+        register_mn: 'applied:identical',
       });
       expect(result.state).toBe('kept_public');
       const out = openDb(result.path!, true);

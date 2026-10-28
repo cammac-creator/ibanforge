@@ -732,6 +732,54 @@ participants in the NBS RTGS and clearing system (PDF list)
          as partial: it names participating banks, not the allocation of the
          code space, so an absence is not a non-allocation.
 
+Bank of Israel, list of banking corporations in Israel and list of bank
+branches (data.gov.il)
+  Never in: this repository. Since 28 October 2026 the API reads, from its
+         private repository, rebuilt every month: the three-digit bank code
+         (IBAN positions 5 to 7), the name and the BIC of the banking
+         corporations the Bank of Israel publishes on data.gov.il (dataset
+         375, "List of banking corporations in Israel", read through the
+         portal's API), and the bank name of the codes that only its list of
+         bank branches carries (dataset "Bank branches", open branches only;
+         that list publishes no BIC, so none is served for them). A published
+         BIC that is not Israeli, such as the parent's BIC of a foreign bank's
+         branch, is not served.
+  Terms: both datasets carry the licence "אחר (פתוח)" ("other (open)") on
+         data.gov.il, with no text. The terms of the Bank of Israel's own site
+         state that the user "may not copy, publish, disseminate, transmit or
+         sell any information made available this site, without the prior
+         written consent of the BOI". No written permission is held.
+         https://data.gov.il/api/3/action/package_show?id=375
+  Served with every API answer built from these codes, in
+  bank_code_check.register and bic.source:
+         Source: Bank of Israel, <dataset> (data.gov.il), dataset updated
+         <date>
+  The lists are treated as partial: they name banking corporations and their
+         branches, not the allocation of the bank-code space, so an absence
+         is not a non-allocation.
+
+Bank of Mongolia (Mongolbank), unified register of payment system
+participants (PDF)
+  Never in: this repository. Since 28 October 2026 the API reads, from its
+         private repository, rebuilt every month: the four-digit code (IBAN
+         positions 5 to 8), the name, in Cyrillic as published, and the BIC
+         of the SWIFT column of the participants that the Mongolbank lists in
+         the PDF linked from its page "ҮТС-ийн оролцогчийн код". The RTGS and
+         ACH+ columns are identifiers of the national payment systems and are
+         never served as a BIC: a participant without a SWIFT BIC is served by
+         name only. Banks the register marks as in liquidation (ЭХА) are not
+         imported.
+  Terms: none published; "Copyright © 2026 - Монголбанк (Монгол Улсын Төв
+         Банк)". No written permission is held.
+         https://www.mongolbank.mn/mn/p/1306
+  Served with every API answer built from these codes, in
+  bank_code_check.register and bic.source:
+         Source: Bank of Mongolia (Mongolbank), unified register of payment
+         system participants (read by IBANforge on <date>)
+  The register is treated as partial: it lists payment system participants,
+         not the allocation of the bank-code space, so an absence is not a
+         non-allocation.
+
 Bank of England, List of PRA-regulated Banks
   Formerly in: data/bic.sqlite, table pra_banks (281 rows).
   Terms: written permission of 25 August 2026 for the monthly list as a

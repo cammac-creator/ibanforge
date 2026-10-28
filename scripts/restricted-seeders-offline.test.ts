@@ -113,6 +113,8 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       register_at: 'failed:http_503',
       register_be: 'failed:http_503',
       register_sm: 'failed:http_503',
+      register_il: 'failed:http_503',
+      register_mn: 'failed:http_503',
       pra: 'failed:download_failed',
       map_pl: 'failed:http_503',
       map_fi: 'failed:http_503',
@@ -142,6 +144,8 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       'ebaclearing.eu',
       'nbb.be',
       'bcsm.sm',
+      'data.gov.il',
+      'mongolbank.mn',
       'bankofengland.co.uk',
       'pypi.org',
     ])
@@ -158,7 +162,9 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
         count("SELECT COUNT(*) AS n FROM bic_entries WHERE source IN ('oenb', 'nbp', 'eba_step2')"),
       ).toBe(0);
       expect(
-        count("SELECT COUNT(*) AS n FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SM')"),
+        count(
+          "SELECT COUNT(*) AS n FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SM', 'IL', 'MN')",
+        ),
       ).toBe(0);
       expect(count('SELECT COUNT(*) AS n FROM pra_banks')).toBe(0);
       // Les membres tardifs : aucune table créée pour rien quand la source est en panne.
