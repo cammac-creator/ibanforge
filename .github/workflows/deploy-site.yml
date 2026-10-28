@@ -94,5 +94,9 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           printf '%s\n' "$VPS_HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPYUhF/MiJIhunHMdPZGimuVdZj3+T6aKt1gPDoAlY7j" > ~/.ssh/known_hosts
+          # Signe de vie toutes les 30 s (jusqu'à 20 sans réponse) : le 28.10.2026, deux déploiements ont perdu la
+          # liaison vers 4 min 30, pendant le téléchargement silencieux de l'image (« client_loop: send disconnect:
+          # Broken pipe ») ; une fois le nouveau site n'a pas démarré, une fois le script a été coupé avant son ménage.
           printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
             "$VPS_USER@$VPS_HOST" "deploy $GITHUB_SHA"
