@@ -115,9 +115,9 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       register_sm: 'failed:http_503',
       register_il: 'failed:http_503',
       register_mn: 'failed:http_503',
-      // Les liens des succursales russes tombent avec leur répertoire, même cause.
+      // Les licences des BIK russes tombent avec leur répertoire, même cause.
       register_ru: 'failed:http_503',
-      register_ru_branches: 'failed:http_503',
+      register_ru_licences: 'failed:http_503',
       pra: 'failed:download_failed',
       map_pl: 'failed:http_503',
       map_fi: 'failed:http_503',
@@ -174,7 +174,7 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       // Les membres tardifs : aucune table créée pour rien quand la source est en panne.
       expect(
         count(
-          "SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('curated_bank_codes', 'fi_monetary_codes', 'ru_branch_heads')",
+          "SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('curated_bank_codes', 'fi_monetary_codes', 'ru_bik_licences')",
         ),
       ).toBe(0);
     } finally {

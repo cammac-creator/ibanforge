@@ -24,7 +24,7 @@
  * jamais dans ce dépôt, un paquet ou un export du site, seulement ici, comme
  * membre. D'où les membres `seco`, `map_tr` et ceux des clés retirées le
  * 29/09/2026 (`supplement`), les registres israélien et mongol (`register_il`,
- * `register_mn`), le répertoire russe (`register_ru`, `register_ru_branches`,
+ * `register_mn`), le répertoire russe (`register_ru`, `register_ru_licences`,
  * décision du 28/10/2026 « Nommer seulement », servi d'ici bien que libre), et
  * l'origine de chaque membre (`origin`), que
  * `RESTRICTED_WITHDRAWN` nomme pour un retrait en minutes.
@@ -356,22 +356,24 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
       decideTogether: false,
     },
     {
-      // Russie (28/10/2026) : chaque succursale du répertoire des BIK de la Banque
-      // de Russie et le BIK de son siège (`PrntBIC`, même licence). Aucune base
-      // publique ne porte cette table ; la fusion la crée depuis cette définition.
-      // Lue par la conformité seulement (src/lib/ru-institution.ts), pour contrôler
-      // l'établissement entier et non le seul BIC d'une ligne.
-      name: 'ru_branch_heads',
-      columns: ['code', 'head', 'source', 'as_of'],
+      // Russie (28/10/2026) : chaque BIK servi du répertoire de la Banque de Russie
+      // et le numéro de licence de son établissement (`RegN`, sans le numéro de
+      // succursale après « / ») : une licence, une personne morale, siège et
+      // succursales. Aucune base publique ne porte cette table ; la fusion la crée
+      // depuis cette définition. Lue par la conformité seulement
+      // (src/lib/ru-institution.ts), pour contrôler l'établissement entier et non le
+      // seul BIC d'une ligne.
+      name: 'ru_bik_licences',
+      columns: ['code', 'licence', 'source', 'as_of'],
       onConflict: 'fail',
       ddl: [
-        `CREATE TABLE ru_branch_heads (
-  code   TEXT PRIMARY KEY,
-  head   TEXT NOT NULL,
-  source TEXT NOT NULL,
-  as_of  TEXT NOT NULL
+        `CREATE TABLE ru_bik_licences (
+  code    TEXT PRIMARY KEY,
+  licence TEXT NOT NULL,
+  source  TEXT NOT NULL,
+  as_of   TEXT NOT NULL
 )`,
-        'CREATE INDEX idx_ru_branch_heads_head ON ru_branch_heads(head)',
+        'CREATE INDEX idx_ru_bik_licences_licence ON ru_bik_licences(licence)',
       ],
       freshness: 'max_as_of',
       decideTogether: false,
@@ -463,10 +465,10 @@ export const RESTRICTED_FLOORS = {
   register_il: 11,
   register_mn: 17,
   // 28/10/2026 (décision « Nommer seulement ») : 663 établissements de crédit et
-  // succursales actifs et sans restriction dans l'ED807 du jour, dont 295
-  // succursales liées à leur siège. Planchers à la moitié, communs au seeder.
+  // succursales actifs et sans restriction dans l'ED807 du jour, dont 660 portent
+  // un numéro de licence. Planchers à la moitié, communs au seeder.
   register_ru: 330,
-  register_ru_branches: 145,
+  register_ru_licences: 330,
 } as const;
 
 /**
@@ -809,14 +811,14 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     origin: 'cbr.ru',
   },
   {
-    // Les liens succursale → siège du même répertoire, lus par la conformité
-    // seule (src/lib/ru-institution.ts).
-    id: 'register_ru_branches',
+    // Le numéro de licence de chaque BIK du même répertoire, lu par la
+    // conformité seule (src/lib/ru-institution.ts).
+    id: 'register_ru_licences',
     kind: 'bic',
-    table: 'ru_branch_heads',
+    table: 'ru_bik_licences',
     where: null,
-    minRows: RESTRICTED_FLOORS.register_ru_branches,
-    label: 'Bank of Russia, BIC directory (ED807): branches and their head office',
+    minRows: RESTRICTED_FLOORS.register_ru_licences,
+    label: 'Bank of Russia, BIC directory (ED807): licence number of each served BIK',
     mayBeAbsent: true,
     origin: 'cbr.ru',
   },

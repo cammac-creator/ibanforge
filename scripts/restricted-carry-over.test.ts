@@ -127,30 +127,30 @@ function fakeSeeders(sourcePath: string, net: Network) {
             .run(net.stamp.slice(0, 10), cc).changes;
           note(member, n);
         }
-        // Les liens des succursales russes (28/10/2026), membre à part du même
-        // seeder, tombent avec leur répertoire.
-        if (down.has('register_ru') || down.has('register_ru_branches')) {
-          if (!silent.has('register_ru_branches'))
+        // Les licences des BIK russes (28/10/2026), membre à part du même seeder,
+        // tombent avec leur répertoire.
+        if (down.has('register_ru') || down.has('register_ru_licences')) {
+          if (!silent.has('register_ru_licences'))
             reportSeedMember(
-              { member: 'register_ru_branches', state: 'failed', cause: 'http_503' },
+              { member: 'register_ru_licences', state: 'failed', cause: 'http_503' },
               env,
             );
         } else {
           const exists = db
             .prepare(
-              "SELECT 1 FROM main.sqlite_master WHERE type = 'table' AND name = 'ru_branch_heads'",
+              "SELECT 1 FROM main.sqlite_master WHERE type = 'table' AND name = 'ru_bik_licences'",
             )
             .get();
           if (!exists)
-            for (const sql of RESTRICTED_TABLES.bic.find((t) => t.name === 'ru_branch_heads')!.ddl)
+            for (const sql of RESTRICTED_TABLES.bic.find((t) => t.name === 'ru_bik_licences')!.ddl)
               db.prepare(sql).run();
           const n = db
             .prepare(
-              `INSERT INTO main.ru_branch_heads (code, head, source, as_of)
-               SELECT code, head, source, as_of FROM src.ru_branch_heads ORDER BY rowid`,
+              `INSERT INTO main.ru_bik_licences (code, licence, source, as_of)
+               SELECT code, licence, source, as_of FROM src.ru_bik_licences ORDER BY rowid`,
             )
             .run().changes;
-          note('register_ru_branches', n);
+          note('register_ru_licences', n);
         }
       } else if (script === 'seed-pra-banks.ts') {
         if (down.has('pra')) {

@@ -786,10 +786,11 @@ Bank of Russia, BIC directory of the Bank of Russia payment system (ED807)
          positions 5 to 13), the name, in Cyrillic as published, and the
          SWIFT BIC the directory marks as the default one, of the credit
          institutions and branches it lists as active and without a
-         restriction of participation; and, for each branch, the BIK of its
-         head office, used by the sanctions screen only. A default SWIFT BIC
-         that is not Russian is not served. No address, account or other
-         participant of the directory is served.
+         restriction of participation (a branch whose head office is not
+         served is left out); and the licence number of each served BIK,
+         used by the sanctions screen only. A default SWIFT BIC that is not
+         Russian is not served. No address, account or other participant of
+         the directory is served.
   Terms: "Все материалы сайта Банка России могут быть воспроизведены в
          любых средствах массовой информации, на серверах сети Интернет или
          на любых иных носителях без каких-либо ограничений по объему и

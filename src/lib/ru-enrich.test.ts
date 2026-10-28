@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 /**
  * Russie (28/10/2026, décision « Nommer seulement ») : le répertoire des BIK de la
  * Banque de Russie, registre PARTIEL servi par la surcouche privée (membres
- * `register_ru` et `register_ru_branches`, src/lib/restricted-family.ts), et le
+ * `register_ru` et `register_ru_licences`, src/lib/restricted-family.ts), et le
  * contrôle des sanctions de l'établissement entier (src/lib/ru-institution.ts,
  * `bankKeys` dans src/lib/compliance.ts).
  *
@@ -12,6 +12,22 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
  * pas dans ce dépôt public. BIK 0499999xx et BIC en `ZZ` vérifiés absents du vrai
  * répertoire, de l'annuaire et des listes le 28/10/2026.
  */
+// La lecture de l'établissement peut lever (base illisible) : le test le provoque.
+const ruFault = vi.hoisted(() => ({ on: false }));
+vi.mock('./ru-institution.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ru-institution.js')>();
+  const guarded =
+    (fn: (code: string) => string[]) =>
+    (code: string): string[] => {
+      if (ruFault.on) throw new Error('establishment unreadable (test)');
+      return fn(code);
+    };
+  return {
+    ruInstitutionBics: guarded(actual.ruInstitutionBics),
+    ruInstitutionBicsForBic: guarded(actual.ruInstitutionBicsForBic),
+  };
+});
+
 const { fixture, ibanFor } = await vi.hoisted(async () => {
   const m = await import('../test-support/restricted-fixtures.js');
   const installed = m.installRestrictedFixture();
@@ -24,8 +40,10 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
     "INSERT INTO national_bank_codes (country, code, name, bic, source, as_of) VALUES ('RU', ?, ?, ?, ?, '2026-10-29')",
   );
   // Un siège listé sous un AUTRE BIC que le sien (ZZALRUM1 sur la liste, ZZALRUMM au
-  // répertoire), une succursale sans BIC SWIFT, une succursale avec le sien.
+  // répertoire), une seconde ligne de siège de la même licence sans BIC SWIFT, une
+  // succursale sans BIC SWIFT, une succursale avec le sien.
   insert.run('049999901', 'АО «Альфа-Тест»', 'ZZALRUMMXXX', SOURCE);
+  insert.run('049999904', 'АО «АЛЬФА-ТЕСТ»', null, SOURCE);
   insert.run('049999902', 'Филиал АО «Альфа-Тест» в г. Тестовске', null, SOURCE);
   insert.run('049999903', 'Филиал № 2 АО «Альфа-Тест»', 'ZZALRUM2SP3', SOURCE);
   // Une banque qu'aucune liste ne porte.
@@ -33,14 +51,16 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
   // Un établissement sans aucun BIC SWIFT, siège et succursale.
   insert.run('049999921', 'ПАО «Гамма-Тест»', null, SOURCE);
   insert.run('049999922', 'Филиал ПАО «Гамма-Тест»', null, SOURCE);
-  for (const statement of restrictedTable('bic', 'ru_branch_heads').ddl)
+  for (const statement of restrictedTable('bic', 'ru_bik_licences').ddl)
     bic.prepare(statement).run();
-  const link = bic.prepare(
-    "INSERT INTO ru_branch_heads (code, head, source, as_of) VALUES (?, ?, ?, '2026-10-29')",
+  const licence = bic.prepare(
+    "INSERT INTO ru_bik_licences (code, licence, source, as_of) VALUES (?, ?, ?, '2026-10-29')",
   );
-  link.run('049999902', '049999901', SOURCE);
-  link.run('049999903', '049999901', SOURCE);
-  link.run('049999922', '049999921', SOURCE);
+  for (const code of ['049999901', '049999904', '049999902', '049999903'])
+    licence.run(code, '9001', SOURCE);
+  licence.run('049999911', '9002', SOURCE);
+  licence.run('049999921', '9003', SOURCE);
+  licence.run('049999922', '9003', SOURCE);
   bic.close();
   const compliance = new Db(installed.compliancePath);
   const listed = compliance.prepare(
@@ -140,6 +160,10 @@ describe('Russia: the sanctions screen covers the whole institution', () => {
     expect(screened(ru('049999903')).compliance.sanctions.bank_sanctioned).toBe(true);
   });
 
+  it('flags a second head office line of the same licence, without a SWIFT BIC', () => {
+    expect(screened(ru('049999904')).compliance.sanctions.bank_sanctioned).toBe(true);
+  });
+
   it('screens and clears an institution no list carries', () => {
     const c = screened(ru('049999911')).compliance;
     expect(c.sanctions.bank_screened).toBe(true);
@@ -174,10 +198,45 @@ describe('Russia: the sanctions screen covers the whole institution', () => {
   });
 });
 
+describe('Russia: an institution that cannot be read is "not screened", never "not listed"', () => {
+  it('on the IBAN path', () => {
+    ruFault.on = true;
+    try {
+      const c = screened(ru('049999901')).compliance;
+      expect(c.sanctions.bank_screened).toBe(false);
+      expect(c.sanctions.institution_listed).toBeNull();
+      expect(c.flags[0]).toBe('compliance_data_unavailable');
+      expect(c.risk_score).toBeGreaterThanOrEqual(50);
+    } finally {
+      ruFault.on = false;
+    }
+  });
+
+  it('on the BIC paths', () => {
+    ruFault.on = true;
+    try {
+      expect(screenBicSanctions('ZZALRUMM')).toEqual({
+        screened: false,
+        listed: null,
+        matched_lists: [],
+      });
+      const b = buildBicComplianceResponse('ZZALRUMMXXX');
+      expect('error' in b).toBe(false);
+      if (!('error' in b)) {
+        expect(b.compliance.sanctions.bank_screened).toBe(false);
+        expect(b.compliance.sanctions.institution_listed).toBeNull();
+        expect(b.compliance.flags[0]).toBe('compliance_data_unavailable');
+      }
+    } finally {
+      ruFault.on = false;
+    }
+  });
+});
+
 describe('Russia without its overlay members', () => {
-  it('falls back to the line own BIC without the branch links', () => {
+  it('falls back to the line own BIC without the licences', () => {
     const db = new Database(fixture.bicPath);
-    db.prepare('DROP TABLE ru_branch_heads').run();
+    db.prepare('DROP TABLE ru_bik_licences').run();
     db.close();
     closeBicDB();
     resetNationalRegisterStatements();

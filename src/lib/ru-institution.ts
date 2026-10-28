@@ -11,22 +11,24 @@ import { nationalRegisterAvailable, normaliseCode } from './national-registers.j
  * succursales n'ont pas de BIC SWIFT à elles (le répertoire de la Banque de Russie en
  * publie pour une succursale sur six). Contrôler le seul BIC de la ligne laissait
  * sans réponse, ou pire « non listée », la succursale d'une banque désignée. Le
- * répertoire nomme le siège de chaque succursale (`PrntBIC`, table `ru_branch_heads`
- * de la surcouche) : l'établissement, ce sont le siège et toutes ses succursales, et
- * ce sont tous leurs BIC SWIFT que la conformité passe aux listes
+ * siège et ses succursales portent le même numéro de licence de la Banque de Russie
+ * (`RegN`, table `ru_bik_licences` de la surcouche) : l'établissement, ce sont toutes
+ * les lignes de sa licence (le répertoire publie deux lignes de siège pour
+ * Sovcombank), et ce sont tous leurs BIC SWIFT que la conformité passe aux listes
  * (src/lib/compliance.ts, `checkSanctions`).
  *
  * Seuls les BIC que le répertoire marque par défaut, ceux que `national_bank_codes`
  * porte : jamais un BIC secondaire, qui peut appartenir à une autre banque.
  *
  * Sans le registre (surcouche absente, membre retiré), aucun BIC : l'axe banque dit
- * « non contrôlé ». Sans la table des liens, le seul BIC de la ligne. Une lecture qui
+ * « non contrôlé ». Sans la table des licences, ou pour un BIK sans licence, le seul
+ * BIC de la ligne. Une lecture qui
  * échoue lève : l'appelant en fait « non contrôlé », jamais un « non ».
  */
 
-function linksLoaded(): boolean {
+function licencesLoaded(): boolean {
   return !!getBicDB()
-    .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'ru_branch_heads'")
+    .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'ru_bik_licences'")
     .get();
 }
 
@@ -36,7 +38,7 @@ export function ruInstitutionBics(bik: string): string[] {
   const code = normaliseCode('RU', bik);
   if (!code) return [];
   const db = getBicDB();
-  if (!linksLoaded()) {
+  if (!licencesLoaded()) {
     const row = db
       .prepare(
         "SELECT bic FROM national_bank_codes WHERE country = 'RU' AND code = ? AND bic IS NOT NULL",
@@ -44,20 +46,20 @@ export function ruInstitutionBics(bik: string): string[] {
       .get(code) as { bic: string } | undefined;
     return row ? [row.bic] : [];
   }
-  const head =
+  const licence =
     (
-      db.prepare('SELECT head FROM ru_branch_heads WHERE code = ?').get(code) as
-        { head: string } | undefined
-    )?.head ?? code;
+      db.prepare('SELECT licence FROM ru_bik_licences WHERE code = ?').get(code) as
+        { licence: string } | undefined
+    )?.licence ?? null;
   return (
     db
       .prepare(
         `SELECT DISTINCT bic FROM national_bank_codes
           WHERE country = 'RU' AND bic IS NOT NULL
-            AND (code IN (?, ?) OR code IN (SELECT code FROM ru_branch_heads WHERE head = ?))
+            AND (code = ? OR code IN (SELECT code FROM ru_bik_licences WHERE licence = ?))
           ORDER BY bic`,
       )
-      .all(code, head, head) as Array<{ bic: string }>
+      .all(code, licence) as Array<{ bic: string }>
   ).map((r) => r.bic);
 }
 

@@ -578,7 +578,7 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       'bic.register_il': 'applied:identical',
       'bic.register_mn': 'applied:identical',
       'bic.register_ru': 'applied:identical',
-      'bic.register_ru_branches': 'applied:identical',
+      'bic.register_ru_licences': 'applied:identical',
       'compliance.seco': 'applied:identical',
     });
     // Le montage doit mordre : la base plus récente répond autrement que la complète.

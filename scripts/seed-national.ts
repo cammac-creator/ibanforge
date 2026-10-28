@@ -160,7 +160,7 @@ import {
 } from './seed-national-it.js';
 import { IL_DATASETS, readIsraelLive } from './seed-national-il.js';
 import { MN_PAGE, readMongoliaLive } from './seed-national-mn.js';
-import { RU_DIRECTORY_URL, readRussiaLive, type RussiaBranch } from './seed-national-ru.js';
+import { RU_DIRECTORY_URL, readRussiaLive, type RussiaLicence } from './seed-national-ru.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -718,43 +718,43 @@ async function parseMongoliaLive(): Promise<Entry[]> {
 }
 
 /**
- * Russie : les lignes nommées, et les liens succursale → siège gardés pour
- * writeRussianBranches, qui les écrit dans leur propre table après elles.
+ * Russie : les lignes nommées, et le numéro de licence de chaque BIK gardé pour
+ * writeRussianLicences, qui l'écrit dans sa propre table après elles.
  */
-let russianBranches: RussiaBranch[] | null = null;
+let russianLicences: RussiaLicence[] | null = null;
 
 async function parseRussiaLive(): Promise<Entry[]> {
-  russianBranches = null;
-  const { entries, branches, notes } = await readRussiaLive();
+  russianLicences = null;
+  const { entries, licences, notes } = await readRussiaLive();
   for (const note of notes) console.log(`  RU: ${note}`);
-  russianBranches = branches;
+  russianLicences = licences;
   return entries;
 }
 
-/** Remplace les liens des succursales russes (membre `register_ru_branches`). */
-function writeRussianBranches(db: Database.Database): number {
-  const branches = russianBranches;
-  if (!branches) throw new Error('RU: the directory was not read, branch links not written');
-  const floor = RESTRICTED_FLOORS.register_ru_branches;
-  if (branches.length < floor)
+/** Remplace les licences des BIK russes (membre `register_ru_licences`). */
+function writeRussianLicences(db: Database.Database): number {
+  const licences = russianLicences;
+  if (!licences) throw new Error('RU: the directory was not read, licences not written');
+  const floor = RESTRICTED_FLOORS.register_ru_licences;
+  if (licences.length < floor)
     throw new Error(
-      `RU: only ${branches.length} branch links, expected at least ${floor}. Refusing to replace the table.`,
+      `RU: only ${licences.length} licences, expected at least ${floor}. Refusing to replace the table.`,
     );
   const exists = db
-    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ru_branch_heads'")
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ru_bik_licences'")
     .get();
   if (!exists)
-    for (const statement of restrictedTable('bic', 'ru_branch_heads').ddl)
+    for (const statement of restrictedTable('bic', 'ru_bik_licences').ddl)
       db.prepare(statement).run();
   db.transaction(() => {
-    db.prepare('DELETE FROM ru_branch_heads').run();
+    db.prepare('DELETE FROM ru_bik_licences').run();
     const ins = db.prepare(
-      'INSERT INTO ru_branch_heads (code, head, source, as_of) VALUES (?, ?, ?, ?)',
+      'INSERT INTO ru_bik_licences (code, licence, source, as_of) VALUES (?, ?, ?, ?)',
     );
-    for (const b of branches) ins.run(b.code, b.head, b.source, b.as_of);
+    for (const l of licences) ins.run(l.code, l.licence, l.source, l.as_of);
   })();
-  console.log(`  RU: ${branches.length} branch links written`);
-  return branches.length;
+  console.log(`  RU: ${licences.length} licences written`);
+  return licences.length;
 }
 
 async function parseSanMarinoLive(): Promise<Entry[]> {
@@ -1468,7 +1468,7 @@ async function main(): Promise<void> {
       : undefined;
     if (!member) {
       write(db, cc, await parse());
-      if (cc === 'RU') writeRussianBranches(db);
+      if (cc === 'RU') writeRussianLicences(db);
       continue;
     }
     let failure: unknown = null;
@@ -1481,20 +1481,18 @@ async function main(): Promise<void> {
       console.warn(`  ${cc}: NOT loaded (${e instanceof Error ? e.message : String(e)})`);
       reportSeedMember({ member: member.id, state: 'failed', cause: failureCause(e) });
     }
-    // Les liens des succursales russes, membre à part : en panne avec le répertoire
-    // (même cause), ils sont repris de la surcouche précédente comme lui ; jamais
-    // écrits frais à côté de noms repris.
+    // Les licences des BIK russes, membre à part : en panne avec le répertoire
+    // (même cause), elles sont reprises de la surcouche précédente comme lui ;
+    // jamais écrites fraîches à côté de noms repris.
     if (cc === 'RU') {
       try {
         if (failure) throw failure;
-        const n = writeRussianBranches(db);
-        reportSeedMember({ member: 'register_ru_branches', state: 'loaded', processed: n });
+        const n = writeRussianLicences(db);
+        reportSeedMember({ member: 'register_ru_licences', state: 'loaded', processed: n });
       } catch (e) {
-        console.warn(
-          `  RU: branch links NOT loaded (${e instanceof Error ? e.message : String(e)})`,
-        );
+        console.warn(`  RU: licences NOT loaded (${e instanceof Error ? e.message : String(e)})`);
         reportSeedMember({
-          member: 'register_ru_branches',
+          member: 'register_ru_licences',
           state: 'failed',
           cause: failureCause(e),
         });

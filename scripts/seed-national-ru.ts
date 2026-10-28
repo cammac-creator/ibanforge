@@ -7,7 +7,7 @@
  *
  * Étages (DONNEES-ETAGES) : lit la source (l'archive du jour, jamais écrite sur
  * disque), écrit l'argent (les lignes nommées de `national_bank_codes` et les liens
- * de `ru_branch_heads`) dans la base que la chaîne privée construit.
+ * de `ru_bik_licences`) dans la base que la chaîne privée construit.
  *
  * ## Pourquoi par la surcouche privée (décision du 28/10/2026, « Nommer seulement »)
  *
@@ -31,7 +31,8 @@
  * - Les établissements de crédit (PtType 20) et leurs succursales (PtType 30), actifs
  *   (`ParticipantStatus` PSAC) et sans restriction de participation (`RstrList`) :
  *   une banque dont la participation est restreinte ou en liquidation n'est pas
- *   nommée comme une banque qui reçoit des virements. Les autres participants
+ *   nommée comme une banque qui reçoit des virements, ni ses succursales (une
+ *   succursale dont le siège, `PrntBIC`, n'est pas servi est écartée). Les autres participants
  *   (divisions de la Banque de Russie, Trésor, administrateurs de liquidation,
  *   clients) sont écartés et comptés.
  * - Le nom `NameP`, en cyrillique, tel que publié ; aucune adresse (« nommer
@@ -40,13 +41,20 @@
  *   publié (8 ou 11 caractères), seulement s'il est russe et bien formé ; sinon
  *   `bic: null`. Jamais celui du siège prêté à une succursale.
  *
- * ## Le lien des succursales (table `ru_branch_heads`)
+ * ## La licence de chaque BIK (table `ru_bik_licences`)
  *
- * Chaque succursale désigne son siège (`PrntBIC`, même licence). Le lien n'est pas
- * servi comme un fait de la réponse : il sert la conformité, qui contrôle sur les
- * listes de sanctions tous les BIC SWIFT de l'établissement (siège et succursales,
- * une seule personne morale), et non le seul BIC de la ligne
+ * Le siège et ses succursales portent le même numéro de licence de la Banque de
+ * Russie (`RegN` : « 963 » pour le siège, « 963/10 » pour une succursale) : une
+ * licence, une personne morale. Une même licence peut avoir plusieurs lignes de
+ * siège (le répertoire en publie deux pour Sovcombank). Le numéro n'est pas servi
+ * comme un fait de la réponse : il sert la conformité, qui contrôle sur les listes de
+ * sanctions tous les BIC SWIFT de l'établissement, et non le seul BIC de la ligne
  * (src/lib/ru-institution.ts).
+ *
+ * Cette conformité compare les BIC sur leurs six premiers caractères (code de
+ * l'institution et pays). Le chargeur refuse donc un répertoire où deux licences
+ * serviraient un BIC de même préfixe : la règle ne vaudrait plus, et le passage
+ * reprend la surcouche précédente plutôt que de servir un faux positif.
  *
  * ## Partiel
  *
@@ -80,17 +88,17 @@ export interface RussiaEntry {
   as_of: string;
 }
 
-/** Une succursale et le BIK de son siège. */
-export interface RussiaBranch {
+/** Un BIK servi et le numéro de licence de son établissement. */
+export interface RussiaLicence {
   code: string;
-  head: string;
+  licence: string;
   source: string;
   as_of: string;
 }
 
 export interface RussiaRegister {
   entries: RussiaEntry[];
-  branches: RussiaBranch[];
+  licences: RussiaLicence[];
   notes: string[];
 }
 
@@ -152,6 +160,8 @@ export interface Ed807Participant {
   type: string;
   status: string;
   parent: string | null;
+  /** Le numéro de licence sans le numéro de succursale (« 963/10 » → « 963 »), ou null. */
+  licence: string | null;
   restrictions: string[];
   swift: Array<{ bic: string; isDefault: boolean }>;
 }
@@ -187,6 +197,7 @@ export function parseEd807(xml: string): { businessDay: string; participants: Ed
       type: p.PtType ?? '',
       status: p.ParticipantStatus ?? '',
       parent: p.PrntBIC ?? null,
+      licence: p.RegN?.split('/')[0].trim() || null,
       restrictions: tags(m[2], 'RstrList').map((r) => r.Rstr ?? '?'),
       swift: tags(m[2], 'SWBICS').map((s) => ({
         bic: (s.SWBIC ?? '').trim().toUpperCase(),
@@ -229,8 +240,22 @@ export function buildRussiaRegister(directory: {
     `${otherTypes} participants that are neither credit institutions nor branches, left out`,
   );
 
+  // Une succursale sans siège servi n'est pas nommée : son établissement est écarté.
+  for (const p of [...kept.values()]) {
+    if (p.type !== BRANCH) continue;
+    const head = p.parent ? kept.get(p.parent) : undefined;
+    if (head?.type !== HEAD_OFFICE) {
+      notes.push(
+        `${p.bik}: branch whose head office ${p.parent ?? '(none)'} is not served, left out`,
+      );
+      kept.delete(p.bik);
+    }
+  }
+
   const entries: RussiaEntry[] = [];
-  const branches: RussiaBranch[] = [];
+  const licences: RussiaLicence[] = [];
+  /** Préfixe (six caractères) → licences qui le servent : une seule, ou la règle ne vaut plus. */
+  const prefixes = new Map<string, Set<string>>();
   for (const p of kept.values()) {
     const defaults = p.swift.filter((s) => s.isDefault);
     if (defaults.length > 1) throw new Error(`RU: BIK ${p.bik} marks several default SWIFT BICs`);
@@ -252,16 +277,24 @@ export function buildRussiaRegister(directory: {
       source: RU_SOURCE,
       as_of: asOf,
     });
-    if (p.type === BRANCH) {
-      const head = p.parent ? kept.get(p.parent) : undefined;
-      if (head?.type === HEAD_OFFICE) {
-        branches.push({ code: p.bik, head: head.bik, source: RU_SOURCE, as_of: asOf });
-      } else {
-        notes.push(`${p.bik}: branch whose head office ${p.parent ?? '(none)'} is not served`);
-      }
+    // Sans licence (une banque centrale étrangère, une banque de développement), le
+    // seul BIC de la ligne : aucune autre ligne n'est rattachée à elle.
+    const institution = p.licence ?? `BIK ${p.bik}`;
+    if (p.licence)
+      licences.push({ code: p.bik, licence: p.licence, source: RU_SOURCE, as_of: asOf });
+    if (bic) {
+      const prefix = bic.slice(0, 6);
+      const holders = prefixes.get(prefix) ?? new Set<string>();
+      holders.add(institution);
+      prefixes.set(prefix, holders);
     }
   }
-  return { entries, branches, notes };
+  for (const [prefix, holders] of prefixes)
+    if (holders.size > 1)
+      throw new Error(
+        `RU: the BIC prefix ${prefix} is served by several institutions (${[...holders].join(', ')}); the sanctions rule on six characters no longer holds`,
+      );
+  return { entries, licences, notes };
 }
 
 /**

@@ -216,7 +216,7 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         (t) =>
           t.name === 'curated_bank_codes' ||
           t.name === 'fi_monetary_codes' ||
-          t.name === 'ru_branch_heads',
+          t.name === 'ru_bik_licences',
       )) {
         const exists = bic
           .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -260,14 +260,14 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       );
       for (let i = 0; i < floorOf('register_fi') + 5; i++)
         fiList.run(String(9000 + i), `Remplissage FI ${i}`);
-      // Les liens succursale → siège du répertoire russe : les BIK de remplissage
-      // au-delà du premier, rattachés au premier.
-      const ruLink = bic.prepare(
-        `INSERT OR IGNORE INTO ru_branch_heads (code, head, source, as_of)
-         VALUES (?, '049900000', 'Remplissage', '2026-01-15')`,
+      // Les licences des BIK russes de remplissage : une licence inventée pour
+      // dix BIK.
+      const ruLicence = bic.prepare(
+        `INSERT OR IGNORE INTO ru_bik_licences (code, licence, source, as_of)
+         VALUES (?, ?, 'Remplissage', '2026-01-15')`,
       );
-      for (let i = 1; i <= floorOf('register_ru_branches') + 5; i++)
-        ruLink.run(String(49900000 + i).padStart(9, '0'));
+      for (let i = 0; i < floorOf('register_ru_licences') + 5; i++)
+        ruLicence.run(String(49900000 + i).padStart(9, '0'), `99${Math.floor(i / 10)}`);
     })();
   } finally {
     bic.close();

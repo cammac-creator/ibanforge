@@ -103,8 +103,8 @@ déjà en base. Rien d'autre (ni adresse, ni comptes).
 
 | Membre | Table | Origine | Ce qui est servi |
 |---|---|---|---|
-| `register_ru` | `national_bank_codes` (`RU`) | `cbr.ru` | le BIK (positions 5 à 13 de l'IBAN), le nom en cyrillique tel que publié, le BIC SWIFT que le répertoire marque par défaut (`DefaultSWBIC="1"`), seulement s'il est russe ; établissements de crédit (`PtType` 20) et succursales (30), actifs (`PSAC`) et sans restriction de participation (`RstrList`) |
-| `register_ru_branches` | `ru_branch_heads` | `cbr.ru` | pour chaque succursale, le BIK de son siège (`PrntBIC`) : lu par la conformité seule |
+| `register_ru` | `national_bank_codes` (`RU`) | `cbr.ru` | le BIK (positions 5 à 13 de l'IBAN), le nom en cyrillique tel que publié, le BIC SWIFT que le répertoire marque par défaut (`DefaultSWBIC="1"`), seulement s'il est russe ; établissements de crédit (`PtType` 20) et succursales (30), actifs (`PSAC`) et sans restriction de participation (`RstrList`) ; une succursale dont le siège (`PrntBIC`) n'est pas servi est écartée |
+| `register_ru_licences` | `ru_bik_licences` | `cbr.ru` | pour chaque BIK servi, le numéro de licence de son établissement (`RegN` sans le numéro de succursale : « 963/10 » → « 963 ») : lu par la conformité seule |
 
 **Source.** Message ED807 (« Справочник БИК ») quotidien, archive ZIP derrière
 `https://www.cbr.ru/s/newbik` (un seul fichier `AAAAMMJJ_ED807_full.xml`, en windows-1251), lu par
@@ -134,22 +134,31 @@ emploie (Sovcombank : `SOMRRUM1` sur la liste de l'OFAC, `SOMRRUMM` au répertoi
 de VTB ont des BIC `VTBRRUM2…`, la liste nomme `VTBRRUMM`), et la plupart des succursales n'ont pas de
 BIC SWIFT à elles. D'où la règle russe :
 
-- tous les BIC SWIFT de l'**établissement** (le siège et toutes ses succursales, une seule personne
-  morale) passent aux listes, pas seulement celui de la ligne ;
-- chacun est comparé sur ses **six premiers caractères** (code de l'institution et pays), qu'aucune
-  autre licence du répertoire ne partage (vérifié le 28/10/2026) ;
+- tous les BIC SWIFT de l'**établissement**, c'est-à-dire de toutes les lignes de sa licence (le
+  siège, éventuellement sur plusieurs lignes comme Sovcombank, et toutes ses succursales : une seule
+  personne morale), passent aux listes, pas seulement celui de la ligne ;
+- chacun est comparé sur ses **six premiers caractères** (code de l'institution et pays). Le chargeur
+  refuse un répertoire où deux licences serviraient un même préfixe : la règle ne vaudrait plus, et
+  le passage reprend la surcouche précédente ;
 - la même règle vaut pour `GET /v1/bic/:code` et la conformité par BIC, selon le pays du BIC ; un BIC
   russe y est comparé sur ses six premiers caractères même sans la surcouche ;
 - un établissement sans aucun BIC SWIFT n'est pas contrôlé, et le dit : `bank_screened: false`,
   `institution_listed: null`, `checks.institution_sanctions: "unknown"`, jamais « non listé ». Le pays
-  reste sanctionné et le score ne descend pas pour autant.
+  reste sanctionné et le score ne descend pas pour autant ;
+- limite qui demeure : une banque qu'une liste désigne **sans** BIC (la table `sanctioned_entities` ne
+  garde que les entrées qui en portent un), ou sous un BIC d'un autre préfixe, n'est pas reconnue et
+  répond « non listée ». Le contrôle reste celui des listes déjà en base, par BIC, comme partout.
+
+Le chemin BIC (`GET /v1/bic/:code`, conformité par BIC) lit le répertoire pour étendre le contrôle à
+l'établissement, sans rien en reproduire dans la réponse : il ne porte donc pas le crédit, que portent
+les réponses qui nomment la banque.
 
 Ailleurs qu'en Russie, la règle d'avant ne change pas (BIC8 exact).
 
 Contrôle exhaustif du 28/10/2026, sur une copie locale (listes publiques de la base : OFAC et UE) :
-663 établissements servis, tous nommés avec leur BIC tel que publié ; 250 marqués sanctionnés, 255
-contrôlés sans correspondance, 158 sans BIC SWIFT donc non contrôlés ; aucun écart avec un calcul
-indépendant fait sur le fichier source.
+663 établissements servis, tous nommés avec leur BIC tel que publié ; 251 marqués sanctionnés, 255
+contrôlés sans correspondance, 157 sans BIC SWIFT dans leur licence donc non contrôlés ; aucun écart
+avec un calcul indépendant fait sur le fichier source.
 
 ## 25/09/2026 : la famille sous conditions a quitté le dépôt public
 

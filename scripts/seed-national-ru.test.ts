@@ -32,6 +32,8 @@ const DIRECTORY = [
     '<SWBICS SWBIC="ZZOTRUMMXXX" DefaultSWBIC="0"/><SWBICS SWBIC="ZZALRUMMXXX" DefaultSWBIC="1"/>' +
       '<Accounts Account="30101810000000000001" AccountStatus="ACAC"></Accounts>',
   ),
+  // Une seconde ligne de siège de la même licence, sans BIC SWIFT.
+  entry('049999904', 'NameP="АО «АЛЬФА-ТЕСТ»" RegN="9001" PtType="20" ParticipantStatus="PSAC"'),
   // Sa succursale, sans BIC SWIFT.
   entry(
     '049999902',
@@ -45,7 +47,7 @@ const DIRECTORY = [
   ),
   // Une banque à la participation restreinte : écartée.
   `<BICDirectoryEntry BIC="049999921"><ParticipantInfo NameP="ООО НКО «Гамма-Тест»" PtType="20" ParticipantStatus="PSAC"><RstrList Rstr="URRS" RstrDate="2026-01-01"/></ParticipantInfo></BICDirectoryEntry>`,
-  // La succursale d'une banque écartée : nommée, sans lien.
+  // La succursale d'une banque écartée : écartée aussi.
   entry(
     '049999922',
     'NameP="Филиал ООО НКО «Гамма-Тест»" PrntBIC="049999921" PtType="30" ParticipantStatus="PSAC"',
@@ -120,6 +122,7 @@ describe('parseEd807', () => {
     expect(d.businessDay).toBe('2026-10-29');
     expect(d.participants.map((p) => p.bik)).toEqual([
       '049999901',
+      '049999904',
       '049999902',
       '049999911',
       '049999921',
@@ -133,8 +136,15 @@ describe('parseEd807', () => {
       { bic: 'ZZOTRUMMXXX', isDefault: false },
       { bic: 'ZZALRUMMXXX', isDefault: true },
     ]);
-    expect(d.participants[3].restrictions).toEqual(['URRS']);
-    expect(d.participants[1].parent).toBe('049999901');
+    expect(d.participants[4].restrictions).toEqual(['URRS']);
+    expect(d.participants[2].parent).toBe('049999901');
+    // Le numéro de licence, sans le numéro de succursale.
+    expect(d.participants.map((p) => p.licence).slice(0, 4)).toEqual([
+      '9001',
+      '9001',
+      '9001',
+      null,
+    ]);
   });
 
   it('refuses rather than guesses', () => {
@@ -178,25 +188,37 @@ describe('buildRussiaRegister', () => {
         source: SOURCE,
         as_of: '2026-10-29',
       },
+      expect.objectContaining({ code: '049999904', bic: null }),
       expect.objectContaining({ code: '049999902', bic: null }),
       expect.objectContaining({ code: '049999911', name: 'Банк развития Тест', bic: null }),
-      expect.objectContaining({ code: '049999922', bic: null }),
     ]);
   });
 
-  it('links a branch to its served head office only', () => {
-    expect(register.branches).toEqual([
-      { code: '049999902', head: '049999901', source: SOURCE, as_of: '2026-10-29' },
-    ]);
+  it('gives every served BIK its licence, head offices and branches alike', () => {
+    expect(register.licences).toEqual(
+      ['049999901', '049999904', '049999902'].map((code) => ({
+        code,
+        licence: '9001',
+        source: SOURCE,
+        as_of: '2026-10-29',
+      })),
+    );
   });
 
   it('says what it left out', () => {
     expect(register.notes).toEqual([
       '049999921: participation restricted (URRS), left out',
       '2 participants that are neither credit institutions nor branches, left out',
+      '049999922: branch whose head office 049999921 is not served, left out',
       '049999911: default SWIFT BIC ZZDVKZKAXXX is not a Russian BIC, not served',
-      '049999922: branch whose head office 049999921 is not served',
     ]);
+  });
+
+  it('refuses two licences serving the same six-character BIC prefix', () => {
+    const shared = DIRECTORY.replace('ZZDVKZKAXXX', 'ZZALRUM5XXX');
+    expect(() => buildRussiaRegister(parseEd807(shared))).toThrow(
+      /prefix ZZALRU is served by several institutions/,
+    );
   });
 
   it('refuses a participant marking two default SWIFT BICs', () => {
@@ -236,10 +258,10 @@ describe('readEd807Zip and readRussiaLive', () => {
     expect(asked).toEqual([RU_DIRECTORY_URL]);
     expect(r.entries.map((e) => e.code)).toEqual([
       '049999901',
+      '049999904',
       '049999902',
       '049999911',
-      '049999922',
     ]);
-    expect(r.branches).toHaveLength(1);
+    expect(r.licences).toHaveLength(3);
   });
 });
