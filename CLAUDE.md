@@ -331,6 +331,12 @@ npm run test:watch   # Watch mode
 
 Tests live next to source files (`*.test.ts`). Use vitest with no special config needed.
 
+🚨 Un fichier de `frontend/`, tests compris, n'importe jamais statiquement hors de `frontend/` : l'image Docker du
+site ne copie que ce dossier (et `CHANGELOG.md`), la CI reste verte et le déploiement casse (28.10.2026). Un test
+peut lire le code de l'API à l'exécution ; une page ou une route ne lit jamais hors de `frontend/` (sauf `CHANGELOG.md`,
+que l'image copie pour les flux). La garde
+`scripts/frontend-image-imports.test.ts` tient la partie « import » (règle 4 d'`AGENTS.md`).
+
 ## Remettre une PR à l'intégrateur (depuis le 15.09.2026)
 
 La session principale Claude Code intègre **toute seule** : un veilleur sur le Mac de l'intégrateur
