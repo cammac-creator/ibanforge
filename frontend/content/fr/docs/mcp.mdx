@@ -72,7 +72,7 @@ Dans un assistant de conversation, l'adresse ci-dessus devient un *connecteur pe
 
 **Un connecteur sans clé puise dans la même allocation sans clé que tout autre appelant**, comptée par adresse source. Dans Claude, les appels d'un connecteur partent du cloud d'Anthropic, pas de votre appareil (page officielle ci-dessous, section « Network requirements ») : cette allocation est donc partagée avec d'autres utilisateurs et peut être déjà épuisée quand vous commencez. Autres assistants : non vérifié par nous. Avec votre propre clé, le connecteur se compte sur cette clé : voir *Avec votre clé* ci-dessus (Claude la prend en en-tête de requête, ChatGPT n'en envoie aucune). Un POST sur `https://api.ibanforge.com/v1/keys/generate` sans corps renvoie une clé, sans e-mail.
 
-Où cliquer, d'après la page officielle de chaque éditeur lue le 24 septembre 2026 ; les menus changent, et la page citée fait foi.
+Où cliquer, d'après les pages officielles liées. Claude, ChatGPT et Gemini : lues le 24 septembre 2026 ; Mistral et Perplexity : lues le 23 octobre 2026. Les menus changent ; la page liée fait référence.
 
 **Claude** ([page officielle](https://support.claude.com/en/articles/11175166), mise à jour le 11 août 2026). Les connecteurs personnalisés sont ouverts aux plans Free, Pro, Max, Team et Enterprise ; en Free, un seul connecteur personnalisé. *Non essayé par nous.*
 
@@ -91,6 +91,18 @@ Où cliquer, d'après la page officielle de chaque éditeur lue le 24 septembre 
 - Sur gemini.google.com, cliquez sur **Settings** en bas, puis **Connected Apps** ; sous « Custom apps », ajoutez une application personnalisée, saisissez `https://api.ibanforge.com/mcp`, cliquez sur **Next** et suivez les instructions à l'écran.
 - La page demande des identifiants sous « Advanced features » quand un serveur ne prend pas en charge le Dynamic Client Registration. Ce serveur ne demande aucune authentification ; que Gemini l'accepte n'est pas vérifié par nous.
 - Dans une requête : tapez **@** et choisissez l'application.
+
+**Mistral (Le Chat)** ([guide officiel des connecteurs, désormais sous Vibe Work](https://docs.mistral.ai/vibe/work/connectors/mcp-connectors), lu le 23 octobre 2026). Un accès administrateur est requis ; les titulaires Free, Pro et Student le sont par défaut. *Non essayé par nous.*
+
+- Ouvrez **Connectors → + Add Connector → Custom MCP Connector**. Nommez-le `IBANforge`, saisissez `https://api.ibanforge.com/mcp` comme adresse du serveur, puis **Connect**.
+- Le guide décrit une détection automatique de l'authentification, y compris son absence. IBANforge s'essaie sans clé ; l'ajout d'une clé dans cet assistant n'a pas été vérifié par nous.
+
+**Perplexity** ([page officielle](https://www.perplexity.ai/help-center/en/articles/13915507-adding-custom-remote-connectors), lue le 23 octobre 2026). Disponible sur Pro, Max et Enterprise selon l'[annonce de lancement](https://www.perplexity.ai/changelog/what-we-shipped---march-13-2026). En organisation, l'administrateur doit autoriser les connecteurs personnalisés. *Non essayé par nous.*
+
+- Ouvrez **Plugins → Add custom → Connector → Add MCP connector → Remote**. Sans Plugins, partez de **Customize → Connectors**.
+- Nommez-le `IBANforge`, saisissez `https://api.ibanforge.com/mcp`, choisissez **Streamable HTTP** et **None** pour essayer sans clé. Lisez l'avertissement, puis **Add** et ouvrez la carte du connecteur pour l'activer. Le guide cite aussi l'authentification par clé API ; son en-tête avec IBANforge n'a pas été vérifié par nous.
+
+Pour les répertoires de connecteurs, `https://api.ibanforge.com/mcp/directory` expose les mêmes outils sans prix ni offres. Cette adresse partage les plafonds et les compteurs de `/mcp` : changer d'adresse ne donne pas une allocation supplémentaire. Elle ne signifie pas qu'IBANforge a été accepté dans le répertoire d'un assistant.
 
 Sur le registre MCP officiel, le serveur est listé sous `io.github.cammac-creator/ibanforge`.
 

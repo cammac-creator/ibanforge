@@ -22,7 +22,7 @@ function send(name: string, locale: string) {
     // Not a person: a driven browser (our own deployment checks, Playwright,
     // Selenium) or a Lighthouse run. Nearly every line of the first day of
     // measurement was ours. The fold demo bails on the same flag.
-    if (navigator.webdriver || /HeadlessChrome|Lighthouse/i.test(navigator.userAgent)) return
+    if (navigator.webdriver || /HeadlessChrome|Lighthouse|IBANforge-outil/i.test(navigator.userAgent)) return
     let referrer = ""
     try { referrer = document.referrer ? new URL(document.referrer).host : "" } catch { referrer = "" }
     const w = window.innerWidth
