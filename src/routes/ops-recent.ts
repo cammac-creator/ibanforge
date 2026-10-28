@@ -26,10 +26,10 @@ import { decodeOpsCursor, encodeOpsCursor } from '../lib/ops-cursor.js';
  * the village must never show the traffic it generates. The same
  * is_internal_email() the funnel uses decides; keyless x402 calls stay.
  *
- * `audit_upload_ch` is not an operation but a marker written beside an
- * `audit_upload` (src/routes/audit.ts, 28/10/2026): served here, one Swiss
- * file would walk the road twice and the feed would say more about a customer
- * file than "an audit happened".
+ * `audit_upload_ch` n'est pas une opération mais un marqueur écrit à côté d'un
+ * `audit_upload` (src/routes/audit.ts, 28.10.2026) : servi ici, un fichier
+ * suisse passerait deux fois sur la route, et le flux en dirait plus sur le
+ * fichier d'un client que « un audit a eu lieu ».
  *
  * Same exposure level as the public /stats page (aggregates of the same
  * table), free on purpose: every poll is one indexed LIMIT-50 read on a WAL

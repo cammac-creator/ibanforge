@@ -93,13 +93,13 @@ function uploadAllowed(ip: string, now: number = Date.now()): boolean {
 }
 
 /**
- * Whether an upload is the site's sample file rather than a customer's.
+ * Le dépôt est-il le fichier d'exemple du site plutôt qu'un fichier de client ?
  *
- * Until 28/10/2026, "Try with a sample file" posted the eight-row sample
- * through this same route and it was counted as an upload, so the counter
- * could not tell a real file from a demonstration. The page now sends
- * `sample=1`; a page still cached in a browser, or a script reusing the
- * sample, does not, so the content is compared as well.
+ * Jusqu'au 28.10.2026, « Essayer avec un fichier d'exemple » envoyait l'exemple
+ * de huit lignes par cette même route, compté comme un dépôt : le compteur ne
+ * distinguait pas un vrai fichier d'une démonstration. La page envoie désormais
+ * `sample=1` ; une page restée en cache dans un navigateur, ou un script qui
+ * reprend l'exemple, ne l'envoie pas : le contenu est donc comparé aussi.
  */
 const SAMPLE_BYTES = Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8');
 export function isSampleUpload(flag: unknown, buffer: Buffer): boolean {
@@ -107,9 +107,9 @@ export function isSampleUpload(flag: unknown, buffer: Buffer): boolean {
 }
 
 /**
- * Whether a file holds at least one Swiss or Liechtenstein row: the IBAN's
- * country once it validated, else the first two letters of what was typed, so
- * that a Swiss creditor with a mistyped IBAN still makes a Swiss file.
+ * Le fichier porte-t-il au moins une ligne suisse ou liechtensteinoise ? Le pays
+ * de l'IBAN quand il valide, sinon les deux premières lettres saisies : un
+ * créancier suisse à l'IBAN mal tapé fait encore un fichier suisse.
  */
 export function containsSwissRows(rows: AuditResult['rows']): boolean {
   return rows.some((r) => {
@@ -258,11 +258,11 @@ audit.post('/v1/audit/upload', async (c) => {
     preview,
     report,
   });
-  // The sample is booked apart, so `uploads` counts customer files only. A
-  // real file with a Swiss or Liechtenstein row gets a second row of its own:
-  // the operation detail keeps twelve characters (stats.ts), too few to carry
-  // the marker. Country stays null on both, so neither enters a per-country
-  // count.
+  // L'exemple est compté à part : `uploads` ne compte que des fichiers de
+  // clients. Un vrai fichier avec une ligne CH ou LI reçoit une seconde ligne à
+  // lui : le détail d'une opération ne garde que douze signes (stats.ts), trop
+  // peu pour porter le marqueur. Le pays reste nul sur les deux, pour qu'aucune
+  // n'entre dans un compte par pays.
   const sample = isSampleUpload(body.sample, buffer);
   const detail = `${result.summary.rows} rows, tier ${result.summary.tier}`;
   const keyPrefix = c.get('apiKeyPrefix');

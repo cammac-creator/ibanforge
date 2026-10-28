@@ -65,7 +65,7 @@ describe('GET /v1/ops/recent', () => {
     }
   });
 
-  it('never serves the Swiss marker an audit upload writes beside it', async () => {
+  it('ne sert jamais le marqueur suisse écrit à côté d’un dépôt d’audit', async () => {
     recordOperation('audit_upload', null, true, 0, '3 rows, tier');
     recordOperation('audit_upload_ch', null, true, 0, '3 rows, tier');
     const { ops } = await fetchOps();

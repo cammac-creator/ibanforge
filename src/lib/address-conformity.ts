@@ -105,17 +105,19 @@ const ISO_CTRY_CLAUSE =
   'fetched (iso20022.org unreachable, 26.08.2026).';
 
 /**
- * Served on every answer of /v1/address/check. Its dates were last read on
- * 02.09.2026 until 28/10/2026, when the Swiss and EPC parts were brought up to
- * date. Each date says when it was read:
+ * Servie sur chaque réponse de /v1/address/check. Ses dates dataient du
+ * 02.09.2026 ; le 28.10.2026, les parties suisse et EPC ont été mises à jour.
+ * Chaque date dit quand elle a été lue :
  * - Swift, 27.08.2026: https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages
- * - EPC, September 2026: https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline
- *   (403 to a script on 28.10.2026; a web search that day found no new end date).
- * - SIX, read 28.10.2026: https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html
- *   ("Town Name" and "Country" "must always be used [...] whenever an address is
- *   provided"; in SIC "validation of the addresses will be waived"; banks "may
- *   continue to offer [...] the unstructured address").
- * - T2, Fedwire, Bank of England: as read on 02.09.2026, not re-read since.
+ * - EPC, septembre 2026 : https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline
+ *   (403 pour un script le 28.10.2026 ; une recherche web ce jour-là ne trouve
+ *   pas de nouvelle date de fin).
+ * - SIX, lue le 28.10.2026 : https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html
+ *   (« Town Name » et « Country » « must always be used [...] whenever an
+ *   address is provided » ; dans SIC « validation of the addresses will be
+ *   waived » ; les banques « may continue to offer [...] the unstructured
+ *   address »).
+ * - T2, Fedwire, Banque d'Angleterre : tels que lus le 02.09.2026, pas relus.
  */
 export const CBPR_NOTE =
   "No 'cbpr+' scheme is offered, on purpose. The CBPR+ usage guideline and the PMPG \"November 2026 postal " +

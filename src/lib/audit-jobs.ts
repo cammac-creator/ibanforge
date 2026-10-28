@@ -290,13 +290,13 @@ export interface AuditStats {
   period_days: number;
   since: string;
   /**
-   * Customer files. Since 28/10/2026 the site's sample is booked apart
-   * (`samples`); the uploads recorded before that day still include it.
+   * Fichiers de clients. Depuis le 28.10.2026, l'exemple du site est compté à
+   * part (`samples`) ; les dépôts enregistrés avant ce jour le comptent encore.
    */
   uploads: number;
-  /** Uploads of the site's sample file ("Try with a sample file"), since 28/10/2026. */
+  /** Dépôts du fichier d'exemple du site (« Essayer avec un fichier d'exemple »), depuis le 28.10.2026. */
   samples: number;
-  /** Among `uploads`, the files with at least one CH or LI row, since 28/10/2026. */
+  /** Parmi `uploads`, les fichiers avec au moins une ligne CH ou LI, depuis le 28.10.2026. */
   uploads_ch: number;
   sales: number;
   /** Total CHF connu à la commande, avant remboursements et frais ; jamais le catalogue. */

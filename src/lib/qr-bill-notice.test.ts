@@ -23,11 +23,11 @@ import { MCP_TOOLS } from '../mcp/inventory.js';
  * articles on payment orders (blog, structured-addresses) use that date
  * correctly and are not scanned here.
  *
- * Until 28/10/2026 the notice, the audit page and the creditor-file article
- * said that from 14.11.2026 every payment order with an unstructured address
- * is refused. The SIX roadmap page read that day keeps the rule but not the
- * refusal (SIC does not validate addresses, each bank decides): see the
- * sources in qr-bill-notice.ts. REFUSAL_CLAIM keeps that sentence out.
+ * Jusqu'au 28.10.2026, la notice, la page d'audit et le billet sur le fichier
+ * de créanciers annonçaient pour le 14.11.2026 un refus général des ordres à
+ * adresse non structurée. La page SIX lue ce jour-là garde la règle, pas ce
+ * refus (SIC ne valide pas les adresses, chaque banque décide) : sources dans
+ * qr-bill-notice.ts. REFUSAL_CLAIM empêche la phrase de revenir.
  */
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -40,8 +40,9 @@ const LANGS: Lang[] = ['fr', 'de', 'en'];
 const dotted = (iso: string): string => iso.split('-').reverse().join('.');
 
 /**
- * The general refusal of 14.11.2026, in each wording it was published in: the
- * notice, the audit page, the creditor-file article and the address check.
+ * Le refus général du 14.11.2026, dans chaque formulation publiée : la notice,
+ * la page d'audit, le billet sur le fichier de créanciers et le contrôle
+ * d'adresse.
  */
 const REFUSAL_CLAIM = [
   /tout ordre de paiement[^.]{0,30} non structurée est refusé/,
@@ -57,7 +58,7 @@ const REFUSAL_CLAIM = [
   /last SIC release accepting unstructured/i,
 ];
 
-/** Where it was published, and where it could come back. */
+/** Là où il a paru, et là où il pourrait revenir. */
 const REFUSAL_SURFACES = [
   ...LANGS.map(
     (l) => `frontend/content/${l}/blog/2026-09-06-creditor-file-checks-before-14-november.mdx`,
@@ -136,7 +137,7 @@ describe('the type K notice, said once', () => {
     expect(COMBINED_ADDRESS_CLAUSE).not.toContain('14.11.2026');
   });
 
-  it('says who enforces the Swiss rule, and what may be rejected, without a general refusal', () => {
+  it('dit qui applique la règle suisse et ce qui peut être rejeté, sans refus général', () => {
     expect(COMBINED_ADDRESS_NOTICE.fr).toContain(
       'Le système SIC ne valide pas les adresses : chaque banque décide.',
     );
@@ -176,8 +177,8 @@ describe('the type K notice, said once', () => {
       '14 November 2026',
     ])
       expect(COMBINED_ADDRESS_SOURCE).toContain(needle);
-    // The SIX factsheet of 19.08.2025 that announced the general refusal is no
-    // longer what the finding is quoted from.
+    // La fiche SIX du 19.08.2025 qui annonçait le refus général n'est plus la
+    // source citée par le constat.
     expect(COMBINED_ADDRESS_SOURCE).not.toContain('factsheet-address-messageversion-erp-en.pdf');
     expect(COMBINED_ADDRESS_SOURCE).not.toContain('can no longer be processed');
   });
@@ -223,13 +224,13 @@ describe('the old claim is gone', () => {
   });
 });
 
-describe('the general refusal of 14.11.2026 is gone', () => {
+describe('le refus général du 14.11.2026 a disparu', () => {
   it.each([...QR_SURFACES, ...REFUSAL_SURFACES])('%s', (path) => {
     const text = read(path);
     for (const re of REFUSAL_CLAIM) expect(text, `${path} still says ${re}`).not.toMatch(re);
   });
 
-  it.each(LANGS)('the audit page (%s) states the rule, who enforces it, and its date', (lang) => {
+  it.each(LANGS)('la page d’audit (%s) dit la règle, qui l’applique, et sa date', (lang) => {
     const messages = JSON.parse(read(`frontend/messages/${lang}.json`)) as {
       audit: { deadline: { title: string; text: string } };
     };

@@ -6,8 +6,8 @@
  *
  * Three payment corpora remove the fully unstructured postal address in
  * November 2026: SIX / Swiss Payment Standards (SPS 2026 in force 14 November
- * 2026; read again on 28.10.2026, SIX now says SIC will not validate addresses
- * and each bank decides what it still accepts, see qr-bill-notice.ts),
+ * 2026 ; relu le 28.10.2026 : SIC ne valide pas les adresses et chaque banque
+ * décide de ce qu'elle accepte encore, voir qr-bill-notice.ts),
  * the Fedwire Funds Service (production 16 November 2026) and T2 / HVPS+
  * (release R2026.NOV). The CBPR+ rule itself is NOT cited anywhere in this
  * module: swift.com and iso20022.org were unreachable on 26/08/2026 and the

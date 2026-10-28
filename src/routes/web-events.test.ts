@@ -67,10 +67,10 @@ describe('parseWebEvent', () => {
     expect(parseWebEvent('cta:try')).toBeNull();
   });
 
-  it('accepts every tag the audit page and the QR-bill tool carry (28/10/2026)', () => {
-    // The page owns the vocabulary, the API refuses what it does not know: a
-    // tag the server would drop is a click nobody ever sees. Read from the
-    // components themselves, so a renamed tag cannot slip past.
+  it('accepte chaque balise de la page d’audit et de l’outil QR-facture (28.10.2026)', () => {
+    // La page fixe le vocabulaire, l'API refuse ce qu'elle ne connaît pas : une
+    // balise que le serveur rejetterait est un clic que personne ne voit. Lu dans
+    // les composants eux-mêmes, pour qu'une balise renommée ne passe pas.
     const root = join(import.meta.dirname, '..', '..');
     const tags = ['frontend/components/audit-client.tsx', 'frontend/components/qr-bill-client.tsx']
       .flatMap((f) => [...readFileSync(join(root, f), 'utf8').matchAll(/data-evt="([^"]+)"/g)])

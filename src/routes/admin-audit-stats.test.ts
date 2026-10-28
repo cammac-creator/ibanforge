@@ -29,7 +29,7 @@ describe('GET /v1/admin/audit-stats', () => {
       const body = (await r.json()) as Record<string, unknown>;
       expect(body.period_days).toBe(7);
       expect(typeof body.uploads).toBe('number');
-      // 28/10/2026: the sample and the Swiss files, beside the existing fields.
+      // 28.10.2026 : l'exemple et les fichiers suisses, à côté des champs existants.
       expect(typeof body.samples).toBe('number');
       expect(typeof body.uploads_ch).toBe('number');
       expect(typeof body.sales).toBe('number');

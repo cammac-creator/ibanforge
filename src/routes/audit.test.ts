@@ -245,12 +245,12 @@ describe('sample report and statistics', () => {
 });
 
 /**
- * 28/10/2026: the sample file went through the upload route and was counted as
- * a customer file, so no reading of `uploads` could say whether a real file had
- * ever arrived. The sample is now booked apart, and a real file with a Swiss or
- * Liechtenstein row leaves a marker of its own.
+ * 28.10.2026 : le fichier d'exemple passait par la route de dépôt et comptait
+ * comme un fichier de client ; aucune lecture d'`uploads` ne pouvait dire si un
+ * vrai fichier était jamais arrivé. L'exemple est désormais compté à part, et un
+ * vrai fichier avec une ligne suisse ou liechtensteinoise laisse un marqueur.
  */
-describe('the sample is booked apart from customer files', () => {
+describe('l’exemple est compté à part des fichiers de clients', () => {
   const delta = (before: ReturnType<typeof auditStats>) => {
     const after = auditStats(30);
     return {
@@ -260,23 +260,23 @@ describe('the sample is booked apart from customer files', () => {
     };
   };
 
-  it('books the sample sent by the page (sample=1) as a sample, never as a Swiss upload', async () => {
+  it('compte l’exemple envoyé par la page (sample=1) comme exemple, jamais comme fichier suisse', async () => {
     const before = auditStats(30);
     const r = await upload(SAMPLE_CREDITOR_CSV, 'exemple-creanciers.csv', 'fr', { sample: '1' });
     expect(r.status).toBe(200);
-    // The sample holds Swiss rows: it still must not count as a Swiss file.
+    // L'exemple porte des lignes suisses : il ne doit pas compter comme fichier suisse.
     expect(SAMPLE_CREDITOR_CSV).toContain(';CH10 0023');
     expect(delta(before)).toEqual({ uploads: 0, samples: 1, uploads_ch: 0 });
   });
 
-  it('recognises the sample by its content when a cached page sends no flag', async () => {
+  it('reconnaît l’exemple à son contenu quand une page en cache n’envoie pas le champ', async () => {
     const before = auditStats(30);
     const r = await upload(SAMPLE_CREDITOR_CSV, 'exemple-creanciers.csv');
     expect(r.status).toBe(200);
     expect(delta(before)).toEqual({ uploads: 0, samples: 1, uploads_ch: 0 });
   });
 
-  it('counts a real Swiss file as an upload and as a Swiss upload', async () => {
+  it('compte un vrai fichier suisse comme dépôt et comme dépôt suisse', async () => {
     const before = auditStats(30);
     const r = await upload(
       ['Nom;IBAN', `Alpha SA;${VALID_CH}`, `Beta GmbH;${VALID_DE}`].join('\n'),
@@ -285,14 +285,14 @@ describe('the sample is booked apart from customer files', () => {
     expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 1 });
   });
 
-  it('counts a real file without a Swiss or Liechtenstein row as an upload only', async () => {
+  it('compte un vrai fichier sans ligne suisse ni liechtensteinoise comme dépôt seulement', async () => {
     const before = auditStats(30);
     const r = await upload(['Nom;IBAN', `Beta GmbH;${VALID_DE}`].join('\n'));
     expect(r.status).toBe(200);
     expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 0 });
   });
 
-  it('counts a Swiss row whose IBAN does not validate, and a Liechtenstein row, as Swiss', async () => {
+  it('compte comme suisses une ligne CH à l’IBAN invalide et une ligne LI', async () => {
     let before = auditStats(30);
     await upload(['Nom;IBAN', `Gamma;${BAD_CHECK}`, `Beta GmbH;${VALID_DE}`].join('\n'));
     expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 1 });
@@ -301,7 +301,7 @@ describe('the sample is booked apart from customer files', () => {
     expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 1 });
   });
 
-  it('writes the Swiss marker with no country, so it enters no per-country count', async () => {
+  it('écrit le marqueur suisse sans pays, hors de tout compte par pays', async () => {
     await upload(['Nom;IBAN', `Alpha SA;${VALID_CH}`].join('\n'));
     const row = getStatsDB()
       .prepare(

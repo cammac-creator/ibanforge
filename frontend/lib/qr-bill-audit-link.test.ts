@@ -39,7 +39,7 @@ describe("le pont de la QR-facture vers l'audit", () => {
     const { title, text, link } = messages.qrBill.toAudit
     for (const s of [title, text, link]) {
       expect(s.length).toBeGreaterThan(0)
-      expect(s).not.toMatch(/14\.11|novembre|November|refus|abgewiesen|rejected|—/)
+      expect(s).not.toMatch(/14\.11|novembre|November|refus|abgewiesen|rejected|\u2014/)
     }
   })
 

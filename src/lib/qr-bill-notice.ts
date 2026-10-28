@@ -11,31 +11,31 @@
  * 30.09.2026; ZKB: "längstens bis Ende September 2026"), and 14.11.2026 is the
  * SIX date for payment ORDERS with an unstructured address.
  *
- * Corrected on 28/10/2026: until then the notice said that from 14.11.2026
- * "any payment order with an unstructured address is refused", after a SIX
- * factsheet of 19.08.2025. The SIX roadmap page, read on 28.10.2026, keeps the
- * rule and the date but not the general refusal:
+ * Corrigé le 28.10.2026 : jusque-là, la notice disait qu'à partir du
+ * 14.11.2026 « any payment order with an unstructured address is refused »,
+ * d'après une fiche SIX du 19.08.2025. La page SIX de la feuille de route, lue
+ * le 28.10.2026, garde la règle et la date, mais pas ce refus général :
  *   https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html
- *   - SPS 2026 and QR-bill IG 2.4 "valid from 14 November 2026, therefore
- *     remain unchanged and in force"; from November 2026 "Town Name" and
- *     "Country" "must always be used and populated with the correct content
- *     whenever an address is provided";
- *   - in SIC, "validation of the addresses will be waived. It should therefore
- *     be noted that payment orders containing unstructured addresses may
- *     continue to be received";
- *   - "Banks may continue to offer additional options as part of their customer
- *     services [...] This may also include the unstructured address";
- *   - Swift and the EPC "decided [...] to suspend the deadline of November 2026".
- * Two banks say what they do with it, both read on 28.10.2026:
+ *   - SPS 2026 et IG QR-facture 2.4 « valid from 14 November 2026, therefore
+ *     remain unchanged and in force » ; dès novembre 2026, « Town Name » et
+ *     « Country » « must always be used and populated with the correct content
+ *     whenever an address is provided » ;
+ *   - dans SIC, « validation of the addresses will be waived. It should
+ *     therefore be noted that payment orders containing unstructured addresses
+ *     may continue to be received » ;
+ *   - « Banks may continue to offer additional options as part of their
+ *     customer services [...] This may also include the unstructured address » ;
+ *   - Swift et l'EPC « decided [...] to suspend the deadline of November 2026 ».
+ * Deux banques disent ce qu'elles en font, pages lues le 28.10.2026 :
  *   https://www.zkb.ch/de/lps/unternehmen/zahlen/neuer-zahlungsverkehr.html
- *   (incomplete address, e.g. no town: "Bankzahlung Inland in CHF und EUR:
- *   werden vorläufig weiterhin akzeptiert"; SEPA, foreign and foreign-currency
- *   payments "werden zurückgewiesen");
+ *   (adresse incomplète, par exemple sans localité : « Bankzahlung Inland in CHF
+ *   und EUR: werden vorläufig weiterhin akzeptiert » ; paiements SEPA, à
+ *   l'étranger et en devises « werden zurückgewiesen ») ;
  *   https://www.postfinance.ch/de/unternehmen/kampagnen/iso-updates.html
- *   (pain.001 with an unstructured address "vorerst nicht strikt abgewiesen",
- *   delivery to the payee not guaranteed).
- * The notice now says exactly that much: the Swiss rule, who enforces it (each
- * bank), and what may be rejected. No more, no less.
+ *   (pain.001 à adresse non structurée « vorerst nicht strikt abgewiesen »,
+ *   arrivée chez le bénéficiaire non garantie).
+ * La notice dit désormais cela et rien de plus : la règle suisse, qui
+ * l'applique (chaque banque), et ce qui peut être rejeté.
  */
 
 /** Combined addresses (AdrTp "K") were removed from the standard on this date. */
@@ -47,20 +47,21 @@ export const COMBINED_ADDRESS_FORBIDDEN_FROM = '2025-11-21';
  */
 export const COMBINED_ADDRESS_PAYMENT_GUARANTEED_UNTIL = '2026-09-30';
 /**
- * From this date the Swiss Payment Standards 2026 apply to payment ORDERS
- * (pain.001): a structured or hybrid address, with the town and the country in
- * their own fields (SIX). A rule of the standard, not a refusal by the network:
- * SIC does not validate addresses and each bank decides what it still accepts
- * (see the sources above). A date for payment orders, not for the QR-bill: it
- * reaches a QR-bill only through the standing orders and templates a payer
- * typed from it.
+ * Dès cette date, les Swiss Payment Standards 2026 s'appliquent aux ORDRES de
+ * paiement (pain.001) : une adresse structurée ou hybride, localité et pays dans
+ * leurs propres champs (SIX). C'est une règle du standard, pas un blocage du
+ * réseau : SIC ne valide pas les adresses et chaque banque décide de ce qu'elle
+ * accepte encore (sources plus haut). Une date pour les ordres de paiement, pas
+ * pour la QR-facture : elle ne la touche qu'au travers des ordres permanents et
+ * des modèles saisis à partir d'elle.
  *
- * Named UNSTRUCTURED_PAYMENT_ORDERS_REFUSED_FROM until 28/10/2026; renamed
- * because the old name stated the refusal the sources no longer support.
+ * Nommée UNSTRUCTURED_PAYMENT_ORDERS_REFUSED_FROM jusqu'au 28.10.2026 ;
+ * renommée parce que l'ancien nom affirmait un refus que les sources ne
+ * soutiennent plus.
  */
 export const SPS_2026_ADDRESS_RULES_FROM = '2026-11-14';
 
-/** What the type K finding is quoted from: the QR-bill standard and two banks, then SIX and two banks on payment orders. */
+/** D'où le constat du type K est cité : le standard QR-facture et deux banques, puis SIX et deux banques sur les ordres de paiement. */
 export const COMBINED_ADDRESS_SOURCE =
   'SIX, Swiss Implementation Guidelines QR-bill, version 2.3 (valid from 21 November 2025): only the structured address ' +
   '(type S) is permitted. UBS, "Strukturierte Adressen" (https://www.ubs.com/ch/de/services/payments/connection-ubs/iso-20022/structured-addresses.html): ' +
