@@ -269,7 +269,7 @@ export const OFFICIAL_IDENTITY_SCHEMA = {
 export const POSTAL_ADDRESS_SCHEMA = {
   type: 'object' as const,
   description:
-    'The institution seat expressed as an ISO 20022 PostalAddress, for the November 2026 structured-address rules (SPS 2026 in force 14 Nov 2026, Fedwire production 16 Nov 2026, T2 R2026.NOV). Purely additive — the `address` block beside it is unchanged and keeps the full untruncated street. Present only when TwnNm and Ctry can both be filled; absent fields are absent, never guessed.',
+    'The institution seat expressed as an ISO 20022 PostalAddress. Timetables differ: SPS 2026 in force 14 Nov 2026 requires town and country whenever an address is given, but SIC does not validate addresses and each bank decides what it still accepts. Fedwire moved its release to November 2027. The fetched T2 R2026.NOV does not forbid an AddressLine-only address; the MyStandards usage guideline could not be read. Purely additive — the `address` block beside it is unchanged and keeps the full untruncated street. Present only when TwnNm and Ctry can both be filled; absent fields are absent, never guessed.',
   properties: {
     strt_nm: {
       type: 'string',
