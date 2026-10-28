@@ -289,7 +289,15 @@ export function listPaidAuditJobs(limit = 50): Array<
 export interface AuditStats {
   period_days: number;
   since: string;
+  /**
+   * Fichiers de clients. Depuis le 28.10.2026, l'exemple du site est compté à
+   * part (`samples`) ; les dépôts enregistrés avant ce jour le comptent encore.
+   */
   uploads: number;
+  /** Dépôts du fichier d'exemple du site (« Essayer avec un fichier d'exemple »), depuis le 28.10.2026. */
+  samples: number;
+  /** Parmi `uploads`, les fichiers avec au moins une ligne CH ou LI, depuis le 28.10.2026. */
+  uploads_ch: number;
   sales: number;
   /** Total CHF connu à la commande, avant remboursements et frais ; jamais le catalogue. */
   revenue_chf: number | null;
@@ -328,13 +336,17 @@ export interface AuditStats {
 export function auditStats(days: number): AuditStats {
   const db = getStatsDB();
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-  const uploads = (
-    db
-      .prepare(
-        `SELECT COUNT(*) n FROM operations WHERE operation_type = 'audit_upload' AND created_at >= datetime('now', ?)`,
-      )
-      .get(`-${days} days`) as { n: number }
-  ).n;
+  const countOf = (type: 'audit_upload' | 'audit_sample' | 'audit_upload_ch'): number =>
+    (
+      db
+        .prepare(
+          `SELECT COUNT(*) n FROM operations WHERE operation_type = ? AND created_at >= datetime('now', ?)`,
+        )
+        .get(type, `-${days} days`) as { n: number }
+    ).n;
+  const uploads = countOf('audit_upload');
+  const samples = countOf('audit_sample');
+  const uploadsCh = countOf('audit_upload_ch');
   // Un ancien montant absent reste inconnu. Les devises ne sont jamais additionnées.
   const sales = db
     .prepare(
@@ -411,6 +423,8 @@ export function auditStats(days: number): AuditStats {
     period_days: days,
     since,
     uploads,
+    samples,
+    uploads_ch: uploadsCh,
     sales: sales.n,
     revenue_chf: sales.chf_payments > 0 || sales.n === 0 ? sales.chf_minor / 100 : null,
     // Sold in dollars since 16/09/2026; the francs of before stay in their own total.

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { auditHrefFromQr, pointsToAudit } from "@/lib/qr-bill-audit-link";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.ibanforge.com";
 
@@ -51,6 +53,7 @@ interface Result {
 
 export function QrBillClient() {
   const t = useTranslations("qrBill");
+  const locale = useLocale();
   const [payload, setPayload] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +162,17 @@ export function QrBillClient() {
               </div>
             ) : null,
           )}
+
+          {/* 28.10.2026 : une adresse K dit « fournisseurs suisses » ; l'audit contrôle tout le fichier. */}
+          {pointsToAudit(result) ? (
+            <div className="rounded-lg border p-4 flex flex-col gap-2 text-sm" data-qr-to-audit>
+              <h3 className="font-semibold">{t("toAudit.title")}</h3>
+              <p className="text-muted-foreground">{t("toAudit.text")}</p>
+              <Link href={auditHrefFromQr(locale)} data-evt="cta:audit-from-qr" className="w-fit underline underline-offset-4">
+                {t("toAudit.link")}
+              </Link>
+            </div>
+          ) : null}
 
           {result.next_steps.length > 0 ? (
             <div className="text-sm">

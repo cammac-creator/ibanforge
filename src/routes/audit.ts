@@ -30,6 +30,7 @@ import {
   AUDIT_MAX_ROWS,
   AUDIT_TIERS,
   type AuditLang,
+  type AuditResult,
 } from '../lib/audit-file.js';
 import {
   createAuditJob,
@@ -89,6 +90,32 @@ function uploadAllowed(ip: string, now: number = Date.now()): boolean {
   recent.push(now);
   uploadTimes.set(ip, recent);
   return true;
+}
+
+/**
+ * Le dépôt est-il le fichier d'exemple du site plutôt qu'un fichier de client ?
+ *
+ * Jusqu'au 28.10.2026, « Essayer avec un fichier d'exemple » envoyait l'exemple
+ * de huit lignes par cette même route, compté comme un dépôt : le compteur ne
+ * distinguait pas un vrai fichier d'une démonstration. La page envoie désormais
+ * `sample=1` ; une page restée en cache dans un navigateur, ou un script qui
+ * reprend l'exemple, ne l'envoie pas : le contenu est donc comparé aussi.
+ */
+const SAMPLE_BYTES = Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8');
+export function isSampleUpload(flag: unknown, buffer: Buffer): boolean {
+  return flag === '1' || buffer.equals(SAMPLE_BYTES);
+}
+
+/**
+ * Le fichier porte-t-il au moins une ligne suisse ou liechtensteinoise ? Le pays
+ * de l'IBAN quand il valide, sinon les deux premières lettres saisies : un
+ * créancier suisse à l'IBAN mal tapé fait encore un fichier suisse.
+ */
+export function containsSwissRows(rows: AuditResult['rows']): boolean {
+  return rows.some((r) => {
+    const country = r.country ?? r.iban_input.replace(/\s+/g, '').slice(0, 2).toUpperCase();
+    return country === 'CH' || country === 'LI';
+  });
 }
 
 function langOf(v: unknown): AuditLang {
@@ -231,18 +258,22 @@ audit.post('/v1/audit/upload', async (c) => {
     preview,
     report,
   });
-  recordSafely(
-    () =>
-      recordOperation(
-        'audit_upload',
-        null,
-        true,
-        0,
-        `${result.summary.rows} rows, tier ${result.summary.tier}`,
-        c.get('apiKeyPrefix'),
-      ),
-    'audit_upload',
-  );
+  // L'exemple est compté à part : `uploads` ne compte que des fichiers de
+  // clients. Un vrai fichier avec une ligne CH ou LI reçoit une seconde ligne à
+  // lui : le détail d'une opération ne garde que douze signes (stats.ts), trop
+  // peu pour porter le marqueur. Le pays reste nul sur les deux, pour qu'aucune
+  // n'entre dans un compte par pays.
+  const sample = isSampleUpload(body.sample, buffer);
+  const detail = `${result.summary.rows} rows, tier ${result.summary.tier}`;
+  const keyPrefix = c.get('apiKeyPrefix');
+  const kind = sample ? 'audit_sample' : 'audit_upload';
+  recordSafely(() => recordOperation(kind, null, true, 0, detail, keyPrefix), kind);
+  if (!sample && containsSwissRows(result.rows)) {
+    recordSafely(
+      () => recordOperation('audit_upload_ch', null, true, 0, detail, keyPrefix),
+      'audit_upload_ch',
+    );
+  }
   return c.json({
     ...publicJob(job, { sessionId: null }),
     processing_ms: Math.round((performance.now() - started) * 100) / 100,

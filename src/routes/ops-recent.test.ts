@@ -65,6 +65,14 @@ describe('GET /v1/ops/recent', () => {
     }
   });
 
+  it('ne sert jamais le marqueur suisse écrit à côté d’un dépôt d’audit', async () => {
+    recordOperation('audit_upload', null, true, 0, '3 rows, tier');
+    recordOperation('audit_upload_ch', null, true, 0, '3 rows, tier');
+    const { ops } = await fetchOps();
+    expect(ops[0]).toMatchObject({ type: 'audit_upload', country: null });
+    expect(ops.map((o) => o.type)).not.toContain('audit_upload_ch');
+  });
+
   it('filters with ?after=<cursor> so a poller only receives what it has not seen', async () => {
     const { ops: all } = await fetchOps();
     const newest = all[0].cursor;

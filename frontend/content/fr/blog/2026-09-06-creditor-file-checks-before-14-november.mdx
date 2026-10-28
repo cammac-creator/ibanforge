@@ -1,12 +1,12 @@
 ---
 title: "Fichier de créanciers : les sept contrôles à passer avant le 14 novembre 2026"
-description: "Le 14 novembre 2026, SIX cesse de traiter les paiements dont l'adresse n'est ni structurée ni hybride. Ce qu'un fichier de créanciers doit avoir, contrôle par contrôle, comment le vérifier gratuitement en dix minutes, et ce qui reste à faire à la main."
+description: "Dès le 14 novembre 2026, les Swiss Payment Standards exigent une adresse structurée ou hybride ; chaque banque décide de ce qu'elle accepte encore. Ce qu'un fichier de créanciers doit avoir, contrôle par contrôle, comment le vérifier gratuitement en dix minutes, et ce qui reste à faire à la main."
 date: "2026-09-06"
 faq:
   - q: "Que se passe-t-il exactement le 14 novembre 2026 ?"
-    a: "Les Swiss Payment Standards 2026 de SIX (Business Rules 3.3, guidelines pain.001 2.3) entrent en vigueur : un paiement dont l'adresse ne respecte ni la forme structurée ni la forme hybride n'est plus traité. La veille, le 13 novembre, les banques doivent avoir assaini les ordres permanents et les modèles de paiement fondés sur d'anciennes QR-factures."
+    a: "Les Swiss Payment Standards 2026 de SIX (Business Rules 3.3, guidelines pain.001 2.3) entrent en vigueur : une adresse structurée ou hybride, avec la localité et le pays dans leurs propres champs. Le système SIC ne valide pas les adresses et chaque banque décide de ce qu'elle accepte encore : certaines acceptent pour un temps les paiements suisses, mais un paiement SEPA ou international sans localité peut être rejeté (SIX, ZKB et PostFinance, relus le 28 octobre 2026)."
   - q: "Une adresse hybride suffit-elle ?"
-    a: "Oui, d'après les guidelines SPS 2026 : la localité et le pays dans leurs propres champs, le NPA aussi quand vous l'avez, et au plus deux lignes libres de 70 caractères pour le reste. Ce qui ne passe plus, c'est l'adresse entière sur une seule ligne."
+    a: "Oui, d'après les guidelines SPS 2026 : la localité et le pays dans leurs propres champs, le NPA aussi quand vous l'avez, et au plus deux lignes libres de 70 caractères pour le reste. Ce que les standards n'admettent plus, c'est l'adresse entière sur une seule ligne."
   - q: "Swift a reporté sa date le 27 août 2026 : puis-je attendre ?"
     a: "Le calendrier suisse doit être vérifié séparément. SIX publie toujours le 14 novembre 2026. Swift a reporté ses changements de paiement le 27 août ; l’EPC a aussi reporté son échéance du 15 novembre le 9 septembre et prévoit une nouvelle date en octobre. Ces annonces ne changent pas à elles seules le calendrier SIX."
   - q: "Combien coûte l'audit de fichier ?"
@@ -19,7 +19,7 @@ Ce qui se joue en novembre, ce n'est pas votre logiciel de paiement. C'est votre
 
 ## 1. L'adresse est structurée, ou au moins hybride
 
-C'est la règle qui change en novembre, et la seule qui exige du travail de saisie. Une adresse structurée met chaque élément dans son champ : rue, numéro, NPA, localité, pays. La forme hybride, admise par les guidelines SPS 2026, demande moins : la localité et le pays dans leurs champs, le NPA quand vous l'avez, et le reste sur au plus deux lignes libres de 70 caractères. Ce qui ne passe plus, c'est l'adresse entière sur une seule ligne, « Rue du Lac 4, 1003 Lausanne » dans une colonne unique.
+C'est la règle qui change en novembre, et la seule qui exige du travail de saisie. Une adresse structurée met chaque élément dans son champ : rue, numéro, NPA, localité, pays. La forme hybride, admise par les guidelines SPS 2026, demande moins : la localité et le pays dans leurs champs, le NPA quand vous l'avez, et le reste sur au plus deux lignes libres de 70 caractères. Ce que les standards n'admettent plus, c'est l'adresse entière sur une seule ligne, « Rue du Lac 4, 1003 Lausanne » dans une colonne unique.
 
 Si votre fichier n'a qu'une colonne d'adresse, le premier geste est de la découper en trois : NPA, localité, pays. La rue peut rester telle quelle sur une ligne. Ce découpage seul fait passer la plupart des lignes en hybride.
 

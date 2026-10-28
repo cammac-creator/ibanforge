@@ -11,6 +11,7 @@ import {
   auditStats,
 } from '../lib/audit-jobs.js';
 import { AUDIT_MAX_BYTES, AUDIT_MAX_ROWS } from '../lib/audit-file.js';
+import { SAMPLE_CREDITOR_CSV } from '../lib/audit-sample.js';
 
 const VALID_CH = 'CH1000230000000012345';
 const VALID_DE = 'DE89370400440532013000';
@@ -39,12 +40,18 @@ interface UploadBody {
   error?: string;
 }
 
-function upload(content: Buffer | string, name = 'creanciers.csv', lang = 'fr') {
+function upload(
+  content: Buffer | string,
+  name = 'creanciers.csv',
+  lang = 'fr',
+  extra: Record<string, string> = {},
+) {
   const form = new FormData();
   const part: BlobPart =
     typeof content === 'string' ? content : (new Uint8Array(content) as unknown as BlobPart);
   form.append('file', new File([part], name, { type: 'text/csv' }));
   form.append('lang', lang);
+  for (const [k, v] of Object.entries(extra)) form.append(k, v);
   return app().request('/v1/audit/upload', { method: 'POST', body: form });
 }
 
@@ -234,6 +241,75 @@ describe('sample report and statistics', () => {
     expect(after.revenue_chf).toBe(before.revenue_chf);
     expect(after.uploads).toBeGreaterThan(before.uploads);
     expect(after.last_sale_at).toBeTruthy();
+  });
+});
+
+/**
+ * 28.10.2026 : le fichier d'exemple passait par la route de dépôt et comptait
+ * comme un fichier de client ; aucune lecture d'`uploads` ne pouvait dire si un
+ * vrai fichier était jamais arrivé. L'exemple est désormais compté à part, et un
+ * vrai fichier avec une ligne suisse ou liechtensteinoise laisse un marqueur.
+ */
+describe('l’exemple est compté à part des fichiers de clients', () => {
+  const delta = (before: ReturnType<typeof auditStats>) => {
+    const after = auditStats(30);
+    return {
+      uploads: after.uploads - before.uploads,
+      samples: after.samples - before.samples,
+      uploads_ch: after.uploads_ch - before.uploads_ch,
+    };
+  };
+
+  it('compte l’exemple envoyé par la page (sample=1) comme exemple, jamais comme fichier suisse', async () => {
+    const before = auditStats(30);
+    const r = await upload(SAMPLE_CREDITOR_CSV, 'exemple-creanciers.csv', 'fr', { sample: '1' });
+    expect(r.status).toBe(200);
+    // L'exemple porte des lignes suisses : il ne doit pas compter comme fichier suisse.
+    expect(SAMPLE_CREDITOR_CSV).toContain(';CH10 0023');
+    expect(delta(before)).toEqual({ uploads: 0, samples: 1, uploads_ch: 0 });
+  });
+
+  it('reconnaît l’exemple à son contenu quand une page en cache n’envoie pas le champ', async () => {
+    const before = auditStats(30);
+    const r = await upload(SAMPLE_CREDITOR_CSV, 'exemple-creanciers.csv');
+    expect(r.status).toBe(200);
+    expect(delta(before)).toEqual({ uploads: 0, samples: 1, uploads_ch: 0 });
+  });
+
+  it('compte un vrai fichier suisse comme dépôt et comme dépôt suisse', async () => {
+    const before = auditStats(30);
+    const r = await upload(
+      ['Nom;IBAN', `Alpha SA;${VALID_CH}`, `Beta GmbH;${VALID_DE}`].join('\n'),
+    );
+    expect(r.status).toBe(200);
+    expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 1 });
+  });
+
+  it('compte un vrai fichier sans ligne suisse ni liechtensteinoise comme dépôt seulement', async () => {
+    const before = auditStats(30);
+    const r = await upload(['Nom;IBAN', `Beta GmbH;${VALID_DE}`].join('\n'));
+    expect(r.status).toBe(200);
+    expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 0 });
+  });
+
+  it('compte comme suisses une ligne CH à l’IBAN invalide et une ligne LI', async () => {
+    let before = auditStats(30);
+    await upload(['Nom;IBAN', `Gamma;${BAD_CHECK}`, `Beta GmbH;${VALID_DE}`].join('\n'));
+    expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 1 });
+    before = auditStats(30);
+    await upload(['Nom;IBAN', 'Delta Anstalt;LI21 0881 0000 2324 013A A'].join('\n'));
+    expect(delta(before)).toEqual({ uploads: 1, samples: 0, uploads_ch: 1 });
+  });
+
+  it('écrit le marqueur suisse sans pays, hors de tout compte par pays', async () => {
+    await upload(['Nom;IBAN', `Alpha SA;${VALID_CH}`].join('\n'));
+    const row = getStatsDB()
+      .prepare(
+        `SELECT country_code FROM operations WHERE operation_type = 'audit_upload_ch' ORDER BY id DESC LIMIT 1`,
+      )
+      .get() as { country_code: string | null } | undefined;
+    expect(row).toBeDefined();
+    expect(row?.country_code).toBeNull();
   });
 });
 

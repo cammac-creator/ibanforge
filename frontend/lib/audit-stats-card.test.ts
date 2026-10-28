@@ -71,6 +71,19 @@ describe('Montants et périmètre de la carte des audits', () => {
     expect(html).toContain('ne mesure pas la conversion des visiteurs');
   });
 
+  it('compte l’exemple et les fichiers suisses à part, quand l’API les donne (28.10.2026)', async () => {
+    const html = await render(stats({ samples: 3, uploads_ch: 1 }));
+    expect(html).toContain('3 clics sur le fichier');
+    expect(html).toContain('1 fichier avec au moins une ligne suisse ou liechtensteinoise');
+    const old = await render(stats());
+    expect(old).not.toContain('clics sur le fichier');
+    expect(old).not.toContain('liechtensteinoise');
+    // Des clics sur l’exemple sans aucun vrai fichier : la carte le dit au lieu de « aucun fichier ».
+    const onlySamples = await render(stats({ uploads: 0, sales: 0, revenue_chf: 0, samples: 2, uploads_ch: 0 }));
+    expect(onlySamples).toContain('2 clics sur le fichier');
+    expect(onlySamples).not.toContain('Aucun fichier déposé');
+  });
+
   it('garde les échecs de lecture distincts de l’absence d’activité', async () => {
     const failed = await render(null, 'fr', 503);
     expect(failed).toContain('Lecture impossible (503)');

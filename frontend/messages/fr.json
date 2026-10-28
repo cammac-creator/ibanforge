@@ -819,7 +819,9 @@
           "otherCurrency": "{count, plural, one {# rapport dans une autre devise : exclu du total CHF.} other {# rapports dans une autre devise : exclus du total CHF.}}",
           "unavailable": "Montants payés indisponibles. Aucun prix catalogue utilisé à leur place.",
           "revenueNote": "Montants confirmés par Stripe à la commande, remises comprises, avant remboursements et frais. Ce total n’est pas un bénéfice.",
-          "ratioNote": "Rapports et dépôts de la période, y compris les exemples et les essais internes. Ce ratio ne mesure pas la conversion des visiteurs ; il peut dépasser 100 %."
+          "samples": "{count, plural, =0 {Aucun clic sur le fichier d'exemple, compté à part.} one {# clic sur le fichier d'exemple, compté à part.} other {# clics sur le fichier d'exemple, comptés à part.}}",
+          "uploadsCh": "{count, plural, =0 {Aucun fichier avec une ligne suisse ou liechtensteinoise.} one {# fichier avec au moins une ligne suisse ou liechtensteinoise.} other {# fichiers avec au moins une ligne suisse ou liechtensteinoise.}}",
+          "ratioNote": "Rapports et dépôts de la période, essais internes compris ; depuis le 28.10.2026, les clics sur l'exemple sont comptés à part, avant ils étaient dans les dépôts. Ce ratio ne mesure pas la conversion des visiteurs ; il peut dépasser 100 %."
         },
         "doors": {
           "title": "Les actions sur le site",
@@ -2602,7 +2604,7 @@
   },
   "audit": {
     "metaTitle": "Audit de fichier de créanciers : 149 $, résultat immédiat",
-    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 $ jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX de mi-novembre 2026.",
+    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 $ jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées selon les Swiss Payment Standards en vigueur dès le 14.11.2026.",
     "eyebrow": "Audit de fichier de créanciers",
     "title": "Contrôlez votre fichier de créanciers avant le prochain lot de paiements",
     "intro": "Chaque ligne passe par les mêmes registres que l'API IBANforge : IBAN, code banque, nom de banque et BIC, joignabilité SEPA, règles d'adresse ISO 20022. Vous voyez gratuitement quoi corriger ; le classeur annoté a un prix affiché, payé par carte, téléchargeable sur-le-champ.",
@@ -2621,8 +2623,8 @@
       "note": "Un fichier, un paiement par carte sur Stripe. Le classeur annoté (.xlsx) et la synthèse sont prêts dès le paiement et restent téléchargeables 24 heures."
     },
     "deadline": {
-      "title": "Mi-novembre 2026 : tout ordre de paiement suisse à adresse non structurée est refusé",
-      "text": "Dès le 14.11.2026 (SIX), tout ordre de paiement à adresse non structurée est refusé, et les modèles de paiement qui en ont une ne peuvent plus servir. Si votre fichier de créanciers a des colonnes rue, NPA et localité, l'audit vous dit quelles lignes ne sont pas prêtes."
+      "title": "Dès le 14.11.2026 : localité et pays exigés dans chaque adresse de paiement suisse",
+      "text": "Dès le 14.11.2026, les Swiss Payment Standards (SIX) exigent dans un ordre de paiement une adresse structurée ou hybride, avec la localité et le pays dans leurs propres champs. Le système SIC ne valide pas les adresses : chaque banque décide de ce qu'elle accepte encore. Certaines acceptent, pour un temps, les paiements suisses ; un paiement SEPA ou international sans localité peut être rejeté. Swift et l'EPC ont reporté leurs propres échéances de novembre. Si votre fichier de créanciers a des colonnes rue, NPA et localité, l'audit vous dit quelles lignes ne sont pas prêtes."
     },
     "upload": {
       "label": "Déposez votre fichier de créanciers ici",
@@ -2724,7 +2726,7 @@
       "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
       "back": "Retour à la page d'audit"
     },
-    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 $ pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant mi-novembre 2026.",
+    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 $ pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée selon les Swiss Payment Standards en vigueur dès le 14.11.2026.",
     "steps": {
       "title": "Trois étapes, un fichier",
       "s1t": "Déposez votre fichier",
@@ -2825,7 +2827,7 @@
     "eyebrow": "Outil gratuit",
     "title": "Cette QR-facture est-elle valide, et ses adresses structurées ?",
     "intro": "Collez le texte contenu dans un code QR-facture suisse (il commence par SPC). Vous obtenez tous les verdicts d'un coup : en-tête, IBAN du créancier et plage QR-IBAN, référence QRR, SCOR ou NON et sa somme de contrôle, montant, monnaie, et si les adresses sont structurées (type S) ou encore combinées (type K). Une adresse combinée revient avec les champs structurés à utiliser à la place.",
-    "deadline": "Le type K n'est plus permis dans une QR-facture depuis le 21.11.2025 (SIX, IG QR-facture 2.3). Les banques n'en garantissent le paiement que jusqu'à fin septembre 2026 (UBS : 30.09.2026 ; ZKB : au plus tard fin septembre 2026). Une QR-facture K risque donc d'être refusée au paiement : réémettez-la en type S. Dès le 14.11.2026, tout ordre de paiement à adresse non structurée est refusé. Refaites aussi les ordres permanents et les modèles saisis depuis une QR-facture K.",
+    "deadline": "Le type K n'est plus permis dans une QR-facture depuis le 21.11.2025 (SIX, IG QR-facture 2.3). Les banques n'en garantissent le paiement que jusqu'à fin septembre 2026 (UBS : 30.09.2026 ; ZKB : au plus tard fin septembre 2026). Une QR-facture K risque donc d'être refusée au paiement : réémettez-la en type S. Dès le 14.11.2026, les Swiss Payment Standards exigent dans un ordre de paiement une adresse structurée ou hybride, avec la localité et le pays dans leurs propres champs. Le système SIC ne valide pas les adresses : chaque banque décide. Certaines acceptent encore, pour un temps, les paiements suisses ; un paiement SEPA ou international sans localité peut être rejeté. Refaites aussi les ordres permanents et les modèles saisis depuis une QR-facture K.",
     "docsLink": "Lire la documentation",
     "input": {
       "label": "Texte de la QR-facture (Swiss Payments Code)",
@@ -2853,6 +2855,11 @@
       "proposedCreditor": "Adresse structurée proposée pour le créancier",
       "proposedDebtor": "Adresse structurée proposée pour le débiteur",
       "nextSteps": "Et ensuite"
+    },
+    "toAudit": {
+      "title": "Vous payez des fournisseurs suisses depuis un fichier ?",
+      "text": "L'audit de fichier contrôle tout votre fichier de créanciers d'un coup, ligne par ligne : IBAN, banque et BIC, et les adresses quand le fichier en a. L'aperçu est gratuit.",
+      "link": "Contrôler mon fichier de créanciers"
     },
     "api": {
       "title": "Le même contrôle depuis le code",

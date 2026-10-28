@@ -737,7 +737,7 @@ const buildRawSpec = () => ({
         operationId: 'checkPostalAddress',
         summary: 'Free ISO 20022 postal-address conformity check',
         description:
-          'FREE rule check on a postal address YOU have already structured, for the November 2026 structured-address deadlines (SPS 2026 in force 14 Nov 2026, last SIC release accepting unstructured addresses 20 Nov 2026, Fedwire production 16 Nov 2026, T2 R2026.NOV). Pure rule evaluation — it reads no database, which is why it is free. Every finding names the document the rule comes from, with its date. ' +
+          'FREE rule check on a postal address YOU have already structured, for the November 2026 structured-address deadlines (SPS 2026 in force 14 Nov 2026, while SIC itself does not validate addresses and each bank decides, Fedwire production 16 Nov 2026, T2 R2026.NOV). Pure rule evaluation — it reads no database, which is why it is free. Every finding names the document the rule comes from, with its date. ' +
           `Schemes: ${ADDRESS_SCHEMES.join(', ')}. ` +
           CBPR_NOTE +
           ' It does NOT parse or normalise a free-text address into a structured one — that needs national postal reference data we do not hold.',

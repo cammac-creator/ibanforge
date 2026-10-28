@@ -420,7 +420,12 @@ export interface SignupSources {
 export interface AuditStats {
   period_days: number;
   since: string;
+  /** Fichiers de clients ; depuis le 28.10.2026, l'exemple du site n'y est plus compté. */
   uploads: number;
+  /** Clics sur l'exemple du site, comptés à part depuis le 28.10.2026. Absent sur une API ancienne. */
+  samples?: number;
+  /** Parmi `uploads`, les fichiers avec au moins une ligne CH ou LI, depuis le 28.10.2026. Absent sur une API ancienne. */
+  uploads_ch?: number;
   sales: number;
   revenue_chf: number | null;
   /** Absents sur une API ancienne : son total catalogue ne doit pas être présenté comme payé. */

@@ -155,6 +155,10 @@ export type OperationType =
   | 'reference_validate'
   | 'address_check'
   | 'audit_upload'
+  /** Le fichier d'exemple du site, envoyé par « Essayer avec un fichier d'exemple » : jamais un fichier de client (28.10.2026). */
+  | 'audit_sample'
+  /** Écrit à côté d'`audit_upload` quand un vrai fichier porte au moins une ligne CH ou LI (28.10.2026). */
+  | 'audit_upload_ch'
   | 'audit_sale'
   | 'qr_bill_check';
 

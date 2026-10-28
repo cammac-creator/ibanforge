@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Hono } from 'hono';
 import { webEvents, resetWebEventLimiter, WEB_EVENTS_PER_WINDOW } from './web-events.js';
 import { parseWebEvent, recordServerEvent, SERVER_EVENT_PAGE } from '../lib/web-events.js';
@@ -63,6 +65,20 @@ describe('parseWebEvent', () => {
     expect(parseWebEvent({ name: 'cta:try', page: 'fr', locale: 'fr' })).toBeNull();
     expect(parseWebEvent({ name: 'cta:try', page: '/fr', locale: 'it' })).toBeNull();
     expect(parseWebEvent('cta:try')).toBeNull();
+  });
+
+  it('accepte chaque balise de la page d’audit et de l’outil QR-facture (28.10.2026)', () => {
+    // La page fixe le vocabulaire, l'API refuse ce qu'elle ne connaît pas : une
+    // balise que le serveur rejetterait est un clic que personne ne voit. Lu dans
+    // les composants eux-mêmes, pour qu'une balise renommée ne passe pas.
+    const root = join(import.meta.dirname, '..', '..');
+    const tags = ['frontend/components/audit-client.tsx', 'frontend/components/qr-bill-client.tsx']
+      .flatMap((f) => [...readFileSync(join(root, f), 'utf8').matchAll(/data-evt="([^"]+)"/g)])
+      .map((m) => m[1]);
+    for (const name of ['cta:audit-upload', 'cta:audit-sample', 'cta:audit-from-qr'])
+      expect(tags).toContain(name);
+    for (const name of tags)
+      expect(parseWebEvent({ name, page: '/fr/audit', locale: 'fr' })?.name, name).toBe(name);
   });
 
   it('refuses the api: family — those rows are written by the server, never claimed', () => {
