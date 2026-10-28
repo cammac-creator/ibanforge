@@ -57,6 +57,21 @@ it.each(['glama.json', 'mcp/README.md', 'integrations/postman/ibanforge.postman_
   },
 );
 
+// Même reste dans l'accueil de la documentation, corrigé en anglais par la
+// PR 461 et oublié en français et en allemand.
+it.each([
+  ['frontend/content/en/docs/index.mdx', /ahead of the November 2026 changes/i],
+  ['frontend/content/fr/docs/index.mdx', /avant les échéances de novembre 2026/i],
+  ['frontend/content/de/docs/index.mdx', /vor den Umstellungen im November 2026/i],
+] as const)(
+  "l'accueil de la documentation %s ne promet plus une échéance commune",
+  (file, ancien) => {
+    const source = readFileSync(join(import.meta.dirname, '..', '..', file), 'utf8');
+    expect(source).not.toMatch(ancien);
+    expect(source.match(OBSOLETE_ADDRESS_TIMETABLE)).toBeNull();
+  },
+);
+
 /**
  * The machine contract must describe every step the endpoint actually demands.
  *
