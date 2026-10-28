@@ -17,8 +17,8 @@ const ruFault = vi.hoisted(() => ({ on: false }));
 vi.mock('./ru-institution.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./ru-institution.js')>();
   const guarded =
-    (fn: (code: string) => string[]) =>
-    (code: string): string[] => {
+    <T>(fn: (code: string) => T) =>
+    (code: string): T => {
       if (ruFault.on) throw new Error('establishment unreadable (test)');
       return fn(code);
     };
@@ -67,6 +67,9 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
     "INSERT INTO sanctioned_entities (bic8, entity_name, source_list, country_code, directory_match) VALUES (?, ?, 'OFAC', ?, 0)",
   );
   listed.run('ZZALRUM1', 'ALFA-TEST BANK JSC', 'RU');
+  // Une liste qui désigne Beta sous un BIC secondaire d'un autre préfixe, que le
+  // répertoire ne marque pas par défaut et qui n'est donc pas servi : limite connue.
+  listed.run('ZZQQRUMM', 'BETA-TEST LLC', 'RU');
   // Hors de Russie, la règle d'avant : le BIC8 exact, rien d'autre.
   listed.run('ZZDEDEF1', 'DELTA TEST BANK AG', 'DE');
   compliance.close();
@@ -164,6 +167,12 @@ describe('Russia: the sanctions screen covers the whole institution', () => {
     expect(screened(ru('049999904')).compliance.sanctions.bank_sanctioned).toBe(true);
   });
 
+  it('cannot match a listing under a secondary BIC of another prefix (known limit)', () => {
+    const c = screened(ru('049999911')).compliance;
+    expect(c.sanctions.bank_screened).toBe(true);
+    expect(c.sanctions.bank_sanctioned).toBe(false);
+  });
+
   it('screens and clears an institution no list carries', () => {
     const c = screened(ru('049999911')).compliance;
     expect(c.sanctions.bank_screened).toBe(true);
@@ -176,8 +185,9 @@ describe('Russia: the sanctions screen covers the whole institution', () => {
     expect(r.compliance.sanctions.bank_screened).toBe(false);
     expect(r.compliance.sanctions.institution_listed).toBeNull();
     expect(r.checks?.institution_sanctions).toBe('unknown');
-    // Le pays reste sanctionné : la réponse ne descend pas pour autant.
+    // Le pays reste sanctionné : le niveau reste critical.
     expect(r.compliance.sanctions.country_sanctioned).toBe(true);
+    expect(r.compliance.risk_level).toBe('critical');
   });
 
   it('gives the BIC routes the same answer', () => {
@@ -234,17 +244,19 @@ describe('Russia: an institution that cannot be read is "not screened", never "n
 });
 
 describe('Russia without its overlay members', () => {
-  it('falls back to the line own BIC without the licences', () => {
+  it('says "not screened" without the licences, never "not listed" on the line own BIC', () => {
     const db = new Database(fixture.bicPath);
     db.prepare('DROP TABLE ru_bik_licences').run();
     db.close();
     closeBicDB();
     resetNationalRegisterStatements();
-    const branch = screened(ru('049999902')).compliance.sanctions;
-    expect(branch.bank_screened).toBe(false);
-    expect(branch.institution_listed).toBeNull();
-    // Le siège garde son BIC, et la règle des six caractères.
-    expect(screened(ru('049999901')).compliance.sanctions.bank_sanctioned).toBe(true);
+    for (const bik of ['049999901', '049999902', '049999911']) {
+      const s = screened(ru(bik)).compliance.sanctions;
+      expect(s.bank_screened, bik).toBe(false);
+      expect(s.institution_listed, bik).toBeNull();
+    }
+    // Le chemin BIC compare toujours le BIC demandé sur ses six premiers caractères.
+    expect(screenBicSanctions('ZZALRUMM').listed).toBe(true);
   });
 
   it('says "not consulted" when the overlay does not carry the directory', () => {

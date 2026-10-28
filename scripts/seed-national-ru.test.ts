@@ -254,7 +254,7 @@ describe('readEd807Zip and readRussiaLive', () => {
     const r = await readRussiaLive(async (url) => {
       asked.push(url);
       return archive;
-    });
+    }, 0);
     expect(asked).toEqual([RU_DIRECTORY_URL]);
     expect(r.entries.map((e) => e.code)).toEqual([
       '049999901',
@@ -263,5 +263,11 @@ describe('readEd807Zip and readRussiaLive', () => {
       '049999911',
     ]);
     expect(r.licences).toHaveLength(3);
+  });
+
+  it('refuses the whole directory under the licence floor, before any name is written', async () => {
+    await expect(readRussiaLive(async () => archive)).rejects.toThrow(
+      /only 3 licences, expected at least \d+/,
+    );
   });
 });

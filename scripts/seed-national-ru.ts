@@ -64,6 +64,7 @@
 import { inflateRawSync } from 'node:zlib';
 import { readZipEntries } from './seed-eba-psd.js';
 import { RU_SOURCE } from '../src/lib/ru-credit.js';
+import { RESTRICTED_FLOORS } from '../src/lib/restricted-family.js';
 
 /** L'adresse stable de l'archive du jour (elle redirige vers le fichier). */
 export const RU_DIRECTORY_URL = 'https://www.cbr.ru/s/newbik';
@@ -331,9 +332,22 @@ async function fetchBuffer(url: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer());
 }
 
-/** Le répertoire lu en ligne : l'archive du jour, le XML, les lignes servies. */
+/**
+ * Le répertoire lu en ligne : l'archive du jour, le XML, les lignes servies.
+ *
+ * Le plancher des licences est vérifié ICI, avant qu'aucun nom ne soit écrit : des
+ * noms frais à côté de licences reprises d'un autre jour laisseraient un BIK nouveau
+ * sans son établissement. Sous le plancher, le répertoire entier est en échec et les
+ * deux membres sont repris ensemble de la surcouche précédente.
+ */
 export async function readRussiaLive(
   get: (url: string) => Promise<Buffer> = fetchBuffer,
+  minLicences: number = RESTRICTED_FLOORS.register_ru_licences,
 ): Promise<RussiaRegister> {
-  return buildRussiaRegister(parseEd807(readEd807Zip(await get(RU_DIRECTORY_URL))));
+  const register = buildRussiaRegister(parseEd807(readEd807Zip(await get(RU_DIRECTORY_URL))));
+  if (register.licences.length < minLicences)
+    throw new Error(
+      `RU: only ${register.licences.length} licences, expected at least ${minLicences}. Refusing the directory.`,
+    );
+  return register;
 }

@@ -1483,7 +1483,8 @@ async function main(): Promise<void> {
     }
     // Les licences des BIK russes, membre à part : en panne avec le répertoire
     // (même cause), elles sont reprises de la surcouche précédente comme lui ;
-    // jamais écrites fraîches à côté de noms repris.
+    // jamais écrites fraîches à côté de noms repris, ni l'inverse (leur plancher est
+    // vérifié par readRussiaLive avant qu'aucun nom ne soit écrit).
     if (cc === 'RU') {
       try {
         if (failure) throw failure;

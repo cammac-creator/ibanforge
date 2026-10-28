@@ -134,9 +134,10 @@ emploie (Sovcombank : `SOMRRUM1` sur la liste de l'OFAC, `SOMRRUMM` au répertoi
 de VTB ont des BIC `VTBRRUM2…`, la liste nomme `VTBRRUMM`), et la plupart des succursales n'ont pas de
 BIC SWIFT à elles. D'où la règle russe :
 
-- tous les BIC SWIFT de l'**établissement**, c'est-à-dire de toutes les lignes de sa licence (le
-  siège, éventuellement sur plusieurs lignes comme Sovcombank, et toutes ses succursales : une seule
-  personne morale), passent aux listes, pas seulement celui de la ligne ;
+- le BIC SWIFT par défaut de chaque ligne de l'**établissement**, c'est-à-dire de toutes les lignes de
+  sa licence (le siège, éventuellement sur plusieurs lignes comme Sovcombank, et toutes ses
+  succursales : une seule personne morale), passe aux listes, pas seulement celui de la ligne ; les
+  BIC secondaires du répertoire ne sont ni servis ni comparés ;
 - chacun est comparé sur ses **six premiers caractères** (code de l'institution et pays). Le chargeur
   refuse un répertoire où deux licences serviraient un même préfixe : la règle ne vaudrait plus, et
   le passage reprend la surcouche précédente ;
@@ -144,10 +145,11 @@ BIC SWIFT à elles. D'où la règle russe :
   russe y est comparé sur ses six premiers caractères même sans la surcouche ;
 - un établissement sans aucun BIC SWIFT n'est pas contrôlé, et le dit : `bank_screened: false`,
   `institution_listed: null`, `checks.institution_sanctions: "unknown"`, jamais « non listé ». Le pays
-  reste sanctionné et le score ne descend pas pour autant ;
+  reste sanctionné et le niveau reste `critical` ; de même quand le registre est servi sans la table
+  des licences (l'établissement ne se lit pas en entier) ;
 - limite qui demeure : une banque qu'une liste désigne **sans** BIC (la table `sanctioned_entities` ne
-  garde que les entrées qui en portent un), ou sous un BIC d'un autre préfixe, n'est pas reconnue et
-  répond « non listée ». Le contrôle reste celui des listes déjà en base, par BIC, comme partout.
+  garde que les entrées qui en portent un), ou sous un BIC d'un autre préfixe (un BIC secondaire, par
+  exemple), n'est pas reconnue et répond « non listée ». Le contrôle reste celui des listes déjà en base, par BIC, comme partout.
 
 Le chemin BIC (`GET /v1/bic/:code`, conformité par BIC) lit le répertoire pour étendre le contrôle à
 l'établissement, sans rien en reproduire dans la réponse : il ne porte donc pas le crédit, que portent
