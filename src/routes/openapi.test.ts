@@ -44,6 +44,36 @@ it.each([
   expect(source).toContain('T2 R2026.NOV does not forbid an AddressLine-only address');
 });
 
+// Les fiches recopiées hors du code (catalogue Glama, README du paquet MCP,
+// qui n'atteint la page npm qu'à la prochaine publication, collection
+// Postman) gardaient « Fedwire production 16 Nov 2026 » et « ahead of the
+// November 2026 changes » après la PR 461 (28.10.2026).
+it.each(['glama.json', 'mcp/README.md', 'integrations/postman/ibanforge.postman_collection.json'])(
+  'garde les échéances distinctes dans la fiche recopiée %s',
+  (file) => {
+    const source = readFileSync(join(import.meta.dirname, '..', '..', file), 'utf8');
+    expect(source.match(OBSOLETE_ADDRESS_TIMETABLE)).toBeNull();
+    expect(source).not.toMatch(/ahead of the November 2026 changes/i);
+    expect(source).toMatch(/Fedwire release (?:moved|rescheduled) to November 2027/);
+    expect(source).toMatch(/SIC (?:itself )?does not validate addresses/);
+  },
+);
+
+// Même reste dans l'accueil de la documentation, corrigé en anglais par la
+// PR 461 et oublié en français et en allemand.
+it.each([
+  ['frontend/content/en/docs/index.mdx', /ahead of the November 2026 changes/i],
+  ['frontend/content/fr/docs/index.mdx', /avant les échéances de novembre 2026/i],
+  ['frontend/content/de/docs/index.mdx', /vor den Umstellungen im November 2026/i],
+] as const)(
+  "l'accueil de la documentation %s ne promet plus une échéance commune",
+  (file, ancien) => {
+    const source = readFileSync(join(import.meta.dirname, '..', '..', file), 'utf8');
+    expect(source).not.toMatch(ancien);
+    expect(source.match(OBSOLETE_ADDRESS_TIMETABLE)).toBeNull();
+  },
+);
+
 /**
  * The machine contract must describe every step the endpoint actually demands.
  *

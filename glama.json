@@ -64,7 +64,7 @@
     },
     {
       "name": "check_postal_address",
-      "description": "Check a structured ISO 20022 postal address against SPS (SIX), HVPS+/T2 or Fedwire rules ahead of the November 2026 changes — every finding cites its source document (free)"
+      "description": "Check a structured ISO 20022 postal address against SPS (SIX), HVPS+/T2 or Fedwire rules; timetables differ (SPS 2026 in force 14 Nov 2026, though SIC does not validate addresses and each bank decides; Fedwire release moved to November 2027) — every finding cites its source document (free)"
     }
   ]
 }
