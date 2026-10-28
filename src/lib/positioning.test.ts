@@ -16,7 +16,11 @@ import {
   uncoveredCountries,
   shareInWords,
 } from './positioning.js';
-import { buildRouteTable } from '../middleware/x402.js';
+import { BATCH_PRICE_PER_IBAN, buildRouteTable } from '../middleware/x402.js';
+import { BUNDLES } from '../routes/api-keys.js';
+import { PRO_PRICE_USD } from './payment-links.js';
+import { PRO_MONTHLY_LIMIT } from './api-keys.js';
+import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { NATIONAL_CHECK_COUNTRIES } from './national-check/index.js';
 
 /**
@@ -34,6 +38,118 @@ import { NATIONAL_CHECK_COUNTRIES } from './national-check/index.js';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
+
+describe('l’essentiel des fichiers destinés aux assistants', () => {
+  const files = ['frontend/public/llms.txt', 'frontend/public/llms-full.txt'];
+  const essentials = (text: string) =>
+    text.slice(text.indexOf('## The essentials'), text.indexOf('\n> '));
+
+  it('place le même résumé anglais puis français avant le paragraphe de couverture', () => {
+    const blocks = files.map((file) => {
+      const text = read(file);
+      expect(text.split('\n')[2]).toBe('## The essentials');
+      const block = essentials(text);
+      expect(block).toContain("## L'essentiel");
+      expect(block.split('\n').filter(Boolean)).toHaveLength(26);
+      return block;
+    });
+    expect(blocks[0]).toBe(blocks[1]);
+  });
+
+  it.each(files)('%s reprend les prix publiés, dans les deux langues', (file) => {
+    const block = essentials(read(file));
+    const [en, fr] = block.split("## L'essentiel");
+    const grouped = (n: number, separator: string) =>
+      String(n).replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+    const packsEn = Object.values(BUNDLES)
+      .map((b, i) => `$${b.price_usdc} for ${grouped(b.credits, ',')}${i === 0 ? ' credits' : ''}`)
+      .join(', ');
+    const packsFr = Object.values(BUNDLES)
+      .map(
+        (b, i) => `${b.price_usdc} $ pour ${grouped(b.credits, ' ')}${i === 0 ? ' crédits' : ''}`,
+      )
+      .join(', ');
+    expect(en).toContain(packsEn);
+    expect(fr).toContain(packsFr);
+    expect(en).toContain(
+      `Pro: $${PRO_PRICE_USD}/month for ${grouped(PRO_MONTHLY_LIMIT, ',')} requests`,
+    );
+    expect(fr).toContain(
+      `Pro : ${PRO_PRICE_USD} $/mois pour ${grouped(PRO_MONTHLY_LIMIT, ' ')} requêtes`,
+    );
+    // Une clé créée sans e-mail reste au palier anonyme : les 200 du mois ne
+    // viennent qu'après la réclamation par un code envoyé à une adresse. Lu seul
+    // par un assistant, « 200 » et « sans e-mail » côte à côte deviendraient
+    // « 200 par mois sans e-mail ».
+    expect(en).toContain(
+      `it reaches ${FREE_TIER_MONTHLY_LIMIT} requests a month at no charge once claimed with a 6-digit code mailed to an address (POST /v1/keys/claim)`,
+    );
+    expect(fr).toContain(
+      `elle atteint ${FREE_TIER_MONTHLY_LIMIT} requêtes par mois sans frais une fois réclamée par un code à 6 chiffres envoyé à une adresse e-mail (POST /v1/keys/claim)`,
+    );
+    const routes = buildRouteTable(
+      '0x0000000000000000000000000000000000000001',
+      'POST',
+      '/v1/iban/validate',
+    );
+    for (const [route, labelEn, labelFr] of [
+      ['POST /v1/iban/validate', 'IBAN validation', 'validation IBAN'],
+      ['GET /v1/bic/:code', 'BIC or Swiss clearing lookup', 'recherche BIC ou clearing suisse'],
+      [
+        'GET /v1/ch/clearing/:iid',
+        'BIC or Swiss clearing lookup',
+        'recherche BIC ou clearing suisse',
+      ],
+      ['POST /v1/iban/compliance', 'compliance', 'conformité'],
+    ]) {
+      const {
+        accepts: { price },
+      } = routes[route] as { accepts: { price: string } };
+      expect(en).toContain(`${labelEn} ${price}`);
+      expect(fr).toContain(`${labelFr} ${price.slice(1).replace('.', ',')} $`);
+    }
+    expect(en).toContain(`batch $${BATCH_PRICE_PER_IBAN} per IBAN`);
+    expect(fr).toContain(`lot ${String(BATCH_PRICE_PER_IBAN).replace('.', ',')} $ par IBAN`);
+  });
+
+  it.each(files)(
+    '%s donne les accès, les limites et la source vivante sans figer sa couverture',
+    (file) => {
+      const block = essentials(read(file));
+      const pkg = JSON.parse(read('mcp/package.json')) as { name: string; mcpName: string };
+      for (const part of block.split("## L'essentiel")) {
+        for (const fact of [
+          'https://api.ibanforge.com/llms.txt',
+          'https://api.ibanforge.com/mcp',
+          `npx -y ${pkg.name}`,
+          pkg.mcpName,
+          'IBANforge, ibanforge.com',
+          'support@ibanforge.com',
+          'VoP, BAV, CoP',
+        ])
+          expect(part).toContain(fact);
+      }
+      expect(block).toContain(`frozen in ${frozenBicShare().month}`);
+      expect(block).toContain('no proof an account exists or is open');
+      expect(block).toContain('aucune preuve que le compte existe ou est ouvert');
+      expect(block).toContain('no sanctions screening of the payee (bank and country only)');
+      expect(block).toContain(
+        'aucun filtrage du bénéficiaire contre les sanctions (banque et pays seulement)',
+      );
+      expect(block).toContain('name the source of each data item');
+      expect(block).toContain('nommer la source de chaque donnée');
+      // Le détail statique nomme aussi des pays servis par les fichiers privés :
+      // il ne décrit ni le code seul ni la production, le fichier vivant fait foi.
+      expect(block).toContain(
+        'can differ from the current production coverage; the live file is the reference',
+      );
+      expect(block).toContain(
+        'peut différer de la couverture actuelle de production ; le fichier vivant fait foi',
+      );
+      expect(block).not.toMatch(/all but \d|\d+ (?:countries|pays)/i);
+    },
+  );
+});
 
 /** The static files that carry the long paragraph verbatim. */
 const LONG_SURFACES = ['frontend/public/llms.txt', 'frontend/public/llms-full.txt', 'README.md'];
