@@ -134,9 +134,26 @@ npm run build             # next build
 - `docs/data-sources.md` — every data source, its licence, and the permission we hold in
   writing. **Read it before touching a register.** Some sources impose an exact credit line
   and a notice that must be reproduced in full on every response.
+- **The data rule of 28 October 2026 (Claude-Alain, "go pour B"): act first, correct if
+  asked.** Data whose terms are non-commercial, "all rights reserved" or "written consent",
+  whose owner is silent, or that a competitor compiled (ibancalculator.com, iban.es,
+  internationalmoneytransfers.org), is SERVED, source cited, without waiting for a permission
+  and without a permission letter by default; a written "stop" from its owner is followed
+  within 48 hours. It never enters this repository, an npm package or a site export: it
+  comes from the private overlay only, as a member of the restricted family below (the rule
+  of 24 September becomes "out of the public repository, but served"). Never extract a
+  competitor's site actively (invented IBANs sent to its validator) without Claude-Alain's
+  explicit consent. Each member names its `origin`; `RESTRICTED_WITHDRAWN=<origin or member>`
+  on the server withdraws it at the restart Railway does on a variable change (state
+  `withdrawn`, named by `GET /health` → `restricted_overlays.<base>.withdrawn`, a typo under
+  `withdrawn_unmatched`), then the member leaves the family within 48 hours.
 - `src/lib/restricted-family.ts` — the data we may serve but not redistribute (EBA STEP2,
   NBP and OeNB directory rows, the AT, BE and SM registers, the PRA list, the UN list, both
-  EPC registers), listed ONCE, with each table's definition and how its rows are dated. In
+  EPC registers, and since 28 October 2026 the Swiss SECO list and the composite-map keys
+  withdrawn on 29 September: TR, AE, BA, GE, KZ, MD, EE, RS and the rest of IT, ES and RO,
+  served as a code-by-code `supplement` where the public map has no key), listed ONCE, with
+  each table's definition and how its rows are dated. Every answer read from the EPC
+  registers carries "Source: European Payments Council" and the day they were extracted. In
   production it comes from a private file per database, named by
   `RESTRICTED_BIC_OVERLAY_PATH` and `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (absolute paths on
   the Railway volume, `/app/data/…`), merged at start-up into a copy of the fresh public
@@ -224,8 +241,9 @@ permissions cover API responses, one entry per request; the tables are not in th
 path git would track) or at the variable's path, and `--check` compares without writing. A hit names the holder
 with the source and its dates in `bank_code_check.register`; a miss keeps the answer it had before, never
 `not_allocated`; none of the three is in `NATIONAL_REGISTERS` or `NON_EXHAUSTIVE_REGISTERS`. Estonia and Serbia
-stay in `UNLICENSED_MAP_COUNTRIES`: the withdrawn composite keys do not come back, though where their file is set
-the public "no data" sentence no longer names them (`uncoveredCountries()` in `positioning.ts`). The Serbian
+stay in `UNLICENSED_MAP_COUNTRIES`; since 28 October 2026 their withdrawn composite keys come back from the
+private overlay (members `map_ee`, `map_rs`), and the authority's list wins wherever it lists the code, even
+without a BIC (`resolveBank` in `enrich.ts`). The Serbian
 company registration number is kept in its file and never served. Without the variables nothing changes;
 switching them on in production is the main session's step.
 

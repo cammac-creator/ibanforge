@@ -117,6 +117,12 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       map_pl: 'failed:http_503',
       map_fi: 'failed:http_503',
       map_lu: 'failed:http_503',
+      ...Object.fromEntries(
+        ['tr', 'ae', 'ba', 'ge', 'kz', 'md', 'ee', 'rs', 'it', 'es', 'ro'].map((cc) => [
+          `map_${cc}`,
+          'failed:http_503',
+        ]),
+      ),
       // La liste finlandaise est statique : jamais téléchargée, recopiée par `seed`.
       register_fi: 'failed:static_list',
     });

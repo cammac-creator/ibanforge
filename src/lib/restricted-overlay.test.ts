@@ -15,9 +15,11 @@ import {
   RESTRICTED_TABLES,
   curatedMapCountries,
   membersOf,
+  restoredMapCountries,
   restrictedBicSources,
   restrictedRegisterCountries,
   seedFamilyFromEnv,
+  withdrawnMembers,
 } from './restricted-family.js';
 import {
   type MemberReport,
@@ -76,8 +78,19 @@ describe('la famille « sous conditions », une seule constante', () => {
       'map_fi',
       'map_lu',
       'register_fi',
+      'map_tr',
+      'map_ae',
+      'map_ba',
+      'map_ge',
+      'map_kz',
+      'map_md',
+      'map_ee',
+      'map_rs',
+      'map_it',
+      'map_es',
+      'map_ro',
     ]);
-    expect(membersOf('compliance').map((m) => m.id)).toEqual(['un', 'epc_sepa', 'epc_vop']);
+    expect(membersOf('compliance').map((m) => m.id)).toEqual(['un', 'epc_sepa', 'epc_vop', 'seco']);
     // Les membres venus après la première surcouche, et eux seuls, peuvent manquer
     // à un fichier ; la liste finlandaise est la seule liste statique.
     expect(RESTRICTED_FAMILY.filter((m) => m.mayBeAbsent).map((m) => m.id)).toEqual([
@@ -85,9 +98,37 @@ describe('la famille « sous conditions », une seule constante', () => {
       'map_fi',
       'map_lu',
       'register_fi',
+      'map_tr',
+      'map_ae',
+      'map_ba',
+      'map_ge',
+      'map_kz',
+      'map_md',
+      'map_ee',
+      'map_rs',
+      'map_it',
+      'map_es',
+      'map_ro',
+      'seco',
     ]);
     expect(RESTRICTED_FAMILY.filter((m) => m.staticList).map((m) => m.id)).toEqual(['register_fi']);
     expect([...curatedMapCountries()].sort()).toEqual(['FI', 'LU', 'PL']);
+    // Règle du 28/10/2026 : les clés retirées le 29/09/2026, en complément seulement.
+    expect([...restoredMapCountries()].sort()).toEqual([
+      'AE',
+      'BA',
+      'EE',
+      'ES',
+      'GE',
+      'IT',
+      'KZ',
+      'MD',
+      'RO',
+      'RS',
+      'TR',
+    ]);
+    // Chaque membre nomme son origine : le mot qu'un retrait donne à RESTRICTED_WITHDRAWN.
+    for (const m of RESTRICTED_FAMILY) expect(m.origin, m.id).toMatch(/^[a-z0-9.-]+\.[a-z]+$/);
   });
 
   it('laisse la Slovaquie et la Tchéquie publiques', () => {
@@ -290,6 +331,70 @@ describe('surcouche : extraction, contrôle, fusion', () => {
     expect(report.error).toBe('overlay_rows_outside_family:bic_entries');
   });
 
+  it('retire à la demande (RESTRICTED_WITHDRAWN) : lignes ôtées de la copie servie, ni refus ni perte', () => {
+    // Règle du 28/10/2026 : une origine se retire en un redémarrage, sans toucher
+    // au fichier privé. Le membre retiré n'est pas servi ; ses voisins de table,
+    // même décidés d'un bloc (`bic_entries`), le sont.
+    const bic = buildMergedDatabase({
+      kind: 'bic',
+      publicPath: publicBase.bic,
+      overlayPath: overlay.bic,
+      outputPath: join(dir, 'retrait-bic.sqlite'),
+      withdrawn: withdrawnMembers('tbb.org.tr, nbp').ids,
+    });
+    expect(bic.state).toBe('applied');
+    const state = (id: string) => bic.members.find((m) => m.id === id)?.state;
+    expect(state('map_tr')).toBe('withdrawn');
+    expect(state('nbp')).toBe('withdrawn');
+    expect(state('eba_step2')).toBe('applied');
+    expect(state('map_ge')).toBe('applied');
+    expect(bic.members.filter(memberRefused)).toEqual([]);
+    const db = openDb(bic.path!, true);
+    const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+    expect(count("SELECT COUNT(*) AS n FROM curated_bank_codes WHERE country = 'TR'")).toBe(0);
+    expect(
+      count("SELECT COUNT(*) AS n FROM curated_bank_codes WHERE country = 'GE'"),
+    ).toBeGreaterThan(0);
+    expect(count("SELECT COUNT(*) AS n FROM bic_entries WHERE source = 'nbp'")).toBe(0);
+    expect(
+      count("SELECT COUNT(*) AS n FROM bic_entries WHERE source = 'eba_step2'"),
+    ).toBeGreaterThan(0);
+    db.close();
+    // Tout retirer d'une base sert la base publique : pas un refus du fichier.
+    const compliance = buildMergedDatabase({
+      kind: 'compliance',
+      publicPath: publicBase.compliance,
+      overlayPath: overlay.compliance,
+      outputPath: join(dir, 'retrait-conformite.sqlite'),
+      withdrawn: withdrawnMembers('un.org,europeanpaymentscouncil.eu,seco.admin.ch').ids,
+    });
+    expect(compliance.state).toBe('applied');
+    expect(compliance.members.map((m) => m.state)).toEqual([
+      'withdrawn',
+      'withdrawn',
+      'withdrawn',
+      'withdrawn',
+    ]);
+  });
+
+  it('RESTRICTED_WITHDRAWN : une origine ou un membre, et la faute de frappe se voit', () => {
+    expect([...withdrawnMembers('ibancalculator.com').ids].sort()).toEqual([
+      'map_ae',
+      'map_ba',
+      'map_ee',
+      'map_ge',
+      'map_it',
+      'map_kz',
+      'map_md',
+      'map_rs',
+    ]);
+    expect(withdrawnMembers(' MAP_TR , ibancalculatr.com ,')).toEqual({
+      ids: new Set(['map_tr']),
+      unmatched: ['ibancalculatr.com'],
+    });
+    expect(withdrawnMembers(undefined)).toEqual({ ids: new Set(), unmatched: [] });
+  });
+
   it('refuse un membre au contenu altéré, et sert les autres', () => {
     const tampered = copy(overlay.compliance);
     const db = openDb(tampered);
@@ -301,6 +406,7 @@ describe('surcouche : extraction, contrôle, fusion', () => {
       ['un', 'applied', undefined],
       ['epc_sepa', 'applied', undefined],
       ['epc_vop', 'refused', 'content_hash_mismatch'],
+      ['seco', 'applied', undefined],
     ]);
     const merged = buildMergedDatabase({
       kind: 'compliance',
@@ -424,6 +530,17 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         map_fi: 'applied:identical',
         map_lu: 'applied:identical',
         register_fi: 'applied:identical',
+        map_tr: 'applied:identical',
+        map_ae: 'applied:identical',
+        map_ba: 'applied:identical',
+        map_ge: 'applied:identical',
+        map_kz: 'applied:identical',
+        map_md: 'applied:identical',
+        map_ee: 'applied:identical',
+        map_rs: 'applied:identical',
+        map_it: 'applied:identical',
+        map_es: 'applied:identical',
+        map_ro: 'applied:identical',
       });
       expect(result.state).toBe('kept_public');
       const out = openDb(result.path!, true);
@@ -527,6 +644,9 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         db.prepare("DELETE FROM sanctioned_entities WHERE bic8 = ? AND source_list = 'UN'").run(
           FIXTURE.UN.onlyUn,
         );
+        db.prepare(
+          "DELETE FROM sanctioned_entities WHERE source_list = 'SECO' AND bic8 = 'XMPC0000'",
+        ).run();
       });
       const result = merge('compliance', newer, overlay.compliance, 'rien.sqlite');
       expect(result.state).toBe('kept_public');
@@ -736,7 +856,25 @@ describe('surcouche : extraction, contrôle, fusion', () => {
   });
 
   describe('membres venus après la première surcouche (mayBeAbsent)', () => {
-    const LATE = ['map_fi', 'map_lu', 'map_pl', 'register_fi'];
+    const LATE = [
+      'map_fi',
+      'map_lu',
+      'map_pl',
+      'register_fi',
+      ...[
+        'map_tr',
+        'map_ae',
+        'map_ba',
+        'map_ge',
+        'map_kz',
+        'map_md',
+        'map_ee',
+        'map_rs',
+        'map_it',
+        'map_es',
+        'map_ro',
+      ],
+    ].sort();
     /** Une base « d'avant » : la famille complète, sans les tables des membres tardifs. */
     const withoutLateTables = (): string => {
       const older = copy(fixture.bicPath);
@@ -826,7 +964,7 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         'members_lost:bic:map_pl',
       );
       expect(pulledFileProblem('bic', inspection, entry, new Set(LATE))).toBe(
-        'members_lost:bic:map_pl,map_fi,map_lu,register_fi',
+        'members_lost:bic:map_pl,map_fi,map_lu,register_fi,map_tr,map_ae,map_ba,map_ge,map_kz,map_md,map_ee,map_rs,map_it,map_es,map_ro',
       );
     });
 

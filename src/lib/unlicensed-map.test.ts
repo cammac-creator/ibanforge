@@ -8,6 +8,7 @@ import {
   lookupByCountryBank,
 } from './bic-lookup.js';
 import { EXAMPLE_IBANS } from './countries.js';
+import { restoredMapCountries } from './restricted-family.js';
 import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import { buildComplianceResponse } from './compliance-response.js';
@@ -20,9 +21,11 @@ import { BANK_CODE_DATA_UNAVAILABLE_FLOOR, calculateRiskScore } from './complian
  *
  * Eight countries lost every key, Spain and Italy part of theirs; Italy and
  * Romania were rebuilt from open data (scripts/derive-map-keys.ts). What must
- * hold from now on: the eight countries stay empty and say "not consulted",
- * never "absent"; no bulk import brings the Spanish and Italian keys back
- * unnoticed; every Romanian key is the derivation it claims to be.
+ * hold from now on: the eight countries stay empty IN THIS REPOSITORY and, on the
+ * public database, say "not consulted", never "absent"; no bulk import brings the
+ * Spanish and Italian keys back unnoticed; every Romanian key is the derivation
+ * it claims to be. Since 28/10/2026 the withdrawn keys are served again from the
+ * private overlay only (restored-map.test.ts holds that path).
  */
 
 const map = JSON.parse(
@@ -45,9 +48,12 @@ const keysOf = (cc: string) => Object.keys(map).filter((k) => k.startsWith(`${cc
 describe('the countries whose every map key was withdrawn', () => {
   const countries = [...UNLICENSED_MAP_COUNTRIES].sort();
 
-  it('are the eight of the decision, and none of them comes back through a private file', () => {
+  it('are the eight of the decision, served again from the private overlay only (28/10/2026)', () => {
     expect(countries).toEqual(['AE', 'BA', 'EE', 'GE', 'KZ', 'MD', 'RS', 'TR']);
     for (const cc of countries) expect(WITHDRAWN_BANK_CODE_COUNTRIES.has(cc), cc).toBe(false);
+    // Rule of 28/10/2026 (option B): each comes back as a `supplement` member of
+    // the restricted family, never as a key of this repository (next test).
+    for (const cc of countries) expect(restoredMapCountries().has(cc), cc).toBe(true);
   });
 
   it.each(countries)('%s carries no key in bic_data.json', (cc) => {

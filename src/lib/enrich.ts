@@ -1345,10 +1345,15 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // and Eesti Pangaliit's list supplies the BIC. The pairing is joined by code
   // and identical name at import (scripts/seed-ee-register.ts) and is OURS, not
   // the authority's: `curated_map`, advisory, never `national_register`. A listed
-  // code without a BIC keeps `bic: null`; nothing is derived from a name.
+  // code without a BIC keeps `bic: null`; nothing is derived from a name. Since
+  // 28/10/2026 the composite map may hold an Estonian key again (restored from
+  // the private overlay, see UNLICENSED_MAP_COUNTRIES): the official list wins
+  // wherever it lists the code, so a listed code without a BIC drops that key
+  // rather than show a compiled BIC beside the holder the authority names.
   if (cc === 'EE') {
     try {
       const reg = lookupEeCode(bankCode);
+      if (reg && !reg.bic) bic = null;
       if (reg?.bic) {
         bic = {
           code: reg.bic,
@@ -1390,7 +1395,8 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
 
   // Serbia (10/10/2026): the National Bank of Serbia's list publishes the BIC
   // beside the code, so the pairing is the register's own and wins over any key of
-  // the composite map (none for Serbia since the withdrawal of 29/09/2026).
+  // the composite map (restored from the private overlay since 28/10/2026, where
+  // the list does not answer).
   if (cc === 'RS') {
     try {
       const reg = lookupRsCode(bankCode);
@@ -1777,6 +1783,14 @@ function enrichResultAt(result: IBANValidationResult, cache?: EnrichCache): void
           ? 'not_listed'
           : vop.status
         : null;
+    // La mention que demandent les conditions de l'EPC, et le jour d'extraction,
+    // dès que ses registres ont été lus pour cette banque (règle du 28/10/2026).
+    // Absente quand le pays a répondu seul : rien n'y vient de l'EPC.
+    const read = reach?.source ? reach : vop?.source ? vop : null;
+    if (read) {
+      sepa.register_source = read.source;
+      sepa.register_as_of = read.as_of ?? null;
+    }
   }
 
   // The demand ledger: a checksum-valid IBAN whose bank code we could not

@@ -31,7 +31,7 @@
  */
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
-import { OVERLAY_ENV, type OverlayKind } from './restricted-family.js';
+import { OVERLAY_ENV, withdrawnMembers, type OverlayKind } from './restricted-family.js';
 import {
   acceptedCopyPath,
   buildMergedDatabase,
@@ -383,6 +383,14 @@ export interface OverlayHealth {
    * leurs identifiants. Disparaît dès qu'une release les porte.
    */
   absent?: string[];
+  /**
+   * Présent seulement quand `RESTRICTED_WITHDRAWN` retire des membres que le
+   * fichier servi porte : leurs identifiants. `withdrawn_unmatched` : les mots
+   * de la variable qui ne nomment ni un membre ni une origine (une faute de
+   * frappe ne retire rien, et doit se voir).
+   */
+  withdrawn?: string[];
+  withdrawn_unmatched?: string[];
 }
 
 /**
@@ -390,17 +398,23 @@ export interface OverlayHealth {
  * les membres absents du fichier servi (des identifiants de code, rien d'autre).
  */
 export function restrictedOverlayHealth(): Record<OverlayKind, OverlayHealth> {
+  const { unmatched } = withdrawnMembers();
   const short = (k: OverlayKind): OverlayHealth => {
     const s = statuses.get(k);
     // Base pas encore ouverte : la fusion n'a pas eu lieu, ce n'est pas un refus.
     if (!s) return { state: overlayPathFromEnv(k) ? 'pending' : 'off', sha256: null };
     const serves = servesOverlay(s.state);
     const absent = serves ? s.members.filter((m) => m.state === 'absent').map((m) => m.id) : [];
+    const withdrawn = serves
+      ? s.members.filter((m) => m.state === 'withdrawn').map((m) => m.id)
+      : [];
     return {
       state: s.state,
       sha256: serves ? (s.sha256?.slice(0, 12) ?? null) : null,
       ...(s.fallback ? { fallback: true as const } : {}),
       ...(absent.length > 0 ? { absent } : {}),
+      ...(withdrawn.length > 0 ? { withdrawn } : {}),
+      ...(unmatched.length > 0 ? { withdrawn_unmatched: unmatched } : {}),
     };
   };
   return { bic: short('bic'), compliance: short('compliance') };

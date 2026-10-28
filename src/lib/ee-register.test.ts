@@ -268,20 +268,17 @@ describe('la place de l’Estonie parmi les pays', () => {
     expect(registerBlock().join('\n')).toContain('Estonia: Finantsinspektsioon');
   });
 
-  it('sort de la phrase des pays sans données, comme du décompte « in all but N », là où le fichier est branché', () => {
+  it('n’est plus dans la phrase des pays sans données depuis le 28/10/2026, fichier branché ou non', () => {
+    // Ses clés de la carte, retirées le 29/09/2026, reviennent par la surcouche
+    // privée (membre `map_ee`, règle du 28/10/2026) : plus aucun pays n'est
+    // annoncé sans données, et le décompte « in all but N » n'a plus de N.
     vi.stubEnv('EE_REGISTER_PATH', '');
-    const before = uncoveredCountries();
-    expect(before).toContain('EE');
-    expect(otherCountriesLine()).toContain('Estonia');
-    expect(positioningLong()).toContain(`in all but ${before.length} of them`);
-    install();
-    const after = uncoveredCountries();
-    expect(after).not.toContain('EE');
-    expect(after).toContain('TR');
-    expect(after).toHaveLength(before.length - 1);
+    expect(uncoveredCountries()).toEqual([]);
     expect(otherCountriesLine()).not.toContain('Estonia');
-    expect(otherCountriesLine()).toContain('Türkiye');
-    expect(positioningLong()).toContain(`in all but ${after.length} of them`);
+    expect(positioningLong()).toContain('in each of them');
+    install();
+    expect(uncoveredCountries()).toEqual([]);
+    expect(otherCountriesLine()).not.toContain('Estonia');
   });
 
   it('reste privée de la carte composite retirée le 29/09/2026, fichier branché ou non', () => {

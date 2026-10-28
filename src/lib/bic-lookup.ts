@@ -18,7 +18,11 @@ import { nlPspEntries } from './nl-psp.js';
 import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
 import { sourceVintage } from './source-vintage.js';
 import { listedInCurrentSource, resetTraceIndex } from './bic-trace.js';
-import { RESTRICTED_FAMILY, curatedMapCountries } from './restricted-family.js';
+import {
+  RESTRICTED_FAMILY,
+  curatedMapCountries,
+  restoredMapCountries,
+} from './restricted-family.js';
 import { fiRegisterLoaded, lookupFiInstitution, resetFiRegister } from './fi-register.js';
 import { getCountryName } from './countries.js';
 
@@ -39,6 +43,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // publisher granted us (see UNLICENSED_MAP_COUNTRIES below; Italian and
 // Romanian keys rebuilt from the Banca d'Italia and GLEIF by
 // scripts/derive-map-keys.ts).
+// 28/10/2026: those withdrawn keys come back from the private overlay only, as
+// a code-by-code supplement (Claude-Alain's rule of 28/10/2026, `supplement`
+// members in restricted-family.ts); this file is unchanged.
 // Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
 // ---------------------------------------------------------------------------
 
@@ -46,6 +53,13 @@ interface BicDataEntry {
   bic: string;
   bank_name?: string;
   city?: string;
+  /**
+   * Only on a key the private overlay restored (28/10/2026): the compilation
+   * and the origin it compiled, served in `bic.source`, and the date of that
+   * compilation. A key of this file carries neither.
+   */
+  source?: string;
+  as_of?: string | null;
 }
 
 let bicDataCache: Record<string, BicDataEntry> | null = null;
@@ -194,23 +208,30 @@ export const WITHDRAWN_BANK_CODE_COUNTRIES: ReadonlySet<string> = new Set([
  * countries its national files were in fact scraped from a commercial IBAN
  * site (by sending it invented IBANs), or copied from a banking association
  * that reserves any commercial use for its written permission (TR). No open
- * source rebuilds them, and no private file brings them back: unlike
- * WITHDRAWN_BANK_CODE_COUNTRIES, nothing restores these countries.
+ * source rebuilds them.
  *
- * Two guards, both needed:
- *  - `lookupByCountryBank` answers nothing, not even through the prefix search.
- *    Georgian and Moldovan bank codes are two letters, and `bic8 LIKE code%`
- *    would still name a bank for them: a guess that the map used to overshadow,
- *    and for Georgia one the country's scheme does not support (a Georgian
- *    bank code is not, as a rule, the start of that bank's BIC).
- *  - `countryHasReferenceData` says we hold nothing for them. Their BIC
+ * Since 28/10/2026 (rule « agir d'abord, corriger si on nous le demande »,
+ * option B) they are served again, from the private overlay ONLY: members
+ * `map_ae` … `map_tr` (`supplement`, restricted-family.ts), never from this
+ * repository, withdrawn within 48 hours if an owner asks (RESTRICTED_WITHDRAWN).
+ * The set still says where the keys live, and keeps two guards:
+ *  - `lookupByCountryBank` answers from the map only, never through the prefix
+ *    search. Georgian and Moldovan bank codes are two letters, and
+ *    `bic8 LIKE code%` would name a bank for a code the map does not carry: a
+ *    guess, and for Georgia one the country's scheme does not support (a
+ *    Georgian bank code is not, as a rule, the start of that bank's BIC).
+ *  - Without the overlay keys (no overlay, member absent or withdrawn),
+ *    `countryHasReferenceData` says we hold nothing for them. Their BIC
  *    directory rows are not a reference for their bank codes, and without this
  *    every code would come back `not_in_register` / `absent_from_reference_data`,
  *    an answer that sounds checked. The honest one is `unavailable` /
- *    `no_reference_data_for_country`, with `bic: null`.
+ *    `no_reference_data_for_country`, with `bic: null`. With them, a code the
+ *    keys do not carry answers as in any country of the map.
  *
- * Spain and Italy lost part of their keys for the same reason and keep the
- * rest; a withdrawn code there answers as any code the map does not carry.
+ * Spain, Italy and Romania lost part of their keys for the same reason and kept
+ * the rest; the overlay adds the withdrawn ones back where the public file
+ * carries no key for the code. Estonia and Serbia also have an official partial
+ * list (ee-register.ts, rs-register.ts), which wins wherever it answers.
  */
 export const UNLICENSED_MAP_COUNTRIES: ReadonlySet<string> = new Set([
   'AE',
@@ -333,6 +354,14 @@ function addListedDutchProviders(data: Record<string, BicDataEntry>): Record<str
  * LU ; membres `map_pl`, `map_fi`, `map_lu`, table `curated_bank_codes`,
  * src/lib/restricted-family.ts), ajoutées au fichier public au chargement.
  *
+ * Depuis la règle du 28/10/2026, la même table porte aussi les clés retirées le
+ * 29/09/2026 (membres `supplement`) : celles-là s'ajoutent CODE PAR CODE, là où
+ * le fichier public n'a aucune clé pour le code, avec leur crédit et leur date
+ * (servis dans `bic.source` et `bic.as_of`). Une clé publique ou reconstruite
+ * depuis une source officielle (IT, RO) garde toujours la réponse ; les
+ * élagages qui suivent (radiations italiennes) s'appliquent aussi aux clés
+ * rétablies.
+ *
  * La règle de fraîcheur de la fusion (src/lib/restricted-overlay.ts, cas (a) à
  * (d)), appliquée pays par pays. Les clés du fichier public ne sont pas datées :
  * tant qu'il porte au moins une clé d'un pays, c'est lui qui répond pour ce pays
@@ -346,28 +375,59 @@ function addListedDutchProviders(data: Record<string, BicDataEntry>): Record<str
  */
 function addCuratedRows(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
   const countries = curatedMapCountries();
+  const restored = restoredMapCountries();
   const carried = new Set<string>();
   for (const key of Object.keys(data)) {
     const cc = key.slice(0, key.indexOf(':'));
     if (countries.has(cc)) carried.add(cc);
   }
-  // Le fichier porte encore chaque pays : la base n'est même pas lue.
-  if (carried.size === countries.size) return data;
-  let rows: Array<{ country: string; code: string; bic: string }>;
+  let rows: Array<{
+    country: string;
+    code: string;
+    bic: string;
+    source: string;
+    as_of: string | null;
+  }>;
   try {
     rows = getBicDB()
-      .prepare('SELECT country, code, bic FROM curated_bank_codes ORDER BY country, code')
+      .prepare(
+        'SELECT country, code, bic, source, as_of FROM curated_bank_codes ORDER BY country, code',
+      )
       .all() as typeof rows;
   } catch {
     // Pas de table : la base publique seule, ou une surcouche qui ne la porte pas.
     return data;
   }
   for (const row of rows) {
-    if (!countries.has(row.country) || carried.has(row.country)) continue;
-    data[`${row.country}:${row.code}`] = { bic: row.bic };
+    const key = `${row.country}:${row.code}`;
+    if (countries.has(row.country)) {
+      if (!carried.has(row.country)) data[key] = { bic: row.bic };
+    } else if (restored.has(row.country) && !data[key]) {
+      data[key] = { bic: row.bic, source: row.source, as_of: row.as_of };
+    }
   }
   return data;
 }
+
+/**
+ * La surcouche a-t-elle apporté des clés pour ce pays (membre `supplement`
+ * servi) ? Lu dans la carte construite : un membre absent ou retiré
+ * (`RESTRICTED_WITHDRAWN`) n'en apporte aucune.
+ */
+export function restoredMapKeysLoaded(countryCode: string): boolean {
+  const cc = countryCode.toUpperCase();
+  if (!restoredMapCountries().has(cc)) return false;
+  const cached = restoredLoadedCache.get(cc);
+  if (cached !== undefined) return cached;
+  const prefix = `${cc}:`;
+  const data = getBicData();
+  const loaded = Object.keys(data).some((k) => k.startsWith(prefix) && data[k]!.source);
+  restoredLoadedCache.set(cc, loaded);
+  return loaded;
+}
+
+/** Mémo par pays de `restoredMapKeysLoaded` : vidé avec la base (resetStatements). */
+const restoredLoadedCache = new Map<string, boolean>();
 
 /**
  * Finnish prefixes the curated map claims and Finance Finland allocates to
@@ -949,11 +1009,6 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
   // Sans garde, comme le tchèque : une base illisible remonte en `lookup_failed`.
   if (countryCode === 'IT' && lookupRetiredNationalCode('IT', bankCode)) return null;
 
-  // The countries whose map keys no publisher granted (29/09/2026): nothing
-  // pairs their bank codes with a BIC any more, and the prefix search below
-  // must not do it in the map's place. See UNLICENSED_MAP_COUNTRIES.
-  if (UNLICENSED_MAP_COUNTRIES.has(countryCode)) return null;
-
   // Strategy 1: exact key lookup in bic_data.json
   const data = getBicData();
   const key = `${countryCode}:${bankCode}`;
@@ -1024,12 +1079,21 @@ export function lookupByCountryBank(countryCode: string, bankCode: string): Bank
       match: 'register',
       // The curated map decided WHICH institution this bank code belongs to; a
       // directory row only supplied its details. Crediting GLEIF for a pairing
-      // the map made would overstate what the registry actually says.
-      source: curatedMapSource(countryCode),
-      as_of: getReferenceAsOf() || null,
+      // the map made would overstate what the registry actually says. A key the
+      // private overlay restored (28/10/2026) names its compilation and the
+      // origin it compiled, dated by that compilation.
+      source: entry.source
+        ? `${CURATED_MAP_SOURCE}; ${entry.source}`
+        : curatedMapSource(countryCode),
+      as_of: entry.source ? (entry.as_of ?? '').slice(0, 7) || null : getReferenceAsOf() || null,
       ...(vintage ? { source_as_of: vintage.as_of } : {}),
     };
   }
+
+  // The countries whose map keys no publisher granted (29/09/2026), now served
+  // from the private overlay only: the prefix search must not answer in the
+  // map's place, overlay or not. See UNLICENSED_MAP_COUNTRIES.
+  if (UNLICENSED_MAP_COUNTRIES.has(countryCode)) return null;
 
   // Strategy 2: SQLite fallback — bic8 starts with bank code (works for some countries)
   const db = getBicDB();
@@ -1129,9 +1193,10 @@ export function countryHasReferenceData(countryCode: string): boolean {
   const cached = referenceDataCache.get(countryCode);
   if (cached !== undefined) return cached;
 
-  // Withdrawn on 29/09/2026 with nothing to replace them: their directory rows
-  // do not decide their bank codes (UNLICENSED_MAP_COUNTRIES).
-  if (UNLICENSED_MAP_COUNTRIES.has(countryCode)) {
+  // Withdrawn on 29/09/2026, back from the private overlay only since
+  // 28/10/2026: without its keys, their directory rows do not decide their bank
+  // codes (UNLICENSED_MAP_COUNTRIES).
+  if (UNLICENSED_MAP_COUNTRIES.has(countryCode) && !restoredMapKeysLoaded(countryCode)) {
     referenceDataCache.set(countryCode, false);
     return false;
   }
@@ -1258,6 +1323,7 @@ export function resetStatements(): void {
   // surcouche rechargée peut apporter ou retirer les clés PL, FI et LU.
   bicDataCache = null;
   curatedMissingCache.clear();
+  restoredLoadedCache.clear();
   resetFiRegister();
   // L'index des traces courantes est calculé sur la même base (bic-trace.ts).
   resetTraceIndex();

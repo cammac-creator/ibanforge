@@ -696,7 +696,9 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
       .path;
   }
 
-  const LATE = ['map_pl', 'map_fi', 'map_lu', 'register_fi'];
+  // Les membres venus après la première surcouche, dans l'ordre de la famille :
+  // PL, FI, LU et la liste finlandaise, puis les clés rétablies le 28/10/2026.
+  const LATE = RESTRICTED_FAMILY.filter((m) => m.kind === 'bic' && m.mayBeAbsent).map((m) => m.id);
 
   it('release sans les membres tardifs que la base sert : refusée au tirage, retenue, toujours servis au redémarrage', async () => {
     // Relecture de la PR 267, défaut 1 : le fichier posé aurait été refusé au
@@ -726,6 +728,8 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     expect((await health()).restricted_overlays.bic.absent).toBeUndefined();
   });
 
+  // Cinq à six fusions complètes de la base (deux par démarrage) : au-delà des
+  // 5 s par défaut sur la machine de la CI depuis les membres du 28/10/2026.
   it('fichier de la variable sans eux au redémarrage : la copie acceptée sert, et reste la copie acceptée', async () => {
     // Le même fichier, posé à la main (ou par un code plus ancien que ce correctif).
     const withoutLate = withoutLateMembers();
@@ -757,7 +761,7 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     restart();
     expect(served('bic').fallback).toBe(false);
     expect(served('bic').sha256).toBe(acceptedBefore);
-  });
+  }, 30_000);
 
   it('échange puis redémarrage : un fichier qui perd un membre servi, même en en gagnant un autre, ne sert pas', async () => {
     // Relecture de la PR 270, point 1 : au démarrage, ce sont les MEMBRES qui
@@ -803,7 +807,7 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     restart();
     expect(served('bic').fallback).toBe(false);
     expect(served('bic').members.filter((m) => m.state === 'absent')).toEqual([]);
-  });
+  }, 30_000);
 
   it('release trop vieille, ou fichier BIC absent : alerte, refermée par une release fraîche', async () => {
     publish('surcouche-essai-6', v1, {

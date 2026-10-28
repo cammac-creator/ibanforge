@@ -224,10 +224,30 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 - Country names populated via `Intl.DisplayNames` API (no hardcoded list).
 - Swiss clearing data includes BC-Nummern, SIC/euroSIC participation, QR-IID allocations, and institution classification.
 
+### Règle du 28.10.2026 : agir d'abord, corriger si on nous le demande
+
+Décision de Claude-Alain (« go pour B », `DECISIONS.md`) : une donnée « non commerciale »,
+« tous droits réservés », « accord écrit », d'un propriétaire silencieux, ou compilée chez un
+concurrent (ibancalculator.com, iban.es, internationalmoneytransfers.org) est SERVIE, source
+citée, sans attendre de permission et sans lettre de permission par défaut ; un « arrêtez »
+écrit de son propriétaire est suivi dans les 48 heures. Elle n'entre jamais dans ce dépôt, un
+paquet npm ou un export du site : elle vient de la surcouche privée seulement, comme membre de
+la famille ci-dessous (la règle du 24.09 devient « hors du dépôt public, mais servi »). Jamais
+d'extraction active chez un concurrent (IBAN inventés envoyés à son validateur) sans son accord
+explicite. Chaque membre nomme son `origin` ; `RESTRICTED_WITHDRAWN=<origine ou membre>` sur le
+serveur le retire au redémarrage que Railway fait à chaque changement de variable (état
+`withdrawn`, nommé par `GET /health` → `restricted_overlays.<base>.withdrawn`, une faute de
+frappe sous `withdrawn_unmatched`), puis le membre quitte la famille dans les 48 heures.
+Appliqué le 28.10 : SECO (membre `seco`), clés TBB turques (`map_tr`) et clés retirées le 29.09
+(`map_ae` … `map_ro`, en complément code par code : une clé publique ou officielle garde la
+réponse ; en EE et RS, la liste de l'autorité gagne où elle répond). Chaque réponse lue dans
+les registres EPC porte « Source: European Payments Council » et le jour d'extraction.
+
 ### Surcouche privée des données sous conditions (depuis le 25.09.2026)
 
 Ce qui peut être servi mais pas redistribué (lignes EBA STEP2, NBP et OeNB de l'annuaire,
-registres AT, BE et SM, liste PRA, liste ONU, registres EPC) est listé UNE fois, dans
+registres AT, BE et SM, liste PRA, liste ONU, registres EPC, et depuis le 28.10.2026 la liste
+SECO et les clés de la carte retirées le 29.09) est listé UNE fois, dans
 `src/lib/restricted-family.ts`, avec la définition de chaque table et la façon de dater ses
 lignes. En production, il vient d'un fichier privé par base, désigné par
 `RESTRICTED_BIC_OVERLAY_PATH` et `RESTRICTED_COMPLIANCE_OVERLAY_PATH` (chemins absolus sur

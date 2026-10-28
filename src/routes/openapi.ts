@@ -3162,6 +3162,15 @@ const buildRawSpec = () => ({
                 description:
                   'Where `schemes` comes from: "epc_register" when the resolved BIC has rows in the embedded EPC scheme registers (bank grain), "country_default" otherwise. Absent when enrichment stopped early. Audit 2026-09-01 (DATA-02).',
               },
+              register_source: {
+                type: 'string',
+                description:
+                  'Present only when the EPC registers (schemes or VoP) were read for the resolved bank: "Source: European Payments Council", the credit their terms ask for.',
+              },
+              register_as_of: {
+                type: ['string', 'null'],
+                description: 'The day the EPC registers served were extracted (YYYY-MM-DD), beside register_source.',
+              },
             },
             required: ['member', 'schemes', 'vop_required'],
           },
@@ -3724,6 +3733,15 @@ const buildRawSpec = () => ({
                 description:
                   'Whether at least one of the three scheme registers lists the bank; null when the registers were not consulted (screened false). For a bank resolved in the SEPA area, true matches sepa.bank_reachability listed and false matches not_listed; null also when no bank was resolved or the bank code is not allocated (the validation then says no_bank or bank_code_not_allocated). Outside the SEPA area the validation carries no bank_reachability: this field is false there for a resolved bank (the country answers, screened true) and null when no bank was resolved.',
               },
+              source: {
+                type: 'string',
+                description:
+                  'Present only when the EPC scheme registers were read: "Source: European Payments Council", the credit their terms ask for.',
+              },
+              as_of: {
+                type: ['string', 'null'],
+                description: 'The day the EPC registers served were extracted (YYYY-MM-DD), beside source.',
+              },
             },
           },
           vop: {
@@ -3740,6 +3758,15 @@ const buildRawSpec = () => ({
                 type: ['string', 'null'],
                 enum: ['active', 'pending', 'inactive', 'not_listed', null],
                 description: `status under its own name (not_found becomes not_listed); null when the register was not consulted (screened false). ${VOP_REGISTER_STATUS_NOTE}`,
+              },
+              source: {
+                type: 'string',
+                description:
+                  'Present only when the EPC VoP register was read: "Source: European Payments Council", the credit its terms ask for.',
+              },
+              as_of: {
+                type: ['string', 'null'],
+                description: 'The day the EPC register served was extracted (YYYY-MM-DD), beside source.',
               },
             },
           },

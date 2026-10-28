@@ -382,6 +382,19 @@ const VALIDATE_IBAN_OUTPUT_SCHEMA = {
         .describe(
           'Where `schemes` came from: read at the EPC register for this bank, or defaulted from the country.',
         ),
+      register_source: z
+        .string()
+        .optional()
+        .describe(
+          'Present only when the EPC registers (schemes or VoP) were read for this bank: "Source: European Payments Council".',
+        ),
+      register_as_of: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'The day the EPC registers served were extracted (YYYY-MM-DD), with register_source.',
+        ),
       // Le grain de la banque (25/09/2026), jamais emprunté au pays.
       bank_reachability: z
         .string()
@@ -610,6 +623,17 @@ const CHECK_COMPLIANCE_OUTPUT_SCHEMA = {
         .describe(
           'At least one of the three schemes lists the bank; null when the EPC registers were not consulted (screened false). Outside the SEPA area the country answers (false) whether or not the registers are loaded.',
         ),
+      source: z
+        .string()
+        .optional()
+        .describe(
+          'Present only when the EPC scheme registers were read: "Source: European Payments Council".',
+        ),
+      as_of: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('The day the EPC registers served were extracted (YYYY-MM-DD), with source.'),
     }),
     vop: z.object({
       screened: z.boolean(),
@@ -620,6 +644,17 @@ const CHECK_COMPLIANCE_OUTPUT_SCHEMA = {
         .nullable()
         .optional()
         .describe(`active | pending | inactive | not_listed, or null. ${VOP_REGISTER_STATUS_NOTE}`),
+      source: z
+        .string()
+        .optional()
+        .describe(
+          'Present only when the EPC VoP register was read: "Source: European Payments Council".',
+        ),
+      as_of: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('The day the EPC register served was extracted (YYYY-MM-DD), with source.'),
     }),
     // .nullable() is load-bearing, not defensive. This tool returns
     // structuredContent, so the MCP SDK validates the payload against

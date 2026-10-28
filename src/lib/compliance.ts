@@ -1,6 +1,8 @@
 import type Database from 'better-sqlite3';
 import {
+  EPC_SOURCE,
   complianceTableLoaded,
+  epcRegistersAsOf,
   getComplianceDB,
   unscreenedSanctionsLists,
 } from './compliance-db.js';
@@ -185,6 +187,9 @@ export function checkReachability(bic8: string | null, countryCode?: string): Re
     sct: schemes.has('SCT'),
     sdd: schemes.has('SDD'),
     screened: true,
+    // Lu dans les registres EPC : leur mention et le jour de leur extraction.
+    source: EPC_SOURCE,
+    as_of: epcRegistersAsOf(),
   };
 }
 
@@ -204,7 +209,13 @@ export function checkVop(bic8: string | null, countryCode?: string): VopCheck {
   // "Pending EDS registration"; they are carried with that status rather than
   // omitted, but reporting them as participants would tell a payer a name check
   // is available before it is.
-  return { participant: status === 'active', status, screened: true };
+  return {
+    participant: status === 'active',
+    status,
+    screened: true,
+    source: EPC_SOURCE,
+    as_of: epcRegistersAsOf(),
+  };
 }
 
 /**

@@ -8,6 +8,54 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 28/10/2026 : agir d'abord, corriger si on nous le demande
+
+Décision de Claude-Alain du 28/10/2026 (« go pour B ») : la règle « permission
+d'abord » des 24/09 et 29/09 ne vaut plus pour le **service** ; elle vaut toujours
+pour le **dépôt public**. Quatre cas :
+
+| Cas | Ce que c'est | Ce que fait l'API | Dans ce dépôt ? |
+|---|---|---|---|
+| 1. Libre | conditions qui permettent l'usage commercial (GLEIF, Bundesbank, SIX, BCE, UE, GAFI, Banca d'Italia…) | servi, source citée, sans rien demander | oui, avec sa mention |
+| 2. Zone grise | « non commercial », « tous droits réservés », « accord écrit », propriétaire silencieux (NBP, EBA Clearing, ONU, SECO, TBB…) | servi depuis le fichier privé, source citée, **sans attendre de réponse ni écrire de lettre de permission par défaut** | **jamais** |
+| 3. Le propriétaire a répondu | licence ou arrêt demandés | servi pendant la discussion ; un « arrêtez » écrit est suivi dans les 48 heures | **jamais** |
+| 4. Copié chez un concurrent | compilations de sites qui vendent le même service (ibancalculator.com, iban.es, internationalmoneytransfers.org) | servi depuis le fichier privé, source citée | **jamais** |
+
+Tout ce qui est ajouté ou rétabli au titre des cas 2 à 4 passe par la famille sous
+conditions (`src/lib/restricted-family.ts`, fichier privé du serveur) : rien dans
+ce dépôt, les paquets npm ou les exports du site. Chaque membre de la famille
+porte son **origine** (`origin`) ; un propriétaire qui demande l'arrêt se retire
+en quelques minutes par `RESTRICTED_WITHDRAWN=<origine ou membre>` sur le serveur
+(Railway redémarre au changement de variable ; `GET /health` →
+`restricted_overlays.<base>.withdrawn` le confirme, `withdrawn_unmatched` montre
+une faute de frappe), puis le membre est retiré de la famille dans les 48 heures.
+Pas d'extraction active sur le site d'un concurrent (IBAN inventés envoyés à son
+validateur) sans l'accord explicite de Claude-Alain.
+
+Ce qui est appliqué le même jour :
+
+| Donnée | Membre(s) | Origine | Comment c'est servi |
+|---|---|---|---|
+| Liste suisse des sanctions (SECO), export complet lu par `scripts/seco-list.ts` | `seco` | `seco.admin.ch` | chaîne privée hebdomadaire ; nommée dans `matched_lists` et `meta.sources` ; le robot public ne la télécharge plus (`data/compliance.sqlite` n'en porte aucune ligne) |
+| Clés turques de la TBB (`manual_tr` de schwifty) | `map_tr` | `tbb.org.tr` | clés de la carte, depuis la dernière roue schwifty, chaque mois |
+| Clés AE (`manual_ae`), BA, GE, KZ, MD, EE, RS et le reste d'IT (`generated_*`) | `map_ae`, `map_ba`, `map_ge`, `map_kz`, `map_md`, `map_ee`, `map_rs`, `map_it` | `ibancalculator.com` | idem |
+| Clés ES (`generated_es`) | `map_es` | `iban.es` | idem |
+| Clés RO (`generated_ro`) | `map_ro` | `internationalmoneytransfers.org` | idem |
+| Registres EPC (SEPA, VoP) | `epc_sepa`, `epc_vop` (inchangés) | `europeanpaymentscouncil.eu` | chaque réponse lue dans ces registres porte « Source: European Payments Council » et le jour d'extraction (`sepa.register_source` / `register_as_of` de la validation, `reachability.source` / `as_of` et `vop.source` / `as_of` de la conformité) |
+
+Les clés rétablies sont servies **en complément**, code par code (`supplement`) :
+une clé du fichier public, ou reconstruite depuis une source officielle (IT depuis
+la Banca d'Italia et GLEIF, RO depuis GLEIF), garde toujours la réponse ; en
+Estonie et en Serbie, la liste de l'autorité (fichiers privés) gagne partout où
+elle répond, même sans BIC. Chaque réponse tirée de ces clés nomme la compilation
+et l'origine dans `bic.source` (« IBANforge curated bank-code map; mdomke/schwifty
+<version> (MIT), compiled from <origine> ») et date la compilation dans `bic.as_of`.
+La recherche par préfixe reste fermée dans les huit pays de
+`UNLICENSED_MAP_COUNTRIES` ; sans clés chargées (surcouche absente, membre absent
+ou retiré), ces pays répondent toujours « non consulté ». Les comptes de la roue
+2026.10.1 diffèrent de ceux du 29/09 (la compilation a grandi) : la roue lue est
+celle du mois, ses comptes sont ceux du passage.
+
 ## 25/09/2026 : la famille sous conditions a quitté le dépôt public
 
 Ce qui peut être servi mais pas redistribué (décision de Claude-Alain du
@@ -40,8 +88,11 @@ Décision de Claude-Alain du 29/09/2026 (point 4), sur l'inventaire des licences
 de la carte composite : les clés que l'import schwifty du 08/04/2026 avait
 tirées de sites commerciaux, ou d'éditeurs qui réservent l'usage commercial,
 quittent `src/db/bic_data.json` **et** ne sont plus servies. Contrairement au
-retrait du 25/09, aucune surcouche privée ne les ramène : l'usage par l'API
-n'est pas plus autorisé que la redistribution.
+retrait du 25/09, aucune surcouche privée ne les ramenait : l'usage par l'API
+n'était pas plus autorisé que la redistribution. **Depuis le 28/10/2026, elles
+sont de nouveau servies, depuis la surcouche privée seulement** (section
+ci-dessus) ; la colonne « Ce que répond l'API » décrit la période du 29/09 au
+28/10, et ce que répond l'API sans surcouche.
 
 | Pays | Clés retirées | Origine réelle (fichier schwifty) | Pourquoi | Remplacement | Ce que répond l'API |
 |---|---:|---|---|---|---|
@@ -70,7 +121,8 @@ d'Italia et GLEIF, groupe C pour les sources retirées).
 Hors de ce retrait, et inchangé : les pays dont l'inventaire n'a trouvé aucune
 condition publiée (NO, SE, LV, et les listes manuelles de schwifty sans source
 nommée : FR, PT, IT, IE, BG, GB, CR, GR, ME, CY, AD, ES, IS, IL, MC) restent dans
-la carte, en attendant la réponse des éditeurs à qui écrire là où il y en a un ;
+la carte (depuis le 28/10/2026, sans lettre de permission par défaut : une
+réponse qui arrive est suivie) ;
 l'Italie garde donc aussi ses 69 clés manuelles d'origine inconnue. SI, LT, HU
 et HR, dont les éditeurs autorisent la reproduction avec mention, entrent au
 groupe A de `NOTICE`, et chaque réponse tirée de leurs clés porte cette mention
@@ -529,7 +581,7 @@ répertoire a répondu.
 | OFAC (US Treasury) | 223 entités | `treasury.gov/ofac/downloads/sdn.csv` |
 | ONU | 5 entités | `scsanctions.un.org/resources/xml/en/consolidated.xml` |
 | Union européenne | 2 entités | `webgate.ec.europa.eu/fsd/fsf/…` |
-| SECO (Suisse) | fetch en place | `sesam.search.admin.ch/…` |
+| SECO (Suisse) | chaîne privée depuis le 28/10/2026 (membre `seco`), plus dans ce fichier | `sesam.search.admin.ch/…/downloadXmlGesamtliste.xhtml` |
 | GAFI / FATF | listes pays | relevé `fatf_as_of` en base |
 | EPC — SCT | participants | `europeanpaymentscouncil.eu/…/sct.csv` |
 | EPC — SCT Inst | participants | `…/sct_inst.csv` |
@@ -540,6 +592,31 @@ répertoire a répondu.
 `f8547b4`). Vérifié le 22/08 : les sanctions en base portent OFAC, UN et EU.
 **SECO n'y apparaît pas.** Le flux est branché, il ne rapporte rien : ne pas
 annoncer SECO tant que la table ne le porte pas.
+
+**28/10/2026 : SECO lue de nouveau, par la chaîne privée.** L'export de recherche
+(`searchSanctionWithExport.xhtml?…&action=exportXml`) répondait HTTP 500 chaque
+dimanche depuis le 12/07. La liste est désormais lue dans l'**export complet**
+(`downloadXmlGesamtliste.xhtml`, environ 42 Mo, `list-type="whole-list"`) par
+`scripts/seco-list.ts`, **par structure** : cette liste garde l'histoire (cibles
+radiées, blocs `added` et `removed`), et une extraction sur le texte brut y
+accuserait une banque radiée et fabriquerait un BIC à partir d'un nom de société.
+Le 07/10, l'essai de la PR 361 y trouvait une dizaine de BIC de banque, dont deux
+qu'aucune autre liste servie ne nomme. Les conditions des sites fédéraux demandant
+un accord écrit pour reproduire leur contenu, la liste est **servie depuis la
+surcouche privée** (membre `seco`, cas 2 de la règle du 28/10), jamais écrite dans
+`data/compliance.sqlite` : `scripts/refresh-compliance.ts` ne la télécharge qu'avec
+`SEED_FAMILY=restricted`. Les réponses la nomment (`matched_lists`,
+`meta.sources`) ; les surfaces de couverture disent encore « OFAC, EU, UN »
+(annonce à part, `ANNOUNCEMENT_PENDING` dans `src/routes/sanctions-claims.test.ts`).
+Chaque liste mesurée a son **plancher** (`scripts/sanctions-source-floor.ts`), sur
+la taille publiée. Pour l'OFAC et l'UE (robot public) : vide, sous le plancher
+absolu, en baisse de plus de 20 % ou sans plus aucun BIC, elle est reprise de la
+base précédente, et sans reprise possible le robot échoue sans remplacer la base.
+Pour SECO (chaîne privée), seuls le plancher absolu et la règle « plus aucun BIC »
+s'appliquent : la base précédente y est la base publique fusionnée avec la
+surcouche, dont `metadata.source_records` ne porte pas la mesure de SECO ; une
+liste refusée y est reprise de la surcouche précédente, sinon le membre est
+absent et la porte du manifeste refuse de perdre un membre déjà publié.
 
 **06/09/2026 — le rafraîchissement hebdomadaire a échoué sur un 500 de l'UE** (SECO a
 répondu 500 aussi, comme depuis juillet) : la base produite ne portait plus qu'OFAC et ONU,
@@ -736,7 +813,8 @@ viennent du fichier Bank Master de SIX (« may be used freely »).
   hebdomadaire pour les sanctions et les registres EPC (`refresh-compliance.yml`,
   `0 3 * * 0`). Les deux cadences sont vérifiées sur les exécutions réelles.
 - ⚠️ **Deux sources sont volontairement absentes du pied de page** :
-  **SECO**, parce que son flux ne rapporte rien (voir plus haut), et **le GAFI**,
+  **SECO**, parce que son flux ne rapportait rien (voir plus haut ; servie par la
+  surcouche depuis le 28/10/2026, annonce en attente), et **le GAFI**,
   parce que ses listes sont **statiques** — maintenues à la main dans
   `src/lib/compliance-static.ts` et datées par `FATF_AS_OF`. Le workflow les
   réinsère chaque semaine, ce qui n'est pas la même chose que les rafraîchir.

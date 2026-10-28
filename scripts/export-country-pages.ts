@@ -41,6 +41,7 @@ const { COMPOSITE_REGISTER, registerCoverage } = await import('../src/lib/enrich
 const { curatedMapCountries, restrictedRegisterCountries } =
   await import('../src/lib/restricted-family.js');
 const { LU_SOURCE } = await import('../src/lib/lu-register.js');
+const { UNLICENSED_MAP_COUNTRIES } = await import('../src/lib/bic-lookup.js');
 const { EE_SOURCE } = await import('../src/lib/ee-register.js');
 const { ME_SOURCE } = await import('../src/lib/me-register.js');
 const { RS_SOURCE } = await import('../src/lib/rs-register.js');
@@ -54,7 +55,8 @@ const { RS_SOURCE } = await import('../src/lib/rs-register.js');
  * (src/lib/ee-register.ts, src/lib/me-register.ts, 08/10/2026), Serbia from the
  * National Bank of Serbia's (src/lib/rs-register.ts, 10/10/2026), Poland and Finland from the keys of the composite
  * map and the Finnish list the overlay carries (members `map_pl`, `map_fi`,
- * `register_fi`). This script runs on the public database, where
+ * `register_fi`), and since 28/10/2026 the countries whose every map key comes
+ * from the overlay (UNLICENSED_MAP_COUNTRIES). This script runs on the public database, where
  * their example would answer "register not consulted", which is not what the
  * API answers in production. Their page therefore names the register (its
  * name, never its rows) and prints no exported answer: it sends the reader to
@@ -82,9 +84,12 @@ function privateRegister(
       basis: 'partial',
     };
   }
-  if (curatedMapCountries().has(cc)) {
+  if (curatedMapCountries().has(cc) || UNLICENSED_MAP_COUNTRIES.has(cc)) {
     // Finlande : la liste de Finance Finland (registre partiel) ; Pologne : la
     // carte composite, qui n'est pas un registre et dont une absence ne prouve rien.
+    // Depuis la règle du 28/10/2026, aussi les pays dont toutes les clés de la
+    // carte viennent de la surcouche (AE, BA, GE, KZ, MD, TR) : la base publique y
+    // répondrait « non consulté », pas ce que répond l'API en production.
     const coverage = registerCoverage(cc);
     return { register: coverage.register ?? COMPOSITE_REGISTER, basis: 'partial' };
   }

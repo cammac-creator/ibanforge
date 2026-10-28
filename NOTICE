@@ -511,11 +511,12 @@ permitted use in the IBANforge API without permitting redistribution of the
 data. They were removed from data/bic.sqlite and data/compliance.sqlite,
 from the composite map src/db/bic_data.json, from the website exports, and
 from the test fixtures, sample API responses and documentation examples of
-the repository. The IBANforge API loads the database records among the
-first entries from a private repository and serves them under the
-permissions described below; where it has not loaded them, its answers say
-that the source was not consulted. It does not serve the keys of the last
-entry at all.
+the repository. The IBANforge API loads them, and the entries marked "Never
+in", from a private repository, never from this one. Where an entry names a
+written permission, it serves them under that permission; where it names
+none, it serves them without one, citing the source, and stops serving them
+within 48 hours if their publisher asks. Where it has not loaded them, its
+answers say that the source was not consulted.
 Earlier commits of this repository, and forks of it, keep copies of these
 records: they are not covered by the MIT License in LICENSE, they remain
 subject to their publishers' terms, and this repository grants no right to
@@ -537,6 +538,20 @@ United Nations, Security Council Consolidated List
          https://www.un.org/en/about-us/copyright
          https://www.un.org/en/about-us/terms-of-use
 
+State Secretariat for Economic Affairs (SECO), Switzerland, consolidated
+list of the persons, entities and organisations subject to sanctions
+measures (whole list, published at www.sesam.search.admin.ch)
+  Never in: this repository. Since 28 October 2026 the API reads the entities
+         in force that the list names by a SWIFT code (their BIC8 and their
+         name) from its private repository, rebuilt every week from the whole
+         list by scripts/seco-list.ts, and names SECO in matched_lists and
+         meta.sources of a compliance check.
+  Terms: the list publishes the annexes of Federal Council ordinances (for
+         example SR 946.231.116.9, measures against Belarus); the general
+         terms of the federal websites ask for prior written consent to
+         reproduce their content. No written permission from SECO is held.
+         https://www.sesam.search.admin.ch
+
 European Payments Council (EPC), registers of participants in the SEPA
 Credit Transfer, SEPA Instant Credit Transfer, SEPA Direct Debit Core and
 Verification of Payee schemes
@@ -553,6 +568,10 @@ Verification of Payee schemes
          purposes, as long as the EPC as its source is acknowledged."
          (Disclaimer, europeanpaymentscouncil.eu)
          Source: European Payments Council.
+  Served with every API answer read from these registers (sepa.register_source
+         of a validation, reachability.source and vop.source of a compliance
+         check), with the day the registers served were extracted:
+         Source: European Payments Council
 
 Narodowy Bank Polski (NBP)
   Formerly in: data/bic.sqlite, table bic_entries, source 'nbp' (21 rows); the
@@ -753,17 +772,18 @@ Keys of the composite map taken from commercial sites or from publishers
 reserving commercial use (removed on 29 September 2026)
   Formerly in: src/db/bic_data.json, 756 keys imported from the bank
          registries of mdomke/schwifty, whose files for these countries do
-         not come from a national register. The IBANforge API no longer
-         serves them either: the United Arab Emirates, Bosnia and
-         Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and
-         Türkiye answer that no bank-code data was consulted, and the Italian
-         and Romanian keys that the Banca d'Italia and GLEIF rebuild are
-         listed in group B.
-  Estonia comes back on 8 October 2026 through its authority (see the
-         Finantsinspektsioon entry above). Nothing of the 16 keys below is
-         reused: the codes come from the authority, the BICs from group B.
-         Serbia comes back on 10 October 2026 through the National Bank of
-         Serbia (entry above); nothing of its 26 keys below is reused either.
+         not come from a national register. From 29 September to 28 October
+         2026 the IBANforge API did not serve them either. Since 28 October
+         2026 it serves them again from its private repository, never from
+         this one, read every month from the same files of the latest
+         mdomke/schwifty release, and only for a bank code that this
+         repository's map carries no key for: the Italian and Romanian keys
+         that the Banca d'Italia and GLEIF rebuild (group B) keep their
+         answer. In Estonia and Serbia, the list of the authority (entries
+         above) answers wherever it lists the code. Each answer built from
+         these keys names the compilation and the site or association it
+         compiled, in bic.source. A publisher who asks has them withdrawn
+         within 48 hours.
   ibancalculator.com, run by Telauges OÜ: the United Arab Emirates (56 keys),
          Bosnia and Herzegovina (25), Estonia (16), Georgia (20), Kazakhstan
          (49), Moldova (9), Serbia (26), and the codes and BICs of 219 Italian

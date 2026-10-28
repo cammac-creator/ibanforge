@@ -3,7 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { COUNTRY_RISK_AS_OF } from './countries.js';
-import { servedDatabasePath } from './restricted-overlay-runtime.js';
+import { restrictedOverlayStatus, servedDatabasePath } from './restricted-overlay-runtime.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -224,6 +224,32 @@ export function loadedComplianceSources(): string | null {
   );
   if (decided && !failed) _sourcesMemo = sources;
   return sources;
+}
+
+/**
+ * La mention que demandent les conditions de l'EPC, dans chaque réponse tirée de
+ * ses registres (28/10/2026). Une seule chaîne, pour les blocs SEPA et VoP de la
+ * validation et de la conformité.
+ */
+export const EPC_SOURCE = 'Source: European Payments Council';
+
+/**
+ * Le jour d'extraction des registres EPC servis (AAAA-MM-JJ) : celui du passage
+ * de la chaîne privée qui les a lus quand ils viennent de la surcouche (la date
+ * du membre `epc_sepa`), sinon le dernier rafraîchissement de la base de
+ * conformité. Null quand aucune date n'est connue.
+ */
+export function epcRegistersAsOf(): string | null {
+  const status = restrictedOverlayStatus().find((s) => s.kind === 'compliance');
+  const member = status?.members.find((m) => m.id === 'epc_sepa');
+  const fromOverlay =
+    member && (member.state === 'applied' || member.state === 'kept_public')
+      ? member.decision === 'public_newer_or_undated'
+        ? null
+        : (member.overlay_date ?? null)
+      : null;
+  const date = fromOverlay ?? getComplianceMeta().sanctions_as_of;
+  return date && /^\d{4}-\d{2}-\d{2}/.test(date) ? date.slice(0, 10) : null;
 }
 
 export interface ComplianceMeta {

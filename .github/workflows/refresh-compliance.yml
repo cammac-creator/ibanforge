@@ -21,10 +21,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # 🔒 Public lists only, since the withdrawal step (25/09/2026): OFAC, the EU
-      # list and SECO, plus the static FATF and country tables. The UN list (all
-      # rights reserved) and the EPC scheme and VoP registers (non-commercial by
-      # default) belong to the restricted family (src/lib/restricted-family.ts):
+      # 🔒 Public lists only, since the withdrawal step (25/09/2026): OFAC and the
+      # EU list, plus the static FATF and country tables. The UN list (all rights
+      # reserved), the EPC scheme and VoP registers (non-commercial by default)
+      # and, since 28/10/2026, the SECO list belong to the restricted family
+      # (src/lib/restricted-family.ts):
       # without SEED_FAMILY the refresher neither downloads nor writes them, and
       # the API serves them from the private overlay a private repository rebuilds
       # every week. The run logs and the commit are public.
