@@ -113,8 +113,8 @@ describe('context7.json', () => {
     expect(config.excludeFiles.filter((f) => /[/\\]/.test(f))).toEqual([]);
   });
 
-  it('excludes by name every markdown file at the root but README.md', () => {
-    const rootDocs = readdirSync(ROOT).filter((f) => /\.(md|mdx|markdown)$/i.test(f));
+  it('excludes by name every markdown or HTML file at the root but README.md', () => {
+    const rootDocs = readdirSync(ROOT).filter((f) => /\.(md|mdx|markdown|html?)$/i.test(f));
     expect(rootDocs).toContain('README.md');
     expect(rootDocs).toContain('AGENTS.md');
     const missing = rootDocs.filter((f) => f !== 'README.md' && !config.excludeFiles.includes(f));

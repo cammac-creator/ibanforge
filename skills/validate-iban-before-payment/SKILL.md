@@ -74,7 +74,7 @@ Read the HTTP status first, then these fields in this order, and stop at the fir
 4. **`bank_code_check`.** `status: "not_in_register"` with `reason: "not_allocated"` and `authoritative: true` is the only answer that says no bank holds this code: stop the payment. Anywhere else, an absence means the code could not be confirmed, not that it is wrong.
 5. **`bic`.** `bank_name`, `code` and `bic8`. Compare a BIC the payee gave you on `bic8`. `bic.authoritative: true` means the national register publishes this BIC for this bank code; otherwise treat the BIC as advisory.
 6. **`sepa`.** `schemes` lists the SEPA schemes that reach the bank (`SCT`, `SCT_INST`, `SDD`). `vop_participant` says whether the EPC VoP register lists the bank as ready; `false` proves nothing, since a bank absent from that register reads `false` too.
-7. **`issuer`.** A `type` of `emi`, `digital_bank` or `payment_institution` makes a virtual IBAN more likely. Count it only when `classification` is `curated`.
+7. **`issuer`.** A `type` of `emi`, `digital_bank` or `payment_institution` makes a virtual IBAN more likely. Count it only when `classification` is `curated` or `register` (the issuer was identified by a curated list or by the EBA PSD2 register).
 
 A `null` or absent field means "no substantiated answer", never "no".
 
@@ -84,8 +84,8 @@ A `null` or absent field means "no substantiated answer", never "no".
 |---|---|---|
 | `200` with `valid: false` | The IBAN itself is wrong | Show `error_detail` and do not pay |
 | `400` | Malformed request: `invalid_json`, or `invalid_request` when the `iban` field is missing or empty | Fix the request body |
-| `402` | No usable way to pay for this call. `cause.reason` says which: `trial_exhausted` (the keyless trial is spent for this address until the reset), `monthly_quota_exhausted` or `credits_exhausted` (the key's allowance or credits are spent), `invalid_api_key` (unknown or revoked key). The body is the x402 payment envelope and has no `valid` field | Treat the IBAN as "not checked", never as "invalid": queue the check, alert the operator, or send a key |
-| `429` | More than 100 requests in one minute from the same IP address | Wait the number of seconds in `Retry-After`, then retry |
+| `402` | No usable way to pay for this call: it needs a key, credits or an x402 payment. A keyless call outside `POST /v1/iban/validate` gets a `402` without `cause`. When `cause.reason` is present, it says which: `trial_exhausted` (the keyless trial is spent for this address until the reset), `trial_unavailable` (the trial counter could not be read: retry later), `monthly_quota_exhausted` or `credits_exhausted` (the key's allowance or credits are spent), `monthly_quota_insufficient` or `credits_insufficient` (a batch larger than what is left is refused whole: send a smaller batch), `invalid_api_key` (unknown or revoked key), `key_revoked_burst` (an anonymous key, created without an e-mail, cut by abuse protection: create a new key). The body is the x402 payment envelope and has no `valid` field | Treat the IBAN as "not checked", never as "invalid": queue the check, alert the operator, or send a key |
+| `429` | Too many requests in one minute from the same IP address (100 by default). On `POST /v1/keys/generate`, `key_creation_limit` means too many keys created from this network today: waiting a few seconds will not help | Wait the number of seconds in `Retry-After`, then retry; for `key_creation_limit`, reuse the key you already have |
 
 ## 5. What it cannot tell you
 
