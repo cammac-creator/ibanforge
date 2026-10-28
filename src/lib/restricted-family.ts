@@ -14,6 +14,18 @@
  * membre ajouté ou retiré ici change les trois d'un coup ; une seconde liste
  * écrite à la main dans un script serait la première à mentir.
  *
+ * ## La règle du 28/10/2026 : hors du dépôt public, mais servi
+ *
+ * Décision de Claude-Alain du 28/10/2026 (« go pour B », grille des sources) :
+ * une donnée de la zone grise (« non commercial », « tous droits réservés »,
+ * « accord écrit », propriétaire silencieux) ou compilée chez un concurrent est
+ * servie sans attendre de permission, source citée, et retirée dans les 48
+ * heures si son propriétaire le demande. La limite ne bouge pas : elle n'entre
+ * jamais dans ce dépôt, un paquet ou un export du site, seulement ici, comme
+ * membre. D'où les membres `seco`, `map_tr` et ceux des clés retirées le
+ * 29/09/2026 (`supplement`), et l'origine de chaque membre (`origin`), que
+ * `RESTRICTED_WITHDRAWN` nomme pour un retrait en minutes.
+ *
  * ## Ce qui n'y est pas, et pourquoi
  *
  * - La Slovaquie reste publique (décision du 24/09/2026, point 4 : publiable avec
