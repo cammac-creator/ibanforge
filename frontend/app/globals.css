@@ -236,7 +236,9 @@
     box-shadow var(--dur-2) var(--ease-std),
     border-color var(--dur-2) var(--ease-std);
 }
-@media (hover: hover) {
+/* `pointer: fine` aussi : certains Android disent « hover » sans souris, et
+   un toucher laissait la carte soulevée (mobile-native, 25.10.2026). */
+@media (hover: hover) and (pointer: fine) {
   .card-surface:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
@@ -529,6 +531,33 @@
   }
   html {
     @apply font-sans;
+    /* Le site n'a qu'un thème, sombre : les contrôles natifs (barres de
+       défilement, remplissage automatique, listes déroulantes) le suivent. */
+    color-scheme: dark;
+    /* Passe mobile du 25.10.2026 (compétence mobile-native) : Safari et Chrome
+       peignaient un voile gris sur tout élément touché, le signe le plus
+       visible d'un « site dans un navigateur ». Le retour au toucher vient
+       désormais de l'opacité ci-dessous, ou du :active propre au composant. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Le clic part au premier toucher, sans attendre un éventuel double-tap. */
+  a,
+  button,
+  summary,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+  /* Un appui long sur un bouton ne sélectionne pas son libellé. Les liens et le
+     texte restent sélectionnables : on copie un IBAN, une adresse, une erreur. */
+  button,
+  [role='button'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  @media (pointer: coarse) {
+    :is(a, button, summary, [role='button']):active {
+      opacity: 0.72;
+    }
   }
 }
 

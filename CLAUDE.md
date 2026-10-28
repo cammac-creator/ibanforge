@@ -9,7 +9,7 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 
 ## Stack
 
-- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 — `^13` aujourd'hui — ne publie pas de binaire linux-x64 pour l'ABI de Node 24, et `node:24-slim` n'a pas de compilateur)
+- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 — `^13` aujourd'hui — ne publie pas de binaire linux-x64 pour l'ABI de Node 24, et `node:24-slim` n'a pas de compilateur). L'image de production épingle un correctif exact de la ligne 22 (`FROM node:22.x.y-slim`), relevé par l'entrée `docker` de Dependabot, qui ignore les versions majeures ; ne jamais revenir à l'étiquette flottante `22-slim` (`scripts/dockerfile-node-pin.test.ts`)
 - **Framework** : Hono
 - **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (121k+ BIC entries from GLEIF + SwiftCodes/MIT + SIX + EBA Step2 SCT + Bundesbank + NBP, plus 1,100+ Swiss clearing entries SIX — counts drift at each monthly refresh, read them live via `getEntryCount()` / `getChClearingCount()`), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)
@@ -63,7 +63,7 @@ data/
 ## Conventions
 
 - **Langue du code** : anglais (noms de variables, commentaires, commits)
-- **Langue de communication** : toujours en francais avec Alain
+- **Langue de communication** : toujours en francais avec Claude-Alain
 - **Commits** : conventional commits (feat:, fix:, chore:, docs:)
 - **Types** : strict TypeScript, pas de `any` sauf cas justifie
 - **Erreurs** : Hono HTTPException pour les erreurs API, jamais de try/catch silencieux
@@ -71,6 +71,10 @@ data/
 - **Formatting** : prettier (voir .prettierrc)
 - **Linting** : eslint (voir eslint.config.js)
 - **Prenom** : Claude-Alain, jamais « Alain »
+- **Les mails d'IBANforge partent d'une adresse `@ibanforge.com`**, jamais d'une boîte
+  personnelle, réponse à un ancien fil comprise (règle de Claude-Alain du 26.10.2026). Une seule
+  boîte d'envoi, `frontend/lib/crm/sending-account.ts` ; les routes d'envoi et de brouillon de
+  `frontend/app/api/crm/` refusent tout autre expéditeur avant de relayer.
 - **Les « 25 » ne partagent jamais une phrase.** L'essai sans clé, c'est 25 validations
   par semaine (semaine ISO, UTC), sur la seule `POST /v1/iban/validate`. L'accès sans clé du
   transport `/mcp` est une allocation séparée (`MCP_WEEKLY_LIMIT`, `src/lib/mcp-limits.ts`) :

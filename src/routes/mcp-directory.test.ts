@@ -36,10 +36,10 @@ import {
   DIRECTORY_SESSION_REFUSAL,
   MCP_DIRECTORY_INSTRUCTIONS,
   directoryAllowanceRefusal,
-  directoryDeviceText,
   directoryKeyRefusalPayload,
   directoryNextSteps,
 } from '../mcp/directory.js';
+import { directoryResponse, directoryResponseText } from '../mcp/directory-responses.js';
 
 const DIR = '/mcp/directory';
 const HEADERS = {
@@ -276,7 +276,7 @@ describe('/mcp/directory — rouge si une offre revient', () => {
 
     found.push(...offers('comptabilité indisponible', DIRECTORY_ACCOUNTING_UNAVAILABLE));
     for (const text of Object.values(DEVICE_TEXTS)) {
-      found.push(...offers('device grant', directoryDeviceText(text, DEVICE_TEXTS)));
+      found.push(...offers('device grant', directoryResponseText(text)));
     }
     found.push(
       ...offers(
@@ -318,14 +318,14 @@ describe('/mcp/directory — rouge si une offre revient', () => {
       expect(tool.description, tool.name).not.toContain('COST:');
     }
     expect(DIRECTORY_ALLOWANCE_NOTE).not.toMatch(/\d/);
-    // Les deux outils du device grant, réécrits depuis le texte de /mcp : chaque
-    // réécriture a bien trouvé son passage.
+    // Les deux outils du device grant, écrits entiers pour cette adresse : la
+    // ligne à coller est l'en-tête du connecteur, jamais le paquet npm.
     const request = tools.find((t) => t.name === 'request_api_key')?.description ?? '';
     expect(request).not.toContain('npm package');
-    expect(request).not.toContain('answers 402');
+    expect(request).not.toContain('402');
     expect(request).toContain('Authorization: Bearer <key>');
     const poll = tools.find((t) => t.name === 'poll_api_key')?.description ?? '';
-    expect(poll).toContain('keep using the keyless allowance;');
+    expect(poll).toContain('config_line is the header "Authorization: Bearer <key>"');
   });
 });
 
@@ -443,7 +443,11 @@ describe('/mcp/directory — une session ne passe pas d’une adresse à l’aut
 });
 
 describe('/mcp/directory — les mêmes données, moins le prix et le renvoi', () => {
-  /** Ce que l'adresse retire : les deux champs de prix et l'étape du partenaire. */
+  /**
+   * Ce que l'adresse retire : les deux champs de prix et l'étape du partenaire.
+   * Et ce qu'elle dit autrement (24.10.2026) : ses textes de réponse, énoncés
+   * comme des faits (`directoryResponse`). Les données, elles, ne bougent pas.
+   */
   const strip = (payload: Record<string, unknown>): Record<string, unknown> => {
     const out: Record<string, unknown> = { ...payload };
     delete out.cost_usdc;
@@ -452,7 +456,7 @@ describe('/mcp/directory — les mêmes données, moins le prix et le renvoi', (
     if (Array.isArray(out.next_steps)) {
       out.next_steps = directoryNextSteps(out.next_steps as never);
     }
-    return out;
+    return directoryResponse(out);
   };
 
   it.each([
@@ -599,7 +603,7 @@ describe('/mcp garde son offre, et les deux adresses annotent tous leurs outils'
     });
     const body = await parse(res);
     expect(body.result?.isError, JSON.stringify(body)).toBe(true);
-    expect(JSON.stringify(body)).toContain('This IBANforge API key cannot serve this call');
+    expect(JSON.stringify(body)).toContain('This IBANforge API key cannot serve this request');
     expect(offers('refus de clé', body)).toEqual([]);
   });
 

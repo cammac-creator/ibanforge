@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl"
 import { Input } from "@/components/ui/input"
 import { localePath } from "@/lib/locale-path"
 import { formatGrouped } from "@/lib/format-grouped"
+import { formatUsd } from "@/lib/format-usd"
 import { ENDPOINTS, MAX_VOLUME, formatCost, packQuote, freeKeyTier, PRO_MONTHLY_PRICE, PRO_MONTHLY_UNITS } from "@/lib/pricing-estimate"
 
 export function CostCalculator() {
@@ -50,10 +51,14 @@ export function CostCalculator() {
 
   return (
     <div
-      className="rounded-xl border p-6 flex flex-col gap-5"
+      className="rounded-xl border p-4 sm:p-6 flex flex-col gap-5"
       style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
     >
-      {/* Per-endpoint volume table — each line is editable and counted. */}
+      {/* Per-endpoint volume table — each line is editable and counted.
+          Sur téléphone, trois colonnes au lieu de quatre : le coût de la ligne
+          passe sous son champ. À 390 px, la colonne « Coût mensuel » était
+          coupée en allemand, et au volume maximal du formulaire (10 000 000)
+          les champs et les montants l'étaient aussi (break-ui, 25.10.2026). */}
       <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--ink-4)" }}>
         <table className="w-full text-sm">
           <thead>
@@ -61,55 +66,65 @@ export function CostCalculator() {
               className="border-b"
               style={{ borderColor: "var(--ink-4)", background: "var(--ink-2)" }}
             >
-              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground text-xs">
+              <th className="px-3 sm:px-4 py-2.5 text-left font-medium text-muted-foreground text-xs">
                 {t("table.endpoint")}
               </th>
               <th className="px-3 py-2.5 text-right font-medium text-muted-foreground text-xs">
                 {t("callsHeader")}
+                <span className="block sm:hidden">{t("table.monthlyCost")}</span>
               </th>
               <th className="px-3 py-2.5 text-right font-medium text-muted-foreground text-xs hidden sm:table-cell">
                 {t("table.rate")}
               </th>
-              <th className="px-4 py-2.5 text-right font-medium text-muted-foreground text-xs">
+              <th className="px-4 py-2.5 text-right font-medium text-muted-foreground text-xs hidden sm:table-cell">
                 {t("table.monthlyCost")}
               </th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <tr
-                key={row.key}
-                className={i < rows.length - 1 ? "border-b" : ""}
-                style={{ borderColor: "var(--hairline)" }}
-              >
-                <td className="px-4 py-2.5">
-                  <span className="font-mono text-xs text-foreground">{row.label}</span>
-                  <span className="block font-mono text-[11px] text-muted-foreground sm:hidden">
-                    {formatCost(row.cost)}/{row.key === "batch" ? "IBAN" : t("perCall")}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5 text-right">
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={volumes[row.key]}
-                    onChange={(e) => handleChange(row.key, e.target.value)}
-                    aria-label={`${row.label} — ${t("callsHeader")}`}
-                    className="h-8 w-20 sm:w-24 ml-auto text-right font-mono text-xs tnum"
-                  />
-                </td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs text-muted-foreground hidden sm:table-cell">
-                  {formatCost(row.cost)}/{row.key === "batch" ? "IBAN" : t("perCall")}
-                </td>
-                <td className="px-4 py-2.5 text-right font-mono text-xs font-semibold tnum">
-                  {row.volume > 0 ? (
-                    <span className="text-amber-500">{formatCost(row.total)}</span>
-                  ) : (
-                    <span className="text-muted-foreground/50">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {rows.map((row, i) => {
+              const cost = row.volume > 0 ? (
+                <span className="text-amber-500">{formatCost(row.total, locale)}</span>
+              ) : (
+                <span className="text-muted-foreground/50">—</span>
+              )
+              return (
+                <tr
+                  key={row.key}
+                  className={i < rows.length - 1 ? "border-b" : ""}
+                  style={{ borderColor: "var(--hairline)" }}
+                >
+                  <td className="px-3 sm:px-4 py-2.5">
+                    <span className="font-mono text-xs text-foreground">{row.label}</span>
+                    <span className="block font-mono text-[11px] text-muted-foreground sm:hidden">
+                      {formatUsd(row.cost, locale)}/{row.key === "batch" ? "IBAN" : t("perCall")}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={volumes[row.key]}
+                      onChange={(e) => handleChange(row.key, e.target.value)}
+                      aria-label={`${row.label} — ${t("callsHeader")}`}
+                      autoComplete="off"
+                      enterKeyHint="done"
+                      // 16 px au doigt : sous 16 px, Safari iOS zoome la page sur
+                      // le champ et ne dézoome plus (mobile-native). La largeur
+                      // tient « 10000000 », le plafond du formulaire, à cette taille.
+                      className="h-8 w-[6.75rem] sm:w-28 ml-auto text-right font-mono text-xs pointer-coarse:text-base tnum"
+                    />
+                    <span className="mt-1 block font-mono text-xs font-semibold tnum sm:hidden">{cost}</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-muted-foreground hidden sm:table-cell">
+                    {formatUsd(row.cost, locale)}/{row.key === "batch" ? "IBAN" : t("perCall")}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono text-xs font-semibold tnum hidden sm:table-cell">
+                    {cost}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -121,9 +136,11 @@ export function CostCalculator() {
             <p className="text-sm font-medium text-foreground">{t("summary.total")}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{t("summary.note")}</p>
           </div>
-          <div className="text-right shrink-0">
+          {/* Sans `shrink-0` : la légende allemande, sur une ligne, était plus
+              large que la carte et emportait le total hors du cadre à 390 px. */}
+          <div className="ml-auto min-w-0 text-right">
             <p className="text-3xl font-bold font-mono text-amber-500 tnum">
-              {formatCost(paygTotal)}
+              {formatCost(paygTotal, locale)}
             </p>
             <p className="text-xs text-muted-foreground">{t("summary.payg")}</p>
           </div>
@@ -133,12 +150,12 @@ export function CostCalculator() {
         {totalUnits > 0 && <div className="grid gap-3 sm:grid-cols-2" aria-live="polite">
           <a href="#packs" className="rounded-lg border border-border p-4 hover:border-amber-500/60 focus-visible:outline-2 focus-visible:outline-amber-500">
             <p className="text-xs text-muted-foreground">{t("summary.packTitle")}</p>
-            <p className="text-xl font-mono font-semibold mt-1">{formatCost(pack.price)}</p>
+            <p className="text-xl font-mono font-semibold mt-1">{formatUsd(pack.price, locale)}</p>
             <p className="text-xs mt-2">{t("summary.packDetail", { credits: formatNumber(pack.credits) })}</p>
           </a>
           <a href={proFits ? "#pro" : localePath(locale, "/vendors")} className="rounded-lg border border-border p-4 hover:border-amber-500/60 focus-visible:outline-2 focus-visible:outline-amber-500">
             <p className="text-xs text-muted-foreground">{t("summary.proTitle")}</p>
-            <p className="text-xl font-mono font-semibold mt-1">{proFits ? formatCost(PRO_MONTHLY_PRICE) : t("summary.overPro")}</p>
+            <p className="text-xl font-mono font-semibold mt-1">{proFits ? formatUsd(PRO_MONTHLY_PRICE, locale) : t("summary.overPro")}</p>
             <p className="text-xs mt-2">{t(proFits ? "summary.proDetail" : "summary.overProDetail", { credits: formatNumber(PRO_MONTHLY_UNITS) })}</p>
           </a>
         </div>}

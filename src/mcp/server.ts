@@ -275,6 +275,9 @@ Cost: $0.002 USDC per IBAN via x402 (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100,
       structuredContent: {
         results: results as unknown as Record<string, unknown>[],
         count: results.length,
+        // As POST /v1/iban/batch counts it (24.10.2026): the output schema it
+        // shares with the hosted transport declares it.
+        valid_count: results.filter((r) => r.valid).length,
       },
     };
   },

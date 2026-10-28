@@ -17,7 +17,12 @@
 
 import { Hono, type Context } from 'hono';
 import type { HonoEnv } from '../types.js';
-import { McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  McpServer,
+  type RegisteredPrompt,
+  type RegisteredResource,
+  type RegisteredTool,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
   LATEST_PROTOCOL_VERSION,
@@ -79,21 +84,42 @@ import {
 } from '../lib/field-notes.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
-import { DIRECTORY_TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import {
   DIRECTORY_ACCOUNTING_UNAVAILABLE,
   DIRECTORY_ALLOWANCE_NOTE,
+  DIRECTORY_NO_SESSION,
+  DIRECTORY_PROMPT_DESCRIPTION,
   DIRECTORY_SESSION_REFUSAL,
+  DIRECTORY_UNKNOWN_SESSION,
   MCP_DIRECTORY_INSTRUCTIONS,
   MCP_DIRECTORY_PATH,
   type McpVariant,
   directoryAllowanceRefusal,
   directoryConfigLine,
-  directoryDescription,
-  directoryDeviceText,
+  directoryEndpointMessage,
   directoryKeyRefusalPayload,
+  directoryOutputSchema,
   directoryPayload,
+  directoryServerDescription,
+  directoryShape,
+  directoryToolDescriptions,
 } from '../mcp/directory.js';
+import { directoryResult } from '../mcp/directory-responses.js';
+import {
+  CHATGPT_ACCOUNTING_UNAVAILABLE,
+  CHATGPT_COUNTRIES_DESCRIPTION,
+  CHATGPT_PROMPT_DESCRIPTION,
+  CHATGPT_SESSION_REFUSAL,
+  CHATGPT_TOOL_META,
+  CHATGPT_TOOL_SET,
+  MCP_CHATGPT_INSTRUCTIONS,
+  MCP_CHATGPT_PATH,
+  chatgptAllowanceRefusal,
+  chatgptDescription,
+  chatgptDiscoveryBody,
+  chatgptPayload,
+  chatgptValidateAndExplainPrompt,
+} from '../mcp/chatgpt.js';
 import {
   MCP_WEEKLY_LIMIT,
   MCP_SESSIONS_PER_IP_DAY,
@@ -105,9 +131,20 @@ import { extractKey } from '../middleware/api-key.js';
 import { validateApiKey } from '../lib/api-keys.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 /** The tools a call may name and be served; parity with registerTool is tested. */
 const MCP_TOOL_NAMES: ReadonlySet<string> = new Set(MCP_TOOLS.map((t) => t.name));
+
+/**
+ * Ce qu'un appel peut nommer et se faire servir, adresse par adresse : les
+ * onze outils sur `/mcp` et `/mcp/directory`, les six de `/mcp/chatgpt`
+ * (24.10.2026). Un outil retiré de l'adresse ChatGPT y est traité comme un
+ * outil inconnu : ni débité, ni compté comme un appel servi.
+ */
+function servableTools(variant: McpVariant): ReadonlySet<string> {
+  return variant === 'chatgpt' ? CHATGPT_TOOL_SET : MCP_TOOL_NAMES;
+}
 import {
   ANONYMOUS_MONTHLY_LIMIT,
   FREE_TIER_MONTHLY_LIMIT,
@@ -293,12 +330,13 @@ export function createMcpSessionStore(
 export const mcpSessions = createMcpSessionStore();
 
 /**
- * L'adresse sur laquelle chaque session a été ouverte : `/mcp` ou
- * `/mcp/directory` (23.10.2026). Un seul magasin pour les deux, pour que la
- * borne mémoire et les plafonds par clé restent communs ; mais une session
- * ouverte sur l'une n'est jamais servie sur l'autre, sans quoi l'offre de
- * `/mcp` reviendrait sur l'adresse des répertoires par un simple identifiant
- * de session. Une `WeakMap` : elle suit le transport et n'a rien à purger.
+ * L'adresse sur laquelle chaque session a été ouverte : `/mcp`,
+ * `/mcp/directory` (23.10.2026) ou `/mcp/chatgpt` (24.10.2026). Un seul
+ * magasin pour toutes, pour que la borne mémoire et les plafonds par clé
+ * restent communs ; mais une session ouverte sur l'une n'est jamais servie sur
+ * une autre, sans quoi l'offre de `/mcp`, ou un outil retiré de l'adresse
+ * ChatGPT, reviendrait par un simple identifiant de session. Une `WeakMap` :
+ * elle suit le transport et n'a rien à purger.
  */
 const sessionVariant = new WeakMap<WebStandardStreamableHTTPServerTransport, McpVariant>();
 
@@ -382,10 +420,12 @@ async function serveOnKey(
   if (metered === null) return run();
   if (metered.served) return metered.result;
   // L'adresse des répertoires ne relaie pas le texte de paiement de l'API REST.
+  // L'adresse ChatGPT n'arrive jamais ici : elle ne lit aucune clé (voir
+  // `handleMcpPost`), donc `authInfo` y est toujours absent.
   const payload =
-    variant === 'directory'
-      ? directoryKeyRefusalPayload(metered.cause)
-      : keyRefusalPayload(metered.cause);
+    variant === 'mcp'
+      ? keyRefusalPayload(metered.cause)
+      : directoryKeyRefusalPayload(metered.cause);
   return { isError: true, content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
 }
 
@@ -595,14 +635,22 @@ function createMcpServer(
   variant: McpVariant = 'mcp',
 ): McpServer {
   // `/mcp/directory` (src/mcp/directory.ts) : les mêmes outils et les mêmes
-  // données, sans rien qui vende. `/mcp` ne change pas : chaque texte de cette
-  // fonction y reste celui d'avant, `dir` ne choisit que pour l'autre adresse.
-  const dir = variant === 'directory';
-  /** La ligne de prix de /mcp ; sur l'adresse des répertoires, la seule limite sans clé. */
-  const cost = (price: string): string => (dir ? DIRECTORY_ALLOWANCE_NOTE : costLine(price));
-  /** Le prix du catalogue sur /mcp ; sur l'adresse des répertoires, aucun prix et les étapes filtrées. */
+  // données, sans rien qui vende. `/mcp/chatgpt` (src/mcp/chatgpt.ts,
+  // 24.10.2026) prend tout ce que fait l'adresse des répertoires (`dir`), puis
+  // se resserre (`chat`) : six outils, aucune clé.
+  // Les textes enregistrés ci-dessous (descriptions, paramètres) sont ceux de
+  // `/mcp`, à l'octet près. Les deux autres adresses reçoivent les leurs à la
+  // fin de cette fonction, écrits entiers dans src/mcp/directory.ts, sans
+  // aucune consigne au modèle (24.10.2026).
+  const dir = variant !== 'mcp';
+  const chat = variant === 'chatgpt';
+  /** Le prix du catalogue sur /mcp ; ailleurs, aucun prix et les étapes filtrées. */
   const bill = (payload: Record<string, unknown>, listPrice?: number): Record<string, unknown> =>
-    dir ? directoryPayload(payload) : billedFree(payload, listPrice);
+    chat
+      ? chatgptPayload(payload)
+      : dir
+        ? directoryPayload(payload)
+        : billedFree(payload, listPrice);
   /** Un appel d'outil de donnée servi sur la clé de SA requête : voir `serveOnKey`. */
   function withKey(
     tool: string,
@@ -628,7 +676,8 @@ function createMcpServer(
       // The first line every MCP client and directory reads. Written once in
       // src/lib/positioning.ts, where the register countries and the share of
       // the frozen 2018 directory copy are read from the data (24/09/2026).
-      description: serverDescription(),
+      // Les adresses des répertoires la disent sans s'adresser au lecteur.
+      description: dir ? directoryServerDescription() : serverDescription(),
       websiteUrl: 'https://ibanforge.com',
       icons: [
         {
@@ -653,7 +702,10 @@ function createMcpServer(
       // paquets (src/mcp/directory.ts). Une clé qui écrase la précédente, et
       // non un ternaire : `src/mcp/instructions.test.ts` vérifie que /mcp passe
       // bien la constante partagée au constructeur.
-      ...(dir ? { instructions: MCP_DIRECTORY_INSTRUCTIONS } : {}),
+      // L'adresse ChatGPT a le sien, sans clé ni retour d'information.
+      ...(dir
+        ? { instructions: chat ? MCP_CHATGPT_INSTRUCTIONS : MCP_DIRECTORY_INSTRUCTIONS }
+        : {}),
     },
   );
 
@@ -667,10 +719,8 @@ function createMcpServer(
         'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
         'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
         'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ' +
-        (dir
-          ? 'A local mod-97 checksum only catches typos: this tool also resolves the BIC/SWIFT, tells whether the IBAN is a virtual IBAN issued by an EMI or a neobank (compliance risk), and checks SEPA reachability. '
-          : 'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
-            'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ') +
+        'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
+        'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
         `RETURNS: ${VALIDATE_TRUTH_RETURNS} ` +
         'valid (boolean), bank_code_holder, checks, country { code, name }, bic { code, bic8, redirected_from?, bank_name, city, basis, authoritative, source, as_of, source_as_of?, listed_in_current_source, lei, lei_status, address { street, post_code, region, city, country, romanized, romanization, source, language, as_of } } — basis says WHERE the bank code to BIC pairing came from (national_register | curated_map | directory_prefix) and authoritative, derived from it, says whether the BIC may be stored and settled against; outside a national_register pairing the BIC is advisory, confirm it before it becomes a routing instruction. code is 8 or 11 characters, as the consulted source publishes it: COMPARE A SUPPLIED BIC ON bic8, never on code — the branch code is informational and in a cooperative network it names the LOCAL bank while the first eight name its clearing institution (Swiss IID 30020 is RBABCH22180, Crédit Mutuel de la Vallée SA, while RBABCH22 alone is Entris Banking AG). redirected_from is present when the register answered for the bank code that took over the one you asked about (CH/LI: SIX redirects a concatenated IID, which does not make the IBAN invalid) — lei and address are read from the same directory row /v1/bic/:code serves, so this call already carries them; both are null when GLEIF publishes nothing for that BIC, which means "no LEI on file", not "the institution has none". bic.address is the LEGAL ENTITY seat, so bic.address.city may legitimately differ from bic.city (the register city for THIS bank code), and bic.address.as_of dates the entity last filing, usually much older than bic.as_of. ' +
         'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required, vop_participant — is the resolved bank listed as ready in the EPC VoP register, bank_reachability, bank_schemes, vop_register_status: the bank itself in the EPC registers, never the country }, ' +
@@ -679,7 +729,7 @@ function createMcpServer(
         'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. ' +
         `${authoritativeVerdictSentence()} ` +
         'match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution. ' +
-        cost('$0.005 per call'),
+        costLine('$0.005 per call'),
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
       },
@@ -703,15 +753,13 @@ function createMcpServer(
     {
       title: 'Batch Validate IBANs',
       description:
-        (dir
-          ? 'Validate up to 100 IBANs in a single call; each IBAN counts as one validate_iban call, with or without a key. '
-          : 'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, it costs $0.002 per IBAN instead of $0.005 per validate_iban call; ' +
-            'on an API key or a credit pack each IBAN uses one request or credit, the same as one validate_iban call. ') +
+        'Validate up to 100 IBANs in a single call. Paid per call in USDC via x402, it costs $0.002 per IBAN instead of $0.005 per validate_iban call; ' +
+        'on an API key or a credit pack each IBAN uses one request or credit, the same as one validate_iban call. ' +
         'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
         'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
         'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
         'RETURNS: { results: [...same shape as validate_iban], count, valid_count }. ' +
-        cost('$0.002 USDC per IBAN via x402'),
+        costLine('$0.002 USDC per IBAN via x402'),
       inputSchema: {
         ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
       },
@@ -734,9 +782,17 @@ function createMcpServer(
           // the wrong catalogue number under the right name.
           return bill(result as unknown as Record<string, unknown>, 0.002);
         });
+        // `valid_count` as POST /v1/iban/batch computes it (24.10.2026): the
+        // description of this tool announced it, the REST route and the npm
+        // package returned it, and this transport did not. Added to
+        // `structuredContent` only: the text block keeps its bare array.
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
-          structuredContent: { results, count: results.length },
+          structuredContent: {
+            results,
+            count: results.length,
+            valid_count: results.filter((r) => r.valid).length,
+          },
         };
       }),
   );
@@ -752,7 +808,7 @@ function createMcpServer(
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
         `BACKED BY: ${bicDirectorySentence({ withCount: true })} ${F.claim.lei} of the rows carry an LEI from GLEIF. ` +
         `SOURCE: ${bicSourceNote({ withMonth: true })} ` +
-        cost('$0.003 per call'),
+        costLine('$0.003 per call'),
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
       },
@@ -831,13 +887,11 @@ function createMcpServer(
         "asks whether the payee's bank or its country is under sanctions, asks if a SEPA Instant transfer can reach the bank, " +
         'or needs a numeric risk score for an internal payment-approval workflow. ' +
         'NOT A REGULATED AML/CFT PRODUCT — informational triage only. ' +
-        (dir
-          ? 'For regulated screening, use a regulated AML/CFT screening provider. '
-          : 'For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ') +
+        'For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
         `CHECKS: IBAN validity + ${BANK_LEVEL_SANCTIONS} + FATF status + SEPA Instant reachability + whether the EPC Verification of Payee (VoP) register lists the bank as ready; the name check itself is done by the payee's bank, never here. ` +
         'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop). ' +
         `${COMPLIANCE_HONEST_NAMES} ` +
-        cost('$0.02 per call'),
+        costLine('$0.02 per call'),
       inputSchema: {
         iban: z.string().describe('IBAN to check'),
       },
@@ -871,10 +925,8 @@ function createMcpServer(
         'AMBIGUITY: only a leading "RF" and a 27-digit length pin a scheme down. A bare 12-digit string is both a Belgian OGM and a legal Finnish length, so the more specific reading is returned and the other appears in also_valid_as. Pass reference_type when you know the country. ' +
         "THE PAIRING RULE — the part no checksum library reproduces: pass an iban and you also get a pairing verdict. Per the Swiss Implementation Guidelines a QRR reference may ONLY be used with a QR-IBAN (institution identifier in the SIX range 30000-31999), and an ISO 11649 reference may NOT be used with one. Outside CH and LI, pairing is not_applicable — there is no QR-IBAN to pair against — and that does not affect the reference's own checksum verdict. " +
         'IMPORTANT: valid and pairing are INDEPENDENT. A reference can be arithmetically valid and still illegal on that account. Read both, and relay source/as_of — they are what makes the verdict auditable. ' +
-        (dir
-          ? ''
-          : 'FREE: the checksums are published commodities. The paid surface is POST /v1/iban/validate, which returns this same pairing block with the full IBAN enrichment. ') +
-        cost('$0 per call, on every surface'),
+        'FREE: the checksums are published commodities. The paid surface is POST /v1/iban/validate, which returns this same pairing block with the full IBAN enrichment. ' +
+        costLine('$0 per call, on every surface'),
       inputSchema: {
         reference: z
           .string()
@@ -917,10 +969,9 @@ function createMcpServer(
       description:
         "Check a Swiss QR-bill payload, the text a QR-bill's code carries (starts with SPC), rule by rule, each finding citing the SIX document it comes from. USE WHEN: an agent, an ERP or an accounting tool holds a scanned or generated QR-bill and must know before paying or issuing it whether it is well-formed, whether the reference type matches the IBAN (QRR needs a QR-IBAN, IID 30000-31999), and above all whether the creditor and debtor addresses are STRUCTURED (type S) or still COMBINED (type K): " +
         COMBINED_ADDRESS_CLAUSE +
-        '. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the ' +
-        (dir ? '' : 'paid ') +
+        '. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the paid ' +
         "validate_iban. RETURNS: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines, to relay as a fix. IMPORTANT: relay each finding's source string. " +
-        cost('$0 per call, on every surface'),
+        costLine('$0 per call, on every surface'),
       inputSchema: {
         payload: z
           .string()
@@ -953,10 +1004,8 @@ function createMcpServer(
         "SCHEMES: 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+ / T2, ECB), 'fedwire' (Federal Reserve). There is deliberately NO 'cbpr+' scheme: that guideline sits behind swift.com, unreachable to automated readers, and a conformity boolean quoting an unread document would be a guess dressed as a verdict — the note field restates this on every answer. " +
         'VERDICTS: pass, fail, and not_applicable — the last marks a rule whose precondition is not met and never counts as a pass. conforms is true when no finding failed. ' +
         "IMPORTANT: relay each finding's source string — it names the exact document, version and validity date the rule is quoted from. They are what makes the verdict auditable. " +
-        (dir
-          ? ''
-          : 'FREE: the rules are published commodities. The paid surface is the postal_address block that /v1/bic and /v1/iban/validate return for the resolved institution. ') +
-        cost('$0 per call, on every surface'),
+        'FREE: the rules are published commodities. The paid surface is the postal_address block that /v1/bic and /v1/iban/validate return for the resolved institution. ' +
+        costLine('$0 per call, on every surface'),
       inputSchema: {
         scheme: z
           .enum(ADDRESS_SCHEMES as [AddressScheme, ...AddressScheme[]])
@@ -1005,7 +1054,7 @@ function createMcpServer(
         `BACKED BY: ${F.claim.chClearing} SIX BankMaster entries (Swiss official source, refreshed monthly). ` +
         'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
         'Only relevant for CH and LI accounts. ' +
-        cost('$0.003 per call'),
+        costLine('$0.003 per call'),
       inputSchema: {
         iid: z.string().describe('Swiss IID (1-5 digit number)'),
       },
@@ -1126,24 +1175,17 @@ function createMcpServer(
     'send_feedback',
     {
       title: 'Send Feedback to IBANforge',
-      description: dir
-        ? 'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
-          'latency, or anything blocking you from using the service (missing network, quota shape). ' +
-          'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, capability) and want it fixed. ' +
-          'This tool does NOT count against the keyless allowance — it works even after the allowance is spent. ' +
-          'A human reads every report.'
-        : 'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
-          'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
-          'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
-          'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
-          'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
+      description:
+        'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
+        'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
+        'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
+        'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
+        'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
       inputSchema: {
         error_type: z
           .enum(FEEDBACK_ERROR_TYPES)
           .describe(
-            dir
-              ? 'Category of the report. Use "other" for product feedback, access blockers or feature needs.'
-              : 'Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.',
+            'Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.',
           ),
         notes: z
           .string()
@@ -1282,9 +1324,9 @@ function createMcpServer(
           verification_uri_complete: null,
           expires_in: null,
           interval: null,
-          display_to_human: dir
-            ? directoryDeviceText(displayToHuman({ status: result.error }), DEVICE_TEXTS)
-            : displayToHuman({ status: result.error }),
+          // Sur les adresses des répertoires, réécrit à la sortie
+          // (`directoryResult`, src/mcp/directory-responses.ts).
+          display_to_human: displayToHuman({ status: result.error }),
         };
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(refused) }],
@@ -1382,12 +1424,11 @@ function createMcpServer(
       if (id && answer.status === 'approved') sessionDeviceCode.delete(id);
 
       // L'adresse des répertoires : la ligne à coller est l'en-tête du
-      // connecteur, jamais le paquet npm, et aucun texte ne renvoie à un rail
-      // de paiement.
+      // connecteur, jamais le paquet npm. Son `message` y est réécrit à la
+      // sortie, comme toute réponse (`directoryResult`).
       if (dir) {
         answer = {
           ...answer,
-          message: directoryDeviceText(answer.message, DEVICE_TEXTS),
           config_line: answer.api_key ? directoryConfigLine(answer.api_key) : answer.config_line,
         };
       }
@@ -1424,25 +1465,98 @@ function createMcpServer(
     }),
   );
 
-  // Les schémas de sortie sans `cost_usdc` ni `list_price_usdc` sur l'adresse
-  // des répertoires (src/mcp/output-schemas.ts), et les descriptions des deux
-  // outils du device grant sans rail de paiement ni paquet npm. Posés après
-  // coup, par l'`update()` public du SDK, parce que les tests de parité avec
-  // les serveurs stdio lisent le texte de chaque `registerTool` : la référence
-  // `TOOL_OUTPUT_SCHEMAS.<outil>`, et la description de ces deux outils au
-  // caractère près (scripts/mcp-parity.test.ts).
-  // `src/routes/mcp-directory.test.ts` est rouge si un outil échappe à ce
-  // passage (un prix reviendrait par `tools/list`).
+  // Les adresses des répertoires (src/mcp/directory.ts), posées après coup par
+  // l'`update()` public du SDK, parce que les tests de parité avec les serveurs
+  // stdio lisent le texte de chaque `registerTool` (la référence
+  // `TOOL_OUTPUT_SCHEMAS.<outil>`, la description des deux outils du device
+  // grant au caractère près : scripts/mcp-parity.test.ts) :
+  //  - chaque description d'outil, écrite entière, sans consigne au modèle ;
+  //  - chaque paramètre et chaque champ de sortie, leurs textes repris passage
+  //    par passage (`DIRECTORY_TEXT_EDITS`), contraintes intactes ;
+  //  - les schémas de sortie sans `cost_usdc` ni `list_price_usdc` ;
+  //  - la description du prompt ;
+  //  - et chaque RÉPONSE (24.10.2026) : le rappel de chaque outil est enveloppé,
+  //    et son résultat, `structuredContent` et blocs de texte, passe par
+  //    `directoryResult` (src/mcp/directory-responses.ts). Un seul point de
+  //    passage, refus de clé et erreurs de format compris : les textes de
+  //    src/lib/ restent ceux de l'API REST et de `/mcp`.
+  // `src/routes/mcp-directory.test.ts` est rouge si un prix revient par
+  // `tools/list`, `src/routes/mcp-descriptions.test.ts` si une consigne revient
+  // dans une description, `src/routes/mcp-responses.test.ts` dans une réponse.
   if (dir) {
-    const tools = (server as unknown as { _registeredTools?: Record<string, RegisteredTool> })
-      ._registeredTools;
-    for (const [name, tool] of Object.entries(tools ?? {})) {
-      const shape =
-        DIRECTORY_TOOL_OUTPUT_SCHEMAS[name as keyof typeof DIRECTORY_TOOL_OUTPUT_SCHEMAS];
-      if (shape) tool.update({ outputSchema: shape });
-      if (tool.description)
-        tool.update({ description: directoryDescription(name, tool.description) });
+    const internals = server as unknown as {
+      _registeredTools?: Record<string, RegisteredTool>;
+      _registeredPrompts?: Record<string, RegisteredPrompt>;
+    };
+    const texts = directoryToolDescriptions(DIRECTORY_ALLOWANCE_NOTE);
+    for (const [name, tool] of Object.entries(internals._registeredTools ?? {})) {
+      const params = (tool.inputSchema as unknown as { shape?: z.ZodRawShape } | undefined)?.shape;
+      const output = directoryOutputSchema(name);
+      const handler = tool.handler as unknown as (
+        args: unknown,
+        extra: unknown,
+      ) => CallToolResult | Promise<CallToolResult>;
+      tool.update({
+        ...(texts[name] ? { description: texts[name] } : {}),
+        ...(params ? { paramsSchema: directoryShape(params) } : {}),
+        ...(output ? { outputSchema: output } : {}),
+        callback: (async (args: unknown, extra: unknown) =>
+          directoryResult(await handler(args, extra))) as unknown as ToolCallback<z.ZodRawShape>,
+      });
     }
+    internals._registeredPrompts?.validate_and_explain?.update({
+      description: DIRECTORY_PROMPT_DESCRIPTION,
+    });
+  }
+
+  // L'adresse ChatGPT (src/mcp/chatgpt.ts), posée par-dessus celle des
+  // répertoires, de la même façon et pour la même raison (les tests de parité
+  // lisent le texte de chaque enregistrement) :
+  //  - les cinq outils hors périmètre sont RETIRÉS du serveur, pas seulement
+  //    cachés de `tools/list` : un `tools/call` direct reçoit « not found » du
+  //    SDK avant tout gestionnaire, donc avant toute clé, tout rapport, tout
+  //    effet ;
+  //  - les six gardent leurs annotations, avec la description de l'adresse des
+  //    répertoires finie par la note de cette adresse, et la déclaration
+  //    d'accès anonyme (`noauth`) de la référence d'OpenAI ;
+  //  - la ressource des pays et le prompt reçoivent leurs textes adaptés.
+  // `src/routes/mcp-chatgpt.test.ts` est rouge si un outil exclu répond encore.
+  if (chat) {
+    const internals = server as unknown as {
+      _registeredTools?: Record<string, RegisteredTool>;
+      _registeredResources?: Record<string, RegisteredResource>;
+      _registeredPrompts?: Record<string, RegisteredPrompt>;
+    };
+    for (const [name, tool] of Object.entries(internals._registeredTools ?? {})) {
+      if (!CHATGPT_TOOL_SET.has(name)) {
+        tool.remove();
+        continue;
+      }
+      tool.update({
+        ...(chatgptDescription(name) ? { description: chatgptDescription(name) } : {}),
+        _meta: CHATGPT_TOOL_META,
+      });
+    }
+    const countries = internals._registeredResources?.['ibanforge://countries'];
+    countries?.update({
+      metadata: { ...countries.metadata, description: CHATGPT_COUNTRIES_DESCRIPTION },
+    });
+    internals._registeredPrompts?.validate_and_explain?.update({
+      description: CHATGPT_PROMPT_DESCRIPTION,
+      // Le schéma des arguments reste celui de l'enregistrement : le SDK a
+      // déjà validé `iban` comme une chaîne quand ce rappel s'exécute.
+      callback: async (args) => ({
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: chatgptValidateAndExplainPrompt(String((args as { iban: string }).iban)),
+            },
+          },
+        ],
+      }),
+    });
   }
 
   return server;
@@ -1460,17 +1574,25 @@ function createMcpServer(
  * against tools/list: the day the SDK renames that field this returns an empty
  * array and the test goes red, instead of the document going quietly stale.
  */
-let toolNamesCache: string[] | null = null;
-function registeredToolNames(): string[] {
-  if (toolNamesCache) return toolNamesCache;
+// Une entrée par adresse (24.10.2026) : `/mcp/chatgpt` n'enregistre que six
+// outils, et sa découverte doit lire les siens, pas l'inventaire des onze.
+const toolNamesCache = new Map<McpVariant, string[]>();
+function registeredToolNames(variant: McpVariant = 'mcp'): string[] {
+  const cached = toolNamesCache.get(variant);
+  if (cached) return cached;
   // An empty context and no session: this instance only ever has its catalogue
   // read, no handler of it ever runs. Handing it a real caller would be a lie
   // about who asked.
-  const probe = createMcpServer({ ip: null, userAgent: null }, () => undefined) as unknown as {
+  const probe = createMcpServer(
+    { ip: null, userAgent: null },
+    () => undefined,
+    variant,
+  ) as unknown as {
     _registeredTools?: Record<string, unknown>;
   };
-  toolNamesCache = Object.keys(probe._registeredTools ?? {});
-  return toolNamesCache;
+  const names = Object.keys(probe._registeredTools ?? {});
+  toolNamesCache.set(variant, names);
+  return names;
 }
 
 // ── MCP tool call rate limiting ───────────────────────────────────────────────
@@ -1684,10 +1806,11 @@ function mcpDnsRebindingOptions(): {
   };
 }
 
-// Handle POST /mcp and POST /mcp/directory (client → server messages). The
-// two addresses share this handler, and with it every counter: the keyless
-// units and the session openings are debited on the same buckets, whichever
-// address the call came through (src/mcp/directory.ts).
+// Handle POST /mcp, POST /mcp/directory and POST /mcp/chatgpt (client → server
+// messages). The three addresses share this handler, and with it every counter:
+// the keyless units and the session openings are debited on the same buckets,
+// whichever address the call came through (src/mcp/directory.ts,
+// src/mcp/chatgpt.ts).
 async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<Response> {
   // Parse the body to check if this is a tools/call (rate-limited)
   // vs. discovery (unlimited). We clone the request so the transport
@@ -1729,8 +1852,10 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
     // Only a tool this server registers can be served (review of 24/09/2026):
     // a call to an unknown name gets "tool not found" from the SDK, so it is
     // neither charged nor counted as a served call.
+    // Depuis le 24.10.2026, par adresse : les cinq outils retirés de
+    // `/mcp/chatgpt` y sont des noms inconnus.
     const servable = calls.filter(
-      (m) => typeof m?.params?.name === 'string' && MCP_TOOL_NAMES.has(m.params.name),
+      (m) => typeof m?.params?.name === 'string' && servableTools(variant).has(m.params.name),
     );
     toolCalls = servable.length;
     keyRequests = servable.filter((m) => m?.params?.name === 'request_api_key').length;
@@ -1792,7 +1917,9 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32001,
           message:
-            'Session expired or server redeployed. Send initialize again to open a new session.',
+            variant === 'mcp'
+              ? 'Session expired or server redeployed. Send initialize again to open a new session.'
+              : DIRECTORY_UNKNOWN_SESSION,
           data: { session_id: sessionId, idle_timeout_minutes: MCP_SESSION_IDLE_MS / 60000 },
         },
       },
@@ -1814,8 +1941,10 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32000,
           message:
-            'Bad Request: no session. Send initialize alone first, then send tools/call with the ' +
-            'mcp-session-id header that initialize returned.',
+            variant === 'mcp'
+              ? 'Bad Request: no session. Send initialize alone first, then send tools/call with the ' +
+                'mcp-session-id header that initialize returned.'
+              : DIRECTORY_NO_SESSION,
         },
       },
       400,
@@ -1851,7 +1980,13 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   // CETTE requête : la session ne garde aucune clé. Elle garde seulement, depuis
   // le 08.10.2026, l'empreinte de la clé qui l'a ouverte, comme étiquette
   // d'éviction du magasin (voir `createMcpSessionStore`), jamais pour payer.
-  const presentedKey = extractKey(c, { query: false });
+  //
+  // 🚨 L'adresse ChatGPT (24.10.2026) ne lit AUCUNE clé : ChatGPT n'en envoie
+  // pas à un connecteur, et l'adresse se déclare anonyme. Une clé présentée là
+  // est ignorée : l'appel est débité sur l'adresse source comme tout appel sans
+  // clé, l'ouverture de session compte dans la franchise du jour, et aucune
+  // réponse ne parle de clé. Aucune exemption, aucune allocation de plus.
+  const presentedKey = variant === 'chatgpt' ? null : extractKey(c, { query: false });
   // Lue UNE fois, et seulement quand elle sert : pour attribuer un appel
   // d'outil, ou pour décider de l'ouverture d'une session (08.10.2026).
   const keyCheck =
@@ -1877,7 +2012,11 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32000,
           message:
-            variant === 'directory' ? DIRECTORY_ACCOUNTING_UNAVAILABLE : MCP_ACCOUNTING_UNAVAILABLE,
+            variant === 'chatgpt'
+              ? CHATGPT_ACCOUNTING_UNAVAILABLE
+              : variant === 'directory'
+                ? DIRECTORY_ACCOUNTING_UNAVAILABLE
+                : MCP_ACCOUNTING_UNAVAILABLE,
           data: { degraded: true },
         },
       });
@@ -1894,9 +2033,11 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         jsonrpc: '2.0',
         id: rpcId,
         error:
-          variant === 'directory'
-            ? directoryAllowanceRefusal(limit.used, MCP_WEEKLY_LIMIT, trialResetsAt(now))
-            : mcpAllowanceRefusal(limit.used, now),
+          variant === 'chatgpt'
+            ? chatgptAllowanceRefusal(limit.used, MCP_WEEKLY_LIMIT, trialResetsAt(now))
+            : variant === 'directory'
+              ? directoryAllowanceRefusal(limit.used, MCP_WEEKLY_LIMIT, trialResetsAt(now))
+              : mcpAllowanceRefusal(limit.used, now),
       });
     }
   }
@@ -1997,13 +2138,15 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
         error: {
           code: -32000,
           message:
-            variant === 'directory'
-              ? DIRECTORY_SESSION_REFUSAL
-              : `Daily MCP session limit reached (${MCP_SESSIONS_PER_IP_DAY} new sessions/day per source address, without a key). ` +
-                'Reuse the mcp-session-id returned by initialize instead of opening a session per call. ' +
-                'A session opened with a valid IBANforge key (Authorization: Bearer ifk_… or X-API-Key) is not counted ' +
-                `against the address. POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key ` +
-                `with no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} calls/month.`,
+            variant === 'chatgpt'
+              ? CHATGPT_SESSION_REFUSAL
+              : variant === 'directory'
+                ? DIRECTORY_SESSION_REFUSAL
+                : `Daily MCP session limit reached (${MCP_SESSIONS_PER_IP_DAY} new sessions/day per source address, without a key). ` +
+                  'Reuse the mcp-session-id returned by initialize instead of opening a session per call. ' +
+                  'A session opened with a valid IBANforge key (Authorization: Bearer ifk_… or X-API-Key) is not counted ' +
+                  `against the address. POST ${KEY_GENERATE_URL} with no body at all returns an ifk_ key ` +
+                  `with no e-mail, ${ANONYMOUS_MONTHLY_LIMIT} calls/month.`,
           data: { used: opened.used, limit: MCP_SESSIONS_PER_IP_DAY, remaining: 0 },
         },
       });
@@ -2092,6 +2235,7 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
 
 mcpHttp.post('/mcp', (c) => handleMcpPost(c, 'mcp'));
 mcpHttp.post(MCP_DIRECTORY_PATH, (c) => handleMcpPost(c, 'directory'));
+mcpHttp.post(MCP_CHATGPT_PATH, (c) => handleMcpPost(c, 'chatgpt'));
 
 /**
  * The discovery body of `GET /mcp/directory` without a session: how to connect,
@@ -2105,15 +2249,14 @@ function directoryDiscoveryBody(): Record<string, unknown> {
     supported_versions: SUPPORTED_PROTOCOL_VERSIONS,
     transport: 'streamable-http',
     endpoint: `https://api.ibanforge.com${MCP_DIRECTORY_PATH}`,
-    message:
-      'This is the IBANforge MCP HTTP endpoint for connector directories. To use it, send a POST with a JSON-RPC initialize request, then keep the returned mcp-session-id header on subsequent requests.',
+    message: directoryEndpointMessage('connector directories'),
     tools: registeredToolNames(),
     documentation: 'https://ibanforge.com/docs',
   };
 }
 
-// Handle GET /mcp and GET /mcp/directory (SSE stream for server → client
-// notifications, OR discovery hint)
+// Handle GET /mcp, GET /mcp/directory and GET /mcp/chatgpt (SSE stream for
+// server → client notifications, OR discovery hint)
 async function handleMcpGet(c: Context<HonoEnv>, variant: McpVariant): Promise<Response> {
   const sessionId = c.req.header('mcp-session-id');
   const transport = sessionFor(sessionId, variant);
@@ -2121,6 +2264,12 @@ async function handleMcpGet(c: Context<HonoEnv>, variant: McpVariant): Promise<R
   if (!transport && variant === 'directory') {
     c.header('Allow', 'POST, DELETE');
     return c.json(directoryDiscoveryBody(), 405);
+  }
+
+  // Les six outils que cette adresse enregistre vraiment, lus sur elle.
+  if (!transport && variant === 'chatgpt') {
+    c.header('Allow', 'POST, DELETE');
+    return c.json(chatgptDiscoveryBody(registeredToolNames('chatgpt')), 405);
   }
 
   if (!transport) {
@@ -2220,8 +2369,9 @@ async function handleMcpGet(c: Context<HonoEnv>, variant: McpVariant): Promise<R
 
 mcpHttp.get('/mcp', (c) => handleMcpGet(c, 'mcp'));
 mcpHttp.get(MCP_DIRECTORY_PATH, (c) => handleMcpGet(c, 'directory'));
+mcpHttp.get(MCP_CHATGPT_PATH, (c) => handleMcpGet(c, 'chatgpt'));
 
-// Handle DELETE /mcp and DELETE /mcp/directory (close session)
+// Handle DELETE /mcp, DELETE /mcp/directory and DELETE /mcp/chatgpt (close session)
 async function handleMcpDelete(c: Context<HonoEnv>, variant: McpVariant): Promise<Response> {
   const sessionId = c.req.header('mcp-session-id');
   const transport = sessionFor(sessionId, variant);
@@ -2237,5 +2387,6 @@ async function handleMcpDelete(c: Context<HonoEnv>, variant: McpVariant): Promis
 
 mcpHttp.delete('/mcp', (c) => handleMcpDelete(c, 'mcp'));
 mcpHttp.delete(MCP_DIRECTORY_PATH, (c) => handleMcpDelete(c, 'directory'));
+mcpHttp.delete(MCP_CHATGPT_PATH, (c) => handleMcpDelete(c, 'chatgpt'));
 
 export { mcpHttp };

@@ -20,7 +20,7 @@
  * Mise en cache 15 minutes, une seule lecture en vol (voir StripeRevenueCache).
  */
 import { Hono } from 'hono';
-import Stripe from 'stripe';
+import { createStripeClient } from '../lib/stripe-client.js';
 import { isAdminAuthorized } from './api-keys.js';
 import {
   CACHE_TTL_MS,
@@ -54,7 +54,7 @@ let client: StripeRevenueClient | null = null;
 function defaultFactory(): StripeRevenueClient | null {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
-  client ??= new Stripe(key, { timeout: STRIPE_TIMEOUT_MS, maxNetworkRetries: 1 });
+  client ??= createStripeClient(key, { timeout: STRIPE_TIMEOUT_MS, maxNetworkRetries: 1 });
   return client;
 }
 

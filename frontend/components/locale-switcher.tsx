@@ -65,7 +65,10 @@ export function LocaleSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-xs font-mono font-semibold text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border"
+        // Bouton de 26 px de haut, cible de 46 px au toucher : la zone `after:`
+        // déborde en hauteur, à peine en largeur pour ne pas mordre sur la clé
+        // voisine (mobile-native, 25.10.2026).
+        className="relative text-xs font-mono font-semibold text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border after:absolute after:-inset-x-1 after:-inset-y-2.5"
         // The accessible name carries the visible text, in the page's language
         // (Lighthouse label-content-name-mismatch, 2026-09-05).
         aria-label={t('changeLanguage', { locale: LABELS[locale] ?? 'EN' })}

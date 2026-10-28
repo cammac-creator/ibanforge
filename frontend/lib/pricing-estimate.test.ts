@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { ENDPOINTS, freeKeyTier, packQuote, PRO_MONTHLY_PRICE, PRO_MONTHLY_UNITS } from "./pricing-estimate"
+import { ENDPOINTS, endpointCost, formatCost, freeKeyTier, packQuote, PRO_MONTHLY_PRICE, PRO_MONTHLY_UNITS } from "./pricing-estimate"
+import en from "../messages/en.json"
+import fr from "../messages/fr.json"
+import de from "../messages/de.json"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
@@ -37,5 +40,31 @@ describe("Choisir une offre sans surestimer son quota", () => {
     const links = readFileSync(resolve(process.cwd(), "../src/lib/payment-links.ts"), "utf8")
     expect(keys).toContain(`PRO_MONTHLY_LIMIT = ${PRO_MONTHLY_UNITS.toString().replace("10000", "10_000")}`)
     expect(links).toContain(`PRO_PRICE_USD = ${PRO_MONTHLY_PRICE}`)
+  })
+})
+
+describe("Écrire un coût calculé dans la langue de la page", () => {
+  const NBSP = "\u00a0"
+
+  it("garde les centimes, zéro et plafond du calculateur compris", () => {
+    expect(formatCost(0, "en")).toBe("$0.00")
+    expect(formatCost(5, "en")).toBe("$5.00")
+    expect(formatCost(5, "fr")).toBe(`5,00${NBSP}$`)
+    expect(formatCost(330000, "en")).toBe("$330,000.00")
+    expect(formatCost(330000, "de")).toBe(`330${NBSP}000,00${NBSP}$`)
+  })
+
+  it("ne réduit pas à zéro un coût de moins d'un centime", () => {
+    expect(formatCost(0.002, "en")).toBe("$0.002")
+    expect(formatCost(3 * 0.003, "fr")).toBe(`0,009${NBSP}$`)
+  })
+
+  it("donne un prix à chaque route du tableau des tarifs, dans chaque langue", () => {
+    for (const messages of [en, fr, de]) {
+      const routes = Object.values(messages.pricing.endpoints).map((e) => e.path)
+      expect(routes).toHaveLength(ENDPOINTS.length)
+      for (const path of routes) expect(endpointCost(path), path).toBeGreaterThan(0)
+    }
+    expect(() => endpointCost("/v1/inconnue")).toThrow()
   })
 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { isAuthenticated } from '@/lib/auth';
+import { isCompanyMailbox } from '@/lib/crm/sending-account';
 
 /** Read per call, never captured at module load: see send/route.ts. */
 function env() {
@@ -39,6 +40,15 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  // The mailbox stored here is the one the draft later asks to leave from.
+  // Absent is fine (the card falls back to the company mailbox); a personal one
+  // is not, since the owner's rule of 26/10/2026.
+  if (body.account !== undefined && body.account !== '' && !isCompanyMailbox(body.account)) {
+    return NextResponse.json(
+      { error: 'sender_not_allowed', message: 'IBANforge n’écrit que depuis une adresse @ibanforge.com : recharge la page.' },
+      { status: 400 },
+    );
+  }
   const text = body.body ?? '';
   const msg = {
     id: draftId(body.email),
@@ -61,7 +71,7 @@ export async function POST(req: NextRequest) {
      * agree: what fits here fits there.
      */
     body: text.slice(0, 50_000),
-    counterparty: body.account ?? '',
+    counterparty: body.account ? body.account.trim().toLowerCase() : '',
   };
   try {
     const r = await fetch(`${apiUrl}/v1/admin/email-messages`, {

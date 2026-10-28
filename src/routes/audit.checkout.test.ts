@@ -111,13 +111,14 @@ describe('Reprise du paiement d’un audit', () => {
     expect(first.status).toBe(200);
     expect(sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        payment_method_types: ['card'],
+        allowed_payment_method_types: ['card'],
         expires_at: session.expires_at,
         locale: 'de',
         allow_promotion_codes: true,
       }),
       { idempotencyKey: `audit:${job.id}` },
     );
+    expect(sessions.create.mock.calls[0][0]).not.toHaveProperty('payment_method_types');
     expect(session.expires_at).toBeLessThan(
       Date.parse(`${job.expires_at.replace(' ', 'T')}Z`) / 1000,
     );
@@ -161,6 +162,61 @@ describe('Reprise du paiement d’un audit', () => {
     expect((await checkout(job.id, { locale: 'en' })).status).toBe(200);
     expect(sessions.create.mock.calls[1]).toEqual(sessions.create.mock.calls[0]);
     expect(getAuditJob(job.id)?.stripe_session_id).toBe(session.id);
+  });
+
+  it('reprend une réservation Dahlia sans changer son corps ni créer un second paiement', async () => {
+    const job = makeJob();
+    const { session, sessions } = fakeStripe(job);
+    // État durable fictif laissé par Stripe 22 après une coupure avant attachement.
+    const legacy = {
+      mode: 'payment',
+      payment_method_types: ['card'],
+      expires_at: session.expires_at,
+      locale: 'de',
+      customer_email: 'acme@example.com',
+      metadata: { audit_job: job.id, rows: '3', tier: 'standard' },
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'usd',
+            unit_amount: 14900,
+            product_data: { name: 'Audit fictif' },
+          },
+        },
+      ],
+      success_url: 'https://alpha.example.net/audit/done?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: 'https://alpha.example.net/audit',
+      allow_promotion_codes: true,
+    };
+    const serialized = JSON.stringify(legacy);
+    getStatsDB()
+      .prepare('UPDATE audit_jobs SET checkout_params_json = ? WHERE id = ?')
+      .run(serialized, job.id);
+    sessions.create.mockRejectedValueOnce(
+      new Stripe.errors.StripeConnectionError({
+        message: 'Réponse interrompue après création',
+      }),
+    );
+    expect((await checkout(job.id, { locale: 'fr' })).status).toBe(503);
+    expect((await checkout(job.id, { locale: 'en' })).status).toBe(200);
+    for (const call of sessions.create.mock.calls) {
+      expect(call).toEqual([
+        legacy,
+        {
+          idempotencyKey: `audit:${job.id}`,
+          apiVersion: '2026-08-26.dahlia',
+        },
+      ]);
+      expect(call[0]).not.toHaveProperty('allowed_payment_method_types');
+    }
+    expect(
+      getStatsDB().prepare('SELECT checkout_params_json FROM audit_jobs WHERE id = ?').get(job.id),
+    ).toEqual({ checkout_params_json: serialized });
+    expect(getAuditJob(job.id)?.stripe_session_id).toBe(session.id);
+    expect((await checkout(job.id)).status).toBe(200);
+    expect(sessions.create).toHaveBeenCalledTimes(2);
+    expect(sessions.retrieve).toHaveBeenCalledWith(session.id);
   });
 
   it('retrouve une session créée après une coupure suivie de quatre-vingt-dix minutes d’attente', async () => {

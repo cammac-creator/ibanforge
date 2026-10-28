@@ -33,12 +33,22 @@ describe('Landing page', () => {
     expect(html).toMatch(/<meta\s+name="description"\s+content="[^"]+"/);
   });
 
-  it('has canonical link', () => {
-    expect(html).toMatch(/<link\s+rel="canonical"\s+href="https:\/\/api\.ibanforge\.com"/);
+  it('omits the canonical link on the non-indexable API landing', () => {
+    expect(html).not.toMatch(/<link\b[^>]*\brel="canonical"/);
   });
 
-  it('has robots meta', () => {
-    expect(html).toMatch(/<meta\s+name="robots"\s+content="index, follow"/);
+  it('excludes the page from indexing while allowing links to be followed', () => {
+    expect(html).toMatch(/<meta\s+name="robots"\s+content="noindex, follow"/);
+    expect(res.headers.get('x-robots-tag')).toBe('noindex, follow');
+  });
+
+  it('links both the logo and the website label to the main website', () => {
+    expect(html).toContain(
+      '<a href="https://ibanforge.com/" class="nav-logo">IBAN<span>forge</span></a>',
+    );
+    expect(html).toMatch(
+      /<a\s+href="https:\/\/ibanforge\.com"\s+class="nav-site"[^>]*>\s*ibanforge\.com/,
+    );
   });
 
   it('has og:title', () => {

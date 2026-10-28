@@ -329,35 +329,30 @@
       "0": {
         "method": "POST",
         "path": "/v1/iban/validate",
-        "cost": "$0.005",
         "costLabel": "par appel",
         "description": "Valider un IBAN unique avec données SEPA, émetteur et risque"
       },
       "1": {
         "method": "POST",
         "path": "/v1/iban/batch",
-        "cost": "$0.002",
         "costLabel": "par IBAN en USDC via x402 (jusqu'à 100)",
         "description": "Validation par lot avec enrichissement complet par IBAN"
       },
       "2": {
         "method": "GET",
         "path": "/v1/bic/:code",
-        "cost": "$0.003",
         "costLabel": "par appel",
         "description": "Rechercher un code BIC/SWIFT dans la base consolidée (GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP)"
       },
       "3": {
         "method": "POST",
         "path": "/v1/iban/compliance",
-        "cost": "$0.02",
         "costLabel": "par appel",
         "description": "Check compliance complet avec screening sanctions, accessibilité SEPA Instant, statut VoP et score de risque (0-100)"
       },
       "4": {
         "method": "GET",
         "path": "/v1/ch/clearing/:iid",
-        "cost": "$0.003",
         "costLabel": "par appel",
         "description": "Recherche BC-Numéro / IID suisse avec SIC, euroSIC, paiements instantanés et données QR-IID — basé sur 1,100+ entrées SIX BankMaster"
       }

@@ -45,6 +45,7 @@ import { testIban } from './routes/test-iban.js';
 import { landing } from './routes/landing.js';
 import { openapi } from './routes/openapi.js';
 import { discovery } from './routes/discovery.js';
+import { openaiDomain, OPENAI_APPS_CHALLENGE_PATH } from './routes/openai-domain.js';
 import { artifacts } from './routes/artifacts.js';
 import { ogImage } from './routes/og-image.js';
 // MCP_WEEKLY_LIMIT travels with the route that enforces it: the /v1 text below
@@ -53,6 +54,7 @@ import { ogImage } from './routes/og-image.js';
 // twenty-five a week).
 import { mcpHttp, MCP_WEEKLY_LIMIT } from './routes/mcp-http.js';
 import { MCP_DIRECTORY_PATH } from './mcp/directory.js';
+import { MCP_CHATGPT_PATH } from './mcp/chatgpt.js';
 import { mcpCard } from './routes/mcp-card.js';
 // The tool inventory, so /llms.txt counts the tools instead of asserting a
 // number. It claimed "7 tools" while the servers exposed 8 (audit 2026-09-01,
@@ -252,6 +254,10 @@ const SKIP_TRACKING = new Set([
   '/stats/events',
   '/health',
   '/ping',
+  // Preuve de domaine d'OpenAI (src/routes/openai-domain.ts) : une vérification du
+  // portail, pas du trafic client. Ni les 200 ni les 404 d'avant la pose du
+  // jeton n'entrent dans la télémétrie.
+  OPENAI_APPS_CHALLENGE_PATH,
 ]);
 
 // /llms.txt — emerging standard (llmstxt.org) for AI agents to understand the API.
@@ -1005,7 +1011,9 @@ export function buildApp(): Hono<HonoEnv> {
       // partage les compteurs de `/mcp` : ses appels d'outils et ses refus
       // prennent les mêmes chemins virtuels. Ses poignées de main gardent leur
       // chemin réel, pour qu'on voie qui se connecte par un répertoire.
-      const mcpTransport = path === '/mcp' || path === MCP_DIRECTORY_PATH;
+      // L'adresse ChatGPT (`/mcp/chatgpt`, 24.10.2026) suit la même règle.
+      const mcpTransport =
+        path === '/mcp' || path === MCP_DIRECTORY_PATH || path === MCP_CHATGPT_PATH;
       const mcpOutcome = mcpTransport ? c.res.headers.get('X-MCP-Outcome') : null;
       const recordedPath = !mcpTransport
         ? path
@@ -1355,6 +1363,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', testIban);
   app.route('/', openapi);
   app.route('/', discovery);
+  app.route('/', openaiDomain);
   app.route('/', artifacts);
   app.route('/', ogImage);
   app.route('/', mcpHttp);
@@ -1374,6 +1383,10 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', createPlaygroundRelay(app));
 
   // Landing page (must be last — catches GET /)
+  app.get('/', async (c, next) => {
+    c.header('Link', '<https://api.ibanforge.com/.well-known/api-catalog>; rel="api-catalog"');
+    await next();
+  });
   app.route('/', landing);
 
   // JSON 404 for unmatched routes — the body tells the caller what to call

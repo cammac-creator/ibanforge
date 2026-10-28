@@ -88,8 +88,11 @@ export function QrBillClient() {
           onChange={(e) => setPayload(e.target.value)}
           rows={12}
           spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
           placeholder={"SPC\n0200\n1\nCH44 3199 9123 0008 8901 2\nS\n..."}
-          className="rounded-md border bg-background px-3 py-2 font-mono text-sm"
+          // 16 px au doigt, sinon Safari iOS zoome sur le champ (mobile-native).
+          className="rounded-md border bg-background px-3 py-2 font-mono text-sm pointer-coarse:text-base"
         />
         <span className="text-xs text-muted-foreground">{t("input.hint")}</span>
       </label>

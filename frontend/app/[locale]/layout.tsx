@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -58,6 +59,19 @@ export function generateStaticParams() {
  * sake: the locale is guarded by `hasLocale`, not by this flag.
  */
 export const dynamicParams = true;
+
+/**
+ * Barre d'état et chrome du navigateur mobile à la couleur du haut de page
+ * (le fond de l'en-tête, --ink-0), au lieu du blanc par défaut (mobile-native,
+ * 25.10.2026). Une seule valeur, sombre : le site n'a pas de thème clair, une
+ * valeur par schéma de couleurs peindrait une barre blanche sur une page noire.
+ * Next garde ses valeurs par défaut pour `width` et `initial-scale`, et le
+ * zoom reste permis.
+ */
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+  colorScheme: "dark",
+};
 
 type Props = {
   children: React.ReactNode;

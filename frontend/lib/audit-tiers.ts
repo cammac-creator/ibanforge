@@ -13,7 +13,5 @@ export const AUDIT_TIERS = [
   { rows: 20_000, price: 349 },
 ] as const
 
-/** A price in US dollars as the site writes it: "$149" in English, "149 $" elsewhere (no-break space). */
-export function formatUsd(amount: number, locale: string): string {
-  return locale.toLowerCase().startsWith("en") ? `$${amount}` : `${amount}\u00a0$`
-}
+/** Un prix en dollars tel que le site l’écrit : « $149 » en anglais, « 149 $ » ailleurs (lib/format-usd.ts). */
+export { formatUsd } from "./format-usd"

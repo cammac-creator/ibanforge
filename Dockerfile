@@ -1,4 +1,7 @@
-FROM node:22-slim AS builder
+# Exact patch, not the floating `22-slim`: a builder may keep a cached base layer,
+# and the running Node version must be readable from the commit that was deployed.
+# Dependabot (docker ecosystem) proposes the next 22.x patch; never a new major.
+FROM node:22.23.4-slim AS builder
 
 WORKDIR /app
 
@@ -29,7 +32,7 @@ RUN mkdir -p reference && \
     UK_MODULUS_PATH=/app/reference/uk-modulus.json npx tsx scripts/seed-uk-modulus.ts \
     || echo "WARNING: UK modulus table unavailable at build time; GB modulus checking will be off"
 
-FROM node:22-slim
+FROM node:22.23.4-slim
 
 WORKDIR /app
 

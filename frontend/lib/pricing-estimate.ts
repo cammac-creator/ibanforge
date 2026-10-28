@@ -1,4 +1,5 @@
 import catalogue from "@/data/onboarding.json"
+import { formatUsd } from "./format-usd"
 
 export interface EndpointDef {
   key: string
@@ -21,10 +22,16 @@ const PACK_1K = 4
 const PACK_5K = 20
 const PACK_25K = 80
 
-export function formatCost(amount: number): string {
-  if (amount === 0) return "$0.00"
-  if (amount < 0.01) return `$${amount.toFixed(4)}`
-  return `$${amount.toFixed(2)}`
+/** Un coût calculé, centimes toujours écrits (« $5.00 », « 5,00 $ ») ; sous le centime, ses propres chiffres (« $0.002 »). */
+export function formatCost(amount: number, locale: string): string {
+  return formatUsd(amount, locale, amount > 0 && amount < 0.01 ? undefined : 2)
+}
+
+/** Le prix x402 d’une route, par son chemin : les pages citent cette liste, jamais un chiffre à elles. */
+export function endpointCost(path: string): number {
+  const endpoint = ENDPOINTS.find((e) => e.path === path)
+  if (!endpoint) throw new Error(`Aucun prix pour ${path} dans ENDPOINTS`)
+  return endpoint.cost
 }
 
 /** Combinaison de packs couvrant le volume au coût d’achat minimal. */

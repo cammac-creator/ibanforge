@@ -58,7 +58,18 @@ function post(body: unknown): Promise<Response> {
   );
 }
 
-const draft = (to: string) => ({ account: 'main', to, subject: 'Suivi', context: BRIEF, deposit: false });
+const draft = (to: string) => ({ account: 'claude-alain@ibanforge.com', to, subject: 'Suivi', context: BRIEF, deposit: false });
+
+describe('POST /api/crm/generate-draft, only from the company domain (rule of 26/10/2026)', () => {
+  it('refuses to write or deposit a draft as a personal mailbox', async () => {
+    for (const account of ['warm@personal.invalid', 'x@mail.ibanforge.com', undefined]) {
+      const res = await post({ ...draft('someone@example.net'), account });
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toMatchObject({ error: 'sender_not_allowed' });
+    }
+    expect(captured).toBeNull();
+  });
+});
 
 describe('POST /api/crm/generate-draft, redaction rules on the wire', () => {
   it('appends the instruction for a recipient on the configured domain', async () => {
@@ -70,7 +81,7 @@ describe('POST /api/crm/generate-draft, redaction rules on the wire', () => {
     expect(captured!.secret).toBe('test-secret');
     expect(captured!.body.context).toBe(`${BRIEF}\nIMPORTANT: never mention "Acme" anywhere.`);
     // The rest of the body is forwarded as sent, `deposit` included.
-    expect(captured!.body).toMatchObject({ account: 'main', to: 'someone@example.com', subject: 'Suivi', deposit: false });
+    expect(captured!.body).toMatchObject({ account: 'claude-alain@ibanforge.com', to: 'someone@example.com', subject: 'Suivi', deposit: false });
   });
 
   it('says nothing for a recipient on another domain, with the same variable set', async () => {
@@ -129,7 +140,7 @@ describe('POST /api/crm/generate-draft, redaction rules on the wire', () => {
 
   it('refuses rather than generate a draft the rule could not reach', async () => {
     vi.stubEnv('CRM_DRAFT_REDACTION_RULES', 'example.com=Acme');
-    const res = await post({ to: 'someone@example.com', context: { text: BRIEF } });
+    const res = await post({ ...draft('someone@example.com'), context: { text: BRIEF } });
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({ error: 'unattachable_context' });

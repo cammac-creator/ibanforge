@@ -82,10 +82,13 @@ function sentToday(n: number) {
 
 const upstreamSends = () => calls.filter((c) => c.url.includes('/api/crm/send'));
 
+/** The company mailbox, the only kind a mail may leave from (sending-account.ts). */
+const ACCOUNT = 'claude-alain@ibanforge.com';
+
 describe('POST /api/crm/send — the blocking rules are replayed on the server', () => {
   it('relays a clean outbound draft and records it into the timeline', async () => {
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -99,7 +102,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
     expect(sends[0].url).toBe('https://upstream.example.com/api/crm/send');
     // The four fields the VPS knows, and nothing this route invented.
     expect(sends[0].body).toEqual({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -113,7 +116,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
 
   it('refuses an em dash and the mail never leaves', async () => {
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: `Bonjour, un point rapide — et rien de plus. ${CLEAN_BODY}`,
@@ -128,7 +131,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
 
   it('catches an em dash hiding in the subject alone', async () => {
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN — suivi',
       body: CLEAN_BODY,
@@ -140,7 +143,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
 
   it('refuses an empty body on the reply path too', async () => {
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Re: votre question',
       body: '   \n  ',
@@ -155,7 +158,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
   it('refuses past the daily cap with a 429, counted from the stored rows', async () => {
     storedMessages = sentToday(HARD_CAP);
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -175,7 +178,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
       msg_date: `${yesterday}T09:00`,
     }));
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -188,7 +191,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
   it('lets an explicit override through, and only for the code it covers', async () => {
     storedMessages = sentToday(HARD_CAP);
     const granted = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -200,7 +203,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
 
     // A grant given against the cap says nothing about an em dash.
     const other = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: `Un point rapide — voilà. ${CLEAN_BODY}`,
@@ -214,7 +217,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
   it('does not apply the prospecting cap to a reply', async () => {
     storedMessages = sentToday(HARD_CAP + 3);
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Re: votre question',
       body: 'Oui, la zone SEPA est couverte.',
@@ -227,7 +230,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
   it('treats a missing intent as outbound, the strict road', async () => {
     storedMessages = sentToday(HARD_CAP);
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -248,7 +251,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
       return new Response(JSON.stringify({ sent: true }), { status: 200 });
     });
     const res = await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -259,7 +262,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
   });
 
   it('refuses a recipient that is not an address', async () => {
-    const res = await post({ account: 'main', to: '', subject: 'x', body: CLEAN_BODY });
+    const res = await post({ account: ACCOUNT, to: '', subject: 'x', body: CLEAN_BODY });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({ error: 'invalid_recipient' });
     expect(upstreamSends()).toHaveLength(0);
@@ -267,7 +270,7 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
 
   it('asks the admin API for today only, and without the bodies', async () => {
     await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,
@@ -281,6 +284,50 @@ describe('POST /api/crm/send — the blocking rules are replayed on the server',
   });
 });
 
+describe('POST /api/crm/send — only from the company domain (rule of 26/10/2026)', () => {
+  const mail = (account: unknown) => ({
+    account,
+    to: 'acme@example.net',
+    subject: 'Validation IBAN',
+    body: CLEAN_BODY,
+    intent: 'reply',
+  });
+
+  it('refuses a personal mailbox, a lookalike or no mailbox at all, and nothing leaves', async () => {
+    for (const account of ['warm@personal.invalid', 'x@ibanforge.com.evil.test', '', undefined, 'main']) {
+      const res = await post(mail(account));
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toMatchObject({ error: 'sender_not_allowed' });
+    }
+    // Refused before anything else: no send, no count, no record.
+    expect(calls).toHaveLength(0);
+  });
+
+  it('relays the company mailbox, normalised, and files it under that mailbox', async () => {
+    const res = await post(mail('  Claude-Alain@IBANforge.com '));
+    expect(res.status).toBe(200);
+    expect(upstreamSends()[0].body.account).toBe(ACCOUNT);
+    const recorded = calls.find(
+      (c) => c.url.includes('/v1/admin/email-messages') && c.method === 'POST',
+    );
+    const msg = (recorded!.body as { messages: Array<Record<string, string>> }).messages[0];
+    expect(msg.counterparty).toBe(ACCOUNT);
+  });
+
+  it('no longer points to another mailbox when the provider blocks this one', async () => {
+    vi.stubGlobal('fetch', async (input: string | URL | Request) => {
+      if (String(input).includes('/api/crm/send')) {
+        return new Response(JSON.stringify({ detail: '550 5.2.0 Spam message rejected' }), { status: 502 });
+      }
+      return new Response(JSON.stringify({ messages: [] }), { status: 200 });
+    });
+    const res = await post(mail(ACCOUNT));
+    const detail = String(((await res.json()) as { detail: string }).detail);
+    expect(detail).toContain('Débloque la boîte dans le Manager Infomaniak');
+    expect(detail).not.toContain('autre compte');
+  });
+});
+
 describe('the recorded row (TABS-19)', () => {
   it('keeps the id at the grain sync-sent.py rebuilds, and dates to the second', async () => {
     // The id is the ONLY thing stopping the IMAP sync from filing a second copy
@@ -288,7 +335,7 @@ describe('the recorded row (TABS-19)', () => {
     // the Sent copy's Date header at minute granularity. Seconds in the id here
     // would duplicate every mail the dashboard sends.
     await post({
-      account: 'main',
+      account: ACCOUNT,
       to: 'acme@example.net',
       subject: 'Validation IBAN',
       body: CLEAN_BODY,

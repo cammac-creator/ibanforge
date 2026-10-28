@@ -131,8 +131,11 @@ All four should print `X.Y.Z`.
 
 ## Step 4 — manual-refresh platforms (no publish API)
 
-The release run's summary lists them: Smithery, MCP.so, RapidAPI, DevHunt, Glama,
+The release run's summary lists them: MCP.so, RapidAPI, DevHunt, Glama,
 Coinbase Bazaar. Most re-scan from npm within 24–48h; refresh by hand if needed.
+
+Smithery: relay closure announced for 2026-10-31; no longer a publishing step
+([announcement](https://smithery.ai/future)).
 
 ## Troubleshooting
 

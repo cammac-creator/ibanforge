@@ -161,6 +161,8 @@ const DISCOVERY_PATHS = new Set([
   // L'adresse des répertoires de connecteurs : ses poignées de main lisent le
   // même catalogue que celles de `/mcp` (23.10.2026).
   '/mcp/directory',
+  // L'adresse ChatGPT, pour la même raison (24.10.2026).
+  '/mcp/chatgpt',
   '/.well-known/x402',
   '/.well-known/ai-plugin.json',
   '/openapi.json',
