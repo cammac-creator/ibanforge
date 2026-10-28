@@ -105,7 +105,12 @@ const MAX_DRIFT = 5;
 const ROW = /^\s*(\d{1,3})\s+(\d{4})\s+(.*)$/u;
 /** Un BIC mongol à huit caractères, la forme que portent les trois colonnes. */
 const BIC = /^[A-Z]{4}MN[A-Z0-9]{2}$/;
-const LIQUIDATION = /(^|\s)ЭХА(\s|$)/u;
+/**
+ * La marque de liquidation, cherchée partout dans le nom (« ЭХА », « (ЭХА) », « ЭХА-д ») :
+ * écarter une banque de trop coûte un nom, en servir une en liquidation coûterait un
+ * virement.
+ */
+const LIQUIDATION = /ЭХА/u;
 
 export interface MongoliaRow {
   n: number;
@@ -116,10 +121,15 @@ export interface MongoliaRow {
 
 /**
  * Les lignes du tableau, depuis le texte de `pdftotext -layout`. Échoue plutôt que
- * deviner : en-tête absent, numéros de ligne qui ne se suivent pas, BIC hors des
- * colonnes, mot inconnu après le nom, code en double.
+ * deviner : plus d'une page, en-tête absent, numéros de ligne qui ne se suivent pas,
+ * BIC hors des colonnes, mot du nom qui déborde dans les colonnes du compte ou des
+ * BIC, mot inconnu après le nom, code en double.
  */
 export function parseMongoliaText(text: string): MongoliaRow[] {
+  // Les colonnes sont lues sur l'en-tête : une deuxième page, que pdftotext peut
+  // aligner autrement et qui ne répète peut-être pas l'en-tête, n'est pas devinée.
+  if (text.split('\f').filter((page) => page.trim() !== '').length > 1)
+    throw new Error('MN: the register runs over several pages, layout changed');
   const lines = text.split(/\r?\n/);
   const headerIndex = lines.findIndex(
     (l) => l.includes('Банк код') && COLUMNS.every((c) => l.includes(c)),
@@ -127,6 +137,11 @@ export function parseMongoliaText(text: string): MongoliaRow[] {
   if (headerIndex < 0) throw new Error('MN: table header not found, layout changed');
   const header = lines[headerIndex];
   const starts = COLUMNS.map((c) => ({ column: COLUMN_KEYS[c], at: header.indexOf(c) }));
+  // Le nom s'arrête avant la colonne du compte : un mot qui commence au-delà n'est pas
+  // un mot du nom (marge de deux caractères, l'alignement du texte n'étant pas exact).
+  const accountAt = header.indexOf('Данс');
+  if (accountAt < 0) throw new Error('MN: account column not found in the header, layout changed');
+  const nameLimit = accountAt - 2;
   const rows: MongoliaRow[] = [];
   const codes = new Set<string>();
   for (const line of lines.slice(headerIndex + 1)) {
@@ -169,6 +184,10 @@ export function parseMongoliaText(text: string): MongoliaRow[] {
         continue;
       }
       if (afterName) throw new Error(`MN: code ${code}, an unknown word after the name`);
+      if (at >= nameLimit)
+        throw new Error(
+          `MN: code ${code}, a word of the name runs into the account or BIC columns`,
+        );
       nameParts.push(value);
     }
     const name = nameParts.join(' ');

@@ -815,7 +815,9 @@ function decideBankCode(
           country: cc,
           ...(reg.lei ? { lei: reg.lei } : {}),
         },
-        as_of: asOf ?? as_of,
+        // Israël : le mois du jeu qui a nommé CE code (les deux jeux de data.gov.il ont
+        // chacun leur date), la même que celle que `register` imprime.
+        as_of: (isIlMn(cc) ? reg.as_of?.slice(0, 7) : undefined) ?? asOf ?? as_of,
       });
     }
     // Le troisième cas (25/09/2026) : le registre a CONNU ce code et l'a radié,
@@ -1305,7 +1307,9 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // partiels, mais le BIC imprimé à côté d'un code listé est celui de l'autorité (la
   // Banque d'Israël publie le sien, épuré au chargement des BIC qui ne sont pas
   // israéliens ; la Mongolbank sa colonne SWIFT, seule lue). Un code listé sans BIC
-  // garde `bic: null` ou la carte composite, jamais le BIC d'une banque du groupe.
+  // garde la réponse d'avant, comme à Saint-Marin : la carte composite s'il y a une
+  // clé (aucune aujourd'hui pour ces codes), sinon `bic: null`. Le chargeur ne prête
+  // jamais à un code le BIC d'une autre banque de son groupe.
   if (
     cc === 'AT' ||
     cc === 'BE' ||

@@ -123,6 +123,25 @@ describe('parseMongoliaText', () => {
     );
   });
 
+  it('refuses a word of the name that runs into the account or BIC columns', () => {
+    // Un participant sans compte dont la case compte porte autre chose qu'un compte.
+    const line = row(1, '0901', 'Туршилтын банк', { ach: 'ZZTSMNUB' }).padEnd(COL.rtgs - 14) + '—';
+    expect(() => parseMongoliaText(sheet([line]))).toThrow(/runs into the account or BIC columns/);
+    // Un identifiant à onze caractères dans une colonne de BIC : pas un BIC mongol à huit.
+    const eleven = row(1, '0901', 'Туршилтын банк', {}).padEnd(COL.ach - 2) + 'ZZTSMNUBXXX';
+    expect(() => parseMongoliaText(sheet([eleven]))).toThrow(
+      /runs into the account or BIC columns/,
+    );
+  });
+
+  it('refuses a register that runs over several pages', () => {
+    const page = sheet([row(1, '0901', 'Туршилтын банк', { rtgs: 'ZZTSMNUB' }, '3509901')]);
+    const second = row(2, '0902', 'Жишээ банк', { ach: 'ZZJSMNUB' });
+    expect(() => parseMongoliaText(`${page}\f${second}\n\f`)).toThrow(/several pages/);
+    // Le saut de page final que pdftotext écrit toujours ne compte pas.
+    expect(parseMongoliaText(`${page}\n\f`)).toHaveLength(1);
+  });
+
   it('refuses a code listed twice', () => {
     const twice = sheet([
       row(1, '0901', 'Туршилтын банк', {}, '3509901'),
@@ -145,6 +164,16 @@ describe('buildMongoliaRegister', () => {
     ]);
     expect(notes).toEqual(['0904: in liquidation (ЭХА), left out']);
     expect(entries.every((e) => e.source === MN_SOURCE && e.as_of === '2026-10-28')).toBe(true);
+  });
+
+  it('recognises the liquidation mark however it is written', () => {
+    const rows = parseMongoliaText(
+      sheet([
+        row(1, '0901', 'Хуучин банк (ЭХА)', { rtgs: 'ZZHUMNUB' }, '3509901'),
+        row(2, '0902', 'Өөр банк ЭХА-д', { rtgs: 'ZZOOMNUB' }, '3509902'),
+      ]),
+    );
+    expect(buildMongoliaRegister(rows, '2026-10-28').entries).toEqual([]);
   });
 });
 

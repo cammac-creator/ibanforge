@@ -23,7 +23,8 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
   const IL_BRANCHES = 'Bank of Israel, Bank branches (data.gov.il)';
   const MN = 'Bank of Mongolia (Mongolbank), unified register of payment system participants';
   insert.run('IL', '901', 'Alpha Bank Ltd', 'ZZALILITXXX', IL_BANKS, '2026-10-28');
-  insert.run('IL', '902', 'Beta Bank Ltd', null, IL_BRANCHES, '2026-10-27');
+  // Le jeu des agences, daté d'un autre mois que celui des banques : chaque code porte la date du sien.
+  insert.run('IL', '902', 'Beta Bank Ltd', null, IL_BRANCHES, '2026-09-30');
   insert.run('MN', '0901', 'Туршилтын банк', 'ZZTSMNUB', MN, '2026-10-28');
   insert.run('MN', '0906', '360 Альфа ББСБ', null, MN, '2026-10-28');
   db.close();
@@ -57,6 +58,7 @@ describe('Israel: the Bank of Israel lists name the holder of a code they carry'
         'Partial register: the Bank of Israel lists banking corporations and their branches, not the allocation of the bank-code space, so an absence is not a non-allocation',
     );
     expect(r.bank_code_check?.institution?.name).toBe('Alpha Bank Ltd');
+    expect(r.bank_code_check?.as_of).toBe('2026-10');
     expect(r.bic?.code).toBe('ZZALILITXXX');
     expect(r.bic?.bank_name).toBe('Alpha Bank Ltd');
     expect(r.bic?.source).toBe(
@@ -69,8 +71,9 @@ describe('Israel: the Bank of Israel lists name the holder of a code they carry'
     const r = check(il('902'));
     expect(r.bank_code_check?.status).toBe('verified');
     expect(r.bank_code_check?.register).toMatch(
-      /^Source: Bank of Israel, Bank branches \(data\.gov\.il\), dataset updated 2026-10-27\. /,
+      /^Source: Bank of Israel, Bank branches \(data\.gov\.il\), dataset updated 2026-09-30\. /,
     );
+    expect(r.bank_code_check?.as_of).toBe('2026-09');
     expect(r.bank_code_check?.institution?.name).toBe('Beta Bank Ltd');
     expect(r.bic).toBeNull();
   });

@@ -130,6 +130,22 @@ describe('readIsraelLive', () => {
     expect(entries.map((e) => e.code)).toEqual(['901', '092', '093', '009', '094']);
   });
 
+  it('reads a portal that caps its pages under the requested limit', async () => {
+    const capped = portal();
+    const get = async (url: string): Promise<unknown> => {
+      const body = (await capped(url)) as { result?: { records?: unknown[] } };
+      if (body.result?.records) body.result.records = body.result.records.slice(0, 2);
+      return body;
+    };
+    const { entries } = await readIsraelLive(get);
+    expect(entries.map((e) => e.code)).toEqual(['901', '092', '093', '009', '094']);
+  });
+
+  it('refuses a branch list that lost its Close_Date field', () => {
+    const branches = [{ Bank_Code: '94', Bank_Name: 'Epsilon Bank Ltd' }];
+    expect(() => buildIsraelRegister({ ...SNAPSHOT, branches })).toThrow(/no Close_Date field/);
+  });
+
   it('refuses a resource that served fewer rows than it announced', async () => {
     await expect(readIsraelLive(portal(BRANCHES.length + 3))).rejects.toThrow(
       /announced 7 rows, 4/,

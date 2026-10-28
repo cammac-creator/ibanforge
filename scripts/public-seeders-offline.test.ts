@@ -55,6 +55,8 @@ const FAMILY_HOSTS = [
   'ebaclearing.eu',
   'nbb.be',
   'bcsm.sm',
+  'data.gov.il',
+  'mongolbank.mn',
   'bankofengland.co.uk',
   'un.org',
   'europeanpaymentscouncil.eu',

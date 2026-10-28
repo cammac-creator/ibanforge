@@ -193,6 +193,8 @@ export function buildIsraelRegister(snapshot: IsraelSnapshot): {
     const code = bankCode(row.Bank_Code);
     if (!code) throw new Error('IL: a branch row carries no readable Bank_Code');
     if (seen.has(code)) continue;
+    // Sans la colonne, une agence fermée passerait pour ouverte : refusé.
+    if (!('Close_Date' in row)) throw new Error('IL: a branch row has no Close_Date field');
     if (String(row.Close_Date ?? '').trim() !== '') continue;
     const name = cleanName(row.Bank_Name);
     if (!name) throw new Error(`IL: an open branch of bank code ${code} has no bank name`);
@@ -230,16 +232,23 @@ async function fetchJson(url: string): Promise<unknown> {
   return res.json();
 }
 
-/** Toutes les lignes d'une ressource, page par page, et le contrôle du total annoncé. */
+/**
+ * Toutes les lignes d'une ressource, page par page, et le contrôle du total annoncé.
+ * Triées par `_id` (sans tri, CKAN ne garantit pas l'ordre d'une page à l'autre), et
+ * le décalage avance du nombre de lignes reçues : un portail qui plafonne ses pages
+ * sous la limite demandée est lu en entier.
+ */
 async function readAll(
   get: IsraelFetch,
   resource: string,
 ): Promise<Array<Record<string, unknown>>> {
   const limit = 500;
   const rows: Array<Record<string, unknown>> = [];
-  for (let offset = 0; ; offset += limit) {
+  for (let offset = 0; ; offset = rows.length) {
     const page = parseDatastorePage(
-      await get(`${API}/datastore_search?resource_id=${resource}&limit=${limit}&offset=${offset}`),
+      await get(
+        `${API}/datastore_search?resource_id=${resource}&limit=${limit}&offset=${offset}&sort=_id`,
+      ),
       resource,
     );
     rows.push(...page.records);
