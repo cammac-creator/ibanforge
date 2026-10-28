@@ -64,10 +64,12 @@ or handle you choose. If you would rather stay anonymous, say so.
 
 **Out of scope**
 
-- Third-party infrastructure we rent rather than run: Railway, Vercel, the x402
-  facilitator, the upstream registries (GLEIF, SIX, Bundesbank, EBA, ECB, Bank
-  of England, BNB, Banco de España). Report those to their owners; tell us too
-  if it affects what we serve.
+- Third-party infrastructure we rent rather than run: Railway, Infomaniak's
+  cloud platform and e-mail service, the x402 facilitator, the upstream
+  registries (GLEIF, SIX, Bundesbank, EBA, ECB, Bank of England, BNB, Banco de
+  España). Report those to their owners; tell us too if it affects what we
+  serve. The server behind `ibanforge.com` is rented from Infomaniak but run by
+  us: how it serves `ibanforge.com` and `www.ibanforge.com` is in scope.
 - Findings that are only a missing hardening header, a TLS configuration
   preference, or the output of a scanner with no demonstrated impact.
 - Denial of service by volume, and anything that requires flooding the API.

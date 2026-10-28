@@ -13,7 +13,7 @@ IBANforge is an IBAN validation and BIC lookup API. Three areas live in one repo
 | Area | Path | Runs on | Deployed by |
 |---|---|---|---|
 | The API (Hono, TypeScript, SQLite) | `src/`, `scripts/`, `data/` | Node 22 | Railway, on every push to `main` |
-| The website and dashboard (Next.js) | `frontend/` | Node 24 | Vercel today, an Infomaniak VPS soon (see below) |
+| The website and dashboard (Next.js) | `frontend/` | Node 24 | a container image built by `.github/workflows/deploy-site.yml`, run on an Infomaniak server in Switzerland (see below) |
 | The published packages | `mcp/`, `sdks/`, `integrations/` | Node 20 | a tagged release workflow, never by hand |
 
 ---
@@ -229,12 +229,13 @@ the public "no data" sentence no longer names them (`uncoveredCountries()` in `p
 company registration number is kept in its file and never served. Without the variables nothing changes;
 switching them on in production is the main session's step.
 
-**Moving the website off Vercel to an Infomaniak VPS in Geneva.** Branch `vps-migration`
-holds the first commit: a container image for `frontend/`, a deploy workflow that builds on
-GitHub and ships to the VPS over a restricted SSH key, and the legal texts updated
-(Infomaniak replaces Vercel as sub-processor). The API does not move. Remaining: two DNS
-records, a decision on a CDN in front, and the cutover. The reasoning is in the internal
-report named below.
+**The website runs on an Infomaniak server in Switzerland since 27 October 2026.** The
+container image is built on GitHub by `.github/workflows/deploy-site.yml` and shipped over a
+restricted SSH key that accepts a single command; the API does not move. The data centre's
+city is not established: write "Switzerland", never a city. Privacy Policy 1.9, DPA 1.7 and
+the Security and trust page describe it, and `frontend/lib/trust.test.ts` keeps Vercel and
+Frankfurt out of them. The old Vercel deployment stays idle as a way back until
+9 November 2026; it no longer serves the domain.
 
 **The keyless trial is twenty-five calls a WEEK since 24 September** (Claude-Alain's
 decision; it was twenty-five a day from 15 September). `REST_TRIAL_WEEKLY_LIMIT` in

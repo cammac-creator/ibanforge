@@ -1841,7 +1841,7 @@
         "title": "Sécurité et confiance",
         "description": "Qui exploite IBANforge, où tourne l'API, ce qu'elle garde et combien de temps, et ce que nous n'avons pas. Chaque fait renvoie au document ou à la vérification qui le prouve."
       },
-      "checked": "Vérifié le 6 octobre 2026. Les documents contractuels font foi, pas ce résumé.",
+      "checked": "Vérifié le 27 octobre 2026. Les documents contractuels font foi, pas ce résumé.",
       "glance": {
         "operator": {
           "label": "Exploitant",
@@ -1881,12 +1881,12 @@
         },
         "site": {
           "name": "Site et tableau de bord",
-          "body": "Vercel. Ses fonctions tournent dans la région de Francfort (Allemagne, UE) ; les pages statiques sont servies par le réseau mondial de Vercel.",
-          "checkNote": "Dans l'en-tête x-vercel-id, la partie qui suit le premier :: est la région où la fonction a tourné : fra1 est Francfort. La première partie est le nœud d'entrée le plus proche de vous."
+          "body": "Infomaniak, Suisse : un serveur virtuel du cloud public d'Infomaniak, que nous exploitons nous-mêmes. Chaque page, statique ou non, est servie par ce serveur, sans réseau de diffusion de contenu devant.",
+          "checkNote": "netname INFOMANIAK-CLOUD et country CH : l'adresse appartient au cloud public d'Infomaniak et est enregistrée en Suisse. Le registre donne le pays, pas le centre de données."
         },
         "mail": {
           "name": "Courriel, DNS et sauvegardes",
-          "body": "Infomaniak, Suisse. Un serveur y garde aussi les sauvegardes nocturnes de l'état des comptes.",
+          "body": "Infomaniak, Suisse. Le serveur du site garde aussi les sauvegardes nocturnes de l'état des comptes.",
           "checkNote": "Les serveurs de noms sont ceux d'Infomaniak."
         }
       },
@@ -1950,13 +1950,6 @@
             "ibans": "Oui, en mémoire, pour répondre à la requête",
             "basis": "Data Privacy Framework UE-USA et Suisse-USA, actif (Railway Corporation)"
           },
-          "vercel": {
-            "name": "Vercel Inc.",
-            "role": "Site et tableau de bord ; les saisies du terrain d'essai sont relayées à l'API",
-            "region": "Fonctions : Francfort (UE). Pages statiques : réseau mondial",
-            "ibans": "Seulement un IBAN saisi dans le terrain d'essai du site",
-            "basis": "Data Privacy Framework UE-USA et Suisse-USA, actif (Vercel Inc.)"
-          },
           "stripe": {
             "name": "Stripe Payments Europe",
             "role": "Paiements par carte",
@@ -1973,9 +1966,9 @@
           },
           "infomaniak": {
             "name": "Infomaniak Network SA",
-            "role": "Courriels transactionnels et support ; sauvegarde nocturne de l'état des comptes",
+            "role": "Hébergement du site et du tableau de bord, sur un serveur virtuel que nous exploitons (les saisies du terrain d'essai y passent en route vers l'API) ; courriels transactionnels et support ; sauvegarde nocturne de l'état des comptes",
             "region": "Suisse",
-            "ibans": "Seulement un IBAN que vous nous écrivez dans un courriel",
+            "ibans": "Seulement un IBAN saisi dans le terrain d'essai du site, en transit vers l'API, ou un IBAN que vous nous écrivez dans un courriel",
             "basis": "Suisse : décision d'adéquation de la Commission européenne"
           },
           "github": {
@@ -2025,7 +2018,7 @@
         "statusLink": "Page de statut",
         "sla": "Les abonnements Editor/OEM ont un SLA écrit : 99,5 % de disponibilité par mois civil, avec crédits de service.",
         "slaLink": "SLA",
-        "probe": "Une sonde extérieure, sur un serveur d'Infomaniak en Suisse, appelle l'API et le site chaque minute et alerte l'exploitant. Ses résultats ne sont pas publiés.",
+        "probe": "Une sonde, sur le serveur du site chez Infomaniak en Suisse, appelle l'API et le site chaque minute et alerte l'exploitant. Une seconde vérification tourne hors d'Infomaniak, sur une machine de l'exploitant : toutes les deux minutes, elle appelle le site et l'API et prévient l'exploitant après trois échecs de suite ; un arrêt du serveur du site est donc signalé lui aussi, tant que cette machine est en ligne. Leurs résultats ne sont pas publiés.",
         "instance": "L'API tourne en une seule instance avec un volume persistant, dans une seule région. Chaque mise à jour, y compris les actualisations automatiques des données, la redémarre, et les requêtes qui arrivent pendant la bascule attendent ou échouent. Railway le documente pour tout service avec volume ; nous avons observé des bascules de moins d'une minute à près de cinq minutes. La page de statut ne peut pas compter ces requêtes, car elles n'atteignent jamais l'API.",
         "instanceLink": "Documentation de Railway"
       },

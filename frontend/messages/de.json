@@ -1841,7 +1841,7 @@
         "title": "Sicherheit und Vertrauen",
         "description": "Wer IBANforge betreibt, wo die API läuft, was sie wie lange aufbewahrt und was wir nicht haben. Jede Angabe verweist auf das Dokument oder die Prüfung, die sie belegt."
       },
-      "checked": "Geprüft am 6. Oktober 2026. Maßgebend sind die Vertragsdokumente, nicht diese Zusammenfassung.",
+      "checked": "Geprüft am 27. Oktober 2026. Maßgebend sind die Vertragsdokumente, nicht diese Zusammenfassung.",
       "glance": {
         "operator": {
           "label": "Betreiber",
@@ -1881,12 +1881,12 @@
         },
         "site": {
           "name": "Website und Dashboard",
-          "body": "Vercel. Die Funktionen laufen in der Region Frankfurt (Deutschland, EU); statische Seiten kommen aus dem globalen Netz von Vercel.",
-          "checkNote": "Im Header x-vercel-id ist der Teil nach dem ersten :: die Region, in der die Funktion lief: fra1 ist Frankfurt. Der erste Teil ist der Netzwerkrand, der Ihnen am nächsten liegt."
+          "body": "Infomaniak, Schweiz: ein virtueller Server in der Public Cloud von Infomaniak, den wir selbst betreiben. Jede Seite, statisch oder nicht, kommt von diesem Server, ohne vorgeschaltetes Content Delivery Network.",
+          "checkNote": "netname INFOMANIAK-CLOUD und country CH: Die Adresse gehört zur Public Cloud von Infomaniak und ist in der Schweiz registriert. Das Register nennt das Land, nicht das Rechenzentrum."
         },
         "mail": {
           "name": "E-Mail, DNS und Sicherungen",
-          "body": "Infomaniak, Schweiz. Ein Server dort hält auch die nächtlichen Sicherungen des Kontostands.",
+          "body": "Infomaniak, Schweiz. Der Server der Website hält auch die nächtlichen Sicherungen des Kontostands.",
           "checkNote": "Die Nameserver sind die von Infomaniak."
         }
       },
@@ -1950,13 +1950,6 @@
             "ibans": "Ja, im Arbeitsspeicher, um die Anfrage zu beantworten",
             "basis": "EU-US- und Swiss-US-Data-Privacy-Framework, aktiv (Railway Corporation)"
           },
-          "vercel": {
-            "name": "Vercel Inc.",
-            "role": "Website und Dashboard; Eingaben im Playground werden an die API weitergeleitet",
-            "region": "Funktionen: Frankfurt (EU). Statische Seiten: globales Netz",
-            "ibans": "Nur eine im Playground der Website eingegebene IBAN",
-            "basis": "EU-US- und Swiss-US-Data-Privacy-Framework, aktiv (Vercel Inc.)"
-          },
           "stripe": {
             "name": "Stripe Payments Europe",
             "role": "Kartenzahlungen",
@@ -1973,9 +1966,9 @@
           },
           "infomaniak": {
             "name": "Infomaniak Network SA",
-            "role": "Transaktions- und Support-E-Mail; nächtliche Sicherung des Kontostands",
+            "role": "Hosting von Website und Dashboard auf einem virtuellen Server, den wir betreiben (Eingaben im Playground durchlaufen ihn auf dem Weg zur API); Transaktions- und Support-E-Mail; nächtliche Sicherung des Kontostands",
             "region": "Schweiz",
-            "ibans": "Nur eine IBAN, die Sie uns in einer E-Mail schreiben",
+            "ibans": "Nur eine im Playground der Website eingegebene IBAN, auf dem Weg zur API, oder eine, die Sie uns in einer E-Mail schreiben",
             "basis": "Schweiz: Angemessenheitsbeschluss der Europäischen Kommission"
           },
           "github": {
@@ -2025,7 +2018,7 @@
         "statusLink": "Statusseite",
         "sla": "Editor- und OEM-Abonnements haben eine schriftliche SLA: 99,5 % Verfügbarkeit je Kalendermonat, mit Servicegutschriften.",
         "slaLink": "SLA",
-        "probe": "Eine externe Sonde auf einem Server bei Infomaniak in der Schweiz ruft die API und die Website jede Minute auf und alarmiert den Betreiber. Ihre Ergebnisse werden nicht veröffentlicht.",
+        "probe": "Eine Sonde auf dem Server der Website, bei Infomaniak in der Schweiz, ruft die API und die Website jede Minute auf und alarmiert den Betreiber. Eine zweite Prüfung läuft außerhalb von Infomaniak, auf einem Rechner des Betreibers: Alle zwei Minuten ruft sie die Website und die API auf und alarmiert den Betreiber nach drei Fehlschlägen in Folge; so wird auch ein Ausfall des Servers der Website gemeldet, solange dieser Rechner online ist. Ihre Ergebnisse werden nicht veröffentlicht.",
         "instance": "Die API läuft als einzelne Instanz mit einem persistenten Speichervolumen in einer Region. Jede Aktualisierung, auch die automatischen Datenaktualisierungen, startet sie neu, und Anfragen, die während des Wechsels eintreffen, warten oder scheitern. Railway dokumentiert dies für jeden Dienst mit Speichervolumen; wir haben Wechsel von unter einer Minute bis zu knapp fünf Minuten beobachtet. Die Statusseite kann diese Anfragen nicht zählen, weil sie die API nie erreichen.",
         "instanceLink": "Dokumentation von Railway"
       },
