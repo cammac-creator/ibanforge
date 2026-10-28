@@ -44,9 +44,10 @@ it.each([
   expect(source).toContain('T2 R2026.NOV does not forbid an AddressLine-only address');
 });
 
-// Les fiches recopiées hors du code (catalogue Glama, page npm du paquet MCP,
-// collection Postman) gardaient « Fedwire production 16 Nov 2026 » et « ahead
-// of the November 2026 changes » après la PR 461 (28.10.2026).
+// Les fiches recopiées hors du code (catalogue Glama, README du paquet MCP,
+// qui n'atteint la page npm qu'à la prochaine publication, collection
+// Postman) gardaient « Fedwire production 16 Nov 2026 » et « ahead of the
+// November 2026 changes » après la PR 461 (28.10.2026).
 it.each(['glama.json', 'mcp/README.md', 'integrations/postman/ibanforge.postman_collection.json'])(
   'garde les échéances distinctes dans la fiche recopiée %s',
   (file) => {
@@ -54,6 +55,7 @@ it.each(['glama.json', 'mcp/README.md', 'integrations/postman/ibanforge.postman_
     expect(source.match(OBSOLETE_ADDRESS_TIMETABLE)).toBeNull();
     expect(source).not.toMatch(/ahead of the November 2026 changes/i);
     expect(source).toMatch(/Fedwire release (?:moved|rescheduled) to November 2027/);
+    expect(source).toMatch(/SIC (?:itself )?does not validate addresses/);
   },
 );
 
