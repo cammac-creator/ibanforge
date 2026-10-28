@@ -44,6 +44,19 @@ it.each([
   expect(source).toContain('T2 R2026.NOV does not forbid an AddressLine-only address');
 });
 
+// Les fiches recopiées hors du code (catalogue Glama, page npm du paquet MCP,
+// collection Postman) gardaient « Fedwire production 16 Nov 2026 » et « ahead
+// of the November 2026 changes » après la PR 461 (28.10.2026).
+it.each(['glama.json', 'mcp/README.md', 'integrations/postman/ibanforge.postman_collection.json'])(
+  'garde les échéances distinctes dans la fiche recopiée %s',
+  (file) => {
+    const source = readFileSync(join(import.meta.dirname, '..', '..', file), 'utf8');
+    expect(source.match(OBSOLETE_ADDRESS_TIMETABLE)).toBeNull();
+    expect(source).not.toMatch(/ahead of the November 2026 changes/i);
+    expect(source).toMatch(/Fedwire release (?:moved|rescheduled) to November 2027/);
+  },
+);
+
 /**
  * The machine contract must describe every step the endpoint actually demands.
  *
