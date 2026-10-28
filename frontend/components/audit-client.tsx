@@ -190,7 +190,7 @@ export function AuditClient({ locale }: { locale: string }) {
                 className="rounded-md border bg-background px-3 py-2 text-sm pointer-coarse:text-base"
               />
             </label>
-            <Button type="button" onClick={() => void pay()} disabled={stage === "paying"} className="w-fit">
+            <Button type="button" data-evt="cta:buy-audit" onClick={() => void pay()} disabled={stage === "paying"} className="w-fit">
               {stage === "paying" ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />

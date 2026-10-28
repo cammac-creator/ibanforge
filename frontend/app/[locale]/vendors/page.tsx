@@ -274,7 +274,7 @@ export default async function VendorsPage({
             variant="amber"
             className="px-8 font-mono"
             nativeButton={false}
-            render={<a href="mailto:support@ibanforge.com?subject=OEM%20licensing" />}
+            render={<a href="mailto:support@ibanforge.com?subject=OEM%20licensing" data-evt="cta:oem-mail" />}
           >
             {t("oem.cta")}
           </Button>
