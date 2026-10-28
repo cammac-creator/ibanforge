@@ -2,17 +2,18 @@
  * ISO 20022 `PostalAddress` — built from what this repository actually holds,
  * and never from what it would be convenient to claim.
  *
- * ## The deadline, in the words of the documents we could read
+ * ## Des calendriers distincts, selon les documents effectivement lus
  *
- * Three payment corpora remove the fully unstructured postal address in
- * November 2026: SIX / Swiss Payment Standards (SPS 2026 in force 14 November
- * 2026 ; relu le 28.10.2026 : SIC ne valide pas les adresses et chaque banque
- * décide de ce qu'elle accepte encore, voir qr-bill-notice.ts),
- * the Fedwire Funds Service (production 16 November 2026) and T2 / HVPS+
- * (release R2026.NOV). The CBPR+ rule itself is NOT cited anywhere in this
- * module: swift.com and iso20022.org were unreachable on 26/08/2026 and the
- * PMPG "November 2026 postal address guidance" lives there. We implement what
- * we can quote, and we say which document each rule comes from.
+ * SPS 2026 entre en vigueur le 14 novembre 2026 : localité et pays requis
+ * lorsqu'une adresse est fournie. SIC ne valide pas les adresses et chaque
+ * banque décide de ce qu'elle accepte encore (relu le 28.10.2026, voir
+ * qr-bill-notice.ts). Fedwire a reporté sa version à novembre 2027.
+ * Le document T2 / HVPS+ R2026.NOV lu ne refuse pas une adresse composée
+ * uniquement d'AddressLine ; le guide MyStandards n'a pas pu être lu.
+ * Voir les sources datées et CBPR_NOTE dans address-conformity.ts.
+ * La règle CBPR+ n'est pas citée ici : swift.com et iso20022.org étaient
+ * inaccessibles le 26.08.2026, et le guide PMPG y est publié. Nous appliquons
+ * les règles que nous pouvons citer, en indiquant leur document d'origine.
  *
  * ## The three principles this file exists to enforce
  *

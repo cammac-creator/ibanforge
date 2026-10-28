@@ -17,6 +17,33 @@ it('aligne la date Fedwire du contrat sur la note de report', () => {
   expect(CBPR_NOTE).toContain('27.08.2026, read 28.10.2026');
 });
 
+// La description de la route était juste, mais les schémas imbriqués et les
+// outils annonçaient encore la date abandonnée ou une suppression générale.
+const OBSOLETE_ADDRESS_TIMETABLE =
+  /16 Nov(?:ember)? 2026|Fedwire 16\.11|November 2026 changes[^\n]*remove the fully unstructured address option/i;
+
+it('refuse les anciennes échéances dans toute la spécification OpenAPI', () => {
+  expect(JSON.stringify(buildSpec()).match(OBSOLETE_ADDRESS_TIMETABLE)).toBeNull();
+});
+
+// Lecture des sources : importer le serveur stdio démarrerait son transport.
+// src/mcp/directory.ts est explicitement exclu depuis le 24.10.2026 jusqu'à
+// la fin de l'examen de sa fiche par le répertoire de Claude. L'ajouter alors
+// à cette garde en même temps que l'alignement de sa description.
+it.each([
+  'src/mcp/server.ts',
+  'src/routes/mcp-http.ts',
+  'mcp/src/index.ts',
+  'src/routes/mcp-card.ts',
+])('garde les échéances distinctes dans les descriptions MCP de %s', (file) => {
+  const source = readFileSync(join(import.meta.dirname, '..', '..', file), 'utf8');
+  expect(source.match(OBSOLETE_ADDRESS_TIMETABLE)).toBeNull();
+  expect(source).toContain('Fedwire moved its release to November 2027');
+  expect(source).toContain('SPS 2026 in force 14 Nov 2026');
+  expect(source).toContain('SIC does not validate addresses and each bank decides');
+  expect(source).toContain('T2 R2026.NOV does not forbid an AddressLine-only address');
+});
+
 /**
  * The machine contract must describe every step the endpoint actually demands.
  *
