@@ -1,5 +1,6 @@
 import { getBicDB } from './db.js';
 import { ilMnCredit } from './il-mn-credit.js';
+import { ruCredit } from './ru-credit.js';
 import { smCredit } from './sm-credit.js';
 
 /**
@@ -68,6 +69,8 @@ const CODE_WIDTH: Record<string, number> = {
   // 5 à 7 de l'IBAN israélien ; le participant, positions 5 à 8 de l'IBAN mongol.
   IL: 3,
   MN: 4,
+  // Russie (28/10/2026) : le BIK, positions 5 à 13 de l'IBAN russe.
+  RU: 9,
 };
 
 /**
@@ -120,6 +123,10 @@ const EXHAUSTIVE: Record<string, boolean> = {
   // listé nomme son titulaire, un code absent ne dit rien.
   IL: false,
   MN: false,
+  // Russie (28/10/2026) : la Banque de Russie attribue les BIK, mais seuls ses
+  // établissements de crédit et leurs succursales actifs et sans restriction sont
+  // servis (scripts/seed-national-ru.ts) : un BIK absent ne dit rien.
+  RU: false,
 };
 
 /**
@@ -520,6 +527,9 @@ const CREDIT_FORMAT: Record<string, (source: string, asOf: string) => string> = 
   // qu'elles sont (src/lib/il-mn-credit.ts).
   IL: (source, asOf) => ilMnCredit('IL', source, asOf),
   MN: (source, asOf) => ilMnCredit('MN', source, asOf),
+  // Russie (28/10/2026) : la ligne stockée (lien vers la source compris) et le jour
+  // ouvrable du répertoire (src/lib/ru-credit.ts).
+  RU: (source, asOf) => ruCredit(source, asOf),
 };
 
 /**

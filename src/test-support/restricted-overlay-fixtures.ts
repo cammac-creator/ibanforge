@@ -190,6 +190,15 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         'Remplissage',
         '2026-01-15',
       );
+      // Russie (28/10/2026, décision « Nommer seulement ») : BIK 0499xxxxx, que le vrai
+      // répertoire ne porte pas.
+      pad(
+        'RU',
+        floorOf('register_ru'),
+        Array.from({ length: 400 }, (_, i) => String(49900000 + i).padStart(9, '0')),
+        'Remplissage',
+        '2026-01-15',
+      );
 
       const pra = bic.prepare(
         `INSERT INTO pra_banks (frn, firm_name, lei, section, lei_basis, list_month, source)
@@ -204,7 +213,10 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       // composite, liste finlandaise) : tables créées depuis la constante, lignes
       // inventées jusqu'aux planchers. BIC `XMP…`, noms « Remplissage ».
       for (const spec of RESTRICTED_TABLES.bic.filter(
-        (t) => t.name === 'curated_bank_codes' || t.name === 'fi_monetary_codes',
+        (t) =>
+          t.name === 'curated_bank_codes' ||
+          t.name === 'fi_monetary_codes' ||
+          t.name === 'ru_branch_heads',
       )) {
         const exists = bic
           .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -248,6 +260,14 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       );
       for (let i = 0; i < floorOf('register_fi') + 5; i++)
         fiList.run(String(9000 + i), `Remplissage FI ${i}`);
+      // Les liens succursale → siège du répertoire russe : les BIK de remplissage
+      // au-delà du premier, rattachés au premier.
+      const ruLink = bic.prepare(
+        `INSERT OR IGNORE INTO ru_branch_heads (code, head, source, as_of)
+         VALUES (?, '049900000', 'Remplissage', '2026-01-15')`,
+      );
+      for (let i = 1; i <= floorOf('register_ru_branches') + 5; i++)
+        ruLink.run(String(49900000 + i).padStart(9, '0'));
     })();
   } finally {
     bic.close();

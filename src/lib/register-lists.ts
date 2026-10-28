@@ -55,12 +55,13 @@ const SHORT_REGISTER_NAME: Record<string, string> = {
  * (the National Bank of Serbia's list does the same): see the San Marino,
  * Montenegro and Serbia blocks of resolveBank in enrich.ts. Israel and Mongolia joined on
  * 28/10/2026 (private overlay): the Bank of Israel publishes a BIC beside each bank code and
- * the Mongolbank a SWIFT column, the only one read. Luxembourg's register pairs its
+ * the Mongolbank a SWIFT column, the only one read; Russia on the same day (private overlay),
+ * the Bank of Russia publishing the default SWIFT BIC of each BIK. Luxembourg's register pairs its
  * BIC the same way but is left out, as it always has been. Estonia is NOT here:
  * its BIC comes from Eesti Pangaliit, joined by us, so `bic.basis` is
  * `curated_map`.
  */
-const PARTIAL_REGISTERS_PAIRING_THE_BIC = ['SM', 'ME', 'RS', 'IL', 'MN'];
+const PARTIAL_REGISTERS_PAIRING_THE_BIC = ['SM', 'ME', 'RS', 'IL', 'MN', 'RU'];
 
 /**
  * What each register publishes about the institution, for the `institution`
@@ -94,6 +95,9 @@ const INSTITUTION_DEPTH: Record<string, InstitutionDepth> = {
   // pour la Mongolie, tel que la Mongolbank le publie.
   IL: { depth: 'name', publisher: 'the Bank of Israel' },
   MN: { depth: 'name', publisher: 'the Bank of Mongolia', script: 'Cyrillic' },
+  // Russie (28/10/2026, surcouche privée, « Nommer seulement ») : le nom seul, en
+  // cyrillique, tel que la Banque de Russie le publie.
+  RU: { depth: 'name', publisher: 'the Bank of Russia', script: 'Cyrillic' },
   // Le siège légal en Italie (pour une banque étrangère, sa succursale
   // italienne), et le LEI quand elle le publie. Sur un code radié, le nom seul.
   IT: { depth: 'registered_office', publisher: "the Banca d'Italia" },

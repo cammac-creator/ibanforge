@@ -73,6 +73,7 @@ const DISPLAY_ORDER = [
   'RS',
   'IL',
   'MN',
+  'RU',
   'LV',
   'GI',
 ];

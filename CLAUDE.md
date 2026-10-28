@@ -239,7 +239,10 @@ serveur le retire au redémarrage que Railway fait à chaque changement de varia
 `withdrawn`, nommé par `GET /health` → `restricted_overlays.<base>.withdrawn`, une faute de
 frappe sous `withdrawn_unmatched`), puis le membre quitte la famille dans les 48 heures.
 Appliqué le 28.10 : SECO (membre `seco`), registres partiels israélien et mongol (`register_il`,
-`register_mn`, origines `boi.org.il` et `mongolbank.mn`), clés TBB turques (`map_tr`) et clés retirées le 29.09
+`register_mn`, origines `boi.org.il` et `mongolbank.mn`), répertoire des BIK de la Banque de Russie
+(`register_ru`, `register_ru_branches`, origine `cbr.ru`, décision « Nommer seulement » du 28.10 au soir :
+conditions libres, tenu hors du dépôt par prudence ; la conformité y passe l'établissement entier aux
+listes, sur les six premiers caractères du BIC), clés TBB turques (`map_tr`) et clés retirées le 29.09
 (`map_ae` … `map_ro`, en complément code par code : une clé publique ou officielle garde la
 réponse ; en EE et RS, la liste de l'autorité gagne où elle répond). Chaque réponse lue dans
 les registres EPC porte « Source: European Payments Council » et le jour d'extraction.

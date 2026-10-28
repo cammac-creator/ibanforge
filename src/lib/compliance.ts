@@ -8,6 +8,7 @@ import {
 } from './compliance-db.js';
 import { getSepaInfo } from './countries.js';
 import { resetTraceIndex } from './bic-trace.js';
+import { ruInstitutionBicsForBic } from './ru-institution.js';
 import type {
   SanctionsCheck,
   ReachabilityCheck,
@@ -17,12 +18,70 @@ import type {
 } from '../types.js';
 
 let _checkSanctionedCountry: Database.Statement | null = null;
+let _checkSanctionedPrefixes: Database.Statement | null = null;
 let _checkSanctionedBank: Database.Statement | null = null;
 let _checkFatf: Database.Statement | null = null;
 let _checkReachability: Database.Statement | null = null;
 let _checkVop: Database.Statement | null = null;
 
-export function checkSanctions(countryCode: string, bic8: string | null): SanctionsCheck {
+/**
+ * Russie (28/10/2026, décision « Nommer seulement ») : les clés de l'axe banque.
+ *
+ * Ailleurs, le BIC8 de la banque, comparé tel quel. En Russie, deux écarts mesurés le
+ * jour même sur le répertoire de la Banque de Russie et les listes en base :
+ *
+ * - les listes portent souvent un autre BIC de la même banque que celui qu'elle
+ *   emploie (l'OFAC désigne Sovcombank sous `SOMRRUM1`, le répertoire publie
+ *   `SOMRRUMM` ; les succursales de VTB ont des BIC `VTBRRUM2…`, la liste nomme
+ *   `VTBRRUMM`) : la comparaison se fait sur les six premiers caractères, le code de
+ *   l'institution et son pays, qu'aucune autre licence du répertoire ne partage ;
+ * - une succursale est la même personne morale que son siège : ce sont tous les BIC
+ *   SWIFT de l'établissement qui passent aux listes (`institutionBics`,
+ *   src/lib/ru-institution.ts), pas seulement celui de la ligne.
+ *
+ * `institutionBics` vaut `null` quand la lecture de l'établissement n'a pas abouti :
+ * aucune clé, l'axe banque dit « non contrôlé », jamais un « non » sur un seul BIC.
+ */
+function bankKeys(
+  countryCode: string,
+  bic8: string | null,
+  institutionBics: readonly string[] | null | undefined,
+): string[] {
+  if (countryCode !== 'RU') return bic8 ? [bic8] : [];
+  if (institutionBics === null) return [];
+  return [
+    ...new Set(
+      [bic8, ...(institutionBics ?? [])].filter((b): b is string => !!b).map((b) => b.slice(0, 8)),
+    ),
+  ];
+}
+
+/** Les listes où figure l'une des clés : BIC8 exact, ou les six premiers caractères en Russie. */
+function listingsOf(countryCode: string, keys: readonly string[]): Array<{ source_list: string }> {
+  const db = getComplianceDB();
+  if (countryCode !== 'RU') {
+    if (!_checkSanctionedBank)
+      _checkSanctionedBank = db.prepare(
+        'SELECT source_list FROM sanctioned_entities WHERE bic8 = ?',
+      );
+    return _checkSanctionedBank.all(keys[0]) as Array<{ source_list: string }>;
+  }
+  if (!_checkSanctionedPrefixes)
+    _checkSanctionedPrefixes = db.prepare(
+      `SELECT DISTINCT source_list FROM sanctioned_entities
+        WHERE substr(bic8, 1, 6) IN (SELECT value FROM json_each(?))
+        ORDER BY source_list`,
+    );
+  const prefixes = [...new Set(keys.map((k) => k.slice(0, 6)))];
+  return _checkSanctionedPrefixes.all(JSON.stringify(prefixes)) as Array<{ source_list: string }>;
+}
+
+export function checkSanctions(
+  countryCode: string,
+  bic8: string | null,
+  /** Russie seulement : les BIC SWIFT de l'établissement entier (voir bankKeys). */
+  institutionBics?: readonly string[] | null,
+): SanctionsCheck {
   const db = getComplianceDB();
   if (!_checkSanctionedCountry)
     _checkSanctionedCountry = db.prepare(
@@ -43,15 +102,10 @@ export function checkSanctions(countryCode: string, bic8: string | null): Sancti
   // critical à elevated. La requête n'est préparée qu'ici, après la sonde :
   // préparée sans condition, une table supprimée faisait lever même un IBAN
   // sans banque résolue.
-  const bankScreened = bic8 !== null && complianceTableLoaded('sanctioned_entities');
+  const keys = bankKeys(countryCode, bic8, institutionBics);
+  const bankScreened = keys.length > 0 && complianceTableLoaded('sanctioned_entities');
   let bankSanctions: { source_list: string }[] = [];
-  if (bankScreened) {
-    if (!_checkSanctionedBank)
-      _checkSanctionedBank = db.prepare(
-        'SELECT source_list FROM sanctioned_entities WHERE bic8 = ?',
-      );
-    bankSanctions = _checkSanctionedBank.all(bic8) as { source_list: string }[];
-  }
+  if (bankScreened) bankSanctions = listingsOf(countryCode, keys);
 
   return {
     country_sanctioned: !!countrySanction,
@@ -102,12 +156,13 @@ export function screenBicSanctions(bic8: string): BicSanctionsScreen {
     return { screened: false, listed: null, matched_lists: [] };
   }
   try {
-    const db = getComplianceDB();
-    if (!_checkSanctionedBank)
-      _checkSanctionedBank = db.prepare(
-        'SELECT source_list FROM sanctioned_entities WHERE bic8 = ?',
-      );
-    const rows = _checkSanctionedBank.all(bic8) as { source_list: string }[];
+    // Un BIC russe : l'établissement que le répertoire de la Banque de Russie lui
+    // donne, et les six premiers caractères (voir bankKeys). Le pays est celui du BIC.
+    const country = bic8.slice(4, 6);
+    const rows = listingsOf(
+      country,
+      country === 'RU' ? bankKeys('RU', bic8, ruInstitutionBicsForBic(bic8)) : [bic8],
+    );
     // Une liste promise absente (l'ONU sans sa surcouche privée) : une
     // correspondance ailleurs reste un « oui » ferme, mais aucune correspondance
     // ne vaut plus « non » (voir unscreenedSanctionsLists).
@@ -474,6 +529,11 @@ export function unreadableComplianceResult(
   isTestBic: boolean,
   bankCode: BankCodeConfidence = 'confirmed',
   bankCodeDataUnavailable: boolean = false,
+  /**
+   * Russie seulement (voir bankKeys) : `null` quand la lecture de l'établissement
+   * n'a pas abouti, et l'axe banque dit alors « non contrôlé ».
+   */
+  institutionBics?: readonly string[] | null,
 ): ComplianceResult {
   const attempt = <T>(...tries: Array<() => T>): T | null => {
     for (const t of tries) {
@@ -486,7 +546,7 @@ export function unreadableComplianceResult(
     return null;
   };
   const sanctions: SanctionsCheck = attempt(
-    () => checkSanctions(countryCode, bic8),
+    () => checkSanctions(countryCode, bic8, institutionBics),
     () => checkSanctions(countryCode, null),
   ) ?? {
     country_sanctioned: false,
@@ -495,14 +555,19 @@ export function unreadableComplianceResult(
     fatf_status: 'non_member',
     bank_screened: false,
   };
-  const byCountry = bic8 !== null && outsideSepaScope(countryCode);
-  const reachability: ReachabilityCheck = attempt(() => checkReachability(bic8, countryCode)) ?? {
+  // Même règle que buildComplianceResult : une succursale russe sans BIC SWIFT à
+  // elle est résolue par ceux de son établissement.
+  const bankBic = bic8 ?? institutionBics?.[0]?.slice(0, 8) ?? null;
+  const byCountry = bankBic !== null && outsideSepaScope(countryCode);
+  const reachability: ReachabilityCheck = attempt(() =>
+    checkReachability(bankBic, countryCode),
+  ) ?? {
     sepa_instant: false,
     sct: false,
     sdd: false,
     screened: byCountry,
   };
-  const vop: VopCheck = attempt(() => checkVop(bic8, countryCode)) ?? {
+  const vop: VopCheck = attempt(() => checkVop(bankBic, countryCode)) ?? {
     participant: false,
     status: 'not_found',
     screened: byCountry,
@@ -515,7 +580,7 @@ export function unreadableComplianceResult(
     countryRisk,
     isTestBic,
     bankCode,
-    bic8 !== null,
+    bankBic !== null,
     attempt(() => unscreenedSanctionsLists()) ?? [],
     bankCodeDataUnavailable,
   );
@@ -581,16 +646,21 @@ export function buildComplianceResult(
   isTestBic: boolean,
   bankCode: BankCodeConfidence = 'confirmed',
   bankCodeDataUnavailable: boolean = false,
+  /** Russie seulement : les BIC SWIFT de l'établissement entier (voir bankKeys). */
+  institutionBics?: readonly string[] | null,
 ): ComplianceResult {
   // Nothing to screen. Return before touching the database: the sanctions,
   // reachability and VoP lookups would all miss and their misses are what used
   // to be added up into a reassuring 10.
   if (!valid) return unassessableCompliance();
-  const sanctions = checkSanctions(countryCode, bic8);
+  const sanctions = checkSanctions(countryCode, bic8, institutionBics);
+  // Russie : une succursale sans BIC SWIFT à elle est résolue par ceux de son
+  // établissement. Hors de la zone SEPA, le pays répond pour SEPA et VoP.
+  const bankBic = bic8 ?? institutionBics?.[0]?.slice(0, 8) ?? null;
   // Le pays passé ici est celui de l'IBAN sur le chemin IBAN, celui du BIC sur
   // le chemin BIC : c'est lui qui dit si la réponse SEPA dépend du registre.
-  const reachability = checkReachability(bic8, countryCode);
-  const vop = checkVop(bic8, countryCode);
+  const reachability = checkReachability(bankBic, countryCode);
+  const vop = checkVop(bankBic, countryCode);
   const { risk_score, risk_level, flags } = calculateRiskScore(
     sanctions,
     reachability,
@@ -599,7 +669,7 @@ export function buildComplianceResult(
     countryRisk,
     isTestBic,
     bankCode,
-    bic8 !== null,
+    bankBic !== null,
     unscreenedSanctionsLists(),
     bankCodeDataUnavailable,
   );
@@ -608,6 +678,7 @@ export function buildComplianceResult(
 
 export function resetComplianceStatements(): void {
   _checkSanctionedCountry = null;
+  _checkSanctionedPrefixes = null;
   _checkSanctionedBank = null;
   _checkFatf = null;
   _checkReachability = null;

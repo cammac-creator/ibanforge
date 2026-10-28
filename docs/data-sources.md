@@ -91,8 +91,65 @@ l'avoir. Un échec de lecture laisse le membre absent ou repris (`scripts/restri
 bloquer les autres.
 
 **Non intégré, exprès.** La Russie (répertoire BIK de la Banque de Russie, conditions de la case 1) :
-l'intégrer touche aux sanctions, décision de Claude-Alain. Oman, Libye, Somalie, Mauritanie, Djibouti,
-Soudan, Timor oriental, Burundi : aucune table officielle code → banque trouvée le 28/10/2026.
+l'intégrer touchait aux sanctions, décision de Claude-Alain, prise le soir même (section suivante).
+Oman, Libye, Somalie, Mauritanie, Djibouti, Soudan, Timor oriental, Burundi : aucune table officielle
+code → banque trouvée le 28/10/2026.
+
+## 28/10/2026 (soir) : la Russie, « nommer seulement »
+
+Décision de Claude-Alain : pour un IBAN russe, l'API **nomme** l'établissement d'après le répertoire
+officiel des BIK de la Banque de Russie, et la conformité dit s'il figure sur une liste de sanctions
+déjà en base. Rien d'autre (ni adresse, ni comptes).
+
+| Membre | Table | Origine | Ce qui est servi |
+|---|---|---|---|
+| `register_ru` | `national_bank_codes` (`RU`) | `cbr.ru` | le BIK (positions 5 à 13 de l'IBAN), le nom en cyrillique tel que publié, le BIC SWIFT que le répertoire marque par défaut (`DefaultSWBIC="1"`), seulement s'il est russe ; établissements de crédit (`PtType` 20) et succursales (30), actifs (`PSAC`) et sans restriction de participation (`RstrList`) |
+| `register_ru_branches` | `ru_branch_heads` | `cbr.ru` | pour chaque succursale, le BIK de son siège (`PrntBIC`) : lu par la conformité seule |
+
+**Source.** Message ED807 (« Справочник БИК ») quotidien, archive ZIP derrière
+`https://www.cbr.ru/s/newbik` (un seul fichier `AAAAMMJJ_ED807_full.xml`, en windows-1251), lu par
+`scripts/seed-national-ru.ts` dans la chaîne privée (`scripts/seed-national.ts`,
+`SEED_FAMILY=restricted`). Seule cette adresse répond à un client sans navigateur ; les pages de
+cbr.ru sont derrière un mur anti-robot.
+
+**Conditions lues.** `https://www.cbr.ru/about/` : reproduction « sans aucune restriction », à la seule
+condition d'un lien vers la source ; `https://cbr.ru/user_agreement/` §3.2 : la citation renvoie au
+site. **Case 1.** Le répertoire passe tout de même par la surcouche privée, par prudence pour un pays
+sous sanctions : retrait en minutes par `RESTRICTED_WITHDRAWN=cbr.ru`, jamais dans ce dépôt, un paquet
+ou un export.
+
+**Le crédit.** `bank_code_check.register` et `bic.source` portent « Source: Bank of Russia, BIC
+directory of the Bank of Russia payment system (ED807), https://www.cbr.ru, business day <date> »
+(`BusinessDay` du fichier) ; `register` ajoute la réserve du registre partiel. Le BIC est celui de
+l'autorité (`bic.basis: "national_register"`), jamais celui du siège prêté à une succursale.
+
+**Partiel.** La Banque de Russie attribue tous les BIK, mais seuls ses établissements de crédit et
+succursales sont servis : un BIK absent garde la réponse d'avant, jamais `not_allocated`. Sans la
+surcouche, un IBAN russe répond `unavailable` / `national_register_unavailable`.
+
+**Les sanctions (`src/lib/compliance.ts`, `bankKeys` ; `src/lib/ru-institution.ts`).** En Russie,
+l'axe banque ne compare plus un BIC8 exact. Deux écarts mesurés le 28/10/2026 entre le répertoire et
+les listes en base : les listes portent souvent un autre BIC de la même banque que celui qu'elle
+emploie (Sovcombank : `SOMRRUM1` sur la liste de l'OFAC, `SOMRRUMM` au répertoire ; les succursales
+de VTB ont des BIC `VTBRRUM2…`, la liste nomme `VTBRRUMM`), et la plupart des succursales n'ont pas de
+BIC SWIFT à elles. D'où la règle russe :
+
+- tous les BIC SWIFT de l'**établissement** (le siège et toutes ses succursales, une seule personne
+  morale) passent aux listes, pas seulement celui de la ligne ;
+- chacun est comparé sur ses **six premiers caractères** (code de l'institution et pays), qu'aucune
+  autre licence du répertoire ne partage (vérifié le 28/10/2026) ;
+- la même règle vaut pour `GET /v1/bic/:code` et la conformité par BIC, selon le pays du BIC ; un BIC
+  russe y est comparé sur ses six premiers caractères même sans la surcouche ;
+- un établissement sans aucun BIC SWIFT n'est pas contrôlé, et le dit : `bank_screened: false`,
+  `institution_listed: null`, `checks.institution_sanctions: "unknown"`, jamais « non listé ». Le pays
+  reste sanctionné et le score ne descend pas pour autant.
+
+Ailleurs qu'en Russie, la règle d'avant ne change pas (BIC8 exact).
+
+Contrôle exhaustif du 28/10/2026, sur une copie locale (listes publiques de la base : OFAC et UE) :
+663 établissements servis, tous nommés avec leur BIC tel que publié ; 250 marqués sanctionnés, 255
+contrôlés sans correspondance, 158 sans BIC SWIFT donc non contrôlés ; aucun écart avec un calcul
+indépendant fait sur le fichier source.
 
 ## 25/09/2026 : la famille sous conditions a quitté le dépôt public
 

@@ -7,6 +7,7 @@ import {
 } from './compliance.js';
 import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult, isTestBic } from './enrich.js';
+import { ruInstitutionBics, ruInstitutionBicsForBic } from './ru-institution.js';
 import { validateIBAN } from './iban.js';
 import { validateBIC } from './bic-validator.js';
 import {
@@ -169,8 +170,14 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
     result.bank_code_check?.reason === 'no_reference_data_for_country' &&
     UNLICENSED_MAP_COUNTRIES.has(countryCode);
 
+  // Russie (28/10/2026) : l'axe banque passe aux listes l'établissement entier, siège
+  // et succursales (src/lib/ru-institution.ts). `null` tant que cette lecture n'a pas
+  // abouti : si elle lève, l'axe banque de la réponse de repli dit « non contrôlé ».
+  let institutionBics: string[] | null | undefined = countryCode === 'RU' ? null : undefined;
   let compliance: ComplianceResult;
   try {
+    if (countryCode === 'RU' && result.bban?.bank_code)
+      institutionBics = ruInstitutionBics(result.bban.bank_code);
     compliance = buildComplianceResult(
       true,
       countryCode,
@@ -180,6 +187,7 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
       isTestBic,
       bankCode,
       bankCodeDataUnavailable,
+      institutionBics,
     );
   } catch {
     // The database is unreachable, which is a different thing from an IBAN we
@@ -195,6 +203,7 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
       isTestBic,
       bankCode,
       bankCodeDataUnavailable,
+      institutionBics,
     );
   }
 
@@ -244,8 +253,12 @@ export function buildBicComplianceResponse(
   const issuerType = known?.type ?? 'bank';
   const countryRisk = getCountryRisk(countryCode);
 
+  // Russie (28/10/2026) : l'établissement auquel le répertoire de la Banque de Russie
+  // donne ce BIC, comme sur le chemin IBAN ; `null` si la lecture lève.
+  let institutionBics: string[] | null | undefined = countryCode === 'RU' ? null : undefined;
   let compliance: ComplianceResult;
   try {
+    if (countryCode === 'RU') institutionBics = ruInstitutionBicsForBic(bic8);
     // `bankCode` stays at its default: there is no bank code in play, so there
     // is nothing to confirm or deny about one. Scoring it as 'unverified' would
     // penalise the caller for a check this input does not involve.
@@ -256,6 +269,9 @@ export function buildBicComplianceResponse(
       issuerType,
       countryRisk,
       isTestBic(bic8),
+      'confirmed',
+      false,
+      institutionBics,
     );
   } catch {
     compliance = unreadableComplianceResult(
@@ -264,6 +280,9 @@ export function buildBicComplianceResponse(
       issuerType,
       countryRisk,
       isTestBic(bic8),
+      'confirmed',
+      false,
+      institutionBics,
     );
   }
 

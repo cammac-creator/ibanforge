@@ -6,7 +6,8 @@
  * script ne lit que les registres publics (SK, CZ, et IT quand on le nomme) ;
  * `SEED_FAMILY=restricted`, posée par la chaîne privée (`npm run overlay:seed`),
  * lit AT, BE et SM seuls, et depuis le 28/10/2026 Israël et la Mongolie (registres
- * partiels de la case 2, scripts/seed-national-il.ts et scripts/seed-national-mn.ts).
+ * partiels de la case 2, scripts/seed-national-il.ts et scripts/seed-national-mn.ts)
+ * et la Russie (décision « Nommer seulement », scripts/seed-national-ru.ts).
  * Nommer un pays hors de son mode est refusé.
  *
  * ⚠️ FOUR of these five are exhaustive; San Marino is NOT. AT, BE, SK and CZ are
@@ -21,7 +22,7 @@
  *   npx tsx scripts/seed-national.ts          # every public register (SK, CZ)
  *   npx tsx scripts/seed-national.ts CZ       # one
  *   npx tsx scripts/seed-national.ts IT       # Italy, only ever on its own
- *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM, IL, MN (private chain)
+ *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM, IL, MN, RU (private chain)
  *
  * ITALIE — Banca d'Italia, registres des banques, des établissements de paiement
  * et de monnaie électronique (open data CC BY 4.0). NON exhaustif, comme
@@ -147,6 +148,7 @@ import {
   RESTRICTED_FAMILY,
   RESTRICTED_FLOORS,
   restrictedRegisterCountries,
+  restrictedTable,
   seedFamilyFromEnv,
 } from '../src/lib/restricted-family.js';
 import { failureCause, reportSeedMember, seedReportActive } from './seed-report.js';
@@ -158,6 +160,7 @@ import {
 } from './seed-national-it.js';
 import { IL_DATASETS, readIsraelLive } from './seed-national-il.js';
 import { MN_PAGE, readMongoliaLive } from './seed-national-mn.js';
+import { RU_DIRECTORY_URL, readRussiaLive, type RussiaBranch } from './seed-national-ru.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -176,6 +179,10 @@ const SOURCES = {
   // le lien du PDF (scripts/seed-national-mn.ts).
   IL: `https://data.gov.il/api/3/action/package_show?id=${IL_DATASETS.banks.package}`,
   MN: MN_PAGE,
+  // Décision du 28/10/2026 (« Nommer seulement »), chaîne privée seulement :
+  // l'archive quotidienne du répertoire des BIK de la Banque de Russie
+  // (scripts/seed-national-ru.ts).
+  RU: RU_DIRECTORY_URL,
 } as const;
 
 /**
@@ -206,6 +213,7 @@ const MIN_EXPECTED: Record<string, number> = {
   CZ: 35,
   IL: RESTRICTED_FLOORS.register_il,
   MN: RESTRICTED_FLOORS.register_mn,
+  RU: RESTRICTED_FLOORS.register_ru,
 };
 
 /**
@@ -707,6 +715,46 @@ async function parseMongoliaLive(): Promise<Entry[]> {
   const { entries, notes } = await readMongoliaLive();
   for (const note of notes) console.log(`  MN: ${note}`);
   return entries;
+}
+
+/**
+ * Russie : les lignes nommées, et les liens succursale → siège gardés pour
+ * writeRussianBranches, qui les écrit dans leur propre table après elles.
+ */
+let russianBranches: RussiaBranch[] | null = null;
+
+async function parseRussiaLive(): Promise<Entry[]> {
+  russianBranches = null;
+  const { entries, branches, notes } = await readRussiaLive();
+  for (const note of notes) console.log(`  RU: ${note}`);
+  russianBranches = branches;
+  return entries;
+}
+
+/** Remplace les liens des succursales russes (membre `register_ru_branches`). */
+function writeRussianBranches(db: Database.Database): number {
+  const branches = russianBranches;
+  if (!branches) throw new Error('RU: the directory was not read, branch links not written');
+  const floor = RESTRICTED_FLOORS.register_ru_branches;
+  if (branches.length < floor)
+    throw new Error(
+      `RU: only ${branches.length} branch links, expected at least ${floor}. Refusing to replace the table.`,
+    );
+  const exists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ru_branch_heads'")
+    .get();
+  if (!exists)
+    for (const statement of restrictedTable('bic', 'ru_branch_heads').ddl)
+      db.prepare(statement).run();
+  db.transaction(() => {
+    db.prepare('DELETE FROM ru_branch_heads').run();
+    const ins = db.prepare(
+      'INSERT INTO ru_branch_heads (code, head, source, as_of) VALUES (?, ?, ?, ?)',
+    );
+    for (const b of branches) ins.run(b.code, b.head, b.source, b.as_of);
+  })();
+  console.log(`  RU: ${branches.length} branch links written`);
+  return branches.length;
 }
 
 async function parseSanMarinoLive(): Promise<Entry[]> {
@@ -1383,6 +1431,7 @@ async function main(): Promise<void> {
     ['SM', parseSanMarinoLive],
     ['IL', parseIsraelLive],
     ['MN', parseMongoliaLive],
+    ['RU', parseRussiaLive],
   ];
   // Deux modes, jamais les deux à la fois (seedFamilyFromEnv) :
   // - sans SEED_FAMILY (robots publics, copie d'un contributeur) : les registres
@@ -1390,7 +1439,7 @@ async function main(): Promise<void> {
   //   l'étape du retrait (25/09/2026), AT, BE et SM ne sont plus téléchargés ici :
   //   la base de ce dépôt ne les porte plus ;
   // - SEED_FAMILY=restricted (chaîne privée de la surcouche) : AT, BE, SM, et depuis
-  //   le 28/10/2026 IL et MN, seuls.
+  //   le 28/10/2026 IL, MN et RU, seuls.
   // Un pays nommé hors de son mode est refusé plutôt que sauté en silence : une
   // commande `seed-national.ts AT` lancée sans la variable écrirait la famille
   // dans data/, d'où elle serait commitée.
@@ -1419,15 +1468,37 @@ async function main(): Promise<void> {
       : undefined;
     if (!member) {
       write(db, cc, await parse());
+      if (cc === 'RU') writeRussianBranches(db);
       continue;
     }
+    let failure: unknown = null;
     try {
       const entries = await parse();
       write(db, cc, entries);
       reportSeedMember({ member: member.id, state: 'loaded', processed: entries.length });
     } catch (e) {
+      failure = e;
       console.warn(`  ${cc}: NOT loaded (${e instanceof Error ? e.message : String(e)})`);
       reportSeedMember({ member: member.id, state: 'failed', cause: failureCause(e) });
+    }
+    // Les liens des succursales russes, membre à part : en panne avec le répertoire
+    // (même cause), ils sont repris de la surcouche précédente comme lui ; jamais
+    // écrits frais à côté de noms repris.
+    if (cc === 'RU') {
+      try {
+        if (failure) throw failure;
+        const n = writeRussianBranches(db);
+        reportSeedMember({ member: 'register_ru_branches', state: 'loaded', processed: n });
+      } catch (e) {
+        console.warn(
+          `  RU: branch links NOT loaded (${e instanceof Error ? e.message : String(e)})`,
+        );
+        reportSeedMember({
+          member: 'register_ru_branches',
+          state: 'failed',
+          cause: failureCause(e),
+        });
+      }
     }
   }
   // Czechia last, and on its own path: it writes two tables, and it is the one
