@@ -18,8 +18,12 @@ describe("accueil des assistants et exclusion des pages privées", () => {
     const excluded = [rule.disallow].flat().filter((path): path is string => typeof path === "string");
     // Une règle nommée remplace celle de « * » : chaque robot doit porter les refus.
     for (const locale of ["", "/en", "/fr", "/de"]) {
-      for (const path of ["/dashboard", "/dashboard/", "/dashboard/login", "/dashboard?view=today", "/account", "/account/", "/account?code=fictif"]) {
+      for (const path of ["/dashboard", "/dashboard/", "/dashboard/login", "/dashboard?view=today"]) {
         expect(excluded.some((prefix) => `${locale}${path}`.startsWith(prefix)), `${agent}: ${locale}${path}`).toBe(true);
+      }
+      // Le compte garde son noindex lisible : aucun refus ne doit le couvrir.
+      for (const path of ["/account", "/account/", "/account?code=fictif"]) {
+        expect(excluded.some((prefix) => `${locale}${path}`.startsWith(prefix)), `${agent}: ${locale}${path}`).toBe(false);
       }
     }
     for (const path of ["/api/crm/send", "/api/auth/login", "/api/dashboard/revenue", "/api/playground"]) {

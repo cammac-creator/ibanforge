@@ -5,10 +5,10 @@ IBANforge checks the bank behind an IBAN before you pay, through an API and MCP 
 Coverage: IBAN structure and mod-97; bank-code allocation where a full national register is available; a partial register or composite map elsewhere cannot rule a code out.
 Limits: no account-holder name check (VoP, BAV, CoP), no proof an account exists or is open, no sanctions screening of the payee (bank and country only).
 Freshness: the BIC directory includes a public SWIFT copy frozen in January 2018; it is not a licensed copy of the SWIFT BIC directory.
-Live coverage, including optional private registers: https://api.ibanforge.com/llms.txt. The static country details below describe the code without those private files, not the current production coverage.
+Live coverage, including optional private registers: https://api.ibanforge.com/llms.txt. The static country details below can differ from the current production coverage; the live file is the reference.
 Prepaid packs (USD, card or USDC): $4 for 1,000 credits, $20 for 5,000, $80 for 25,000; no expiry. Pro: $29/month for 10,000 requests. Each IBAN in a batch uses one request or credit.
 x402 (USDC on Base, per call): IBAN validation $0.005; batch $0.002 per IBAN; BIC or Swiss clearing lookup $0.003; compliance $0.02. Full pricing: https://ibanforge.com/pricing.
-Claimed key: 200 requests a month at no charge; create a key with no e-mail or card. The keyless REST trial and the hosted MCP allowance are separate doors; their limits are detailed below.
+A key needs no e-mail or card to create; it reaches 200 requests a month at no charge once claimed with a 6-digit code mailed to an address (POST /v1/keys/claim). The keyless REST trial and the hosted MCP allowance are separate doors; their limits are detailed below.
 API: https://api.ibanforge.com. Hosted MCP: https://api.ibanforge.com/mcp.
 Local MCP: npx -y ibanforge-mcp. Official MCP Registry name: io.github.cammac-creator/ibanforge.
 How to cite: "IBANforge, ibanforge.com"; name the source of each data item, reproduce its attribution and notices, and include its date when supplied. Never invent an API answer.
@@ -19,10 +19,10 @@ IBANforge vérifie la banque derrière un IBAN avant de payer, par une API et de
 Couverture : structure de l'IBAN et mod-97 ; attribution du code bancaire quand un registre national complet est disponible ; ailleurs, un registre partiel ou une table composite ne permet pas d'exclure un code.
 Limites : aucun contrôle du nom du titulaire (VoP, BAV, CoP), aucune preuve que le compte existe ou est ouvert, aucun filtrage du bénéficiaire contre les sanctions (banque et pays seulement).
 Fraîcheur : l'annuaire BIC comprend une copie publique de SWIFT figée en janvier 2018 ; ce n'est pas une copie sous licence de l'annuaire BIC de SWIFT.
-Couverture actuelle, registres privés optionnels compris : https://api.ibanforge.com/llms.txt. Le détail statique par pays ci-dessous décrit le code sans ces fichiers privés, pas la couverture actuelle de production.
+Couverture actuelle, registres privés optionnels compris : https://api.ibanforge.com/llms.txt. Le détail statique par pays ci-dessous peut différer de la couverture actuelle de production ; le fichier vivant fait foi.
 Packs prépayés (USD, carte ou USDC) : 4 $ pour 1 000 crédits, 20 $ pour 5 000, 80 $ pour 25 000 ; sans expiration. Pro : 29 $/mois pour 10 000 requêtes. Chaque IBAN d'un lot consomme une requête ou un crédit.
 x402 (USDC sur Base, par appel) : validation IBAN 0,005 $ ; lot 0,002 $ par IBAN ; recherche BIC ou clearing suisse 0,003 $ ; conformité 0,02 $. Tous les prix : https://ibanforge.com/pricing.
-Clé réclamée : 200 requêtes par mois sans frais ; création sans e-mail ni carte. L'essai REST sans clé et l'allocation du MCP hébergé sont deux portes séparées ; leurs plafonds sont détaillés ci-dessous.
+Une clé se crée sans e-mail ni carte ; elle atteint 200 requêtes par mois sans frais une fois réclamée par un code à 6 chiffres envoyé à une adresse e-mail (POST /v1/keys/claim). L'essai REST sans clé et l'allocation du MCP hébergé sont deux portes séparées ; leurs plafonds sont détaillés ci-dessous.
 API : https://api.ibanforge.com. MCP hébergé : https://api.ibanforge.com/mcp.
 MCP local : npx -y ibanforge-mcp. Nom au registre officiel MCP : io.github.cammac-creator/ibanforge.
 Comment citer : « IBANforge, ibanforge.com » ; nommer la source de chaque donnée, reproduire ses crédits et notices, et indiquer sa date lorsqu'elle est fournie. Ne jamais inventer une réponse de l'API.

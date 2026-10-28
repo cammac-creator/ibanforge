@@ -1,16 +1,17 @@
 import { MetadataRoute } from "next";
 
 /**
- * Les pages privées existent sans préfixe et sous chaque langue.
- * Sans barre finale, le refus couvre aussi la racine de la page, ses
- * paramètres et ses sous-pages. Les routes Next /api restent hors index.
+ * Le tableau de bord existe sans préfixe et sous chaque langue.
+ * Sans barre finale, le refus couvre aussi sa racine, ses paramètres et ses
+ * sous-pages. Les routes Next /api restent hors index.
  * Ces consignes aux robots ne remplacent jamais l'authentification.
+ *
+ * `/account` reste lisible exprès : la page porte son propre noindex (voir
+ * sitemap.ts). Refusée ici, un robot ne lirait plus ce noindex et pourrait
+ * indexer l'adresse sans contenu, puisque le pied de page la lie partout.
  */
 const PRIVATE_PATHS = [
-  ...["", "/en", "/fr", "/de"].flatMap((locale) => [
-    `${locale}/dashboard`,
-    `${locale}/account`,
-  ]),
+  ...["", "/en", "/fr", "/de"].map((locale) => `${locale}/dashboard`),
   "/api/",
 ];
 

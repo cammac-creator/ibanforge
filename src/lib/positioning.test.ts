@@ -76,8 +76,16 @@ describe('l’essentiel des fichiers destinés aux assistants', () => {
     expect(fr).toContain(
       `Pro : ${PRO_PRICE_USD} $/mois pour ${grouped(PRO_MONTHLY_LIMIT, ' ')} requêtes`,
     );
-    expect(en).toContain(`Claimed key: ${FREE_TIER_MONTHLY_LIMIT} requests a month at no charge`);
-    expect(fr).toContain(`Clé réclamée : ${FREE_TIER_MONTHLY_LIMIT} requêtes par mois sans frais`);
+    // Une clé créée sans e-mail reste au palier anonyme : les 200 du mois ne
+    // viennent qu'après la réclamation par un code envoyé à une adresse. Lu seul
+    // par un assistant, « 200 » et « sans e-mail » côte à côte deviendraient
+    // « 200 par mois sans e-mail ».
+    expect(en).toContain(
+      `it reaches ${FREE_TIER_MONTHLY_LIMIT} requests a month at no charge once claimed with a 6-digit code mailed to an address (POST /v1/keys/claim)`,
+    );
+    expect(fr).toContain(
+      `elle atteint ${FREE_TIER_MONTHLY_LIMIT} requêtes par mois sans frais une fois réclamée par un code à 6 chiffres envoyé à une adresse e-mail (POST /v1/keys/claim)`,
+    );
     const routes = buildRouteTable(
       '0x0000000000000000000000000000000000000001',
       'POST',
@@ -129,8 +137,14 @@ describe('l’essentiel des fichiers destinés aux assistants', () => {
       );
       expect(block).toContain('name the source of each data item');
       expect(block).toContain('nommer la source de chaque donnée');
-      expect(block).toContain('not the current production coverage');
-      expect(block).toContain('pas la couverture actuelle de production');
+      // Le détail statique nomme aussi des pays servis par les fichiers privés :
+      // il ne décrit ni le code seul ni la production, le fichier vivant fait foi.
+      expect(block).toContain(
+        'can differ from the current production coverage; the live file is the reference',
+      );
+      expect(block).toContain(
+        'peut différer de la couverture actuelle de production ; le fichier vivant fait foi',
+      );
       expect(block).not.toMatch(/all but \d|\d+ (?:countries|pays)/i);
     },
   );
