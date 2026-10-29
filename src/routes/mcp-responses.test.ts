@@ -129,6 +129,8 @@ const INIT = {
 const DE = 'DE89370400440532013000';
 const CH = 'CH5204835012345671000';
 const QR_IBAN = 'CH4431999123000889012';
+/** Un QR-IBAN sur un QR-IID que SIX attribue (30700) : il porte l'étape QR-IBAN. */
+const QR_IBAN_ALLOCATED = 'CH3130700123000889012';
 
 type App = ReturnType<typeof buildApp>;
 
@@ -203,6 +205,11 @@ const QR_PAYLOADS: readonly string[] = [
   qr({ 27: 'XYZ' }),
   qr({ 30: 'END' }),
   qr({}, ['S1/10/10201409/11/200701']),
+  // Les deux règles du 29.10.2026 : la QR-facture en euros (IG 2.4) et le jeu
+  // de caractères (ch. 4.1.1), un émoji, du cyrillique et un caractère invisible,
+  // que le constat nomme par son point de code, jamais tel quel.
+  qr({ 3: QR_IBAN, 19: 'EUR', 27: 'QRR', 28: '210000000003139471430009017' }),
+  qr({ 5: `Robert${String.fromCodePoint(0x200b)} Schneider AG`, 29: 'Order \u{1F600} Заказ' }),
 ];
 
 const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
@@ -210,6 +217,7 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
     DE,
     CH,
     QR_IBAN,
+    QR_IBAN_ALLOCATED,
     'DE89370400440532013001',
     'DE44999999990532013000',
     'CH8499999012345678901',
@@ -558,6 +566,26 @@ const STEP_CASES: ReadonlyArray<readonly [string, IBANValidationResult]> = [
     'code confirmé, détenteur déduit',
     base({ bank_code_check: VERIFIED, bank_code_holder: 'inferred' }),
   ],
+  [
+    'QR-IBAN',
+    base({
+      country: { code: 'CH', name: 'Switzerland' },
+      bban: { bank_code: '30700', account_number: '123000889012' },
+      bank_code_check: VERIFIED,
+      clearing: {
+        iid: '00700',
+        name: 'Société Alpha',
+        type: 'cantonal_bank',
+        town: null,
+        sic: true,
+        instant_payments_chf: true,
+        eurosic: true,
+        qr_iid: '30700',
+        qr_iid_source: 'register',
+        is_qr_iid: true,
+      },
+    }),
+  ],
 ];
 
 /** Un IBAN dont les chiffres de contrôle ISO sont recalculés sur ce BBAN. */
@@ -847,6 +875,21 @@ describe('ce qu’un appel local n’atteint pas, en unitaire', () => {
       found.push(...crib({ message: text }, label).hits);
     }
     expect(found, found.join('\n')).toEqual([]);
+  });
+
+  it('les deux constats du 29.10.2026 sont bien dans le corpus, et passent tels quels', () => {
+    const qrResults = produced()
+      .filter((r) => r.label.startsWith('QR-facture'))
+      .map((r) => r.raw as ReturnType<typeof checkSwissQrBill>);
+    for (const code of ['qr_iban_chf_only_ig24', 'character_not_permitted']) {
+      const findings = qrResults.flatMap((r) => r.findings).filter((f) => f.code === code);
+      expect(findings.length, code).toBeGreaterThan(0);
+      // Aucune réécriture ne les touche : le texte de /mcp passe déjà le crible.
+      for (const f of findings) {
+        expect(directoryResponse(f), code).toEqual(f);
+        expect(crib(f, code).hits, code).toEqual([]);
+      }
+    }
   });
 
   it('les constats, notes et erreurs de src/lib/, et les crédits des registres privés', () => {
