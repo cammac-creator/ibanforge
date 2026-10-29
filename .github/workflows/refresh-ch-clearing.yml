@@ -1,0 +1,198 @@
+name: Re-read the Swiss clearing (SIX BankMaster), weekly
+
+# Pourquoi une relecture à part, chaque semaine
+#
+# Décision de Claude-Alain du 29.10.2026 : relire chaque semaine le fichier SIX
+# des banques suisses (BankMaster), au lieu du seul passage mensuel. SIX tient ce
+# fichier à jour chaque jour ouvrable (« The Download Bank Master is an extract
+# from the daily updated Swiss Bank Master ») ; mesuré le 29.10.2026, 21 lignes
+# sur 1 164 avaient changé depuis la copie du 2 octobre, dont 18 BIC (neuf
+# banques, chacune sous son IID et son QR-IID). Le BIC d'un IBAN suisse que
+# rend l'API vient de ces lignes (`ch_clearing`, src/lib/enrich.ts) : une copie
+# d'un mois sert un BIC que SIX a déjà remplacé.
+#
+# Ce que ce run peut toucher : la table ch_clearing de data/bic.sqlite et
+# frontend/data/registers/ch-iid.json, rien d'autre. Seul le chargeur SIX tourne
+# (`npm run db:seed-ch`, qui ne télécharge que chez api.six-group.com), et
+# scripts/ch-clearing-diff.ts refuse le commit si une autre table ou le schéma
+# diffère de la base commitée, ou si SIX sert un fichier plus ancien que celui
+# déjà chargé. Il ne commite que si le CONTENU suisse a changé : `valid_on` (la
+# date du fichier, qui avance chaque jour ouvrable) et `updated_at` ne comptent
+# pas, sinon l'API serait redéployée chaque semaine pour rien.
+#
+# Ce que ce run ne fait PAS : il ne touche pas l'annuaire BIC (`bic_entries`).
+# Un BIC que SIX vient d'attribuer y entre au passage mensuel suivant
+# (refresh-bic.yml, `bic:enrich`), qui reste inchangé et relit aussi SIX.
+#
+# Licence : « Information in the Download Bank Master may be used freely »
+# (docs/data-sources.md). Les journaux, publics comme le dépôt, ne portent que
+# des décomptes, des dates de fichier et des BIC de banques.
+#
+# SIX est publique, hors de la famille sous conditions
+# (src/lib/restricted-family.ts) : le chargeur tourne sans SEED_FAMILY, et la
+# suite (src/lib/public-base-family-free.test.ts) refuse une base qui porterait
+# une ligne de cette famille avant tout commit.
+
+on:
+  schedule:
+    # Chaque lundi à 03:47 UTC (04:47 à Zurich en hiver, 05:47 en été) : le
+    # fichier du vendredi soir (horodaté 16 h 30) vaut alors pour le lundi.
+    #
+    # Le créneau, à côté des trois autres écrivains de data/bic.sqlite (mesuré
+    # sur leurs runs d'août à octobre 2026, `gh run list`) : GitHub lance un cron
+    # avec des heures de retard (la relecture tchèque de 05:17 est partie entre
+    # 09:31 et 11:29 UTC du 24 au 29.10 et dure environ 35 s ; l'italienne du
+    # jeudi 05:37 entre 10:15 et 12:12, environ 3 min). Le mensuel (le 1er à
+    # 03:00) dure de 7 à 10 min, mais le run du 01.10.2026 est resté plus de six
+    # heures avant d'échouer. Un lundi qui est le 1er, ce run ne relit rien (étape
+    # « Not on the 1st » ci-dessous) : le mensuel relit SIX ce jour-là.
+    - cron: '47 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # Lire les jobs du run, pour que l'alerte nomme l'étape qui a cassé.
+  actions: read
+
+# Le même groupe que refresh-bic.yml, refresh-cz-register.yml et
+# refresh-it-register.yml : un seul écrivain de data/bic.sqlite à la fois.
+# Aucun n'annule l'autre. GitHub ne garde qu'un run EN ATTENTE par groupe : si
+# un troisième arrive pendant que celui-ci attend, celui-ci est annulé sans
+# alerte. Le battement (9 jours, src/lib/ops-alert.ts) le dit si cela se
+# répète.
+concurrency:
+  group: bic-sqlite-writer
+  cancel-in-progress: false
+
+jobs:
+  refresh-ch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # `ref: main` et non le commit qui a déclenché le run : un run qui a fait
+      # la queue derrière un autre écrivain part ainsi de la base que celui-ci
+      # vient de pousser, et son `git pull --rebase` n'a pas de binaire en
+      # conflit à fusionner.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Le 1er du mois, refresh-bic.yml relit SIX avec tout le reste. Les deux
+      # runs font alors la queue dans le même groupe, dans un ordre que GitHub ne
+      # garantit pas : si celui-ci poussait la base d'abord, le mensuel, parti
+      # du commit qui l'a déclenché, buterait sur un binaire en conflit à son
+      # `git pull --rebase`. Ce jour-là, ce run ne relit donc rien et pointe
+      # seulement son battement. Un lancement à la main relit toujours.
+      - name: Not on the 1st (the monthly run re-reads SIX that day)
+        id: day
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ] && [ "$(date -u +%d)" = "01" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Le 1er du mois : refresh-bic.yml relit SIX aujourd'hui, rien à faire ici."
+          fi
+
+      # Échoue (étape rouge, alerte) quand SIX ne répond pas, ou quand le
+      # fichier compte moins de 800 lignes (plancher du chargeur) : la table
+      # n'est alors pas touchée, et rien n'est commité.
+      - name: Read the SIX BankMaster (Swiss clearing only)
+        if: steps.day.outputs.skip != 'true'
+        run: npm run db:seed-ch
+
+      # La table ch_clearing seulement, comparée par contenu à la base commitée.
+      # Refuse (étape rouge, alerte) si autre chose diffère ou si le fichier est
+      # plus ancien ; écrit `changed=true|false` sinon. Les étapes suivantes ne
+      # tournent que sur `changed == 'true'`, donc jamais le 1er.
+      - name: Swiss clearing only, and did it change?
+        if: steps.day.outputs.skip != 'true'
+        id: diff_ch
+        run: npx tsx scripts/ch-clearing-diff.ts
+
+      # Le même garde de qualité que le rafraîchissement mensuel : une table
+      # effondrée serait refusée ici, avant tout commit.
+      - name: Quality diff against the committed database
+        if: steps.diff_ch.outputs.changed == 'true'
+        run: npx tsx scripts/refresh-diff.ts
+
+      - name: Run tests
+        if: steps.diff_ch.outputs.changed == 'true'
+        run: npm run test
+
+      # Les pages /iid lisent un JSON exporté de cette base par l'API elle-même :
+      # réexporté dans le même commit, sans toucher aux fichiers des autres
+      # registres (le filtre du script n'écrit que ch-iid.json).
+      - name: Export the Swiss clearing pages
+        if: steps.diff_ch.outputs.changed == 'true'
+        run: npm run pages:export -- CH
+
+      - name: Commit the Swiss clearing
+        if: steps.diff_ch.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/bic.sqlite frontend/data/registers/ch-iid.json
+          git commit -m "chore(data): clearing suisse de SIX (BankMaster), nouvelle édition (relecture hebdomadaire)"
+          git pull --rebase
+          git push
+
+      # Homme mort : dire à l'API que ce cron est passé (src/lib/ops-alert.ts,
+      # HEARTBEATS). APRÈS le push, comme refresh-bic.yml depuis l'audit OPS-03
+      # du 01.09.2026 : un push rejeté ne doit pas laisser le battement pointé.
+      # Le push redémarre l'API sur Railway, d'où dix tentatives à 30 s (environ
+      # 5 minutes) ; une semaine sans changement ne pousse rien et pointe tout de
+      # suite. Bloquant : au-delà, l'API ne répond pas, et l'alerte le dit.
+      - name: Heartbeat (après le push)
+        if: success()
+        env:
+          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+        run: |
+          if [ -z "$HEARTBEAT_TOKEN" ]; then
+            echo "::warning::HEARTBEAT_TOKEN absent, battement non envoyé"
+            exit 0
+          fi
+          for i in $(seq 1 10); do
+            curl -fsS -X POST \
+              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
+              "https://api.ibanforge.com/internal/heartbeat/refresh-ch-clearing" && exit 0
+            echo "tentative $i/10 sans réponse, l'API redémarre peut-être après le push"
+            sleep 30
+          done
+          echo "::error::battement KO après 10 tentatives sur environ 5 minutes, l'API ne répond pas"
+          exit 1
+
+      # La même alerte que les trois autres écrivains, mêmes secrets.
+      - name: Tell Telegram if anything above failed
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "::warning::secrets Telegram absents, alerte non envoyée"
+            exit 0
+          fi
+          STEP=""
+          if RAW=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+                     --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name' 2>/dev/null); then
+            STEP=$(printf '%s' "$RAW" | head -3 | paste -sd, -)
+          fi
+          [ -z "$STEP" ] && STEP="(étape inconnue, voir le run)"
+          CONSEQ="le clearing suisse (SIX BankMaster) n’a pas été relu cette semaine ; l’édition déjà chargée reste servie."
+          case "$STEP" in
+            "Swiss clearing only"*) CONSEQ="la relecture a changé autre chose que le clearing suisse, ou SIX a servi un fichier plus ancien : rien n’a été commité." ;;
+            *Heartbeat*) CONSEQ="le clearing suisse a bien été relu (et poussé s’il avait changé), mais l’API n’a pas répondu au battement en 5 minutes : vérifier que le service est debout." ;;
+          esac
+          MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
+                  "🔴 IBANforge : le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$CONSEQ" "$RUN_URL")
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" >/dev/null

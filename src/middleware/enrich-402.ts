@@ -224,7 +224,7 @@ const PRICING: EndpointPricing[] = [
   {
     match: (m, p) => m === 'GET' && p.startsWith('/v1/ch/clearing/'),
     price_usdc: 0.003,
-    description: `Swiss BC-Nummer / IID clearing lookup against ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly). Returns institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation.`,
+    description: `Swiss BC-Nummer / IID clearing lookup against ${F.claim.chClearing} SIX BankMaster entries (re-read weekly). Returns institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation.`,
     inputSchema: {
       type: 'object',
       required: ['iid'],

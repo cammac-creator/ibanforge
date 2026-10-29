@@ -282,6 +282,13 @@ export const HEARTBEATS: ReadonlyArray<{ name: string; maxAgeMs: number; label: 
     maxAgeMs: 9 * 24 * 3600_000,
     label: 'registres italiens (Banca d’Italia)',
   },
+  // Hebdomadaire depuis le 29/10/2026 (relecture SIX du lundi) : neuf jours
+  // couvrent un lundi où le runner part en retard, comme pour l'Italie.
+  {
+    name: 'refresh-ch-clearing',
+    maxAgeMs: 9 * 24 * 3600_000,
+    label: 'clearing suisse (SIX BankMaster)',
+  },
   { name: 'indexnow', maxAgeMs: 9 * 24 * 3600_000, label: 'envoi IndexNow du plan du site' },
 ];
 

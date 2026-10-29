@@ -57,10 +57,12 @@
  *
  *   npm run pages:export          # tous les registres, comme avant
  *   npm run pages:export -- IT    # n'écrit que it-bank.json
+ *   npm run pages:export -- CH    # n'écrit que ch-iid.json
  *
- * La relecture hebdomadaire du registre italien (refresh-it-register.yml)
- * réexporte ses pages sans réécrire les fichiers des autres registres, qui ne
- * sont rafraîchis que par le cycle mensuel. Toutes les réponses sont quand même
+ * La relecture hebdomadaire du registre italien (refresh-it-register.yml), et
+ * depuis le 29/10/2026 celle du clearing suisse (refresh-ch-clearing.yml),
+ * réexportent leurs pages sans réécrire les fichiers des autres registres, qui
+ * ne sont rafraîchis que par le cycle mensuel. Toutes les réponses sont quand même
  * calculées (quelques secondes) : le filtre ne porte que sur l'écriture, ce qui
  * laisse chaque section de ce fichier telle qu'elle était.
  */
@@ -512,7 +514,7 @@ if (wants('DE'))
       entries: de,
     }),
   );
-if (wants('CH'))
+if (wants('CH')) {
   writeFileSync(
     resolve(OUT_DIR, 'ch-iid.json'),
     JSON.stringify({
@@ -523,6 +525,10 @@ if (wants('CH'))
       entries: ch,
     }),
   );
+  console.log(
+    `ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`,
+  );
+}
 if (wants('SK'))
   writeFileSync(
     resolve(OUT_DIR, 'sk-bank.json'),
@@ -560,8 +566,5 @@ if (!ONLY) {
   console.log(
     `sk-bank.json: ${Object.keys(sk).length} codes, batch1 ${skBatch1.length}, ` +
       `${skRows.filter((r) => r.bic).length} carrying a BIC`,
-  );
-  console.log(
-    `ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`,
   );
 }

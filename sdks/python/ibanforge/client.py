@@ -233,7 +233,7 @@ class IBANforge:
     def lookup_ch_clearing(self, iid: Union[str, int]) -> CHClearingResult:
         """Resolve a Swiss BC-Nummer / IID into institution data ($0.003 / call).
 
-        Backed by ~1,200 SIX BankMaster entries (refreshed monthly) — the
+        Backed by 1,100+ SIX BankMaster entries (re-read weekly) — the
         deepest Swiss clearing data in any public API: full payment-rail
         participation (SIC, euroSIC, CHF instant) plus QR-IID.
         """

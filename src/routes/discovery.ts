@@ -91,7 +91,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     path: '/v1/ch/clearing/:iid',
     examplePath: '/v1/ch/clearing/100',
     price_usdc: 0.003,
-    description: `Swiss BC-Nummer / IID clearing lookup with SIC, euroSIC, Instant Payments and QR-IID data (${F.claim.chClearing} SIX entries, refreshed monthly)`,
+    description: `Swiss BC-Nummer / IID clearing lookup with SIC, euroSIC, Instant Payments and QR-IID data (${F.claim.chClearing} SIX entries, re-read weekly)`,
   },
 ];
 

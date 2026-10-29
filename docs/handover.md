@@ -184,6 +184,18 @@ il y a donc **trois écrivains** de `data/bic.sqlite` (mensuel, tchèque, italie
 garde qu'un run en attente par groupe ; un run annulé n'alerte pas. Cas possible le 1er d'un
 mois qui tombe un jeudi.
 
+Depuis le 29.10.2026 (décision de Claude-Alain : « relire le fichier SIX chaque semaine »), il y a
+**quatre écrivains** : le clearing suisse (SIX BankMaster) est aussi relu chaque lundi par
+`.github/workflows/refresh-ch-clearing.yml`, seul (`npm run db:seed-ch`), dans le même groupe.
+`scripts/ch-clearing-diff.ts` n'y laisse commiter que la table `ch_clearing`, et seulement quand
+son contenu change hors de `valid_on` et `updated_at` (la date du fichier SIX avance chaque jour
+ouvrable ; la compter redéploierait l'API chaque semaine pour rien) ; il refuse un fichier plus
+ancien que celui commité. Il ne touche pas `bic_entries` : un BIC que SIX vient d'attribuer est
+servi par `validate_iban` et `lookup_ch_clearing` dès la relecture, mais `lookup_bic` ne le trouve
+(`found: false`, avec déjà l'adresse SIX dans `postal_address`) qu'au mensuel suivant. Le 1er du
+mois, il ne relit rien : le mensuel relit SIX ce jour-là, et un commit hebdomadaire passé avant
+lui ferait buter son `git pull --rebase` sur le binaire.
+
 Known gaps a newcomer should expect to work on, in order:
 
 - **The `NOTICE` file requires a verbatim attribution sentence for the BIC-to-LEI mapping

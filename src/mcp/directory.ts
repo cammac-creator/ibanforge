@@ -491,7 +491,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       'Resolves a Swiss or Liechtenstein clearing number (BC-Nummer / IID, 1 to 5 digits) into the institution behind it, with its payment-rail participation ' +
       '(SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and its QR-IID allocation. ' +
       'Suited to a question about which institution holds an IID, its routing for a Swiss instant transfer, its QR-IID, or what kind of institution it is (bank, PFS or SIC-only participant). ' +
-      `Covers every IID of the SIX BankMaster: ${F.claim.chClearing} entries (Swiss official source, refreshed monthly). ` +
+      `Covers every IID of the SIX BankMaster: ${F.claim.chClearing} entries (Swiss official source, re-read weekly). ` +
       'Returns: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on; ' +
       'a merged IID answers for its successor, with redirected_from. Relevant to CH and LI accounts only. ' +
       note,

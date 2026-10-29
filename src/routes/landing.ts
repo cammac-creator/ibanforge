@@ -1034,7 +1034,7 @@ landing.get('/', (c) => {
             <div class="hero-moat">
               <strong>Swiss clearing:</strong> every <strong>IID</strong> of the SIX BankMaster with
               its payment-rail participation (SIC, euroSIC, CHF Instant Payments) and, where SIX
-              allocates one, its <strong>QR-IID</strong>, refreshed monthly.
+              allocates one, its <strong>QR-IID</strong>, re-read weekly.
             </div>
             <div class="hero-ctas">
               <a href="#tryit" class="cta cta-primary">Try it free &darr;</a>

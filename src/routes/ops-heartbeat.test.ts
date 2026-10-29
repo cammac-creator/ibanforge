@@ -99,12 +99,13 @@ describe('POST /internal/heartbeat/:name — la porte', () => {
 });
 
 describe('POST /internal/heartbeat/:name — le battement', () => {
-  it('accepte les sept crons déclarés et écrit leur battement dans kv_state', async () => {
+  it('accepte les huit crons déclarés et écrit leur battement dans kv_state', async () => {
     // La liste blanche EST le contrat : les noms des étapes YAML doivent lui
     // correspondre exactement, sinon le cron pointe dans le vide.
     expect(HEARTBEATS.map((h) => h.name).sort()).toEqual([
       'indexnow',
       'refresh-bic',
+      'refresh-ch-clearing',
       'refresh-compliance',
       'refresh-cz-register',
       'refresh-it-register',
@@ -138,6 +139,8 @@ describe('POST /internal/heartbeat/:name — le battement', () => {
     // Hebdomadaires ajoutés le 28/09/2026.
     expect(byName.get('refresh-it-register')).toBeGreaterThanOrEqual(8 * DAY);
     expect(byName.get('indexnow')).toBeGreaterThanOrEqual(8 * DAY);
+    // Hebdomadaire ajouté le 29/10/2026 : la relecture SIX du lundi.
+    expect(byName.get('refresh-ch-clearing')).toBeGreaterThanOrEqual(8 * DAY);
     // Quotidien : au moins deux jours de marge.
     expect(byName.get('refresh-cz-register')).toBeGreaterThanOrEqual(2 * DAY);
   });
