@@ -14,8 +14,11 @@
  * compliance answer cannot read it as a signal.
  *
  * The exclusions each law writes (subordinated debt, participation capital,
- * subsidiaries) are not turned into categories: the article cited carries
- * them. Obwalden and Glarus add a default condition ("und die Bank nicht in der
+ * subsidiaries) are not turned into categories: they are in that law. Most
+ * laws write them in the guarantee article itself; Fribourg (LBCF art. 5 al. 3,
+ * participation certificates) and Neuchâtel (LBCN art. 8 al. 3, participation
+ * certificates) write them in another article, which `source` cites as well.
+ * Obwalden and Glarus add a default condition ("und die Bank nicht in der
  * Lage ist, ihren fälligen Verpflichtungen / Verbindlichkeiten nachzukommen");
  * their guarantee is still in the law, and the article reference is the answer.
  *
@@ -35,8 +38,10 @@
  *
  * Laws and other official enactments are not protected by copyright (Federal
  * Act on Copyright, art. 5), so the table may live in this public repository.
- * Every article was read on 29.10.2026 in the canton's official collection,
- * except where `source` names the LexFind copy that was read (Vaud, Schwyz).
+ * Every article was read on 29.10.2026 in the canton's official collection:
+ * for Vaud, the version of the BLV in force since 1 March 2025; for Schwyz,
+ * the consolidated text of 1 January 2015 that the cantonal index (SRSZ) still
+ * lists on that day, which `source` says.
  * Re-read once a year; known reforms to watch: Basel-Landschaft (2026).
  */
 
@@ -102,7 +107,7 @@ export const CANTONAL_BANK_STATE_GUARANTEE: Readonly<Record<string, StateGuarant
     canton: 'NE',
     bic8: 'BCNNCH22',
     guaranteed: true,
-    source: 'Loi sur la Banque cantonale neuchâteloise (LBCN), RSN 621, art. 4',
+    source: 'Loi sur la Banque cantonale neuchâteloise (LBCN), RSN 621, art. 4 and art. 8 al. 3',
     url: 'https://rsn.ne.ch/DATA/program/books/rsne/htm/621.htm',
   },
   '00767': {
@@ -110,15 +115,15 @@ export const CANTONAL_BANK_STATE_GUARANTEE: Readonly<Record<string, StateGuarant
     bic8: 'BCVLCH2L',
     guaranteed: false,
     source:
-      'Loi organisant la Banque Cantonale Vaudoise (LBCV), BLV 951.01, version in force since 1 May 2010 (LexFind copy)',
-    url: 'https://www.lexfind.ch/tolv/183980/fr',
+      'Loi organisant la Banque Cantonale Vaudoise (LBCV), BLV 951.01, version in force since 1 March 2025',
+    url: 'https://prestations.vd.ch/pub/blv-publication/actes/consolide/951.01?id=88fb1d2a-f88f-45b7-b149-76fc03096249',
     note: 'The law has no article granting a state guarantee.',
   },
   '00768': {
     canton: 'FR',
     bic8: 'BEFRCH22',
     guaranteed: true,
-    source: 'Loi sur la Banque cantonale de Fribourg (LBCF), RSF 961.1, art. 3',
+    source: 'Loi sur la Banque cantonale de Fribourg (LBCF), RSF 961.1, art. 3 and art. 5 al. 3',
     url: 'https://bdlf.fr.ch/app/fr/texts_of_law/961.1',
   },
   '00769': {
@@ -154,8 +159,8 @@ export const CANTONAL_BANK_STATE_GUARANTEE: Readonly<Record<string, StateGuarant
     bic8: 'KBSZCH22',
     guaranteed: true,
     source:
-      'Gesetz über die Schwyzer Kantonalbank, SRSZ 321.100, § 7, version of 1 January 2015 (LexFind copy)',
-    url: 'https://www.lexfind.ch/tolv/83644/de',
+      'Gesetz über die Schwyzer Kantonalbank (SZKBG), SRSZ 321.100, § 7, consolidated text of 1 January 2015 listed by the cantonal index on 29 October 2026',
+    url: 'https://www.sz.ch/public/upload/assets/6226/321_100.pdf?fp=4',
   },
   '00778': {
     canton: 'LU',

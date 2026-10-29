@@ -109,6 +109,32 @@ describe('the table: 24 cantonal banks, each with its law, its text and its date
     }
   });
 
+  it('cites the second article where the law writes its exclusion outside the guarantee article', () => {
+    // Fribourg excludes participation certificates in art. 5 al. 3, Neuchâtel
+    // in art. 8 al. 3: the guarantee article alone would leave them out.
+    expect(stateGuaranteeForHeadOffice('00768')!.source).toMatch(
+      /RSF 961\.1, art\. 3 and art\. 5 al\. 3$/,
+    );
+    expect(stateGuaranteeForHeadOffice('00766')!.source).toMatch(
+      /RSN 621, art\. 4 and art\. 8 al\. 3$/,
+    );
+  });
+
+  it('every text was read in the official collection of its canton, never in a copy', () => {
+    for (const [iid, row] of TABLE) {
+      expect(row.url, iid).not.toMatch(/lexfind/i);
+      expect(row.source, iid).not.toMatch(/lexfind|copy/i);
+    }
+    // Vaud: the BLV of the canton, the version in force since 1 March 2025.
+    const bcv = CANTONAL_BANK_STATE_GUARANTEE['00767'];
+    expect(bcv.url).toMatch(/^https:\/\/prestations\.vd\.ch\/pub\/blv-publication\//);
+    expect(bcv.source).toContain('BLV 951.01, version in force since 1 March 2025');
+    // Schwyz: the PDF the cantonal index (SRSZ) lists, and the date of its text.
+    const szkb = CANTONAL_BANK_STATE_GUARANTEE['00777'];
+    expect(szkb.url).toMatch(/^https:\/\/www\.sz\.ch\/public\/upload\/assets\/\d+\/321_100\.pdf/);
+    expect(szkb.source).toContain('SRSZ 321.100, § 7, consolidated text of 1 January 2015');
+  });
+
   it('accepts an unpadded IID, and answers null for anything else', () => {
     expect(stateGuaranteeForHeadOffice('700')).toEqual(stateGuaranteeForHeadOffice('00700'));
     expect(stateGuaranteeForHeadOffice('00230')).toBeNull();

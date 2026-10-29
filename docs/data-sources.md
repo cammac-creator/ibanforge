@@ -19,9 +19,11 @@ lecture) et, pour la BEKB, la BCV et la BCGE, une `note`. Table :
 `src/lib/ch-state-guarantee.ts`.
 
 **La source et sa licence.** Les 24 lois cantonales, lues article par article le
-29/10/2026 au recueil officiel de chaque canton (Vaud et Schwyz : copie LexFind, dont
-la version lue est écrite dans `source`). Les lois et autres actes officiels ne sont
-pas protégés par le droit d'auteur (LDA art. 5) : cas 1, la table vit dans ce dépôt.
+29/10/2026 au recueil officiel de chaque canton (Vaud : la BLV, version en vigueur
+depuis le 01/03/2025 ; Schwyz : le texte consolidé au 01/01/2015 que l'index SRSZ
+du canton donne ce jour-là, ce que dit `source`). Les lois et autres actes officiels
+ne sont pas protégés par le droit d'auteur (LDA art. 5) : cas 1, la table vit dans
+ce dépôt.
 
 **Ce que dit la table.** 21 garanties inscrites dans la loi ; aucune pour la BEKB
 (art. 4 abrogé au 01/01/2006 ; art. T1-1 : depuis le 01/01/2013, seules les
@@ -31,8 +33,10 @@ subsidiaire les autres engagements qui existaient au 01/01/2006, jusqu'à leur
 dans la LBCV) et pour la BCGE (art. 4 abrogé au 01/01/2013, garantie transitoire
 plafonnée jusqu'au 31/12/2016). Soleure et Appenzell Rhodes-Extérieures n'ont plus de
 banque cantonale. Les exclusions de chaque loi (dettes subordonnées, capital de
-participation, filiales) restent dans l'article cité ; la condition de défaut
-qu'ajoutent Obwald et Glaris n'en fait pas une catégorie à part.
+participation, filiales) restent dans cette loi, sans catégorie à part : le plus
+souvent dans l'article de la garantie ; à Fribourg (LBCF art. 5 al. 3) et à
+Neuchâtel (LBCN art. 8 al. 3), dans un autre article, que `source` cite aussi. La
+condition de défaut qu'ajoutent Obwald et Glaris n'en fait pas une catégorie à part.
 
 **Rattachement par numéro, jamais par nom.** Clé : l'IID du siège dans le
 BankMaster de SIX, confirmé par son BIC dans l'annuaire le 29/10/2026 ; une agence

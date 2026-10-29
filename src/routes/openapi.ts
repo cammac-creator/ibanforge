@@ -3876,7 +3876,7 @@ const buildRawSpec = () => ({
                 type: 'string',
                 example: 'Kantonalbankgesetz (ZKBG), LS 951.1, § 6',
                 description:
-                  'The law, its number in the cantonal collection, and the article. The exclusions the law writes (for example subordinated debt) are in that article.',
+                  'The law, its number in the cantonal collection, and the article. The exclusions the law writes (for example subordinated debt) are in that law; where they sit in another article, that article is cited too.',
               },
               url: { type: 'string', format: 'uri', description: 'The text that was read.' },
               as_of: { type: 'string', format: 'date', description: 'The day the text was read.' },
