@@ -44,8 +44,8 @@ Dependabot's docker entry, which ignores majors; never go back to the floating `
 dependency check). Frontend tests run **from** `frontend/`: at the root, vitest finds
 nothing and exits zero, which reads like success.
 A file under `frontend/`, tests included, never imports statically from outside `frontend/`: the site's
-Docker image copies only that folder (plus `CHANGELOG.md`), so CI stays green and the deployment fails
-(28.10.2026). A test may read API code at run time; a page or a route never reads outside `frontend/` (except
+Docker image copies only that folder (plus `CHANGELOG.md`): on 28.10.2026 CI stayed green and the deployment
+failed. Since then the `site-image` job of `ci.yml` builds that image on every pull request. A test may read API code at run time; a page or a route never reads outside `frontend/` (except
 `CHANGELOG.md`, which the image copies for the feeds).
 `scripts/frontend-image-imports.test.ts` enforces the import part.
 

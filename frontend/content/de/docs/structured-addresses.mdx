@@ -142,7 +142,7 @@ Derselbe Block erscheint am `bic`-Objekt von [`POST /v1/iban/validate`](/de/docs
 
 Die andere Hälfte. Sie haben eine Adresse strukturiert; dies sagt Ihnen, ob sie die Regeln einer bestimmten Schiene erfüllt — Regel für Regel, mit dem Dokument, aus dem jede Regel stammt.
 
-Es liest keine unserer Datenbanken. Deshalb ist es kostenlos.
+Es ist kostenlos. Für eine Adresse in der Schweiz oder in Liechtenstein (`ctry` `CH` oder `LI`, mit `pst_cd` und `twn_nm`) trägt die Antwort zusätzlich `postcode_locality`: ob PLZ und Ort im amtlichen Ortschaftenverzeichnis von swisstopo zusammengehören (Quellenangabe ©swisstopo, Versionsdatum in `as_of`). Der Block steht neben den Befunden und ändert `conforms` nie. `status` ist `match`, `town_mismatch`, `other_country` (9490 Vaduz mit `CH` geschrieben), `postcode_not_listed` oder `not_verifiable`: Das Verzeichnis beschreibt das Gebiet, eine Postfach-PLZ wie 1211 Genève oder 2501 Biel steht also nicht darin, und wenn der Ort unter einer anderen PLZ desselben Gebiets verzeichnet ist, bleibt das Paar ungeprüft, statt gemeldet zu werden. Akzente, Gross- und Kleinschreibung, «St.» oder «Sankt», ein Kantonskürzel und jede Hälfte eines zweisprachigen Namens (Biel/Bienne) werden ignoriert, und die üblichen Namen der grösseren Städte in einer anderen Sprache (Genf, Berne) werden akzeptiert. Die Strasse wird nicht geprüft.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/address/check \
@@ -214,7 +214,7 @@ Drei Grenzen, hier genannt, damit sie niemand erst im November entdeckt.
 
 **Dies löst keine Migration von Kundenadressen.** Der Grossteil der Änderung von November 2026 betrifft die Adressen der **Parteien** einer Zahlung — `Dbtr`, `Cdtr`, `UltmtDbtr`, `UltmtCdtr`. Das ist Ihr eigenes Kundenadressbuch; diese API hält dazu keine Daten und stellt dazu keine Behauptung auf. Wer Ihnen sagt, eine IBAN- und BIC-API erledige diese Migration für Sie, verkauft Ihnen etwas, das er nicht hat.
 
-**Dies verwandelt keine Freitextadresse in eine strukturierte.** Aus `„ul. Sokolska 34, 40-086 Katowice"` ein `StrtNm` / `BldgNb` / `PstCd` / `TwnNm` zu machen, erfordert nationale Postreferenzdaten für rund 250 Länder. Das ist das Geschäft von Loqate, Smarty und Googles Address Validation API. Wir halten davon nichts, und eine ungeprüfte Vermutung über einen Strassennamen ist weniger wert als keine Antwort.
+**Dies verwandelt keine Freitextadresse in eine strukturierte.** Aus `„ul. Sokolska 34, 40-086 Katowice"` ein `StrtNm` / `BldgNb` / `PstCd` / `TwnNm` zu machen, erfordert nationale Postreferenzdaten für rund 250 Länder. Das ist das Geschäft von Loqate, Smarty und Googles Address Validation API. Wir halten davon nichts (das Schweizer Ortschaftenverzeichnis oben kennt PLZ und Orte, keine Strassen), und eine ungeprüfte Vermutung über einen Strassennamen ist weniger wert als keine Antwort.
 
 **Dies bescheinigt keine CBPR+-Konformität.** Keine öffentliche Quelle erlaubt es heute irgendjemandem, das ehrlich zu tun. Der Prüfer benennt die Schiene, gegen die er urteilt, und jedes Finding benennt sein Dokument.
 

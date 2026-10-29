@@ -46,6 +46,12 @@ COPY --from=builder /app/reference/ reference/
 # workflow. Copied OUTSIDE data/, which the Railway volume masks at runtime; an
 # absent file only turns the German account check off (not_checked).
 COPY data/de-pruefziffer.json reference/de-pruefziffer.json
+# The official directory of Swiss and Liechtenstein localities with postcode
+# (swisstopo, open data, "©swisstopo"), tracked in git and written by
+# scripts/seed-ch-localities.ts. Same reason for reference/: the volume masks
+# data/. An absent file only turns the postcode and town lookup off
+# (directory_unavailable, no warning).
+COPY data/ch-localities.json reference/ch-localities.json
 COPY src/db/bic_data.json dist/db/bic_data.json
 COPY src/db/nl-psp.json dist/db/nl-psp.json
 
@@ -66,6 +72,7 @@ ENV PORT=3000
 # Outside data/, which the Railway volume masks at runtime.
 ENV UK_MODULUS_PATH=/app/reference/uk-modulus.json
 ENV DE_PRUEFZIFFER_PATH=/app/reference/de-pruefziffer.json
+ENV CH_LOCALITIES_PATH=/app/reference/ch-localities.json
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"

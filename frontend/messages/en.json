@@ -2723,6 +2723,7 @@
       "issuer_not_bank": "Held at a payment institution, not a bank",
       "country_risk": "Elevated country risk",
       "address_not_structured": "Address not structured (ISO 20022)",
+      "postcode_locality_mismatch": "Postcode and town not listed together (swisstopo directory)",
       "bank_not_consulted": "Bank not consulted"
     },
     "pay": {
@@ -2878,6 +2879,9 @@
       "error": "Error",
       "warning": "Warning",
       "clean": "No finding: every rule passes.",
+      "cleanUnverified": "No error and no warning, but not every postcode could be checked:",
+      "postcodeNotVerifiable": "{party}: postcode {postcode} is not in the official directory of localities of swisstopo, which lists {town} under another postcode of the same postal area (a post-office box postcode, likely). The pair is neither confirmed nor contradicted, so it gets no warning.",
+      "postcodeDirectoryUnavailable": "{party}: the directory of localities could not be read on the server, so postcode {postcode} and town {town} were not compared.",
       "proposedCreditor": "Proposed structured creditor address",
       "proposedDebtor": "Proposed structured debtor address",
       "nextSteps": "What to do next"

@@ -189,6 +189,11 @@ function qr(changes: Record<number, string> = {}, extra: readonly string[] = [])
 /** Les QR-factures qui atteignent chaque constat écrit avec une règle. */
 const QR_PAYLOADS: readonly string[] = [
   qr(),
+  // NPA et localité au répertoire de swisstopo (29.10.2026) : les trois
+  // avertissements, lus par le crible comme tout autre constat.
+  qr({ 8: '8001', 9: 'Bern' }),
+  qr({ 8: '9490', 9: 'Vaduz' }),
+  qr({ 8: '8238', 9: 'Büsingen' }),
   'SPC\n0200\n1',
   qr({ 0: 'SPX', 1: '0100', 2: '2' }),
   qr({ 3: 'DE89370400440532013000' }),
@@ -262,6 +267,20 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ],
   ['check_postal_address', { scheme: 'hvps_plus', address: { adr_line: ['Rue du Lac 1268'] } }],
   ['check_postal_address', { scheme: 'fedwire', address: { twn_nm: 'New York', ctry: 'US' } }],
+  // Chaque état du bloc postcode_locality qui porte une phrase (29.10.2026).
+  ...(
+    [
+      ['8001', 'Zurich', 'CH'],
+      ['8001', 'Bern', 'CH'],
+      ['9490', 'Vaduz', 'CH'],
+      ['8238', 'Büsingen', 'CH'],
+      ['2501', 'Biel', 'CH'],
+      ['80011', 'Zürich', 'CH'],
+    ] as const
+  ).map(
+    ([pst_cd, twn_nm, ctry]) =>
+      ['check_postal_address', { scheme: 'sps', address: { pst_cd, twn_nm, ctry } }] as const,
+  ),
   ...QR_PAYLOADS.map((payload) => ['check_swiss_qr_bill', { payload }] as const),
   ['lookup_ch_clearing', { iid: '230' }],
   // 29.10.2026 : la provenance du QR-IID, la phrase d'un QR-IID et celle d'une

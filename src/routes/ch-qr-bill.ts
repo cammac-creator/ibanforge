@@ -12,8 +12,11 @@
  * the character set (ch. 4.1.1, an error) and, as a warning, the CHF-only
  * QR-IBAN and QR reference of the guidelines version 2.4.
  *
- * Free: pure rule evaluation over a published standard, no database, no
- * key, no quota. The paid surface stays the bank behind the IBAN.
+ * Free: rule evaluation over a published standard, plus, for a type S
+ * address in CH or LI, postcode and town looked up in the official directory
+ * of localities of swisstopo (open data shipped with the server; a warning,
+ * never an error). No key, no quota. The paid surface stays the bank behind
+ * the IBAN.
  */
 import { Hono } from 'hono';
 import { z } from 'zod';
