@@ -7,10 +7,23 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult, createEnrichCache } from '../lib/enrich.js';
-import { bicCountryName, bicSourceFields, lookup, namedRow, nonEmpty } from '../lib/bic-lookup.js';
+import {
+  bicCountryName,
+  bicSourceFields,
+  lookup,
+  namedRow,
+  nonEmpty,
+  registeredAddress,
+} from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
-import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
+import {
+  clearingRecord,
+  clearingRemarks,
+  lookupClearingByBankCode,
+  normalizeIid,
+  getChClearingCount,
+} from '../lib/ch-clearing.js';
 import {
   buildCountriesPayload,
   buildPricingPayload,
@@ -343,6 +356,10 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
 
     // Une fiche complète ou introuvable, comme GET /v1/bic/:code (25/09/2026).
     const row = namedRow(lookup(validation.bic11!));
+    // L'adresse du siège, comme GET /v1/bic/:code et le transport HTTP
+    // (29.10.2026) : même constructeur que `bic.address` de validate_iban, avec
+    // sa source et sa date (`as_of`). Ni `postal_address` ni les sanctions.
+    const address = registeredAddress(row);
 
     const result = {
       bic: validation.bic,
@@ -368,6 +385,8 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
         name: bicCountryName(row, validation.country_code!),
       },
       city: nonEmpty(row?.city),
+      address,
+      address_available: address !== null,
       branch_code: validation.branch_code,
       branch_info: row?.branch_info ?? null,
       lei: row?.lei ?? null,
@@ -693,28 +712,14 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       };
     }
 
+    // Mêmes constructeurs que GET /v1/ch/clearing/:iid et que le transport HTTP
+    // (29.10.2026) : la provenance du QR-IID (`qr_iid_source`, `qr_iids`), le
+    // drapeau et la phrase d'un QR-IID, puis la phrase de fusion.
     const result: Record<string, unknown> = {
-      iid: entry.iid,
-      found: true,
-      institution: {
-        name: entry.name,
-        type: entry.institution_type,
-        iid_type: entry.iid_type,
-        headquarters_iid: entry.headquarters_iid,
-      },
-      address: entry.address,
-      bic: entry.bic,
-      payment_services: entry.payment_services,
-      sic_iid: entry.sic_iid,
-      qr_iid: entry.qr_iid,
-      valid_on: entry.valid_on,
+      ...clearingRecord(entry),
       cost_usdc: 0.003,
+      ...clearingRemarks(entry),
     };
-
-    if (entry.redirected_from) {
-      result.redirected_from = entry.redirected_from;
-      result.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
-    }
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

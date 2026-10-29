@@ -113,6 +113,7 @@ describe('nextSteps', () => {
       'DE43100110010532013000',
       'DE89370400440532013000',
       'CH1000230000000012345',
+      'CH3130700123000889012',
     ]) {
       for (const s of steps(iban)) {
         expect(s.code, iban).toMatch(/^[a-z_]+$/);
@@ -349,6 +350,43 @@ describe('national_check_digits_failed', () => {
 
   it('never fires on an IBAN that failed validation', () => {
     expect(nextSteps(base({ valid: false, national_check_digits: national('fail') }))).toEqual([]);
+  });
+});
+
+/**
+ * `qr_iban_requires_qr_reference` (29.10.2026) : un QR-IBAN ne se paie qu'avec
+ * la référence QR de la QR-facture du créancier, et la version 2.4 des
+ * directives QR-facture de SIX (valable dès le 14.11.2026) le réserve aux
+ * francs. De bout en bout, sur la base publique : 30700 est le QR-IID de la
+ * Banque cantonale de Zurich dans le fichier SIX, 00700 son IID ordinaire, et
+ * 31999 (l'exemple des directives) n'est attribué à personne.
+ */
+describe('qr_iban_requires_qr_reference', () => {
+  const QR_IBAN = 'CH3130700123000889012'; // IID 30700, QR-IID attribué
+  const SAME_BANK = 'CH0900700123000889012'; // IID 00700, même banque, IBAN ordinaire
+  const UNALLOCATED = 'CH4431999123000889012'; // IID 31999, plage QR, non attribué
+
+  it('fires on a QR-IBAN, names the field, and stays out of the blocking steps', () => {
+    const s = steps(QR_IBAN);
+    const hit = s.find((x) => x.code === 'qr_iban_requires_qr_reference');
+    expect(hit).toBeDefined();
+    expect(hit!.because).toBe(
+      'clearing.is_qr_iid is true: bank code 30700 is in the QR-IID range 30000-31999',
+    );
+    expect(hit!.do).toContain('QR reference (QRR)');
+    expect(hit!.do).toContain('version 2.4 (valid from 14.11.2026) it is for CHF only');
+    expect(hit!.do).toContain('version 2.3 remains valid until November 2027');
+    expect(hit!.action).toBeUndefined();
+    // Pas un refus : l'offre de criblage suit, après l'étape.
+    expect(s.map((x) => x.code)).toEqual(['qr_iban_requires_qr_reference', 'screen_compliance']);
+  });
+
+  it('stays silent on an ordinary IBAN of the same bank', () => {
+    expect(codes(SAME_BANK)).not.toContain('qr_iban_requires_qr_reference');
+  });
+
+  it('stays silent on a QR-range code SIX has not allocated: the register already says stop', () => {
+    expect(codes(UNALLOCATED)).toEqual(['bank_code_not_allocated']);
   });
 });
 

@@ -557,6 +557,16 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .nullable()
     .optional()
     .describe('Null, never an empty string, when the source leaves the town blank.'),
+  // 29.10.2026 : l'adresse du siège que la description promet depuis le
+  // 24.06.2026 et que GET /v1/bic/:code sert. Déclarée ici, sinon Zod la retire.
+  // Même bloc que `bic.address` de validate_iban.
+  address: REGISTERED_ADDRESS_SCHEMA.nullable()
+    .optional()
+    .describe(
+      'Registered head-office address of the legal entity, from the same directory row as GET /v1/bic/:code and the bic.address of validate_iban, with its source and as_of (the date the entity last filed it, usually older than the bank name beside it). ' +
+        'Null when the source publishes no address for this BIC. It is the seat of the legal entity, not the branch, so address.city may differ from city.',
+    ),
+  address_available: z.boolean().optional().describe('True when address is not null.'),
   branch_code: z.string().optional(),
   branch_info: z.string().nullable().optional(),
   lei: z
@@ -837,6 +847,28 @@ const LOOKUP_CH_CLEARING_OUTPUT_SCHEMA = {
     .optional(),
   sic_iid: z.string().nullable().optional(),
   qr_iid: z.string().nullable().optional().describe('QR-bill enabled IID.'),
+  // 29.10.2026 : servis par GET /v1/ch/clearing/:iid, déclarés ici pour que
+  // Zod ne les retire plus (src/lib/ch-clearing.ts, `clearingRecord` et
+  // `clearingRemarks`).
+  qr_iid_source: z
+    .enum(['register', 'headquarters'])
+    .nullable()
+    .optional()
+    .describe(
+      'How qr_iid was obtained. register = SIX BankMaster publishes this pairing; headquarters = inherited from the head office (headquarters_iid), an inference and not a published SIX pairing. Null when qr_iid is null.',
+    ),
+  qr_iids: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Every QR-IID SIX allocates to the institution, present only when there is more than one; qr_iid carries the lowest.',
+    ),
+  is_qr_iid: z
+    .boolean()
+    .optional()
+    .describe(
+      'Present (true) only when the IID asked about is a QR-IID (SIX QR-bill range 30000-31999); iid then carries the standard IID of the institution and qr_iid the QR-IID asked about.',
+    ),
   valid_on: z.string().optional(),
   redirected_from: z.string().optional(),
   note: z.string().optional(),

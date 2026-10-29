@@ -7,7 +7,12 @@
 
 import { getBicDB } from './db.js';
 import type Database from 'better-sqlite3';
-import type { ChClearingEntry, ChInstitutionType, ChIidType } from '../types.js';
+import type {
+  ChClearingEntry,
+  ChClearingLookupResult,
+  ChInstitutionType,
+  ChIidType,
+} from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Cached prepared statements
@@ -422,6 +427,86 @@ export function lookupClearingSeatByBic(bic: string): ChClearingSeatAddress | nu
     country: row.country ?? 'CH',
     valid_on: row.valid_on,
   };
+}
+
+/**
+ * The record part of a found clearing answer: everything but the price and the
+ * timing, in the order GET /v1/ch/clearing/:iid has always served it.
+ *
+ * Shared by that route and by `lookup_ch_clearing` on both MCP transports
+ * (src/routes/mcp-http.ts, src/mcp/server.ts) since 29.10.2026. Until then the
+ * two MCP copies were hand-written and had dropped `qr_iid_source`, `qr_iids`
+ * and `is_qr_iid`: a branch's QR-IID, INFERRED from its head office, reached
+ * assistants as if SIX published it. One builder, three callers, so the
+ * surfaces cannot drift apart again.
+ */
+export function clearingRecord(
+  entry: ChClearingEntry,
+): Pick<
+  ChClearingLookupResult,
+  | 'iid'
+  | 'found'
+  | 'institution'
+  | 'address'
+  | 'bic'
+  | 'payment_services'
+  | 'sic_iid'
+  | 'qr_iid'
+  | 'qr_iid_source'
+  | 'qr_iids'
+  | 'valid_on'
+> & { found: true } {
+  return {
+    iid: entry.iid,
+    found: true,
+    institution: {
+      name: entry.name,
+      type: entry.institution_type,
+      iid_type: entry.iid_type,
+      headquarters_iid: entry.headquarters_iid,
+    },
+    address: entry.address,
+    bic: entry.bic,
+    payment_services: entry.payment_services,
+    sic_iid: entry.sic_iid,
+    qr_iid: entry.qr_iid,
+    // Never serve the QR-IID without saying how it was obtained. A standard IID
+    // now resolves one through the reverse index, and for a branch that value is
+    // INFERRED from its head office — presenting that as a published SIX pairing
+    // on the endpoint most likely to be used for QR-bill work would be exactly
+    // the overclaim the rest of this API is built to avoid.
+    qr_iid_source: entry.qr_iid_source,
+    ...(entry.qr_iids ? { qr_iids: entry.qr_iids } : {}),
+    valid_on: entry.valid_on,
+  };
+}
+
+/**
+ * What a found clearing answer says about the number that was asked: the
+ * QR-IID flag and its sentence, then the merger and its sentence. Served after
+ * the price, as the REST route always has; shared with both MCP transports for
+ * the reason given on `clearingRecord`.
+ *
+ * Order matters: on an IID that is both a QR-IID and merged, the merger
+ * sentence replaces the QR one, exactly as the route has answered since the
+ * QR flag was added.
+ */
+export function clearingRemarks(
+  entry: ChClearingEntry & { redirected_from?: string },
+): Pick<ChClearingLookupResult, 'is_qr_iid' | 'redirected_from' | 'note'> {
+  const remarks: Pick<ChClearingLookupResult, 'is_qr_iid' | 'redirected_from' | 'note'> = {};
+  // QR-IID lookups (range 30000–31999): `iid` already carries the institution's
+  // standard IID and `qr_iid` the queried QR-IID — flag it and say so, an agent
+  // should not have to know the SIX range convention.
+  if (entry.is_qr_iid) {
+    remarks.is_qr_iid = true;
+    remarks.note = `IID ${entry.qr_iid} is a QR-IID (QR-bill range 30000–31999) of ${entry.name}; the institution's standard IID is ${entry.iid}.`;
+  }
+  if (entry.redirected_from) {
+    remarks.redirected_from = entry.redirected_from;
+    remarks.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
+  }
+  return remarks;
 }
 
 /**

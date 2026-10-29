@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
+  clearingRecord,
+  clearingRemarks,
   lookupClearing,
   lookupClearingByBankCode,
   detectInstitutionType,
@@ -267,6 +269,65 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
       const snb = lookupClearing('00100');
       expect(snb!.qr_iid).toBeNull();
       expect(snb!.qr_iid_source).toBeNull();
+    });
+  });
+
+  // The two builders REST and both MCP transports share (29.10.2026). The MCP
+  // copies were hand-written and served a branch's INFERRED QR-IID without
+  // `qr_iid_source`; these pin what every surface now receives.
+
+  describe('clearingRecord and clearingRemarks', () => {
+    it('a ZKB branch (702) carries the inherited QR-IID and says it is inferred', () => {
+      const entry = lookupClearingByBankCode('00702')!;
+      const record = clearingRecord(entry);
+      expect(record.institution).toMatchObject({ iid_type: 'branch', headquarters_iid: '00700' });
+      expect(record.qr_iid).toBe('30700');
+      expect(record.qr_iid_source).toBe('headquarters');
+      expect(clearingRemarks(entry)).toEqual({});
+    });
+
+    it('the ZKB head office (700) carries its QR-IID as published by SIX', () => {
+      const entry = lookupClearingByBankCode('00700')!;
+      expect(clearingRecord(entry)).toMatchObject({
+        iid: '00700',
+        found: true,
+        qr_iid: '30700',
+        qr_iid_source: 'register',
+      });
+      expect(clearingRemarks(entry)).toEqual({});
+    });
+
+    it('a QR-IID (30700) is flagged and said in one sentence', () => {
+      const entry = lookupClearingByBankCode('30700')!;
+      expect(clearingRecord(entry)).toMatchObject({ iid: '00700', qr_iid: '30700' });
+      expect(clearingRemarks(entry)).toEqual({
+        is_qr_iid: true,
+        note: "IID 30700 is a QR-IID (QR-bill range 30000–31999) of Zürcher Kantonalbank; the institution's standard IID is 00700.",
+      });
+    });
+
+    it('several QR-IIDs reach the record, and an entry without any keeps both fields null', () => {
+      expect(clearingRecord(lookupClearing('00230')!).qr_iids).toEqual(['30005', '30308']);
+      const snb = clearingRecord(lookupClearing('00100')!);
+      expect(snb.qr_iid).toBeNull();
+      expect(snb.qr_iid_source).toBeNull();
+      expect(snb).not.toHaveProperty('qr_iids');
+    });
+
+    it('a merger is said, and on a merged QR-IID its sentence replaces the QR one', () => {
+      const merged = lookupClearingByBankCode('04835')!;
+      expect(clearingRemarks(merged)).toEqual({
+        redirected_from: '04835',
+        note: 'IID 04835 has been merged into IID 00230.',
+      });
+      // Built on a real QR row rather than on a merged QR-IID of the day: the
+      // order is the rule under test, and SIX's list of merged QR-IIDs moves.
+      const both = { ...lookupClearing('30005')!, redirected_from: '31000' };
+      expect(clearingRemarks(both)).toEqual({
+        is_qr_iid: true,
+        redirected_from: '31000',
+        note: 'IID 31000 has been merged into IID 00230.',
+      });
     });
   });
 

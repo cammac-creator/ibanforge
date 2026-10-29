@@ -6,9 +6,11 @@
  * IBAN and QR-IBAN range, QRR / SCOR / NON reference checksums and their
  * pairing with the IBAN, amount and currency, and above all whether the
  * addresses are STRUCTURED (type S) or still COMBINED (type K), which the
- * standard removed on 21.11.2025 and whose payment the banks guarantee only
+ * standard removed on 21.11.2025 and whose payment the banks guaranteed only
  * until the end of September 2026 (COMBINED_ADDRESS_NOTICE). A combined
- * address comes back with a proposed structured form.
+ * address comes back with a proposed structured form. Since 29.10.2026 also
+ * the character set (ch. 4.1.1, an error) and, as a warning, the CHF-only
+ * QR-IBAN and QR reference of the guidelines version 2.4.
  *
  * Free: rule evaluation over a published standard, plus, for a type S
  * address in CH or LI, postcode and town looked up in the official directory

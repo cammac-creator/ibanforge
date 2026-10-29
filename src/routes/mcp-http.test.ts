@@ -38,6 +38,8 @@ import {
 import { MCP_TOOLS } from '../mcp/inventory.js';
 import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { deviceGrant } from './device-grant.js';
+import { chClearing } from './ch-clearing.js';
+import { bicLookup } from './bic-lookup.js';
 import { getStatsDB } from '../lib/db.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { trialWeekStart } from '../lib/trial.js';
@@ -1705,5 +1707,123 @@ describe('le haut de l’entonnoir MCP distant, par jour', () => {
     );
     expect(refused.error?.message).toContain('Weekly MCP free tier limit reached');
     expect(today()).toEqual(before);
+  });
+});
+
+/**
+ * REST and MCP give the same bank answer (29.10.2026).
+ *
+ * `lookup_ch_clearing` on MCP dropped `qr_iid_source`, `qr_iids`, `is_qr_iid`
+ * and the QR sentence that GET /v1/ch/clearing/:iid serves: a ZKB branch's
+ * QR-IID, inferred from its head office, reached assistants as if SIX
+ * published it. `lookup_bic` promised the registered head-office address in
+ * its description since 24.06.2026 and never returned it. Both answers are
+ * now compared field by field against the REST route, on the routes as they
+ * are mounted, with everything REST adds of its own set aside (price, timing,
+ * the free-tier attribution a bare app never attaches).
+ */
+describe('/mcp — lookup_ch_clearing and lookup_bic answer what REST answers', () => {
+  const REST_ONLY = new Set(['cost_usdc', 'list_price_usdc', 'processing_ms', 'attribution']);
+  const shared = (body: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(body).filter(([key]) => !REST_ONLY.has(key)));
+
+  function restApp() {
+    const app = new Hono<HonoEnv>();
+    app.route('/', chClearing);
+    app.route('/', bicLookup);
+    return app;
+  }
+
+  async function rest(path: string): Promise<Record<string, unknown>> {
+    const res = await restApp().request(path);
+    expect(res.status, path).toBe(200);
+    return (await res.json()) as Record<string, unknown>;
+  }
+
+  async function tool(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const resp = await rpc(app, sessionId, 'tools/call', { name, arguments: args });
+    expect(resp.error, `${name} ${JSON.stringify(args)}`).toBeUndefined();
+    const result = resp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent, `${name} lost its structuredContent`).toBeDefined();
+    return result.structuredContent!;
+  }
+
+  it('702, a ZKB branch: the QR-IID is said to be inherited from the head office', async () => {
+    const onRest = await rest('/v1/ch/clearing/702');
+    const onMcp = await tool('lookup_ch_clearing', { iid: '702' });
+    expect(shared(onMcp)).toEqual(shared(onRest));
+    expect(onMcp).toMatchObject({
+      iid: '00702',
+      qr_iid: '30700',
+      qr_iid_source: 'headquarters',
+      institution: { iid_type: 'branch', headquarters_iid: '00700' },
+    });
+    expect(onMcp).not.toHaveProperty('is_qr_iid');
+  });
+
+  it('30700, a QR-IID: flagged, and said in the same sentence as REST', async () => {
+    const onRest = await rest('/v1/ch/clearing/30700');
+    const onMcp = await tool('lookup_ch_clearing', { iid: '30700' });
+    expect(shared(onMcp)).toEqual(shared(onRest));
+    expect(onMcp).toMatchObject({
+      iid: '00700',
+      qr_iid: '30700',
+      qr_iid_source: 'register',
+      is_qr_iid: true,
+    });
+    expect(onMcp.note).toBe(
+      "IID 30700 is a QR-IID (QR-bill range 30000–31999) of Zürcher Kantonalbank; the institution's standard IID is 00700.",
+    );
+  });
+
+  it('700, the ZKB head office: the QR-IID is the one SIX publishes', async () => {
+    const onRest = await rest('/v1/ch/clearing/700');
+    const onMcp = await tool('lookup_ch_clearing', { iid: '700' });
+    expect(shared(onMcp)).toEqual(shared(onRest));
+    expect(onMcp).toMatchObject({ iid: '00700', qr_iid: '30700', qr_iid_source: 'register' });
+  });
+
+  it('04835, a merged IID: the merger sentence, as on REST', async () => {
+    const onRest = await rest('/v1/ch/clearing/04835');
+    const onMcp = await tool('lookup_ch_clearing', { iid: '04835' });
+    expect(shared(onMcp)).toEqual(shared(onRest));
+    expect(onMcp).toMatchObject({ iid: '00230', redirected_from: '04835' });
+  });
+
+  it('UBSWCHZH80A: the registered head-office address of REST, with its source and date', async () => {
+    const onRest = await rest('/v1/bic/UBSWCHZH80A');
+    const onMcp = await tool('lookup_bic', { bic: 'UBSWCHZH80A' });
+    expect(onMcp.address_available).toBe(true);
+    expect(onMcp.address).toEqual(onRest.address);
+    expect(onRest.address_available).toBe(true);
+    // The values the data holds today, read so a refresh that empties them is
+    // noticed: GLEIF publishes the seat, and `as_of` dates its filing.
+    expect(onMcp.address).toMatchObject({
+      type: 'registered',
+      post_code: '8001',
+      country: 'CH',
+      source: 'GLEIF',
+    });
+    expect((onMcp.address as { as_of: string | null }).as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('FABMCNSHXXX: no address on either surface, and both say so', async () => {
+    const onRest = await rest('/v1/bic/FABMCNSHXXX');
+    const onMcp = await tool('lookup_bic', { bic: 'FABMCNSHXXX' });
+    expect(onRest).toMatchObject({ address: null, address_available: false });
+    expect(onMcp).toMatchObject({ address: null, address_available: false });
+  });
+
+  it('lookup_bic keeps out what its description does not announce', async () => {
+    const onMcp = await tool('lookup_bic', { bic: 'UBSWCHZH80A' });
+    // The sanctions screen is check_compliance's; the ISO 20022 block is a
+    // later step (a Swiss block for lookup_bic), not this one.
+    expect(onMcp).not.toHaveProperty('sanctions');
+    expect(onMcp).not.toHaveProperty('postal_address');
   });
 });

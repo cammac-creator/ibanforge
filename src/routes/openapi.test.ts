@@ -17,6 +17,23 @@ it('aligne la date Fedwire du contrat sur la note de report', () => {
   expect(CBPR_NOTE).toContain('27.08.2026, read 28.10.2026');
 });
 
+// Le contrôle de QR-facture rend `valid` faux sur un caractère hors du jeu du
+// ch. 4.1.1 depuis le 29.10.2026 : le contrat le dit, avec l'avertissement
+// euros de la version 2.4, qui ne change pas `valid`.
+it('dit le jeu de caractères et la règle euros dans la description du contrôle de QR-facture', () => {
+  const description = buildSpec().paths['/v1/ch/qr-bill/check'].post.description;
+  for (const needle of [
+    'the character set',
+    'ch. 4.1.1',
+    'typographic apostrophe (U+2019), a tab or a decomposed letter',
+    'is an error (character_not_permitted',
+    'makes valid false',
+    'gets a warning (qr_iban_chf_only_ig24)',
+    'version 2.3 remains valid until November 2027; valid does not change',
+  ])
+    expect(description).toContain(needle);
+});
+
 // La description de la route était juste, mais les schémas imbriqués et les
 // outils annonçaient encore la date abandonnée ou une suppression générale.
 const OBSOLETE_ADDRESS_TIMETABLE =

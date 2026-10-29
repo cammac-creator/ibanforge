@@ -366,7 +366,8 @@ describe('a failed national check key stops the row, like the UK check', () => {
       expect(hits, cc).toHaveLength(1);
       expect(hits[0]!.detail, cc).toMatch(/cannot have been issued as written/);
       expect(row.status, cc).toBe('error');
-      // La colonne next_steps du classeur porte l'étape de l'API, telle quelle.
+      // Le champ next_steps de la ligne (AuditRow, jamais servi : ni colonne du
+      // classeur, ni aperçu) porte l'étape de l'API, telle quelle.
       expect(row.next_steps, cc).toContain('national_check_digits_failed');
     });
     expect(res.summary.by_code.national_check_digits_failed).toBe(FAILED.length);
@@ -425,5 +426,48 @@ describe('a failed national check key stops the row, like the UK check', () => {
     expect(preview[0]!.line).toBe(2);
     expect(preview[0]!.status).toBe('error');
     expect(preview[0]!.findings).toContain('national_check_digits_failed');
+  });
+});
+
+/**
+ * L'étape QR-IBAN de validate_iban (29.10.2026) arrive dans l'audit de fichier
+ * par `row.next_steps`, qui recopie les codes d'étape de l'API. Ce champ n'est
+ * servi nulle part : le classeur payant n'a pas de colonne next_steps, l'aperçu
+ * gratuit et la synthèse ne le lisent pas. Une ligne QR-IBAN se lit donc
+ * exactement comme l'IBAN ordinaire de la même banque : même état, mêmes
+ * constats, mêmes cellules d'audit.
+ */
+describe('a QR-IBAN line reads like the ordinary IBAN of the same bank', () => {
+  const QR = 'CH3130700123000889012'; // QR-IID 30700, attribué par SIX
+  const PLAIN = 'CH0900700123000889012'; // IID 00700, même banque
+
+  it('carries the step in row.next_steps only, and renders the same in workbook and preview', () => {
+    const res = auditFile(csv(['Nom;IBAN', `Alpha;${QR}`, `Beta;${PLAIN}`]), 'x.csv');
+    const [qr, plain] = res.rows;
+    expect(qr!.next_steps).toContain('qr_iban_requires_qr_reference');
+    expect(plain!.next_steps).not.toContain('qr_iban_requires_qr_reference');
+    expect(qr!.status).toBe(plain!.status);
+    expect(qr!.status).toBe('ok');
+    expect(qr!.findings).toEqual(plain!.findings);
+    expect(res.summary.ok).toBe(2);
+
+    for (const lang of ['fr', 'de', 'en'] as const) {
+      const wb = XLSX.read(buildWorkbook(res, lang), { type: 'buffer' });
+      const aoa = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[wb.SheetNames[0]!]!, {
+        header: 1,
+      });
+      // Après les deux colonnes source (Nom, IBAN) : les colonnes d'audit.
+      expect(aoa[1]!.slice(2), lang).toEqual(aoa[2]!.slice(2));
+      const cells = wb.SheetNames.flatMap((name) =>
+        XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name]!, { header: 1 }).flat(),
+      ).map(String);
+      expect(cells.join('\n'), lang).not.toContain('qr_iban_requires_qr_reference');
+    }
+
+    const preview = previewRows(res, 20);
+    expect(preview).toHaveLength(2);
+    for (const row of preview) expect(Object.keys(row)).not.toContain('next_steps');
+    const strip = ({ line: _l, iban_masked: _m, ...rest }: (typeof preview)[number]) => rest;
+    expect(strip(preview[0]!)).toEqual(strip(preview[1]!));
   });
 });
