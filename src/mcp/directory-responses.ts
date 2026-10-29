@@ -129,8 +129,8 @@ export const DIRECTORY_RESPONSE_EDITS: ReadonlyArray<ResponseEdit> = [
   ],
   // The QR-bill `next_steps`, a list of sentences.
   [
-    'Reissue the QR-bill with the creditor address in type S: the banks guarantee payment of a type K QR-bill only until the end of September 2026; see creditor.proposed_structured.',
-    'The creditor address is in type K, and the banks guarantee payment of a type K QR-bill only until the end of September 2026; creditor.proposed_structured carries the type S fields for a reissue.',
+    'Reissue the QR-bill with the creditor address in type S: the banks guaranteed payment of a type K QR-bill only until the end of September 2026; see creditor.proposed_structured.',
+    'The creditor address is in type K, and the banks guaranteed payment of a type K QR-bill only until the end of September 2026; creditor.proposed_structured carries the type S fields for a reissue.',
   ],
   [
     'Convert the ultimate debtor address to type S; see ultimate_debtor.proposed_structured.',
@@ -331,6 +331,8 @@ export function directoryStepSentence(step: NextStep, result: StepContext): stri
       return 'This is likely a virtual IBAN: with this issuer, account holder and IBAN holder often differ, which gives the name check more weight.';
     case 'issuer_not_a_known_iban_issuer':
       return 'The bank is not confirmed: the code resolves to a BIC, but its holder is not among the providers known to issue IBANs in this country, so the account may not exist; a payee name check settles it before sending.';
+    case 'qr_iban_requires_qr_reference':
+      return "This is a QR-IBAN (IID 30000-31999): a payment to it carries the QR reference (QRR) from the creditor's QR-bill, not an RF (SCOR) reference, and it is not an account for transfers without a reference. Under the SIX QR-bill guidelines version 2.4 (valid from 14.11.2026) it is for CHF only; version 2.3 remains valid until November 2027.";
     case 'screen_compliance':
       return 'check_compliance screens this institution against sanctions, FATF status and VoP reachability before a transfer; it reads the same bank-code verdict as this answer, so it does not score an unconfirmed code as an ordinary bank.';
     default:

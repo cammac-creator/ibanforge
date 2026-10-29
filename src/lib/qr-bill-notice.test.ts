@@ -80,6 +80,10 @@ const QR_SURFACES = [
   'src/routes/openapi.ts',
   'src/mcp/output-schemas.ts',
   'src/routes/discovery.ts',
+  // Depuis le 29.10.2026, l'étape QR-IBAN et la liste OpenAPI des codes
+  // d'étape citent le 14.11.2026 (date de validité des directives 2.4).
+  'src/lib/next-steps.ts',
+  'src/lib/bank-code-schema.ts',
   'mcp/src/index.ts',
   'frontend/messages/fr.json',
   'frontend/messages/de.json',
