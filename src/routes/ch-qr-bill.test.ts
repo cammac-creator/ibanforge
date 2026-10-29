@@ -92,4 +92,26 @@ describe('POST /v1/ch/qr-bill/check', () => {
     const bad = await app().request('/v1/ch/qr-bill/check', { method: 'POST', body: 'not json' });
     expect(bad.status).toBe(400);
   });
+
+  it('serves an example that passes its own check without a finding (29.10.2026)', async () => {
+    // The example of the 400 body is written with "\n" spelled out, as a
+    // caller pastes it into JSON. Turned back into line breaks, it meets
+    // neither the character set nor the CHF-only rule of the guidelines 2.4.
+    const none = await app().request('/v1/ch/qr-bill/check', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    const { example } = (await none.json()) as ErrorBody;
+    const r = await app().request('/v1/ch/qr-bill/check', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ payload: example.payload.replace(/\\n/g, '\n') }),
+    });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as SwissQrBillCheck;
+    expect(body.findings).toEqual([]);
+    expect(body.valid).toBe(true);
+    expect(body.ready_for_2026_11_14).toBe(true);
+  });
 });

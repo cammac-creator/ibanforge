@@ -93,6 +93,19 @@ describe('buildComplianceResponse — a valid IBAN is scored exactly as before',
   it('attaches meta on the valid path too', () => {
     expect(buildComplianceResponse('DE89370400440532013000').meta.scope).toBe('bank_bic_only');
   });
+
+  it('carries the QR-IBAN step of validate_iban, by design, and scores the bank as before', () => {
+    // buildComplianceResponse spreads the whole validation result, next_steps
+    // included (29.10.2026): the step that says how a QR-IBAN is paid reaches
+    // check_compliance too. It is advice on the payment, not a risk signal, so
+    // the score and the flags are those of the ordinary IBAN of the same bank.
+    const qr = buildComplianceResponse('CH3130700123000889012'); // QR-IID 30700
+    const plain = buildComplianceResponse('CH0900700123000889012'); // IID 00700
+    expect(qr.next_steps?.map((s) => s.code)).toContain('qr_iban_requires_qr_reference');
+    expect(plain.next_steps?.map((s) => s.code)).not.toContain('qr_iban_requires_qr_reference');
+    expect(qr.compliance.risk_score).toBe(plain.compliance.risk_score);
+    expect(qr.compliance.flags).toEqual(plain.compliance.flags);
+  });
 });
 
 /**
