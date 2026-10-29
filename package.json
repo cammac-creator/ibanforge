@@ -72,7 +72,7 @@
     "better-sqlite3": "^13.0.3",
     "hono": "^4.13.13",
     "iban-core": "npm:ibanforge@2.1.0",
-    "stripe": "23.0.0",
+    "stripe": "23.0.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.6"
   },
