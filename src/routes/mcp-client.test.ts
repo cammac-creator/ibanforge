@@ -57,6 +57,12 @@ const scenarios = [
   ['conformité sans banque', 'check_compliance', { iban: 'DE23999999990000000000' }],
   ['conformité carte composite', 'check_compliance', { iban: 'NL19BICK0123456789' }],
   ['clearing suisse', 'lookup_ch_clearing', { iid: '230' }],
+  // 29.10.2026 : provenance du QR-IID, drapeau et phrase QR, adresse du siège.
+  ['agence suisse, QR-IID hérité du siège', 'lookup_ch_clearing', { iid: '702' }],
+  ['QR-IID suisse', 'lookup_ch_clearing', { iid: '30700' }],
+  ['IID suisse fusionné', 'lookup_ch_clearing', { iid: '04835' }],
+  ['BIC suisse et adresse du siège', 'lookup_bic', { bic: 'UBSWCHZH80A' }],
+  ['BIC sans adresse', 'lookup_bic', { bic: 'FABMCNSHXXX' }],
   ['conformité allemande', 'check_compliance', { iban: 'DE89370400440532013000' }],
   ['conformité sans IBAN valide', 'check_compliance', { iban: 'not-an-iban' }],
   ['référence RF', 'validate_payment_reference', { reference: 'RF18539007547034' }],

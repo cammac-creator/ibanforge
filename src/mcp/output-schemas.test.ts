@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
+import { DIRECTORY_TOOL_OUTPUT_SCHEMAS, TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { frozenSources } from '../lib/source-vintage.js';
-import { sourceName } from '../lib/bic-lookup.js';
+import { lookup, namedRow, registeredAddress, sourceName } from '../lib/bic-lookup.js';
+import { clearingRecord, clearingRemarks, lookupClearingByBankCode } from '../lib/ch-clearing.js';
 import { MCP_TOOLS } from './inventory.js';
 import { getComplianceMeta, type ComplianceMeta } from '../lib/compliance-db.js';
 
@@ -248,5 +249,46 @@ describe('the truth fields are declared, so the schema never strips them', () =>
     };
     const parsed = z.object(TOOL_OUTPUT_SCHEMAS.lookup_bic).parse(payload);
     expect(parsed).toMatchObject(payload);
+  });
+
+  // 29.10.2026 : the fields REST served and the MCP schemas did not declare.
+  // Zod strips an undeclared key in silence, so each payload below is built by
+  // the same functions the tools call and must come out of `parse` whole, on
+  // /mcp and on the directory addresses (whose schemas drop only the prices).
+  it('lookup_ch_clearing keeps qr_iid_source, qr_iids, is_qr_iid and the QR sentence', () => {
+    const shapes = [
+      TOOL_OUTPUT_SCHEMAS.lookup_ch_clearing,
+      DIRECTORY_TOOL_OUTPUT_SCHEMAS.lookup_ch_clearing,
+    ];
+    for (const iid of ['00702', '30700', '00700', '00230', '04835', '00100']) {
+      const entry = lookupClearingByBankCode(iid)!;
+      const payload = { ...clearingRecord(entry), ...clearingRemarks(entry) };
+      for (const shape of shapes) expect(z.object(shape).parse(payload), iid).toEqual(payload);
+    }
+    // And the values those fields take, so a schema that kept the keys but
+    // narrowed the enum would be caught too.
+    const branch = clearingRecord(lookupClearingByBankCode('00702')!);
+    expect(branch.qr_iid_source).toBe('headquarters');
+    const qr = lookupClearingByBankCode('30700')!;
+    expect(clearingRemarks(qr).is_qr_iid).toBe(true);
+    expect(clearingRecord(lookupClearingByBankCode('00230')!).qr_iids!.length).toBeGreaterThan(1);
+  });
+
+  it('lookup_bic keeps the registered address and address_available, null included', () => {
+    for (const bic11 of ['UBSWCHZH80A', 'FABMCNSHXXX']) {
+      const row = namedRow(lookup(bic11));
+      const address = registeredAddress(row);
+      const payload = { bic: bic11, found: row !== null, address, address_available: !!address };
+      for (const shape of [
+        TOOL_OUTPUT_SCHEMAS.lookup_bic,
+        DIRECTORY_TOOL_OUTPUT_SCHEMAS.lookup_bic,
+      ])
+        expect(z.object(shape).parse(payload), bic11).toEqual(payload);
+    }
+    expect(registeredAddress(namedRow(lookup('UBSWCHZH80A')))).toMatchObject({
+      source: 'GLEIF',
+      country: 'CH',
+    });
+    expect(registeredAddress(namedRow(lookup('FABMCNSHXXX')))).toBeNull();
   });
 });

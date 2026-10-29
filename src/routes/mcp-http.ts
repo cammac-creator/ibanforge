@@ -42,11 +42,17 @@ import {
   lookup,
   namedRow,
   nonEmpty,
+  registeredAddress,
   restrictedDirectoryLoaded,
 } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
-import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
+import {
+  clearingRecord,
+  clearingRemarks,
+  lookupClearingByBankCode,
+  normalizeIid,
+} from '../lib/ch-clearing.js';
 import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-reference.js';
 import {
   checkPostalAddress,
@@ -831,6 +837,12 @@ function createMcpServer(
       }
       // Une fiche complète ou introuvable, comme GET /v1/bic/:code (25/09/2026).
       const row = namedRow(lookup(validation.bic11!));
+      // L'adresse du siège que la description promet depuis le 24.06.2026,
+      // jamais servie ici avant le 29.10.2026 : même constructeur que
+      // GET /v1/bic/:code et que `bic.address` de validate_iban, avec sa source
+      // et sa date (`as_of`). Ni `postal_address` ni les sanctions (voir
+      // check_compliance) : seulement ce que la description annonce.
+      const address = registeredAddress(row);
       const result = {
         bic: validation.bic,
         bic8: validation.bic8,
@@ -855,6 +867,8 @@ function createMcpServer(
           name: bicCountryName(row, validation.country_code!),
         },
         city: nonEmpty(row?.city),
+        address,
+        address_available: address !== null,
         branch_code: validation.branch_code,
         branch_info: row?.branch_info ?? null,
         lei: row?.lei ?? null,
@@ -1097,27 +1111,14 @@ function createMcpServer(
           structuredContent: notFoundPayload,
         };
       }
+      // Mêmes constructeurs que GET /v1/ch/clearing/:iid (29.10.2026) : la
+      // provenance du QR-IID (`qr_iid_source`, `qr_iids`), le drapeau et la
+      // phrase d'un QR-IID, puis la phrase de fusion, dans l'ordre du REST.
       const result: Record<string, unknown> = {
-        iid: entry.iid,
-        found: true,
-        institution: {
-          name: entry.name,
-          type: entry.institution_type,
-          iid_type: entry.iid_type,
-          headquarters_iid: entry.headquarters_iid,
-        },
-        address: entry.address,
-        bic: entry.bic,
-        payment_services: entry.payment_services,
-        sic_iid: entry.sic_iid,
-        qr_iid: entry.qr_iid,
-        valid_on: entry.valid_on,
+        ...clearingRecord(entry),
         cost_usdc: 0.003,
+        ...clearingRemarks(entry),
       };
-      if (entry.redirected_from) {
-        result.redirected_from = entry.redirected_from;
-        result.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
-      }
       const payload = bill(result);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
