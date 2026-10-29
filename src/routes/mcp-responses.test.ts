@@ -245,6 +245,8 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ['check_compliance', { iban: DE }],
   ['check_compliance', { iban: 'DE44999999990532013000' }],
   ['check_compliance', { iban: 'DE89370400440532013001' }],
+  // check_compliance recopie les étapes de validate_iban (29.10.2026).
+  ['check_compliance', { iban: QR_IBAN_ALLOCATED }],
   ['validate_payment_reference', { reference: 'RF18539007547034', iban: CH }],
   ['validate_payment_reference', { reference: 'RF18539007547034', iban: QR_IBAN }],
   ['validate_payment_reference', { reference: '210000000003139471430009017', iban: CH }],
@@ -804,6 +806,42 @@ describe.each([
     }
     for (const tool of tools) expect(called.has(tool), tool).toBe(true);
   });
+
+  // Le crible vert ne prouve rien si l'étape a été filtrée en route : ici elle
+  // doit être servie, avec sa phrase des répertoires, par validate_iban ET par
+  // check_compliance, qui recopie toute la réponse de validate_iban (29.10.2026).
+  it.each(['validate_iban', 'check_compliance'])(
+    '%s sur un QR-IBAN attribué sert l’étape QR-IBAN avec sa phrase des répertoires',
+    async (tool) => {
+      const app = buildApp();
+      const ip = `198.20.${n}.${tool === 'validate_iban' ? 1 : 2}`;
+      const sid = await open(app, path, ip);
+      const res = (await body(
+        await post(
+          app,
+          path,
+          ip,
+          {
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'tools/call',
+            params: { name: tool, arguments: { iban: QR_IBAN_ALLOCATED } },
+          },
+          sid,
+        ),
+      )) as {
+        result?: { structuredContent?: { next_steps?: NextStep[] }; content?: { text: string }[] };
+      };
+      const served = res.result?.structuredContent;
+      const step = served?.next_steps?.find((s) => s.code === 'qr_iban_requires_qr_reference');
+      expect(step, `${path} ${tool} : étape absente`).toBeDefined();
+      expect(step!.do).toBe(directoryStepSentence(step!, served as never));
+      expect(step!.do).not.toContain('pay it only');
+      // Le bloc texte dit la même chose que structuredContent.
+      expect(res.result?.content?.[0]?.text).toContain(step!.do);
+      expect(crib(res, `${path} ${tool} QR-IBAN`).hits).toEqual([]);
+    },
+  );
 });
 
 describe('ce qu’un appel local n’atteint pas, en unitaire', () => {

@@ -271,6 +271,26 @@ describe('QR-IBAN and QR reference in EUR (guidelines 2.4)', () => {
       expect.arrayContaining(['qrr_requires_qr_iban', 'qr_iban_chf_only_ig24']),
     );
   });
+
+  it.each([
+    ['SCOR', RF],
+    ['NON', ''],
+  ])(
+    'warns on a QR-IBAN in EUR with reference type %s; valid stays false from the 2.3 error alone',
+    (refType, ref) => {
+      const eur = checkSwissQrBill(payload({ currency: 'EUR', refType, ref }));
+      expect(eur.findings.map((f) => [f.code, f.severity])).toEqual([
+        ['qr_iban_requires_qrr', 'error'],
+        ['qr_iban_chf_only_ig24', 'warning'],
+      ]);
+      expect(eur.valid).toBe(false);
+      // In CHF, the same payload keeps the error and loses the warning: the
+      // warning is not what turns `valid` false.
+      const chf = checkSwissQrBill(payload({ currency: 'CHF', refType, ref }));
+      expect(codes(chf)).toEqual(['qr_iban_requires_qrr']);
+      expect(chf.valid).toBe(false);
+    },
+  );
 });
 
 /**
@@ -389,6 +409,33 @@ describe('the character set (ch. 4.1.1)', () => {
       }),
     );
     expect(charset(r).map((f) => f.field)).toEqual(['creditor.address_line_1']);
+  });
+
+  it('names the ultimate creditor block with the field of ultimate_creditor_not_allowed', () => {
+    const r = checkSwissQrBill(
+      payload({
+        ultimateCreditor: ['S', 'Société Alpha \u{1F600}', 'Rue du Lac', '1', '2501', 'Biel', 'CH'],
+      }),
+    );
+    const block = r.findings.find((f) => f.code === 'ultimate_creditor_not_allowed');
+    expect(block!.field).toBe('ultimate_creditor');
+    expect(charset(r).map((f) => f.field)).toEqual([block!.field]);
+    expect(charset(r)[0]!.detail).toContain('Line 13 (ultimate_creditor)');
+  });
+
+  it('names both alternative schemes with the field of their field_too_long, line apart', () => {
+    const r = checkSwissQrBill(
+      payload({
+        billing: '',
+        alt: [`eBill/B/acme@example.com \u{1F600}`, `${'x'.repeat(100)}\u{1F600}`],
+      }),
+    );
+    const tooLong = r.findings.find((f) => f.code === 'field_too_long');
+    expect(tooLong!.field).toBe('alternative_scheme');
+    const found = charset(r);
+    expect(found.map((f) => f.field)).toEqual([tooLong!.field, tooLong!.field]);
+    expect(found[0]!.detail).toContain('Line 33 (alternative_scheme)');
+    expect(found[1]!.detail).toContain('Line 34 (alternative_scheme)');
   });
 
   it('cites chapter 4.1.1 of both versions, with the date each is valid from', () => {

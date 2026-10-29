@@ -425,13 +425,19 @@ export function isQrBillCharacter(codePoint: number): boolean {
 
 const PARTY_FIELDS = ['address_type', 'name', '', '', 'postal_code', 'town', 'country'] as const;
 
-/** The response field a payload line feeds, named as the other findings name it. */
+/**
+ * The response field a payload line feeds, named as the other findings name it.
+ * The ultimate creditor block is one field, `ultimate_creditor`, as in
+ * `ultimate_creditor_not_allowed`; both alternative schemes are
+ * `alternative_scheme`, as in their `field_too_long`: the line number in the
+ * detail tells them apart.
+ */
 function lineField(i: number, lines: readonly string[]): string {
   const head = ['qr_type', 'version', 'coding', 'creditor_iban'];
   if (i < 4) return head[i]!;
+  if (i >= 11 && i <= 17) return 'ultimate_creditor';
   const parties: Array<[number, string]> = [
     [4, 'creditor'],
-    [11, 'ultimate_creditor'],
     [20, 'ultimate_debtor'],
   ];
   for (const [start, label] of parties) {
@@ -450,8 +456,8 @@ function lineField(i: number, lines: readonly string[]): string {
     29: 'unstructured_message',
     30: 'trailer',
     31: 'billing_information',
-    32: 'alternative_schemes[0]',
-    33: 'alternative_schemes[1]',
+    32: 'alternative_scheme',
+    33: 'alternative_scheme',
   };
   return tail[i] ?? 'payload';
 }
