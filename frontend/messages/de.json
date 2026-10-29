@@ -2723,6 +2723,7 @@
       "issuer_not_bank": "Konto bei einem Zahlungsinstitut, nicht bei einer Bank",
       "country_risk": "Erhöhtes Länderrisiko",
       "address_not_structured": "Adresse nicht strukturiert (ISO 20022)",
+      "postcode_locality_mismatch": "PLZ und Ort nicht zusammen verzeichnet (Verzeichnis swisstopo)",
       "bank_not_consulted": "Bank nicht geprüft"
     },
     "pay": {

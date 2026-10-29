@@ -162,6 +162,35 @@ Contrôle exhaustif du 28/10/2026, sur une copie locale (listes publiques de la 
 contrôlés sans correspondance, 157 sans BIC SWIFT dans leur licence donc non contrôlés ; aucun écart
 avec un calcul indépendant fait sur le fichier source.
 
+## 29/10/2026 : le NPA et la localité, au répertoire officiel de swisstopo (cas 1, dans ce dépôt)
+
+Décision de Claude-Alain du 29/10/2026, 15 h 06 (« localites = Oui » sur la page du
+chantier rentabilité) : contrôler le NPA et la localité des adresses suisses et
+liechtensteinoises au répertoire officiel, en avertissement, jamais en refus.
+
+| | |
+|---|---|
+| Jeu | Répertoire officiel des localités avec NPA et périmètre (Amtliches Ortschaftenverzeichnis), Office fédéral de topographie swisstopo, ordonnance sur les noms géographiques, art. 24 ; saisi par les services cantonaux du cadastre avec la Poste (fiche geocat `972cd117-f1ed-4818-be14-233d89ab9fdf`) |
+| Où on le lit | élément STAC `ortschaftenverzeichnis_plz` de la collection `ch.swisstopo-vd.ortschaftenverzeichnis_plz` (data.geo.admin.ch), fichier `ortschaftenverzeichnis_plz_4326.csv.zip` |
+| Version servie | 01/10/2026 (date de l'élément STAC), lue le 29/10/2026 : 5 716 lignes, 3 190 NPA, dont 13 au Liechtenstein (canton vide) |
+| Conditions, lues le 29/10/2026 | https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices : « The free geodata and geoservices of swisstopo may be used, distributed and made accessible. Furthermore, they may be enriched and processed and also used commercially. A reference to the source is mandatory. » Mentions admises, entre autres : « Federal Office of Topography swisstopo » et « ©swisstopo ». La fiche STAC dit `license: proprietary` et renvoie à cette page |
+| Cas | 1 : dans ce dépôt (`data/ch-localities.json`), avec la mention |
+| Ce qui est gardé | NPA, chiffre additionnel, localité, commune, canton, langue ; ni coordonnées, ni part d'adresses, ni numéro de commune |
+| Ce qui est servi | le bloc `postcode_locality` de `POST /v1/address/check` et `check_postal_address`, le même dans `sps_check` de la QR-facture (avec un avertissement quand le couple n'est pas répertorié), un avertissement dans l'audit de fichier ; chaque réponse porte la source, sa version et « ©swisstopo » |
+| Rafraîchissement | `npm run db:seed-ch-localities` (mensuel chez swisstopo) ; aucun workflow ne le lance encore |
+
+Ce que le répertoire ne dit pas : il décrit le territoire, chaque NPA avec son
+périmètre. Les NPA de cases postales et d'entreprises (1211 Genève, 3003 Bern,
+2501 Biel, 8010 Zürich, mesurés absents le 29/10/2026) n'y sont pas, ni un NPA
+suisse employé hors du territoire (8238 Büsingen, 6911 Campione). Quand la
+localité écrite figure sous un autre NPA de la même zone postale, la réponse est
+`not_verifiable`, sans avertissement ; un NPA absent n'est jamais dit inexistant.
+
+Exonymes des grandes villes (« Genf », « Berne ») : libellés allemand, français,
+italien et anglais de Wikidata (CC0), lus le 29/10/2026 par numéro de commune de
+l'OFS, écrits dans `src/lib/ch-localities.ts` (`CH_TOWN_EXONYMS`). Ils servent
+seulement à ne pas signaler une adresse juste et ne sont jamais servis.
+
 ## 25/09/2026 : la famille sous conditions a quitté le dépôt public
 
 Ce qui peut être servi mais pas redistribué (décision de Claude-Alain du

@@ -743,6 +743,44 @@ const VALIDATE_PAYMENT_REFERENCE_OUTPUT_SCHEMA = {
   pairing_as_of: z.string().optional(),
 };
 
+/**
+ * Postcode and town in the official directory of localities of swisstopo
+ * (src/lib/ch-localities.ts, 29.10.2026), shared by check_postal_address and the
+ * sps_check of check_swiss_qr_bill. Written without directions: the texts of
+ * /mcp/directory read these descriptions as they stand.
+ */
+const POSTCODE_LOCALITY_SCHEMA = z
+  .object({
+    status: z
+      .string()
+      .describe(
+        'match | town_mismatch | other_country | postcode_not_listed | not_verifiable | directory_unavailable. ' +
+          'not_verifiable: the postcode is not in the directory, which lists territory only, while the town is listed under ' +
+          'other postcodes of the same postal area (a post-office box or business postcode is likely).',
+      ),
+    localities: z
+      .array(
+        z.object({
+          name: z.string().describe('The locality as the directory writes it.'),
+          municipality: z.string(),
+          canton: z.string().nullable().describe('null in Liechtenstein.'),
+          country: z.string().describe('CH | LI'),
+        }),
+      )
+      .describe('The entries the directory gives for this postcode; empty when it has none.'),
+    detail: z.string().describe('What was compared and what came out of it.'),
+    source: z
+      .string()
+      .describe('The directory, its version and the credit ©swisstopo that its terms require.'),
+    as_of: z.string().nullable().describe('Version date of the directory (YYYY-MM-DD).'),
+  })
+  .nullable()
+  .describe(
+    'Swiss and Liechtenstein addresses with a postcode and a town: whether the two go together in the official ' +
+      'directory of localities of swisstopo. Informative, beside the format verdicts: it does not change conforms or valid. ' +
+      'The street is not checked. null for any other address.',
+  );
+
 const CHECK_POSTAL_ADDRESS_OUTPUT_SCHEMA = {
   scheme: z.string().describe('sps | hvps_plus | fedwire — the rule set that was applied.'),
   conforms: z
@@ -758,6 +796,7 @@ const CHECK_POSTAL_ADDRESS_OUTPUT_SCHEMA = {
       }),
     )
     .describe('One entry per rule of the scheme, in a stable order.'),
+  postcode_locality: POSTCODE_LOCALITY_SCHEMA,
   note: z.string().describe("Why 'cbpr+' is not on the menu. Served on every answer."),
 };
 
@@ -854,6 +893,7 @@ const QR_PARTY_SCHEMA = z.object({
       findings: z.array(
         z.object({ rule: z.string(), verdict: z.string(), detail: z.string(), source: z.string() }),
       ),
+      postcode_locality: POSTCODE_LOCALITY_SCHEMA,
       note: z.string(),
     })
     .nullable()

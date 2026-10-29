@@ -17,13 +17,17 @@ import {
  *
  * What it does: takes the `PostalAddress` elements you intend to send and tells
  * you, rule by rule and with the document each rule comes from, whether they
- * satisfy the scheme you name. Pure rule evaluation — it reads no database and
- * needs no data of ours, which is why it costs nothing.
+ * satisfy the scheme you name. Since 29.10.2026, for a Swiss or Liechtenstein
+ * address, it also says in `postcode_locality` whether postcode and town go
+ * together in the official directory of localities of swisstopo (open data,
+ * shipped with the server: src/lib/ch-localities.ts), beside the findings and
+ * without effect on `conforms`. It costs nothing.
  *
  * What it does NOT do, and will not pretend to: turn a free-text address into a
  * structured one. That is address parsing against national postal reference
  * data for 250 countries — the trade of Loqate, Smarty and Google Address
- * Validation. We hold no such reference data.
+ * Validation. We hold no such reference data: the swisstopo directory knows
+ * postcodes and localities, not streets.
  *
  * And it does not answer "is this CBPR+ compliant?", because nobody honestly
  * can from public sources: see CBPR_NOTE, served on every response.

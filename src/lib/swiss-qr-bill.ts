@@ -2,8 +2,8 @@
  * Swiss QR-bill payload check ("Swiss Payments Code", the text inside the QR).
  *
  * The payload is a fixed sequence of lines (SIX, Swiss Implementation
- * Guidelines QR-bill). This module parses it, checks every rule that can be
- * checked without a database, and answers the one question that decides
+ * Guidelines QR-bill). This module parses it, checks every rule of the
+ * standard that it can check, and answers the one question that decides
  * whether a QR-bill still gets paid: is the creditor address STRUCTURED
  * (address type S), or still COMBINED (type K), which the standard has not
  * permitted since 21 November 2025 and whose payment the banks guarantee only
@@ -14,16 +14,21 @@
  *   - QR-IID range 30000-31999: isQrIidRange (src/lib/ch-clearing.ts)
  *   - QRR (mod 10 recursive) and RF (ISO 11649) references: validatePaymentReference
  *   - the SPS structured-address rules, each finding sourced: checkPostalAddress
+ *   - for a type S address in CH or LI, postcode and town in the official
+ *     directory of localities of swisstopo (src/lib/ch-localities.ts,
+ *     29.10.2026): a warning when the pair is not listed, never an error
  *
- * Pure rule evaluation, no network, no storage. Free on every surface: the
- * rules are published commodities; the paid surface is the bank behind the
- * IBAN (/v1/iban/validate).
+ * Rule evaluation plus that directory, read from a file shipped with the
+ * server: no network, no storage. Free on every surface: the rules are
+ * published commodities and the directory is open data; the paid surface is
+ * the bank behind the IBAN (/v1/iban/validate).
  */
 import { validateIBAN } from './iban.js';
 import { isQrIidRange } from './ch-clearing.js';
 import { validatePaymentReference } from './payment-reference.js';
 import { checkPostalAddress, type AddressCheckResult } from './address-conformity.js';
 import { COMBINED_ADDRESS_NOTICE, COMBINED_ADDRESS_SOURCE } from './qr-bill-notice.js';
+import { POSTCODE_LOCALITY_WARNINGS, type PostcodeLocalityStatus } from './ch-localities.js';
 
 export {
   COMBINED_ADDRESS_CLAUSE,
@@ -46,6 +51,16 @@ export const QR_BILL_SOURCE =
   'data structure of the Swiss QR Code, ch. 4.';
 
 export type QrFindingSeverity = 'error' | 'warning';
+
+/**
+ * The warning code of each state of the postcode and town lookup that is
+ * worth one (src/lib/ch-localities.ts). Severity `warning` for all three.
+ */
+export const POSTCODE_LOCALITY_CODES: Partial<Record<PostcodeLocalityStatus, string>> = {
+  town_mismatch: 'postcode_town_mismatch',
+  other_country: 'postcode_other_country',
+  postcode_not_listed: 'postcode_not_listed',
+};
 
 export interface QrFinding {
   code: string;
@@ -290,6 +305,20 @@ function reportParty(
           source: f.source,
         });
       }
+    }
+    // NPA et localité au répertoire officiel de swisstopo (29.10.2026) : un
+    // avertissement, jamais une erreur, donc ni `valid` ni
+    // `ready_for_2026_11_14` ne bougent. Un NPA absent dont la localité figure
+    // sous un autre NPA de la même zone (case postale probable) n'en donne pas.
+    const locality = report.sps_check.postcode_locality;
+    if (locality && POSTCODE_LOCALITY_WARNINGS.has(locality.status)) {
+      findings.push({
+        code: POSTCODE_LOCALITY_CODES[locality.status]!,
+        severity: 'warning',
+        field: field(locality.status === 'town_mismatch' ? 'town' : 'postal_code'),
+        detail: locality.detail,
+        source: locality.source,
+      });
     }
   } else if (a.type === 'K') {
     report.structured = false;

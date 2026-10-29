@@ -142,7 +142,7 @@ The same block appears on the `bic` object of [`POST /v1/iban/validate`](/docs/i
 
 The other half. You have structured an address; this tells you whether it satisfies a given rail's rules, rule by rule, with the document each rule comes from.
 
-It reads no database of ours. That is why it is free.
+It is free. For a Swiss or Liechtenstein address (`ctry` `CH` or `LI`, with `pst_cd` and `twn_nm`), the answer also carries `postcode_locality`: whether the postcode and the town go together in the official directory of localities of swisstopo (credit ©swisstopo, version date in `as_of`). It sits beside the findings and never changes `conforms`. `status` is `match`, `town_mismatch`, `other_country` (9490 Vaduz written with `CH`), `postcode_not_listed`, or `not_verifiable`: the directory describes territory, so a post-office box postcode such as 1211 Genève or 2501 Biel is not in it, and when the town is listed under another postcode of the same area the pairing is left unverified rather than flagged. Accents, case, "St." or "Sankt", a canton suffix and either half of a bilingual name (Biel/Bienne) are ignored, and the usual names of the larger towns in another language (Genf, Berne) are accepted. The street is not checked.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/address/check \
@@ -214,7 +214,7 @@ Three limits, stated here so nobody discovers them in November.
 
 **It does not solve a customer-address migration.** The bulk of the November 2026 change falls on the addresses of the **parties** to a payment — `Dbtr`, `Cdtr`, `UltmtDbtr`, `UltmtCdtr`. That is your own customer address book, and this API holds no data about it and makes no claim about it. If someone tells you an IBAN and BIC API will settle that migration for you, they are selling you something they do not have.
 
-**It does not parse a free-text address into a structured one.** Turning `"ul. Sokolska 34, 40-086 Katowice"` into `StrtNm` / `BldgNb` / `PstCd` / `TwnNm` requires national postal reference data across some 250 countries. That is the trade of Loqate, Smarty and Google's Address Validation API. We hold none of it, and a checksum-free guess at a street name is worse than no answer.
+**It does not parse a free-text address into a structured one.** Turning `"ul. Sokolska 34, 40-086 Katowice"` into `StrtNm` / `BldgNb` / `PstCd` / `TwnNm` requires national postal reference data across some 250 countries. That is the trade of Loqate, Smarty and Google's Address Validation API. We hold none of it (the Swiss directory of localities above knows postcodes and towns, not streets), and a checksum-free guess at a street name is worse than no answer.
 
 **It does not certify CBPR+ conformity.** No public source lets anyone do that honestly today. The checker names the rail it is judging against, and every finding names its document.
 

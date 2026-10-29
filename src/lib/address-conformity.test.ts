@@ -373,3 +373,33 @@ describe('the widths of the structured elements', () => {
     expect(find('sps', { ...clean, ctry: 'CHE' }, 'ctry_iso3166').verdict).toBe('fail');
   });
 });
+
+describe('checkPostalAddress: postcode_locality beside the findings (29.10.2026)', () => {
+  it('a Swiss address whose town does not go with its postcode still conforms: the block is informative', () => {
+    const r = checkPostalAddress('sps', {
+      strt_nm: 'Bahnhofstrasse',
+      bldg_nb: '45',
+      pst_cd: '8001',
+      twn_nm: 'Bern',
+      ctry: 'CH',
+    });
+    expect(r.conforms).toBe(true);
+    expect(r.findings.every((f) => f.verdict !== 'fail')).toBe(true);
+    expect(r.postcode_locality?.status).toBe('town_mismatch');
+    expect(r.postcode_locality?.as_of).toBe('2026-10-01');
+  });
+
+  it('the block is the same whatever the scheme, and null outside CH and LI', () => {
+    const address = { pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' };
+    for (const scheme of ['sps', 'hvps_plus', 'fedwire'] as const) {
+      expect(checkPostalAddress(scheme, address).postcode_locality?.status).toBe('match');
+    }
+    expect(
+      checkPostalAddress('hvps_plus', { pst_cd: '10115', twn_nm: 'Berlin', ctry: 'DE' })
+        .postcode_locality,
+    ).toBeNull();
+    expect(
+      checkPostalAddress('sps', { twn_nm: 'Zürich', ctry: 'CH' }).postcode_locality,
+    ).toBeNull();
+  });
+});

@@ -472,12 +472,15 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       'Returns: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ' +
       'ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. ' +
       "A combined address comes back with proposed_structured, the S-type fields derived from the combined lines. Each finding's source names the document it is quoted from. " +
+      'For a type S address in CH or LI, sps_check.postcode_locality compares postcode and town with the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of); ' +
+      'a pair the directory does not list comes back as a warning, which leaves valid unchanged. ' +
       note,
     check_postal_address:
       "Checks a structured ISO 20022 postal address against a payment rail's published address rules, rule by rule, each verdict citing the document it comes from. " +
       'Suited to assembling a payment instruction (pain.001, a Fedwire message, a T2 transfer) with a creditor or debtor address, to learn before submission whether the rail accepts it. ' +
       'The November 2026 changes (SIC 20.11, Fedwire 16.11, T2 R2026.NOV) remove the fully unstructured address option; the answer says whether an address survives them. ' +
-      'It checks conformity with the message format rules, not postal reality: it does not establish that a street or town exists. ' +
+      'The findings check conformity with the message format rules. For a Swiss or Liechtenstein address with a postcode and a town, the separate postcode_locality block states whether the two go together in the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of); ' +
+      'it is informative and leaves conforms unchanged. The street and the building number are not checked. ' +
       "Schemes: 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+ / T2, ECB), 'fedwire' (Federal Reserve). " +
       "There is deliberately no 'cbpr+' scheme: that guideline sits behind swift.com, unreachable to automated readers, and a conformity boolean quoting an unread document would be a guess dressed as a verdict; the note field restates this on every answer. " +
       'Verdicts: pass, fail, and not_applicable, which marks a rule whose precondition is not met and does not count as a pass. conforms is true when no finding failed. ' +

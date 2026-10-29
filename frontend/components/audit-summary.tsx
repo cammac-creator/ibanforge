@@ -187,6 +187,7 @@ const KNOWN = new Set([
   "issuer_not_bank",
   "country_risk",
   "address_not_structured",
+  "postcode_locality_mismatch",
   "bank_not_consulted",
 ]);
 
