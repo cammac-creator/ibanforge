@@ -232,6 +232,8 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
     { ibans: [DE, 'FR1420041010050500013M02606', CH, 'DE89370400440532013001'] },
   ],
   ['lookup_bic', { bic: 'DEUTDEFF' }],
+  // 29.10.2026 : l'adresse du siège, désormais servie par l'outil.
+  ['lookup_bic', { bic: 'UBSWCHZH80A' }],
   ['lookup_bic', { bic: 'XXXXXX' }],
   ['lookup_bic', { bic: 'ZZZZDEZZ' }],
   ['check_compliance', { iban: DE }],
@@ -252,6 +254,11 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ['check_postal_address', { scheme: 'fedwire', address: { twn_nm: 'New York', ctry: 'US' } }],
   ...QR_PAYLOADS.map((payload) => ['check_swiss_qr_bill', { payload }] as const),
   ['lookup_ch_clearing', { iid: '230' }],
+  // 29.10.2026 : la provenance du QR-IID, la phrase d'un QR-IID et celle d'une
+  // fusion, désormais servies par l'outil, passent le crible des directives.
+  ['lookup_ch_clearing', { iid: '702' }],
+  ['lookup_ch_clearing', { iid: '30700' }],
+  ['lookup_ch_clearing', { iid: '04835' }],
   ['lookup_ch_clearing', { iid: '99999' }],
   ['lookup_ch_clearing', { iid: 'abc' }],
   [

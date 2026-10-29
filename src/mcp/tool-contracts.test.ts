@@ -133,6 +133,66 @@ describe('lookup_bic: MCP and REST agree on the country shape', () => {
   });
 });
 
+/**
+ * 29.10.2026. `lookup_ch_clearing` answered on both MCP surfaces without saying
+ * whether a QR-IID was published by SIX or inherited from the head office, and
+ * `lookup_bic` described a registered head-office address it never returned.
+ * The route tests compare the HTTP transport with REST on live data; the stdio
+ * server cannot be imported, so this is the only place that holds it to the
+ * same builders.
+ */
+describe('MCP and REST agree on the QR-IID provenance and the seat address', () => {
+  const REST_CLEARING = readFileSync(join(ROOT, 'src/routes/ch-clearing.ts'), 'utf8');
+  const REST_BIC = readFileSync(join(ROOT, 'src/routes/bic-lookup.ts'), 'utf8');
+
+  it('the clearing answer is built by the same two functions on REST, HTTP and stdio', () => {
+    for (const [label, src] of [
+      ['REST', REST_CLEARING],
+      ['HTTP', HTTP],
+      ['stdio', STDIO],
+    ] as const) {
+      expect(src, `${label} no longer builds the record with clearingRecord`).toContain(
+        '...clearingRecord(entry)',
+      );
+      expect(src, `${label} no longer builds the remarks with clearingRemarks`).toContain(
+        '...clearingRemarks(entry)',
+      );
+    }
+    // The hand-written copies are gone: a second copy is how the two MCP
+    // surfaces lost `qr_iid_source` while REST kept it.
+    for (const src of [HTTP, STDIO]) {
+      expect(src).not.toMatch(/qr_iid:\s*entry\.qr_iid/);
+      expect(src).not.toMatch(/has been merged into IID/);
+    }
+  });
+
+  it('lookup_bic reads the seat address with the helper REST uses, on both transports', () => {
+    for (const [label, src] of [
+      ['REST', REST_BIC],
+      ['HTTP', HTTP],
+      ['stdio', STDIO],
+    ] as const) {
+      expect(src, `${label} no longer reads registeredAddress(row)`).toContain(
+        'registeredAddress(row)',
+      );
+      expect(src, `${label} no longer derives address_available`).toContain(
+        'address_available: address !== null',
+      );
+    }
+  });
+
+  it('the descriptions in review are unchanged: the output catches up with them', () => {
+    // The HTTP description has promised the address since 24.06.2026, and both
+    // clearing descriptions promise the QR-IID allocation. That the schemas
+    // keep the new fields is held by output-schemas.test.ts, which parses them.
+    expect(HTTP).toContain(
+      'name, country, city, LEI, and registered head-office address (where available)',
+    );
+    expect(HTTP).toContain('plus QR-IID allocation, not just a name lookup.');
+    expect(STDIO).toContain('QR-IID allocation, and headquarters IID.');
+  });
+});
+
 describe('no latency claim outlives its measurement', () => {
   it('neither MCP surface repeats the old per-endpoint millisecond figures', () => {
     for (const src of [STDIO, HTTP]) {
