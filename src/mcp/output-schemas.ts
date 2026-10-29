@@ -870,6 +870,34 @@ const LOOKUP_CH_CLEARING_OUTPUT_SCHEMA = {
       'Present (true) only when the IID asked about is a QR-IID (SIX QR-bill range 30000-31999); iid then carries the standard IID of the institution and qr_iid the QR-IID asked about.',
     ),
   valid_on: z.string().optional(),
+  // 29.10.2026 : lu dans les lois cantonales (src/lib/ch-state-guarantee.ts),
+  // servi par `clearingRecord` sur REST et les deux transports.
+  state_guarantee: z
+    .object({
+      guaranteed: z
+        .boolean()
+        .describe(
+          "True when the cantonal law makes the canton liable for the bank's liabilities where the bank's own funds fall short (Staatsgarantie, garantie de l'État).",
+        ),
+      canton: z.string().describe('Two-letter canton code.'),
+      source: z
+        .string()
+        .describe(
+          'The law, its number in the cantonal collection, and the article. The exclusions the law writes (for example subordinated debt) are in that law; where they sit in another article, that article is cited too.',
+        ),
+      url: z.string().describe('The text that was read.'),
+      as_of: z.string().describe('The day the text was read (YYYY-MM-DD).'),
+      note: z
+        .string()
+        .optional()
+        .describe(
+          'Present where the guarantee ended (BEKB, BCGE: what the law kept and until when) or where the law has none (BCV).',
+        ),
+    })
+    .optional()
+    .describe(
+      "Present for the 24 Swiss cantonal banks only, matched by head-office IID; a branch or QR-IID takes its head office's entry. A description of the institution, not an assessment of the bank or of any account.",
+    ),
   redirected_from: z.string().optional(),
   note: z.string().optional(),
   cost_usdc: z

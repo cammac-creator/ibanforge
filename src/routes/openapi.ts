@@ -3895,6 +3895,35 @@ const buildRawSpec = () => ({
               'Every QR-IID allocated to this institution, in register order. `qr_iid` is the first of them; an institution may legitimately hold several.',
           },
           valid_on: { type: 'string', format: 'date' },
+          // Added on 29/10/2026 (src/lib/ch-state-guarantee.ts): read in the
+          // cantonal laws, so it carries its own source and date.
+          state_guarantee: {
+            type: 'object',
+            description:
+              "Present for the 24 Swiss cantonal banks only, matched by head-office IID; a branch or QR-IID takes its head office's entry. A description of the institution, not an assessment of the bank or of any account.",
+            required: ['guaranteed', 'canton', 'source', 'url', 'as_of'],
+            properties: {
+              guaranteed: {
+                type: 'boolean',
+                description:
+                  "True when the cantonal law makes the canton liable for the bank's liabilities where the bank's own funds fall short (Staatsgarantie, garantie de l'État).",
+              },
+              canton: { type: 'string', example: 'ZH', description: 'Two-letter canton code.' },
+              source: {
+                type: 'string',
+                example: 'Kantonalbankgesetz (ZKBG), LS 951.1, § 6',
+                description:
+                  'The law, its number in the cantonal collection, and the article. The exclusions the law writes (for example subordinated debt) are in that law; where they sit in another article, that article is cited too.',
+              },
+              url: { type: 'string', format: 'uri', description: 'The text that was read.' },
+              as_of: { type: 'string', format: 'date', description: 'The day the text was read.' },
+              note: {
+                type: 'string',
+                description:
+                  'Present where the guarantee ended (BEKB, BCGE: what the law kept and until when) or where the law has none (BCV).',
+              },
+            },
+          },
           cost_usdc: { type: 'number', example: 0.003 },
           processing_ms: { type: 'number' },
         },

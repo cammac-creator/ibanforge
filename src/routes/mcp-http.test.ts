@@ -1793,6 +1793,32 @@ describe('/mcp — lookup_ch_clearing and lookup_bic answer what REST answers', 
     const onMcp = await tool('lookup_ch_clearing', { iid: '04835' });
     expect(shared(onMcp)).toEqual(shared(onRest));
     expect(onMcp).toMatchObject({ iid: '00230', redirected_from: '04835' });
+    expect(onMcp).not.toHaveProperty('state_guarantee');
+  });
+
+  // 29.10.2026 : la garantie de l'État, lue dans les lois cantonales, servie
+  // par le même constructeur sur les deux surfaces, et gardée par le schéma.
+  it.each([
+    ['702', true, 'ZH'],
+    ['76711', false, 'VD'],
+    ['790', false, 'BE'],
+    ['30780', true, 'OW'],
+  ] as const)(
+    '%s: the state guarantee of REST, with its source and date',
+    async (iid, guaranteed, canton) => {
+      const onRest = await rest(`/v1/ch/clearing/${iid}`);
+      const onMcp = await tool('lookup_ch_clearing', { iid });
+      expect(shared(onMcp)).toEqual(shared(onRest));
+      expect(onMcp.state_guarantee).toEqual(onRest.state_guarantee);
+      expect(onMcp.state_guarantee).toMatchObject({ guaranteed, canton, as_of: '2026-10-29' });
+    },
+  );
+
+  it('230, UBS: no state guarantee on either surface', async () => {
+    const onRest = await rest('/v1/ch/clearing/230');
+    const onMcp = await tool('lookup_ch_clearing', { iid: '230' });
+    expect(onRest).not.toHaveProperty('state_guarantee');
+    expect(onMcp).not.toHaveProperty('state_guarantee');
   });
 
   it('UBSWCHZH80A: the registered head-office address of REST, with its source and date', async () => {

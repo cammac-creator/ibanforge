@@ -61,6 +61,9 @@ const scenarios = [
   ['agence suisse, QR-IID hérité du siège', 'lookup_ch_clearing', { iid: '702' }],
   ['QR-IID suisse', 'lookup_ch_clearing', { iid: '30700' }],
   ['IID suisse fusionné', 'lookup_ch_clearing', { iid: '04835' }],
+  // 29.10.2026 : garantie de l'État, avec et sans, et la note de la BEKB.
+  ['banque cantonale garantie', 'lookup_ch_clearing', { iid: '700' }],
+  ['banque cantonale sans garantie', 'lookup_ch_clearing', { iid: '790' }],
   ['BIC suisse et adresse du siège', 'lookup_bic', { bic: 'UBSWCHZH80A' }],
   ['BIC sans adresse', 'lookup_bic', { bic: 'FABMCNSHXXX' }],
   ['conformité allemande', 'check_compliance', { iban: 'DE89370400440532013000' }],
