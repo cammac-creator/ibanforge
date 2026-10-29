@@ -388,7 +388,7 @@ That `meta.disclaimer` is not decoration and it is not softened here: this is **
 - **A reference checksum is not proof the reference is the right one.** `valid: true` says the digits are internally consistent; it says nothing about whether that reference matches the invoice the creditor is expecting to reconcile.
 - **Two schemes we deliberately do not judge.** Norwegian KID and Swedish OCR are configured per creditor account by the beneficiary's bank. We recognise the format and stop there, rather than manufacture a verdict we cannot support.
 - **CH16 / CH17 are named, never quoted.** The codes appear in the guidelines; their wording lives in a status-report document we have not consulted.
-- **Monthly freshness, always stamped.** The SIX BankMaster is refreshed monthly and every clearing answer carries `valid_on`. A QR-IID valid a year ago may be redirected today.
+- **Weekly freshness, always stamped.** The SIX BankMaster is re-read weekly and every clearing answer carries `valid_on`. A QR-IID valid a year ago may be redirected today.
 - **`qr_iid_source: "headquarters"` is a deduction.** Sound, labelled, and never presented as a published SIX pairing.
 
 ## Next steps

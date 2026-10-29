@@ -71,7 +71,7 @@ let bicDataCache: Record<string, BicDataEntry> | null = null;
  * ## What was happening
  *
  * bic_data.json is a curated bank-code-to-BIC map; ch_clearing is the SIX
- * BankMaster, the official Swiss register, refreshed monthly by workflow. The
+ * BankMaster, the official Swiss register, re-read weekly by workflow. The
  * first is hand-maintained, the second is authoritative, and nothing compared
  * them. Audited 28/07/2026, four CH codes were asserting a live institution
  * that the register does not contain:

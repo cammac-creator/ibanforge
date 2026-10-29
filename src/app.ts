@@ -638,7 +638,7 @@ curl -s https://api.ibanforge.com/v1/ch/clearing/230 \\
   -H "Authorization: Bearer ifk_YOUR_KEY"
 \`\`\`
 
-Returns: institution name + address, type (bank/cantonal_bank/raiffeisen/postfinance/...), BIC, and the full payment-rail participation matrix: SIC, RTGS CHF, instant payments CHF, euroSIC, LSV+/BDD direct debits, plus the QR-IID allocation. **Every IID of the SIX BankMaster** (${chCount} entries, refreshed monthly) comes with its rail participation and, where SIX allocates one, its QR-IID, not just a name.
+Returns: institution name + address, type (bank/cantonal_bank/raiffeisen/postfinance/...), BIC, and the full payment-rail participation matrix: SIC, RTGS CHF, instant payments CHF, euroSIC, LSV+/BDD direct debits, plus the QR-IID allocation. **Every IID of the SIX BankMaster** (${chCount} entries, re-read weekly) comes with its rail participation and, where SIX allocates one, its QR-IID, not just a name.
 
 ### 5. check_compliance — pre-flight risk score before sending ($0.02)
 

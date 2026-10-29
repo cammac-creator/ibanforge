@@ -164,15 +164,21 @@ describe('the operator and the promises the page repeats', () => {
     // so it must stay true of the files: ci.yml on pull requests and pushes to
     // main (the robots push with GITHUB_TOKEN, which triggers no other
     // workflow, hence "the operator"), the BIC, Czech and Italian refreshes
-    // behind `npm run test` and the quality diff, the compliance refresh
-    // behind its claims test only.
+    // (and the weekly Swiss clearing re-read, since 29.10.2026) behind
+    // `npm run test` and the quality diff, the compliance refresh behind its
+    // claims test only.
     const wf = (name: string) =>
       readFileSync(join(process.cwd(), '..', '.github', 'workflows', name), 'utf8');
     const ci = wf('ci.yml');
     expect(ci).toMatch(/push:\s*\n\s*branches: \[main\]/);
     expect(ci).toMatch(/pull_request:\s*\n\s*branches: \[main\]/);
     expect(ci).toMatch(/\n {2}docker:/);
-    for (const name of ['refresh-bic.yml', 'refresh-cz-register.yml', 'refresh-it-register.yml']) {
+    for (const name of [
+      'refresh-bic.yml',
+      'refresh-cz-register.yml',
+      'refresh-it-register.yml',
+      'refresh-ch-clearing.yml',
+    ]) {
       const w = wf(name);
       expect(w, name).toContain('npm run test');
       expect(w, name).toContain('scripts/refresh-diff.ts');

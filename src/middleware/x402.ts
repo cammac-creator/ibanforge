@@ -270,7 +270,7 @@ export function buildRouteTable(
     FB.month && FB.rows > 0
       ? `Production · ${PERF} · ${F.claim.bic} BIC entries, ${FB.words} from a public copy of the SWIFT directory frozen in ${FB.month} · ${V}`
       : `Production · ${PERF} · ${F.claim.bic} BIC entries from GLEIF and national registers, refreshed monthly · ${V}`;
-  const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, refreshed monthly · ${V}`;
+  const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, re-read weekly · ${V}`;
   const TRUST_TAG_COMPLIANCE = `Production · ${PERF} · OFAC, EU, UN + FATF + SEPA + VoP · weekly refresh · ${V}`;
   // Read from the code that decides the verdict (src/lib/positioning.ts).
   const REGISTER_CODES = codesOf(registerCountries().authoritative);
@@ -821,7 +821,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description: `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation. Backed by ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly) — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
+      description: `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation. Backed by ${F.claim.chClearing} SIX BankMaster entries (re-read weekly) — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {

@@ -55,7 +55,7 @@
       "trust": "Sécurité et confiance"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · Bank of England (List of Banks, 2026-09) — mensuel · SwiftCodes/MIT — copie figée, 2018 · OFAC · UN · UE · EPC — hebdomadaire"
+    "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · EBA · NBP · Bank of England (List of Banks, 2026-09) — mensuel · SwiftCodes/MIT — copie figée, 2018 · SIX · OFAC · UN · UE · EPC — hebdomadaire"
   },
   "home": {
     "metadata": {

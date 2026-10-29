@@ -1051,7 +1051,7 @@ function createMcpServer(
         'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
         'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
         'EVERY IID OF THE SIX BANKMASTER, with its full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
-        `BACKED BY: ${F.claim.chClearing} SIX BankMaster entries (Swiss official source, refreshed monthly). ` +
+        `BACKED BY: ${F.claim.chClearing} SIX BankMaster entries (Swiss official source, re-read weekly). ` +
         'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
         'Only relevant for CH and LI accounts. ' +
         costLine('$0.003 per call'),

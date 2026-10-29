@@ -106,7 +106,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - validate_iban — validate one IBAN + enrich (bank-code verdict, BIC with its source, issuer EMI/vIBAN, SEPA and VoP readiness, risk, Swiss bc_nummer). Cost: $0.005
 - batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 USDC per IBAN via x402 (e.g. 100 = $0.20); on a key, a credit pack or Pro, each IBAN in the batch uses one request or credit
 - lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
-- lookup_ch_clearing — Swiss BC-Nummer / IID → institution, address, full rail participation (SIC, euroSIC, CHF instant, LSV+/BDD), QR-IID, for every IID of the SIX BankMaster, refreshed monthly. Cost: $0.003
+- lookup_ch_clearing — Swiss BC-Nummer / IID → institution, address, full rail participation (SIC, euroSIC, CHF instant, LSV+/BDD), QR-IID, for every IID of the SIX BankMaster, re-read weekly. Cost: $0.003
 - check_compliance — sanctions lists (OFAC, EU, UN) on the bank (BIC8), the country against a fixed list of sanctioned jurisdictions, never the payee's name + FATF + SEPA Instant + VoP readiness + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
 - validate_payment_reference — RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero checksums against the dated document that publishes each rule, plus the QRR/QR-IBAN pairing verdict. Cost: free
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free

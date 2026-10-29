@@ -14,7 +14,9 @@ permissions:
 
 # One writer of data/bic.sqlite at a time. refresh-cz-register.yml commits the
 # same file daily; sharing the group makes the two queue rather than race on
-# the 1st, and cancel-in-progress stays false so neither kills the other.
+# the 1st, and cancel-in-progress stays false so neither kills the other. Two
+# more writers share it: refresh-it-register.yml (Thursday) and, since
+# 29/10/2026, refresh-ch-clearing.yml (Monday, the SIX BankMaster only).
 #
 # 🔒 Public sources only, since the withdrawal step (25/09/2026). The rows whose
 # licence does not allow redistribution (EBA STEP2, OeNB and NBP directory rows,
@@ -52,8 +54,10 @@ jobs:
         run: npm run db:enrich
 
       # Swiss clearing (SIX BankMaster) lives in the SAME data/bic.sqlite file,
-      # so it is refreshed and committed here in ONE workflow rather than a
-      # second cron that would race on committing the same file. The script
+      # so it is refreshed and committed here with the rest. Since 29/10/2026
+      # it is ALSO re-read every Monday by refresh-ch-clearing.yml (SIX only,
+      # same concurrency group, committed only when the Swiss content changed),
+      # which skips the 1st because this run re-reads it that day. The script
       # has a built-in sanity floor: if the SIX feed is truncated it aborts
       # *before* dropping ch_clearing, so the existing data stands and this
       # step fails loudly instead of committing garbage.
