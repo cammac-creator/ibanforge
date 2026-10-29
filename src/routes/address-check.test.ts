@@ -112,6 +112,29 @@ describe('POST /v1/address/check (free, no payment)', () => {
  * tell it apart from any other path, and no answer to "is anyone asking for
  * this?". Free it stays; measured it now is.
  */
+describe('POST /v1/address/check — postcode and town in the directory of swisstopo (29.10.2026)', () => {
+  it('8001 Bern: the format rules pass, postcode_locality says the pair is not listed, with source and date', async () => {
+    const { status, json } = await post({
+      scheme: 'sps',
+      address: { pst_cd: '8001', twn_nm: 'Bern', ctry: 'CH' },
+    });
+    expect(status).toBe(200);
+    expect(json.conforms).toBe(true);
+    const block = json.postcode_locality as Record<string, unknown>;
+    expect(block.status).toBe('town_mismatch');
+    expect(block.as_of).toBe('2026-10-01');
+    expect(String(block.source)).toContain('©swisstopo');
+  });
+
+  it('answers postcode_locality: null outside CH and LI', async () => {
+    const { json } = await post({
+      scheme: 'hvps_plus',
+      address: { pst_cd: '10115', twn_nm: 'Berlin', ctry: 'DE' },
+    });
+    expect(json).toHaveProperty('postcode_locality', null);
+  });
+});
+
 describe('POST /v1/address/check — the demand for a free endpoint is measurable', () => {
   const rows = (): Array<{
     country_code: string | null;

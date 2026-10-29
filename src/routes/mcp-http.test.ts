@@ -445,6 +445,58 @@ describe('POST /mcp — full handshake', () => {
     expect(result.structuredContent!.note).toBeTruthy();
   });
 
+  it('tools/call check_postal_address keeps postcode_locality, its source and its date through the schema', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'check_postal_address',
+      arguments: { scheme: 'sps', address: { pst_cd: '8001', twn_nm: 'Bern', ctry: 'CH' } },
+    });
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent, 'schema mismatch silently drops this').toBeDefined();
+    // Informatif : les règles de format passent, conforms ne bouge pas.
+    expect(result.structuredContent!.conforms).toBe(true);
+    const block = result.structuredContent!.postcode_locality as Record<string, unknown>;
+    expect(block.status).toBe('town_mismatch');
+    expect(block.as_of).toBe('2026-10-01');
+    expect(String(block.source)).toContain('©swisstopo');
+    expect(block.localities).toEqual([
+      { name: 'Zürich', municipality: 'Zürich', canton: 'ZH', country: 'CH' },
+    ]);
+  });
+
+  it('tools/call check_swiss_qr_bill keeps the lookup inside sps_check, and the warning in findings', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const payload = [
+      'SPC', '0200', '1', 'CH5800791123000889012',
+      'S', 'Société Alpha', 'Rue du Lac', '12', '8001', 'Bern', 'CH',
+      '', '', '', '', '', '', '',
+      '10.00', 'CHF',
+      '', '', '', '', '', '', '',
+      'NON', '', '', 'EPD',
+    ].join('\n'); // prettier-ignore
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'check_swiss_qr_bill',
+      arguments: { payload },
+    });
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent!.valid).toBe(true);
+    const creditor = result.structuredContent!.creditor as {
+      sps_check: { postcode_locality: { status: string } };
+    };
+    expect(creditor.sps_check.postcode_locality.status).toBe('town_mismatch');
+    const findings = result.structuredContent!.findings as Array<{
+      code: string;
+      severity: string;
+    }>;
+    expect(findings).toContainEqual(
+      expect.objectContaining({ code: 'postcode_town_mismatch', severity: 'warning' }),
+    );
+  });
+
   it('tools/call check_postal_address fails a townless SPS address, with the rule named', async () => {
     const app = makeApp();
     const sessionId = await initialize(app);

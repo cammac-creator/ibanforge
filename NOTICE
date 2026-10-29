@@ -175,6 +175,21 @@ SIX Group AG, Bank Master
          https://www.six-group.com/dam/download/banking-services/interbank-clearing/en/bc_bank_master/bankmaster-v3-record-description-en.pdf
          https://www.six-group.com/en/products-services/banking-services/payment-services/bc-bank-master.html
 
+Federal Office of Topography swisstopo, official directory of localities
+with postcode and perimeter (ch.swisstopo-vd.ortschaftenverzeichnis_plz)
+  Where: data/ch-localities.json (version of 1 October 2026: postcode,
+         additional digit, locality, municipality, canton, language; 5,716
+         rows), written by scripts/seed-ch-localities.ts.
+  Attribution required by swisstopo:
+         ©swisstopo
+  Terms: "The free geodata and geoservices of swisstopo may be used,
+         distributed and made accessible. Furthermore, they may be enriched
+         and processed and also used commercially. A reference to the source
+         is mandatory." (read 29 October 2026)
+         https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices
+  Served with every API response that uses it: the source with its version
+  date and ©swisstopo (postcode_locality.source).
+
 Bulgarian National Bank, BAE register
   Where: data/bic.sqlite, table bg_bae (251 rows, edition of
          4 February 2026).

@@ -8,7 +8,12 @@
  * the BIC the file carries against the BIC the register derives, the address
  * country against the IBAN country, and the ISO 20022 postal-address
  * conformity the SIX deadline of 14.11.2026 makes urgent for Swiss creditor
- * files.
+ * files. Since 29.10.2026, a Swiss or Liechtenstein address (country column CH
+ * or LI) also has its postcode and town looked up in the official directory of
+ * localities of swisstopo: a warning when the directory contradicts the pair
+ * or knows neither half of it, never an error; a postcode it lacks while it
+ * lists the town nearby (a post-office box, likely) stays unverified, without
+ * a warning (src/lib/ch-localities.ts).
  *
  * Nothing here touches storage: the caller decides what to keep and for how
  * long. Findings carry stable codes; the labels are rendered per language at
@@ -18,6 +23,7 @@ import * as XLSX from 'xlsx';
 import { validateIBAN } from './iban.js';
 import { createEnrichCache, enrichResult, registerCoverage, type RegisterBasis } from './enrich.js';
 import { checkPostalAddress, type AddressScheme } from './address-conformity.js';
+import { POSTCODE_LOCALITY_WARNINGS, loadChLocalities } from './ch-localities.js';
 import type { IBANValidationResult } from '../types.js';
 
 export const AUDIT_MAX_ROWS = 20_000;
@@ -72,6 +78,7 @@ export type FindingCode =
   | 'issuer_not_bank'
   | 'country_risk'
   | 'address_not_structured'
+  | 'postcode_locality_mismatch'
   | 'verify_payee_name'
   | 'bank_not_consulted';
 
@@ -579,6 +586,23 @@ export function auditTable(
                   : (row.country ?? undefined),
             });
             row.address_verdict = check.conforms ? 'pass' : 'fail';
+            // NPA et localité (29.10.2026). Seulement quand la colonne pays du
+            // fichier dit CH ou LI : sans elle, le pays est celui de l'IBAN, et
+            // un créancier autrichien (NPA à quatre chiffres aussi) titulaire
+            // d'un compte suisse serait comparé au répertoire suisse à tort.
+            const stated =
+              cols.country !== undefined ? countryOfInput(r[cols.country] ?? '') : null;
+            const locality = check.postcode_locality;
+            if (
+              (stated === 'CH' || stated === 'LI') &&
+              locality &&
+              POSTCODE_LOCALITY_WARNINGS.has(locality.status)
+            ) {
+              findings.push({
+                code: 'postcode_locality_mismatch',
+                detail: `${locality.detail} Source: ${locality.source}`,
+              });
+            }
             if (!check.conforms) {
               const what = check.findings
                 .filter((f) => f.verdict === 'fail')
@@ -672,6 +696,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     issuer_not_bank: 'Held at a payment institution, not a bank',
     country_risk: 'Elevated country risk',
     address_not_structured: 'Address not structured (ISO 20022)',
+    postcode_locality_mismatch: 'Postcode and town not listed together (swisstopo directory)',
     verify_payee_name: 'Verify the payee name (VoP)',
     bank_not_consulted: 'Bank not consulted',
   },
@@ -690,6 +715,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     issuer_not_bank: 'Compte chez un établissement de paiement, pas une banque',
     country_risk: 'Risque pays élevé',
     address_not_structured: 'Adresse non structurée (ISO 20022)',
+    postcode_locality_mismatch: 'NPA et localité non répertoriés ensemble (répertoire swisstopo)',
     verify_payee_name: 'Vérifier le nom du bénéficiaire (VoP)',
     bank_not_consulted: 'Banque non consultée',
   },
@@ -708,6 +734,7 @@ const LABELS: Record<AuditLang, Record<FindingCode, string>> = {
     issuer_not_bank: 'Konto bei einem Zahlungsinstitut, nicht bei einer Bank',
     country_risk: 'Erhöhtes Länderrisiko',
     address_not_structured: 'Adresse nicht strukturiert (ISO 20022)',
+    postcode_locality_mismatch: 'PLZ und Ort nicht zusammen verzeichnet (Verzeichnis swisstopo)',
     verify_payee_name: 'Empfängernamen prüfen (VoP)',
     bank_not_consulted: 'Bank nicht geprüft',
   },
@@ -901,6 +928,7 @@ export function buildWorkbook(
     [t.method_1, ''],
     [t.method_2, ''],
     [t.method_3, ''],
+    [localityMethodLine(lang), ''],
   ];
   const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
   ws2['!cols'] = [{ wch: 60 }, { wch: 22 }];
@@ -970,3 +998,41 @@ const SUMMARY_LABELS: Record<AuditLang, Record<string, string>> = {
       'Postadresse gegen die Regeln für strukturierte Adressen der Swiss Payment Standards (CH/LI) bzw. ISO 20022 HVPS+ (andere Länder) geprüft, wenn Adressspalten vorhanden sind.',
   },
 };
+
+/**
+ * La ligne de méthode du contrôle NPA et localité, avec la version du
+ * répertoire et la mention que swisstopo exige pour toute diffusion.
+ */
+function localityMethodLine(lang: AuditLang): string {
+  const table = loadChLocalities();
+  const v = table ? table.version.split('-').reverse().join('.') : null;
+  const credit = '©swisstopo';
+  if (lang === 'fr') {
+    return (
+      'NPA et localité des adresses suisses et liechtensteinoises (colonne pays CH ou LI) comparés au répertoire ' +
+      `officiel des localités de l'Office fédéral de topographie swisstopo${v ? `, version du ${v}` : ' (non chargé sur ce serveur)'}, ${credit} : ` +
+      "un avertissement quand le répertoire donne ce NPA pour d'autres localités ou dans l'autre pays, ou n'y connaît " +
+      'ni le NPA ni la localité dans cette zone postale ; jamais une erreur. Un NPA absent du répertoire, alors que la ' +
+      'localité y figure sous un autre NPA de la même zone postale (probablement une case postale), reste non vérifié, ' +
+      "sans avertissement : l'absence d'avertissement ne vaut pas vérification. La rue n'est pas contrôlée."
+    );
+  }
+  if (lang === 'de') {
+    return (
+      'PLZ und Ort von Adressen in der Schweiz und in Liechtenstein (Länderspalte CH oder LI) mit dem amtlichen ' +
+      `Ortschaftenverzeichnis des Bundesamts für Landestopografie swisstopo verglichen${v ? `, Stand ${v}` : ' (auf diesem Server nicht geladen)'}, ${credit}: ` +
+      'eine Warnung, wenn das Verzeichnis die PLZ anderen Orten oder dem anderen Land zuordnet oder in diesem ' +
+      'Postleitzahlgebiet weder die PLZ noch den Ort kennt; nie ein Fehler. Eine PLZ, die im Verzeichnis fehlt, während ' +
+      'der Ort dort unter einer anderen PLZ desselben Postleitzahlgebiets steht (wahrscheinlich ein Postfach), bleibt ' +
+      'ungeprüft, ohne Warnung: das Fehlen einer Warnung ist keine Bestätigung. Die Strasse wird nicht geprüft.'
+    );
+  }
+  return (
+    'Postcode and town of Swiss and Liechtenstein addresses (country column CH or LI) compared with the official ' +
+    `directory of localities of the Federal Office of Topography swisstopo${v ? `, version of ${v}` : ' (not loaded on this server)'}, ${credit}: ` +
+    'a warning when the directory lists the postcode for other towns or in the other country, or lists neither the ' +
+    'postcode nor the town in that postal area; never an error. A postcode missing from the directory, while the town ' +
+    'is listed there under another postcode of the same postal area (likely a post-office box), stays unverified, ' +
+    'without a warning: the absence of a warning does not mean the pair was verified. The street is not checked.'
+  );
+}

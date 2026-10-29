@@ -17,6 +17,11 @@
  * checker is parameterised instead, and each finding names the document it
  * comes from with its date.
  *
+ * Since 29.10.2026 the answer also carries `postcode_locality` for a Swiss or
+ * Liechtenstein address: postcode and town looked up in the official directory
+ * of localities of swisstopo. It sits beside the findings, never among them:
+ * the verdicts stay those of the rails' format rules.
+ *
  * **`cbpr+` is not among the schemes**, and this is deliberate. The CBPR+ usage
  * guideline and the PMPG "November 2026 postal address guidance" both live on
  * swift.com, which was unreachable on 26/08/2026 (as was iso20022.org, and
@@ -24,6 +29,8 @@
  * ship rules we could not read. Every rule below is quoted from a document that
  * was actually fetched.
  */
+
+import { checkPostcodeLocality, type PostcodeLocalityCheck } from './ch-localities.js';
 
 /** The rails whose address rules could be read from a primary source. */
 export type AddressScheme = 'sps' | 'hvps_plus' | 'fedwire';
@@ -64,6 +71,14 @@ export interface AddressCheckResult {
   /** True when no finding failed. Rules that did not apply do not count against it. */
   conforms: boolean;
   findings: AddressFinding[];
+  /**
+   * Swiss and Liechtenstein addresses only: do postcode and town go together in
+   * the official directory of localities of swisstopo (src/lib/ch-localities.ts,
+   * 29.10.2026)? A separate, informative answer: it never moves `conforms`,
+   * since a rail's format rules say nothing of postal reality. `null` for any
+   * other address, or when the postcode or the town is missing.
+   */
+  postcode_locality: PostcodeLocalityCheck | null;
   /** Why `cbpr+` is not on the menu. Served on every answer. */
   note: string;
 }
@@ -590,6 +605,7 @@ export function checkPostalAddress(
     scheme,
     conforms: findings.every((f) => f.verdict !== 'fail'),
     findings,
+    postcode_locality: checkPostcodeLocality(address),
     note: CBPR_NOTE,
   };
 }

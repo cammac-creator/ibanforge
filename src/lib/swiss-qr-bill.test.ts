@@ -456,8 +456,29 @@ describe('the character set (ch. 4.1.1)', () => {
  * finding. Example 4 already met one before 29.10.2026 and keeps it: its
  * reference RF720191230100405JSH0438, printed the same in the table and on the
  * payment part (p. 55), fails the ISO 11649 modulo 97 check (remainder 49).
+ *
+ * NPA et localité (29.10.2026, PR 470) : « 8000 Seldwyla » est la ville fictive
+ * des exemples de SIX. Le répertoire officiel des localités de swisstopo ne la
+ * connaît pas, et l'avertissement `postcode_not_listed` qu'elle reçoit est juste.
+ * Il est compté à part : ce bloc tient les règles de la PR 467, et vérifie que
+ * Seldwyla ne donne qu'un avertissement, jamais une erreur ni `valid` à faux.
+ * « 3001 Bern » (exemple 3, une case postale) et le créancier « 9490 Vaduz, LI »
+ * de l'exemple 5 n'en reçoivent aucun.
  */
 describe('the examples of the guidelines 2.4, Annex A', () => {
+  const LOCALITY_CODES: ReadonlySet<string> = new Set([
+    'postcode_town_mismatch',
+    'postcode_other_country',
+    'postcode_not_listed',
+  ]);
+  /** Les avertissements des localités : seulement Seldwyla, et seulement `postcode_not_listed`. */
+  function expectOnlySeldwyla(r: ReturnType<typeof checkSwissQrBill>): void {
+    for (const f of r.findings.filter((x) => LOCALITY_CODES.has(x.code))) {
+      expect(f.code).toBe('postcode_not_listed');
+      expect(f.severity).toBe('warning');
+      expect(f.detail).toContain('"Seldwyla"');
+    }
+  }
   const CR = [
     'S',
     'Max Muster & Söhne (sample company)',
@@ -493,14 +514,25 @@ describe('the examples of the guidelines 2.4, Annex A', () => {
 
   it.each(Object.keys(EXAMPLES))('%s meets no new finding, with CR+LF as printed', (name) => {
     const r = checkSwissQrBill(EXAMPLES[name]!.join('\r\n'));
-    const codes = r.findings.map((f) => f.code);
+    const others = r.findings.filter((f) => !LOCALITY_CODES.has(f.code));
+    const codes = others.map((f) => f.code);
     expect(codes).not.toContain('character_not_permitted');
     expect(codes).not.toContain('qr_iban_chf_only_ig24');
     if (name === 'example 4') {
       expect(codes).toEqual(['scor_reference_invalid']);
     } else {
-      expect(r.findings).toEqual([]);
+      expect(others).toEqual([]);
       expect(r.valid).toBe(true);
+    }
+    expectOnlySeldwyla(r);
+    if (name === 'example 3' || name === 'example 5') {
+      const creditorLocality = r.findings.filter(
+        (f) => LOCALITY_CODES.has(f.code) && f.field.startsWith('creditor.'),
+      );
+      expect(creditorLocality).toEqual([]);
+      expect(r.creditor.sps_check?.postcode_locality?.status).toBe(
+        name === 'example 3' ? 'not_verifiable' : 'match',
+      );
     }
   });
 
@@ -508,7 +540,10 @@ describe('the examples of the guidelines 2.4, Annex A', () => {
     const lines = [...EXAMPLES['example 2']!];
     lines[19] = 'EUR';
     const r = checkSwissQrBill(lines.join('\n'));
-    expect(r.findings.map((f) => f.code)).toEqual(['qr_iban_chf_only_ig24']);
+    expect(r.findings.filter((f) => !LOCALITY_CODES.has(f.code)).map((f) => f.code)).toEqual([
+      'qr_iban_chf_only_ig24',
+    ]);
+    expectOnlySeldwyla(r);
     expect(r.valid).toBe(true);
   });
 });
