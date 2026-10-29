@@ -222,6 +222,50 @@ jobs:
           docker logs ibanforge-ci 2>&1 | tail -40 || true
           docker rm -f ibanforge-ci || true
 
+  # The site image (frontend/Dockerfile, context = repository root) used to be
+  # built only after a merge, by deploy-site.yml. On 28/10/2026 a site test
+  # that imported ../../src passed every job here and broke that build (TS2307
+  # in next build: the image copies frontend/ and CHANGELOG.md only); the site
+  # stayed on the previous version until a fix shipped. This job builds the
+  # same image on every pull request, with no push and no secret, then runs
+  # the deploy's own smoke test, so such a change stops before the merge.
+  # scripts/frontend-image-imports.test.ts still catches the import case
+  # earlier and cheaper; this job catches the rest (pre-render, Dockerfile).
+  site-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the site image (no push)
+        run: docker build -f frontend/Dockerfile --build-arg GIT_SHA="$GITHUB_SHA" -t ibanforge-site-ci .
+
+      # Same paths and the same feed check as deploy-site.yml, so a page that
+      # boots there boots here.
+      - name: Boot the image and read the pages the deploy reads
+        run: |
+          set -euo pipefail
+          docker run -d --name site-ci -p 3400:3000 \
+            -e API_URL=https://ibanforge-production.up.railway.app \
+            -e NEXT_PUBLIC_API_URL=https://api.ibanforge.com \
+            ibanforge-site-ci
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:3400/robots.txt && break
+            sleep 2
+          done
+          for path in / /fr /de /robots.txt /sitemap.xml /rss.xml; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3400$path")
+            echo "$path -> $code"
+            [ "$code" = 200 ] || { docker logs --tail 60 site-ci; exit 1; }
+          done
+          curl -fsS http://127.0.0.1:3400/rss.xml | grep -q '<title>Release ' \
+            || { echo "rss.xml has no release entry: CHANGELOG.md is missing from the image"; exit 1; }
+
+      - name: Container logs and teardown
+        if: always()
+        run: |
+          docker logs site-ci 2>&1 | tail -40 || true
+          docker rm -f site-ci || true
+
   sdk-java:
     runs-on: ubuntu-latest
     steps:
