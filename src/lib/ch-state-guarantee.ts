@@ -119,7 +119,7 @@ export const CANTONAL_BANK_STATE_GUARANTEE: Readonly<Record<string, StateGuarant
     bic8: 'BEFRCH22',
     guaranteed: true,
     source: 'Loi sur la Banque cantonale de Fribourg (LBCF), RSF 961.1, art. 3',
-    url: 'https://bdlf.fr.ch/api/fr/texts_of_law/961.1',
+    url: 'https://bdlf.fr.ch/app/fr/texts_of_law/961.1',
   },
   '00769': {
     canton: 'BL',
