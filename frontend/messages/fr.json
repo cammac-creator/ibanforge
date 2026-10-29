@@ -2723,6 +2723,7 @@
       "issuer_not_bank": "Compte chez un établissement de paiement, pas une banque",
       "country_risk": "Risque pays élevé",
       "address_not_structured": "Adresse non structurée (ISO 20022)",
+      "postcode_locality_mismatch": "NPA et localité non répertoriés ensemble (répertoire swisstopo)",
       "bank_not_consulted": "Banque non consultée"
     },
     "pay": {
@@ -2878,6 +2879,9 @@
       "error": "Erreur",
       "warning": "Avertissement",
       "clean": "Aucun constat : toutes les règles passent.",
+      "cleanUnverified": "Aucune erreur ni aucun avertissement, mais tous les NPA n'ont pas pu être vérifiés :",
+      "postcodeNotVerifiable": "{party} : le NPA {postcode} ne figure pas au répertoire officiel des localités de swisstopo, qui donne {town} sous un autre NPA de la même zone postale (probablement une case postale). Le couple n'est ni confirmé ni contredit : il ne reçoit donc pas d'avertissement.",
+      "postcodeDirectoryUnavailable": "{party} : le répertoire des localités n'a pas pu être lu sur le serveur ; le NPA {postcode} et la localité {town} n'ont pas été comparés.",
       "proposedCreditor": "Adresse structurée proposée pour le créancier",
       "proposedDebtor": "Adresse structurée proposée pour le débiteur",
       "nextSteps": "Et ensuite"

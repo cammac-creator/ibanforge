@@ -7,10 +7,23 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult, createEnrichCache } from '../lib/enrich.js';
-import { bicCountryName, bicSourceFields, lookup, namedRow, nonEmpty } from '../lib/bic-lookup.js';
+import {
+  bicCountryName,
+  bicSourceFields,
+  lookup,
+  namedRow,
+  nonEmpty,
+  registeredAddress,
+} from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
-import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
+import {
+  clearingRecord,
+  clearingRemarks,
+  lookupClearingByBankCode,
+  normalizeIid,
+  getChClearingCount,
+} from '../lib/ch-clearing.js';
 import {
   buildCountriesPayload,
   buildPricingPayload,
@@ -343,6 +356,10 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
 
     // Une fiche complète ou introuvable, comme GET /v1/bic/:code (25/09/2026).
     const row = namedRow(lookup(validation.bic11!));
+    // L'adresse du siège, comme GET /v1/bic/:code et le transport HTTP
+    // (29.10.2026) : même constructeur que `bic.address` de validate_iban, avec
+    // sa source et sa date (`as_of`). Ni `postal_address` ni les sanctions.
+    const address = registeredAddress(row);
 
     const result = {
       bic: validation.bic,
@@ -368,6 +385,8 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
         name: bicCountryName(row, validation.country_code!),
       },
       city: nonEmpty(row?.city),
+      address,
+      address_available: address !== null,
       branch_code: validation.branch_code,
       branch_info: row?.branch_info ?? null,
       lei: row?.lei ?? null,
@@ -521,7 +540,9 @@ server.registerTool(
     title: 'Check Swiss QR-bill Payload',
     description: `Check a Swiss QR-bill payload, the text a QR-bill's code carries (starts with SPC), rule by rule, each finding citing the SIX document it comes from. USE WHEN: an agent, an ERP or an accounting tool holds a scanned or generated QR-bill and must know before paying or issuing it whether it is well-formed, whether the reference type matches the IBAN (QRR needs a QR-IBAN, IID 30000-31999), and above all whether the creditor and debtor addresses are STRUCTURED (type S) or still COMBINED (type K): ${COMBINED_ADDRESS_CLAUSE}. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the paid validate_iban. RETURNS: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines, to relay as a fix. IMPORTANT: relay each finding's source string. 
 
-Cost: free. Pure rule evaluation over the published SIX standard, no database. The paid surface is the bank behind the IBAN (validate_iban).`,
+Postcode and town: for a type S address in CH or LI, sps_check.postcode_locality compares them with the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of). A warning (postcode_town_mismatch, postcode_other_country, postcode_not_listed) comes back when the directory lists the postcode for other towns or in the other country, or lists neither the postcode nor the town in that postal area; never an error, so valid does not change. A postcode missing from the directory, while the town is listed there under another postcode of the same postal area (likely a post-office box postcode), comes back not_verifiable, without a warning: the absence of a warning does not mean the pair was verified. The street is not checked.
+
+Cost: free. Rule evaluation over the published SIX standard, plus that directory, an open dataset shipped with the server. The paid surface is the bank behind the IBAN (validate_iban).`,
     inputSchema: {
       payload: z
         .string()
@@ -556,17 +577,17 @@ server.registerTool(
     description: `Check a structured ISO 20022 postal address against a payment rail's published address rules, rule by rule, each verdict citing the document it comes from.
 
 When to use: an agent is assembling a payment instruction (pain.001, a Fedwire message, a T2 transfer) and holds a creditor or debtor address, and needs to check conformity with the named document BEFORE submitting. Timetables differ: SPS 2026 in force 14 Nov 2026 requires town and country whenever an address is given, but SIC does not validate addresses and each bank decides what it still accepts. Fedwire moved its release to November 2027. The fetched T2 R2026.NOV does not forbid an AddressLine-only address; the MyStandards usage guideline could not be read.
-When NOT to use: to verify that a street or town EXISTS — this tool checks conformity with the message format rules, not postal reality. Address verification services do that; this does not.
+When NOT to use: to verify that a street or a building EXISTS — the findings check conformity with the message format rules, and no street is looked up. For a Swiss or Liechtenstein address (ctry CH or LI, with pst_cd and twn_nm), the separate postcode_locality block says whether postcode and town go together in the official directory of localities of swisstopo; it is informative and does not change conforms.
 
 Schemes: 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+ / T2, ECB), 'fedwire' (Federal Reserve). There is deliberately NO 'cbpr+' scheme: the CBPR+ usage guideline is published behind swift.com, which is unreachable to automated readers, and a conformity boolean quoting a document nobody here has read would be a guess dressed as a verdict. The response's note field restates this on every answer.
 
-Behavior: read-only, no network calls, pure rule evaluation. Findings carry three verdicts: pass, fail, and not_applicable — the last is a real answer marking a rule whose precondition is not met, and it never counts as a pass.
+Behavior: read-only, no network calls: rule evaluation, plus a lookup in the official directory of localities of swisstopo, a file shipped with the server. Findings carry three verdicts: pass, fail, and not_applicable — the last is a real answer marking a rule whose precondition is not met, and it never counts as a pass.
 
-Returns: { scheme, conforms, findings: [{ rule, verdict, detail, source }], note }. conforms is true when no finding failed.
+Returns: { scheme, conforms, findings: [{ rule, verdict, detail, source }], postcode_locality: { status, localities, detail, source, as_of } | null, note }. conforms is true when no finding failed. postcode_locality.status is match, town_mismatch, other_country, postcode_not_listed, not_verifiable (a postcode the directory does not list, such as a post-office box postcode, with the town listed nearby) or directory_unavailable.
 
 IMPORTANT — relay the source strings when reporting to a user: each names the exact document, version and validity date the rule is quoted from (e.g. "SIX, Swiss Implementation Guidelines … SPS 2026 v2.3, valid from 14 November 2026, ch. 3.11 table 9."). They are what makes the verdict auditable.
 
-Example: input scheme 'sps', address { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' } → { conforms: true, findings: [7 rules, each sourced] }. Dropping twn_nm flips twn_nm_required to fail and conforms to false.
+Example: input scheme 'sps', address { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' } → { conforms: true, findings: [11 rules, each sourced], postcode_locality: { status: 'match' } }. Dropping twn_nm flips twn_nm_required to fail and conforms to false; writing twn_nm 'Bern' keeps conforms true and turns postcode_locality.status to town_mismatch.
 
 Cost: free. The rules are published commodities; the paid surface is the postal_address block that /v1/bic and /v1/iban/validate return for the resolved institution.`,
     inputSchema: {
@@ -691,28 +712,14 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       };
     }
 
+    // Mêmes constructeurs que GET /v1/ch/clearing/:iid et que le transport HTTP
+    // (29.10.2026) : la provenance du QR-IID (`qr_iid_source`, `qr_iids`), le
+    // drapeau et la phrase d'un QR-IID, puis la phrase de fusion.
     const result: Record<string, unknown> = {
-      iid: entry.iid,
-      found: true,
-      institution: {
-        name: entry.name,
-        type: entry.institution_type,
-        iid_type: entry.iid_type,
-        headquarters_iid: entry.headquarters_iid,
-      },
-      address: entry.address,
-      bic: entry.bic,
-      payment_services: entry.payment_services,
-      sic_iid: entry.sic_iid,
-      qr_iid: entry.qr_iid,
-      valid_on: entry.valid_on,
+      ...clearingRecord(entry),
       cost_usdc: 0.003,
+      ...clearingRemarks(entry),
     };
-
-    if (entry.redirected_from) {
-      result.redirected_from = entry.redirected_from;
-      result.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
-    }
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

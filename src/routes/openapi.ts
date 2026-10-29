@@ -666,9 +666,13 @@ const buildRawSpec = () => ({
         operationId: 'checkSwissQrBill',
         summary: 'Free Swiss QR-bill payload check (structured vs combined address)',
         description:
-          'FREE rule check of the text inside a Swiss QR-bill code (the Swiss Payments Code, 31 positional lines from SPC to EPD): header and version, creditor IBAN and QR-IBAN range (IID 30000-31999), QRR/SCOR/NON reference checksum and its pairing with the IBAN, amount, currency, ultimate creditor left empty, and whether the creditor and ultimate debtor addresses are structured (type S) or still combined (type K). ' +
+          'FREE rule check of the text inside a Swiss QR-bill code (the Swiss Payments Code, 31 positional lines from SPC to EPD): header and version, creditor IBAN and QR-IBAN range (IID 30000-31999), QRR/SCOR/NON reference checksum and its pairing with the IBAN, amount, currency, ultimate creditor left empty, the character set, and whether the creditor and ultimate debtor addresses are structured (type S) or still combined (type K). ' +
+          'Character set: ch. 4.1.1 of the SIX QR-bill guidelines, in force since version 2.3 (November 2025) and unchanged in version 2.4, allows Basic Latin, Latin-1 Supplement, Latin Extended-A, Ș ș Ț ț and €. Any other character, a typographic apostrophe (U+2019), a tab or a decomposed letter included, is an error (character_not_permitted, one per line, naming the code point and its position) and makes valid false. ' +
+          'A QR-IBAN or a QR reference on an invoice in EUR gets a warning (qr_iban_chf_only_ig24): version 2.4, valid from 14.11.2026, keeps them for CHF, while version 2.3 remains valid until November 2027; valid does not change. ' +
           COMBINED_ADDRESS_NOTICE.en +
-          ' A combined address comes back with proposed_structured, the S-type fields derived from the combined lines. Pure rule evaluation, no database: the bank behind the IBAN is the job of POST /v1/iban/validate.',
+          ' A combined address comes back with proposed_structured, the S-type fields derived from the combined lines.' +
+          ' For a type S address in CH or LI, creditor.sps_check.postcode_locality (and the same under ultimate_debtor) compares postcode and town with the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of). A warning (postcode_town_mismatch, postcode_other_country, postcode_not_listed) comes back when the directory lists the postcode for other towns or in the other country, or lists neither the postcode nor the town in that postal area; valid does not change. A postcode missing from the directory, while the town is listed there under another postcode of the same postal area (likely a post-office box postcode), comes back not_verifiable, without a warning: the absence of a warning does not mean the pair was verified. The street is not checked.' +
+          ' Rule evaluation plus that open directory: the bank behind the IBAN is the job of POST /v1/iban/validate.',
         tags: ['Free'],
         security: [],
         requestBody: {
@@ -739,10 +743,11 @@ const buildRawSpec = () => ({
         description:
           // FRFS, annonce du 27.08.2026, relue le 28.10.2026 : report à novembre 2027.
           // https://www.frbservices.org/news/communications/082726-fedwire-funds-services-release-rescheduled/
-          'FREE rule check on a postal address YOU have already structured, for the structured-address timetables (SPS 2026 in force 14 Nov 2026, while SIC itself does not validate addresses and each bank decides, Fedwire release rescheduled to November 2027, T2 R2026.NOV). Pure rule evaluation — it reads no database, which is why it is free. Every finding names the document the rule comes from, with its date. ' +
+          'FREE rule check on a postal address YOU have already structured, for the structured-address timetables (SPS 2026 in force 14 Nov 2026, while SIC itself does not validate addresses and each bank decides, Fedwire release rescheduled to November 2027, T2 R2026.NOV). Free. Every finding names the document the rule comes from, with its date. ' +
+          'For a Swiss or Liechtenstein address (ctry CH or LI, with pst_cd and twn_nm), postcode_locality says whether postcode and town go together in the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of): informative, beside the findings, without effect on conforms; the street is not checked. ' +
           `Schemes: ${ADDRESS_SCHEMES.join(', ')}. ` +
           CBPR_NOTE +
-          ' It does NOT parse or normalise a free-text address into a structured one — that needs national postal reference data we do not hold.',
+          ' It does NOT parse or normalise a free-text address into a structured one — that needs street-level postal reference data we do not hold.',
         tags: ['Free'],
         // Explicitly no authentication, same statement as /v1/iban/format:
         // 'free', not 'the author forgot to say'.
@@ -790,7 +795,7 @@ const buildRawSpec = () => ({
               'application/json': {
                 schema: {
                   type: 'object',
-                  required: ['scheme', 'conforms', 'findings', 'note'],
+                  required: ['scheme', 'conforms', 'findings', 'postcode_locality', 'note'],
                   properties: {
                     scheme: { type: 'string', enum: [...ADDRESS_SCHEMES] },
                     conforms: {
@@ -817,6 +822,38 @@ const buildRawSpec = () => ({
                             description: 'The document the rule comes from, with its date.',
                           },
                         },
+                      },
+                    },
+                    postcode_locality: {
+                      type: ['object', 'null'],
+                      description:
+                        'Swiss and Liechtenstein addresses with a postcode and a town: whether the two go together in the official directory of localities of swisstopo. Informative: it never changes conforms. null for any other address.',
+                      properties: {
+                        status: {
+                          type: 'string',
+                          enum: ['match', 'town_mismatch', 'other_country', 'postcode_not_listed', 'not_verifiable', 'directory_unavailable'],
+                          description:
+                            'not_verifiable: the postcode is not in the directory, which lists territory only, while the town is listed under other postcodes of the same postal area (a post-office box or business postcode is likely). Only town_mismatch, other_country and postcode_not_listed are worth a warning.',
+                        },
+                        localities: {
+                          type: 'array',
+                          description: 'The entries the directory gives for this postcode; empty when it has none.',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              name: { type: 'string' },
+                              municipality: { type: 'string' },
+                              canton: { type: ['string', 'null'] },
+                              country: { type: 'string', enum: ['CH', 'LI'] },
+                            },
+                          },
+                        },
+                        detail: { type: 'string' },
+                        source: {
+                          type: 'string',
+                          description: 'The directory, its version and the credit ©swisstopo that its terms require.',
+                        },
+                        as_of: { type: ['string', 'null'], description: 'Version date of the directory (YYYY-MM-DD).' },
                       },
                     },
                     note: { type: 'string', description: 'Why no cbpr+ scheme is offered. Served on every answer.' },

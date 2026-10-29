@@ -2,28 +2,43 @@
  * Swiss QR-bill payload check ("Swiss Payments Code", the text inside the QR).
  *
  * The payload is a fixed sequence of lines (SIX, Swiss Implementation
- * Guidelines QR-bill). This module parses it, checks every rule that can be
- * checked without a database, and answers the one question that decides
+ * Guidelines QR-bill). This module parses it, checks every rule of the
+ * standard that it can check, and answers the one question that decides
  * whether a QR-bill still gets paid: is the creditor address STRUCTURED
  * (address type S), or still COMBINED (type K), which the standard has not
- * permitted since 21 November 2025 and whose payment the banks guarantee only
+ * permitted since 21 November 2025 and whose payment the banks guaranteed only
  * until the end of September 2026?
+ *
+ * Two rules of 29.10.2026, each with its own source:
+ *   - the character set (ch. 4.1.1), in force since version 2.3 and unchanged
+ *     in 2.4: an `error`, so `valid` turns false;
+ *   - QR-IBAN and QR reference in CHF only, a rule of version 2.4 (valid from
+ *     14 November 2026) while version 2.3 remains valid until November 2027:
+ *     a `warning`, so `valid` and `ready_for_2026_11_14` do not move.
  *
  * What it reuses rather than re-implements:
  *   - IBAN structure and check digits: validateIBAN (src/lib/iban.ts)
  *   - QR-IID range 30000-31999: isQrIidRange (src/lib/ch-clearing.ts)
  *   - QRR (mod 10 recursive) and RF (ISO 11649) references: validatePaymentReference
  *   - the SPS structured-address rules, each finding sourced: checkPostalAddress
+ *   - for a type S address in CH or LI, postcode and town in the official
+ *     directory of localities of swisstopo (src/lib/ch-localities.ts,
+ *     29.10.2026): a warning when the directory contradicts the pair or knows
+ *     neither half of it, never an error; a postcode it lacks while it lists
+ *     the town nearby (a post-office box, likely) is not_verifiable, without
+ *     a warning
  *
- * Pure rule evaluation, no network, no storage. Free on every surface: the
- * rules are published commodities; the paid surface is the bank behind the
- * IBAN (/v1/iban/validate).
+ * Rule evaluation plus that directory, read from a file shipped with the
+ * server: no network, no storage. Free on every surface: the rules are
+ * published commodities and the directory is open data; the paid surface is
+ * the bank behind the IBAN (/v1/iban/validate).
  */
 import { validateIBAN } from './iban.js';
 import { isQrIidRange } from './ch-clearing.js';
 import { validatePaymentReference } from './payment-reference.js';
 import { checkPostalAddress, type AddressCheckResult } from './address-conformity.js';
 import { COMBINED_ADDRESS_NOTICE, COMBINED_ADDRESS_SOURCE } from './qr-bill-notice.js';
+import { POSTCODE_LOCALITY_WARNINGS, type PostcodeLocalityStatus } from './ch-localities.js';
 
 export {
   COMBINED_ADDRESS_CLAUSE,
@@ -45,7 +60,43 @@ export const QR_BILL_SOURCE =
   'SIX, Swiss Implementation Guidelines QR-bill, version 2.3 (published 2023, mandatory from 21 November 2025): ' +
   'data structure of the Swiss QR Code, ch. 4.';
 
+/**
+ * The source of the one rule this check takes from version 2.4 (29.10.2026).
+ * QR_BILL_SOURCE stays on 2.3: it goes out with every other finding, and those
+ * rules were checked against 2.3. Read in the PDF of 24.02.2026: ch. 2.10 (the
+ * QR-IBAN "can only be used for invoicing and payments in CHF"), ch. 2.12.1
+ * and 4.3.2 (the QR reference, "only be used for invoicing in CHF"), and the
+ * change control on page 4 ("For invoicing in euros (EUR), only the
+ * combination IBAN/SCOR reference and IBAN/unstructured message is possible";
+ * "Version 2.3 remains valid until November 2027"). Version 2.3 has no such
+ * rule in its ch. 2.10, 2.12.1 or 4.3.2, hence a warning and not an error.
+ */
+export const QR_BILL_IG24_SOURCE =
+  'SIX, Swiss Implementation Guidelines QR-bill, version 2.4 of 24.02.2026, valid from 14 November 2026 ' +
+  '(https://www.six-group.com/dam/download/banking-services/standardization/qr-bill/ig-qr-bill-v2.4-en.pdf, read 29.10.2026): ' +
+  'change control (p. 4), ch. 2.10, 2.12.1 and 4.3.2. Version 2.3 remains valid until November 2027.';
+
+/**
+ * The source of the character-set rule (29.10.2026). Chapter 4.1.1 reads the
+ * same in version 2.3 (valid from 21 November 2025, in force today) and in
+ * version 2.4, so the rule is checked as an error.
+ */
+export const QR_BILL_CHARSET_SOURCE =
+  'SIX, Swiss Implementation Guidelines QR-bill, version 2.3, valid from 21 November 2025 ' +
+  '(https://www.six-group.com/dam/download/banking-services/standardization/qr-bill/ig-qr-bill-v2.3-en.pdf, read 29.10.2026), ' +
+  'ch. 4.1.1 Character set; the same set in version 2.4, valid from 14 November 2026, ch. 4.1.1.';
+
 export type QrFindingSeverity = 'error' | 'warning';
+
+/**
+ * The warning code of each state of the postcode and town lookup that is
+ * worth one (src/lib/ch-localities.ts). Severity `warning` for all three.
+ */
+export const POSTCODE_LOCALITY_CODES: Partial<Record<PostcodeLocalityStatus, string>> = {
+  town_mismatch: 'postcode_town_mismatch',
+  other_country: 'postcode_other_country',
+  postcode_not_listed: 'postcode_not_listed',
+};
 
 export interface QrFinding {
   code: string;
@@ -291,6 +342,20 @@ function reportParty(
         });
       }
     }
+    // NPA et localité au répertoire officiel de swisstopo (29.10.2026) : un
+    // avertissement, jamais une erreur, donc ni `valid` ni
+    // `ready_for_2026_11_14` ne bougent. Un NPA absent dont la localité figure
+    // sous un autre NPA de la même zone (case postale probable) n'en donne pas.
+    const locality = report.sps_check.postcode_locality;
+    if (locality && POSTCODE_LOCALITY_WARNINGS.has(locality.status)) {
+      findings.push({
+        code: POSTCODE_LOCALITY_CODES[locality.status]!,
+        severity: 'warning',
+        field: field(locality.status === 'town_mismatch' ? 'town' : 'postal_code'),
+        detail: locality.detail,
+        source: locality.source,
+      });
+    }
   } else if (a.type === 'K') {
     report.structured = false;
     findings.push({
@@ -374,6 +439,114 @@ export function splitPayload(payload: string): string[] {
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((l) => l.replace(/\s+$/, ''));
+}
+
+/**
+ * Ch. 4.1.1: Basic Latin (U+0020-U+007E), Latin-1 Supplement (U+00A0-U+00FF),
+ * Latin Extended-A (U+0100-U+017F), plus S and T with comma below
+ * (U+0218-U+021B) and the euro sign (U+20AC).
+ */
+export function isQrBillCharacter(codePoint: number): boolean {
+  return (
+    (codePoint >= 0x20 && codePoint <= 0x7e) ||
+    (codePoint >= 0xa0 && codePoint <= 0x17f) ||
+    (codePoint >= 0x218 && codePoint <= 0x21b) ||
+    codePoint === 0x20ac
+  );
+}
+
+const PARTY_FIELDS = ['address_type', 'name', '', '', 'postal_code', 'town', 'country'] as const;
+
+/**
+ * The response field a payload line feeds, named as the other findings name it.
+ * The ultimate creditor block is one field, `ultimate_creditor`, as in
+ * `ultimate_creditor_not_allowed`; both alternative schemes are
+ * `alternative_scheme`, as in their `field_too_long`: the line number in the
+ * detail tells them apart.
+ */
+function lineField(i: number, lines: readonly string[]): string {
+  const head = ['qr_type', 'version', 'coding', 'creditor_iban'];
+  if (i < 4) return head[i]!;
+  if (i >= 11 && i <= 17) return 'ultimate_creditor';
+  const parties: Array<[number, string]> = [
+    [4, 'creditor'],
+    [20, 'ultimate_debtor'],
+  ];
+  for (const [start, label] of parties) {
+    const k = i - start;
+    if (k < 0 || k > 6) continue;
+    const combined = (lines[start] ?? '').trim() === 'K';
+    if (k === 2) return `${label}.${combined ? 'address_line_1' : 'street'}`;
+    if (k === 3) return `${label}.${combined ? 'address_line_2' : 'building_number'}`;
+    return `${label}.${PARTY_FIELDS[k]}`;
+  }
+  const tail: Record<number, string> = {
+    18: 'amount',
+    19: 'currency',
+    27: 'reference_type',
+    28: 'reference',
+    29: 'unstructured_message',
+    30: 'trailer',
+    31: 'billing_information',
+    32: 'alternative_scheme',
+    33: 'alternative_scheme',
+  };
+  return tail[i] ?? 'payload';
+}
+
+/** How many offending code points a finding names before it summarises the rest. */
+const CHARSET_LISTED = 5;
+
+/**
+ * One `character_not_permitted` error per line that carries a character outside
+ * ch. 4.1.1, naming the field and each code point (never the character itself:
+ * an invisible one would travel unseen in the detail).
+ *
+ * Read on the payload as received, split on its line breaks only: splitPayload
+ * and trim() remove trailing white space, and with it U+FEFF, U+2028, U+3000
+ * or a tab, which would then pass unseen. One byte-order mark at the very head
+ * of the payload is tolerated, as an artefact of the encoding rather than a
+ * character of the QR-bill; anywhere else it is reported. Lines 1 to 34 only:
+ * what follows is already reported as ignored (payload_too_long).
+ *
+ * A letter in decomposed form ("u" followed by U+0308) is reported too: the
+ * combining mark is outside the set, the precomposed letter is not, and the
+ * detail says so.
+ */
+function characterFindings(payload: string): QrFinding[] {
+  const body = payload.codePointAt(0) === 0xfeff ? payload.slice(1) : payload;
+  const raw = body.replace(/\r\n?/g, '\n').split('\n');
+  const out: QrFinding[] = [];
+  for (let i = 0; i < Math.min(raw.length, 34); i++) {
+    const seen = new Map<number, number>();
+    let position = 0;
+    for (const ch of raw[i]!) {
+      position += 1;
+      const cp = ch.codePointAt(0)!;
+      if (!isQrBillCharacter(cp) && !seen.has(cp)) seen.set(cp, position);
+    }
+    if (seen.size === 0) continue;
+    const field = lineField(i, raw);
+    const named = [...seen]
+      .slice(0, CHARSET_LISTED)
+      .map(([cp, at]) => `U+${cp.toString(16).toUpperCase().padStart(4, '0')} at position ${at}`);
+    const more = seen.size > CHARSET_LISTED ? `, and ${seen.size - CHARSET_LISTED} more` : '';
+    const combining = [...seen.keys()].some((cp) => cp >= 0x300 && cp <= 0x36f)
+      ? ' U+0300 to U+036F are combining marks: the precomposed letter (Unicode NFC) is in the set.'
+      : '';
+    out.push({
+      code: 'character_not_permitted',
+      severity: 'error',
+      field,
+      detail:
+        `Line ${i + 1} (${field}) carries ${seen.size === 1 ? 'a character' : `${seen.size} characters`} ` +
+        `outside the character set of the Swiss QR Code: ${named.join(', ')}${more}. ` +
+        'The set is Basic Latin, Latin-1 Supplement and Latin Extended-A, plus Ș, ș, Ț, ț and €.' +
+        combining,
+      source: QR_BILL_CHARSET_SOURCE,
+    });
+  }
+  return out;
 }
 
 export function checkSwissQrBill(payload: string): SwissQrBillCheck {
@@ -573,6 +746,24 @@ export function checkSwissQrBill(payload: string): SwissQrBillCheck {
     });
   }
 
+  // Version 2.4 keeps the QR-IBAN and the QR reference for CHF; version 2.3,
+  // which this check applies, admits them in EUR and stays valid until
+  // November 2027. A warning, then: `valid` counts errors only, and
+  // `ready_for_2026_11_14` keeps the meaning fixed on 24.09.2026.
+  if (currency === 'EUR' && (qrIban || refType === 'QRR')) {
+    findings.push({
+      code: 'qr_iban_chf_only_ig24',
+      severity: 'warning',
+      field: 'currency',
+      detail:
+        'Under the SIX QR-bill guidelines version 2.4 (valid from 14.11.2026), a QR-IBAN and a QR reference (QRR) ' +
+        'are for invoicing in CHF only, and an invoice in EUR carries an ordinary IBAN with an SCOR reference or ' +
+        'without a reference. Version 2.3, against which this check is made, sets no such limit and remains ' +
+        'valid until November 2027, so this is a warning and not an error.',
+      source: QR_BILL_IG24_SOURCE,
+    });
+  }
+
   const message = at(29) || null;
   if (message && message.length > MAX.message) {
     findings.push({
@@ -636,6 +827,7 @@ export function checkSwissQrBill(payload: string): SwissQrBillCheck {
       });
     }
   }
+  findings.push(...characterFindings(payload));
   if (lines.length > 34) {
     findings.push({
       code: 'payload_too_long',
@@ -656,7 +848,7 @@ export function checkSwissQrBill(payload: string): SwissQrBillCheck {
   const nextSteps: string[] = [];
   if (creditor.structured === false)
     nextSteps.push(
-      'Reissue the QR-bill with the creditor address in type S: the banks guarantee payment of a type K QR-bill only until the end of September 2026; see creditor.proposed_structured.',
+      'Reissue the QR-bill with the creditor address in type S: the banks guaranteed payment of a type K QR-bill only until the end of September 2026; see creditor.proposed_structured.',
     );
   if (ultimateDebtor.present && ultimateDebtor.structured === false)
     nextSteps.push(

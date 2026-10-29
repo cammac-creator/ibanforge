@@ -1334,8 +1334,9 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', ibanFormat);
   app.route('/', referenceValidate);
   app.route('/', ibanStructure);
-  // Pure rule evaluation over an address the caller supplies — it reads no
-  // database of ours, which is exactly why it is free.
+  // Rule evaluation over an address the caller supplies, plus, for a CH or LI
+  // address, postcode and town in the official directory of localities of
+  // swisstopo (open data shipped with the server). Free.
   app.route('/', addressCheck);
   app.route('/', audit);
   app.route('/', chQrBill);

@@ -142,7 +142,7 @@ Le même bloc apparaît sur l'objet `bic` de [`POST /v1/iban/validate`](/fr/docs
 
 L'autre moitié. Vous avez structuré une adresse ; ceci vous dit si elle satisfait les règles d'un rail donné, règle par règle, avec le document dont chaque règle sort.
 
-Il ne lit aucune de nos bases. C'est pour cela qu'il est gratuit.
+Il est gratuit. Pour une adresse suisse ou liechtensteinoise (`ctry` `CH` ou `LI`, avec `pst_cd` et `twn_nm`), la réponse porte aussi `postcode_locality` : le NPA et la localité vont-ils ensemble dans le répertoire officiel des localités de swisstopo (mention ©swisstopo, date de version dans `as_of`) ? Le bloc se tient à côté des constats et ne change jamais `conforms`. `status` vaut `match`, `town_mismatch`, `other_country` (9490 Vaduz écrit avec `CH`), `postcode_not_listed`, ou `not_verifiable` : le répertoire décrit le territoire, si bien qu'un NPA de case postale comme 1211 Genève ou 2501 Biel n'y figure pas, et quand la localité y figure sous un autre NPA de la même zone, le couple reste non vérifié au lieu d'être signalé. Les accents, les majuscules, « St. » ou « Sankt », un suffixe de canton et chaque moitié d'un nom bilingue (Biel/Bienne) sont ignorés, et les noms courants des grandes villes dans une autre langue (Genf, Berne) sont acceptés. La rue n'est pas contrôlée.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/address/check \
@@ -214,7 +214,7 @@ Trois limites, énoncées ici pour que personne ne les découvre en novembre.
 
 **Ceci ne règle pas une migration d'adresses clients.** L'essentiel du changement de novembre 2026 porte sur les adresses des **parties** à un paiement — `Dbtr`, `Cdtr`, `UltmtDbtr`, `UltmtCdtr`. C'est votre propre carnet d'adresses clients : cette API n'en détient aucune donnée et n'avance rien à son sujet. Si on vous dit qu'une API IBAN et BIC va régler cette migration pour vous, on vous vend quelque chose qu'on n'a pas.
 
-**Ceci ne transforme pas une adresse en texte libre en adresse structurée.** Passer de `« ul. Sokolska 34, 40-086 Katowice »` à `StrtNm` / `BldgNb` / `PstCd` / `TwnNm` demande des référentiels postaux nationaux sur quelque 250 pays. C'est le métier de Loqate, Smarty et de l'Address Validation API de Google. Nous n'en détenons aucun, et une supposition sans somme de contrôle sur un nom de rue vaut moins que pas de réponse.
+**Ceci ne transforme pas une adresse en texte libre en adresse structurée.** Passer de `« ul. Sokolska 34, 40-086 Katowice »` à `StrtNm` / `BldgNb` / `PstCd` / `TwnNm` demande des référentiels postaux nationaux sur quelque 250 pays. C'est le métier de Loqate, Smarty et de l'Address Validation API de Google. Nous n'en détenons aucun (le répertoire suisse des localités ci-dessus connaît les NPA et les localités, pas les rues), et une supposition sans somme de contrôle sur un nom de rue vaut moins que pas de réponse.
 
 **Ceci ne certifie pas une conformité CBPR+.** Aucune source publique ne permet à quiconque de le faire honnêtement aujourd'hui. Le contrôleur nomme le rail contre lequel il juge, et chaque finding nomme son document.
 

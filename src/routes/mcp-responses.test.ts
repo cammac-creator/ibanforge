@@ -129,6 +129,8 @@ const INIT = {
 const DE = 'DE89370400440532013000';
 const CH = 'CH5204835012345671000';
 const QR_IBAN = 'CH4431999123000889012';
+/** Un QR-IBAN sur un QR-IID que SIX attribue (30700) : il porte l'étape QR-IBAN. */
+const QR_IBAN_ALLOCATED = 'CH3130700123000889012';
 
 type App = ReturnType<typeof buildApp>;
 
@@ -187,6 +189,11 @@ function qr(changes: Record<number, string> = {}, extra: readonly string[] = [])
 /** Les QR-factures qui atteignent chaque constat écrit avec une règle. */
 const QR_PAYLOADS: readonly string[] = [
   qr(),
+  // NPA et localité au répertoire de swisstopo (29.10.2026) : les trois
+  // avertissements, lus par le crible comme tout autre constat.
+  qr({ 8: '8001', 9: 'Bern' }),
+  qr({ 8: '9490', 9: 'Vaduz' }),
+  qr({ 8: '8238', 9: 'Büsingen' }),
   'SPC\n0200\n1',
   qr({ 0: 'SPX', 1: '0100', 2: '2' }),
   qr({ 3: 'DE89370400440532013000' }),
@@ -203,6 +210,11 @@ const QR_PAYLOADS: readonly string[] = [
   qr({ 27: 'XYZ' }),
   qr({ 30: 'END' }),
   qr({}, ['S1/10/10201409/11/200701']),
+  // Les deux règles du 29.10.2026 : la QR-facture en euros (IG 2.4) et le jeu
+  // de caractères (ch. 4.1.1), un émoji, du cyrillique et un caractère invisible,
+  // que le constat nomme par son point de code, jamais tel quel.
+  qr({ 3: QR_IBAN, 19: 'EUR', 27: 'QRR', 28: '210000000003139471430009017' }),
+  qr({ 5: `Robert${String.fromCodePoint(0x200b)} Schneider AG`, 29: 'Order \u{1F600} Заказ' }),
 ];
 
 const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
@@ -210,6 +222,7 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
     DE,
     CH,
     QR_IBAN,
+    QR_IBAN_ALLOCATED,
     'DE89370400440532013001',
     'DE44999999990532013000',
     'CH8499999012345678901',
@@ -232,11 +245,15 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
     { ibans: [DE, 'FR1420041010050500013M02606', CH, 'DE89370400440532013001'] },
   ],
   ['lookup_bic', { bic: 'DEUTDEFF' }],
+  // 29.10.2026 : l'adresse du siège, désormais servie par l'outil.
+  ['lookup_bic', { bic: 'UBSWCHZH80A' }],
   ['lookup_bic', { bic: 'XXXXXX' }],
   ['lookup_bic', { bic: 'ZZZZDEZZ' }],
   ['check_compliance', { iban: DE }],
   ['check_compliance', { iban: 'DE44999999990532013000' }],
   ['check_compliance', { iban: 'DE89370400440532013001' }],
+  // check_compliance recopie les étapes de validate_iban (29.10.2026).
+  ['check_compliance', { iban: QR_IBAN_ALLOCATED }],
   ['validate_payment_reference', { reference: 'RF18539007547034', iban: CH }],
   ['validate_payment_reference', { reference: 'RF18539007547034', iban: QR_IBAN }],
   ['validate_payment_reference', { reference: '210000000003139471430009017', iban: CH }],
@@ -250,8 +267,27 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ],
   ['check_postal_address', { scheme: 'hvps_plus', address: { adr_line: ['Rue du Lac 1268'] } }],
   ['check_postal_address', { scheme: 'fedwire', address: { twn_nm: 'New York', ctry: 'US' } }],
+  // Chaque état du bloc postcode_locality qui porte une phrase (29.10.2026).
+  ...(
+    [
+      ['8001', 'Zurich', 'CH'],
+      ['8001', 'Bern', 'CH'],
+      ['9490', 'Vaduz', 'CH'],
+      ['8238', 'Büsingen', 'CH'],
+      ['2501', 'Biel', 'CH'],
+      ['80011', 'Zürich', 'CH'],
+    ] as const
+  ).map(
+    ([pst_cd, twn_nm, ctry]) =>
+      ['check_postal_address', { scheme: 'sps', address: { pst_cd, twn_nm, ctry } }] as const,
+  ),
   ...QR_PAYLOADS.map((payload) => ['check_swiss_qr_bill', { payload }] as const),
   ['lookup_ch_clearing', { iid: '230' }],
+  // 29.10.2026 : la provenance du QR-IID, la phrase d'un QR-IID et celle d'une
+  // fusion, désormais servies par l'outil, passent le crible des directives.
+  ['lookup_ch_clearing', { iid: '702' }],
+  ['lookup_ch_clearing', { iid: '30700' }],
+  ['lookup_ch_clearing', { iid: '04835' }],
   ['lookup_ch_clearing', { iid: '99999' }],
   ['lookup_ch_clearing', { iid: 'abc' }],
   [
@@ -558,6 +594,26 @@ const STEP_CASES: ReadonlyArray<readonly [string, IBANValidationResult]> = [
     'code confirmé, détenteur déduit',
     base({ bank_code_check: VERIFIED, bank_code_holder: 'inferred' }),
   ],
+  [
+    'QR-IBAN',
+    base({
+      country: { code: 'CH', name: 'Switzerland' },
+      bban: { bank_code: '30700', account_number: '123000889012' },
+      bank_code_check: VERIFIED,
+      clearing: {
+        iid: '00700',
+        name: 'Société Alpha',
+        type: 'cantonal_bank',
+        town: null,
+        sic: true,
+        instant_payments_chf: true,
+        eurosic: true,
+        qr_iid: '30700',
+        qr_iid_source: 'register',
+        is_qr_iid: true,
+      },
+    }),
+  ],
 ];
 
 /** Un IBAN dont les chiffres de contrôle ISO sont recalculés sur ce BBAN. */
@@ -776,6 +832,42 @@ describe.each([
     }
     for (const tool of tools) expect(called.has(tool), tool).toBe(true);
   });
+
+  // Le crible vert ne prouve rien si l'étape a été filtrée en route : ici elle
+  // doit être servie, avec sa phrase des répertoires, par validate_iban ET par
+  // check_compliance, qui recopie toute la réponse de validate_iban (29.10.2026).
+  it.each(['validate_iban', 'check_compliance'])(
+    '%s sur un QR-IBAN attribué sert l’étape QR-IBAN avec sa phrase des répertoires',
+    async (tool) => {
+      const app = buildApp();
+      const ip = `198.20.${n}.${tool === 'validate_iban' ? 1 : 2}`;
+      const sid = await open(app, path, ip);
+      const res = (await body(
+        await post(
+          app,
+          path,
+          ip,
+          {
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'tools/call',
+            params: { name: tool, arguments: { iban: QR_IBAN_ALLOCATED } },
+          },
+          sid,
+        ),
+      )) as {
+        result?: { structuredContent?: { next_steps?: NextStep[] }; content?: { text: string }[] };
+      };
+      const served = res.result?.structuredContent;
+      const step = served?.next_steps?.find((s) => s.code === 'qr_iban_requires_qr_reference');
+      expect(step, `${path} ${tool} : étape absente`).toBeDefined();
+      expect(step!.do).toBe(directoryStepSentence(step!, served as never));
+      expect(step!.do).not.toContain('pay it only');
+      // Le bloc texte dit la même chose que structuredContent.
+      expect(res.result?.content?.[0]?.text).toContain(step!.do);
+      expect(crib(res, `${path} ${tool} QR-IBAN`).hits).toEqual([]);
+    },
+  );
 });
 
 describe('ce qu’un appel local n’atteint pas, en unitaire', () => {
@@ -847,6 +939,21 @@ describe('ce qu’un appel local n’atteint pas, en unitaire', () => {
       found.push(...crib({ message: text }, label).hits);
     }
     expect(found, found.join('\n')).toEqual([]);
+  });
+
+  it('les deux constats du 29.10.2026 sont bien dans le corpus, et passent tels quels', () => {
+    const qrResults = produced()
+      .filter((r) => r.label.startsWith('QR-facture'))
+      .map((r) => r.raw as ReturnType<typeof checkSwissQrBill>);
+    for (const code of ['qr_iban_chf_only_ig24', 'character_not_permitted']) {
+      const findings = qrResults.flatMap((r) => r.findings).filter((f) => f.code === code);
+      expect(findings.length, code).toBeGreaterThan(0);
+      // Aucune réécriture ne les touche : le texte de /mcp passe déjà le crible.
+      for (const f of findings) {
+        expect(directoryResponse(f), code).toEqual(f);
+        expect(crib(f, code).hits, code).toEqual([]);
+      }
+    }
   });
 
   it('les constats, notes et erreurs de src/lib/, et les crédits des registres privés', () => {

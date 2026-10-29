@@ -557,6 +557,16 @@ const LOOKUP_BIC_OUTPUT_SCHEMA = {
     .nullable()
     .optional()
     .describe('Null, never an empty string, when the source leaves the town blank.'),
+  // 29.10.2026 : l'adresse du siège que la description promet depuis le
+  // 24.06.2026 et que GET /v1/bic/:code sert. Déclarée ici, sinon Zod la retire.
+  // Même bloc que `bic.address` de validate_iban.
+  address: REGISTERED_ADDRESS_SCHEMA.nullable()
+    .optional()
+    .describe(
+      'Registered head-office address of the legal entity, from the same directory row as GET /v1/bic/:code and the bic.address of validate_iban, with its source and as_of (the date the entity last filed it, usually older than the bank name beside it). ' +
+        'Null when the source publishes no address for this BIC. It is the seat of the legal entity, not the branch, so address.city may differ from city.',
+    ),
+  address_available: z.boolean().optional().describe('True when address is not null.'),
   branch_code: z.string().optional(),
   branch_info: z.string().nullable().optional(),
   lei: z
@@ -743,6 +753,44 @@ const VALIDATE_PAYMENT_REFERENCE_OUTPUT_SCHEMA = {
   pairing_as_of: z.string().optional(),
 };
 
+/**
+ * Postcode and town in the official directory of localities of swisstopo
+ * (src/lib/ch-localities.ts, 29.10.2026), shared by check_postal_address and the
+ * sps_check of check_swiss_qr_bill. Written without directions: the texts of
+ * /mcp/directory read these descriptions as they stand.
+ */
+const POSTCODE_LOCALITY_SCHEMA = z
+  .object({
+    status: z
+      .string()
+      .describe(
+        'match | town_mismatch | other_country | postcode_not_listed | not_verifiable | directory_unavailable. ' +
+          'not_verifiable: the postcode is not in the directory, which lists territory only, while the town is listed under ' +
+          'other postcodes of the same postal area (a post-office box or business postcode is likely).',
+      ),
+    localities: z
+      .array(
+        z.object({
+          name: z.string().describe('The locality as the directory writes it.'),
+          municipality: z.string(),
+          canton: z.string().nullable().describe('null in Liechtenstein.'),
+          country: z.string().describe('CH | LI'),
+        }),
+      )
+      .describe('The entries the directory gives for this postcode; empty when it has none.'),
+    detail: z.string().describe('What was compared and what came out of it.'),
+    source: z
+      .string()
+      .describe('The directory, its version and the credit ©swisstopo that its terms require.'),
+    as_of: z.string().nullable().describe('Version date of the directory (YYYY-MM-DD).'),
+  })
+  .nullable()
+  .describe(
+    'Swiss and Liechtenstein addresses with a postcode and a town: whether the two go together in the official ' +
+      'directory of localities of swisstopo. Informative, beside the format verdicts: it does not change conforms or valid. ' +
+      'The street is not checked. null for any other address.',
+  );
+
 const CHECK_POSTAL_ADDRESS_OUTPUT_SCHEMA = {
   scheme: z.string().describe('sps | hvps_plus | fedwire — the rule set that was applied.'),
   conforms: z
@@ -758,6 +806,7 @@ const CHECK_POSTAL_ADDRESS_OUTPUT_SCHEMA = {
       }),
     )
     .describe('One entry per rule of the scheme, in a stable order.'),
+  postcode_locality: POSTCODE_LOCALITY_SCHEMA,
   note: z.string().describe("Why 'cbpr+' is not on the menu. Served on every answer."),
 };
 
@@ -798,6 +847,28 @@ const LOOKUP_CH_CLEARING_OUTPUT_SCHEMA = {
     .optional(),
   sic_iid: z.string().nullable().optional(),
   qr_iid: z.string().nullable().optional().describe('QR-bill enabled IID.'),
+  // 29.10.2026 : servis par GET /v1/ch/clearing/:iid, déclarés ici pour que
+  // Zod ne les retire plus (src/lib/ch-clearing.ts, `clearingRecord` et
+  // `clearingRemarks`).
+  qr_iid_source: z
+    .enum(['register', 'headquarters'])
+    .nullable()
+    .optional()
+    .describe(
+      'How qr_iid was obtained. register = SIX BankMaster publishes this pairing; headquarters = inherited from the head office (headquarters_iid), an inference and not a published SIX pairing. Null when qr_iid is null.',
+    ),
+  qr_iids: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Every QR-IID SIX allocates to the institution, present only when there is more than one; qr_iid carries the lowest.',
+    ),
+  is_qr_iid: z
+    .boolean()
+    .optional()
+    .describe(
+      'Present (true) only when the IID asked about is a QR-IID (SIX QR-bill range 30000-31999); iid then carries the standard IID of the institution and qr_iid the QR-IID asked about.',
+    ),
   valid_on: z.string().optional(),
   redirected_from: z.string().optional(),
   note: z.string().optional(),
@@ -854,6 +925,7 @@ const QR_PARTY_SCHEMA = z.object({
       findings: z.array(
         z.object({ rule: z.string(), verdict: z.string(), detail: z.string(), source: z.string() }),
       ),
+      postcode_locality: POSTCODE_LOCALITY_SCHEMA,
       note: z.string(),
     })
     .nullable()

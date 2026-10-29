@@ -209,6 +209,28 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
     });
   }
 
+  // 3c. Un QR-IBAN (IID 30000-31999, 29.10.2026) : il ne reçoit qu'un paiement
+  //     qui porte la référence QR de la QR-facture du créancier (IG QR-facture
+  //     de SIX, ch. 2.10 et 4.3.2, versions 2.3 et 2.4), et la version 2.4,
+  //     valable dès le 14.11.2026, le réserve aux francs (ch. 2.10) ; la 2.3
+  //     reste valable jusqu'en novembre 2027. Pas un refus : une étape qui dit
+  //     comment payer ce compte. Sur `clearing.is_qr_iid`, que le registre SIX
+  //     pose seulement sur un QR-IID attribué ; un code de la plage que SIX
+  //     n'attribue pas reçoit déjà « Do not send », et l'étape ne suit pas un
+  //     compte qu'une étape bloquante a déclaré impossible. Recopiée telle
+  //     quelle dans check_compliance, qui reprend toute la réponse de
+  //     validate_iban (`compliance-response.ts`).
+  if (result.clearing?.is_qr_iid === true && !accountInDoubt) {
+    steps.push({
+      code: 'qr_iban_requires_qr_reference',
+      do:
+        "This is a QR-IBAN (IID 30000-31999): pay it only with the QR reference (QRR) from the creditor's QR-bill. " +
+        'A QR-IBAN identifies a payment that carries a QR reference, so it is not an account for transfers with an RF (SCOR) reference or without a reference. ' +
+        'Under the SIX QR-bill guidelines version 2.4 (valid from 14.11.2026) it is for CHF only; version 2.3 remains valid until November 2027.',
+      because: `clearing.is_qr_iid is true: bank code ${result.bban?.bank_code ?? result.clearing.qr_iid} is in the QR-IID range 30000-31999`,
+    });
+  }
+
   // 4. Ours to offer, and only once the account itself is not in doubt.
   //
   // Pas sur un code déjà radié (`retired_on`) : le registre dit que son
