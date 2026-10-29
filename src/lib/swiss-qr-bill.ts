@@ -23,7 +23,10 @@
  *   - the SPS structured-address rules, each finding sourced: checkPostalAddress
  *   - for a type S address in CH or LI, postcode and town in the official
  *     directory of localities of swisstopo (src/lib/ch-localities.ts,
- *     29.10.2026): a warning when the pair is not listed, never an error
+ *     29.10.2026): a warning when the directory contradicts the pair or knows
+ *     neither half of it, never an error; a postcode it lacks while it lists
+ *     the town nearby (a post-office box, likely) is not_verifiable, without
+ *     a warning
  *
  * Rule evaluation plus that directory, read from a file shipped with the
  * server: no network, no storage. Free on every surface: the rules are

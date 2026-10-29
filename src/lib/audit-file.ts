@@ -10,8 +10,10 @@
  * conformity the SIX deadline of 14.11.2026 makes urgent for Swiss creditor
  * files. Since 29.10.2026, a Swiss or Liechtenstein address (country column CH
  * or LI) also has its postcode and town looked up in the official directory of
- * localities of swisstopo: a warning when the pair is not listed, never an
- * error (src/lib/ch-localities.ts).
+ * localities of swisstopo: a warning when the directory contradicts the pair
+ * or knows neither half of it, never an error; a postcode it lacks while it
+ * lists the town nearby (a post-office box, likely) stays unverified, without
+ * a warning (src/lib/ch-localities.ts).
  *
  * Nothing here touches storage: the caller decides what to keep and for how
  * long. Findings carry stable codes; the labels are rendered per language at
@@ -1009,19 +1011,28 @@ function localityMethodLine(lang: AuditLang): string {
     return (
       'NPA et localité des adresses suisses et liechtensteinoises (colonne pays CH ou LI) comparés au répertoire ' +
       `officiel des localités de l'Office fédéral de topographie swisstopo${v ? `, version du ${v}` : ' (non chargé sur ce serveur)'}, ${credit} : ` +
-      "un avertissement quand le couple n'y figure pas, jamais une erreur. La rue n'est pas contrôlée."
+      "un avertissement quand le répertoire donne ce NPA pour d'autres localités ou dans l'autre pays, ou n'y connaît " +
+      'ni le NPA ni la localité dans cette zone postale ; jamais une erreur. Un NPA absent du répertoire, alors que la ' +
+      'localité y figure sous un autre NPA de la même zone postale (probablement une case postale), reste non vérifié, ' +
+      "sans avertissement : l'absence d'avertissement ne vaut pas vérification. La rue n'est pas contrôlée."
     );
   }
   if (lang === 'de') {
     return (
       'PLZ und Ort von Adressen in der Schweiz und in Liechtenstein (Länderspalte CH oder LI) mit dem amtlichen ' +
       `Ortschaftenverzeichnis des Bundesamts für Landestopografie swisstopo verglichen${v ? `, Stand ${v}` : ' (auf diesem Server nicht geladen)'}, ${credit}: ` +
-      'eine Warnung, wenn das Paar dort nicht verzeichnet ist, nie ein Fehler. Die Strasse wird nicht geprüft.'
+      'eine Warnung, wenn das Verzeichnis die PLZ anderen Orten oder dem anderen Land zuordnet oder in diesem ' +
+      'Postleitzahlgebiet weder die PLZ noch den Ort kennt; nie ein Fehler. Eine PLZ, die im Verzeichnis fehlt, während ' +
+      'der Ort dort unter einer anderen PLZ desselben Postleitzahlgebiets steht (wahrscheinlich ein Postfach), bleibt ' +
+      'ungeprüft, ohne Warnung: das Fehlen einer Warnung ist keine Bestätigung. Die Strasse wird nicht geprüft.'
     );
   }
   return (
     'Postcode and town of Swiss and Liechtenstein addresses (country column CH or LI) compared with the official ' +
     `directory of localities of the Federal Office of Topography swisstopo${v ? `, version of ${v}` : ' (not loaded on this server)'}, ${credit}: ` +
-    'a warning when the pair is not listed, never an error. The street is not checked.'
+    'a warning when the directory lists the postcode for other towns or in the other country, or lists neither the ' +
+    'postcode nor the town in that postal area; never an error. A postcode missing from the directory, while the town ' +
+    'is listed there under another postcode of the same postal area (likely a post-office box), stays unverified, ' +
+    'without a warning: the absence of a warning does not mean the pair was verified. The street is not checked.'
   );
 }

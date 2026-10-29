@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auditHrefFromQr, pointsToAudit } from "@/lib/qr-bill-audit-link";
+import { unverifiedPostcodes } from "@/lib/qr-bill-postcode";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.ibanforge.com";
 
@@ -33,7 +34,8 @@ interface Finding {
 interface Party {
   present: boolean;
   structured: boolean | null;
-  address: { type: string; name: string };
+  address: { type: string; name: string; postal_code?: string; town?: string };
+  sps_check?: { postcode_locality?: { status: string } | null } | null;
   proposed_structured: null | { strt_nm?: string; bldg_nb?: string; pst_cd?: string; twn_nm?: string; ctry?: string; confidence: string; note: string };
 }
 interface Result {
@@ -58,6 +60,7 @@ export function QrBillClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const unverified = result ? unverifiedPostcodes(result) : [];
 
   async function check(text: string) {
     setError(null);
@@ -146,8 +149,25 @@ export function QrBillClient() {
               </ul>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">{t("result.clean")}</p>
+            <p className="text-sm text-muted-foreground">
+              {unverified.length > 0 ? t("result.cleanUnverified") : t("result.clean")}
+            </p>
           )}
+
+          {/* 29.10.2026 : un NPA que le répertoire n'a pas pu confirmer ne donne pas d'avertissement ; la page le dit. */}
+          {unverified.length > 0 ? (
+            <ul className="flex flex-col gap-1 text-sm text-muted-foreground" data-qr-postcode-unverified>
+              {unverified.map((u) => (
+                <li key={u.party}>
+                  {t(u.status === "not_verifiable" ? "result.postcodeNotVerifiable" : "result.postcodeDirectoryUnavailable", {
+                    party: u.party === "creditor" ? t("result.creditorAddress") : t("result.debtorAddress"),
+                    postcode: u.postcode,
+                    town: u.town,
+                  })}
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
           {[result.creditor, result.ultimate_debtor].map((p, i) =>
             p.proposed_structured ? (

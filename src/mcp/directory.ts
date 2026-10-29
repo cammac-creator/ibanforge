@@ -472,8 +472,9 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       'Returns: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ' +
       'ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. ' +
       "A combined address comes back with proposed_structured, the S-type fields derived from the combined lines. Each finding's source names the document it is quoted from. " +
-      'For a type S address in CH or LI, sps_check.postcode_locality compares postcode and town with the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of); ' +
-      'a pair the directory does not list comes back as a warning, which leaves valid unchanged. ' +
+      'For a type S address in CH or LI, sps_check.postcode_locality compares postcode and town with the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of). ' +
+      'A warning (postcode_town_mismatch, postcode_other_country, postcode_not_listed) comes back when the directory lists the postcode for other towns or in the other country, or lists neither the postcode nor the town in that postal area; it leaves valid unchanged. ' +
+      'A postcode missing from the directory, while the town is listed there under another postcode of the same postal area (likely a post-office box postcode), comes back not_verifiable, without a warning: the absence of a warning does not mean the pair was verified. ' +
       note,
     check_postal_address:
       "Checks a structured ISO 20022 postal address against a payment rail's published address rules, rule by rule, each verdict citing the document it comes from. " +

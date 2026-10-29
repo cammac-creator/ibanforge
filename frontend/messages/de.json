@@ -2879,6 +2879,9 @@
       "error": "Fehler",
       "warning": "Warnung",
       "clean": "Kein Befund: alle Regeln bestanden.",
+      "cleanUnverified": "Kein Fehler und keine Warnung, aber nicht jede PLZ konnte geprüft werden:",
+      "postcodeNotVerifiable": "{party}: Die PLZ {postcode} steht nicht im amtlichen Ortschaftenverzeichnis von swisstopo, das {town} unter einer anderen PLZ desselben Postleitzahlgebiets führt (wahrscheinlich eine Postfach-PLZ). Das Paar ist weder bestätigt noch widerlegt und erhält darum keine Warnung.",
+      "postcodeDirectoryUnavailable": "{party}: Das Ortschaftenverzeichnis konnte auf dem Server nicht gelesen werden; PLZ {postcode} und Ort {town} wurden nicht verglichen.",
       "proposedCreditor": "Vorgeschlagene strukturierte Kreditorenadresse",
       "proposedDebtor": "Vorgeschlagene strukturierte Debitorenadresse",
       "nextSteps": "Nächste Schritte"
