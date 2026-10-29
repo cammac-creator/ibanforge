@@ -6,6 +6,7 @@
  */
 
 import { getBicDB } from './db.js';
+import { stateGuaranteeForHeadOffice } from './ch-state-guarantee.js';
 import type Database from 'better-sqlite3';
 import type {
   ChClearingEntry,
@@ -455,7 +456,14 @@ export function clearingRecord(
   | 'qr_iid_source'
   | 'qr_iids'
   | 'valid_on'
+  | 'state_guarantee'
 > & { found: true } {
+  // Read from the cantonal laws, not from SIX, so it carries its own source and
+  // date, and comes after `valid_on`, which dates the SIX record above it. A
+  // branch and a QR-IID take their head office's entry; anything that is not a
+  // cantonal bank gets no key at all. Kept out of `validate_iban` on purpose
+  // (src/lib/ch-state-guarantee.ts says why).
+  const guarantee = stateGuaranteeForHeadOffice(entry.headquarters_iid);
   return {
     iid: entry.iid,
     found: true,
@@ -478,6 +486,7 @@ export function clearingRecord(
     qr_iid_source: entry.qr_iid_source,
     ...(entry.qr_iids ? { qr_iids: entry.qr_iids } : {}),
     valid_on: entry.valid_on,
+    ...(guarantee ? { state_guarantee: guarantee } : {}),
   };
 }
 

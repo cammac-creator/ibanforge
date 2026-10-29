@@ -1177,6 +1177,26 @@ export interface ChClearingEntry {
   redirect_iid: string | null;
 }
 
+/**
+ * The state guarantee of a cantonal bank, as its cantonal law writes it
+ * (src/lib/ch-state-guarantee.ts). Served by `lookup_ch_clearing` only, for
+ * the 24 cantonal banks, matched by head-office IID.
+ */
+export interface ChStateGuarantee {
+  /** True when the cantonal law makes the canton liable for the bank's liabilities where its own funds fall short. */
+  guaranteed: boolean;
+  /** Two-letter canton code. */
+  canton: string;
+  /** The law, its number in the cantonal collection, and the article. */
+  source: string;
+  /** The text that was read. */
+  url: string;
+  /** The day the text was read (YYYY-MM-DD). */
+  as_of: string;
+  /** What the law keeps or kept after the guarantee ended (BEKB, BCGE), or why there is none (BCV). */
+  note?: string;
+}
+
 export interface ChClearingLookupResult {
   iid: string;
   found: boolean;
@@ -1216,6 +1236,8 @@ export interface ChClearingLookupResult {
   /** Present (true) only when the looked-up IID is a QR-IID (30000–31999). */
   is_qr_iid?: boolean;
   valid_on?: string;
+  /** Present for a cantonal bank only, matched by its head-office IID (29.10.2026). */
+  state_guarantee?: ChStateGuarantee;
   note?: string;
   error?: string;
   message?: string;

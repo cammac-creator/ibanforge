@@ -259,6 +259,12 @@ const TOOL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ['lookup_ch_clearing', { iid: '702' }],
   ['lookup_ch_clearing', { iid: '30700' }],
   ['lookup_ch_clearing', { iid: '04835' }],
+  // 29.10.2026 : la garantie de l'État et les notes de la BEKB, de la BCV et de
+  // la BCGE passent le même crible.
+  ['lookup_ch_clearing', { iid: '790' }],
+  ['lookup_ch_clearing', { iid: '767' }],
+  ['lookup_ch_clearing', { iid: '788' }],
+  ['lookup_ch_clearing', { iid: '700' }],
   ['lookup_ch_clearing', { iid: '99999' }],
   ['lookup_ch_clearing', { iid: 'abc' }],
   [

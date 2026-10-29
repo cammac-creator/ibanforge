@@ -8,6 +8,45 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 29/10/2026 : la garantie de l'État des 24 banques cantonales, lue dans les lois (cas 1)
+
+**Ce qui est servi.** Un bloc `state_guarantee` sur `GET /v1/ch/clearing/:iid` et
+sur l'outil MCP `lookup_ch_clearing`, pour les 24 banques cantonales seulement :
+`guaranteed` (la loi cantonale rend-elle le canton responsable des engagements de
+la banque quand ses fonds propres ne suffisent pas), `canton`, `source` (la loi, son
+numéro au recueil cantonal, l'article), `url` (le texte lu), `as_of` (le jour de la
+lecture) et, pour la BEKB, la BCV et la BCGE, une `note`. Table :
+`src/lib/ch-state-guarantee.ts`.
+
+**La source et sa licence.** Les 24 lois cantonales, lues article par article le
+29/10/2026 au recueil officiel de chaque canton (Vaud et Schwyz : copie LexFind, dont
+la version lue est écrite dans `source`). Les lois et autres actes officiels ne sont
+pas protégés par le droit d'auteur (LDA art. 5) : cas 1, la table vit dans ce dépôt.
+
+**Ce que dit la table.** 21 garanties inscrites dans la loi ; aucune pour la BEKB
+(art. 4 abrogé au 01/01/2006 ; art. T1-1 : depuis le 01/01/2013, seules les
+obligations d'emprunt encore en cours à cette date, jusqu'à leur échéance, et à titre
+subsidiaire les autres engagements qui existaient au 01/01/2006, jusqu'à leur
+échéance ou la fin du délai de résiliation), pour la BCV (aucun article de garantie
+dans la LBCV) et pour la BCGE (art. 4 abrogé au 01/01/2013, garantie transitoire
+plafonnée jusqu'au 31/12/2016). Soleure et Appenzell Rhodes-Extérieures n'ont plus de
+banque cantonale. Les exclusions de chaque loi (dettes subordonnées, capital de
+participation, filiales) restent dans l'article cité ; la condition de défaut
+qu'ajoutent Obwald et Glaris n'en fait pas une catégorie à part.
+
+**Rattachement par numéro, jamais par nom.** Clé : l'IID du siège dans le
+BankMaster de SIX, confirmé par son BIC dans l'annuaire le 29/10/2026 ; une agence
+ou un QR-IID prend l'entrée de son `headquarters_iid`. `ch-state-guarantee.test.ts`
+tient la table contre `data/bic.sqlite` dans les deux sens : un rafraîchissement qui
+déplace un IID rougit.
+
+**Ce qui n'est pas servi.** Rien dans `validate_iban` ni dans `check_compliance`
+(qui recopie `validate_iban`) : le bloc décrit l'établissement et n'entre dans aucun
+score. Aucune note de solidité, aucun délai de paiement.
+
+**Entretien.** Relire les 24 textes une fois par an ; réforme connue à suivre :
+Bâle-Campagne (2026).
+
 ## 28/10/2026 : agir d'abord, corriger si on nous le demande
 
 Décision de Claude-Alain du 28/10/2026 (« go pour B ») : la règle « permission
