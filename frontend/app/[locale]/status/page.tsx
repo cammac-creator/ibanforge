@@ -1,9 +1,26 @@
 import { getTranslations } from "next-intl/server";
 import { alternatesFor } from "@/lib/seo";
+import { createHealthProbe } from "@/lib/status-health";
 
-export const revalidate = 300;
+/*
+ * Rendered on each visit, never pre-rendered at build (2026-10-31). The build
+ * has no STATS_TOKEN, so its copy of this page shows a dash for every figure.
+ * Since the self-hosted image keeps its page cache in memory only
+ * (next.config.ts, isrFlushToDisk), a page pushed out of memory falls back to
+ * that build copy for one visit: on a page that asks prospects to trust the
+ * service, a page of dashes. Rendering on demand removes the build copy.
+ *
+ * The API is still asked at most every five minutes. The health line is a real
+ * round trip kept five minutes in memory (lib/status-health.ts: in a request
+ * render the data cache would time a cache read and hide an outage). The
+ * history keeps `revalidate: 300` in the data cache: daily figures, for which a
+ * copy refreshed in the background is the right trade.
+ */
+export const dynamic = "force-dynamic";
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "https://api.ibanforge.com";
+
+const readHealth = createHealthProbe(`${API_URL}/health`);
 
 /**
  * PERF-07 (audit 2026-09-01): this page asked for ninety days of history every
@@ -16,9 +33,12 @@ const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "https
 const HISTORY_DAYS = 30;
 
 /**
- * The page is regenerated every five minutes, so a slow API must cost one stale
- * render, never a hanging one. Five seconds is far above the measured cost of
- * the trimmed query and far below any wait a visitor would sit through.
+ * The history comes from the data cache, refreshed in the background at most
+ * every five minutes; only a cold cache (after a restart, or once the entry has
+ * left memory) makes a visitor wait for the API, and a slow API must then cost
+ * an empty history, never a hanging page. Five seconds is far above the
+ * measured cost of the trimmed query and far below any wait a visitor would sit
+ * through.
  */
 const HISTORY_TIMEOUT_MS = 5_000;
 
@@ -55,23 +75,8 @@ interface StatusData {
 }
 
 async function getStatusData(): Promise<StatusData> {
-  let healthy = false;
-  let latencyMs: number | null = null;
-  let version: string | null = null;
+  const { healthy, latencyMs, version } = await readHealth();
   let days: DayStat[] = [];
-
-  try {
-    const start = Date.now();
-    const res = await fetch(`${API_URL}/health`, { next: { revalidate: 300 } });
-    latencyMs = Date.now() - start;
-    if (res.ok) {
-      healthy = true;
-      const body = (await res.json()) as { version?: string };
-      version = body.version ?? null;
-    }
-  } catch {
-    healthy = false;
-  }
 
   const token = process.env.STATS_TOKEN;
   if (token) {

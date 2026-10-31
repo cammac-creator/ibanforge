@@ -52,6 +52,30 @@ const nextConfig: NextConfig = {
    * else, so a Vercel build, CI's `next build` and `next dev` are unchanged.
    */
   ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
+  /*
+   * Self-hosted image only: keep the page cache in memory, never on the
+   * container's disk.
+   *
+   * Next's file-system cache writes every page it renders or revalidates to
+   * .next/server/route-cache and never evicts anything: on the VPS that meant
+   * every register code page, in each of the three languages, plus a second
+   * copy of every page already pre-rendered into the image (build pages are
+   * "promoted" into route-cache on first read). Several gigabytes on a disk
+   * shared with other sites, wiped only when the container is recreated.
+   *
+   * With isrFlushToDisk off, build pages are read straight from the image and
+   * on-demand pages live in the default in-memory LRU (cacheMaxMemorySize,
+   * left at its default on purpose: the container has a tight memory cap). A
+   * page evicted from memory is simply rendered again. Side effects, accepted:
+   * the data cache (fetch with `revalidate`) shares that memory and has no disk
+   * copy either, so a cached API answer is asked again after a restart or once
+   * it has left memory; optimized images (next/image) lose their disk cache too
+   * and are recomputed when the browser does not already hold them.
+   *
+   * Vercel ignores the flag (minimal mode never writes to disk); CI's
+   * `next build` and `next dev` do not set NEXT_OUTPUT and are unchanged.
+   */
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { experimental: { isrFlushToDisk: false } } : {}),
   turbopack: {
     root: path.resolve(__dirname),
   },
