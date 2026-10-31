@@ -1,7 +1,17 @@
 import { getTranslations } from "next-intl/server";
 import { alternatesFor } from "@/lib/seo";
 
-export const revalidate = 300;
+/*
+ * Rendered on each visit, never pre-rendered at build (2026-10-31). The build
+ * has no STATS_TOKEN, so its copy of this page shows a dash for every figure.
+ * Since the self-hosted image keeps its page cache in memory only
+ * (next.config.ts, isrFlushToDisk), a page pushed out of memory falls back to
+ * that build copy for one visit: on a page that asks prospects to trust the
+ * service, a page of dashes. Rendering on demand removes the build copy. The
+ * API is still asked at most every five minutes: both fetches below keep
+ * `revalidate: 300` in the data cache.
+ */
+export const dynamic = "force-dynamic";
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "https://api.ibanforge.com";
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /*
@@ -30,5 +32,16 @@ describe('page cache of the self-hosted image', () => {
     const config = await loadConfig(undefined);
     expect(config.output).toBeUndefined();
     expect(config.experimental?.isrFlushToDisk).toBeUndefined();
+  });
+
+  /*
+   * Without a disk copy, a pre-rendered page pushed out of memory is served
+   * once from its build copy. The build of /status has no STATS_TOKEN and
+   * shows dashes: that page must have no build copy at all.
+   */
+  it('renders /status on each visit, so no build copy of it can be served', () => {
+    const source = readFileSync(resolve(__dirname, '../app/[locale]/status/page.tsx'), 'utf8');
+    expect(source).toMatch(/^export const dynamic = "force-dynamic";$/m);
+    expect(source).not.toMatch(/^export const revalidate\b/m);
   });
 });
