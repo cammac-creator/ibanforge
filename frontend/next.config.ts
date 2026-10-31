@@ -66,9 +66,11 @@ const nextConfig: NextConfig = {
    * With isrFlushToDisk off, build pages are read straight from the image and
    * on-demand pages live in the default in-memory LRU (cacheMaxMemorySize,
    * left at its default on purpose: the container has a tight memory cap). A
-   * page evicted from memory is simply rendered again. Side effect, accepted:
-   * optimized images (next/image) lose their disk cache too and are recomputed
-   * when the browser does not already hold them.
+   * page evicted from memory is simply rendered again. Side effects, accepted:
+   * the data cache (fetch with `revalidate`) shares that memory and has no disk
+   * copy either, so a cached API answer is asked again after a restart or once
+   * it has left memory; optimized images (next/image) lose their disk cache too
+   * and are recomputed when the browser does not already hold them.
    *
    * Vercel ignores the flag (minimal mode never writes to disk); CI's
    * `next build` and `next dev` do not set NEXT_OUTPUT and are unchanged.

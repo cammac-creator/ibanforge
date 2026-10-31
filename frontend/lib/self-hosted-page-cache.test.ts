@@ -44,4 +44,16 @@ describe('page cache of the self-hosted image', () => {
     expect(source).toMatch(/^export const dynamic = "force-dynamic";$/m);
     expect(source).not.toMatch(/^export const revalidate\b/m);
   });
+
+  /*
+   * Rendered on each visit, a /health fetch kept in the data cache would time a
+   * cache read and keep the last 200 on screen during an outage: the health
+   * line goes through the probe (lib/status-health.test.ts tests its
+   * behaviour), never through a cached fetch of /health.
+   */
+  it('reads the health of /status through the probe, not the data cache', () => {
+    const source = readFileSync(resolve(__dirname, '../app/[locale]/status/page.tsx'), 'utf8');
+    expect(source).toMatch(/createHealthProbe\(`\$\{API_URL\}\/health`\)/);
+    expect(source).not.toMatch(/fetch\(`\$\{API_URL\}\/health`/);
+  });
 });

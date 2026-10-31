@@ -13,10 +13,11 @@
 #
 # Build arguments, all public: the API URL baked into the client bundle, the
 # origin the server reads while pre-rendering, and the commit the changelog
-# page links to. No secret is ever passed at build time: pages that read a
-# server secret (the landing statistics, /status) render their fallback at
-# build and refresh themselves with the runtime environment at their next
-# revalidation (one hour at most for the landing page).
+# page links to. No secret is ever passed at build time: the landing page,
+# which reads a server secret for its statistics, renders its fallback at
+# build and refreshes itself with the runtime environment at its next
+# revalidation (one hour at most); /status is never rendered at build, only on
+# each visit, with the runtime environment.
 
 FROM node:24-slim AS deps
 WORKDIR /app/frontend
