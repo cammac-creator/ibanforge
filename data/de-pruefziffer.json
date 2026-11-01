@@ -1,7 +1,7 @@
 {
- "source": "Deutsche Bundesbank: Bankleitzahlendatei (field 9) and Prüfzifferberechnungsmethoden (Stand: Juni 2018)",
+ "source": "Quelle: Deutsche Bundesbank (Bankleitzahlendatei, field 9; Prüfzifferberechnungsmethoden, Stand: Juni 2018)",
  "attribution": "Quelle: Deutsche Bundesbank",
- "fetched_on": "2026-10-06",
+ "fetched_on": "2026-11-01",
  "methods": {
   "10000000": "09",
   "10010010": "24",
