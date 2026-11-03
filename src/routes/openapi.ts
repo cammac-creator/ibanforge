@@ -19,6 +19,7 @@ import {
   NATIONAL_CHECK_VERIFIED_BY,
 } from '../lib/national-check/index.js';
 import { frozenSources } from '../lib/source-vintage.js';
+import { FATF_AS_OF } from '../lib/compliance-static.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 import { COMBINED_ADDRESS_NOTICE, READY_FIELD_DESCRIPTION } from '../lib/qr-bill-notice.js';
 // Read from the route rather than retyped: the enum of error types and the
@@ -558,7 +559,7 @@ const buildRawSpec = () => ({
                               description: 'The limits of the answer in plain words. Informational triage, not a regulated AML/CFT product.',
                             },
                             sanctions_as_of: { type: 'string', description: 'When the sanctions data was last refreshed.' },
-                            fatf_as_of: { type: 'string', example: '2026-06', description: 'The FATF plenary the jurisdiction flag comes from.' },
+                            fatf_as_of: { type: 'string', example: FATF_AS_OF, description: 'The FATF plenary the jurisdiction flag comes from.' },
                             sources: { type: 'string', example: 'EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD', description: 'The lists and registers consulted.' },
                             country_risk_as_of: { type: 'string', example: '2026-07', description: 'Review date of the editorial country-risk axis.' },
                             country_risk_scope: {
