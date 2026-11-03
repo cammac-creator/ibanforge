@@ -53,9 +53,9 @@ describe('FATF attribution', () => {
     );
     expect(citation.startsWith(`FATF (${FATF_AS_OF.slice(0, 4)}),`)).toBe(true);
     // Today's values, spelled out once so a reader sees what the pages say.
-    if (FATF_AS_OF === '2026-06' && FATF_ACCESSED_ON === '2026-07-10') {
-      expect(citation).toContain('June 2026 plenary');
-      expect(citation).toContain('(accessed on 10 July 2026).');
+    if (FATF_AS_OF === '2026-10' && FATF_ACCESSED_ON === '2026-11-03') {
+      expect(citation).toContain('October 2026 plenary');
+      expect(citation).toContain('(accessed on 3 November 2026).');
     }
   });
 

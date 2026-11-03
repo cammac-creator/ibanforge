@@ -32,15 +32,16 @@ describe('the two country-risk axes are both dated and both scoped', () => {
     expect(ru.compliance.risk_level).toBe('critical');
   });
 
-  it('a FATF-grey SEPA country keeps its own two answers, both visible', () => {
-    // Bulgaria: grey_list on the FATF axis, standard on the editorial one. That
-    // is the pair the audit called a contradiction. It is a considered
-    // difference, and the response now carries both dates to prove it.
-    const bg = buildComplianceResponse('BG80BNBG96611020345678');
-    expect(bg.valid).toBe(true);
-    expect(bg.compliance.sanctions.fatf_status).toBe('grey_list');
-    expect(bg.risk_indicators?.country_risk).toBe('standard');
-    expect(bg.compliance.flags).toContain('fatf_grey_list');
-    expect(bg.meta.country_risk_as_of).toBeTruthy();
+  it('a FATF-grey country the editorial axis rates standard keeps both answers, both visible', () => {
+    // Kuwait: grey_list on the FATF axis, standard on the editorial one. That
+    // is the pair the audit called a contradiction (it was Bulgaria until the
+    // FATF removed it from the grey list on 30 October 2026). It is a
+    // considered difference, and the response carries both dates to prove it.
+    const kw = buildComplianceResponse('KW81CBKU0000000000001234560101');
+    expect(kw.valid).toBe(true);
+    expect(kw.compliance.sanctions.fatf_status).toBe('grey_list');
+    expect(kw.risk_indicators?.country_risk).toBe('standard');
+    expect(kw.compliance.flags).toContain('fatf_grey_list');
+    expect(kw.meta.country_risk_as_of).toBeTruthy();
   });
 });

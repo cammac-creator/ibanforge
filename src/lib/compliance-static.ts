@@ -6,9 +6,10 @@
  * are maintained here by hand and dated via FATF_AS_OF.
  *
  * ⚠️  RECALIBRATE after every FATF plenary — 3×/year (February, June, October).
- *     Last plenary reflected here: 17–19 June 2026 (fatf-gafi.org,
- *     "Jurisdictions under Increased Monitoring — 19 June 2026").
- *     NEXT plenary: October 2026 — update FATF_GREY_LIST, bump FATF_AS_OF,
+ *     Last plenary reflected here: 28–30 October 2026 (fatf-gafi.org,
+ *     "Jurisdictions under Increased Monitoring – 30 October 2026" and
+ *     "High-Risk Jurisdictions subject to a Call for Action - 30 October 2026").
+ *     NEXT plenary: February 2027 — update FATF_GREY_LIST, bump FATF_AS_OF,
  *     FATF_PLENARY_OPENED_ON AND FATF_ACCESSED_ON, then the citation on the
  *     static surfaces listed in
  *     src/routes/fatf-attribution.test.ts (the test fails until they match).
@@ -17,22 +18,23 @@
  */
 
 /** Year-month (YYYY-MM) of the FATF plenary these lists reflect. */
-export const FATF_AS_OF = '2026-06';
+export const FATF_AS_OF = '2026-10';
 
 /**
- * First day (YYYY-MM-DD) of that plenary (17–19 June 2026). The FATF statements
+ * First day (YYYY-MM-DD) of that plenary (28–30 October 2026). The FATF statements
  * cannot have been read before it opened: the attribution test holds
  * FATF_ACCESSED_ON to that.
  */
-export const FATF_PLENARY_OPENED_ON = '2026-06-17';
+export const FATF_PLENARY_OPENED_ON = '2026-10-28';
 
 /**
  * Day (YYYY-MM-DD) the FATF statements behind these lists were read on
  * fatf-gafi.org. The FATF's terms make it part of the credit ("accessed on
- * (date)"), so it is a licence term, not a freshness detail. 2026-07-10 is the
- * day the June 2026 plenary lists were transcribed here (commit 766d711d).
+ * (date)"), so it is a licence term, not a freshness detail. 2026-11-03 is the
+ * day the October 2026 plenary statements were read on fatf-gafi.org (in a
+ * browser: the site answers 403 to scripts) and transcribed here.
  */
-export const FATF_ACCESSED_ON = '2026-07-10';
+export const FATF_ACCESSED_ON = '2026-11-03';
 
 /**
  * The credit the FATF's terms require for its data, in its own citation format:
@@ -66,25 +68,24 @@ export const FATF_BLACK_LIST: string[] = ['KP', 'IR', 'MM'];
 
 /**
  * FATF "Jurisdictions under Increased Monitoring" (the grey list).
- * 19 June 2026 plenary — 22 jurisdictions.
+ * 30 October 2026 plenary — 18 jurisdictions.
+ * October 2026 changes: − BG (Bulgaria), − CI (Côte d'Ivoire),
+ * − CD (Democratic Republic of the Congo), − MC (Monaco) — all four removed
+ * after successful on-site visits; no jurisdiction added.
  * June 2026 changes: + BA (Bosnia and Herzegovina), + IQ (Iraq);
- * − DZ (Algeria), − NA (Namibia) — both delisted after completed action plans.
+ * − DZ (Algeria), − NA (Namibia).
  */
 export const FATF_GREY_LIST: string[] = [
   'AO',
   'BA',
   'BO',
-  'BG',
   'CM',
-  'CI',
-  'CD',
   'HT',
   'IQ',
   'KE',
   'KW',
   'LA',
   'LB',
-  'MC',
   'NP',
   'PG',
   'SS',
@@ -97,7 +98,7 @@ export const FATF_GREY_LIST: string[] = [
 
 /**
  * FATF members whose membership is SUSPENDED. Russia's membership has been
- * suspended since 24 February 2023 (unchanged through the June 2026 plenary).
+ * suspended since 24 February 2023 (unchanged through the October 2026 plenary).
  * A suspended member is NOT a member in good standing — reporting it as
  * `member` was factually wrong. Scoring treats `suspended` at least as
  * severely as `non_member`.
