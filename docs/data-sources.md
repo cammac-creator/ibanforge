@@ -1430,16 +1430,17 @@ sur les pages data-sources publiques (3 langues).
 **Formule remplie le 24/09/2026** (l'ancienne formule publiée n'avait ni
 l'année ni une date de consultation) :
 
-> FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
+> FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the October 2026 plenary, https://www.fatf-gafi.org (accessed on 3 November 2026).
 
 Elle est construite par `fatfCitation()` à partir de `FATF_AS_OF` (mois de la
 plénière) et de `FATF_ACCESSED_ON` (jour de lecture des déclarations du GAFI :
-le 10/07/2026, commit `766d711d`, qui a synchronisé les listes sur la plénière
-des 17-19 juin), dans `src/lib/compliance-static.ts`. Les trois pages
+le 03/11/2026, lu dans un navigateur, le site répondant 403 aux scripts, pour la
+plénière des 28-30 octobre ; auparavant le 10/07/2026, commit `766d711d`, pour
+celle des 17-19 juin), dans `src/lib/compliance-static.ts`. Les trois pages
 data-sources et `NOTICE` ne peuvent pas appeler la fonction :
 `src/routes/fatf-attribution.test.ts` les épingle sur elle (ce fichier
 compris), et échoue si la date de consultation précède l'ouverture de la
-plénière (`FATF_PLENARY_OPENED_ON`, le 17/06/2026 pour la plénière de juin).
+plénière (`FATF_PLENARY_OPENED_ON`, le 28/10/2026 pour la plénière d'octobre).
 
 **EPC — ❌ NON COMMERCIAL par défaut → permission d'abord.**
 > « In principle, the information contained in this website can be

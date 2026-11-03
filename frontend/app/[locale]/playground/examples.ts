@@ -153,7 +153,7 @@ export const DEFAULT_RESULT: Record<PlaygroundMode, Record<string, unknown>> = {
       disclaimer:
         'Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.',
       sanctions_as_of: '2026-07-05T04:29:13.136Z',
-      fatf_as_of: '2026-02',
+      fatf_as_of: '2026-10',
       sources: 'EU,OFAC,FATF',
     },
     processing_ms: 0.3,

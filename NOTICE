@@ -269,14 +269,14 @@ to EU financial sanctions
 
 FATF (Financial Action Task Force), High-Risk and Other Monitored
 Jurisdictions, and FATF membership
-  Where: data/compliance.sqlite, table fatf_countries (62 rows), from the
+  Where: data/compliance.sqlite, table fatf_countries (58 rows), from the
          lists kept by hand in src/lib/compliance-static.ts (plenary of
-         June 2026).
+         October 2026).
   Terms: "you can extract from, download, copy, adapt, print, distribute,
          share and embed data for any purpose, even for commercial use",
          with credit in the FATF's citation format, "FATF (year), (dataset
          name), (data source) DOI or URL (accessed on (date))":
-           FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the June 2026 plenary, https://www.fatf-gafi.org (accessed on 10 July 2026).
+           FATF (2026), High-Risk and Other Monitored Jurisdictions, FATF public statements of the October 2026 plenary, https://www.fatf-gafi.org (accessed on 3 November 2026).
          The year and the access date change with each plenary sync.
          Reuse of these records carries the same attribution requirement.
          No endorsement by the FATF is implied.

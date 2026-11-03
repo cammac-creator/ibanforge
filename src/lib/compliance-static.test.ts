@@ -44,17 +44,23 @@ describe('compliance-static', () => {
     }
   });
 
-  it('FATF black list reflects the June 2026 plenary (IR, KP, MM — unchanged)', () => {
+  it('FATF black list reflects the October 2026 plenary (IR, KP, MM — unchanged)', () => {
     expect([...FATF_BLACK_LIST].sort()).toEqual(['IR', 'KP', 'MM']);
   });
 
-  it('FATF grey list reflects the June 2026 plenary (+BA +IQ, −DZ −NA, 22 total)', () => {
+  it('FATF grey list reflects the October 2026 plenary (−BG −CI −CD −MC, none added, 18 total)', () => {
+    // 30 October 2026: Bulgaria, Côte d'Ivoire, the DR Congo and Monaco removed
+    // after successful on-site visits; no jurisdiction added.
+    for (const removed of ['BG', 'CI', 'CD', 'MC']) {
+      expect(FATF_GREY_LIST).not.toContain(removed);
+    }
+    // June 2026 additions still listed, June removals still off.
     expect(FATF_GREY_LIST).toContain('BA');
     expect(FATF_GREY_LIST).toContain('IQ');
     expect(FATF_GREY_LIST).not.toContain('DZ');
     expect(FATF_GREY_LIST).not.toContain('NA');
-    expect(FATF_GREY_LIST).toHaveLength(22);
-    expect(FATF_AS_OF).toBe('2026-06');
+    expect(FATF_GREY_LIST).toHaveLength(18);
+    expect(FATF_AS_OF).toBe('2026-10');
   });
 
   it('Russia is SUSPENDED from the FATF — never listed as a member', () => {
