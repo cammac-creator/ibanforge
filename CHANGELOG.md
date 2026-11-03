@@ -39,7 +39,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Security
 
 - **Three transitive dependencies at patched versions (3 November 2026).** In the site tree, `undici` 7.30.1 (the eight advisories open against 7.29.1, among them a TLS certificate check that dropped custom verification callbacks, cache poisoning across a redirect, and several denial-of-service paths) and `systeminformation` 5.33.19; in the site tree and the `ibanforge-mcp` package tree, `@hono/node-server` 2.1.6. `undici` is held at 7.30.1 or above by an `overrides` entry in `frontend/package.json`, because `@scalar/json-magic` 0.16.0, under the API reference page, pins exactly 7.29.1; `frontend/lib/undici-override.test.ts` says when that entry can go. The published `ibanforge-mcp` package does not change: only its development lockfile does.
-- **One advisory stays open for lack of a patched release (3 November 2026).** `deepmerge` (prototype poisoning in `mergeObject`, low severity), transitive under the `shadcn` command-line tool of the site tree, has no fixed version published.
+- **`follow-redirects` 1.16.2 in the API tree (3 November 2026).** Before it, a custom credentials header could follow a redirect to another origin (GHSA-mrwp-f3q8-3g9p, high). It comes in through `axios`, which asks for `^1.16.0`: only the lockfile changes.
+- **Two advisories stay open for lack of a usable patched release (3 November 2026).** `deepmerge` (prototype poisoning in `mergeObject`, low severity), transitive under the `shadcn` command-line tool of the site tree, has no fixed version published. `minimatch` (denial of service through glob pattern amplification, medium), transitive under ESLint and the TypeScript tooling of both trees and under `shadcn` in the site tree, is fixed only in 11.0.1, a major release the packages that pull it, which ask for 10.x or 3.x, do not accept yet.
 
 ## [1.9.0] — 2026-10-07
 
