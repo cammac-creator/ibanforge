@@ -35,6 +35,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **The Odoo module states both free allowances (8 October 2026).** 200 requests a month with an e-mail address, 25 without, in its settings, field help, README and store description.
 - **The MCP pages link to OpenAI's current guide for connecting a server to ChatGPT (7 October 2026).** The previous developer-mode link answered 404.
 
+### Security
+
+- **Three transitive dependencies at patched versions (3 November 2026).** In the site tree, `undici` 7.30.1 (the eight advisories open against 7.29.1, among them a TLS certificate check that dropped custom verification callbacks, cache poisoning across a redirect, and several denial-of-service paths) and `systeminformation` 5.33.19; in the site tree and the `ibanforge-mcp` package tree, `@hono/node-server` 2.1.6. `undici` is held at 7.30.1 or above by an `overrides` entry in `frontend/package.json`, because `@scalar/json-magic` 0.16.0, under the API reference page, pins exactly 7.29.1; `frontend/lib/undici-override.test.ts` says when that entry can go. The published `ibanforge-mcp` package does not change: only its development lockfile does.
+- **One advisory stays open for lack of a patched release (3 November 2026).** `deepmerge` (prototype poisoning in `mergeObject`, low severity), transitive under the `shadcn` command-line tool of the site tree, has no fixed version published.
+
 ## [1.9.0] — 2026-10-07
 
 ### Added
