@@ -1,209 +1,113 @@
 ---
-title: "Validation par lot"
-description: "POST /v1/iban/batch — Valider jusqu'a 100 IBAN en une seule requete avec donnees SEPA, emetteur et risque."
+title: "Validation IBAN par lot"
+description: "Appeler POST /v1/iban/batch avec une clé, lire chaque résultat dans son ordre et comprendre le décompte par IBAN."
 order: 2
 ---
 
-# Validation par lot
+# Validation IBAN par lot
 
-Validez jusqu'a 100 IBAN en un seul appel API. Chaque IBAN est traite independamment — un IBAN invalide n'affecte pas les autres. Payé à l'appel en USDC via x402, un IBAN coûte 0,002 $ dans un lot au lieu de 0,005 $ seul ; avec une clé API ou un pack de crédits, chaque IBAN compte pour une requête ou un crédit, comme une validation seule.
+Contrôlez de 1 à 100 IBAN par requête. Le résultat de chaque élément reste indépendant : un IBAN invalide ne supprime ni les autres résultats ni sa propre ligne. Ce contrôle ne prouve pas l’existence du compte ou l’identité de son titulaire.
 
-## Endpoint
-
-```
+```text
 POST https://api.ibanforge.com/v1/iban/batch
 ```
 
-**Cout :** $0.002 USDC par IBAN via x402 (ex. : 10 IBAN = $0.020, 100 IBAN = $0.200). Avec une cle API, un lot debite **1 requete / 1 credit prepaye par IBAN** — offre gratuite et packs de credits inclus. Si le lot depasse votre solde restant, l'API le refuse en tout-ou-rien avec un 402 qui nomme le manque (en-tetes `X-Credits-Required` / `X-Quota-Required`) ; rien n'est consomme.
+## Accès et coût
 
-## Requete
+Une **clé API** ou un paiement x402 est nécessaire. L’essai sans clé de la validation unitaire ne couvre pas cette route. Conservez la même clé pour suivre son usage et la recharger ; ne la placez pas dans une page publique ou un dépôt.
 
-### En-tetes
+Avec une clé, chaque élément envoyé compte pour une unité de franchise ou un crédit prépayé, y compris les doublons et les IBAN invalides. Le coût affiché dans `cost_usdc` vaut alors `0` : cela ne signifie pas que le lot ne consomme aucune unité. Un lot qui dépasse les unités disponibles est refusé entièrement en `402` ; aucun résultat partiel n’est servi. L’allocation et les crédits peuvent financer ensemble un lot.
 
-| En-tete | Valeur | Requis |
-|---|---|---|
-| `Content-Type` | `application/json` | Oui |
-| `Authorization` | `Bearer ifk_...` (clé API gratuite) | L'un des deux |
-| `X-PAYMENT` | Token de paiement x402 | L'un des deux |
+Avec x402, le prix est de **0,002 USDC par IBAN**. Un client x402 signe les exigences reçues dans le `402` ; un en-tête vide n’est pas un paiement. Le guide [x402](/fr/docs/x402) décrit les signatures v2 `PAYMENT-SIGNATURE` et la compatibilité v1 `X-PAYMENT`.
 
-### Corps
+## Requête avec une clé
 
-```json
-{
-  "ibans": [
-    "CH10 0023 0000 0000 1234 5",
-    "DE89 3704 0044 0532 0130 00",
-    "INVALID123"
-  ]
-}
-```
-
-| Champ | Type | Description |
-|---|---|---|
-| `ibans` | `string[]` | Tableau d'IBAN a valider. De 1 a 100 elements. |
-
-## Reponse
-
-### Succes (200)
-
-```json
-{
-  "results": [
-    {
-      "iban": "CH1000230000000012345",
-      "valid": true,
-      "country": { "code": "CH", "name": "Switzerland" },
-      "check_digits": "10",
-      "bban": { "bank_code": "00230", "account_number": "000000012345" },
-      "bic": { "code": "UBSWCHZH80A", "bic8": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zürich" },
-      "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
-      "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
-      "risk_indicators": {
-        "issuer_type": "bank",
-        "country_risk": "standard",
-        "test_bic": false,
-        "sepa_reachable": true,
-        "vop_coverage": false
-      },
-      "clearing": {
-        "iid": "00230",
-        "name": "UBS Switzerland AG",
-        "type": "bank",
-        "town": "Zürich",
-        "sic": true,
-        "instant_payments_chf": true,
-        "eurosic": true,
-        "qr_iid": null
-      },
-      "formatted": "CH10 0023 0000 0000 1234 5",
-      "cost_usdc": 0.002
-    },
-    {
-      "iban": "DE89370400440532013000",
-      "valid": true,
-      "country": { "code": "DE", "name": "Germany" },
-      "check_digits": "89",
-      "bban": { "bank_code": "37040044", "account_number": "0532013000" },
-      "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
-      "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
-      "issuer": { "type": "bank", "name": "Commerzbank" },
-      "risk_indicators": {
-        "issuer_type": "bank",
-        "country_risk": "standard",
-        "test_bic": false,
-        "sepa_reachable": true,
-        "vop_coverage": true
-      },
-      "formatted": "DE89 3704 0044 0532 0130 00",
-      "cost_usdc": 0.002
-    },
-    {
-      "iban": "INVALID123",
-      "valid": false,
-      "error": "unsupported_country",
-      "error_detail": "Country code 'IN' is not a recognized IBAN country.",
-      "cost_usdc": 0.002
-    }
-  ],
-  "count": 3,
-  "valid_count": 2,
-  "cost_usdc": 0.006,
-  "processing_ms": 1.05
-}
-```
-
-### Champs de la reponse
-
-**Premier niveau :**
-
-| Champ | Type | Description |
-|---|---|---|
-| `results` | `array` | Tableau des resultats de validation, dans le meme ordre que l'entree |
-| `count` | `number` | Nombre total d'IBAN traites |
-| `valid_count` | `number` | Nombre d'IBAN valides |
-| `cost_usdc` | `number` | Cout total de ce lot |
-| `processing_ms` | `number` | Temps total de traitement |
-
-**Chaque element de `results`** possede la meme structure que la [reponse de validation unitaire](/docs/iban-validate), incluant `sepa`, `issuer` et `risk_indicators` pour les IBAN valides.
-
-### Erreurs
-
-| Statut | Code | Description |
-|---|---|---|
-| 400 | `empty_batch` | Le tableau `ibans` est vide |
-| 400 | `batch_too_large` | Plus de 100 IBAN soumis |
-| 400 | `invalid_request` | Le corps de la requete n'est pas un JSON valide ou le champ `ibans` est manquant |
-
-## Exemples de code
-
-### cURL
+Les exemples utilisent une clé déjà conservée dans la variable d’environnement `IBANFORGE_API_KEY`, côté serveur. [Obtenir et conserver une clé](/fr/docs/api-keys). Les IBAN ci-dessous sont des exemples documentaires ; ils ne désignent pas des comptes à payer.
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/batch \
+curl --fail-with-body --silent --show-error \
+  https://api.ibanforge.com/v1/iban/batch \
   -H "Content-Type: application/json" \
-  -d '{
-    "ibans": [
-      "CH1000230000000012345",
-      "DE89370400440532013000",
-      "FR7630006000011234567890189"
-    ]
-  }'
+  -H "Authorization: Bearer ${IBANFORGE_API_KEY:?}" \
+  -d '{"ibans":["CH1000230000000012345","DE89370400440532013000","INVALID123"]}'
 ```
+
+`ibans` est un tableau de 1 à 100 chaînes. Les alias `iban_list` et `list` sont aussi acceptés ; utilisez un seul champ. Les espaces, traits d’union ASCII et minuscules sont normalisés par le validateur. Une chaîne vide reste un élément invalide, tandis qu’un nombre ou un objet rend la requête entière invalide.
 
 ### Python
 
 ```python
-import requests
+import json
+import os
+import urllib.request
 
-response = requests.post(
+ibans = ["CH1000230000000012345", "DE89370400440532013000", "INVALID123"]
+request = urllib.request.Request(
     "https://api.ibanforge.com/v1/iban/batch",
-    json={
-        "ibans": [
-            "CH1000230000000012345",
-            "DE89370400440532013000",
-            "FR7630006000011234567890189",
-        ]
+    data=json.dumps({"ibans": ibans}).encode(),
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + os.environ["IBANFORGE_API_KEY"],
     },
+    method="POST",
 )
+with urllib.request.urlopen(request, timeout=30) as response:
+    data = json.load(response)
 
-data = response.json()
-print(f"Valid: {data['valid_count']}/{data['count']}")
-
-for result in data["results"]:
-    if result["valid"]:
-        risk = result["risk_indicators"]["country_risk"]
-        issuer = result["issuer"]["type"]
-        print(f"  {result['iban']} — {result['country']['name']} ({issuer}, risk: {risk})")
-    else:
-        print(f"  INVALID — {result['error_detail']}")
+if len(data["results"]) != len(ibans):
+    raise ValueError("results / ibans")
+for index, result in enumerate(data["results"]):
+    print(json.dumps({"index": index, "input": ibans[index], "result": result}))
 ```
 
-### TypeScript
+### Node.js / TypeScript
 
 ```typescript
-const response = await fetch(
-  "https://api.ibanforge.com/v1/iban/batch",
-  {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ibans: [
-        "CH1000230000000012345",
-        "DE89370400440532013000",
-        "FR7630006000011234567890189",
-      ],
-    }),
-  }
-);
-
+const key = process.env.IBANFORGE_API_KEY;
+if (!key) throw new Error("IBANFORGE_API_KEY");
+const ibans = ["CH1000230000000012345", "DE89370400440532013000", "INVALID123"];
+const response = await fetch("https://api.ibanforge.com/v1/iban/batch", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+  body: JSON.stringify({ ibans }),
+  signal: AbortSignal.timeout(30000),
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
 const data = await response.json();
-console.log(`Valid: ${data.valid_count}/${data.count}`);
-
-for (const result of data.results) {
-  if (result.valid) {
-    console.log(`  ${result.iban} — ${result.issuer.type}, risk: ${result.risk_indicators.country_risk}`);
-  } else {
-    console.log(`  INVALID — ${result.error_detail}`);
-  }
+if (!Array.isArray(data.results) || data.results.length !== ibans.length) {
+  throw new Error("results / ibans");
+}
+for (const [index, result] of data.results.entries()) {
+  console.log(JSON.stringify({ index, input: ibans[index], result }));
 }
 ```
+
+## Lire la réponse
+
+Un `200` signifie que le lot a été traité, pas que chaque IBAN est valide. `results[i]` correspond à l’entrée `ibans[i]`, dans le même ordre et sans dédoublonnage. Conservez votre identifiant de ligne à côté de cet indice.
+
+| Champ | Lecture |
+|---|---|
+| `results` | Une réponse de validation par entrée ; inspecter `valid`, puis les contrôles et leurs sources. |
+| `count` | Nombre d’éléments traités, doublons compris. |
+| `valid_count` | Nombre dont `valid` vaut `true` ; ne compte pas des comptes existants ou des paiements autorisés. |
+| `cost_usdc` | Montant USDC de cet appel ; zéro avec une clé. |
+| `processing_ms` | Durée de traitement de cette réponse ; ce n’est pas un engagement de délai. |
+| `attribution` | Crédits de sources lorsque la réponse en porte ; les conserver avec les résultats. |
+
+Chaque élément suit la [référence de validation unitaire](/fr/docs/iban-validate). `bank_code_holder`, `bank_code_check`, `bic`, `checks` et les sources distinguent une référence confirmée, une déduction et une absence de donnée. Certains blocs sont absents ou `null` selon l’IBAN et les sources disponibles. Le lot ne renvoie pas le bloc supplémentaire de la route [compliance](/fr/docs/compliance).
+
+## Erreurs et reprise
+
+| Statut / code | Traitement |
+|---|---|
+| 400 `invalid_json` | JSON mal formé. |
+| 400 `invalid_request` | Champ absent, tableau attendu ou élément non textuel. |
+| 400 `empty_batch` | Tableau vide. |
+| 400 `batch_too_large` | Plus de 100 éléments ; découper les entrées avant l’appel. |
+| 402 | Clé absente, inutilisable ou unités insuffisantes ; lire le corps et les en-têtes du refus. |
+| 429 | Limite de débit ; attendre `Retry-After`. |
+
+Une réponse `200` peut contenir `valid: false` avec `error` et `error_detail`. Pour un échec réseau après l’envoi, le traitement peut avoir eu lieu : ne pas rejouer automatiquement tout le lot comme s’il n’avait rien consommé. Conserver les lignes déjà traitées et vérifier l’usage de la clé. Une issue de paiement x402 inconnue demande aussi une vérification avant tout nouveau paiement.
+
+Pour un fichier à examiner, utiliser [l’audit de fichier](/fr/audit) ou le [parcours fournisseurs](/fr/vendors). Pour automatiser la revue : [recettes](/fr/docs/recipes). Pour démarrer : [prise en main](/fr/docs/onboarding). Les [erreurs](/fr/docs/errors) détaillent les quotas et les limites de débit.

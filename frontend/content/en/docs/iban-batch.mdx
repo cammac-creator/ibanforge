@@ -1,209 +1,113 @@
 ---
-title: "Batch Validate"
-description: "POST /v1/iban/batch — Validate up to 100 IBANs in a single request with SEPA, issuer, and risk data."
+title: "Batch IBAN validation"
+description: "Call POST /v1/iban/batch with a key, preserve the order of individual results and understand per-IBAN usage."
 order: 2
 ---
 
-# Batch Validate
+# Batch IBAN validation
 
-Validate up to 100 IBANs in a single API call. Each IBAN is processed independently — one invalid IBAN does not affect the others. Paid per call in USDC via x402, an IBAN costs $0.002 in a batch instead of $0.005 on its own; on an API key or a credit pack, each IBAN uses one request or credit, the same as a single validation.
+Check 1 to 100 IBANs per request. Each entry has its own result: an invalid IBAN removes neither the other results nor its own row. This check does not establish account existence or account-holder identity.
 
-## Endpoint
-
-```
+```text
 POST https://api.ibanforge.com/v1/iban/batch
 ```
 
-**Cost:** $0.002 USDC per IBAN via x402 (e.g. 10 IBANs = $0.020, 100 IBANs = $0.200). On an API key, a batch debits **1 request / 1 prepaid credit per IBAN** — free tier and credit packs alike. If the batch exceeds your remaining allowance, the API refuses it all-or-nothing with a 402 naming the shortfall (`X-Credits-Required` / `X-Quota-Required` headers); nothing is consumed.
+## Access and cost
 
-## Request
+An **API key** or an x402 payment is required. The keyless single-validation trial does not cover this route. Keep the same key to track its usage and top it up; do not place it in a public page or repository.
 
-### Headers
+With a key, every submitted entry consumes one allowance unit or prepaid credit, including duplicates and invalid IBANs. `cost_usdc` is then `0`; that does not mean the batch consumes no units. A batch larger than the available units is rejected in full with `402`, with no partial results. Allowance and credits can jointly fund a batch.
 
-| Header | Value | Required |
-|---|---|---|
-| `Content-Type` | `application/json` | Yes |
-| `Authorization` | `Bearer ifk_...` (free API key) | One of the two |
-| `X-PAYMENT` | x402 payment token | One of the two |
+With x402, the price is **0.002 USDC per IBAN**. An x402 client signs the requirements returned with `402`; an empty header is not a payment. The [x402 guide](/docs/x402) covers v2 `PAYMENT-SIGNATURE` and v1 `X-PAYMENT` compatibility.
 
-### Body
+## Request with a key
 
-```json
-{
-  "ibans": [
-    "CH10 0023 0000 0000 1234 5",
-    "DE89 3704 0044 0532 0130 00",
-    "INVALID123"
-  ]
-}
-```
-
-| Field | Type | Description |
-|---|---|---|
-| `ibans` | `string[]` | Array of IBANs to validate. 1 to 100 items. |
-
-## Response
-
-### Success (200)
-
-```json
-{
-  "results": [
-    {
-      "iban": "CH1000230000000012345",
-      "valid": true,
-      "country": { "code": "CH", "name": "Switzerland" },
-      "check_digits": "10",
-      "bban": { "bank_code": "00230", "account_number": "000000012345" },
-      "bic": { "code": "UBSWCHZH80A", "bic8": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zürich" },
-      "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
-      "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
-      "risk_indicators": {
-        "issuer_type": "bank",
-        "country_risk": "standard",
-        "test_bic": false,
-        "sepa_reachable": true,
-        "vop_coverage": false
-      },
-      "clearing": {
-        "iid": "00230",
-        "name": "UBS Switzerland AG",
-        "type": "bank",
-        "town": "Zürich",
-        "sic": true,
-        "instant_payments_chf": true,
-        "eurosic": true,
-        "qr_iid": null
-      },
-      "formatted": "CH10 0023 0000 0000 1234 5",
-      "cost_usdc": 0.002
-    },
-    {
-      "iban": "DE89370400440532013000",
-      "valid": true,
-      "country": { "code": "DE", "name": "Germany" },
-      "check_digits": "89",
-      "bban": { "bank_code": "37040044", "account_number": "0532013000" },
-      "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
-      "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
-      "issuer": { "type": "bank", "name": "Commerzbank" },
-      "risk_indicators": {
-        "issuer_type": "bank",
-        "country_risk": "standard",
-        "test_bic": false,
-        "sepa_reachable": true,
-        "vop_coverage": true
-      },
-      "formatted": "DE89 3704 0044 0532 0130 00",
-      "cost_usdc": 0.002
-    },
-    {
-      "iban": "INVALID123",
-      "valid": false,
-      "error": "unsupported_country",
-      "error_detail": "Country code 'IN' is not a recognized IBAN country.",
-      "cost_usdc": 0.002
-    }
-  ],
-  "count": 3,
-  "valid_count": 2,
-  "cost_usdc": 0.006,
-  "processing_ms": 1.05
-}
-```
-
-### Response fields
-
-**Top-level:**
-
-| Field | Type | Description |
-|---|---|---|
-| `results` | `array` | Array of validation results, same order as input |
-| `count` | `number` | Total IBANs processed |
-| `valid_count` | `number` | Count of valid IBANs |
-| `cost_usdc` | `number` | Total cost for this batch |
-| `processing_ms` | `number` | Total processing time |
-
-**Each item in `results`** has the same structure as the [single validation response](/docs/iban-validate), including `sepa`, `issuer`, and `risk_indicators` for valid IBANs.
-
-### Errors
-
-| Status | Code | Description |
-|---|---|---|
-| 400 | `empty_batch` | The `ibans` array is empty |
-| 400 | `batch_too_large` | More than 100 IBANs submitted |
-| 400 | `invalid_request` | Request body is not valid JSON or missing `ibans` field |
-
-## Code examples
-
-### cURL
+These examples use a key already stored in the server-side `IBANFORGE_API_KEY` environment variable. [Get and retain a key](/docs/api-keys). The IBANs below are documentation examples, not accounts to pay.
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/batch \
+curl --fail-with-body --silent --show-error \
+  https://api.ibanforge.com/v1/iban/batch \
   -H "Content-Type: application/json" \
-  -d '{
-    "ibans": [
-      "CH1000230000000012345",
-      "DE89370400440532013000",
-      "FR7630006000011234567890189"
-    ]
-  }'
+  -H "Authorization: Bearer ${IBANFORGE_API_KEY:?}" \
+  -d '{"ibans":["CH1000230000000012345","DE89370400440532013000","INVALID123"]}'
 ```
+
+`ibans` is an array of 1 to 100 strings. The aliases `iban_list` and `list` are also accepted; use one field. The validator normalizes spaces, ASCII hyphens and lowercase letters. An empty string remains an invalid entry, while a number or object makes the entire request invalid.
 
 ### Python
 
 ```python
-import requests
+import json
+import os
+import urllib.request
 
-response = requests.post(
+ibans = ["CH1000230000000012345", "DE89370400440532013000", "INVALID123"]
+request = urllib.request.Request(
     "https://api.ibanforge.com/v1/iban/batch",
-    json={
-        "ibans": [
-            "CH1000230000000012345",
-            "DE89370400440532013000",
-            "FR7630006000011234567890189",
-        ]
+    data=json.dumps({"ibans": ibans}).encode(),
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + os.environ["IBANFORGE_API_KEY"],
     },
+    method="POST",
 )
+with urllib.request.urlopen(request, timeout=30) as response:
+    data = json.load(response)
 
-data = response.json()
-print(f"Valid: {data['valid_count']}/{data['count']}")
-
-for result in data["results"]:
-    if result["valid"]:
-        risk = result["risk_indicators"]["country_risk"]
-        issuer = result["issuer"]["type"]
-        print(f"  {result['iban']} — {result['country']['name']} ({issuer}, risk: {risk})")
-    else:
-        print(f"  INVALID — {result['error_detail']}")
+if len(data["results"]) != len(ibans):
+    raise ValueError("results / ibans")
+for index, result in enumerate(data["results"]):
+    print(json.dumps({"index": index, "input": ibans[index], "result": result}))
 ```
 
-### TypeScript
+### Node.js / TypeScript
 
 ```typescript
-const response = await fetch(
-  "https://api.ibanforge.com/v1/iban/batch",
-  {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ibans: [
-        "CH1000230000000012345",
-        "DE89370400440532013000",
-        "FR7630006000011234567890189",
-      ],
-    }),
-  }
-);
-
+const key = process.env.IBANFORGE_API_KEY;
+if (!key) throw new Error("IBANFORGE_API_KEY");
+const ibans = ["CH1000230000000012345", "DE89370400440532013000", "INVALID123"];
+const response = await fetch("https://api.ibanforge.com/v1/iban/batch", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+  body: JSON.stringify({ ibans }),
+  signal: AbortSignal.timeout(30000),
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
 const data = await response.json();
-console.log(`Valid: ${data.valid_count}/${data.count}`);
-
-for (const result of data.results) {
-  if (result.valid) {
-    console.log(`  ${result.iban} — ${result.issuer.type}, risk: ${result.risk_indicators.country_risk}`);
-  } else {
-    console.log(`  INVALID — ${result.error_detail}`);
-  }
+if (!Array.isArray(data.results) || data.results.length !== ibans.length) {
+  throw new Error("results / ibans");
+}
+for (const [index, result] of data.results.entries()) {
+  console.log(JSON.stringify({ index, input: ibans[index], result }));
 }
 ```
+
+## Read the response
+
+A `200` means the batch was processed, not that every IBAN is valid. `results[i]` corresponds to `ibans[i]`, in the same order without deduplication. Keep your source-row identifier alongside that index.
+
+| Field | Meaning |
+|---|---|
+| `results` | One validation response per entry; inspect `valid`, then the checks and their sources. |
+| `count` | Number of processed entries, including duplicates. |
+| `valid_count` | Number with `valid: true`; not a count of existing accounts or authorized payments. |
+| `cost_usdc` | USDC amount for this call; zero with a key. |
+| `processing_ms` | Processing duration for this response, not a latency commitment. |
+| `attribution` | Source credits when carried by the response; retain them with the results. |
+
+Each entry follows the [single-validation reference](/docs/iban-validate). `bank_code_holder`, `bank_code_check`, `bic`, `checks` and their sources distinguish confirmed references, inferences and unavailable data. Some blocks are absent or `null` depending on the IBAN and available sources. Batch validation does not return the additional [compliance](/docs/compliance) block.
+
+## Errors and resuming work
+
+| Status / code | Handling |
+|---|---|
+| 400 `invalid_json` | Malformed JSON. |
+| 400 `invalid_request` | Missing field, expected array or non-string entry. |
+| 400 `empty_batch` | Empty array. |
+| 400 `batch_too_large` | More than 100 entries; split the input before calling. |
+| 402 | Missing or unusable key, or insufficient units; read the response body and headers. |
+| 429 | Rate limit; wait for `Retry-After`. |
+
+A `200` can contain `valid: false` with `error` and `error_detail`. After a network failure during a submitted request, processing may have occurred: do not automatically replay the entire batch as if it consumed nothing. Retain completed rows and check key usage. An unknown x402 settlement outcome also needs investigation before another payment.
+
+For a file, use the [file audit](/audit) or [supplier workflow](/vendors). To automate review: [recipes](/docs/recipes). To get started: [onboarding](/docs/onboarding). The [error reference](/docs/errors) explains quotas and rate limits.
