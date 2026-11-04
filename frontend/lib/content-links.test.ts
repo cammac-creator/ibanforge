@@ -42,8 +42,8 @@ describe('liens de contenu dans la langue de lecture', () => {
   it('rend le lien en conservant son contenu, son ancre et ses attributs', () => {
     const components = mdxComponentsForLocale('de');
     const html = renderToStaticMarkup(createElement(components.a, {
-      href: '/docs/api-keys#claim', title: 'Clé', rel: 'help', children: 'Conserver la clé',
-    }));
+      href: '/docs/api-keys#claim', title: 'Clé', rel: 'help',
+    }, 'Conserver la clé'));
     expect(html).toContain('href="/de/docs/api-keys#claim"');
     expect(html).toContain('title="Clé"');
     expect(html).toContain('rel="help"');
@@ -55,8 +55,8 @@ describe('liens de contenu dans la langue de lecture', () => {
   it('préserve aussi un téléchargement déclaré sans extension', () => {
     const components = mdxComponentsForLocale('fr');
     const html = renderToStaticMarkup(createElement(components.a, {
-      href: '/docs/export', download: 'guide', children: 'Télécharger',
-    }));
+      href: '/docs/export', download: 'guide',
+    }, 'Télécharger'));
     expect(html).toContain('href="/docs/export"');
     expect(html).toContain('download="guide"');
   });
