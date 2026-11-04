@@ -72,19 +72,23 @@ Die [Validierungsreferenz](/de/docs/iban-validate) erklärt die Felder, die [Feh
 
 HTTPS-Basis: `https://api.ibanforge.com`. Den vollständigen Vertrag finden Sie in der [OpenAPI-Referenz](/de/openapi) und der [Postman-Collection](/ibanforge-postman.json).
 
-| Route | Zweck | Zugang |
-|---|---|---|
-| `POST /v1/iban/validate` | Struktur und Referenzen für eine IBAN | Test ohne Schlüssel auf dieser Route, danach Schlüssel oder autorisierter kostenpflichtiger Zugang |
-| `POST /v1/iban/batch` | Bis zu 100 IBAN, ein Ergebnis je Eingabe | Eine Kontingenteinheit pro IBAN |
-| `GET /v1/bic/:code` | BIC-Suche | Schlüssel oder autorisierter kostenpflichtiger Zugang |
-| `GET /v1/ch/clearing/:iid` | Schweizer Clearing-Referenz | Schlüssel oder autorisierter kostenpflichtiger Zugang |
-| `POST /v1/iban/compliance` | Indikatoren zu Institut und Land | Schlüssel oder autorisierter kostenpflichtiger Zugang; kein Empfänger-Screening |
-| `GET` oder `POST /v1/iban/format` | Struktur und Prüfsumme ohne Banksuche | Kostenlos, ohne Schlüssel |
-| `GET` oder `POST /v1/reference/validate` | Prüfsumme unterstützter Zahlungsreferenzen | Kostenlos, ohne Schlüssel |
-| `POST /v1/address/check` | Adressformat nach gewähltem Schema und belegten Regeln | Kostenlos, ohne Schlüssel |
-| `POST /v1/ch/qr-bill/check` | Struktur des Inhalts einer Schweizer QR-Rechnung | Kostenlos, ohne Schlüssel |
-| `POST /v1/audit/upload` | Prüfung einer CSV- oder Excel-Datei | Kostenlose Vorschau; vollständiger Bericht zum angezeigten Preis |
-| `GET /v1/demo` | Öffentliche Beispielantworten | Kostenlos; prüft keinen Schlüssel |
-| `GET /health` | Öffentlicher Dienststatus | Kostenlos |
+Die folgenden x402-Preise gelten nur bei gewählter Zahlung pro Aufruf. Sie werden nicht zusätzlich zum REST-Test oder zu Aufrufen innerhalb des Schlüsselkontingents oder Prepaid-Guthabens berechnet. Siehe [x402](/de/docs/x402) für die Zahlung und [Preise](/de/pricing) für aktuelle Angebote.
+
+| Route | Zweck | Zugang | x402 |
+|---|---|---|---|
+| [`POST /v1/iban/validate`](/de/docs/iban-validate) | Struktur und Referenzen für eine IBAN | Test ohne Schlüssel auf dieser Route, danach Schlüssel oder autorisierter kostenpflichtiger Zugang | 0.005 USDC |
+| [`POST /v1/iban/batch`](/de/docs/iban-batch) | Bis zu 100 IBAN, ein Ergebnis je Eingabe | Eine Kontingenteinheit pro IBAN | 0.002 USDC / IBAN |
+| [`GET /v1/bic/:code`](/de/docs/bic-lookup) | BIC-Suche | Schlüssel oder autorisierter kostenpflichtiger Zugang | 0.003 USDC |
+| [`GET /v1/ch/clearing/:iid`](/de/docs/ch-clearing) | Schweizer Clearing-Referenz | Schlüssel oder autorisierter kostenpflichtiger Zugang | 0.003 USDC |
+| [`POST /v1/iban/compliance`](/de/docs/compliance) | Indikatoren zu Institut und Land | Schlüssel oder autorisierter kostenpflichtiger Zugang; kein Empfänger-Screening | 0.02 USDC |
+| [`GET` oder `POST /v1/iban/format`](/de/openapi) | Struktur und Prüfsumme ohne Banksuche | Kostenlos, ohne Schlüssel | 0 |
+| [`GET` oder `POST /v1/reference/validate`](/de/docs/swiss-qr-iban) | Prüfsumme unterstützter Zahlungsreferenzen | Kostenlos, ohne Schlüssel | 0 |
+| [`POST /v1/address/check`](/de/docs/structured-addresses) | Adressformat nach gewähltem Schema und belegten Regeln | Kostenlos, ohne Schlüssel | 0 |
+| [`POST /v1/ch/qr-bill/check`](/de/docs/swiss-qr-iban) | Struktur des Inhalts einer Schweizer QR-Rechnung | Kostenlos, ohne Schlüssel | 0 |
+| [`POST /v1/audit/upload`](/de/audit) | Prüfung einer CSV- oder Excel-Datei | Kostenlose Vorschau; vollständiger Bericht zum angezeigten Preis | Eigener Dateipreis |
+| [`GET /v1/demo`](/de/docs/onboarding) | Öffentliche Beispielantworten | Kostenlos; prüft keinen Schlüssel | 0 |
+| [`GET /health`](https://api.ibanforge.com/health) | Öffentlicher Dienststatus | Kostenlos | 0 |
+
+Prepaid-Pakete: **1.000 Credits = 4 $; 5.000 = 20 $; 25.000 = 80 $**. Credits verfallen nicht; eine Validierung oder Suche kostet einen Credit, ein Batch einen je IBAN. Kartenzahlung und USDC stehen unter [Preise](/de/pricing). Die Dateiprüfung hat einen eigenen, von der Dateigröße abhängigen Preis, der mit der kostenlosen Vorschau angezeigt wird; diese Aufrufpreise enthalten ihn nicht.
 
 [Preise](/de/pricing) und [Zugangsgrenzen](/de/docs/api-keys) beschreiben die Angebote. Eine `402`-Antwort erklärt die Möglichkeiten; sie ermächtigt eine Automatisierung weder zum Kauf von Guthaben noch zu einer Zahlung.

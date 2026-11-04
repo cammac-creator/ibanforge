@@ -17,7 +17,7 @@ curl --silent --show-error --include \
   --data '{"iban":"CH10 0023 0000 0000 1234 5"}'
 ```
 
-Der REST-Test erlaubt **25 Validierungen pro ISO-Woche in UTC und Quelladresse**, ausschliesslich auf `POST /v1/iban/validate`. Der Block `trial` nennt das verbleibende Kontingent und die Rücksetzung am Montag um 00:00 UTC. In einem gemeinsam genutzten Netzwerk kann das Kontingent bereits verbraucht sein: `402` mit `cause.reason: "trial_exhausted"` bezeichnet ein erschöpftes Testkontingent, keine falsche IBAN.
+Der REST-Test erlaubt **25 Validierungen pro ISO-Woche in UTC und Quelladresse**, ausschließlich auf `POST /v1/iban/validate`. Der Block `trial` nennt das verbleibende Kontingent und die Rücksetzung am Montag um 00:00 UTC. In einem gemeinsam genutzten Netzwerk kann das Kontingent bereits verbraucht sein: `402` mit `cause.reason: "trial_exhausted"` bezeichnet ein erschöpftes Testkontingent, keine falsche IBAN.
 
 Lesen Sie zuerst den HTTP-Status, dann den Inhalt. Eine bearbeitete Anfrage liefert `200`, auch bei einer ungültigen IBAN. Dieser **Auszug** stammt aus der Antwort für das Beispiel vom 4. November 2026; weitere Prüfungen und Referenzen sind ausgelassen:
 
@@ -88,13 +88,41 @@ curl --silent --show-error --include \
 | Feld | Bedeutung |
 |---|---|
 | `valid`, `error`, `error_detail` | Validierungsergebnis und angegebener Grund bei einer ungültigen IBAN. Von HTTP- oder Netzwerkfehlern unterscheiden. |
-| `checks` | Durchgeführte, fehlgeschlagene oder nicht durchgeführte Prüfungen. `not_checked` heisst: nicht geprüft. |
+| `checks` | Durchgeführte, fehlgeschlagene oder nicht durchgeführte Prüfungen. `not_checked` heißt: nicht geprüft. |
 | `bank_code_check` | Status der Bankkennung, abgefragtes Register, Verbindlichkeit und Datum. Ein unbekanntes Ergebnis oder eine nicht verfügbare Quelle erfordert Prüfung; ein fehlender Eintrag in einem Teilregister beweist keine unzugeteilte Kennung. |
 | `bic` | Referenz des ermittelten Instituts samt Herkunft. Der Bankname ist nicht der Name des Kontoinhabers. |
 | `sepa`, `risk_indicators` | Angaben zu Abdeckung und Geltungsbereich. Die Teilnahme einer Bank an einem Verfahren bestätigt nicht die Identität des Empfängers. |
 | `next_steps` | Vorschläge, die anhand Ihres Bedarfs und Ihrer Berechtigungen einzuordnen sind, keine Kauf- oder Zahlungsaufträge. |
 
-Ungültige Antworten und unterschiedliche Länder enthalten nicht immer dieselben Blöcke. Behandeln Sie fehlende Felder und `null`-Werte gemäss [Validierungsreferenz](/de/docs/iban-validate) und [Datenquellen](/de/docs/data-sources). Der Abgleich mit dem Kontoinhaber gehört zum bankseitigen Verfahren [Verification of Payee](/de/docs/vop).
+Ungültige Antworten und unterschiedliche Länder enthalten nicht immer dieselben Blöcke. Behandeln Sie fehlende Felder und `null`-Werte gemäß [Validierungsreferenz](/de/docs/iban-validate) und [Datenquellen](/de/docs/data-sources). Der Abgleich mit dem Kontoinhaber gehört zum bankseitigen Verfahren [Verification of Payee](/de/docs/vop).
+
+
+### Antwortreferenz, Block für Block
+
+Die vorhandenen Felder hängen von Eingabe, Land und tatsächlich abgefragten Quellen ab. Ein früh erkannter ungültiger Wert kann ohne Anreicherung zurückkommen. Fehlende Blöcke und `null` sind keine negativen Befunde.
+
+| Block oder Felder | Bedeutung und Grenzen |
+|---|---|
+| `iban`, `valid`, `error`, `error_detail` | Normalisierte Eingabe, Ergebnis und Grund. Auch eine ungültige IBAN kann HTTP `200` erhalten. |
+| `country`, `check_digits`, `bban`, `formatted` | Land, Prüfziffern, nationale Bestandteile und lesbare Gruppierung, soweit die Analyse gelingt. |
+| `checks` | Getrennte Prüfungen von Struktur, Prüfsumme, Bankcode und nationaler Kontonummer. `account_exists` und `payee_name` bleiben `not_checked`. |
+| `bic` | Ermitteltes Institut mit `source`, `as_of`, `basis` und `authoritative`; gegebenenfalls mit `lei`, `lei_status`, `address` und `postal_address`. Ein Quelldatum beweist kein offenes Konto. |
+| `bank_code_check`, `bank_code_holder` | `status`, `reason`, `match`, `register`, `authoritative`, `institution` und `as_of` lesen, soweit vorhanden. `bank_code_holder` unterscheidet den Befund zum Codeinhaber; ein fehlender Eintrag in einer Teilquelle beweist keinen unvergebenen Code. |
+| `issuer` | Institutstyp und Klassifizierungsgrundlage, sofern ermittelt. Gemeint ist das Institut, nicht der Zahlungsempfänger. |
+| `sepa` | `member` beschreibt das Land. `schemes` und `basis` können einen Länderstandard oder ein EPC-Registerergebnis beschreiben; für die Bank gelten `bank_reachability` und `bank_schemes`. Fehlende Bankdaten oder `null` sind keine bestätigte Ablehnung. |
+| `sepa.vop_required`, `risk_indicators.vop_coverage` | Indikatoren auf Länderebene. Keiner davon prüft den Empfängernamen. |
+| `sepa.vop_participant`, `sepa.vop_register_status` | Teilnahme und Status des Instituts im abgefragten VoP-Register. `null` bedeutet, dass die Antwort den Institutsbefund nicht feststellen konnte. Siehe [VoP-Referenz](/de/docs/vop). Diese Validierungsantwort hat keinen `vop`-Block auf oberster Ebene. |
+| `risk_indicators` | `issuer_type`, `country_risk`, `test_bic`, `sepa_reachable` und `sepa_reachable_scope` sowie `vop_coverage`. Ein Länderindikator bestätigt weder Bank noch Konto. Der Risikowert steht im getrennten [Compliance-Endpunkt](/de/docs/compliance). |
+| `clearing` | Schweizer Clearingdaten, sofern ermittelt: `iid`, `sic`, `instant_payments_chf`, `eurosic`, `qr_iid`, `qr_iids` und Herkunft. Siehe [Schweizer Clearing](/de/docs/ch-clearing). |
+| `pra_authorisation` | Britische Zulassungsreferenz, sofern gefunden: `firm_name`, `frn`, `section`, `basis`, `source` und `list_month`. Ein fehlender Block beweist für sich allein keine fehlende Zulassung. |
+| `official_identity` | Zusätzliche Identität aus einer amtlichen Institutsliste bei einem Treffer: `name`, `lei`, `address`, `category`, `matched_by`, `source` und `as_of`. Sie ändert weder das IBAN-Ergebnis noch identifiziert sie den Kontoinhaber. |
+| `reference_check` | Getrennter Befund, wenn dieser Route eine Zahlungsreferenz übergeben wird. Eine gültige Referenz macht weder die IBAN noch die Zahlung gültig. Siehe [Zahlungsreferenzen](/de/docs/swiss-qr-iban). |
+| `next_steps` | Vorgeschlagene Folgeschritte mit `code`, `do`, `because` und `action`. Eigene Berechtigungen beachten, besonders vor kostenpflichtigen Aufrufen. |
+| `cost_usdc`, `processing_ms` | Ausgewiesene Kosten und Verarbeitungsdauer. Diese Validierungsroute meldet `cost_usdc: 0` bei einem Schlüssel oder dem REST-Test; Kontingent oder Guthaben können trotzdem verbraucht werden. |
+| `attribution` | Quellenhinweis bei Antworten mit Gratisschlüssel. `required`, `text`, `url` und `note` beachten, wenn Ergebnisse Personen angezeigt werden. |
+| `trial` | Zähler einer tatsächlich über den schlüssellosen REST-Test bedienten Antwort; bei Verwendung eines Schlüssels nicht vorhanden. |
+
+Quellen- und Datumsfelder zusammen mit gespeicherten Befunden behalten. Die Namen unterscheiden sich je nach Quelle: `bank_code_check` verwendet `register`, der PRA-Block `list_month`. [Datenquellen](/de/docs/data-sources) erläutert Abdeckung und Quellenangaben.
 
 ## 4. Einen kleinen Batch testen
 
@@ -116,7 +144,7 @@ Die Antwort enthält `results`, `count` und `valid_count`. Prüfen Sie den HTTP-
 
 Nach mindestens einer Validierung mit diesem Schlüssel nimmt `POST /v1/keys/claim` Ihre E-Mail-Adresse im JSON-Inhalt entgegen, mit dem Schlüssel im `Authorization`-Header. Ohne Code kündigt eine Antwort mit `202` und `status: "code_sent"` den Codeversand an. Wiederholen Sie die Anfrage innerhalb von 15 Minuten mit demselben Schlüssel, derselben Adresse und dem erhaltenen Code. `200` mit `claimed: true` bestätigt die Beanspruchung; der Schlüssel bleibt unverändert.
 
-`403 unused_key` bedeutet, dass Sie den Schlüssel zuerst verwenden müssen. Eine Adresse allein schliesst die Beanspruchung nicht ab. Ein Agent übermittelt eine Adresse nur, wenn sein Nutzer diese Verwendung erlaubt hat.
+`403 unused_key` bedeutet, dass Sie den Schlüssel zuerst verwenden müssen. Eine Adresse allein schließt die Beanspruchung nicht ab. Ein Agent übermittelt eine Adresse nur, wenn sein Nutzer diese Verwendung erlaubt hat.
 
 Sie können eine Adresse auch bei `POST /v1/keys/generate` angeben. Je nach bisheriger Schlüsselerstellung im Netzwerk antwortet der Dienst sofort mit `201` oder verlangt mit `403 verification_required` einen Code. Lesen Sie `monthly_limit` und `notice` in der abschliessenden Antwort. [API-Schlüssel](/de/docs/api-keys) beschreibt diese Wege und die Ablehnungsgründe.
 

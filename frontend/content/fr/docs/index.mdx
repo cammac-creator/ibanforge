@@ -72,19 +72,23 @@ La [référence de validation](/fr/docs/iban-validate) décrit les champs ; les 
 
 Base HTTPS : `https://api.ibanforge.com`. Le contrat complet est dans la [référence OpenAPI](/fr/openapi) et la [collection Postman](/ibanforge-postman.json).
 
-| Route | Usage | Accès |
-|---|---|---|
-| `POST /v1/iban/validate` | Structure et références pour un IBAN | Essai sans clé sur cette route, puis clé ou accès payant autorisé |
-| `POST /v1/iban/batch` | Jusqu’à 100 IBAN, résultat par entrée | Une unité de quota par IBAN |
-| `GET /v1/bic/:code` | Recherche d’un BIC | Clé ou accès payant autorisé |
-| `GET /v1/ch/clearing/:iid` | Référence de clearing suisse | Clé ou accès payant autorisé |
-| `POST /v1/iban/compliance` | Indicateurs concernant l’établissement et le pays | Clé ou accès payant autorisé ; pas de screening du bénéficiaire |
-| `GET` ou `POST /v1/iban/format` | Structure et somme de contrôle, sans recherche bancaire | Gratuit, sans clé |
-| `GET` ou `POST /v1/reference/validate` | Somme de contrôle des références de paiement prises en charge | Gratuit, sans clé |
-| `POST /v1/address/check` | Format d’adresse selon le schéma demandé et ses règles sourcées | Gratuit, sans clé |
-| `POST /v1/ch/qr-bill/check` | Structure d’une charge utile de QR-facture suisse | Gratuit, sans clé |
-| `POST /v1/audit/upload` | Revue d’un fichier CSV ou Excel | Aperçu gratuit ; rapport complet au prix affiché |
-| `GET /v1/demo` | Exemples publics de réponse | Gratuit ; ne teste pas une clé |
-| `GET /health` | État public du service | Gratuit |
+Les prix x402 ci-dessous concernent uniquement le paiement à l’appel que vous choisissez. Ils ne s’ajoutent pas à l’essai REST ni aux appels couverts par le quota ou les crédits prépayés d’une clé. Voir [x402](/fr/docs/x402) pour le paiement et les [tarifs](/fr/pricing) pour les offres actuelles.
+
+| Route | Usage | Accès | x402 |
+|---|---|---|---|
+| [`POST /v1/iban/validate`](/fr/docs/iban-validate) | Structure et références pour un IBAN | Essai sans clé sur cette route, puis clé ou accès payant autorisé | 0.005 USDC |
+| [`POST /v1/iban/batch`](/fr/docs/iban-batch) | Jusqu’à 100 IBAN, résultat par entrée | Une unité de quota par IBAN | 0.002 USDC / IBAN |
+| [`GET /v1/bic/:code`](/fr/docs/bic-lookup) | Recherche d’un BIC | Clé ou accès payant autorisé | 0.003 USDC |
+| [`GET /v1/ch/clearing/:iid`](/fr/docs/ch-clearing) | Référence de clearing suisse | Clé ou accès payant autorisé | 0.003 USDC |
+| [`POST /v1/iban/compliance`](/fr/docs/compliance) | Indicateurs concernant l’établissement et le pays | Clé ou accès payant autorisé ; pas de screening du bénéficiaire | 0.02 USDC |
+| [`GET` ou `POST /v1/iban/format`](/fr/openapi) | Structure et somme de contrôle, sans recherche bancaire | Gratuit, sans clé | 0 |
+| [`GET` ou `POST /v1/reference/validate`](/fr/docs/swiss-qr-iban) | Somme de contrôle des références de paiement prises en charge | Gratuit, sans clé | 0 |
+| [`POST /v1/address/check`](/fr/docs/structured-addresses) | Format d’adresse selon le schéma demandé et ses règles sourcées | Gratuit, sans clé | 0 |
+| [`POST /v1/ch/qr-bill/check`](/fr/docs/swiss-qr-iban) | Structure d’une charge utile de QR-facture suisse | Gratuit, sans clé | 0 |
+| [`POST /v1/audit/upload`](/fr/audit) | Revue d’un fichier CSV ou Excel | Aperçu gratuit ; rapport complet au prix affiché | Tarif fichier distinct |
+| [`GET /v1/demo`](/fr/docs/onboarding) | Exemples publics de réponse | Gratuit ; ne teste pas une clé | 0 |
+| [`GET /health`](https://api.ibanforge.com/health) | État public du service | Gratuit | 0 |
+
+Packs prépayés : **1 000 crédits = 4 $ ; 5 000 = 20 $ ; 25 000 = 80 $**. Les crédits n’expirent pas ; une validation ou une recherche consomme un crédit, un lot en consomme un par IBAN. Le paiement par carte et l’option USDC sont présentés dans les [tarifs](/fr/pricing). L’audit de fichier a son propre tarif selon la taille du fichier, affiché avec l’aperçu gratuit ; il n’est pas compris dans ces prix à l’appel.
 
 Les [tarifs](/fr/pricing) et les [limites d’accès](/fr/docs/api-keys) précisent les offres. Une réponse `402` décrit les options disponibles ; elle ne donne pas à une automatisation l’autorisation d’acheter des crédits ou d’effectuer un paiement.

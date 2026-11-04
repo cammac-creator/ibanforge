@@ -96,6 +96,34 @@ curl --silent --show-error --include \
 
 Les réponses invalides et les pays ne portent pas tous les mêmes blocs. Traitez les champs absents et les valeurs `null` ; suivez la [référence de validation](/fr/docs/iban-validate) et les [sources](/fr/docs/data-sources). Le contrôle du titulaire passe par le circuit bancaire de [Verification of Payee](/fr/docs/vop).
 
+
+### Référence de la réponse, bloc par bloc
+
+La présence des champs dépend de l’entrée, du pays et des sources réellement consultées. Un verdict invalide précoce peut notamment omettre l’enrichissement. Un bloc absent ou une valeur `null` ne constitue pas un résultat négatif.
+
+| Bloc ou champs | Signification et limites |
+|---|---|
+| `iban`, `valid`, `error`, `error_detail` | Entrée normalisée, verdict et motif. Un IBAN invalide peut recevoir un statut HTTP `200`. |
+| `country`, `check_digits`, `bban`, `formatted` | Pays, chiffres de contrôle, composants nationaux et regroupement lisible, lorsque l’analyse aboutit. |
+| `checks` | Contrôles séparés de structure, somme de contrôle, code bancaire et compte national. `account_exists` et `payee_name` restent `not_checked`. |
+| `bic` | Établissement résolu avec `source`, `as_of`, `basis` et `authoritative` ; peut porter `lei`, `lei_status`, `address` et `postal_address`. La date d’une source ne prouve pas l’ouverture du compte. |
+| `bank_code_check`, `bank_code_holder` | Lire `status`, `reason`, `match`, `register`, `authoritative`, `institution` et `as_of` lorsqu’ils sont fournis. `bank_code_holder` distingue le constat sur le détenteur du code ; une absence dans une source partielle ne prouve pas une non-attribution. |
+| `issuer` | Type d’établissement et fondement du classement, lorsqu’il est identifié. Il s’agit de l’établissement, pas du bénéficiaire. |
+| `sepa` | `member` décrit le pays. `schemes` et `basis` peuvent décrire une valeur par défaut du pays ou un registre EPC ; lire `bank_reachability` et `bank_schemes` pour la banque. Une donnée bancaire absente ou `null` n’est pas un refus confirmé. |
+| `sepa.vop_required`, `risk_indicators.vop_coverage` | Indicateurs de couverture au niveau du pays. Aucun ne contrôle le nom du bénéficiaire. |
+| `sepa.vop_participant`, `sepa.vop_register_status` | Participation et statut de l’établissement dans le registre VoP consulté. `null` signifie que la réponse n’a pas pu établir le constat pour cet établissement. Voir la [référence VoP](/fr/docs/vop). Cette réponse de validation ne contient pas de bloc `vop` à la racine. |
+| `risk_indicators` | `issuer_type`, `country_risk`, `test_bic`, `sepa_reachable` et `sepa_reachable_scope`, ainsi que `vop_coverage`. Un indicateur du pays ne confirme ni la banque ni le compte. Le score de risque se trouve sur l’[endpoint de conformité](/fr/docs/compliance) distinct. |
+| `clearing` | Informations suisses lorsqu’elles sont résolues : `iid`, `sic`, `instant_payments_chf`, `eurosic`, `qr_iid`, `qr_iids` et provenance. Voir le [clearing suisse](/fr/docs/ch-clearing). |
+| `pra_authorisation` | Référence d’autorisation britannique lorsqu’elle est trouvée : `firm_name`, `frn`, `section`, `basis`, `source` et `list_month`. L’absence du bloc ne suffit pas à établir qu’une entreprise n’est pas autorisée. |
+| `official_identity` | Identité complémentaire issue d’une liste officielle d’établissements en cas de correspondance : `name`, `lei`, `address`, `category`, `matched_by`, `source` et `as_of`. Elle ne change pas le verdict IBAN et n’identifie pas le titulaire du compte. |
+| `reference_check` | Constat distinct lorsqu’une référence de paiement est fournie à cette route. Une référence valide ne rend pas valides l’IBAN ou le paiement. Voir les [références de paiement](/fr/docs/swiss-qr-iban). |
+| `next_steps` | Suites proposées avec `code`, `do`, `because` et `action`. Appliquer vos autorisations, particulièrement avant un appel payant. |
+| `cost_usdc`, `processing_ms` | Coût indiqué et durée de traitement. Cette route de validation indique `cost_usdc: 0` lorsqu’elle répond avec une clé ou sur l’essai REST ; du quota ou des crédits peuvent néanmoins être consommés. |
+| `attribution` | Mention de crédit sur les réponses d’une clé gratuite. Suivre `required`, `text`, `url` et `note` lorsque les résultats sont montrés à des personnes. |
+| `trial` | Compteurs d’une réponse effectivement servie sur l’essai REST sans clé ; absent lorsqu’une clé est utilisée. |
+
+Conserver les champs de source et de date avec les constats enregistrés. Les noms varient selon la source : `bank_code_check` utilise `register`, et le bloc PRA utilise `list_month`. Les [sources de données](/fr/docs/data-sources) détaillent couverture et attribution.
+
 ## 4. Tester un petit lot
 
 La seconde entrée ci-dessous change seulement la clé de contrôle : elle doit produire un verdict invalide. Le corps JSON est complet, sans élément de remplissage à remplacer.

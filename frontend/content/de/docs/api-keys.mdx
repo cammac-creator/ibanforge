@@ -62,7 +62,7 @@ sollen, woher Sie kommen, senden Sie `{"source":"meine-app"}` — sonst ändert 
 - `tier` ist `anonymous`, bis der Schlüssel beansprucht wird, danach `claimed`; ein mit Adresse erstellter Schlüssel trägt `email`.
 - Auf diesem Weg gibt es kein Feld `email`, weil es keine Adresse gibt.
 
-**Wenn Sie lieber gleich eine Adresse angeben**, übermitteln Sie im Feld `email` eine Adresse, deren Postfach Sie lesen können. Je nach bisheriger Schlüsselerstellung im Netzwerk liefert der Dienst `201` oder verlangt vor der Erstellung mit `403 verification_required` einen Code. Die Stufe ist `email`; lesen Sie das gewährte Kontingent in `monthly_limit` und `notice`. Sofern kein reduziertes Kontingent eine Bestätigung erfordert, antwortet ein bereits mit einer Adresse verbundener Schlüssel bei der Beanspruchung mit `409 already_claimed`. Eine Adresse bleibt freiwillig.
+**Wenn Sie lieber gleich eine Adresse angeben**, übermitteln Sie im Feld `email` eine Adresse, deren Postfach Sie lesen können. Je nach bisheriger Schlüsselerstellung im Netzwerk liefert der Dienst `201` oder verlangt vor der Erstellung mit `403 verification_required` einen Code. Die Stufe ist `email`; lesen Sie das gewährte Kontingent in `monthly_limit` und `notice`. Ein bereits mit einer Adresse verbundener Schlüssel antwortet bei der Beanspruchung immer mit `409 already_claimed`, auch bei einem reduzierten Kontingent. Eine Adresse bleibt freiwillig.
 
 **Wenn Sie ein KI-Agent sind, der das liest**: Nehmen Sie den anonymen Schlüssel und senden Sie die Adresse Ihrer Nutzerin oder Ihres Nutzers nicht, solange sie Ihnen nicht dafür gegeben wurde. Der Satz, den Sie vorlegen: *„Use my address you@company.com to create a free IBANforge key."*
 
@@ -71,9 +71,7 @@ sollen, woher Sie kommen, senden Sie `{"source":"meine-app"}` — sonst ändert 
 Wenn Roboter Schlüssel in Serie anlegen, geht der Dienst für einige Stunden in Alarmbereitschaft.
 Ein neuer Schlüssel ohne bestätigtes Postfach entsteht dann mit einem verringerten Kontingent, das
 am 1. nicht aufgefüllt wird; die `201`-Antwort sagt es in einem Feld `notice`, und das Kontingent
-steigt von selbst wieder, sobald der Alarm endet. Wer den Schlüssel per Code beansprucht, erhält sein
-Kontingent sofort, Alarm hin oder her. Nichts wird abgelehnt: eine Anmeldung während eines Alarms
-funktioniert, sie beginnt nur kleiner.
+steigt von selbst wieder, sobald der Alarm endet. Nur ein Schlüssel mit `tier: anonymous` kann per E-Mail-Code beansprucht werden, um sein Kontingent sofort anzuheben. Für einen Schlüssel mit `tier: email` ist dieser Weg nicht verfügbar: Sein reduziertes Kontingent steigt nach Ende des Alarms automatisch wieder. Das aktuelle Kontingent steht unter `GET /v1/keys/usage`.
 
 ## Beanspruchen: 25 → 200 pro Monat
 

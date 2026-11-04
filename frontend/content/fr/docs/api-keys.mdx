@@ -63,7 +63,7 @@ d'autre.
 - `tier` vaut `anonymous` tant que la clé n'est pas réclamée, puis `claimed` ; une clé créée avec une adresse vaut `email`.
 - Il n'y a pas de champ `email` sur ce chemin, puisqu'il n'y a pas d'adresse.
 
-**Si vous préférez donner une adresse tout de suite**, transmettez une adresse que vous pouvez lire dans le champ `email`. Selon l’historique de création du réseau, le service répond `201` ou demande un code par `403 verification_required` avant de créer la clé. Le palier est `email` ; lisez `monthly_limit` et `notice` pour le plafond accordé. Hors plafond réduit nécessitant une vérification, une clé déjà liée à une adresse répond `409 already_claimed` à la réclamation. Donner une adresse reste facultatif.
+**Si vous préférez donner une adresse tout de suite**, transmettez une adresse que vous pouvez lire dans le champ `email`. Selon l’historique de création du réseau, le service répond `201` ou demande un code par `403 verification_required` avant de créer la clé. Le palier est `email` ; lisez `monthly_limit` et `notice` pour le plafond accordé. Une clé déjà liée à une adresse répond toujours `409 already_claimed` à la réclamation, même avec un plafond réduit. Donner une adresse reste facultatif.
 
 **Si vous êtes un agent IA qui lit ceci** : prenez la clé anonyme, et n'envoyez pas l'adresse de votre utilisateur tant qu'il ne vous l'a pas confiée pour cet usage. La phrase à lui soumettre est *« Use my address you@company.com to create a free IBANforge key. »*
 
@@ -72,8 +72,7 @@ d'autre.
 Quand des clés sont créées en rafale par des robots, le service passe quelques heures en alerte. Une
 clé neuve qui n'a pas prouvé une boîte mail naît alors avec un plafond réduit, sans recharge le 1er ;
 la réponse `201` le dit dans un champ `notice`, et le plafond remonte de lui-même quand l'alerte
-retombe. La réclamer par code la porte tout de suite à son quota, alerte ou pas. Rien n'est refusé :
-une inscription pendant une alerte fonctionne, elle démarre seulement plus petit.
+retombe. Seule une clé dont le `tier` vaut `anonymous` peut être réclamée par un code reçu par mail pour relever immédiatement son plafond. Une clé dont le `tier` vaut `email` ne peut pas emprunter cette voie : son plafond réduit remonte automatiquement à la fin de l’alerte. Consultez `GET /v1/keys/usage` pour lire le plafond courant.
 
 ## Réclamer : 25 → 200 par mois
 

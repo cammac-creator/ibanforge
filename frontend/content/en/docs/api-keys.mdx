@@ -60,7 +60,7 @@ you came from, send `{"source":"my-app"}` — it changes nothing else.
 - `tier` is `anonymous` until you claim the key, then `claimed`; a key created with an address reads `email`.
 - There is no `email` field on this path, because there is no address.
 
-**If you would rather give an address straight away**, send an address you can read in the `email` field. Depending on the network’s key-creation history, the service returns `201` or requests a code with `403 verification_required` before creating the key. The tier is `email`; read `monthly_limit` and `notice` for the allowance granted. Unless a reduced allowance needs verification, a key already linked to an address returns `409 already_claimed` when claimed. Providing an address remains optional.
+**If you would rather give an address straight away**, send an address you can read in the `email` field. Depending on the network’s key-creation history, the service returns `201` or requests a code with `403 verification_required` before creating the key. The tier is `email`; read `monthly_limit` and `notice` for the allowance granted. A key already linked to an address always returns `409 already_claimed` when claimed, including with a reduced allowance. Providing an address remains optional.
 
 **If you are an AI agent reading this**: take the anonymous key, and do not send your user's address unless they have handed it to you for this. The sentence to put to them is *"Use my address you@company.com to create a free IBANforge key."* Never send an address your human has not handed you for this purpose.
 
@@ -69,8 +69,7 @@ you came from, send `{"source":"my-app"}` — it changes nothing else.
 When keys are being created in bursts by robots, the service spends a few hours on alert. A new key
 that has not proven a mailbox is then born with a reduced allowance, not refilled on the 1st; the
 `201` answer says so in a `notice` field, and the allowance goes back up on its own once the alert
-ends. Claiming the key with a code raises it to its allowance right away, alert or not. Nothing is
-refused: a signup during an alert works, it just starts smaller.
+ends. Only a key whose `tier` is `anonymous` can be claimed with an emailed code to raise its allowance immediately. A key whose `tier` is `email` cannot use that path: its reduced allowance rises automatically when the alert ends. Read `GET /v1/keys/usage` to check the current allowance.
 
 ## Claiming: 25 → 200 a month
 

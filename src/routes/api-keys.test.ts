@@ -17,6 +17,8 @@ import {
 } from '../lib/key-creation-guard.js';
 import { Hono } from 'hono';
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 function makeApp() {
   const app = new Hono();
@@ -1859,16 +1861,37 @@ describe('POST /v1/keys/claim', () => {
     expect(((await b.json()) as { error: string }).error).toBe('verification_unavailable');
   });
 
-  it('une clé qui n’est plus anonyme : 409 already_claimed', async () => {
-    const withEmail = generateApiKey(`held-${RUN_TAG}@alpha-corp.example.net`);
-    if (!withEmail) throw new Error('mint impossible');
-    fakeUsage(withEmail.key_hash, 5);
-    const res = await claim(makeApp(), withEmail.api_key, {
-      email: `held-${RUN_TAG}@alpha-corp.example.net`,
-    });
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { error: string }).error).toBe('already_claimed');
-  });
+  it.each([200, 5])(
+    'une clé email avec un plafond de %i refuse la réclamation, comme le disent les trois guides',
+    async (limit) => {
+      const email = `held-${limit}-${RUN_TAG}@alpha-corp.example.net`;
+      const withEmail = generateApiKey(email, limit);
+      if (!withEmail) throw new Error('Création de la clé fictive impossible');
+      fakeUsage(withEmail.key_hash, 1);
+      expect(getKeyTier(withEmail.key_hash)?.tier).toBe('email');
+      expect(validateApiKey(withEmail.api_key).monthlyLimit).toBe(limit);
+
+      // Même réduite, une clé email est refusée avant toute vérification du
+      // code. La documentation ne doit pas inventer d'exception à ce 409.
+      for (const code of [undefined, '123456']) {
+        const res = await claim(makeApp(), withEmail.api_key, { email, code });
+        expect(res.status).toBe(409);
+        expect(((await res.json()) as { error: string }).error).toBe('already_claimed');
+      }
+      const statements = {
+        en: 'A key already linked to an address always returns `409 already_claimed` when claimed, including with a reduced allowance.',
+        fr: 'Une clé déjà liée à une adresse répond toujours `409 already_claimed` à la réclamation, même avec un plafond réduit.',
+        de: 'Ein bereits mit einer Adresse verbundener Schlüssel antwortet bei der Beanspruchung immer mit `409 already_claimed`, auch bei einem reduzierten Kontingent.',
+      };
+      for (const [lang, statement] of Object.entries(statements)) {
+        const doc = readFileSync(
+          join(import.meta.dirname, '../../frontend/content', lang, 'docs/api-keys.mdx'),
+          'utf8',
+        );
+        expect(doc, lang).toContain(statement);
+      }
+    },
+  );
 
   it('rail complet : le bon code promeut la clé, et /usage le dit', async () => {
     const app = makeApp();

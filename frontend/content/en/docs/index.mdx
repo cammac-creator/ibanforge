@@ -72,19 +72,23 @@ The [validation reference](/docs/iban-validate) explains the fields; the [error 
 
 HTTPS base: `https://api.ibanforge.com`. The complete contract is available in the [OpenAPI reference](/openapi) and [Postman collection](/ibanforge-postman.json).
 
-| Route | Purpose | Access |
-|---|---|---|
-| `POST /v1/iban/validate` | Structure and references for one IBAN | Keyless trial on this route, then a key or authorised paid access |
-| `POST /v1/iban/batch` | Up to 100 IBANs, one result per input | One quota unit per IBAN |
-| `GET /v1/bic/:code` | BIC lookup | Key or authorised paid access |
-| `GET /v1/ch/clearing/:iid` | Swiss clearing reference | Key or authorised paid access |
-| `POST /v1/iban/compliance` | Institution and country indicators | Key or authorised paid access; no payee screening |
-| `GET` or `POST /v1/iban/format` | Structure and checksum without bank lookup | Free, no key |
-| `GET` or `POST /v1/reference/validate` | Checksum of supported payment references | Free, no key |
-| `POST /v1/address/check` | Address format under the requested scheme and its sourced rules | Free, no key |
-| `POST /v1/ch/qr-bill/check` | Swiss QR-bill payload structure | Free, no key |
-| `POST /v1/audit/upload` | CSV or Excel file review | Free preview; full report at the displayed price |
-| `GET /v1/demo` | Public response examples | Free; does not test a key |
-| `GET /health` | Public service status | Free |
+The x402 prices below apply only when you choose payment per call. They are not charges added to the REST trial or calls covered by a key’s quota or prepaid credits. See [x402](/docs/x402) for payment and [pricing](/pricing) for the current offers.
+
+| Route | Purpose | Access | x402 |
+|---|---|---|---|
+| [`POST /v1/iban/validate`](/docs/iban-validate) | Structure and references for one IBAN | Keyless trial on this route, then a key or authorised paid access | 0.005 USDC |
+| [`POST /v1/iban/batch`](/docs/iban-batch) | Up to 100 IBANs, one result per input | One quota unit per IBAN | 0.002 USDC / IBAN |
+| [`GET /v1/bic/:code`](/docs/bic-lookup) | BIC lookup | Key or authorised paid access | 0.003 USDC |
+| [`GET /v1/ch/clearing/:iid`](/docs/ch-clearing) | Swiss clearing reference | Key or authorised paid access | 0.003 USDC |
+| [`POST /v1/iban/compliance`](/docs/compliance) | Institution and country indicators | Key or authorised paid access; no payee screening | 0.02 USDC |
+| [`GET` or `POST /v1/iban/format`](/openapi) | Structure and checksum without bank lookup | Free, no key | 0 |
+| [`GET` or `POST /v1/reference/validate`](/docs/swiss-qr-iban) | Checksum of supported payment references | Free, no key | 0 |
+| [`POST /v1/address/check`](/docs/structured-addresses) | Address format under the requested scheme and its sourced rules | Free, no key | 0 |
+| [`POST /v1/ch/qr-bill/check`](/docs/swiss-qr-iban) | Swiss QR-bill payload structure | Free, no key | 0 |
+| [`POST /v1/audit/upload`](/audit) | CSV or Excel file review | Free preview; full report at the displayed price | Separate file price |
+| [`GET /v1/demo`](/docs/onboarding) | Public response examples | Free; does not test a key | 0 |
+| [`GET /health`](https://api.ibanforge.com/health) | Public service status | Free | 0 |
+
+Prepaid packs: **1,000 credits = $4; 5,000 = $20; 25,000 = $80**. Credits do not expire; a validation or lookup uses one credit, and a batch uses one per IBAN. Card checkout and USDC options are described on [pricing](/pricing). The file audit has its own price based on file size, shown with the free preview; it is not included in these per-call prices.
 
 [Pricing](/pricing) and [access limits](/docs/api-keys) describe the plans. A `402` response explains available options; it does not give an automation permission to buy credits or make a payment.

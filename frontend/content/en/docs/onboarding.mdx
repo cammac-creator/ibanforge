@@ -96,6 +96,34 @@ curl --silent --show-error --include \
 
 Invalid responses and different countries do not all include the same blocks. Handle missing fields and `null` values; follow the [validation reference](/docs/iban-validate) and [data sources](/docs/data-sources). Account-holder matching belongs to the bank's [Verification of Payee](/docs/vop) process.
 
+
+### Response reference, block by block
+
+Availability depends on the input, country and sources actually consulted. In particular, an early invalid verdict can omit enrichment. Missing blocks and `null` values are not negative findings.
+
+| Block or fields | Meaning and limits |
+|---|---|
+| `iban`, `valid`, `error`, `error_detail` | Normalized input, verdict and reason. An invalid IBAN can still receive HTTP `200`. |
+| `country`, `check_digits`, `bban`, `formatted` | Parsed country, check digits, national components and display grouping, when parsing succeeds. |
+| `checks` | Separate structure, checksum, bank-code and national-account checks. `account_exists` and `payee_name` remain `not_checked`. |
+| `bic` | Resolved institution with `source`, `as_of`, `basis` and `authoritative`; may include `lei`, `lei_status`, `address` and `postal_address`. A source date does not prove that an account is open. |
+| `bank_code_check`, `bank_code_holder` | Read `status`, `reason`, `match`, `register`, `authoritative`, `institution` and `as_of`, where supplied. `bank_code_holder` distinguishes the holder finding; a missing entry in a partial source is not proof that a code is unallocated. |
+| `issuer` | Institution type and its classification basis, when identified. It describes the institution, not the beneficiary. |
+| `sepa` | `member` describes the country. `schemes` and `basis` can describe a country default or an EPC register result; use `bank_reachability` and `bank_schemes` for the bank finding. Missing or `null` bank data is not a confirmed refusal. |
+| `sepa.vop_required`, `risk_indicators.vop_coverage` | Country-level coverage indicators. Neither checks a beneficiary name. |
+| `sepa.vop_participant`, `sepa.vop_register_status` | Institution participation and status in the consulted VoP register. `null` means the response could not establish the institution finding. Read the [VoP reference](/docs/vop). There is no top-level `vop` block in this validation response. |
+| `risk_indicators` | `issuer_type`, `country_risk`, `test_bic`, `sepa_reachable` and `sepa_reachable_scope`, plus `vop_coverage`. A country-level indicator is not bank or account confirmation. The risk score is on the separate [compliance endpoint](/docs/compliance). |
+| `clearing` | Swiss clearing information when resolved: `iid`, `sic`, `instant_payments_chf`, `eurosic`, `qr_iid`, `qr_iids` and provenance. See [Swiss clearing](/docs/ch-clearing). |
+| `pra_authorisation` | UK authorisation reference when found: `firm_name`, `frn`, `section`, `basis`, `source` and `list_month`. An absent block does not itself establish an unauthorised firm. |
+| `official_identity` | Additional identity from an official institution list when matched: `name`, `lei`, `address`, `category`, `matched_by`, `source` and `as_of`. It does not change the IBAN verdict or identify the account holder. |
+| `reference_check` | Separate finding when a payment reference is supplied to this route. Reference validity does not make the IBAN or payment valid. See [payment references](/docs/swiss-qr-iban). |
+| `next_steps` | Proposed follow-up actions with `code`, `do`, `because` and `action`. Apply your own permissions, especially before a paid call. |
+| `cost_usdc`, `processing_ms` | Reported call cost and processing duration. This validation route reports `cost_usdc: 0` when served using a key or the REST trial; quota or credits can still be consumed. |
+| `attribution` | Credit information on free-key responses. Follow `required`, `text`, `url` and `note` when displaying the result to people. |
+| `trial` | Counters on a response actually served through the keyless REST trial; absent when a key is used. |
+
+Keep the source and date fields alongside the findings you store. Field names differ by source: for example, `bank_code_check` uses `register` and the PRA block uses `list_month`. See [data sources](/docs/data-sources) for coverage and attribution.
+
 ## 4. Try a small batch
 
 The second entry below changes only the check digits and should return an invalid verdict. The JSON body is complete, with no filler entry to replace.
