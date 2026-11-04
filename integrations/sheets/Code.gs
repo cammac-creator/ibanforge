@@ -1,27 +1,23 @@
 /**
- * IBANforge for Google Sheets: check a column of IBANs against the bank
- * registers behind api.ibanforge.com, from custom functions.
+ * Fonctions IBANforge pour Google Sheets, installation manuelle par Apps Script.
+ * IBAN_VALID : résultat valid de l'API, pas existence du compte.
+ * IBAN_BANK : nom lié au BIC, sinon établissement du contrôle du code banque.
+ * IBAN_BIC : BIC résolu, cellule vide si absent.
+ * IBAN_CHECK : cinq colonnes, résumé sans les dates et détails de source.
  *
- *   =IBAN_VALID(A2:A200)   TRUE / FALSE, one row per cell
- *   =IBAN_BANK(A2:A200)    the institution the register names for the bank code
- *   =IBAN_BIC(A2:A200)     the BIC, empty when no register pairs one
- *   =IBAN_CHECK(A2:A200)   five columns: valid, bank, BIC, bank-code verdict, SEPA
- *
- * French and German aliases: IBAN_VALIDE / IBAN_BANQUE / IBAN_CONTROLE and
- * IBAN_GUELTIG / IBAN_BANKNAME / IBAN_PRUEFUNG. Same code path.
- *
- * Billing: the user's own IBANforge key (25 requests/month without email; claim the same key for 200/month, no
- * card; then prepaid packs or the Pro plan). One request per IBAN, sent in
- * batches of 100 to POST /v1/iban/batch. Results are cached for six hours per
- * user, so a recalculated sheet does not pay twice for the same IBAN.
- *
- * Nothing leaves the sheet except the IBAN strings the functions receive; the
- * key lives in the user's own script properties, never in the spreadsheet.
+ * Une clé est nécessaire pour les valeurs absentes du cache. Les chaînes reçues,
+ * la clé d'authentification et source=sheets sont transmis par les serveurs Google.
+ * Les valeurs normalisées sont dédoublonnées dans une exécution, puis envoyées
+ * par lots de 100 au plus. Chaque IBAN envoyé compte, même s'il est invalide.
+ * Le cache demandé dure six heures au plus ; Google peut l'effacer plus tôt.
+ * Les formules simultanées et les nouvelles tentatives peuvent consommer à nouveau.
+ * En classeur partagé, les propriétés lues par la fonction sont celles du propriétaire :
+ * ne pas supposer une clé ou un quota isolé pour chaque collaborateur.
  */
 
 var IBF_API = 'https://api.ibanforge.com';
 var IBF_BATCH = 100;
-var IBF_CACHE_SECONDS = 21600; // six hours, the maximum CacheService allows
+var IBF_CACHE_SECONDS = 21600; // Six heures demandées, sans garantie de conservation par Google.
 var IBF_CACHE_PREFIX = 'ibf:v1:';
 var IBF_KEY_PROP = 'IBANFORGE_API_KEY';
 var IBF_SOURCE = 'sheets';
@@ -52,10 +48,10 @@ function ibfShowHelp() {
   ui.alert(
     'IBANforge functions',
     '=IBAN_VALID(A2:A200)  TRUE / FALSE\n' +
-      '=IBAN_BANK(A2:A200)   bank named by the register\n' +
+      '=IBAN_BANK(A2:A200)   resolved bank name, if available\n' +
       '=IBAN_BIC(A2:A200)    BIC\n' +
       '=IBAN_CHECK(A2:A200)  valid, bank, BIC, bank-code verdict, SEPA\n\n' +
-      'One request per IBAN: 25/month without email, 200/month after claiming. Results are cached for six hours.',
+      'An API key is required. Each IBAN sent consumes one unit. Cache eviction or recalculation can consume again. See ibanforge.com/pricing and your key usage. Results are for review, not payment approval.',
     ui.ButtonSet.OK
   );
 }
@@ -107,7 +103,7 @@ function ibfFetchUsage_(key) {
 // ---------------------------------------------------------------------------
 
 /**
- * Checks IBANs against the bank registers behind IBANforge and returns TRUE or FALSE.
+ * Renvoie le résultat valid de l'API ; ne confirme pas l'existence du compte.
  *
  * @param {A2:A200} input A cell or a range of IBANs (spaces allowed).
  * @return {boolean} TRUE when the IBAN is structurally valid, one row per cell.
@@ -120,10 +116,10 @@ function IBAN_VALID(input) {
 }
 
 /**
- * Returns the institution the national register names for the IBAN's bank code.
+ * Renvoie le nom associé au BIC, sinon celui de l'établissement du code banque.
  *
  * @param {A2:A200} input A cell or a range of IBANs.
- * @return {string} Bank name, empty when no register names one.
+ * @return {string} Nom de banque disponible, sinon cellule vide.
  * @customfunction
  */
 function IBAN_BANK(input) {
@@ -131,10 +127,10 @@ function IBAN_BANK(input) {
 }
 
 /**
- * Returns the BIC paired with the IBAN's bank code by the register.
+ * Renvoie le BIC résolu par l'API, quelle que soit sa source disponible.
  *
  * @param {A2:A200} input A cell or a range of IBANs.
- * @return {string} BIC, empty when no register pairs one.
+ * @return {string} BIC disponible, sinon cellule vide.
  * @customfunction
  */
 function IBAN_BIC(input) {
@@ -144,7 +140,7 @@ function IBAN_BIC(input) {
 }
 
 /**
- * Full check in five columns: valid, bank, BIC, bank-code verdict, SEPA.
+ * Résumé en cinq colonnes : valid, banque, BIC, statut du code banque, SEPA.
  *
  * @param {A2:A200} input A cell or a range of IBANs.
  * @return {Array} Five columns per row.
@@ -270,7 +266,7 @@ function ibfResolve_(ibans) {
 
   var key = PropertiesService.getUserProperties().getProperty(IBF_KEY_PROP);
   if (!key) {
-    throw new Error('IBANforge: no API key yet. Extensions > IBANforge > Set up API key (25/month without email; 200/month after claiming).');
+    throw new Error('IBANforge: no API key yet. Run ibfShowSidebar in Apps Script to save your key. See ibanforge.com/docs/api-keys for access and the effective quota.');
   }
   var toCache = {};
   for (var i = 0; i < missing.length; i += IBF_BATCH) {

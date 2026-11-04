@@ -2934,29 +2934,29 @@
   },
   "sheets": {
     "metaTitle": "IBANforge pour Google Sheets",
-    "metaDescription": "Quatre formules qui contrôlent une colonne d'IBAN contre les registres bancaires : valide, banque, BIC, verdict du code banque, SEPA. Votre propre clé, 25 contrôles par mois gratuits sans adresse.",
-    "eyebrow": "Add-on Google Sheets",
+    "metaDescription": "Quatre formules pour examiner le format des IBAN et les références bancaires disponibles dans Google Sheets. Installation manuelle, clé API et guide d'essai.",
+    "eyebrow": "Script pour Google Sheets",
     "title": "Contrôler une colonne d'IBAN depuis une formule",
-    "intro": "=IBAN_CONTROLE(A2:A200) remplit cinq colonnes à côté de vos IBAN : valide, la banque que le registre nomme, le BIC, le verdict du code banque et la portée SEPA. Par lots de 100, en cache six heures, sur votre propre clé IBANforge.",
+    "intro": "=IBAN_CONTROLE(A2:A7) remplit cinq colonnes : validité de l'IBAN, banque disponible, BIC, statut du code banque et information SEPA. Une clé IBANforge est nécessaire ; commencez dans un classeur de test dont vous êtes propriétaire.",
     "cta": {
       "key": "Obtenir une clé gratuite",
       "source": "Lire le code sur GitHub"
     },
     "functions": {
       "0": {
-        "formula": "=IBAN_VALIDE(A2:A200)",
-        "returns": "VRAI ou FAUX, une ligne par cellule"
+        "formula": "=IBAN_VALIDE(A2:A7)",
+        "returns": "VRAI ou FAUX : résultat valid de l’API, pas existence du compte"
       },
       "1": {
-        "formula": "=IBAN_BANQUE(A2:A200)",
-        "returns": "l'établissement que le registre national nomme pour le code banque"
+        "formula": "=IBAN_BANQUE(A2:A7)",
+        "returns": "nom lié au BIC, sinon établissement trouvé par le contrôle du code banque"
       },
       "2": {
-        "formula": "=IBAN_BIC(A2:A200)",
-        "returns": "le BIC que le registre apparie au code banque, vide s'il n'y en a pas"
+        "formula": "=IBAN_BIC(A2:A7)",
+        "returns": "BIC résolu par l’API, vide si absent"
       },
       "3": {
-        "formula": "=IBAN_CONTROLE(A2:A200)",
+        "formula": "=IBAN_CONTROLE(A2:A7)",
         "returns": "cinq colonnes : valide, banque, BIC, verdict du code banque, SEPA"
       },
       "title": "Les quatre fonctions",
@@ -2964,25 +2964,28 @@
     },
     "install": {
       "title": "Installer",
-      "status": "L'add-on n'est pas encore sur le Google Workspace Marketplace : il n'y a donc pas de bouton de boutique. Le script est open source et s'installe à la main en cinq minutes :",
+      "status": "Le script est open source et s'installe à la main. Il n'est pas publié sur le Google Workspace Marketplace. Une copie installée ne se met pas à jour automatiquement.",
       "steps": {
-        "0": "Dans votre feuille : Extensions, puis Apps Script.",
-        "1": "Collez Code.gs et Sidebar.html depuis le dossier GitHub, ainsi que le manifeste appsscript.json (Paramètres du projet, afficher le manifeste).",
-        "2": "Rechargez la feuille : un menu Extensions, IBANforge, Set up API key apparaît. Collez-y votre clé.",
-        "3": "Tapez =IBAN_CONTROLE(A2:A200) à côté d'une colonne d'IBAN."
+        "0": "Dans un classeur de test à vous : Extensions, puis Apps Script.",
+        "1": "Ajoutez Code.gs, le fichier HTML Sidebar et le manifeste appsscript.json fournis dans le kit du guide.",
+        "2": "Exécutez ibfShowSidebar depuis l’éditeur, examinez les autorisations et enregistrez votre clé dans la barre latérale, jamais dans une cellule.",
+        "3": "Avec les exemples en A2:A7, laissez B2:F7 vide et placez =IBAN_CONTROLE(A2:A7) en B2."
       }
     },
     "billing": {
       "title": "Ce que ça coûte, ce que ça envoie",
-      "text": "Une requête par IBAN, sur votre propre clé : 25 par mois gratuites sans donner d'adresse, 200 par mois une fois la clé réclamée, puis des packs prépayés ou l'abonnement Pro à 29 dollars par mois pour 10 000. Les résultats sont gardés six heures en cache par utilisateur, donc recalculer une feuille ne paie pas deux fois.",
-      "privacy": "Rien ne sort de la feuille sauf les chaînes IBAN que les fonctions reçoivent ; la clé reste dans vos propres propriétés de script, jamais dans la feuille.",
+      "text": "Chaque IBAN transmis compte pour une unité, même invalide. Les doublons sont regroupés dans une même exécution ; les valeurs absentes du cache partent par lots de 100 au plus. Google peut supprimer le cache avant les six heures demandées : un recalcul peut consommer à nouveau. Consultez l’usage de la clé et les tarifs applicables. Aucun achat automatique.",
+      "privacy": "Les chaînes données à la formule et la clé d’authentification sont transmises par Google Apps Script à api.ibanforge.com avec source=sheets ; la barre latérale consulte aussi le quota. La clé est stockée dans les propriétés utilisateur. Les fonctions lisent celles du propriétaire et les éditeurs peuvent modifier le script : le partage ne garantit pas une clé isolée par collaborateur.",
       "privacyLink": "Politique de confidentialité",
-      "limits": "IBANforge n'est pas un service de Verification of Payee et n'affirme jamais qu'un compte appartient à une personne : il dit ce que les registres savent de la banque derrière l'IBAN."
+      "limits": "Les cinq colonnes ne conservent pas les dates ni la provenance détaillée. Un résultat absent reste à examiner. IBANforge ne confirme ni l’existence du compte, ni son titulaire, ni le succès d’un paiement.",
+      "keyLink": "Clé et quota effectif",
+      "pricingLink": "Tarifs",
+      "guideLink": "Guide des résultats"
     },
     "example": {
-      "title": "Essayer sur deux IBAN de test",
-      "body": "Importez l’exemple de documentation et sa variante invalide, puis vérifiez les cinq colonnes de résultat.",
-      "cta": "Installation et exemple téléchargeable"
+      "title": "Essayer une petite liste",
+      "body": "Six lignes de documentation pour voir le traitement des doublons, des cellules vides et des erreurs.",
+      "cta": "Guide d’installation et d’interprétation"
     }
   },
   "registers": {

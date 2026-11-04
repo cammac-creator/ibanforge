@@ -1,87 +1,48 @@
 # IBANforge for Google Sheets
 
-An Editor add-on: four custom functions that check a column of IBANs against the bank
-registers behind `api.ibanforge.com`, on the user's own IBANforge key (25 requests/month without email; claim the same key for 200/month, no card; then prepaid packs or the Pro plan).
+Four custom functions for reviewing IBAN format and available bank references beside your original data. This is an open-source Apps Script installed manually, not a published Google Workspace Marketplace add-on.
 
 | Function | Returns |
 |---|---|
-| `=IBAN_VALID(A2:A200)` | TRUE / FALSE, one row per cell |
-| `=IBAN_BANK(A2:A200)` | the institution the national register names for the bank code |
-| `=IBAN_BIC(A2:A200)` | the BIC the register pairs with the bank code, empty when none |
-| `=IBAN_CHECK(A2:A200)` | five columns: valid, bank, BIC, bank-code verdict, SEPA |
+| `=IBAN_VALID(A2:A7)` | The API's `valid` value, not proof of account existence |
+| `=IBAN_BANK(A2:A7)` | Name associated with the BIC, otherwise the institution from the bank-code check; blank if absent |
+| `=IBAN_BIC(A2:A7)` | Resolved BIC, blank if absent |
+| `=IBAN_CHECK(A2:A7)` | Five columns: valid, bank, BIC, bank-code status, SEPA |
 
-Aliases: `IBAN_VALIDE`, `IBAN_BANQUE`, `IBAN_CONTROLE` (French) and `IBAN_GUELTIG`,
-`IBAN_BANKNAME`, `IBAN_PRUEFUNG` (German). One code path.
+Aliases: `IBAN_VALIDE`, `IBAN_BANQUE`, `IBAN_CONTROLE` (French), `IBAN_GUELTIG`, `IBAN_BANKNAME`, `IBAN_PRUEFUNG` (German). `IBAN_CHECK` accepts one input column and preserves empty rows. Its compact result omits source dates, `authoritative`, detailed provenance and successor codes. Keep the full API response when those details are needed for a review. No function confirms account ownership or approves a payment.
 
-**Billing and privacy.** One request per IBAN, sent in batches of 100 to
-`POST /v1/iban/batch` with `?source=sheets`. Results are cached six hours per user
-(`CacheService.getUserCache`), so a recalculated sheet does not pay twice. The key is stored in
-the user's own script properties, never in the spreadsheet. Nothing leaves the sheet but the IBAN
-strings the functions receive. Scopes: `spreadsheets.currentonly`, `script.container.ui`,
-`script.external_request`; `urlFetchWhitelist` pins the API host.
+## Install a test copy
 
-## Files
+Use a spreadsheet you own and documentation examples first. Follow the [installation and result guide](https://ibanforge.com/blog/2026-09-29-check-iban-list-google-sheets?src=sheets): create `Code.gs`, the HTML file `Sidebar`, and the supplied `appsscript.json` in **Extensions → Apps Script**. Run `ibfShowSidebar`, review the requested permissions and authorize if appropriate. Enter the key in the sidebar, never a cell. Put `=IBAN_CHECK(A2:A7)` in B2 with B2:F7 empty.
 
-- `appsscript.json`: manifest (scopes, whitelist, V8).
-- `Code.gs`: menu, sidebar server side, the four functions, cache and batching.
-- `Sidebar.html`: the key screen (test, save, remove, usage line).
+The batch route requires an API key. [Key access](https://ibanforge.com/docs/api-keys?src=sheets), [pricing](https://ibanforge.com/pricing?src=sheets), and the usage report describe the effective allowance and paid options. There is no automatic purchase. Installed copies do not update automatically.
 
-## Test without a Google account
+## Calls and data
 
-The logic runs under Node with the Apps Script services stubbed:
+The script removes spaces, uppercases strings, skips empty cells and deduplicates within one execution. It sends cache misses in batches of at most 100 to `POST /v1/iban/batch?source=sheets`, consuming one unit per transmitted IBAN, including invalid ones. The requested cache duration is six hours, but [Google may evict entries sooner](https://developers.google.com/apps-script/reference/cache/cache). Concurrent formulas or later recalculation may consume again. A failed later batch can leave earlier calls consumed; the cache is written only after all batches succeed.
 
-```bash
-cd integrations/sheets
-CODE_GS=./Code.gs node test/harness.cjs canned   # projections, one batch per recalculation, 3 batches for 230 IBANs, missing key
-CODE_GS=./Code.gs node test/harness.cjs live     # a fake key against the real API: request shape and the invalid-key path
-```
+Input strings and the authentication key leave Apps Script for `api.ibanforge.com`; the sidebar also requests key usage. Do not pass names or comments as formula arguments. Calls run on [Google's infrastructure](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app). The manifest scopes are `spreadsheets.currentonly`, `script.container.ui` and `script.external_request`; the declared `urlFetchWhitelist` names the API host.
 
-Last run: 3 September 2026, both modes green.
+The key is saved in user properties. [Custom functions read the spreadsheet owner's properties](https://developers.google.com/apps-script/guides/sheets/functions), and editors can modify the bound script. Do not treat this as isolated credentials for collaborators. A custom function must finish within Google's 30-second limit; start with a small range.
 
-## Install a development copy (any Google account, five minutes)
+## Local logic check
+
+From the repository root, with Node 20 or later:
 
 ```bash
-npm i -g @google/clasp
-clasp login                                   # browser
-cd integrations/sheets
-clasp create --type sheets --title "IBANforge"  # creates a bound script + a test spreadsheet
-clasp push                                    # uploads the three files
-clasp open                                    # opens the script editor; run onOpen once to authorise
+CODE_GS=./integrations/sheets/Code.gs node integrations/sheets/test/harness.cjs canned
 ```
 
-Then, in the test spreadsheet: **Extensions → IBANforge → Set up API key**, paste a key,
-type `=IBAN_CHECK(A2:A20)` next to a column of IBANs.
+This executes the functions with simulated Apps Script services and fictional responses. It does not prove installation, permissions, recalculation or sharing inside a real Google account. The separate `live` harness mode contacts the public API with a fake key; it is not needed for the local check.
 
-## Publish on the Google Workspace Marketplace (Claude-Alain, about 1.5 h, one time)
+## Download and publication
 
-The add-on must belong to a Google Cloud project owned by the publisher's Google account.
-Eight steps, nothing to invent, every text is in `LISTING.md` next to this file:
+From the repository root:
 
-1. [console.cloud.google.com](https://console.cloud.google.com) → **New project** → name
-   `ibanforge-sheets` → create. Note the project number (Dashboard).
-2. Same project → **APIs & Services → OAuth consent screen** → External → app name
-   `IBANforge`, support e-mail, logo `frontend/public/sheets/icon-128.png`, homepage
-   `https://ibanforge.com/sheets`, privacy `https://ibanforge.com/legal/privacy`, terms
-   `https://ibanforge.com/legal/terms`. Scopes: add the three from `appsscript.json`
-   (none is "sensitive" in Google's list, so no security assessment). Publishing status: In production.
-3. **APIs & Services → Library** → enable **Google Workspace Marketplace SDK**.
-4. In the Apps Script editor of the add-on: **Project settings → Google Cloud Platform project**
-   → paste the project number → Set project. Then **Deploy → New deployment → Add-on** →
-   description `IBANforge 1.0` → Deploy. Copy the deployment ID.
-5. Marketplace SDK → **App Configuration**: Public (or Private for a first test), Sheets add-on,
-   script project = the add-on's script ID, deployment = the ID above, version = 1. Save.
-6. Marketplace SDK → **Store listing**: paste the texts from `LISTING.md` (EN default, FR and DE
-   as additional languages), category *Productivity* (or *Business tools*), icons 32/48/96/128/256
-   from `frontend/public/sheets/`, at least one screenshot 1280 × 800 (take it on the test
-   spreadsheet with `=IBAN_CHECK` filled), support link `mailto:support@ibanforge.com`.
-7. **Publish**. Google reviews (they say "several days", in practice one to two weeks); the
-   listing status shows the outcome, and I read it with you.
-8. Once listed: I update `https://ibanforge.com/sheets` with the Marketplace link and the
-   install path, and the docs recipe.
+```bash
+python3 integrations/sheets/export-download.py
+```
 
-Until then the code is open source here; anyone can paste it into their own script project
-(the page on ibanforge.com says exactly that).
+The exporter builds a deterministic ZIP containing `Code.gs`, `Sidebar.html` and `appsscript.json`. Its filename carries the content hash; recipe and article links in all three languages are updated. Previous archives remain available for cached pages. Inspect the diff, run the repository checks and hand the change to the integrator. The exporter does not deploy or publish anything.
 
-## Générer le kit téléchargeable du site
-
-Après une modification des trois fichiers Apps Script, exécuter `python3 integrations/sheets/export-download.py` depuis la racine du dépôt. Le script génère un ZIP déterministe, nomme le fichier avec son empreinte et actualise les liens des recettes FR/EN/DE. Le kit reste une installation manuelle ; il ne publie rien sur le Marketplace.
+`LISTING.md` contains draft descriptions only. A Marketplace release is a separate task: verify the current Google publication requirements, permissions, account ownership and review outcome. This repository does not establish that an OAuth review is unnecessary or that publication will take a particular time. No Marketplace listing or approval is claimed.

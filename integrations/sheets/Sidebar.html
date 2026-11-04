@@ -24,23 +24,28 @@
   </head>
   <body>
     <h1>IBANforge</h1>
-    <p class="muted">Check a column of IBANs against the bank registers. Your own key: 25 checks/month without email; claim the same key for 200/month. No card.</p>
+    <p class="muted">Review IBAN format and available bank references. Save your IBANforge key below; its usage report shows the effective allowance.</p>
 
     <label for="key">API key</label>
     <input id="key" type="password" placeholder="ifk_…" autocomplete="off" />
     <button id="save" onclick="save()">Test and save</button>
     <button class="secondary" onclick="clearKey()">Remove</button>
     <div id="status" class="status">Checking the saved key…</div>
-    <p class="muted" style="margin-top:10px">No key yet? <a href="https://ibanforge.com/?src=sheets" target="_blank" rel="noopener">Get a free one</a> (no e-mail needed, one minute).</p>
+    <p class="muted" style="margin-top:10px">No key yet? <a href="https://ibanforge.com/?src=sheets" target="_blank" rel="noopener">Get a free one</a> (see access options and limits).</p>
 
     <label>Then, in any cell</label>
     <ul>
       <li><code>=IBAN_VALID(A2:A200)</code> TRUE / FALSE</li>
-      <li><code>=IBAN_BANK(A2:A200)</code> bank named by the register</li>
+      <li><code>=IBAN_BANK(A2:A200)</code> resolved bank name, if available</li>
       <li><code>=IBAN_BIC(A2:A200)</code> BIC</li>
       <li><code>=IBAN_CHECK(A2:A200)</code> valid, bank, BIC, verdict, SEPA</li>
     </ul>
-    <p class="muted" style="margin-top:10px">One request per IBAN, sent in batches of 100. Results are cached six hours, so recalculating does not pay twice. French: <code>IBAN_VALIDE</code>, <code>IBAN_BANQUE</code>, <code>IBAN_CONTROLE</code>. German: <code>IBAN_GUELTIG</code>, <code>IBAN_BANKNAME</code>, <code>IBAN_PRUEFUNG</code>.</p>
+    <p class="muted" style="margin-top:10px">Each IBAN sent consumes one unit, in batches of at most 100. Repeated values share a lookup within one execution. The requested six-hour cache may be evicted earlier; recalculation can consume again. French: <code>IBAN_VALIDE</code>, <code>IBAN_BANQUE</code>, <code>IBAN_CONTROLE</code>. German: <code>IBAN_GUELTIG</code>, <code>IBAN_BANKNAME</code>, <code>IBAN_PRUEFUNG</code>.</p>
+
+    <p class="muted">The input strings and API key are sent through Google Apps Script to api.ibanforge.com with source=sheets. Key usage is also requested. The key is stored in user properties, not in a cell.</p>
+    <p class="muted">Use a test spreadsheet you own first. Custom functions read the owner's user properties, and spreadsheet editors can edit the bound script. This is not a separate key or quota for each collaborator.</p>
+    <p class="muted">The five columns omit source dates and detailed provenance. A result is not proof of account existence, ownership or payment success.</p>
+    <p class="muted"><a href="https://ibanforge.com/blog/2026-09-29-check-iban-list-google-sheets?src=sheets" target="_blank" rel="noopener">Installation and result guide</a> · <a href="https://ibanforge.com/pricing?src=sheets" target="_blank" rel="noopener">Pricing</a></p>
 
     <script>
       function show(cls, text) { var s = document.getElementById('status'); s.className = 'status ' + cls; s.textContent = text; }
