@@ -2243,7 +2243,7 @@
       "rows": {
         "pricing": {
           "label": "Preismodell",
-          "ibanforge": "Prepaid-Packs: 4 $ / 1.000 Credits, verfallen nie. Oder 0,002–0,02 $ pro Aufruf (x402). Gratis: 25 pro Monat ohne E-Mail, 200 pro Monat nach Beanspruchung.",
+          "ibanforge": "Prepaid-Pakete: 4 $ / 1.000 Credits ohne Verfall. Auch Pro-Abonnement und x402-Zahlung pro Aufruf verfügbar; Einheiten und Einzelheiten stehen auf der Preisseite.",
           "ibancom": "Jahresabo: 530 €/Jahr (2.000 Lookups) bis 4.150 €/Jahr (unbegrenzt), Mindestlaufzeit 1 Jahr, zzgl. MwSt.",
           "ibanapi": "Vorausbezahlte Credits, die mit dem Plan verfallen: 15 $ für 60 Tage (2'000 Basis + 400 Bankabfragen) bis 115 $ für ein Jahr (30'000 + 5'000).",
           "libs": "Kostenlos, unter Open-Source-Lizenzen. Die Kosten sind Ihre Zeit.",
@@ -2259,7 +2259,7 @@
         },
         "freeTier": {
           "label": "Kostenloses Kontingent",
-          "ibanforge": "25 Anfragen pro Monat ganz ohne E-Mail, 200 pro Monat nach Beanspruchung, keine Karte",
+          "ibanforge": "Test ohne Schlüssel: 25 Prüfungen pro Woche auf POST /v1/iban/validate. Nach Beanspruchung mit verifizierter Adresse erlaubt der Schlüssel 200 Anfragen pro Monat, ohne Karte. Das bei der Erstellung gelieferte Anfangskontingent beachten.",
           "ibancom": "Test mit 100 Anfragen, läuft nach einem Monat ab",
           "ibanapi": "100 Basis- + 20 Bank-Credits pro 30 Tage; der kostenlose Plan verlängert sich automatisch, laut ihrer Preisseite",
           "libs": "Alles kostenlos",
@@ -2267,7 +2267,7 @@
         },
         "bankData": {
           "label": "Bankidentifikation (BIC, Name)",
-          "ibanforge": "121k+ BIC-Einträge (Einträge, nicht Institute): GLEIF und nationale Register, monatlich aktualisiert, etwa zwei Drittel aus einer öffentlichen Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018; 39k+ LEI-angereichert via GLEIF. Jede Validierung nennt die Quelle ihres BIC.",
+          "ibanforge": "BIC, Bankname und Herkunft, sofern verfügbar. GLEIF und nationale Register werden durch eine öffentliche Kopie des SWIFT-Verzeichnisses vom Januar 2018 ergänzt, beim Abruf am 4. November 2026 etwa zwei Drittel der Zeilen. Ein gefundener BIC beweist nicht, dass das Konto existiert.",
           "ibancom": "Ja: IBAN Suite ermittelt BIC und Bankdaten, mit BIC-Daten unter Lizenz von S.W.I.F.T.",
           "ibanapi": "BIC „where available“ laut ihrer Startseite (ihre Dokumentationsseite antwortete bei unserer Prüfung mit 403)",
           "libs": "Je nach Bibliothek: schwifty kann den BIC einer IBAN anhand seiner Bankcodedaten ermitteln.",
@@ -2275,7 +2275,7 @@
         },
         "bankCode": {
           "label": "Bankcode gegen das nationale Register geprüft (fehlt er dort, ist er nicht vergeben)",
-          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI: das nationale Register selbst. Teillisten in FI, SM, LU, EE, ME und RS, wo ein fehlender Code keine Ablehnung ist. Sonst eine zusammengesetzte Zuordnung, gekennzeichnet mit authoritative: false.",
+          "ibanforge": "Vollständige Register für DE, AT, BE, SK, CZ, BG, CH, LI: Ein fehlender Code kann bei verfügbarem Register als nicht zugeteilt gemeldet werden. In einer Teilliste oder zusammengesetzten Zuordnung bleibt ein fehlender Eintrag unbestimmt; Quelle und authoritative beachten.",
           "ibancom": "Von uns nicht geprüft",
           "ibanapi": "Laut ihrer Startseite (24. September 2026): Der Bankcode der IBAN wird mit ihrem eigenen Bankregister abgeglichen (Zentralbanken, SEPA-Daten und manuelle Prüfung). Ob ein dort fehlender Code nicht vergeben ist: von uns nicht geprüft.",
           "libs": "Je nach Bibliothek: schwifty lehnt einen Bankcode ab, den sein mitgeliefertes Register nicht kennt. Andere von uns nicht geprüft.",
@@ -2283,7 +2283,7 @@
         },
         "swiss": {
           "label": "Schweizer Clearing-Tiefe (SIC / euroSIC / QR-IID)",
-          "ibanforge": "1,100+ SIX-BankMaster-Einträge, Instant-Rail-Teilnahme, QR-IID-Semantik",
+          "ibanforge": "SIX-BankMaster-Daten: IID, SIC-/euroSIC-Teilnahme, Kennzeichen für CHF-Echtzeitzahlungen und QR-IID, sofern angegeben. Die Teilnahme garantiert keine erfolgreiche Überweisung.",
           "ibancom": "Von uns nicht geprüft",
           "ibanapi": "Von uns nicht geprüft",
           "libs": "Von uns nicht geprüft",
@@ -2291,23 +2291,23 @@
         },
         "compliance": {
           "label": "Compliance-Vorprüfung (Sanktionen, FATF, VoP-Pflicht)",
-          "ibanforge": "Ein Endpunkt, 0,02 $: Bankprüfung (OFAC, EU, UN), FATF-Listen, SEPA-Erreichbarkeit und VoP-Bereitschaft der Bank, Score 0–100",
+          "ibanforge": "Indikatoren zur ermittelten Bank: Sanktionen, FATF, SEPA-Daten und VoP-Teilnahme nach verfügbaren Quellen. Diese Vorprüfung prüft keinen Kontoinhaber und genehmigt keine Zahlung.",
           "ibancom": "IBAN Suite nennt die SEPA-Erreichbarkeit; Namensprüfung (BAV/VoP) als separates Produkt ab 2.000 € je 2.500 Prüfungen; Sanktionen und FATF: von uns nicht geprüft",
           "ibanapi": "Von uns nicht geprüft",
           "libs": "Von uns nicht geprüft",
           "abstract": "Nicht in der dokumentierten Antwort (nur iban und is_valid)"
         },
         "agents": {
-          "label": "KI-Agenten (MCP, autonome Zahlung)",
-          "ibanforge": "Nativer MCP-Server und x402-Zahlung pro Aufruf in USDC; dieser Zahlungsweg benötigt kein Konto.",
+          "label": "KI-Agenten und Zahlungsart",
+          "ibanforge": "Gehosteter MCP-Transport und ein konfigurierbares MCP-Paket. USDC-Zahlungen per x402 sind möglich, wenn der Client sie implementiert; die SDKs aktivieren standardmässig keinen automatischen Kauf.",
           "ibancom": "Von uns nicht geprüft",
           "ibanapi": "Von uns nicht geprüft",
           "libs": "Nein (eine Bibliothek, kein Dienst)",
           "abstract": "Von uns nicht geprüft"
         },
         "signup": {
-          "label": "Zeit bis zum ersten Aufruf",
-          "ibanforge": "Ein curl für einen kostenlosen Schlüssel — oder null Anmeldung via x402",
+          "label": "Zugang zum ersten Test",
+          "ibanforge": "Formatprüfung und Validierungstest ohne Schlüssel. Für andere Routen einen Schlüssel erstellen und aufbewahren; die Anleitung erklärt das anfängliche Kontingent und eine mögliche Adressverifizierung.",
           "ibancom": "Online-Registrierung für einen Test mit 100 Anfragen, einen Monat aktiv; Lizenzen online an der Kasse oder auf Rechnung über den Vertrieb",
           "ibanapi": "Konto anlegen",
           "libs": "npm/pip install",
@@ -2315,7 +2315,7 @@
         },
         "trust": {
           "label": "Veröffentlichte Rechts-/Ops-Unterlagen",
-          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich. Telemetrie löscht sich 30 Tage nach Ende der Kundenbeziehung selbst (DPA 4.7)",
+          "ibanforge": "Öffentliche AGB, Datenschutzerklärung, DPA, OEM-Vereinbarung und Statusseite. Aufbewahrungsfristen hängen von den Daten ab und stehen in diesen Dokumenten.",
           "ibancom": "Öffentliche Bedingungen, Datenschutzerklärung, DPA und SLA; Weitervertriebsrechte werden mit dem Anbieter vereinbart.",
           "ibanapi": "Öffentliche Bedingungen und Datenschutzerklärung; Betriebszusagen beim Anbieter prüfen.",
           "libs": "Lizenzdatei",
@@ -2335,20 +2335,20 @@
     "forWho": {
       "heading": "Wo IBANforge die starke Wahl ist",
       "items": [
-        "Pay-once-Ökonomie: Prepaid-Credits ohne Verfall statt eines Abos, das Sie amortisieren müssen.",
-        "Deutsche, österreichische, belgische, slowakische und bulgarische Bankcodes gegen das nationale Register geprüft: Eine formal korrekte IBAN, deren Bankcode niemandem zugeteilt ist, fällt vor der Zahlung auf.",
-        "Schweizer Zahlungen: jede IID des SIX BankMaster mit ihrer Teilnahme an den Zahlungsrails (SIC, euroSIC, CHF-Instant) und, sofern vorhanden, ihrer QR-IID.",
-        "Ein einziger Compliance-Triage-Aufruf vor einer Auszahlung: Sanktionsprüfung der Bank + FATF + SEPA-Erreichbarkeit + VoP-Bereitschaft + Risikoscore in einer 0,02-$-Anfrage.",
-        "KI-Agenten und Automatisierung: native MCP-Tools, maschinenlesbare 402er mit exakten Anweisungen, autonome x402-Zahlung."
+        "Unregelmässige Nutzung: Prepaid-Credits ohne Verfall, deren Einheiten Sie mit dem tatsächlichen Volumen und den verwendeten Routen vergleichen.",
+        "ERP-Importe und Lieferantendateien: einen nicht zugeteilten Bankcode von einem unbestimmten Ergebnis unterscheiden und Ausnahmen zur Prüfung behalten.",
+        "Schweizer Integrationen: SIX-Clearing-Daten und, sofern vorhanden, die Verbindung zwischen IID und QR-IID lesen.",
+        "OCR-Abläufe: die Extraktion um Format- und Bankdatenprüfungen ergänzen, ohne daraus den Kontoinhaber abzuleiten.",
+        "Automatisierung: Stapelanfragen und MCP-Werkzeuge mit ausdrücklichem Kontingent; Kaufentscheidungen bleiben in Ihrer Anwendung."
       ]
     },
     "cta": {
       "heading": "Testen Sie es mit Ihren eigenen IBANs",
-      "description": "25 kostenlose Anfragen pro Monat, ohne E-Mail und ohne Karte. Der Playground nutzt die echte API.",
+      "description": "Test ohne Schlüssel: 25 Prüfungen pro Woche auf der Validierungsroute. Der Playground nutzt die echte API; beginnen Sie mit Beispielen.",
       "getKey": "Kostenlosen Schlüssel holen",
       "playground": "Playground öffnen"
     },
-    "footnote": "Preise, Kontingente, kostenlose Angebote und die in der Tabelle genannten Leistungen am 24. September 2026 auf den öffentlichen Seiten erneut geprüft. Die Zellen zu Anmeldung und Rechtsdokumenten von IBANAPI und AbstractAPI stammen aus der ersten Prüfung am 10. September 2026. Eine stumme Seite beweist nichts: Wo wir eine Leistung nicht geprüft haben, sagt es die Tabelle. Abrechnungszeiträume und Bankdatenkontingente werden getrennt ausgewiesen. Mehrwertsteuer, Lizenzen und die beim Kauf geltenden Bedingungen bestimmt der jeweilige Anbieter.",
+    "footnote": "IBANforge-Zugangswege und Prüfumfang am 4. November 2026 geprüft. Für die Wettbewerber: Preise, Kontingente, kostenlose Angebote und die in der Tabelle genannten Leistungen am 24. September 2026 auf den öffentlichen Seiten erneut geprüft. Die Zellen zu Anmeldung und Rechtsdokumenten von IBANAPI und AbstractAPI stammen aus der ersten Prüfung am 10. September 2026. Eine stumme Seite beweist nichts: Wo wir eine Leistung nicht geprüft haben, sagt es die Tabelle. Abrechnungszeiträume und Bankdatenkontingente werden getrennt ausgewiesen. Mehrwertsteuer, Lizenzen und die beim Kauf geltenden Bedingungen bestimmt der jeweilige Anbieter.",
     "honest": {
       "heading": "Wo wir verlieren, klar gesagt",
       "items": [
@@ -2397,7 +2397,26 @@
         }
       ]
     },
-    "footnoteExtra": "Öffentliche Quellen geprüft am 24. September 2026:"
+    "footnoteExtra": "Öffentliche Quellen geprüft am 24. September 2026:",
+    "uses": {
+      "heading": "Mit Ihrem Anwendungsfall beginnen",
+      "body": "Eine formal gültige IBAN, eine identifizierte Bank und ein geprüfter Kontoinhaber sind unterschiedliche Ergebnisse. IBANforge bestätigt weder das Konto noch seinen Inhaber.",
+      "entry": {
+        "title": "Eingabe in einer Software",
+        "body": "Für Struktur und Prüfsumme allein kann eine lokale Bibliothek genügen. Wenn Sie die Bank, ihren BIC oder ein Registerergebnis benötigen, prüfen Sie die Antwortfelder der API.",
+        "link": "Eine Prüfantwort verstehen"
+      },
+      "vendors": {
+        "title": "Lieferanten importieren",
+        "body": "Erkennen Sie vor einem ERP-Import fehlende Angaben, nicht zugeteilte Bankcodes und unbestimmte Ergebnisse. Bewahren Sie Ausnahmen zur Prüfung auf, ohne eine IBAN automatisch zu ersetzen.",
+        "link": "Eine Dateiprüfung vorbereiten"
+      },
+      "automation": {
+        "title": "OCR und Automatisierung",
+        "body": "Gleichen Sie extrahierte Angaben mit den verfügbaren Bankdaten ab. Ein technisches Ergebnis beweist nicht, dass das Konto dem Lieferanten gehört; behalten Sie diese Prüfung in Ihrem Prozess.",
+        "link": "Integrationsbeispiele ansehen"
+      }
+    }
   },
   "testIban": {
     "metaTitle": "Test-IBAN-Generator — echte Bankcodes, gegen Nationalregister verifiziert",
