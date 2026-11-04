@@ -218,11 +218,16 @@ function anonymousTierDisabled(): boolean {
  * une valeur tapée ici serait une énième autorité sur un plafond, et elle
  * mentirait le jour où le palier bouge.
  */
-function shieldNotice(): string {
+function shieldNotice(tier: 'anonymous' | 'email'): string {
+  // Seul le palier anonyme peut être réclamé. Une clé email, même réduite,
+  // reçoit 409 sur ce chemin : lui indiquer son rapport d'usage à la place.
   return (
     `This key was issued with a reduced allowance of ${SHIELD_MONTHLY_LIMIT} requests this month. ` +
-    'It goes back up on its own within a few hours. To lift it to ' +
-    `${FREE_TIER_MONTHLY_LIMIT} right away, claim it: POST /v1/keys/claim.`
+    'It goes back up on its own within a few hours. ' +
+    (tier === 'anonymous'
+      ? `To lift it to ${FREE_TIER_MONTHLY_LIMIT} right away, claim it: POST /v1/keys/claim.`
+      : 'This key is already linked to an email address. ' +
+        'Check GET /v1/keys/usage for its current allowance.')
   );
 }
 
@@ -635,7 +640,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
         tier: 'anonymous',
         monthly_limit: degrade ? SHIELD_MONTHLY_LIMIT : ANONYMOUS_MONTHLY_LIMIT,
         claim_url: KEY_CLAIM_URL,
-        ...(degrade ? { notice: shieldNotice() } : {}),
+        ...(degrade ? { notice: shieldNotice('anonymous') } : {}),
         message: degrade
           ? 'Save this key - it will not be shown again.'
           : `Save this key - it will not be shown again. ${ANONYMOUS_MONTHLY_LIMIT} requests a month that are yours alone: ` +
@@ -658,7 +663,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       // n'y a rien à réclamer.
       tier: 'email',
       monthly_limit: degrade ? SHIELD_MONTHLY_LIMIT : FREE_TIER_MONTHLY_LIMIT,
-      ...(degrade ? { notice: shieldNotice() } : {}),
+      ...(degrade ? { notice: shieldNotice('email') } : {}),
       message: 'Save this key — it will not be shown again.',
       terms_url: 'https://ibanforge.com/legal/terms',
     },
