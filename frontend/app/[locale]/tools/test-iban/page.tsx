@@ -57,13 +57,20 @@ export default async function TestIbanPage({
         <pre className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm overflow-x-auto">
           <code>{curl}</code>
         </pre>
+        <p className="text-muted-foreground text-sm">{t("integrationIntro")}</p>
+        <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium">
+          <Link href={localePath(locale, '/docs/onboarding')} className="text-primary hover:underline" data-evt="cta:test-iban-integrate">
+            {t("integrationLink")} →
+          </Link>
+          <Link href={localePath(locale, '/docs/recipes')} className="text-primary hover:underline" data-evt="cta:test-iban-recipes">
+            {t("recipesLink")} →
+          </Link>
+        </div>
       </section>
 
 
-      {/* 2026-09-06: the free tool is where a developer decides; the door to
-          the free key was two clicks away in the header. */}
       <section className="flex flex-wrap items-center gap-4 rounded-md border p-4" style={{ borderColor: "var(--hairline)" }}>
-        <p className="text-sm text-muted-foreground max-w-prose">{tk("text")}</p>
+        <p className="text-sm text-muted-foreground max-w-prose">{t("keyText")}</p>
         <GetKeyButton size="sm" evt="cta:key-tool">{tk("cta")}</GetKeyButton>
       </section>
       <p className="text-xs text-muted-foreground border-t border-border pt-4">{t("disclaimer")}</p>
