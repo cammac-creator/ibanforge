@@ -2208,7 +2208,7 @@
       },
       "docs": {
         "title": "Ihre Software verbinden",
-        "body": "Folgen Sie der Anleitung für den ersten Aufruf und nutzen Sie REST oder ein verfügbares SDK. Odoo 18 setzt eigene Module voraus; die n8n-Anleitung gilt für selbst gehostete Installationen.",
+        "body": "Folgen Sie der Anleitung für den ersten Aufruf und nutzen Sie REST oder ein verfügbares SDK. Odoo 18 setzt eigene Module voraus. Der importierbare n8n-Workflow funktioniert in der Cloud und auf selbst gehosteten Instanzen; die Community-Erweiterung erfordert eine selbst gehostete Installation.",
         "link": "Zur Integrationsanleitung"
       },
       "key": {

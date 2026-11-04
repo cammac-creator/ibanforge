@@ -2208,7 +2208,7 @@
       },
       "docs": {
         "title": "Connecter votre logiciel",
-        "body": "Suivez le guide du premier appel, puis utilisez REST ou un SDK disponible. Odoo 18 exige les modules personnalisés ; le guide n8n concerne les installations auto-hébergées.",
+        "body": "Suivez le guide du premier appel, puis utilisez REST ou un SDK disponible. Odoo 18 exige les modules personnalisés. Le workflow n8n à importer fonctionne sur Cloud et en auto-hébergement ; l’extension communautaire exige une installation auto-hébergée.",
         "link": "Suivre le guide d’intégration"
       },
       "key": {
