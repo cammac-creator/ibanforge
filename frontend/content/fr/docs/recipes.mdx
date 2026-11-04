@@ -141,23 +141,36 @@ Deux IBAN représentent deux unités de quota, pas un seul appel facturé. Le ca
 
 L’essai sans clé utilise le quota REST décrit dans le [guide de démarrage](/fr/docs/onboarding), partagé par adresse réseau. Sur n8n Cloud, plusieurs utilisateurs peuvent partager une adresse ; si le quota est épuisé, configurez votre clé. [Importer un workflow](https://docs.n8n.io/workflows/export-import/) · [Paramètres HTTP Request](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/).
 
+### Revoir un lot fournisseurs avant un import ERP
+
+[Téléchargez le modèle de revue](/integrations/ibanforge-n8n-revue-cf41a091e3a7.json) pour conserver les lignes originales et obtenir un fichier JSON de constats. Il utilise des nœuds intégrés et une clé API, sans extension communautaire. Import et exécution vérifiés avec **n8n 2.46.6** ; les nœuds et les notes sont en français. L’exécution sur n8n Cloud n’a pas été essayée.
+
+1. Importez le fichier dans un nouveau workflow. Dans **Contrôler les IBAN avec la clé**, choisissez un credential **Header Auth** : `Authorization`, puis `Bearer ` suivi de votre [clé API](/fr/docs/api-keys). Ne collez pas la clé dans le workflow exporté.
+2. Exécutez les quatre lignes fictives fournies. Elles illustrent des IBAN incorrects, une ligne sans IBAN et un doublon ; elles ne représentent aucun fournisseur réel.
+3. Dans **Télécharger la revue JSON**, ouvrez la sortie **Binary**, champ `data`, pour enregistrer le fichier. Le nœud précédent montre les constats par ligne.
+4. Pour vos données, remplacez **Lignes fictives à remplacer** par une source JSON de **1 à 100 lignes**, avec une colonne `iban` de type texte. `bic` et `bank_name` sont facultatives ; les autres colonnes restent dans `original`.
+
+Les propositions restent dans `review.proposal`, séparées des valeurs d’origine. `ask_supplier` signale une anomalie précise ; `review` conserve une incertitude, un champ manquant ou un doublon ; `enrichment_proposal` contient seulement des champs proposés avec leurs références. Une banque non identifiée ne devient jamais un résultat validé. Aucun statut n’autorise un paiement.
+
+Seuls les IBAN sont envoyés à l’API. Le lot utilise [une unité de quota par IBAN](/fr/docs/iban-batch), doublons compris. Une erreur HTTP, un quota épuisé ou une réponse incohérente arrête le workflow sans nouveau fichier, sans relance ni achat automatique. Un lot sans IBAN est conservé pour revue sans appel API. Les données originales et le rapport restent dans n8n et son historique : adaptez leur conservation avant d’y placer des données réelles.
+
 ### Extension communautaire pour n8n auto-hébergé
 
-Le paquet publié [`n8n-nodes-ibanforge@0.1.1`](https://www.npmjs.com/package/n8n-nodes-ibanforge) propose la validation IBAN, la recherche BIC, le clearing suisse et les pré-contrôles de conformité au niveau bancaire. Cette recette concerne **n8n auto-hébergé**, avec un compte propriétaire ou administrateur. L'installation d'un paquet depuis npm n'est pas disponible sur n8n Cloud, qui exige une fiche vérifiée. Voir le [guide d'installation n8n](https://docs.n8n.io/integrations/community-nodes/installation-and-management/).
+Le paquet publié [`n8n-nodes-ibanforge@0.1.3`](https://www.npmjs.com/package/n8n-nodes-ibanforge) propose la validation IBAN, la recherche BIC, le clearing suisse et les pré-contrôles de conformité au niveau bancaire. Cette recette concerne **n8n auto-hébergé**, avec un compte propriétaire ou administrateur. L'installation d'un paquet depuis npm n'est pas disponible sur n8n Cloud, qui exige une fiche vérifiée. Voir le [guide d'installation n8n](https://docs.n8n.io/integrations/community-nodes/installation-and-management/).
 
-1. Ouvrez **Settings → Community nodes → Install** et saisissez `n8n-nodes-ibanforge@0.1.1`.
+1. Ouvrez **Settings → Community nodes → Install** et saisissez `n8n-nodes-ibanforge@0.1.3`.
 2. Obtenez une [clé API gratuite](/fr/docs/api-keys) (25 requêtes/mois sans e-mail, 200 après réclamation, sans carte). Dans un nouveau workflow, reliez **Manual Trigger** à **IBANforge** et collez la clé dans un identifiant **IBANforge API**.
 3. Choisissez **Validate IBAN**, saisissez l'exemple de documentation `DE89370400440532013000`, puis exécutez l'étape.
 4. Lisez le résultat JSON : `valid` doit valoir `true` pour cet exemple, `bank_code_check` décrit le résultat du registre et `bic` la banque lorsqu'elle peut être identifiée. Une opération terminée qui renvoie ces champs prouve le premier appel API ; le seul test de connexion au vert ne suffit pas.
 
-Dans la version 0.1.1, le test de connexion appelle la route publique `/v1/demo`, qui ne vérifie pas la clé. Contrôlez le résultat réel de **Validate IBAN** avant d'utiliser le workflow. Ni un format valide ni une banque identifiée ne prouvent l'existence du compte ou son appartenance à un bénéficiaire nommé.
+Dans la version 0.1.3, le test de connexion appelle la route publique `/v1/demo`, qui ne vérifie pas la clé. Contrôlez le résultat réel de **Validate IBAN** avant d'utiliser le workflow. Ni un format valide ni une banque identifiée ne prouvent l'existence du compte ou son appartenance à un bénéficiaire nommé.
 
 Pour une installation manuelle, exécutez les commandes suivantes **avec l'utilisateur du service n8n**, dans son conteneur le cas échéant, puis redémarrez n8n :
 
 ```bash
 mkdir -p ~/.n8n/nodes
 cd ~/.n8n/nodes
-npm install n8n-nodes-ibanforge@0.1.1
+npm install n8n-nodes-ibanforge@0.1.3
 ```
 
 Le nœud traite chaque élément entrant séparément ; il n'a pas d'opération batch. Une liste de 100 éléments peut donc consommer 100 requêtes. [Détails de l'installation manuelle](https://docs.n8n.io/integrations/community-nodes/installation-and-management/manual-installation/).
