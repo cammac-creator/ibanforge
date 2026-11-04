@@ -1,67 +1,69 @@
 ---
-title: "Creditor files: the seven checks to run before 14 November 2026"
-description: "From 14 November 2026 the Swiss Payment Standards require a structured or hybrid address; each bank decides what it still accepts. What a creditor file must contain, check by check, how to verify it for free in ten minutes, and what is left to do by hand."
+title: "Supplier files: seven checks before an import or payment"
+description: "Prepare a supplier-file review covering IBANs, bank references, BICs, duplicates and addresses. Separate findings, uncertainty and checks that remain with the bank."
 date: "2026-09-06"
 updated: "2026-11-04"
 faq:
-  - q: "What exactly happens on 14 November 2026?"
-    a: "The Swiss Payment Standards 2026 from SIX (Business Rules 3.3, pain.001 guidelines 2.3) come into force: a structured or hybrid address, with the town and country in their own fields. The SIC system does not validate addresses and each bank decides what it still accepts: some still accept domestic Swiss payments for now, but a SEPA or international payment without a town may be rejected (SIX, ZKB and PostFinance, read again on 28 October 2026)."
-  - q: "Is a hybrid address enough?"
-    a: "Yes, according to the SPS 2026 guidelines: town and country in their own fields, the postcode too when you have it, and at most two free lines of 70 characters for the rest. What the standards no longer allow is the whole address on a single line."
-  - q: "Swift postponed its date on 27 August 2026: can I wait?"
-    a: "The Swiss timetable remains separate: SIX maintains SPS 2026 for 14 November. On 29 October, EPC postponed setting its replacement deadline and plans to decide it by February 2027; that is not a retirement date. Swift promises an address timetable update by December at the latest. EPC, SIX and Swift sources reviewed on 4 November 2026, linked in the detailed timetable below."
-  - q: "What does the file audit cost?"
-    a: "The preview is free: the counters and twenty lines, IBANs masked. The annotated workbook costs $149 up to 5,000 lines and $349 up to 20,000, paid by card, downloadable for 24 hours."
+  - q: "Will every payment be rejected on 14 November 2026?"
+    a: "No. SPS requirements and acceptance by an individual bank are different matters. Check the payment route, standard version and your bank’s instructions. This article links to the detailed calendar."
+  - q: "Is a difference between the address country and IBAN country an error?"
+    a: "Not necessarily. A supplier may hold an account in another country. The difference is a review point, not evidence of fraud or sufficient reason to change or reject an IBAN."
+  - q: "Does the audit verify that the supplier holds the account?"
+    a: "No. It checks formats and bank reference data. Comparing a payee name with an account belongs to the verification service offered by the bank or payment service provider."
+  - q: "What is available without buying the report?"
+    a: "Finding counts and up to twenty rows with masked IBANs. The sample report is free. The audit page displays the full workbook’s price before payment."
 ---
 
-The Swiss Payment Standards maintain 14 November 2026 for structured or hybrid addresses whenever an address is provided. On [29 October, EPC postponed setting its replacement deadline](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-defers-setting-new-end-date-unstructured-address-format-until-february-2027) and plans to decide it by February 2027: that month is not a retirement date. Swift still promises an address timetable update by December at the latest. These announcements do not by themselves change the Swiss timetable. See [the sources reviewed on 4 November 2026, network by network](/blog/2026-09-02-which-date-structured-addresses).
+An ERP import, supplier-data migration or upcoming payment run is an opportunity to review bank details. The useful output is a traceable list of findings: what to ask the supplier, what to compare with a register and what to leave to the bank. A file check alone cannot guarantee payment execution.
 
-What is at stake in November is not your payment software. It is your creditor file: the spreadsheet, table or export where suppliers entered ten years ago sleep with an address on one line, a BIC copied from an invoice and sometimes an IBAN nobody ever verified. Every payment leaves with that data. Here are the seven checks to run on it, and how to run them in ten minutes.
+**Calendar reviewed on 4 November 2026.** SIX retains 14 November for SPS 2026; SIC does not validate addresses and banks may offer options outside SPS. The EPC will decide its new deadline by February 2027: that month is not a cutover date. See the [dated decisions by payment route](/blog/2026-09-02-which-date-structured-addresses) and the [SIX publication](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html).
 
-## 1. The address is structured, or at least hybrid
+## 1. Identify columns without changing values
 
-This is the rule that changes in November, and the only one that requires typing. A structured address puts every element in its field: street, number, postcode, town, country. The hybrid form, allowed by the SPS 2026 guidelines, asks for less: town and country in their fields, the postcode when you have it, and the rest on at most two free lines of 70 characters. What the standards no longer allow is the whole address on one line, "Rue du Lac 4, 1003 Lausanne" in a single column.
+Work from an export and keep the original. Keep IBANs as text; internal references let you locate the record in the ERP. Check the detected columns before interpreting the report: IBAN, BIC, name, street, building number, postcode, town and country where present.
 
-If your file has one address column, the first move is to split it in three: postcode, town, country. The street can stay as it is on a line. That split alone turns most lines hybrid.
+A missing column limits the check. Without address columns, for example, the audit has not checked the address format. A supplier name in the file is not a name confirmed by the bank.
 
-## 2. The address country is the IBAN country
+## 2. Check the IBAN structure
 
-A creditor based in Geneva with a German IBAN is not wrong in itself. But in an old file the gap almost always signals a move that was never recorded, or an account changed without the address following. The check is mechanical: the first two letters of the IBAN against the address's country field.
+Length, country format and the mod-97 checksum identify input inconsistencies. National checks may supplement the result, depending on the country and available references. Passing these checks does not establish that an account exists or identify its holder. [Read the IBAN response fields](/docs/iban-validate).
 
-## 3. The IBAN is valid, and of the right kind
+For a Swiss QR-bill, check the IBAN/reference pairing separately. The [QR-bill checker](/tools/qr-bill) examines the complete code; uploading an IBAN column to the file audit is not a complete QR-bill check.
 
-The mod-97 check digits catch the typo. They do not catch the rest: a Swiss IBAN starts with a five-digit bank code, a German one with an eight-digit Bankleitzahl, and every country has [its length and layout](/iban). In Switzerland there is also the kind: a QR-IBAN, whose bank code sits in the 30000 to 31999 range, requires a QR reference, and an ordinary IBAN forbids one. A QR reference next to an ordinary IBAN is a rejected payment.
+## 3. Read the bank-register finding
 
-## 4. The bank code exists in the register
+A bank reference can confirm the institution associated with a code. An absent code is classified as unallocated only when the consulted register supports that conclusion. A partial, unavailable or absent register does not provide the same evidence.
 
-This is the check most tools skip. The example IBAN everybody tests with, CH93 0076 2011 6238 5295 7, passes the check digits and carries a bank code SIX never allocated. The Swiss IID register, the Bundesbank's Bankleitzahl file, the Austrian and Belgian lists say whether the code exists, which institution holds it and whether it was retired. A retired code is a payment that will come back.
+Keep the source and its date. If a code is marked as retired, review the published information and ask for confirmation of the bank details. Do not automatically replace the IBAN or BIC with a successor’s details. [Reference coverage and limits](/docs/data-sources).
 
-## 5. The file's BIC is the register's, or there is none
+## 4. Compare an existing BIC without overwriting it
 
-A BIC copied from an invoice ages badly: mergers, renamings, closed branches. If your file carries one, it must be the one the register pairs with the IBAN's bank code. And if you pay in Switzerland or within SEPA you can often drop it: the IBAN is enough, and an absent BIC cannot be wrong.
+The audit compares the first eight characters of the supplied BIC with those of the reference BIC when both are available. A difference calls for review; agreement does not identify the account holder or settle every routing question.
 
-## 6. No duplicates, and the institution is known
+Keep the original value separate from any proposal. Whether a BIC is needed depends on the payment and the bank’s instructions. An empty field is not a reason to invent one.
 
-Two lines with the same IBAN is a supplier entered twice, or two suppliers sharing an account. Either way someone has to look. The same look applies to accounts held at a payment institution rather than a bank: not an anomaly, but a fact an accounts department would rather know before the transfer than after.
+## 5. Review duplicates and country differences
 
-## 7. The payee name is the legal name
+The same IBAN can appear in several records. This may reflect duplicate data or an arrangement that needs explaining; the audit does not decide which records to merge.
 
-Since 9 October 2025, euro-area banks compare the name you give with the account holder's before executing a SEPA transfer: Verification of Payee, whose rules we [described](/blog/2026-09-02-verification-of-payee-rulebook-1-1-checklist). A trade name instead of the registered name produces a warning on every payment. That check is done by the banks, not by us; but the "name" column of your file is what they will compare.
+Likewise, a supplier based in Switzerland may use an account in another country. A difference between address country and IBAN country is a review signal, **not proof of an error or fraud**. Do not change the address country to match the IBAN.
 
-## Running them in ten minutes
+## 6. Prepare addresses for the payment route
 
-Export the file as CSV or XLSX with at least an IBAN column; name, BIC and address columns are used when they exist. Drop it on the [file audit](/audit). The preview is free and immediate: the counters per finding type, twenty lines with masked IBANs, and the sentence that matters, how many payments of this file would be rejected. Every line goes through the same registers as the IBANforge API: IBAN structure and check digits, bank code against the national register, the file's BIC against the register, duplicates, address country against IBAN country, and the address against the Swiss rules when the file has address columns.
+The required format depends on the standard and message. Under SPS, when an address is supplied, town and country must be populated separately. The [address-check documentation](/docs/structured-addresses) states each rule’s scope and source.
 
-The annotated workbook, $149 up to 5,000 lines, shows every line in full with the register's bank and BIC, the detail of each finding, and a summary sheet to pass on. It stays downloadable for 24 hours.
+Splitting a free-text address requires reviewing its content. Do not infer a town or country from the IBAN. Confirm the format accepted for the relevant flow with your bank and software provider; a format finding does not predict their execution decision.
 
-If you would rather integrate it, the three routes doing this work are public: [`POST /v1/iban/validate`](/docs/iban-validate) for the IBAN and its bank code, [`POST /v1/address/check`](/docs/structured-addresses) to say, for free, whether an address passes the Swiss rules while naming the document, and [`POST /v1/ch/qr-bill/check`](/docs/swiss-qr-iban) for a whole QR-bill.
+## 7. Keep payee verification in the banking process
 
-## What is left to do by hand
+The file contains the name you entered. IBANforge does not query the account holder. The EPC’s [Verification of Payee service](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee-vop) conveys a comparison through payment service providers; possible outcomes include a match, close match, no match or an unavailable check.
 
-The audit says where the problems are; it does not fix them. Three pieces of work remain yours.
+Maintain your procedure for confirming changes to bank details. A row with no audit finding replaces neither that procedure nor your bank’s result.
 
-The addresses to split or to ask for again: for most lines, splitting postcode, town and country is enough. For the others, ask the supplier for the address now, while the question is not urgent.
+## Try the report before uploading a file
 
-The standing orders and payment templates: banks must have cleaned them up by 13 November. A template built on a QR-bill with a combined address, a form removed from the standard on 21 November 2025, will no longer be executed.
+The [audit page](/audit) offers a free sample report using fictitious data. For your CSV or Excel export, the preview shows counters and up to twenty rows with masked IBANs. It separates errors detected by the checks from warnings; it does not count certain bank rejections.
 
-The second pass: once the corrections are made, drop the file again. A clean file in September is a November without surprises.
+The full workbook preserves the columns read and adds findings, available bank references and a summary. Its price is displayed before payment. The report contains the file’s data: read the audit page’s processing and retention information before sending real data. Preparation and review depend on the file; no uniform completion time is promised.
+
+For recurring processing, the [ERP import guide](/blog/2026-09-02-missing-bank-details-before-an-erp-migration) and [batch API documentation](/docs/iban-batch) show how to keep proposals separate. After a confirmed correction, another analysis lets you compare the remaining findings. It does not turn the file into payment authorisation.

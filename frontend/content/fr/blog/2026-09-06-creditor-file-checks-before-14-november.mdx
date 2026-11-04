@@ -1,67 +1,69 @@
 ---
-title: "Fichier de créanciers : les sept contrôles à passer avant le 14 novembre 2026"
-description: "Dès le 14 novembre 2026, les Swiss Payment Standards exigent une adresse structurée ou hybride ; chaque banque décide de ce qu'elle accepte encore. Ce qu'un fichier de créanciers doit avoir, contrôle par contrôle, comment le vérifier gratuitement en dix minutes, et ce qui reste à faire à la main."
+title: "Fichier fournisseurs : sept contrôles avant un import ou un paiement"
+description: "Préparer une revue de fichier fournisseurs : IBAN, références bancaires, BIC, doublons et adresses. Distinguer les anomalies, les incertitudes et les contrôles qui restent à la banque."
 date: "2026-09-06"
 updated: "2026-11-04"
 faq:
-  - q: "Que se passe-t-il exactement le 14 novembre 2026 ?"
-    a: "Les Swiss Payment Standards 2026 de SIX (Business Rules 3.3, guidelines pain.001 2.3) entrent en vigueur : une adresse structurée ou hybride, avec la localité et le pays dans leurs propres champs. Le système SIC ne valide pas les adresses et chaque banque décide de ce qu'elle accepte encore : certaines acceptent pour un temps les paiements suisses, mais un paiement SEPA ou international sans localité peut être rejeté (SIX, ZKB et PostFinance, relus le 28 octobre 2026)."
-  - q: "Une adresse hybride suffit-elle ?"
-    a: "Oui, d'après les guidelines SPS 2026 : la localité et le pays dans leurs propres champs, le NPA aussi quand vous l'avez, et au plus deux lignes libres de 70 caractères pour le reste. Ce que les standards n'admettent plus, c'est l'adresse entière sur une seule ligne."
-  - q: "Swift a reporté sa date le 27 août 2026 : puis-je attendre ?"
-    a: "Le calendrier suisse reste distinct : SIX maintient les SPS 2026 au 14 novembre. Le 29 octobre, l’EPC a reporté la fixation de sa nouvelle échéance et prévoit de la décider d’ici février 2027 ; ce n’est pas une date de retrait. Swift annonce une mise à jour du calendrier des adresses pour décembre au plus tard. Sources EPC, SIX et Swift relues le 4 novembre 2026, liées dans le calendrier détaillé ci-dessous."
-  - q: "Combien coûte l'audit de fichier ?"
-    a: "L'aperçu est gratuit : les compteurs et vingt lignes, IBAN masqués. Le classeur annoté coûte 149 $ jusqu'à 5 000 lignes et 349 $ jusqu'à 20 000, payé par carte, téléchargeable pendant 24 heures."
+  - q: "Tous les paiements seront-ils rejetés le 14 novembre 2026 ?"
+    a: "Non. Les règles SPS et l’acceptation par chaque banque sont deux choses différentes. Il faut vérifier le circuit de paiement, la version du standard et les consignes de sa banque. Le calendrier détaillé est lié dans cet article."
+  - q: "Un pays d’adresse différent du pays de l’IBAN est-il une erreur ?"
+    a: "Pas nécessairement. Un fournisseur peut détenir un compte dans un autre pays. L’écart est un point de revue, sans preuve de fraude ni motif suffisant pour changer ou refuser un IBAN."
+  - q: "L’audit vérifie-t-il que le fournisseur détient le compte ?"
+    a: "Non. Il contrôle des formats et des références bancaires. La comparaison entre le nom du bénéficiaire et le compte relève du service de vérification du bénéficiaire proposé par la banque ou le prestataire de paiement."
+  - q: "Que peut-on voir sans acheter le rapport ?"
+    a: "Les compteurs par type de constat et jusqu’à vingt lignes avec les IBAN masqués. Le rapport d’exemple est gratuit. Le prix du classeur complet est affiché avant paiement sur la page d’audit."
 ---
 
-Les Swiss Payment Standards maintiennent le 14 novembre 2026 pour l’adresse structurée ou hybride lorsqu’une adresse est fournie. Le [29 octobre, l’EPC a reporté la fixation de sa nouvelle échéance](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-defers-setting-new-end-date-unstructured-address-format-until-february-2027) et prévoit de la décider d’ici février 2027 : ce mois n’est pas une date de retrait. Swift annonce toujours une mise à jour du calendrier des adresses pour décembre au plus tard. Ces annonces ne changent pas à elles seules le calendrier suisse. Voir [les sources relues le 4 novembre 2026, réseau par réseau](/fr/blog/2026-09-02-which-date-structured-addresses).
+Un import ERP, une reprise de fichier fournisseurs ou un prochain lot de paiements sont de bonnes occasions de revoir les coordonnées bancaires. Le résultat utile est une liste de constats traçables : quoi demander au fournisseur, quoi comparer au registre et quoi laisser à la banque. Aucun contrôle de fichier ne garantit à lui seul l’exécution d’un paiement.
 
-Ce qui se joue en novembre, ce n'est pas votre logiciel de paiement. C'est votre fichier de créanciers : le tableau, la table ou l'export dans lequel dorment des fournisseurs saisis il y a dix ans, avec une adresse sur une ligne, un BIC recopié d'une facture et parfois un IBAN qui n'a jamais été vérifié. Chaque paiement part avec ces données. Voici les sept contrôles à lui faire passer, et comment les faire passer en dix minutes.
+**Calendrier relu le 4 novembre 2026.** SIX maintient SPS 2026 au 14 novembre ; SIC ne valide pas les adresses et les banques peuvent proposer des options hors SPS. L’EPC décidera de sa nouvelle échéance d’ici février 2027 : ce mois n’est pas une date de bascule. Voir [les décisions datées par circuit](/fr/blog/2026-09-02-which-date-structured-addresses) et la [publication SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html).
 
-## 1. L'adresse est structurée, ou au moins hybride
+## 1. Identifier les colonnes sans altérer les valeurs
 
-C'est la règle qui change en novembre, et la seule qui exige du travail de saisie. Une adresse structurée met chaque élément dans son champ : rue, numéro, NPA, localité, pays. La forme hybride, admise par les guidelines SPS 2026, demande moins : la localité et le pays dans leurs champs, le NPA quand vous l'avez, et le reste sur au plus deux lignes libres de 70 caractères. Ce que les standards n'admettent plus, c'est l'adresse entière sur une seule ligne, « Rue du Lac 4, 1003 Lausanne » dans une colonne unique.
+Travaillez sur un export et gardez l’original. L’IBAN doit rester du texte ; les références internes permettent de retrouver la ligne dans l’ERP. Vérifiez les colonnes reconnues avant d’interpréter le rapport : IBAN, BIC, nom, rue, numéro, NPA, localité et pays lorsqu’elles existent.
 
-Si votre fichier n'a qu'une colonne d'adresse, le premier geste est de la découper en trois : NPA, localité, pays. La rue peut rester telle quelle sur une ligne. Ce découpage seul fait passer la plupart des lignes en hybride.
+Une colonne absente limite le contrôle. Sans colonnes d’adresse, par exemple, l’audit n’a pas vérifié la forme de l’adresse. Un nom de fournisseur présent dans le fichier ne devient pas un nom confirmé par la banque.
 
-## 2. Le pays de l'adresse est celui de l'IBAN
+## 2. Contrôler la structure de l’IBAN
 
-Un créancier domicilié à Genève avec un IBAN allemand n'est pas une erreur en soi. Mais dans un fichier ancien, l'écart signale presque toujours un déménagement non reporté ou un compte changé sans que l'adresse suive. Le contrôle est mécanique : les deux premières lettres de l'IBAN contre le champ pays de l'adresse.
+La longueur, le format du pays et la clé mod 97 détectent des incohérences de saisie. Selon le pays et les références disponibles, des contrôles nationaux peuvent compléter ce résultat. Un IBAN qui passe ces contrôles ne prouve ni l’existence du compte ni son titulaire. [Lire les champs du résultat IBAN](/fr/docs/iban-validate).
 
-## 3. L'IBAN est valide, et il est du bon type
+Pour une QR-facture suisse, le couple IBAN/référence mérite un contrôle séparé. Le [contrôle de QR-facture](/fr/tools/qr-bill) examine le code complet ; déposer seulement une colonne IBAN dans l’audit n’équivaut pas à vérifier toute la QR-facture.
 
-La clé de contrôle mod 97 attrape la faute de frappe. Elle n'attrape pas le reste : un IBAN suisse commence par un code banque de cinq chiffres, un IBAN allemand par une Bankleitzahl de huit, et chaque pays a [sa longueur et son découpage](/fr/iban). En Suisse s'ajoute le type : un QR-IBAN, dont le code banque est dans la plage 30000 à 31999, exige une référence QR, et un IBAN ordinaire l'interdit. Une référence QR dans la colonne d'un IBAN ordinaire est un paiement rejeté.
+## 3. Lire le verdict du registre bancaire
 
-## 4. Le code banque existe dans le registre
+Une référence bancaire peut confirmer l’établissement associé au code. Une absence ne devient un code non attribué que lorsque le registre consulté permet réellement cette conclusion. Un registre partiel, indisponible ou absent ne fournit pas la même preuve.
 
-C'est le contrôle que la plupart des outils ne font pas. L'IBAN d'exemple que tout le monde teste, CH93 0076 2011 6238 5295 7, passe la clé de contrôle et porte un code banque que SIX n'a jamais attribué. Le registre suisse des IID, le fichier des Bankleitzahlen de la Bundesbank, les listes autrichienne et belge disent si le code existe, à quel établissement il appartient et s'il a été retiré. Un code retiré est un paiement qui reviendra.
+Conservez la source et sa date. Si un code est signalé comme retiré, examinez les informations publiées et demandez confirmation des coordonnées : ne remplacez pas automatiquement l’IBAN ou le BIC par ceux d’un successeur. [Couverture et limites des références](/fr/docs/data-sources).
 
-## 5. Le BIC du fichier est celui du registre, ou il n'y en a pas
+## 4. Comparer un BIC existant sans le remplacer d’office
 
-Un BIC recopié d'une facture vieillit mal : fusions, changements de nom, agences fermées. Si votre fichier en porte un, il doit être celui que le registre associe au code banque de l'IBAN. Et si vous payez en Suisse ou dans SEPA, vous pouvez souvent vous en passer : l'IBAN suffit, et un BIC absent ne peut pas être faux.
+L’audit compare les huit premiers caractères du BIC fourni avec ceux du BIC issu de la référence, lorsque les deux sont disponibles. Une différence appelle une revue ; une correspondance n’établit pas le titulaire du compte et ne couvre pas toutes les questions de routage.
 
-## 6. Pas de doublon, et l'établissement est connu
+Gardez la valeur d’origine et la proposition séparées. La nécessité de fournir un BIC dépend du paiement et des consignes de la banque : un champ absent n’est pas une invitation à inventer une valeur.
 
-Deux lignes avec le même IBAN, c'est un fournisseur saisi deux fois, ou deux fournisseurs qui partagent un compte. Dans les deux cas, quelqu'un doit regarder. Le même regard vaut pour les comptes tenus chez un établissement de paiement plutôt qu'une banque : ce n'est pas une anomalie, c'est une information qu'un service comptable préfère avoir avant le virement qu'après.
+## 5. Examiner les doublons et les écarts de pays
 
-## 7. Le nom du bénéficiaire est le nom légal
+Le même IBAN peut apparaître sur plusieurs fiches. Cela peut correspondre à un doublon de données ou à une organisation à expliquer ; l’audit ne décide pas quelles fiches fusionner.
 
-Depuis le 9 octobre 2025, les banques de la zone euro comparent le nom que vous indiquez avec celui du titulaire du compte avant d'exécuter un virement SEPA : c'est la vérification du bénéficiaire, dont nous avons [décrit les règles](/fr/blog/2026-09-02-verification-of-payee-rulebook-1-1-checklist). Un nom commercial à la place de la raison sociale produit un avertissement à chaque paiement. Cette vérification est faite par les banques, pas par nous ; mais la colonne « nom » de votre fichier est ce qu'elles compareront.
+De même, un fournisseur domicilié en Suisse peut utiliser un compte dans un autre pays. Un écart entre le pays de l’adresse et celui de l’IBAN est un signal de revue, **pas une preuve d’erreur ou de fraude**. Ne changez pas le pays de l’adresse pour le faire coïncider avec l’IBAN.
 
-## Les faire passer en dix minutes
+## 6. Préparer les adresses pour le circuit utilisé
 
-Exportez le fichier en CSV ou en XLSX, avec au minimum une colonne IBAN ; les colonnes nom, BIC et adresse sont utilisées si elles existent. Déposez-le sur [l'audit de fichier](/fr/audit). L'aperçu est gratuit et immédiat : les compteurs par type de constat, vingt lignes avec leurs IBAN masqués, et la phrase qui compte, combien de paiements de ce fichier seraient rejetés. Chaque ligne passe par les mêmes registres que l'API IBANforge : structure et clé de l'IBAN, code banque contre le registre national, BIC du fichier contre le registre, doublons, pays de l'adresse contre pays de l'IBAN, et l'adresse contre les règles suisses quand le fichier a des colonnes d'adresse.
+La forme attendue dépend du standard et du message. Pour SPS, lorsqu’une adresse est fournie, localité et pays doivent être renseignés séparément. La [documentation du contrôle d’adresse](/fr/docs/structured-addresses) indique le périmètre et la source de chaque règle.
 
-Le classeur annoté, 149 $ jusqu'à 5 000 lignes, montre chaque ligne en entier avec la banque et le BIC du registre, le détail de chaque constat, et une feuille de synthèse à transmettre. Il reste téléchargeable pendant 24 heures.
+Séparer une adresse libre exige de relire son contenu. N’inventez ni localité ni pays à partir de l’IBAN. Faites confirmer par votre banque et votre logiciel le format accepté pour le flux concerné ; un constat de format ne prédit pas leur décision d’exécution.
 
-Si vous préférez l'intégrer, les trois routes qui font ce travail sont publiques : [`POST /v1/iban/validate`](/fr/docs/iban-validate) pour l'IBAN et son code banque, [`POST /v1/address/check`](/fr/docs/structured-addresses) pour dire, gratuitement, si une adresse passe les règles suisses en nommant le document, et [`POST /v1/ch/qr-bill/check`](/fr/docs/swiss-qr-iban) pour une QR-facture entière.
+## 7. Garder la vérification du bénéficiaire dans le circuit bancaire
 
-## Ce qui reste à faire à la main
+Le fichier contient le nom que vous avez saisi. IBANforge ne consulte pas le titulaire du compte. Le service [Verification of Payee de l’EPC](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee-vop) transmet une comparaison par les prestataires de paiement ; elle peut notamment être concordante, proche, différente ou impossible.
 
-L'audit dit où sont les problèmes ; il ne les corrige pas. Trois chantiers restent à vous.
+Préservez votre procédure de confirmation des changements de coordonnées. Une ligne sans constat dans l’audit ne remplace ni cette procédure ni le résultat de votre banque.
 
-Les adresses à découper ou à redemander : pour la plupart des lignes, découper NPA, localité et pays suffit. Pour les autres, demandez l'adresse au fournisseur maintenant, tant que la question n'est pas urgente.
+## Essayer le rapport avant de déposer un fichier
 
-Les ordres permanents et les modèles de paiement : les banques doivent les avoir assainis le 13 novembre. Un modèle fondé sur une QR-facture à adresse combinée, forme retirée de la norme depuis le 21 novembre 2025, ne sera plus exécuté.
+La [page d’audit](/fr/audit) présente un rapport d’exemple gratuit sur des données fictives. Pour votre export CSV ou Excel, l’aperçu montre les compteurs et jusqu’à vingt lignes avec les IBAN masqués. Il distingue les erreurs détectées par les contrôles et les avertissements ; il ne compte pas des rejets bancaires certains.
 
-La seconde passe : une fois les corrections faites, redéposez le fichier. Un fichier propre en septembre est un mois de novembre sans surprise.
+Le classeur complet conserve les colonnes lues et ajoute les constats, les références bancaires disponibles et une synthèse. Son prix est affiché avant paiement. Le rapport reprend les données du fichier : consultez les informations de traitement et de conservation sur la page d’audit avant d’envoyer des données réelles. La préparation et la revue dépendent du fichier ; aucun délai uniforme n’est promis.
+
+Pour un traitement récurrent, le [guide d’import ERP](/fr/blog/2026-09-02-missing-bank-details-before-an-erp-migration) et la [documentation de l’API par lots](/fr/docs/iban-batch) montrent comment garder les propositions à part. Après une correction confirmée, une nouvelle analyse permet de comparer les constats restants. Elle ne transforme pas le fichier en autorisation de paiement.

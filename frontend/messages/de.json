@@ -2629,8 +2629,8 @@
     }
   },
   "audit": {
-    "metaTitle": "Prüfung der Kreditorendatei: 149 $, Ergebnis sofort",
-    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 $ bis 5 000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen nach den ab 14.11.2026 geltenden Swiss Payment Standards.",
+    "metaTitle": "Lieferantendatei prüfen: kostenlose Vorschau und Bericht",
+    "metaDescription": "CSV- oder Excel-Lieferantendatei prüfen: IBAN, Bankreferenzen, BIC, Dubletten und Adressen. Kostenlose Vorschau, kostenpflichtiger Bericht. Keine Zahlungsgarantie.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
     "intro": "Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN, Bankleitzahl, Bankname und BIC, SEPA-Erreichbarkeit, Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
@@ -2753,7 +2753,7 @@
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
     },
-    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 $ für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse nach den ab 14.11.2026 geltenden Swiss Payment Standards.",
+    "ogDescription": "Unstimmigkeiten und zu prüfende Bankverbindungen in einer Lieferantendatei erkennen. Kostenlose Vorschau, danach eine kommentierte Arbeitsmappe zum angezeigten Preis. Weder Kontoinhaber noch Zahlungserfolg werden bestätigt.",
     "steps": {
       "title": "Drei Schritte, eine Datei",
       "s1t": "Datei ablegen",
@@ -2837,7 +2837,7 @@
       "q4": "Mehr als 20 000 Zeilen oder mehrere Dateien?",
       "a4": "Teilen Sie die Datei: jeder Teil ist eine eigene Prüfung zum angezeigten Preis. Für wiederkehrenden Bedarf kosten die API und ihr Batch-Endpoint pro Zeile weniger; schreiben Sie an support@ibanforge.com.",
       "q5": "Kann ich die korrigierte Datei erneut prüfen lassen?",
-      "a5": "Ja. Laden Sie sie erneut hoch: die kostenlose Vorschau sagt Ihnen, ob alles behoben ist, bevor Sie ein zweites Mal zahlen, und oft brauchen Sie das nicht."
+      "a5": "Ja. Eine erneute Analyse zeigt, welche Befunde nach Ihren Korrekturen verbleiben. Ein Ergebnis ohne Befunde bestätigt weder den Kontoinhaber noch den Zahlungserfolg. Die neue Vorschau bleibt kostenlos; eine weitere vollständige Arbeitsmappe wird gesondert gekauft."
     },
     "demo": {
       "title": "Demo: fiktive Daten",

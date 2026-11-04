@@ -2629,8 +2629,8 @@
     }
   },
   "audit": {
-    "metaTitle": "Creditor file audit: $149, result at once",
-    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then $149 up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses under the Swiss Payment Standards in force from 14.11.2026.",
+    "metaTitle": "Supplier file audit: free preview and annotated report",
+    "metaDescription": "Check a supplier CSV or Excel file: IBANs, bank references, BICs, duplicates and addresses. Free preview, paid annotated report. No payment guarantee.",
     "eyebrow": "Creditor file audit",
     "title": "Audit your creditor file before the next payment run",
     "intro": "Every row goes through the same registers the IBANforge API serves: IBAN, bank code, bank name and BIC, SEPA reach, ISO 20022 address rules. You see what to fix for free; the annotated workbook has a displayed price, paid by card, downloadable at once.",
@@ -2753,7 +2753,7 @@
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
     },
-    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then $149 for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address under the Swiss Payment Standards in force from 14.11.2026.",
+    "ogDescription": "Find inconsistencies and bank details to review in a supplier file. Free preview, then an annotated workbook at the displayed price. The check confirms neither the account holder nor payment success.",
     "steps": {
       "title": "Three steps, one file",
       "s1t": "Drop your file",
@@ -2837,7 +2837,7 @@
       "q4": "More than 20,000 rows, or several files?",
       "a4": "Split the file: each part is its own audit at the displayed price. For a recurring need, the API and its batch endpoint cost less per row; write to support@ibanforge.com.",
       "q5": "Can I re-run the corrected file?",
-      "a5": "Yes. Upload it again: the free preview tells you whether everything is fixed before you pay a second time, and often you will not need to."
+      "a5": "Yes. Another analysis lets you compare findings after your corrections. No findings does not confirm the account holder or guarantee payment success. The new preview remains free; another complete workbook is a separate purchase."
     },
     "demo": {
       "title": "Demo: fictional data",
