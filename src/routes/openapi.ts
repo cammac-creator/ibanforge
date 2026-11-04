@@ -4065,15 +4065,15 @@ const buildRawSpec = () => ({
     },
   },
   tags: [
-    { name: 'IBAN', description: 'IBAN validation endpoints (paid via x402)' },
-    { name: 'BIC', description: 'BIC/SWIFT lookup endpoints (paid via x402)' },
+    { name: 'IBAN', description: 'IBAN validation and bank references. A limited keyless trial is available on POST /v1/iban/validate only; reusable API keys or x402 provide the access documented for each operation. Validation does not confirm account existence or account-holder identity.' },
+    { name: 'BIC', description: 'BIC/SWIFT reference lookup with source provenance where available. Access with a reusable API key or x402; finding an institution does not confirm an account or its holder.' },
     {
       name: 'UK register',
       description:
         'One UK-regulated firm per request from the FCA Financial Services Register, under its written permission (paid via x402 or an API key)',
     },
-    { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
-    { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)' },
+    { name: 'Compliance', description: 'Bank-level screening and reference checks: IBAN validation, sanctions, SEPA and VoP register information, and risk indicators. Access with a reusable API key or x402. These results are not account-holder verification or a payment decision.' },
+    { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing reference lookup, including QR-IID allocation and institution-level payment-service participation. Access with a reusable API key or x402; no account or account-holder verification.' },
     {
       name: 'API Keys',
       description:
@@ -4083,7 +4083,7 @@ const buildRawSpec = () => ({
       name: 'Account',
       description: `The account page, ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a read-only session cookie that shows every key of that address. Rotating or revoking a key still takes the key itself.`,
     },
-    { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N credits; batch validation debits 1 credit per IBAN' },
+    { name: 'Credits', description: 'Prepaid credit bundles for reusable API keys, with card checkout and USDC (x402) purchase options. Keep the same key for top-ups; batch validation debits one credit per IBAN. See each operation for its access and payment requirements.' },
     { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },
     { name: 'Free', description: 'Free endpoints — no payment required' },
   ],
