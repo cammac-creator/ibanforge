@@ -2141,13 +2141,13 @@
     "deadline": {
       "badge": "Échéance",
       "title": "Adresses structurées : calendriers distincts pour la Suisse, l’EPC et Swift",
-      "body": "Vérifié le 10 septembre 2026 : SIX publie le 14 novembre 2026 comme échéance des exigences d’adresse des Swiss Payment Standards, pour les ordres de paiement du client vers sa banque. Nous n’affichons plus de compte à rebours : les autres calendriers ont bougé. Le 9 septembre, l’EPC a reporté la fin des adresses non structurées de ses cinq schémas au-delà du 15 novembre ; il prévoit de fixer la nouvelle date en octobre. Swift a aussi reporté ses changements de paiement le 27 août, avec une mise à jour pour décembre au plus tard. Les annonces de l’EPC et de Swift ne changent pas à elles seules le calendrier suisse. Continuez à préparer vos données fournisseurs selon les règles du rail utilisé.",
+      "body": "Vérifié le 4 novembre 2026 : le 29 octobre, l’EPC a reporté la fixation de sa nouvelle échéance et prévoit une décision d’ici février 2027. Février 2027 n’est pas la date de retrait des adresses non structurées. Swift annonce une mise à jour du calendrier des adresses pour décembre 2026 au plus tard. SIX maintient les Swiss Payment Standards 2026 au 14 novembre : lorsqu’une adresse est fournie, elle doit être structurée ou hybride. SIC ne valide pas les adresses et les banques peuvent proposer des options hors SPS. Ces calendriers restent distincts ; préparez vos données selon les réseaux utilisés et les exigences de votre banque.",
       "what": "Deux choses que cette API fait pour vous, déjà en production. Un contrôle de conformité gratuit vous dit, règle par règle et avec le document dont chaque règle provient, si une adresse que vous avez structurée passe sur un rail donné. Et résoudre un code de clearing ou un IBAN en BIC supprime souvent l'obligation d'adresse de l'agent : détenez le BIC, et cette branche de la règle ne s'applique plus à vous.",
       "refused": "Refusée : un pays en minuscules et pas d'élément localité",
       "accepted": "Acceptée : localité, pays et rue dans leurs propres éléments",
       "note": "Ce qu'elle ne fait pas : elle ne migre pas le carnet d'adresses de vos clients et ne transforme pas un texte libre en adresse structurée. Elle contrôle ce que vous avez structuré, gratuitement, et nomme le document derrière chaque verdict.",
       "qrTool": "Vous tenez une QR-facture ? Vérifiez si son adresse est structurée ou combinée, gratuitement.",
-      "datesLink": "Quelle est LA date ? L'état de chaque rail, avec les sources."
+      "datesLink": "Calendriers EPC, Swift et SIX : état et sources au 4 novembre 2026."
     },
     "vop": {
       "title": "Et la Verification of Payee",

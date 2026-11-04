@@ -2141,13 +2141,13 @@
     "deadline": {
       "badge": "Stichtag",
       "title": "Strukturierte Adressen: getrennte Zeitpläne für die Schweiz, EPC und Swift",
-      "body": "Geprüft am 10. September 2026: SIX nennt den 14. November 2026 als Stichtag für die Adressanforderungen der Swiss Payment Standards, für Zahlungsaufträge vom Kunden an seine Bank. Einen Countdown zeigen wir nicht mehr: Die anderen Zeitpläne haben sich verschoben. Am 9. September hat der EPC das Ende unstrukturierter Adressen in allen fünf Zahlungsschemen über den 15. November hinaus verschoben; ein neues Datum soll im Oktober festgelegt werden. Swift hat seine Zahlungsverkehrsänderungen am 27. August ebenfalls verschoben, mit einem Update spätestens im Dezember. Diese Ankündigungen ändern für sich allein den Schweizer Zeitplan nicht. Bereiten Sie Ihre Lieferantendaten weiterhin nach den Regeln des verwendeten Zahlungswegs vor.",
+      "body": "Geprüft am 4. November 2026: Am 29. Oktober hat der EPC die Festlegung des neuen Enddatums verschoben und plant eine Entscheidung bis Februar 2027. Februar 2027 ist nicht das Abschaltdatum für unstrukturierte Adressen. Swift kündigt eine Aktualisierung des Adresszeitplans bis spätestens Dezember 2026 an. SIX hält an den Swiss Payment Standards 2026 ab 14. November fest: Eine angegebene Adresse muss strukturiert oder hybrid sein. SIC validiert Adressen nicht, und Banken können Optionen ausserhalb der SPS anbieten. Die Zeitpläne bleiben getrennt; bereiten Sie Ihre Daten nach den verwendeten Zahlungswegen und den Anforderungen Ihrer Bank vor.",
       "what": "Zwei Dinge, die diese API dafür tut, beide bereits produktiv. Eine kostenlose Konformitätsprüfung sagt Ihnen Regel für Regel, mit dem Dokument, aus dem jede Regel stammt, ob eine von Ihnen strukturierte Adresse auf einer bestimmten Schiene besteht. Und das Auflösen eines Clearing-Codes oder einer IBAN in einen BIC hebt die Adresspflicht des Agenten oft ganz auf: Wer den BIC hat, für den gilt dieser Zweig der Regel nicht.",
       "refused": "Abgelehnt: Land in Kleinbuchstaben und kein Ortselement",
       "accepted": "Akzeptiert: Ort, Land und Strasse in eigenen Elementen",
       "note": "Was sie nicht tut: Sie migriert nicht das Adressbuch Ihrer Kunden und macht aus Freitext keine strukturierte Adresse. Sie prüft, was Sie strukturiert haben, kostenlos, und nennt zu jedem Urteil das Dokument dahinter.",
       "qrTool": "Sie halten eine QR-Rechnung? Prüfen Sie kostenlos, ob ihre Adresse strukturiert oder kombiniert ist.",
-      "datesLink": "Welches Datum ist DAS Datum? Der Stand jeder Schiene, mit Quellen."
+      "datesLink": "Zeitpläne von EPC, Swift und SIX: Stand und Quellen am 4. November 2026."
     },
     "vop": {
       "title": "Und Verification of Payee",
