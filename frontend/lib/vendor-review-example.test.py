@@ -16,12 +16,12 @@ FILE = Path(__file__).parents[1] / "public/examples/prepare-vendor-review-v1.py"
 spec = importlib.util.spec_from_file_location("vendor_review", FILE)
 example = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(example)
-IBAN = "DE89370400440532013000"
-OTHER = "GB29NWBK60161331926819"
+EXEMPLE_A = "DE00" + "0" * 18
+EXEMPLE_B = "GB00" + "0" * 18
 
 
-def answer(iban=IBAN):
-    # L'IBAN est un exemple public ; banque, source et fiche sont inventées.
+def answer(iban=EXEMPLE_A):
+    # Réponses simulées : numéros volontairement fictifs, banque et source inventées.
     return {"iban": iban, "valid": True, "bank_code_holder": "confirmed",
             "checks": {"bank_code": "pass", "bic": "pass", "national_check_digits": "pass"},
             "bank_code_check": {"status": "verified", "authoritative": True,
@@ -33,7 +33,7 @@ def answer(iban=IBAN):
 
 class ReviewTests(unittest.TestCase):
     def test_proposition_sans_mutation_et_sans_autorisation(self):
-        rows = [{"iban": IBAN, "reference": "alpha", "bic": "", "bank_name": "Nom conservé"}]
+        rows = [{"iban": EXEMPLE_A, "reference": "alpha", "bic": "", "bank_name": "Nom conservé"}]
         initial = deepcopy(rows)
         result = example.prepare(rows, lambda _: {"results": [answer()]})[0]
         self.assertEqual(rows, initial)
@@ -43,7 +43,7 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(result["result"]["bic"]["source"], "Registre de démonstration")
 
     def test_vide_trop_long_doublons_et_frontiere_des_lots(self):
-        rows = [{"iban": IBAN, "reference": str(i)} for i in range(101)]
+        rows = [{"iban": EXEMPLE_A, "reference": str(i)} for i in range(101)]
         rows.insert(1, {"iban": "", "reference": "vide"})
         rows.insert(10, {"iban": "X" * 65, "reference": "long"})
         calls = []
@@ -58,18 +58,18 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual([r["record"] for r in review], list(range(1, 104)))
 
     def test_reponses_courtes_longues_reordonnees_ou_mal_formees(self):
-        rows = [{"iban": IBAN}, {"iban": OTHER}]
+        rows = [{"iban": EXEMPLE_A}, {"iban": EXEMPLE_B}]
         bad = [None, {}, {"results": []}, {"results": [answer()]},
-               {"results": [answer(), answer(OTHER), answer()]},
-               {"results": [answer(OTHER), answer()]},
+               {"results": [answer(), answer(EXEMPLE_B), answer()]},
+               {"results": [answer(EXEMPLE_B), answer()]},
                {"results": [answer(), None]},
-               {"results": [{"iban": IBAN}, answer(OTHER)]}]
+               {"results": [{"iban": EXEMPLE_A}, answer(EXEMPLE_B)]}]
         for payload in bad:
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 example.prepare(rows, lambda _: payload)
 
     def test_formatage_ne_change_pas_la_correspondance(self):
-        review = example.prepare([{"iban": "de89-3704 0044 0532 0130 00"}],
+        review = example.prepare([{"iban": "de00-0000 0000 0000 0000 00"}],
                                  lambda _: {"results": [answer()]})
         self.assertEqual(review[0]["decision"], "enrichment_proposal")
 
@@ -88,7 +88,7 @@ class ReviewTests(unittest.TestCase):
             with self.subTest(block=block, changes=changes):
                 result = answer()
                 result[block].update(changes)
-                decision, _, proposal = example.classify({"iban": IBAN}, result)
+                decision, _, proposal = example.classify({"iban": EXEMPLE_A}, result)
                 self.assertEqual(decision, "review")
                 self.assertIsNone(proposal)
 
@@ -135,7 +135,7 @@ class ReviewTests(unittest.TestCase):
     def test_cli_ecrit_un_rapport_relisible_et_conserve_la_source(self):
         with tempfile.TemporaryDirectory() as directory:
             source, output = Path(directory) / "source.csv", Path(directory) / "review.json"
-            content = f"iban,reference\n{IBAN},alpha\n,beta\n"
+            content = f"iban,reference\n{EXEMPLE_A},alpha\n,beta\n"
             source.write_text(content)
             code, calls, stdout, stderr = self.invoke(source, output, lambda *_: {"results": [answer()]})
             self.assertEqual((code, calls, stderr), (0, 1, ""))
@@ -143,14 +143,14 @@ class ReviewTests(unittest.TestCase):
             self.assertFalse(report["payment_authorized"])
             self.assertEqual(len(report["rows"]), 2)
             self.assertEqual(source.read_text(), content)
-            self.assertNotIn(IBAN, stdout)
+            self.assertNotIn(EXEMPLE_A, stdout)
             self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
             self.assertEqual(self.invoke(source, output, lambda *_: self.fail("Appel inattendu"))[:2], (1, 0))
 
     def test_cli_aucune_sortie_partielle_ni_relance_apres_echec(self):
         with tempfile.TemporaryDirectory() as directory:
             source, output = Path(directory) / "source.csv", Path(directory) / "review.json"
-            source.write_text("iban\n" + (IBAN + "\n") * 101)
+            source.write_text("iban\n" + (EXEMPLE_A + "\n") * 101)
             calls = []
             def fetch(ibans, _key):
                 calls.append(ibans)
@@ -174,10 +174,10 @@ class ReviewTests(unittest.TestCase):
         stream = io.BytesIO(b'{"results": []}')
         with patch.object(example, "build_opener") as opener:
             opener.return_value.open.return_value = stream
-            self.assertEqual(example.call_api([IBAN], "cle-fictive"), {"results": []})
+            self.assertEqual(example.call_api([EXEMPLE_A], "cle-fictive"), {"results": []})
             request = opener.return_value.open.call_args.args[0]
             self.assertEqual(request.full_url, example.API)
-            self.assertEqual(json.loads(request.data), {"ibans": [IBAN]})
+            self.assertEqual(json.loads(request.data), {"ibans": [EXEMPLE_A]})
             self.assertEqual(request.get_header("Authorization"), "Bearer cle-fictive")
             self.assertEqual(opener.return_value.open.call_args.kwargs["timeout"], 30)
             handler = opener.call_args.args[0]
